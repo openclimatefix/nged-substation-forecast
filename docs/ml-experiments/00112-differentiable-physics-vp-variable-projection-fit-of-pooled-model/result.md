@@ -305,7 +305,9 @@ network-on fit fails even on noise-free data.
 - **Handoff.** C1v's interval does not lie wholly above +0.10, so by the plan the pooled neural
   model continues and a later experiment compares VP-P against the per-substation model. The fitter
   option `fitter="vp"` stays off by default. The advice to compare fitting methods with the network
-  off departs from that handoff and is for the maintainer to rule on.
+  off departs from that handoff and is advice only. It departs from that handoff because with the network on the exact fit
+  could not recover heating even from noise-free data, and the network-off fit matched the
+  gradient fit.
 - **Audit triggers that fired, and their triage.** Trigger 1 (a control failed): the gate failed.
   Trigger 2 (the result contradicts its prediction): V1 is positive where -0.15 to -0.45 was
   predicted. Trigger 5 (a nested model beats the larger one): VP-P-nonet beats VP-P by 2.183. Trigger
@@ -333,11 +335,12 @@ network-on fit fails even on noise-free data.
   not VP-P itself. The ladder prediction (L1 against G-all by the 0.25-point gap) is also not
   evaluated cleanly, because L1 changes the objective.
 - **Not built:** VP-P-pin, the equivalence ladder's L2, batching of copies, the ladder, threshold
-  profile, and tails figures, and the substation cards. The series rule asks for cards that let the
-  maintainer check each fit is sane. Cards were skipped because none of the fitted thresholds is
-  interpretable at real noise levels; a card, if built, would carry the line "weakly identified at
-  real noise levels (experiment 112); compare across substations with care", and the skip is for
-  the manager to rule on. Figure 4 shows VP-P-nonet and G-2y in place of the plan's VP-S.
+  profile, and tails figures, and the substation cards. The series rule asks for cards
+  that let the maintainer check each fit is sane. The fit's weights are blown up (last-layer norm
+  270, largest harmonic coefficient 37, largest holiday coefficient 54), so a card would show
+  unreliable values, and the manager waived the cards for this page once. Cards for the repaired
+  fit are owed. A card, when built, will carry the line "weakly identified at real noise levels
+  (experiment 112); compare across substations with care". Figure 4 shows VP-P-nonet and G-2y in place of the plan's VP-S.
 
 ## Caveats
 
