@@ -22,7 +22,7 @@ from studies.dp_features import FeatureCache
 from studies.dp_gam import TrainingWindow, training_rows
 from studies.dp_pooled_vp import VpSettings
 
-STAGES: Final[tuple[str, ...]] = ("sigma", "pooled", "per_site", "adam_same")
+STAGES: Final[tuple[str, ...]] = ("sigma", "pooled", "per_site", "adam_same", "nonet")
 MIN_SITE_ROWS: Final[int] = 1440
 """A substation with fewer training rows than this (30 days) has no per-site fit at the cut."""
 EARLIEST_ROW: Final[datetime] = datetime(2021, 7, 1, tzinfo=UTC)
@@ -124,6 +124,22 @@ def stage_per_site(*, cache: FeatureCache, cut: datetime) -> None:
             )
 
 
+def stage_nonet(*, cache: FeatureCache, cut: datetime) -> None:
+    """Fit VP-P-nonet, the pooled VP model without the network (post hoc, both starts)."""
+    batch = pool_batch(cache=cache, sites=common.POOL, cut=cut)
+    settings = common.vp_settings(cut=cut, round_name="round2")
+    for start in common.STARTS:
+        vp.fit_cached(
+            name=f"vp_p_nonet_{start}",
+            cut=cut,
+            batch=batch,
+            settings=settings,
+            start=start,
+            fallback_steps=common.FALLBACK_STEPS_SECONDARY,
+            network=False,
+        )
+
+
 def stage_adam_same(*, cache: FeatureCache, cut: datetime) -> None:
     """Fit P-map-same and P-map-polish; record both objectives, in nats, on the VP objective."""
     batch = pool_batch(cache=cache, sites=common.POOL, cut=cut)
@@ -160,6 +176,7 @@ def main() -> None:
         "pooled": stage_pooled,
         "per_site": stage_per_site,
         "adam_same": stage_adam_same,
+        "nonet": stage_nonet,
     }
     for stage in STAGES:
         if stage in arguments.stages:

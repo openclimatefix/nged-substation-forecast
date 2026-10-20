@@ -73,7 +73,7 @@ def lower_objective_start(*, names: dict[str, str], cut: datetime) -> str:
 
 
 def pooled_forecasts(
-    *, cache: FeatureCache, name: str, start: str | None, year: str
+    *, cache: FeatureCache, name: str, start: str | None, year: str, network: bool = True
 ) -> dict[str, gradient.SiteForecast]:
     """Return a pooled arm's forecasts of every reported substation.
 
@@ -82,6 +82,7 @@ def pooled_forecasts(
         name: The stored fit's name at each cut (`{name}` for `start=None`, else `{name}_{start}`).
         start: The start to use, or `None` for a fit that has none (P-map-same).
         year: `rep` or `scored`.
+        network: False loads a fit made without the interaction network.
 
     Returns:
         A forecast per substation.
@@ -90,8 +91,8 @@ def pooled_forecasts(
     fit_name = name if start is None else f"{name}_{start}"
     train = vp_train(cache=cache, cut=cut)
     train_r = vp_train(cache=cache, cut=cut_r)
-    model = vp.load_fit(name=fit_name, cut=cut, batch=train)
-    model_r = vp.load_fit(name=fit_name, cut=cut_r, batch=train_r)
+    model = vp.load_fit(name=fit_name, cut=cut, batch=train, network=network)
+    model_r = vp.load_fit(name=fit_name, cut=cut_r, batch=train_r, network=network)
     score = gradient.remap_sites(
         batch=score_batch(cache=cache, sites=common.REPORT_SITES, cut=cut, through=through),
         model_sites=common.POOL,
@@ -199,6 +200,27 @@ def run_year(*, cache: FeatureCache, year: str) -> None:
         name=f"vp_s{tag}",
         forecasts=per_site_forecasts(cache=cache, name_prefix="vp_s", year=year, start=None),
     )
+    if all(vp.has_fit(name=f"vp_p_nonet_{s}", cut=cut) for s in common.STARTS):
+        nonet_names = {s: f"vp_p_nonet_{s}" for s in common.STARTS}
+        for start in common.STARTS:
+            store(
+                cache=cache,
+                name=f"vp_p_nonet_{start}{tag}",
+                forecasts=pooled_forecasts(
+                    cache=cache, name="vp_p_nonet", start=start, year=year, network=False
+                ),
+            )
+        store(
+            cache=cache,
+            name=f"vp_p_nonet{tag}",
+            forecasts=pooled_forecasts(
+                cache=cache,
+                name="vp_p_nonet",
+                start=lower_objective_start(names=nonet_names, cut=cut),
+                year=year,
+                network=False,
+            ),
+        )
     for same in ("p_map_same", "p_map_polish"):
         store(
             cache=cache,

@@ -42,11 +42,12 @@ RECORDS_PATH: Final[Path] = common.WORK_DIR / "fit_records.json"
 DEVICE: Final[str] = "cuda"
 
 
-def model_config(*, shapes: int | None = None) -> DpConfig:
+def model_config(*, shapes: int | None = None, network: bool = True) -> DpConfig:
     """Return the pooled configuration of every VP arm: P-map's MAP prior, K shapes, the network.
 
     Args:
         shapes: The number of shared daily shapes; `None` takes experiment 105's tuned K.
+        network: False builds the model without the interaction network (VP-P-nonet).
 
     Returns:
         The configuration.
@@ -54,18 +55,21 @@ def model_config(*, shapes: int | None = None) -> DpConfig:
     tuned = common.tuned()
     return DpConfig(
         shared_shapes=int(tuned["k"]) if shapes is None else shapes,
-        interaction_hidden=common.INTERACTION,
+        interaction_hidden=common.INTERACTION if network else (),
         population_scales=PopulationScales(deviation=tuned["map_deviation"]),
     )
 
 
-def new_model(*, batch: PooledBatch, start: str, shapes: int | None = None) -> PooledDemandModel:
+def new_model(
+    *, batch: PooledBatch, start: str, shapes: int | None = None, network: bool = True
+) -> PooledDemandModel:
     """Return a fresh pooled model for `batch`, on the batch's device in float64.
 
     Args:
         batch: The training rows, which give the site and season-year layout.
         start: `s0` (seed 0, the default thresholds) or `s1` (seed 1, thresholds at 17 degrees).
         shapes: The number of shared daily shapes; `None` takes experiment 105's tuned K.
+        network: False builds the model without the interaction network.
 
     Returns:
         The model, with the MVA operator frozen at zero reactive power.
@@ -78,7 +82,7 @@ def new_model(*, batch: PooledBatch, start: str, shapes: int | None = None) -> P
         raise ValueError(msg)
     torch.manual_seed(0 if start == "s0" else 1)
     model = PooledDemandModel(
-        config=model_config(shapes=shapes),
+        config=model_config(shapes=shapes, network=network),
         n_sites=len(batch.site_labels),
         n_season_years=batch.n_season_years,
         initial_level=torch.full((len(batch.site_labels),), 50.0),
@@ -126,6 +130,7 @@ def load_fit(
     start: str = "s0",
     prepare: Callable[[PooledDemandModel], None] | None = None,
     shapes: int | None = None,
+    network: bool = True,
 ) -> PooledDemandModel:
     """Load a saved fit into a fresh model built for `batch`.
 
@@ -137,11 +142,12 @@ def load_fit(
         prepare: Called on the new model before the state is loaded; it sets what the state needs
             to fit (a capacity override).
         shapes: The number of shared daily shapes of the fit.
+        network: Whether the fit has the interaction network.
 
     Returns:
         The model.
     """
-    model = new_model(batch=batch, start=start, shapes=shapes)
+    model = new_model(batch=batch, start=start, shapes=shapes, network=network)
     if prepare is not None:
         prepare(model)
     model.load_state_dict(torch.load(model_path(name=name, cut=cut), map_location=batch.y.device))
@@ -159,6 +165,7 @@ def fit_cached(
     init_state: dict | None = None,
     prepare: Callable[[PooledDemandModel], None] | None = None,
     shapes: int | None = None,
+    network: bool = True,
 ) -> tuple[PooledDemandModel, dict]:
     """Fit a pooled VP model, or load it if its fit is saved already; return it and its record.
 
@@ -173,16 +180,23 @@ def fit_cached(
             Adam warm start is skipped then. A fit that must not see other rows starts cold.
         prepare: Called on the new model before anything else (a start, or a capacity override).
         shapes: The number of shared daily shapes; `None` takes experiment 105's tuned K.
+        network: False fits the model without the interaction network.
 
     Returns:
         The model and the fit's record.
     """
     if has_fit(name=name, cut=cut):
         model = load_fit(
-            name=name, cut=cut, batch=batch, start=start, prepare=prepare, shapes=shapes
+            name=name,
+            cut=cut,
+            batch=batch,
+            start=start,
+            prepare=prepare,
+            shapes=shapes,
+            network=network,
         )
         return model, read_record(name=name, cut=cut)
-    model = new_model(batch=batch, start=start, shapes=shapes)
+    model = new_model(batch=batch, start=start, shapes=shapes, network=network)
     if prepare is not None:
         prepare(model)
     if init_state is not None:
