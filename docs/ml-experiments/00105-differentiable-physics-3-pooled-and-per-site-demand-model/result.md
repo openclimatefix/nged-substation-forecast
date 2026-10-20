@@ -52,6 +52,11 @@ advice:
     a per-site model (six substations), while full history scored 3.42 against 3.04 (five
     substations) (C1, C2).
   - >-
+    Prefer a convex partially pooled model to the neural pooled model for onboarding, since it came
+    within 0.2 points at 4 weeks and 0.12 better at 3 months on six held-out substations while
+    losing only 0.03 at full history against 0.385 here (experiment 109, gate not yet passed; post
+    hoc).
+  - >-
     Do not read the pooled model's PV capacity as a measurement: it differs by up to 20 points of
     capacity between starts and with the network off, a capacity prior cannot hold it, and fixing
     the capacities at the convex values gives a lower training loss than the free fit (capacity
@@ -78,9 +83,15 @@ forecasts a substation with 2 years of history worse than a model fitted to that
 alone.** By the series' pre-registered success rule (C2 or C3 supported, and C1 passing), pooling is
 **not yet a success**, because C1 is refuted. The practical finding beside it, chosen after seeing
 the results, is that the pooled model is much better than every per-site model fitted to the same 4
-weeks or 3 months, a per-site convex model included, and worse at full history. The page is
-provisional: it is a first screening run on past weather, and one of the four known-answer checks
-(gate test 2, the injected-farm recovery) failed, which caps the verdict at `inconclusive`.
+weeks or 3 months, a per-site convex model included, and worse at full history. Post hoc, a convex
+partially pooled model ([experiment
+109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md), whose own
+known-answer test is not yet passed) gets about the same onboarding gain on the six held-out
+substations (4.17 against 4.04 at 4 weeks, and 4.06 against 4.16 at 3 months) without the
+full-history loss (+0.03 against +0.385 here), which suggests the loss came largely from the neural
+fit. The page is provisional: it is a first screening run on past weather, and one of the four
+known-answer checks (gate test 2, the injected-farm recovery) failed, which caps the verdict at
+`inconclusive`.
 
 We asked whether one model for many substations (the "pooled" model) forecasts a substation as well
 as a model fitted to that substation alone (the "per-site" model), and forecasts a new or
