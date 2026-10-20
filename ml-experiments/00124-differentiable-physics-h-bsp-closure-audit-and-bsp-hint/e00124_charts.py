@@ -131,7 +131,10 @@ def figure_tradeoff() -> None:
     )
     chart = alt.vconcat(top, bottom).properties(
         title=_title(
-            text=("The BSP hint cuts damage by 41% but costs 2.4 points or more of clean accuracy"),
+            text=(
+                "The BSP reading cuts damage from injected errors but makes clean forecasts at "
+                "least 2.3 points worse"
+            ),
             subtitle=(
                 "Pilot BSP with 2 MW and 4 MVA Primaries; frozen fits scored by mean absolute "
                 "error "
@@ -221,7 +224,8 @@ def figure_coefficients() -> None:
             subtitle=(
                 "Closure audit fitted on rows before each cut. Dot: fitted coefficient. Line: 80% "
                 "interval from resampling whole months. Dashed line: 1, the value the joint model "
-                "fixes. A panel without a cut has fewer than one year of complete rows there."
+                "fixes. The first panel is the BSP that does not close (an 11-point residual). "
+                "A cut without a dot has fewer than one year of complete rows."
             ),
         )
     )
