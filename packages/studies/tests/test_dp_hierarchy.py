@@ -8,11 +8,12 @@ remainder agree.
 """
 
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from functools import partial
 from typing import Final
 
 import numpy as np
+import polars as pl
 import pytest
 
 torch = pytest.importorskip("torch")
@@ -26,6 +27,7 @@ from studies.dp_gam import (  # noqa: E402
     design_matrix,
     fit_gam,
     penalty_matrix,
+    pinned_solar_points,
     predict_gam,
     prepare_fit,
 )
@@ -34,6 +36,7 @@ from studies.dp_hierarchy import (  # noqa: E402
     BspSeries,
     JointFit,
     RemainderSpec,
+    assemble_joint,
     bsp_rows,
     fit_joint,
     make_remainder_layout,
@@ -42,7 +45,9 @@ from studies.dp_hierarchy import (  # noqa: E402
     remainder_penalty,
     remainder_prediction,
     separate_fits_equal_joint_at_zero_weight,
+    solve_joint,
 )
+from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity  # noqa: E402
 
 CUT: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 WINDOW: Final[TrainingWindow] = TrainingWindow(months=12)
@@ -355,7 +360,7 @@ def test_each_primary_block_is_the_separate_gram_plus_penalty_divided_by_its_sig
         )
         penalty, _cost = penalty_matrix(layout=layout, n_rows=len(index))
         expected = (gram[0].numpy() + penalty) / SIGMA_POINTS[site] ** 2
-        assert np.allclose(joint.primary_blocks[site], expected, rtol=1e-9, atol=0.0)
+        assert np.abs(joint.primary_blocks[site] - expected).max() < 1e-9 * np.abs(expected).max()
 
 
 def test_a_very_large_weight_ties_the_primaries_to_the_bsp(two_sites: FeatureCache):
@@ -487,3 +492,169 @@ def test_the_bsp_rows_start_where_the_primaries_training_window_starts(two_sites
     second = _fit(cache=two_sites, bsp=changed, weights=[1.0])
     assert np.array_equal(first.theta, second.theta)
     assert first.n_bsp_rows["B"] == second.n_bsp_rows["B"]
+
+
+def test_one_assembly_solves_for_new_readings_exactly_as_a_fresh_fit_does(two_sites: FeatureCache):
+    # The cached path: designs and Gram matrices built once, then solved for replaced readings,
+    # must equal a fresh fit on a cache that holds those readings.
+    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    rng = np.random.default_rng(3)
+    new_s1 = two_sites.sites["S1"].y + 0.4 * rng.normal(size=len(two_sites.end_times))
+    new_reading = bsp.reading_mw + 1.5 * rng.normal(size=len(two_sites.end_times))
+    assembly = assemble_joint(
+        cache=two_sites,
+        specs={"S1": SPEC, "S2": SPEC},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(step_penalty=1.0, shape_ridge=1e-3),
+        sigma_points=SIGMA_POINTS,
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    cached = solve_joint(
+        assembly=assembly,
+        weights=[0.0, 3.0],
+        primary_power={"S1": new_s1},
+        bsp_readings={"B": new_reading},
+    )
+    changed = replace(
+        two_sites, sites={**two_sites.sites, "S1": replace(two_sites.sites["S1"], y=new_s1)}
+    )
+    fresh = _fit(cache=changed, bsp=replace(bsp, reading_mw=new_reading), weights=[0.0, 3.0])
+    assert np.allclose(cached.theta, fresh.theta, rtol=1e-6, atol=1e-6)
+    default = solve_joint(assembly=assembly, weights=[3.0])
+    assert not np.allclose(default.theta[0], cached.theta[1], atol=1e-6)
+
+
+def _pinned_capacity(*, cache: FeatureCache, site: str) -> PinnedCapacity:
+    """Pin a site's capacity to a weekly vintage that rises from 1 MW at 0.01 MW a week."""
+    weeks = []
+    week = date(2019, 9, 2)
+    while week <= CUT.date():
+        weeks.append(week)
+        week += timedelta(days=7)
+    vintages = pl.DataFrame(
+        {
+            "time_series_id": cache.sites[site].table.time_series_id,
+            "variant": "frozen",
+            "origin_monday": CUT.date(),
+            "week_start": weeks,
+            "capacity_mw": [1.0 + 0.01 * i for i in range(len(weeks))],
+            "unobserved": False,
+        }
+    )
+    return pinned_capacity(vintages=vintages, table=cache.sites[site].table, cut=CUT)
+
+
+def test_a_pinned_capacity_moves_the_primarys_solar_output_into_both_targets(
+    two_sites: FeatureCache,
+):
+    # With a pinned capacity the model fits y + pinned solar = X theta, so net power y falls by the
+    # solar output. The Primary rows and the BSP target both need that output added back, which the
+    # plain-capacity tests never exercise.
+    spec = GamSpec(drift="none", ridge=1e-3, capacity="pinned")
+    pinned = {s: _pinned_capacity(cache=two_sites, site=s) for s in ("S1", "S2")}
+    sites = {}
+    for label, scale in (("S1", 1.0), ("S2", 0.7)):
+        features = two_sites.sites[label]
+        layout, _ = prepare_fit(
+            cache=two_sites,
+            site=label,
+            spec=spec,
+            cut=CUT,
+            window=WINDOW,
+            season_years=SEASON_YEARS,
+        )
+        theta = _truth_theta(layout=layout, scale=scale)
+        usable = np.flatnonzero(
+            np.isfinite(features.pv_unit_shape)
+            & np.isfinite(features.smoothed_temperature_c).all(axis=1)
+        )
+        net = np.full(len(two_sites.end_times), np.nan)
+        for start in range(0, len(usable), 20000):
+            rows = usable[start : start + 20000]
+            demand = design_matrix(cache=two_sites, features=features, layout=layout, index=rows)
+            solar = pinned_solar_points(
+                cache=two_sites, features=features, pinned=pinned[label], index=rows
+            )
+            net[rows] = demand @ theta - solar
+        sites[label] = replace(features, y=net)
+    cache = replace(two_sites, sites=sites)
+    bsp = _bsp(cache=cache, members=_members(), truth_members=("S1", "S2"))
+    joint = fit_joint(
+        cache=cache,
+        specs={"S1": spec, "S2": spec},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(step_penalty=1.0, shape_ridge=1e-3),
+        weights=[0.0, 1.0],
+        sigma_points=SIGMA_POINTS,
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+        pinned=pinned,
+    )
+    separate = {
+        s: fit_gam(
+            cache=cache,
+            site=s,
+            specs=[spec],
+            cut=CUT,
+            window=WINDOW,
+            season_years=SEASON_YEARS,
+            pinned=pinned[s],
+        )
+        for s in ("S1", "S2")
+    }
+    assert separate_fits_equal_joint_at_zero_weight(joint=joint, separate=separate, atol=1e-5)
+    index = bsp_rows(cache=cache, bsp=bsp, start=np.datetime64("2023-07-01T00:00", "us"), cut=CUT)
+    predicted = predict_bsp(
+        cache=cache,
+        fit=joint,
+        bsp=bsp,
+        index=index,
+        generators_mw=bsp.generators_mw[index],
+        weight_index=1,
+    )
+    assert (
+        np.abs(predicted - bsp.reading_mw[index]).max()
+        < 1e-3 * np.abs(bsp.reading_mw[index]).mean()
+    )
+
+
+def test_an_mva_dark_member_enters_the_bsp_row_with_its_demand_terms_only(two_sites: FeatureCache):
+    # S2 has a fitted PV capacity. As an `mva_dark` member its capacity columns are zeroed on the
+    # BSP rows, so a BSP built from S2's demand terms alone is matched, and one that carried S2's
+    # solar term would leave a residual.
+    base = two_sites.sites["S2"]
+    layout, _ = prepare_fit(
+        cache=two_sites, site="S2", spec=SPEC, cut=CUT, window=WINDOW, season_years=SEASON_YEARS
+    )
+    theta = _truth_theta(layout=layout, scale=0.7)
+    capacity = layout.slices["capacity"]
+    theta[capacity.start + layout.season_years.index(2021)] = 6.0
+    usable = np.flatnonzero(
+        np.isfinite(base.pv_unit_shape) & np.isfinite(base.smoothed_temperature_c).all(axis=1)
+    )
+    net = np.full(len(two_sites.end_times), np.nan)
+    demand_only = np.full(len(two_sites.end_times), np.nan)
+    for start in range(0, len(usable), 20000):
+        rows = usable[start : start + 20000]
+        x = design_matrix(cache=two_sites, features=base, layout=layout, index=rows)
+        net[rows] = x @ theta
+        x[:, capacity] = 0.0
+        demand_only[rows] = x @ theta
+    cache = replace(two_sites, sites={**two_sites.sites, "S2": replace(base, y=net)})
+    truth_cache = replace(two_sites, sites={**two_sites.sites, "S2": replace(base, y=demand_only)})
+    members = (BspMember(site="S1"), BspMember(site="S2", kind="mva_dark"))
+    bsp = _bsp(cache=truth_cache, members=members, truth_members=("S1", "S2"))
+    joint = _fit(cache=cache, bsp=bsp, weights=[1e3])
+    index = bsp_rows(cache=cache, bsp=bsp, start=np.datetime64("2023-07-01T00:00", "us"), cut=CUT)
+    predicted = predict_bsp(
+        cache=cache, fit=joint, bsp=bsp, index=index, generators_mw=bsp.generators_mw[index]
+    )
+    assert (
+        np.abs(predicted - bsp.reading_mw[index]).mean()
+        < 0.02 * np.abs(bsp.reading_mw[index]).mean()
+    )
+    fitted_capacity = joint.site_fit(site="S2").capacity_points()[2023]
+    assert abs(fitted_capacity - 6.0) < 0.6

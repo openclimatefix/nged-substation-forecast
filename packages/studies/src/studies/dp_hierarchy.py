@@ -42,7 +42,7 @@ apparent power hides the sign in daylight; its embedded PV joins the remainder's
 BSP rows are cut by the same rule and checked with `dp_gam.assert_no_lookahead`.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Final, Literal
@@ -60,7 +60,6 @@ from studies.dp_gam import (
     GamLayout,
     GamSpec,
     TrainingWindow,
-    accumulate_gram,
     assert_before_holdout,
     assert_no_lookahead,
     design_matrix,
@@ -413,16 +412,64 @@ def _member_design(
 
 
 @dataclass
-class _Normal:
-    """The pieces of the normal equations that do and do not depend on the BSP weight."""
+class JointAssembly:
+    """The designs and Gram matrices of one cut, built once and solved for any targets and weights.
 
+    A synthetic system or an injected error changes the readings and leaves the designs alone, so
+    the expensive part of a fit (the designs and their Gram matrices) is shared by every system,
+    injection, and weight, and `solve_joint` only recomputes the right-hand sides.
+
+    Attributes:
+        cache: The feature cache the designs were built from.
+        sites: The Primaries in column order.
+        bsps: The BSPs.
+        cut: The cut; every row ends no later.
+        layouts: Each Primary's layout.
+        indices: Each Primary's training rows.
+        offsets: Each Primary's columns.
+        sigma_points: Each Primary's sigma in points.
+        pinned: Each Primary's pinned capacity, or `None`.
+        remainder_layouts: Each BSP's remainder layout.
+        remainder_offsets: Each BSP's remainder columns.
+        bsp_indices: Each BSP's training rows.
+        bsp_columns: The columns each BSP's rows touch.
+        site_designs: Each Primary's design at its training rows, shape (n_i, p_i).
+        site_target_offsets: Each Primary's pinned solar output at its rows, added to its target.
+        bsp_designs: Each BSP's stacked design at its rows (member columns, then remainder).
+        bsp_target_offsets: Each BSP's generators plus its members' pinned solar at its rows.
+        base: The Primary blocks of the matrix, scaled by 1 / sigma_i^2, plus the remainder ridge.
+        base_cost: The Primaries' linear costs.
+        hint: The BSP term of the matrix per unit weight (Gram matrices and remainder penalties).
+        hint_cost: The remainder's linear costs per unit weight.
+        constrained: True for the columns that must be non-negative.
+        device: Where the tensors live.
+        dtype: Their floating-point type.
+    """
+
+    cache: FeatureCache
+    sites: tuple[str, ...]
+    bsps: tuple[BspSeries, ...]
+    cut: datetime
+    layouts: dict[str, GamLayout]
+    indices: dict[str, np.ndarray]
+    offsets: dict[str, slice]
+    sigma_points: dict[str, float]
+    pinned: dict[str, PinnedCapacity | None]
+    remainder_layouts: dict[str, RemainderLayout]
+    remainder_offsets: dict[str, slice]
+    bsp_indices: dict[str, np.ndarray]
+    bsp_columns: dict[str, torch.Tensor]
+    site_designs: dict[str, torch.Tensor]
+    site_target_offsets: dict[str, np.ndarray]
+    bsp_designs: dict[str, torch.Tensor]
+    bsp_target_offsets: dict[str, np.ndarray]
     base: torch.Tensor
-    base_rhs: torch.Tensor
     base_cost: torch.Tensor
     hint: torch.Tensor
-    hint_rhs: torch.Tensor
     hint_cost: torch.Tensor
     constrained: np.ndarray
+    device: torch.device | str
+    dtype: torch.dtype
 
 
 def _check_members(
@@ -448,101 +495,28 @@ def _check_members(
     return tuple(owners)
 
 
-def _add_primary_blocks(
+def _stack_designs(
     *,
-    cache: FeatureCache,
-    normal: _Normal,
-    layouts: Mapping[str, GamLayout],
-    indices: Mapping[str, np.ndarray],
-    offsets: Mapping[str, slice],
-    sigma_points: Mapping[str, float],
-    pinned: Mapping[str, PinnedCapacity | None],
+    rows: np.ndarray,
+    build: Callable[[np.ndarray], np.ndarray],
     device: torch.device | str,
     dtype: torch.dtype,
-) -> None:
-    """Add each Primary's scaled Gram matrix, penalties, and constraints to `normal`."""
-    for site, layout in layouts.items():
-        gram, rhs = accumulate_gram(
-            cache=cache,
-            features=cache.sites[site],
-            layout=layout,
-            index=indices[site],
-            device=device,
-            dtype=dtype,
-            pinned=pinned.get(site),
-        )
-        penalty, cost = penalty_matrix(layout=layout, n_rows=len(indices[site]))
-        scale = 1.0 / sigma_points[site] ** 2
-        block = offsets[site]
-        normal.base[block, block] = scale * (
-            gram[0] + torch.as_tensor(penalty, dtype=dtype, device=device)
-        )
-        normal.base_rhs[block] = scale * rhs[0]
-        normal.base_cost[block] = scale * torch.as_tensor(cost, dtype=dtype, device=device)
-        normal.constrained[block] = layout.constrained
-
-
-def _add_bsp_block(
-    *,
-    cache: FeatureCache,
-    normal: _Normal,
-    bsp: BspSeries,
-    index: np.ndarray,
-    rem: RemainderLayout,
-    layouts: Mapping[str, GamLayout],
-    offsets: Mapping[str, slice],
-    rem_block: slice,
-    pinned: Mapping[str, PinnedCapacity | None],
-    device: torch.device | str,
-    dtype: torch.dtype,
-) -> None:
-    """Add one BSP's remainder penalties and its unweighted row Gram matrix to `normal`."""
-    penalty, cost = remainder_penalty(layout=rem, n_rows=len(index))
-    inverse_variance = 1.0 / bsp.sigma_mw**2
-    # The remainder's penalties scale with the BSP term (w / sigma_b^2), so changing w changes how
-    # much the hint matters and not how freely the remainder can absorb an offset. A tiny ridge
-    # that does not scale with w keeps the matrix definite at w = 0.
-    normal.base[rem_block, rem_block] = REMAINDER_RIDGE * torch.eye(
-        rem.n_columns, dtype=dtype, device=device
-    )
-    normal.hint[rem_block, rem_block] += inverse_variance * torch.as_tensor(
-        penalty, dtype=dtype, device=device
-    )
-    normal.hint_cost[rem_block] = inverse_variance * torch.as_tensor(
-        cost, dtype=dtype, device=device
-    )
-    normal.constrained[rem_block] = rem.constrained
-    columns = np.concatenate(
-        [np.arange(offsets[m.site].start, offsets[m.site].stop) for m in bsp.members]
-        + [np.arange(rem_block.start, rem_block.stop)]
-    )
-    column_index = torch.as_tensor(columns, device=device)
-    for chunk in row_chunks(index=index):
-        rows = index[chunk]
-        parts = [
-            _member_design(cache=cache, member=m, layout=layouts[m.site], index=rows)
-            for m in bsp.members
+) -> torch.Tensor:
+    """Build a design chunk by chunk and return it as one tensor on `device`."""
+    return torch.cat(
+        [
+            torch.as_tensor(build(rows[chunk]), dtype=dtype, device=device)
+            for chunk in row_chunks(index=rows)
         ]
-        parts.append(remainder_design(cache=cache, layout=rem, bsp=bsp, index=rows))
-        design = torch.as_tensor(np.concatenate(parts, axis=1), dtype=dtype, device=device)
-        z = torch.as_tensor(
-            bsp_target(cache=cache, bsp=bsp, pinned=pinned, layouts=layouts, index=rows),
-            dtype=dtype,
-            device=device,
-        )
-        normal.hint[column_index[:, None], column_index[None, :]] += inverse_variance * (
-            design.T @ design
-        )
-        normal.hint_rhs[column_index] += inverse_variance * (design.T @ z)
+    )
 
 
-def fit_joint(
+def assemble_joint(
     *,
     cache: FeatureCache,
     specs: Mapping[str, GamSpec],
     bsps: Sequence[BspSeries],
     remainder_spec: RemainderSpec,
-    weights: Sequence[float],
     sigma_points: Mapping[str, float],
     cut: datetime,
     window: TrainingWindow,
@@ -550,8 +524,8 @@ def fit_joint(
     pinned: Mapping[str, PinnedCapacity | None] | None = None,
     device: torch.device | str = "cpu",
     dtype: torch.dtype = torch.float64,
-) -> JointFit:
-    """Fit the Primaries and the BSPs above them jointly, for each BSP weight in `weights`.
+) -> JointAssembly:
+    """Build the designs and Gram matrices of the Primaries and BSPs for one cut.
 
     Args:
         cache: The cache.
@@ -559,7 +533,6 @@ def fit_joint(
         bsps: The BSPs. Every member's site must be in `specs`, and no Primary may sit under two
             BSPs.
         remainder_spec: The penalties of every BSP's remainder.
-        weights: The BSP weights `w`, one batch member each; 0 reproduces the separate fits.
         sigma_points: Each Primary's robust half-hourly residual scale in points, from pre-cut rows.
         cut: The cut; every training row ends no later.
         window: The window rule for the Primaries' rows.
@@ -570,7 +543,7 @@ def fit_joint(
         dtype: The floating-point type.
 
     Returns:
-        The fitted batch.
+        The assembly, ready for `solve_joint`.
 
     Raises:
         ValueError: If a member has no spec or no sigma, a Primary sits under two BSPs, a sigma is
@@ -612,71 +585,256 @@ def fit_joint(
         )
         remainder_offsets[bsp.name] = slice(start, start + remainder_layouts[bsp.name].n_columns)
         start += remainder_layouts[bsp.name].n_columns
-    square = (start, start)
-    normal = _Normal(
-        base=torch.zeros(square, dtype=dtype, device=device),
-        base_rhs=torch.zeros(start, dtype=dtype, device=device),
-        base_cost=torch.zeros(start, dtype=dtype, device=device),
-        hint=torch.zeros(square, dtype=dtype, device=device),
-        hint_rhs=torch.zeros(start, dtype=dtype, device=device),
-        hint_cost=torch.zeros(start, dtype=dtype, device=device),
-        constrained=np.zeros(start, dtype=bool),
-    )
-    _add_primary_blocks(
+    assembly = JointAssembly(
         cache=cache,
-        normal=normal,
+        sites=sites,
+        bsps=tuple(bsps),
+        cut=cut,
         layouts=layouts,
         indices=indices,
         offsets=offsets,
+        sigma_points=dict(sigma_points),
+        pinned=pinned,
+        remainder_layouts=remainder_layouts,
+        remainder_offsets=remainder_offsets,
+        bsp_indices=bsp_indices,
+        bsp_columns={},
+        site_designs={},
+        site_target_offsets={},
+        bsp_designs={},
+        bsp_target_offsets={},
+        base=torch.zeros((start, start), dtype=dtype, device=device),
+        base_cost=torch.zeros(start, dtype=dtype, device=device),
+        hint=torch.zeros((start, start), dtype=dtype, device=device),
+        hint_cost=torch.zeros(start, dtype=dtype, device=device),
+        constrained=np.zeros(start, dtype=bool),
+        device=device,
+        dtype=dtype,
+    )
+    _add_primary_blocks(assembly=assembly)
+    for bsp in bsps:
+        _add_bsp_block(assembly=assembly, bsp=bsp)
+    return assembly
+
+
+def _add_primary_blocks(*, assembly: JointAssembly) -> None:
+    """Add each Primary's scaled Gram matrix, penalties, and constraints to the assembly."""
+    cache, device, dtype = assembly.cache, assembly.device, assembly.dtype
+    for site, layout in assembly.layouts.items():
+        features = cache.sites[site]
+        index = assembly.indices[site]
+        design = _stack_designs(
+            rows=index,
+            build=lambda rows, f=features, lay=layout: design_matrix(
+                cache=cache, features=f, layout=lay, index=rows
+            ),
+            device=device,
+            dtype=dtype,
+        )
+        capacity = assembly.pinned.get(site)
+        assembly.site_designs[site] = design
+        assembly.site_target_offsets[site] = (
+            np.zeros(len(index))
+            if capacity is None
+            else pinned_solar_points(
+                cache=cache, features=features, pinned=capacity, index=index, clip=layout.spec.clip
+            )
+        )
+        penalty, cost = penalty_matrix(layout=layout, n_rows=len(index))
+        scale = 1.0 / assembly.sigma_points[site] ** 2
+        block = assembly.offsets[site]
+        assembly.base[block, block] = scale * (
+            design.T @ design + torch.as_tensor(penalty, dtype=dtype, device=device)
+        )
+        assembly.base_cost[block] = scale * torch.as_tensor(cost, dtype=dtype, device=device)
+        assembly.constrained[block] = layout.constrained
+
+
+def _add_bsp_block(*, assembly: JointAssembly, bsp: BspSeries) -> None:
+    """Add one BSP's remainder penalties and its unweighted row Gram matrix to the assembly."""
+    cache, device, dtype = assembly.cache, assembly.device, assembly.dtype
+    index = assembly.bsp_indices[bsp.name]
+    rem = assembly.remainder_layouts[bsp.name]
+    rem_block = assembly.remainder_offsets[bsp.name]
+    penalty, cost = remainder_penalty(layout=rem, n_rows=len(index))
+    inverse_variance = 1.0 / bsp.sigma_mw**2
+    # The remainder's penalties scale with the BSP term (w / sigma_b^2), so changing w changes how
+    # much the hint matters and not how freely the remainder can absorb an offset. A tiny ridge
+    # that does not scale with w keeps the matrix definite at w = 0.
+    assembly.base[rem_block, rem_block] = REMAINDER_RIDGE * torch.eye(
+        rem.n_columns, dtype=dtype, device=device
+    )
+    assembly.hint[rem_block, rem_block] += inverse_variance * torch.as_tensor(
+        penalty, dtype=dtype, device=device
+    )
+    assembly.hint_cost[rem_block] = inverse_variance * torch.as_tensor(
+        cost, dtype=dtype, device=device
+    )
+    assembly.constrained[rem_block] = rem.constrained
+    columns = np.concatenate(
+        [
+            np.arange(assembly.offsets[m.site].start, assembly.offsets[m.site].stop)
+            for m in bsp.members
+        ]
+        + [np.arange(rem_block.start, rem_block.stop)]
+    )
+    column_index = torch.as_tensor(columns, device=device)
+
+    def build(rows: np.ndarray) -> np.ndarray:
+        parts = [
+            _member_design(cache=cache, member=m, layout=assembly.layouts[m.site], index=rows)
+            for m in bsp.members
+        ]
+        parts.append(remainder_design(cache=cache, layout=rem, bsp=bsp, index=rows))
+        return np.concatenate(parts, axis=1)
+
+    design = _stack_designs(rows=index, build=build, device=device, dtype=dtype)
+    assembly.bsp_designs[bsp.name] = design
+    assembly.bsp_columns[bsp.name] = column_index
+    assembly.bsp_target_offsets[bsp.name] = (
+        bsp_target(
+            cache=cache, bsp=bsp, pinned=assembly.pinned, layouts=assembly.layouts, index=index
+        )
+        - bsp.reading_mw[index]
+    )
+    assembly.hint[column_index[:, None], column_index[None, :]] += inverse_variance * (
+        design.T @ design
+    )
+
+
+def solve_joint(
+    *,
+    assembly: JointAssembly,
+    weights: Sequence[float],
+    primary_power: Mapping[str, np.ndarray] | None = None,
+    bsp_readings: Mapping[str, np.ndarray] | None = None,
+) -> JointFit:
+    """Solve the joint problem of an assembly for each BSP weight, for given readings.
+
+    Only the right-hand sides depend on the readings, so a synthetic system or an injected error
+    costs one matrix-vector product per block and one batched solve.
+
+    Args:
+        assembly: The designs and Gram matrices from `assemble_joint`.
+        weights: The BSP weights `w`, one batch member each; 0 reproduces the separate fits.
+        primary_power: Replacement readings of Primaries in points, each on the cache grid; a
+            Primary not named keeps the cache's.
+        bsp_readings: Replacement readings of BSPs in MW, each on the cache grid; a BSP not named
+            keeps its own.
+
+    Returns:
+        The fitted batch.
+    """
+    cache, device, dtype = assembly.cache, assembly.device, assembly.dtype
+    primary_power = primary_power or {}
+    bsp_readings = bsp_readings or {}
+    rhs0 = torch.zeros(assembly.base.shape[0], dtype=dtype, device=device)
+    hint_rhs = torch.zeros_like(rhs0)
+    for site in assembly.sites:
+        y = primary_power.get(site, cache.sites[site].y)[assembly.indices[site]]
+        target = torch.as_tensor(y + assembly.site_target_offsets[site], dtype=dtype, device=device)
+        scale = 1.0 / assembly.sigma_points[site] ** 2
+        rhs0[assembly.offsets[site]] = scale * (assembly.site_designs[site].T @ target)
+    for bsp in assembly.bsps:
+        index = assembly.bsp_indices[bsp.name]
+        reading = bsp_readings.get(bsp.name, bsp.reading_mw)[index]
+        z = torch.as_tensor(
+            reading + assembly.bsp_target_offsets[bsp.name], dtype=dtype, device=device
+        )
+        hint_rhs[assembly.bsp_columns[bsp.name]] += (
+            assembly.bsp_designs[bsp.name].T @ z
+        ) / bsp.sigma_mw**2
+    w = torch.as_tensor(list(weights), dtype=dtype, device=device)
+    theta, violation = solve_bounded_quadratic(
+        matrix=assembly.base[None] + w[:, None, None] * assembly.hint[None],
+        rhs=rhs0[None]
+        + w[:, None] * hint_rhs[None]
+        - 0.5 * (assembly.base_cost[None] + w[:, None] * assembly.hint_cost[None]),
+        constrained=torch.as_tensor(assembly.constrained, device=device),
+    )
+    return JointFit(
+        weights=tuple(float(x) for x in weights),
+        sites=assembly.sites,
+        site_layouts=assembly.layouts,
+        site_slices=assembly.offsets,
+        remainder_layouts=assembly.remainder_layouts,
+        remainder_slices=assembly.remainder_offsets,
+        theta=theta.cpu().numpy(),
+        cut=assembly.cut,
+        n_site_rows={s: len(assembly.indices[s]) for s in assembly.sites},
+        n_bsp_rows={b: len(i) for b, i in assembly.bsp_indices.items()},
+        last_season_years={
+            s: last_signal_season_year(
+                cache=cache,
+                site=s,
+                index=assembly.indices[s],
+                cut=assembly.cut,
+                pinned=assembly.pinned.get(s),
+            )
+            for s in assembly.sites
+        },
+        pinned={s: assembly.pinned.get(s) for s in assembly.sites},
+        violation=violation.cpu().numpy(),
+        primary_blocks={
+            s: assembly.base[assembly.offsets[s], assembly.offsets[s]].cpu().numpy().copy()
+            for s in assembly.sites
+        },
+    )
+
+
+def fit_joint(
+    *,
+    cache: FeatureCache,
+    specs: Mapping[str, GamSpec],
+    bsps: Sequence[BspSeries],
+    remainder_spec: RemainderSpec,
+    weights: Sequence[float],
+    sigma_points: Mapping[str, float],
+    cut: datetime,
+    window: TrainingWindow,
+    season_years: Sequence[int],
+    pinned: Mapping[str, PinnedCapacity | None] | None = None,
+    device: torch.device | str = "cpu",
+    dtype: torch.dtype = torch.float64,
+) -> JointFit:
+    """Fit the Primaries and the BSPs above them jointly, for each BSP weight in `weights`.
+
+    This is `assemble_joint` followed by `solve_joint` with the cache's own readings; use those two
+    directly to solve for many readings against one assembly.
+
+    Args:
+        cache: The cache.
+        specs: The convex model's spec of each Primary that appears under any BSP, by label.
+        bsps: The BSPs. Every member's site must be in `specs`, and no Primary may sit under two
+            BSPs.
+        remainder_spec: The penalties of every BSP's remainder.
+        weights: The BSP weights `w`, one batch member each; 0 reproduces the separate fits.
+        sigma_points: Each Primary's robust half-hourly residual scale in points, from pre-cut rows.
+        cut: The cut; every training row ends no later.
+        window: The window rule for the Primaries' rows.
+        season_years: The season-years with a capacity increment.
+        pinned: Each Primary's pinned capacity built for `cut`, or `None`; a missing key means
+            `None`.
+        device: Where the arithmetic runs.
+        dtype: The floating-point type.
+
+    Returns:
+        The fitted batch.
+    """
+    assembly = assemble_joint(
+        cache=cache,
+        specs=specs,
+        bsps=bsps,
+        remainder_spec=remainder_spec,
         sigma_points=sigma_points,
+        cut=cut,
+        window=window,
+        season_years=season_years,
         pinned=pinned,
         device=device,
         dtype=dtype,
     )
-    primary_blocks = {s: normal.base[offsets[s], offsets[s]].cpu().numpy().copy() for s in sites}
-    for bsp in bsps:
-        _add_bsp_block(
-            cache=cache,
-            normal=normal,
-            bsp=bsp,
-            index=bsp_indices[bsp.name],
-            rem=remainder_layouts[bsp.name],
-            layouts=layouts,
-            offsets=offsets,
-            rem_block=remainder_offsets[bsp.name],
-            pinned=pinned,
-            device=device,
-            dtype=dtype,
-        )
-    w = torch.as_tensor(list(weights), dtype=dtype, device=device)
-    theta, violation = solve_bounded_quadratic(
-        matrix=normal.base[None] + w[:, None, None] * normal.hint[None],
-        rhs=normal.base_rhs[None]
-        + w[:, None] * normal.hint_rhs[None]
-        - 0.5 * (normal.base_cost[None] + w[:, None] * normal.hint_cost[None]),
-        constrained=torch.as_tensor(normal.constrained, device=device),
-    )
-    return JointFit(
-        weights=tuple(float(x) for x in weights),
-        sites=sites,
-        site_layouts=layouts,
-        site_slices=offsets,
-        remainder_layouts=remainder_layouts,
-        remainder_slices=remainder_offsets,
-        theta=theta.cpu().numpy(),
-        cut=cut,
-        n_site_rows={s: len(indices[s]) for s in sites},
-        n_bsp_rows={b: len(i) for b, i in bsp_indices.items()},
-        last_season_years={
-            s: last_signal_season_year(
-                cache=cache, site=s, index=indices[s], cut=cut, pinned=pinned.get(s)
-            )
-            for s in sites
-        },
-        pinned={s: pinned.get(s) for s in sites},
-        violation=violation.cpu().numpy(),
-        primary_blocks=primary_blocks,
-    )
+    return solve_joint(assembly=assembly, weights=weights)
 
 
 def remainder_prediction(
