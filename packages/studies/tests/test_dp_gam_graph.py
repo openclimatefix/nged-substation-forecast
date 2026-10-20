@@ -15,7 +15,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from studies.dp_calendar import HALF_HOURS_PER_DAY  # noqa: E402
+from studies.dp_calendar import HALF_HOURS_PER_DAY, band_of_hour  # noqa: E402
 from studies.dp_features import FeatureCache  # noqa: E402
 from studies.dp_gam import (  # noqa: E402
     GamLayout,
@@ -27,6 +27,7 @@ from studies.dp_gam import (  # noqa: E402
     prepare_fit,
 )
 from studies.dp_gam_graph import (  # noqa: E402
+    GRAPH_FAMILIES,
     GraphPenalty,
     GraphSolution,
     InterconnectionGraph,
@@ -39,6 +40,7 @@ from studies.dp_gam_graph import (  # noqa: E402
     gam_fits_from_solution,
     heating_band_slopes,
     holiday_level,
+    identified_columns,
     joint_month_counts,
     kappa_for_neighbour_correlation,
     latest_capacity,
@@ -234,17 +236,80 @@ def test_a_holiday_only_fleet_mean_pools_only_the_holiday_coefficients(graph_cac
         assert moved.max() < 0.15
 
 
+def _identified_reference(*, x: np.ndarray, layout: GamLayout) -> np.ndarray:
+    """Return the identified columns by the rule written out again, independently."""
+    counts = (x != 0.0).sum(axis=0)
+    out = np.zeros(layout.n_columns, dtype=bool)
+    for family in ("heating", "capacity"):
+        columns = layout.slices[family]
+        out[columns] = counts[columns] >= 1000
+    for family in ("profile", "holiday"):
+        columns = layout.slices[family]
+        held = counts[columns][counts[columns] > 0]
+        if held.size:
+            out[columns] = (counts[columns] > 0) & (counts[columns] >= 0.05 * np.median(held))
+    return out
+
+
+def _shared_centring_reference(*, family: str, shared: np.ndarray) -> np.ndarray:
+    """Return the centring over the shared columns: band means removed for the profile."""
+    count = int(shared.sum())
+    if family != "profile":
+        return np.eye(count)
+    band = band_of_hour(hour=(np.arange(len(shared)) % HALF_HOURS_PER_DAY) // 2)[shared]
+    centre = np.eye(count)
+    for value in np.unique(band):
+        members = np.flatnonzero(band == value)
+        centre[np.ix_(members, members)] -= 1.0 / len(members)
+    return centre
+
+
+def _capacity_penalty_reference(
+    *,
+    designs: list[np.ndarray],
+    layouts: list[GamLayout],
+    known: list[np.ndarray],
+    labels: list[str],
+    edges: list[tuple[str, str]],
+    gamma: float,
+    starts: np.ndarray,
+) -> np.ndarray:
+    """Return the capacity edges' quadratic form, written out again independently."""
+    total = int(starts[-1])
+    hessian = np.zeros((total, total))
+    cells, capacity_sum = 0, 0.0
+    for x, layout, identified in zip(designs, layouts, known, strict=True):
+        columns = layout.slices["capacity"]
+        if identified[columns].any():
+            cells += (columns.stop - columns.start) * len(x)
+            capacity_sum += np.diag(x.T @ x)[columns].sum()
+    capacity_scale = capacity_sum / cells
+    for first, second in edges:
+        i, j = labels.index(first), labels.index(second)
+        left, right = layouts[i].slices["capacity"], layouts[j].slices["capacity"]
+        if left.stop == left.start or right.stop == right.start:
+            continue
+        if not (known[i][left].any() and known[j][right].any()):
+            continue
+        vector = np.zeros(total)
+        vector[int(starts[i]) + left.start : int(starts[i]) + left.stop] = 1.0
+        vector[int(starts[j]) + right.start : int(starts[j]) + right.stop] = -1.0
+        hessian += gamma * capacity_scale * np.outer(vector, vector)
+    return hessian
+
+
 def _dense_graph_reference(
     *,
     cache: FeatureCache,
-    labels: tuple[str, ...],
+    sites: list[PooledSite],
     edges: list[tuple[str, str]],
     gamma: float,
     fixed: np.ndarray,
 ) -> np.ndarray:
     """Return the joint solution of an independent dense computation, holding `fixed` at zero."""
+    labels = [site.site for site in sites]
     designs, targets, penalties, layouts = [], [], [], []
-    for site in _sites(labels=labels):
+    for site in sites:
         layout, index = prepare_fit(
             cache=cache,
             site=site.site,
@@ -269,37 +334,79 @@ def _dense_graph_reference(
         stop = int(start) + x.shape[1]
         hessian[start:stop, start:stop] += x.T @ x + penalty
         rhs[start:stop] += x.T @ y
+    known = [
+        _identified_reference(x=x, layout=layout)
+        for x, layout in zip(designs, layouts, strict=True)
+    ]
     for family in ("heating", "profile", "holiday"):
         columns = layouts[0].slices[family]
         size = columns.stop - columns.start
         scale = sum(np.diag(x.T @ x)[columns].sum() for x in designs) / (size * total_rows)
-        centre = centring_matrix(family=family, size=size)
         for first, second in edges:
             i, j = labels.index(first), labels.index(second)
-            difference = np.zeros((size, total))
-            difference[:, int(starts[i]) + columns.start : int(starts[i]) + columns.stop] = centre
-            difference[:, int(starts[j]) + columns.start : int(starts[j]) + columns.stop] = -centre
+            shared = known[i][columns] & known[j][columns]
+            if not shared.any():
+                continue
+            centre = _shared_centring_reference(family=family, shared=shared)
+            difference = np.zeros((int(shared.sum()), total))
+            rows_i = int(starts[i]) + columns.start + np.flatnonzero(shared)
+            rows_j = int(starts[j]) + columns.start + np.flatnonzero(shared)
+            difference[:, rows_i] = centre
+            difference[:, rows_j] = -centre
             hessian += gamma * scale * difference.T @ difference
+    hessian += _capacity_penalty_reference(
+        designs=designs,
+        layouts=layouts,
+        known=known,
+        labels=labels,
+        edges=edges,
+        gamma=gamma,
+        starts=starts,
+    )
     free = ~fixed
     solution = np.zeros(total)
     solution[free] = np.linalg.solve(hessian[np.ix_(free, free)], rhs[free])
     return solution
 
 
-def test_the_solver_matches_a_dense_program_on_a_three_node_path_and_ignores_node_order(
-    graph_cache: FeatureCache,
+@pytest.fixture(scope="module")
+def dark_cache(graph_cache: FeatureCache) -> FeatureCache:
+    """The graph cache with the last substation dark wherever the sun is below the horizon."""
+    features = graph_cache.sites[LABELS[-1]]
+    flagged = replace(features, dark=features.elevation_deg < 0.0)
+    return replace(graph_cache, sites={**graph_cache.sites, LABELS[-1]: flagged})
+
+
+def _fleet_with_a_dark_node(*, cache: FeatureCache) -> list[PooledSite]:
+    sites = _sites(labels=LABELS[:2])
+    dark = PooledSite(
+        site=LABELS[-1],
+        spec=GamSpec(ridge=1.0),
+        window=TrainingWindow(months=24, dark_only=True),
+        season_years=SEASON_YEARS,
+    )
+    return [*sites, dark]
+
+
+def test_the_solver_matches_a_dense_program_with_a_dark_only_node_and_ignores_node_order(
+    dark_cache: FeatureCache,
 ):
-    labels = LABELS[:3]
+    sites = _fleet_with_a_dark_node(cache=dark_cache)
+    labels = tuple(site.site for site in sites)
     gamma = 2000.0
-    designs = _designs(cache=graph_cache, labels=labels)
-    penalty = GraphPenalty(fleet={}, graph={"heating": gamma, "profile": gamma, "holiday": gamma})
+    designs = [build_node_design(cache=dark_cache, site=site, cut=CUT) for site in sites]
+    dark_design = designs[-1]
+    daytime = ~dark_design.identified[dark_design.layout.slices["profile"]]
+    assert daytime.any(), "the dark node must leave some profile columns unidentified"
+    assert not dark_design.identified[dark_design.layout.slices["capacity"]].any()
+    penalty = GraphPenalty(fleet={}, graph=dict.fromkeys(GRAPH_FAMILIES, gamma))
     graph = _path(labels=labels)
     solution = _solve(designs=designs, graph=graph, penalty=penalty)
     stacked = np.concatenate([solution.thetas[label][0] for label in labels])
     constrained = np.concatenate([design.layout.constrained for design in designs])
     reference = _dense_graph_reference(
-        cache=graph_cache,
-        labels=labels,
+        cache=dark_cache,
+        sites=sites,
         edges=list(graph.edges),
         gamma=gamma,
         fixed=constrained & (stacked <= 0.0),
@@ -309,6 +416,94 @@ def test_the_solver_matches_a_dense_program_on_a_three_node_path_and_ignores_nod
     other = _solve(designs=designs, graph=reversed_graph, penalty=penalty)
     for label in labels:
         assert np.abs(other.thetas[label] - solution.thetas[label]).max() < 1e-8
+
+
+def test_the_capacity_scale_ignores_a_node_without_capacity_columns(dark_cache: FeatureCache):
+    sites = _fleet_with_a_dark_node(cache=dark_cache)
+    designs = [build_node_design(cache=dark_cache, site=site, cut=CUT) for site in sites]
+    with_dark = family_scales(designs=designs)["capacity"]
+    without_dark = family_scales(designs=designs[:2])["capacity"]
+    assert designs[-1].identified[designs[-1].layout.slices["capacity"]].sum() == 0
+    assert with_dark == pytest.approx(without_dark, rel=1e-12)
+
+
+def test_a_very_large_gamma_on_a_complete_graph_approaches_complete_pooling(
+    graph_cache: FeatureCache,
+):
+    labels = LABELS[:3]
+    pairs = [(a, b) for i, a in enumerate(labels) for b in labels[i + 1 :]]
+    graph = InterconnectionGraph.from_pairs(nodes=labels, pairs=pairs)
+    designs = _designs(cache=graph_cache, labels=labels)
+    gamma = 1e8
+    solution = _solve(
+        designs=designs,
+        graph=graph,
+        penalty=GraphPenalty(
+            fleet={}, graph=dict.fromkeys(("heating", "holiday", "profile"), gamma)
+        ),
+    )
+    tied = fit_pooled(cache=graph_cache, sites=_sites(labels=labels), cut=CUT, tied=True)
+    layout = designs[0].layout
+    for label in labels:
+        for family in ("heating", "holiday"):
+            columns = layout.slices[family]
+            difference = solution.thetas[label][0, columns] - tied.fits[label].theta[0, columns]
+            assert np.abs(difference).max() < 5e-3
+        profile = layout.slices["profile"]
+        centre = centring_matrix(family="profile", size=profile.stop - profile.start)
+        gap = solution.thetas[label][0, profile] - tied.fits[label].theta[0, profile]
+        difference = centre @ gap
+        assert np.abs(difference).max() < 5e-2
+
+
+def test_the_identification_rule_is_relative_for_profile_and_holiday_and_absolute_for_heating(
+    graph_cache: FeatureCache,
+):
+    layout = _designs(cache=graph_cache, labels=LABELS[:1])[0].layout
+    x = np.zeros((2000, layout.n_columns))
+    profile = layout.slices["profile"]
+    x[:300, profile.start] = 1.0  # a typical profile column
+    x[:300, profile.start + 1] = 1.0
+    x[:300, profile.start + 2] = 1.0
+    x[:1, profile.start + 3] = 1.0  # one non-zero row: well under 5% of the median of 300
+    x[:15, profile.start + 4] = 1.0  # exactly 5% of the median
+    heating = layout.slices["heating"]
+    x[:1200, heating.start] = 1.0
+    x[:900, heating.start + 1] = 1.0
+    identified = identified_columns(x=x, layout=layout)
+    assert identified[profile.start]
+    assert not identified[profile.start + 3]
+    assert identified[profile.start + 4]
+    assert not identified[profile.start + 5]  # no non-zero row
+    assert identified[heating.start]
+    assert not identified[heating.start + 1]
+    assert not identified[layout.slices["tent"]].any()
+
+
+def test_a_layout_with_other_pooled_columns_is_refused(graph_cache: FeatureCache):
+    designs = _designs(cache=graph_cache, labels=LABELS[:2])
+    holiday = designs[1].layout.slices["holiday"]
+    changed_layout = replace(
+        designs[1].layout,
+        slices={**designs[1].layout.slices, "holiday": slice(holiday.start, holiday.stop - 1)},
+    )
+    designs[1] = replace(designs[1], layout=changed_layout)
+    with pytest.raises(ValueError, match="differ"):
+        _solve(designs=designs, graph=_path(labels=LABELS[:2]), penalty=GraphPenalty.none())
+
+
+def test_heating_band_slopes_read_the_window_count_from_the_layout(graph_cache: FeatureCache):
+    layout, _ = prepare_fit(
+        cache=graph_cache,
+        site=LABELS[0],
+        spec=GamSpec(slow_heating_only=True),
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    theta = np.zeros((1, layout.n_columns))
+    theta[:, layout.slices["heating"]] = 1.0
+    assert (heating_band_slopes(layout=layout, theta=theta) == 2.0).all()
 
 
 def test_a_larger_gamma_pulls_two_connected_nodes_together(graph_cache: FeatureCache):
@@ -433,7 +628,7 @@ def test_the_readouts_sum_the_right_columns(graph_cache: FeatureCache):
     theta[0, layout.slices["capacity"]] = (1.0,) * (
         layout.slices["capacity"].stop - layout.slices["capacity"].start
     )
-    theta[:, layout.slices["holiday"]] = (0.5, 1.5)[0]
+    theta[:, layout.slices["holiday"]] = 0.5
     profile = layout.slices["profile"]
     theta[1, profile] = 7.0
     slopes = heating_band_slopes(layout=layout, theta=theta)
@@ -458,7 +653,7 @@ def test_gam_fits_from_a_solution_carry_the_batch_and_the_layout(graph_cache: Fe
     assert fits[LABELS[0]].cut == CUT
 
 
-def test_a_fifteen_member_joint_fit_of_four_nodes_takes_under_a_minute(
+def test_a_fit_of_fifteen_resamples_on_four_nodes_takes_under_a_minute(
     graph_cache: FeatureCache,
 ):
     designs = _designs(cache=graph_cache)
@@ -574,3 +769,54 @@ def test_smooth_fields_are_alike_along_edges_and_the_similarity_ratio_shows_it()
     assert independent == pytest.approx(1.0, abs=0.25)
     with pytest.raises(ValueError, match="no value"):
         edge_similarity_ratio(graph=graph, values={}, rng=np.random.default_rng(0))
+
+
+def test_a_fifteen_node_coupled_fit_runs_in_bounded_time(graph_cache: FeatureCache):
+    base = _designs(cache=graph_cache)
+    designs = [
+        replace(base[k % 4], inputs=replace(base[k % 4].inputs, site=f"N{k:02d}"))
+        for k in range(15)
+    ]
+    nodes = tuple(design.site for design in designs)
+    graph = ring_with_chords(nodes=nodes, n_chords=6, rng=np.random.default_rng(3))
+    axis = month_axis_of(designs=designs)
+    counts = joint_month_counts(axis=axis, n_resamples=2, rng=np.random.default_rng(2))
+    started = time.perf_counter()
+    solution = _solve(
+        designs=designs,
+        graph=graph,
+        penalty=GraphPenalty.of(fleet_rows=3000.0, graph_rows=3000.0),
+        axis=axis,
+        counts=counts,
+    )
+    assert time.perf_counter() - started < 300.0
+    assert solution.thetas[nodes[0]].shape[0] == 3
+    assert (solution.violation < 1e-3).all()
+
+
+def test_nothing_after_the_cut_in_a_neighbours_weather_or_solar_shape_reaches_a_fit(
+    graph_cache: FeatureCache,
+):
+    graph = _path(labels=LABELS[:2])
+    penalty = GraphPenalty.of(fleet_rows=3000.0, graph_rows=3000.0)
+    baseline = _solve(
+        designs=_designs(cache=graph_cache, labels=LABELS[:2]), graph=graph, penalty=penalty
+    )
+    neighbour = graph_cache.sites[LABELS[1]]
+    after_cut = graph_cache.end_times > np.datetime64(CUT.replace(tzinfo=None), "us")
+    temperature = neighbour.smoothed_temperature_c.copy()
+    temperature[after_cut] += 25.0
+    shape = neighbour.pv_unit_shape.copy()
+    shape[after_cut] *= 3.0
+    changed_cache = replace(
+        graph_cache,
+        sites={
+            **graph_cache.sites,
+            LABELS[1]: replace(neighbour, smoothed_temperature_c=temperature, pv_unit_shape=shape),
+        },
+    )
+    changed = _solve(
+        designs=_designs(cache=changed_cache, labels=LABELS[:2]), graph=graph, penalty=penalty
+    )
+    for label in LABELS[:2]:
+        assert np.abs(changed.thetas[label] - baseline.thetas[label]).max() < 1e-10

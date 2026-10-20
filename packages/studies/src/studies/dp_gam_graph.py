@@ -15,10 +15,15 @@ the joint fit has one optimum.
 - **Graph families:** the heating slopes, the profile, the holiday periods, and the capacity.
   The capacity term acts on the sum of a substation's capacity increments (its latest capacity in
   points of effective capacity), and only on an edge whose two ends both fit a capacity.
+- **Per-edge weight:** the penalty is summed over edges, so a substation with `d` edges is pulled
+  `d` times as hard as one with a single edge, and a complete graph on `S` substations with weight
+  `gamma` equals the fleet-mean penalty with weight `S * gamma`. The weight reads as rows of
+  evidence per edge.
 - **Identified coordinates:** a substation identifies a coordinate if the rows it trains on make the
-  design column non-zero in at least `MIN_IDENTIFYING_ROWS` rows, a threshold that depends on the
-  family. A substation that trains on dark rows only has no non-zero daytime heating, profile, or
-  capacity columns, so an edge to it penalises only the coordinates both ends hold.
+  design column non-zero often enough (`MIN_IDENTIFYING_ROWS` and `RELATIVE_IDENTIFYING_SHARE`). A
+  substation that trains on dark rows only has no non-zero daytime heating, profile, or capacity
+  columns, so an edge to it penalises only the coordinates both ends hold. The profile's centring
+  runs over those shared coordinates only, so a level shift of a band is never penalised.
 - **Fleet-mean penalty:** `GraphPenalty.fleet` adds the deviation penalty of `dp_gam_pooled` for the
   families it names, so one fit can hold the fleet-mean penalty, the graph penalty, both, or only a
   holiday fleet mean.
@@ -43,7 +48,7 @@ from typing import Final, Literal
 import numpy as np
 import torch
 
-from studies.dp_calendar import SMOOTHING_HOURS
+from studies.dp_calendar import DAY_TYPES, HALF_HOURS_PER_DAY, band_of_hour
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (
     N_BANDS,
@@ -71,27 +76,26 @@ GraphFamilyType = Literal["heating", "profile", "holiday", "capacity"]
 GRAPH_FAMILIES: Final[tuple[GraphFamilyType, ...]] = ("heating", "profile", "holiday", "capacity")
 """The coefficient families a graph penalty can act on."""
 
-MIN_IDENTIFYING_ROWS: Final[dict[GraphFamilyType, int]] = {
-    "heating": 1_000,
-    "capacity": 1_000,
-    "profile": 1,
-    "holiday": 1,
-}
-"""A substation identifies a coordinate if its design column is non-zero in this many rows.
+MIN_IDENTIFYING_ROWS: Final[dict[GraphFamilyType, int]] = {"heating": 1_000, "capacity": 1_000}
+"""A heating or capacity column is identified if it is non-zero in this many rows.
 
-The heating and capacity columns are dense (a heating column is non-zero in a quarter of the rows),
-so 1,000 rows separates a band the substation trains on from one it does not. A profile column
-(one half-hour of one day type) is non-zero in about 100 to 500 rows over two years, and a holiday
-column in 48 to 96, so a threshold of 1,000 would leave both families without an identified
-coordinate. For those two families a single non-zero row is the test, which still separates the
-daytime columns of a substation that trains on dark rows only.
+These columns are dense (a heating column is non-zero in a quarter of the rows), so 1,000 rows
+separates a band the substation trains on from one it does not.
 """
 
-MAX_MATRIX_BYTES: Final[int] = 1_500_000_000
-"""The most memory one batch of dense joint matrices may take; larger batches are split."""
+RELATIVE_IDENTIFYING_SHARE: Final[float] = 0.05
+"""A profile or holiday column is identified if its non-zero rows reach this share of the median.
 
-SMOOTHING_COUNT: Final[int] = len(SMOOTHING_HOURS)
-"""The number of smoothing windows of each heating band."""
+The median is taken over the family's columns that are non-zero in the substation's own design. A
+profile column (one half-hour of one day type) is non-zero in about 100 to 500 rows over two years
+and a holiday column in 48 to 96, so a fixed threshold of 1,000 rows would leave both families
+without an identified coordinate, and a share of the substation's own typical column keeps the test
+the same for a 12-month and a 24-month window. A column that is non-zero in a handful of twilight
+rows is not identified.
+"""
+
+MAX_MATRIX_BYTES: Final[int] = 800_000_000
+"""The most memory one batch of dense joint matrices may take; larger batches are split."""
 
 
 @dataclass(frozen=True)
@@ -263,7 +267,7 @@ def smooth_field_covariance(*, graph: InterconnectionGraph, kappa: float) -> np.
         The correlation matrix (unit diagonal) in the order of `graph.nodes`.
     """
     precision = np.eye(len(graph.nodes)) + kappa * graph.laplacian()
-    covariance = np.linalg.inv(precision)
+    covariance = np.linalg.solve(precision, np.eye(len(graph.nodes)))
     scale = np.sqrt(np.diag(covariance))
     return covariance / scale[:, None] / scale[None, :]
 
@@ -465,8 +469,7 @@ class NodeDesign:
             output added back for a pinned substation), shape (months, p).
         penalty: The base penalty matrix of `dp_gam.penalty_matrix`.
         cost: The base penalty's linear term.
-        identified: True for each design column non-zero in at least `MIN_IDENTIFYING_ROWS` rows
-            of its family (columns of no graph family are False).
+        identified: The design columns the substation's rows identify, from `identified_columns`.
     """
 
     inputs: PooledSite
@@ -513,13 +516,33 @@ def _check_site(*, site: PooledSite, cache: FeatureCache, cut: datetime) -> None
         raise ValueError(msg)
 
 
-def _identified_columns(*, x: np.ndarray, layout: GamLayout) -> np.ndarray:
-    """Return the columns whose non-zero rows reach their family's `MIN_IDENTIFYING_ROWS`."""
+def identified_columns(*, x: np.ndarray, layout: GamLayout) -> np.ndarray:
+    """Return the design columns that a substation's own rows identify.
+
+    Args:
+        x: The substation's design matrix, shape (rows, p).
+        layout: The columns.
+
+    Returns:
+        A boolean array of length p. A heating or capacity column is identified if it is non-zero in
+        at least `MIN_IDENTIFYING_ROWS` rows; a profile or holiday column if it is non-zero in at
+        least `RELATIVE_IDENTIFYING_SHARE` of the median non-zero count of the family's non-zero
+        columns. Columns of no graph family are False.
+    """
     non_zero_rows = (x != 0.0).sum(axis=0)
     identified = np.zeros(layout.n_columns, dtype=bool)
     for family, minimum in MIN_IDENTIFYING_ROWS.items():
         columns = layout.slices[family]
         identified[columns] = non_zero_rows[columns] >= minimum
+    for family in ("profile", "holiday"):
+        columns = layout.slices[family]
+        counts = non_zero_rows[columns]
+        held = counts[counts > 0]
+        if len(held) == 0:
+            continue
+        identified[columns] = (counts > 0) & (
+            counts >= RELATIVE_IDENTIFYING_SHARE * np.median(held)
+        )
     return identified
 
 
@@ -569,7 +592,7 @@ def build_node_design(*, cache: FeatureCache, site: PooledSite, cut: datetime) -
         month_rhs=rhs,
         penalty=penalty,
         cost=cost,
-        identified=_identified_columns(x=x, layout=layout),
+        identified=identified_columns(x=x, layout=layout),
     )
 
 
@@ -636,8 +659,10 @@ def family_scales(
     """Return `g_f`, the mean diagonal of each family's Gram matrix per training row.
 
     The pooled families follow `dp_gam_pooled`: pooled over every substation's rows and the
-    family's columns. The capacity scale pools the substations that fit a capacity, over their
-    capacity columns.
+    family's columns. The capacity scale is the diagonal sum over the capacity columns of the
+    substations that identify a capacity, divided by their number of capacity columns times their
+    rows, so a pinned substation (no capacity column) and a dark-only substation (capacity columns
+    that are all zero) do not enter it.
 
     Args:
         designs: The fleet's designs, whose full-sample Gram matrices set the scale.
@@ -653,27 +678,41 @@ def family_scales(
         columns = reference[family]
         diagonal_sum = sum(float(d[columns].sum()) for d in diagonals)
         scales[family] = diagonal_sum / ((columns.stop - columns.start) * total_rows)
-    capacity_sum, capacity_columns, capacity_rows = 0.0, 0, 0
+    capacity_sum, capacity_cells = 0.0, 0
     for design, diagonal in zip(designs, diagonals, strict=True):
         columns = design.layout.slices["capacity"]
-        if columns.stop > columns.start:
-            capacity_sum += float(diagonal[columns].sum())
-            capacity_columns += columns.stop - columns.start
-            capacity_rows += design.n_rows
-    if capacity_columns:
-        scales["capacity"] = capacity_sum / (capacity_columns * capacity_rows / len(designs))
-    else:
-        scales["capacity"] = 0.0
+        if not design.identified[columns].any():
+            continue
+        capacity_sum += float(diagonal[columns].sum())
+        capacity_cells += (columns.stop - columns.start) * design.n_rows
+    scales["capacity"] = capacity_sum / capacity_cells if capacity_cells else 0.0
     return scales
+
+
+def _masked_centring(*, family: GraphFamilyType, both: np.ndarray) -> np.ndarray:
+    """Return the centring projector over the shared coordinates only, shape (m, m).
+
+    The profile's centring removes each hour band's mean over the band's shared columns; every other
+    family uses the identity.
+    """
+    shared = int(both.sum())
+    if family != "profile":
+        return np.eye(shared)
+    band_of_half_hour = band_of_hour(hour=np.arange(HALF_HOURS_PER_DAY) // 2)
+    band = np.tile(band_of_half_hour, len(DAY_TYPES))[both]
+    indicator = (band[:, None] == np.arange(N_BANDS)[None, :]).astype(np.float64)
+    sizes = np.maximum(indicator.sum(axis=0), 1.0)
+    return np.eye(shared) - indicator @ (indicator / sizes[None, :]).T
 
 
 def _edge_block(
     *, family: GraphFamilyType, first: NodeDesign, second: NodeDesign
 ) -> tuple[slice, slice, np.ndarray] | None:
-    """Return the two ends' column slices of a family and the edge's quadratic form `M^T M`.
+    """Return the two ends' column slices of a family and the edge's quadratic form.
 
-    The form is `(C M)^T (C M)` for the coordinates both ends identify, or `a a^T` for the
-    capacity functional; `None` if the edge has nothing to penalise in this family.
+    The form acts on the difference of the two ends' coefficients: `(C D)^T (C D)` over the
+    coordinates both ends identify, with the centring `C` taken over those coordinates only, or
+    `a a^T` for the capacity functional. `None` if the edge has nothing to penalise in this family.
     """
     if family == "capacity":
         left, right = first.layout.slices["capacity"], second.layout.slices["capacity"]
@@ -687,12 +726,15 @@ def _edge_block(
     both = first.identified[left] & second.identified[right]
     if not both.any():
         return None
-    reduce = centring_matrix(family=family, size=size) @ np.diag(both.astype(np.float64))
-    return left, right, reduce.T @ reduce
+    centring = _masked_centring(family=family, both=both)
+    form = np.zeros((size, size))
+    form[np.ix_(both, both)] = centring.T @ centring
+    return left, right, form
 
 
-def _coupling_matrix(
+def _add_coupling(
     *,
+    matrix: torch.Tensor,
     designs: Sequence[NodeDesign],
     graph: InterconnectionGraph,
     penalty: GraphPenalty,
@@ -700,10 +742,8 @@ def _coupling_matrix(
     offsets: Mapping[PooledFamilyType, slice],
     starts: np.ndarray,
     mu_start: int,
-    total: int,
-) -> torch.Tensor:
-    """Return the quadratic form of the fleet-mean and graph penalties, shape (total, total)."""
-    matrix = torch.zeros((total, total), dtype=torch.float64)
+) -> None:
+    """Add the quadratic form of the fleet-mean and graph penalties to `matrix`, in place."""
     reference = designs[0].layout.slices
     for family, rows in penalty.fleet.items():
         weight = rows * scales[family]
@@ -731,20 +771,21 @@ def _coupling_matrix(
             if block is None:
                 continue
             left, right, form = block
-            form_tensor = torch.as_tensor(weight * form)
             a = slice(int(starts[i]) + left.start, int(starts[i]) + left.stop)
             b = slice(int(starts[j]) + right.start, int(starts[j]) + right.stop)
             if family == "capacity":
+                # The penalty acts on the sum of each end's increments, so every entry of the
+                # blocks (a, a), (b, b), (a, b), and (b, a) takes the same weight.
                 matrix[a, a] += weight
                 matrix[b, b] += weight
                 matrix[a, b] -= weight
                 matrix[b, a] -= weight
                 continue
+            form_tensor = torch.as_tensor(weight * form)
             matrix[a, a] += form_tensor
             matrix[b, b] += form_tensor
             matrix[a, b] -= form_tensor
             matrix[b, a] -= form_tensor
-    return matrix
 
 
 @dataclass(frozen=True)
@@ -761,6 +802,15 @@ class GraphSolution:
     thetas: dict[str, np.ndarray]
     fleet_mean: np.ndarray | None
     violation: np.ndarray
+
+
+def _check_same_pooled_layout(*, designs: Sequence[NodeDesign]) -> None:
+    """Raise unless every substation holds the same pooled-family columns in the same places."""
+    reference = {f: designs[0].layout.slices[f] for f in POOLED_FAMILIES}
+    for design in designs[1:]:
+        if {f: design.layout.slices[f] for f in POOLED_FAMILIES} != reference:
+            msg = f"{design.site} has pooled-family columns that differ from {designs[0].site}'s"
+            raise ValueError(msg)
 
 
 def _slice_counts(
@@ -819,6 +869,7 @@ def solve_graph_fit(
         msg = "month counts need the fleet's month axis"
         raise ValueError(msg)
     ordered = [next(d for d in designs if d.site == node) for node in graph.nodes]
+    _check_same_pooled_layout(designs=ordered)
     batch = 1 if counts is None else counts.shape[0]
     grams, rhss = [], []
     for design in ordered:
@@ -887,16 +938,6 @@ def _solve_coupled(
     starts = np.concatenate([[0], np.cumsum(sizes)]).astype(int)
     mu_start = int(starts[-1])
     total = mu_start + (cursor if has_fleet else 0)
-    coupling = _coupling_matrix(
-        designs=designs,
-        graph=graph,
-        penalty=penalty,
-        scales=scales,
-        offsets=offsets,
-        starts=starts,
-        mu_start=mu_start,
-        total=total,
-    ).to(device)
     constrained = np.zeros(total, dtype=bool)
     fixed = torch.zeros((total, total), dtype=torch.float64)
     fixed_rhs = torch.zeros(total, dtype=torch.float64)
@@ -907,7 +948,17 @@ def _solve_coupled(
         constrained[start:stop] = design.layout.constrained
     if has_fleet:
         fixed[mu_start:, mu_start:] += FLEET_MEAN_RIDGE * torch.eye(cursor, dtype=torch.float64)
-    fixed = fixed.to(device) + coupling
+    _add_coupling(
+        matrix=fixed,
+        designs=designs,
+        graph=graph,
+        penalty=penalty,
+        scales=scales,
+        offsets=offsets,
+        starts=starts,
+        mu_start=mu_start,
+    )
+    fixed = fixed.to(device)
     chunk = _batch_size(total=total, batch=batch)
     pieces, violations = [], []
     for first in range(0, batch, chunk):
@@ -980,10 +1031,12 @@ def heating_band_slopes(*, layout: GamLayout, theta: np.ndarray) -> np.ndarray:
 
     Returns:
         An array of shape (batch, `N_BANDS`), in points per 10 degrees Celsius as the layout scales.
+        The number of smoothing windows is read from the layout.
     """
-    start = layout.slices["heating"].start
-    block = theta[:, start : start + SMOOTHING_COUNT * N_BANDS]
-    return block.reshape(theta.shape[0], SMOOTHING_COUNT, N_BANDS).sum(axis=1)
+    columns = layout.slices["heating"]
+    windows = (columns.stop - columns.start) // N_BANDS
+    block = theta[:, columns].reshape(theta.shape[0], windows, N_BANDS)
+    return block.sum(axis=1)
 
 
 def profile_scale(*, layout: GamLayout, theta: np.ndarray) -> np.ndarray:
@@ -1031,6 +1084,7 @@ def holiday_level(*, layout: GamLayout, theta: np.ndarray) -> np.ndarray:
 __all__ = [
     "GRAPH_FAMILIES",
     "MIN_IDENTIFYING_ROWS",
+    "RELATIVE_IDENTIFYING_SHARE",
     "GraphFamilyType",
     "GraphPenalty",
     "GraphSolution",
@@ -1044,6 +1098,7 @@ __all__ = [
     "gam_fits_from_solution",
     "heating_band_slopes",
     "holiday_level",
+    "identified_columns",
     "joint_month_counts",
     "kappa_for_neighbour_correlation",
     "latest_capacity",
