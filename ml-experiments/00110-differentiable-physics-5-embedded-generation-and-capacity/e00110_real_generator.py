@@ -1,13 +1,13 @@
-"""The real generator case, G-c: a Primary with an embedded generator, summed with its neighbour.
+"""The real generator case G-c: a Primary with an embedded generator, summed with its neighbour.
 
 The two series that make up G-c, and which of them carries the generator, are listed in a private
 file, `work/g_c_members.json`, with the keys `members` (two D-labels) and `generator_member`.
 Nothing here or in the published page names either series next to G-c.
 
 The fit is hindsight: it covers the scored months, so it is labelled so and enters no forecast
-score. Four months before the 2025-07-01 cut cannot identify heating or a season, so there is no
-forecast arm. The node's level is compared with the mean dark-row export of the series that
-carries the generator, which is mostly the generator (it has no temperature slope).
+score. The history before the 2025-07-01 cut is too short to identify heating or a season, so
+there is no forecast arm. The node's level is compared with the mean dark-row export of the
+series that carries the generator, which is mostly the generator (it has no temperature slope).
 
     uv run python ml-experiments/00110-*/e00110_real_generator.py
 """
@@ -113,7 +113,6 @@ def main() -> None:
         "path_points": path.tolist(),
     }
     (common.WORK_DIR / "g_c.json").write_text(json.dumps(result, indent=2) + "\n")
-    print({k: v for k, v in result.items() if k != "path_normalised"})
 
 
 if __name__ == "__main__":

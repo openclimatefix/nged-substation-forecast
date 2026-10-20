@@ -24,6 +24,8 @@ FARMS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "F")
 FARM_MAX_ZENITH_DEG: Final[float] = 75.0
 FARM_DROPOUT_GHI_W_M2: Final[float] = 100.0
 """A farm half-hour at or below zero power while the irradiance exceeds this is a dropout."""
+SUN_UP_UNIT_SHAPE: Final[float] = 0.01
+"""A grid half-hour with no frame row counts as sunlit when a unit shape exceeds this."""
 MIDDAY_HOURS_UTC: Final[tuple[int, int]] = (10, 14)
 
 EAST_WEST_PLANTS: Final[tuple[PlantParameters, ...]] = (
@@ -106,11 +108,13 @@ def farm_norm(*, cache: FeatureCache, farm: str) -> np.ndarray:
     """Return a farm's power divided by its 99th percentile, on the cache's grid.
 
     The 99th percentile is over the farm's daylight half-hours in all history, as in experiment 39.
-    A daylight half-hour with no reading, or at or below zero power while the irradiance exceeds
-    `FARM_DROPOUT_GHI_W_M2` (a dropout), returns `NaN`, so a substation's power becomes `NaN` there
-    and the row drops out of training instead of carrying a farm that produced nothing. Remaining
-    negative readings are set to zero. A half-hour outside the daylight rows of the farm's frame
-    returns 0, because the farm injects nothing in the dark.
+    A half-hour returns `NaN`, so a substation's power becomes `NaN` there and the row drops out of
+    training instead of carrying a farm that produced nothing, when the farm's frame has no row for
+    it while the sun is up, or has a daylight row (zenith under 75 degrees) with no reading or a
+    dropout (power at or below zero while the irradiance exceeds `FARM_DROPOUT_GHI_W_M2`).
+    Remaining negative readings are set to zero. A half-hour with the sun below 75 degrees of zenith
+    in the frame returns 0: the farm's output there is under a few per cent of its 99th percentile.
+    A half-hour with no frame row and the sun down returns 0.
 
     Args:
         cache: The cache, for the grid.
@@ -119,9 +123,10 @@ def farm_norm(*, cache: FeatureCache, farm: str) -> np.ndarray:
     Returns:
         The normalised power on the grid.
     """
-    frame = pl.read_parquet(common.INJECTION_FRAME_PATH).filter(
-        pl.col("site") == farm, pl.col("kind") == "farm", pl.col("zenith") < FARM_MAX_ZENITH_DEG
+    everything = pl.read_parquet(common.INJECTION_FRAME_PATH).filter(
+        pl.col("site") == farm, pl.col("kind") == "farm"
     )
+    frame = everything.filter(pl.col("zenith") < FARM_MAX_ZENITH_DEG)
     power = frame.filter(pl.col("power").is_not_null())
     p99 = float(np.nanpercentile(power["power"].to_numpy(), 99))
     dropout = (pl.col("power") <= 0.0) & (pl.col("ghi_u") > FARM_DROPOUT_GHI_W_M2)
@@ -133,7 +138,14 @@ def farm_norm(*, cache: FeatureCache, farm: str) -> np.ndarray:
     )
     grid = pl.DataFrame({"time": cache.times_series()})
     joined = grid.join(daylight, on="time", how="left", validate="1:1", maintain_order="left")
-    return joined["norm"].fill_null(0.0).to_numpy().astype(np.float64)
+    norm = joined["norm"].fill_null(0.0).to_numpy().astype(np.float64)
+    in_frame = grid.join(everything.select("time"), on="time", how="semi")["time"]
+    missing = ~np.isin(cache.times_series().to_numpy(), in_frame.to_numpy())
+    sun_up = np.max(
+        [np.nan_to_num(site.pv_unit_shape, nan=0.0) for site in cache.sites.values()], axis=0
+    )
+    norm[missing & (sun_up > SUN_UP_UNIT_SHAPE)] = np.nan
+    return norm
 
 
 def inject_farm(

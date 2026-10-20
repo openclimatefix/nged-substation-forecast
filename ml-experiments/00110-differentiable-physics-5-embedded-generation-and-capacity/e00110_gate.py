@@ -175,16 +175,31 @@ def _farm_job(job: tuple[str, str]) -> list[dict[str, Any]]:
     """Gate test 2 for one site and K arm: every farm."""
     site, arm = job
     cache: FeatureCache = _STATE["cache"]
-    base = _capacity(cache=cache, site=site, arm=arm)
     target = FARM_POINTS / _shape_p99(cache=cache, site=site)
     rows = []
     for farm in inject.FARMS:
+        # The base fit drops the same rows as the injected fit (an injection of zero capacity
+        # carries the farm's missing half-hours as NaN), so the rise is the injection alone.
+        base_cache = inject.inject_pv(
+            cache=cache, site=site, shape=_farm_norm(farm), capacity_points=0.0
+        )
         injected = inject.inject_pv(
             cache=cache, site=site, shape=_farm_norm(farm), capacity_points=FARM_POINTS
         )
+        _check_rows_remain(base=cache, injected=base_cache, site=site)
+        base = _capacity(cache=base_cache, site=site, arm=arm)
         rise = _capacity(cache=injected, site=site, arm=arm) - base
         rows.append({"test": 2, "site": site, "arm": arm, "farm": farm, "ratio": rise / target})
     return rows
+
+
+def _check_rows_remain(*, base: FeatureCache, injected: FeatureCache, site: str) -> None:
+    """Raise if an injection leaves under half of a site's readings."""
+    before = int(np.isfinite(base.sites[site].y).sum())
+    after = int(np.isfinite(injected.sites[site].y).sum())
+    if after < 0.5 * before:
+        msg = f"an injection left {after} of {before} readings at {site}"
+        raise ValueError(msg)
 
 
 def _pinned_b(*, cache: FeatureCache, site: str) -> tuple[PinnedCapacity, GamSpec]:
@@ -337,7 +352,9 @@ def _node_job(site: str) -> dict[str, Any]:
 def _clip_job(site: str) -> dict[str, Any]:
     """Gate test 5 at one site."""
     cache: FeatureCache = _STATE["cache"]
-    pinned, spec = _pinned_b(cache=cache, site=site)
+    pinned, _ = _pinned_b(cache=cache, site=site)
+    # The scored clip arms profile the clip on B-D1 without its node, so the gate does too.
+    spec = arms.base_specs(part_4=arms.read_part_4_tuned())["b_d1"]
     features = cache.sites[site]
     rows = np.flatnonzero(np.isfinite(features.y) & np.isfinite(features.pv_unit_shape))
     rooftop = np.full(len(cache.end_times), np.nan)
