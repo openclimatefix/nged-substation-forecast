@@ -199,7 +199,9 @@ flatters the hint (experiment 113's caveat). Readings, at W\* and at W0:
    remainder's level moves beyond 3 clean-system standard deviations in at least 80% of 100 systems.
 6. **Positive control for the claim (also C2's power check):** with a 25% scale error for 30 days at
    one synthetic Primary, W\* cuts that Primary's damage by at least 0.30 at the median system, in both
-   halves of the systems. This reading fails if the weight is effectively zero.
+   halves of the systems. This reading fails if the weight is effectively zero. **Clarified after
+   the module was written, before any fit (see "Clarifications"): the damage is scored on the clean
+   scored year, outside the corrupted window, at the default step penalty and at the tuned one.**
 7. **Power for C1:** the paired half-width (99.17% interval) of W\* minus W0 on the clean synthetic
    systems, at the **real site count** under the chosen BSPs (2 to 3 sites, not 5), is measured and
    printed before any real fit. If it exceeds 0.03 points, the verdict is capped at
@@ -308,6 +310,27 @@ sits under which BSP (two cards sharing a remainder would give away the grouping
 **Module `studies.dp_hierarchy` (own PR off `main`, two code reviews, green tests, no new dependencies):** stacks per-site `GamLayout`s with a BSP block and wraps `solve_bounded_quadratic` with the weight, remainder, generators, and MVA dark-row mask; tests P1 to P3 under 5 minutes each. No replicate-year or scored-year fit runs before that PR has merged.
 
 **Compute, CPU only, at most 6 cores: about 8 to 18 hours of wall clock at 8 cores, to be re-read at 6.** Single-site Gram accumulation is 12 minutes per site and cut, cached. A joint solve takes 1 to 3 minutes. Counts: tuning grid 42 solves; tuning injections about 300; gate about 400; C2 450 injections x 3 arms plus OR x 2 cuts, about 3,600 solves, each also run through the filter. **Thinning, on the total:** if C2's projected wall clock exceeds 14 hours after 200 solves, C2 drops to 5 seeds per cell and the weight grid to {0, 0.3, 1, 3, 30}.
+
+## Clarifications made after the module was written and before any fit
+
+**These five changes follow a Sonnet code review of the module. They were made before any tuning,
+gate, replicate-year, or scored-year fit ran, and are labelled so a reader can tell them from the
+original plan.**
+
+- **The remainder's penalties scale with the BSP term.** The BSP term is `(w / sigma_b^2) * (loss +
+  penalties)`, so the weight `w` changes how much the BSP reading matters and not how freely the
+  remainder can absorb an offset. The original plan added the penalties unscaled.
+- **Gate reading 6 is scored out of the corrupted window.** The module's own test showed a BSP
+  weight pulls a corrupted Primary back inside the corrupted window (error 11.3 to about 3.3
+  points) while the remainder's free level absorbs the constant offset elsewhere. The damage that
+  matters in C2 arrives on the clean scored year, so reading 6 scores that year, and also reports
+  the in-window error and the BSP residual, at the default step penalty (30) and at the tuned one.
+- **The BSP rows start where the Primaries' training window starts,** so the hint does not
+  constrain a Primary's coefficients at times its own block ignores.
+- **The remainder's last step knot (at the cut) is dropped,** because its indicator is true for the
+  final training row only and cannot be identified.
+- **The generator sign is tested with a time-varying series.** A constant would be absorbed by the
+  remainder's level.
 
 ## Rulings made before the run
 
