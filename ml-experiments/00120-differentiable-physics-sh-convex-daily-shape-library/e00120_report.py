@@ -772,6 +772,151 @@ def step_by_temperature() -> pl.DataFrame:
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
+COLD_BST_NIGHT_C: Final[float] = 6.0
+"""Cold for the clock test only: the E7 finding is about cold British Summer Time nights."""
+MIN_CLOCK_NIGHTS: Final[int] = 5
+
+
+def step_clock_table() -> pl.DataFrame:
+    """Return the UTC time of the largest night-time rise on cold nights in summer and winter time.
+
+    For each decision substation and year, the mean actual power at each half-hour end from 21:30
+    to 04:00 UTC is taken over cold nights (6-hour-smoothed ERA5 temperature below
+    `COLD_BST_NIGHT_C`), separately for nights in British Summer Time and in Greenwich Mean Time.
+    The rise is the half-hour with the largest increase on the half-hour before. A step on the
+    local clock rises one hour earlier in UTC in summer time; a UTC-fixed step rises at the same
+    UTC time in both. Fewer than `MIN_CLOCK_NIGHTS` cold nights in a clock give "cannot tell".
+    """
+    cache_ = common.load_cache()
+    rows = []
+    for label in ("scored", "replicate"):
+        frame = seeded(label=label, arm="sh", pooled=False)
+        for site in DECISION:
+            temperature = pl.DataFrame(
+                {
+                    "valid_time": pl.Series(cache_.end_times).dt.replace_time_zone("UTC"),
+                    "temperature": cache_.sites[site].smoothed_temperature_c[:, 0],
+                }
+            )
+            part = (
+                frame.filter(pl.col("site_name") == site)
+                .join(temperature, on="valid_time", how="left")
+                .with_columns(
+                    utc_minutes=pl.col("valid_time").dt.hour() * 60
+                    + pl.col("valid_time").dt.minute(),
+                    summer=pl.col("valid_time")
+                    .dt.convert_time_zone("Europe/London")
+                    .dt.offset_by("0s")
+                    .dt.dst_offset()
+                    > pl.duration(seconds=0),
+                    night=(pl.col("valid_time") - pl.duration(hours=12)).dt.date(),
+                )
+                .filter(pl.col("temperature") < COLD_BST_NIGHT_C)
+            )
+            for clock, summer in (("British Summer Time", True), ("Greenwich Mean Time", False)):
+                kept = part.filter(pl.col("summer") == summer)
+                n_nights = kept["night"].n_unique()
+                night_rows = kept.filter(
+                    (pl.col("utc_minutes") >= 21 * 60 + 30) | (pl.col("utc_minutes") <= 4 * 60)
+                )
+                curve = (
+                    night_rows.with_columns(order=(pl.col("utc_minutes") + 150) % 1440)
+                    .group_by("order")
+                    .agg(pl.col("actual").mean())
+                    .sort("order")
+                )
+                rise = float("nan")
+                rise_time = "cannot tell"
+                if n_nights >= MIN_CLOCK_NIGHTS and curve.height > 2:
+                    values = curve["actual"].to_numpy()
+                    step = np.diff(values)
+                    position = int(np.argmax(step)) + 1
+                    minutes = (int(curve["order"][position]) - 150) % 1440
+                    rise_time = f"{minutes // 60:02d}:{minutes % 60:02d} UTC"
+                    rise = float(step.max())
+                rows.append(
+                    {
+                        "year": label,
+                        "site": site,
+                        "clock": clock,
+                        "cold nights": n_nights,
+                        "largest rise ends at": rise_time,
+                        "rise (points)": rise,
+                    }
+                )
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
+def step_windows_table() -> pl.DataFrame:
+    """Return the two largest rises and falls of each shape and profile in the first 12 hours.
+
+    The columns are local half-hours of the weekday block; a night-time step shows as a rise near
+    column 2 (01:00) and a fall about seven hours later (column 16, 08:00 local, or 07:00 local
+    in the other clock), and a second window shows as a second rise and fall pair.
+    """
+    fits = fit_files(label="scored", arm="sh")
+    arrays = min(fits, key=lambda fit: fit[2]["objective"])[1]
+    labels = [str(label) for label in arrays["labels"]]
+    items = [(f"shape {k + 1}", arrays["shapes"][k][:48]) for k in range(arrays["shapes"].shape[0])]
+    items += [
+        (label, (arrays["weights"][i] @ arrays["shapes"] + arrays["deviations"][i])[:48])
+        for i, label in enumerate(labels)
+        if label in DECISION
+    ]
+    rows = []
+    for name, weekday in items:
+        step = np.diff(weekday[:25])
+        order = np.argsort(step)
+        for kind, picks in (("rise", order[::-1][:2]), ("fall", order[:2])):
+            for rank, column in enumerate(picks, start=1):
+                minutes = (int(column) + 1) * 30
+                rows.append(
+                    {
+                        "name": name,
+                        "kind": f"{kind} {rank}",
+                        "local time": f"{minutes // 60:02d}:{minutes % 60:02d}",
+                        "size": float(step[column]),
+                    }
+                )
+    return pl.DataFrame(rows)
+
+
+def weight_by_year_table() -> pl.DataFrame:
+    """Return each substation's weight share on the shape with the largest 01:00 rise, per cut.
+
+    The shapes of the replicate and tuning cuts are matched to the scored-year shapes. A cut at
+    which the substation has no fit (too little history) gives "cannot tell".
+    """
+    fits = {label: fit_files(label=label, arm="sh") for label in ("tuning", "replicate", "scored")}
+    if not fits["scored"]:
+        return pl.DataFrame()
+    reference = min(fits["scored"], key=lambda fit: fit[2]["objective"])[1]["shapes"]
+    rises = reference[:, STEP_COLUMN] - reference[:, STEP_COLUMN - 1]
+    step_shape = int(np.argmax(rises))
+    rows = []
+    for label, cut_fits in fits.items():
+        if not cut_fits:
+            continue
+        arrays = min(cut_fits, key=lambda fit: fit[2]["objective"])[1]
+        order, _ = match_shapes(first=reference, second=arrays["shapes"])
+        names = [str(name) for name in arrays["labels"]]
+        for site in DECISION:
+            share: float | None = None
+            if site in names:
+                weights = arrays["weights"][names.index(site)][order]
+                share = float(weights[step_shape] / weights.sum())
+            rows.append(
+                {
+                    "cut": label,
+                    "site": site,
+                    "shape with largest 01:00 rise": step_shape + 1,
+                    "weight share": share,
+                    "note": "" if share is not None else "cannot tell (no fit)",
+                }
+            )
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
 def audit_triggers(*, planned: pl.DataFrame, reproduction: pl.DataFrame) -> list[str]:
     """Return which of the plan's audit triggers the numbers fire (trigger 7 is judged by hand)."""
     fired = []
@@ -846,6 +991,12 @@ def main() -> None:
     print(step_table().write_csv(float_precision=3), end="")
     print("== The 01:00 step on cold and mild nights (actual and SH mean forecast) ==")
     print(step_by_temperature().write_csv(float_precision=3), end="")
+    print("== Clock of the largest night-time rise on cold nights (post hoc style readout) ==")
+    print(step_clock_table().write_csv(float_precision=3), end="")
+    print("== Rises and falls of the shapes and profiles in the first 12 hours (local time) ==")
+    print(step_windows_table().write_csv(float_precision=3), end="")
+    print("== Weight on the step shape by cut ==")
+    print(weight_by_year_table().write_csv(float_precision=3), end="")
     print("== Audit triggers that the numbers fire ==")
     print(audit_triggers(planned=planned, reproduction=reproduction))
 

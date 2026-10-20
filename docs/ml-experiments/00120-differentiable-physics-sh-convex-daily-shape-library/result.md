@@ -452,6 +452,19 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
       filter variant GAM-K (the per-site convex model with recent-level assimilation) is outside
       this experiment, so G stands in as the per-site reference. A visible miss on cold winter
       nights counts against release even when the mean score is unchanged, and the verdict says so.
+    - **Labelling a shape that looks like the 01:00 step (maintainer, 2026-10-20; labelled
+      exploratory readouts, hypotheses from background text and not findings).** The report prints,
+      for each decision substation, the UTC time of the largest night-time rise on cold nights
+      (6-hour-smoothed ERA5 temperature below 6 °C) separately in British Summer Time and in
+      Greenwich Mean Time. A step on the local clock rises one hour earlier in UTC in summer; a
+      UTC-fixed step rises at the same UTC time in both. A clock with fewer than 5 cold nights
+      gives "cannot tell". The report also prints each shape's and each substation's two largest
+      rises and two largest falls in the first 12 local hours, which shows the end of the window
+      (about seven hours after the start) and any second window. The weight of each decision
+      substation on the shape with the largest 01:00 rise is printed for the tuning, replicate,
+      and scored cuts (shapes matched across cuts), with "cannot tell" where a substation has no
+      fit at a cut, so a change over the radio-teleswitch meter retirement can be seen if the
+      history allows.
     - **K from 3 to 6.** The tuning year also runs K = 5 and 6 at the chosen pair (exploratory, never
       scored later); the report shows K = 2 to 6.
     - **Penalties against shape collapse and noise shapes.** The orthogonality penalty is the
