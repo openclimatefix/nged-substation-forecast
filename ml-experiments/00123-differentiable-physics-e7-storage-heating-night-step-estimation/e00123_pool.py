@@ -2,8 +2,8 @@
 
 The pooled mean uses the DerSimonian-Laird between-series variance, a Hartung-Knapp interval (t
 with `k - 1` degrees of freedom), a percentile interval from resampling whole series, and a
-profile-likelihood interval for the between-series standard deviation `tau`. A set of fewer than
-`MIN_SERIES` series gets the plain mean and range only.
+maximum-likelihood between-series standard deviation `tau` with a profile-likelihood interval. A
+set of fewer than `MIN_SERIES` series gets the plain mean and range only.
 """
 
 from dataclasses import dataclass
@@ -28,7 +28,7 @@ class Pooled:
         high_hk: Upper end of the Hartung-Knapp interval.
         low_boot: Lower end of the series-bootstrap percentile interval.
         high_boot: Upper end of the series-bootstrap percentile interval.
-        tau: DerSimonian-Laird between-series standard deviation.
+        tau: Maximum-likelihood between-series standard deviation.
         tau_low: Lower end of the profile-likelihood interval for `tau`.
         tau_high: Upper end of the profile-likelihood interval for `tau`.
         minimum: The smallest per-series value.
@@ -74,16 +74,18 @@ def _profile_log_likelihood(*, values: np.ndarray, variances: np.ndarray, tau2: 
 
 
 def _tau_interval(*, values: np.ndarray, variances: np.ndarray) -> tuple[float, float, float]:
-    """Return tau and its profile-likelihood interval (maximum likelihood, grid search)."""
-    spread = float(np.ptp(values)) + float(np.sqrt(variances.max())) + 1e-9
-    grid = np.concatenate([[0.0], np.linspace(1e-4, 2.0 * spread, 2000) ** 2 / (2.0 * spread)])
+    """Return the maximum-likelihood tau and its profile-likelihood interval (grid in tau).
+
+    The upper end is infinite when the profile is still inside the cut-off at the grid's edge.
+    """
+    tau_max = 2.0 * (float(np.ptp(values)) + float(np.sqrt(variances.max()))) + 1e-9
+    taus = np.linspace(0.0, tau_max, 4001)
     log_likelihood = np.array(
-        [_profile_log_likelihood(values=values, variances=variances, tau2=t) for t in grid]
+        [_profile_log_likelihood(values=values, variances=variances, tau2=t**2) for t in taus]
     )
-    best = log_likelihood.max()
-    inside = grid[2.0 * (best - log_likelihood) <= stats.chi2.ppf(LEVEL, df=1)]
-    tau2_hat = float(grid[int(np.argmax(log_likelihood))])
-    return float(np.sqrt(tau2_hat)), float(np.sqrt(inside.min())), float(np.sqrt(inside.max()))
+    inside = taus[2.0 * (log_likelihood.max() - log_likelihood) <= stats.chi2.ppf(LEVEL, df=1)]
+    tau_high = float("inf") if inside.max() == taus[-1] else float(inside.max())
+    return float(taus[int(np.argmax(log_likelihood))]), float(inside.min()), tau_high
 
 
 def pool(*, values: np.ndarray, standard_errors: np.ndarray, rng: np.random.Generator) -> Pooled:

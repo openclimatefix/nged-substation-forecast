@@ -21,7 +21,10 @@ def main() -> None:
     table = pl.concat(frames)
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     table.write_parquet(common.WORK_DIR / "night_tables.parquet")
-    usable = table.filter((pl.col("season") == "gmt") & ~pl.col("excluded"))
+    allowed = list(common.allowed_winters(winters=common.WINTERS))
+    usable = table.filter(
+        (pl.col("season") == "gmt") & ~pl.col("excluded") & pl.col("winter").is_in(allowed)
+    )
     feasibility = (
         usable.group_by("site", "winter")
         .agg(

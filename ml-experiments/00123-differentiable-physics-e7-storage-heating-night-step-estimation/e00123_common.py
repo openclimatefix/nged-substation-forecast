@@ -10,10 +10,11 @@ so a half-hour *starting* at `s` carries the stamp `s + 30 min`, as experiments 
 """
 
 import os
+import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
 import polars as pl
 from studies.dp_calendar import LOCAL_TIME_ZONE, bank_holiday_names
@@ -325,7 +326,7 @@ def night_labels(*, evenings: list[date]) -> pl.DataFrame:
         Columns `evening`, `winter`, `season`, `day_type`, `excluded`.
     """
     holidays = set(bank_holiday_names())
-    changes = clock_change_dates(years=range(evenings[0].year, evenings[-1].year + 2))
+    changes = clock_change_dates(years=range(evenings[0].year - 1, evenings[-1].year + 2))
     rows = []
     for evening in evenings:
         morning = evening + timedelta(days=1)
@@ -391,8 +392,8 @@ def build_night_table(*, info: SeriesInfo, power: pl.DataFrame) -> pl.DataFrame:
         rows), `window_mean`, and `baseline_mean` (local clock). `d` is null unless every one of the
         nine slots has a reading.
     """
-    first_reading = power["time"].min()
-    last_reading = power["time"].max()
+    first_reading = cast("datetime | None", power["time"].min())
+    last_reading = cast("datetime | None", power["time"].max())
     if first_reading is None or last_reading is None:
         msg = f"{info.site} has no readings"
         raise ValueError(msg)
@@ -457,7 +458,8 @@ def scored_winter_unlocked() -> bool:
         return False
     import json
 
-    return bool(json.loads(DECISIONS_PATH.read_text()).get("pr1397_merge_sha"))
+    sha = json.loads(DECISIONS_PATH.read_text()).get("pr1397_merge_sha")
+    return re.fullmatch(r"[0-9a-f]{40}", str(sha)) is not None
 
 
 def allowed_winters(*, winters: tuple[int, ...]) -> tuple[int, ...]:

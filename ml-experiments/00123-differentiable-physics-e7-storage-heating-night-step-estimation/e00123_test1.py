@@ -6,7 +6,8 @@ reproduce its tuning-year quantile score at four decimal places. It reads no est
 """
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
+from typing import cast
 
 import e00123_common as common
 import e00123_estimate as estimate
@@ -111,44 +112,50 @@ def main() -> None:
     print_convention()
     ids = [infos["D10"].time_series_id]
     power = common.load_power(time_series_ids=ids)
-    if power["time"].max() >= common.HOLDOUT_START:
+    if cast("datetime", power["time"].max()) >= common.HOLDOUT_START:
         msg = "a reading on or after 2026-07-01 was read"
         raise AssertionError(msg)
     print("Readings read: latest", power["time"].max(), "(before 2026-07-01).")
     print("\n".join(hand_check(table=table, power=power, site="D10")))
     print("\nB0 reproduction (experiment 114 stored predictions, tuning year):")
     print("\n".join(check_b0_reproduction(infos=infos)))
-    print("\nTest 0 and test 3 (design winters 2023-24 and 2024-25 and all headline winters):")
+    print("\nTest 0 and test 3, on the design winters 2023-24 and 2024-25 only:")
     report: dict[str, dict[str, float | str]] = {}
     for site in common.FITTED_SERIES:
         nights = estimate.load_nights(
             table=table,
             site=site,
             capacity_mw=infos[site].effective_capacity_mw,
-            winters=common.allowed_winters(winters=common.WINTERS),
+            winters=common.DESIGN_WINTERS,
             summer_years=common.SUMMER_YEARS,
         )
-        usable = table.filter(
-            (pl.col("site") == site)
-            & (pl.col("season") == "gmt")
-            & ~pl.col("excluded")
-            & pl.col("winter").is_in(list(nights.winters))
+        shares = (
+            table.filter(
+                (pl.col("site") == site)
+                & (pl.col("season") == "gmt")
+                & ~pl.col("excluded")
+                & pl.col("winter").is_in(list(common.DESIGN_WINTERS))
+            )
+            .group_by("winter")
+            .agg(share=pl.col("d").is_not_null().mean())
+            .sort("winter")["share"]
+            .to_list()
         )
-        share = usable["d"].is_not_null().mean()
+        lowest = min(float(share) for share in shares) if shares else 0.0
         check = estimate.rank_check(nights=nights)
         ok = (
             len(nights.winters) >= 2
-            and float(share or 0.0) >= common.MIN_PRESENT_SHARE
+            and lowest >= common.MIN_PRESENT_SHARE
             and check["rank"] == check["columns"]
             and check["vif_cold"] <= 10.0
         )
         print(
-            f"{site}: winters {nights.winters}, present share {float(share or 0):.3f}, "
+            f"{site}: winters {nights.winters}, lowest per-winter present share {lowest:.3f}, "
             f"rank {check['rank']:.0f}/{check['columns']:.0f}, smallest singular value "
             f"{check['smallest_singular_value']:.3f}, VIF of c {check['vif_cold']:.2f}, "
             f"{'kept' if ok else 'DROPPED'}"
         )
-        report[site] = {**check, "present_share": float(share or 0.0), "kept": str(ok)}
+        report[site] = {**check, "present_share": lowest, "kept": str(ok)}
     (common.WORK_DIR / "test1.json").write_text(json.dumps(report, indent=2))
 
 
