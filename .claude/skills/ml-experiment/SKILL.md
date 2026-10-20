@@ -421,8 +421,8 @@ in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
 `experiment_tables.py --check`. A failure found by CI costs a ten-minute rerun.
 
-**Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its `take_home_message`.** The
-agent receives the files and no account of the reasoning behind them, loads the `prose-review`
+**Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its
+`take_home_message`.** The agent receives the files and no account of the reasoning behind them, loads the `prose-review`
 skill, and reads the opening paragraph first. It reports every term, abbreviation, and number in the
 opening that a reader who has not seen the experiment could not parse, and then checks the rest of
 the page against the prose rules in `CLAUDE.md`. The experiment's session triages the findings,
