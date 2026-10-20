@@ -407,15 +407,15 @@ extra-paths = [
 
 [[tool.ty.overrides]]
 # `torch` and `triton` come from the optional `gpu` dependency group of `packages/studies`, which CI
-# does not install, so `ty` cannot resolve them there. Only the modules listed here import them: the
-# differentiable battery estimator, the differentiable-physics model of the demand series
-# (`dp_gam.py`, `dp_gam_pooled.py`, `dp_operator.py`, `dp_pooled.py`, `dp_pooled_vp.py`,
-# `dp_onboarding.py`), their tests, and the battery study wrapper.
+# does not install, so `ty` cannot resolve them there. The files listed in `include` are the ones
+# that import them, directly or through the differentiable-physics modules, and the tests and
+# scripts that go with those.
 include = [
     "packages/studies/src/studies/battery_recurrence.py",
     "packages/studies/src/studies/battery_state_space.py",
     "packages/studies/src/studies/capacity_physics_torch.py",
     "packages/studies/src/studies/dp_gam.py",
+    "packages/studies/src/studies/dp_meter.py",
     "packages/studies/src/studies/dp_gam_pooled.py",
     "packages/studies/src/studies/dp_onboarding.py",
     "packages/studies/src/studies/dp_operator.py",
@@ -450,6 +450,8 @@ include = [
     "packages/studies/tests/test_battery_state_space.py",
     "packages/studies/tests/test_capacity_physics_torch.py",
     "packages/studies/tests/test_dp_gam.py",
+    "packages/studies/tests/test_dp_generation.py",
+    "packages/studies/tests/test_dp_meter.py",
     "packages/studies/tests/test_dp_gam_pooled.py",
     "packages/studies/tests/test_dp_onboarding.py",
     "packages/studies/tests/test_dp_operator.py",
