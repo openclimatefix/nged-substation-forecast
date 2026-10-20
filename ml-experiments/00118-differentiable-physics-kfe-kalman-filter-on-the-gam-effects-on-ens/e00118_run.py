@@ -37,20 +37,27 @@ PREDS_DIR: Final[Path] = common.WORK_DIR / "preds"
 SPREAD_DIR: Final[Path] = common.WORK_DIR / "spread"
 TUNED_PATH: Final[Path] = common.WORK_DIR / "tuned.json"
 GATE_PATH: Final[Path] = common.WORK_DIR / "gate.json"
+GATE_RULING_PATH: Final[Path] = common.WORK_DIR / "gate_ruling.json"
 PERIODS: Final[tuple[str, ...]] = ("tuning", "replicate", "scored")
 GUARDED_PERIODS: Final[frozenset[str]] = frozenset({"replicate", "scored"})
 
 
 def require_clearance(*, periods: list[str]) -> None:
-    """Raise unless the known-answer gate has passed, for the replicate and scored periods.
+    """Raise unless the known-answer gate has passed, or a ruling allows a descriptive run.
+
+    A failed gate caps the verdict at `inconclusive`. A run after a failed gate needs the file
+    `work/gate_ruling.json`, which records who ruled and what, so the page can quote it.
 
     Args:
         periods: The periods about to be forecast; only replicate and scored are guarded.
 
     Raises:
-        RuntimeError: If a guarded period is asked for and the gate has not passed.
+        RuntimeError: If a guarded period is asked for, the gate has not passed, and no ruling
+            allows the run.
     """
     if not GUARDED_PERIODS & set(periods):
+        return
+    if GATE_RULING_PATH.exists():
         return
     if not GATE_PATH.exists() or json.loads(GATE_PATH.read_text())["blocking_failed"] != 0:
         msg = "the known-answer gate has not passed; no replicate or scored run may start"
