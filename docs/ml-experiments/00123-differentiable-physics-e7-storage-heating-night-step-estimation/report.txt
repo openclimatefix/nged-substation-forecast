@@ -577,3 +577,224 @@ shape: (14, 6)
 | D19 | 100% / 0% (31) | 92% / 0% (12) | 100% / 0% (13) | 100% / 0% (11) | cannot tell (6) |
 | D21 | 97% / 0% (31) | 58% / 0% (12) | 85% / 0% (13) | 45% / 9% (11) | cannot tell (6) |
 | D22 | 88% / 0% (25) | 83% / 0% (12) | 38% / 38% (13) | 62% / 8% (13) | cannot tell (4) |
+
+## Tariff edges on the local clock (post hoc, exploratory)
+
+== placebo edges: share of series-years whose 90% interval excludes 0 (5% expected) ==
+shape: (4, 3)
+┌───────────────┬──────────────────────┬───────┐
+│ edge          ┆ share_excluding_zero ┆ cells │
+│ ---           ┆ ---                  ┆ ---   │
+│ str           ┆ f64                  ┆ u32   │
+╞═══════════════╪══════════════════════╪═══════╡
+│ placebo 21:00 ┆ 0.79                 ┆ 68    │
+│ placebo 18:30 ┆ 0.76                 ┆ 68    │
+│ placebo 03:30 ┆ 0.76                 ┆ 68    │
+│ placebo 10:00 ┆ 0.76                 ┆ 68    │
+└───────────────┴──────────────────────┴───────┘
+== detection limit: median half-width of the 90% interval, points ==
+shape: (2, 3)
+┌─────────────┬───────────────────┬────────────────┐
+│ kind        ┆ median_half_width ┆ max_half_width │
+│ ---         ┆ ---               ┆ ---            │
+│ str         ┆ f64               ┆ f64            │
+╞═════════════╪═══════════════════╪════════════════╡
+│ placebo     ┆ 0.32              ┆ 2.10           │
+│ tariff edge ┆ 0.30              ┆ 3.90           │
+└─────────────┴───────────────────┴────────────────┘
+== tariff edges: series-years in which the expected-sign edge is visible ==
+shape: (9, 4)
+┌─────────────────────────────────┬──────────────┬─────────┬─────────────────┐
+│ edge                            ┆ series_years ┆ visible ┆ median_estimate │
+│ ---                             ┆ ---          ┆ ---     ┆ ---             │
+│ str                             ┆ u32          ┆ u32     ┆ f64             │
+╞═════════════════════════════════╪══════════════╪═════════╪═════════════════╡
+│ Cosy closes 07:00               ┆ 54           ┆ 0       ┆ 2.93            │
+│ Cosy closes 16:00               ┆ 54           ┆ 2       ┆ 3.54            │
+│ Cosy opens 04:00                ┆ 54           ┆ 16      ┆ -0.18           │
+│ Cosy opens 13:00                ┆ 54           ┆ 34      ┆ 1.23            │
+│ Cosy opens 22:00                ┆ 54           ┆ 0       ┆ -1.56           │
+│ Intelligent Octopus Go closes … ┆ 68           ┆ 33      ┆ -0.24           │
+│ Intelligent Octopus Go opens 2… ┆ 68           ┆ 7       ┆ -0.55           │
+│ Octopus Go closes 05:30         ┆ 68           ┆ 33      ┆ -0.24           │
+│ Octopus Go opens 00:30          ┆ 68           ┆ 47      ┆ 0.45            │
+└─────────────────────────────────┴──────────────┴─────────┴─────────────────┘
+== tariff edges: substations visible in at least two years ==
+shape: (44, 4)
+┌─────────────────────────────────┬──────┬───────┬───────────────┐
+│ edge                            ┆ site ┆ years ┆ mean_estimate │
+│ ---                             ┆ ---  ┆ ---   ┆ ---           │
+│ str                             ┆ str  ┆ u32   ┆ f64           │
+╞═════════════════════════════════╪══════╪═══════╪═══════════════╡
+│ Cosy closes 16:00               ┆ D8   ┆ 2     ┆ -9.14         │
+│ Cosy opens 04:00                ┆ D16  ┆ 2     ┆ 0.37          │
+│ Cosy opens 04:00                ┆ D22  ┆ 3     ┆ 1.54          │
+│ Cosy opens 04:00                ┆ D3   ┆ 4     ┆ 0.77          │
+│ Cosy opens 04:00                ┆ D4   ┆ 3     ┆ 0.24          │
+│ Cosy opens 04:00                ┆ D8   ┆ 2     ┆ 0.88          │
+│ Cosy opens 13:00                ┆ D10  ┆ 4     ┆ 3.08          │
+│ Cosy opens 13:00                ┆ D11  ┆ 3     ┆ 0.77          │
+│ Cosy opens 13:00                ┆ D14  ┆ 2     ┆ 0.63          │
+│ Cosy opens 13:00                ┆ D16  ┆ 4     ┆ 1.73          │
+│ Cosy opens 13:00                ┆ D19  ┆ 4     ┆ 3.01          │
+│ Cosy opens 13:00                ┆ D2   ┆ 4     ┆ 1.59          │
+│ Cosy opens 13:00                ┆ D21  ┆ 4     ┆ 1.56          │
+│ Cosy opens 13:00                ┆ D22  ┆ 3     ┆ 2.69          │
+│ Cosy opens 13:00                ┆ D4   ┆ 4     ┆ 0.48          │
+│ Intelligent Octopus Go closes … ┆ D11  ┆ 2     ┆ -0.63         │
+│ Intelligent Octopus Go closes … ┆ D16  ┆ 4     ┆ -0.79         │
+│ Intelligent Octopus Go closes … ┆ D19  ┆ 2     ┆ -0.42         │
+│ Intelligent Octopus Go closes … ┆ D2   ┆ 5     ┆ -0.37         │
+│ Intelligent Octopus Go closes … ┆ D21  ┆ 2     ┆ -0.30         │
+│ Intelligent Octopus Go closes … ┆ D3   ┆ 5     ┆ -0.57         │
+│ Intelligent Octopus Go closes … ┆ D4   ┆ 5     ┆ -0.45         │
+│ Intelligent Octopus Go closes … ┆ D8   ┆ 5     ┆ -2.50         │
+│ Intelligent Octopus Go opens 2… ┆ D16  ┆ 3     ┆ 0.56          │
+│ Octopus Go closes 05:30         ┆ D11  ┆ 2     ┆ -0.63         │
+│ Octopus Go closes 05:30         ┆ D16  ┆ 4     ┆ -0.79         │
+│ Octopus Go closes 05:30         ┆ D19  ┆ 2     ┆ -0.42         │
+│ Octopus Go closes 05:30         ┆ D2   ┆ 5     ┆ -0.37         │
+│ Octopus Go closes 05:30         ┆ D21  ┆ 2     ┆ -0.30         │
+│ Octopus Go closes 05:30         ┆ D3   ┆ 5     ┆ -0.57         │
+│ Octopus Go closes 05:30         ┆ D4   ┆ 5     ┆ -0.45         │
+│ Octopus Go closes 05:30         ┆ D8   ┆ 5     ┆ -2.50         │
+│ Octopus Go opens 00:30          ┆ D10  ┆ 4     ┆ 0.71          │
+│ Octopus Go opens 00:30          ┆ D11  ┆ 5     ┆ 0.70          │
+│ Octopus Go opens 00:30          ┆ D14  ┆ 3     ┆ 0.51          │
+│ Octopus Go opens 00:30          ┆ D16  ┆ 2     ┆ 0.38          │
+│ Octopus Go opens 00:30          ┆ D2   ┆ 5     ┆ 0.51          │
+│ Octopus Go opens 00:30          ┆ D21  ┆ 5     ┆ 0.56          │
+│ Octopus Go opens 00:30          ┆ D22  ┆ 5     ┆ 1.61          │
+│ Octopus Go opens 00:30          ┆ D3   ┆ 4     ┆ 0.27          │
+│ Octopus Go opens 00:30          ┆ D4   ┆ 4     ┆ 0.26          │
+│ Octopus Go opens 00:30          ┆ D5   ┆ 5     ┆ 1.08          │
+│ Octopus Go opens 00:30          ┆ D8   ┆ 3     ┆ 1.28          │
+│ Octopus Go opens 00:30          ┆ D9   ┆ 2     ┆ 0.52          │
+└─────────────────────────────────┴──────┴───────┴───────────────┘
+== injected step: recovery of S at one real edge series ==
+S=0: estimate -0.53, interval -0.78 to -0.27 (shifted by exactly S)
+S=1: estimate 0.47, interval 0.22 to 0.73 (shifted by exactly S)
+S=2: estimate 1.47, interval 1.22 to 1.73 (shifted by exactly S)
+S=4: estimate 3.47, interval 3.22 to 3.73 (shifted by exactly S)
+== change from first to last year: placebo false-positive rate (either sign) ==
+shape: (4, 3)
+┌───────────────┬───────────────┬───────────┐
+│ edge          ┆ share_changed ┆ median_se │
+│ ---           ┆ ---           ┆ ---       │
+│ str           ┆ f64           ┆ f64       │
+╞═══════════════╪═══════════════╪═══════════╡
+│ placebo 03:30 ┆ 0.21          ┆ 0.20      │
+│ placebo 10:00 ┆ 0.36          ┆ 0.36      │
+│ placebo 21:00 ┆ 0.43          ┆ 0.30      │
+│ placebo 18:30 ┆ 0.21          ┆ 0.34      │
+└───────────────┴───────────────┴───────────┘
+== change from first to last year: tariff edges, expected sign ==
+shape: (9, 5)
+┌─────────────────────────────────┬─────────────┬─────────┬───────────────┬────────────────┐
+│ edge                            ┆ substations ┆ visible ┆ median_change ┆ largest_change │
+│ ---                             ┆ ---         ┆ ---     ┆ ---           ┆ ---            │
+│ str                             ┆ u32         ┆ u32     ┆ f64           ┆ f64            │
+╞═════════════════════════════════╪═════════════╪═════════╪═══════════════╪════════════════╡
+│ Cosy closes 07:00               ┆ 14          ┆ 6       ┆ -0.50         ┆ 3.45           │
+│ Cosy closes 16:00               ┆ 14          ┆ 6       ┆ -0.78         ┆ 12.43          │
+│ Cosy opens 04:00                ┆ 14          ┆ 6       ┆ 0.19          ┆ 3.90           │
+│ Cosy opens 13:00                ┆ 14          ┆ 0       ┆ 0.05          ┆ 2.90           │
+│ Cosy opens 22:00                ┆ 14          ┆ 5       ┆ 0.33          ┆ 3.42           │
+│ Intelligent Octopus Go closes … ┆ 14          ┆ 4       ┆ 0.03          ┆ 2.55           │
+│ Intelligent Octopus Go opens 2… ┆ 14          ┆ 8       ┆ 0.63          ┆ 2.54           │
+│ Octopus Go closes 05:30         ┆ 14          ┆ 4       ┆ 0.03          ┆ 2.55           │
+│ Octopus Go opens 00:30          ┆ 14          ┆ 3       ┆ -0.06         ┆ 1.39           │
+└─────────────────────────────────┴─────────────┴─────────┴───────────────┴────────────────┘
+== empirical detection limit: placebo 90th pct |change| = 1.19 points ==
+shape: (9, 3)
+┌─────────────────────────────────┬──────────────┬─────────────┐
+│ edge                            ┆ beyond_limit ┆ substations │
+│ ---                             ┆ ---          ┆ ---         │
+│ str                             ┆ u32          ┆ u32         │
+╞═════════════════════════════════╪══════════════╪═════════════╡
+│ Cosy closes 07:00               ┆ 4            ┆ 14          │
+│ Cosy closes 16:00               ┆ 5            ┆ 14          │
+│ Cosy opens 04:00                ┆ 2            ┆ 14          │
+│ Cosy opens 13:00                ┆ 2            ┆ 14          │
+│ Cosy opens 22:00                ┆ 3            ┆ 14          │
+│ Intelligent Octopus Go closes … ┆ 1            ┆ 14          │
+│ Intelligent Octopus Go opens 2… ┆ 1            ┆ 14          │
+│ Octopus Go closes 05:30         ┆ 1            ┆ 14          │
+│ Octopus Go opens 00:30          ┆ 0            ┆ 14          │
+└─────────────────────────────────┴──────────────┴─────────────┘
+shape: (19, 3)
+┌─────────────────────────────────┬──────┬────────┐
+│ edge                            ┆ site ┆ change │
+│ ---                             ┆ ---  ┆ ---    │
+│ str                             ┆ str  ┆ f64    │
+╞═════════════════════════════════╪══════╪════════╡
+│ Cosy closes 07:00               ┆ D11  ┆ -1.95  │
+│ Cosy closes 07:00               ┆ D21  ┆ -1.55  │
+│ Cosy closes 07:00               ┆ D22  ┆ -2.43  │
+│ Cosy closes 07:00               ┆ D8   ┆ -3.45  │
+│ Cosy closes 16:00               ┆ D10  ┆ -2.32  │
+│ Cosy closes 16:00               ┆ D12  ┆ -7.73  │
+│ Cosy closes 16:00               ┆ D16  ┆ -1.52  │
+│ Cosy closes 16:00               ┆ D22  ┆ -1.40  │
+│ Cosy closes 16:00               ┆ D8   ┆ -12.43 │
+│ Cosy opens 04:00                ┆ D12  ┆ 3.90   │
+│ Cosy opens 04:00                ┆ D8   ┆ 2.06   │
+│ Cosy opens 13:00                ┆ D12  ┆ 2.90   │
+│ Cosy opens 13:00                ┆ D8   ┆ 1.31   │
+│ Cosy opens 22:00                ┆ D19  ┆ 1.21   │
+│ Cosy opens 22:00                ┆ D3   ┆ 1.20   │
+│ Cosy opens 22:00                ┆ D8   ┆ 3.39   │
+│ Intelligent Octopus Go closes … ┆ D8   ┆ -2.31  │
+│ Intelligent Octopus Go opens 2… ┆ D8   ┆ 2.54   │
+│ Octopus Go closes 05:30         ┆ D8   ┆ -2.31  │
+└─────────────────────────────────┴──────┴────────┘
+== substations where the expected-sign change is visible ==
+shape: (42, 6)
+┌─────────────────────────────────┬──────┬────────────┬───────────┬────────┬──────┐
+│ edge                            ┆ site ┆ first_year ┆ last_year ┆ change ┆ se   │
+│ ---                             ┆ ---  ┆ ---        ┆ ---       ┆ ---    ┆ ---  │
+│ str                             ┆ str  ┆ i64        ┆ i64       ┆ f64    ┆ f64  │
+╞═════════════════════════════════╪══════╪════════════╪═══════════╪════════╪══════╡
+│ Cosy closes 07:00               ┆ D11  ┆ 2021       ┆ 2024      ┆ -1.95  ┆ 0.42 │
+│ Cosy closes 07:00               ┆ D14  ┆ 2021       ┆ 2024      ┆ -0.93  ┆ 0.30 │
+│ Cosy closes 07:00               ┆ D21  ┆ 2021       ┆ 2024      ┆ -1.55  ┆ 0.35 │
+│ Cosy closes 07:00               ┆ D22  ┆ 2021       ┆ 2024      ┆ -2.43  ┆ 0.75 │
+│ Cosy closes 07:00               ┆ D3   ┆ 2021       ┆ 2024      ┆ -0.62  ┆ 0.24 │
+│ Cosy closes 07:00               ┆ D9   ┆ 2023       ┆ 2024      ┆ -0.77  ┆ 0.21 │
+│ Cosy closes 16:00               ┆ D10  ┆ 2021       ┆ 2024      ┆ -2.32  ┆ 0.54 │
+│ Cosy closes 16:00               ┆ D12  ┆ 2021       ┆ 2024      ┆ -7.73  ┆ 2.68 │
+│ Cosy closes 16:00               ┆ D16  ┆ 2021       ┆ 2024      ┆ -1.52  ┆ 0.72 │
+│ Cosy closes 16:00               ┆ D2   ┆ 2021       ┆ 2024      ┆ -0.97  ┆ 0.43 │
+│ Cosy closes 16:00               ┆ D22  ┆ 2021       ┆ 2024      ┆ -1.40  ┆ 0.67 │
+│ Cosy closes 16:00               ┆ D8   ┆ 2021       ┆ 2024      ┆ -12.43 ┆ 2.17 │
+│ Cosy opens 04:00                ┆ D12  ┆ 2021       ┆ 2024      ┆ 3.90   ┆ 1.74 │
+│ Cosy opens 04:00                ┆ D19  ┆ 2021       ┆ 2024      ┆ 0.47   ┆ 0.25 │
+│ Cosy opens 04:00                ┆ D2   ┆ 2021       ┆ 2024      ┆ 0.45   ┆ 0.10 │
+│ Cosy opens 04:00                ┆ D21  ┆ 2021       ┆ 2024      ┆ 0.78   ┆ 0.19 │
+│ Cosy opens 04:00                ┆ D4   ┆ 2021       ┆ 2024      ┆ 0.23   ┆ 0.09 │
+│ Cosy opens 04:00                ┆ D8   ┆ 2021       ┆ 2024      ┆ 2.06   ┆ 0.23 │
+│ Cosy opens 22:00                ┆ D10  ┆ 2021       ┆ 2024      ┆ 0.63   ┆ 0.30 │
+│ Cosy opens 22:00                ┆ D11  ┆ 2021       ┆ 2024      ┆ 0.53   ┆ 0.19 │
+│ Cosy opens 22:00                ┆ D19  ┆ 2021       ┆ 2024      ┆ 1.21   ┆ 0.42 │
+│ Cosy opens 22:00                ┆ D3   ┆ 2021       ┆ 2024      ┆ 1.20   ┆ 0.11 │
+│ Cosy opens 22:00                ┆ D8   ┆ 2021       ┆ 2024      ┆ 3.39   ┆ 1.38 │
+│ Intelligent Octopus Go closes … ┆ D11  ┆ 2021       ┆ 2025      ┆ -0.88  ┆ 0.15 │
+│ Intelligent Octopus Go closes … ┆ D16  ┆ 2021       ┆ 2025      ┆ -0.82  ┆ 0.22 │
+│ Intelligent Octopus Go closes … ┆ D8   ┆ 2021       ┆ 2025      ┆ -2.31  ┆ 0.65 │
+│ Intelligent Octopus Go closes … ┆ D9   ┆ 2023       ┆ 2025      ┆ -0.42  ┆ 0.11 │
+│ Intelligent Octopus Go opens 2… ┆ D11  ┆ 2021       ┆ 2025      ┆ 0.77   ┆ 0.19 │
+│ Intelligent Octopus Go opens 2… ┆ D14  ┆ 2021       ┆ 2025      ┆ 1.10   ┆ 0.36 │
+│ Intelligent Octopus Go opens 2… ┆ D16  ┆ 2021       ┆ 2025      ┆ 0.68   ┆ 0.22 │
+│ Intelligent Octopus Go opens 2… ┆ D19  ┆ 2021       ┆ 2025      ┆ 1.10   ┆ 0.30 │
+│ Intelligent Octopus Go opens 2… ┆ D2   ┆ 2021       ┆ 2025      ┆ 0.40   ┆ 0.18 │
+│ Intelligent Octopus Go opens 2… ┆ D21  ┆ 2021       ┆ 2025      ┆ 0.67   ┆ 0.23 │
+│ Intelligent Octopus Go opens 2… ┆ D4   ┆ 2021       ┆ 2025      ┆ 0.60   ┆ 0.21 │
+│ Intelligent Octopus Go opens 2… ┆ D8   ┆ 2021       ┆ 2025      ┆ 2.54   ┆ 0.73 │
+│ Octopus Go closes 05:30         ┆ D11  ┆ 2021       ┆ 2025      ┆ -0.88  ┆ 0.15 │
+│ Octopus Go closes 05:30         ┆ D16  ┆ 2021       ┆ 2025      ┆ -0.82  ┆ 0.23 │
+│ Octopus Go closes 05:30         ┆ D8   ┆ 2021       ┆ 2025      ┆ -2.31  ┆ 0.67 │
+│ Octopus Go closes 05:30         ┆ D9   ┆ 2023       ┆ 2025      ┆ -0.42  ┆ 0.11 │
+│ Octopus Go opens 00:30          ┆ D10  ┆ 2021       ┆ 2025      ┆ 0.76   ┆ 0.20 │
+│ Octopus Go opens 00:30          ┆ D21  ┆ 2021       ┆ 2025      ┆ 0.27   ┆ 0.16 │
+│ Octopus Go opens 00:30          ┆ D3   ┆ 2021       ┆ 2025      ┆ 0.62   ┆ 0.06 │
+└─────────────────────────────────┴──────┴────────────┴───────────┴────────┴──────┘

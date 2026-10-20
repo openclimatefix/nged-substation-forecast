@@ -358,6 +358,57 @@ local-clock share above 10% appears only at D8 and D22 in 2023 (31% and 38%) and
 2024. A local-clock component is therefore visible at a few substations in single years, and cannot
 be separated from noise with 13 nights; it would need a second winter or a larger sample to say.
 
+### Tariff edges on the local clock (post hoc and exploratory)
+
+**Local-clock tariff edges are not visible at Primary level: the control failed, and no change since
+2021 beyond the placebo limit appears at the Octopus Go edges outside D8.** The tariff windows are
+unverified hypotheses from a search for equivalents, not sources: Intelligent Octopus Go 23:30 to
+05:30, Octopus Go 00:30 to 05:30, and Cosy 04:00 to 07:00, 13:00 to 16:00, and 22:00 to 24:00 on
+winter weekdays. The script is `e00123_tariffs.py`; `report.txt` prints every number. Saving
+Sessions and demand-flexibility events are not modelled.
+
+For each edge we took the rise in demand entering the half-hour starting at the edge, minus the
+median rise at the four half-hours either side, on British Summer Time nights (April to October,
+when the UTC-fixed Economy 7 step falls an hour later on the local clock) for the Octopus edges, and
+on winter weekdays for Cosy. Intervals resample 14-day blocks. Half-hours with no hypothesised edge
+(21:00, 03:30, 10:00, and 18:30) serve as placebos.
+
+- **The level of the statistic is not a test.** The ordinary daily load shape gives every half-hour
+  a non-zero rise against its neighbours: the 90% interval excluded 0 in 76% to 79% of series-years
+  at the placebo half-hours (5% expected), so a visible edge in one year means nothing. The median
+  half-width of the intervals is 0.3 points.
+- **Known-answer injection.** Adding a step of S points (1, 2, and 4) to the edge statistic shifts
+  the estimate and its interval by exactly S, so recovery is exact and the interval width is
+  unchanged. The placebo is the control that failed; the injection says nothing about the load-shape
+  confound.
+
+- **The change between years cancels the load shape but the control still fails.** Comparing the
+  first and last year (2021 and 2025 for the Octopus edges; winters 2021-22 and 2024-25 for Cosy),
+  the 90% interval of the change excluded 0 at 21% to 43% of placebo series (10% expected for either
+  sign), because the load shape drifts between years by more than the sampling error. The empirical
+  detection limit is therefore the 90th percentile of the placebo changes, 1.19 points (about 0.06
+  to 0.22 MW across the 14 substations).
+
+- **Against that limit, the Octopus Go and Intelligent Octopus Go edges show a change at D8 only.**
+  At D8 the 23:30 edge changed by +2.5 points and the 05:30 edge by -2.3, in the expected signs. D8
+  has no Economy 7 step and large changes at the Cosy edges too (-12.4 points at 16:00), which
+  points to a change in the substation's load, not to a tariff. The 00:30 Octopus Go opening, the
+  edge the legacy step could be confused with in summer, shows no substation beyond the limit; the
+  median change over the 14 substations is +0.6 points at 23:30, -0.06 at 00:30, and +0.03 at 05:30.
+
+- **Cosy is not distinguished from other load changes.** Beyond the limit, in the expected sign: the
+  07:00 closing at 4 substations (D11, D21, D22, and D8), the 16:00 closing at 5 (D10, D12, D16,
+  D22, and D8), the 04:00 opening at 2 (D12 and D8), the 13:00 opening at 2 (D12 and D8), and the
+  22:00 opening at 3 (D19, D3, and D8). D8 and D12 appear at most edges, which fits a change in
+  their loads. A heat-pump tariff would add its edges together; no substation other than D8 and D12
+  shows more than one opening and one closing together.
+
+The detection limit is 1.19 points of a substation's demand, which is the smallest year-on-year
+change in an edge this design can tell apart from placebo drift. A tariff effect smaller than that
+at Primary level is not visible here. The sizes by year at each substation are in `report.txt`. The
+design could improve by using a matched control substation or by shortening the comparison to
+neighbouring years.
+
 ## Limitations
 
 - **Summer is assumed step-free.** On summer nights the later half-hours average 0.7 to 13.4 points
