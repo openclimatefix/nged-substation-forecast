@@ -45,39 +45,66 @@ def tuned_spec() -> GamSpec:
     )
 
 
-def site_frame(
-    *, cache: FeatureCache, site: str, cut: datetime, through: datetime, spec: GamSpec
-) -> pl.DataFrame | None:
-    """Return G-2y's predictions of one substation, or `None` if it has no training rows."""
-    if len(training_rows(features=cache.sites[site], cache=cache, cut=cut, window=WINDOW)) == 0:
+def site_replica(*, cache: FeatureCache, site: str, cut: datetime, spec: GamSpec):  # noqa: ANN201
+    """Return G-2y's replica residuals of a substation, or `None` if it has none."""
+    try:
+        return replica_residuals(
+            cache=cache,
+            site=site,
+            spec=spec,
+            cut=cut,
+            window=WINDOW,
+            season_years=common.SEASON_YEARS,
+        )
+    except ValueError:
         return None
-    fit = fit_gam(
-        cache=cache,
-        site=site,
-        specs=[spec],
-        cut=cut,
-        window=WINDOW,
-        season_years=common.SEASON_YEARS,
-    )
-    replica = replica_residuals(
-        cache=cache,
-        site=site,
-        spec=spec,
-        cut=cut,
-        window=WINDOW,
-        season_years=common.SEASON_YEARS,
-    )
-    spread = ResidualSpread.fit(
-        residuals=replica.residuals, band=replica.band, quarter=replica.quarter, centre=True
-    )
-    index = common.scoring_index(cache=cache, site=site, after=cut, through=through)
-    mean = predict_gam(cache=cache, fit=fit, index=index)
-    quantiles = spread.quantiles(
-        mean=mean, band=cache.calendar.band[index], quarter=cache.calendar.quarter[index]
-    )
-    return common.prediction_frame(
-        cache=cache, site=site, index=index, quantiles=quantiles
-    ).with_columns(mean=pl.Series(mean.astype(np.float32)))
+
+
+def year_frames(
+    *, cache: FeatureCache, cut: datetime, through: datetime, spec: GamSpec
+) -> list[pl.DataFrame]:
+    """Return G-2y's predictions of every reported substation for one year.
+
+    A substation with no training rows at the cut has no forecast. One with training rows but none
+    at the replica cut (its history began later) takes the spread of the other substations'
+    replica residuals pooled, as the gradient per-site arms do.
+    """
+    sites = [
+        site
+        for site in common.REPORT_SITES
+        if len(training_rows(features=cache.sites[site], cache=cache, cut=cut, window=WINDOW))
+    ]
+    replicas = {site: site_replica(cache=cache, site=site, cut=cut, spec=spec) for site in sites}
+    frames = []
+    for site in sites:
+        own = replicas[site]
+        pool = [r for other, r in replicas.items() if other != site and r is not None]
+        use = [own] if own is not None else pool
+        spread = ResidualSpread.fit(
+            residuals=np.concatenate([r.residuals for r in use]),
+            band=np.concatenate([r.band for r in use]),
+            quarter=np.concatenate([r.quarter for r in use]),
+            centre=True,
+        )
+        fit = fit_gam(
+            cache=cache,
+            site=site,
+            specs=[spec],
+            cut=cut,
+            window=WINDOW,
+            season_years=common.SEASON_YEARS,
+        )
+        index = common.scoring_index(cache=cache, site=site, after=cut, through=through)
+        mean = predict_gam(cache=cache, fit=fit, index=index)
+        quantiles = spread.quantiles(
+            mean=mean, band=cache.calendar.band[index], quarter=cache.calendar.quarter[index]
+        )
+        frames.append(
+            common.prediction_frame(
+                cache=cache, site=site, index=index, quantiles=quantiles
+            ).with_columns(mean=pl.Series(mean.astype(np.float32)))
+        )
+    return frames
 
 
 def main() -> None:
@@ -85,12 +112,7 @@ def main() -> None:
     cache = common.load_cache()
     spec = tuned_spec()
     for suffix, (cut, through) in YEARS.items():
-        frames = [
-            frame
-            for site in common.REPORT_SITES
-            if (frame := site_frame(cache=cache, site=site, cut=cut, through=through, spec=spec))
-            is not None
-        ]
+        frames = year_frames(cache=cache, cut=cut, through=through, spec=spec)
         common.store_arm(name=f"g_2y{suffix}", frame=pl.concat(frames))
         print(f"stored g_2y{suffix}", flush=True)
 
