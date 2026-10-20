@@ -25,6 +25,17 @@ WIDTH: Final[int] = 560
 """Plot-area width: the axis labels bring a chart to the 680 px text column."""
 WRAP: Final[int] = 95
 SITE_ORDER: Final[list[str]] = ["D5", "D10", "D11", "D14", "D16", "D9"]
+RUN_LABELS: Final[dict[str, str]] = {
+    "noise_free_off": "no noise, network off",
+    "noise_free_on": "no noise, network on",
+    "sd_1_off": "noise sd 1, network off",
+    "sd_1_on": "noise sd 1, network on",
+    "sd_1_dark_only": "noise sd 1, network on, temperature hidden by day",
+    "preregistered_off": "noise sd 5, network off",
+    "preregistered_dark_only": "noise sd 5, network on, temperature hidden by day",
+    "no_harmonics_off": "noise sd 5, no harmonics, network off",
+    "no_harmonics_on": "noise sd 5, no harmonics, network on",
+}
 GATE_LABEL: Final[str] = "The known-answer gate failed, so the verdict is capped at inconclusive."
 ARM_LABELS: Final[dict[str, str]] = {
     "vp_p": "VP-P (lower-objective start)",
@@ -101,39 +112,48 @@ def figure_1_headline() -> alt.TopLevelMixin:
             }
         )
     table = pl.DataFrame(rows)
-    order = table["contrast"].to_list()
-    y = alt.Y("contrast:N", sort=order, title=None, axis=alt.Axis(labelLimit=300))
-    rule = (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_rule(strokeWidth=2, color=ocf.BRAND_ORANGE)
-        .encode(y=y, x="low:Q", x2="high:Q")
-    )
-    dot = (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=True, size=70, color=ocf.BRAND_ORANGE)
-        .encode(
-            y=y,
-            x=alt.X("estimate:Q", title="Difference in quantile score (points; below 0 is better)"),
+    panels = []
+    for group, height in (
+        ([r[0] for r in report.PLANNED[:2]], 80),
+        ([r[0] for r in report.PLANNED[2:]], 80),
+    ):
+        part = table.filter(pl.col("contrast").is_in(group))
+        y = alt.Y("contrast:N", sort=group, title=None, axis=alt.Axis(labelLimit=300))
+        rule = (
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
+            .mark_rule(strokeWidth=2, color=ocf.BRAND_ORANGE)
+            .encode(y=y, x="low:Q", x2="high:Q")
         )
-    )
-    hollow = (
-        alt.Chart(table.drop_nulls("replicate"))  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=False, size=70, color=ocf.DATA_BLUE, strokeWidth=2)
-        .encode(y=y, x="replicate:Q")
-    )
-    text = (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_text(align="left", dx=8, fontSize=10)
-        .encode(y=y, x="high:Q", text="sites:N")
-    )
-    zero = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(color="#888888", strokeDash=[4, 3])
-        .encode(x="x:Q")
-    )
-    return (zero + rule + dot + hollow + text).properties(
-        width=WIDTH - 150,
-        height=48 * len(order),
+        dot = (
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
+            .mark_point(filled=True, size=70, color=ocf.BRAND_ORANGE)
+            .encode(
+                y=y,
+                x=alt.X(
+                    "estimate:Q",
+                    title="Difference in quantile score (points; below 0 is better)",
+                ),
+            )
+        )
+        ring = (
+            alt.Chart(part.drop_nulls("replicate"))  # ty: ignore[unresolved-attribute]
+            .mark_point(filled=False, size=70, color=ocf.DATA_BLUE, strokeWidth=2)
+            .encode(y=y, x="replicate:Q")
+        )
+        text = (
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
+            .mark_text(align="left", dx=8, fontSize=10)
+            .encode(y=y, x="high:Q", text="sites:N")
+        )
+        zero = (
+            alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
+            .mark_rule(color="#888888", strokeDash=[4, 3])
+            .encode(x="x:Q")
+        )
+        panels.append(
+            (zero + rule + dot + ring + text).properties(width=WIDTH - 150, height=height)
+        )
+    return alt.vconcat(*panels).properties(
         title=_title(
             text="Variable projection did not beat the gradient fit, pooled or per-site",
             subtitle=(
@@ -141,9 +161,10 @@ def figure_1_headline() -> alt.TopLevelMixin:
                 "(points of capacity; lower is better) over the five decision sites; orange line: "
                 "98.75% interval from resampling whole calendar months (Bonferroni for four "
                 "planned contrasts). Blue ring: the replicate year (2024-07 to 2025-06). "
-                "C2v and C3v are over six substations."
+                "C2v and C3v are over six substations; their comparators, the per-site VP "
+                "models on 4 weeks and 3 months, extrapolate wildly (scores 49 to 71)."
             ),
-        ),
+        )
     )
 
 
@@ -341,32 +362,31 @@ def figure_5_profile() -> alt.TopLevelMixin | None:
                         "excess": entry["objective_without_capacity_prior"] - lowest,
                     }
                 )
-    line = (
-        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True, color=ocf.BRAND_ORANGE)
-        .encode(
-            x=alt.X("multiplier:Q", title="Multiplier on the convex capacity path"),
-            y=alt.Y("excess:Q", title="Objective above the lowest profile point (nats)"),
-            row=alt.Row("config:N", title=None),
+    panels = []
+    for config in out:
+        line = (
+            alt.Chart(pl.DataFrame([r for r in rows if r["config"] == config]))  # ty: ignore[unresolved-attribute]
+            .mark_line(point=True, color=ocf.BRAND_ORANGE)
+            .encode(
+                x=alt.X("multiplier:Q", title="Multiplier on the convex capacity path"),
+                y=alt.Y("excess:Q", title="Objective above the lowest profile point (nats)"),
+            )
         )
-    )
-    points = (
-        alt.Chart(pl.DataFrame(marks))  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=True, size=40)
-        .encode(
-            x="multiplier:Q",
-            y="excess:Q",
-            color=alt.Color(
-                "start:N",
-                title="Free start",
-                scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.DATA_GREEN, ocf.DATA_PURPLE]),
-            ),
-            row=alt.Row("config:N", title=None),
+        points = (
+            alt.Chart(pl.DataFrame([m for m in marks if m["config"] == config]))  # ty: ignore[unresolved-attribute]
+            .mark_point(filled=True, size=40)
+            .encode(
+                x="multiplier:Q",
+                y="excess:Q",
+                color=alt.Color(
+                    "start:N",
+                    title="Free start",
+                    scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.DATA_GREEN, ocf.DATA_PURPLE]),
+                ),
+            )
         )
-    )
-    return (line + points).properties(
-        width=WIDTH - 90,
-        height=110,
+        panels.append((line + points).properties(width=WIDTH - 90, height=110, title=config))
+    return alt.vconcat(*panels).properties(
         title=_title(
             text="Free fits land away from the profile minimum",
             subtitle=(
@@ -374,7 +394,7 @@ def figure_5_profile() -> alt.TopLevelMixin | None:
                 "convex path. Dots: each scored substation's free-fit capacity over the convex "
                 "capacity, at that fit's objective, from three starts."
             ),
-        ),
+        )
     )
 
 
@@ -401,7 +421,7 @@ def figure_6_gate() -> alt.TopLevelMixin | None:
     for key, label in names.items():
         rows.append(
             {
-                "run": "Gate: noise sd 5, network on",
+                "run": "gate: noise sd 5, network on",
                 "measure": label,
                 "value": float(max(gate[key]) if isinstance(gate[key], list) else gate[key]),
                 "limit": limits[key],
@@ -411,29 +431,31 @@ def figure_6_gate() -> alt.TopLevelMixin | None:
             if isinstance(entry, dict) and "worst" in entry and run != "continue_default_start":
                 rows.append(
                     {
-                        "run": run.replace("_", " "),
+                        "run": RUN_LABELS.get(run, run),
                         "measure": label,
                         "value": entry["worst"][key],
                         "limit": limits[key],
                     }
                 )
     table = pl.DataFrame(rows)
-    bars = (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_bar(color=ocf.DATA_BLUE)
-        .encode(
-            y=alt.Y("run:N", title=None, sort=None),
-            x=alt.X("value:Q", title="Worst error over the eight substations"),
-            facet=alt.Facet("measure:N", columns=2, title=None),
+    panels = []
+    for label in names.values():
+        part = table.filter(pl.col("measure") == label)
+        bars = (
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
+            .mark_bar(color=ocf.DATA_BLUE)
+            .encode(
+                y=alt.Y("run:N", title=None, sort=None),
+                x=alt.X("value:Q", title=label),
+            )
         )
-        .properties(width=(WIDTH - 200) / 2, height=130)
-    )
-    rule = (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3])
-        .encode(x="limit:Q", facet=alt.Facet("measure:N", columns=2, title=None))
-    )
-    return (bars + rule).properties(
+        rule = (
+            alt.Chart(part)  # ty: ignore[unresolved-attribute]
+            .mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3])
+            .encode(x="limit:Q")
+        )
+        panels.append((bars + rule).properties(width=WIDTH - 220, height=130))
+    return alt.vconcat(*panels).properties(
         title=_title(
             text="The synthetic fleet is recovered exactly without noise, not at realistic noise",
             subtitle=(

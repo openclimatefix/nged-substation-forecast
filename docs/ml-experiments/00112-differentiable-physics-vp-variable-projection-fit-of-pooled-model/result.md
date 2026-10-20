@@ -3,7 +3,7 @@ id: "00112"
 slug: differentiable-physics-vp-variable-projection-fit-of-pooled-model
 theme: differentiable-physics-pooling-across-substations
 also_relevant_to: [differentiable-physics-demand-calendar-and-weather, differentiable-physics-long-history-and-drift]
-status: planned
+status: finished
 size: >-
   complex for the module (a new fit path in studies.dp_pooled, reused by any later pooled arm);
   medium for the experiment scripts, which reuse experiment 105's. See "Size triggers".
@@ -24,324 +24,218 @@ row_set_id: >-
 metric: >-
   Quantile score (twice the mean pinball loss over experiment 87's 11 quantiles) in points of
   effective capacity, on rows outside the hand-filtered switching events at the scored site
-verdict: <supported, partly supported, refuted, or inconclusive>
+verdict: inconclusive
 production_status: not-for-production
-take_home_message: <written after the results>
-date: <date>
-pr: <pr>
-advice: <written after the results>
+take_home_message: >-
+  Solving the linear coefficients exactly did not make the pooled model forecast better: it reached
+  a training objective 16,000 to 27,000 nats lower than the gradient fit, but with the interaction
+  network on it scored worse on new data (5.49 against 3.27 points) and from two starts the scores
+  differed by 1.6 points. With the network off, the exact fit is stable (both starts agree to 0.004
+  points) and matches the gradient fit (3.30 against 3.27), so the optimiser was not what held the
+  pooled model back. The known-answer test failed, because at realistic noise the model cannot pin
+  down heating thresholds, slopes or capacities.
+date: 2026-10-20
+pr: 1392
+advice:
+  - >-
+    Do not read a lower training objective as a better pooled model: with the interaction network
+    on, a 16,000-nat gain scored 2.2 points worse (V1).
+  - >-
+    Drop the interaction network from the pooled demand model before comparing fitting methods:
+    with it off, both variable-projection starts agree to 0.004 points and the fit matches the
+    gradient fit (VP-P-nonet, exploratory).
+  - >-
+    Fit the equivalence configuration (one substation, no network, no shared shapes, capacity
+    pinned to the convex path) by variable projection, not by Adam: it scores 0.45 points better
+    than the gradient fit and 0.20 better than the convex model (L1).
+  - >-
+    Never fit the calendar and seasonal terms exactly to a window under three months, or onboard
+    a substation by an exact fit of its own 4 weeks: the per-site VP fits scored 49 to 71 points.
+  - >-
+    Write any future parameter-recovery gate as a calibrated-interval test over at least 20
+    synthetic substations, not as point tolerances: at noise sd 5.0 points no variant of the
+    pooled model passes point tolerances, although recovery is exact without noise (gate).
+  - >-
+    Interpret no per-substation heating threshold, slope or capacity from a pooled or
+    variable-projection fit at real noise levels; report them as weakly identified (gate, profile).
 code: ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/
 ---
 
 # Differentiable physics, VP: fitting the pooled model's linear coefficients exactly
 
-**Status: planned.** This page is the plan, committed before any code runs. The write-up replaces it
-when the experiment finishes.
+**Solving the linear coefficients exactly did not improve the pooled model, and the gap to a
+per-substation model is not an optimiser problem.** Variable projection (VP) reached a training
+objective 16,000 to 27,000 nats lower than the gradient fit on the identical objective, yet with
+the interaction network on it forecast worse (5.49 against 3.27 points at the five decision
+substations) and its two starts differed by 1.6 points. With the network off, the exact fit is
+stable (both starts agree to 0.004 points) and matches the gradient fit (3.30 against 3.27).
+The known-answer test failed on its pre-registered definition, so the verdict is capped at
+inconclusive.
 
-**The theme's `plan.md`** gets a VP row in this PR, and the finished PR updates it.
-**Earlier advice:** VP follows experiment 105's advice to fix the capacity fit with an optimiser
-that reaches the profile minimum, and departs from experiment 106's pinned capacity in its decision
-arm, because whether a free fit reaches the minimum is the question. **Data lessons** (such as a
-threshold left unidentified above a site's highest temperature) go on
-`docs/ml-experiments/data-processing.md` in the same PR.
+We asked whether the pooled model lost to a per-substation model in experiment 105 because gradient
+descent stopped short of the optimum. Variable projection solves every coefficient that enters the
+forecast linearly (shapes, calendar terms, heating slopes, capacities, levels) exactly at each step,
+and moves only the remaining non-linear parameters by gradient steps. We fitted the pooled model
+and a model per substation this way at three training cuts, scored 2025-07-01 to 2026-06-30 with
+2024-07-01 to 2025-06-30 as a replicate, and compared with the gradient fit on one objective.
+**It narrows the search:** exact optimisation helps a simple model (L1 below) and does nothing for
+the pooled model, whose network absorbs structure the data cannot pin down. The gate failure, the
+capacity profile and the network-off arm all point the same way. The gate failed (all three tests),
+so the pooled results are labelled "gate failed", and the verdict cannot exceed `inconclusive`.
 
-## What VP asks, and the evidence that the optimiser is at fault
+**Figure 1. The planned contrasts.** The pooled model and the per-substation model fitted by VP are
+no better than the gradient fits, and the onboarding contrasts are dominated by a broken comparator.
 
-**VP asks whether the pooled DP matches a per-site model once its fit reaches the optimum.** Part
-3's C1 (P minus S) is +0.385 points (98.33% interval +0.18 to +0.69, 5 of 5 sites worse, error of
-the mean forecast +0.607). Three Part 3 results point at the optimiser, and none settles it:
+![Figure 1: planned contrasts](figure_01_headline.svg)
 
-- **Capacity profile.** With one multiplier on the convex capacity path, refitted over {0.5, 0.7,
-  0.85, 1.0, 1.15, 1.3}, the loss is lowest at 1.0 (767,141 nats); the free fit sat 4,563 nats above
-  it, and its capacity followed its start. The audit found the losses not like for like.
-- **Equivalence check.** The per-site DP set up like the convex model (`s_equiv_all`: no network,
-  no shared shapes, weak deviation penalty, capacity pinned to G's path, all years) scored 0.25
-  worse than centred G-all (+0.12 to +0.41), 5 of 5 sites, mostly D10 (+0.90; others +0.05 to
-  +0.12); its mean-forecast error is 0.60 worse. **That arm is not G's model:** its heating is one
-  hinge at a learned threshold on a learned temperature mix, where G has one non-negative slope per
-  smoothing and band at 15.5 °C. The +0.25 mixes optimiser, heating form, and other specification.
-- **Ablations.** P-nonet minus P −0.03; P-map minus P +0.04.
+**Figure 2. Training objective.** VP reaches a far lower objective than the gradient fit
+(P-map-same), and its two starts differ by up to 3,000 nats.
 
-**Variable projection (VP) separates the causes.** Given the non-linear parameters φ, every other
-coefficient enters linearly, so its best values solve a bounded convex quadratic, which
-`dp_gam.solve_bounded_quadratic` solves exactly. Gradient steps move only φ, on the objective with
-the linear part already minimised.
+![Figure 2: training objectives](figure_02_objectives.svg)
 
-## Which vehicle: its own framework PR and a small experiment
+**Figure 3. Scores.** The exact fit with the network on scores worst; without the network it
+matches the gradient fit, and none of the pooled fits beats the per-substation convex model.
 
-**Recommendation: a framework PR adding `fit_pooled_vp` to `studies.dp_pooled`, then a small
-experiment on Part 3's rows.** Part 5's pooled branch is switched off and Part 5's module PR changes
-`dp_gam` and `dp_operator`, which VP does not touch, so separate PRs are reviewed and merged in
-parallel without holding up Part 5's convex results. The review is about 400 lines (a design
-builder, an outer loop, one gradient formula), and later pooled arms switch with `fitter="vp"`.
+![Figure 3: quantile scores](figure_03_scores.svg)
 
-## Size triggers
+**Figure 4. Raw forecasts** in a winter week and a spring week, weeks fixed in advance.
 
-**Stored data:** private files only. **Serving path, degradation rules:** not touched. **More than
-one defensible design:** yes (the linear set, the outer optimiser, the priors, the noise scale); one
-of each is pre-registered. **Callers:** this experiment, N9, and the pooled arms of Parts 5 and 6.
-The module PR goes off `main` with two Opus code reviews (the gradient formula and the training cut
-first); the maintainer merges it.
+![Figure 4: weeks](figure_04_weeks.svg)
 
-## Module (`studies.dp_pooled`, tests under 5 minutes each)
+**Figure 5. Capacity profile.** The free fits sit 1,400 to 8,600 nats above the lowest profile
+point.
 
-| Linear θ (solved exactly, with bounds) | Non-linear φ (gradient steps) |
-|---|---|
-| the shared daily shapes; each site's level and deviation | the style loadings (softmax mix) |
-| the holiday, tent, harmonic, and lighting coefficients | the heating threshold per site, and its population mean |
-| the heating slope per site and band (≥ 0) | the thermal-inertia mix (softmax) |
-| the capacity increments per site and season-year (≥ 0) | the interaction network's hidden layers |
-| the network's last-layer weights; the population means of these families | |
+![Figure 5: capacity profile](figure_05_profile.svg)
 
-Pooled drift is not built in `dp_pooled`, so no arm has drift.
+**Figure 6. The failed gate.** Recovery of a synthetic fleet is exact without noise, and fails at
+realistic noise for every variant.
 
-- **`PooledDemandModel.linear_design(batch, phi)`** returns X(φ) and an offset with output
-  X(φ)θ + offset(φ). Calendar, lighting, and network columns are centred per site-year with the
-  training rows' means; the network's bias column, exactly zero after centring, is dropped. The Gram
-  matrix is built site by site in chunks (shared columns plus about 720 per site); no dense X of all
-  rows is formed (0.4 million rows by 3,800 columns would be about 12 GB).
-- **Partial pooling as in N0:** the variables are each site's θ_s and the population mean μ, with
-  the prior as a quadratic penalty on (θ_s − μ), so the bounds are boxes on θ_s, μ is free, and the
-  problem is one convex quadratic. First and growth capacity increments keep separate families.
-- **Priors (no retuning).** P-map's MAP population scales are fixed hyperparameters set before the
-  softplus (level 5, threshold 2, slope 1, growth 1, first increment 8, deviation 1.0 from
-  `tuned.json`). VP multiplies each by the softplus slope at P-map's population mean (0.985 for the
-  slope, 0.946 for growth, 1.00 for the first increment), so no scale moves over 6%. K = 2.
-- **The noise scale σ** is fixed within a round: round 1 from G-2y's training residuals at the same
-  cut (never the stored scored-year G-2y), round 2 from round 1's residuals, then stop.
-- **MVA rows** enter with Q = 0 (tan φ = q0 = 0), the series rule for Parts 2 to 4 and the only
-  case where the operator is linear. P-map fitted tan φ from −0.006 to −1.21 and q0 from −0.95 to
-  +10.17 points, which changes what MVA rows teach the shared terms; P-map-same isolates this.
-- **The outer loop:** L-BFGS on φ (strong Wolfe, history 20, at most 300 evaluations including the
-  line search's, stop below 1e-7 relative fall over 10 iterations). Each evaluation builds the Gram
-  matrix, solves θ*(φ), evaluates the loss at (φ, θ*) with θ* constant, and back-propagates to φ,
-  recomputing the centring means inside the autograd graph (as `_centred` does in training mode).
-  Every linear column has a ridge or prior and the box does not depend on φ, so θ* is unique and
-  the projected objective is continuously differentiable, active-set changes included (Danskin);
-  the gradient is exact to the solver's tolerance. Only the second derivative jumps there, so
-  L-BFGS skips curvature pairs with sᵀy ≤ 0. Adam (1,200 steps, exact solve each step) runs only if
-  L-BFGS fails its convergence test, and both objectives are then reported.
-- **`convex` mode** emits `dp_gam.design_matrix`'s columns for one unpooled site with no φ, so test
-  1 checks the plumbing exactly; test 2 checks the DP design.
-- **`objective="vp"`** gives `fit_pooled`'s Adam the same loss (Q = 0 frozen, natural-scale priors
-  on the softplus outputs, σ fixed), for P-map-same. **One objective function** evaluates the
-  deterministic MAP objective for any parameter set, VP's or Adam's.
-- **Batching:** copies (onboarding sites, multipliers, starts) share one float64 GPU solve call.
+![Figure 6: gate](figure_06_gate.svg)
 
-**Tests:** (1) in `convex` mode VP equals `fit_gam` at every decision site, all years, Part 2's
-tuned spec, within 1e-8 relative on the CPU and 1e-6 on the GPU; (2) for random φ and θ,
-X(φ)θ + offset(φ) equals `PooledDemandModel.forward` within 1e-6 points, network on and off,
-chunk by chunk; (3) with φ fixed, θ* matches a dense float64 bounded solve of a 3-site synthetic
-batch within 1e-8, and no 5,000-step Adam run on θ reaches a lower objective; (4) the envelope
-gradient matches central finite differences within 1e-4 relative at a φ with an active bound and
-at one without, and to O(h) where the step crosses an active-set change (an increment or slope
-leaving 0), each φ jittered off the hinge's kinks; (5) leakage asserts as in Parts 2 to 4: no
-target, feature, capacity, centring mean, σ, or population mean from a row after the cut, an
-onboarded site's rows inside its window, nothing scored on or after 2026-07-01.
+## Results
 
-## Sites, years, and rows
+- **Arms and fits.** VP-P: Part 3's pooled model (K = 2 shapes, network (64, 64), fitted capacity),
+  MAP, fitted by VP from two starts (seed 0; seed 1 with thresholds at 17 C); the arm is the
+  lower-objective start (start 0 at the 2024-07-01 and 2025-07-01 cuts, start 1 at 2023-07-01).
+  VP-S: the same model per MW substation. P-map-same:
+  experiment 105's Adam fit on VP's objective; P-map-polish: its non-linear parameters with the
+  linear coefficients solved exactly. References: 105's P, P-map, S and equivalence arm,
+  G-all (Part 2), G-2y (the convex model on the 2-year window), climatology, manual heuristic.
+  Post hoc, exploratory: VP-P-nonet (network off). Row set, window, pool and masks as experiment 105.
+  Every VP fit used 600 Adam warm-start steps, L-BFGS to 300 evaluations, and an Adam fallback of
+  1,200 steps (VP-P) or 400 (others) when it missed the convergence test; no fit met that test, so
+  none is exactly at its optimum. Schedule: one frozen fit per cut, no refits.
+- **Scores (five decision sites, scored year; replicate year in brackets).** VP-P 5.49 (4.26);
+  VP-P start 1 3.89 (3.64); VP-P-nonet 3.30 (3.21); VP-S 4.09 (3.70); P-map-same 3.27 (3.11);
+  P-map-polish 3.29 (3.18); 105's P 3.42, P-map 3.46, S 3.04; G-2y 2.94 (3.02); G-all 3.07;
+  climatology 4.07; manual heuristic 3.49.
+- **V1, the fitting method on one objective (planned).** VP-P minus P-map-same: **+2.215 points
+  (98.75% interval +0.398 to +5.041)**, 0 of 5 sites better; replicate year +1.154 (+0.527 to
+  +1.849), 0 of 5 better. In nats, VP-P minus P-map-same is **-16,747** at the 2025-07-01 cut
+  (172,257 against 189,005), -16,014 at 2024-07-01 and -27,257 at 2023-07-01; P-map-polish lowers
+  P-map-same by 1,005 nats and changes the score by +0.013 (-0.001 to +0.025), so the linear
+  coefficients are not what limits skill. Experiment 105's own P-map is 239,053 on this objective
+  (a different objective, shown as a reference only).
+- **C1v, pooling under VP (planned).** VP-P minus VP-S: +1.394 (-0.896 to +4.508), 0 of 5 better;
+  replicate +0.561 (-0.095 to +1.289). Non-inferiority (upper end at most +0.10) fails.
+- **C2v and C3v (planned, six substations).** VP-onb4w minus VP-S-4w -60.8 (-81.9 to -38.0); VP-short3m
+  minus VP-S-3m -49.4 (-86.7 to -17.3); both 6 of 6 better. **These contrasts are not evidence
+  for pooling:** the per-site VP fits on 4 weeks and 3 months score 70.6 and 48.4, because the exact
+  solve fits the lightly penalised seasonal terms to a short window and extrapolates them. Against
+  experiment 105's gradient arms: VP-onb4w minus P-onb4w +1.460 (+0.439 to +2.522); VP-short3m minus
+  P-short3m -0.122 (-0.554 to +0.182).
+- **Start spread.** The two VP-P starts differ by 1.599 points (limit 0.10). VP-P-nonet: 0.004.
+- **Ladder (L1, exploratory).** The equivalence configuration fitted by VP scores **2.877**, against
+  105's 3.326 (-0.449, -0.537 to -0.373, 5 of 5 better) and G-all's 3.072 (-0.195, -0.298 to
+  -0.075). All five threshold starts reach the same objective to 1 nat at every site and cut.
+  L1 minus s_equiv_all contains the optimiser and the change of objective (natural-scale slope
+  prior, fixed noise scale) together, and the heating-form share of the 0.25 gap cannot be
+  separated from it. L2 was dropped. D9 and D16 had a numerically singular replica fit and use
+  the other sites' spread.
+- **Capacity profile (labelled).** Each free fit's capacities agree across the three starts within
+  3 points at every substation (largest 1.6 points for K = 2 and 1.3 for K = 4): **line 1 passes at
+  both configurations.** Each free objective is 1,400 to 8,600 nats above the lowest profile point
+  (tolerance 31 to 34 nats): **line 2 fails**; the profile minimum is at 0.85 times the convex
+  capacity path, and the free capacities lie between 0.5 and 1.05 times it: **line 3 fails.** The
+  three starts reach objectives up to 7,000 nats apart and none converged, so the network's
+  landscape has many local optima. The pinned fits did not converge either.
+- **Gate (failed, pre-registered definition).** Test 2: worst-case errors at noise sd 5.0 points
+  were 5.1 to 5.7 C in threshold (limit 1), 70 to 76% in slope (15%), 39 to 44% in capacity (10%),
+  2.0 to 2.5 points in growth increment (1.5), and 2.1 to 6.1 points of network output (0.1). Test 3:
+  no start converged; spread 31 nats per 10,000 rows (limit 1). Test 4: recovered over injected
+  capacity 0.77 to 0.90 (median 0.82; limit 0.9 to 1.1; experiment 105 had 0.78); other sites
+  moved 1.1 to 4.8%.
+- **Gate diagnostics (post hoc).** Continuing 1,500 more evaluations lowers the objective by 4,200
+  nats and leaves the errors unchanged, so the failure is not under-training. Without noise,
+  with the network off, recovery is exact (all errors 0.000), so the module is correct. At noise
+  sd 1.0 the network-off fit recovers thresholds to 0.02 C, slopes to 1% and capacities to 1.3%; the
+  network-on fit has slopes 17% off and a 0.40-point network output; hiding temperature from the
+  network by day fixes the slope (0.8%) but not the output (0.31). At the pre-registered noise
+  every variant fails: network off 2.7 C, 30%, 33%; temperature hidden by day 3.1 C, 37%, 37%.
+  Generating and fitting the fleet without the day-of-year harmonics (the hypothesis that the
+  seasonal terms absorb the seasonal cycle of temperature and sun) improves the network-off
+  thresholds and slopes (1.7 C, 21%) but not the capacities (34%), and worsens the network-on fit
+  (5.9 C, 79%), so the hypothesis is not confirmed. **Hypothesis, not a result:** the harmonics,
+  the per-band profile and the calendar terms absorb most of the seasonal cycle, leaving only
+  day-to-day weather anomalies to identify slope, threshold and capacity, so the effective sample
+  is far smaller than the row count; identification should improve with more weather anomalies,
+  that is, with more years of history, which could help interpretability even where scores do not
+  move.
+- **Tails (five sites, coverage at q01, q05, q95, q99; pinball at the same).** VP-P 0.023, 0.052,
+  0.910, 0.983 (1.929, 2.548, 1.057, 0.272); VP-P-nonet 0.016, 0.047, 0.829, 0.922 (0.277, 0.735,
+  0.996, 0.352); P-map-same 0.015, 0.043, 0.834, 0.920; G-2y 0.015, 0.043, 0.846, 0.940. VP-P's
+  lower tail covers 2.3% of rows at q01 (nominal 1%) with a pinball loss of 1.929 against 0.198.
 
-| Year | Cut (training ends) | Role |
-|---|---|---|
-| 2023-07-01 to 2024-06-30 | 2023-07-01 | replica rows for the replicate year's spread only |
-| 2024-07-01 to 2025-06-30 | 2024-07-01 | replicate: every planned contrast; the capacity profile |
-| 2025-07-01 to 2026-06-30 | 2025-07-01 | scored: the verdict |
+## Checks
 
-- **Pool, rows, and predictions as Part 3:** the MW Primaries D5, D9, D10, D11, D14, D16, and D18,
-  plus the 8 MVA Primaries on dark rows, `default_rows == True`, 2 years before each cut, through
-  `build_pooled_batch`; the 66 hand-filtered transfers masked ±24 hours (hindsight labels, a mild
-  leak shared by every arm). Decision sites D5, D10, D11, D14, and D16 (4 of 5 needed); D9 beside
-  them; D18 descriptive.
-- **The replicate year is Part 3's tuning year,** in-sample for K and the deviation scale. P-map
-  and S are refitted by gradient at the 2024-07-01 cut, since experiment 105 stored the scored year
-  only.
-- **Spread:** `dp_gam`'s centred replica spread (the arm refitted 12 months earlier by the same
-  method); `dp_onboarding.cross_fitted_spread` for onboarding and short history. The replicate
-  year's replicas are fits at the 2023-07-01 cut, trained from 2021-07-01 (the lockdown removes
-  2021-07-01 to 07-19; D9 and D18 have no rows). Part 4 trained from 2019-09 on the same cache, and
-  the scripts assert coverage from 2021-07-01.
-- **Robustness rows, every contrast:** November to March against April to October; without D16;
-  without D14; D10's unlabelled switching windows dropped (as Part 4); the all-rows score.
+- **Median minus mean forecast per site (scored year, points).** VP-P: D10 -1.11, D11 0.58, D14 0.27,
+  D16 0.43, D5 0.01, D9 -0.27, D18 0.93. VP-P-nonet: D10 -1.80, D11 0.94, D14 0.21, D16 0.20, D5 0.32.
+  P-map-same: D10 -1.72, D11 0.73. D10's gap of about -1 to -1.8 points appears in every arm,
+  including S (-1.74), so it is not a VP effect.
+- **Error of the mean forecast beside each contrast.** V1 +2.676 (+0.847 to +4.840); C1v +1.460
+  (-0.665 to +3.950); C2v -64.9; C3v -53.1. The quantile-score and mean-error contrasts agree in sign.
+- **Leave one site out.** V1 stays +2.1 to +2.3 with any site dropped (0 of 4 better); C1v stays
+  +1.2 to +1.7. Dropping D10's unlabelled jump (2025-11-17 to 2025-12-14), the winter or the summer
+  half, or masked rows changes no sign.
+- **L0 control.** G-all scores 3.072 at the five sites, as in Part 2. P-map-polish is never above
+  P-map-same on the VP objective, at all three cuts.
+- **Audit triggers that fired.** Trigger 1: the gate failed. Trigger 2: V1 contradicts its
+  prediction. Trigger 7: the result decides the pooled route. An Opus audit is requested, and
+  its findings are triaged in the pull request.
 
-## Arms
+## Predictions, held or failed
 
-**Every arm is screening tier, one frozen fit per cut.** VP-P and VP-S are fitted from two starts
-(seed 0; seed 1 with the thresholds at 17 °C); the lower-objective start is the arm, and the score
-spread between starts is reported beside every contrast that uses them.
+- **Held:** VP-P sits over 2,000 nats below P-map-same (by 16,747); the capacity-profile start
+  agreement (line 1); P-map-polish does not exceed P-map-same; each VP fit took under 10 minutes
+  of GPU time before its fallback (519 s at most) and peak memory was under 1 GB; VP-P's q01, q05
+  and q99 coverage are within the predicted bands.
+- **Failed:** V1 -0.15 to -0.45 at 5 of 5 sites (it is +2.215, 0 of 5); C1v within +/-0.10 (+1.394);
+  start spread under 0.05 (1.599); C2v and C3v -0.5 to -2.0 and -0.2 to -1.0 (-60.8, -49.4, from a
+  broken comparator); the capacity profile passes (lines 2 and 3 fail); VP-P's q95 coverage is
+  0.910, 4 points below nominal (limit 3). The prediction that VP-P's capacities lie within 15% of
+  G-2y's at 4 of 5 sites was not evaluated.
+- **Not built:** VP-P-pin, the equivalence ladder's L2, batching of copies, and substation cards.
+  Cards would show per-site thresholds, and none is interpretable at real noise levels (weakly
+  identified at real noise levels (experiment 112); compare across substations with care).
 
-| Arm | Model and fit | Role |
-|---|---|---|
-| VP-P | Part 3's P configuration (K = 2, network (64, 64), fitted capacity), MAP, by VP | decision arm |
-| VP-S | the same model, one MW site at a time, by VP | per-site comparator |
-| P-map-same | experiment 105's Adam fit (code, steps, schedule) on VP's objective, σ at VP's final round | V1's comparator |
-| P-map, S, P | experiment 105's gradient fits (P-map and S refitted at the replicate cut) | references |
-| P-map-polish | P-map-same's φ frozen, θ solved exactly | splits V1 (exploratory) |
-| VP-P-nonet, VP-P-pin | VP-P without the network; with capacity pinned by Part 4's rule | exploratory |
-| VP-onb4w, VP-S-4w | 4 weeks (2025-06-03 to 2025-06-30); shared modules frozen from a VP fit leaving the onboarded site out (B = 6, as Part 3); per-site VP | C2v |
-| VP-short3m, VP-S-3m | 3 months (2025-04-01 to 2025-06-30): joint VP refit with the short site inside; per-site VP | C3v |
-| G-2y | per-site convex model, 2-year window, no drift | convex anchor |
+## Caveats
 
-**VP-S's prior in full:** in a single-site MAP fit each learned population mean equals the site's
-own value, so the active priors are the deviation and loadings centred on zero at scale 1.0, the
-bands' slopes pulled to their common mean, and the threshold's 15.5 ± 2 °C hyperprior. The short
-windows move back one year at the replicate cut.
+- No VP fit met its convergence test within 300 L-BFGS evaluations and the Adam fallback, so the
+  exact-fit comparison is between fits that are lower in objective but not at the optimum.
+- ERA5 and CAMS flatter the solar term; the hand-filtered masks are hindsight labels; MVA
+  `tan(phi)` and `q0` are zero in VP, unlike P-map's; the replicate year is in sample for K and the
+  deviation scale; MAP only.
+- The known-answer gate used the plan's noise (residuals of the per-site convex model, sd 5.0
+  points). A gate for parameter recovery should test calibrated intervals (an 80% interval covering
+  the truth 70 to 90% of the time over at least 20 synthetic substations, with the widths), not point
+  tolerances.
+- VP-S-4w and VP-S-3m are broken comparators (see C2v); the leave-one-out and short-history VP
+  refits start cold with L-BFGS only. The 2023-07-01 and 2024-07-01 fits exist for the spread.
+- GPU time used: 5.5 of the 10 hours cap, as tallied by `e00112_budget.py`.
 
-**The equivalence ladder** (all years, per site, capacity pinned to G's path): **L0** is VP in
-`convex` mode, G-all by construction, scored to confirm 3.072 points. **L1** is `s_equiv_all`'s
-exact objective (its MAP prior with deviation scale 100, its penalties, its learned σ; none of VP's
-priors or σ rounds), fitted by VP; its prior acts on the slopes before the softplus, so the slopes
-and σ join φ, and L1 starts from a threshold grid of 12 to 20 °C every 1 °C, keeping the lowest
-objective. **L2** is L1 with G's heating basis (one slope per smoothing and band at 15.5 °C). The
-+0.25 is reported as three terms summing to it, per site: `s_equiv_all` minus L1 (the optimiser),
-L1 minus L2 (the heating form), and L2 minus G-all (the remaining specification), with D10 also
-shown without its unlabelled switching windows.
+## What the next experiment should answer
 
-## Known-answer gate (blocking, before any scored or replicate fit)
-
-**A failed blocking test stops scoring until it is fixed;** if it cannot be fixed inside the
-experiment, the verdict is `inconclusive`. Every synthetic fit has the network on, because with it
-off a test cannot see the route by which the network imitates solar.
-
-1. **Module tests 1 to 5 pass.**
-2. **A synthetic fleet:** eight sites on the real calendar and weather tensors of the MW Primaries,
-   2 years each. The truth: K = 2 shapes with known loadings, a 14 °C threshold, a known inertia
-   mix, non-zero shared holiday and harmonic terms, capacity paths with a 3 to 8 point growth
-   increment in the last season-year, no network term, and residuals block-bootstrapped by week
-   from G's training residuals at a different site. Pass if every threshold is within 1 °C, every
-   slope within 15%, every season-year capacity within 10%, every growth increment within 1.5
-   points, and the network's centred summer-midday output under 0.1 points.
-3. **The outer loop converges** on the synthetic fleet from three starts (seed 0; seed 1; thresholds
-   at 17 °C with uniform loadings): the projected gradient's norm falls below 1e-4 relative, the
-   objectives agree within 1 nat per 10,000 rows, and each threshold agrees with a 0.1 °C grid
-   profile within 0.2 °C.
-4. **Injected farms** (experiment 39's harness), one farm at a time at D10, D11, D14, and D16,
-   batched, night rows kept (`farm_norm` not null). Pass if the median recovered-to-injected ratio
-   is in [0.9, 1.1], which Part 3's 0.78 would fail, and the other sites' capacities move under 5%.
-   The shared modules' midday movement is reported against a second-seed base fit's. Only ratios
-   appear: the farms are metered generators.
-
-**Real-data thresholds are reported, never passed or failed.** P-map's include 48.3 °C and 25 to
-27 °C around a population mean of 19.9 °C; above a site's highest temperature the hinge is always
-on, the deviation absorbs a shift, and only the prior sets the threshold. Each site's threshold
-profile is shown.
-
-## The capacity profile re-run (pre-registered, labelled pass or fail)
-
-**Does VP find the profile minimum from any start?** VP solves the capacity exactly, so a start
-can matter only through φ. At Part 3's diagnostic configuration (K = 4, 2024-07-01 cut) and at
-VP-P's (K = 2, 2025-07-01 cut), the six multipliers are refitted by VP as one batch, and free fits
-run from three starts (default; seed 1 with thresholds at 17 °C; P-map's φ at that cut). **Pass,
-every line:** the starts' capacities agree within 3 points at every MW site (the series rule); each
-free objective is no higher than the lowest profile point plus 1 nat per 10,000 rows (about 40
-nats); each free capacity lies where the profile is within that tolerance of its minimum. Every
-loss goes through the one objective function; each site's VP capacity is shown beside G's, P's,
-and the vintage's season-year mean (never its last week).
-
-## Planned contrasts
-
-Four planned contrasts, Bonferroni-corrected (98.75% intervals from `studies.bootstrap`, whole
-calendar months of stored predictions resampled, paired across arms), each with site counts, every
-arm's absolute score, the mean-forecast error, the replicate year's estimate and count, and the
-robustness rows:
-
-- **V1, the fitting method on one objective:** VP-P minus P-map-same.
-- **C1v, pooling on all rows under VP:** VP-P minus VP-S, non-inferiority with a margin of 0.10
-  points (Part 3 ruling 2), the interval's upper end printed against +0.10.
-- **C2v, onboarding:** VP-onb4w minus VP-S-4w. **C3v, short history:** VP-short3m minus VP-S-3m.
-
-**Exploratory at 95%:** VP-P minus P-map (method plus objective), P, S, and G-2y; VP-S minus S;
-P-map-polish minus P-map-same; VP-P-nonet and VP-P-pin minus VP-P; the ladder; VP-onb4w minus
-P-onb4w; contrasts against experiment 109's N in a follow-up note once stored. **Descriptive:** D9,
-D18, coastal D5 and D9, bank holidays, the Christmas run, and days below 0 °C.
-
-## Predictions
-
-Written before any fit; each line can fail, and none overrides the decision rule.
-
-- **Objective:** on VP's objective, VP-P sits over 2,000 nats below P-map-same at the same cut.
-- **V1:** VP-P minus P-map-same is −0.15 to −0.45, 5 of 5 sites better, in both years;
-  P-map-polish recovers over half of it. **VP-S minus S:** −0.05 to −0.30.
-- **C1v:** within −0.10 to +0.10 in both years; dropping D16 moves it under 0.10. **Starts:** the
-  score spread between VP-P's two starts is under 0.05.
-- **Ladder:** the optimiser term is over half of the +0.25; D10's share in L1 is under +0.30.
-- **C2v and C3v:** −0.5 to −2.0 and −0.2 to −1.0, 5 of 5 sites better each.
-- **Capacity profile:** passes at both configurations; VP-P's capacities within 15% of G-2y's at
-  4 of 5 decision sites, D11 included.
-- **Tails:** VP-P's q01 and q99 coverage within 1.5 points of nominal, q05 and q95 within 3.
-- **Run time:** each VP fit under 10 minutes; peak GPU memory under 10 GB.
-
-## Decision rule
-
-**The verdict reads C1v and V1 under Phase A labels with a replicate check.** C1v passes if, for
-the lower-objective start, its estimate is at most +0.10, its interval does not lie wholly above
-zero, and the replicate year's estimate is at most +0.10.
-
-- **`supported`:** the gate passed; C1v passes; V1 is below zero in both years, with 4 of 5 sites
-  better in the scored year; VP-S minus S is at most +0.05 in the scored year (so C1v is not bought
-  with a weaker per-site fit); and the score spread between starts is at most 0.10.
-- **`partly supported`:** the gate passed, and either V1 meets that bar but C1v fails, or V1 is
-  below zero at 4 of 5 sites in the scored year but not in the replicate.
-- **`refuted`:** V1 is at or above zero in the scored year and C1v's interval lies wholly above
-  zero: the optimiser was not the cause.
-- **`inconclusive`:** the start spread exceeds 0.10, a gate test cannot be fixed, or anything else.
-
-**C2v and C3v are labelled in the bullets, with the capacity profile check beside them.**
-**Handoffs (decided 2026-10-19), tied to different contrasts:** `fitter="vp"` becomes the
-default for every pooled DP arm if the gate passes and V1 is below zero in both years at 4 of 5
-sites, whatever C1v shows. If C1v is not refuted (its interval does not lie wholly above +0.10),
-the pooled neural DP continues and N9 compares VP-P against N; otherwise pooling moves to N0's
-convex route.
-
-## Audit before merge: the seven triggers
-
-**The "Checks" bullets answer each; trigger 7 fires by construction, so an Opus audit is planned.**
-(1) Control: any gate line, L0 not scoring 3.072, or P-map-polish with a higher VP objective than
-P-map-same. (2) Contradiction: C1v passing while VP-P loses to G-2y by over 0.2, or the objective
-falling while the score worsens at most sites. (3) Mean forecast: each contrast's error of the
-mean; median minus mean per site and arm. (4) Leave one site out for V1 and C1v to C3v, naming D10,
-D14, and D16. (5) Nested arms: VP-P-nonet and VP-P-pin move little; VP-S does not lose to G-2y.
-(6) Interval width against Part 3's C1. (7) N9 and Parts 5 and 6's pooled arms depend on it.
-
-## Run order, compute, and time
-
-**Order:** (1) the module PR, about 5 hours of agent time, measuring the Gram build first; (2) the
-gate, about 20 minutes; (3) the capacity profile re-run; (4) VP-P and VP-S (two starts each),
-P-map-same, and the gradient refits at the 2024-07-01 and 2025-07-01 cuts, plus every arm's
-2023-07-01 replica; (5) the onboarding and short-history batches (B = 6) and replicas; (6) the
-ladder; (7) report, cards, and write-up (about 3 hours), the numbers review, audit, prose sweep.
-
-**Compute, re-estimated.** The RTX A6000's float64 rate is about 1/32 of float32, about 1.2
-TFLOPS. Site-by-site blocks give about 4e11 flops per Gram build (about 0.4 s; dense would take
-about 5 s), and each pivoting iteration adds a factorisation of about 2e10 flops. An evaluation
-should take about 1 s, so a 300-evaluation fit up to 5 minutes. About 35 VP fits over three cuts
-and about 8 Adam fits of 10 minutes come to about 4 hours of GPU, over the series' 2-hour target:
-**the experiment asks for the GPU time before step 4.** One Gram matrix is about 115 MB, a
-batch of 6 under 1 GB. **If the budget is cut, drop in this order:** VP-P-nonet, VP-P-pin, L2, the
-K = 4 profile, then the exploratory arms' 2023-07-01 replicas. **Data paths:** as experiment 105's
-scripts, plus its `predictions/` and `work/`, and experiment 104's `g_all_centred` and `tuned.json`.
-
-## What the write-up must contain (beyond the series brief's standing rules)
-
-The take-home says plainly whether Part 3's pooling loss came from the fitting method, how much an
-exact fit gains for the pooled and the per-site DP, whether the pooled capacity lands in one place
-from any start, and what that means for N9. Gloss "linear coefficients", "variable projection"
-(solve exactly what can be solved exactly, and step the rest), and "pooled".
-
-- **Figures:** the planned contrasts with intervals, counts, replicate year, and start spread;
-  absolute scores per site; each fit's objective; the capacity profile with the free starts marked;
-  the ladder's terms; the threshold profiles; the gate; a winter and a summer week per decision site
-  (VP-P, P-map-same, VP-S); the tails (coverage and pinball at q01, q05, q95, q99, every arm).
-- **Substation cards** (D-labels only, provisional, VP-P at the 2025-07-01 cut): the series brief's
-  panels, capacity as VP-P's (with its start spread), G-2y's, and the vintage's season-year mean,
-  plus one cross-substation figure.
-- **Caveats:** ERA5 and CAMS flatter the solar term; the masks are hindsight; MVA tan φ and q0 are
-  zero, unlike P-map's; the replicate is in-sample for K and the deviation scale; the priors are
-  P-map's re-expressed; MAP only (with active bounds the posterior is a truncated Gaussian, so a
-  Laplace posterior needs its own design). **Privacy:** D-labels with dates only; no generator
-  data; G-a, G-b, and D15 out; injected farms as ratios only.
-
-## Decisions recorded (2026-10-19)
-
-P-map's re-expressed prior scales, no retuning; no Laplace posterior now; the extra fit is a second
-L-BFGS start, with Adam only when L-BFGS fails its convergence test; the handoffs above; do not wait
-for experiment 109's N. **Open questions:** none.
+**Whether the pooled demand model is worth its network.** Run the pooled model without the network
+(VP-P-nonet matches the gradient fit and its fits are unique) against the per-substation convex
+model on more years of history, because identification should improve with more weather anomalies.
+Do not fit a calendar or seasonal term exactly to a window under three months.

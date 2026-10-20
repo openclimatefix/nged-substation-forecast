@@ -168,6 +168,22 @@ date after the experiment's window, not rechecked there), and D5 shows a flat mi
 2023-07) and D11 (2020-04). Applies to experiments. Evidence: [experiment
 103](00103-differentiable-physics-1-data-look/result.md) for the step list and D8.
 
+**Do not fit calendar and seasonal terms exactly to a window of under three months.** An exact
+least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
+weeks or 3 months of data extrapolates those terms badly: the per-site variable-projection fits
+scored 70.6 and 48.4 points at the five decision substations, against 15.1 and 5.5 for the
+gradient fits that stop early ([experiment
+112](00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result.md); medium
+confidence; provisional). Applies to experiments.
+
+**Treat a heating threshold above a substation's highest temperature, and any per-site threshold
+of a pooled model, as unidentified.** Above the highest temperature the heating hinge is always on,
+and the deviation absorbs a shift, so only the prior sets the threshold; at real noise (standard
+deviation 5 points) a synthetic fleet with a 14 degree threshold was recovered to 2.7 to 5.7 degrees
+with the interaction network off or on ([experiment
+112](00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result.md); medium
+confidence; provisional). Applies to experiments.
+
 ## Drift in demand over the years
 
 **Do not assume that one level shift removes drift, because drift differs by series and by hour
