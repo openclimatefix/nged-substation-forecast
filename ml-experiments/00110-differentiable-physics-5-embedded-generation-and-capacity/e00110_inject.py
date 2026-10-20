@@ -272,6 +272,27 @@ def _level_at(*, path: np.ndarray, first_day: int, block_days: int, day: int) ->
     return float(path[block])
 
 
+def _outage_level(
+    *, path: np.ndarray, first_day: int, block_days: int, outage: tuple[int, int]
+) -> float:
+    """Return the lowest level among the blocks that lie wholly inside the outage.
+
+    A block that straddles the outage's edge is read only where no block lies inside it, such as
+    a one-day outage in three-day blocks, when the lowest block that overlaps the outage is used.
+    """
+    first, length = outage
+    first_block = (first - first_day) // block_days
+    last_block = (first + length - 1 - first_day) // block_days
+    inside = [
+        block
+        for block in range(first_block, last_block + 1)
+        if first_day + block * block_days >= first
+        and first_day + (block + 1) * block_days <= first + length
+    ]
+    chosen = inside or list(range(first_block, last_block + 1))
+    return float(min(path[min(max(block, 0), len(path) - 1)] for block in chosen))
+
+
 def node_readout(
     *,
     fit: GamFit,
@@ -283,8 +304,8 @@ def node_readout(
     """Read the node's level path around an injected step and an injected outage.
 
     The step is placed at the block with the largest positive change in the path within
-    `window_days` of the true step day. The outage is read from the days strictly inside it, so a
-    block that straddles the outage's edge does not count.
+    `window_days` of the true step day. The outage is read from the lowest block wholly inside it,
+    so a block that straddles the outage's edge does not count.
 
     Args:
         fit: A fit with a node.
@@ -313,8 +334,7 @@ def node_readout(
     before = np.mean([level(step_day - k) for k in range(2, flank_days + 2)])
     after = np.mean([level(step_day + k) for k in range(2, flank_days + 2)])
     first, length = outage
-    interior = range(first + (1 if length > 2 else 0), first + length - (1 if length > 2 else 0))
-    during = float(np.mean([level(day) for day in interior]))
+    during = _outage_level(path=path, first_day=first_day, block_days=block, outage=(first, length))
     just_before = float(np.mean([level(first - k) for k in range(2, 9)]))
     return NodeReadout(
         step_error_days=float(placed - step_day),
