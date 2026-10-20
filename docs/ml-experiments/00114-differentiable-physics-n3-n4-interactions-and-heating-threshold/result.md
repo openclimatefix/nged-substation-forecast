@@ -94,7 +94,8 @@ lowers its day-ahead error after the recent-error filter by about 0.04 points, a
 substations in both years.** The model is the convex per-substation model of Primary demand that
 Part 6 ([experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)) made the
-differentiable-physics (DP) series' candidate (GAM-K), and every number here uses past weather. Letting heating or lighting differ between weekdays and weekends adds nothing.
+differentiable-physics (DP) series' candidate (GAM-K), and every number here uses past weather.
+Letting heating or lighting differ between weekdays and weekends adds nothing.
 
 **Choosing the heating threshold separately for each substation did not clearly help.** The score
 changed by -0.012 points, and the interval spans zero. The profiled loss prefers a threshold below
