@@ -308,7 +308,7 @@ def figure_subsets(*, scored: dict) -> alt.TopLevelMixin:
     ).properties(width=WIDTH - 320, height=52 * len(order))
     return chart.properties(
         title=_title(
-            text="No arm beats GAM-K in winter or on cold days, and KEZ-DT loses on holidays",
+            text="Winter and cold-day contrasts show no clear gain, and KEZ-DT loses on holidays",
             subtitle=(
                 "Difference in mean quantile score at D+1 against GK, scored year, five decision "
                 "substations. Line: 95% interval (whole months, or whole days for cold-snap and "
@@ -513,7 +513,7 @@ def _kez_traces() -> dict[str, tuple[streams.SiteStreams, fc.ArmFilter]]:
 
 WEIGHT_GROUPS: Final[dict[str, tuple[str, tuple[tuple[str, int, str], ...]]]] = {
     "pv": (
-        "The PV capacity weight stays mostly below 1 and moves in steps and short swings",
+        "The PV capacity weight drifts and swings, and its median is below 1 at every substation",
         (("PV capacity weight", PV_INDEX, ocf.BRAND_ORANGE),),
     ),
     "heating": (
@@ -524,7 +524,7 @@ WEIGHT_GROUPS: Final[dict[str, tuple[str, tuple[tuple[str, int, str], ...]]]] = 
         ),
     ),
     "profile_holiday": (
-        "The weekday profile weight is steady and the holiday weight jumps on holidays",
+        "The weekday profile weight and the holiday weight move at some substations",
         (
             ("weekday profile weight", PROFILE.start, ocf.DATA_PURPLE),
             ("holiday-effects weight", HOLIDAY_INDEX, ocf.DATA_GREEN),
@@ -647,7 +647,8 @@ def figure_weights(*, traces: dict, group: str) -> alt.TopLevelMixin:
                 "at the end of each day, with a band of one posterior standard deviation (clipped "
                 "to -1 to 3). Grey rules: holiday days. Light-blue spans: cold-snap days (a "
                 "November to March day colder than the 10th percentile of such days from 2019-09 "
-                "to 2024-06). A weight of 1 is the fitted effect. Weights are not interpretable."
+                "to 2024-06), all of them, including the one day in five the scored rows leave "
+                "out. A weight of 1 is the fitted effect. Weights are not interpretable."
             ),
         )
     )
@@ -731,7 +732,8 @@ def figure_week(*, month: str) -> alt.TopLevelMixin:
                 "Day-ahead (D+1) forecasts chained from each 09:00 UTC origin over the week "
                 f"starting {first:%d %B %Y}, fixed in advance as the second Monday of the month. "
                 "Black: observed. Orange: KEZ median, with 80% and 90% bands. "
-                "Dashed blue: GK median."
+                "Dashed blue: GK median. A gap is a day with no scored row (no reading, or inside "
+                "a switching event)."
             ),
         )
     )
@@ -806,6 +808,99 @@ def TRACES() -> dict:  # noqa: N802
     return _kez_traces()
 
 
+def _cold_night_rows(*, site: str, arm: str) -> tuple[pl.DataFrame, set[str]]:
+    """Return an arm's D+1 rows on cold winter nights at a site, and the cold nights' dates.
+
+    A cold winter night is the stretch from 22:00 local on a cold-snap day to 08:00 the next
+    morning. `hours` counts the hours from 22:00.
+    """
+    cold = score.cold_snap_dates(site=site)[1]
+    frame = pl.read_parquet(score.PREDS_DIR / f"{arm}_scored_{site}.parquet").filter(
+        ~pl.col("switching_mask") & (pl.col("lead_hours") > 15.0) & (pl.col("lead_hours") <= 39.0)
+    )
+    local = pl.col("valid_time").dt.convert_time_zone(score.LOCAL_ZONE) - timedelta(minutes=30)
+    frame = frame.with_columns(local_start=local).with_columns(
+        night=pl.when(pl.col("local_start").dt.hour() >= 22)
+        .then(pl.col("local_start").dt.date())
+        .when(pl.col("local_start").dt.hour() < 8)
+        .then(pl.col("local_start").dt.date() - timedelta(days=1))
+        .otherwise(None)
+    )
+    frame = frame.filter(pl.col("night").is_not_null()).with_columns(
+        night_text=pl.col("night").cast(pl.String)
+    )
+    frame = frame.filter(pl.col("night_text").is_in(list(cold)))
+    frame = frame.with_columns(
+        hours=(
+            (pl.col("local_start").dt.hour() + pl.col("local_start").dt.minute() / 60.0 - 22.0) % 24
+        )
+    )
+    return frame, set(frame["night_text"].to_list())
+
+
+def figure_cold_nights() -> alt.TopLevelMixin:
+    """Forecast against observation on cold winter nights: the median over nights, GK and KEZ."""
+    panels = []
+    for site in SITE_ORDER:
+        pieces = []
+        nights: set[str] = set()
+        for arm in ("GK", "KEZ"):
+            frame, nights = _cold_night_rows(site=site, arm=arm)
+            by_hour = frame.group_by("hours").agg(
+                forecast=pl.col("q50").median(), actual=pl.col("actual").median()
+            )
+            pieces.append(by_hour.with_columns(arm=pl.lit(arm)))
+        table = pl.concat(pieces).sort("hours")
+        kez = table.filter(pl.col("arm") == "KEZ")
+        gk = table.filter(pl.col("arm") == "GK")
+        x = alt.X(
+            "hours:Q",
+            title="Hours after 22:00 local time",
+            axis=alt.Axis(values=[0, 2, 4, 6, 8, 10]),
+        )
+        observed = (
+            alt.Chart(kez)
+            .mark_line(color=DARK, strokeWidth=1.4)
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=x,
+                y=alt.Y("actual:Q", title="Net power (% of capacity)", scale=alt.Scale(zero=False)),
+            )
+        )
+        gk_line = (
+            alt.Chart(gk)
+            .mark_line(color=ocf.DATA_BLUE, strokeDash=[4, 2], strokeWidth=1.4)
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=x, y="forecast:Q"
+            )
+        )
+        kez_line = (
+            alt.Chart(kez)
+            .mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.6)
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=x, y="forecast:Q"
+            )
+        )
+        note = "too few nights" if len(nights) < score.MIN_DAYS_FOR_INTERVAL else ""
+        panels.append(
+            (observed + gk_line + kez_line).properties(
+                width=WIDTH - 90,
+                height=105,
+                title=f"{site}: {len(nights)} cold nights {note}".strip(),
+            )
+        )
+    return alt.vconcat(*panels).properties(
+        title=_title(
+            text="KEZ scores worse than GAM-K on cold winter nights at 4 of 5 substations",
+            subtitle=(
+                "Median over the cold-snap nights of the scored winter (22:00 to 08:00 local, the "
+                "night after a cold-snap day) of the D+1 forecast median and of the observed net "
+                "power. Black: observed. Orange: KEZ. Dashed blue: GK. Fewer than 15 nights at "
+                "every substation, so no ranking and no interval."
+            ),
+        )
+    )
+
+
 def main() -> None:
     """Draw every figure."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -830,6 +925,7 @@ def main() -> None:
             for group in WEIGHT_GROUPS
         },
         "cold": lambda: _save(figure_cold(scored=scored), name="figure_08_cold_snaps"),
+        "cold_nights": lambda: _save(figure_cold_nights(), name="figure_08b_cold_nights"),
         **{
             f"week_{month.lower()}": (
                 lambda month=month: _save(

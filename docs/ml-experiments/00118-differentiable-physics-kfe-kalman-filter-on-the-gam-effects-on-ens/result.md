@@ -25,9 +25,9 @@ hypothesis: >-
   weight, so the gain comes from how each effect drifts and not from the weights' freedom alone.
 prediction: >-
   C1 (KEZ minus GK at D+1) is -0.02 to -0.10 with gains at 3 to 4 of 5 substations; C2 within
-  +/-0.05; C3 -0.02 to -0.08 under 24 hours; C4 within +/-0.02; C5 -0.01 to -0.06; the gate passes
-  readings 1 and 3 to 5, with heating tracking the likeliest to fail (the pre-registered predictions
-  are kept in the section 'Pre-registered design')
+  +/-0.05; C3 -0.02 to -0.08 under 24 hours and under 0.03 in size at D+1; C4 within +/-0.02;
+  C5 -0.01 to -0.06; the gate passes readings 1 and 3 to 5, with heating tracking the likeliest to
+  fail (the pre-registered predictions are kept in the section 'Pre-registered design')
 decision_rule: >-
   The verdict is C1's label (scored-year 99% interval wholly below zero, estimate at least 0.05, at
   least 4 of 5 substations better in both periods, C5 below zero), capped at inconclusive if the
@@ -72,7 +72,8 @@ lessons:
     holidays.
   - >-
     On residuals from real data, the weights cannot be told from noise: in the known-answer gate the
-    filter passed none of the four blocking readings with resampled real residuals.
+    filter failed blocking readings 1, 3, 4, and 5 overall, and with resampled real residuals it
+    passed only the forecast-skill reading, and only in the scenarios that move the PV weight.
 adopted_in: none
 take_home_message: >-
   Letting the convex model's PV, heating, profile, and holiday weights drift did not improve the
@@ -84,40 +85,61 @@ take_home_message: >-
   inconclusive.
 date: 2026-10-20
 pr: 1409
-advice: <written after the results>
+advice:
+  - >-
+    Keep the level-and-anomaly filter of experiment 111 as the DP's recent-level correction for
+    Primaries; do not port the 14-weight effects filter (C1 +0.015, interval -0.013 to +0.048).
+  - >-
+    Fit the noise of a filter that serves day-ahead forecasts by a day-ahead likelihood, not the
+    one-step likelihood (KEZ-1s minus KEZ +0.127 at D+1).
+  - >-
+    Do not let a PV capacity weight move day to day in a day-ahead filter at Primaries (KEZ without
+    the PV weight minus KEZ -0.028 at D+1).
+  - >-
+    Do not set the level and anomaly corrections to zero on holiday days, and do not expect a halved
+    correction to help (KEZ-DT minus KEZ +1.24 and KEZ-DTs minus KEZ +0.09 on holiday days).
+  - >-
+    Test any adaptive-weight filter on resampled real residuals as well as on its own noise model
+    before reading a weight as a measurement (the gate, figure 1), and expect a known-variance
+    recovery bar of a factor of 3 to be missed by a noise fit whose scatter runs over orders of
+    magnitude (P4, repeated over 10 seeds).
 code: ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/
 ---
 
 # Differentiable physics, KFE: a Kalman filter on the convex model's effects, on ENS
 
-**The effects filter (KEZ) does not beat experiment 111's level-and-anomaly filter (GAM-K) at day
+**The 14-weight filter (KEZ) does not beat experiment 111's level-and-anomaly filter (GAM-K) at day
 D+1: it scored 0.015 points worse in the scored year (99% interval -0.013 to +0.048; 1 of 5
-substations better), and it did no better in winter, on winter nights, or on cold days.** The
-day-type version (KEZ-DT), which switches the filter's correction off on holidays, is much worse on
-the 17 holiday days (+1.24 points); halving the correction instead (KEZ-DTs) is not better either
-(+0.09), so the filter's correction still helps on holidays. The known-answer gate and control P4
-both failed, so the PV and holiday weights are not interpretable: the filter recovered an injected
-30% rise in the PV weight and 30% fall in the heating weights when the noise followed its own model,
-but not when the noise was resampled from real residuals, and a weight with true variance 0 was
-fitted anywhere between 6e-7 and 6e-3 per day. The verdict is `inconclusive`. The next step is to
-keep GAM-K's filter, and to fit the noise of any new filter by a day-ahead likelihood, which
-improved KEZ by 0.127 points here.
+substations better), and it did no better in winter, on winter nights, or on cold days.** A point is
+1% of a substation's capacity, and a smaller score is better. The arm that switches the filter's
+correction off on holidays (KEZ-DT) is much worse on the 17 holiday days (+1.24 points), and the arm
+that halves it (KEZ-DTs) is not better either (+0.09), so the filter's correction still helps on
+holidays. The known-answer gate and control P4 both failed: the filter recovered an injected 30%
+rise in the weight on the solar panels (PV) and a 30% fall in the heating weights when the noise
+followed its own model, but not when the noise was resampled from real residuals, so the PV and
+heating weights are not interpretable, and P4 adds that the PV and holiday variances are not
+recovered (a holiday variance simulated at 0 was fitted between 9e-7 and 3e-2 per day in the first
+run). The verdict is `inconclusive`. The evidence supports keeping GAM-K's filter, and fitting a new
+filter's noise by a day-ahead likelihood, which improved KEZ by 0.127 points here.
 
 **This experiment re-implements the method of [de Vilmarest et al.
 (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) on our convex model and our data.** They froze
 the fitted effects of an additive model of regional electricity load, put a random walk on one
 weight per effect, and fitted a diagonal noise matrix by likelihood. We applied the same idea to the
 convex model of the differentiable-physics series at 6 Primary substations, driven by ECMWF ensemble
-(ENS) weather forecasts, with the noise choices of [de Vilmarest and Goude
-(2022)](https://arxiv.org/abs/2110.00334) and the greedy likelihood search of the R package
-[viking](https://CRAN.R-project.org/package=viking). Everything builds on [experiment
+(ENS) weather forecasts (ECMWF is the European Centre for Medium-Range Weather Forecasts), with the
+noise choices of [de Vilmarest and Goude (2022)](https://doi.org/10.48550/arXiv.2110.00334) and the
+greedy likelihood search of the R package [viking](https://CRAN.R-project.org/package=viking).
+Everything builds on [experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md), whose monthly
 fits, calibration, and forecasts the experiment reuses, and the code is the module
 `studies.dp_effects_filter` in [PR
 1407](https://github.com/openclimatefix/nged-substation-forecast/pull/1407).
 
 **The question was whether a filter that lets 14 weights drift beats a filter that lets one level
-per hour band drift.** The weights multiply the fitted effects of the convex model (the level, the
+per hour band drift.** In the tables GK is GAM-K, KEZ is the 14-weight filter with an anomaly state,
+KE is the same without the anomaly, KEZ-Q0 moves only the level, and KEZ-QI shares one step variance
+between the weights. The weights multiply the fitted effects of the convex model (the level, the
 daily profile of each day type, the heating response, the PV capacity, and the holiday effects). A
 "point" is 1% of a substation's effective capacity, and a score is twice the mean pinball loss over
 11 quantiles (smaller is better). The experiment scored the day after the forecast is made (D+1,
@@ -147,6 +169,8 @@ fitted on the odd months of 2024-07 to 2025-06 only.
 ![KEZ's filtered weekday profile and holiday weights over the scored year, per substation](figure_07_weights_profile_holiday.svg)
 
 ![Mean quantile score of GK and KEZ on cold-snap days, per substation](figure_08_cold_snaps.svg)
+
+![The median cold winter night: observed power and the D+1 forecast medians of GK and KEZ](figure_08b_cold_nights.svg)
 
 ## Results
 
@@ -218,10 +242,12 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   the true 1e-4, with 58% of fits within a factor of 3 (10th to 90th percentile 6e-8 to 2.4e-4); a
   median heating variance of 6.8e-7 against 1e-6, 62% within the factor; and, for the holiday group
   simulated at 0, a median of 4.4e-6 with none of the 50 fits under the bar of 1e-7 (10th to 90th
-  percentile 6e-7 to 6e-3). The estimator is unbiased but scatters by about 10 times, so the
-  pre-registered bar of a factor of 3 asked for more than the fit delivers, and the variance of a
-  rare effect (the holiday group is active at 480 half-hours in the tuning months) is not
-  identifiable from the likelihood.
+  percentile 6e-7 to 6e-3). The median fit is slightly low (0.74 of the true PV variance, 0.68 of
+  the heating variance), but the scatter runs over two to three orders of magnitude (10th to 90th
+  percentile 6e-8 to 2.4e-4 for PV and 1.2e-7 to 5.7e-5 for heating), so the pre-registered bar of a
+  factor of 3 asked for more than the fit delivers. One reading is that the variance of a rare
+  effect is not identifiable from the likelihood (the holiday group is active at 480 half-hours in
+  the tuning months).
 
 ## Winter, cold snaps, and holidays
 
@@ -236,20 +262,32 @@ fitted on the odd months of 2024-07 to 2025-06 only.
 - **Cold snaps:** a cold-snap day is a local November to March day whose mean ERA5 temperature is
   below the 10th percentile of such days from 2019-09 to 2024-06 at the site (thresholds 2.08 to
   3.36 degrees Celsius). The scored winter holds 2 to 14 such days per substation (D5 2, D10 11, D11
-  11, D14 10, D16 2, D9 14), so every comparison says too few days and has no interval. The point
-  estimates favour GK at D10, D11, and D14 by 0.2 to 0.6 points (figure above).
-- **Holiday days (KEZ-DT, pre-registered clarification):** KEZ-DT leaves holiday-day readings out of
-  the filter and sets the level and anomaly corrections to 0 on holiday targets. KEZ-DT minus KEZ on
-  the 17 holiday days of the scored year is +1.242 (+0.623 to +1.832), 0 of 5 substations better
-  (C6), and +1.222 on the replicate months (too few days: 14). On all other days it is -0.012
-  (-0.025 to +0.001), within the non-inferiority margin of 0.02 (C6b). The carried level helps on
-  holidays, so the idea that the filter carries the wrong level into holidays is not supported by
-  this arm. An exploratory arm added after the results, KEZ-DTs (KEZ's filter with the level and
-  anomaly corrections halved on holiday targets, a post hoc choice of 0.5 that the tuning months,
-  with 2 to 3 holiday days, could not tune), scores +0.091 (-0.015 to +0.208) against KEZ on the
-  same 17 holiday days and -0.000 (-0.001 to +0.000) on other days, so a halved correction is no
-  better than the full one; against GK it is -0.058 (-0.326 to +0.178) on holiday days and +0.019
-  (-0.004 to +0.045) at D+1 overall.
+  11, D14 10, D16 2, D9 14), so every comparison says too few days and has no interval. Those counts
+  are days in the scored rows: every fifth day of the scored year is a stride day that is never
+  scored, so the weight figures, which mark every cold-snap day of the winter, show more spans than
+  the counts. The point estimates favour GK at D10, D11, and D14 by 0.2 to 0.6 points (figure
+  above).
+- **Cold winter nights (the operator-visible case):** a cold winter night is 22:00 to 08:00 local
+  after a cold-snap day. The scored winter holds 2 to 14 such nights per substation (D5 2, D10 11,
+  D11 11, D14 10, D16 2, D9 14), too few for an interval. The mean quantile score of GK and KEZ on
+  those nights at D+1 is 2.168 and 2.462 pooled over the five decision substations; by substation GK
+  and KEZ score D5 1.593 and 1.698, D10 2.394 and 2.332, D11 2.755 and 3.674, D14 1.471 and 1.556,
+  D16 1.821 and 1.916, so KEZ is worse at 4 of 5 and much worse at D11, where both filters
+  under-forecast the observed night (figure below).
+- **KEZ-DTs on winter nights** scores -0.023 (-0.045 to -0.003) against GK at D+1 (95%, uncorrected,
+  one of many exploratory intervals), and against KEZ it is within 0.002 on winter rows.
+- **Holiday days (KEZ-DT, pre-fit clarification):** KEZ-DT leaves holiday-day readings out of the
+  filter and sets the level and anomaly corrections to 0 on holiday targets. KEZ-DT minus KEZ on the
+  17 holiday days of the scored year is +1.242 (+0.623 to +1.832), 0 of 5 substations better (C6),
+  and +1.222 on the replicate months (too few days: 14). On all other days it is -0.012 (-0.025 to
+  +0.001), within the non-inferiority margin of 0.02 (C6b). The carried level helps on holidays, so
+  the idea that the filter carries the wrong level into holidays is not supported by this arm. An
+  exploratory arm added after the results, KEZ-DTs (KEZ's filter with the level and anomaly
+  corrections halved on holiday targets, a post hoc choice of 0.5 that the tuning months, with 2 to
+  3 holiday days, could not tune), scores +0.091 (-0.015 to +0.208) against KEZ on the same 17
+  holiday days and -0.000 (-0.001 to +0.000) on other days, so a halved correction is no better than
+  the full one; against GK it is -0.058 (-0.326 to +0.178) on holiday days and +0.019 (-0.004 to
+  +0.045) at D+1 overall.
 
 ## The known-answer gate
 
@@ -264,10 +302,12 @@ fitted on the odd months of 2024-07 to 2025-06 only.
 - **Result:** blocking readings 1, 3, 4, and 5 failed. In the filter's own noise model, PV tracking
   passed (0.87 to 0.93 of draws recovered 70% of the change), heating tracking passed (0.98 to 1.00
   recovered 50%, a non-blocking reading), cross-talk passed (0.96 to 1.00), and the filter beat GK
-  on the stream in every draw; only the no-false-movement reading failed, narrowly (on a clean
-  stream the heating weight wandered by a median 0.15 and the holiday weight by 0.13, against a bar
-  of 0.10). With resampled real residuals, PV tracking passed in 0.16 to 0.21 of draws, heating
-  tracking in 0.44 to 0.53, no-false-movement in none, and cross-talk in 0.37 to 0.51.
+  on the stream in every draw; only the no-false-movement reading failed, passing in 2 to 3 of 100
+  draws against a bar of 80 (the wander is modest: on a clean stream the heating weight wandered by
+  a median 0.15 and the holiday weight by 0.13, against a bar of 0.10). With resampled real
+  residuals, PV tracking passed in 0.16 to 0.21 of draws, heating tracking in 0.44 to 0.53,
+  no-false-movement in none, and cross-talk in 0.37 to 0.51; the forecast-skill reading passed in
+  the PV scenarios (0.86 to 0.90 in S1 and S3) and failed in S2 (0.26 to 0.30).
 - **Power check:** the injected PV change was 1.5 to 14.7 posterior standard deviations (D10 1.5,
   D16 1.8, D5 4.5, D14 4.9, D11 14.7) and the heating change 0.9 to 3.4, so both weights are
   labelled "not interpretable". The doubled-amplitude rows were added as a check after the first
@@ -298,11 +338,10 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   C5 in the replicate months turns positive without D10); 5, a nested arm beats the arm that
   contains it (GK beats KEZ by 0.015, inside the noise); 6, the replicate months' C1 interval
   (half-width 0.09) is about four times as wide as the sister experiment's. Triggers 3 and 7 did not
-  fire. A fresh audit (by a Sonnet reviewer, by the manager's ruling) is due before the prose
-  review.
+  fire. Triggers 1, 2, 4, 5, and 6 therefore call for an audit.
 - **Tails at D+1, scored year** (coverage at q01, q05, q95, q99, and pinball loss at each): GK
   0.020, 0.062, 0.942, 0.982 and 0.189, 0.635, 0.656, 0.206; KEZ 0.017, 0.055, 0.945, 0.982 and
-  0.187, 0.646, 0.672, 0.211. KEZ is within 0.7 points of GK's coverage at every tail.
+  0.187, 0.646, 0.672, 0.211. KEZ is within 0.7 percentage points of GK's coverage at every tail.
   Threshold-weighted CRPS and curtailment cost were not computed (experiment 87 found no event that
   could rank forecasts).
 
@@ -314,9 +353,11 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   capacity vintage for D9 at the tuning cuts is hindsight (D9's vintages start in 2025-04); the
   in-sample ENS calibration, the pinned capacity reading hindsight weeks, ERA5 in the convex model's
   last training rows, and the spread fitted on the tuning months are inherited from experiment 111;
-  the gain of de Vilmarest et al. (2024) is on regional load. The forecasts ran on module commit
-  `2e356581b` of PR 1407, which has had a Sonnet review and awaits an Opus review; if that review
-  changes the module, what it affects re-runs and these first-run results stay on this page.
+  the gain reported by de Vilmarest et al. is on regional load. The forecasts ran on module commit
+  `2e356581b` of PR 1407; if its review changes the module, what the change affects re-runs and
+  these first-run results stay on this page. **This page cannot merge before PR 1407 does**, because
+  the scripts import the module, and until then this pull request's diff carries the module's code,
+  its tests, and three lines of `pyproject.toml`.
 - **What to try next:** KEZ without the PV weight is the only arm that scored below GK in the scored
   year, and it did not in the replicate months, so a filter that moves the profile and heating
   weights while fixing PV is a cheap follow-up. A day-ahead likelihood fit for GK's own
@@ -340,15 +381,16 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   periods, and C5 below zero), capped at `inconclusive` if the known-answer gate fails. The smallest
   gain worth porting is 0.05 points at D+1.
 - **Predictions against the outcome:** C1 was predicted at -0.02 to -0.10 and observed +0.015
-  (failed); C2 within +/-0.05, observed +0.180 (failed); C3 under 0.03 in size at D+1, observed
-  -0.164 (failed); C4, KEZ-Q0 within 0.02 of GK, observed +0.022 (failed narrowly); C5 at -0.01 to
-  -0.06, observed -0.010 (held, with an interval that includes zero). The gate's readings 1 and 3 to
-  5 were predicted to pass and failed with real residuals; reading 2 (heating tracking), predicted
-  likeliest to fail, passed in the filter's own noise model. The fitted steps were predicted at 0.1
-  to 0.4 a year for the level and holiday weights, 0.02 to 0.15 for PV, and under 0.05 for the
-  profile scales; observed, the level steps are 1 to 70 points a year, PV 0.02 to 1.8, and profile
-  0.07 to 0.55. The PV weight was predicted within 0.15 of 1 at 4 of 5 substations and was not at
-  any.
+  (failed); C2 within +/-0.05, observed +0.180 (failed); C3 at -0.02 to -0.08 under 24 hours and
+  under 0.03 in size at D+1, observed -0.134 and -0.164 (failed); C4, KEZ-Q0 within 0.02 of GK,
+  observed +0.022 (failed narrowly); C5 at -0.01 to -0.06, observed -0.010 (held, with an interval
+  that includes zero). The gate's readings 1 and 3 to 5 were predicted to pass and failed with real
+  residuals; reading 2 (heating tracking), predicted likeliest to fail, passed in the filter's own
+  noise model. The fitted steps were predicted at 0.1 to 0.4 a year for the level and holiday
+  weights, 0.02 to 0.15 for PV, and under 0.05 for the profile scales; observed, the level steps are
+  1 to 70 points a year, PV 0.02 to 1.8, and profile 0.07 to 0.55. The PV weight was predicted to
+  stay within 0.15 of 1 at 4 of 5 substations; its median over the scored year is within 0.15 of 1
+  at 2 (D14 0.95 and D16 0.89; D5 0.82, D10 0.74, D11 0.76).
 - **Three clarifications were added before any replicate or scored forecast,** each recorded in the
   plan commits of [PR 1409](https://github.com/openclimatefix/nged-substation-forecast/pull/1409):
   the winter breakdown and the cold-snap rule (maintainer's winter-first rule); the day-type-aware
@@ -375,6 +417,11 @@ cold-snap days (the cold-snap figure), and four example weeks (below).
   0.55 to 1.15 at D16, and 0.42 to 1.02 at D9, so the implied PV capacity is mostly below the pinned
   vintage capacity. D9's vintage is hindsight at the tuning cuts, so its PV weight is the least
   informative. The hindsight capacity estimates of experiment 45 are not drawn beside the weights.
+- **Weights worth a second look:** D16's holiday weight sits at the clip of -1 from January to March
+  (days 184 to 275 of the figure), and D11's holiday weight sits near 1.7 from late August to
+  mid-December with a band that reaches the clip of 3. Both follow from a weight that updates only
+  on the few holiday half-hours, so they are not measurements. D5's weekday profile weight rises
+  from about 0.35 to 1.2 and falls to 0.55 within the year.
 - **Cross-substation comparison:** the step figure shows, for every weight, the fitted random-walk
   step at all six substations side by side; the level steps range from 1 to 70 points a year, the
   holiday and PV steps differ by more than 10 times between substations, and the profile steps stay
