@@ -40,6 +40,12 @@ EXPLORATORY: Final[dict[str, tuple[str, str]]] = {
     "KEZ-DT minus KEZ": ("KEZ-DT", "KEZ"),
     "KEZ-DT minus GK": ("KEZ-DT", "GK"),
     "KEZ-Q0 minus GK": ("KEZ-Q0", "GK"),
+    "KEZ-1s minus KEZ": ("KEZ-1s", "KEZ"),
+    "KEZ-drop-pv minus GK": ("KEZ-drop-pv", "GK"),
+    "KEZ-drop-profile minus GK": ("KEZ-drop-profile", "GK"),
+    "KEZ-drop-heating minus GK": ("KEZ-drop-heating", "GK"),
+    "KEZ-drop-holiday minus GK": ("KEZ-drop-holiday", "GK"),
+    "KEZ-DT minus KEZ-Q0": ("KEZ-DT", "KEZ-Q0"),
 }
 REFERENCE_CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "KEZ minus GAM-0": ("KEZ", "gam0"),
@@ -315,6 +321,38 @@ def reference_contrasts(
     return out
 
 
+def reference_scores(
+    *, mine: dict[str, pl.DataFrame], references: dict[str, pl.DataFrame], labels: dict[int, str]
+) -> dict:
+    """Return KEZ's and each reference's mean quantile score by lead band on their shared rows.
+
+    Only the decision sites count. A reference's rows are those it shares with KEZ.
+    """
+    out: dict = {}
+    decision = [site for site in labels.values() if site in common.DECISION_SITES]
+    for name, frame in references.items():
+        pair = score.common_rows(
+            arms_by_name={
+                "KEZ": mine["KEZ"].drop("mean", "level", "anomaly", strict=False),
+                name: frame.drop("mean", strict=False),
+            }
+        )
+        out[name] = {}
+        for arm, rows in pair.items():
+            kept = rows.filter(pl.col("site").is_in(decision))
+            scored = kept.with_columns(score.quantile_score(frame=kept))
+            out[name][arm] = {
+                lead: float(
+                    scored.filter(
+                        (pl.col("lead_hours") > BAND_OF_LEAD[lead][1])
+                        & (pl.col("lead_hours") <= BAND_OF_LEAD[lead][2])
+                    )["qs"].mean()
+                )
+                for lead in LEADS
+            }
+    return out
+
+
 def run_period(*, period: str) -> dict:
     """Score one period and return the results."""
     mine, references = load_period(period=period)
@@ -361,6 +399,7 @@ def run_period(*, period: str) -> dict:
     results["against_references"] = reference_contrasts(
         mine=mine, references=references, labels=labels
     )
+    results["reference_scores"] = reference_scores(mine=mine, references=references, labels=labels)
     return results
 
 
@@ -397,11 +436,27 @@ def markdown(*, results: dict) -> str:
     return "\n".join(lines)
 
 
+def add_reference_scores(*, period: str) -> None:
+    """Add the references' absolute scores to a stored results file, without rescoring."""
+    mine, references = load_period(period=period)
+    ids, _ = score.site_meta(sites=SITES)
+    labels = {series: site for site, series in ids.items()}
+    path = common.WORK_DIR / f"results_{period}.json"
+    results = json.loads(path.read_text())
+    results["reference_scores"] = reference_scores(mine=mine, references=references, labels=labels)
+    common.write_json_atomic(path=path, content=results)
+
+
 def main() -> None:
     """Score the chosen periods."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--periods", nargs="+", default=["replicate", "scored"])
+    parser.add_argument("--references-only", action="store_true")
     args = parser.parse_args()
+    if args.references_only:
+        for period in args.periods:
+            add_reference_scores(period=period)
+        return
     for period in args.periods:
         results = run_period(period=period)
         common.write_json_atomic(path=common.WORK_DIR / f"results_{period}.json", content=results)
