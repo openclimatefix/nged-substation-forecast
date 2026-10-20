@@ -35,7 +35,7 @@ take_home_message: >-
   pooled model back. The known-answer test failed, because at realistic noise the model cannot pin
   down heating thresholds, slopes or capacities.
 date: 2026-10-20
-pr: 1392
+pr: 1396
 advice:
   - >-
     Do not read a lower training objective as a better pooled model: with the interaction network
