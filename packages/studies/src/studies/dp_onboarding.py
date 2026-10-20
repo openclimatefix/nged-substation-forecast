@@ -317,20 +317,22 @@ def onboard_site(
     optimiser = torch.optim.Adam(trainable, lr=learning_rate)
     torch.manual_seed(seed)
     last = float("nan")
-    if batch.n_rows and fitter is not None:
-        last = fitter(model, batch, site)
-    elif batch.n_rows:
-        model.train()
-        for _ in range(steps):
-            optimiser.zero_grad(set_to_none=True)
-            loss = model.loss(batch=batch)
-            loss.backward()
-            optimiser.step()
-            last = float(loss.detach())
-    for handle in handles:
-        handle.remove()
-    for name, parameter in model.named_parameters():
-        parameter.requires_grad_(saved_flags[name])
+    try:
+        if batch.n_rows and fitter is not None:
+            last = fitter(model, batch, site)
+        elif batch.n_rows:
+            model.train()
+            for _ in range(steps):
+                optimiser.zero_grad(set_to_none=True)
+                loss = model.loss(batch=batch)
+                loss.backward()
+                optimiser.step()
+                last = float(loss.detach())
+    finally:
+        for handle in handles:
+            handle.remove()
+        for name, parameter in model.named_parameters():
+            parameter.requires_grad_(saved_flags[name])
     _restore_other_sites(
         model=model,
         batch=batch,

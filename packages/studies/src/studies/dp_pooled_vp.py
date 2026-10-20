@@ -1448,7 +1448,8 @@ def vp_site_fitter(
     by L-BFGS, solving its level, deviation, heating slopes, and capacity increments exactly at
     each step, with the population means as fixed prior centres. The shared calendar terms are
     centred on the substation's own rows, as in the gradient onboarding. A fit that does not meet
-    the convergence test keeps its best point.
+    the convergence test keeps its best point. The base model must have a zero MVA operator (a
+    variable-projection fit has one), because the fitter leaves every substation's operator alone.
 
     Args:
         settings: The noise standard deviation and the prior scales.
@@ -1456,11 +1457,14 @@ def vp_site_fitter(
 
     Returns:
         A function of the model, the substation's rows, and its index that fits the substation in
-        place and returns the final loss per row.
+        place and returns the final loss per row; it raises `ValueError` if the model has a
+        non-zero MVA operator.
     """
 
     def fitter(model: PooledDemandModel, batch: PooledBatch, site: int) -> float:
-        freeze_operator_for_vp(model=model)
+        if bool((model.tan_phi != 0).any()) or bool((model.q0 != 0).any()):
+            msg = "onboarding by variable projection needs a base model with a zero MVA operator"
+            raise ValueError(msg)
         problem = make_vp_problem(model=model, batch=batch, settings=settings, frozen_shared=True)
         owned: list[nn.Parameter] = [model.threshold]
         if model.config.shared_shapes:

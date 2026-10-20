@@ -23,6 +23,7 @@ from studies.dp_pooled_vp import (  # noqa: E402
     VpLayout,
     VpProblem,
     VpSettings,
+    _check_mva_demand,
     _evaluate,
     _last_layer,
     assemble_system,
@@ -41,6 +42,8 @@ from studies.dp_pooled_vp import (  # noqa: E402
     vp_objective,
     vp_site_fitter,
 )
+
+from studies import dp_pooled_vp  # noqa: E402
 
 CUT: Final[np.datetime64] = np.datetime64("2024-07-01T00:00:00", "us")
 WINDOW_START: Final[np.datetime64] = np.datetime64("2022-07-01T00:00:00", "us")
@@ -502,7 +505,11 @@ def test_the_fit_reaches_the_objective_of_the_parameters_that_made_the_targets(
     model = _model(batch=batch, hidden=(), shapes=2, seed=32)
     with torch.no_grad():
         start = float(vp_objective(model=model, batch=batch, settings=SETTINGS))
-    result = fit_pooled_vp(model=model, batch=batch, settings=SETTINGS, max_evaluations=150)
+    # No Adam fallback: L-BFGS alone has to reach the optimum and say it converged.
+    result = fit_pooled_vp(
+        model=model, batch=batch, settings=SETTINGS, max_evaluations=150, adam_steps=0
+    )
+    assert result.converged
     assert result.objective < start - 1e3
     assert result.history[-1] <= result.history[0]
     assert result.kkt_violation < 1e-6
@@ -752,7 +759,7 @@ def test_onboarding_by_variable_projection_changes_only_the_new_substation(
         if name in per_site:
             others_changed = torch.arange(change.shape[0]) != site
             assert float(change[others_changed].sum()) == 0.0, name
-        elif name not in ("tan_phi", "q0"):
+        else:
             assert float(change.sum()) == 0.0, name
     assert float((model.level.detach() - before["level"]).abs()[site]) > 0.0
     assert float((model.threshold.detach() - before["threshold"]).abs()[site]) > 0.0
@@ -786,3 +793,55 @@ def test_the_frozen_site_solve_matches_an_independent_dense_bounded_solve(
 
     _onboard(model, own, cache, probe)
     assert checked
+
+
+def test_a_modelled_mva_demand_that_is_not_positive_is_refused(dp_synthetic_cache: FeatureCache):
+    batch = _batch(_cache(dp_synthetic_cache, third="mva"), sites=("S1", "S3"))
+    model = _model(batch=batch)
+    with torch.no_grad():
+        model.level.fill_(-100.0)
+    with pytest.raises(ValueError, match="modelled demand"):
+        _check_mva_demand(model=model, batch=batch)
+
+
+def test_onboarding_by_variable_projection_refuses_a_base_model_with_a_reactive_operator(
+    dp_synthetic_cache: FeatureCache,
+):
+    model, own, cache = _onboarding_setup(dp_synthetic_cache)
+    with torch.no_grad():
+        model.tan_phi[0] = 0.2
+    with pytest.raises(ValueError, match="zero MVA operator"):
+        _onboard(model, own, cache, vp_site_fitter(settings=SETTINGS, max_evaluations=5))
+    # A fitter that raises leaves no gradient hooks and no changed training flags behind.
+    assert all(not p._backward_hooks for p in model.parameters())
+
+
+def test_the_site_fitter_returns_the_loss_of_the_best_point_it_saw(
+    dp_synthetic_cache: FeatureCache, monkeypatch: pytest.MonkeyPatch
+):
+    model, own, cache = _onboarding_setup(dp_synthetic_cache)
+    seen: list[float] = []
+    original = dp_pooled_vp._run_lbfgs
+
+    def recording(**kwargs):  # noqa: ANN003, ANN202
+        history, best, stopped = original(**kwargs)
+        seen.append(best.objective)
+        return history, best, stopped
+
+    monkeypatch.setattr(dp_pooled_vp, "_run_lbfgs", recording)
+    info = _onboard(model, own, cache, vp_site_fitter(settings=SETTINGS, max_evaluations=25))
+    assert info["loss"] == pytest.approx(seen[0], rel=1e-9)
+
+
+def test_a_training_batch_holds_no_row_after_its_cut(dp_synthetic_cache: FeatureCache):
+    cache = _cache(dp_synthetic_cache, third=None)
+    batch = _batch(cache, sites=("S1", "S2"))
+    assert cache.end_times[batch.row.cpu().numpy()].max() <= CUT
+    later = build_pooled_batch(
+        cache=cache,
+        sites=("S1", "S2"),
+        cut_end=CUT + np.timedelta64(1, "D"),
+        after=WINDOW_START,
+        dtype=torch.float64,
+    )
+    assert later.n_rows > batch.n_rows
