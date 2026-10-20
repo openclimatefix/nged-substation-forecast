@@ -143,6 +143,7 @@ member of the latest run, leads 9 to 33 hours), as experiment 111's residuals do
 | KEZ-Q0 | level only moves (10 weights fixed) | yes | fitted for the level | the paper's static control (descriptive) |
 | KEZ-QI | all 14 | yes | one q for every weight, fitted | identity noise matrix: the test of a learned noise matrix |
 | KEZ-drop-g | all but group g | yes | fitted | which group earns the gain; g in profile, heating, PV, holiday |
+| KEZ-DT | all 14 | yes | fitted | the day-type-aware arm (pre-fit clarification below); descriptive for the verdict |
 | KEZ-sh | KEZ plus experiment W1's shape state | yes | fitted | labelled follow-up with no number, unless experiment 115 (W1) has merged a tested shape state by the end of the scored year |
 
 **KEZ nests GK:** with q_k = 0 for the 10 non-level weights it reproduces GK exactly (control P1).
@@ -326,6 +327,29 @@ plan was first committed and before any filter was fitted, at the maintainer's r
   If KEZ's C1 on the winter rows is above zero in the scored year with its interval wholly above
   zero, or if the cold-snap days show KEZ worse than GK by more than 0.05 points, the verdict is
   capped at `partly supported` and the take-home message says so.
+
+## Day-type-aware arm KEZ-DT (pre-fit clarification, added before any fit)
+
+**A stored-forecast check found that experiment 111's GAM-K scores 0.4 to 0.5 quantile-score points
+worse on Christmas than on matched ordinary days in all three stored sets, while GAM-0 scores about
+the same on both.** The filter may be carrying an ordinary-day level into holidays. The clarification
+below was added to the plan at the maintainer's request, after the plan was first committed and
+before any filter was fitted. It does not change the verdict, which stays C1's.
+
+- **Holiday days:** the days the calendar marks as a named holiday period (each bank holiday, Easter,
+  bridge days, and the Christmas to New Year run) or as a bank-holiday day type.
+- **Design:** KEZ-DT is KEZ with two changes. Readings on holiday days do not update the state (the
+  filter treats them as missing, so the state still moves by the exact gap discretisation), and the
+  noise matrix is refitted on the stream with those readings removed. On a holiday target day the
+  level and anomaly corrections are set to 0, so the frozen model's holiday effects stand without an
+  ordinary-day level added to them. The other weights still apply.
+- **C6, primary for this arm:** KEZ-DT minus KEZ on the holiday days of the replicate months and the
+  scored year, resampling whole days. The stored sets hold only 8 to 20 Christmas days, so the page
+  says "too few days" for any group of fewer than 15 days, and gives no interval there.
+- **C6b, non-inferiority:** KEZ-DT minus KEZ on all other days, passed if the upper end of the
+  interval is at most +0.02 points.
+- **Also reported:** the same two contrasts against GK, and winter nights (November to March, hour
+  band night) with the winter breakdown above.
 
 ## Audit before merge: the seven triggers
 
