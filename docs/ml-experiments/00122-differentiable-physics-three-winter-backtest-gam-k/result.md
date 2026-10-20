@@ -53,7 +53,7 @@ take_home_message: >-
   those two gains are partly in-sample; 2025-26 is the cleanest. The scoring uses past weather, so
   the gain under live weather forecasts is unknown.
 date: 2026-10-20
-pr: <pr>
+pr: 1415
 advice:
   - >-
     Test whether GAM-K's gain over a fit frozen for a year is a level-tracking gain, by debiasing
