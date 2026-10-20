@@ -30,6 +30,8 @@ CLEAN_COST_LIMIT: Final[float] = 0.023
 TUNING_SEEDS: Final[int] = 10
 SCORED_SEEDS: Final[int] = 10
 MAX_WEIGHT: Final[float] = 30.0
+CORRECTED_GRID: Final[tuple[float, ...]] = (0.0, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0, 3.0, 10.0, 30.0)
+"""The corrected-scale re-run's weights: the first grid's, with lower weights added."""
 DEVICE: Final[str] = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -119,24 +121,33 @@ def inject_all(
         sys.stdout.flush()
 
 
-def tune() -> None:
-    """Choose W* on the tuning year's injections and write it with the clean costs."""
+def tune(*, corrected: bool = False) -> None:
+    """Choose W* on the tuning year's injections and write it with the clean costs.
+
+    With `corrected`, the BSP row's scale is the residual against the Primaries' fitted values
+    (a post hoc re-run after arm B's plumbing check found the first scale too small), the weight
+    grid reaches lower, and the files carry the suffix `_corrected`.
+    """
     WORK_DIR.mkdir(parents=True, exist_ok=True)
-    cache, pilot, assembly, cut = setup(cut_name="tuning")
-    clean = solve_joint(assembly=assembly, weights=WEIGHT_GRID)
+    grid = CORRECTED_GRID if corrected else WEIGHT_GRID
+    suffix = "_corrected" if corrected else ""
+    cache, pilot, assembly, cut = setup(
+        cut_name="tuning", sigma_b_from="fitted" if corrected else "observed"
+    )
+    clean = solve_joint(assembly=assembly, weights=grid)
     scores = {
         s: score_rows(cache=cache, assembly=assembly, fit=clean, site=s, cut=cut)
         for s in pilot.mw_sites
     }
     clean_mae = {s: mae(score=scores[s], fit=clean, site=s) for s in pilot.mw_sites}
-    path = WORK_DIR / "tuning_injections.jsonl"
+    path = WORK_DIR / f"tuning_injections{suffix}.jsonl"
     with path.open("w") as out:
         inject_all(
             cache=cache,
             pilot=pilot,
             assembly=assembly,
             cut=cut,
-            weights=list(WEIGHT_GRID),
+            weights=list(grid),
             seeds=TUNING_SEEDS,
             seed_offset=1000,
             scores=scores,
@@ -144,7 +155,7 @@ def tune() -> None:
             with_oracle=False,
         )
     rows = [json.loads(line) for line in path.read_text().splitlines()]
-    damage = np.zeros(len(WEIGHT_GRID))
+    damage = np.zeros(len(grid))
     for row in rows:
         damage += np.array(row["mae"]) - np.array(clean_mae[row["site"]])
     cost = np.mean([clean_mae[s] - clean_mae[s][0] for s in pilot.mw_sites], axis=0)
@@ -152,14 +163,14 @@ def tune() -> None:
     allowed = cost <= CLEAN_COST_LIMIT
     best = int(np.argmax(np.where(allowed, reduction, -np.inf)))
     result = {
-        "weights": list(WEIGHT_GRID),
+        "weights": list(grid),
         "summed_damage": damage.tolist(),
         "summed_reduction": reduction.tolist(),
         "clean_cost": cost.tolist(),
-        "w_star": WEIGHT_GRID[best],
+        "w_star": grid[best],
         "n_injections": len(rows),
     }
-    (WORK_DIR / "tuning.json").write_text(json.dumps(result, indent=2))
+    (WORK_DIR / f"tuning{suffix}.json").write_text(json.dumps(result, indent=2))
     sys.stdout.write(json.dumps(result, indent=2) + "\n")
 
 
@@ -197,31 +208,36 @@ def score(*, cut_name: str) -> None:
         )
 
 
-def clean_grid(*, cut_name: str) -> None:
+def clean_grid(*, cut_name: str, corrected: bool = False) -> None:
     """Fit at a cut for the whole weight grid and score the clean year, with no injections."""
-    cache, pilot, assembly, cut = setup(cut_name=cut_name)
-    fit = solve_joint(assembly=assembly, weights=WEIGHT_GRID)
+    grid = CORRECTED_GRID if corrected else WEIGHT_GRID
+    suffix = "_corrected" if corrected else ""
+    cache, pilot, assembly, cut = setup(
+        cut_name=cut_name, sigma_b_from="fitted" if corrected else "observed"
+    )
+    fit = solve_joint(assembly=assembly, weights=grid)
     scores = {
         s: score_rows(cache=cache, assembly=assembly, fit=fit, site=s, cut=cut)
         for s in pilot.mw_sites
     }
     result = {
         "cut": cut_name,
-        "weights": list(WEIGHT_GRID),
+        "weights": list(grid),
         "clean_mae": {s: mae(score=scores[s], fit=fit, site=s).tolist() for s in pilot.mw_sites},
         "monthly_mae": {
             s: monthly_mae(cache=cache, score=scores[s], fit=fit, site=s) for s in pilot.mw_sites
         },
     }
-    (WORK_DIR / f"clean_grid_{cut_name}.json").write_text(json.dumps(result, indent=2))
+    (WORK_DIR / f"clean_grid_{cut_name}{suffix}.json").write_text(json.dumps(result, indent=2))
     mean = np.mean([result["clean_mae"][s] for s in pilot.mw_sites], axis=0)
     sys.stdout.write(f"{cut_name}: mean clean MAE by weight {np.round(mean, 3).tolist()}\n")
 
 
 if __name__ == "__main__":
+    corrected = sys.argv[-1] == "corrected"
     if sys.argv[1] == "tune":
-        tune()
+        tune(corrected=corrected)
     elif sys.argv[1] == "clean":
-        clean_grid(cut_name=sys.argv[2])
+        clean_grid(cut_name=sys.argv[2], corrected=corrected)
     else:
         score(cut_name=sys.argv[2])

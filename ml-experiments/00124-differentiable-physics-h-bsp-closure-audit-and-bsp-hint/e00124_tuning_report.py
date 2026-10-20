@@ -15,23 +15,21 @@ import numpy as np
 from e00124_common import WORK_DIR
 
 
-def main() -> None:
-    """Write and print the tuning report."""
-    tuning = json.loads((WORK_DIR / "tuning.json").read_text())
+def section(*, suffix: str, title: str) -> list[str]:
+    """Return the report lines of the tuning run with the files' `suffix`."""
+    tuning = json.loads((WORK_DIR / f"tuning{suffix}.json").read_text())
     weights = tuning["weights"]
-    clean = json.loads((WORK_DIR / "clean_grid_tuning.json").read_text())["clean_mae"]
+    clean = json.loads((WORK_DIR / f"clean_grid_tuning{suffix}.json").read_text())["clean_mae"]
     rows = [
-        json.loads(line) for line in (WORK_DIR / "tuning_injections.jsonl").read_text().splitlines()
+        json.loads(line)
+        for line in (WORK_DIR / f"tuning_injections{suffix}.jsonl").read_text().splitlines()
     ]
     by_kind: dict[str, np.ndarray] = defaultdict(lambda: np.zeros(len(weights)))
-    sibling: dict[str, np.ndarray] = defaultdict(lambda: np.zeros(len(weights)))
     counts: dict[str, int] = defaultdict(int)
     for row in rows:
         by_kind[row["kind"]] += np.array(row["mae"]) - np.array(clean[row["site"]])
         counts[row["kind"]] += 1
-        for other, values in row["siblings"].items():
-            sibling[row["kind"]] += np.array(values) - np.array(clean[other])
-    lines = ["# Experiment 124, tuning year", ""]
+    lines = [f"## {title}", ""]
     lines.append(f"- weights tried: {', '.join(f'{w:g}' for w in weights)}")
     lines.append(f"- chosen weight W*: {tuning['w_star']:g} ({tuning['n_injections']} injections)")
     total = sum(by_kind.values())
@@ -50,21 +48,29 @@ def main() -> None:
                 else "; no damage to reduce at weight 0"
             )
         )
-    for kind, values in sibling.items():
-        lines.append(
-            f"- {kind}: the other Primary's summed damage by weight "
-            + ", ".join(f"{v:.2f}" for v in values)
-        )
     lines.append(
         "- clean cost by weight, tuning year (mean over the MW Primaries of the clean error minus "
         "weight 0's): " + ", ".join(f"{v:.3f}" for v in tuning["clean_cost"])
     )
     for year in ("replicate", "scored"):
-        grid = json.loads((WORK_DIR / f"clean_grid_{year}.json").read_text())["clean_mae"]
+        grid = json.loads((WORK_DIR / f"clean_grid_{year}{suffix}.json").read_text())["clean_mae"]
         mean = np.mean(list(grid.values()), axis=0)
         lines.append(
             f"- clean cost by weight, {year} year: " + ", ".join(f"{v:.3f}" for v in mean - mean[0])
         )
+    return [*lines, ""]
+
+
+def main() -> None:
+    """Write and print the tuning report: the first run, then the corrected-scale re-run."""
+    lines = ["# Experiment 124, tuning year", ""]
+    lines += section(
+        suffix="", title="First run (BSP-row scale 1.2 MW, from the observed readings)"
+    )
+    lines += section(
+        suffix="_corrected",
+        title="Re-run after the plumbing check (BSP-row scale 2.9 MW, from the fitted Primaries)",
+    )
     text = "\n".join(lines) + "\n"
     (WORK_DIR / "tuning_report.md").write_text(text)
     (

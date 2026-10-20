@@ -50,36 +50,57 @@ def _weight_label(weight: float) -> str:
     return f"{weight:g}"
 
 
-def figure_tradeoff() -> None:
-    """Figure 1: the damage from injected errors and the clean-score cost against the weight."""
-    tuning = json.loads((WORK_DIR / "tuning.json").read_text())
-    labels = [_weight_label(w) for w in tuning["weights"]]
-    damage = pl.DataFrame({"weight": labels, "damage": tuning["summed_damage"]})
+FIRST_RUN: Final[str] = "first run"
+CORRECTED_RUN: Final[str] = "re-run, scale corrected"
+
+
+def _tradeoff_frames() -> tuple[pl.DataFrame, pl.DataFrame, list[str]]:
+    """Return the damage rows, the clean-rise rows, and the weights in order, for both runs."""
+    damage_rows = []
     clean_rows = []
-    for year, file in (
-        ("tuning year", "clean_grid_tuning.json"),
-        ("replicate year", "clean_grid_replicate.json"),
-        ("scored year", "clean_grid_scored.json"),
-    ):
-        grid = json.loads((WORK_DIR / file).read_text())
-        sites = list(grid["clean_mae"].values())
-        mean = [sum(s[i] for s in sites) / len(sites) for i in range(len(labels))]
-        clean_rows += [
-            {"weight": label, "cost": value - mean[0], "year": year}
-            for label, value in zip(labels, mean, strict=True)
-        ]
+    all_weights: set[float] = set()
+    for suffix, run in (("", FIRST_RUN), ("_corrected", CORRECTED_RUN)):
+        tuning = json.loads((WORK_DIR / f"tuning{suffix}.json").read_text())
+        all_weights.update(tuning["weights"])
+        for weight, value in zip(tuning["weights"], tuning["summed_damage"], strict=True):
+            damage_rows.append({"weight": weight, "damage": value, "run": run})
+        for year, file in (
+            ("tuning year", f"clean_grid_tuning{suffix}.json"),
+            ("replicate year", f"clean_grid_replicate{suffix}.json"),
+            ("scored year", f"clean_grid_scored{suffix}.json"),
+        ):
+            grid = json.loads((WORK_DIR / file).read_text())
+            sites = list(grid["clean_mae"].values())
+            mean = [sum(s[i] for s in sites) / len(sites) for i in range(len(grid["weights"]))]
+            clean_rows += [
+                {"weight": w, "cost": v - mean[0], "year": year, "run": run}
+                for w, v in zip(grid["weights"], mean, strict=True)
+            ]
+    labels = [f"{w:g}" for w in sorted(all_weights)]
+    return pl.DataFrame(damage_rows), pl.DataFrame(clean_rows), labels
+
+
+def figure_tradeoff() -> None:
+    """Figure 1: the damage from injected errors and the clean-error rise against the weight."""
+    damage, clean, labels = _tradeoff_frames()
+    del labels
     x = alt.X(
-        "weight:N",
-        sort=labels,
-        axis=alt.Axis(labelAngle=0),
-        title="Weight on the BSP reading (0 = no hint: the separate fits)",
+        "weight:Q",
+        scale=alt.Scale(type="symlog", constant=0.003, domain=[0, 30]),
+        axis=alt.Axis(
+            values=[0, 0.003, 0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30], labelAngle=0, format="~g"
+        ),
+        title="Weight on the BSP reading (0 = no hint: the separate fits; logarithmic axis)",
+    )
+    dash = alt.StrokeDash(
+        "run:N",
+        sort=None,
+        scale=alt.Scale(domain=[FIRST_RUN, CORRECTED_RUN], range=[[1, 0], [5, 3]]),
+        legend=alt.Legend(title=None, orient="top"),
     )
     top = (
         alt.Chart(damage)  # ty: ignore[unresolved-attribute]
-        .mark_line(
-            point=alt.OverlayMarkDef(filled=True, size=70, color=ocf.BRAND_ORANGE),
-            color=ocf.BRAND_ORANGE,
-        )
+        .mark_line(point=alt.OverlayMarkDef(filled=True, size=60, color=ocf.BRAND_ORANGE))
         .encode(
             x=x,
             y=alt.Y(
@@ -87,6 +108,8 @@ def figure_tradeoff() -> None:
                 scale=alt.Scale(domain=[0, 36]),
                 title="Summed damage (points; smaller is better)",
             ),
+            strokeDash=dash,
+            color=alt.value(ocf.BRAND_ORANGE),
         )
         .properties(
             width=WIDTH,
@@ -105,8 +128,8 @@ def figure_tradeoff() -> None:
         legend=alt.Legend(title=None, orient="top"),
     )
     lines = (
-        alt.Chart(pl.DataFrame(clean_rows))  # ty: ignore[unresolved-attribute]
-        .mark_line(point=alt.OverlayMarkDef(filled=True, size=60))
+        alt.Chart(clean)  # ty: ignore[unresolved-attribute]
+        .mark_line(point=alt.OverlayMarkDef(filled=True, size=45))
         .encode(
             x=x,
             y=alt.Y(
@@ -115,32 +138,38 @@ def figure_tradeoff() -> None:
                 title="Extra clean error (points; smaller is better)",
             ),
             color=colours,
+            strokeDash=alt.StrokeDash(
+                "run:N",
+                sort=None,
+                scale=alt.Scale(domain=[FIRST_RUN, CORRECTED_RUN], range=[[1, 0], [5, 3]]),
+                legend=None,
+            ),
         )
     )
     limit = (
         alt.Chart(pl.DataFrame({"limit": [CLEAN_LIMIT]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(strokeDash=[5, 3], color=ocf.BRAND_ORANGE)
+        .mark_rule(strokeDash=[2, 2], color=ocf.BRAND_ORANGE)
         .encode(y="limit:Q")
     )
     bottom = alt.layer(lines, limit).properties(
         width=WIDTH,
         height=160,
         title=alt.TitleParams(
-            "but every weight above 0 makes clean forecasts worse", fontSize=12, anchor="start"
+            "but every weight above 0 makes clean forecasts worse",
+            fontSize=12,
+            anchor="start",
         ),
     )
     chart = alt.vconcat(top, bottom).properties(
         title=_title(
-            text=(
-                "The BSP reading cuts damage from injected errors but makes clean forecasts at "
-                "least 2.3 points worse"
-            ),
+            text="The BSP reading cuts damage from injected errors but makes clean forecasts worse",
             subtitle=(
                 "Pilot BSP with 2 MW and 4 MVA Primaries; frozen fits scored by mean absolute "
-                "error "
-                "in points of effective capacity over the year after each cut, averaged over the "
+                "error in points of effective capacity over the year after each cut, averaged "
+                "over the "
                 "2 MW Primaries. Top: summed extra error from 200 injected errors in the tuning "
-                "year. Bottom: clean error minus weight 0's. Dashed line: the 0.023-point limit."
+                "year. Bottom: clean error minus weight 0's. Solid: first run. Dashed: re-run "
+                "after the BSP-row scale was corrected. Dotted line: the 0.023-point limit."
             ),
         )
     )
