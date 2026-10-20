@@ -124,6 +124,7 @@ def main() -> None:
         nights = estimate.load_nights(
             table=table,
             site=site,
+            capacity_mw=infos[site].effective_capacity_mw,
             winters=common.allowed_winters(winters=common.WINTERS),
             summer_years=common.SUMMER_YEARS,
         )

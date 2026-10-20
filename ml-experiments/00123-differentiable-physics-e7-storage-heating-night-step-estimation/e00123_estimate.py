@@ -67,28 +67,36 @@ class Nights:
         return Nights(**values)
 
 
-def _blocks(*, evenings: np.ndarray, strata: np.ndarray) -> np.ndarray:
-    """Return the 14-day block index of each night within its stratum."""
+def _blocks(
+    *, evenings: np.ndarray, strata: np.ndarray, block_days: int = common.BLOCK_DAYS
+) -> np.ndarray:
+    """Return the block index (of `block_days` days) of each night within its stratum."""
     out = np.zeros(len(evenings), dtype=np.int64)
     for stratum in np.unique(strata):
         mask = strata == stratum
         start = evenings[mask].min()
-        out[mask] = ((evenings[mask] - start) // np.timedelta64(common.BLOCK_DAYS, "D")).astype(
-            np.int64
-        )
+        out[mask] = ((evenings[mask] - start) // np.timedelta64(block_days, "D")).astype(np.int64)
     return out
 
 
 def load_nights(
-    *, table: pl.DataFrame, site: str, winters: tuple[int, ...], summer_years: tuple[int, ...]
+    *,
+    table: pl.DataFrame,
+    site: str,
+    capacity_mw: float,
+    winters: tuple[int, ...],
+    summer_years: tuple[int, ...],
+    block_days: int = common.BLOCK_DAYS,
 ) -> Nights:
     """Build one series' `Nights` from the night table.
 
     Args:
         table: `night_tables.parquet`.
         site: The label.
+        capacity_mw: The series' effective capacity; `d` is returned in points of it.
         winters: The winters to include (the caller decides which are opened).
         summer_years: The calendar years whose June to August nights make `d_summer`.
+        block_days: The length of a bootstrap block in days.
 
     Returns:
         The usable GMT winter nights (not excluded, `d` and temperature present) and summer nights.
@@ -108,6 +116,7 @@ def load_nights(
         & pl.col("evening").dt.year().is_in(list(summer_years))
         & pl.col("d").is_not_null()
     ).sort("evening")
+    points_per_mw = 100.0 / capacity_mw
     evening = winter["evening"].to_numpy().astype("datetime64[D]")
     summer_evening = summer["evening"].to_numpy().astype("datetime64[D]")
     summer_year = summer["evening"].dt.year().to_numpy().astype(np.int64)
@@ -119,11 +128,11 @@ def load_nights(
         cold_night=winter["cold_night_c"].to_numpy().astype(np.float64),
         saturday=(winter["day_type"] == "saturday").to_numpy().astype(np.float64),
         sunday=(winter["day_type"] == "sunday").to_numpy().astype(np.float64),
-        d=winter["d"].to_numpy().astype(np.float64),
+        d=winter["d"].to_numpy().astype(np.float64) * points_per_mw,
         evening=evening,
-        block=_blocks(evenings=evening, strata=winter_year),
-        summer_d=summer["d"].to_numpy().astype(np.float64),
-        summer_block=_blocks(evenings=summer_evening, strata=summer_year),
+        block=_blocks(evenings=evening, strata=winter_year, block_days=block_days),
+        summer_d=summer["d"].to_numpy().astype(np.float64) * points_per_mw,
+        summer_block=_blocks(evenings=summer_evening, strata=summer_year, block_days=block_days),
         summer_year=summer_year,
     )
 

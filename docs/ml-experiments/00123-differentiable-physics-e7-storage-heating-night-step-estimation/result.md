@@ -73,6 +73,17 @@ at D10 is 0.054 MW). Test 1 printed raw night differences for one series in the 
 and a per-series mean `d` over all nights of winters 2021-22 to 2025-26; no estimate, interval, or
 fit was computed before this clarification.
 
+**Units clarification: what "effective capacity" is, and the raw step in MW.** The table's
+effective capacity is a scale taken from the demand itself: it matches each series' 99th percentile
+of cleaned half-hourly demand (D10: 5.398 MW against a 99th percentile of 5.413 MW; D5: 5.723 against
+5.734; D16: 9.115 against 9.143). It is neither the electrical rating of the substation nor a PV
+capacity. A point is therefore 1% of that near-peak demand. Computed from the stored cleaned power
+on cold GMT nights (daily mean at most 3 C) of winters 2023-24 and 2024-25, the half-hour ending at
+01:00 minus the mean of the 22:00 to 23:30 half-hours is 0.27 MW (4.8 points) at D5, 0.44 MW (8.2
+points) at D10, and 0.87 MW (9.5 points) at D16. The raw step is therefore a few tenths of a
+megawatt, and the figures of 1.9 to 10.7 "MW" in the earlier descriptive check of the night step
+are points: that check divided by a proxy capacity of about 100, which is the scale of points.
+
 ## The question, and what earlier experiments already say
 
 **The night step is real in one winter and unmeasured across winters.** Experiment 121 tried to
