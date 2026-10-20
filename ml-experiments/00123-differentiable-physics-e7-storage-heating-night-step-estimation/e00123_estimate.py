@@ -248,8 +248,10 @@ def weighted_fit(
         One estimate per row of weights.
     """
     x = design_matrix(nights=nights, cold=cold)
-    gram = np.einsum("bn,ni,nj->bij", winter_weights, x, x)
-    moment = np.einsum("bn,ni,n->bi", winter_weights, x, nights.d)
+    columns = x.shape[1]
+    products = (x[:, :, None] * x[:, None, :]).reshape(len(x), columns * columns)
+    gram = (winter_weights @ products).reshape(-1, columns, columns)
+    moment = winter_weights @ (x * nights.d[:, None])
     coefficients = np.linalg.solve(gram, moment[..., None])[..., 0]
     k = len(nights.winters)
     intercepts = coefficients[:, :k]

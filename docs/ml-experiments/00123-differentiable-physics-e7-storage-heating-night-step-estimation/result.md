@@ -61,17 +61,18 @@ selection winter.
 ## Pre-fit clarification 2: the unit is points of effective capacity (written before any fit)
 
 **Every size in this plan is in points of effective capacity, and the first draft mislabelled the
-unit as megawatts.** One point is 1% of the series' effective capacity. Experiment 121's step
-figures (4.3, 7.1, and 5.3 at D5, D10, and D16) are in points: its quantile scores are in points,
-and a 7.1 MW step at D10 would exceed the series' 5.4 MW effective capacity. The wrong label was
-found in test 1, which showed D10's night difference to be about 0.4 MW (about 8 points). Every
-number in the plan (the predictions, the injected shapes `S` of 4 and 7, the bias bound of 0.5, the
-trigger thresholds of 4, 8, and 15, and the 1.7 summer step) keeps its value and now reads in
-points. Each series' night difference `d` is converted to points before any fit, so the pooled
-steps average comparable quantities, and the page also prints each series' step in MW (one point
-at D10 is 0.054 MW). Test 1 printed raw night differences for one series in the design winters
-and a per-series mean `d` over all nights of winters 2021-22 to 2025-26; no estimate, interval, or
-fit was computed before this clarification.
+unit as megawatts.** One point is 1% of the series' effective capacity, which is the series' own
+99th percentile of cleaned demand and not an electrical rating. Experiment 121's step figures (4.3,
+7.1, and 5.3 at D5, D10, and D16) are in points: its quantile scores are in points, and a 7.1 MW
+step at D10 would exceed the series' 5.4 MW effective capacity. The wrong label was found in test 1,
+which showed D10's night difference to be about 0.4 MW (about 8 points). Every number in the plan
+(the predictions, the injected shapes `S` of 4 and 7, the bias bound of 0.5, the trigger thresholds
+of 4, 8, and 15, and the 1.7 summer step) keeps its value and now reads in points. Each series'
+night difference `d` is converted to points before any fit, so the pooled steps average comparable
+quantities, and the page also prints each series' step in MW (one point at D10 is 0.054 MW). Test 1
+printed raw night differences for one series in the design winters and a per-series mean `d` over
+all nights of winters 2021-22 to 2025-26; no estimate, interval, or fit was computed before this
+clarification.
 
 **Units clarification: what "effective capacity" is, and the raw step in MW.** The table's
 effective capacity is a scale taken from the demand itself: it matches each series' 99th percentile
