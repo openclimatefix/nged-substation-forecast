@@ -162,6 +162,15 @@ def _node_job(job: tuple[float, float, int]) -> dict[str, Any]:
     pinned = pinned_capacity(
         vintages=_STATE["vintages"], table=cache.sites[site].table, cut=common.TUNING_CUT
     )
+    baseline = fit_gam(
+        cache=cache,
+        site=site,
+        specs=[spec],
+        cut=common.TUNING_CUT,
+        window=NODE_WINDOW,
+        season_years=common.SEASON_YEARS,
+        pinned=pinned,
+    )
     rows = []
     for injection in NODE_INJECTIONS:
         step_day = inject.day_of(moment=datetime(*injection["step_date"], tzinfo=UTC))
@@ -184,7 +193,9 @@ def _node_job(job: tuple[float, float, int]) -> dict[str, Any]:
             season_years=common.SEASON_YEARS,
             pinned=pinned,
         )
-        readout = inject.node_readout(fit=fit, step_day=step_day, outage=(first, length))
+        readout = inject.node_readout(
+            fit=fit, step_day=step_day, outage=(first, length), baseline=baseline
+        )
         truth_level = injection["level"] + (injection["step"] if first >= step_day else 0.0)
         recovered = (
             abs(readout.step_error_days) <= STEP_TOLERANCE_DAYS

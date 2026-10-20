@@ -239,7 +239,12 @@ def inject_meter(
 
 
 def clipped_total(
-    *, pinned_pv: np.ndarray, scale: float, share_of_peak: float, beta: float
+    *,
+    pinned_pv: np.ndarray,
+    scale: float,
+    share_of_peak: float,
+    beta: float,
+    peak_rows: np.ndarray,
 ) -> tuple[np.ndarray, float]:
     """Return the clipped, scaled rooftop output, and the clip level in points.
 
@@ -252,12 +257,14 @@ def clipped_total(
         scale: The capacity multiplier, such as 1.25.
         share_of_peak: The clip as a share of the scaled output's peak.
         beta: The smooth clip's sharpness, per point.
+        peak_rows: The rows whose peak sets the clip level: the training rows, so that the clip
+            binds in the data the fit sees.
 
     Returns:
         The clipped output on the grid and the clip level.
     """
     total = scale * np.nan_to_num(pinned_pv, nan=0.0)
-    level = share_of_peak * float(np.max(total))
+    level = share_of_peak * float(np.max(total[peak_rows]))
     return clipped_pv(unclipped=total, p_max=level, beta=beta), level
 
 
@@ -310,6 +317,7 @@ def node_readout(
     fit: GamFit,
     step_day: int,
     outage: tuple[int, int],
+    baseline: GamFit | None = None,
     window_days: int = 60,
     flank_days: int = 20,
 ) -> NodeReadout:
@@ -323,6 +331,9 @@ def node_readout(
         fit: A fit with a node.
         step_day: The true step day, in days since 1970-01-01.
         outage: The true outage as `(first_day, n_days)`.
+        baseline: The same fit without the injection. Its path is subtracted, so the real series'
+            own steps and dips, which the node also reads, cancel and the readout is the
+            injection's.
         window_days: The search window for the step, either side of the true day.
         flank_days: The days before and after the step that the step size is read from.
 
@@ -334,6 +345,8 @@ def node_readout(
         msg = "the fit has no node"
         raise ValueError(msg)
     path = generator_path(fit=fit)
+    if baseline is not None:
+        path = path - generator_path(fit=baseline)
     first_day = int(fit.layout.node_first_day)
     block = node.step_days
 

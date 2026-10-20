@@ -329,8 +329,21 @@ def _node_job(site: str) -> dict[str, Any]:
         season_years=common.SEASON_YEARS,
         pinned=pinned,
     )
-    long = inject.node_readout(fit=fit, step_day=step_day, outage=(long_first, long_length))
-    short = inject.node_readout(fit=fit, step_day=step_day, outage=(short_first, short_length))
+    baseline = fit_gam(
+        cache=cache,
+        site=site,
+        specs=[spec],
+        cut=common.TUNING_CUT,
+        window=_STATE["definitions"]["b_gen"].window,
+        season_years=common.SEASON_YEARS,
+        pinned=pinned,
+    )
+    long = inject.node_readout(
+        fit=fit, step_day=step_day, outage=(long_first, long_length), baseline=baseline
+    )
+    short = inject.node_readout(
+        fit=fit, step_day=step_day, outage=(short_first, short_length), baseline=baseline
+    )
     truth_level = generator["level"] + generator["step"]
     return {
         "test": 4,
@@ -369,6 +382,7 @@ def _clip_job(job: tuple[str, str]) -> dict[str, Any]:
         scale=CLIP_SCALE,
         share_of_peak=CLIP_SHARE_OF_PEAK,
         beta=CLIP_BETA_PER_POINT,
+        peak_rows=rows[cache.end_times[rows] <= common.to_64(moment=common.TUNING_CUT)],
     )
     demand = features.y + np.nan_to_num(rooftop, nan=0.0)
     injected = inject.with_reading(cache=cache, site=site, y=demand - clipped)
