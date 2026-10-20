@@ -8,6 +8,7 @@ level with 12 months.
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | Drift from recent demand (proposed) | Does a drift that re-estimates its level from recent demand beat a drift held constant? | 1 | Part 3, which pools the model across substations | Proposed |
+| Three-winter backtest of GAM-K | Does GAM-K beat the plain GAM and lagless XGBoost by at least 1 point of mean absolute error in each of the winters 2023-24, 2024-25, and 2025-26 on past weather? | Running | Nothing | Running (experiment 122) |
 | N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Running | Nothing | Running (experiment 114) |
 | Smoothed temperatures at two time constants | Do exponentially smoothed temperatures with two decay rates, plus smoothed daily minimum and maximum, lower the convex model's error? | 2 | Experiment 114, which changes the same temperature terms | Proposed |
 | UTC-indexed night term | Does a small level per hour band in UTC hours, from 22:00 to 08:00 UTC, remove error that the local-time daily profile leaves around the clock changes? | 3 | A descriptive check of residuals against UTC hour | Waiting on a descriptive check |
