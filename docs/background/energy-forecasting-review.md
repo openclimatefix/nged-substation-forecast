@@ -3233,6 +3233,14 @@ as an outcome: evidence that switching cannot be recovered from power data alone
 would be worth having, because that evidence would justify extracting switching labels from
 operational systems instead of continuing to look.
 
+## Related notes
+
+**Bare-bones notes from a later, smaller literature scan sit on [Differentiable physics: literature
+scan](../ml-experiments/themes/differentiable-physics-literature.md).** The scan covers additive
+models and Kalman filters for demand forecasting, hierarchical reconciliation, and separating
+unmetered solar from substation demand. It informed the design of the differentiable-physics
+experiments, and has not had this review's fact-checking rounds.
+
 ## References
 
 Every source cited above, in alphabetical order by first author.
