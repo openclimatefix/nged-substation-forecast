@@ -41,32 +41,40 @@ the module has its own PR off `main`.
 ## What experiment A asks, and what the data allow
 
 **Experiment A is a switching-and-NRA experiment, not a mean-forecast experiment.** A perfect
-detector was worth 0.42% of the best guess's score (experiment 44), and label masks move the
-out-of-event score by under 0.03 points (experiment 75). Events touch 1 to 3% of rows, so a 10-point
-in-event gain moves the all-row score by about 0.2 points at most; contrasts are read on transfer
-rows, with that ceiling beside them.
+detector was worth 0.42% of the best guess's score ([experiment
+44](../00044-sw2-2-switching-share-of-best-guess-score/result.md)), and label masks move the
+out-of-event score by under 0.03 points ([experiment
+75](../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)). Events touch 1 to 3% of
+rows, so a 10-point in-event gain moves the all-row score by about 0.2 points at most; contrasts are
+read on transfer rows, with that ceiling beside them.
 
 **Only two MW–MW edges have data in the tuning and replicate years: D5–D16 and D10–D11.** The two
-series labelled G-c have only a few months of usable history at the scored cut (experiment 103), so
-every edge that touches them is exploratory. Of the 66 hand-filtered events, 6 have MW meters on
-both sides before the scored year, all on D5–D16. The verdict rests on injected transfers alone.
+series labelled G-c have only a few months of usable history at the scored cut ([experiment
+103](../00103-differentiable-physics-1-data-look/result.md)), so every edge that touches them is
+exploratory. Of the 66 hand-filtered events, 6 have MW meters on both sides before the scored year,
+all on D5–D16. The verdict rests on injected transfers alone.
 
 **The gate, and every claim it licenses, covers those two edges.** MW–MVA edges are reported, not
 gated; C3 injects only on D5–D16 and D10–D11 (sites D5, D10, D11, D16). D14 enters C2 only.
 
-**The Kalman filter already carries long transfers** (experiment 106: 0.94 of the moved MW by day
-2, all but 0.004 released within 3 days), so a causal flow can add skill only in a transfer's first
-day, the two days after it ends, and transfers under a day. C3 is built around those rows.
+**The Kalman filter already carries long transfers** ([experiment
+106](../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md): 0.94 of the
+moved MW by day 2, all but 0.004 released within 3 days), so a causal flow can add skill only in a
+transfer's first day, the two days after it ends, and transfers under a day. C3 is built around
+those rows.
 
 ## The base model and the graph
 
-**GAM-K is experiment 111's decision form, run on past weather.** The convex GAM has no drift, a
-24-month window, and pinned capacity; Part 4's Kalman filter runs under the 3.5-hour telemetry
-delay, hyperparameters fitted by marginal likelihood on the tuning year per base arm. Weather is
-ERA5 and CAMS under the "lab conditions first" rule (experiment 111: ENS-driven residuals were as
-good for the filter, −0.008 points); ERA5-driven causal flows are not available at forecast time,
-and the page says so. Residuals enter the edges in MW (points × `effective_capacity_mw` / 100); an
-MVA site's dark-row residual enters in MVA, rescaled by 0.97 in a sensitivity.
+**GAM-K is [experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s decision form,
+run on past weather.** The convex GAM has no drift, a 24-month window, and pinned capacity; Part 4's
+Kalman filter runs under the 3.5-hour telemetry delay, hyperparameters fitted by marginal likelihood
+on the tuning year per base arm. Weather is ERA5 and CAMS under the "lab conditions first" rule
+([experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md):
+ENS-driven residuals were as good for the filter, −0.008 points); ERA5-driven causal flows are not
+available at forecast time, and the page says so. Residuals enter the edges in MW (points ×
+`effective_capacity_mw` / 100); an MVA site's dark-row residual enters in MVA, rescaled by 0.97 in a
+sensitivity.
 
 **Decision graph: the 21 metered edges that do not touch G-c, plus an outside path g_i per node.**
 The interconnection file holds 37 undirected edges (17 pairs listed twice), 25 of them metered at
@@ -84,7 +92,7 @@ residual is read.
 | Arm | GAM | Flows | Filter |
 |---|---|---|---|
 | A0 | GAM-K, no switching masks | none | plain |
-| A1 | GAM-K, hand-filtered masks (experiment 111's form) | none | plain |
+| A1 | GAM-K, hand-filtered masks ([experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s form) | none | plain |
 | A2 | A0's frozen fit | flat, half-hourly, hindsight | plain |
 | A2-b | A0's frozen fit | flat, on 3-hour block means, hindsight | plain |
 | A3 | A0's frozen fit | demand-shaped shares, hindsight | plain |
@@ -92,30 +100,32 @@ residual is read.
 | A5 | A4's GAM | the chosen model, refitted causally per origin | flows as known input, held by S |
 | OR | A4's GAM | the true injected flows | as A5, true flow and true end (ceiling) |
 
-**A2, flat flows.** For edge e = (i, j) with sign +1 at i and −1 at j, the path f_e minimises
-Σ_t H_i(r_i,t − f_t) + H_j(r_j,t + f_t) + λ_f Σ|f_t − f_t−1| + λ_l Σ_obs |f_t|, with r each end's
-partial residual (other paths removed) and H a Huber loss weighted by 1 / σ_i² and thresholded at
-1.5 σ_i (σ_i the site's robust half-hourly residual scale in MW, from pre-cut rows only). The level
-penalty acts only on observed rows, and a path is held flat across rows with no reading at either
-end, so a gap neither pays λ_l nor ends a flow. A common shift leaks into f unless the end weights
-are equal, and fully on an MVA edge in daylight, which is why MW–MVA edges stay outside the gate.
-Block-coordinate descent stops when the objective's relative change and the largest path change
-(in MW) both fall under 1e-6.
+**A2, flat flows.** For edge e = (i, j) with sign +1 at i and −1 at j, the path f_e minimises Σ_t
+H_i(r_i,t − f_t) + H_j(r_j,t + f_t) + λ_f Σ|f_t − f_t−1| + λ_l Σ_obs |f_t|, with r each end's
+partial residual (other paths removed) and H a [Huber](https://doi.org/10.1214/aoms/1177703732) loss
+weighted by 1 / σ_i² and thresholded at 1.5 σ_i (σ_i the site's robust half-hourly residual scale in
+MW, from pre-cut rows only). The level penalty acts only on observed rows, and a path is held flat
+across rows with no reading at either end, so a gap neither pays λ_l nor ends a flow. A common shift
+leaks into f unless the end weights are equal, and fully on an MVA edge in daylight, which is why
+MW–MVA edges stay outside the gate. Block-coordinate descent stops when the objective's relative
+change and the largest path change (in MW) both fall under 1e-6.
 
-**Each path is solved exactly** by a dynamic programme in the style of
-[Johnson (2013)](https://doi.org/10.1080/10618600.2012.681238) (stated there for squared error; the
-Huber, weight, and level extension is this module's, guarded by P1). ADMM on a banded Cholesky
-factor solves a non-negative flow and cross-checks the programme in the tests. Measured on the
-module branch: the exact programme takes 1.8 seconds for a 17,520-point solve whatever the
-penalties and 0.14 seconds for a 1,440-point window, and ADMM took 4.5 to 22 seconds at tolerances
-of 1e-3 to 1e-8, so the programme is the solver. [Condat
-(2013)](https://doi.org/10.1109/LSP.2013.2278339) with soft-thresholding
-([Friedman et al. (2007)](https://doi.org/10.1214/07-AOAS131)) is the unweighted reference.
+**Each path is solved exactly** by a dynamic programme in the style of [Johnson
+(2013)](https://doi.org/10.1080/10618600.2012.681238) (stated there for squared error; the Huber,
+weight, and level extension is this module's, guarded by P1). ADMM ([Boyd et al.,
+2011](https://doi.org/10.1561/2200000016)) on a banded Cholesky factor solves a non-negative flow
+and cross-checks the programme in the tests. Measured on the module branch: the exact programme
+takes 1.8 seconds for a 17,520-point solve whatever the penalties and 0.14 seconds for a 1,440-point
+window, and ADMM took 4.5 to 22 seconds at tolerances of 1e-3 to 1e-8, so the programme is the
+solver. [Condat (2013)](https://doi.org/10.1109/LSP.2013.2278339) with soft-thresholding ([Friedman
+et al. (2007)](https://doi.org/10.1214/07-AOAS131)) is the unweighted reference.
 
-**A2-b answers the series brief's advice** (experiment 67's hourly fit found 0.108 of the moved
-MW against 0.646 for a 24-hour step; experiment 113's half-hourly autocorrelation is 0.83): the same
-solver on 3-hour block means. A2 or A2-b is chosen on seeds T by the placebo rule, before seeds G
-are drawn; "the chosen flows" below means that choice.
+**A2-b answers the series brief's advice** ([experiment
+67](../00067-sw2-15-joint-edge-flow-estimator/result.md)'s hourly fit found 0.108 of the moved MW
+against 0.646 for a 24-hour step; [experiment
+113](../00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result.md)'s
+half-hourly autocorrelation is 0.83): the same solver on 3-hour block means. A2 or A2-b is chosen on
+seeds T by the placebo rule, before seeds G are drawn; "the chosen flows" below means that choice.
 
 **A3 (exploratory), demand-shaped shares:** f_e(t) = a_ij(t)·D_i(t) − a_ji(t)·D_j(t), D each end's
 fitted demand (fitted net power plus the pinned solar term), two non-negative piecewise-constant
@@ -138,18 +148,30 @@ absorbs growth and new connections.
 **S is a Kaplan–Meier estimate of the chosen hindsight flows' run lengths** (|f| over 0.1 MW;
 runs cut by the window's end censored) in each cut's 24-month window, never fitted from labels.
 
-**Injections** copy experiment 43's harness, with two shapes (its donor-shaped share, and a flat
-block drifting between 0.5 and 2 times its start), conserved on D5–D16 or D10–D11, never within 48
-hours of a hand-filtered event or of D10's two unlabelled windows (2024-11-08 to 2024-12-01,
-2025-11-17 to 2025-12-14). **Counts are not limited by the real event rate:** each seed holds up to
-4 non-overlapping transfers per edge-year, at least 7 days apart, and each disjoint set (T, G, C1,
-C3) has 50 seeds drawn independently of the residuals, about 400 transfers. T and G span 4 sizes
-(0.5 MW, and 10%, 25%, and 40% of the receiving load) by 3 durations (3 to 6 hours, 6 to 24 hours,
-over 1 day, log-uniform within), at least 30 per cell; gate readings 1 to 3 use the 25% and 40%
-cells. The realistic set (C1, C3) draws size and duration jointly from the 66 events (median 1.0
-MW for 31 hours), the distribution S also sees; 20% of C1's transfers straddle the cut. Expected
-98.3% half-widths, measured on T before G is drawn: about ±0.06 on a recall or ratio per duration
-band and ±0.2 points on C3; if C3's exceeds 0.4 on T, every set doubles to 100 seeds.
+**Injections** copy [experiment 43](../00043-sw2-1-detector-scoreboard/result.md)'s harness, with
+two shapes (its donor-shaped share, and a flat block drifting between 0.5 and 2 times its start),
+conserved on D5–D16 or D10–D11, never within 48 hours of a hand-filtered event or of D10's two
+unlabelled windows (2024-11-08 to 2024-12-01, 2025-11-17 to 2025-12-14). **Counts are not limited by
+the real event rate:** each seed holds up to 4 non-overlapping transfers per edge-year, at least 7
+days apart, and each disjoint set (T, G, C1, C3) has 50 seeds drawn independently of the residuals,
+about 400 transfers. T and G span 4 sizes (0.5 MW, and 10%, 25%, and 40% of the receiving load) by 3
+durations (3 to 6 hours, 6 to 24 hours, over 1 day, log-uniform within), at least 30 per cell; gate
+readings 1 to 3 use the 25% and 40% cells. The realistic set (C1, C3) draws size and duration
+jointly from the 66 events (median 1.0 MW for 31 hours, with durations capped at 14 days because one
+of the 66 lasts 31 days), the distribution S also sees. Expected 98.3% half-widths, measured on T
+before G is drawn: about ±0.06 on a recall or ratio per duration band and ±0.2 points on C3; if C3's
+exceeds 0.4 on T, every set doubles to 100 seeds.
+
+**Hundreds of injected transfers are fitted as neighbourhoods, not as whole-year fits.** A
+whole-year fit of the 33 to 35 paths takes about 8 minutes, so each injected transfer instead gets a
+fit of the paths that touch its two ends, on a window that starts 3 days before the transfer and
+ends 3 days after the transfer's 48 post-event hours, with every other path at zero. The tuning and
+gate placebo flows are read the same way, on non-overlapping windows of 18 days that tile the year.
+The whole-year fits (tuning, replicate, and scored years, from [experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s base form)
+supply the real-data flows that A4 removes and the run lengths for S. An injected transfer is added
+to the frozen fit's residuals, which is exact for a fit that did not train on the injected rows; C1
+is the exception, and refits A0 on the injected history.
 
 ## Years, rows, and the tuning split
 
@@ -167,10 +189,12 @@ separate runs with the real graph present and never enter A2 to A5.
 
 **Scoring rows.** Decision sites D5, D10, D11, D14, and D16 (MW ends); D9 beside them. C2 uses day
 D+1 from 09:00 UTC origins, with and without D10's two unlabelled windows. C3 uses origins every 6
-hours and leads 0.5 to 48 hours, because experiment 88 found no 09:00 origin inside a real transfer
-with both sides at most half missing. Predictions carry the keys, `q01` to `q99`, `actual`,
-`lead_hours`, `level`, `anomaly`, `flow`, and an in-event flag. Spread: `LeadSpread` at day D+1; for
-C3 a lead-hours spread fitted on the replica through each arm's own pipeline.
+hours and leads 0.5 to 48 hours, because [experiment
+88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)
+found no 09:00 origin inside a real transfer with both sides at most half missing. Predictions carry
+the keys, `q01` to `q99`, `actual`, `lead_hours`, `level`, `anomaly`, `flow`, and an in-event flag.
+Spread: `LeadSpread` at day D+1; for C3 a lead-hours spread fitted on the replica through each arm's
+own pipeline.
 
 ## Plumbing controls and the known-answer gate
 
@@ -186,7 +210,9 @@ C3 a lead-hours spread fitted on the replica through each arm's own pipeline.
   unchanged; no fit trains on a row after its cut; σ_i, σ_e, and the Huber scale use pre-cut rows
   only; A0, A4, and A5 forecasts are unchanged when the label file is emptied; no origin's window
   holds in-sample residuals; A5 with flows forced to zero equals A4 exactly;
-- P4: the 66 events filter as experiment 101's `real_events` does (35 conserved, 31 one-sided).
+- P4: the 66 events filter as [experiment
+  101](../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md)'s `real_events`
+  does (35 conserved, 31 one-sided).
 
 **The gate is blocking: a failed reading stops C2 and C3 and caps the verdict at `inconclusive`.**
 It runs on seeds G in the tuning year, both shapes pooled; the release clock runs from the end in
@@ -194,7 +220,8 @@ valid time, so the 6-hour allowance includes the 3.5-hour delay.
 
 1. **Moved-MW ratio:** median fitted over true mean flow, true edge and window, in 0.8 to 1.25.
 2. **Release:** the causal flow under 20% of the moved MW within the larger of 6 hours and 10% of
-   the duration after the end, in at least half the transfers (experiment 101's end rule).
+   the duration after the end, in at least half the transfers ([experiment
+   101](../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md)'s end rule).
 3. **Recall:** MW-weighted recall (Σ min(fitted, true) MW-hours, right edge and sign, over Σ true)
    at least 0.77 over 1 day (RO-NC's injected figure) and 0.5 for 6 to 24 hours; at least 0.5 over
    1 day on the realistic set.
@@ -202,7 +229,9 @@ valid time, so the 6-hour allowance includes the 3.5-hour delay.
    |flow| per pair-year in the replicate year.
 5. **NRA gap:** on in-event and 48-hour post-event rows, the NRA forecast (A5 without the flow added
    back) scored against the uninjected truth closes at least 50% of the gap from A0 to the oracle
-   (experiment 88: lag correction 51%, oracle-trained model 83%).
+   ([experiment
+   88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md):
+   lag correction 51%, oracle-trained model 83%).
 
 **Reported, not blocking:** reading 1 on in-sample residuals (injections in the 2023-07-01 cut's
 window, GAM refitted); MW–MVA power curves; one-sided injections at D11 and D16.
@@ -257,8 +286,11 @@ the 6 usable MW–MW events, the 66 by duration bin, and D10's two unlabelled wi
 
 **Tails, every arm:** coverage and pinball at q01, q05, q95, and q99 on all and in-event rows, per
 role, and the receiver's q99 exceedance inside against outside transfers; no curtailment cost (no
-generator forecast; experiment 87 found 0 events at f = 0.9 here). **Comparators:** every arm,
-climatology, `manual_heuristic`, and experiment 111's GAM-K (2.800) and BG2 (2.780) on ENS.
+generator forecast; [experiment
+87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) found 0 events at f = 0.9
+here). **Comparators:** every arm, climatology, `manual_heuristic`, and [experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s GAM-K (2.800)
+and BG2 (2.780) on ENS.
 
 ## Predictions
 
@@ -268,7 +300,8 @@ Written before any fit; each line can fail, and none overrides the decision rule
   hours (the reading most likely to fail, and better for A2-b than A2); realistic recall 0.5 to 0.8;
   release passes; placebo 0.01 to 0.04; NRA gap closed 0.5 to 0.8.
 - **C1:** 0.55 to 0.85; the clean-year forecast gap between A0 and the oracle GAM within ±0.02.
-- **C2:** A4 minus A0 within ±0.02; A1 minus A0 within ±0.03 (experiment 75).
+- **C2:** A4 minus A0 within ±0.02; A1 minus A0 within ±0.03 ([experiment
+  75](../00075-sw2-11-nra-forecast-with-labelled-switching-masks/result.md)).
 - **C3:** −0.5 to −2.0 points, closing 25 to 60% of the oracle gap, over two-thirds of it in each
   event's first day and the first 24 hours after its end; the all-row effect under 0.05 points.
 - **Other:** A3 beats A2 on donor-shaped injections only; S = 1 loses most of C3's post-event gain;
@@ -312,7 +345,9 @@ supply-point membership, no unmetered partners, no edge counts per named site).
 3. **Quantile score against mean error:** C2 or C3 with opposite signs in the two.
 4. **Leave one out:** dropping D5–D16, D10–D11, or any decision site flips C2 or C3.
 5. **Nested arms:** A5 with S = 1 beating A5; A3 losing to A2 on donor-shaped injections.
-6. **Interval width:** C2's over twice or under half experiment 106's or 111's day-D+1 widths.
+6. **Interval width:** C2's over twice or under half [experiment
+   106](../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md)'s or 111's
+   day-D+1 widths.
 7. **Dependence:** v2's NRA design rests on C1 and C2, so any positive verdict triggers an audit.
 
 "Checks" bullets: median minus mean forecast per site and arm, mean error beside each contrast.
