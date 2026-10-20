@@ -321,8 +321,9 @@ Every number on this page is printed by `e00114_report.py` into `report.txt`.
 ## Caveats and choices made after the plan
 
 - **Past weather:** both gains use ERA5 temperature at the target half-hour, an upper bound on
-  skill with a live forecast. Part 6's calibration moved ENS temperature by -1.15 to +2.05 K and its filter gain on
-  ENS was about two-thirds of Part 4's. Only an ENS confirmation with monthly refits tests transfer.
+  skill with a live forecast. Part 6's calibration moved ENS temperature by -1.15 to +2.05 K and
+  its filter gain on ENS was about two-thirds of Part 4's. Only an ENS confirmation with monthly
+  refits tests transfer.
 - **One scored year plus a replicate, frozen fits, hindsight switching masks** shared by every arm.
 - **Lambda sits at the weakest penalty tried** for T1, T2, and T-all. A weaker penalty was not
   tried, and the tuning-year gain was still growing towards it.
