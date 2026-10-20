@@ -157,18 +157,23 @@ def main() -> None:
     """Read the five readings and write `gate.json`."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument(
+        "--tuning-only",
+        action="store_true",
+        help="read only readings 1, 2, 3a, 3b, and 5, which use tuning-year rows",
+    )
     arguments = parser.parse_args()
     os.environ["OMP_NUM_THREADS"] = "1"
     cache = common.load_cache()
     gate = inject.draw_set(set_name="G", year_name="tuning", cache=cache)
-    realistic = inject.draw_set(set_name="C1", year_name="replicate", cache=cache)
     jobs = [(row, "tuning", row["size"] in BIG) for row in gate.iter_rows(named=True)]
-    jobs += [(row, "replicate", False) for row in realistic.iter_rows(named=True)]
+    if not arguments.tuning_only:
+        realistic = inject.draw_set(set_name="C1", year_name="replicate", cache=cache)
+        jobs += [(row, "replicate", False) for row in realistic.iter_rows(named=True)]
     with ProcessPoolExecutor(max_workers=arguments.workers) as pool:
         results = list(pool.map(local_readings, jobs, chunksize=4))
     frame = pl.DataFrame(results, strict=False)
     gate_rows = frame.filter(pl.col("transfer_id").str.starts_with("G-"), pl.col("size").is_in(BIG))
-    realistic_rows = frame.filter(pl.col("transfer_id").str.starts_with("C1-"))
     ratio = float(np.median(gate_rows["ratio"].to_numpy()))
     detected = gate_rows.filter(
         pl.col("released").is_not_null(), pl.col("recall") >= DETECTED_RECALL
@@ -176,32 +181,40 @@ def main() -> None:
     release = float(np.mean(detected["released"].to_numpy())) if detected.height else float("nan")
     recall_day = recall_over(frame=gate_rows.filter(pl.col("duration") == "over 1 day"))
     recall_6_24 = recall_over(frame=gate_rows.filter(pl.col("duration") == "6-24h"))
-    recall_real = recall_over(frame=realistic_rows.filter(pl.col("hours") > 24.0))
-    _setup(cut_name="replicate")
-    _, config, data, paths = _STATE["setup:replicate"]
-    placebo = {
-        "-".join(pair): local.placebo_mw_days(data=data, paths=paths, config=config, pair=pair)
-        for pair in common.PLACEBO_PAIRS["replicate"]
-    }
+    held_back: dict[str, Any] = {}
+    if not arguments.tuning_only:
+        realistic_rows = frame.filter(pl.col("transfer_id").str.starts_with("C1-"))
+        recall_real = recall_over(frame=realistic_rows.filter(pl.col("hours") > 24.0))
+        _setup(cut_name="replicate")
+        _, config, data, paths = _STATE["setup:replicate"]
+        placebo = {
+            "-".join(pair): local.placebo_mw_days(data=data, paths=paths, config=config, pair=pair)
+            for pair in common.PLACEBO_PAIRS["replicate"]
+        }
+        held_back = {
+            "3c_recall_realistic_over_1_day": {
+                "value": recall_real,
+                "pass": recall_real >= RECALL_REALISTIC,
+            },
+            "4_placebo_mw_days": {"value": placebo, "pass": max(placebo.values()) < PLACEBO_LIMIT},
+        }
     gap = nra_gap()
     readings = {
         "1_moved_mw_ratio": {"value": ratio, "pass": RATIO_RANGE[0] <= ratio <= RATIO_RANGE[1]},
         "2_release_share": {"value": release, "pass": release >= RELEASE_SHARE},
         "3a_recall_over_1_day": {"value": recall_day, "pass": recall_day >= RECALL_OVER_DAY},
         "3b_recall_6_to_24_h": {"value": recall_6_24, "pass": recall_6_24 >= RECALL_6_TO_24H},
-        "3c_recall_realistic_over_1_day": {
-            "value": recall_real,
-            "pass": recall_real >= RECALL_REALISTIC,
-        },
-        "4_placebo_mw_days": {
-            "value": placebo,
-            "pass": max(placebo.values()) < PLACEBO_LIMIT,
-        },
+        **held_back,
         "5_nra_gap_closed": {"value": gap, "pass": gap["closed"] >= GAP_SHARE},
     }
-    readings["gate_passes"] = {"value": all(r["pass"] for r in readings.values()), "pass": None}
-    score.write_json(path=GATE_PATH, payload=readings)
-    frame.write_parquet(common.WORK_DIR / "gate_local.parquet")
+    if not arguments.tuning_only:
+        readings["gate_passes"] = {"value": all(r["pass"] for r in readings.values()), "pass": None}
+    target = GATE_PATH.with_name("gate_tuning_only.json") if arguments.tuning_only else GATE_PATH
+    score.write_json(path=target, payload=readings)
+    frame.write_parquet(
+        common.WORK_DIR
+        / ("gate_local_tuning.parquet" if arguments.tuning_only else "gate_local.parquet")
+    )
     for name, reading in readings.items():
         print(name, reading["value"], "PASS" if reading["pass"] else "FAIL")
 

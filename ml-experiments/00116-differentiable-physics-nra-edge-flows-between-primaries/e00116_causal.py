@@ -314,6 +314,9 @@ def causal_forecasts(
         For each node, one forecast per origin.
     """
     paths = context.local_paths(nodes=nodes)
+    # Only edge flows are taken out and added back; an outside path's level also absorbs growth and
+    # new connections, so it stays in the residual for the filter, as in the A4 refit.
+    edge_paths = tuple(path for path in paths if path.node_b is not None)
     band = context.cache.calendar.band
     points = {node: streams_mw[node] / context.scale[node] for node in nodes}
     graph_nodes = {p.node_a for p in paths} | {p.node_b for p in paths if p.node_b}
@@ -348,7 +351,7 @@ def causal_forecasts(
         previous, previous_cutoff = fit.flows, cutoff
         for node in nodes:
             scale = context.scale[node]
-            flow_mw = node_flow(paths=paths, flows=fit.flows, node=node)
+            flow_mw = node_flow(paths=edge_paths, flows=fit.flows, node=node)
             runs = run_known_input_filter(
                 residual=points[node],
                 flow=flow_mw / scale,

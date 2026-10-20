@@ -292,6 +292,24 @@ here). **Comparators:** every arm, climatology, `manual_heuristic`, and [experim
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s GAM-K (2.800)
 and BG2 (2.780) on ENS.
 
+## Tuning result, recorded before the gate runs
+
+**The registered choice rule picked a configuration that finds little of the injected megawatts.**
+Tuning ran on the 400 transfers of seeds T and the two tuning placebo pairs (module commit
+6a57d0944). The chosen configuration is the half-hourly form with step constant 300 and level
+constant 0; its MW-weighted recall is 0.216 and its placebo flow is about zero, because almost no
+flow survives. Looser settings recover more (step constant 3, level constant 0: recall 0.776) but
+put 9.6 and 21.9 MW-days a year on the two placebo pairs, against the 0.05 limit. A pair with no
+interconnection absorbs the opposite-signed slow drifts of two substations, and a level penalty of
+0.3 or more per megawatt leaves 25 to 31 MW-days on the pair D16–D14. The 3-hour block form (A2-b)
+is no better: its chosen configuration has recall 0.212.
+
+**Prediction added after tuning and before the gate:** the gate's recall readings (0.77 over 1 day
+and 0.5 for 6 to 24 hours) will very likely fail with the registered configuration, which caps the
+verdict at `inconclusive`. The gate runs exactly as registered and its first run stays on the page.
+Any variant run afterwards, such as a larger Huber threshold or a looser step constant that ignores
+the placebo limit, is labelled post hoc and exploratory, and cannot change the verdict.
+
 ## Predictions
 
 Written before any fit; each line can fail, and none overrides the decision rule.

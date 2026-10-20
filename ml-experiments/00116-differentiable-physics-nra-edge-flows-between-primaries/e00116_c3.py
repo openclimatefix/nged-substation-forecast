@@ -132,6 +132,7 @@ def analyse(*, cache: FeatureCache, year_name: str) -> dict[str, Any]:
         ),
         transfers=transfers,
     )
+    rows.write_parquet(common.WORK_DIR / f"c3_rows_{year_name}.parquet")
     contrasts = {
         "a5_minus_a4": score.paired_contrast(
             rows=rows, treatment="a5", reference="a4", metric="score"

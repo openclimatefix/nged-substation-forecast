@@ -133,12 +133,13 @@ def _rows(
     return pl.concat(frames) if frames else pl.DataFrame()
 
 
-def run_transfer(*, transfer: dict, cut_name: str) -> pl.DataFrame:
+def run_transfer(*, transfer: dict, cut_name: str, only_a5: bool = False) -> pl.DataFrame:
     """Run the four arms on one transfer at its two ends.
 
     Args:
         transfer: One row of the transfers table.
         cut_name: The year's cut.
+        only_a5: True to compute only arm A5, to refresh an existing file.
 
     Returns:
         Long rows, one per arm, node, origin, and forecast row, as described in the module
@@ -149,10 +150,10 @@ def run_transfer(*, transfer: dict, cut_name: str) -> pl.DataFrame:
     nodes = (transfer["receiver"], transfer["donor"])
     cutoffs = origin_cutoffs(onset=int(transfer["onset"]), end=int(transfer["end"]))
     frames = []
-    for arm in ("a0", "a4"):
+    for arm in ("a4",) if only_a5 else ("a0", "a4"):
         streams, added = local.injected_streams(cache=cache, data=ctx[arm].data, transfer=transfer)
         scale = ctx[arm].scale
-        for node in nodes:
+        for node in () if only_a5 else nodes:
             clean = cache.sites[node].y
             actual = clean + added[node] / scale[node]
             plain = causal.plain_forecasts(
@@ -213,18 +214,20 @@ def transfers_dir(*, set_name: str, year_name: str) -> Path:
     return common.WORK_DIR / "transfers" / f"{set_name}_{year_name}"
 
 
-def _transfer_worker(job: tuple[dict, str, str]) -> str:
+def _transfer_worker(job: tuple[dict, str, str, bool]) -> str:
     """Run one transfer in a worker process with one thread, and write its file."""
     import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
-    transfer, set_name, year_name = job
+    transfer, set_name, year_name, refresh = job
     target = (
         transfers_dir(set_name=set_name, year_name=year_name) / f"{transfer['transfer_id']}.parquet"
     )
-    if target.exists():
+    if target.exists() and not refresh:
         return f"skip {target.name}"
-    frame = run_transfer(transfer=transfer, cut_name=year_name)
+    frame = run_transfer(transfer=transfer, cut_name=year_name, only_a5=refresh)
+    if refresh:
+        frame = pl.concat([pl.read_parquet(target).filter(pl.col("arm") != "a5"), frame])
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
     frame.write_parquet(temporary)
@@ -329,6 +332,9 @@ def main() -> None:
     transfers.add_argument("--set", dest="set_name", choices=tuple(inject.SET_IDS), required=True)
     transfers.add_argument("--year", choices=tuple(common.CUTS), required=True)
     transfers.add_argument("--limit", type=int, default=None)
+    transfers.add_argument(
+        "--refresh-a5", action="store_true", help="recompute only arm a5 in the existing files"
+    )
     replica = sub.add_parser("replica")
     replica.add_argument("--year", choices=("replicate", "scored"), required=True)
     replica.add_argument("--chunks", type=int, default=6)
@@ -344,7 +350,8 @@ def main() -> None:
         if arguments.limit is not None:
             table = table.head(arguments.limit)
         jobs: list = [
-            (row, arguments.set_name, arguments.year) for row in table.iter_rows(named=True)
+            (row, arguments.set_name, arguments.year, arguments.refresh_a5)
+            for row in table.iter_rows(named=True)
         ]
         worker = _transfer_worker
     else:
