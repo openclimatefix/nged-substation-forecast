@@ -233,7 +233,8 @@ are climatology and `manual_heuristic`.
   are reported; the arm is still judged.
 - **The node's step and level penalties** (3 × 3 grid) on an injection that gate test 4 never uses:
   flat generators of 6 and 15 points with one step and one 14-day outage, injected at D5 (D9 has
-  no usable rows at the tuning cut) on other dates. The chosen values are the largest at which that injection is recovered.
+  no usable rows at the tuning cut) on other dates. The chosen values are the largest at which that
+  injection is recovered.
 - **C4's arm:** among the K arms, the one with the best tuning-year score, recorded before any later
   fit.
 
