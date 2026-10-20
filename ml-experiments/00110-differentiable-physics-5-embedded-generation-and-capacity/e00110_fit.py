@@ -24,7 +24,7 @@ import numpy as np
 import polars as pl
 from studies.dp_assimilation import FilterHyperparameters
 from studies.dp_features import FeatureCache
-from studies.dp_gam import generator_path
+from studies.dp_gam import generator_evidence, generator_path
 from studies.dp_pinned_capacity import read_vintages
 
 _STATE: dict[str, Any] = {}
@@ -113,6 +113,9 @@ def _details(*, run: arms.SiteRun) -> dict[str, Any]:
             "tan_phi": run.meter.tan_phi,
             "q0": run.meter.q0,
             "power_factor": run.meter.power_factor,
+            "reactive": run.meter.reactive,
+            "reverse_flow_share": run.meter.reverse_flow_share,
+            "converged": run.meter.converged,
             "loss": run.meter.loss,
             "starts": [
                 {"name": s.name, "loss": s.loss, "capacity": s.final_capacity, "tan_phi": s.tan_phi}
@@ -124,6 +127,7 @@ def _details(*, run: arms.SiteRun) -> dict[str, Any]:
         details["node"] = {
             "first_day": run.fit.layout.node_first_day,
             "step_days": run.spec.node.step_days,
+            "evidence": generator_evidence(path=path),
             "path": path.tolist(),
         }
     return details

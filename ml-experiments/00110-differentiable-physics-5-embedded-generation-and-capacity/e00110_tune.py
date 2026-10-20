@@ -8,7 +8,7 @@ chosen in this order:
    daylight quarter-by-half-hour cell at every decision site. If none does, 100, and the residual
    correlations are reported.
 2. **The node's step and level penalties** (a 3 by 3 grid) on an injection that gate test 4 never
-   uses: flat generators of 6 and 15 points, each with one step and one 3-day outage, injected at
+   uses: flat generators of 6 and 15 points, each with one step and one 6-day outage, injected at
    D5 on dates that gate test 4 does not use. D9 has no usable rows at this cut, so it is not
    injected. The chosen pair is the largest step penalty, then the largest level penalty, at which
    both injections are recovered.
@@ -51,15 +51,19 @@ from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
 LAMBDA_GRID: Final[tuple[float, ...]] = (0.1, 1.0, 10.0, 100.0)
 CORRELATION_TARGET: Final[float] = 0.05
-STEP_PENALTY_GRID: Final[tuple[float, ...]] = (100.0, 300.0, 1000.0)
-LEVEL_PENALTY_GRID: Final[tuple[float, ...]] = (0.3, 1.0, 3.0)
+STEP_PENALTY_GRID: Final[tuple[float, ...]] = (30.0, 100.0, 300.0)
+LEVEL_PENALTY_GRID: Final[tuple[float, ...]] = (0.01, 0.03, 0.1)
 NODE_WINDOW: Final[TrainingWindow] = TrainingWindow(months=24)
-"""The node's tuning fits use the last 24 months, which keeps the daily path to about 730 days."""
+"""The node's tuning fits use the last 24 months, which keeps the path to about 240 blocks."""
 NODE_INJECTIONS: Final[tuple[dict[str, Any], ...]] = (
-    {"level": 6.0, "step": 3.0, "step_date": (2022, 2, 15), "outage": (2022, 6, 8, 3)},
-    {"level": 15.0, "step": 6.0, "step_date": (2022, 9, 20), "outage": (2023, 2, 14, 3)},
+    {"level": 6.0, "step": 3.0, "step_date": (2022, 2, 15), "outage": (2022, 6, 8, 6)},
+    {"level": 15.0, "step": 6.0, "step_date": (2022, 9, 20), "outage": (2023, 2, 14, 6)},
 )
-"""The tuning injections: a level, a step, its date, and a 3-day outage's date and length."""
+"""The tuning injections: a level, a step, its date, and a 6-day outage's date and length.
+
+The outage is 6 days, not 3, because the node's blocks are 3 days long and a 3-day outage that
+straddles two blocks would be read at half its depth.
+"""
 STEP_TOLERANCE_DAYS: Final[float] = 7.0
 STEP_SIZE_TOLERANCE: Final[float] = 0.30
 LEVEL_TOLERANCE: Final[float] = 0.20
@@ -251,7 +255,7 @@ def main() -> None:
     """Choose the settings and write `work/tuned.json`."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--node-step-days", type=int, default=1)
+    parser.add_argument("--node-step-days", type=int, default=3)
     arguments = parser.parse_args()
     os.environ["OMP_NUM_THREADS"] = "2"
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)

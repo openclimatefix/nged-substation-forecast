@@ -539,6 +539,98 @@ def k_iii_table() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def fit_details() -> dict:
+    """Return the fitted quantities `e00110_fit.py` stored for every arm, site, and cut."""
+    return json.loads((common.WORK_DIR / "fit_details.json").read_text())
+
+
+def node_table() -> pl.DataFrame:
+    """Return the node's evidence (deepest outage, in points) at each MW site, arm, and cut.
+
+    The real-data clause of the node is that the evidence stays under 1 point at 4 or more of the 5
+    decision sites in both years. A generator is evidenced only by an outage, so a fall in demand
+    read as a step (large range of the path, no dip) counts as zero.
+    """
+    rows = []
+    for key, detail in fit_details().items():
+        label, arm, site = key.split("/")
+        if "node" not in detail:
+            continue
+        rows.append(
+            {
+                "cut": label,
+                "arm": arm,
+                "site": site,
+                "evidence points": detail["node"]["evidence"],
+                "path range points": max(detail["node"]["path"]) - min(detail["node"]["path"]),
+                "under 1 point": detail["node"]["evidence"] < 1.0,
+            }
+        )
+    return pl.DataFrame(rows).sort("arm", "cut", "site")
+
+
+def clip_table() -> pl.DataFrame:
+    """Return the profiled clip (multiplier and ceiling share) at each MW site, arm, and cut.
+
+    The clip stays open at a site when the share is at the top of the grid (1.0).
+    """
+    rows = []
+    for key, detail in fit_details().items():
+        label, arm, site = key.split("/")
+        if "clip" not in detail:
+            continue
+        rows.append(
+            {
+                "cut": label,
+                "arm": arm,
+                "site": site,
+                "multiplier": detail["clip"]["multiplier"],
+                "ceiling share": detail["clip"]["p_max_share"],
+                "open": detail["clip"]["p_max_share"] >= 1.0 - 1e-9,
+            }
+        )
+    return pl.DataFrame(rows).sort("arm", "cut", "site")
+
+
+def meter_table() -> pl.DataFrame:
+    """Return the meter fits' power factor, q0, reactive mode, and reverse-flow share per site."""
+    rows = []
+    for key, detail in fit_details().items():
+        label, arm, site = key.split("/")
+        if "meter" not in detail:
+            continue
+        meter = detail["meter"]
+        rows.append(
+            {
+                "cut": label,
+                "arm": arm,
+                "site": site,
+                "reactive": meter["reactive"],
+                "reverse-flow share": meter["reverse_flow_share"],
+                "power factor": meter["power_factor"],
+                "q0 points": meter["q0"],
+                "converged": meter["converged"],
+            }
+        )
+    table = pl.DataFrame(rows).sort("arm", "cut", "site")
+    boot = common.WORK_DIR / "meter_boot_summary.parquet"
+    if boot.exists():
+        table = table.join(
+            pl.read_parquet(boot).select(
+                "cut",
+                "site",
+                "power_factor_low",
+                "power_factor_high",
+                "q0_low",
+                "q0_high",
+                "recovered",
+            ),
+            on=["cut", "site"],
+            how="left",
+        )
+    return table
+
+
 def main() -> None:
     """Print every table of the report as comma-separated values."""
     print("== Absolute quantile score by arm, points of capacity (rows outside the masks) ==")
@@ -556,6 +648,12 @@ def main() -> None:
     print(labels.write_csv(float_precision=3), end="")
     print("== K-iii over K-base ==")
     print(k_iii_table().write_csv(float_precision=3), end="")
+    print("== Node: deepest outage by site, arm, and cut ==")
+    print(node_table().write_csv(float_precision=3), end="")
+    print("== Clip: profiled multiplier and ceiling by site, arm, and cut ==")
+    print(clip_table().write_csv(float_precision=3), end="")
+    print("== Meter: reactive pair by site, arm, and cut ==")
+    print(meter_table().write_csv(float_precision=3), end="")
     print("== Median forecast minus mean forecast, points ==")
     print(median_minus_mean().write_csv(float_precision=3), end="")
     print("== Tail calibration ==")

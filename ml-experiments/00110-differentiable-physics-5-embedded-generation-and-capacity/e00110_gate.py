@@ -263,7 +263,9 @@ def _meter_job(site: str) -> list[dict[str, Any]]:
                     "balanced_accuracy": accuracy,
                     "capacity_ratio_to_signed": capacity / reference_capacity,
                     "power_factor": meter.power_factor,
+                    "reactive": meter.reactive,
                     "starts_capacity_spread": meter.capacity_spread,
+                    "converged": meter.converged,
                 }
             )
     return rows
@@ -387,8 +389,10 @@ def _summarise(*, results: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         "balanced_accuracy_min": float(accuracy.min()),
         "capacity_ratio_range": [float(capacity.min()), float(capacity.max())],
         "median_power_factor": power_factor,
+        "all_learned": all(row["reactive"] == "learned" for row in three),
         "passed": bool(
-            (accuracy >= DIRECTION_ACCURACY_BAR).all()
+            all(row["reactive"] == "learned" for row in three)
+            and (accuracy >= DIRECTION_ACCURACY_BAR).all()
             and (np.abs(capacity - 1.0) <= METER_CAPACITY_TOLERANCE).all()
             and abs(power_factor - POWER_FACTOR_TRUTH) <= POWER_FACTOR_TOLERANCE
         ),

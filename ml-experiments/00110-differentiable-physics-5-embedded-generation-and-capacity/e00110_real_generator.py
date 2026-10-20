@@ -21,7 +21,7 @@ import e00110_arms as arms
 import e00110_common as common
 import numpy as np
 from studies.dp_features import FeatureCache, SiteFeatures, SiteTable
-from studies.dp_gam import NodeSpec, TrainingWindow, fit_gam, generator_path
+from studies.dp_gam import NodeSpec, TrainingWindow, fit_gam, generator_evidence, generator_path
 
 LABEL: Final[str] = "G-c"
 FIT_CUT: Final[datetime] = datetime(2026, 6, 30, 23, 30, tzinfo=UTC)
@@ -100,9 +100,9 @@ def main() -> None:
     )
     carrier_mw = carrier.y[window] * carrier.table.effective_capacity_mw / 100.0
     reference = float(-carrier_mw.mean() * 100.0 / combined.table.effective_capacity_mw)
-    level = float(np.median(path))
+    level = generator_evidence(path=path)
     result = {
-        "node_level_median": level,
+        "node_evidence_points": level,
         "node_level_max": float(path.max()),
         "node_level_min": float(path.min()),
         "dark_row_export_points": reference,

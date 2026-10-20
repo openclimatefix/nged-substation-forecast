@@ -76,6 +76,7 @@ def _job(job: tuple[str, str]) -> list[dict[str, Any]]:
                 "draw": draw,
                 "power_factor": meter.power_factor,
                 "q0": meter.q0,
+                "reactive": meter.reactive,
                 "capacity": meter.fit.capacity_points()[meter.fit.last_season_year],
             }
         )
@@ -98,7 +99,10 @@ def summarise(*, table: pl.DataFrame) -> pl.DataFrame:
                 "power_factor_high": float(factor[-2]),
                 "q0_low": float(q0[1]),
                 "q0_high": float(q0[-2]),
-                "recovered": bool(factor[-2] - factor[1] < high_band - low_band),
+                "recovered": bool(
+                    factor[-2] - factor[1] < high_band - low_band
+                    and (group["reactive"] == "learned").all()
+                ),
             }
         )
     return pl.DataFrame(rows)
