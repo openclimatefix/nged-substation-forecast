@@ -55,7 +55,11 @@ rows `regressor_scale` and `active_counts` look at, and the sites' streams in
 caller's duty.
 
 **The noise matrix** is fitted by `fit_effects_noise` as a maximum a posteriori estimate: a batched
-greedy search over a grid of `log q_k` for each weight in turn, then an L-BFGS polish. All `log q_k`
+greedy search over a grid of `log q_k` for each weight in turn, then an L-BFGS polish. The
+likelihood is either the one-step likelihood of the readings or, given `DayAheadTargets`, the
+predictive likelihood of each reading from the state at its day-ahead cutoff. The one-step
+likelihood rewards weights that adapt as fast as the half-hourly data allow, which does not suit a
+forecast used 15 to 39 hours ahead. All `log q_k`
 carry a normal prior whose mean and spread `fit_effects_noise_sites` updates from the sites' own
 fits. A weight with too few active half-hours in the likelihood has its `q_k` set to the prior mean
 instead of fitted.
@@ -70,7 +74,13 @@ from typing import Final
 import numpy as np
 from scipy.optimize import minimize
 
-from studies.dp_assimilation import INITIAL_LEVEL_VARIANCE, VARIANCE_FLOOR
+from studies.dp_assimilation import (
+    DEFAULT_DELAY_HOURS,
+    INITIAL_LEVEL_VARIANCE,
+    VARIANCE_FLOOR,
+    day_ahead_initialisation,
+    usable_cutoff_positions,
+)
 from studies.dp_calendar import DAY_TYPES, HALF_HOURS_PER_DAY
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import N_BANDS, GamFit, pinned_solar_points, predict_gam
@@ -113,11 +123,25 @@ ACTIVE_THRESHOLD: Final[float] = 1e-9
 """A regressor is active at a half-hour when its absolute value is above this."""
 MIN_ACTIVE_HALF_HOURS: Final[int] = 200
 """A weight with fewer active half-hours in the likelihood has its `q` set by the prior."""
-LOG_Q_BOUNDS: Final[tuple[float, float]] = (-20.0, 2.0)
-"""Bounds on `log q`, which keep the optimiser off degenerate corners."""
+LOG_Q_BOUNDS: Final[tuple[float, float]] = (-20.0, 6.0)
+"""Bounds on `log q`, which keep the optimiser off degenerate corners.
+
+The upper bound is `studies.dp_assimilation`'s, so that a level variance that filter fits can
+reach is reachable here too."""
 LOG_SIGMA_EPS_BOUNDS: Final[tuple[float, float]] = (log(0.05), 6.0)
 """Bounds on `log sigma_eps` in points, which keep the update stable."""
-GREEDY_GRID: Final[tuple[float, ...]] = (-18.0, -14.0, -11.0, -9.0, -7.0, -5.0, -3.0, -1.0)
+GREEDY_GRID: Final[tuple[float, ...]] = (
+    -18.0,
+    -14.0,
+    -11.0,
+    -9.0,
+    -7.0,
+    -5.0,
+    -3.0,
+    -1.0,
+    1.0,
+    3.0,
+)
 """The `log q` values the greedy search tries for each weight in turn."""
 FINITE_DIFFERENCE_STEP: Final[float] = 1e-4
 """The forward-difference step in `log q` of the polish's gradient."""
@@ -380,6 +404,215 @@ def active_counts(*, contributions: np.ndarray, mask: np.ndarray) -> np.ndarray:
     return (np.isfinite(column) & (np.abs(column) > ACTIVE_THRESHOLD)).sum(axis=0)
 
 
+@dataclass(frozen=True)
+class DayAheadTargets:
+    """The readings that a lead-matched likelihood scores, and the cutoff each is predicted from.
+
+    **A one-step likelihood rewards a filter that adapts as fast as the data allow, which is the
+    wrong thing for a forecast used a day ahead.** The lead-matched likelihood scores each target
+    reading by its predictive density from the state at a cutoff 15 to 39 hours earlier (the
+    day-ahead forecast's information), so a noise matrix that adapts too fast to carry its state to
+    the next day is penalised.
+
+    Attributes:
+        target_rows: The grid rows of the scored readings.
+        cutoff_rows: For each target, the newest grid row its forecast may see.
+    """
+
+    target_rows: np.ndarray
+    cutoff_rows: np.ndarray
+
+
+def day_ahead_targets(
+    *, end_times: np.ndarray, rows: np.ndarray, delay_hours: float = DEFAULT_DELAY_HOURS
+) -> DayAheadTargets:
+    """Return the day-ahead cutoff of each grid row in `rows`.
+
+    The cutoff is the newest half-hour that ended `delay_hours` before 09:00 UTC on the day before
+    the target's day (`studies.dp_assimilation.day_ahead_initialisation`).
+
+    Args:
+        end_times: The grid's half-hour ends as `datetime64[us]`.
+        rows: The grid rows to score.
+        delay_hours: The telemetry delay.
+
+    Returns:
+        The targets that have a cutoff on the grid.
+    """
+    cutoff = usable_cutoff_positions(
+        end_times=end_times,
+        initialisation=day_ahead_initialisation(end_times=end_times[rows], days_ahead=1),
+        delay_hours=delay_hours,
+    )
+    keep = (cutoff >= 0) & (cutoff < rows)
+    return DayAheadTargets(target_rows=rows[keep], cutoff_rows=cutoff[keep])
+
+
+@dataclass(frozen=True)
+class _Snapshot:
+    """The filter's state after the newest reading at or before a cutoff."""
+
+    x: np.ndarray
+    covariance: np.ndarray
+    position: int
+    grows: np.ndarray
+
+
+def _day_ahead_log_likelihood(
+    *,
+    snapshot: _Snapshot,
+    design: np.ndarray,
+    values: np.ndarray,
+    band: np.ndarray,
+    positions: np.ndarray,
+    q_step: np.ndarray,
+    noise: np.ndarray,
+    phi: float,
+    stationary: float,
+    use_anomaly: bool,
+) -> np.ndarray:
+    """Return the predictive log likelihood of target readings from one snapshot, per batch member.
+
+    Args:
+        snapshot: The state the targets are predicted from.
+        design: The design rows of the targets, shape (targets, 18).
+        values: The targets' residuals.
+        band: The hour band of each target.
+        positions: The grid row of each target.
+        q_step: Random-walk variance per half-hour, shape (batch, 14).
+        noise: Observation noise variance, shape (batch,).
+        phi: The anomaly's AR(1) factor.
+        stationary: The anomaly's stationary variance.
+        use_anomaly: Whether the anomaly states take part.
+
+    Returns:
+        The log likelihood, shape (batch,).
+    """
+    gap = positions - snapshot.position
+    decay = phi**gap
+    projected = design.copy()
+    mean = snapshot.x[:, :N_WEIGHTS] @ design[:, :N_WEIGHTS].T
+    walk = (design[:, :N_WEIGHTS] ** 2 * snapshot.grows) @ q_step.T * gap[:, None]
+    extra = np.zeros_like(walk)
+    if use_anomaly:
+        index = N_WEIGHTS + band
+        projected[np.arange(len(gap)), index] = decay
+        mean = mean + snapshot.x[:, index] * decay
+        extra = (stationary * (1.0 - decay**2))[:, None] * np.ones((1, len(noise)))
+    variance = (
+        np.einsum("ni,bij,nj->bn", projected, snapshot.covariance, projected)
+        + walk.T
+        + extra.T
+        + noise[:, None]
+    )
+    innovation = values[None, :] - mean
+    return -0.5 * (np.log(2.0 * pi * variance) + innovation**2 / variance).sum(axis=1)
+
+
+def _snapshot_groups(
+    *, lead_matched: DayAheadTargets | None, positions: np.ndarray, counted: np.ndarray
+) -> list[tuple[int, np.ndarray]]:
+    """Group the scored readings by cutoff: pairs of (cutoff row, indices into the readings)."""
+    if lead_matched is None:
+        return []
+    at = np.searchsorted(positions, lead_matched.target_rows)
+    inside = at < len(positions)
+    found = np.zeros(len(at), dtype=bool)
+    found[inside] = positions[at[inside]] == lead_matched.target_rows[inside]
+    found[found] = counted[at[found]]
+    cutoffs = lead_matched.cutoff_rows[found]
+    readings = at[found]
+    return [(int(cutoff), readings[cutoffs == cutoff]) for cutoff in np.unique(cutoffs)]
+
+
+def _propagate(
+    *,
+    x: np.ndarray,
+    covariance: np.ndarray,
+    q_step: np.ndarray,
+    grows: np.ndarray,
+    gap: int,
+    phi: float,
+    stationary: float,
+    use_anomaly: bool,
+) -> None:
+    """Move the state and its covariance forward by `gap` half-hours, in place."""
+    diagonal = covariance.reshape(covariance.shape[0], -1)[:, :: N_STATES + 1]
+    if use_anomaly:
+        decay = phi**gap
+        covariance[:, N_WEIGHTS:, :] *= decay
+        covariance[:, :, N_WEIGHTS:] *= decay
+        x[:, N_WEIGHTS:] *= decay
+        diagonal[:, N_WEIGHTS:] += stationary * (1.0 - decay * decay)
+    diagonal[:, :N_WEIGHTS] += q_step * (gap * grows)
+
+
+def _score_snapshots(
+    *,
+    snapshots: list[_Snapshot | None],
+    groups: list[tuple[int, np.ndarray]],
+    arrays: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    q_step: np.ndarray,
+    noise: np.ndarray,
+    filter_settings: tuple[float, float, bool],
+) -> np.ndarray:
+    """Return the summed day-ahead log likelihood of every group with a snapshot, per batch member.
+
+    Args:
+        snapshots: The state at each group's cutoff, `None` where no reading was that old.
+        groups: Each group's cutoff row and the indices of its readings.
+        arrays: The readings' design rows, residuals, and grid rows, and the hour band per grid row.
+        q_step: Random-walk variance per half-hour, shape (batch, 14).
+        noise: Observation noise variance, shape (batch,).
+        filter_settings: The anomaly's AR(1) factor, its stationary variance, and whether it is on.
+
+    Returns:
+        The log likelihood, shape (batch,).
+    """
+    design, values, band, positions = arrays
+    phi, stationary, use_anomaly = filter_settings
+    total = np.zeros(len(noise))
+    for snapshot, (_, readings) in zip(snapshots, groups, strict=True):
+        if snapshot is not None:
+            total += _day_ahead_log_likelihood(
+                snapshot=snapshot,
+                design=design[readings],
+                values=values[readings],
+                band=band[positions[readings]].astype(np.int64),
+                positions=positions[readings],
+                q_step=q_step,
+                noise=noise,
+                phi=phi,
+                stationary=stationary,
+                use_anomaly=use_anomaly,
+            )
+    return total
+
+
+def _kalman_update(
+    *, x: np.ndarray, covariance: np.ndarray, h: np.ndarray, value: float, noise: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply one reading's rank-one update to the state and covariance in place.
+
+    Args:
+        x: The state, shape (batch, 18).
+        covariance: The covariance, shape (batch, 18, 18).
+        h: The reading's design row, shape (18,).
+        value: The reading.
+        noise: Observation noise variance, shape (batch,).
+
+    Returns:
+        The innovation variance and the innovation, each of shape (batch,).
+    """
+    p_h = covariance @ h
+    innovation_variance = p_h @ h + noise
+    innovation = value - x @ h
+    gain = p_h / innovation_variance[:, None]
+    x += gain * innovation[:, None]
+    covariance -= gain[:, :, None] * p_h[:, None, :]
+    return innovation_variance, innovation
+
+
 def _filter_core(
     *,
     residual: np.ndarray,
@@ -393,6 +626,7 @@ def _filter_core(
     use_anomaly: bool,
     likelihood_mask: np.ndarray | None,
     keep_trace: bool,
+    lead_matched: DayAheadTargets | None = None,
 ) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None, np.ndarray, np.ndarray]:
     """Run the filter for a batch of noise settings that share the data.
 
@@ -408,6 +642,8 @@ def _filter_core(
         use_anomaly: Whether the anomaly states take part.
         likelihood_mask: True on the grid rows whose readings add to the likelihood; `None` for all.
         keep_trace: Whether to keep the state (only for a batch of one).
+        lead_matched: If given, the log likelihood is the sum of the targets' day-ahead predictive
+            densities, and the readings in the mask add nothing as one-step innovations.
 
     Returns:
         The log likelihood of each batch member, the state after each reading and the posterior
@@ -439,38 +675,55 @@ def _filter_core(
     log_likelihood = np.zeros(n_batch)
     state = np.empty((len(positions), N_STATES)) if keep_trace else None
     sd = np.empty((len(positions), N_WEIGHTS)) if keep_trace else None
+    groups = _snapshot_groups(lead_matched=lead_matched, positions=positions, counted=counted)
+    snapshots: list[_Snapshot | None] = []
+    if lead_matched is not None:
+        counted = np.zeros(len(positions), dtype=bool)
     previous = int(positions[0]) if len(positions) else 0
     for k in range(len(positions)):
         position = int(positions[k])
         band_k = int(band[position])
+        while len(snapshots) < len(groups) and groups[len(snapshots)][0] < position:
+            snapshots.append(
+                None if k == 0 else _Snapshot(x.copy(), covariance.copy(), previous, grows.copy())
+            )
         gap = position - previous
         previous = position
         if gap:
-            if use_anomaly:
-                decay = phi**gap
-                covariance[:, N_WEIGHTS:, :] *= decay
-                covariance[:, :, N_WEIGHTS:] *= decay
-                x[:, N_WEIGHTS:] *= decay
-                diagonal[:, N_WEIGHTS:] += stationary * (1.0 - decay * decay)
-            diagonal[:, :N_WEIGHTS] += q_step * (gap * grows)
+            _propagate(
+                x=x,
+                covariance=covariance,
+                q_step=q_step,
+                grows=grows,
+                gap=gap,
+                phi=phi,
+                stationary=stationary,
+                use_anomaly=use_anomaly,
+            )
         grows[band_k] = 1.0
-        h = design[k]
-        p_h = covariance @ h
-        innovation_variance = p_h @ h + noise
-        innovation = values[k] - x @ h
+        innovation_variance, innovation = _kalman_update(
+            x=x, covariance=covariance, h=design[k], value=values[k], noise=noise
+        )
         if counted[k]:
             log_likelihood -= 0.5 * (
                 np.log(2.0 * pi * innovation_variance) + innovation**2 / innovation_variance
             )
-        gain = p_h / innovation_variance[:, None]
-        x += gain * innovation[:, None]
-        covariance -= gain[:, :, None] * p_h[:, None, :]
         np.maximum(diagonal, VARIANCE_FLOOR, out=diagonal)
         if k % SYMMETRISE_EVERY == SYMMETRISE_EVERY - 1:
             covariance[:] = 0.5 * (covariance + covariance.transpose(0, 2, 1))
         if state is not None and sd is not None:
             state[k] = x[0]
             sd[k] = np.sqrt(diagonal[0, :N_WEIGHTS])
+    while len(snapshots) < len(groups):
+        snapshots.append(_Snapshot(x.copy(), covariance.copy(), previous, grows.copy()))
+    log_likelihood += _score_snapshots(
+        snapshots=snapshots,
+        groups=groups,
+        arrays=(design, values, band, positions),
+        q_step=q_step,
+        noise=noise,
+        filter_settings=(phi, stationary, use_anomaly),
+    )
     return log_likelihood, state, sd, positions, covariance
 
 
@@ -658,6 +911,7 @@ def fit_effects_noise(
     start_log_q: np.ndarray | None = None,
     greedy: bool = True,
     sigma_eps_spread: float = SIGMA_EPS_PRIOR_SPREAD,
+    lead_matched: DayAheadTargets | None = None,
 ) -> FittedNoise:
     """Fit one site's noise matrix by maximum a posteriori.
 
@@ -682,6 +936,8 @@ def fit_effects_noise(
         greedy: Whether to run the greedy search before the polish.
         sigma_eps_spread: The standard deviation of the normal prior on `log sigma_eps`, centred
             on `sigma_eps_start`; a small value holds the observation noise near its start.
+        lead_matched: If given, the likelihood is the day-ahead predictive likelihood of these
+            targets (`DayAheadTargets`) and not the one-step likelihood.
 
     Returns:
         The fitted noise.
@@ -728,6 +984,7 @@ def fit_effects_noise(
             use_anomaly=variant.use_anomaly,
             likelihood_mask=likelihood_mask,
             keep_trace=False,
+            lead_matched=lead_matched,
         )
         return log_likelihood + log_prior(theta)
 
@@ -797,6 +1054,7 @@ class SiteStream:
         phi: The site's anomaly AR(1) factor.
         sigma_z: The site's anomaly innovation standard deviation.
         sigma_eps_start: The site's starting observation noise.
+        lead_matched: The site's day-ahead targets, or `None` for the one-step likelihood.
     """
 
     residual: np.ndarray
@@ -806,6 +1064,7 @@ class SiteStream:
     phi: float
     sigma_z: float
     sigma_eps_start: float
+    lead_matched: DayAheadTargets | None = None
 
 
 def fit_effects_noise_sites(
@@ -857,6 +1116,7 @@ def fit_effects_noise_sites(
                 start_log_q=fitted[site].log_q if site in fitted else None,
                 greedy=round_index == 0,
                 sigma_eps_spread=sigma_eps_spread,
+                lead_matched=stream.lead_matched,
             )
             for site, stream in streams.items()
         }

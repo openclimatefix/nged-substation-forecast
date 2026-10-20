@@ -27,6 +27,7 @@ from studies.dp_effects_filter import (  # noqa: E402
     NON_LEVEL,
     PROFILE,
     PV_INDEX,
+    DayAheadTargets,
     FilterNoise,
     FilterState,
     FilterVariant,
@@ -34,6 +35,7 @@ from studies.dp_effects_filter import (  # noqa: E402
     _filter_core,
     active_counts,
     correction_from_state,
+    day_ahead_targets,
     effect_regressors,
     fit_effects_noise,
     fit_effects_noise_sites,
@@ -784,3 +786,197 @@ def test_a_small_observation_noise_spread_holds_sigma_eps_near_its_start():
         sigma_eps_spread=1e-3,
     )
     assert fitted.noise.sigma_eps == pytest.approx(2.0, rel=0.01)
+
+
+def _dense_day_ahead(
+    *,
+    residual: np.ndarray,
+    regressors: np.ndarray,
+    band: np.ndarray,
+    noise: FilterNoise,
+    cutoff: int,
+    targets: np.ndarray,
+) -> float:
+    """Return the day-ahead predictive log likelihood of the targets from a dense filter.
+
+    The filter reads every reading at or before the cutoff, then the state is stepped forward one
+    half-hour at a time with no update to each target, where the predictive density is evaluated.
+    """
+    stationary = noise.sigma_z**2 / (1.0 - noise.phi**2)
+    transition = np.diag(np.r_[np.ones(N_WEIGHTS), np.full(N_BANDS, noise.phi)])
+    state = np.zeros(N_STATES)
+    covariance = np.diag(np.r_[noise.initial_sd**2, np.full(N_BANDS, stationary)])
+    started = np.ones(N_WEIGHTS)
+    started[:N_BANDS] = 0.0
+    first = np.flatnonzero(np.isfinite(residual))[0]
+
+    def step(*, state: np.ndarray, covariance: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        process = np.diag(np.r_[noise.q / 48.0 * started, np.zeros(N_BANDS)])
+        moved = transition @ covariance @ transition.T + process
+        moved[N_WEIGHTS:, N_WEIGHTS:] += np.eye(N_BANDS) * noise.sigma_z**2
+        return transition @ state, moved
+
+    def design(position: int) -> np.ndarray:
+        h = np.zeros(N_STATES)
+        h[:N_WEIGHTS] = regressors[position] * (noise.initial_sd > 0)
+        h[N_WEIGHTS + band[position]] = 1.0
+        return h
+
+    for position in range(first, cutoff + 1):
+        if position > first:
+            state, covariance = step(state=state, covariance=covariance)
+        if not np.isfinite(residual[position]):
+            continue
+        started[band[position]] = 1.0
+        h = design(position)
+        variance = h @ covariance @ h + noise.sigma_eps**2
+        gain = covariance @ h / variance
+        state = state + gain * (residual[position] - h @ state)
+        covariance = covariance - np.outer(gain, gain) * variance
+    total = 0.0
+    walk_state, walk_covariance = state, covariance
+    for position in range(cutoff + 1, int(targets.max()) + 1):
+        walk_state, walk_covariance = step(state=walk_state, covariance=walk_covariance)
+        if position in set(targets.tolist()):
+            h = design(position)
+            variance = h @ walk_covariance @ h + noise.sigma_eps**2
+            innovation = residual[position] - h @ walk_state
+            total -= 0.5 * (np.log(2 * np.pi * variance) + innovation**2 / variance)
+    return total
+
+
+def test_the_day_ahead_likelihood_matches_a_dense_filter_stepped_without_updates():
+    generator = np.random.default_rng(21)
+    n = 400
+    band = _bands(n=n)
+    regressors = generator.normal(size=(n, N_WEIGHTS))
+    regressors[:, :N_BANDS] = np.eye(N_BANDS)[band]
+    residual = generator.normal(size=n) * 2.0
+    residual[generator.random(n) < 0.15] = np.nan
+    noise = _noise(q=np.exp(generator.uniform(-6.0, -1.0, size=N_WEIGHTS)), moving=ALL_MOVING)
+    cutoff = 250
+    targets = np.flatnonzero(np.isfinite(residual) & (np.arange(n) > cutoff) & (np.arange(n) < 330))
+    values, _, _, _, _ = _filter_core(
+        residual=residual,
+        regressors=regressors,
+        band=band,
+        q=noise.q[None, :],
+        sigma_eps=np.array([noise.sigma_eps]),
+        phi=noise.phi,
+        sigma_z=noise.sigma_z,
+        initial_sd=noise.initial_sd,
+        use_anomaly=True,
+        likelihood_mask=None,
+        keep_trace=False,
+        lead_matched=DayAheadTargets(
+            target_rows=targets, cutoff_rows=np.full(len(targets), cutoff)
+        ),
+    )
+    expected = _dense_day_ahead(
+        residual=residual,
+        regressors=regressors,
+        band=band,
+        noise=noise,
+        cutoff=cutoff,
+        targets=targets,
+    )
+    assert values[0] == pytest.approx(expected, abs=1e-8)
+
+
+def test_with_each_cutoff_just_before_its_target_the_day_ahead_likelihood_is_the_one_step_one():
+    residual, regressors, band, noise = _random_problem(seed=22)
+    positions = np.flatnonzero(np.isfinite(residual))
+    kwargs = {
+        "residual": residual,
+        "regressors": regressors,
+        "band": band,
+        "q": noise.q[None, :],
+        "sigma_eps": np.array([noise.sigma_eps]),
+        "phi": noise.phi,
+        "sigma_z": noise.sigma_z,
+        "initial_sd": noise.initial_sd,
+        "use_anomaly": noise.use_anomaly,
+        "keep_trace": False,
+    }
+    mask = np.ones(len(residual), dtype=bool)
+    mask[positions[0]] = False
+    one_step, _, _, _, _ = _filter_core(likelihood_mask=mask, **kwargs)
+    matched, _, _, _, _ = _filter_core(
+        likelihood_mask=None,
+        lead_matched=DayAheadTargets(target_rows=positions[1:], cutoff_rows=positions[:-1]),
+        **kwargs,
+    )
+    assert matched[0] == pytest.approx(one_step[0], abs=1e-8)
+
+
+def test_the_day_ahead_likelihood_prefers_the_true_q_to_one_hundred_times_it():
+    true_q = np.zeros(N_WEIGHTS)
+    true_q[HEATING.start] = 1e-3
+    residual, regressors, band = _simulate_stream(true_q=true_q, seed=23, n=48 * 200)
+    n = len(residual)
+    rows = np.flatnonzero(np.arange(n) > 48 * 20)
+    targets = day_ahead_targets(
+        end_times=np.datetime64("2024-07-01T00:30", "us") + np.arange(n) * np.timedelta64(30, "m"),
+        rows=rows,
+    )
+
+    def log_likelihood(*, scale: float) -> float:
+        q = np.zeros(N_WEIGHTS)
+        q[HEATING.start] = 1e-3 * scale
+        values, _, _, _, _ = _filter_core(
+            residual=residual,
+            regressors=regressors,
+            band=band,
+            q=q[None, :],
+            sigma_eps=np.array([0.6]),
+            phi=0.98,
+            sigma_z=0.3,
+            initial_sd=initial_sd_for(
+                scale=np.ones(N_WEIGHTS), moving=np.arange(N_WEIGHTS) == HEATING.start
+            ),
+            use_anomaly=False,
+            likelihood_mask=None,
+            keep_trace=False,
+            lead_matched=targets,
+        )
+        return float(values[0])
+
+    assert log_likelihood(scale=1.0) - log_likelihood(scale=1e3) > 3.0
+
+
+def test_the_day_ahead_cutoff_ends_three_and_a_half_hours_before_the_forecast_origin():
+    end_times = np.datetime64("2024-07-01T00:30", "us") + np.arange(48 * 4) * np.timedelta64(
+        30, "m"
+    )
+    target = np.flatnonzero(end_times == np.datetime64("2024-07-03T12:00", "us"))
+    result = day_ahead_targets(end_times=end_times, rows=target)
+    # The forecast is made at 09:00 UTC on 2 July, and the newest usable half-hour ended at 05:30.
+    assert end_times[result.cutoff_rows[0]] == np.datetime64("2024-07-02T05:30", "us")
+    assert result.target_rows.tolist() == target.tolist()
+
+
+def test_a_day_ahead_fit_recovers_a_slow_weights_variance_and_keeps_a_fast_one_small():
+    true_q = np.zeros(N_WEIGHTS)
+    true_q[HEATING.start] = 1e-2
+    residual, regressors, band = _simulate_stream(true_q=true_q, seed=24)
+    n = len(residual)
+    end_times = np.datetime64("2024-07-01T00:30", "us") + np.arange(n) * np.timedelta64(30, "m")
+    targets = day_ahead_targets(end_times=end_times, rows=np.arange(48 * 30, n))
+    moving = np.zeros(N_WEIGHTS, dtype=bool)
+    moving[[HEATING.start, PV_INDEX]] = True
+    fitted = fit_effects_noise(
+        residual=residual,
+        regressors=regressors,
+        band=band,
+        scale=np.ones(N_WEIGHTS),
+        variant=FilterVariant(moving=moving, use_anomaly=False),
+        phi=0.98,
+        sigma_z=0.3,
+        sigma_eps_start=0.6,
+        likelihood_mask=np.ones(n, dtype=bool),
+        prior_mean=np.full(N_WEIGHTS, -3.0),
+        prior_spread=np.full(N_WEIGHTS, 20.0),
+        lead_matched=targets,
+    )
+    assert 0.25 < fitted.noise.q[HEATING.start] / 1e-2 < 4.0
+    assert fitted.noise.q[PV_INDEX] < 1e-3
