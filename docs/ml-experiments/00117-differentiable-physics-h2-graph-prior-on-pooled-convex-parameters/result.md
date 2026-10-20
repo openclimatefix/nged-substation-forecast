@@ -20,11 +20,12 @@ hypothesis: >-
   narrows those parameters' month-block bootstrap intervals without breaking their coverage when
   neighbouring Primaries are alike, and costs the full-history forecast at most 0.03 points.
 prediction: >-
-  R1 and R2 inside ±0.02 points with a half-width of 0.02 to 0.03; R3 −0.01 to −0.03. Smooth-cell
-  coverage of H and NH 72 to 88% and within 5 points of G; width ratio 0.6 to 0.9 for slopes and
-  scale, 0.8 to 1.0 for the capacity share; unlike-neighbours coverage 65 to 80%; the planted
-  failure covers 40 to 60%. Real data: edge-similarity ratio 0.5 to 0.9 for heating slopes; H's
-  width ratio against G 0.8 to 0.95 and against H-perm 0.85 to 1.0. See "Predictions".
+  R1 and R2 inside ±0.02 points with a half-width of 0.02 to 0.03; R3 (event days) −0.1 to −0.5
+  points, R3b inside ±0.01. Smooth-cell coverage of H and NH 72 to 88% and within 5 points of G;
+  width ratio 0.6 to 0.9 for slopes and scale, 0.8 to 1.0 for the capacity share; unlike-neighbours
+  coverage 65 to 80%; the planted failure covers 40 to 60%. Real data: edge-similarity ratio 0.5 to
+  0.9 for heating slopes; H's width ratio against G 0.8 to 0.95 and against H-perm 0.85 to 1.0. See
+  "Predictions".
 decision_rule: >-
   See "Decision rule": supported needs the plumbing controls and the planted failure to pass,
   readings (a) to (c), R1 and R2 non-inferior at +0.03 points in the scored and replicate years with
@@ -81,17 +82,33 @@ term and also get their own arm (below).
 
 H and NH include the holiday family in the graph term. P-hol is the labelled holiday arm.
 **lambda_hol is tuned on the tuning year over {0, 300, 1,000, 3,000, 10,000} by the quantile score
-of P-hol on all scored rows of the five decision sites (tuning-year clock-change days excluded); it
-is the largest value whose score is within one month-block standard error of the lowest.** The harm
-bound of the gamma rule does not apply, because P-hol is a gain arm and R3 never changes the
-verdict.
+of P-hol on the tuning year's event days of the five decision sites (event days are defined under
+R3; clock-change days excluded); it is the largest value whose score is within one event-day
+standard error of the lowest.** The harm bound of the gamma rule does not apply, because P-hol is a
+gain arm and R3 and R3b never change the verdict.
 
 **Clock-change days are excluded from the scored rows of every arm and every contrast** (G, N, H,
-NH, P-hol, climatology, `manual_heuristic`; R1, R2, R3, and every descriptive score), so all pairs
-stay on the same rows. In the scored year the excluded days are 26 October 2025, 28 March 2026, and
-29 March 2026. In the replicate year they are the matching autumn change day, the spring change day,
-and the day before it (27 October 2024, 29 and 30 March 2025), and in the tuning year likewise
-(29 October 2023, 30 and 31 March 2024). The fits themselves train on those days as before.
+NH, P-hol, climatology, `manual_heuristic`; R1, R2, R3, R3b, and every descriptive score), so all
+pairs stay on the same rows. In the scored year the excluded days are 26 October 2025, 28 March
+2026, and 29 March 2026. In the replicate year they are the matching autumn change day, the spring
+change day, and the day before it (27 October 2024, 29 and 30 March 2025), and in the tuning year
+likewise (29 October 2023, 30 and 31 March 2024). The fits themselves train on those days as before.
+
+## Builds on
+
+- [Experiment 109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) (the
+  fleet-mean penalty N, its gate, and its advice), [experiment
+  113](../00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result.md)
+  (bootstrap intervals at realistic noise), and [experiment
+  105](../00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md) (pooling at
+  full history).
+- [Experiment 103](../00103-differentiable-physics-1-data-look/result.md) for the rows, the start
+  cuts, and the hand-filtered switching events.
+- The technique pages on [differentiable physics](../../techniques/differentiable-physics.md) and
+  [convex optimisation](../../techniques/convex-optimisation.md).
+- [Hallac, Leskovec, and Boyd (2015)](https://doi.org/10.1145/2783258.2783313), who penalise
+  the differences between the parameters of neighbouring nodes of a graph (the network lasso). Here
+  the penalty is a squared difference, so the fit stays a convex quadratic program.
 
 ## Graph
 
@@ -220,23 +237,34 @@ short-history arm (maintainer scope).
 
 ## Planned contrasts
 
-**Three real-data contrasts, Bonferroni-corrected, 98.3% intervals from `studies.bootstrap` (whole
-calendar months resampled, 3 seeds, paired across arms). **The contrasts use the joint draw: each
-resample picks the same calendar months at all five decision sites,** so the correlation between
-neighbouring sites is kept, as in the parameter bootstrap; the contrast is the mean over sites. If
-`studies.bootstrap` draws months per site, the script supplies the month indices.** Each reports
-sites moving each way, every arm's absolute score, the mean-forecast error beside it, and the
-replicate year.
+**Four real-data contrasts, Bonferroni-corrected, 98.75% intervals from `studies.bootstrap`
+(3 seeds, paired across arms).** R1, R2, and R3b resample whole calendar months. **They use the
+joint draw: each resample picks the same calendar months at all five decision sites,** so the
+correlation between neighbouring sites is kept, as in the parameter bootstrap; the contrast is the
+mean over sites. If `studies.bootstrap` draws months per site, the script supplies the month
+indices. R3 resamples whole event days (below). Each contrast reports sites moving each way, every
+arm's absolute score, the mean-forecast error beside it, and the replicate year.
 
 - **R1, the graph prior alone does no harm:** H minus G, non-inferior if the upper end is at most
   +0.03 points in the scored year and in the replicate year.
 - **R2, the graph prior on top of the fleet mean does no harm:** NH minus N, same rule.
-- **R3, holiday pooling:** P-hol minus G; a gain if the interval lies wholly below zero (the design
-  session expects about −0.02).
+- **R3, holiday pooling on the event days (primary):** P-hol minus G on the **event days**, the days
+  of the holiday periods that the holiday coefficients cover (each bank holiday, Easter, the bridge
+  days, and the Christmas to New Year run, as `studies.dp_calendar.HOLIDAY_PERIODS` lists them),
+  without the clock-change days. P-hol gains if the interval lies wholly below zero. The interval
+  resamples whole event days (all 48 half-hours of a day together), with the same days drawn at
+  every decision site, within each holiday period so that every period keeps its size. **The
+  evidence is thin:** each site holds 1 or 2 days per holiday period in a year, and the script
+  prints the number of event days per site and year before any score is read. The annual average
+  is reported and is not decisive.
+- **R3b, holiday pooling leaves the other days alone:** P-hol minus G on all days that are not
+  event days and not clock-change days, non-inferior if the upper end is at most +0.02 points in the
+  scored year. P-hol counts as a gain only if R3 gains and R3b is non-inferior. R3 and R3b never
+  change the verdict.
 
 **What the margin buys.** Both R1 and R2 are nested pairs, so their half-width is likely near
-experiment 109's C1: about ±0.025 at 99% and ±0.022 at 97.5%, so about ±0.024 at the 98.3% level
-these contrasts use (scaled by the normal quantiles 2.39 and 2.24), below Part 4's C4 of ±0.023 for
+experiment 109's C1: about ±0.025 at 99% and ±0.022 at 97.5%, so about ±0.025 at the 98.75% level
+these contrasts use (scaled by the normal quantiles 2.50 and 2.24), below Part 4's C4 of ±0.023 for
 two filtered arms at its level. The 0.025 limit for `supported` is therefore nearly binding, and a
 scored half-width above it is reported as undecidable, not as a failure. Porting a convex penalty
 adds no serving cost, so the 0.03 margin only decides whether the next experiment builds on H.
@@ -266,7 +294,9 @@ climatology, `manual_heuristic`, 109's stored N and G.
 
 Written before any fit; each line can fail, and none overrides the decision rule.
 
-- **R1 and R2:** inside ±0.02 points, with a half-width of 0.02 to 0.03. **R3:** −0.01 to −0.03.
+- **R1 and R2:** inside ±0.02 points, with a half-width of 0.02 to 0.03. **R3 (event days):** −0.1
+  to −0.5 points, because the event days are about 4% of a year and an annual gain of 0.01 to 0.03
+  would then sit on them; **R3b:** inside ±0.01.
 - **S1:** smooth-cell coverage of H and NH 72 to 88% and within 5 points of G; width ratio 0.6 to
   0.9 for slopes and scale, 0.8 to 1.0 for the capacity share; unlike-neighbours coverage 65 to 80%;
   the planted failure covers 40 to 60%.
@@ -280,22 +310,25 @@ Written before any fit; each line can fail, and none overrides the decision rule
 - **`supported`:** the controls pass; readings (a), (b), (c) pass; R1 and R2 are non-inferior in
   both years with the scored half-width at most 0.025; and the real width ratio of H against H-perm
   is below 1 for heating slopes. Without the last condition the take-home is worded as
-  synthetic-only and the verdict is `partly supported`. - **`partly supported`:** the controls pass
-  and (a) and (b) pass, but R1 or R2 fails in the replicate year only, is undecidable, or the real
-  placebo does not separate H from H-perm. - **`small gain`:** the controls pass, R1 and R2 are
-  non-inferior in both years, and the smooth-cell median width ratio is 0.85 to 0.95 in at least two
-  of the three width families with reading (a) holding. - **`not supported`:** the controls pass, R1
-  and R2 are non-inferior in both years, and either the smooth-cell median width ratio is above 0.95
-  in at least two of the three width families (any interval, so [0.93, 1.01] at a median of 0.97
-  lands here), or the ratio is at most 0.95 but reading (a) fails with coverage still at least 60%
-  or within 10 points of G's (narrowing bought by losing coverage is not support), or only gamma = 0
-  passed the harm bound. - **`refuted`:** the controls pass and either R1 or R2 lies wholly above
-  +0.03 in the scored year, or H's or NH's smooth-cell coverage is under 60% and more than 10 points
-  below G's (at a gamma that passed the harm bound). - **`inconclusive`:** a failed control, or
-  anything else (for example R1 or R2 straddling +0.03 in the scored year).
+  synthetic-only and the verdict is `partly supported`.
+- **`partly supported`:** the controls pass and (a) and (b) pass, but R1 or R2 fails in the
+  replicate year only, is undecidable, or the real placebo does not separate H from H-perm.
+- **`small gain`:** the controls pass, R1 and R2 are non-inferior in both years, and the smooth-cell
+  median width ratio is 0.85 to 0.95 in at least two of the three width families with reading (a)
+  holding.
+- **`not supported`:** the controls pass, R1 and R2 are non-inferior in both years, and either the
+  smooth-cell median width ratio is above 0.95 in at least two of the three width families (any
+  interval, so [0.93, 1.01] at a median of 0.97 lands here), or the ratio is at most 0.95 but
+  reading (a) fails with coverage still at least 60% or within 10 points of G's (narrowing bought by
+  losing coverage is not support), or only gamma = 0 passed the harm bound.
+- **`refuted`:** the controls pass and either R1 or R2 lies wholly above +0.03 in the scored year,
+  or H's or NH's smooth-cell coverage is under 60% and more than 10 points below G's (at a gamma
+  that passed the harm bound).
+- **`inconclusive`:** a failed control, or anything else (for example R1 or R2 straddling +0.03 in
+  the scored year).
 
-**Verdict wording** states the capacity family as synthetic-only. R3 is reported beside the
-verdict and never changes it.
+**Verdict wording** states the capacity family as synthetic-only. R3 and R3b are reported beside the
+verdict and never change it.
 
 ## Substation cards (provisional)
 
@@ -329,14 +362,15 @@ shown; the real graph is shown only as the allowed D-label pairs.
 ## Audit before merge: the seven triggers
 
 1. **A control fails:** any plumbing control, the planted failure not failing, or the power check.
-   2. **A contradiction:** width falling while coverage rises; NH better than both H and N with
-   gamma on a grid edge; H-perm matching H on real widths while the smooth cell shows a gain. 3.
-   **Quantile score against mean error:** R1, R2, or R3 with opposite signs in the two. 4. **Leave
-   one out:** dropping D5–D16, D10–D11, any decision site, or any MVA node flips R1, R2, or a
-   reading. 5. **Nested arms:** NH worse than both N and H; H at gamma 0 not equal to G; gamma at
-   the grid top. 6. **Interval width:** R1 or R2 half-width over twice or under half experiment
-   109's C1 width. 7. **Dependence:** the hierarchy work builds on a positive verdict, so any
-   `supported` or `partly supported` triggers an audit.
+2. **A contradiction:** width falling while coverage rises; NH better than both H and N with gamma
+   on a grid edge; H-perm matching H on real widths while the smooth cell shows a gain.
+3. **Quantile score against mean error:** R1, R2, R3, or R3b with opposite signs in the two.
+4. **Leave one out:** dropping D5–D16, D10–D11, any decision site, or any MVA node flips R1, R2, or
+   a reading.
+5. **Nested arms:** NH worse than both N and H; H at gamma 0 not equal to G; gamma at the grid top.
+6. **Interval width:** R1 or R2 half-width over twice or under half experiment 109's C1 width.
+7. **Dependence:** the hierarchy work builds on a positive verdict, so any `supported` or
+   `partly supported` triggers an audit.
 
 "Checks" bullets in the write-up: median minus mean forecast per site and arm, the mean-forecast
 error beside each contrast, and which triggers fired.
@@ -350,12 +384,11 @@ followed:** none. **Caveats carried over:** the tuning year's capacity vintage i
 after its cut (a small leak, as in 109); the replica spread uses one stale replica year, which gave
 109 an 83% q95 coverage, so tail results are reported with that caveat.
 
-**Order:** (1) module PR; (2) this plan commit; (3) P1 to P5 and the
-timing and standard-error measurement on 10 fleets; (4) the synthetic tuning set and the real
-tuning-year harm bound, choosing gamma and lambda_hol; (5) the gate on 3 sets of 40 fleets;
-(6) scored and replicate years; (7) cards, figures, audit, write-up in the short format of
-the short format, leading with the take-home message. Steps 6 and 7's scored fits are skipped if
-the controls fail.
+**Order:** (1) module PR; (2) this plan commit; (3) P1 to P5 and the timing and standard-error
+measurement on 10 fleets; (4) the synthetic tuning set and the real tuning-year harm bound, choosing
+gamma and lambda_hol; (5) the gate on 3 sets of 40 fleets; (6) scored and replicate years; (7)
+cards, figures, audit, write-up in the short format, leading with the take-home message. Steps 6 and
+7's scored fits are skipped if the controls fail.
 
 **Compute, CPU only: 12 cores across slots B and C (two workers of 6 threads), about 9 to 10 hours
 of wall clock.** Per gate set: smooth 6 arm-cells (G, N, H and NH at two gammas), unlike-neighbours
