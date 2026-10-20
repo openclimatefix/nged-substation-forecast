@@ -647,6 +647,7 @@ def main() -> None:  # noqa: PLR0915
     """Print every number the write-up quotes and write `work/numbers.json`."""
     gate2 = json.loads((common.WORK_DIR / "gate2.json").read_text())
     gate4 = json.loads((common.WORK_DIR / "gate4.json").read_text())
+    gate4b = json.loads((common.WORK_DIR / "gate4b.json").read_text())
     shrunk = shrunk_name()
     print(f"MH-sh multiplier: {shrunk}")
     print_table(
@@ -738,12 +739,11 @@ def main() -> None:  # noqa: PLR0915
         for name in NIGHT_ARMS
     ]
     print_table(title="Night filter-fit controls on winter nights", frame=pl.DataFrame(controls))
-    shares = gate4["shares"]
     powered = {
         "ns_l": None,
-        "ns_u": bool(gate4["gate4_prime"]["a"]),
-        "ns_h": bool(shares["cold:ns_h_beats_b0:winter_night"] >= 0.9),
-        "ns_hw": bool(gate4["gate4_prime"]["b"]),
+        "ns_u": bool(gate4b["a_pass"]),
+        "ns_h": bool(gate4b["c_pass"]),
+        "ns_hw": bool(gate4b["b_pass"]),
     }
     night_labels = {
         name: night_label(row=row, non_inf=non_inf[c.name], powered=powered[name])
@@ -754,7 +754,7 @@ def main() -> None:  # noqa: PLR0915
     index_row = contrast_row(contrast=indexing, level=EXPLORATORY_LEVEL, where=pl.col("bst_night"))
     print_table(title="Indexing contrast (BST nights, 95%)", frame=pl.DataFrame([index_row]))
     index_label = "indexing not identified"
-    if gate4["gate4_prime"]["a"]:
+    if gate4b["a_pass"]:
         index_label = (
             "UTC"
             if index_row["high"] < 0.0
@@ -803,7 +803,11 @@ def main() -> None:  # noqa: PLR0915
     print("\n== Gates ==")
     print(
         json.dumps(
-            {"gate2": gate2, "gate4": {k: v for k, v in gate4.items() if k != "mean_scores"}},
+            {
+                "gate2": gate2,
+                "gate4_first_written": {k: v for k, v in gate4.items() if k != "mean_scores"},
+                "gate4b": gate4b,
+            },
             indent=2,
         )
     )
