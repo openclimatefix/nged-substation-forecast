@@ -56,6 +56,9 @@ WALK_STEP: Final[float] = 0.03
 """Standard deviation of the log random walk per half-hour (experiment 43)."""
 WALK_LOW: Final[float] = 0.5
 WALK_HIGH: Final[float] = 2.0
+MAX_REALISTIC_HOURS: Final[float] = 14 * 24.0
+"""A realistic transfer lasts at most 14 days: one of the 66 events lasts 31 days, and every
+realistic transfer is forecast at an origin every 6 hours until 48 hours after its end."""
 MAX_DONOR_SHARE: Final[float] = 0.8
 """The donor-shaped share never exceeds this part of the donor's power."""
 
@@ -120,11 +123,10 @@ def moved_mw(
     """
     length = int(transfer["end"] - transfer["onset"])
     walk = _walk(length=length, rng=np.random.default_rng(int(transfer["walk_seed"])))
-    if transfer["size"] == "0.5MW":
-        start = HALF_MW
+    if transfer["size_mw"] > 0:
+        start = float(transfer["size_mw"])
     else:
         start = SIZE_FRACTION[transfer["size"]] * float(np.nanmean(receiver_power_mw))
-    start = float(transfer["size_mw"]) if transfer["size_mw"] > 0 else start
     if transfer["shape"] == "flat":
         return start * walk
     donor = np.maximum(np.nan_to_num(donor_power_mw, nan=np.nanmean(donor_power_mw)), 1e-6)
@@ -234,7 +236,7 @@ def draw_set(
                     assert events is not None
                     pick = int(rng.integers(0, len(events.hours)))
                     hours, size, size_mw = (
-                        float(events.hours[pick]),
+                        min(float(events.hours[pick]), MAX_REALISTIC_HOURS),
                         "event",
                         float(events.moved_mw[pick]),
                     )

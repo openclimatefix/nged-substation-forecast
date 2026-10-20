@@ -66,6 +66,19 @@ class YearData:
         """Return each site's residual over the scored year only."""
         return {site: r[self.first : self.stop] for site, r in self.residual_mw.items()}
 
+    def out_of_sample(self) -> dict[str, np.ndarray]:
+        """Return each site's residual on the whole grid with the fit's own training rows removed.
+
+        The rows before the scored year are the frozen fit's in-sample residuals, which a forecast
+        made during the year must not read, so they are `NaN` here.
+        """
+        streams = {}
+        for site, residual in self.residual_mw.items():
+            stream = np.full(len(residual), np.nan)
+            stream[self.first : self.stop] = residual[self.first : self.stop]
+            streams[site] = stream
+        return streams
+
     def noise_mw(self, *, block: int = 1) -> dict[str, float]:
         """Return each site's robust residual scale from rows at or before the cut.
 

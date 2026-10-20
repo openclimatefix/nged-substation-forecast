@@ -283,7 +283,7 @@ def _warm_start(
     *, previous: dict[str, np.ndarray] | None, shift: int
 ) -> dict[str, np.ndarray] | None:
     """Shift the previous window's flows left by `shift` rows, holding the last value."""
-    if previous is None:
+    if previous is None or shift >= len(next(iter(previous.values()))):
         return None
     return {
         name: np.concatenate([flow[shift:], np.full(shift, flow[-1])])

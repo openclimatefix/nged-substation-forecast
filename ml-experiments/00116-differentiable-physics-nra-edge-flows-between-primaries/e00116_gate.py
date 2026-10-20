@@ -8,7 +8,7 @@ transfers of 25% and 40% of the receiving load.
    between 0.8 and 1.25.
 2. **Release:** the causal flow is under 20% of the moved MW at the larger of 6 hours and 10% of
    the duration after the end, counting the 3.5-hour telemetry delay, in at least half the
-   transfers.
+   transfers that the hindsight fit found (recall of at least 0.5).
 3. **Recall:** MW-weighted recall at least 0.77 over 1 day and 0.5 for 6 to 24 hours, and at least
    0.5 over 1 day on the realistic set (set `C1`, fitted on the replicate year's residuals).
 4. **Placebo, out of sample:** the held-out pairs of the replicate year carry under 0.05
@@ -51,6 +51,9 @@ RECALL_OVER_DAY: Final[float] = 0.77
 RECALL_6_TO_24H: Final[float] = 0.5
 RECALL_REALISTIC: Final[float] = 0.5
 RELEASE_SHARE: Final[float] = 0.5
+DETECTED_RECALL: Final[float] = 0.5
+"""Release is read only on transfers the hindsight fit found: a transfer that was never found is not
+released in any useful sense."""
 PLACEBO_LIMIT: Final[float] = 0.05
 GAP_SHARE: Final[float] = 0.5
 RELEASE_FLOOR_HALF_HOURS: Final[int] = 12
@@ -129,7 +132,7 @@ def release_test(*, cache: Any, config: Any, data: Any, paths: Any, transfer: di
 
 def recall_over(*, frame: pl.DataFrame) -> float:
     """Return the MW-weighted recall pooled over transfers."""
-    return float(frame["matched"].sum() / frame["total"].sum())
+    return float(np.sum(frame["matched"].to_numpy()) / np.sum(frame["total"].to_numpy()))
 
 
 def nra_gap() -> dict[str, float]:
@@ -140,7 +143,8 @@ def nra_gap() -> dict[str, float]:
         error=(pl.col("clean") - pl.col("gam") - pl.col("level") - pl.col("anomaly")).abs()
     )
     mean_error = {
-        arm: float(rows.filter(pl.col("arm") == arm)["error"].mean()) for arm in ("a0", "a5", "or")
+        arm: score.column_mean(frame=rows.filter(pl.col("arm") == arm), column="error")
+        for arm in ("a0", "a5", "or")
     }
     gap = mean_error["a0"] - mean_error["or"]
     return {
@@ -165,8 +169,11 @@ def main() -> None:
     frame = pl.DataFrame(results, strict=False)
     gate_rows = frame.filter(pl.col("transfer_id").str.starts_with("G-"), pl.col("size").is_in(BIG))
     realistic_rows = frame.filter(pl.col("transfer_id").str.starts_with("C1-"))
-    ratio = float(gate_rows["ratio"].median())
-    release = float(gate_rows.filter(pl.col("released").is_not_null())["released"].mean())
+    ratio = float(np.median(gate_rows["ratio"].to_numpy()))
+    detected = gate_rows.filter(
+        pl.col("released").is_not_null(), pl.col("recall") >= DETECTED_RECALL
+    )
+    release = float(np.mean(detected["released"].to_numpy())) if detected.height else float("nan")
     recall_day = recall_over(frame=gate_rows.filter(pl.col("duration") == "over 1 day"))
     recall_6_24 = recall_over(frame=gate_rows.filter(pl.col("duration") == "6-24h"))
     recall_real = recall_over(frame=realistic_rows.filter(pl.col("hours") > 24.0))

@@ -207,6 +207,25 @@ valid time, so the 6-hour allowance includes the 3.5-hour delay.
 **Reported, not blocking:** reading 1 on in-sample residuals (injections in the 2023-07-01 cut's
 window, GAM refitted); MW–MVA power curves; one-sided injections at D11 and D16.
 
+## Winter breakdown
+
+**Winter matters most, so every contrast is also read on winter rows.** The best model reaches
+production in about a month, and the network operator first sees it in winter. Three winter scopes
+are defined here, before any scored contrast is read: **winter** is a valid time in November to
+March; a **cold-snap day** is a UTC day whose mean ERA5 temperature at the substation is under 2 °C,
+read within winter; an **evening peak** is a half-hour ending between 16:30 and 20:00 UTC, read
+within winter. C2 and C3 report each contrast on winter rows, on cold-snap days, and on evening
+peaks, with the same paired intervals where the rows are numerous enough, and say "too few days"
+where a scope holds fewer than 10 days or fewer than 30 transfers. A winter loss is a reason to hold
+an arm back even when the annual mean improves, and the verdict text says so; the thresholds of the
+decision rule below do not change.
+
+**The evidence holds few independent winters.** The scored year holds the 2025-26 winter and the
+replicate year the 2024-25 winter, so C2 and C3 have two. The tuning year (the 2023-24 winter)
+carries the gate only, since A4 equals A0 there. Injected transfers are placed anywhere in the year,
+so the winter subset of C3 holds about 5 of the 12 months of each year's transfers, from the same
+two winters. The two series labelled G-c have no winter in the evidence, and the page says so.
+
 ## Planned contrasts
 
 **Three contrasts, Bonferroni-corrected (98.3% intervals from `studies.bootstrap`, resampling whole

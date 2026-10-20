@@ -7,6 +7,7 @@ scores injected transfers. The private interconnection file is read at run time:
 written into this repository, except the two edges the gate and C3 cover.
 """
 
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -26,8 +27,11 @@ EXPERIMENT_ID: Final[int] = 116
 SLUG: Final[str] = "differentiable-physics-nra-edge-flows-between-primaries"
 ROW_SET_ID: Final[str] = "dp_mw_v1"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
-WORK_DIR: Final[Path] = DATA_DIR / "work"
-"""Small result files (fits, tuning, reports); private and never committed."""
+WORK_DIR: Final[Path] = Path(os.environ.get("E00116_WORK_DIR", DATA_DIR / "work"))
+"""Small result files (fits, tuning, reports); private and never committed.
+
+The environment variable `E00116_WORK_DIR` points a trial run at a scratch folder, so that a
+smoke test never writes into the real results."""
 CACHE_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
     / "00106-differentiable-physics-4-all-years-drift-and-recent-level"
@@ -163,3 +167,46 @@ def private_edges() -> tuple[tuple[str, str], ...]:
             }
         )
     )
+
+
+WINTER_MONTHS: Final[tuple[int, ...]] = (11, 12, 1, 2, 3)
+"""Winter is November to March."""
+COLD_SNAP_DAILY_MEAN_C: Final[float] = 2.0
+"""A cold-snap day has a UTC-day mean ERA5 temperature under this, at the substation."""
+EVENING_PEAK_FIRST_END_MINUTES: Final[int] = 16 * 60 + 30
+EVENING_PEAK_LAST_END_MINUTES: Final[int] = 20 * 60
+"""An evening-peak half-hour ends between 16:30 and 20:00 UTC, inclusive."""
+MIN_COLD_SNAP_DAYS: Final[int] = 10
+MIN_WINTER_TRANSFERS: Final[int] = 30
+
+
+def winter_flags(
+    *, cache: FeatureCache, site: str, positions: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Flag grid rows that fall in winter, in an evening peak, and on a cold-snap day.
+
+    Args:
+        cache: The feature cache.
+        site: The substation's label, whose ERA5 temperature defines its cold-snap days.
+        positions: Grid positions.
+
+    Returns:
+        Three boolean arrays: winter (November to March); evening peak and cold snap, each only
+        meaningful within winter, so callers combine them with the winter flag.
+    """
+    ends = cache.end_times
+    month = ends[positions].astype("datetime64[M]").astype(int) % 12 + 1
+    winter = np.isin(month, WINTER_MONTHS)
+    minutes = (ends[positions] - ends[positions].astype("datetime64[D]")) / np.timedelta64(1, "m")
+    evening = (minutes >= EVENING_PEAK_FIRST_END_MINUTES) & (
+        minutes <= EVENING_PEAK_LAST_END_MINUTES
+    )
+    day = ends.astype("datetime64[D]")
+    _, inverse = np.unique(day, return_inverse=True)
+    temperature = cache.sites[site].temperature_c
+    finite = np.isfinite(temperature)
+    totals = np.bincount(inverse, weights=np.where(finite, temperature, 0.0))
+    counts = np.bincount(inverse, weights=finite.astype(float))
+    daily = np.where(counts > 0, totals / np.maximum(counts, 1), np.nan)
+    cold = daily[inverse[positions]] < COLD_SNAP_DAILY_MEAN_C
+    return winter, winter & evening, winter & cold

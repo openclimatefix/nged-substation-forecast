@@ -33,7 +33,7 @@ C3_REAL_ROWS: Final[float] = 0.03
 VERDICT_PATH: Final = common.WORK_DIR / "verdict.json"
 
 
-def c1_summary() -> dict[str, float]:
+def c1_summary() -> dict[str, Any]:
     """Read the seeds of C1 and return the reconstruction share and its interval."""
     frames = [pl.read_parquet(p) for p in sorted((common.WORK_DIR / "c1").glob("seed_*.parquet"))]
     transfers = pl.concat(frames, how="diagonal").filter(pl.col("kind") == "transfer")
@@ -61,7 +61,10 @@ def c1_summary() -> dict[str, float]:
         "lower": float(np.percentile(resampled, tail)),
         "upper": float(np.percentile(resampled, 100.0 - tail)),
         "n_transfers": transfers.height,
-        "clean_year_mae": {arm: float(clean[arm].mean()) for arm in ("a0_inj", "a4_inj", "or_inj")},
+        "clean_year_mae": {
+            arm: score.column_mean(frame=clean, column=arm)
+            for arm in ("a0_inj", "a4_inj", "or_inj")
+        },
     }
 
 

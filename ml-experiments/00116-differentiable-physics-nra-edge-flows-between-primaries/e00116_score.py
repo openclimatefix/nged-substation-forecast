@@ -41,12 +41,16 @@ def quantile_score(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
     return 2.0 * np.mean(np.maximum(levels * error, (levels - 1.0) * error), axis=1)
 
 
-def read_replica(*, year_name: str, arm: str) -> pl.DataFrame:
-    """Read every chunk of an arm's replica forecasts for a scored year."""
-    folder = common.WORK_DIR / "replica"
-    return pl.concat(
-        [pl.read_parquet(path) for path in sorted(folder.glob(f"{year_name}_{arm}_*"))]
-    )
+def read_replica(*, year_name: str, arm: str, own_year: bool = False) -> pl.DataFrame:
+    """Read every chunk of an arm's replica forecasts for a scored year, or its real-data run."""
+    prefix = "real_" if own_year else ""
+    paths = sorted((common.WORK_DIR / "replica").glob(f"{prefix}{year_name}_{arm}_*"))
+    return pl.concat([pl.read_parquet(path) for path in paths])
+
+
+def column_mean(*, frame: pl.DataFrame, column: str) -> float:
+    """Return the mean of a column as a float."""
+    return float(np.mean(frame[column].to_numpy()))
 
 
 def fit_spreads(
@@ -108,8 +112,14 @@ def with_quantiles(
         quantiles = np.sort(spread.quantiles(mean=mean, **common_args), axis=1)
         quantiles_nra = np.sort(spread.quantiles(mean=mean_nra, **common_args), axis=1)
         month = cache.end_times[target].astype("datetime64[M]").astype(int)
+        winter, evening_peak, cold_snap = common.winter_flags(
+            cache=cache, site=node, positions=target
+        )
         out.append(
             part.with_columns(
+                pl.Series("winter", winter),
+                pl.Series("evening_peak", evening_peak),
+                pl.Series("cold_snap", cold_snap),
                 pl.Series("mean", mean),
                 *(pl.Series(c, quantiles[:, k]) for k, c in enumerate(QUANTILE_COLUMNS)),
                 pl.Series(

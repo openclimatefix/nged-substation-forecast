@@ -242,7 +242,7 @@ def injected_streams(
         The streams in megawatts, and the injected megawatts at each of the two ends (positive at
         the receiver, negative at the donor, zero elsewhere), also on the whole grid.
     """
-    streams = {node: r.copy() for node, r in data.residual_mw.items()}
+    streams = {node: r.copy() for node, r in data.out_of_sample().items()}
     onset, end = int(transfer["onset"]), int(transfer["end"])
     scale = {node: data.capacity_mw[node] / data_module.POINTS_PER_CAPACITY for node in data.sites}
     power = {

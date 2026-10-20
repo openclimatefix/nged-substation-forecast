@@ -52,10 +52,27 @@ def injected_cache(
     return replace(cache, sites=sites)
 
 
-def fit_mean(*, cache: FeatureCache, vintages: pl.DataFrame, node: str) -> pl.DataFrame:
-    """Fit arm A0's model at the scored cut on a cache; return its means over window and year."""
+def fit_mean(
+    *, cache: FeatureCache, vintages: pl.DataFrame, node: str, own_rows: bool = False
+) -> pl.DataFrame:
+    """Fit arm A0's model at the scored cut on a cache; return its means over window and year.
+
+    Args:
+        cache: The cache, whose power may carry injected transfers.
+        vintages: The real-time capacity vintages.
+        node: The substation.
+        own_rows: True to train on the cache's own `default_rows` (the oracle's masked rows)
+            instead of every row outside the lockdown window.
+
+    Returns:
+        The fit's mean over the training window and the scored year.
+    """
     return gam.fit_job(
-        cache=cache, vintages=vintages, arm="a0", site=node, cut=common.CUTS[CUT_NAME]
+        cache=cache,
+        vintages=vintages,
+        arm="a1" if own_rows else "a0",
+        site=node,
+        cut=common.CUTS[CUT_NAME],
     )
 
 
@@ -161,12 +178,13 @@ def run_seed(*, seed: int) -> pl.DataFrame:
     )
     oracle_sites = dict(injected.sites)
     for node in common.GATE_SITES:
-        keep = oracle_sites[node].default_rows & (added[node] == 0.0)
+        features = oracle_sites[node]
+        keep = features.in_pool & ~features.lockdown & (added[node] == 0.0)
         oracle_sites[node] = replace(oracle_sites[node], default_rows=keep)
     oracle_cache = replace(injected, sites=oracle_sites)
     for node in common.GATE_SITES:
         a4 = fit_mean(cache=refit_cache, vintages=vintages, node=node)
-        oracle = fit_mean(cache=oracle_cache, vintages=vintages, node=node)
+        oracle = fit_mean(cache=oracle_cache, vintages=vintages, node=node, own_rows=True)
         rows.append(
             {
                 "kind": "clean_year",
@@ -175,20 +193,20 @@ def run_seed(*, seed: int) -> pl.DataFrame:
                 "a0_inj": clean_error(
                     frame=fits[node],
                     clean_y=clean_y[node],
-                    first=data.stop,
-                    stop=data.stop + common.HALF_HOURS_PER_YEAR,
+                    first=data.first,
+                    stop=data.stop,
                 ),
                 "a4_inj": clean_error(
                     frame=a4,
                     clean_y=clean_y[node],
-                    first=data.stop,
-                    stop=data.stop + common.HALF_HOURS_PER_YEAR,
+                    first=data.first,
+                    stop=data.stop,
                 ),
                 "or_inj": clean_error(
                     frame=oracle,
                     clean_y=clean_y[node],
-                    first=data.stop,
-                    stop=data.stop + common.HALF_HOURS_PER_YEAR,
+                    first=data.first,
+                    stop=data.stop,
                 ),
             }
         )

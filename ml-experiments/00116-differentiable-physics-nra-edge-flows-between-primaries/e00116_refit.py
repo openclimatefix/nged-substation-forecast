@@ -85,7 +85,7 @@ def _worker(job: tuple[str, str]) -> str:
     target = job_path(site=site, cut=cut)
     if target.exists():
         return f"skip {target.name}"
-    key = ("cache", cut_name)
+    key = f"cache:{cut_name}"
     if key not in _STATE:
         base = common.load_cache()
         _STATE[key] = (base, flow_free_cache(cache=base, cut_name=cut_name))

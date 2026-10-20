@@ -40,7 +40,9 @@ def tails(*, rows: pl.DataFrame) -> list[dict[str, Any]]:
         entry: dict[str, Any] = {"arm": arm}
         for column, level in TAIL_LEVELS.items():
             error = part["actual"] - part[column]
-            entry[f"coverage_{column}"] = float((part["actual"] <= part[column]).mean())
+            entry[f"coverage_{column}"] = float(
+                np.mean(part["actual"].to_numpy() <= part[column].to_numpy())
+            )
             entry[f"pinball_{column}"] = float(
                 np.mean(np.maximum(level * error.to_numpy(), (level - 1.0) * error.to_numpy()))
             )
@@ -55,7 +57,9 @@ def receiver_exceedance(*, rows: pl.DataFrame) -> dict[str, float]:
         part = rows.filter(pl.col("arm") == arm, pl.col("role") == "receiver")
         for label, scope in (("inside", part["in_event"]), ("after", ~part["in_event"])):
             chosen = part.filter(scope)
-            out[f"{arm}_{label}"] = float((chosen["actual"] > chosen["q99"]).mean())
+            out[f"{arm}_{label}"] = float(
+                np.mean(chosen["actual"].to_numpy() > chosen["q99"].to_numpy())
+            )
     return out
 
 
@@ -145,6 +149,18 @@ def analyse(*, cache: FeatureCache, year_name: str) -> dict[str, Any]:
     gain = -contrasts["or_minus_a4"]["estimate"]
     gap_closed = -contrasts["a5_minus_a4"]["estimate"] / gain if gain > 0 else float("nan")
     first_day = rows.filter(pl.col("in_event"))
+    winter = {}
+    for scope in ("winter", "cold_snap", "evening_peak"):
+        chosen = rows.filter(pl.col(scope))
+        n_transfers = chosen["transfer_id"].n_unique() if chosen.height else 0
+        winter[scope] = {
+            "too_few": n_transfers < common.MIN_WINTER_TRANSFERS,
+            "a5_minus_a4": score.paired_contrast(
+                rows=chosen, treatment="a5", reference="a4", metric="score"
+            )
+            if n_transfers
+            else None,
+        }
     return {
         "year": year_name,
         "contrasts": contrasts,
@@ -154,11 +170,12 @@ def analyse(*, cache: FeatureCache, year_name: str) -> dict[str, Any]:
         * in_event_share(cache=cache, year_name=year_name),
         "sites": sites_improving(rows=rows),
         "absolute": {
-            arm: float(rows.filter(pl.col("arm") == arm)["score"].mean())
+            arm: score.column_mean(frame=rows.filter(pl.col("arm") == arm), column="score")
             for arm in ("a0", "a4", "a5", "or")
         },
         "tails": tails(rows=rows),
         "receiver_q99_exceedance": receiver_exceedance(rows=rows),
+        "winter_scopes": winter,
         "in_event_only": {
             "a5_minus_a4": score.paired_contrast(
                 rows=first_day, treatment="a5", reference="a4", metric="score"

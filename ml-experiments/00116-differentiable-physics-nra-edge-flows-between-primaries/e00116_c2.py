@@ -119,6 +119,7 @@ def arm_losses(
     quantiles = np.sort(quantiles, axis=1)
     features = cache.sites[site]
     time = cache.end_times[index]
+    winter, evening_peak, cold_snap = common.winter_flags(cache=cache, site=site, positions=index)
     d10_jump = np.zeros(len(index), dtype=bool)
     if site == "D10":
         for start, stop in common.D10_JUMP_WINDOWS:
@@ -136,6 +137,9 @@ def arm_losses(
             "score": score.quantile_score(actual=y, quantiles=quantiles),
             "abs_error": np.abs(y - corrected),
             "signed_error": y - corrected,
+            "winter": winter,
+            "evening_peak": evening_peak,
+            "cold_snap": cold_snap,
             "in_event": features.switching_mask[index],
             "jump_window": d10_jump,
             **{c: quantiles[:, k] for k, c in enumerate(QUANTILE_COLUMNS)},
@@ -144,8 +148,14 @@ def arm_losses(
 
 
 def hyper_for(*, cache: FeatureCache, arm: str) -> dict[str, FilterHyperparameters]:
-    """Return an arm's hyperparameters: A4 shares A0's, which are fitted on the same stream."""
-    return causal.fit_hyper(cache=cache, arm="a1" if arm == "a1" else "a0")
+    """Return an arm's hyperparameters: A4 shares A0's, which are fitted on the same stream.
+
+    A site with no tuning-year residuals (D9 starts after the tuning year) gets the mean of the
+    other sites' hyperparameters, which is the prior mean of the empirical-Bayes fit.
+    """
+    fitted = causal.fit_hyper(cache=cache, arm="a1" if arm == "a1" else "a0")
+    mean = np.mean([hyper.as_array() for hyper in fitted.values()], axis=0)
+    return {site: fitted.get(site, FilterHyperparameters.from_array(values=mean)) for site in SITES}
 
 
 def contrast(
@@ -160,10 +170,9 @@ def contrast(
         .group_by("site")
         .agg((pl.col(treatment) - pl.col(reference)).mean().alias("difference"))
     )
-    difference = (
-        losses.filter(pl.col("arm") == treatment)[metric].mean()
-        - losses.filter(pl.col("arm") == reference)[metric].mean()
-    )
+    difference = score.column_mean(
+        frame=losses.filter(pl.col("arm") == treatment), column=metric
+    ) - score.column_mean(frame=losses.filter(pl.col("arm") == reference), column=metric)
     return {
         "difference": float(difference),
         "lower": lower,
@@ -197,6 +206,9 @@ def main() -> None:
         for label, filters in {
             "outside_events": (~pl.col("in_event")),
             "outside_events_and_jump_windows": (~pl.col("in_event")) & (~pl.col("jump_window")),
+            "winter": (~pl.col("in_event")) & pl.col("winter"),
+            "winter_cold_snap": (~pl.col("in_event")) & pl.col("cold_snap"),
+            "winter_evening_peak": (~pl.col("in_event")) & pl.col("evening_peak"),
             "all_rows": pl.lit(True),
         }.items():
             scope = losses.filter(
@@ -215,8 +227,19 @@ def main() -> None:
                 "a4_minus_a0_mean_error": contrast(
                     losses=scope, treatment="a4", reference="a0", metric="abs_error"
                 ),
+                "days": {
+                    "winter_days": int(scope.filter(pl.col("winter"))["time"].dt.date().n_unique()),
+                    "cold_snap_days": int(
+                        scope.filter(pl.col("cold_snap"))["time"].dt.date().n_unique()
+                    ),
+                    "too_few_cold_snap_days": int(
+                        scope.filter(pl.col("cold_snap"))["time"].dt.date().n_unique()
+                    )
+                    < common.MIN_COLD_SNAP_DAYS,
+                },
                 "absolute": {
-                    arm: float(scope.filter(pl.col("arm") == arm)["score"].mean()) for arm in ARMS
+                    arm: score.column_mean(frame=scope.filter(pl.col("arm") == arm), column="score")
+                    for arm in ARMS
                 },
             }
     score.write_json(path=RESULT_PATH, payload=results)

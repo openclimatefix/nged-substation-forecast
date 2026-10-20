@@ -264,7 +264,7 @@ def run_replica(
     )
     cutoffs = [int(position) - causal.DELAY_HALF_HOURS for position in window[at_nine]]
     cutoffs = cutoffs[chunk::n_chunks]
-    streams = dict(data.residual_mw)
+    streams = data.out_of_sample()
     if arm == "a5":
         forecasts = causal.causal_forecasts(
             context=context, streams_mw=streams, nodes=REPLICA_NODES, cutoffs=cutoffs
