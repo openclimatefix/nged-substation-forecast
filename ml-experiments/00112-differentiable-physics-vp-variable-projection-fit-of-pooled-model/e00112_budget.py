@@ -37,6 +37,17 @@ def main() -> None:
     hours: dict[str, float] = defaultdict(float)
     for key, record in records.items():
         hours[kind_of(key)] += float(record.get("seconds", 0.0)) / 3600.0
+    diagnostics = common.WORK_DIR / "gate_diagnostics.json"
+    if diagnostics.exists():
+        entries = json.loads(diagnostics.read_text()).values()
+        hours["gate diagnostics"] = (
+            sum(float(e.get("seconds", 0.0)) for e in entries if isinstance(e, dict)) / 3600.0
+        )
+    ladder = common.WORK_DIR / "ladder_objectives.json"
+    if ladder.exists():
+        hours["ladder"] = (
+            sum(float(v["seconds"]) for v in json.loads(ladder.read_text()).values()) / 3600.0
+        )
     total = sum(hours.values())
     for kind, value in sorted(hours.items(), key=lambda item: -item[1]):
         print(f"{kind:14}{value:7.2f} h")

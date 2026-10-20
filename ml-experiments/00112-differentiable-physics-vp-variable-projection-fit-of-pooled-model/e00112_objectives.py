@@ -46,6 +46,19 @@ def p_map_105_objective(*, cache, batch, settings) -> float:  # noqa: ANN001
         return float(vp_objective(model=model, batch=batch, settings=settings))
 
 
+def weight_sizes(*, model: PooledDemandModel) -> dict[str, float]:
+    """Return the sizes of the linear coefficients that an exact solve can drive large."""
+    out = {
+        "largest_holiday": float(model.holiday.abs().max()),
+        "largest_harmonic": float(model.harmonic_coef.abs().max()),
+        "largest_tent": float(model.tent_coef.abs().max()),
+        "largest_shape": float(model.shapes.abs().max()),
+    }
+    if model.interaction is not None:
+        out["network_last_layer_norm"] = float(list(model.interaction.parameters())[-2].norm())
+    return out
+
+
 def main() -> None:
     """Write `work/objectives.json`."""
     cache = common.load_cache()
@@ -66,8 +79,19 @@ def main() -> None:
     settings = common.vp_settings(cut=common.FINAL_CUT, round_name="round2")
     key = common.FINAL_CUT.date().isoformat()
     out[key]["p_map_105"] = p_map_105_objective(cache=cache, batch=batch, settings=settings)
+    weights: dict[str, dict[str, float]] = {}
+    for name, network in (
+        ("vp_p_s0", True),
+        ("vp_p_s1", True),
+        ("p_map_same", True),
+        ("vp_p_nonet_s0", False),
+    ):
+        loaded = vp.load_fit(name=name, cut=common.FINAL_CUT, batch=batch, network=network)
+        weights[name] = weight_sizes(model=loaded)
+        print("weights", name, weights[name], flush=True)
     for key, values in out.items():
         print(key, {name: round(value) for name, value in values.items()}, flush=True)
+    out["weights_2025-07-01"] = weights  # ty: ignore[invalid-assignment]
     common.write_json(name="objectives.json", payload=out)
 
 

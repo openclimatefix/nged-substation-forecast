@@ -19,7 +19,7 @@ import contextlib
 import io
 import json
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Final
 
@@ -361,6 +361,89 @@ def print_checks(*, arms: dict[str, pl.DataFrame]) -> None:
         print(f"{name:16}", {site: round(value, 2) for site, value in gap.iter_rows()})
 
 
+BLOWUP_POINTS: Final[float] = 30.0
+"""A day on which an arm's mean median forecast error over the five sites exceeds this is listed."""
+EASTER_DAYS: Final[list[date]] = [
+    date(2026, 3, 28),
+    date(2026, 3, 29),
+    date(2026, 4, 3),
+    date(2026, 4, 6),
+]
+"""The four days around Easter 2026 on which the VP-P forecast was 75 to 280 points too high.
+
+The numbers audit found them; excluding them is a post hoc robustness check, not a planned one.
+"""
+BLOWUP_ARMS: Final[tuple[str, ...]] = (
+    "vp_p",
+    "vp_p_s1",
+    "vp_onb4w",
+    "vp_p_nonet",
+    "p_map_same",
+    "g_2y",
+)
+
+
+def blowup_days(*, arms: dict[str, pl.DataFrame]) -> list:
+    """Print the days on which an arm's forecast is far off, and return their dates.
+
+    For each arm, the error of a day is the mean over the five decision substations of the median
+    forecast minus the actual, in points of effective capacity. A day is listed when any listed arm
+    exceeds `BLOWUP_POINTS` in absolute value.
+    """
+    table = {}
+    for name in BLOWUP_ARMS:
+        if name not in arms:
+            continue
+        frame = arms[name].filter(pl.col("site").is_in(common.ELIGIBLE_SITES))
+        daily = frame.group_by(pl.col("valid_time").dt.date().alias("day")).agg(
+            (pl.col("q50") - pl.col("actual")).mean().alias("error")
+        )
+        table[name] = dict(daily.iter_rows())
+    days = sorted(
+        {d for errors in table.values() for d, e in errors.items() if abs(e) > BLOWUP_POINTS}
+    )
+    print(f"\n== Days with an error over {BLOWUP_POINTS:.0f} points (five-site mean error) ==")
+    for day in days:
+        cells = {name: round(errors.get(day, float("nan")), 1) for name, errors in table.items()}
+        print(day, cells)
+    if not days:
+        print("none")
+    return days
+
+
+def print_excluding_days(*, arms: dict[str, pl.DataFrame], days: list, out: dict) -> None:
+    """Print the planned contrasts and the start spread with the listed days left out (post hoc)."""
+    if not days:
+        return
+    keep = ~pl.col("valid_time").dt.date().is_in(days)
+    print(f"\n== Post hoc: the same contrasts without the {len(days)} listed days ==")
+    for label, treatment, reference, which in PLANNED[:2]:
+        if treatment in arms and reference in arms:
+            sites = {"five": common.ELIGIBLE_SITES, "six": common.SCORED_SITES}[which]
+            result = contrast(
+                arms=arms,
+                treatment=treatment,
+                reference=reference,
+                sites=sites,
+                level=BONFERRONI_LEVEL,
+                where=keep,
+            )
+            out[f"{label} without the listed days"] = result
+            print(f"{label}: {fmt(result)}")
+    if "vp_p_s0" in arms and "vp_p_s1" in arms:
+        five = arms["vp_p_s0"].filter(pl.col("site").is_in(common.ELIGIBLE_SITES)).filter(keep)
+        other = arms["vp_p_s1"].filter(pl.col("site").is_in(common.ELIGIBLE_SITES)).filter(keep)
+        spread = abs(
+            float(five["score"].to_numpy().mean()) - float(other["score"].to_numpy().mean())
+        )
+        print(f"VP-P start spread without the listed days: {spread:.3f}")
+    for name in ("vp_p", "p_map_same"):
+        if name in arms:
+            part = arms[name].filter(pl.col("site").is_in(common.ELIGIBLE_SITES)).filter(keep)
+            mean_score = float(part["score"].to_numpy().mean())
+            print(f"{name} five-site score without the listed days: {mean_score:.3f}")
+
+
 def report_year(*, year: str, ids: dict[int, str]) -> dict:
     """Print the report of one year and return its planned contrasts."""
     all_rows = load_year(year=year, ids=ids)
@@ -409,6 +492,8 @@ def report_year(*, year: str, ids: dict[int, str]) -> dict:
         )
     print_tails(arms=arms)
     print_checks(arms=arms)
+    days = blowup_days(arms=arms)
+    print_excluding_days(arms=arms, days=EASTER_DAYS if year == "scored" else days, out=out)
     if "g_all" in arms:
         five = arms["g_all"].filter(pl.col("site").is_in(common.ELIGIBLE_SITES))
         score = float(five["score"].to_numpy().mean())
@@ -525,6 +610,11 @@ def print_v1_in_nats() -> None:
         "\n######## V1 in nats (the VP objective, one function, same rows and noise scale) ########"
     )
     for cut, values in objectives.items():
+        if cut.startswith("weights_"):
+            print(f"\nSizes of the linear coefficients and the network's last layer ({cut}):")
+            for name, sizes in values.items():
+                print(name, {k: round(v, 1) for k, v in sizes.items()})
+            continue
         print(cut, {name: round(value) for name, value in values.items()})
         if "vp_p_s0" in values and "p_map_same" in values:
             low = min(values.get("vp_p_s0", 1e99), values.get("vp_p_s1", 1e99))

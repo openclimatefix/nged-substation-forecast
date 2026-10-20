@@ -22,6 +22,7 @@ at the five decision sites.
 
 import argparse
 import json
+import time
 from datetime import datetime
 from typing import Final
 
@@ -105,6 +106,17 @@ def equivalence_model(*, batch: PooledBatch, override: torch.Tensor, threshold: 
     return model
 
 
+def record_ladder(*, site: str, cut: datetime, objectives: dict, seconds: float) -> None:
+    """Store a site's objectives by threshold start and the seconds the fits took."""
+    path = common.WORK_DIR / "ladder_objectives.json"
+    table = json.loads(path.read_text()) if path.exists() else {}
+    table[f"{site}__{cut.date().isoformat()}"] = {
+        "objectives": {str(k): v for k, v in objectives.items()},
+        "seconds": seconds,
+    }
+    common.write_json(name="ladder_objectives.json", payload=table)
+
+
 def fit_site(*, cache: FeatureCache, site: str, cut: datetime, sigma: float):  # noqa: ANN201
     """Fit L1 for one substation from every threshold start; return the lowest-objective model."""
     batch = common.pooled_batch_for(
@@ -119,6 +131,7 @@ def fit_site(*, cache: FeatureCache, site: str, cut: datetime, sigma: float):  #
     settings = VpSettings(noise_sd=sigma, deviation=WEAK_DEVIATION_SCALE)
     best = None
     objectives = {}
+    started = time.perf_counter()
     for threshold in THRESHOLD_STARTS_C:
         model = equivalence_model(batch=batch, override=override, threshold=threshold)
         result = fit_pooled_vp(
@@ -132,7 +145,9 @@ def fit_site(*, cache: FeatureCache, site: str, cut: datetime, sigma: float):  #
         if best is None or result.objective < best[1].objective:
             best = (model, result, batch)
     assert best is not None
+    seconds = time.perf_counter() - started
     print(f"L1 {site} at {cut.date()}: objectives by start {objectives}", flush=True)
+    record_ladder(site=site, cut=cut, objectives=objectives, seconds=seconds)
     return best
 
 
