@@ -180,16 +180,20 @@ SLOW_SMOOTHING_COLUMNS: Final[tuple[int, ...]] = (2, 3)
 """The columns of `SMOOTHING_HOURS` (72 and 168 hours) that `slow_heating_only` keeps."""
 N_MONTHS: Final[int] = 12
 """Months of the year, for the solar climatology of the anomaly form."""
-NODE_TIE_RATIO: Final[float] = 100.0
-"""The weight of the quadratic tie between a node level's daily change and its two step parts,
-as a multiple of the linear cost of a point of step.
+NODE_TIE_RATIO: Final[float] = 10000.0
+"""The weight of the quadratic tie between a node level's change and its two step parts.
 
-With cost `c` per point of step and tie weight `w`, the steps carry the level's daily change less
-`c / (2 w)` points, so a ratio of 100 lets a step of 0.005 points go uncharged. A larger ratio
-makes the system worse conditioned.
+The weight is this multiple of the linear cost of a point of step.
+
+With cost `c` per point of step and tie weight `w`, the steps carry a block-to-block change in level
+less `c / (2 w)` points. At a ratio of 10,000 a change of 0.00005 points goes uncharged, so a slow
+ramp of the level costs about as much as one step of the same total size. A larger ratio makes the
+system worse conditioned.
 """
 NODE_RIDGE: Final[float] = 1e-3
 """A tiny ridge on the node's columns, which keeps the step columns (with no design) well posed."""
+DEFAULT_MAX_ITERATIONS: Final[int] = 500
+"""The most pivoting iterations `solve_bounded_quadratic` makes by default."""
 NODE_MAX_ITERATIONS: Final[int] = 20000
 """The most pivoting iterations of a fit with a node, whose many step columns sit at their bound."""
 NODE_NEGATIVE_TOLERANCE: Final[float] = 1e-6
@@ -229,17 +233,21 @@ class ClipSpec:
 class NodeSpec:
     """The penalties of the unmetered generator node.
 
+    The costs do not depend on the length of the training window, so the same penalties mean the
+    same thing at every cut. An outage's evidence (the rows it covers times its depth squared) is
+    fixed, and so are the costs of the steps that make it.
+
     Attributes:
-        step_penalty: The linear cost of each point of daily step, per training site-year.
-        level_penalty: The linear cost of each point of level, per training site-year, which
-            settles the level that the profile also explains.
+        step_penalty: The linear cost of each point of step, in the units of the squared error.
+        level_penalty: The linear cost of each point of level for each day it lasts. It settles
+            the level that the profile also explains, so it can be small.
         step_days: The length of one level block in days. Each block is one more unknown with a
             tie and two step parts, so a longer block makes the fit smaller and faster, and cannot
             resolve an outage shorter than the block.
     """
 
     step_penalty: float = 300.0
-    level_penalty: float = 1.0
+    level_penalty: float = 0.03
     step_days: int = 1
 
     def __post_init__(self) -> None:
@@ -306,7 +314,8 @@ class GamSpec:
         Raises:
             ValueError: If `final_knot_shrink` is outside 0 to 1, `final_knot` is not `free` while
                 `drift` is `none`, the anomaly form is asked for with a pinned capacity, a clip
-                is asked for without a pinned capacity, or the orthogonal penalty is negative.
+                is asked for without a pinned capacity, the orthogonal penalty is negative, or a
+                node is asked for without drift.
         """
         if not 0.0 <= self.final_knot_shrink <= 1.0:
             msg = f"final_knot_shrink must be between 0 and 1, not {self.final_knot_shrink}"
@@ -324,6 +333,12 @@ class GamSpec:
             raise ValueError(msg)
         if self.orthogonal_penalty < 0.0:
             msg = f"orthogonal_penalty must not be negative, not {self.orthogonal_penalty}"
+            raise ValueError(msg)
+        if self.node is not None and self.drift == "none":
+            msg = (
+                "the node needs a drift term beside it: a non-negative step path on a base with no "
+                "drift absorbs any fall in demand"
+            )
             raise ValueError(msg)
 
 
@@ -480,6 +495,28 @@ def derated_unit_shape(*, features: SiteFeatures, index: np.ndarray) -> np.ndarr
     )
 
 
+def calendar_cell(
+    *, cache: FeatureCache, index: np.ndarray, kind: Literal["month", "quarter"]
+) -> np.ndarray:
+    """Return the calendar cell of each row: its local month or quarter times 48 plus its half-hour.
+
+    Args:
+        cache: The cache.
+        index: Row positions on the grid.
+        kind: `month` for the 12 months of the anomaly form's climatology, `quarter` for the 4
+            quarters of the covariance penalty.
+
+    Returns:
+        The cell: 48 times the month or quarter plus the half-hour, so 576 cells for months and 192
+        for quarters.
+    """
+    if kind == "month":
+        period = _month_index(cache=cache, index=index)
+    else:
+        period = cache.calendar.quarter[index].astype(np.int64)
+    return period * HALF_HOURS_PER_DAY + cache.calendar.half_hour[index].astype(np.int64)
+
+
 def _month_index(*, cache: FeatureCache, index: np.ndarray) -> np.ndarray:
     """Return the local month of the rows, 0 for January to 11 for December."""
     months = cache.calendar.local_date[index].astype("datetime64[M]").astype(np.int64)
@@ -521,9 +558,7 @@ def month_half_hour_mean(
         An array of shape (12, 48); a cell with no row is 0.
     """
     shape = derated_unit_shape(features=features, index=index)
-    cell = _month_index(cache=cache, index=index) * HALF_HOURS_PER_DAY + cache.calendar.half_hour[
-        index
-    ].astype(np.int64)
+    cell = calendar_cell(cache=cache, index=index, kind="month")
     n_cells = N_MONTHS * HALF_HOURS_PER_DAY
     totals = np.bincount(cell, weights=shape, minlength=n_cells)
     counts = np.bincount(cell, minlength=n_cells)
@@ -623,9 +658,7 @@ def design_matrix(
     years = np.array(layout.season_years)
     x[:, layout.slices["capacity"]] = -shape[:, None] * (season[:, None] >= years[None, :])
     if "climatology" in layout.slices:
-        cell = _month_index(cache=cache, index=index) * HALF_HOURS_PER_DAY + calendar.half_hour[
-            index
-        ].astype(np.int64)
+        cell = calendar_cell(cache=cache, index=index, kind="month")
         x[rows, layout.slices["climatology"].start + cell] = -1.0
     if "node_level" in layout.slices:
         block = node_step_index(cache=cache, layout=layout, index=index)
@@ -700,18 +733,16 @@ def penalty_matrix(*, layout: GamLayout, n_rows: int) -> tuple[np.ndarray, np.nd
         matrix[block, block] = 1e-6 * np.eye(block.stop - block.start)
         cost[block] = spec.step_penalty * scale
     if spec.node is not None:
-        _add_node_penalty(matrix=matrix, cost=cost, layout=layout, scale=scale)
+        _add_node_penalty(matrix=matrix, cost=cost, layout=layout)
     return matrix, cost
 
 
-def _add_node_penalty(
-    *, matrix: np.ndarray, cost: np.ndarray, layout: GamLayout, scale: float
-) -> None:
+def _add_node_penalty(*, matrix: np.ndarray, cost: np.ndarray, layout: GamLayout) -> None:
     """Add the node's tie, ridge, and linear costs to the penalty `matrix` and `cost` in place.
 
     The tie `NODE_TIE_RATIO * c * (g_d - g_(d-1) - up_d + down_d)^2` makes the two step parts carry
     the level's change from one block to the next, and the linear cost on the steps then charges its
-    absolute value.
+    absolute value. The costs are not scaled by the number of training rows (see `NodeSpec`).
     """
     node = layout.spec.node
     if node is None:
@@ -722,16 +753,27 @@ def _add_node_penalty(
     down = layout.slices["node_down"]
     for block in (level, up, down):
         matrix[block, block] += NODE_RIDGE * np.eye(block.stop - block.start)
-    cost[level] += node.level_penalty * scale
-    cost[up] += node.step_penalty * scale
-    cost[down] += node.step_penalty * scale
-    for day in range(1, layout.n_node_steps):
-        tie = np.zeros(layout.n_columns)
-        tie[level.start + day] = 1.0
-        tie[level.start + day - 1] = -1.0
-        tie[up.start + day] = -1.0
-        tie[down.start + day] = 1.0
-        matrix += NODE_TIE_RATIO * node.step_penalty * scale * np.outer(tie, tie)
+    cost[level] += node.level_penalty * node.step_days
+    cost[up] += node.step_penalty
+    cost[down] += node.step_penalty
+    blocks = np.arange(1, layout.n_node_steps)
+    columns = np.stack(
+        [
+            level.start + blocks,
+            level.start + blocks - 1,
+            up.start + blocks,
+            down.start + blocks,
+        ]
+    )
+    signs = np.array([1.0, -1.0, -1.0, 1.0])
+    weight = NODE_TIE_RATIO * node.step_penalty
+    for first in range(4):
+        for second in range(4):
+            np.add.at(
+                matrix,
+                (columns[first], columns[second]),
+                weight * signs[first] * signs[second],
+            )
 
 
 def training_rows(
@@ -825,7 +867,7 @@ def assert_before_holdout(*, cache: FeatureCache, index: np.ndarray) -> None:
         raise ValueError(msg)
 
 
-def _chunks(*, index: np.ndarray) -> Iterator[slice]:
+def row_chunks(*, index: np.ndarray) -> Iterator[slice]:
     """Yield consecutive slices of `index` of at most `CHUNK_ROWS` rows."""
     for start in range(0, len(index), CHUNK_ROWS):
         yield slice(start, min(start + CHUNK_ROWS, len(index)))
@@ -840,11 +882,11 @@ def clipped_pv(*, unclipped: np.ndarray, p_max: float, beta: float) -> np.ndarra
         beta: The sharpness, per point.
 
     Returns:
-        The clipped output: `x` far below the ceiling, and `P_max` far above it.
+        The clipped output, never below zero: `x` far below the ceiling, and `P_max` far above it.
     """
     if np.isinf(p_max):
         return unclipped
-    return p_max - np.logaddexp(0.0, beta * (p_max - unclipped)) / beta
+    return np.maximum(p_max - np.logaddexp(0.0, beta * (p_max - unclipped)) / beta, 0.0)
 
 
 def pinned_solar_points(
@@ -922,7 +964,7 @@ def accumulate_gram(
     gram = torch.zeros((batch, p, p), dtype=dtype, device=device)
     rhs = torch.zeros((batch, p), dtype=dtype, device=device)
     weight_tensor = torch.as_tensor(weights, dtype=dtype, device=device)
-    for chunk in _chunks(index=index):
+    for chunk in row_chunks(index=index):
         rows = index[chunk]
         x = torch.as_tensor(
             design_matrix(cache=cache, features=features, layout=layout, index=rows),
@@ -963,7 +1005,7 @@ def solve_bounded_quadratic(
     matrix: torch.Tensor,
     rhs: torch.Tensor,
     constrained: torch.Tensor,
-    max_iterations: int = 500,
+    max_iterations: int = DEFAULT_MAX_ITERATIONS,
     tolerance: float | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Minimise `theta^T A theta - 2 b^T theta` with `theta_j >= 0` where `constrained[j]`.
@@ -1219,7 +1261,8 @@ def fit_gam(
 ) -> GamFit:
     """Fit the convex model of one substation, for one or more penalty sets or weightings.
 
-    All `specs` must share a drift form, a capacity mode, a COVID flag, and a final-knot mode. The
+    All `specs` must share a drift form, a capacity mode, a COVID flag, a final-knot mode, a solar
+    form, the harmonics and heating options, a clip, and a node block length. The
     Gram matrix is built once and each batch member adds its own penalty, so a grid of penalties
     costs one pass over the rows. Give either several `specs` and no `weights`, or one spec and
     `weights`.
@@ -1241,9 +1284,9 @@ def fit_gam(
         The fitted batch.
 
     Raises:
-        ValueError: If the specs differ in drift form, capacity mode, COVID flag, or final knot,
-            the batch sizes do not match, the pinned capacity is missing, unexpected or built for
-            another cut, or no row can train.
+        ValueError: If the specs differ in any of the structure fields above, the batch sizes do
+            not match, the pinned capacity is missing, unexpected or built for another cut, or no
+            row can train.
     """
     features = cache.sites[site]
     structure = {
@@ -1310,7 +1353,7 @@ def fit_gam(
             specs=specs,
             gram=gram,
             matrix=orthogonal_penalty_matrix(
-                cache=cache, features=features, layout=layout, index=index
+                cache=cache, features=features, layout=layout, index=index, weights=weights
             ),
             dtype=dtype,
             device=device,
@@ -1319,7 +1362,9 @@ def fit_gam(
         matrix=gram + penalty,
         rhs=rhs - 0.5 * linear,
         constrained=torch.as_tensor(layout.constrained),
-        max_iterations=NODE_MAX_ITERATIONS if specs[0].node is not None else 500,
+        max_iterations=(
+            NODE_MAX_ITERATIONS if specs[0].node is not None else DEFAULT_MAX_ITERATIONS
+        ),
     )
     return GamFit(
         layout=layout,
@@ -1407,7 +1452,7 @@ def predict_gam(
         theta = np.where(columns, theta, 0.0)
         free_theta = np.where(columns, free_theta, 0.0)
     after_cut = cache.end_times > naive_utc(moment=fit.cut)
-    for chunk in _chunks(index=index):
+    for chunk in row_chunks(index=index):
         rows = index[chunk]
         x = design_matrix(cache=cache, features=features, layout=layout, index=rows)
         capacity = layout.slices["capacity"]
@@ -1452,7 +1497,12 @@ def _forecast_theta(*, fit: GamFit, member: int) -> np.ndarray:
 
 
 def orthogonal_penalty_matrix(
-    *, cache: FeatureCache, features: SiteFeatures, layout: GamLayout, index: np.ndarray
+    *,
+    cache: FeatureCache,
+    features: SiteFeatures,
+    layout: GamLayout,
+    index: np.ndarray,
+    weights: np.ndarray | None = None,
 ) -> np.ndarray:
     """Return `sum cov(term, u)^2` as a quadratic form in the coefficients.
 
@@ -1461,47 +1511,53 @@ def orthogonal_penalty_matrix(
     the block's contribution `x_block theta` with the derated unit shape `u` is linear in theta:
     `c theta`, with `c = mean(u x_block) - mean(u) mean(x_block)` over the cell's rows. The matrix
     is the sum of `c^T c` over blocks and cells, so the penalty keeps the fit convex. A cell with
-    fewer than `MIN_ORTHOGONAL_CELL_ROWS` rows is left out. Only the training rows `index`
-    contribute.
+    fewer than `MIN_ORTHOGONAL_CELL_ROWS` rows (a total weight under that, for weighted rows) is
+    left out. Only the training rows `index` contribute.
 
     Args:
         cache: The cache.
         features: The substation's arrays.
         layout: The columns.
         index: The training rows.
+        weights: Row weights of shape (batch, len(index)), such as month-block bootstrap counts, so
+            that each weighting gets the covariance of its own resample; `None` for unit weights.
 
     Returns:
-        A positive semi-definite matrix of shape (p, p), unscaled.
+        A positive semi-definite matrix of shape (p, p), unscaled, or of shape (batch, p, p) when
+        `weights` is given.
     """
     p = layout.n_columns
     shape = derated_unit_shape(features=features, index=index)
     daylight = shape > LAST_TRAINED_MIN_SHAPE
     rows = index[daylight]
     unit = shape[daylight]
+    row_weights = np.ones((1, len(rows))) if weights is None else np.asarray(weights)[:, daylight]
+    batch = row_weights.shape[0]
     n_cells = 4 * HALF_HOURS_PER_DAY
-    cell = cache.calendar.quarter[rows].astype(
-        np.int64
-    ) * HALF_HOURS_PER_DAY + cache.calendar.half_hour[rows].astype(np.int64)
-    counts = np.bincount(cell, minlength=n_cells).astype(np.float64)
-    unit_sums = np.bincount(cell, weights=unit, minlength=n_cells)
-    unit_times_x = np.zeros((n_cells, p))
-    x_sums = np.zeros((n_cells, p))
-    for chunk in _chunks(index=rows):
+    cell = calendar_cell(cache=cache, index=rows, kind="quarter")
+    counts = np.stack([np.bincount(cell, weights=w, minlength=n_cells) for w in row_weights])
+    unit_sums = np.stack(
+        [np.bincount(cell, weights=w * unit, minlength=n_cells) for w in row_weights]
+    )
+    unit_times_x = np.zeros((batch, n_cells, p))
+    x_sums = np.zeros((batch, n_cells, p))
+    for chunk in row_chunks(index=rows):
         chunk_rows = rows[chunk]
         x = design_matrix(cache=cache, features=features, layout=layout, index=chunk_rows)
         one_hot = (cell[chunk, None] == np.arange(n_cells)[None, :]).astype(np.float64)
-        unit_times_x += one_hot.T @ (unit[chunk, None] * x)
-        x_sums += one_hot.T @ x
-    enough = counts >= MIN_ORTHOGONAL_CELL_ROWS
-    safe = np.maximum(counts, 1.0)[:, None]
-    covariance = unit_times_x / safe - (unit_sums[:, None] / safe) * (x_sums / safe)
-    covariance[~enough] = 0.0
-    matrix = np.zeros((p, p))
+        for member in range(batch):
+            weighted = one_hot * row_weights[member, chunk, None]
+            unit_times_x[member] += weighted.T @ (unit[chunk, None] * x)
+            x_sums[member] += weighted.T @ x
+    safe = np.maximum(counts, 1e-12)[:, :, None]
+    covariance = unit_times_x / safe - (unit_sums[:, :, None] / safe) * (x_sums / safe)
+    covariance[counts < MIN_ORTHOGONAL_CELL_ROWS] = 0.0
+    matrix = np.zeros((batch, p, p))
     for name in ORTHOGONAL_BLOCKS:
         block = layout.slices[name]
-        c = covariance[:, block]
-        matrix[block, block] += c.T @ c
-    return matrix
+        c = covariance[:, :, block]
+        matrix[:, block, block] += np.einsum("bcp,bcq->bpq", c, c)
+    return matrix[0] if weights is None else matrix
 
 
 def _orthogonal_term(
@@ -1521,7 +1577,8 @@ def _orthogonal_term(
         specs: The specs, whose `orthogonal_penalty` values are the lambdas; one spec is shared
             across the whole batch.
         gram: The Gram matrices, shape (batch, p, p).
-        matrix: The unscaled penalty matrix of `orthogonal_penalty_matrix`.
+        matrix: The unscaled penalty matrix of `orthogonal_penalty_matrix`, shape (p, p) shared by
+            the batch or (batch, p, p) with one per member.
         dtype: The floating-point type.
         device: Where the arithmetic runs.
 
@@ -1529,19 +1586,42 @@ def _orthogonal_term(
         The penalty of each batch member, shape (batch, p, p).
 
     Raises:
-        ValueError: If the matrix is all zero.
+        ValueError: If a matrix is all zero.
     """
-    mean_diagonal = float(np.diag(matrix).mean())
-    if mean_diagonal <= 0.0:
+    batch = gram.shape[0]
+    matrices = torch.as_tensor(
+        np.array(np.broadcast_to(matrix, (batch, *matrix.shape[-2:]))), dtype=dtype, device=device
+    )
+    mean_diagonal = torch.diagonal(matrices, dim1=-2, dim2=-1).mean(dim=-1)
+    if bool((mean_diagonal <= 0.0).any()):
         msg = "the orthogonal penalty matrix is zero: no daylight cell has enough rows"
         raise ValueError(msg)
-    batch = gram.shape[0]
     weights = torch.as_tensor(
         [spec.orthogonal_penalty for spec in specs], dtype=dtype, device=device
     ).expand(batch)
     gram_diagonal = torch.diagonal(gram, dim1=-2, dim2=-1).mean(dim=-1)
     scale = weights * gram_diagonal / mean_diagonal
-    return scale[:, None, None] * torch.as_tensor(matrix, dtype=dtype, device=device)[None]
+    return scale[:, None, None] * matrices
+
+
+def generator_evidence(*, path: np.ndarray) -> float:
+    """Return the depth of the deepest outage in a node's level path, in points.
+
+    A generator is evidenced only by an outage, a dip that is higher on both sides: its level is
+    aliased with the profile everywhere else. For each block this is the lower of the highest level
+    before it and the highest level after it, minus its own level, and the result is the largest
+    such depth. A single unpaired step, such as a fall in demand read as a generator starting, has
+    no higher level on one side and gives zero, however large the step is.
+
+    Args:
+        path: The node's level path, in points.
+
+    Returns:
+        The deepest dip, zero or more.
+    """
+    before = np.maximum.accumulate(path)
+    after = np.maximum.accumulate(path[::-1])[::-1]
+    return float(np.max(np.minimum(before, after) - path))
 
 
 def generator_path(*, fit: GamFit, member: int = 0) -> np.ndarray:
@@ -1650,7 +1730,7 @@ def profile_clip(
     x_y = np.zeros(p)
     x_pv = np.zeros((p, n_models))
     target_squares = np.zeros(n_models)
-    for chunk in _chunks(index=index):
+    for chunk in row_chunks(index=index):
         rows = index[chunk]
         x = design_matrix(cache=cache, features=features, layout=layout, index=rows)
         y = features.y[rows]
