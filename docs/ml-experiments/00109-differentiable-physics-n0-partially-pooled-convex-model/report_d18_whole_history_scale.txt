@@ -1,0 +1,228 @@
+== C4 bar (better of x_2y and x_2yamq on the tuning year): x_2yamq ==
+== Absolute quantile score by arm, points of capacity (rows outside the masks) ==
+cut,arm,five sites QS,five sites MAE of mean,D16,D11,D14,D9,D5,D10
+replicate,n2l_htenth_osame,3.162,5.386,3.284,3.255,1.992,2.618,3.232,4.083
+replicate,n,3.163,5.390,3.279,3.256,1.994,2.622,3.228,4.095
+replicate,n2l_hsame_osame,3.163,5.390,3.279,3.256,1.994,2.622,3.228,4.095
+replicate,n2l_htenth_otenth,3.164,5.386,3.289,3.262,1.989,2.309,3.227,4.090
+replicate,g,3.166,5.389,3.300,3.265,1.989,2.196,3.233,4.080
+replicate,n2l_hsame_otenth,3.166,5.387,3.284,3.267,1.995,2.347,3.222,4.101
+replicate,n2l_htenfold_osame,3.170,5.407,3.239,3.262,2.005,2.630,3.219,4.163
+replicate,n2l_htenfold_otenth,3.171,5.400,3.248,3.269,2.010,2.461,3.215,4.151
+replicate,n2l_htenth_otenfold,3.185,5.467,3.259,3.312,2.037,2.820,3.245,4.109
+replicate,n2l_hsame_otenfold,3.190,5.472,3.263,3.326,2.035,2.831,3.246,4.116
+replicate,x_2yamq,3.199,5.276,3.286,3.157,2.120,,2.963,4.531
+replicate,x_2y,3.212,5.293,3.311,3.179,2.130,2.310,2.956,4.543
+replicate,n2l_htenfold_otenfold,3.214,5.507,3.256,3.340,2.024,2.929,3.253,4.239
+replicate,n_26w,3.507,5.845,3.690,3.650,2.519,2.671,2.917,4.827
+replicate,n_full,3.580,6.195,3.340,4.227,2.174,3.550,3.380,4.816
+replicate,g_26w,3.930,6.549,4.699,3.953,2.684,2.195,3.109,5.299
+replicate,n_3m,4.205,6.924,3.228,3.522,2.333,2.636,4.684,7.350
+replicate,n_8w,4.796,8.063,4.157,3.659,2.844,2.600,5.830,7.580
+replicate,n_4w_pin,5.051,8.333,4.290,3.515,3.163,2.878,5.422,9.010
+replicate,g_3m,5.172,8.611,4.312,3.903,2.912,2.890,5.779,9.090
+replicate,n_4w_cappool,5.414,8.957,4.658,3.568,3.196,2.818,6.037,9.772
+replicate,n_full_4w,5.447,9.029,4.564,3.553,3.445,3.318,5.686,10.167
+replicate,n_4w,5.450,9.017,4.707,3.579,3.275,2.858,6.061,9.792
+replicate,n_2w,5.969,9.357,,3.540,3.655,2.996,,10.943
+replicate,x_pool_4w,6.774,11.084,5.982,8.038,3.129,5.795,6.471,10.353
+replicate,g_8w,7.599,12.644,7.135,6.460,5.122,4.862,10.508,8.774
+replicate,x_3m,7.762,10.181,8.635,6.468,5.771,3.636,7.649,10.443
+replicate,g_4w_pin,7.858,12.994,8.048,6.174,5.385,4.507,8.852,10.969
+replicate,g_2w,9.085,15.321,,6.887,7.367,6.354,,13.196
+replicate,g_4w,9.146,15.018,9.487,6.839,6.284,5.100,11.135,12.121
+replicate,x_4w,9.272,11.862,,9.173,9.371,7.880,,
+scored,g,2.884,5.048,2.991,2.556,2.325,2.337,3.413,3.200
+scored,n2l_htenth_otenth,2.888,5.051,3.009,2.558,2.330,2.335,3.418,3.192
+scored,n2l_hsame_otenth,2.889,5.053,3.026,2.561,2.340,2.353,3.412,3.172
+scored,n2l_htenfold_otenth,2.905,5.071,3.080,2.576,2.372,2.387,3.417,3.147
+scored,n2l_htenth_osame,2.915,5.086,3.082,2.572,2.367,2.364,3.437,3.187
+scored,n,2.915,5.085,3.088,2.572,2.373,2.381,3.435,3.177
+scored,n2l_hsame_osame,2.915,5.085,3.088,2.572,2.373,2.381,3.435,3.177
+scored,n2l_htenfold_osame,2.925,5.098,3.121,2.583,2.387,2.408,3.428,3.174
+scored,n2l_hsame_otenfold,3.006,5.225,3.235,2.687,2.456,2.684,3.463,3.251
+scored,n2l_htenth_otenfold,3.012,5.236,3.238,2.698,2.462,2.660,3.470,3.255
+scored,n2l_htenfold_otenfold,3.025,5.262,3.242,2.687,2.465,2.720,3.459,3.332
+scored,x_2yamq,3.048,5.078,3.029,2.950,2.499,2.001,3.076,3.684
+scored,x_2y,3.056,5.097,3.051,2.952,2.507,2.017,3.073,3.692
+scored,n_26w,3.081,5.438,3.150,2.557,2.781,2.666,3.282,3.662
+scored,n_full,3.554,6.188,3.494,3.629,2.817,3.845,3.578,4.241
+scored,g_26w,4.071,7.120,3.467,3.217,2.888,3.102,5.109,5.768
+scored,n_4w_pin,4.178,7.240,3.465,3.190,3.435,3.316,4.922,5.934
+scored,n_3m,4.293,7.429,3.682,3.133,3.155,2.956,4.774,6.744
+scored,n_4w_cappool,4.391,7.646,3.565,3.194,3.437,3.208,5.465,6.385
+scored,n_4w,4.399,7.657,3.574,3.182,3.444,3.342,5.482,6.405
+scored,n_8w,4.425,7.691,3.642,3.117,3.247,3.034,5.880,6.378
+scored,n_full_4w,4.433,7.688,3.527,3.275,3.531,3.749,5.025,6.833
+scored,n_2w,4.767,7.784,3.624,3.445,3.604,3.515,4.634,8.447
+scored,g_3m,5.104,9.162,4.962,3.357,4.069,2.774,5.832,7.381
+scored,g_4w_pin,6.849,11.660,6.637,4.979,6.862,5.340,7.901,8.003
+scored,x_pool_4w,6.954,11.614,6.427,6.835,3.651,5.942,6.266,11.434
+scored,x_3m,7.504,9.625,8.136,4.809,6.594,4.189,7.875,10.189
+scored,g_4w,7.597,13.160,7.173,5.469,7.139,5.868,9.394,9.025
+scored,g_8w,8.902,13.969,5.295,4.488,5.397,4.103,7.471,21.488
+scored,g_2w,9.077,15.350,7.886,6.226,7.816,6.783,10.598,12.998
+scored,x_4w,11.302,14.139,11.962,9.018,10.865,10.398,12.504,12.354
+tuning,x_2yamq,3.801,6.424,2.456,3.978,2.551,,2.412,7.437
+tuning,x_2y,3.801,6.417,2.468,3.996,2.560,,2.408,7.404
+winter,n_4w,4.363,7.460,3.158,4.542,3.092,4.511,4.385,6.541
+winter,g_4w,6.545,10.660,7.755,5.093,4.395,4.698,9.057,6.784
+winter,x_pool_4w,6.967,11.365,6.003,7.056,3.491,5.577,7.025,11.171
+winter,x_4w,12.085,15.044,,6.294,10.014,5.671,13.520,18.693
+== Planned contrasts (99.00% intervals), negative = treatment better ==
+contrast,scored QS,scored MAE of mean,scored rows,scored sites better,scored sites with rows,scored all rows,scored D10 windows dropped,scored low,scored high,replicate QS,replicate MAE of mean,replicate rows,replicate sites better,replicate sites with rows,replicate all rows,replicate D10 windows dropped,replicate low,replicate high,without D16,without D14,Nov-Mar,Apr-Oct
+C1 N - G (all rows),0.032,0.037,83865,1,5,0.023,0.033,0.010,0.060,-0.003,0.001,85594,3,5,-0.001,-0.005,-0.038,0.030,0.015,0.027,0.069,0.008
+C2 N-4w - G-4w,-3.198,-5.502,83865,5,5,-3.487,-3.221,-5.071,-1.577,-3.696,-6.001,85594,5,5,-3.683,-3.725,-5.580,-1.943,-3.099,-3.070,-5.404,-1.771
+C3 N-3m - G-3m,-0.811,-1.733,83865,5,5,-0.885,-0.892,-1.694,0.004,-0.967,-1.687,85594,5,5,-0.966,-0.950,-1.631,-0.407,-0.695,-0.784,-0.558,-0.974
+C4 N - x_2yamq,-0.133,0.007,83865,3,5,-0.137,-0.098,-0.453,0.154,-0.037,0.114,85594,3,5,-0.035,-0.039,-0.323,0.198,-0.180,-0.135,-0.479,0.090
+C5 N-4w - N-full-4w,-0.034,-0.030,83865,3,5,0.012,-0.014,-0.137,0.085,0.003,-0.013,85594,2,5,-0.001,0.011,-0.144,0.173,-0.054,-0.020,0.090,-0.114
+== Decision rule ==
+The gate failed under the pre-registered definition (runs 1 to 3); a post hoc
+redefinition passes in run 4. The plan counts the gate as failed, so the verdict
+is capped at inconclusive. Beside it, the verdict if the post hoc gate were accepted:
+{
+  "C1 passes": true,
+  "C1 refuted": false,
+  "C2 supported": true,
+  "C3 supported": true,
+  "gate counted as passed": false,
+  "verdict": "inconclusive (capped by the failed gate; the numbers alone give supported)"
+}
+{
+  "C1 passes": true,
+  "C1 refuted": false,
+  "C2 supported": true,
+  "C3 supported": true,
+  "gate counted as passed": true,
+  "verdict": "supported"
+}
+== Exploratory contrasts (95% intervals) ==
+contrast,scored QS,scored MAE of mean,scored rows,scored sites better,scored sites with rows,scored all rows,scored D10 windows dropped,scored low,scored high,replicate QS,replicate MAE of mean,replicate rows,replicate sites better,replicate sites with rows,replicate all rows,replicate D10 windows dropped,replicate low,replicate high,without D16,without D14,Nov-Mar,Apr-Oct,winter QS,winter MAE of mean,winter rows,winter sites better,winter sites with rows,winter all rows,winter D10 windows dropped,winter low,winter high
+N-full - N,0.639,1.103,83865,0,5,0.646,0.615,0.384,0.983,0.418,0.805,85594,0,5,0.405,0.413,0.228,0.660,0.696,0.689,0.937,0.446,,,,,,,,,
+N-2lambda htenth_otenth - N,-0.027,-0.033,83865,4,5,-0.020,-0.028,-0.044,-0.014,0.001,-0.003,85594,3,5,-0.001,0.002,-0.020,0.022,-0.015,-0.023,-0.057,-0.008,,,,,,,,,
+N-2lambda htenth_osame - N,-0.000,0.001,83865,3,5,0.000,-0.001,-0.005,0.005,-0.001,-0.004,85594,3,5,-0.001,0.000,-0.004,0.002,0.001,0.001,-0.001,0.001,,,,,,,,,
+N-2lambda htenth_otenfold - N,0.096,0.152,83865,0,5,0.092,0.092,0.057,0.147,0.022,0.077,85594,1,5,0.023,0.028,-0.025,0.084,0.083,0.098,0.167,0.051,,,,,,,,,
+N-2lambda hsame_otenth - N,-0.027,-0.032,83865,5,5,-0.020,-0.026,-0.043,-0.013,0.003,-0.003,85594,1,5,0.002,0.003,-0.015,0.021,-0.018,-0.025,-0.056,-0.007,,,,,,,,,
+N-2lambda hsame_otenfold - N,0.091,0.140,83865,0,5,0.087,0.087,0.052,0.139,0.027,0.083,85594,1,5,0.028,0.032,-0.018,0.086,0.077,0.093,0.158,0.047,,,,,,,,,
+N-2lambda htenfold_otenth - N,-0.011,-0.014,83865,4,5,-0.008,-0.007,-0.031,0.006,0.008,0.010,85594,2,5,0.010,0.001,-0.005,0.023,-0.011,-0.013,-0.027,0.000,,,,,,,,,
+N-2lambda htenfold_osame - N,0.010,0.013,83865,2,5,0.005,0.011,-0.002,0.022,0.007,0.018,85594,2,5,0.008,0.000,-0.002,0.016,0.004,0.009,0.018,0.005,,,,,,,,,
+N-2lambda htenfold_otenfold - N,0.110,0.177,83865,0,5,0.102,0.104,0.061,0.162,0.052,0.117,85594,1,5,0.052,0.048,0.010,0.103,0.099,0.114,0.195,0.054,,,,,,,,,
+N-4w-pin - G-4w-pin,-2.671,-4.420,83865,5,5,-2.884,-2.687,-3.945,-1.488,-2.807,-4.661,85594,5,5,-2.810,-2.824,-3.825,-1.744,-2.548,-2.477,-4.535,-1.466,,,,,,,,,
+N-4w-cappool - N-4w,-0.008,-0.012,83865,4,5,-0.010,-0.006,-0.016,-0.002,-0.037,-0.059,85594,5,5,-0.036,-0.036,-0.058,-0.017,-0.008,-0.008,-0.019,-0.001,,,,,,,,,
+N-4w - X-pool-4w,-2.554,-3.957,83865,5,5,-2.422,-2.834,-4.085,-0.774,-1.324,-2.068,85594,4,5,-1.283,-1.649,-3.523,1.074,-2.481,-3.159,0.753,-4.694,,,,,,,,,
+N-4w - X-4w,-6.903,-6.481,83865,5,5,-7.398,-6.709,-10.503,-3.609,-5.843,-5.770,34800,2,2,-5.830,-5.843,-8.811,-3.146,-6.537,-6.770,-13.758,-2.468,,,,,,,,,
+N-3m - X-3m,-3.211,-2.196,83865,5,5,-3.506,-3.074,-5.255,-1.423,-3.557,-3.256,85594,5,5,-3.599,-3.471,-5.704,-1.586,-2.905,-3.152,-6.623,-1.004,,,,,,,,,
+N-2w - G-2w,-4.311,-7.567,83865,5,5,-4.729,-4.268,-6.205,-2.611,-3.117,-5.964,51393,3,3,-3.087,-3.164,-4.317,-2.015,-4.323,-4.336,-7.663,-2.142,,,,,,,,,
+N-8w - G-8w,-4.477,-6.278,83865,5,5,-4.509,-4.354,-6.525,-2.641,-2.803,-4.581,85594,5,5,-2.768,-2.816,-4.032,-1.652,-5.172,-5.075,-7.684,-2.402,,,,,,,,,
+N-26w - G-26w,-0.990,-1.682,83865,5,5,-0.943,-0.886,-1.960,-0.158,-0.423,-0.704,85594,5,5,-0.454,-0.411,-0.809,-0.123,-1.156,-1.218,-0.910,-1.042,,,,,,,,,
+N - P (experiment 105),-0.505,-0.783,83865,5,5,-0.508,-0.475,-0.852,-0.246,,,,,,,,,,-0.539,-0.565,-0.940,-0.223,,,,,,,,,
+N - S (experiment 105),-0.120,-0.176,83865,3,5,-0.124,-0.107,-0.258,0.016,,,,,,,,,,-0.214,-0.173,-0.277,-0.018,,,,,,,,,
+N - lagged XGBoost d1 (experiment 105),0.541,1.099,83865,0,5,0.674,0.547,0.306,0.839,,,,,,,,,,0.466,0.573,0.716,0.427,,,,,,,,,
+N - climatology,-1.152,-2.232,83865,5,5,-1.076,-1.162,-1.390,-0.894,-0.748,-1.722,85594,5,5,-0.703,-0.796,-1.079,-0.433,-1.163,-1.233,-1.223,-1.107,,,,,,,,,
+N - manual heuristic,-0.573,-1.130,83865,5,5,-0.483,-0.554,-0.849,-0.249,-0.676,-1.424,85594,4,5,-0.652,-0.636,-1.011,-0.344,-0.701,-0.577,-0.672,-0.509,,,,,,,,,
+N-win4w - G-win4w,,,,,,,,,,,,,,,,,,,-1.608,-2.410,-0.785,-3.083,-2.182,-3.200,83825,5,5,-2.130,-2.182,-3.182,-1.252
+== Onboarding curve ==
+year,weeks of history,N,G,N minus G
+scored,2,4.767,9.077,-4.311
+scored,4,4.399,7.597,-3.198
+scored,8,4.425,8.902,-4.477
+scored,13,4.293,5.104,-0.811
+scored,26,3.081,4.071,-0.990
+replicate,2,5.969,9.085,-3.117
+replicate,4,5.450,9.146,-3.696
+replicate,8,4.796,7.599,-2.803
+replicate,13,4.205,5.172,-0.967
+replicate,26,3.507,3.930,-0.423
+== Planned contrasts with each decision site left out (quantile score) ==
+contrast,year,all five,without D5,without D10,without D11,without D14,without D16
+C1 N - G (all rows),scored,0.032,0.034,0.046,0.036,0.027,0.015
+C1 N - G (all rows),replicate,-0.003,-0.002,-0.008,-0.002,-0.005,0.001
+C2 N-4w - G-4w,scored,-3.198,-3.040,-3.349,-3.439,-3.070,-3.099
+C2 N-4w - G-4w,replicate,-3.696,-3.342,-4.025,-3.808,-3.870,-3.434
+C3 N-3m - G-3m,scored,-0.811,-0.756,-0.856,-0.965,-0.784,-0.695
+C3 N-3m - G-3m,replicate,-0.967,-0.935,-0.782,-1.118,-1.066,-0.939
+C4 N - x_2yamq,scored,-0.133,-0.242,-0.035,-0.068,-0.135,-0.180
+C4 N - x_2yamq,replicate,-0.037,-0.114,0.059,-0.072,-0.014,-0.044
+C5 N-4w - N-full-4w,scored,-0.034,-0.142,0.069,-0.018,-0.020,-0.054
+C5 N-4w - N-full-4w,replicate,0.003,-0.093,0.094,-0.003,0.047,-0.031
+== Median forecast minus mean forecast, points ==
+year,arm,D11,D9,D16,D5,D14,D10
+scored,g,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n_full,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n_4w,0.000,0.000,0.000,0.000,0.000,0.000
+scored,g_4w,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n_3m,0.000,0.000,0.000,0.000,0.000,0.000
+scored,g_3m,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n_full_4w,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,g,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n_full,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n_4w,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,g_4w,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n_3m,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,g_3m,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n_full_4w,0.000,0.000,0.000,0.000,0.000,0.000
+== Tail calibration on the five decision sites ==
+year,arm,q95 coverage Nov-Feb,q01 coverage,q01 pinball,q05 coverage,q05 pinball,q95 coverage,q95 pinball,q99 coverage,q99 pinball
+scored,g,0.7801,0.0070,0.1672,0.0266,0.6278,0.8407,0.8512,0.9393,0.2838
+scored,n,0.7577,0.0072,0.1682,0.0270,0.6333,0.8323,0.8823,0.9335,0.2970
+scored,n_full,0.7067,0.0203,0.2107,0.0511,0.7896,0.8135,1.0584,0.9179,0.3618
+scored,n_4w,0.7942,0.0320,0.3872,0.0700,1.0423,0.9091,1.2665,0.9629,0.4960
+scored,g_4w,0.5622,0.0231,0.4080,0.0504,1.3828,0.8208,2.7513,0.9477,0.8457
+scored,n_3m,0.7740,0.0246,0.3710,0.0581,0.9798,0.8998,1.3210,0.9565,0.5281
+scored,g_3m,0.7673,0.0217,0.3279,0.0501,1.0720,0.8590,1.4664,0.9460,0.5274
+scored,n_full_4w,0.8104,0.0304,0.3942,0.0667,1.0720,0.9165,1.2777,0.9618,0.5479
+replicate,g,0.7333,0.0194,0.1849,0.0549,0.6828,0.7995,1.0367,0.9052,0.4011
+replicate,n,0.7307,0.0193,0.1844,0.0550,0.6819,0.7991,1.0297,0.9075,0.3887
+replicate,n_full,0.7659,0.0288,0.2201,0.0742,0.8117,0.8122,1.0626,0.9141,0.3962
+replicate,n_4w,0.5673,0.0129,0.3707,0.0242,1.1213,0.7710,2.0779,0.8866,1.0178
+replicate,g_4w,0.3135,0.0075,0.3438,0.0189,1.3502,0.6554,4.5343,0.9349,0.8884
+replicate,n_3m,0.6890,0.0159,0.3547,0.0343,0.9878,0.8346,1.4750,0.9197,0.6618
+replicate,g_3m,0.6350,0.0158,0.3032,0.0390,1.0848,0.8127,1.8795,0.9028,0.8727
+replicate,n_full_4w,0.5957,0.0130,0.3753,0.0238,1.1541,0.7785,2.0300,0.8924,1.0273
+== How each fit set its capacities ==
+cut,arm,held_out,site,source
+replicate,n,-,D5,pinned
+replicate,n,-,D9,fitted_late_vintage
+replicate,n,-,D10,pinned
+replicate,n,-,D11,pinned
+replicate,n,-,D14,pinned
+replicate,n,-,D16,pinned
+replicate,n_4w,D5,D5,fitted_short_window
+replicate,n_4w,D9,D9,fitted_short_window
+replicate,n_4w,D10,D10,fitted_short_window
+replicate,n_4w,D11,D11,fitted_short_window
+replicate,n_4w,D14,D14,fitted_short_window
+replicate,n_4w,D16,D16,fitted_short_window
+replicate,n_3m,D5,D5,fitted_short_window
+replicate,n_3m,D9,D9,fitted_short_window
+replicate,n_3m,D10,D10,fitted_short_window
+replicate,n_3m,D11,D11,fitted_short_window
+replicate,n_3m,D14,D14,fitted_short_window
+replicate,n_3m,D16,D16,fitted_short_window
+scored,n,-,D5,pinned
+scored,n,-,D9,pinned
+scored,n,-,D10,pinned
+scored,n,-,D11,pinned
+scored,n,-,D14,pinned
+scored,n,-,D16,pinned
+scored,n,-,D18,fitted_late_vintage
+scored,n_4w,D5,D5,fitted_short_window
+scored,n_4w,D9,D9,fitted_short_window
+scored,n_4w,D10,D10,fitted_short_window
+scored,n_4w,D11,D11,fitted_short_window
+scored,n_4w,D14,D14,fitted_short_window
+scored,n_4w,D16,D16,fitted_short_window
+scored,n_3m,D5,D5,fitted_short_window
+scored,n_3m,D9,D9,fitted_short_window
+scored,n_3m,D10,D10,fitted_short_window
+scored,n_3m,D11,D11,fitted_short_window
+scored,n_3m,D14,D14,fitted_short_window
+scored,n_3m,D16,D16,fitted_short_window
+winter,n_4w,D5,D5,fitted_short_window
+winter,n_4w,D9,D9,fitted_short_window
+winter,n_4w,D10,D10,fitted_short_window
+winter,n_4w,D11,D11,fitted_short_window
+winter,n_4w,D14,D14,fitted_short_window
+winter,n_4w,D16,D16,fitted_short_window
