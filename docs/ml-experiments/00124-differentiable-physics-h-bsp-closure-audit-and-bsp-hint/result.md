@@ -152,6 +152,40 @@ in the remainder: 11 points in-sample. The full numbers are in `audit_report.md`
   repeat the weight tuning against the same 0.023-point limit. Whether to run it is the
   maintainer's decision.
 
+## Follow-on arm B (planned): the audit-calibrated hint
+
+**This section is the plan for a second arm of the same experiment, written before any fit of
+arm B.** The first joint fit above stays as written. Arm B asks whether the same hint stops hurting
+clean forecasts once its multipliers are fixed at the closure audit's fit.
+
+- **Hypothesis.** A BSP hint whose multipliers on the MW Primaries, the MVA Primaries, and the
+  generation are fixed at the closure audit's fit made on rows before the cut raises the clean
+  forecast error of the MW Primaries by no more than 0.023 points at some weight above 0, and at
+  that weight it still removes damage from scale errors.
+- **Prediction (can fail).** The chosen weight is above 0, and the damage from scale errors falls by
+  at least 20% at it. We give this a low chance: a constant multiplier error is absorbed by the
+  remainder's level (the module's synthetic test finds a 10% error barely moves a Primary), so the
+  multipliers may not be the cause.
+- **Design.** The same pilot BSP, cuts, injections (10 seeds per cell and Primary in the tuning
+  year), score, and limit as the first joint fit. The multipliers are the audit's values at that
+  cut, fitted on rows before it only (no replicate-year or scored-year data). The weight grid adds
+  0.003, 0.01, and 0.03 below the first grid's 0.1, because the first grid never saw a weight
+  small enough to cost less than 2.3 points.
+- **Plumbing check first, blocking.** A synthetic BSP built exactly from the fitted Primaries, with
+  the audit's multipliers and a known remainder, must cost under 0.023 points at weight 0.1, which
+  excludes a coding fault that the first fit's missing gate did not. If it fails, arm B stops
+  as `invalid` until the fault is found.
+- **Decision rule.** The chosen weight is the weight with the largest summed damage reduction in the
+  tuning year whose clean error rise is at most 0.023 points. If no weight above 0 passes, arm B
+  stops at `not supported`, and the BSP reading is recorded as a possible monitoring signal and not
+  as a loss term. If one passes, the replicate and scored years and the gate run for that weight,
+  under the first plan's rules.
+- **Reports.** The curve of damage reduction against clean error rise across the weights, and the
+  audit multipliers per BSP with their intervals.
+- **Cost.** One GPU job of about an hour for the tuning grid, and about three hours more if a weight
+  passes. The code is `BspMember.coefficient` and `BspSeries.generator_coefficient` in
+  `studies.dp_hierarchy`.
+
 ## The plan as committed, with its clarifications
 
 **Everything below was written before the results and is kept as committed.** The pilot's
