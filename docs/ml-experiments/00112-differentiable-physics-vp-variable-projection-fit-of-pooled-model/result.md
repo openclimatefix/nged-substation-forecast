@@ -305,9 +305,9 @@ network-on fit fails even on noise-free data.
 - **Handoff.** C1v's interval does not lie wholly above +0.10, so by the plan the pooled neural
   model continues and a later experiment compares VP-P against the per-substation model. The fitter
   option `fitter="vp"` stays off by default. The advice to compare fitting methods with the network
-  off departs from that handoff and is advice only. It departs from that handoff because with the network on the exact fit
-  could not recover heating even from noise-free data, and the network-off fit matched the
-  gradient fit.
+  off departs from that handoff and is advice only. It departs because, with the network on,
+  the exact fit could not recover heating even from noise-free data, and the network-off fit
+  matched the gradient fit.
 - **Audit triggers that fired, and their triage.** Trigger 1 (a control failed): the gate failed.
   Trigger 2 (the result contradicts its prediction): V1 is positive where -0.15 to -0.45 was
   predicted. Trigger 5 (a nested model beats the larger one): VP-P-nonet beats VP-P by 2.183. Trigger
@@ -340,7 +340,8 @@ network-on fit fails even on noise-free data.
   270, largest harmonic coefficient 37, largest holiday coefficient 54), so a card would show
   unreliable values, and the manager waived the cards for this page once. Cards for the repaired
   fit are owed. A card, when built, will carry the line "weakly identified at real noise levels
-  (experiment 112); compare across substations with care". Figure 4 shows VP-P-nonet and G-2y in place of the plan's VP-S.
+  (experiment 112); compare across substations with care".
+- **Figure 4** shows VP-P-nonet and G-2y in place of the plan's VP-S.
 
 ## Caveats
 
