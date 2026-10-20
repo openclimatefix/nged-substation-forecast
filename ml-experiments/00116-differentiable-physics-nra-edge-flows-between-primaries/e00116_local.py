@@ -226,3 +226,37 @@ def placebo_mw_days(
         )
         total += float(np.sum(np.abs(fit.flows[placebo.name]))) / 48.0
     return total
+
+
+def injected_streams(
+    *, cache: FeatureCache, data: data_module.YearData, transfer: dict
+) -> tuple[dict[str, np.ndarray], dict[str, np.ndarray]]:
+    """Return every site's residual stream on the whole grid with a transfer added.
+
+    Args:
+        cache: The feature cache.
+        data: The year's residuals.
+        transfer: One row of the transfers table.
+
+    Returns:
+        The streams in megawatts, and the injected megawatts at each of the two ends (positive at
+        the receiver, negative at the donor, zero elsewhere), also on the whole grid.
+    """
+    streams = {node: r.copy() for node, r in data.residual_mw.items()}
+    onset, end = int(transfer["onset"]), int(transfer["end"])
+    scale = {node: data.capacity_mw[node] / data_module.POINTS_PER_CAPACITY for node in data.sites}
+    power = {
+        node: cache.sites[node].y[onset:end] * scale[node]
+        for node in (transfer["donor"], transfer["receiver"])
+    }
+    moved = inject.moved_mw(
+        transfer=transfer,
+        donor_power_mw=power[transfer["donor"]],
+        receiver_power_mw=power[transfer["receiver"]],
+    )
+    added = {node: np.zeros(len(next(iter(streams.values())))) for node in streams}
+    added[transfer["receiver"]][onset:end] = moved
+    added[transfer["donor"]][onset:end] = -moved
+    for node in (transfer["receiver"], transfer["donor"]):
+        streams[node] = streams[node] + added[node]
+    return streams, added
