@@ -146,15 +146,25 @@ def l1_forecasts(*, cache: FeatureCache) -> dict[str, gradient.SiteForecast]:
     for site in common.SCORED_SITES:
         model, _, _ = fit_site(cache=cache, site=site, cut=cut, sigma=sigma)
         models[site] = model
-        model_r, _, _ = fit_site(cache=cache, site=site, cut=cut_r, sigma=sigma_r)
+        try:
+            model_r, _, _ = fit_site(cache=cache, site=site, cut=cut_r, sigma=sigma_r)
+        except torch.linalg.LinAlgError:
+            # A substation with 9 months of history at the replica cut gives a singular system;
+            # its spread comes from the other substations' replica residuals.
+            print(f"L1 {site}: replica fit failed (singular), pooled spread used", flush=True)
+            continue
         replica_year = forecast.score_batch(
             cache=cache, sites=(site,), cut=cut_r, through=cut, for_spread=True
         )
         residuals[site] = pooled_residuals(model=model_r, batch=replica_year)
     out: dict[str, gradient.SiteForecast] = {}
     for site, model in models.items():
-        own = residuals[site]
-        spread = fit_centred_spread(residual=own.residual, band=own.band, quarter=own.quarter)
+        use = [residuals[site]] if site in residuals else list(residuals.values())
+        spread = fit_centred_spread(
+            residual=np.concatenate([r.residual for r in use]),
+            band=np.concatenate([r.band for r in use]),
+            quarter=np.concatenate([r.quarter for r in use]),
+        )
         score = forecast.score_batch(cache=cache, sites=(site,), cut=cut, through=through)
         out |= gradient.forecasts_by_site(
             model=model, score=score, replica=None, spread_for={site: spread}
