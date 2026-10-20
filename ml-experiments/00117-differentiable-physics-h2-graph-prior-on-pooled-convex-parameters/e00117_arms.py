@@ -15,6 +15,7 @@ points after its forecast is divided by the rebuilt scale.
 12 months before the cut and predicted over the 12 months that follow.
 """
 
+import os
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -118,6 +119,7 @@ def solve(
         graph=plan.graph,
         penalty=penalty,
         scales=family_scales(designs=designs),
+        device=os.environ.get("E00117_DEVICE", "cpu"),
     )
 
 

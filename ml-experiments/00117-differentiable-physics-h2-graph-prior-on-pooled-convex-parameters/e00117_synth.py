@@ -445,7 +445,8 @@ def arm_penalty(*, arm: str, gamma_lo: float, gamma_hi: float) -> GraphPenalty:
 
     Args:
         arm: `g`, `n`, `h_lo`, `nh_lo`, `h_hi`, `nh_hi`, `h_planted`, or `h@<gamma>` (the graph
-            penalty alone at a stated weight).
+            penalty alone at a stated weight), `heat@<gamma>` or `hol@<gamma>` (the graph
+            penalty on the heating or the holiday family alone).
         gamma_lo: The tuned graph weight.
         gamma_hi: The next grid value above it.
 
@@ -466,6 +467,10 @@ def arm_penalty(*, arm: str, gamma_lo: float, gamma_hi: float) -> GraphPenalty:
     }
     if arm.startswith("h@"):
         return GraphPenalty.of(graph_rows=float(arm[2:]))
+    if arm.startswith("heat@"):
+        return GraphPenalty(fleet={}, graph={"heating": float(arm[5:])})
+    if arm.startswith("hol@"):
+        return GraphPenalty(fleet={}, graph={"holiday": float(arm[4:])})
     if arm not in table:
         msg = f"unknown arm {arm}"
         raise ValueError(msg)

@@ -35,6 +35,8 @@ def arm_catalogue(*, tuned: dict) -> dict[str, GraphPenalty]:
         "h_lo": GraphPenalty.of(graph_rows=decision["gamma_lo"]),
         "nh_lo": GraphPenalty.of(fleet_rows=common.FLEET_ROWS, graph_rows=decision["gamma_lo"]),
         "phol": GraphPenalty.of(holiday_fleet_rows=decision["lambda_hol"]),
+        "h_heat": GraphPenalty(fleet={}, graph={"heating": decision["gamma_lo"]}),
+        "h_hol": GraphPenalty(fleet={}, graph={"holiday": decision["gamma_lo"]}),
     }
     if decision["gamma_hi"] is not None:
         arms_["h_hi"] = GraphPenalty.of(graph_rows=decision["gamma_hi"])

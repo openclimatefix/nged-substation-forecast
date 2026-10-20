@@ -13,6 +13,7 @@ A width gain that H shares with H-perm is the prior shrinking variance, not neig
 
 import argparse
 import json
+import os
 from typing import Any
 
 import e00117_arms as arms
@@ -49,6 +50,7 @@ def interval_frame(*, context: arms.CutContext, arm: str, penalty: GraphPenalty)
         scales=family_scales(designs=designs),
         axis=axis,
         counts=counts,
+        device=os.environ.get("E00117_DEVICE", "cpu"),
     )
     rows = []
     for design in designs:

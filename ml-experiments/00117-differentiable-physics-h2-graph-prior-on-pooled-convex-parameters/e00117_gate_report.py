@@ -52,6 +52,13 @@ def covered(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def pooled(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Pool the sets: every (set, fleet) pair becomes one fleet of set 0."""
+    return frame.with_columns(
+        fleet=pl.col("set_id") * 1000 + pl.col("fleet"), set_id=pl.lit(0, dtype=pl.Int64)
+    )
+
+
 def coverage_table(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Return coverage and its fleet-clustered standard error by set, cell, arm, and family."""
     keys = ["set_id", "cell", "arm", "family"]
@@ -142,8 +149,11 @@ def main() -> None:
     parser.add_argument("--tag", nargs="+", required=True)
     arguments = parser.parse_args()
     frame = covered(frame=load(tags=arguments.tag))
-    coverage = coverage_table(frame=frame)
-    ratios = width_ratio_table(frame=frame, rng=np.random.default_rng(0))
+    pool = pooled(frame=frame)
+    coverage = coverage_table(frame=pool)
+    ratios = width_ratio_table(frame=pool, rng=np.random.default_rng(0))
+    by_set_coverage = coverage_table(frame=frame)
+    by_set_ratios = width_ratio_table(frame=frame, rng=np.random.default_rng(0))
     power = power_check(coverage=coverage)
     with pl.Config(tbl_rows=200, tbl_cols=12, fmt_str_lengths=30):
         print(coverage)
@@ -155,6 +165,8 @@ def main() -> None:
             {
                 "coverage": coverage.to_dicts(),
                 "width_ratio": ratios.to_dicts(),
+                "coverage_by_set": by_set_coverage.to_dicts(),
+                "width_ratio_by_set": by_set_ratios.to_dicts(),
                 "power": power,
             },
             indent=2,

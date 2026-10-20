@@ -78,6 +78,9 @@ CONTRASTS: Final[tuple[Contrast, ...]] = (
     Contrast("NH - N, winter evening peak", "nh_lo", "n", "winter_evening_peak", "week"),
     Contrast("H - G, cold snaps", "h_lo", "g", "cold_snap", "day"),
     Contrast("NH - N, cold snaps", "nh_lo", "n", "cold_snap", "day"),
+    Contrast("Exploratory: H heating only - G", "h_heat", "g", "all", "month"),
+    Contrast("Exploratory: H heating only - G, winter", "h_heat", "g", "winter", "week"),
+    Contrast("Exploratory: H holiday only - G", "h_hol", "g", "all", "month"),
     Contrast("N - G", "n", "g", "all", "month"),
     Contrast("NH - G", "nh_lo", "g", "all", "month"),
     Contrast("H - N", "h_lo", "n", "all", "month"),
@@ -227,6 +230,12 @@ def tails_table(*, losses: pl.DataFrame, frame: pl.DataFrame) -> dict[str, float
     return out
 
 
+def decision_ids() -> list[int]:
+    """Return the series identifiers of the five decision sites, which every score is read on."""
+    cache = common.load_cache()
+    return [cache.sites[site].table.time_series_id for site in common.DECISION_SITES]
+
+
 def median_minus_mean(*, frame: pl.DataFrame) -> dict[str, float]:
     """Return each site's median of (q50 minus mean forecast), which exposes a shifted spread."""
     shifted = frame.with_columns(difference=pl.col("q50") - pl.col("mean")).group_by(
@@ -242,16 +251,21 @@ def report_cut(*, cut_name: str, arms: list[str]) -> dict[str, Any]:
     """Return the report of one cut: scores, contrasts, tails, and checks."""
     losses: dict[str, pl.DataFrame] = {}
     frames: dict[str, pl.DataFrame] = {}
+    ids = decision_ids()
     for arm in arms:
         frame = load_arm(cut_name=cut_name, arm=arm)
         if frame is not None:
+            frame = frame.filter(pl.col("time_series_id").is_in(ids))
             frames[arm] = frame
             losses[arm] = row_losses(frame=frame)
     for key in EXTERNAL:
         frame = load_external(cut_name=cut_name, key=key)
         if frame is not None:
-            keep = losses["g"].select("site", "time")
-            ext = row_losses(frame=frame).join(keep, on=["site", "time"], how="semi")
+            frame = frame.filter(pl.col("time_series_id").is_in(ids))
+            flags = losses["g"].select(
+                "site", "time", "event_day", "winter", "evening_peak", "cold_snap"
+            )
+            ext = row_losses(frame=frame).join(flags, on=["site", "time"], how="inner")
             losses[key] = ext
     scores = {}
     for arm, frame in losses.items():
@@ -262,6 +276,13 @@ def report_cut(*, cut_name: str, arms: list[str]) -> dict[str, Any]:
                 part.group_by("site").agg(pl.col("qs").mean()).sort("site").iter_rows()
             ),
             "mean_error": common.as_float(part["mean_error"].mean()),
+            "by_scope": {
+                scope: common.as_float(
+                    part.filter(scope_mask(frame=part, scope=scope))["qs"].mean()
+                )
+                for scope in SCOPES
+                if not part.filter(scope_mask(frame=part, scope=scope)).is_empty()
+            },
         }
     contrasts = [
         contrast_result(
@@ -284,7 +305,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cuts", nargs="+", default=["scored", "replicate"])
     arguments = parser.parse_args()
-    arms = ["g", "n", "h_lo", "nh_lo", "h_hi", "nh_hi", "phol", "h_perm0", "h_perm1", "h_perm2"]
+    arms = [
+        "g",
+        "n",
+        "h_lo",
+        "nh_lo",
+        "h_hi",
+        "nh_hi",
+        "phol",
+        "h_heat",
+        "h_hol",
+        "h_perm0",
+        "h_perm1",
+        "h_perm2",
+    ]
     report = {cut: report_cut(cut_name=cut, arms=arms) for cut in arguments.cuts}
     path = common.WORK_DIR / "report.json"
     path.write_text(json.dumps(report, indent=2) + "\n")

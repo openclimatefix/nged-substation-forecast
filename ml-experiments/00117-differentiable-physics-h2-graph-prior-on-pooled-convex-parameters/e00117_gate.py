@@ -38,7 +38,7 @@ class Job:
     device: str = "cpu"
 
 
-LOAD_LIMIT = 35.0
+LOAD_LIMIT = float(os.environ.get("H2_LOAD_LIMIT", "35"))
 """A job waits while the machine's one-minute load average is above this."""
 
 
