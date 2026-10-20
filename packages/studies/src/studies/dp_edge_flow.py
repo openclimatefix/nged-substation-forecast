@@ -26,8 +26,9 @@ running arrangement (NRA) unless the data insist.
 The derivative of the value function is kept as a piecewise-linear function, clipped to the step
 penalty at each row, and the flow is recovered by clipping backwards. The extension to the Huber
 loss, per-row weights, and a level penalty is this module's; the tests check it against a
-quadratic-programme reference. A flow constrained to be non-negative, and the tests, use ADMM (the
-alternating direction method of multipliers) with a banded Cholesky factor instead.
+quadratic-programme reference. A flow constrained to be non-negative also uses ADMM (the alternating
+direction method of multipliers) with a banded Cholesky factor, and the tests compare the two
+solvers.
 **Paths are fitted by block-coordinate descent:** each path is re-solved on the
 residual left after the other paths at its nodes are removed, until the objective and the largest
 path change stop moving. A row where a path's nodes have no reading is dropped from that path's
@@ -106,6 +107,7 @@ class PathProblem:
         step_penalty: Penalty per megawatt of change between consecutive rows.
         level_penalty: Penalty per megawatt of flow on a row with a reading.
         non_negative: Whether the flow is constrained to be at least zero.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
     """
 
     residual_a: np.ndarray
@@ -119,6 +121,7 @@ class PathProblem:
     step_penalty: float = 0.0
     level_penalty: float = 0.0
     non_negative: bool = False
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS
 
 
 @dataclass(frozen=True)
@@ -194,7 +197,7 @@ def _compress(*, problem: PathProblem) -> tuple[np.ndarray, list[_End]]:
         _End(
             value=np.nan_to_num(residual[kept]),
             weight=weight[kept],
-            threshold=HUBER_THRESHOLD_IN_SIGMAS * noise,
+            threshold=problem.huber_sigmas * noise,
             gain=np.ones(len(kept)) if gain is None else gain[kept],
         )
         for (residual, noise, _, gain), weight in zip(ends_raw, weights, strict=True)
@@ -270,8 +273,9 @@ def _soft_threshold(*, x: np.ndarray, level: float) -> np.ndarray:
 
 def _prox_level(*, x: np.ndarray, level: float, non_negative: bool) -> np.ndarray:
     """Return the proximal map of the level penalty, with the optional bound at zero."""
-    shrunk = _soft_threshold(x=x, level=level)
-    return np.maximum(x - level, 0.0) if non_negative else shrunk
+    if non_negative:
+        return np.maximum(x - level, 0.0)
+    return _soft_threshold(x=x, level=level)
 
 
 @dataclass
@@ -512,6 +516,8 @@ class _Derivative:
 
     def right_limit(self, *, at: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Return the right-hand limit and the right-hand slope at positions."""
+        if len(self.knot) == 0:
+            return np.full(len(at), self.left_value), np.zeros(len(at))
         index = np.searchsorted(self.knot, at, side="right") - 1
         before = index < 0
         safe = np.where(before, 0, index)
@@ -529,6 +535,8 @@ class _Derivative:
 
     def first_at_least(self, *, level: float) -> float:
         """Return the smallest position where the function reaches `level`, or `-inf`."""
+        if len(self.knot) == 0:
+            return -np.inf if self.left_value >= level else np.inf
         if self.left_value >= level:
             return -np.inf
         i = int(np.searchsorted(self.value, level, side="left"))
@@ -540,6 +548,8 @@ class _Derivative:
 
     def last_at_most(self, *, level: float) -> float:
         """Return the largest position where the function is at most `level`, or `inf`."""
+        if len(self.knot) == 0:
+            return np.inf if self.left_value <= level else -np.inf
         if self.value[-1] <= level:
             return np.inf
         j = int(np.searchsorted(self.value, level, side="right"))
@@ -689,7 +699,9 @@ def _dynamic_programme(
     flow[-1] = derivative.first_at_least(level=0.0)
     for row in range(n - 2, -1, -1):
         flow[row] = min(max(flow[row + 1], lowers[row]), uppers[row])
-    return flow
+    # A path whose rows all have a zero gain or zero weight has a flat derivative and no pull on
+    # the flow; it is held at zero instead of at an infinite position.
+    return np.where(np.isfinite(flow), flow, 0.0)
 
 
 def expand_held_flat(*, kept: np.ndarray, values: np.ndarray, length: int) -> np.ndarray:
@@ -739,7 +751,7 @@ class PathSpec:
 
 def edge_name(*, node_a: str, node_b: str) -> str:
     """Return the name of the edge between two nodes, the same whichever order they come in."""
-    first, second = sorted((node_a, node_b))
+    first, second = edge_pair(pair=(node_a, node_b))
     return f"{first}-{second}"
 
 
@@ -754,8 +766,10 @@ def build_paths(
     """Build the paths of a graph: one per edge, and one outside path per node.
 
     An outside path carries transfers to partners that are not metered. Its step and level
-    penalties are `outside_factor` times those of the node's first edge by name, so a conserved
-    transfer between two metered nodes is cheaper on their edge than through two outside paths.
+    penalties are `outside_factor` times those of the node's first edge by name (the edges' scales
+    differ little within a node, and any fixed rule keeps the outside path dearer than the node's
+    edges), so a conserved transfer between two metered nodes is cheaper on their edge than
+    through two outside paths.
 
     Args:
         edges: Each interconnection as a pair of node names; either order, duplicates ignored.
@@ -768,20 +782,29 @@ def build_paths(
         The edge paths in name order, then the outside paths in node order.
 
     Raises:
-        ValueError: If an edge joins a node to itself, names an unknown node, or
-            `outside_factor` is under 1.
+        ValueError: If an edge joins a node to itself, names an unknown node, a node has no edge
+            or a '-' in its name, or `outside_factor` is under 1.
     """
     if outside_factor < 1.0:
         msg = f"outside_factor must be at least 1, not {outside_factor}"
         raise ValueError(msg)
     known = set(nodes)
-    unique = sorted({edge_name(node_a=a, node_b=b) for a, b in edges})
-    paths: list[PathSpec] = []
-    first_edge_of: dict[str, str] = {}
     for a, b in edges:
         if a == b or a not in known or b not in known:
             msg = f"edge ({a}, {b}) joins a node to itself or names an unknown node"
             raise ValueError(msg)
+    if any("-" in node for node in nodes):
+        msg = "a node name must not contain '-', which joins the two names of an edge"
+        raise ValueError(msg)
+    on_an_edge = {node for edge in edges for node in edge}
+    if known - on_an_edge:
+        msg = (
+            f"nodes {sorted(known - on_an_edge)} have no edge, so their outside path has no penalty"
+        )
+        raise ValueError(msg)
+    unique = sorted({edge_name(node_a=a, node_b=b) for a, b in edges})
+    paths: list[PathSpec] = []
+    first_edge_of: dict[str, str] = {}
     for name in unique:
         node_a, node_b = name.split("-")
         first_edge_of.setdefault(node_a, name)
@@ -847,6 +870,7 @@ def joint_objective(
     residuals: Mapping[str, np.ndarray],
     noise: Mapping[str, float],
     reliability: Mapping[str, np.ndarray] | None = None,
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
 ) -> float:
     """Return the objective of the whole graph at a set of flows.
 
@@ -859,6 +883,7 @@ def joint_objective(
         residuals: Each node's residual in megawatts, `NaN` where there is no reading.
         noise: Each node's robust residual standard deviation in megawatts.
         reliability: Optional per-row weight in 0 to 1 for each node.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
 
     Returns:
         The joint objective.
@@ -878,7 +903,7 @@ def joint_objective(
                 weight
                 * huber_loss(
                     x=np.nan_to_num(residual) - modelled,
-                    threshold=HUBER_THRESHOLD_IN_SIGMAS * noise[node],
+                    threshold=huber_sigmas * noise[node],
                 )
             )
         )
@@ -901,6 +926,7 @@ def fit_flows(
     max_sweeps: int = DEFAULT_MAX_SWEEPS,
     tolerance: float = DEFAULT_TOLERANCE,
     sweep_tolerance: float = SWEEP_TOLERANCE,
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
 ) -> FlowFit:
     """Fit every path's flow by block-coordinate descent.
 
@@ -919,6 +945,8 @@ def fit_flows(
         tolerance: The ADMM tolerance of each path solve in megawatts.
         sweep_tolerance: The sweeps' stopping tolerance on the objective's relative change and on
             the largest path change in megawatts.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero; a large
+            value makes the data term squared error.
 
     Returns:
         The fitted flows and how the fit ended.
@@ -957,6 +985,7 @@ def fit_flows(
                     noise=noise,
                     reliability=reliability,
                     length=length,
+                    huber_sigmas=huber_sigmas,
                 ),
                 start=flows[path.name],
                 tolerance=tolerance,
@@ -967,7 +996,12 @@ def fit_flows(
             )
             flows[path.name] = solution.flow
         objective = joint_objective(
-            paths=paths, flows=flows, residuals=residuals, noise=noise, reliability=reliability
+            paths=paths,
+            flows=flows,
+            residuals=residuals,
+            noise=noise,
+            reliability=reliability,
+            huber_sigmas=huber_sigmas,
         )
         relative = abs(previous_objective - objective) / max(abs(objective), 1.0)
         previous_objective = objective
@@ -986,6 +1020,7 @@ def _partial_problem(
     noise: Mapping[str, float],
     reliability: Mapping[str, np.ndarray],
     length: int,
+    huber_sigmas: float,
 ) -> PathProblem:
     """Build one path's problem on the residual left by the other paths."""
     partial_a = residuals[path.node_a] - _node_contribution(
@@ -1010,6 +1045,7 @@ def _partial_problem(
         step_penalty=path.step_penalty,
         level_penalty=path.level_penalty,
         non_negative=path.non_negative,
+        huber_sigmas=huber_sigmas,
     )
 
 
@@ -1032,6 +1068,22 @@ def robust_residual_scale(*, residual: np.ndarray) -> float:
         msg = "no finite residual to take a scale from"
         raise ValueError(msg)
     return MAD_TO_STANDARD_DEVIATION * float(np.median(np.abs(finite - np.median(finite))))
+
+
+def noise_before(*, residuals: Mapping[str, np.ndarray], last_row: int) -> dict[str, float]:
+    """Return each node's robust residual scale from rows up to `last_row` only.
+
+    Args:
+        residuals: Each node's residual stream on the whole grid in megawatts.
+        last_row: The last grid position that was known when the scored period began.
+
+    Returns:
+        Each node's scale in megawatts.
+    """
+    return {
+        node: robust_residual_scale(residual=residual[: last_row + 1])
+        for node, residual in residuals.items()
+    }
 
 
 def block_mean_residuals(
@@ -1118,6 +1170,9 @@ def run_lengths(*, flow: np.ndarray, threshold: float) -> tuple[np.ndarray, np.n
     Args:
         flow: A flow on the grid in megawatts.
         threshold: A row is in a run when `|flow|` is over this.
+
+    A run already going on the first row is counted from that row (it is left-truncated, and the
+    estimate does not correct for this); only a run that reaches the end of the flow is censored.
 
     Returns:
         The run lengths in rows, and whether each run is censored because it reaches the end of
@@ -1222,7 +1277,7 @@ def run_band_filter(
 ) -> BandFilterRun:
     """Run the two-state filter of `studies.dp_assimilation` over one band's readings.
 
-    This repeats the update of `dp_assimilation.run_kalman`, which always starts cold, so that a
+    This is the update of `dp_assimilation.run_kalman`, which always starts cold, so that a
     run can start from the state an earlier run held. Started cold, it returns the same levels and
     anomalies as `run_kalman`.
 
@@ -1299,11 +1354,15 @@ def run_known_input_filter(
 
     The flow is a known input: the filter sees `residual - flow`, so a transfer that the flow
     explains does not reach the level or the anomaly. The window starts from `carry`, the state the
-    previous run held at the window's start.
+    previous run held at the window's start. **The residual and the flow must be in the unit of the
+    hyperparameters, points of effective capacity** (the filter's variances are in points squared),
+    so a caller that holds megawatts divides both by the substation's effective capacity over 100,
+    once, before calling.
 
     Args:
-        residual: The residual stream on the whole grid in megawatts, `NaN` where there is none.
-        flow: The node's flow over the window, one value per row from `first` to `last`.
+        residual: The residual stream on the whole grid in points of effective capacity, `NaN`
+            where there is none.
+        flow: The node's flow over the window in points, one value per row from `first` to `last`.
         band: The hour band of each grid row.
         first: The first grid position of the window.
         last: The last grid position of the window, inclusive.
@@ -1403,8 +1462,10 @@ def causal_window_fit(
     cutoff: int,
     window_length: int,
     start: Mapping[str, np.ndarray] | None = None,
+    reliability: Mapping[str, np.ndarray] | None = None,
     max_sweeps: int = DEFAULT_MAX_SWEEPS,
     sweep_tolerance: float = SWEEP_TOLERANCE,
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
 ) -> tuple[FlowFit, int]:
     """Fit the flows on the trailing window of residuals that a forecast may see.
 
@@ -1414,38 +1475,69 @@ def causal_window_fit(
     Args:
         paths: The paths to fit.
         residuals: Each node's residual stream on the whole grid in megawatts.
-        noise: Each node's robust residual standard deviation, from rows before the cut.
+        noise: Each node's robust residual standard deviation. It must come from rows that were
+            known at the start of the scored period (`noise_before` computes it), never from rows
+            after `cutoff`; the function cannot check this, because it holds only the window.
         cutoff: The newest usable grid position.
         window_length: How many rows the window holds.
-        start: Optional warm start for each path, on the window's rows.
+        start: Optional warm start for each path, with exactly the window's number of rows; a
+            warm start from an earlier origin is shifted by the caller to this window.
+        reliability: Optional per-row weight in 0 to 1 for each node on the whole grid, for a fit
+            on block means.
         max_sweeps: The sweep limit of the block-coordinate fit.
         sweep_tolerance: The sweeps' stopping tolerance.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
 
     Returns:
         The fit, whose flows have `window_length` rows (fewer near the start of the stream), and
         the grid position of the window's first row.
 
     Raises:
-        ValueError: If `cutoff` is negative.
+        ValueError: If `cutoff` is negative, or a warm start does not have one value per row of
+            the window.
     """
     if cutoff < 0:
         msg = "cutoff must be a grid position of at least 0"
         raise ValueError(msg)
     first = max(cutoff - window_length + 1, 0)
     window = {node: residual[first : cutoff + 1] for node, residual in residuals.items()}
+    if start is not None and any(
+        len(flow) != len(next(iter(window.values()))) for flow in start.values()
+    ):
+        msg = "a warm start needs one value per row of the window"
+        raise ValueError(msg)
+    window_reliability = (
+        None
+        if reliability is None
+        else {node: weight[first : cutoff + 1] for node, weight in reliability.items()}
+    )
     fit = fit_flows(
         paths=paths,
         residuals=window,
         noise=noise,
+        reliability=window_reliability,
         start=start,
         max_sweeps=max_sweeps,
         sweep_tolerance=sweep_tolerance,
+        huber_sigmas=huber_sigmas,
     )
     return fit, first
 
 
 FLOW_AS_MOVED_FRACTION: Final[float] = 0.2
 """A flow has been released when its magnitude is under this share of the moved megawatts."""
+
+
+def flow_mw_days(*, flow: np.ndarray) -> float:
+    """Return the megawatt-days of flow: the sum of the magnitudes over the half-hours, over 48.
+
+    Args:
+        flow: A flow in megawatts on half-hourly rows.
+
+    Returns:
+        The megawatt-days.
+    """
+    return float(np.sum(np.abs(flow))) / HALF_HOURS_PER_DAY
 
 
 def moved_mw_ratio(*, fitted: np.ndarray, true: np.ndarray) -> float:
@@ -1464,7 +1556,7 @@ def moved_mw_ratio(*, fitted: np.ndarray, true: np.ndarray) -> float:
 
 
 def mw_weighted_recall(*, fitted: np.ndarray, true: np.ndarray) -> float:
-    """Return the share of the true flow's megawatt-hours that the fitted flow recovers.
+    """Return the share of the true flow's megawatt-half-hours that the fitted flow recovers.
 
     Each row counts the smaller of the fitted flow with the true flow's sign, floored at zero, and
     the true flow's magnitude, so a flow on the wrong edge, of the wrong sign, or too large earns
@@ -1632,11 +1724,14 @@ def seed_month_bootstrap(
     level: float,
     n_resamples: int = N_SEED_MONTH_RESAMPLES,
 ) -> tuple[float, float, float]:
-    """Bound the mean of row values by resampling whole calendar months within each seed.
+    """Bound the mean of row values by resampling whole calendar months, the same in every seed.
 
-    Each resample draws, for every seed, as many months as that seed has with replacement, takes
-    the mean of the rows in the drawn months, and averages those means over the seeds. A seed is a
-    set of independent injected transfers, so the seeds are pooled and not resampled.
+    Each resample draws as many months as there are distinct months with replacement, and every seed
+    takes the mean of its rows in the drawn months; the seeds' means are then averaged. A seed is a
+    set of independent injected transfers, so the seeds are pooled and not resampled. The drawn
+    months are shared by all seeds, because the seeds cover the same calendar months and a month's
+    weather affects every seed alike; drawing months separately for each seed would let that shared
+    effect average out and give an interval that is too narrow.
 
     Args:
         values: One value per row, such as a paired difference in quantile score.
@@ -1659,19 +1754,20 @@ def seed_month_bootstrap(
         msg = f"level is a coverage in percent, above 1 and below 100: {level}"
         raise ValueError(msg)
     generator = np.random.default_rng(SEED_MONTH_BOOTSTRAP_SEED)
+    month_labels = np.unique(months)
     cells = []
     for seed in np.unique(seeds):
         chosen = seeds == seed
-        month_labels, inverse = np.unique(months[chosen], return_inverse=True)
-        sums = np.bincount(inverse, weights=values[chosen], minlength=len(month_labels))
-        counts = np.bincount(inverse, minlength=len(month_labels)).astype(float)
+        position = np.searchsorted(month_labels, months[chosen])
+        sums = np.bincount(position, weights=values[chosen], minlength=len(month_labels))
+        counts = np.bincount(position, minlength=len(month_labels)).astype(float)
         cells.append((sums, counts))
     estimate = float(np.mean([sums.sum() / counts.sum() for sums, counts in cells]))
+    draws = generator.integers(0, len(month_labels), size=(n_resamples, len(month_labels)))
+    weight = np.stack([np.bincount(row, minlength=len(month_labels)) for row in draws])
     resampled = np.zeros(n_resamples)
     for sums, counts in cells:
-        draws = generator.integers(0, len(sums), size=(n_resamples, len(sums)))
-        weight = np.stack([np.bincount(row, minlength=len(sums)) for row in draws])
-        resampled += (weight @ sums) / (weight @ counts)
+        resampled += (weight @ sums) / np.maximum(weight @ counts, 1.0)
     resampled /= len(cells)
     tail = (100.0 - level) / 2.0
     return (

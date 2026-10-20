@@ -166,6 +166,7 @@ nav:
           - Research plan: ml-experiments/themes/demand-inputs/plan.md
       - Differentiable physics:
           - Background: ml-experiments/themes/differentiable-physics-background.md
+          - Literature scan: ml-experiments/themes/differentiable-physics-literature.md
           - Demand, calendar, and weather:
               - Summary: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-demand-calendar-and-weather/experiments.md
