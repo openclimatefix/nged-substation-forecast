@@ -32,13 +32,15 @@ LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("144-168 h", 144.0, 168.0),
     ("12-36 h", 12.0, 36.0),
 )
-SIMP1_DIR: Final[Path] = (
+SIMP1_ANCHORS: Final[Path] = (
     common.WORK_DIR.parents[1]
     / "00102-simp1-simplifying-the-bg2-best-guess-before-production"
     / "work"
     / "anchor_preds"
-    / "n1h_nolag"
 )
+SIMP1_DIR: Final[Path] = SIMP1_ANCHORS / "n1h_nolag"
+SIMP1_CUT_DIR: Final[Path] = SIMP1_ANCHORS / "n1h_nolag_cut"
+"""SIMP1's refits with D18's commissioning months cut; D18's X-nl comes from here."""
 E87_PREDICTIONS: Final[Path] = (
     common.WORK_DIR.parents[1]
     / "00087-bg2-best-guess-assembled-with-drop-one-ablations"
@@ -164,7 +166,8 @@ def load_simp1_raw(*, sites: tuple[str, ...]) -> pl.DataFrame:
     for site in sites:
         power = data.power_array(time_series_id=ids[site], effective_capacity_mw=capacity[site])
         for index, refit in enumerate(refits):
-            path = SIMP1_DIR / f"{site}_s0_{refit:%Y%m%dT%H%M}.parquet"
+            folder = SIMP1_CUT_DIR if site == "D18" else SIMP1_DIR
+            path = folder / f"{site}_s0_{refit:%Y%m%dT%H%M}.parquet"
             if not path.exists():
                 continue
             following = (

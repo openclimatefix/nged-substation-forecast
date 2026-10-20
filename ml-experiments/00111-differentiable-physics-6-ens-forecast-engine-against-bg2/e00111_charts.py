@@ -512,7 +512,7 @@ def figure_weeks(*, season: str, shared: dict[str, pl.DataFrame]) -> alt.TopLeve
         .mark_line(strokeWidth=1.3)
         .encode(
             x=alt.X("time:T", title=None, axis=alt.Axis(format="%d %b", tickCount=7)),
-            y=alt.Y("power:Q", title="Power (% of capacity)", scale=alt.Scale(zero=False)),
+            y=alt.Y("power:Q", title=None, scale=alt.Scale(zero=False)),
             color=alt.Color(
                 "series:N",
                 scale=alt.Scale(domain=domain, range=colours),
@@ -521,18 +521,23 @@ def figure_weeks(*, season: str, shared: dict[str, pl.DataFrame]) -> alt.TopLeve
         )
         .properties(width=250, height=70)
     )
-    return chart.facet(
-        row=alt.Row("site:N", sort=list(common.DECISION_SITES), title=None),
-        column=alt.Column("panel:N", sort=["1 day ahead", "6 days ahead"], title=None),
-    ).properties(
-        title=_title(
-            text=f"A {season} week at each decision substation: observed power and four forecasts",
-            subtitle=(
-                "Median forecast made one day ahead (left) and six days ahead (right) of each "
-                "half-hour, against the observed power. Each substation's week is the 7-day block "
-                f"of the scored year in the {season} months with the largest swing in "
-                "observed power."
-            ),
+    return (
+        chart.facet(
+            row=alt.Row("site:N", sort=list(common.DECISION_SITES), title=None),
+            column=alt.Column("panel:N", sort=["1 day ahead", "6 days ahead"], title=None),
+        )
+        .resolve_scale(x="independent")
+        .properties(
+            title=_title(
+                text=f"A {season} week at each decision substation: power and four forecasts",
+                subtitle=(
+                    "Power as a percentage of the substation's effective capacity. Median forecast "
+                    "made one day ahead (left) and six days ahead (right) of each half-hour, "
+                    "against the observed power. Each substation's week is the 7-day block "
+                    f"of the scored year in the {season} months with the largest swing in "
+                    "observed power."
+                ),
+            )
         )
     )
 
