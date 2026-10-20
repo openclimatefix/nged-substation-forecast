@@ -201,53 +201,6 @@ def figure_by_site(*, data: dict) -> alt.TopLevelMixin:
     domain = [a for a in ARM_LABELS if a in set(table["arm"].to_list())]
     chart = (
         alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_line(point=True, strokeWidth=2)
-        .encode(
-            x=alt.X("day:O", title="Lead (days after the 09:00 UTC forecast origin)"),
-            y=alt.Y(
-                "qs:Q",
-                title="Mean quantile score (points of capacity; smaller is better)",
-                scale=alt.Scale(zero=False),
-            ),
-            color=alt.Color(
-                "label:N",
-                scale=alt.Scale(
-                    domain=[ARM_LABELS[a] for a in domain], range=[ARM_COLOURS[a] for a in domain]
-                ),
-                legend=alt.Legend(
-                    title=None, orient="top", columns=2, labelLimit=330, symbolType="stroke"
-                ),
-            ),
-        )
-        .properties(width=WIDTH - 60, height=260)
-    )
-    return chart.properties(
-        title=_title(
-            text="Every arm scores worse as the lead grows",
-            subtitle=(
-                "Mean quantile score over the five decision substations by day of lead, on the "
-                "rows "
-                "every arm holds, scored year, rows outside the switching events."
-            ),
-        )
-    )
-
-
-def figure_by_site(*, data: dict) -> alt.TopLevelMixin:
-    """Mean quantile score per decision substation and arm."""
-    rows = list(data["headline_scores_decision"])
-    table = (
-        pl.DataFrame(rows)
-        .group_by("arm", "site")
-        .agg(qs=(pl.col("qs") * pl.col("n")).sum() / pl.col("n").sum())
-        .with_columns(label=pl.col("arm").replace(ARM_LABELS))
-    )
-    table = table.with_columns(site_label=pl.col("site")).filter(
-        pl.col("site_label").is_in(list(common.DECISION_SITES))
-    )
-    domain = [a for a in ARM_LABELS if a in set(table["arm"].to_list())]
-    chart = (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70)
         .encode(
             y=alt.Y("site_label:N", sort=list(common.DECISION_SITES), title=None),
