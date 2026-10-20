@@ -111,7 +111,9 @@ def x_bar() -> str:
     scores = {}
     for arm in ("x_2y", "x_2yamq"):
         frame = load_arm(label="tuning", arm=arm)
-        scores[arm] = float(frame.filter(pl.col("site_name").is_in(DECISION))["qs"].mean())
+        scores[arm] = float(
+            frame.filter(pl.col("site_name").is_in(DECISION))["qs"].to_numpy().mean()
+        )
     return min(scores, key=lambda arm: scores[arm])
 
 
@@ -452,13 +454,15 @@ def onboarding_curve() -> pl.DataFrame:
         ):
             n_frame = load_arm(label=label, arm=n_arm).filter(pl.col("site_name").is_in(DECISION))
             g_frame = load_arm(label=label, arm=g_arm).filter(pl.col("site_name").is_in(DECISION))
+            n_score = float(n_frame["qs"].to_numpy().mean())
+            g_score = float(g_frame["qs"].to_numpy().mean())
             rows.append(
                 {
                     "year": label,
                     "weeks of history": weeks,
-                    "N": n_frame["qs"].mean(),
-                    "G": g_frame["qs"].mean(),
-                    "N minus G": n_frame["qs"].mean() - g_frame["qs"].mean(),
+                    "N": n_score,
+                    "G": g_score,
+                    "N minus G": n_score - g_score,
                 }
             )
     return pl.DataFrame(rows)

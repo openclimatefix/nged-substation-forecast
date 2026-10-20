@@ -129,13 +129,13 @@ def figure_1_contrasts(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixi
     )
     y = alt.Y("contrast:N", sort=order, title=None, axis=alt.Axis(labelLimit=260))
     offset = alt.YOffset("year:N", sort=["Scored year", "Replicate year"])
-    base = alt.Chart(data)  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(data)
     rule = (
         alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="#808080", strokeDash=[4, 3])
         .encode(x="x:Q")
     )
-    bars = base.mark_rule(strokeWidth=2).encode(
+    bars = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "low:Q", title="Quantile score difference (points of capacity; negative is better)"
         ),
@@ -144,7 +144,7 @@ def figure_1_contrasts(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixi
         yOffset=offset,
         color=colour,
     )
-    dots = base.mark_point(filled=True, size=70).encode(
+    dots = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
         x="estimate:Q", y=y, yOffset=offset, color=colour, tooltip=["contrast", "year", "better"]
     )
     return (rule + bars + dots).properties(
@@ -208,7 +208,7 @@ def figure_3_curve(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         scale=alt.Scale(domain=["N pooled", "G per site"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
         legend=alt.Legend(orient="top", title=None),
     )
-    base = alt.Chart(labelled).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(labelled).encode(
         x=alt.X(
             "weeks of history:Q",
             scale=alt.Scale(type="log", domain=[1.6, 32]),
@@ -218,9 +218,9 @@ def figure_3_curve(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         y=alt.Y("score:Q", title="Score (points)", scale=alt.Scale(domain=[0, 10])),
         color=colour,
     )
-    chart = (base.mark_line(strokeWidth=2) + base.mark_point(filled=True, size=50)).properties(
-        width=WIDTH, height=150
-    )
+    chart = (
+        base.mark_line(strokeWidth=2) + base.mark_point(filled=True, size=50)  # ty: ignore[unsupported-operator]
+    ).properties(width=WIDTH, height=150)
     return chart.facet(row=alt.Row("year:N", title=None)).properties(
         title=_title(
             text="The gain from pooling falls as the new substation's history grows",
@@ -246,7 +246,7 @@ def figure_4_lambda() -> alt.TopLevelMixin:
         scale=alt.Scale(domain=["4 weeks", "3 months"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
         legend=alt.Legend(orient="top", title=None),
     )
-    base = alt.Chart(long).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(long).encode(
         x=alt.X(
             "lam:Q",
             scale=alt.Scale(type="log"),
@@ -268,7 +268,9 @@ def figure_4_lambda() -> alt.TopLevelMixin:
         .encode(x="lam:Q")
     )
     return (
-        base.mark_line(strokeWidth=2) + base.mark_point(filled=True, size=50) + star
+        base.mark_line(strokeWidth=2)  # ty: ignore[unsupported-operator]
+        + base.mark_point(filled=True, size=50)
+        + star
     ).properties(
         width=WIDTH,
         height=200,
@@ -288,7 +290,7 @@ def figure_5_gate() -> alt.TopLevelMixin:
     data = table.with_columns(
         status=pl.when(pl.col("passed")).then(pl.lit("passed")).otherwise(pl.lit("failed"))
     )
-    base = alt.Chart(data).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(data).encode(
         x=alt.X("run:N", title=None, axis=alt.Axis(labelAngle=0)),
         y=alt.Y(
             "line:N",
@@ -297,7 +299,7 @@ def figure_5_gate() -> alt.TopLevelMixin:
             axis=alt.Axis(labelLimit=320),
         ),
     )
-    rects = base.mark_rect(stroke="white").encode(
+    rects = base.mark_rect(stroke="white").encode(  # ty: ignore[unresolved-attribute]
         color=alt.Color(
             "status:N",
             scale=alt.Scale(domain=["passed", "failed"], range=[ocf.DATA_GREEN, ocf.BRAND_ORANGE]),

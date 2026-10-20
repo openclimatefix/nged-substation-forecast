@@ -58,6 +58,7 @@ from studies.dp_gam import (
 )
 from studies.dp_gam_pooled import (
     POOLED_FAMILIES,
+    PooledFamilyType,
     PoolingStrength,
     centring_matrix,
     fit_pooled,
@@ -134,7 +135,7 @@ def _family_truth(
     sizes = {f: layout.slices[f].stop - layout.slices[f].start for f in POOLED_FAMILIES}
     offsets = dict(zip(POOLED_FAMILIES, np.cumsum([0, *sizes.values()])[:-1], strict=True))
 
-    def block(family: str) -> slice:
+    def block(family: PooledFamilyType) -> slice:
         return slice(int(offsets[family]), int(offsets[family]) + sizes[family])
 
     mean_fit: dict[str, np.ndarray] = {}
