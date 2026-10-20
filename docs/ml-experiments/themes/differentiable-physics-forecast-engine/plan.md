@@ -10,7 +10,7 @@ order for the maintainer to change.
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter in the production serving path (proposed) | Does a Kalman filter on the recent residuals of the production XGBoost blend lower its day-ahead score as it does for the convex model? | 1 | Nothing; a candidate for the next release review | Proposed |
 | W1, a diurnal-shape state | Does a second filter state for the shape of the day lower the convex model's day-ahead error? | Running | Nothing | Running (experiment 115) |
-| N8, ensemble members through the DP | Does running each ensemble member through the DP give better-calibrated spread than residual quantiles? | 4 | Part 6 merged, and a free GPU | Proposed |
+| [Experiment 125 (N8)](../../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md), ensemble members through GAM-K and the spread around them | Does GAM-K's residual table, fitted on ensemble-mean residuals, count the weather error twice, and does a table fitted on analysis-driven forecasts, placed around each of the 51 members, calibrate the tails better than today's table rescaled by the same factors? | 1 | Nothing (CPU only; the new metric module waits for its review before the scored-year fit) | Planned |
 | N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly zero where both sides are metered? | 5 | Nothing | Proposed |
 | Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals calibrate the tails better than residual quantiles? | 6 | CAL, if the maintainer restarts it | Proposed |
 | Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles? | 7 | CAL, and the quantile regression above | Proposed |
@@ -28,14 +28,12 @@ and which re-spreading of the same mean forecast fixes the bands that are not. E
 substations in winter, the night hours, and one or two lead bands. Curtailment depends on the upper
 tail, so those cells matter more than the pooled figure.
 
-**The mean forecast stays fixed, and only the spread changes.** Five methods are candidates, each
+**The mean forecast stays fixed, and only the spread changes.** Four methods are candidates, each
 reusing the stored fits of experiment 111 so that no new model is fitted:
 
 - a rolling conformal offset per substation, lead band, and quantile;
 - the Kalman filter's own predictive variance, scaled by a table of standardised residuals;
 - the same variance widened by the spread across the ensemble members;
-- a model-error spread placed around each member, estimated from forecasts driven by the analysis
-  proxy so that the weather-forecast error is not counted twice;
 - separate lower and upper widening factors per lead band.
 
 **A cell counts as calibrated when its coverage lies within a binomial band set by the number of
@@ -65,14 +63,14 @@ day's shape from the model's day-type profile lowers the day-ahead error of the 
 Kalman filter. The idea comes from the remaining day-ahead error being mostly in the shape of the
 day, and not in its level. The result goes in the experiment's own write-up.
 
-## N8: ensemble members through the DP
+## N8: ensemble members through GAM-K and the spread around them
 
-**Running each of the 50 perturbed ensemble members through the DP lets weather uncertainty enter
-physically, through heating and solar output.** The comparison arms are member propagation,
-residual quantiles, and the two combined, plus the Kalman filter run on ensemble-driven residuals by
-lead. The fit is unchanged, so the work is feature preparation, which is CPU and disk bound, plus
-about one GPU hour. CAL's model-error arm is a cheaper version of the same question, so N8 waits for
-CAL's result if the maintainer restarts it.
+**Experiment 125 tests whether the weather error is counted twice in GAM-K's bands.** The residual
+table is fitted on observed demand minus the corrected ensemble mean, so it already holds the
+weather error that the 51 members carry, and it is then placed around every member. The plan
+compares today's table, today's table re-tuned on a wider factor grid, and a table fitted on forecasts
+driven by the analysis proxy and placed around each member, on tail coverage and tail pinball,
+winter first. The work reuses experiment 111's stored fits and runs on the CPU.
 
 ## N7: paired residuals at switching events
 
