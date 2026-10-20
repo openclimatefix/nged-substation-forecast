@@ -324,41 +324,6 @@ def figure_variants() -> alt.TopLevelMixin:
     )
 
 
-def figure_fleet() -> alt.TopLevelMixin:
-    """Megawatt-days of flow on each edge of the decision graph, mean of two years."""
-    rows = []
-    for year in ("replicate", "scored"):
-        flows = flows_module.read_flows(year_name=year)
-        for name, flow in flows.items():
-            if name == "position" or name.startswith("outside"):
-                continue
-            rows.append({"pair": name, "year": year, "mw_days": float(np.sum(np.abs(flow)) / 48.0)})
-    table = pl.DataFrame(rows).group_by("pair").agg(pl.col("mw_days").mean())
-    order = table.sort("mw_days", descending=True)["pair"].to_list()
-    return (
-        alt.Chart(table)  # ty: ignore[unresolved-attribute]
-        .mark_bar(color=ocf.DATA_BLUE)
-        .encode(
-            y=alt.Y("pair:N", sort=order, title=None),
-            x=alt.X(
-                "mw_days:Q", title="Flow the registered fit puts on the edge (MW-days per year)"
-            ),
-        )
-        .properties(
-            width=WIDTH - 100,
-            height=14 * len(order),
-            title=title(
-                text="Where the registered fit puts flow",
-                subtitle=(
-                    "Mean over the replicate and scored years of the megawatt-days of flow on each "
-                    "edge of the decision graph, with the registered penalties. The placebo pairs "
-                    "carry about zero in this fit."
-                ),
-            ),
-        )
-    )
-
-
 WINTER_WEEK: Final[tuple[str, str]] = ("2025-12-01", "2025-12-08")
 SUMMER_WEEK: Final[tuple[str, str]] = ("2026-06-01", "2026-06-08")
 """The two weeks every card shows. Fixed before any score was read: the first full weeks of
@@ -768,7 +733,6 @@ FIGURES: Final[dict[str, Callable[[], alt.TopLevelMixin]]] = {
     "variants": figure_variants,
     "headline": figure_headline,
     "transfer_weeks": figure_transfer_weeks,
-    "fleet": figure_fleet,
     **{
         f"card_{site}": (lambda site=site: figure_card(site=site)) for site in common.DECISION_SITES
     },
