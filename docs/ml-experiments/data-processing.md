@@ -394,6 +394,24 @@ labels. Treat it as interpolated, not as a separate measurement
 experiments. Confidence: high, because the mean absolute difference from the neighbours' average is
 zero.
 
+**Rebuild a new substation's effective capacity from its own rows before a model pools it in points,
+and fit its solar capacity from the same rows.** A power series is divided by its effective capacity,
+the 99th percentile of its absolute power over its history, and a substation with 4 weeks of history
+has only that window to take the percentile from. In experiment 109 the capacity rebuilt from June
+windows was 1.09 to 2.04 times smaller than the whole-history capacity, and from January windows 0.91
+to 1.01 times, so a model that pools coefficients in points sees a June substation as larger than it
+is. The vintage capacity of such a substation is fitted on its whole history, so a model that reads it
+for a short window leaks the future. Applies to experiments that pool a substation with a short
+history, and to onboarding in production. Evidence: [experiment
+109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) (scored year, six
+held-out Primaries; provisional until the reviews finish).
+
+**Do not pool a capacity read from a vintage fitted long after the cut.** In a joint fit such a
+capacity moves the fleet mean, and so every other substation's forecast. Give the substation a
+capacity fitted from its own rows before the cut instead (D9 at the 2024-07-01 cut and D18 at the
+2025-07-01 cut, [experiment
+109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md); provisional).
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers

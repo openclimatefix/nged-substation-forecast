@@ -211,11 +211,11 @@ def figure_3_curve(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
     base = alt.Chart(labelled).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "weeks of history:Q",
-            scale=alt.Scale(type="log"),
+            scale=alt.Scale(type="log", domain=[1.6, 32]),
             axis=alt.Axis(values=[2, 4, 8, 14, 26]),
             title="Weeks of history at the new substation (log scale)",
         ),
-        y=alt.Y("score:Q", title="Quantile score (points; smaller is better)"),
+        y=alt.Y("score:Q", title="Score (points)", scale=alt.Scale(domain=[0, 10])),
         color=colour,
     )
     chart = (base.mark_line(strokeWidth=2) + base.mark_point(filled=True, size=50)).properties(
@@ -224,7 +224,10 @@ def figure_3_curve(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
     return chart.facet(row=alt.Row("year:N", title=None)).properties(
         title=_title(
             text="The gain from pooling falls as the new substation's history grows",
-            subtitle="Mean over the five decision sites; each takes a turn as the new substation.",
+            subtitle=(
+                "Quantile score in points of capacity; smaller is better. Mean over the five "
+                "decision sites; each takes a turn as the new substation."
+            ),
         )
     )
 
@@ -244,7 +247,14 @@ def figure_4_lambda() -> alt.TopLevelMixin:
         legend=alt.Legend(orient="top", title=None),
     )
     base = alt.Chart(long).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("lam:Q", scale=alt.Scale(type="log"), title="Deviation penalty (rows of evidence)"),
+        x=alt.X(
+            "lam:Q",
+            scale=alt.Scale(type="log"),
+            axis=alt.Axis(
+                values=[100, 300, 1000, 3000, 10000, 30000, 100000, 1000000], format="~s"
+            ),
+            title="Deviation penalty (rows of evidence)",
+        ),
         y=alt.Y(
             "ratio:Q",
             title="Score over the unpooled score (smaller is better)",
@@ -280,7 +290,12 @@ def figure_5_gate() -> alt.TopLevelMixin:
     )
     base = alt.Chart(data).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("run:N", title=None, axis=alt.Axis(labelAngle=0)),
-        y=alt.Y("line:N", sort=table["line"].unique(maintain_order=True).to_list(), title=None),
+        y=alt.Y(
+            "line:N",
+            sort=table["line"].unique(maintain_order=True).to_list(),
+            title=None,
+            axis=alt.Axis(labelLimit=320),
+        ),
     )
     rects = base.mark_rect(stroke="white").encode(
         color=alt.Color(
@@ -350,7 +365,7 @@ def figure_6_weeks() -> alt.TopLevelMixin:
             .encode(
                 x=alt.X(
                     "day:Q",
-                    title="Days since Monday 00:00 UTC",
+                    title="Day",
                     axis=alt.Axis(values=list(range(8))),
                     scale=alt.Scale(domain=[0, 7]),
                 ),
@@ -373,7 +388,7 @@ def figure_6_weeks() -> alt.TopLevelMixin:
             text="Four weeks of June history, one summer week and one winter week",
             subtitle=(
                 "Median forecasts of the pooled and the per-site model that held only the 4 weeks "
-                "before 2025-07-01, against the measured power."
+                "before 2025-07-01, against the measured power. Day 0 is Monday 00:00 UTC."
             ),
         )
     )

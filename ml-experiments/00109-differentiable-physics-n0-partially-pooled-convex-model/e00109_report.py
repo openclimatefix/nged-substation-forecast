@@ -24,6 +24,7 @@ from functools import cache
 from pathlib import Path
 from typing import Final
 
+import e00109_arms as arms
 import e00109_common as common
 import numpy as np
 import polars as pl
@@ -521,21 +522,46 @@ def decision(*, gate_passed: bool) -> dict[str, object]:
 
 
 def capacity_sources() -> str:
-    """Return how the fits of N and N-4w set each site's capacity, one line per cut and site."""
-    path = common.WORK_DIR / "capacity_sources.json"
-    if not path.exists():
-        return "none\n"
-    stored = json.loads(path.read_text())
-    lines = ["cut,arm,target,site,source"]
-    for name in sorted(stored):
-        cut, _, arm = name.partition("_")
-        if arm not in ("n", "n_4w", "n_3m"):
-            continue
-        for target, by_site in sorted(stored[name].items()):
-            if arm == "n":
-                lines.extend(f"{cut},{arm},-,{site},{source}" for site, source in by_site.items())
-                break
-            lines.append(f"{cut},{arm},{target},{target},{by_site[target]}")
+    """Return how each fit sets each site's capacity, one line per cut, arm, and site.
+
+    A site is `pinned` to the real-time vintage, `fitted_late_vintage` when the vintage is fitted
+    long after the cut (so the capacity is fitted from the site's own rows before the cut), or
+    `fitted_short_window` for the short-history site.
+    """
+    cache, vintages = arms.load_source(source=arms.Source())
+    lines = ["cut,arm,held_out,site,source"]
+    for cut_name in ("replicate", "scored", "winter"):
+        cut = common.CUTS[cut_name]
+        if cut_name != "winter":
+            built = arms.build_arm(
+                cache=cache,
+                vintages=vintages,
+                cut=cut,
+                config=arms.ArmConfig(name="n"),
+                held_out=None,
+                history=None,
+            )
+            lines.extend(
+                f"{cut_name},n,-,{site},{source}" for site, source in built.capacity_sources.items()
+            )
+        for history in (common.FOUR_WEEKS, common.THREE_MONTHS):
+            if cut_name == "winter" and history is not common.FOUR_WEEKS:
+                continue
+            for site in common.HELD_OUT_SITES:
+                try:
+                    built = arms.build_arm(
+                        cache=cache,
+                        vintages=vintages,
+                        cut=cut,
+                        config=arms.ArmConfig(name="n_short", history=history),
+                        held_out=site,
+                        history=history,
+                    )
+                except ValueError:
+                    continue
+                lines.append(
+                    f"{cut_name},n_{history.label},{site},{site},{built.capacity_sources[site]}"
+                )
     return "\n".join(lines) + "\n"
 
 

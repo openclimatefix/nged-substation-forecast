@@ -182,7 +182,7 @@ def figure_heating(*, joint: PooledFit, unpooled: PooledFit) -> alt.TopLevelMixi
     )
     return chart.properties(
         title=alt.TitleParams(
-            text="Each substation's heating response sits close to the fleet mean",
+            text="Pooling pulls each substation's heating response towards the fleet mean",
             subtitle=[
                 (
                     "Pooled model N at the 2025-07-01 cut, 2 years of history per substation. "
@@ -215,7 +215,10 @@ def figure_capacity(*, rows: list) -> alt.TopLevelMixin:
         alt.Chart(table)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70)
         .encode(
-            x=alt.X("points:Q", title="Solar capacity (points of the site's rebuilt capacity)"),
+            x=alt.X(
+                "points:Q",
+                title="Solar capacity (points of the site's whole-history effective capacity)",
+            ),
             y=alt.Y("site:N", sort=list(SITES), title=None),
             color=alt.Color(
                 "source:N",
@@ -241,12 +244,9 @@ def figure_capacity(*, rows: list) -> alt.TopLevelMixin:
                 subtitle=[
                     (
                         "Fits at the 2025-07-01 cut where the substation keeps only its last 4 "
-                        "weeks or 3 months. Points of each"
+                        "weeks or 3 months, against"
                     ),
-                    (
-                        "substation's own rebuilt capacity for the fitted dots, and of its "
-                        "whole-history capacity for the vintage."
-                    ),
+                    "the capacity fitted to its whole history by the real-time vintage.",
                 ],
                 anchor="start",
                 fontSize=14,
@@ -264,8 +264,8 @@ def short_capacity(*, strength: PoolingStrength, ridge: dict[str, float]) -> dic
         ridge: The per-site comparator's ridge for each history, from `tuned.json`.
 
     Returns:
-        For each site, the capacity of the last season-year the fit trained on, in points of the
-        site's rebuilt capacity, for each of the four fits.
+        For each site, the capacity of the last season-year the fit trained on, converted back to
+        points of the site's whole-history effective capacity, for each of the four fits.
     """
     cache, vintages = arms.load_source(source=arms.Source())
     cut = common.SCORED_CUT
@@ -293,7 +293,10 @@ def short_capacity(*, strength: PoolingStrength, ridge: dict[str, float]) -> dic
                     cache=built.cache, sites=built.sites, cut=cut, strengths=[model_strength]
                 )
                 fit: GamFit = joint.fits[site]
-                out[site][f"{label}-{name} fit"] = fit.capacity_points()[fit.last_season_year]
+                scale = built.transform.scale if built.transform is not None else 1.0
+                out[site][f"{label}-{name} fit"] = (
+                    fit.capacity_points()[fit.last_season_year] / scale
+                )
     return out
 
 

@@ -160,22 +160,22 @@
     {
       "site": "D5",
       "source": "N-4w fit",
-      "points": 79.28644574740456
+      "points": 46.04072386451907
     },
     {
       "site": "D5",
       "source": "G-4w fit",
-      "points": 23.416910046322194
+      "points": 13.597929369135523
     },
     {
       "site": "D5",
       "source": "N-3m fit",
-      "points": 70.05801969358093
+      "points": 45.603571098843354
     },
     {
       "site": "D5",
       "source": "G-3m fit",
-      "points": 47.0190908109133
+      "points": 30.60660949562813
     },
     {
       "site": "D10",
@@ -185,22 +185,22 @@
     {
       "site": "D10",
       "source": "N-4w fit",
-      "points": 61.29962144922561
+      "points": 36.17007070883737
     },
     {
       "site": "D10",
       "source": "G-4w fit",
-      "points": 30.790018296612324
+      "points": 18.167765356223633
     },
     {
       "site": "D10",
       "source": "N-3m fit",
-      "points": 69.78013661246212
+      "points": 41.97809228474075
     },
     {
       "site": "D10",
       "source": "G-3m fit",
-      "points": 54.91727015940878
+      "points": 33.03694069246048
     },
     {
       "site": "D11",
@@ -210,22 +210,22 @@
     {
       "site": "D11",
       "source": "N-4w fit",
-      "points": 40.798005149157134
+      "points": 30.294969157683347
     },
     {
       "site": "D11",
       "source": "G-4w fit",
-      "points": 15.524068972231351
+      "points": 11.527553589840508
     },
     {
       "site": "D11",
       "source": "N-3m fit",
-      "points": 36.475290234327325
+      "points": 28.68398753231641
     },
     {
       "site": "D11",
       "source": "G-3m fit",
-      "points": 26.835426957992603
+      "points": 21.10324681016601
     },
     {
       "site": "D14",
@@ -235,22 +235,22 @@
     {
       "site": "D14",
       "source": "N-4w fit",
-      "points": 42.71574401652535
+      "points": 28.607396497067555
     },
     {
       "site": "D14",
       "source": "G-4w fit",
-      "points": 19.282097591581916
+      "points": 12.913519916313172
     },
     {
       "site": "D14",
       "source": "N-3m fit",
-      "points": 43.2504895846134
+      "points": 31.438405887271326
     },
     {
       "site": "D14",
       "source": "G-3m fit",
-      "points": 33.19061471778729
+      "points": 24.125970068025655
     },
     {
       "site": "D16",
@@ -260,22 +260,22 @@
     {
       "site": "D16",
       "source": "N-4w fit",
-      "points": 49.5730809923578
+      "points": 35.993484520729126
     },
     {
       "site": "D16",
       "source": "G-4w fit",
-      "points": 20.935104612192685
+      "points": 15.20033350186498
     },
     {
       "site": "D16",
       "source": "N-3m fit",
-      "points": 48.302833639575574
+      "points": 35.16690219592544
     },
     {
       "site": "D16",
       "source": "G-3m fit",
-      "points": 36.24842051947727
+      "points": 26.39068069333323
     }
   ],
   "capacity_sources": {
