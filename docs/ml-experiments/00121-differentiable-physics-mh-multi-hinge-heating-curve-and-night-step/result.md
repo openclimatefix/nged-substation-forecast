@@ -258,6 +258,34 @@ are agreed with the experiment manager.
   audit trigger 5 fires. Gate 4 as written covers nothing. Gate 4' was written after gate 4 had
   failed by construction; the first-run results of both are kept in the write-up. The NS label is
   the best label among N2, N3, and N4.
+- **Gate 4' as first written is kept, and gate 4'' replaces it (redefined after seeing gate 4'
+  fail, before any replicate-year or scored-year fit; agreed with the experiment manager).** Gate
+  4' as first written failed: NS-U beat B0 on British Summer Time (BST) nights in 74% of draws (80%
+  needed), B0 beat NS-U on a local-time step in 60%, and NS-HW beat B0 on winter nights with a
+  cold-dependent step in 72% (90% needed); the descriptive 01:00 version gave 77%, 45%, and 80%.
+  Those thresholds were set without a statement of the effect size or of a power target. Gate 4''
+  derives its thresholds from both, and they are fixed here before the gate runs. If gate 4'' fails,
+  the labels it covers stay `not powered`, the verdict stays `inconclusive`, and the gate is not
+  redefined again.
+    - **Injected steps.** A step of 4 MW and a step of 7 MW (the sizes seen at D5, D10, and D16,
+      where one point of the quantile score's unit is one MW) in the half-hour starting 00:30. The
+      night-row noise has a standard deviation of 4.6 to 7.7 points at D5 and D10, so 4 MW is about
+      one noise standard deviation. Three kinds: a flat step on the UTC clock all year (`utc`), a flat
+      step on the local clock all year (`local`), and a cold-dependent step on the UTC clock (`cold`,
+      equal to a constant times the 15.5 C hinge of the first smoothed temperature, scaled so the mean
+      over the winter rows of that half-hour equals the stated size). A `placebo` has no step.
+    - **Statistic.** For an arm, the mean quantile score minus B0's on the label's own rows (BST
+      nights for NS-U, winter nights for NS-H and NS-HW), unfiltered, on the same noise.
+    - **Critical value.** The 5th percentile of the statistic over 100 placebo draws (20 per
+      substation, draws 0 to 19). An arm detects a step in a draw when its statistic is below the
+      critical value, so the false-positive rate on the placebo is 5% by construction. It is checked
+      on 100 further placebo draws (draws 100 to 119), where at most 10% must detect.
+    - **Pass.** (a) NS-U detects the 4 MW `utc` step in at least 80% of draws, and detects the 4 MW
+      `local` step in at most 10% of draws (so the clock is identified); (b) NS-HW detects the 4 MW
+      `cold` step in at least 80% of draws; (c) NS-H detects the 4 MW `cold` step in at least 80%
+      of draws. (a) covers N2 and the indexing contrast, (b) covers N4, and (c) covers N3.
+    - **Descriptive.** The same statistics for 7 MW, and on the rows of the injected half-hour only,
+      per substation. These cannot rescue a label.
 - **Scoring rows and wording of gate 4'.** "Beats" means a lower mean quantile score (unfiltered,
   as in gate 4) over the stated rows, and a tie is not a beat. Gate 4'(a) scores all
   22:00-to-08:00 British Summer Time (BST) night rows. Gate 4'(b) scores all winter-night rows. The
