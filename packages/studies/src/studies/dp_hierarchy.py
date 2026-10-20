@@ -709,6 +709,7 @@ def solve_joint(
     weights: Sequence[float],
     primary_power: Mapping[str, np.ndarray] | None = None,
     bsp_readings: Mapping[str, np.ndarray] | None = None,
+    excluded_rows: Mapping[str, np.ndarray] | None = None,
 ) -> JointFit:
     """Solve the joint problem of an assembly for each BSP weight, for given readings.
 
@@ -722,6 +723,9 @@ def solve_joint(
             Primary not named keeps the cache's.
         bsp_readings: Replacement readings of BSPs in MW, each on the cache grid; a BSP not named
             keeps its own.
+        excluded_rows: Grid rows to leave out of a Primary's own loss (not out of the BSP rows),
+            for example the rows of a known metering error. The Primary's penalties keep the
+            scale of its full training set.
 
     Returns:
         The fitted batch.
@@ -729,13 +733,26 @@ def solve_joint(
     cache, device, dtype = assembly.cache, assembly.device, assembly.dtype
     primary_power = primary_power or {}
     bsp_readings = bsp_readings or {}
+    excluded_rows = excluded_rows or {}
+    base = assembly.base
     rhs0 = torch.zeros(assembly.base.shape[0], dtype=dtype, device=device)
     hint_rhs = torch.zeros_like(rhs0)
     for site in assembly.sites:
         y = primary_power.get(site, cache.sites[site].y)[assembly.indices[site]]
         target = torch.as_tensor(y + assembly.site_target_offsets[site], dtype=dtype, device=device)
+        design = assembly.site_designs[site]
         scale = 1.0 / assembly.sigma_points[site] ** 2
-        rhs0[assembly.offsets[site]] = scale * (assembly.site_designs[site].T @ target)
+        block = assembly.offsets[site]
+        if site in excluded_rows:
+            dropped = torch.as_tensor(
+                np.isin(assembly.indices[site], excluded_rows[site]), device=device
+            )
+            design, target = design[~dropped], target[~dropped]
+            removed = assembly.site_designs[site][dropped]
+            if base is assembly.base:
+                base = assembly.base.clone()
+            base[block, block] -= scale * (removed.T @ removed)
+        rhs0[block] = scale * (design.T @ target)
     for bsp in assembly.bsps:
         index = assembly.bsp_indices[bsp.name]
         reading = bsp_readings.get(bsp.name, bsp.reading_mw)[index]
@@ -747,7 +764,7 @@ def solve_joint(
         ) / bsp.sigma_mw**2
     w = torch.as_tensor(list(weights), dtype=dtype, device=device)
     theta, violation = solve_bounded_quadratic(
-        matrix=assembly.base[None] + w[:, None, None] * assembly.hint[None],
+        matrix=base[None] + w[:, None, None] * assembly.hint[None],
         rhs=rhs0[None]
         + w[:, None] * hint_rhs[None]
         - 0.5 * (assembly.base_cost[None] + w[:, None] * assembly.hint_cost[None]),

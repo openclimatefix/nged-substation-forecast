@@ -688,3 +688,34 @@ def test_a_window_per_primary_gives_the_same_fit_as_one_shared_window(two_sites:
     )
     assert narrower.n_site_rows["S2"] < shared.n_site_rows["S2"]
     assert narrower.n_site_rows["S1"] == shared.n_site_rows["S1"]
+
+
+def test_excluding_rows_from_a_primary_equals_fitting_without_those_readings(
+    two_sites: FeatureCache,
+):
+    # With a spec whose penalties do not scale with the number of rows, leaving rows out of the
+    # Primary's own loss equals a fresh fit in which those readings are missing. The BSP rows
+    # keep them either way.
+    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    window = (two_sites.end_times > np.datetime64("2024-01-01T00:00", "us")) & (
+        two_sites.end_times <= np.datetime64("2024-02-15T00:00", "us")
+    )
+    rows = np.flatnonzero(window)
+    assembly = assemble_joint(
+        cache=two_sites,
+        specs={"S1": SPEC, "S2": SPEC},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(step_penalty=1.0, shape_ridge=1e-3),
+        sigma_points=SIGMA_POINTS,
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    cached = solve_joint(assembly=assembly, weights=[0.0, 5.0], excluded_rows={"S1": rows})
+    missing = np.where(window, np.nan, two_sites.sites["S1"].y)
+    cache = replace(
+        two_sites, sites={**two_sites.sites, "S1": replace(two_sites.sites["S1"], y=missing)}
+    )
+    fresh = _fit(cache=cache, bsp=bsp, weights=[0.0, 5.0])
+    assert np.allclose(cached.theta, fresh.theta, rtol=1e-6, atol=1e-6)
+    assert not np.allclose(cached.theta, solve_joint(assembly=assembly, weights=[0.0, 5.0]).theta)
