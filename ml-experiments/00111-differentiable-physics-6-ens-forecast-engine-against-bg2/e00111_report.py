@@ -10,6 +10,7 @@ contrasts C1 to C4 are read at 98.75% (a Bonferroni correction across four), the
 
 import argparse
 import contextlib
+import json
 from typing import Final
 
 import e00111_common as common
@@ -239,6 +240,41 @@ def headline_scores(*, loaded: dict[str, pl.DataFrame]) -> list[dict]:
     return rows
 
 
+def settings_lines() -> list[str]:
+    """Return the tuned settings, the gate summary, the calibration range, and the GPU hours."""
+    import e00111_arms as arms
+
+    tuned = arms.read_tuned()
+    drift = json.loads((common.WORK_DIR / "drift.json").read_text())
+    gate = json.loads((common.WORK_DIR / "gate.json").read_text())
+    lines = ["", "## Settings"]
+    lines.append(f"- solar shrink per lead band: {tuned['solar_shrink']}")
+    lines.append(f"- spread factors per lead band: {tuned['spread_factors']}")
+    lines.append(
+        f"- GAM-0 drift step: chosen {drift['chosen_step']:g} from {drift['grid']}, "
+        f"interior to the grid: {drift['chosen_is_interior']}; mean scores "
+        f"{ {k: round(v, 4) for k, v in drift['mean_score'].items()} }"
+    )
+    passed = sum(1 for c in gate["checks"] if c["passed"])
+    lines.append(f"- gate: {passed} of {len(gate['checks'])} readings pass")
+    shifts, ratios = [], []
+    for site in common.DECISION_SITES:
+        calibration = arms.load_calibration(site=site)
+        shifts.append(calibration.temperature_shift_c)
+        ratios.append(calibration.irradiance_ratio[:, :, 1:])
+    lines.append(
+        f"- calibration over the decision sites: temperature shift {np.min(shifts):+.2f} to "
+        f"{np.max(shifts):+.2f} K (mean {np.mean(shifts):+.2f}); irradiance ratio in daylight "
+        f"bands {np.min(ratios):.2f} to {np.max(ratios):.2f} (mean {np.mean(ratios):.2f})"
+    )
+    seconds = sum(
+        json.loads(line)["seconds"]
+        for line in (common.WORK_DIR / "gpu_hours.jsonl").read_text().splitlines()
+    )
+    lines.append(f"- logged XGBoost job time: {seconds / 3600:.2f} job-hours")
+    return lines
+
+
 def render_report(*, results: dict) -> list[str]:
     """Return the report's lines: every contrast, then the checks tables."""
     lines = ["# Experiment 111 report", ""]
@@ -268,6 +304,7 @@ def render_report(*, results: dict) -> list[str]:
         )
         lines.append(f"    - leave one site out: {loso}")
     lines += ["", "Skipped (arm missing): " + "; ".join(results["skipped"])]
+    lines += settings_lines()
     for sites_label in ("decision",):
         lines += ["", f"## Median forecast minus mean forecast ({sites_label} sites, points)"]
         table = pl.DataFrame(results[f"median_minus_mean_{sites_label}"])
