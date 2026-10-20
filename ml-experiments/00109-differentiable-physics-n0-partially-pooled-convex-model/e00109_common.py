@@ -55,6 +55,9 @@ FULL_WINDOW: Final[TrainingWindow] = TrainingWindow(months=24)
 """Two years before each cut, no drift, for every arm."""
 BASE_RIDGE: Final[float] = 0.1
 """The ridge of every full-history substation: experiment 104's tuned value (flat to 0.003)."""
+PARTIAL_HISTORY_ROWS: Final[int] = 28_000
+"""A pool site with fewer usable rows in its 2-year window holds only part of it (a full window
+has about 35,000), and its points of effective capacity are rebuilt from the rows it holds."""
 MIN_TRAINING_ROWS: Final[int] = 1344
 """A site enters a cut only with at least four weeks of usable rows."""
 LAMBDA_GRID: Final[tuple[float, ...]] = (

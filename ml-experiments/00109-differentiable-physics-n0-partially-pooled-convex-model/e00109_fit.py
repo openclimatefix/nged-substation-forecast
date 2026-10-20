@@ -138,7 +138,7 @@ def run_job(job: FitJob) -> tuple[str, dict[str, dict[str, str]]]:
                 target=site,
                 decision_pool=common.DECISION_SITES,
             )
-        except (ValueError, KeyError) as error:
+        except ValueError as error:
             print(f"{job.cut_name}_{job.config.name} {site}: skipped ({error})", flush=True)
             continue
         frames.append(frame)

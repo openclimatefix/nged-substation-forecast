@@ -21,6 +21,7 @@ before the cut. A short-history arm for site `s` takes the spread of each other 
 in the replica fit in which `t` held the same history and every other site its full window.
 """
 
+import hashlib
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
@@ -193,6 +194,8 @@ class Built:
         sites: The substations of the joint fit.
         cache: The cache with the held-out site's target changed, if it is.
         transform: The held-out site's change of target, or `None`.
+        partial_transforms: The rebuilt scale of each pool site that holds only part of the window
+            (D18 at the scored cut, D9 at the replicate and winter cuts).
         capacity_sources: How each site's capacity was set: `pinned`, `fitted_late_vintage`, or
             `fitted_short_window`.
     """
@@ -200,6 +203,7 @@ class Built:
     sites: list[PooledSite]
     cache: FeatureCache
     transform: Transform | None
+    partial_transforms: dict[str, Transform]
     capacity_sources: dict[str, str]
 
 
@@ -271,6 +275,19 @@ def build_arm(
             )
         ]
     )
+    partial_transforms: dict[str, Transform] = {}
+    if config.rebuild_scale:
+        for label in labels:
+            if label == held_out:
+                continue
+            rows = training_rows(
+                features=used.sites[label], cache=used, cut=cut, window=common.FULL_WINDOW
+            )
+            if len(rows) < common.PARTIAL_HISTORY_ROWS:
+                partial_transforms[label] = history_transform(
+                    cache=used, site=label, cut=cut, window=common.FULL_WINDOW
+                )
+                used = transformed_cache(cache=used, transform=partial_transforms[label])
     sites: list[PooledSite] = []
     sources: dict[str, str] = {}
     for label in labels:
@@ -294,7 +311,13 @@ def build_arm(
                 allow_late_vintage=short and config.oracle_pin,
             )
         )
-    return Built(sites=sites, cache=used, transform=transform, capacity_sources=sources)
+    return Built(
+        sites=sites,
+        cache=used,
+        transform=transform,
+        partial_transforms=partial_transforms,
+        capacity_sources=sources,
+    )
 
 
 def _capacity_prior(
@@ -323,8 +346,17 @@ def _centre_spread(*, replica: ReplicaResiduals) -> ResidualSpread:
     )
 
 
-def _replica_path(*, cut: datetime, config: ArmConfig, history: str, site: str) -> Path:
-    return REPLICA_DIR / f"{cut:%Y%m%d}_{config.family}_{history}_{site}.npz"
+REPLICA_VERSION: Final[str] = "2"
+"""Bump when the arms or the replica logic change, so stored replicas are never reused."""
+
+
+def _replica_path(
+    *, cut: datetime, config: ArmConfig, history: str, site: str, cache: FeatureCache
+) -> Path:
+    """Return where a replica is stored; the name hashes everything the residuals depend on."""
+    key = f"{config.family}|{config.pool}|{cache.key}|{REPLICA_VERSION}"
+    digest = hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()[:10]
+    return REPLICA_DIR / f"{cut:%Y%m%d}_{digest}_{history}_{site}.npz"
 
 
 def _save_replica(*, path: Path, replica: PooledReplica) -> None:
@@ -384,7 +416,9 @@ def replica_of(
     sites_key = held_out or "all"
     fit_cut = replica_cut(cut=cut)
     paths = {
-        site: _replica_path(cut=cut, config=config, history=f"{label}_{sites_key}", site=site)
+        site: _replica_path(
+            cut=cut, config=config, history=f"{label}_{sites_key}", site=site, cache=cache
+        )
         for site in config.pool
     }
     present = {site: path for site, path in paths.items() if path.exists()}
@@ -494,7 +528,7 @@ def fit_and_score_site(
         spread = short_history_spread(
             replicas=short_replicas, held_out=target, weeks_of_history=history.weeks_of_history
         )
-    transform = built.transform
+    transform = built.transform if target == held_out else built.partial_transforms.get(target)
     if transform is not None:
         shape = np.nan_to_num(
             derated_unit_shape(features=cache.sites[target], index=index), nan=0.0
