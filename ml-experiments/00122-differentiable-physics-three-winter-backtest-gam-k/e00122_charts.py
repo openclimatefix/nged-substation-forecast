@@ -193,7 +193,7 @@ def figure_3_bias() -> alt.TopLevelMixin:
                 subtitle=(
                     "Mean signed error of the median forecast over all winter days. Positive: the "
                     "model under-forecast demand. In 2023-24 one substation, D10, was "
-                    "over-forecast by 12 points by both plain models."
+                    "over-forecast by 11 to 12 points by both plain models."
                 ),
             ),
         )
