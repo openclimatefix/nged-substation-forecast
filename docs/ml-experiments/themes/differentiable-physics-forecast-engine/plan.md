@@ -121,9 +121,10 @@ The run takes CPU seconds.
 can be judged over every winter the power history covers.** The release candidate is the convex
 model with the Kalman filter (GAM-K), plus whichever of the night steps and the multi-hinge heating
 terms win their experiments. XGBoost is the production recipe (BG2) and its lagless version. ERA5
-removes forecast-weather error, so the result ranks model structure on past weather and does not give production skill. The
-report gives winter-by-winter paired contrasts next to the ensemble-weather result, and says whether
-the two rankings agree. The run is cheap and uses the CPU only. It is queued and not started.
+removes forecast-weather error, so the result ranks model structure on past weather and does not
+give production skill. The report gives winter-by-winter paired contrasts next to the
+ensemble-weather result, and says whether the two rankings agree. The run is cheap and uses the CPU
+only. It is queued and not started.
 
 ## Event-day comparison of DP models against XGBoost
 
