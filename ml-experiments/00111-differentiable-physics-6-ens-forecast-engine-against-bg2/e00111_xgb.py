@@ -222,6 +222,16 @@ class OffsetTables:
             pl.col("time_series_id") == time_series_id
         )
 
+    def with_anomaly(self, *, frame: pl.DataFrame) -> pl.DataFrame:
+        """Keep the rows that have a solar anomaly.
+
+        Experiment 87's table lacks the anomaly of the rows of the last two weeks of June 2025
+        (0.9% of the training rows), which are left out of the offset arms' training.
+        """
+        return frame.join(
+            self.anomaly.select(*data.KEYS), on=list(data.KEYS), how="semi", maintain_order="left"
+        )
+
     def shift(self, *, frame: pl.DataFrame) -> np.ndarray:
         """Return `w * held capacity / effective capacity * anomaly` for each row of the frame.
 
@@ -375,6 +385,8 @@ def fit_refit(
     known = known_rows(rows=site_data.control, refit=refit, first_usable=site_data.first_usable)
     if arm.max_train_lead is not None:
         known = known.filter(pl.col("lead_hours") <= arm.max_train_lead)
+    if arm.start == "offset" and site_data.offset is not None:
+        known = site_data.offset.with_anomaly(frame=known)
     if arm.lagged:
         known = site_data.with_lags(frame=known)
     margin = None

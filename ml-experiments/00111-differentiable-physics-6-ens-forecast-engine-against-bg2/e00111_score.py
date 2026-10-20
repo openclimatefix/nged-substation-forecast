@@ -85,6 +85,8 @@ def in_period(*, frame: pl.DataFrame, periods: set[str]) -> pl.DataFrame:
 def drop_unscorable(*, frame: pl.DataFrame, sites: tuple[str, ...]) -> pl.DataFrame:
     """Drop rows with no reading, inside a switching event, or beyond 168 hours."""
     cache = common.load_cache()
+    last = cache.end_times[-1].astype("datetime64[us]").astype(datetime).replace(tzinfo=UTC)
+    frame = frame.filter(pl.col("valid_time") <= last)
     kept = []
     for site in sites:
         features = cache.sites[site]
@@ -231,8 +233,15 @@ def common_rows(*, arms_by_name: dict[str, pl.DataFrame]) -> dict[str, pl.DataFr
         current = frame.select(keys).unique()
         shared = current if shared is None else shared.join(current, on=keys, how="inner")
     assert shared is not None
+    schema = {
+        "time_series_id": pl.Int32,
+        "lead_hours": pl.Float64,
+        "seed": pl.Int8,
+        "actual": pl.Float32,
+        **dict.fromkeys(LEVEL_COLUMNS, pl.Float32),
+    }
     return {
-        name: frame.join(shared, on=keys, how="inner").sort(keys)
+        name: frame.join(shared, on=keys, how="inner").sort(keys).cast(schema)
         for name, frame in arms_by_name.items()
     }
 
