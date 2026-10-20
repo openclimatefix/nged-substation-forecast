@@ -63,6 +63,7 @@ import e00120_arms as arms
 import e00120_common as common
 import numpy as np
 import polars as pl
+import torch
 from scipy.stats import norm
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (
@@ -660,7 +661,12 @@ def sparse_fleet_job(*, rng: np.random.Generator, overlapping: bool, tuned: dict
     k4_g0 = fit_sh(fleet=fleet, k=TRUE_SHAPES + 1, tuned=tuned, gamma=0.0)
     scores = {TRUE_SHAPES: headline.score, TRUE_SHAPES + 1: k4.score}
     for k in (2, 6):
-        scores[k] = fit_sh(fleet=fleet, k=k, tuned=tuned).score
+        try:
+            scores[k] = fit_sh(fleet=fleet, k=k, tuned=tuned).score
+        except torch.linalg.LinAlgError:
+            # More shapes than the pool can use leaves a dead shape and a singular weights step;
+            # a library that cannot be fitted is never the tuning rule's choice.
+            scores[k] = float("inf")
     bump_site = int(rng.integers(len(fleet.sites)))
     bump_fleet = build_fleet(
         rng=np.random.default_rng(fleet_seed),
@@ -824,8 +830,6 @@ def job_path(*, job: GateJob) -> Path:
 
 def run_job(job: GateJob) -> str:
     """Run one fleet's fits and store its result atomically; skip a stored one."""
-    import torch
-
     torch.set_num_threads(1)
     path = job_path(job=job)
     if path.exists():
@@ -833,14 +837,19 @@ def run_job(job: GateJob) -> str:
     tuned = json.loads((common.WORK_DIR / "tuned.json").read_text())
     rng = np.random.default_rng([SET_SEEDS[job.set_index], job.fleet_index, hash_kind(job.kind)])
     overlapping = job.fleet_index % 2 == 1
-    if job.kind == "sparse":
-        result = sparse_fleet_job(rng=rng, overlapping=overlapping, tuned=tuned)
-    elif job.kind == "null":
-        result = null_fleet_job(rng=rng, tuned=tuned)
-    elif job.kind == "power":
-        result = power_fleet_job(rng=rng, overlapping=overlapping, tuned=tuned)
-    else:
-        result = dense_fleet_job(rng=rng, tuned=tuned)
+    try:
+        if job.kind == "sparse":
+            result = sparse_fleet_job(rng=rng, overlapping=overlapping, tuned=tuned)
+        elif job.kind == "null":
+            result = null_fleet_job(rng=rng, tuned=tuned)
+        elif job.kind == "power":
+            result = power_fleet_job(rng=rng, overlapping=overlapping, tuned=tuned)
+        else:
+            result = dense_fleet_job(rng=rng, tuned=tuned)
+    except torch.linalg.LinAlgError as error:
+        # A fleet whose fit is singular is reported as missing, so the line's denominator shrinks
+        # visibly instead of the whole gate stopping.
+        return f"{path.name}: failed, {error}"
     result |= {
         "kind": job.kind,
         "set": job.set_index,
