@@ -79,7 +79,12 @@ def load_all(*, periods: set[str], sites: tuple[str, ...]) -> dict[str, pl.DataF
 
 
 def summarise(
-    *, name: str, pair: tuple[str, str], loaded: dict[str, pl.DataFrame], level: float
+    *,
+    name: str,
+    pair: tuple[str, str],
+    loaded: dict[str, pl.DataFrame],
+    level: float,
+    months: tuple[str, ...] = (),
 ) -> dict | None:
     """Return a contrast's estimate and interval overall, by lead band, and by robustness cut."""
     if pair[0] not in loaded or pair[1] not in loaded:
