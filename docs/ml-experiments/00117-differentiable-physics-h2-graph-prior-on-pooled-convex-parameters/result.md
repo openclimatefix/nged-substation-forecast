@@ -119,7 +119,11 @@ reading any residual. An MVA node joins a cut only if it holds those 12 months. 
 counted, never named, on the page.
 
 **An edge penalises a coordinate only if both ends identify it:** a node identifies a coordinate if
-the rows its fit trains on make the column non-zero in at least 1,000 rows. An MVA node trains on
+the rows its fit trains on make the column non-zero in at least 1,000 rows (heating and capacity
+columns) or at least one row (profile and holiday columns). **This is a clarification made after
+seeing the module and before any fit; the Opus review of the module will rule on it:** a profile column (one half-hour of one day type) is non-zero in
+about 100 to 500 rows over two years and a holiday column in 48 to 96, so a 1,000-row rule would
+leave both families with no identified coordinate. An MVA node trains on
 dark rows (solar elevation below the horizon plus a 1-hour margin), so its daytime-band heating
 columns and its capacity are not identified. D5–D16 and D10–D11 carry capacity and daytime bands;
 the other edges carry night-band heating, profile, and holiday terms. Parameters are in points of
