@@ -164,10 +164,9 @@ def figure_tradeoff() -> None:
         title=_title(
             text="The BSP reading cuts damage from injected errors but makes clean forecasts worse",
             subtitle=(
-                "Pilot BSP with 2 MW and 4 MVA Primaries; frozen fits scored by mean absolute "
+                "Pilot BSP; frozen fits scored by mean absolute "
                 "error in points of effective capacity over the year after each cut, averaged "
-                "over the "
-                "2 MW Primaries. Top: summed extra error from 200 injected errors in the tuning "
+                "over its MW Primaries. Top: summed extra error from 200 injected errors in the tuning "
                 "year. Bottom: clean error minus weight 0's. Solid: first run. Dashed: re-run "
                 "after the BSP-row scale was corrected. Dotted line: the 0.023-point limit."
             ),
