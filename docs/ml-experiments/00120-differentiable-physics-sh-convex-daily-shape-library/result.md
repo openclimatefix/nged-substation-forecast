@@ -435,6 +435,12 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
       07:00, November to March), beside the hand-built night-step arms of experiment 121 (NS-U and
       NS-HW) once that experiment's page is merged. Those arms are the benchmark the learned shapes
       must match or beat.
+    - **The step is read as a function of the heating term (maintainer, 2026-10-20).** Most Economy 7
+      load is storage heating, so the step should grow with cold. The report prints the 01:00 step of
+      the actual power and of the forecast on cold nights (6-hour-smoothed ERA5 temperature below
+      2 °C) and mild nights (above 10 °C) at each decision substation, and each shape's start time
+      in local time and in UTC (01:00 local is 00:00 UTC in summer). Shapes that depend on heating
+      themselves wait for the exploratory arm below.
     - **K from 3 to 6.** The tuning year also runs K = 5 and 6 at the chosen pair (exploratory, never
       scored later); the report shows K = 2 to 6.
     - **Penalties against shape collapse and noise shapes.** The orthogonality penalty is the

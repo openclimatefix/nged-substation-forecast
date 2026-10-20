@@ -717,6 +717,61 @@ def step_table() -> pl.DataFrame:
     return pl.DataFrame(rows, schema_overrides={"users": pl.Int64}, infer_schema_length=None)
 
 
+COLD_NIGHT_C: Final[float] = 2.0
+MILD_NIGHT_C: Final[float] = 10.0
+
+
+def step_by_temperature() -> pl.DataFrame:
+    """Return the 01:00 step of the actual power and of SH's mean forecast on cold and mild nights.
+
+    The step is the mean over rows at 01:00 to 01:30 local time minus the mean over rows at 00:30
+    to 01:00, in points of capacity, separately for rows whose 6-hour-smoothed ERA5 temperature is
+    below `COLD_NIGHT_C` (cold) and above `MILD_NIGHT_C` (mild). The profile columns are local
+    time, so 01:00 local is 01:00 UTC in winter and 00:00 UTC in summer.
+    """
+    cache_ = common.load_cache()
+    rows = []
+    for label in ("scored", "replicate"):
+        frame = seeded(label=label, arm="sh", pooled=False).filter(
+            pl.col("site_name").is_in(DECISION)
+        )
+        local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
+        end_minutes = local.dt.hour() * 60 + local.dt.minute()
+        for site in DECISION:
+            features = cache_.sites[site]
+            temperature = pl.DataFrame(
+                {
+                    "valid_time": pl.Series(cache_.end_times).dt.replace_time_zone("UTC"),
+                    "temperature": features.smoothed_temperature_c[:, 0],
+                }
+            )
+            part = frame.filter(pl.col("site_name") == site).join(
+                temperature, on="valid_time", how="left"
+            )
+            part = part.with_columns(end_minutes=end_minutes)
+            for name, condition in (
+                ("cold (below 2 C)", pl.col("temperature") < COLD_NIGHT_C),
+                ("mild (above 10 C)", pl.col("temperature") > MILD_NIGHT_C),
+            ):
+                kept = part.filter(condition)
+                for quantity in ("actual", "mean"):
+                    after = kept.filter(pl.col("end_minutes") == 90)[quantity].to_numpy()
+                    before = kept.filter(pl.col("end_minutes") == 60)[quantity].to_numpy()
+                    rows.append(
+                        {
+                            "year": label,
+                            "site": site,
+                            "nights": name,
+                            "series": quantity,
+                            "step at 01:00": float(after.mean() - before.mean())
+                            if len(after) and len(before)
+                            else float("nan"),
+                            "rows": len(after),
+                        }
+                    )
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
 def audit_triggers(*, planned: pl.DataFrame, reproduction: pl.DataFrame) -> list[str]:
     """Return which of the plan's audit triggers the numbers fire (trigger 7 is judged by hand)."""
     fired = []
@@ -789,6 +844,8 @@ def main() -> None:
     print(mix_table().write_csv(float_precision=3), end="")
     print("== The 01:00 step in the profiles and shapes (scored-year headline fit) ==")
     print(step_table().write_csv(float_precision=3), end="")
+    print("== The 01:00 step on cold and mild nights (actual and SH mean forecast) ==")
+    print(step_by_temperature().write_csv(float_precision=3), end="")
     print("== Audit triggers that the numbers fire ==")
     print(audit_triggers(planned=planned, reproduction=reproduction))
 
