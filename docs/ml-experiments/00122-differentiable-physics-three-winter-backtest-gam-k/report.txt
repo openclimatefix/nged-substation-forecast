@@ -1,0 +1,120 @@
+# Experiment 122: GAM-K against GAM and lagless XGBoost over three winters
+
+Points of effective capacity; negative contrasts favour GAM-K. 95% intervals resample 7-day blocks of days, paired across arms (2000 draws, seed 122).
+Sites: D5, D10, D11, D14, D16. Past weather (ERA5 and CAMS); nothing is refitted.
+
+## Winter 2023-24
+
+152 covered days; sites present: D10, D11, D14, D16, D5; 15 cold-snap days (-2.0 to 3.1 C daily mean).
+
+| Arm | MAE, all days | MAE, cold-snap days | MAE, evening peak | Quantile score |
+|---|---|---|---|---|
+| GAM | 6.79 | 6.90 | 7.32 | 4.279 |
+| GAM-K | 3.73 | 3.57 | 3.99 | 2.113 |
+| XGBoost | 6.83 | 7.04 | 7.46 | 4.136 |
+
+| Other arm | All days (planned) | Cold-snap days (exploratory) | Evening peak (exploratory) | Quantile score (exploratory) | All days, 14-day blocks |
+|---|---|---|---|---|---|
+| GAM | -3.06 (-3.54 to -2.52) | -3.33 (-3.99 to -2.65) | -3.33 (-3.80 to -2.80) | -2.17 (-2.53 to -1.77) | -3.06 (-3.64 to -2.42) |
+| XGBoost | -3.10 (-3.57 to -2.63) | -3.47 (-4.16 to -2.30) | -3.47 (-3.96 to -2.97) | -2.02 (-2.33 to -1.71) | -3.10 (-3.65 to -2.53) |
+
+Leave-one-site-out, GAM-K minus the other arm on all winter days:
+
+| Site left out | GAM | XGBoost |
+|---|---|---|
+| D5 | -3.60 (-4.19 to -2.97) | -3.61 (-4.17 to -3.10) |
+| D10 | -1.62 (-1.94 to -1.28) | -1.85 (-2.21 to -1.48) |
+| D11 | -3.03 (-3.59 to -2.48) | -2.94 (-3.51 to -2.36) |
+| D14 | -3.74 (-4.38 to -3.05) | -3.74 (-4.31 to -3.16) |
+| D16 | -3.30 (-3.92 to -2.64) | -3.38 (-3.94 to -2.79) |
+
+Mean signed error (observed minus median forecast) by site, all winter days; positive means the arm under-forecast:
+
+| Arm | D5 | D10 | D11 | D14 | D16 |
+|---|---|---|---|---|---|
+| GAM | -1.64 | -12.02 | -6.64 | +2.35 | +2.44 |
+| GAM-K | -0.33 | +0.34 | +0.36 | +0.26 | +0.02 |
+| XGBoost | -0.95 | -11.35 | -6.90 | +2.56 | +2.21 |
+
+Median forecast minus the mean of the 11 quantiles (a stand-in for median minus mean forecast; the stored sets hold quantiles only): GAM -0.492, GAM-K -0.218, XGBoost +0.534
+
+## Winter 2024-25
+
+151 covered days; sites present: D10, D11, D14, D16, D5; 15 cold-snap days (-1.2 to 2.0 C daily mean).
+
+| Arm | MAE, all days | MAE, cold-snap days | MAE, evening peak | Quantile score |
+|---|---|---|---|---|
+| GAM | 5.97 | 8.01 | 6.50 | 3.616 |
+| GAM-K | 4.14 | 4.54 | 4.41 | 2.396 |
+| XGBoost | 6.14 | 7.80 | 6.58 | 3.822 |
+
+| Other arm | All days (planned) | Cold-snap days (exploratory) | Evening peak (exploratory) | Quantile score (exploratory) | All days, 14-day blocks |
+|---|---|---|---|---|---|
+| GAM | -1.83 (-2.47 to -1.28) | -3.48 (-5.52 to -1.65) | -2.09 (-2.84 to -1.39) | -1.22 (-1.70 to -0.81) | -1.83 (-2.75 to -1.16) |
+| XGBoost | -2.00 (-2.60 to -1.46) | -3.26 (-4.53 to -1.33) | -2.17 (-2.80 to -1.56) | -1.43 (-1.87 to -1.04) | -2.00 (-2.85 to -1.27) |
+
+Leave-one-site-out, GAM-K minus the other arm on all winter days:
+
+| Site left out | GAM | XGBoost |
+|---|---|---|
+| D5 | -1.86 (-2.51 to -1.29) | -1.98 (-2.58 to -1.44) |
+| D10 | -1.81 (-2.27 to -1.40) | -1.82 (-2.31 to -1.36) |
+| D11 | -1.72 (-2.37 to -1.18) | -2.07 (-2.71 to -1.50) |
+| D14 | -2.17 (-3.04 to -1.43) | -2.37 (-3.17 to -1.65) |
+| D16 | -1.60 (-2.42 to -0.90) | -1.77 (-2.62 to -1.05) |
+
+Mean signed error (observed minus median forecast) by site, all winter days; positive means the arm under-forecast:
+
+| Arm | D5 | D10 | D11 | D14 | D16 |
+|---|---|---|---|---|---|
+| GAM | +3.75 | +4.73 | +4.50 | -2.30 | +6.26 |
+| GAM-K | +0.14 | +0.32 | +0.10 | +0.13 | +0.16 |
+| XGBoost | +4.02 | +4.46 | +3.76 | -2.26 | +5.52 |
+
+Median forecast minus the mean of the 11 quantiles (a stand-in for median minus mean forecast; the stored sets hold quantiles only): GAM +0.013, GAM-K +0.110, XGBoost +0.651
+
+## Winter 2025-26
+
+151 covered days; sites present: D10, D11, D14, D16, D5; 15 cold-snap days (-2.0 to 2.8 C daily mean).
+
+| Arm | MAE, all days | MAE, cold-snap days | MAE, evening peak | Quantile score |
+|---|---|---|---|---|
+| GAM | 6.09 | 7.48 | 6.48 | 3.375 |
+| GAM-K | 4.19 | 5.38 | 4.34 | 2.391 |
+| XGBoost | 6.36 | 6.37 | 6.79 | 3.912 |
+
+| Other arm | All days (planned) | Cold-snap days (exploratory) | Evening peak (exploratory) | Quantile score (exploratory) | All days, 14-day blocks |
+|---|---|---|---|---|---|
+| GAM | -1.90 (-2.49 to -1.36) | -2.11 (-3.92 to -0.66) | -2.13 (-2.88 to -1.40) | -0.98 (-1.28 to -0.70) | -1.90 (-2.54 to -1.30) |
+| XGBoost | -2.17 (-2.99 to -1.45) | -0.99 (-3.03 to +0.29) | -2.45 (-3.30 to -1.62) | -1.52 (-2.06 to -1.04) | -2.17 (-3.12 to -1.29) |
+
+Leave-one-site-out, GAM-K minus the other arm on all winter days:
+
+| Site left out | GAM | XGBoost |
+|---|---|---|
+| D5 | -1.98 (-2.64 to -1.40) | -2.29 (-3.18 to -1.48) |
+| D10 | -1.55 (-2.03 to -1.08) | -2.02 (-2.69 to -1.38) |
+| D11 | -2.02 (-2.69 to -1.43) | -1.98 (-2.78 to -1.26) |
+| D14 | -2.07 (-2.76 to -1.44) | -2.25 (-3.22 to -1.40) |
+| D16 | -1.88 (-2.55 to -1.26) | -2.33 (-3.26 to -1.49) |
+
+Mean signed error (observed minus median forecast) by site, all winter days; positive means the arm under-forecast:
+
+| Arm | D5 | D10 | D11 | D14 | D16 |
+|---|---|---|---|---|---|
+| GAM | +4.74 | +7.13 | +3.34 | +3.33 | +5.21 |
+| GAM-K | +0.49 | +0.36 | +0.22 | +0.52 | +0.17 |
+| XGBoost | +4.74 | +5.43 | +2.39 | +4.16 | +4.11 |
+
+Median forecast minus the mean of the 11 quantiles (a stand-in for median minus mean forecast; the stored sets hold quantiles only): GAM -0.500, GAM-K -0.119, XGBoost +0.806
+
+Sensitivity, 2025-26 with D9 added (six Primaries):
+
+- GAM-K minus GAM: -1.64 (-2.12 to -1.20)
+- GAM-K minus XGBoost: -1.82 (-2.48 to -1.23)
+
+## Decision
+
+Contrasts meeting the bar (estimate at most -1.0 and interval below 0): 6 of 6.
+Verdict by the decision rule: supported.
+
