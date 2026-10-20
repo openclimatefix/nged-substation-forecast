@@ -138,6 +138,12 @@ carry capacity and daytime bands; the other edges carry night-band heating, prof
 terms. Parameters are in points of effective capacity. An MVA node's effective capacity is built
 from pre-cut rows only (experiment 109's advice); the 0.97 power-factor rescale is a sensitivity.
 
+**The node set of every graph arm, and of N and NH, is the cut's graph:** the decision sites, D9
+where it holds rows, and the MVA nodes that join (clarification before any fit). N pools its fleet
+mean over the same nodes as NH, so R2 differs from N by the graph term alone. Experiment 109's own
+pool of seven series is used only for the reproduction control P5, and P-hol pools over the five
+decision sites alone, as the arm table says.
+
 **The penalty is convex.** For the heating, profile, and holiday families the graph term is
 
     gamma * g_f * sum over edges e=(i,j) of ||C_f (theta[i, f] - theta[j, f])||^2
