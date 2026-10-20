@@ -726,12 +726,99 @@ def figure_transfer_weeks() -> alt.TopLevelMixin:
     )
 
 
+def figure_cold_nights() -> alt.TopLevelMixin:
+    """Day-ahead forecasts against observed power on the nights of cold-snap days, per site."""
+    cache = common.load_cache()
+    losses = pl.read_parquet(common.WORK_DIR / "c2_losses.parquet").filter(
+        pl.col("cut") == "scored", pl.col("arm").is_in(["a0", "a4"]), ~pl.col("in_event")
+    )
+    panels = []
+    for site in common.DECISION_SITES:
+        scale = cache.sites[site].table.effective_capacity_mw / 100.0
+        part = losses.filter(pl.col("site") == site).with_columns(
+            night_date=(pl.col("time") - pl.duration(hours=8)).dt.date(),
+            hour=pl.col("time").dt.hour() + pl.col("time").dt.minute() / 60.0,
+        )
+        cold_days = set(part.filter(pl.col("cold_snap"))["time"].dt.date().unique().to_list())
+        nights = part.filter(
+            pl.col("night_date").is_in(list(cold_days)),
+            (pl.col("hour") > 22.0) | (pl.col("hour") <= 8.0),
+        ).with_columns(
+            clock=pl.when(pl.col("hour") > 12.0)
+            .then(pl.col("hour") - 24.0)
+            .otherwise(pl.col("hour"))
+        )
+        n_nights = nights["night_date"].n_unique() if nights.height else 0
+        table = pl.concat(
+            [
+                nights.filter(pl.col("arm") == "a0")
+                .group_by("clock")
+                .agg(pl.col("actual").median(), pl.col("mean").median())
+                .select(
+                    "clock",
+                    mw=pl.col("actual") * scale,
+                    series=pl.lit("Observed (median of nights)"),
+                ),
+                nights.filter(pl.col("arm") == "a0")
+                .group_by("clock")
+                .agg(pl.col("mean").median())
+                .select("clock", mw=pl.col("mean") * scale, series=pl.lit("A0 forecast")),
+                nights.filter(pl.col("arm") == "a4")
+                .group_by("clock")
+                .agg(pl.col("mean").median())
+                .select("clock", mw=pl.col("mean") * scale, series=pl.lit("A4 forecast")),
+            ]
+        ).sort("clock")
+        label = f"{site}: {n_nights} cold-snap nights" + (
+            " (too few nights)" if n_nights < common.MIN_COLD_SNAP_DAYS else ""
+        )
+        domain = ["Observed (median of nights)", "A0 forecast", "A4 forecast"]
+        panels.append(
+            alt.Chart(table)  # ty: ignore[unresolved-attribute]
+            .mark_line(strokeWidth=1.8)
+            .encode(
+                x=alt.X(
+                    "clock:Q",
+                    title="Hour of the night (UTC; 22:00 to 08:00, half-hours ending)",
+                    axis=alt.Axis(
+                        values=[-2, 0, 2, 4, 6, 8],
+                        labelExpr="datum.value < 0 ? datum.value + 24 : datum.value",
+                    ),
+                    scale=alt.Scale(domain=[-2, 8]),
+                ),
+                y=alt.Y("mw:Q", title="Power (MW)", scale=alt.Scale(zero=False)),
+                color=alt.Color(
+                    "series:N",
+                    scale=alt.Scale(
+                        domain=domain, range=[DARK, ocf.DATA_BLUE_LIGHT, ocf.BRAND_ORANGE]
+                    ),
+                    legend=alt.Legend(title=None, orient="top", direction="horizontal"),
+                ),
+            )
+            .properties(width=WIDTH - 60, height=110, title=label)
+        )
+    return alt.vconcat(*panels).properties(
+        title=title(
+            text="Forecasts and observed power on cold winter nights",
+            subtitle=(
+                "Scored year, day-ahead forecasts of the five decision substations on the nights "
+                "(22:00 to 08:00 UTC) that follow a cold-snap day (a UTC-day mean ERA5 temperature "
+                "under 2 C), rows outside hand-filtered events. Lines: the median over those "
+                "nights at each half-hour. A5 is not drawn: its day-ahead run covers one origin in "
+                "three days, so it has too few cold nights; A4 stands in, and A5 equals A4 where "
+                "no flow is found."
+            ),
+        )
+    )
+
+
 FIGURES: Final[dict[str, Callable[[], alt.TopLevelMixin]]] = {
     "tuning": figure_tuning,
     "recall_cells": figure_recall_cells,
     "examples": figure_examples,
     "variants": figure_variants,
     "headline": figure_headline,
+    "cold_nights": figure_cold_nights,
     "transfer_weeks": figure_transfer_weeks,
     **{
         f"card_{site}": (lambda site=site: figure_card(site=site)) for site in common.DECISION_SITES

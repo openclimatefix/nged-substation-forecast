@@ -91,6 +91,8 @@ can exist.
 
 ![Forecasts around four injected transfers in the scored year](transfer_weeks.svg)
 
+![Day-ahead forecasts against observed power on cold winter nights](cold_nights.svg)
+
 ## Results
 
 **The gate.** The registered configuration (half-hourly flows, step constant 300, level constant 0,
@@ -107,7 +109,8 @@ year. All readings failed:
 - recall: 0.22 over 1 day (needs 0.77), 0.10 for 6 to 24 hours (needs 0.5), and 0.46 over 1 day on
   the realistic set (needs 0.5);
 
-- placebo in the replicate year: 0.0 MW-days on D5–D11 and 2.9 on D16–D10 (needs under 0.05 each);
+- placebo in the replicate year: 0.0 MW-days on replicate placebo pair 1 and 2.9 on pair 2 (needs
+  under 0.05 each);
 
 - normal-running gap: the forecast with the causal flows removed has a mean absolute error of 7.07
   points against 5.82 for the plain filter and 3.76 for the oracle (the share of the gap closed is
@@ -142,9 +145,9 @@ is +0.03.
 **Post hoc variants (exploratory, chosen after the gate failed; the verdict does not use them).** On
 100 gate transfers of 25% and 40% of the receiving load: registered penalties with a Huber threshold
 of 10 noise scales give recall 0.35 over 1 day; step constant 10 and level constant 0.3 give 0.69
-over 1 day with 28.6 MW-days on D16–D14; adding the larger Huber threshold gives 0.70 and 43.7; step
-constant 3, level constant 0, and the larger threshold give recall 0.86 over 1 day, 0.74 for 6 to 24
-hours, a moved-MW ratio of 0.79, and 18.4 and 29.5 MW-days on the two pairs.
+over 1 day with 28.6 MW-days on tuning placebo pair 2; adding the larger Huber threshold gives 0.70
+and 43.7; step constant 3, level constant 0, and the larger threshold give recall 0.86 over 1 day,
+0.74 for 6 to 24 hours, a moved-MW ratio of 0.79, and 18.4 and 29.5 MW-days on the two pairs.
 
 **Real transfers (descriptive, no verdict role).** Three of the eight hand-filtered events on the
 two gate edges fall in a year with hindsight flows. The registered fit puts a mean flow of 1.19 MW
@@ -161,15 +164,19 @@ read. C2 on winter rows: A4 minus A0 is -0.001 (-0.026 to +0.020) in the scored 
 +0.026 (-0.028 to +0.155) and +0.015 (-0.007 to +0.064), and on evening peaks -0.005 (-0.035 to
 +0.025) and +0.009 (-0.010 to +0.032). The one exception is A1 minus A0 in the scored winter
 (+0.007, +0.002 to +0.012; 0 of 5 sites better), where dropping the hand-filtered events is slightly
-worse. The cold-snap intervals are wide. No arm is proposed for production, so none is held back.
-The page has no figure of a cold winter night beyond the cold-snap bars on the cards. C3 on winter
-rows: A5 minus A4 is -0.010 (-0.027 to +0.044) in the scored year (28 transfers, too few) and +0.006
-(-0.006 to +0.039) in the replicate year (37 transfers). On cold-snap days it is -0.065 (-0.237 to
--0.009) on 6 transfers in the scored year and -0.052 (-0.052 to +0.002) on 11 in the replicate year,
-both too few to read. On evening peaks it is -0.022 (-0.044 to +0.060) on 28 transfers (too few) and
--0.003 (-0.019 to +0.020) on 37. The evidence holds two independent winters (2024-25 and 2025-26);
-the 2023-24 winter was used for tuning and the gate. The two series labelled G-c have no winter in
-the data, and the injected transfers give no winter result at G-c.
+worse. The cold-snap intervals are wide. No arm is proposed for production, so none is held back. A
+figure of the cold nights themselves is below: at the three substations with 10 cold-snap nights
+(D10, D11, D14) both forecasts run about 0.2 to 0.5 MW under the median observed power overnight, A0
+and A4 alike; D5 and D16 have 2 cold-snap nights, too few to read. A5 is not on that figure, because
+its day-ahead run covers one origin in three days, which leaves too few cold nights; A5 equals A4
+wherever the fit finds no flow, which is nearly everywhere. C3 on winter rows: A5 minus A4 is -0.010
+(-0.027 to +0.044) in the scored year (28 transfers, too few) and +0.006 (-0.006 to +0.039) in the
+replicate year (37 transfers). On cold-snap days it is -0.065 (-0.237 to -0.009) on 6 transfers in
+the scored year and -0.052 (-0.052 to +0.002) on 11 in the replicate year, both too few to read. On
+evening peaks it is -0.022 (-0.044 to +0.060) on 28 transfers (too few) and -0.003 (-0.019 to
++0.020) on 37. The evidence holds two independent winters (2024-25 and 2025-26); the 2023-24 winter
+was used for tuning and the gate. The two series labelled G-c have no winter in the data, and the
+injected transfers give no winter result at G-c.
 
 ## Checks and bullets
 
@@ -405,8 +412,8 @@ is the exception, and refits A0 on the injected history.
 
 | Period | Cut | Role |
 |---|---|---|
-| 2023-07-01 to 2024-06-30 | 2023-07-01 | tuning (seeds T; placebos D5–D10, D16–D14); gate (G) |
-| 2024-07-01 to 2025-06-30 | 2024-07-01 | gate placebo (D5–D11, D16–D10); replicate; C1 rows |
+| 2023-07-01 to 2024-06-30 | 2023-07-01 | tuning (seeds T; placebo pairs 1 and 2 of the tuning year); gate (G) |
+| 2024-07-01 to 2025-06-30 | 2024-07-01 | gate placebo (replicate placebo pairs 1 and 2); replicate; C1 rows |
 | 2025-07-01 to 2026-06-30 | 2025-07-01 | scored: the verdict |
 
 **Tuned on seeds T only:** λ_f = c / σ_e, c in {3, 10, 30, 100, 300}; λ_l = c_l / σ_e, c_l in
@@ -453,7 +460,7 @@ valid time, so the 6-hour allowance includes the 3.5-hour delay.
 3. **Recall:** MW-weighted recall (Σ min(fitted, true) MW-hours, right edge and sign, over Σ true)
    at least 0.77 over 1 day (RO-NC's injected figure) and 0.5 for 6 to 24 hours; at least 0.5 over
    1 day on the realistic set.
-4. **Placebo, out of sample:** the held-out pairs D5–D11 and D16–D10 carry under 0.05 MW-days of
+4. **Placebo, out of sample:** the two held-out replicate placebo pairs carry under 0.05 MW-days of
    |flow| per pair-year in the replicate year.
 5. **NRA gap:** on in-event and 48-hour post-event rows, the NRA forecast (A5 without the flow added
    back) scored against the uninjected truth closes at least 50% of the gap from A0 to the oracle
@@ -529,7 +536,7 @@ constant 0; its MW-weighted recall is 0.216 and its placebo flow is about zero, 
 flow survives. Looser settings recover more (step constant 3, level constant 0: recall 0.776) but
 put 9.6 and 21.9 MW-days a year on the two placebo pairs, against the 0.05 limit. A pair with no
 interconnection absorbs the opposite-signed slow drifts of two substations, and a level penalty of
-0.3 or more per megawatt leaves 25 to 31 MW-days on the pair D16–D14. The 3-hour block form (A2-b)
+0.3 or more per megawatt leaves 25 to 31 MW-days on tuning placebo pair 2. The 3-hour block form (A2-b)
 is no better: its chosen configuration has recall 0.212.
 
 **Prediction added after tuning and before the gate:** the gate's recall readings (0.77 over 1 day
