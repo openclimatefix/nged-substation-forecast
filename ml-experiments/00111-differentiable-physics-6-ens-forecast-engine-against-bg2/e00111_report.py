@@ -354,7 +354,7 @@ def render_report(*, results: dict) -> list[str]:
         lines.append(f"    - leave one site out: {loso}")
     lines += ["", "Skipped (arm missing): " + "; ".join(results["skipped"])]
     lines += settings_lines()
-    for sites_label in ("decision",):
+    for sites_label in [g for g in ("decision", "d18") if f"tails_{g}" in results]:
         lines += ["", f"## Median forecast minus mean forecast ({sites_label} sites, points)"]
         table = pl.DataFrame(results[f"median_minus_mean_{sites_label}"])
         if table.height:
@@ -385,15 +385,25 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--periods", nargs="+", default=["scored"])
     parser.add_argument(
+        "--groups",
+        nargs="+",
+        default=["decision", "scored"],
+        choices=["decision", "scored", "d18"],
+        help="the site groups to score; d18 is the descriptive substation",
+    )
+    parser.add_argument(
         "--months", nargs="+", default=[], help="keep only runs of these months, as YYYY-MM"
     )
     args = parser.parse_args()
     periods = set(args.periods)
     results: dict = {"periods": sorted(periods), "contrasts": [], "skipped": []}
-    for sites_label, sites in (
-        ("decision", common.DECISION_SITES),
-        ("scored", common.SCORED_SITES),
-    ):
+    site_groups = {
+        "decision": common.DECISION_SITES,
+        "scored": common.SCORED_SITES,
+        "d18": common.DESCRIPTIVE_SITES,
+    }
+    for sites_label in args.groups:
+        sites = site_groups[sites_label]
         loaded = load_all(periods=periods, sites=sites)
         results[f"arms_{sites_label}"] = sorted(loaded)
         results[f"tails_{sites_label}"] = tail_table(loaded=loaded)
@@ -426,6 +436,8 @@ def main() -> None:
     tag = "" if periods == {"scored"} else "_" + "_".join(sorted(periods))
     if args.months:
         tag += "_" + "_".join(args.months)
+    if args.groups != ["decision", "scored"]:
+        tag += "_" + "_".join(args.groups)
     common.write_json_atomic(path=common.WORK_DIR / f"results{tag}.json", content=results)
     lines = render_report(results=results)
     (common.WORK_DIR / f"report{tag}.md").write_text("\n".join(lines) + "\n")

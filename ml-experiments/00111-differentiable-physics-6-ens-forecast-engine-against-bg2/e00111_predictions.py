@@ -105,8 +105,12 @@ def margin_column(*, frame: pl.DataFrame, sites: tuple[str, ...]) -> pl.DataFram
 def store(*, name: str, frame: pl.DataFrame, row_set_id: str) -> None:
     """Write one named set with the stored columns.
 
-    Rows with no reading, and rows on or after the held-out start, are left out.
+    Rows with no reading, and rows on or after the held-out start, are left out. A set that exists
+    is skipped, so a rerun writes only the sets that are new.
     """
+    if (common.DATA_DIR / "predictions" / name).exists():
+        print(f"skipped {name}: exists", flush=True)
+        return
     frame = frame.filter(pl.col("actual").is_finite() & (pl.col("valid_time") < HOLDOUT_START))
     columns = [
         "time_series_id",
