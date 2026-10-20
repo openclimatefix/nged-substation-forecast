@@ -1,6 +1,7 @@
 name: CI
 
-# Per-PR quality gate: lint, format, types, markdown, and the offline test suite.
+# Per-PR quality gate: lint, format, types, markdown, and the offline test suite (which an
+# experiment-only pull request replaces with the study boundaries test; see the scope step).
 # The network-gated tests are NOT run here — they run in nightly_network_tests.yml.
 # Design rationale (including why this is a bespoke workflow rather than OCF's reusable
 # branch_ci.yml template):
@@ -37,7 +38,10 @@ jobs:
         run: |
           experiment_only=false
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            if ! git diff --name-only HEAD^1 HEAD | grep -qvE '^(ml-experiments/|docs/ml-experiments/|mkdocs\.yml$)'; then
+            # --no-renames lists the old path of a moved file too, so moving code into an
+            # experiment folder still takes the full path.
+            changed=$(git diff --name-only --no-renames HEAD^1 HEAD)
+            if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^(ml-experiments/|docs/ml-experiments/|mkdocs\.yml$)'; then
               experiment_only=true
             fi
           fi
