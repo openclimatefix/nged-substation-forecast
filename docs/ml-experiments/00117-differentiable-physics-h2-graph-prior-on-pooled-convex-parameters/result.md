@@ -239,6 +239,26 @@ is the profile scale, 10.3 points at 10 fleets). The planted failure sat 4.8 (he
 sees over-shrinkage. The cells therefore stay at 40 fleets per set. The holiday family sat 1.5
 standard errors below G and is reported, not gated.
 
+**Tuning outcome (recorded before the gate runs).** The tuning set (20 smooth-cell fleets) and the
+tuning year (the 2023-07-01 cut, scored 2023-24) gave these values.
+
+- **Synthetic interval score (smaller is better; mean, standard error over 20 fleets):** gamma 0:
+  1.471 (0.132); gamma 300: 1.504 (0.093); gamma 1,000: 1.484 (0.098); gamma 3,000: 1.454 (0.111);
+  gamma 10,000: 1.481 (0.130); gamma 30,000: 1.554 (0.143). Every gamma is within one standard error
+  of the best (3,000), so the synthetic score does not choose between them.
+- **Real tuning-year harm (quantile score in points on the five decision sites; H minus G / NH minus
+  N):** gamma 0: +0.000 / +0.000; gamma 300: +0.001 / +0.000; gamma 1,000: -0.001 / +0.002; gamma
+  3,000: +0.005 / +0.007; gamma 10,000: +0.014 / +0.016; gamma 30,000: +0.024 / +0.019. The harm
+  bound of +0.02 keeps every gamma up to 10,000 and rejects 30,000.
+- **Chosen:** gamma = 10,000 (the largest gamma that passes the bound and sits within one standard
+  error of the best synthetic score), and the next grid value above it, 30,000, runs as the
+  exploratory arm. Gamma is not at the top of the grid.
+- **Holiday weight (event-day score, tuning year, 19 event days; mean and standard error):**
+  lambda_hol 0: 2.713 (0.134); lambda_hol 300: 2.708 (0.134); lambda_hol 1,000: 2.700 (0.134);
+  lambda_hol 3,000: 2.679 (0.135); lambda_hol 10,000: 2.633 (0.137). The score falls as lambda_hol
+  rises, so the rule picks the top of the grid, 10,000. A value at the grid edge means the event-day
+  score might fall further at a larger weight, which this plan does not try.
+
 **Code under test.** The tuning set, the gate, and the real-data stage run on `studies.dp_gam_graph`
 as of module commit 67deaa053 (module pull request 1411), which includes a Cholesky solver that a
 test shows equal to the LU solver on a 15-node fleet to 1e-7. If the later Opus review of the module
