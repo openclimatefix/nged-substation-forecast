@@ -298,7 +298,8 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   C5 in the replicate months turns positive without D10); 5, a nested arm beats the arm that
   contains it (GK beats KEZ by 0.015, inside the noise); 6, the replicate months' C1 interval
   (half-width 0.09) is about four times as wide as the sister experiment's. Triggers 3 and 7 did not
-  fire. A fresh Opus audit is due before the prose review.
+  fire. A fresh audit (by a Sonnet reviewer, by the manager's ruling) is due before the prose
+  review.
 - **Tails at D+1, scored year** (coverage at q01, q05, q95, q99, and pinball loss at each): GK
   0.020, 0.062, 0.942, 0.982 and 0.189, 0.635, 0.656, 0.206; KEZ 0.017, 0.055, 0.945, 0.982 and
   0.187, 0.646, 0.672, 0.211. KEZ is within 0.7 points of GK's coverage at every tail.
