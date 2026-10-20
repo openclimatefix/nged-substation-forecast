@@ -41,44 +41,49 @@ adopted_in: none
 date: 2026-10-20
 pr: 1392
 take_home_message: >-
-  One convex model shared across substations forecast a new substation with only 4 weeks of history
-  3.2 points better than a model fitted to that substation alone (and 0.8 points better with 3
-  months), while costing 0.03 points on substations with 2 years of history, and it matched the
-  neural pooled model of experiment 105 on new substations without that model's loss on long
-  histories. Complete pooling did as well as partial pooling for a 4-week substation, so the
-  penalty that decides how far each substation may differ from the fleet matters mainly for long
-  histories. The verdict is inconclusive only because the known-answer test of the method failed
-  under its pre-registered definition; the numbers alone meet the plan's rule for supported.
+  For the five MW Primaries tested, one convex model shared across substations forecast a new
+  substation with only 4 weeks of history 3.2 points better than a model fitted to that substation
+  alone (and 0.8 points better with 3 months), far more than the 0.5 to 2.0 predicted, while costing
+  0.03 points on substations with 2 years of history. On the six held-out substations it came within
+  0.2 points of experiment 105's neural pooled model with 4 weeks (the neural model slightly better)
+  and 0.1 points better with 3 months, without that model's loss on long histories, so the loss in
+  experiment 105 came largely from the neural fit. Complete pooling did as well as partial pooling
+  for a 4-week substation. The verdict is inconclusive only because the known-answer test of the
+  method failed under its pre-registered definition; the numbers alone meet the plan's rule for
+  supported.
 advice:
   - >-
-    Start a new substation from the pooled convex model N, not from a model fitted to its own first
-    weeks: with 4 weeks it scored 3.2 points better than the per-site model (99% interval 1.6 to 5.1
-    better, 5 of 5 sites, 3.7 better in the replicate year), and with 3 months 0.8 points better (C2,
-    C3).
+    If the gate rerun passes, start a new MW Primary from the pooled convex model N and not from a
+    model fitted to its own first weeks: for these five Primaries, with 4 weeks it scored 3.2 points
+    better than the per-site model (99% interval 1.6 to 5.1 better, 5 of 5 sites, 3.7 better in the
+    replicate year), and with 3 months 0.8 points better (C2, C3).
   - >-
-    Use complete pooling with a free band mean per site (N-full) for a substation with under 8
-    weeks of history, since it scored 0.03 points better than partial pooling at 4 weeks (interval
-    -0.14 to +0.09), and tune the partial-pooling penalty on long histories, where complete pooling
-    costs 0.64 points (C5, N-full minus N).
+    Expect complete pooling with a free band mean per site (N-full) to do as well as partial pooling
+    for a 4-week Primary, since partial pooling scored only 0.03 points better (interval -0.14 to
+    +0.09); complete pooling was run at 4 weeks only. Tune the partial-pooling penalty on long
+    histories, where complete pooling costs 0.64 points (C5, N-full minus N).
   - >-
-    Use the deviation penalty of 3,000 rows of evidence for full-history substations, where it costs
+    Use the deviation penalty of 3,000 rows of evidence for full-history Primaries, where it costs
     0.03 points against the per-site model (99% interval +0.01 to +0.06, inside the 0.10 margin),
-    and do not give heating its own penalty: eight alternative heating and other-family penalties
-    moved the score by at most 0.11 points (C1, N-2lambda contrasts).
+    and do not give heating its own penalty: the heating-only variants moved the score by at most
+    0.01 points (C1, N-2lambda contrasts).
   - >-
-    Rebuild a new substation's effective capacity from its own window before pooling in points, and
+    Rebuild a new substation's effective capacity from its own window before pooling in points, to
+    avoid leaking its whole history (a rule against leakage: no arm used the whole-history scale), and
     fit its solar capacity from that window: the per-site fit recovered 0 of 8 synthetic capacities
-    within 25% from 4 weeks and the pooled fit recovered 8 of 8, and on real data the pooled
-    4-week capacity was 0.70 to 0.97 of the real-time vintage against 0.22 to 0.40 for the per-site
-    fit (known-answer gate line e, substation cards).
+    within 25% from 4 weeks and the pooled fit recovered 7 or 8 of 8 across the four gate runs, and on
+    real data the pooled 4-week capacity was 0.70 to 0.97 of the real-time vintage against 0.22 to
+    0.44 for the per-site fit (known-answer gate line e, substation cards).
   - >-
     Do not trust the upper tail of the pooled convex model on full histories: its 95% and 99%
     quantiles covered 83.2% and 93.4% of the scored year, and 79.9% and 90.7% of the replicate year,
     because the spread comes from one stale replica year (tail table).
   - >-
-    Repeat the known-answer gate before porting, with an oracle that estimates every coefficient and
-    a tuning rule checked on several seeds: the gate failed under its pre-registered definition, the
-    redefinition that passes ran on one seed, and line (d) of the tuning rule passed on 3 of 4 seeds.
+    Repeat the known-answer gate before any later experiment starts from N (the next pooled
+    experiments, including experiment 112 and Parts 5 and 6), with an oracle that estimates every
+    coefficient and a tuning rule checked on several seeds: the gate failed under its pre-registered
+    definition, the redefinition that passes ran on one seed, and line (d) of the tuning rule passed
+    on 3 of 4 seeds.
 code: ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/
 ---
 
@@ -96,20 +101,22 @@ gave it only its last 4 weeks (June 2025) or its last 3 months of readings, kept
 others, and scored the next 12 months. Experiment 105's neural pooled model lost to per-site models
 when history was long; this experiment asks whether the loss came from the neural fit.
 
-**The answer is no.** On the five decision substations (D5, D10, D11, D14, and D16), the pooled
+**The answer is largely yes: the neural fit caused most of the loss.** In convex form, pooling costs
+0.03 points on long histories where the neural pooled model cost 0.39. On the five decision
+substations (D5, D10, D11, D14, and D16), the pooled
 model N scored 0.03 points worse than the per-site convex model G with 2 years of history (a lower
 score is better; the plan's margin was 0.10). With 4 weeks of history N scored 3.2 points better
 than G (4.40 against 7.60), with 3 months 0.8 points better, in both the scored year and the
-replicate year, at all five decision substations. N matched lagless XGBoost on full history (0.13 points
-better, interval spanning zero). Complete pooling did as well as partial pooling at 4 weeks.
+replicate year, at all five decision substations. N matched lagless XGBoost on full history (0.13
+points better, interval spanning zero). Complete pooling did as well as partial pooling at 4 weeks.
 **The verdict is `inconclusive`** because the known-answer gate failed under its pre-registered
 definition (see "The known-answer gate"). Applied to the numbers alone, the plan's rule gives
 `supported`.
 
 All five contrasts that decide the verdict are in figure 1. The 6 held-out substations, the cut
 (2025-07-01), the 4-week and 3-month windows, and the scored rows are those of experiment 105, so
-the two experiments compare directly; the rows agree (X-4w scores 11.15 here on six sites against
-11.30 there). Every number below is labelled "gate failed (a post hoc redefinition passes)".
+the two experiments compare directly; the rows agree (X-4w scores 11.15 on the six sites and 11.30 on
+the five in both experiments). Every number below is labelled "gate failed (a post hoc redefinition passes)".
 
 ## Figures
 
@@ -156,14 +163,17 @@ the two experiments compare directly; the rows agree (X-4w scores 11.15 here on 
 - **Scale.** A new substation's points of effective capacity are rebuilt from its window (the 99th
   percentile of the absolute power in the window's usable rows, without lockdown or switching
   rows), in N and G alike, and forecasts convert back to whole-history points before scoring. The
-  rebuilt capacity was 1.09 to 2.04 times smaller than the whole-history capacity in the June
-  windows and 0.91 to 1.01 in the January windows.
+  rebuilt capacity was 1.29 to 2.04 times smaller than the whole-history capacity in the June
+  4-week windows, 1.09 to 1.66 in the April-to-June 3-month windows, and 0.91 to 0.98 in the
+  January 4-week windows.
 - **Spread.** Each full-history site takes the median-centred residual quantiles of its own replica
   fit 12 months earlier. A new substation takes the residuals of each other decision site from the
   replica fits in which that site was the new one with the same weeks of history.
 - **Tuning (2023-24 only).** `lambda*` is 3,000 rows: the value that minimises the mean of the
   4-week and 3-month score ratios subject to the all-rows score staying within 0.02 points of G's.
-  At `lambda*` the ratios were 0.257 and 0.219 and the all-rows cost +0.015 points. The all-rows
+  A ratio is the score over that of the unpooled fit at `lambda = 0` with the base ridge (a
+  4-week score of 18.3), not over G with its tuned ridge (about 7.1). At `lambda*` the ratios were
+  0.257 and 0.219 and the all-rows cost +0.015 points. The all-rows
   score alone prefers `lambda = 0`, and the median-error rule picks 3,000 as well. The per-site
   comparator's own short-history ridge is 10 for both histories.
 
@@ -186,13 +196,17 @@ the two experiments compare directly; the rows agree (X-4w scores 11.15 here on 
   weeks.
 - **Complete pooling on full history costs 0.64 points** (N-full minus N, 95% interval 0.38 to
   0.98; replicate +0.42, 0.23 to 0.66), 0 of 5 sites better.
-- **Against experiment 105 (95% intervals, scored year, all rows).** N minus P is -0.51 (-0.85 to
-  -0.25), 5 of 5 sites; N minus S is -0.12 (-0.26 to +0.02), 3 of 5. On the six held-out sites
-  with 4 weeks, N-4w scored 4.22 against 4.18 for P, and G-4w 7.30 against 15.13 for the per-site
-  neural model; with 3 months, N-3m 4.06 against 4.38 and G-3m 4.70 against 5.47. The neural
-  per-site model was the weak comparator, not the convex one.
+- **Against experiment 105 (95% intervals, scored year, five decision sites, rows outside the
+  masks).** N minus P is -0.51 (-0.85 to -0.25), 5 of 5 sites; N minus S is -0.12 (-0.26 to +0.02),
+  3 of 5. For a new substation, the like-for-like comparison names the site set. On the six
+  held-out sites, 4 weeks: N-4w 4.22 against 4.04 for experiment 105's pooled neural model P, so P is
+  0.17 better (interval spanning zero); G-4w 7.30 against 14.38 for its per-site neural model. With 3
+  months, N-3m 4.06 against 4.16 for P (0.10 better) and G-3m 4.70 against 6.03. On the five decision
+  sites the 4-week gap is +0.22 for N (P 4.18). P is a frozen-module onboarding and N a joint refit,
+  so the two are not the same procedure. The neural per-site model was the weak comparator, not the
+  convex one.
 - **The onboarding curve (N minus G, scored year).** -4.31 at 2 weeks, -3.20 at 4, -4.48 at 8,
-  -0.81 at 3 months (14 weeks), and -0.99 at 26 weeks; replicate -3.12, -3.70, -2.80, -0.97, and
+  -0.81 at 3 months (13 weeks), and -0.99 at 26 weeks; replicate -3.12, -3.70, -2.80, -0.97, and
   -0.42. N's gain falls by more than half between 4 and 26 weeks.
 - **Winter onboarding (4 weeks ending 2025-01-31, scored to 2026-01-31).** N-win4w minus G-win4w is
   -2.18 (-3.18 to -1.25), 5 of 5, so the gain survives a window that holds heating.
@@ -206,9 +220,10 @@ the two experiments compare directly; the rows agree (X-4w scores 11.15 here on 
 - **References.** N minus climatology -1.15 (-1.39 to -0.89) and N minus the manual heuristic
   -0.57 (-0.85 to -0.25), both 5 of 5 sites. N is 0.54 points worse than lagged XGBoost at 24.5 to
   48 hours (0.31 to 0.84), which has power lags that N lacks; the pairing is on valid time.
-- **N-2lambda.** Eight alternative heating and other-family penalties (a tenth to ten times
-  `lambda*`) moved the score by -0.03 to +0.11 points; a tenth of `lambda*` for the non-heating
-  families was best, at -0.03 (-0.04 to -0.01).
+- **N-2lambda.** The heating-only variants (a tenth or ten times `lambda*` for heating, the other
+  families at `lambda*`) moved the score by at most 0.01 points. A tenth of `lambda*` for the
+  non-heating families helped by 0.03 (-0.04 to -0.01) in the scored year and not in the replicate
+  year (+0.00); ten times `lambda*` for them cost 0.09 to 0.11.
 
 ## Predictions against outcome
 
@@ -217,7 +232,8 @@ the two experiments compare directly; the rows agree (X-4w scores 11.15 here on 
   +0.015 without D16). The interval half-width is 0.025.
 - **C2 between -0.5 and -2.0, interval below zero, 5 of 5 sites both years, over two-thirds in
   November to March: partly held.** The estimate is larger than predicted (-3.2 and -3.7). The
-  November-to-March share is 0.69 by rows.
+  November-to-March share of the gain is 0.66 in the scored year (just short of two-thirds) and 0.69
+  in the replicate year.
 - **C3 between -0.2 and -1.0, interval below zero, 4 of 5 sites: partly held.** The estimate and
   the sites held; the scored interval reaches +0.004.
 - **C4 between -0.1 and -0.4: held** (-0.13).
@@ -264,47 +280,57 @@ folder (`gate_run1.json` to `gate_run4.json`, `gate_runs.csv`).
   the slope was 0.17 against the oracle's 0.15, and the heating error 2.40 against 2.97.
 - **Weaknesses of the pass.** The oracle's heating error is larger than the pooled fit's, which an
   oracle cannot be if its independent-noise assumption held, so the error half of line (b) is weak.
-  Line (d) passed on 3 of 4 seeds. The tuned single penalty shrinks heating harder than a
+  A heating-only oracle that knows every other coefficient had a heating error of 1.40 in run 4,
+  which N-4w (2.40) would fail against the 1.2-times bound. Line (d) passed on 3 of 4 seeds. The
+  tuned single penalty shrinks heating harder than a
   heating-only oracle would (a sweep in `gate_run4.json` shows the heating error flat from 300 to
   1,000 rows and the slope falling), which the exploratory N-2lambda arms then tested on real data
-  and found to matter by at most 0.03 points.
+  and found to matter by at most 0.01 points for heating alone.
 
 ## Checks
 
 - **Median forecast minus mean forecast, per site.** Zero at every site and arm (report section
   "Median forecast minus mean forecast"). This holds by construction, because every spread is
   centred on its median.
-- **Error of the mean forecast beside each contrast (mean absolute error, five sites, scored
-  year).** C1 +0.037 (quantile score +0.032), C2 -5.50 (-3.20), C3 -1.73 (-0.81), C4 +0.007
-  (-0.13), C5 -0.030 (-0.034). The error of the mean agrees in sign except for C4, where both are
-  within 0.13 of zero.
-- **Leaving one site out.** C1 to C3 keep their sign in both years whichever site is left out
-  (C1 between +0.015 and +0.046 scored, C2 between -3.44 and -3.04, C3 between -0.97 and -0.70).
-  C4 changes sign without D10 in the replicate year (+0.059), and C5 changes sign without D10 in
-  both years (+0.069 scored, +0.094 replicate); both are near zero with intervals spanning zero.
-- **Audit triggers.** Fired: **trigger 1** (the gate's blocking line failed under the
-  pre-registered definition); **trigger 3** for C4 only, as above; **trigger 4** for C4 and C5
-  (D10, near-zero contrasts that carry no verdict); and **trigger 7** (the next pooled experiments
-  start from N). **Trigger 2** is partly met: C2's estimate exceeds its predicted range, which the
-  plan review expected because a per-site model fitted to 4 June weeks has almost no heating
-  evidence and is a straw man in winter (the November-to-March gain is 5.4 points), and C5 and the
-  tails fall short of their predictions. **Trigger 5 did not fire:** on the tuning year N is 0.015
-  points worse than G and 0.2 better than the penalty of 1,000,000 rows that approximates
-  complete pooling, so it does not lose to both, and the
-  `-pin` and capacity controls moved the contrast by less than its interval. **Trigger 6 did not
-  fire in the expected direction:** C1's interval is about 10 times narrower than experiment 105's
-  (+0.18 to +0.69), as nested convex fits without seed noise should give. A fresh Opus audit runs
-  before the prose review.
+- **Error of the mean forecast beside each contrast (mean absolute error, five sites).** Scored
+  year: C1 +0.037 (quantile score +0.032), C2 -5.50 (-3.20), C3 -1.73 (-0.81), C4 +0.007 (-0.13),
+  C5 -0.030 (-0.034). Replicate year: C1 +0.001 (-0.003), C4 +0.114 (-0.037), C5 -0.013 (+0.003).
+  The error of the mean disagrees in sign for C4 in both years, and for C1 and C5 in the replicate
+  year, all within 0.13 points of zero. N is better than the XGBoost bar only in the quantile
+  score; on the error of the mean it is not.
+- **Leaving one site out.** C2 and C3 keep their sign in both years whichever site is left out
+  (C2 between -3.44 and -3.04 scored, C3 between -0.97 and -0.70). C1's scored estimate stays
+  between +0.015 and +0.046; its replicate estimate moves between -0.008 and +0.001 and turns
+  positive without D16, inside the margin either way. C4 changes sign without D10 in the replicate
+  year (+0.059). C5 changes sign without D10 in the scored year (+0.069) and, in the replicate year,
+  without D5 (-0.093), D11 (-0.003), or D16 (-0.031). C4 and C5 are indistinguishable from zero for
+  these five substations.
+- **Audit triggers** (private audit: `data/ml-experiments/briefs/dp_pr1392_numbers_audit_result.md`).
+  **Trigger 1 fired:** the gate's blocking line failed under the pre-registered definition (the
+  other clause held: N-full-4w beat G-4w, 4.43 against 7.60). **Trigger 2 fired (post hoc
+  explanation):** C2 is 1.6 to 2 times the top of the predicted range. A June window's lack of
+  heating explains part of the excess (the November-to-March gain is -5.4), but the winter-window
+  gain of -2.18 and the April-to-October gain of -1.77 are both still above the predicted range,
+  so the per-site 4-week fit is weak in every season. C5 and the tails also fell short of their
+  predictions. **Trigger 3 fired** for C4 in both years and for C1 and C5 in the replicate year,
+  as above. **Trigger 4 fired** for C4 and C5, as above. **Trigger 5 did not fire:** on the
+  tuning year N is 0.015 points worse than G and 0.2 better than the penalty of 1,000,000 rows that
+  approximates complete pooling, so it does not lose to both; the capacity control N-4w-cappool
+  moved N-4w by -0.008 (scored) and -0.037 (replicate), tiny but beyond its own interval. **Trigger
+  6 fired:** C1's interval is about a tenth as wide as experiment 105's (+0.18 to +0.69), as nested
+  convex fits without seed noise should give. **Trigger 7 fired:** the next pooled experiments
+  (experiment 112, Parts 5 and 6) start from or compare against N, and the gate that validates the
+  method failed.
 
 ## Substation cards (provisional)
 
 - **Heating is the family the penalty moves most.** At `lambda*` the pooled fit removes 35% to 72%
   of each decision substation's difference from the fleet mean in the heating coefficients (D10
-  35%, D11 49%, D16 51%, D5 62%, D14 72%), 15% to 43% in the profile shape and the harmonics, and
-  0% to 75% in the lighting ramps. D10's heating response stays the steepest of the five (figure 8).
+  35%, D11 49%, D16 51%, D5 62%, D14 72%), 6% to 43% in the profile shape and the harmonics, and
+  18% to 75% in the lighting ramps. D10's heating response stays the steepest of the five (figure 8).
 - **Capacity from 4 weeks.** The pooled 4-week fit gave 0.70 to 0.97 of the real-time vintage's
   capacity (D5 46 against 62 points, D10 36 against 51, D11 30 against 33, D14 29 against 30, D16 36
-  against 43), while the per-site 4-week fit gave 0.22 to 0.40 (figure 9).
+  against 43), while the per-site 4-week fit gave 0.22 to 0.44 (figure 9).
 
 ## Caveats
 
@@ -320,8 +346,9 @@ folder (`gate_run1.json` to `gate_run4.json`, `gate_runs.csv`).
   so each new substation entered a refit of the whole pool; the result does not transfer to
   onboarding a frozen model.
 - **The new substation's scale is rebuilt from its window**, which makes its points larger in a
-  June window (by 9% to 104%). If the whole-history scale had been used the pooled gain would likely
-  be larger, because pooling in points leans on the scale being right.
+  June 4-week window (by 29% to 104%). No arm used the whole-history scale, so the effect of the
+  rebuild on the gain is not measured; pooling in points leans on the scale being right, which is
+  why it is rebuilt.
 - **The tails are under-dispersed for full histories.** The spread comes from one replica year, so
   q95 and q99 covered 83% and 93% of the scored year.
 - **Not run.** The marginal-likelihood `lambda` arm (N-ml), D18 as a short-history substation, and

@@ -8,6 +8,11 @@
 | Part 4 (proposed) | Does a pooled drift term, trained from 2019-09, beat the same model on its best window? | 2 | 00105 confirmation tier | Proposed |
 | Part 5 (proposed) | Does the pooled MVA observation layer help the MW sites and recover MW at MVA sites? | 3 | 00105 | Proposed |
 
+**Experiment 109 gives the pooled convex model N for the next experiments to start from, once its
+known-answer gate is rerun.** The gate failed under its pre-registered definition, so experiment
+112, Part 5, and Part 6 depend on N and on a rerun of the gate with an oracle that estimates every
+coefficient and a tuning rule checked on several seeds.
+
 ## Planned experiments
 
 <!-- planned-table -->

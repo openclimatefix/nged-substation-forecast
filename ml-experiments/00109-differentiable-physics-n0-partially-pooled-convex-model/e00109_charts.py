@@ -212,7 +212,7 @@ def figure_3_curve(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         x=alt.X(
             "weeks of history:Q",
             scale=alt.Scale(type="log", domain=[1.6, 32]),
-            axis=alt.Axis(values=[2, 4, 8, 14, 26]),
+            axis=alt.Axis(values=[2, 4, 8, 13, 26]),
             title="Weeks of history at the new substation (log scale)",
         ),
         y=alt.Y("score:Q", title="Score (points)", scale=alt.Scale(domain=[0, 10])),
