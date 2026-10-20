@@ -194,15 +194,15 @@ finished write-up.** An experiment opens one pull request, when its result is re
 commit is the first commit in that pull request's history. No pull request is opened at plan time. A
 change to `packages/studies/` that the experiment needs is the exception: open its pull request as
 soon as the module is ready for review, because the module needs its own review. The planning commit
-updates the experiment's row in the priority table at the top of the page with its id, the question in one line, the priority, what it waits for, and the
-state, and commits the `result.md` with `status: planned`, which the page's generated
-planned-experiments table then lists. The finished commit deletes that row and the experiment's
-proposal section from the page, sets the final `status`, `verdict`, and `production_status` in the
-front matter, and writes `take_home_message`. Nothing else is edited: the Experiments table of the
-theme, and the candidates table on the overview, are generated from the front matter. An idea the
-maintainer has agreed to run but that has no folder yet goes in the priority table marked
-"Proposed". An experiment that ends `invalid` or `failed` keeps its `result.md`, and its
-`take_home_message` says why.
+updates the experiment's row in the priority table at the top of the page with its id, the question
+in one line, the priority, what it waits for, and the state, and commits the `result.md` with
+`status: planned`, which the page's generated planned-experiments table then lists. The finished
+commit deletes that row and the experiment's proposal section from the page, sets the final
+`status`, `verdict`, and `production_status` in the front matter, and writes `take_home_message`.
+Nothing else is edited: the Experiments table of the theme, and the candidates table on the
+overview, are generated from the front matter. An idea the maintainer has agreed to run but that has
+no folder yet goes in the priority table marked "Proposed". An experiment that ends `invalid` or
+`failed` keeps its `result.md`, and its `take_home_message` says why.
 
 **Name every experiment in a series with the same topic words in its slug, so a reader can find the
 series by eye.** Write the slug as a few words naming the topic and the part, such as
