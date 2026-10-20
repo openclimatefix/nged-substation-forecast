@@ -338,3 +338,36 @@ Peak GPU memory is under 3 GB; a fit under 30 seconds lets the 5 seeds be stacke
 fit exceeds 1.1 minutes, cut in this order:** seeds from five to three, ENC-r0, the gate's 0.10
 size, the sparse hard-day injections; never ENC-c0, the placebos, or the 0.05 gates. Data
 extraction is CPU (about 2 CPU-hours).
+
+## Pre-fit clarifications (2026-10-20, before any encoder is fitted)
+
+**Winter breakdown (maintainer priority, relayed by the manager).** The best model goes to
+production in about a month and NGED first sees it in winter, so the page reports a winter breakdown
+beside every annual score.
+
+- **Winter rows:** November to March, by the run date's month, for every arm and every contrast
+  (C1 to C5), with paired intervals from the same month-resampled bootstrap on the rows where all
+  compared arms have predictions, and the annual score beside it. Evening peaks within winter are
+  the half-hours 16:00 to 20:00 UTC.
+- **Cold snap:** the day belongs to the coldest 5% of days (`hard_days.json`, subset 1, 37 days
+  over the two years, about 18 per year, defined before any score). The cold-snap panel of each
+  substation card shows K0 and ENC-c against the observed series on that year's cold-snap days
+  that fall in the scored year, with the day count stated, and says "too few days" for fewer than
+  10 days with rows at the site.
+- **Independent winters:** the local ENS holds two winters, 2024-25 (scored in F2) and 2025-26
+  (scored in F1). Each direction's winter estimate rests on one winter, so no winter result is
+  labelled by itself, and the page says so.
+- **Verdict rule:** an arm that loses in winter (winter estimate above zero with an interval
+  wholly above zero in either year, or above zero in both years) is held back even if the annual
+  mean improves, and the verdict says so in its first sentence. This does not change the decision
+  rule's labels.
+
+**Corrections to the numbers above, found while building the data.** (1) The first 9 runs of
+2024-04 have no week of analysis-proxy weather before their origin, so experiment 111 never
+forecast them: F1 trains on 447 runs (2024-04-10 to 2025-06-30), not 456. (2) A run's half-hours
+reach 177 hours after its 00:00 initialisation, so the encoder reads 54 ENS steps (3-hourly to
+144 hours, 6-hourly to 174 hours), not 53. (3) Experiment 111 stored GAM-K for the tuning months
+(odd months of 2024-07 to 2025-06), the replicate months (even months), and the scored year, but
+not for 2024-04 to 2024-06; ENC re-forecast those 91 runs from experiment 111's stored monthly
+fits, and the check that the same code re-forecasts 4 stored runs per site gave a largest
+difference of 0 (`e00119_gamk.py`).
