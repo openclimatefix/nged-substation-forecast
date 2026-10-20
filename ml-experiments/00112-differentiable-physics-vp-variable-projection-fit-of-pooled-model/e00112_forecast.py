@@ -25,6 +25,8 @@ from studies.dp_features import FeatureCache
 from studies.dp_gam import MIN_SPREAD_GROUP_ROWS
 from studies.dp_onboarding import PooledResiduals, fit_centred_spread, pooled_residuals
 
+MIN_SITE_ROWS: Final[int] = 1440
+"""A substation with fewer training rows than this has no per-site fit at the cut."""
 YEARS: Final[dict[str, tuple[datetime, datetime, datetime]]] = {
     "rep": (common.REPLICATE_CUT, common.REPLICA_CUT, common.FINAL_CUT),
     "scored": (common.FINAL_CUT, common.REPLICATE_CUT, common.SCORING_END),
@@ -37,14 +39,26 @@ def suffix(*, year: str) -> str:
     return "_rep" if year == "rep" else ""
 
 
-def score_batch(*, cache: FeatureCache, sites: tuple[str, ...], cut: datetime, through: datetime):  # noqa: ANN201
-    """Return the float64 scoring rows (every present row) of `sites` in (`cut`, `through`]."""
+def score_batch(  # noqa: ANN201
+    *,
+    cache: FeatureCache,
+    sites: tuple[str, ...],
+    cut: datetime,
+    through: datetime,
+    for_spread: bool = False,
+):
+    """Return the float64 rows of `sites` in (`cut`, `through`].
+
+    Scored rows are every present row. The replica year that fits a spread uses the default rows
+    only (outside the switching masks, the lockdown window, and experiment 103's pool filter), as
+    experiment 105's spread did.
+    """
     return common.scoring_batch_for(
         cache=cache,
         sites=sites,
         after=cut,
         through=through,
-        all_present_rows=True,
+        all_present_rows=not for_spread,
         device=vp.DEVICE,
         dtype=common.BATCH_DTYPE,
     )
@@ -83,7 +97,9 @@ def pooled_forecasts(
         model_sites=common.POOL,
     )
     replica_year = gradient.remap_sites(
-        batch=score_batch(cache=cache, sites=common.REPORT_SITES, cut=cut_r, through=cut),
+        batch=score_batch(
+            cache=cache, sites=common.REPORT_SITES, cut=cut_r, through=cut, for_spread=True
+        ),
         model_sites=common.POOL,
     )
     return gradient.forecasts_by_site(model=model, score=score, replica=(model_r, replica_year))
@@ -111,20 +127,26 @@ def per_site_forecasts(
     models = {}
     for site in common.REPORT_SITES:
         names = {s: f"{name_prefix}_{site.lower()}_{s}" for s in common.STARTS}
-        if not all(vp.has_fit(name=n, cut=cut) for n in names.values()):
-            continue
-        begin = start or lower_objective_start(names=names, cut=cut)
-        chosen[site] = begin
         train = common.pooled_batch_for(
             cache=cache, sites=(site,), cut=cut, device=vp.DEVICE, dtype=common.BATCH_DTYPE
         )
+        if train.n_rows < MIN_SITE_ROWS:
+            continue
+        missing = [n for n in names.values() if not vp.has_fit(name=n, cut=cut)]
+        if missing:
+            msg = f"missing fits at {cut.date()}: {missing}"
+            raise RuntimeError(msg)
+        begin = start or lower_objective_start(names=names, cut=cut)
+        chosen[site] = begin
         models[site] = vp.load_fit(name=names[begin], cut=cut, batch=train)
         if vp.has_fit(name=names[begin], cut=cut_r):
             train_r = common.pooled_batch_for(
                 cache=cache, sites=(site,), cut=cut_r, device=vp.DEVICE, dtype=common.BATCH_DTYPE
             )
             model_r = vp.load_fit(name=names[begin], cut=cut_r, batch=train_r)
-            replica_year = score_batch(cache=cache, sites=(site,), cut=cut_r, through=cut)
+            replica_year = score_batch(
+                cache=cache, sites=(site,), cut=cut_r, through=cut, for_spread=True
+            )
             residuals[site] = pooled_residuals(model=model_r, batch=replica_year)
     out: dict[str, gradient.SiteForecast] = {}
     for site, model in models.items():
@@ -187,6 +209,7 @@ def run_year(*, cache: FeatureCache, year: str) -> None:
 
 def main() -> None:
     """Store the prediction sets of the requested years."""
+    common.require_gate_passed()
     parser = argparse.ArgumentParser()
     parser.add_argument("--years", nargs="+", default=["rep", "scored"], choices=list(YEARS))
     arguments = parser.parse_args()

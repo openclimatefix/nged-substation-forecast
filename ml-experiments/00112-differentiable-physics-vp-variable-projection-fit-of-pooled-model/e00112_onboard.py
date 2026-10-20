@@ -1,13 +1,13 @@
 """The onboarding arms (C2v) and the short-history arms (C3v) of the variable-projection fit.
 
 **Onboarding (C2v).** For each scored MW substation s, VP-P is refitted on every other substation
-(leave one out), starting from the full VP-P fit. Then `onboard_site` fits only s's site-level
+(leave one out), from a cold start. Then `onboard_site` fits only s's site-level
 parameters on s's last 4 weeks before the cut, with every shared parameter and population mean
 frozen from that leave-one-out fit and the site's own parameters solved exactly
 (`vp_site_fitter`). The per-site comparator VP-S-4w is the per-site VP model on those 4 weeks.
 
 **Short history (C3v).** For each s, VP-P is refitted on the full window in which s keeps only its
-last 3 months (the shared modules are refitted with s inside), starting from the full VP-P fit. The
+last 3 months (the shared modules are refitted with s inside), from a cold start. The
 comparator VP-S-3m is the per-site VP model on those 3 months.
 
 **Spread.** A new substation has no residuals of its own, so the spread for s comes from the other
@@ -15,8 +15,9 @@ scored substations: substation t's residuals come from the same procedure at the
 months earlier, scored over the following 12 months. The replica fits include s's rows before the
 replica cut, which a truly new substation would not have.
 
-The leave-one-out and short-history refits at the three cuts are saved with `--stage fit`; the
-forecasts of the replicate year and the scored year follow with `--stage forecast`.
+The leave-one-out and short-history refits at the three cuts are saved with `--stage fit`, each
+from a cold start; the forecasts of the replicate year and the scored year follow with
+`--stage forecast`.
 
     uv run --no-sync python ml-experiments/00112-*/e00112_onboard.py --stage fit|forecast
 """
@@ -31,7 +32,6 @@ import e00112_forecast as forecast
 import e00112_gradient as gradient
 import e00112_vp as vp
 import numpy as np
-import torch
 from studies.dp_features import FeatureCache
 from studies.dp_onboarding import (
     PooledResiduals,
@@ -49,19 +49,12 @@ HELD_OUT_SITES: Final[tuple[str, ...]] = common.SCORED_SITES
 ONBOARD_WEEKS: Final[int] = 4
 SHORT_MONTHS: Final[int] = 3
 REFIT_FALLBACK_STEPS: Final[int] = 0
-"""The leave-one-out and short-history refits continue from a converged VP-P fit, so L-BFGS only."""
+"""The leave-one-out and short-history refits use L-BFGS only, to keep inside the GPU budget."""
 
 
 def train_batch(*, cache: FeatureCache, cut: datetime) -> PooledBatch:
     """Return the float64 pooled training rows of the whole pool at `cut`."""
     return forecast.vp_train(cache=cache, cut=cut)
-
-
-def base_state(*, cut: datetime, batch: PooledBatch) -> dict:
-    """Return the state of the full VP-P fit (the lower-objective start) at `cut`."""
-    names = {s: f"vp_p_{s}" for s in common.STARTS}
-    start = forecast.lower_objective_start(names=names, cut=cut)
-    return torch.load(vp.model_path(name=names[start], cut=cut), map_location=batch.y.device)
 
 
 def short_keep(*, batch: PooledBatch, cache: FeatureCache, site: str, cut: datetime):  # noqa: ANN201
@@ -80,30 +73,27 @@ def weeks_rows(  # noqa: ANN201
 
 
 def stage_fit(*, cache: FeatureCache) -> None:
-    """Save the leave-one-out and short-history refits at every cut."""
+    """Save the leave-one-out and short-history refits at every cut.
+
+    Each refit starts cold, as the arm it is compared with does: a start taken from the full VP-P
+    fit would carry the held-out substation's older rows into its shared parameters.
+    """
     for cut in common.CUTS:
         batch = train_batch(cache=cache, cut=cut)
         settings = common.vp_settings(cut=cut, round_name="round2")
-        state = base_state(cut=cut, batch=batch)
         for site in HELD_OUT_SITES:
             for kind, keep in (
                 ("loo", ~site_mask(batch=batch, label=site)),
                 ("short3m", short_keep(batch=batch, cache=cache, site=site, cut=cut)),
             ):
-                name = f"vp_{kind}_{site.lower()}"
-                if vp.has_fit(name=name, cut=cut):
-                    continue
-                rows = select_rows(batch=batch, keep=keep)
-                model, result = vp.fit_pooled_arm(
-                    batch=rows,
+                vp.fit_cached(
+                    name=f"vp_{kind}_{site.lower()}",
+                    cut=cut,
+                    batch=select_rows(batch=batch, keep=keep),
                     settings=settings,
                     start="s0",
                     fallback_steps=REFIT_FALLBACK_STEPS,
-                    init_state=state,
                 )
-                record = vp.record_of(result=result, rows=rows.n_rows)
-                vp.save_fit(name=name, cut=cut, model=model, record=record)
-                print(f"{name} at {cut.date()}: {result.seconds:.0f} s", flush=True)
 
 
 def onboarded_copy(
@@ -144,7 +134,9 @@ def replica_residuals(
     out: dict[str, PooledResiduals] = {}
     for site in HELD_OUT_SITES:
         year = gradient.remap_sites(
-            batch=forecast.score_batch(cache=cache, sites=(site,), cut=cut_r, through=cut),
+            batch=forecast.score_batch(
+                cache=cache, sites=(site,), cut=cut_r, through=cut, for_spread=True
+            ),
             model_sites=common.POOL,
         )
         if kind == "onboard":
@@ -216,7 +208,9 @@ def stage_forecast(*, cache: FeatureCache) -> None:
             )
             tr = per_site_short(cache=cache, cut=cut, site=site, weeks=ONBOARD_WEEKS)
             if tr.n_rows:
-                per_model, _ = vp.fit_pooled_arm(
+                per_model, _ = vp.fit_cached(
+                    name=f"vp_s_4w_{site.lower()}",
+                    cut=cut,
                     batch=tr,
                     settings=settings,
                     start="s0",
@@ -233,7 +227,9 @@ def stage_forecast(*, cache: FeatureCache) -> None:
             )
             tr3 = per_site_short(cache=cache, cut=cut, site=site, weeks=None)
             if tr3.n_rows:
-                per_model3, _ = vp.fit_pooled_arm(
+                per_model3, _ = vp.fit_cached(
+                    name=f"vp_s_3m_{site.lower()}",
+                    cut=cut,
                     batch=tr3,
                     settings=settings,
                     start="s0",
@@ -254,6 +250,7 @@ def stage_forecast(*, cache: FeatureCache) -> None:
 
 def main() -> None:
     """Run the requested stage."""
+    common.require_gate_passed()
     parser = argparse.ArgumentParser()
     parser.add_argument("--stage", required=True, choices=["fit", "forecast"])
     arguments = parser.parse_args()

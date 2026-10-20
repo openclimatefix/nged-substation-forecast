@@ -1,24 +1,28 @@
 """The blocking known-answer gate of experiment 112, before any replicate-year or scored-year fit.
 
 Module tests 1 to 5 of the plan are `packages/studies/tests/test_dp_pooled_vp.py`. This script runs
-the other three, each fitted at the replicate cut (2024-07-01) with the interaction network on:
+the other three, each fitted at the replicate cut (2024-07-01) with the interaction network on. Every
+fit starts cold and is saved, so a rerun loads it. The results go to `work/gate.json`, which the fit,
+forecast, onboarding, profile, and ladder scripts check before they run.
 
-2. **A synthetic fleet.** Eight sites on the real calendar and weather tensors of the MW Primaries,
-   2 years each, with K = 2 shared daily shapes of known loadings, a 14 degree threshold, a known
-   thermal-inertia mix, non-zero shared holiday, tent, harmonic, and lighting terms, a capacity path
-   with a 3 to 8 point growth increment in the last season-year, no network term, and residuals
-   block-bootstrapped by week from the per-site convex model's training residuals at a different
-   site. Pass if every threshold is within 1 degree, every slope within 15%, every season-year
-   capacity within 10%, every growth increment within 1.5 points, and the network's centred
-   summer-midday output under 0.1 points.
-3. **The outer loop converges** on the fleet from three starts (seed 0; seed 1; thresholds at 17
-   degrees with uniform loadings): the final objective gradient is under 1e-4, the objectives agree
-   within 1 nat per 10,000 rows, and each threshold agrees with a 0.1 degree grid profile within
-   0.2 degrees.
-4. **Injected farms**, one at a time at D10, D11, D14, and D16: the recovered capacity increment
-   over the injected one has a median in [0.9, 1.1] (experiment 105's value was 0.78), and the other
-   substations' capacities move under 5%. The shared modules' midday movement is reported beside a
-   second-seed base fit's, made once on the first farm's rows. Only ratios appear.
+**Test 2, a synthetic fleet.** Eight sites on the real calendar and weather tensors of the MW
+Primaries, 2 years each, with K = 2 shared daily shapes of known loadings, a 14 degree threshold, a
+known thermal-inertia mix, non-zero shared holiday, tent, harmonic, and lighting terms, a capacity
+path with a 3 to 8 point growth increment in the last season-year, no network term, and residuals
+block-bootstrapped by week from the per-site convex model's training residuals at a different site.
+Pass if every threshold is within 1 degree, every slope in every band within 15%, every season-year
+capacity within 10%, every growth increment within 1.5 points, and the network's centred
+summer-midday output under 0.1 points.
+
+**Test 3, the outer loop converges** on the fleet from three starts (seed 0; seed 1; thresholds at
+17 degrees with uniform loadings): the final objective gradient is under 1e-4, the objectives agree
+within 1 nat per 10,000 rows, and each threshold agrees with a 0.1 degree grid profile within 0.2
+degrees.
+
+**Test 4, injected farms**, one at a time at D10, D11, D14, and D16: the recovered capacity increment
+over the injected one has a median in [0.9, 1.1] (experiment 105's value was 0.78), and the other
+scored substations' capacities move under 5%. The shared modules' midday movement is reported
+beside a second-seed base fit's, made once on the first farm's rows. Only ratios appear.
 
     uv run --no-sync python ml-experiments/00112-*/e00112_gate.py [--tests 2 3 4]
 """
@@ -41,7 +45,6 @@ from studies.dp_pooled import DpConfig, PooledBatch, PooledDemandModel
 from studies.dp_pooled_vp import (
     VpSettings,
     _evaluate,
-    fit_pooled_vp,
     make_vp_problem,
     phi_parameters,
     trainable_only,
@@ -327,25 +330,28 @@ def network_midday_size(
     return max(sizes)
 
 
+def uniform_loadings_at_17(model: PooledDemandModel) -> None:
+    """Start every threshold at 17 degrees with uniform style loadings (test 3's third start)."""
+    with torch.no_grad():
+        model.threshold.fill_(common.START_THRESHOLD_C)
+        model.population_mean["threshold"].fill_(common.START_THRESHOLD_C)
+        model.site_logits.zero_()
+
+
 def fit_synthetic(
-    *, batch: PooledBatch, noise_sd: float, start: str, uniform_loadings_at_17: bool = False
-) -> tuple[PooledDemandModel, Any]:
-    """Fit the fleet from a start; `uniform_loadings_at_17` is the third start of test 3."""
+    *, batch: PooledBatch, noise_sd: float, name: str, start: str, third: bool = False
+) -> tuple[PooledDemandModel, dict]:
+    """Fit the fleet from a start (saved, so a rerun loads it); `third` is test 3's third start."""
     settings = VpSettings(noise_sd=noise_sd, deviation=common.tuned()["map_deviation"])
-    model = vp.new_model(batch=batch, start=start)
-    if uniform_loadings_at_17:
-        with torch.no_grad():
-            model.threshold.fill_(common.START_THRESHOLD_C)
-            model.population_mean["threshold"].fill_(common.START_THRESHOLD_C)
-            model.site_logits.zero_()
-    result = fit_pooled_vp(
-        model=model,
+    return vp.fit_cached(
+        name=f"gate_fleet_{name}",
+        cut=GATE_CUT,
         batch=batch,
         settings=settings,
-        adam_steps=GATE_FALLBACK_STEPS,
-        warm_start_steps=common.WARM_START_STEPS,
+        start=start,
+        fallback_steps=GATE_FALLBACK_STEPS,
+        prepare=uniform_loadings_at_17 if third else None,
     )
-    return model, result
 
 
 def recovery(
@@ -353,8 +359,8 @@ def recovery(
 ) -> dict[str, Any]:
     """Return how well `model` recovered the truth's thresholds, slopes, capacities, and network."""
     n_sites = len(batch.site_labels)
-    slope_fit = torch.nn.functional.softplus(model.slope_raw).mean(dim=1).detach().cpu().numpy()
-    slope_true = torch.nn.functional.softplus(truth.slope_raw).mean(dim=1).detach().cpu().numpy()
+    slope_fit = torch.nn.functional.softplus(model.slope_raw).detach().cpu().numpy()
+    slope_true = torch.nn.functional.softplus(truth.slope_raw).detach().cpu().numpy()
     capacity_fit = model.capacities().detach().cpu().numpy()
     capacity_true = truth.capacities().detach().cpu().numpy()
     trained = (truth.trained > 0).cpu().numpy()
@@ -373,7 +379,7 @@ def recovery(
             float(abs(t - TRUE_THRESHOLD_C)) for t in model.threshold.detach().cpu().tolist()
         ],
         "slope_relative_error": [
-            float(abs(slope_fit[i] / slope_true[i] - 1)) for i in range(n_sites)
+            float(np.max(np.abs(slope_fit[i] / slope_true[i] - 1))) for i in range(n_sites)
         ],
         "capacity_relative_error": capacity_error,
         "growth_increment_error_points": growth_error,
@@ -423,17 +429,17 @@ def gate_2_and_3(*, cache: FeatureCache) -> dict[str, Any]:
     """Return the synthetic-fleet recovery (test 2) and the three-start convergence (test 3)."""
     batch, truth, noise_sd = build_synthetic(cache=cache)
     fits = {
-        "s0": fit_synthetic(batch=batch, noise_sd=noise_sd, start="s0"),
-        "s1": fit_synthetic(batch=batch, noise_sd=noise_sd, start="s1"),
+        "s0": fit_synthetic(batch=batch, noise_sd=noise_sd, name="s0", start="s0"),
+        "s1": fit_synthetic(batch=batch, noise_sd=noise_sd, name="s1", start="s1"),
         "s17_uniform": fit_synthetic(
-            batch=batch, noise_sd=noise_sd, start="s0", uniform_loadings_at_17=True
+            batch=batch, noise_sd=noise_sd, name="s17_uniform", start="s0", third=True
         ),
     }
     recoveries = {
         name: recovery(model=model, truth=truth, batch=batch, cache=cache)
         for name, (model, _) in fits.items()
     }
-    objectives = {name: result.objective for name, (_, result) in fits.items()}
+    objectives = {name: record["objective"] for name, (_, record) in fits.items()}
     rows = batch.n_rows
     spread = (max(objectives.values()) - min(objectives.values())) / rows * 1e4
     profile = {
@@ -449,12 +455,12 @@ def gate_2_and_3(*, cache: FeatureCache) -> dict[str, Any]:
         "test_3": {
             "objectives": objectives,
             "objective_spread_nats_per_10000_rows": spread,
-            "gradient_max_abs": {name: r.gradient_max_abs for name, (_, r) in fits.items()},
-            "converged": {name: r.converged for name, (_, r) in fits.items()},
+            "gradient_max_abs": {name: r["gradient_max_abs"] for name, (_, r) in fits.items()},
+            "converged": {name: r["converged"] for name, (_, r) in fits.items()},
             "threshold_profile_error_c": profile,
-            "seconds": {name: r.seconds for name, (_, r) in fits.items()},
+            "seconds": {name: r["seconds"] for name, (_, r) in fits.items()},
             "passed": bool(
-                all(r.gradient_max_abs < 1e-4 for _, r in fits.values())
+                all(r["gradient_max_abs"] < 1e-4 for _, r in fits.values())
                 and spread < 1.0
                 and all(max(e) <= 0.2 for e in profile.values())
             ),
@@ -490,7 +496,7 @@ def gate_4_injected(*, cache: FeatureCache) -> dict[str, Any]:
 
     A farm reports for about 30% of the window, so each injection fit keeps the injected
     substation's rows only where the farm has a reading, and is compared with a base fit on exactly
-    the same rows. The injected fit starts from the base fit's parameters.
+    the same rows. Every fit starts cold.
     """
     batch = common.pooled_batch_for(
         cache=cache, sites=common.POOL, cut=GATE_CUT, device=vp.DEVICE, dtype=common.BATCH_DTYPE
@@ -498,7 +504,7 @@ def gate_4_injected(*, cache: FeatureCache) -> dict[str, Any]:
     sigma = common.read_sigma(cut=GATE_CUT, round_name="round1")
     settings = VpSettings(noise_sd=sigma, deviation=common.tuned()["map_deviation"])
     end = cache.end_times[batch.row.cpu().numpy()]
-    solar_sites = [s for s in common.MW_POOL if s in batch.site_labels]
+    solar_sites = [s for s in common.SCORED_SITES if s in batch.site_labels]
     ratios, others, by_module, floor = {}, {}, {}, {}
     for site in INJECTED_SITES:
         index = batch.site_labels.index(site)
@@ -511,20 +517,32 @@ def gate_4_injected(*, cache: FeatureCache) -> dict[str, Any]:
         injected_y = rows.y - INJECTED_POINTS * torch.where(
             rows.site == index, farm[keep], torch.zeros_like(farm[keep])
         )
-        base, _ = vp.fit_pooled_arm(
-            batch=rows, settings=settings, start="s0", fallback_steps=GATE_FALLBACK_STEPS
+        tag = site.lower()
+        base, _ = vp.fit_cached(
+            name=f"gate_farm_{tag}_base",
+            cut=GATE_CUT,
+            batch=rows,
+            settings=settings,
+            start="s0",
+            fallback_steps=GATE_FALLBACK_STEPS,
         )
         second = None
         if site == INJECTED_SITES[0]:
-            second, _ = vp.fit_pooled_arm(
-                batch=rows, settings=settings, start="s1", fallback_steps=GATE_FALLBACK_STEPS
+            second, _ = vp.fit_cached(
+                name=f"gate_farm_{tag}_second",
+                cut=GATE_CUT,
+                batch=rows,
+                settings=settings,
+                start="s1",
+                fallback_steps=GATE_FALLBACK_STEPS,
             )
-        injected, _ = vp.fit_pooled_arm(
+        injected, _ = vp.fit_cached(
+            name=f"gate_farm_{tag}_injected",
+            cut=GATE_CUT,
             batch=with_targets(batch=rows, y=injected_y),
             settings=settings,
             start="s0",
-            fallback_steps=0,
-            init_state=base.state_dict(),
+            fallback_steps=GATE_FALLBACK_STEPS,
         )
         base_cap = base.capacities()[:, -1].detach().cpu().numpy()
         cap = injected.capacities()[:, -1].detach().cpu().numpy()
@@ -566,7 +584,8 @@ def main() -> None:
         out |= gate_2_and_3(cache=cache)
     if 4 in arguments.tests:
         out["test_4"] = gate_4_injected(cache=cache)
-    common.write_json(name="gate.json", payload=out)
+    previous = json.loads(common.GATE_PATH.read_text()) if common.GATE_PATH.exists() else {}
+    common.write_json(name="gate.json", payload=previous | out)
     for name in ("test_2", "test_3", "test_4"):
         if name in out:
             print(name, "passed" if out[name]["passed"] else "FAILED", flush=True)

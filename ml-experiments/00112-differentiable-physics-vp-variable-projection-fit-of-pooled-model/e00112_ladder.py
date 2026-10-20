@@ -147,7 +147,9 @@ def l1_forecasts(*, cache: FeatureCache) -> dict[str, gradient.SiteForecast]:
         model, _, _ = fit_site(cache=cache, site=site, cut=cut, sigma=sigma)
         models[site] = model
         model_r, _, _ = fit_site(cache=cache, site=site, cut=cut_r, sigma=sigma_r)
-        replica_year = forecast.score_batch(cache=cache, sites=(site,), cut=cut_r, through=cut)
+        replica_year = forecast.score_batch(
+            cache=cache, sites=(site,), cut=cut_r, through=cut, for_spread=True
+        )
         residuals[site] = pooled_residuals(model=model_r, batch=replica_year)
     out: dict[str, gradient.SiteForecast] = {}
     for site, model in models.items():
@@ -162,6 +164,7 @@ def l1_forecasts(*, cache: FeatureCache) -> dict[str, gradient.SiteForecast]:
 
 def main() -> None:
     """Store L1's prediction set."""
+    common.require_gate_passed()
     argparse.ArgumentParser().parse_args()
     cache = common.load_cache()
     forecast.store(cache=cache, name="vp_l1_equiv_all", forecasts=l1_forecasts(cache=cache))

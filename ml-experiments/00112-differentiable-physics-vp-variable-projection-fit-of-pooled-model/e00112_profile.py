@@ -38,7 +38,6 @@ from studies.dp_pooled_vp import (
     VpSettings,
     capacity_prior_term,
     fit_pooled_adam_on_vp_objective,
-    fit_pooled_vp,
     vp_objective,
 )
 
@@ -77,26 +76,6 @@ def pooled_config(*, shapes: int) -> DpConfig:
         interaction_hidden=common.INTERACTION,
         population_scales=PopulationScales(deviation=tuned["map_deviation"]),
     )
-
-
-def fresh_model(*, batch: PooledBatch, shapes: int, start: str) -> PooledDemandModel:
-    """Return a new model with `shapes` daily shapes, started as `vp.new_model` does."""
-    model = vp.new_model(batch=batch, start=start)
-    if shapes == model.config.shared_shapes:
-        return model
-    torch.manual_seed(0 if start == "s0" else 1)
-    rebuilt = PooledDemandModel(
-        config=pooled_config(shapes=shapes),
-        n_sites=len(batch.site_labels),
-        n_season_years=batch.n_season_years,
-        initial_level=torch.full((len(batch.site_labels),), 50.0),
-    ).to(device=batch.y.device, dtype=batch.y.dtype)
-    if start == "s1":
-        with torch.no_grad():
-            rebuilt.threshold.fill_(common.START_THRESHOLD_C)
-            rebuilt.population_mean["threshold"].fill_(common.START_THRESHOLD_C)
-    vp.freeze_operator_for_vp(model=rebuilt)
-    return rebuilt
 
 
 def convex_capacity_path(*, cache: FeatureCache, cut: datetime) -> dict[str, dict[int, float]]:
@@ -186,16 +165,25 @@ def vintage_season_means(*, cache: FeatureCache, cut: datetime) -> dict[str, dic
     return out
 
 
-def adam_start_state(*, batch: PooledBatch, settings: VpSettings, shapes: int) -> dict:
-    """Return the state of an Adam fit on the VP objective, the third start."""
-    model = fresh_model(batch=batch, shapes=shapes, start="s0")
-    fit_pooled_adam_on_vp_objective(
+def adam_start(*, batch: PooledBatch, cut: datetime, settings: VpSettings, shapes: int) -> dict:
+    """Return the state of an Adam fit on the VP objective, the third start (saved once)."""
+    name = f"profile_k{shapes}_adam_start"
+    if vp.has_fit(name=name, cut=cut):
+        return torch.load(vp.model_path(name=name, cut=cut), map_location=batch.y.device)
+    model = vp.new_model(batch=batch, start="s0", shapes=shapes)
+    result = fit_pooled_adam_on_vp_objective(
         model=model,
         batch=batch,
         settings=settings,
         steps=common.FIT_STEPS,
         learning_rate=common.FIT_RATE,
         final_rate_fraction=common.FINAL_RATE_FRACTION,
+    )
+    vp.save_fit(
+        name=name,
+        cut=cut,
+        model=model,
+        record={"seconds": result.seconds, "peak_gpu_gb": result.peak_memory_bytes / 1e9},
     )
     return model.state_dict()
 
@@ -211,18 +199,18 @@ def run_config(*, cache: FeatureCache, config: ProfileConfig) -> dict[str, Any]:
     tolerance = TOLERANCE_NATS_PER_10000_ROWS * rows / 1e4
     free: dict[str, dict[str, Any]] = {}
     states: dict[str, dict] = {}
-    third = adam_start_state(batch=batch, settings=settings, shapes=config.shapes)
+    third = adam_start(batch=batch, cut=config.cut, settings=settings, shapes=config.shapes)
+    tag = f"profile_{config.name}"
     for name, state in (("default", None), ("seed1_17c", None), ("adam", third)):
-        start = "s1" if name == "seed1_17c" else "s0"
-        model = fresh_model(batch=batch, shapes=config.shapes, start=start)
-        if state is not None:
-            model.load_state_dict(state)
-        result = fit_pooled_vp(
-            model=model,
+        model, record = vp.fit_cached(
+            name=f"{tag}_free_{name}",
+            cut=config.cut,
             batch=batch,
             settings=settings,
-            adam_steps=common.FALLBACK_STEPS_SECONDARY,
-            warm_start_steps=0 if state is not None else common.WARM_START_STEPS,
+            start="s1" if name == "seed1_17c" else "s0",
+            fallback_steps=common.FALLBACK_STEPS_SECONDARY,
+            init_state=state,
+            shapes=config.shapes,
         )
         states[name] = model.state_dict()
         free[name] = {
@@ -230,8 +218,8 @@ def run_config(*, cache: FeatureCache, config: ProfileConfig) -> dict[str, Any]:
                 model=model, batch=batch, settings=settings
             ),
             "capacity_points": final_capacity(model=model, batch=batch),
-            "converged": result.converged,
-            "seconds": result.seconds,
+            "converged": record["converged"],
+            "seconds": record["seconds"],
             "thresholds": model.threshold.detach().cpu().tolist(),
         }
         print(
@@ -240,19 +228,25 @@ def run_config(*, cache: FeatureCache, config: ProfileConfig) -> dict[str, Any]:
         )
     profile: dict[float, dict[str, Any]] = {}
     for multiplier in MULTIPLIERS:
-        model = fresh_model(batch=batch, shapes=config.shapes, start="s0")
-        model.load_state_dict(states["default"])
-        model.capacity_override = override_for(batch=batch, convex=convex, multiplier=multiplier)
-        result = fit_pooled_vp(
-            model=model,
+        override = override_for(batch=batch, convex=convex, multiplier=multiplier)
+
+        def pin(model: PooledDemandModel, override: torch.Tensor = override) -> None:
+            model.capacity_override = override
+
+        model, record = vp.fit_cached(
+            name=f"{tag}_m{multiplier}",
+            cut=config.cut,
             batch=batch,
             settings=settings,
-            adam_steps=PROFILE_FALLBACK_STEPS,
-            warm_start_steps=0,
+            start="s0",
+            fallback_steps=PROFILE_FALLBACK_STEPS,
+            init_state=states["default"],
+            prepare=pin,
+            shapes=config.shapes,
         )
         profile[multiplier] = {
             "objective": shared_objective(model=model, batch=batch, settings=settings),
-            "converged": result.converged,
+            "converged": record["converged"],
         }
         print(
             f"{config.name} profile {multiplier}: {profile[multiplier]['objective']:.0f}",
@@ -314,6 +308,7 @@ def checks(
 
 def main() -> None:
     """Run the requested configurations and write `work/profile.json`."""
+    common.require_gate_passed()
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+", default=list(CONFIGS), choices=list(CONFIGS))
     arguments = parser.parse_args()

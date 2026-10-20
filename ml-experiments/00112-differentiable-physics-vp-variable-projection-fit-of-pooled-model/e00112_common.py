@@ -347,6 +347,35 @@ BATCH_DTYPE: Final[torch.dtype] = torch.float64
 """The variable-projection fit needs float64 (the Gram matrix is badly conditioned)."""
 
 
+GATE_PATH: Final[Path] = WORK_DIR / "gate.json"
+"""The known-answer gate's results, written by `e00112_gate.py`."""
+GPU_CAP_HOURS: Final[float] = 10.0
+"""The hard cap on GPU time for the whole experiment."""
+PEAK_GPU_CAP_GB: Final[float] = 10.0
+"""A fit may use up to this much GPU memory."""
+
+
+def require_gate_passed() -> None:
+    """Raise unless the known-answer gate has run and passed (tests 2, 3, and 4).
+
+    Module tests 1 to 5 are the pytest suite of `packages/studies`, which must pass before this
+    script runs; the gate file records the other three.
+
+    Raises:
+        RuntimeError: If the gate file is missing, lacks a test, or holds a failed test.
+    """
+    if not GATE_PATH.exists():
+        msg = "the known-answer gate has not run: run e00112_gate.py first"
+        raise RuntimeError(msg)
+    gate = json.loads(GATE_PATH.read_text())
+    failed = [
+        name for name in ("test_2", "test_3", "test_4") if not gate.get(name, {}).get("passed")
+    ]
+    if failed:
+        msg = f"the known-answer gate has not passed: {failed}"
+        raise RuntimeError(msg)
+
+
 def tuned() -> dict[str, float]:
     """Return experiment 105's tuned settings."""
     return json.loads(TUNED_PATH.read_text())

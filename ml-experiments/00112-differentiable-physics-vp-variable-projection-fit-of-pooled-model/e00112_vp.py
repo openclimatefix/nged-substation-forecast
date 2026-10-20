@@ -13,6 +13,7 @@ starting point of the round-2 VP-P fit.
 """
 
 import json
+from collections.abc import Callable
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
@@ -41,22 +42,30 @@ RECORDS_PATH: Final[Path] = common.WORK_DIR / "fit_records.json"
 DEVICE: Final[str] = "cuda"
 
 
-def model_config() -> DpConfig:
-    """Return the pooled configuration of every VP arm: P-map's MAP prior, K shapes, the network."""
+def model_config(*, shapes: int | None = None) -> DpConfig:
+    """Return the pooled configuration of every VP arm: P-map's MAP prior, K shapes, the network.
+
+    Args:
+        shapes: The number of shared daily shapes; `None` takes experiment 105's tuned K.
+
+    Returns:
+        The configuration.
+    """
     tuned = common.tuned()
     return DpConfig(
-        shared_shapes=int(tuned["k"]),
+        shared_shapes=int(tuned["k"]) if shapes is None else shapes,
         interaction_hidden=common.INTERACTION,
         population_scales=PopulationScales(deviation=tuned["map_deviation"]),
     )
 
 
-def new_model(*, batch: PooledBatch, start: str) -> PooledDemandModel:
+def new_model(*, batch: PooledBatch, start: str, shapes: int | None = None) -> PooledDemandModel:
     """Return a fresh pooled model for `batch`, on the batch's device in float64.
 
     Args:
         batch: The training rows, which give the site and season-year layout.
         start: `s0` (seed 0, the default thresholds) or `s1` (seed 1, thresholds at 17 degrees).
+        shapes: The number of shared daily shapes; `None` takes experiment 105's tuned K.
 
     Returns:
         The model, with the MVA operator frozen at zero reactive power.
@@ -69,7 +78,7 @@ def new_model(*, batch: PooledBatch, start: str) -> PooledDemandModel:
         raise ValueError(msg)
     torch.manual_seed(0 if start == "s0" else 1)
     model = PooledDemandModel(
-        config=model_config(),
+        config=model_config(shapes=shapes),
         n_sites=len(batch.site_labels),
         n_season_years=batch.n_season_years,
         initial_level=torch.full((len(batch.site_labels),), 50.0),
@@ -89,6 +98,9 @@ def model_path(*, name: str, cut: datetime) -> Path:
 
 def save_fit(*, name: str, cut: datetime, model: PooledDemandModel, record: dict) -> None:
     """Save a fitted model's state dictionary, and add its record to the shared record file."""
+    if record.get("peak_gpu_gb", 0.0) > common.PEAK_GPU_CAP_GB:
+        msg = f"{name} used {record['peak_gpu_gb']:.1f} GB of GPU memory, over the cap"
+        raise RuntimeError(msg)
     common.MODELS_DIR.mkdir(parents=True, exist_ok=True)
     torch.save(model.state_dict(), model_path(name=name, cut=cut))
     records = json.loads(RECORDS_PATH.read_text()) if RECORDS_PATH.exists() else {}
@@ -107,12 +119,94 @@ def has_fit(*, name: str, cut: datetime) -> bool:
 
 
 def load_fit(
-    *, name: str, cut: datetime, batch: PooledBatch, start: str = "s0"
+    *,
+    name: str,
+    cut: datetime,
+    batch: PooledBatch,
+    start: str = "s0",
+    prepare: Callable[[PooledDemandModel], None] | None = None,
+    shapes: int | None = None,
 ) -> PooledDemandModel:
-    """Load a saved fit into a fresh model built for `batch`."""
-    model = new_model(batch=batch, start=start)
+    """Load a saved fit into a fresh model built for `batch`.
+
+    Args:
+        name: The arm's name.
+        cut: The cut of the fit.
+        batch: Rows with the layout of the fit's rows.
+        start: The start the model was built from.
+        prepare: Called on the new model before the state is loaded; it sets what the state needs
+            to fit (a capacity override).
+        shapes: The number of shared daily shapes of the fit.
+
+    Returns:
+        The model.
+    """
+    model = new_model(batch=batch, start=start, shapes=shapes)
+    if prepare is not None:
+        prepare(model)
     model.load_state_dict(torch.load(model_path(name=name, cut=cut), map_location=batch.y.device))
     return model
+
+
+def fit_cached(
+    *,
+    name: str,
+    cut: datetime,
+    batch: PooledBatch,
+    settings: VpSettings,
+    start: str,
+    fallback_steps: int,
+    init_state: dict | None = None,
+    prepare: Callable[[PooledDemandModel], None] | None = None,
+    shapes: int | None = None,
+) -> tuple[PooledDemandModel, dict]:
+    """Fit a pooled VP model, or load it if its fit is saved already; return it and its record.
+
+    Args:
+        name: The arm's name, saved under the cut.
+        cut: The cut.
+        batch: The training rows (float64, on the GPU).
+        settings: The noise standard deviation and the prior scales.
+        start: Which start (`common.STARTS`).
+        fallback_steps: Adam steps of the fallback when L-BFGS misses its convergence test.
+        init_state: A saved state to continue from (the same rows under another noise round); the
+            Adam warm start is skipped then. A fit that must not see other rows starts cold.
+        prepare: Called on the new model before anything else (a start, or a capacity override).
+        shapes: The number of shared daily shapes; `None` takes experiment 105's tuned K.
+
+    Returns:
+        The model and the fit's record.
+    """
+    if has_fit(name=name, cut=cut):
+        model = load_fit(
+            name=name, cut=cut, batch=batch, start=start, prepare=prepare, shapes=shapes
+        )
+        return model, read_record(name=name, cut=cut)
+    model = new_model(batch=batch, start=start, shapes=shapes)
+    if prepare is not None:
+        prepare(model)
+    if init_state is not None:
+        # A pinned fit may continue from a free fit: only the override buffer differs.
+        kept = {k: v for k, v in init_state.items() if k != "capacity_override"}
+        incompatible = model.load_state_dict(kept, strict=False)
+        if set(incompatible.unexpected_keys) or set(incompatible.missing_keys) - {
+            "capacity_override"
+        }:
+            msg = f"the starting state does not fit the model: {incompatible}"
+            raise ValueError(msg)
+    result = fit_pooled_vp(
+        model=model,
+        batch=batch,
+        settings=settings,
+        adam_steps=fallback_steps,
+        warm_start_steps=0 if init_state is not None else common.WARM_START_STEPS,
+    )
+    record = record_of(result=result, rows=batch.n_rows)
+    save_fit(name=name, cut=cut, model=model, record=record)
+    print(
+        f"{name} at {cut.date()}: {result.seconds:.0f} s, converged {result.converged}", flush=True
+    )
+    return model, record
 
 
 def record_of(*, result: VpFitResult, rows: int, extra: dict | None = None) -> dict:
@@ -198,6 +292,10 @@ def fit_pooled_arm(
 
 def fit_adam_same(*, batch: PooledBatch, settings: VpSettings) -> tuple[PooledDemandModel, dict]:
     """Fit P-map-same: experiment 105's Adam fit (steps, schedule) on the VP objective.
+
+    Args:
+        batch: The training rows (float64, on the GPU).
+        settings: The noise standard deviation and the prior scales.
 
     Returns:
         The model and a record holding its VP objective in nats.

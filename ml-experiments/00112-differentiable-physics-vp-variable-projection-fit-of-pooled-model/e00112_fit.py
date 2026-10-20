@@ -74,61 +74,36 @@ def stage_pooled(*, cache: FeatureCache, cut: datetime) -> None:
     """Fit VP-P from both starts; take round 2 of the noise standard deviation from the first."""
     batch = pool_batch(cache=cache, sites=common.POOL, cut=cut)
     first = "vp_p_s0_r1"
-    if not vp.has_fit(name=first, cut=cut):
-        settings = common.vp_settings(cut=cut, round_name="round1")
-        model, result = vp.fit_pooled_arm(
-            batch=batch,
-            settings=settings,
-            start="s0",
-            fallback_steps=common.FALLBACK_STEPS_PRIMARY,
-        )
-        vp.save_fit(
-            name=first, cut=cut, model=model, record=vp.record_of(result=result, rows=batch.n_rows)
-        )
-        common.write_sigma(
-            cut=cut, round_name="round2", value=vp.training_residual_sd(model=model, batch=batch)
-        )
-        print(
-            f"{first} at {cut.date()}: {result.seconds:.0f} s, converged {result.converged}",
-            flush=True,
-        )
+    model, _ = vp.fit_cached(
+        name=first,
+        cut=cut,
+        batch=batch,
+        settings=common.vp_settings(cut=cut, round_name="round1"),
+        start="s0",
+        fallback_steps=common.FALLBACK_STEPS_PRIMARY,
+    )
+    if "round2" not in common.read_sigma_table().get(cut.date().isoformat(), {}):
+        value = vp.training_residual_sd(model=model, batch=batch)
+        common.write_sigma(cut=cut, round_name="round2", value=value)
     settings = common.vp_settings(cut=cut, round_name="round2")
-    if not vp.has_fit(name="vp_p_s0", cut=cut):
-        state = torch.load(vp.model_path(name=first, cut=cut), map_location=batch.y.device)
-        model, result = vp.fit_pooled_arm(
-            batch=batch,
-            settings=settings,
-            start="s0",
-            fallback_steps=common.FALLBACK_STEPS_SECONDARY,
-            init_state=state,
-        )
-        vp.save_fit(
-            name="vp_p_s0",
-            cut=cut,
-            model=model,
-            record=vp.record_of(result=result, rows=batch.n_rows),
-        )
-        print(
-            f"vp_p_s0 at {cut.date()}: {result.seconds:.0f} s, converged {result.converged}",
-            flush=True,
-        )
-    if not vp.has_fit(name="vp_p_s1", cut=cut):
-        model, result = vp.fit_pooled_arm(
-            batch=batch,
-            settings=settings,
-            start="s1",
-            fallback_steps=common.FALLBACK_STEPS_PRIMARY,
-        )
-        vp.save_fit(
-            name="vp_p_s1",
-            cut=cut,
-            model=model,
-            record=vp.record_of(result=result, rows=batch.n_rows),
-        )
-        print(
-            f"vp_p_s1 at {cut.date()}: {result.seconds:.0f} s, converged {result.converged}",
-            flush=True,
-        )
+    state = torch.load(vp.model_path(name=first, cut=cut), map_location=batch.y.device)
+    vp.fit_cached(
+        name="vp_p_s0",
+        cut=cut,
+        batch=batch,
+        settings=settings,
+        start="s0",
+        fallback_steps=common.FALLBACK_STEPS_SECONDARY,
+        init_state=state,
+    )
+    vp.fit_cached(
+        name="vp_p_s1",
+        cut=cut,
+        batch=batch,
+        settings=settings,
+        start="s1",
+        fallback_steps=common.FALLBACK_STEPS_PRIMARY,
+    )
 
 
 def stage_per_site(*, cache: FeatureCache, cut: datetime) -> None:
@@ -139,24 +114,13 @@ def stage_per_site(*, cache: FeatureCache, cut: datetime) -> None:
         if batch.n_rows < MIN_SITE_ROWS:
             continue
         for start in common.STARTS:
-            name = f"vp_s_{site.lower()}_{start}"
-            if vp.has_fit(name=name, cut=cut):
-                continue
-            model, result = vp.fit_pooled_arm(
+            vp.fit_cached(
+                name=f"vp_s_{site.lower()}_{start}",
+                cut=cut,
                 batch=batch,
                 settings=settings,
                 start=start,
                 fallback_steps=common.FALLBACK_STEPS_SECONDARY,
-            )
-            vp.save_fit(
-                name=name,
-                cut=cut,
-                model=model,
-                record=vp.record_of(result=result, rows=batch.n_rows),
-            )
-            print(
-                f"{name} at {cut.date()}: {result.seconds:.0f} s, converged {result.converged}",
-                flush=True,
             )
 
 
@@ -187,6 +151,8 @@ def main() -> None:
     parser.add_argument("--stages", nargs="+", default=list(STAGES), choices=STAGES)
     arguments = parser.parse_args()
     cut = parse_cut(arguments.cut)
+    if set(arguments.stages) - {"sigma"}:
+        common.require_gate_passed()
     torch.set_num_threads(2)
     cache = common.load_cache()
     runners = {
