@@ -420,6 +420,9 @@ def predict_run(
 ) -> pl.DataFrame:
     """Return one run's mixture quantiles in points, keyed by series, origin, and valid time."""
     frame = data.run_rows(run=run, table_row=site_data.table_row)
+    if arm.start == "gam":
+        last = site_data.cache.end_times[-1].astype("datetime64[us]").astype(datetime)
+        frame = frame.filter(pl.col("valid_time") <= last.replace(tzinfo=UTC))
     if arm.lagged:
         frame = site_data.with_lags(frame=frame)
     margin = None

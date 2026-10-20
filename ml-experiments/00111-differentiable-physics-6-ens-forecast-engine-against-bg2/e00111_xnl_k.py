@@ -15,6 +15,7 @@ fits.
     uv run python ml-experiments/00111-*/e00111_xnl_k.py
 """
 
+from datetime import UTC, datetime
 from typing import Final
 
 import e00111_arms as arms
@@ -38,9 +39,11 @@ def raw_xnl(*, site: str) -> pl.DataFrame:
     """Return every run's X-nl rows at a site (no scorability filters), in points."""
     own = score.load_xgb_raw(arm="xnl", sites=(site,))
     simp1 = score.load_simp1_raw(sites=(site,))
-    return pl.concat([own, simp1]).unique(
+    last = common.load_cache().end_times[-1].astype("datetime64[us]").astype(datetime)
+    frame = pl.concat([own, simp1]).unique(
         subset=["time_series_id", "power_fcst_init_time", "valid_time"], keep="first"
     )
+    return frame.filter(pl.col("valid_time") <= last.replace(tzinfo=UTC))
 
 
 def residual_stream(*, frame: pl.DataFrame, n_rows: int, end_times: np.ndarray) -> np.ndarray:
@@ -51,7 +54,9 @@ def residual_stream(*, frame: pl.DataFrame, n_rows: int, end_times: np.ndarray) 
         & (pl.col("valid_time") <= pl.col("power_fcst_init_time") + pl.duration(hours=24))
     )
     position = np.searchsorted(end_times, block["valid_time"].dt.replace_time_zone(None).to_numpy())
-    stream[position] = (block["actual"] - block["q50"]).to_numpy()
+    residual = (block["actual"] - block["q50"]).to_numpy().astype(np.float64)
+    keep = position < n_rows
+    stream[position[keep]] = residual[keep]
     return stream
 
 
