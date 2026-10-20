@@ -294,9 +294,7 @@ def figure_4_weeks() -> alt.TopLevelMixin:
                 title="Day of the week (0 = Monday 00:00 UTC)",
                 axis=alt.Axis(values=[0, 2, 4, 6]),
             ),
-            y=alt.Y(
-                "value:Q", title="Power (% of effective capacity)", scale=alt.Scale(zero=False)
-            ),
+            y=alt.Y("value:Q", title="Power (% capacity)", scale=alt.Scale(zero=False)),
             color=alt.Color(
                 "series:N",
                 scale=alt.Scale(domain=domain, range=colours),
@@ -309,10 +307,10 @@ def figure_4_weeks() -> alt.TopLevelMixin:
             width=(WIDTH - 90) / 2,
             height=70,
             title=_title(
-                text="The network-on fit misses in spring",
+                text="Forecasts and actual power in one winter week and one spring week",
                 subtitle=(
-                    "Median forecast and actual power, scored year, at the five decision "
-                    "substations."
+                    "Median forecast and actual power at the five decision substations; the weeks "
+                    "are fixed in advance, not chosen by error."
                 ),
             ),
         )
