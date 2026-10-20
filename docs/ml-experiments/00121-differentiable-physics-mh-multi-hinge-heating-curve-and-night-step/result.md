@@ -279,7 +279,7 @@ are agreed with the experiment manager.
     - **Critical value.** The 5th percentile of the statistic over 100 placebo draws (20 per
       substation, draws 0 to 19). An arm detects a step in a draw when its statistic is below the
       critical value, so the false-positive rate on the placebo is 5% by construction. It is checked
-      on 100 further placebo draws (draws 100 to 119), where at most 10% must detect.
+      on 100 further placebo draws (draws 100 to 119), where at most 8% may detect (the target is 5%; 100 draws carry a Monte Carlo error of about 2 points).
     - **Pass.** (a) NS-U detects the 4 MW `utc` step in at least 80% of draws, and detects the 4 MW
       `local` step in at most 10% of draws (so the clock is identified); (b) NS-HW detects the 4 MW
       `cold` step in at least 80% of draws; (c) NS-H detects the 4 MW `cold` step in at least 80%

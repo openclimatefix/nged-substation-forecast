@@ -20,7 +20,8 @@ below the critical value. The false-positive rate is checked on 100 further plac
 
 **Pass.** (a) NS-U detects the 4 MW `utc` step in at least 80% of draws and the 4 MW `local` step
 in at most 10%; (b) NS-HW detects the 4 MW `cold` step in at least 80%; (c) NS-H detects it in at
-least 80%; and the verification placebo false-positive rate is at most 10% for each.
+least 80%; and the verification placebo false-positive rate is at most 8% for each
+(target 5%; 100 draws carry a Monte Carlo error of about 2 points).
 
     OMP_NUM_THREADS=1 uv run python ml-experiments/00121-*/e00121_gate4b.py run [--workers 5]
     uv run python ml-experiments/00121-*/e00121_gate4b.py summary
@@ -42,7 +43,7 @@ ARMS: Final[tuple[str, ...]] = ("b0", "ns_u", "ns_h", "ns_hw")
 CALIBRATION_DRAWS: Final[range] = range(base_gate.N_DRAWS_PER_SITE)
 VERIFICATION_DRAWS: Final[range] = range(100, 100 + base_gate.N_DRAWS_PER_SITE)
 FALSE_POSITIVE_RATE: Final[float] = 0.05
-MAX_VERIFIED_FALSE_POSITIVE: Final[float] = 0.10
+MAX_VERIFIED_FALSE_POSITIVE: Final[float] = 0.08
 MIN_POWER: Final[float] = 0.80
 MAX_WRONG_CLOCK_DETECTION: Final[float] = 0.10
 ROWS_OF: Final[dict[str, tuple[str, str]]] = {
