@@ -104,9 +104,12 @@ Block-coordinate descent stops when the objective's relative change and the larg
 
 **Each path is solved exactly** by a dynamic programme in the style of
 [Johnson (2013)](https://doi.org/10.1080/10618600.2012.681238) (stated there for squared error; the
-Huber, weight, and level extension is this module's, guarded by P1), with ADMM on
-`scipy.linalg.solveh_banded` to 1e-8 as the fallback if P1 fails or a 17,520-point solve exceeds 1
-second. [Condat (2013)](https://doi.org/10.1109/LSP.2013.2278339) with soft-thresholding
+Huber, weight, and level extension is this module's, guarded by P1). ADMM on a banded Cholesky
+factor solves a non-negative flow and cross-checks the programme in the tests. Measured on the
+module branch: the exact programme takes 1.8 seconds for a 17,520-point solve whatever the
+penalties and 0.14 seconds for a 1,440-point window, and ADMM took 4.5 to 22 seconds at tolerances
+of 1e-3 to 1e-8, so the programme is the solver. [Condat
+(2013)](https://doi.org/10.1109/LSP.2013.2278339) with soft-thresholding
 ([Friedman et al. (2007)](https://doi.org/10.1214/07-AOAS131)) is the unweighted reference.
 
 **A2-b answers the series brief's advice** (experiment 67's hourly fit found 0.108 of the moved
@@ -163,7 +166,7 @@ on the tuning placebo pairs; ρ = 2 is kept only if it adds 0.05 recall. Placebo
 separate runs with the real graph present and never enter A2 to A5.
 
 **Scoring rows.** Decision sites D5, D10, D11, D14, and D16 (MW ends); D9 beside them. C2 uses day
-D+1 from 09:00 UTC origins, with and without D10's two unlabelled windows. C3 uses origins every 3
+D+1 from 09:00 UTC origins, with and without D10's two unlabelled windows. C3 uses origins every 6
 hours and leads 0.5 to 48 hours, because experiment 88 found no 09:00 origin inside a real transfer
 with both sides at most half missing. Predictions carry the keys, `q01` to `q99`, `actual`,
 `lead_hours`, `level`, `anomaly`, `flow`, and an in-event flag. Spread: `LeadSpread` at day D+1; for
@@ -303,15 +306,17 @@ known-input wrapper over `run_kalman`, Kaplan–Meier survival, lead-hours sprea
 each under 5 minutes. Unmasked and oracle fits need no `dp_gam` change: scripts replace `y`,
 `switching_mask`, and `default_rows` (`in_pool & ~lockdown & ~mask`) on `SiteFeatures`.
 
-**Compute, CPU only, at most 6 cores: about 3 to 4 hours of wall clock.** GAM fits about 12
-minutes; hindsight flows (30 tuning fits of about 37 paths × 20 sweeps × 0.3 to 1 second per
-year-long solve, then each seed warm-started from the uninjected fit, about 1 minute, for 200
-seeds) about 1.5 hours; causal flows (730 daily origins on all paths, plus about 400 transfers × 20
-three-hourly origins per year at 0.05 seconds a solve) about 1 hour.
-**Pre-registered thinning:** if one 17,520-point solve exceeds 1 second after the ADMM fallback,
-C3's origins thin to every 6 hours.
+**Compute, CPU only, at most 6 cores: about 3 to 5 hours of wall clock.** GAM fits about 12 minutes;
+hindsight flows (30 tuning fits of about 37 paths × 3 to 5 sweeps × 1.8 seconds per year-long solve,
+so about 4 minutes a fit, then each seed warm-started from the uninjected fit) about 2 hours on 6
+cores; causal flows (730 daily origins, plus about 400 transfers × 10 six-hourly origins per year,
+each refitting the paths at the scored nodes on a 30-day window at 0.14 seconds a solve) about 1
+hour.
+
+**Thinning decision, made before any fit:** one 17,520-point solve takes 1.8 seconds, over the 1
+second mark, and ADMM is slower, so the pre-registered thinning applies. C3's origins are every 6
+hours, not every 3.
 
 **Settled before the run:** C2's margin of 0.05 points stands, and the page reports A4 minus A0 (the
 decision contrast) beside A4 minus A1. C3 is A5 minus A4, with A5 minus A0 beside it. A failed gate
-caps the verdict at `inconclusive`, not `refuted`. The module adds no dependency: if the exact
-dynamic programme is too slow, the ADMM fallback is used, and C3's origins thin as stated above.
+caps the verdict at `inconclusive`, not `refuted`. The module adds no dependency.
