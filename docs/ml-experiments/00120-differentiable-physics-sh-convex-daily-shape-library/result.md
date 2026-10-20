@@ -315,14 +315,14 @@ in `verdict`; if C2 fails (SH loses to G by more than 0.05) the take-home says s
 
 ## Substation cards (provisional)
 
-**Labelled "Provisional: fitted to past weather on a screening run".** One card per decision
-substation (D-labels, with dates) from the 2025-07-01 fit: shape mix as a stacked bar beside the
-deviation's size; profile per day type (library and deviation drawn separately); pinned capacity;
-heating response; holiday, Christmas, and lighting effects. **Example forecasts** on 4 weeks fixed
-by calendar rule before any score is read: the first Monday on or after 15 July 2025, 15 October
-2025, 15 January 2026, and 15 April 2026, each with median and 80% and 90% bands against observed,
-for SH and N. One cross-substation figure compares shares, deviation size, capacity, and heating
-slope.
+**Labelled "Provisional: fitted to past weather on a screening run".** Each card also has a "how it
+does in a cold snap" panel (rule under "Implementation choices"). One card per decision substation
+(D-labels, with dates) from the 2025-07-01 fit: shape mix as a stacked bar beside the deviation's
+size; profile per day type (library and deviation drawn separately); pinned capacity; heating
+response; holiday, Christmas, and lighting effects. **Example forecasts** on 4 weeks fixed by
+calendar rule before any score is read: the first Monday on or after 15 July 2025, 15 October 2025,
+15 January 2026, and 15 April 2026, each with median and 80% and 90% bands against observed, for SH
+and N. One cross-substation figure compares shares, deviation size, capacity, and heating slope.
 
 **D15 and D18 are generator data: label them G-c alone.** D15 is outside the pool; D18 is in it at
 the scored cut and gets no shape of its own in any D-label figure. Any figure for D18, or the D15 +
@@ -397,6 +397,25 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
   relative) but a rotated cone of shapes (cosines 0.85 and 0.98 against the truth, against 0.98 and
   0.98), which is the identification limit the gate's sparse and dense priors are built to
   separate.
+- **The tuning spread is each configuration's own.** Every tuning fit builds its spread from its own
+  replica fit at 2022-07-01, the recipe every arm uses later, so tuning costs two fits per
+  configuration and seed.
+- **Gate line 9 sizes the truth so the oracle gain over N is 0.10 points, and passes at SH minus N
+  of −0.05 or lower.** The briefs' wording (oracle gain 0.05, pass at −0.05) could pass only for a
+  fit that loses nothing to estimation, which no fit with noise achieves. The new rule asks that SH
+  recovers half of a gain of twice the smallest gain worth porting. The oracle is the true
+  coefficients; the gain is N's held-out score minus the oracle's, and the script rescales the
+  library energy until the gain is within 0.01 of 0.10. The scores in this line use a Gaussian
+  spread fitted to each arm's own training residuals, because a gate fleet has no replica year.
+- **Winter is reported beside the annual score (maintainer priority, 2026-10-20).** Winter is valid
+  times from November to March, with the evening peak (16:00 to 20:00 UTC, which is local time in
+  winter) and cold snaps inside it. A **cold-snap day** is a day whose mean 6-hour-smoothed ERA5
+  temperature at the site is below 0 °C; the rule is fixed here before any score is read, and a
+  panel with fewer than 5 such site-days in the scored year says "too few days". Every winter
+  contrast against N and G has a paired month-resampled interval, and a winter loss to N is a
+  reason to hold SH back whatever the annual mean does; the verdict says so. The out-of-sample
+  evidence holds two independent winters (2024-25 in the replicate year, 2025-26 in the scored
+  year); the tuning winter (2023-24) chose the settings and does not count.
 - **Documents not carried over.** The briefs name `docs/ml-experiments/research-plan.md`, which
   the documentation restructure deleted; the theme's `plan.md` row is the only plan entry.
 
