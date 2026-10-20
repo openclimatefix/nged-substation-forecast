@@ -281,9 +281,9 @@ def contrast(
         reference: The second-named arm.
         metric: The loss column.
         level: The interval's coverage in percent.
-        interval: Whether to compute the interval; a secondary read of the estimate alone skips it.
         by_day: Resample whole local days instead of whole calendar months. With fewer than
             `MIN_DAYS_FOR_INTERVAL` days the interval is `None` and `too_few_days` is true.
+        interval: Whether to compute the interval; a secondary read of the estimate alone skips it.
 
     Returns:
         Keys `estimate` (treatment minus reference, negative favours the treatment), `lower`,

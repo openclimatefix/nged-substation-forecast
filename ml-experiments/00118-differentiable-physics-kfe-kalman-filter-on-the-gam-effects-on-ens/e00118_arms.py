@@ -47,10 +47,10 @@ class ArmConfig:
         use_anomaly: Whether the anomaly states are in use.
         shared_q: Whether one q is fitted for every moving weight.
         inflated: Whether the observation noise is held at the inflated value of KE.
-        one_step: Whether the noise was fitted by the one-step likelihood (the first run, kept as an
-            arm) and not by the lead-matched likelihood.
         skip_holidays: Whether readings on holiday days are left out of the filter and the level
             and anomaly corrections are zero on holiday target days (the day-type-aware arm).
+        one_step: Whether the noise was fitted by the one-step likelihood (the first run, kept as an
+            arm) and not by the lead-matched likelihood.
     """
 
     name: str
