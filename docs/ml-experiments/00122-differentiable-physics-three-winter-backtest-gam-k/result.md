@@ -72,16 +72,15 @@ code: ml-experiments/00122-differentiable-physics-three-winter-backtest-gam-k/
 # Differentiable physics: GAM-K against the plain GAM and lagless XGBoost over three winters
 
 **In all three winters, GAM-K forecast tomorrow's demand at Primary substations 1.8 to 3.1 points of
-capacity better than both comparison models, but the gain is largely a level correction and
-partly in-sample.** GAM-K is a physics-based demand model, fitted once and frozen for a year, with
-a Kalman filter that corrects it from recent errors; [experiment
+capacity better than both comparison models, but the gain is largely a level correction and partly
+in-sample.** GAM-K is a physics-based demand model, fitted once and frozen for a year, with a Kalman
+filter that corrects it from recent errors; [experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md) chose it as the
 differentiable-physics series' candidate. The comparison models are the same model without the
 filter (the plain model) and lagless XGBoost, an XGBoost model given no recent power. A Primary
-substation steps the voltage down for the local distribution network. A point of effective
-capacity is 1% of a substation's capacity. We rescored the stored day-ahead forecasts of [experiment
-114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md) (the plain
-model and GAM-K) and [experiment
+substation steps the voltage down for the local distribution network. A point of effective capacity
+is 1% of a substation's capacity. We rescored the stored day-ahead forecasts of experiment 114 (pull
+request 1397, not yet merged) (the plain model and GAM-K) and [experiment
 109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) (lagless XGBoost)
 for November to March of 2023-24, 2024-25, and 2025-26, at five Primary substations. Nothing was
 refitted. Each mean absolute error is a mean over the winter's days, in points of effective
