@@ -69,6 +69,8 @@ def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     PNG_DIR.mkdir(parents=True, exist_ok=True)
     chart.save(DOCS_DIR / f"{name}.svg")
+    with (DOCS_DIR / f"{name}.svg").open("a", encoding="utf-8") as handle:
+        handle.write("\n")
     chart.save(PNG_DIR / f"{name}.png", scale_factor=1.5)
     print("wrote", name)
 
