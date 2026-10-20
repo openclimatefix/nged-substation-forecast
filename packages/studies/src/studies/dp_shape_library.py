@@ -30,7 +30,10 @@ substations' joint model (`theta^T A theta - 2 b^T theta`, in the units of `dp_g
 2. *Shape step, one shape at a time (Gauss-Seidel).* The weights and the other shapes are fixed.
    One solve finds shape `k` and, with it, every other coefficient.
 3. *Renormalise.* Each shape is scaled to unit norm and its scale moved into the weights, which
-   leaves every prediction unchanged.
+   leaves every prediction unchanged. A shape that has collapsed to zero (all its weights zero)
+   stays at zero. The renormalisation does change the shape ridge and orthogonality terms, which
+   scale with a shape's norm, so the full objective is not guaranteed monotone within a sweep; the
+   weights step that follows restores the joint optimum for the renormalised shapes.
 
 A sweep is the K shape steps, a renormalisation, and a weights step. The fit stops when a sweep
 lowers the objective by less than `tolerance` per training row, or after `max_sweeps`. Each
@@ -194,8 +197,11 @@ class ShapeLibraryFit:
     cut: datetime
 
     @property
-    def n_free_parameters(self) -> int:
-        """Shape entries (rank of the centred space), weights, and deviations that the fit holds."""
+    def n_library_parameters(self) -> int:
+        """Count the shape, weight, and deviation degrees of freedom.
+
+        Band means and the other families' coefficients are not counted.
+        """
         rank = PROFILE_COLUMNS - N_BANDS
         n_sites = len(self.weights)
         return self.config.n_shapes * rank + n_sites * self.config.n_weights + n_sites * rank

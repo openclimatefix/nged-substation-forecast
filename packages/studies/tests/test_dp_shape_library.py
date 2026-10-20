@@ -36,6 +36,7 @@ from studies.dp_shape_library import (  # noqa: E402
     PROFILE_COLUMNS,
     LibraryConfig,
     _build_problem,
+    _curvature,
     _objective,
     _Problem,
     _renormalise,
@@ -136,6 +137,7 @@ def library_cache(dp_synthetic_cache: FeatureCache) -> FeatureCache:
 
 
 def _sites(*, labels: tuple[str, ...] = LABELS) -> list[PooledSite]:
+    """Return the substations of the fixture with the test spec and window."""
     return [
         PooledSite(site=label, spec=GamSpec(ridge=1.0), window=WINDOW, season_years=SEASON_YEARS)
         for label in labels
@@ -143,6 +145,7 @@ def _sites(*, labels: tuple[str, ...] = LABELS) -> list[PooledSite]:
 
 
 def _fresh_state(*, problem: _Problem, config: LibraryConfig, shapes: np.ndarray) -> _State:
+    """Return a state with the given shapes, unit weights, and zeros elsewhere."""
     n_sites = len(problem.labels)
     return _State(
         shapes=shapes.copy(),
@@ -175,8 +178,13 @@ def test_one_shape_with_weights_fixed_at_one_reproduces_the_partially_pooled_fit
         assert theta == pytest.approx(reference.fits[label].theta[0], rel=1e-6, abs=1e-6)
 
 
-def test_each_convex_step_does_not_raise_the_objective_it_minimises(library_cache: FeatureCache):
-    config = LibraryConfig(n_shapes=2, deviation_weight=1000.0, orthogonality=1.0)
+@pytest.mark.parametrize("per_day", [False, True])
+def test_each_convex_step_does_not_raise_the_objective_it_minimises(
+    library_cache: FeatureCache, per_day: bool
+):
+    config = LibraryConfig(
+        n_shapes=2, deviation_weight=1000.0, orthogonality=1.0, weights_per_day_type=per_day
+    )
     problem = _build_problem(cache=library_cache, sites=_sites(), cut=CUT)
     state = _fresh_state(problem=problem, config=config, shapes=_truth_shapes() + 0.05)
     _solve_step(problem=problem, config=config, state=state, shape_index=None)
@@ -192,10 +200,11 @@ def test_each_convex_step_does_not_raise_the_objective_it_minimises(library_cach
             assert after <= before + 1e-6
 
 
+@pytest.mark.parametrize("per_day", [False, True])
 def test_the_weights_step_equals_non_negative_least_squares_on_the_weights(
-    library_cache: FeatureCache,
+    library_cache: FeatureCache, per_day: bool
 ):
-    config = LibraryConfig(n_shapes=2, deviation_weight=3000.0)
+    config = LibraryConfig(n_shapes=2, deviation_weight=3000.0, weights_per_day_type=per_day)
     problem = _build_problem(cache=library_cache, sites=_sites(), cut=CUT)
     state = _fresh_state(problem=problem, config=config, shapes=_truth_shapes())
     _solve_step(problem=problem, config=config, state=state, shape_index=None)
@@ -250,6 +259,7 @@ def test_a_fit_ignores_rows_after_the_cut(library_cache: FeatureCache):
     sites = _sites()
     first = fit_library(cache=library_cache, sites=sites, cut=CUT, config=config)
     after = library_cache.end_times > np.datetime64(CUT.replace(tzinfo=None), "us")
+    assert (after & np.isfinite(library_cache.sites["D1"].y)).any()
     corrupted = {
         label: replace(features, y=np.where(after, 1e6, features.y))
         for label, features in library_cache.sites.items()
@@ -262,8 +272,11 @@ def test_a_fit_ignores_rows_after_the_cut(library_cache: FeatureCache):
         assert second.fits[label].theta == pytest.approx(first.fits[label].theta, abs=1e-8)
 
 
-def test_renormalising_leaves_every_prediction_unchanged(library_cache: FeatureCache):
-    config = LibraryConfig(n_shapes=2, deviation_weight=1000.0)
+@pytest.mark.parametrize("per_day", [False, True])
+def test_renormalising_leaves_every_prediction_unchanged(
+    library_cache: FeatureCache, per_day: bool
+):
+    config = LibraryConfig(n_shapes=2, deviation_weight=1000.0, weights_per_day_type=per_day)
     problem = _build_problem(cache=library_cache, sites=_sites(), cut=CUT)
     state = _fresh_state(problem=problem, config=config, shapes=_truth_shapes())
     _solve_step(problem=problem, config=config, state=state, shape_index=None)
@@ -310,12 +323,13 @@ def test_the_fit_recovers_a_known_library_and_predicts_with_the_gam_machinery(
         np.median(np.abs(weights - truth) / np.maximum(truth.max(axis=1, keepdims=True), 1.0))
         < 0.15
     )
-    assert fit.objective_trace[-1] <= fit.objective_trace[0] + 1e-6
+    assert fit.converged or fit.n_sweeps == config.max_sweeps
+    assert (np.diff(fit.objective_trace) <= 1e-3).all()
     features = library_cache.sites["D1"]
     index = np.flatnonzero(np.isfinite(features.y))[-500:]
     predicted = predict_gam(cache=library_cache, fit=fit.fits["D1"], index=index)
     assert np.sqrt(np.mean((predicted - features.y[index]) ** 2)) < 1.0
-    assert fit.n_free_parameters > 0
+    assert fit.n_library_parameters == 2 * (192 - N_BANDS) + 5 * 2 + 5 * (192 - N_BANDS)
 
 
 def test_a_per_day_type_fit_holds_four_weights_per_shape(library_cache: FeatureCache):
@@ -331,26 +345,40 @@ def test_the_library_replica_is_fitted_a_year_early_and_scored_on_the_year_after
     library_cache: FeatureCache,
 ):
     config = LibraryConfig(n_shapes=2, deviation_weight=1000.0, max_sweeps=1)
-    replica = library_replica_residuals(cache=library_cache, sites=_sites(), cut=CUT, config=config)
-    for entry in replica.values():
+    sites = _sites()
+    replica = library_replica_residuals(cache=library_cache, sites=sites, cut=CUT, config=config)
+    fit_cut = datetime(2023, 7, 1, tzinfo=UTC)
+    direct = fit_library(cache=library_cache, sites=sites, cut=fit_cut, config=config)
+    at_cut = fit_library(cache=library_cache, sites=sites, cut=CUT, config=config)
+    lower = np.datetime64(fit_cut.replace(tzinfo=None), "us")
+    upper = np.datetime64(CUT.replace(tzinfo=None), "us")
+    for label, entry in replica.items():
         residuals = entry.residuals
-        assert residuals.fit_cut == datetime(2023, 7, 1, tzinfo=UTC)
-        assert len(residuals.residuals) > 0
-        assert np.isfinite(residuals.residuals).all()
+        assert residuals.fit_cut == fit_cut
+        ends = library_cache.end_times[residuals.index]
+        assert ((ends > lower) & (ends <= upper)).all()
+        features = library_cache.sites[label]
+        predicted = predict_gam(cache=library_cache, fit=direct.fits[label], index=residuals.index)
+        assert residuals.residuals == pytest.approx(features.y[residuals.index] - predicted)
+        assert entry.n_training_rows == direct.fits[label].n_rows
+        assert entry.n_training_rows != at_cut.fits[label].n_rows
 
 
 def test_shape_matching_uses_the_signed_cosine():
     rng = np.random.default_rng(0)
     first = rng.normal(size=(3, 192))
-    second = np.stack([-first[1], first[2], first[0]])
-    order, cosines = match_shapes(first=first, second=second)
-    assert list(order) == [2, 0, 1] or cosines.min() > -1.0
-    assert cosines[0] == pytest.approx(1.0)
+    unrelated = rng.normal(size=192)
+    second = np.stack([-first[0], unrelated])
+    order, cosines = match_shapes(first=first[:2], second=second)
+    assert list(order) == [1, 0]  # absolute-cosine matching would pair shape 0 with its negative
+    assert np.abs(cosines).max() < 0.3
     flipped = match_shapes(first=first[:1], second=-first[:1])[1]
     assert flipped[0] == pytest.approx(-1.0)
     assert largest_pair_cosine(shapes=np.stack([first[0], -first[0]])) == pytest.approx(1.0)
     assert largest_pair_cosine(shapes=first[:1]) == 0.0
     assert cosine_matrix(first=first, second=first).diagonal() == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="same number of shapes"):
+        match_shapes(first=first, second=second)
 
 
 def test_starting_shapes_are_centred_and_unit_norm_for_both_methods():
@@ -386,3 +414,56 @@ def test_a_fit_refuses_no_substations_and_a_repeated_label(library_cache: Featur
             config=config,
             start_shapes=np.zeros((3, 192)),
         )
+
+
+def test_kappa_is_the_profile_scale_times_the_row_weighted_squared_weights(
+    library_cache: FeatureCache,
+):
+    config = LibraryConfig(n_shapes=2, deviation_weight=1000.0)
+    problem = _build_problem(cache=library_cache, sites=_sites(), cut=CUT)
+    state = _fresh_state(problem=problem, config=config, shapes=_truth_shapes())
+    assert _curvature(problem=problem, config=config, state=state) == pytest.approx(
+        problem.scales["profile"] * sum(problem.n_rows)
+    )
+    state.weights = 3.0 * state.weights
+    assert _curvature(problem=problem, config=config, state=state) == pytest.approx(
+        9.0 * problem.scales["profile"] * sum(problem.n_rows)
+    )
+    assert problem.scales["profile"] * sum(problem.n_rows) == pytest.approx(175440 / 192)
+
+
+def test_a_negative_heating_response_is_held_at_zero_by_the_fit(library_cache: FeatureCache):
+    layout, _ = prepare_fit(
+        cache=library_cache,
+        site="D1",
+        spec=GamSpec(ridge=1.0),
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    features = library_cache.sites["D1"]
+    usable = np.flatnonzero(np.isfinite(features.y))
+    y = features.y.copy()
+    heating = layout.slices["heating"]
+    for start in range(0, len(usable), 20000):
+        rows = usable[start : start + 20000]
+        x = design_matrix(cache=library_cache, features=features, layout=layout, index=rows)
+        y[rows] -= 3.0 * x[:, heating].sum(axis=1)
+    sites = {**library_cache.sites, "D1": replace(features, y=y)}
+    config = LibraryConfig(n_shapes=2, deviation_weight=1000.0, max_sweeps=2)
+    fit = fit_library(
+        cache=replace(library_cache, sites=sites), sites=_sites(), cut=CUT, config=config
+    )
+    fitted = fit.fits["D1"].theta[0, heating]
+    assert (fitted >= 0.0).all()
+    assert (fitted == 0.0).any()
+
+
+def test_a_shape_with_no_weight_stays_at_zero_when_renormalised(library_cache: FeatureCache):
+    config = LibraryConfig(n_shapes=2, deviation_weight=1000.0)
+    problem = _build_problem(cache=library_cache, sites=_sites(), cut=CUT)
+    state = _fresh_state(problem=problem, config=config, shapes=_truth_shapes())
+    state.shapes[1] = 0.0
+    _renormalise(state=state, config=config)
+    assert np.linalg.norm(state.shapes[1]) == 0.0
+    assert np.linalg.norm(state.shapes[0]) == pytest.approx(1.0)
