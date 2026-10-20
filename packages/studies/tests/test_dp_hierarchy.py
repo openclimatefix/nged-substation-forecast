@@ -25,6 +25,7 @@ from studies.dp_gam import (  # noqa: E402
     accumulate_gram,
     design_matrix,
     fit_gam,
+    penalty_matrix,
     predict_gam,
     prepare_fit,
 )
@@ -52,7 +53,7 @@ SIGMA_POINTS: Final[dict[str, float]] = {"S1": 0.5, "S2": 2.0}
 TRUE_LEVEL_MW: Final[float] = 3.0
 TRUE_PV_MW: Final[float] = 2.0
 TRUE_HEATING_MW: Final[float] = 0.5
-GENERATORS_MW: Final[float] = 4.0
+GENERATORS_MEAN_MW: Final[float] = 4.0
 
 
 def _truth_theta(*, layout: GamLayout, scale: float) -> np.ndarray:
@@ -94,6 +95,16 @@ def _two_site_cache(*, cache: FeatureCache) -> tuple[FeatureCache, dict[str, np.
     return replace(cache, sites=sites, node_ids={s: (s,) for s in sites}), thetas
 
 
+def _generators(*, n: int) -> np.ndarray:
+    """Return a metered-generation series that varies in time and repeats nowhere.
+
+    A constant would be absorbed by the remainder's level, and a daily cycle by its daily shape,
+    so a wrong sign on the generator term would go unseen.
+    """
+    noise = np.random.default_rng(5).normal(size=n)
+    return GENERATORS_MEAN_MW + 2.0 * np.convolve(noise, np.ones(6) / 6.0, mode="same")
+
+
 def _bsp(
     *, cache: FeatureCache, members: tuple[BspMember, ...], truth_members: tuple[str, ...]
 ) -> BspSeries:
@@ -102,14 +113,15 @@ def _bsp(
     n = len(cache.end_times)
     hinge = np.clip(15.5 - base.temperature_c, 0.0, None) / 10.0
     remainder = TRUE_LEVEL_MW - TRUE_PV_MW * base.pv_unit_shape + TRUE_HEATING_MW * hinge
-    reading = remainder - GENERATORS_MW
+    generators = _generators(n=n)
+    reading = remainder - generators
     for site in truth_members:
         reading = reading + CAPACITY_MW[site] * cache.sites[site].y
     return BspSeries(
         name="B",
         members=members,
         reading_mw=reading,
-        generators_mw=np.full(n, GENERATORS_MW),
+        generators_mw=generators,
         temperature_c=base.temperature_c,
         pv_shape=base.pv_unit_shape,
         sigma_mw=0.5,
@@ -146,7 +158,8 @@ def _fit(
 def test_at_weight_zero_the_joint_fit_equals_the_separate_fits_whatever_the_sigmas(
     two_sites: FeatureCache,
 ):
-    # P1. The sigmas differ by a factor of 4, so a joint block that scaled the loss but not the
+    # Control P1 of the experiment's plan: at weight 0 the joint fit is the separate fits.
+    # The sigmas differ by a factor of 4, so a joint block that scaled the loss but not the
     # penalties (or the reverse) would move the minimiser.
     noisy = {
         s: replace(f, y=f.y + 0.3 * np.sin(np.arange(len(f.y)))) for s, f in two_sites.sites.items()
@@ -160,7 +173,7 @@ def test_at_weight_zero_the_joint_fit_equals_the_separate_fits_whatever_the_sigm
         )
         for s in ("S1", "S2")
     }
-    assert separate_fits_equal_joint_at_zero_weight(joint=joint, separate=separate, member=0)
+    assert separate_fits_equal_joint_at_zero_weight(joint=joint, separate=separate, weight_index=0)
     # The check can fail: with the BSP switched on, the Primaries' coefficients move.
     assert not np.allclose(
         joint.theta[1, joint.site_slices["S1"]], separate["S1"].theta[0], atol=1e-6
@@ -171,13 +184,13 @@ def test_the_weight_zero_check_refuses_a_member_with_another_weight(two_sites: F
     bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
     joint = _fit(cache=two_sites, bsp=bsp, weights=[0.0, 1.0])
     with pytest.raises(ValueError, match="not 0"):
-        separate_fits_equal_joint_at_zero_weight(joint=joint, separate={}, member=1)
+        separate_fits_equal_joint_at_zero_weight(joint=joint, separate={}, weight_index=1)
 
 
 def test_a_noise_free_bsp_built_from_the_relation_is_recovered_at_weight_one(
     two_sites: FeatureCache,
 ):
-    # P2.
+    # Control P2: a noise-free BSP built exactly from the relation is recovered at weight 1.
     bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
     joint = _fit(cache=two_sites, bsp=bsp, weights=[1.0])
     index = bsp_rows(
@@ -192,7 +205,7 @@ def test_a_noise_free_bsp_built_from_the_relation_is_recovered_at_weight_one(
     )
     assert (
         np.abs(predicted - bsp.reading_mw[index]).max()
-        < 0.05 * np.abs(bsp.reading_mw[index]).mean()
+        < 1e-3 * np.abs(bsp.reading_mw[index]).mean()
     )
     remainder = remainder_prediction(cache=two_sites, fit=joint, bsp=bsp, index=index)
     base = two_sites.sites["S1"]
@@ -207,8 +220,9 @@ def test_a_noise_free_bsp_built_from_the_relation_is_recovered_at_weight_one(
 def test_dropping_a_member_from_the_bsp_row_moves_the_remainder_by_that_members_demand(
     two_sites: FeatureCache,
 ):
-    # The sabotage reading: the audit has to be able to see a missing Primary. The BSP is built with
-    # both Primaries, but only S1 is declared under it, so S2's demand must land in the remainder.
+    # The known-answer gate's sabotage reading: the audit has to see a missing Primary. The BSP
+    # is built with both Primaries, but only S1 is declared under it, so S2's demand must land in
+    # the remainder.
     full = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
     partial = replace(full, members=(BspMember(site="S1"),))
     fit_full = _fit(cache=two_sites, bsp=full, weights=[1.0])
@@ -233,8 +247,9 @@ def test_dropping_a_member_from_the_bsp_row_moves_the_remainder_by_that_members_
     assert abs(shift.mean() - s2_demand.mean()) < 0.1 * s2_demand.mean()
 
 
+@pytest.mark.parametrize("step_penalty", [1e9, 30.0])
 def test_the_bsp_hint_pulls_a_corrupted_primary_back_inside_the_corrupted_window(
-    two_sites: FeatureCache,
+    two_sites: FeatureCache, step_penalty: float
 ):
     # A 30% scale error on 90 days of S1's training readings, with S1 alone under the BSP and a
     # drift term free to follow the error. The BSP is built from the clean truth. The remainder's
@@ -256,7 +271,7 @@ def test_the_bsp_hint_pulls_a_corrupted_primary_back_inside_the_corrupted_window
         cache=corrupted,
         specs={"S1": spec},
         bsps=[bsp],
-        remainder_spec=RemainderSpec(step_penalty=1e9, shape_ridge=1e-3),
+        remainder_spec=RemainderSpec(step_penalty=step_penalty, shape_ridge=1e-3),
         weights=[0.0, 30.0],
         sigma_points={"S1": 0.5},
         cut=CUT,
@@ -280,7 +295,7 @@ def test_the_bsp_hint_pulls_a_corrupted_primary_back_inside_the_corrupted_window
             bsp=bsp,
             index=index,
             generators_mw=bsp.generators_mw[index],
-            member=member,
+            weight_index=member,
         )
         residual.append(np.abs(bsp_hat - bsp.reading_mw[index]).mean())
     assert damage[1] < 0.5 * damage[0]
@@ -290,7 +305,13 @@ def test_the_bsp_hint_pulls_a_corrupted_primary_back_inside_the_corrupted_window
 def test_no_fit_reads_a_row_after_the_cut(two_sites: FeatureCache):
     bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
     after = two_sites.end_times > np.datetime64("2024-07-01T00:00", "us")
-    changed = replace(bsp, reading_mw=np.where(after, 1e6, bsp.reading_mw))
+    changed = replace(
+        bsp,
+        reading_mw=np.where(after, 1e6, bsp.reading_mw),
+        generators_mw=np.where(after, 1e6, bsp.generators_mw),
+        temperature_c=np.where(after, -1e3, bsp.temperature_c),
+        pv_shape=np.where(after, 1e3, bsp.pv_shape),
+    )
     index = bsp_rows(
         cache=two_sites, bsp=changed, start=np.datetime64("2023-07-01T00:00", "us"), cut=CUT
     )
@@ -313,22 +334,59 @@ def test_the_unmetered_pv_term_stays_non_negative_when_the_truth_is_negative(
     assert (joint.theta[0, joint.remainder_slices["B"]][layout.slices["steps"]] >= 0.0).all()
 
 
-def test_the_stacked_primary_block_is_the_separate_gram_matrix_scaled_by_its_sigma(
+def test_each_primary_block_is_the_separate_gram_plus_penalty_divided_by_its_sigma_squared(
     two_sites: FeatureCache,
 ):
-    # P1's block-by-block half: at weight 0 the normal equations of a Primary's block are the
-    # separate fit's, divided by sigma squared. The solution check above cannot see a Gram error
-    # that the constraints hide, so compare the matrices through a one-column perturbation.
-    layout, index = prepare_fit(
-        cache=two_sites, site="S2", spec=SPEC, cut=CUT, window=WINDOW, season_years=SEASON_YEARS
+    # Control P1, block by block: the block that `fit_joint` stacks for a Primary equals that
+    # Primary's own Gram matrix plus penalty matrix, divided by the Primary's sigma squared.
+    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    joint = _fit(cache=two_sites, bsp=bsp, weights=[0.0])
+    for site in ("S1", "S2"):
+        layout, index = prepare_fit(
+            cache=two_sites,
+            site=site,
+            spec=SPEC,
+            cut=CUT,
+            window=WINDOW,
+            season_years=SEASON_YEARS,
+        )
+        gram, _rhs = accumulate_gram(
+            cache=two_sites, features=two_sites.sites[site], layout=layout, index=index
+        )
+        penalty, _cost = penalty_matrix(layout=layout, n_rows=len(index))
+        expected = (gram[0].numpy() + penalty) / SIGMA_POINTS[site] ** 2
+        assert np.allclose(joint.primary_blocks[site], expected, rtol=1e-9, atol=0.0)
+
+
+def test_a_very_large_weight_ties_the_primaries_to_the_bsp(two_sites: FeatureCache):
+    # With w = 1e6 and a remainder that can only shift the level and the unmetered PV, the BSP
+    # reading is matched to a relative error under 1e-3, and a noise-free truth is still the
+    # solution because it satisfies the Primaries' rows and the BSP rows together.
+    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    joint = fit_joint(
+        cache=two_sites,
+        specs={"S1": SPEC, "S2": SPEC},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(shape_ridge=1e9, with_heating=False),
+        weights=[1e6],
+        sigma_points=SIGMA_POINTS,
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
     )
-    gram, rhs = accumulate_gram(
-        cache=two_sites, features=two_sites.sites["S2"], layout=layout, index=index
+    index = bsp_rows(
+        cache=two_sites, bsp=bsp, start=np.datetime64("2023-07-01T00:00", "us"), cut=CUT
     )
-    x = design_matrix(cache=two_sites, features=two_sites.sites["S2"], layout=layout, index=index)
-    y = two_sites.sites["S2"].y[index]
-    assert np.allclose(gram[0].numpy(), x.T @ x, rtol=1e-9)
-    assert np.allclose(rhs[0].numpy(), x.T @ y, rtol=1e-9)
+    predicted = predict_bsp(
+        cache=two_sites, fit=joint, bsp=bsp, index=index, generators_mw=bsp.generators_mw[index]
+    )
+    assert (
+        np.abs(predicted - bsp.reading_mw[index]).mean()
+        < 1e-3 * np.abs(bsp.reading_mw[index]).mean()
+    )
+    for site in ("S1", "S2"):
+        fitted = predict_gam(cache=two_sites, fit=joint.site_fit(site=site), index=index)
+        assert np.abs(fitted - two_sites.sites[site].y[index]).mean() < 0.05
 
 
 def test_the_remainder_design_has_the_documented_columns_and_signs(two_sites: FeatureCache):
@@ -418,3 +476,14 @@ def test_the_primary_step_costs_scale_with_the_sigma_like_the_loss(two_sites: Fe
         for s in ("S1", "S2")
     }
     assert separate_fits_equal_joint_at_zero_weight(joint=joint, separate=separate, atol=1e-5)
+
+
+def test_the_bsp_rows_start_where_the_primaries_training_window_starts(two_sites: FeatureCache):
+    # The 12-month window starts at 2023-07-01, so BSP readings before it must not enter the fit.
+    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    before = two_sites.end_times <= np.datetime64("2023-07-01T00:00", "us")
+    changed = replace(bsp, reading_mw=np.where(before, 1e6, bsp.reading_mw))
+    first = _fit(cache=two_sites, bsp=bsp, weights=[1.0])
+    second = _fit(cache=two_sites, bsp=changed, weights=[1.0])
+    assert np.array_equal(first.theta, second.theta)
+    assert first.n_bsp_rows["B"] == second.n_bsp_rows["B"]

@@ -17,13 +17,21 @@ half-hour effects, and an optional non-negative loss term on a given series.
 **The joint objective is a bounded least-squares problem in the stacked coefficients.**
 
     sum_i (1/sigma_i^2) * (|y_i - X_i theta_i|^2 + penalties_i)
-      + w * sum_b (1/sigma_b^2) * |z_b - sum_i scale_i X_i theta_i - Z_b rho_b|^2 + penalties_b
+      + (w / sigma_b^2) * sum_b (|z_b - sum_i scale_i X_i theta_i - Z_b rho_b|^2 + penalties_b)
 
 with `z_b = BSP_b + generators_b + (the pinned solar output of each member that has one)`. Each
 Primary block carries the factor `1/sigma_i^2` on its loss *and* its penalties, so at `w = 0` the
 joint solution equals the separate fits exactly (the minimiser of a scaled objective is the same).
-The Gram matrix of the Primary blocks is block diagonal and does not depend on `w`, so one pass over
-the rows serves a whole grid of weights, and `solve_bounded_quadratic` solves them as one batch.
+**The remainder's penalties scale with the BSP term, `w / sigma_b^2`,** so changing `w` changes how
+much the BSP reading matters and not how freely the remainder can absorb an offset; a tiny ridge
+that does not scale with `w` keeps the matrix definite at `w = 0`. The Gram matrix of the Primary
+blocks is block diagonal and does not depend on `w`, so one pass over the rows serves a whole grid
+of weights, and `solve_bounded_quadratic` solves them as one batch.
+
+**The remainder's level can absorb a constant offset,** so a BSP reading pulls a corrupted
+Primary back where the error is local in time and not where it is constant. How much damage the
+hint removes on a clean year is a property of the data and the penalties, and experiment 124
+measures it.
 
 **A member is `mw` or `mva_dark`.** An `mw` member contributes its net power, so its pinned solar
 output (if any) moves to the BSP target as for a single-site fit. An `mva_dark` member contributes
@@ -77,9 +85,6 @@ DEFAULT_SHAPE_RIDGE: Final[float] = 1.0
 
 DEFAULT_STEP_PENALTY: Final[float] = 30.0
 """The default L1 cost of one step of the remainder's drift, per site-year of rows, in MW."""
-
-PV_SHARE_FLOOR: Final[float] = 1e-9
-"""A shape value below this counts as zero when checking that the PV term has a signal."""
 
 
 @dataclass(frozen=True)
@@ -145,7 +150,8 @@ class BspSeries:
         temperature_c: The BSP area's mean temperature, shape (T,).
         pv_shape: The unmetered PV's per-unit output shape, shape (T,), `NaN` where unknown.
         loss: A loss series for the optional loss term, shape (T,), or `None`.
-        sigma_mw: The robust half-hourly residual scale of the BSP row, from pre-cut rows, in MW.
+        sigma_mw: The robust half-hourly residual scale of the BSP row, in MW. The caller must
+            compute it from rows before the fit's cut; nothing here can check that.
     """
 
     name: str
@@ -176,6 +182,8 @@ class JointFit:
         last_season_years: Each Primary's latest season-year with a solar signal.
         pinned: Each Primary's pinned capacity, or `None`.
         violation: Each fit's optimality violation.
+        primary_blocks: Each Primary's block of the normal equations before the BSP rows are added:
+            the Gram matrix plus the penalty matrix, divided by the Primary's sigma squared.
     """
 
     weights: tuple[float, ...]
@@ -191,6 +199,7 @@ class JointFit:
     last_season_years: dict[str, int]
     pinned: dict[str, PinnedCapacity | None]
     violation: np.ndarray
+    primary_blocks: dict[str, np.ndarray]
 
     def site_fit(self, *, site: str) -> GamFit:
         """Return one Primary's coefficients as a `dp_gam.GamFit` batch over the weights.
@@ -232,7 +241,7 @@ def make_remainder_layout(
     knot_days = cut_day - KNOT_SPACING_DAYS * np.arange(n_knots)[::-1]
     sizes: dict[str, int] = {
         "level": 1,
-        "steps": 2 * (n_knots - 1),
+        "steps": 2 * max(n_knots - 2, 0),
         "pv": 1,
         "shape": HALF_HOURS_PER_DAY,
     }
@@ -274,7 +283,7 @@ def remainder_design(
     x = np.zeros((n, layout.n_columns))
     x[:, layout.slices["level"]] = 1.0
     days = cache.end_times[index].astype("datetime64[s]").astype(np.int64) / 86400.0
-    after = (days[:, None] >= layout.knot_days[None, 1:]).astype(np.float64)
+    after = (days[:, None] >= layout.knot_days[None, 1:-1]).astype(np.float64)
     x[:, layout.slices["steps"]] = np.concatenate([after, -after], axis=1)
     x[:, layout.slices["pv"]] = -bsp.pv_shape[index][:, None]
     x[np.arange(n), layout.slices["shape"].start + cache.calendar.half_hour[index]] = 1.0
@@ -298,7 +307,8 @@ def remainder_penalty(*, layout: RemainderLayout, n_rows: int) -> tuple[np.ndarr
 
     Returns:
         `(P, c)` of shapes (p, p) and (p,): a ridge on every column (the daily shape's is
-        `spec.shape_ridge`) and the L1 cost `c` on the step parts.
+        `spec.shape_ridge`) and the L1 cost `c` on the step parts, both in MW units. `fit_joint`
+        scales them by `w / sigma_b^2`, with the BSP rows.
     """
     matrix = REMAINDER_RIDGE * np.eye(layout.n_columns)
     cost = np.zeros(layout.n_columns)
@@ -411,6 +421,7 @@ class _Normal:
     base_cost: torch.Tensor
     hint: torch.Tensor
     hint_rhs: torch.Tensor
+    hint_cost: torch.Tensor
     constrained: np.ndarray
 
 
@@ -487,15 +498,25 @@ def _add_bsp_block(
 ) -> None:
     """Add one BSP's remainder penalties and its unweighted row Gram matrix to `normal`."""
     penalty, cost = remainder_penalty(layout=rem, n_rows=len(index))
-    normal.base[rem_block, rem_block] = torch.as_tensor(penalty, dtype=dtype, device=device)
-    normal.base_cost[rem_block] = torch.as_tensor(cost, dtype=dtype, device=device)
+    inverse_variance = 1.0 / bsp.sigma_mw**2
+    # The remainder's penalties scale with the BSP term (w / sigma_b^2), so changing w changes how
+    # much the hint matters and not how freely the remainder can absorb an offset. A tiny ridge
+    # that does not scale with w keeps the matrix definite at w = 0.
+    normal.base[rem_block, rem_block] = REMAINDER_RIDGE * torch.eye(
+        rem.n_columns, dtype=dtype, device=device
+    )
+    normal.hint[rem_block, rem_block] += inverse_variance * torch.as_tensor(
+        penalty, dtype=dtype, device=device
+    )
+    normal.hint_cost[rem_block] = inverse_variance * torch.as_tensor(
+        cost, dtype=dtype, device=device
+    )
     normal.constrained[rem_block] = rem.constrained
     columns = np.concatenate(
         [np.arange(offsets[m.site].start, offsets[m.site].stop) for m in bsp.members]
         + [np.arange(rem_block.start, rem_block.stop)]
     )
     column_index = torch.as_tensor(columns, device=device)
-    inverse_variance = 1.0 / bsp.sigma_mw**2
     for chunk in row_chunks(index=index):
         rows = index[chunk]
         parts = [
@@ -576,8 +597,12 @@ def fit_joint(
     remainder_layouts: dict[str, RemainderLayout] = {}
     remainder_offsets: dict[str, slice] = {}
     for bsp in bsps:
-        earliest = max(cache.sites[m.site].table.first_usable for m in bsp.members)
-        index = bsp_rows(cache=cache, bsp=bsp, start=naive_utc(moment=earliest), cut=cut)
+        # The BSP rows start at the earliest training row of any member, so the hint covers the
+        # years the Primaries train on and no earlier ones.
+        first_member_row = min(cache.end_times[indices[m.site][0]] for m in bsp.members)
+        index = bsp_rows(
+            cache=cache, bsp=bsp, start=first_member_row - np.timedelta64(1, "us"), cut=cut
+        )
         if len(index) == 0:
             msg = f"{bsp.name} has no training row before {cut}"
             raise ValueError(msg)
@@ -594,6 +619,7 @@ def fit_joint(
         base_cost=torch.zeros(start, dtype=dtype, device=device),
         hint=torch.zeros(square, dtype=dtype, device=device),
         hint_rhs=torch.zeros(start, dtype=dtype, device=device),
+        hint_cost=torch.zeros(start, dtype=dtype, device=device),
         constrained=np.zeros(start, dtype=bool),
     )
     _add_primary_blocks(
@@ -607,6 +633,7 @@ def fit_joint(
         device=device,
         dtype=dtype,
     )
+    primary_blocks = {s: normal.base[offsets[s], offsets[s]].cpu().numpy().copy() for s in sites}
     for bsp in bsps:
         _add_bsp_block(
             cache=cache,
@@ -626,8 +653,8 @@ def fit_joint(
         matrix=normal.base[None] + w[:, None, None] * normal.hint[None],
         rhs=normal.base_rhs[None]
         + w[:, None] * normal.hint_rhs[None]
-        - 0.5 * normal.base_cost[None],
-        constrained=torch.as_tensor(normal.constrained),
+        - 0.5 * (normal.base_cost[None] + w[:, None] * normal.hint_cost[None]),
+        constrained=torch.as_tensor(normal.constrained, device=device),
     )
     return JointFit(
         weights=tuple(float(x) for x in weights),
@@ -648,6 +675,7 @@ def fit_joint(
         },
         pinned={s: pinned.get(s) for s in sites},
         violation=violation.cpu().numpy(),
+        primary_blocks=primary_blocks,
     )
 
 
@@ -657,7 +685,7 @@ def remainder_prediction(
     fit: JointFit,
     bsp: BspSeries,
     index: np.ndarray,
-    member: int = 0,
+    weight_index: int = 0,
 ) -> np.ndarray:
     """Return a BSP's remainder `r(t)` in MW at the grid rows `index`.
 
@@ -666,7 +694,7 @@ def remainder_prediction(
         fit: The joint fit.
         bsp: The BSP's series, with covariates at the rows to predict.
         index: Grid rows.
-        member: Which batch member (weight) of the fit.
+        weight_index: Which weight of the fit's batch.
 
     Returns:
         The remainder, one value per row.
@@ -680,7 +708,7 @@ def remainder_prediction(
     if not np.isfinite(x).all():
         msg = f"{bsp.name} has a non-finite input among the rows to predict"
         raise ValueError(msg)
-    return x @ fit.theta[member, fit.remainder_slices[bsp.name]]
+    return x @ fit.theta[weight_index, fit.remainder_slices[bsp.name]]
 
 
 def predict_bsp(
@@ -690,7 +718,7 @@ def predict_bsp(
     bsp: BspSeries,
     index: np.ndarray,
     generators_mw: np.ndarray,
-    member: int = 0,
+    weight_index: int = 0,
 ) -> np.ndarray:
     """Predict a BSP's import-positive power in MW at the grid rows `index`.
 
@@ -705,12 +733,14 @@ def predict_bsp(
         index: Grid rows.
         generators_mw: The generators' sum (observed in fitting, forecast in forecasting) at the
             rows, export-positive.
-        member: Which batch member (weight) of the fit.
+        weight_index: Which weight of the fit's batch.
 
     Returns:
         The BSP's predicted power in MW.
     """
-    total = remainder_prediction(cache=cache, fit=fit, bsp=bsp, index=index, member=member)
+    total = remainder_prediction(
+        cache=cache, fit=fit, bsp=bsp, index=index, weight_index=weight_index
+    )
     total = total - generators_mw
     for m in bsp.members:
         site_fit = fit.site_fit(site=m.site)
@@ -719,21 +749,21 @@ def predict_bsp(
             columns = np.ones(site_fit.layout.n_columns, dtype=bool)
             columns[site_fit.layout.slices["capacity"]] = False
         predicted = predict_gam(
-            cache=cache, fit=site_fit, index=index, member=member, columns=columns
+            cache=cache, fit=site_fit, index=index, member=weight_index, columns=columns
         )
         total = total + cache.sites[m.site].table.effective_capacity_mw * predicted
     return total
 
 
 def separate_fits_equal_joint_at_zero_weight(
-    *, joint: JointFit, separate: Mapping[str, GamFit], member: int = 0, atol: float = 1e-6
+    *, joint: JointFit, separate: Mapping[str, GamFit], weight_index: int = 0, atol: float = 1e-6
 ) -> bool:
     """Return True if the joint solution at weight 0 equals the separate fits (control P1).
 
     Args:
-        joint: A joint fit whose batch member `member` has weight 0.
+        joint: A joint fit whose weight at `weight_index` is 0.
         separate: The Primaries' separate `dp_gam` fits, in the same specs, window, and cut.
-        member: Which batch member of `joint` has weight 0.
+        weight_index: Which weight of the joint fit's batch is 0.
         atol: The tolerance on each coefficient.
 
     Returns:
@@ -742,10 +772,10 @@ def separate_fits_equal_joint_at_zero_weight(
     Raises:
         ValueError: If the batch member's weight is not 0.
     """
-    if joint.weights[member] != 0.0:
-        msg = f"batch member {member} has weight {joint.weights[member]}, not 0"
+    if joint.weights[weight_index] != 0.0:
+        msg = f"weight {weight_index} is {joint.weights[weight_index]}, not 0"
         raise ValueError(msg)
     return all(
-        np.allclose(joint.theta[member, joint.site_slices[s]], fit.theta[0], atol=atol)
+        np.allclose(joint.theta[weight_index, joint.site_slices[s]], fit.theta[0], atol=atol)
         for s, fit in separate.items()
     )
