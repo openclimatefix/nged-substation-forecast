@@ -107,6 +107,7 @@ class PathProblem:
         step_penalty: Penalty per megawatt of change between consecutive rows.
         level_penalty: Penalty per megawatt of flow on a row with a reading.
         non_negative: Whether the flow is constrained to be at least zero.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
     """
 
     residual_a: np.ndarray
@@ -120,6 +121,7 @@ class PathProblem:
     step_penalty: float = 0.0
     level_penalty: float = 0.0
     non_negative: bool = False
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS
 
 
 @dataclass(frozen=True)
@@ -195,7 +197,7 @@ def _compress(*, problem: PathProblem) -> tuple[np.ndarray, list[_End]]:
         _End(
             value=np.nan_to_num(residual[kept]),
             weight=weight[kept],
-            threshold=HUBER_THRESHOLD_IN_SIGMAS * noise,
+            threshold=problem.huber_sigmas * noise,
             gain=np.ones(len(kept)) if gain is None else gain[kept],
         )
         for (residual, noise, _, gain), weight in zip(ends_raw, weights, strict=True)
@@ -868,6 +870,7 @@ def joint_objective(
     residuals: Mapping[str, np.ndarray],
     noise: Mapping[str, float],
     reliability: Mapping[str, np.ndarray] | None = None,
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
 ) -> float:
     """Return the objective of the whole graph at a set of flows.
 
@@ -880,6 +883,7 @@ def joint_objective(
         residuals: Each node's residual in megawatts, `NaN` where there is no reading.
         noise: Each node's robust residual standard deviation in megawatts.
         reliability: Optional per-row weight in 0 to 1 for each node.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
 
     Returns:
         The joint objective.
@@ -899,7 +903,7 @@ def joint_objective(
                 weight
                 * huber_loss(
                     x=np.nan_to_num(residual) - modelled,
-                    threshold=HUBER_THRESHOLD_IN_SIGMAS * noise[node],
+                    threshold=huber_sigmas * noise[node],
                 )
             )
         )
@@ -922,6 +926,7 @@ def fit_flows(
     max_sweeps: int = DEFAULT_MAX_SWEEPS,
     tolerance: float = DEFAULT_TOLERANCE,
     sweep_tolerance: float = SWEEP_TOLERANCE,
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
 ) -> FlowFit:
     """Fit every path's flow by block-coordinate descent.
 
@@ -940,6 +945,8 @@ def fit_flows(
         tolerance: The ADMM tolerance of each path solve in megawatts.
         sweep_tolerance: The sweeps' stopping tolerance on the objective's relative change and on
             the largest path change in megawatts.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero; a large
+            value makes the data term squared error.
 
     Returns:
         The fitted flows and how the fit ended.
@@ -978,6 +985,7 @@ def fit_flows(
                     noise=noise,
                     reliability=reliability,
                     length=length,
+                    huber_sigmas=huber_sigmas,
                 ),
                 start=flows[path.name],
                 tolerance=tolerance,
@@ -988,7 +996,12 @@ def fit_flows(
             )
             flows[path.name] = solution.flow
         objective = joint_objective(
-            paths=paths, flows=flows, residuals=residuals, noise=noise, reliability=reliability
+            paths=paths,
+            flows=flows,
+            residuals=residuals,
+            noise=noise,
+            reliability=reliability,
+            huber_sigmas=huber_sigmas,
         )
         relative = abs(previous_objective - objective) / max(abs(objective), 1.0)
         previous_objective = objective
@@ -1007,6 +1020,7 @@ def _partial_problem(
     noise: Mapping[str, float],
     reliability: Mapping[str, np.ndarray],
     length: int,
+    huber_sigmas: float,
 ) -> PathProblem:
     """Build one path's problem on the residual left by the other paths."""
     partial_a = residuals[path.node_a] - _node_contribution(
@@ -1031,6 +1045,7 @@ def _partial_problem(
         step_penalty=path.step_penalty,
         level_penalty=path.level_penalty,
         non_negative=path.non_negative,
+        huber_sigmas=huber_sigmas,
     )
 
 
@@ -1450,6 +1465,7 @@ def causal_window_fit(
     reliability: Mapping[str, np.ndarray] | None = None,
     max_sweeps: int = DEFAULT_MAX_SWEEPS,
     sweep_tolerance: float = SWEEP_TOLERANCE,
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
 ) -> tuple[FlowFit, int]:
     """Fit the flows on the trailing window of residuals that a forecast may see.
 
@@ -1470,6 +1486,7 @@ def causal_window_fit(
             on block means.
         max_sweeps: The sweep limit of the block-coordinate fit.
         sweep_tolerance: The sweeps' stopping tolerance.
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
 
     Returns:
         The fit, whose flows have `window_length` rows (fewer near the start of the stream), and
@@ -1502,6 +1519,7 @@ def causal_window_fit(
         start=start,
         max_sweeps=max_sweeps,
         sweep_tolerance=sweep_tolerance,
+        huber_sigmas=huber_sigmas,
     )
     return fit, first
 

@@ -804,3 +804,13 @@ def test_a_noisy_transfer_on_one_edge_leaves_the_other_edges_nearly_empty():
 
 def test_flow_mw_days_sums_magnitudes_over_forty_eight():
     assert flow_mw_days(flow=np.array([2.0, -2.0, 0.0, 4.0])) == pytest.approx(8.0 / 48.0)
+
+
+def test_a_large_huber_threshold_turns_the_data_term_into_squared_error():
+    spike = np.zeros(21)
+    spike[10] = 100.0
+    robust = PathProblem(residual_a=spike, noise_a=1.0, step_penalty=3.0)
+    squared = PathProblem(residual_a=spike, noise_a=1.0, step_penalty=3.0, huber_sigmas=1e6)
+
+    assert np.max(np.abs(solve_path(problem=robust).flow)) < 2.0
+    assert np.max(np.abs(solve_path(problem=squared).flow)) > 10.0
