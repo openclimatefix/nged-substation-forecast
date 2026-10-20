@@ -318,6 +318,33 @@ Every number on this page is printed by `e00114_report.py` into `report.txt`.
   prediction of at most 3.
 - **B0-K within 0.06 of WK, run under 1.5 hours:** held (-0.012; about 10 minutes of compute).
 
+## Work this builds on
+
+- **Earlier experiments in the series:** [experiment
+  104](../00104-differentiable-physics-2-simple-structural-model/result.md) (Part 2) built the
+  convex model and tuned its ridge; [experiment
+  105](../00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md) (Part 3) found
+  that a neural-network interaction added nothing measurable, which is why N3 asks the question of
+  the convex terms directly; [experiment
+  106](../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md) (Part 4) built
+  the Kalman filter and supplies the stored references (A2, WK, XGBoost, climatology, the manual
+  heuristic); [experiment
+  107](../00107-differentiable-physics-rolling-origin-history-and-tails/result.md) gave the
+  0.03-point sister contrast; [experiment
+  103](../00103-differentiable-physics-1-data-look/result.md) chose the rows, cuts, and switching
+  masks; [experiment 45](../00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md) supplies the
+  pinned PV capacity; and [experiment
+  87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md) fixed the 11 quantile
+  levels of the score.
+- **Heating response in the literature:** additive models of electricity demand with smooth,
+  data-fitted terms are the closest published relatives of the convex model's heating terms, which
+  use a hinge at a fixed threshold. [Fasiolo et al.
+  (2021)](https://doi.org/10.1080/01621459.2020.1725521) fit additive quantile regressions with
+  calibrated inference, motivated by load forecasting. [Obst et al.
+  (2021)](https://arxiv.org/abs/2009.06527) correct additive load models with Kalman filters, the
+  same pairing as GAM-K and its recent-error filter. Neither paper's page states how temperature
+  enters its model, so this page makes no claim about their temperature terms.
+
 ## Caveats and choices made after the plan
 
 - **Past weather:** both gains use ERA5 temperature at the target half-hour, an upper bound on
