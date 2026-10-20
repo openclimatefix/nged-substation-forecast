@@ -46,6 +46,8 @@ EXPLORATORY: Final[dict[str, tuple[str, str]]] = {
     "KEZ-drop-heating minus GK": ("KEZ-drop-heating", "GK"),
     "KEZ-drop-holiday minus GK": ("KEZ-drop-holiday", "GK"),
     "KEZ-DT minus KEZ-Q0": ("KEZ-DT", "KEZ-Q0"),
+    "KEZ-DTs minus KEZ": ("KEZ-DTs", "KEZ"),
+    "KEZ-DTs minus GK": ("KEZ-DTs", "GK"),
 }
 REFERENCE_CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "KEZ minus GAM-0": ("KEZ", "gam0"),

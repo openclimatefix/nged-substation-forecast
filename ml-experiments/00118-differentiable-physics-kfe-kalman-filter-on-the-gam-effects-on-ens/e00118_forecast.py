@@ -57,9 +57,14 @@ FORECAST_ARMS: Final[tuple[str, ...]] = (
     "GK-sp",
     SHIFT_ARM,
     *arms.FITTED_ARMS,
+    *arms.HOLIDAY_SHRINK_ARMS,
 )
 """Every arm the experiment forecasts."""
-STATE_ARM_OF: Final[dict[str, str]] = {"GK-sp": "GK", SHIFT_ARM: "KEZ"}
+STATE_ARM_OF: Final[dict[str, str]] = {
+    "GK-sp": "GK",
+    SHIFT_ARM: "KEZ",
+    **dict.fromkeys(arms.HOLIDAY_SHRINK_ARMS, "KEZ"),
+}
 """Arms whose filter state is another arm's."""
 OWN_SPREAD_ARMS: Final[tuple[str, ...]] = tuple(
     name for name in FORECAST_ARMS if name not in SPREAD_ARM_OF
@@ -207,6 +212,7 @@ def corrected_members(
     data: streams.SiteStreams,
     filtered: ArmFilter,
     members: RunMembers,
+    holiday_factor: float | None = None,
 ) -> Corrected:
     """Apply an arm's filter state at the run's origin to every member.
 
@@ -216,6 +222,8 @@ def corrected_members(
         data: The site's streams (for the regressor scale).
         filtered: The arm's filter.
         members: The run's members.
+        holiday_factor: If given, the level and anomaly corrections are multiplied by this factor
+            on holiday target days (0 removes them).
 
     Returns:
         The corrected members.
@@ -238,11 +246,12 @@ def corrected_members(
         phi=filtered.noise.phi,
     )
     shift, level, anomaly = correction.shift, correction.level, correction.anomaly
-    if filtered.day_type_aware:
+    factor = 0.0 if filtered.day_type_aware else holiday_factor
+    if factor is not None:
         holiday = data.holiday_day[target]
-        shift = shift - np.where(holiday, level + anomaly, 0.0)[None, :]
-        level = np.where(holiday, 0.0, level)
-        anomaly = np.where(holiday, 0.0, anomaly)
+        shift = shift - np.where(holiday, (1.0 - factor) * (level + anomaly), 0.0)[None, :]
+        level = np.where(holiday, factor * level, level)
+        anomaly = np.where(holiday, factor * anomaly, anomaly)
     return Corrected(
         means=members.base_mean + shift, level=level, anomaly=anomaly, state_position=state.position
     )

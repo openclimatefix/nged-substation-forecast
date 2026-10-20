@@ -20,6 +20,7 @@
 """
 
 import argparse
+import json
 from dataclasses import replace
 from typing import Final
 
@@ -65,6 +66,10 @@ P4_MAX_SD: Final[float] = 0.5
 P4_TRUE_Q: Final[dict[str, float]] = {"pv": 1e-4, "heating": 1e-6, "profile": 0.0, "holiday": 0.0}
 """The simulated random-walk variances in weight units per day, for P4."""
 CHECK_RUNS: Final[int] = 40
+P4_SEEDS: Final[int] = 10
+"""How many seeds per decision substation the post hoc multi-seed P4 uses."""
+P4_WORKERS: Final[int] = 6
+"""Worker processes of the multi-seed P4, within the slot's 6 cores."""
 
 
 def p0() -> dict:
@@ -312,67 +317,121 @@ def p3() -> dict:
     return result
 
 
+def _p4_fit(*, site: str, seed_label: str) -> dict:
+    """Simulate one stream from known weight variances, refit it, and return the fitted ones.
+
+    Args:
+        site: A decision substation's label.
+        seed_label: Names the draw; the first run uses `p4`.
+
+    Returns:
+        For the PV, heating, and holiday groups, the true and fitted variance (weight units per
+        day), whether the weight ended identified, and whether the group passes the bar.
+    """
+    inputs = gate.gate_inputs(site)
+    generator = np.random.default_rng(gate.draw_seed(parts=("p4", site, seed_label)))
+    weight_q = np.zeros(N_WEIGHTS)
+    weight_q[PV_INDEX] = P4_TRUE_Q["pv"]
+    weight_q[HEATING] = P4_TRUE_Q["heating"]
+    weight_q[PROFILE] = P4_TRUE_Q["profile"]
+    weight_q[HOLIDAY_INDEX] = P4_TRUE_Q["holiday"]
+    steps = generator.normal(size=(len(inputs.rows), N_WEIGHTS)) * np.sqrt(weight_q / 48.0)
+    deviation = np.cumsum(steps, axis=0)
+    stream = (deviation * inputs.seen).sum(axis=1) + gate.ar1_noise(
+        inputs=inputs, generator=generator
+    )
+    stream = np.where(np.isfinite(inputs.seen).all(axis=1), stream, np.nan)
+    fitted = fit_effects_noise(
+        residual=stream,
+        regressors=inputs.seen / inputs.scale,
+        band=inputs.band,
+        scale=inputs.scale,
+        variant=arms.FITTED_ARMS["KEZ"].variant,
+        phi=inputs.noise.phi,
+        sigma_z=inputs.noise.sigma_z,
+        sigma_eps_start=inputs.noise.sigma_eps,
+        likelihood_mask=inputs.likelihood_mask & np.isfinite(stream),
+        prior_mean=np.full(N_WEIGHTS, -3.0),
+        prior_spread=np.full(N_WEIGHTS, 20.0),
+        lead_matched=gate.day_ahead_scored(inputs=inputs, stream=stream),
+    )
+    trace = run_effects_filter(
+        residual=stream,
+        regressors=inputs.seen / inputs.scale,
+        band=inputs.band,
+        noise=fitted.noise,
+    )
+    fitted_weight_q = fitted.noise.q / inputs.scale**2
+    end_sd = trace.sd[-1] / inputs.scale
+    rows = {}
+    for name, index in (("pv", PV_INDEX), ("heating", HEATING.start), ("holiday", HOLIDAY_INDEX)):
+        true = float(weight_q[index])
+        value = float(fitted_weight_q[index])
+        identified = bool(end_sd[index] < P4_MAX_SD and not fitted.set_by_prior[index])
+        ok = (
+            value < P4_ZERO_Q
+            if true == 0.0
+            else (true / P4_FACTOR <= value <= true * P4_FACTOR) or not identified
+        )
+        rows[name] = {"true": true, "fitted": value, "identified": identified, "ok": bool(ok)}
+    return rows
+
+
 def p4() -> dict:
     """Fit streams simulated from known random-walk variances and compare the fitted ones."""
     result: dict = {}
     for site in gate.SITES:
-        inputs = gate.gate_inputs(site)
-        generator = np.random.default_rng(gate.draw_seed(parts=("p4", site)))
-        weight_q = np.zeros(N_WEIGHTS)
-        weight_q[PV_INDEX] = P4_TRUE_Q["pv"]
-        weight_q[HEATING] = P4_TRUE_Q["heating"]
-        weight_q[PROFILE] = P4_TRUE_Q["profile"]
-        weight_q[HOLIDAY_INDEX] = P4_TRUE_Q["holiday"]
-        steps = generator.normal(size=(len(inputs.rows), N_WEIGHTS)) * np.sqrt(weight_q / 48.0)
-        deviation = np.cumsum(steps, axis=0)
-        stream = (deviation * inputs.seen).sum(axis=1) + gate.ar1_noise(
-            inputs=inputs, generator=generator
-        )
-        stream = np.where(np.isfinite(inputs.seen).all(axis=1), stream, np.nan)
-        fitted = fit_effects_noise(
-            residual=stream,
-            regressors=inputs.seen / inputs.scale,
-            band=inputs.band,
-            scale=inputs.scale,
-            variant=arms.FITTED_ARMS["KEZ"].variant,
-            phi=inputs.noise.phi,
-            sigma_z=inputs.noise.sigma_z,
-            sigma_eps_start=inputs.noise.sigma_eps,
-            likelihood_mask=inputs.likelihood_mask & np.isfinite(stream),
-            prior_mean=np.full(N_WEIGHTS, -3.0),
-            prior_spread=np.full(N_WEIGHTS, 20.0),
-            lead_matched=gate.day_ahead_scored(inputs=inputs, stream=stream),
-        )
-        trace = run_effects_filter(
-            residual=stream,
-            regressors=inputs.seen / inputs.scale,
-            band=inputs.band,
-            noise=fitted.noise,
-        )
-        fitted_weight_q = fitted.noise.q / inputs.scale**2
-        end_sd = trace.sd[-1] / inputs.scale
-        rows = {}
-        for name, index in (
-            ("pv", PV_INDEX),
-            ("heating", HEATING.start),
-            ("holiday", HOLIDAY_INDEX),
-        ):
-            true = weight_q[index]
-            value = float(fitted_weight_q[index])
-            identified = bool(end_sd[index] < P4_MAX_SD and not fitted.set_by_prior[index])
-            ok = (
-                value < P4_ZERO_Q
-                if true == 0.0
-                else (true / P4_FACTOR <= value <= true * P4_FACTOR) or not identified
-            )
-            rows[name] = {"true": true, "fitted": value, "identified": identified, "ok": bool(ok)}
-        result[site] = rows
-        print(site, rows)
+        result[site] = _p4_fit(site=site, seed_label="")
+        print(site, result[site])
     result["passed"] = all(r["ok"] for site in gate.SITES for r in result[site].values())
     return result
 
 
-STEPS: Final = {"p0": p0, "p1": p1, "p2": p2, "p3": p3, "p4": p4}
+def _p4_job(job: tuple[str, int]) -> tuple[str, int, dict]:
+    site, seed = job
+    return site, seed, _p4_fit(site=site, seed_label=f"seed{seed}")
+
+
+def p4_seeds() -> dict:
+    """Repeat P4 over several seeds per decision substation and report the medians (post hoc).
+
+    This is an added check after the first P4 run failed. It changes no bar, and the first run's
+    result stands. Each fitted variance is compared with the truth by the ratio fitted / true (PV
+    and heating) or by the fitted value itself (the holiday group, simulated at 0).
+    """
+    from concurrent.futures import ProcessPoolExecutor
+
+    jobs = [(site, seed) for site in gate.SITES for seed in range(P4_SEEDS)]
+    with ProcessPoolExecutor(max_workers=P4_WORKERS) as pool:
+        outputs = list(pool.map(_p4_job, jobs))
+    summary: dict = {"seeds": P4_SEEDS, "sites": {}}
+    for group in ("pv", "heating", "holiday"):
+        values = [out[group]["fitted"] for _, _, out in outputs]
+        truth = outputs[0][2][group]["true"]
+        summary[group] = {
+            "true": truth,
+            "median_fitted": float(np.median(values)),
+            "share_within_factor_3": float(
+                np.mean([truth / P4_FACTOR <= v <= truth * P4_FACTOR for v in values])
+            )
+            if truth > 0
+            else None,
+            "share_below_bar": float(np.mean([v < P4_ZERO_Q for v in values]))
+            if truth == 0
+            else None,
+            "p10": float(np.percentile(values, 10)),
+            "p90": float(np.percentile(values, 90)),
+        }
+    for site in gate.SITES:
+        summary["sites"][site] = {
+            group: float(np.median([out[group]["fitted"] for s, _, out in outputs if s == site]))
+            for group in ("pv", "heating", "holiday")
+        }
+    print(json.dumps(summary, indent=2))
+    return summary
+
+
+STEPS: Final = {"p0": p0, "p1": p1, "p2": p2, "p3": p3, "p4": p4, "p4_seeds": p4_seeds}
 
 
 def main() -> None:

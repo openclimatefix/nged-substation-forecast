@@ -24,6 +24,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Final
 
+import e00118_arms as arms
 import e00118_common as common
 import e00118_forecast as fc
 import e00118_streams as streams
@@ -101,15 +102,16 @@ def site_inputs(*, site: str) -> tuple:
     return cache, setup, fits, data, fc.build_filters(cache=cache, data=data)
 
 
-def tune_site(site: str) -> dict:
-    """Fit every arm's spread at one site on the tuning runs and score the factor grid.
+def tune_site(job: tuple[str, tuple[str, ...] | None]) -> dict:
+    """Fit arms' spreads at one site on the tuning runs and score the factor grid.
 
     Args:
-        site: The substation's label.
+        job: The substation's label and the arms to tune (`None` for every arm).
 
     Returns:
         Per arm, the factor grid's per-lead-band score sums, as `{arm: {factor: [[sum, n]...]}}`.
     """
+    site, only = job
     torch.set_num_threads(1)
     cache, setup, fits, data, filters = site_inputs(site=site)
     runs = setup.indices(periods={"tuning"})
@@ -118,7 +120,10 @@ def tune_site(site: str) -> dict:
         for index in runs
         if (piece := fc.run_members(cache=cache, setup=setup, fits=fits, index=index)) is not None
     ]
-    own_arms = fc.available_arms(filters=filters, arms_wanted=fc.OWN_SPREAD_ARMS)
+    wanted = (
+        fc.OWN_SPREAD_ARMS if only is None else tuple(a for a in fc.OWN_SPREAD_ARMS if a in only)
+    )
+    own_arms = fc.available_arms(filters=filters, arms_wanted=wanted)
     zero_frames: dict[str, list[pl.DataFrame]] = {arm: [] for arm in own_arms}
     corrected: dict[str, list[fc.Corrected]] = {arm: [] for arm in own_arms}
     for members in pieces:
@@ -129,6 +134,7 @@ def tune_site(site: str) -> dict:
                 data=data,
                 filtered=filters[state_arm(arm=arm)],
                 members=members,
+                holiday_factor=arms.HOLIDAY_SHRINK_ARMS.get(arm),
             )
             corrected[arm].append(result)
             frame = fc.frame_of(
@@ -197,21 +203,22 @@ def spread_for(*, arm: str, site: str, tuned: dict) -> LeadHourSpread:
     return load_spread(arm=arm, site=site, factors=tuned["spread_factors"][arm])
 
 
-def forecast_site(job: tuple[str, list[str]]) -> str:
+def forecast_site(job: tuple[str, list[str], tuple[str, ...] | None]) -> str:
     """Forecast the periods with every arm at one site and write the parquet files.
 
     Args:
-        job: The site's label and the periods to forecast.
+        job: The site's label, the periods to forecast, and the arms (`None` for every arm).
 
     Returns:
         A progress line.
     """
-    site, periods = job
+    site, periods, only = job
     torch.set_num_threads(1)
     started = time.monotonic()
     cache, setup, fits, data, filters = site_inputs(site=site)
     tuned = read_tuned()
-    todo = fc.available_arms(filters=filters, arms_wanted=fc.FORECAST_ARMS)
+    wanted = fc.FORECAST_ARMS if only is None else tuple(a for a in fc.FORECAST_ARMS if a in only)
+    todo = fc.available_arms(filters=filters, arms_wanted=wanted)
     spreads = {arm: spread_for(arm=arm, site=site, tuned=tuned) for arm in todo}
     rows = 0
     for period in periods:
@@ -230,6 +237,7 @@ def forecast_site(job: tuple[str, list[str]]) -> str:
                     data=data,
                     filtered=filters[state_arm(arm=arm)],
                     members=members,
+                    holiday_factor=arms.HOLIDAY_SHRINK_ARMS.get(arm),
                 )
                 quantiles = fc.quantiles_of(
                     cache=cache, members=members, corrected=result.means, spread=spreads[arm]
@@ -261,24 +269,32 @@ def main() -> None:
     parser.add_argument("step", choices=("tune", "choose", "forecast"))
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--periods", nargs="+", choices=PERIODS, default=["tuning"])
+    parser.add_argument(
+        "--only-arms",
+        nargs="+",
+        default=None,
+        help="Restrict the tune and forecast steps to these arms (an arm added after a first run).",
+    )
     args = parser.parse_args()
+    only = None if args.only_arms is None else tuple(args.only_arms)
     started = time.monotonic()
     if args.step == "tune":
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
-            results = list(pool.map(tune_site, common.SCORED_SITES))
-        common.write_json_atomic(
-            path=common.WORK_DIR / "factor_scores.json", content={"results": results}
-        )
+            results = list(pool.map(tune_site, [(site, only) for site in common.SCORED_SITES]))
+        name = "factor_scores.json" if only is None else f"factor_scores_{'_'.join(only)}.json"
+        common.write_json_atomic(path=common.WORK_DIR / name, content={"results": results})
     elif args.step == "choose":
-        results = json.loads((common.WORK_DIR / "factor_scores.json").read_text())["results"]
-        factors = choose_factors(results=results)
+        factors: dict[str, list[float]] = {}
+        for path in sorted(common.WORK_DIR.glob("factor_scores*.json")):
+            results = json.loads(path.read_text())["results"]
+            factors.update(choose_factors(results=results))
         common.write_json_atomic(path=TUNED_PATH, content={"spread_factors": factors})
         print(f"factors: {factors}")
     else:
         require_clearance(periods=args.periods)
         with ProcessPoolExecutor(max_workers=args.workers) as pool:
             for line in pool.map(
-                forecast_site, [(site, args.periods) for site in common.SCORED_SITES]
+                forecast_site, [(site, args.periods, only) for site in common.SCORED_SITES]
             ):
                 print(line, flush=True)
     print(f"done in {time.monotonic() - started:.0f} s")

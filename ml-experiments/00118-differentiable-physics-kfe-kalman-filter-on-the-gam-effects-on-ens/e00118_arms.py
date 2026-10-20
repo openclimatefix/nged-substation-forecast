@@ -11,6 +11,7 @@
 | KEZ-drop-g | all but group g | yes | fitted |
 | KEZ-1s | all 14 | yes | the first run's, fitted by the one-step likelihood (q bound of 2) |
 | KEZ-DT | all 14 | yes | fitted on a stream without holiday-day readings |
+| KEZ-DTs | all 14 | yes | KEZ's, with the level and anomaly corrections halved on holiday targets |
 """
 
 from dataclasses import dataclass
@@ -31,6 +32,9 @@ INFLATION_VARIANCE: Final[float] = 27.0
 INFLATED_SIGMA_EPS_SPREAD: Final[float] = 1e-3
 """The prior spread of `log sigma_eps` that holds KE-infl's observation noise at its start."""
 DROPPABLE_GROUPS: Final[tuple[str, ...]] = ("profile", "heating", "pv", "holiday")
+HOLIDAY_SHRINK_ARMS: Final[dict[str, float]] = {"KEZ-DTs": 0.5}
+"""Arms that use KEZ's filter and multiply its level and anomaly corrections by this factor on
+holiday target days (the shrunk-correction arm, an exploratory arm added after the results)."""
 
 
 @dataclass(frozen=True)

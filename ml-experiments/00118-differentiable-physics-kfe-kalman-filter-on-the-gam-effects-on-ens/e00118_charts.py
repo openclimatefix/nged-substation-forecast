@@ -9,7 +9,8 @@ write-up's folder, PNGs to a scratch folder for the render check. Only D-labels 
 import argparse
 import json
 import textwrap
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 from typing import Final
 
@@ -22,7 +23,8 @@ import e00118_streams as streams
 import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
-from studies.dp_effects_filter import HEATING, HOLIDAY_INDEX, PROFILE, PV_INDEX
+from studies.dp_effects_filter import HEATING, HOLIDAY_INDEX, PROFILE, PV_INDEX, EffectsTrace
+from studies.dp_features import FeatureCache
 
 DOCS_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
@@ -137,6 +139,8 @@ def figure_headline(*, scored: dict, replicate: dict) -> alt.TopLevelMixin:
         ("C5 KEZ minus KEZ-QI", "planned", "all rows"),
         ("KEZ-DT minus KEZ", "exploratory", "holiday"),
         ("KEZ-DT minus KEZ", "exploratory", "non_holiday"),
+        ("KEZ-DTs minus KEZ", "exploratory", "holiday"),
+        ("KEZ-DTs minus KEZ", "exploratory", "non_holiday"),
         ("KEZ-drop-pv minus KEZ", "exploratory", "all rows"),
     )
     for period, data in (("scored year", scored), ("replicate months", replicate)):
@@ -252,6 +256,7 @@ def figure_subsets(*, scored: dict) -> alt.TopLevelMixin:
         ("C1 KEZ minus GK", "planned", "KEZ minus GK"),
         ("KEZ-drop-pv minus GK", "exploratory", "KEZ without the PV weight minus GK"),
         ("KEZ-DT minus GK", "exploratory", "KEZ-DT minus GK"),
+        ("KEZ-DTs minus GK", "exploratory", "KEZ-DTs (halved on holidays) minus GK"),
     ):
         for subset, subset_label in SUBSET_LABELS.items():
             entry = scored[group][name][subset].get("D+1")
@@ -281,8 +286,9 @@ def figure_subsets(*, scored: dict) -> alt.TopLevelMixin:
                     "KEZ minus GK",
                     "KEZ without the PV weight minus GK",
                     "KEZ-DT minus GK",
+                    "KEZ-DTs (halved on holidays) minus GK",
                 ],
-                range=[ocf.BRAND_ORANGE, ocf.DATA_GREEN, ocf.DATA_PURPLE],
+                range=[ocf.BRAND_ORANGE, ocf.DATA_GREEN, ocf.DATA_PURPLE, ocf.DATA_PURPLE_LIGHT],
             ),
             legend=alt.Legend(title=None, orient="top", labelLimit=320, columns=2),
         ),
@@ -299,7 +305,7 @@ def figure_subsets(*, scored: dict) -> alt.TopLevelMixin:
             )
         )
         + base.mark_text(align="left", dx=8, fontSize=9).encode(x="estimate:Q", text="note:N")  # ty: ignore[unresolved-attribute]
-    ).properties(width=WIDTH - 320, height=44 * len(order))
+    ).properties(width=WIDTH - 320, height=52 * len(order))
     return chart.properties(
         title=_title(
             text="No arm beats GAM-K in winter or on cold days, and KEZ-DT loses on holidays",
@@ -505,88 +511,143 @@ def _kez_traces() -> dict[str, tuple[streams.SiteStreams, fc.ArmFilter]]:
     return out
 
 
-def figure_weights(*, traces: dict) -> alt.TopLevelMixin:
-    """The filtered PV, heating, profile, and holiday weights over the scored year, per site."""
-    cache = common.load_cache()
-    rows = []
+WEIGHT_GROUPS: Final[dict[str, tuple[str, tuple[tuple[str, int, str], ...]]]] = {
+    "pv": (
+        "The PV capacity weight stays mostly below 1 and moves in steps and short swings",
+        (("PV capacity weight", PV_INDEX, ocf.BRAND_ORANGE),),
+    ),
+    "heating": (
+        "The midday heating weight swings widely at some substations and the night weight less",
+        (
+            ("heating weight, night", HEATING.start, ocf.DATA_BLUE),
+            ("heating weight, midday", HEATING.start + 2, ocf.DATA_SKY),
+        ),
+    ),
+    "profile_holiday": (
+        "The weekday profile weight is steady and the holiday weight jumps on holidays",
+        (
+            ("weekday profile weight", PROFILE.start, ocf.DATA_PURPLE),
+            ("holiday-effects weight", HOLIDAY_INDEX, ocf.DATA_GREEN),
+        ),
+    ),
+}
+"""Each figure's title, and its weights as (label, weight index, colour)."""
+
+
+def _daily_weights(
+    *, trace: EffectsTrace, scale: np.ndarray, index: int, cache: FeatureCache
+) -> pl.DataFrame:
+    """Return a weight and its one-sd band at the end of each day of the scored year."""
     start = np.datetime64("2025-07-01T00:00", "us")
+    times = cache.end_times[trace.positions]
+    day_ends = start + np.arange(1, 366) * np.timedelta64(1, "D")
+    found = np.searchsorted(times, day_ends, side="right") - 1
+    valid = found >= 0
+    weight = 1.0 + trace.state[found[valid], index] / scale[index]
+    sd = trace.sd[found[valid], index] / scale[index]
+    days = np.arange(365)[valid]
+    return pl.DataFrame(
+        {
+            "day": days.astype(np.float64),
+            "value": np.clip(weight, -1.0, 3.0),
+            "low": np.clip(weight - sd, -1.0, 3.0),
+            "high": np.clip(weight + sd, -1.0, 3.0),
+        }
+    )
+
+
+def _marked_days(
+    *, cache: FeatureCache, data: streams.SiteStreams, site: str
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Return the holiday days and the cold-snap days of the scored year, as day numbers."""
+    start = np.datetime64("2025-07-01T00:00", "us")
+    rows = np.flatnonzero(
+        (cache.end_times > start) & (cache.end_times <= start + np.timedelta64(365, "D"))
+    )
+    day = (
+        (cache.end_times[rows] - start - np.timedelta64(1, "us")) / np.timedelta64(1, "D")
+    ).astype(np.int64)
+    holiday_days = np.unique(day[data.holiday_day[rows]])
+    local = pl.Series(cache.end_times[rows]).dt.replace_time_zone("UTC")
+    local_dates = (
+        (local.dt.convert_time_zone(score.LOCAL_ZONE) - timedelta(minutes=30))
+        .dt.date()
+        .cast(pl.String)
+    )
+    cold_dates = score.cold_snap_dates(site=site)[1]
+    cold_flag = np.array([d in cold_dates for d in local_dates.to_list()])
+    cold_days = np.unique(day[cold_flag])
+    return (
+        pl.DataFrame({"day": holiday_days.astype(np.float64), "end": holiday_days + 1.0}),
+        pl.DataFrame({"day": cold_days.astype(np.float64), "end": cold_days + 1.0}),
+    )
+
+
+def figure_weights(*, traces: dict, group: str) -> alt.TopLevelMixin:
+    """The filtered weights of one group over the scored year, per substation, with bands.
+
+    Each panel shows the weight with a band of one posterior standard deviation, holiday days as
+    grey rules, and cold-snap days as light-blue spans.
+    """
+    cache = common.load_cache()
+    title, weights = WEIGHT_GROUPS[group]
+    panels = []
     for site, (data, filtered) in traces.items():
-        trace = filtered.trace
-        times = cache.end_times[trace.positions]
-        keep = times > start
-        days = (times[keep] - start) / np.timedelta64(1, "D")
-        for label, index in (
-            ("PV capacity weight", PV_INDEX),
-            ("heating weight (night)", HEATING.start),
-            ("heating weight (midday)", HEATING.start + 2),
-            ("weekday profile weight", PROFILE.start),
-            ("holiday-effects weight", HOLIDAY_INDEX),
-        ):
-            weight = 1.0 + trace.state[keep, index] / data.scale[index]
-            sd = trace.sd[keep, index] / data.scale[index]
-            step = max(len(days) // 365, 1)
-            rows.extend(
-                {
-                    "site": site,
-                    "weight": label,
-                    "day": float(days[k]),
-                    "value": float(weight[k]),
-                    "low": float(weight[k] - sd[k]),
-                    "high": float(weight[k] + sd[k]),
-                }
-                for k in range(0, len(days), step)
-            )
-    table = pl.DataFrame(rows).with_columns(
-        pl.col("value").clip(-1.0, 4.0),
-        pl.col("low").clip(-1.0, 4.0),
-        pl.col("high").clip(-1.0, 4.0),
-    )
-    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X(
-            "day:Q", title="Days since 1 July 2025", axis=alt.Axis(values=[0, 92, 184, 275, 365])
-        ),
-        color=alt.Color(
+        holiday, cold = _marked_days(cache=cache, data=data, site=site)
+        frames = []
+        for label, index, _ in weights:
+            frame = _daily_weights(trace=filtered.trace, scale=data.scale, index=index, cache=cache)
+            frames.append(frame.with_columns(weight=pl.lit(label)))
+        table = pl.concat(frames)
+        domain = [label for label, _, _ in weights]
+        colours = [colour for _, _, colour in weights]
+        colour = alt.Color(
             "weight:N",
-            scale=alt.Scale(
-                domain=[
-                    "PV capacity weight",
-                    "heating weight (night)",
-                    "heating weight (midday)",
-                    "weekday profile weight",
-                    "holiday-effects weight",
-                ],
-                range=[
-                    ocf.BRAND_ORANGE,
-                    ocf.DATA_BLUE,
-                    ocf.DATA_SKY,
-                    ocf.DATA_PURPLE,
-                    ocf.DATA_GREEN,
-                ],
-            ),
-            legend=alt.Legend(title=None, orient="top", columns=3),
-        ),
-    )
-    chart = (
-        base.mark_line(strokeWidth=1.2).encode(
-            y=alt.Y(
-                "value:Q",
-                title="Filtered weight (1 is the fitted effect)",
-                scale=alt.Scale(domain=[-1, 4]),
+            scale=alt.Scale(domain=domain, range=colours),
+            legend=alt.Legend(title=None, orient="top"),
+        )
+        x = alt.X(
+            "day:Q",
+            title="Days since 1 July 2025",
+            axis=alt.Axis(values=[0, 92, 184, 275, 365]),
+            scale=alt.Scale(domain=[0, 365]),
+        )
+        layers = []
+        if cold.height:
+            layers.append(
+                alt.Chart(cold)
+                .mark_rect(color=ocf.DATA_SKY_LIGHT, opacity=0.6)
+                .encode(x=x, x2="end:Q")  # ty: ignore[unresolved-attribute]
+            )
+        if holiday.height:
+            layers.append(
+                alt.Chart(holiday).mark_rule(color=GREY, strokeWidth=1, opacity=0.8).encode(x=x)  # ty: ignore[unresolved-attribute]
+            )
+        layers.append(
+            alt.Chart(table)  # ty: ignore[unresolved-attribute]
+            .mark_area(opacity=0.25)
+            .encode(
+                x=x,
+                y=alt.Y(
+                    "low:Q", title="Weight (1 = fitted effect)", scale=alt.Scale(domain=[-1, 3])
+                ),
+                y2="high:Q",
+                color=colour,
             )
         )
-    ).properties(width=WIDTH - 80, height=110)
-    return alt.vconcat(
-        *[
-            chart.transform_filter(alt.datum.site == site).properties(title=site)
-            for site in SITE_ORDER
-        ]
-    ).properties(
+        layers.append(
+            alt.Chart(table).mark_line(strokeWidth=1.4).encode(x=x, y="value:Q", color=colour)  # ty: ignore[unresolved-attribute]
+        )
+        panels.append(alt.layer(*layers).properties(width=WIDTH - 90, height=105, title=site))
+    return alt.vconcat(*panels).properties(
         title=_title(
-            text="Most weights stay near 1; midday heating and holiday weights swing at some sites",
+            text=title,
             subtitle=(
-                "KEZ's filtered weights at each substation over the scored year, from the state "
-                "after every half-hourly reading, clipped to -1 to 4. A weight of 1 is the fitted "
-                "effect. Weights are not interpretable (see the gate)."
+                "KEZ's filtered weight at each substation over the scored year, from the state "
+                "at the end of each day, with a band of one posterior standard deviation (clipped "
+                "to -1 to 3). Grey rules: holiday days. Light-blue spans: cold-snap days (a "
+                "November to March day colder than the 10th percentile of such days from 2019-09 "
+                "to 2024-06). A weight of 1 is the fitted effect. Weights are not interpretable."
             ),
         )
     )
@@ -739,6 +800,12 @@ def figure_cold(*, scored: dict) -> alt.TopLevelMixin:
     )
 
 
+@lru_cache(maxsize=1)
+def TRACES() -> dict:  # noqa: N802
+    """Return KEZ's streams and filters at every site, built once."""
+    return _kez_traces()
+
+
 def main() -> None:
     """Draw every figure."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -754,7 +821,14 @@ def main() -> None:
         "gate": lambda: _save(figure_gate(), name="figure_04_gate"),
         "noise": lambda: _save(figure_noise(), name="figure_05_noise"),
         "tails": lambda: _save(figure_tails(scored=scored), name="figure_06_tails"),
-        "weights": lambda: _save(figure_weights(traces=_kez_traces()), name="figure_07_weights"),
+        **{
+            f"weights_{group}": (
+                lambda group=group: _save(
+                    figure_weights(traces=TRACES(), group=group), name=f"figure_07_weights_{group}"
+                )
+            )
+            for group in WEIGHT_GROUPS
+        },
         "cold": lambda: _save(figure_cold(scored=scored), name="figure_08_cold_snaps"),
         **{
             f"week_{month.lower()}": (
