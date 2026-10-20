@@ -900,12 +900,13 @@ def fit_flows(
     start: Mapping[str, np.ndarray] | None = None,
     max_sweeps: int = DEFAULT_MAX_SWEEPS,
     tolerance: float = DEFAULT_TOLERANCE,
+    sweep_tolerance: float = SWEEP_TOLERANCE,
 ) -> FlowFit:
     """Fit every path's flow by block-coordinate descent.
 
     Each sweep re-solves every path on the residual left at its nodes after the other paths'
     flows are removed. The sweeps stop when the joint objective's relative change and the largest
-    path change in megawatts are both under `SWEEP_TOLERANCE`.
+    path change in megawatts are both under `sweep_tolerance`.
 
     Args:
         paths: The graph's paths.
@@ -916,6 +917,8 @@ def fit_flows(
         start: Optional warm-start flow for each path.
         max_sweeps: The sweep limit.
         tolerance: The ADMM tolerance of each path solve in megawatts.
+        sweep_tolerance: The sweeps' stopping tolerance on the objective's relative change and on
+            the largest path change in megawatts.
 
     Returns:
         The fitted flows and how the fit ended.
@@ -968,7 +971,7 @@ def fit_flows(
         )
         relative = abs(previous_objective - objective) / max(abs(objective), 1.0)
         previous_objective = objective
-        if relative < SWEEP_TOLERANCE and largest_change < SWEEP_TOLERANCE:
+        if relative < sweep_tolerance and largest_change < sweep_tolerance:
             converged = all_converged
             break
     return FlowFit(flows=flows, sweeps=sweeps, converged=converged, objective=previous_objective)
