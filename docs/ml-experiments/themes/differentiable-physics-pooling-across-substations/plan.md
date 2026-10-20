@@ -10,8 +10,9 @@ substation and was worse at full history.
 | Part 4 (proposed) | Does a drift term (a slowly changing demand level), trained from 2019-09, beat the same model on its best window? | 3 | Experiment 112 (finished: an exact variable-projection fit did not improve the pooled model, and its known-answer test failed at realistic noise) and a rerun of experiment 109's gate | Proposed |
 | Part 5 (proposed) | Does the MVA observation layer (a model of how a meter that reads apparent power relates to real power) help the MW sites and recover MW at MVA sites? | 4 | Experiment 105 and a better capacity fit | Proposed |
 | H2, graph prior on the pooled parameters | Does a prior that pulls the parameters of connected substations together improve the pooled convex model? | Running | Nothing | Running (experiment 117) |
-| N9, scale-up | Does the pooled model on every v1 series it can take, including MVA substations, improve full-history skill and capacity identification? | 5 | Experiment 109's gate rerun, and 3 to 5 GPU hours | Proposed |
+| N9, scale-up | Does the pooled model on every v1 series it can take, including MVA substations, improve full-history skill and capacity identification? | 5 | The result of H2, and a rerun of experiment 109's gate (owned by the H2 session); 3 to 5 GPU hours | Queued |
 | Hierarchy closure audit | Do the Primaries, the metered generators, and a level and unmetered-solar term close the bulk supply point (BSP) readings, and where does the residual sit? | 6 | Nothing | Proposed |
+| BSP as a Kalman observation | Does treating the BSP reading as an extra observation in the Kalman filter improve the Primaries' forecasts? | 6 | The closure audit | Queued |
 | Top-down against bottom-up | Does a direct forecast at a BSP or grid supply point (GSP) beat the sum of the Primary forecasts, and does reconciling the levels help either? | 7 | The closure audit | Proposed |
 | Metered generators in the graph | Do metered generators, entered as export-positive nodes at the BSP, make the BSP relation close better? | 8 | The closure audit | Proposed |
 | Unmetered wind at higher levels | Can unmetered wind at the BSP and GSP be estimated as the part of the residual that follows the wind forecast? | 9 | The closure audit | Proposed |
@@ -52,6 +53,10 @@ small against the power that switching moves. Three facts shape the design:
   1%, and [Brégère and Huard (2022)](https://arxiv.org/abs/2003.00585) found that most of the gain
   came from mixing in other nodes' forecasts, not from the constraint. The expected gain at the
   Primaries is therefore small, and the proposals below aim at the BSP and GSP levels.
+
+**The BSP as a Kalman observation tests whether the closure relation, with its unmetered remainder as
+state noise, helps the Primaries' filters.** It runs on the CPU in about 2 hours and waits for the
+closure audit.
 
 **Top-down against bottom-up at the BSP and GSP levels asks which direction gives the better
 forecast at each level.** The arms are a direct forecast of the BSP, the sum of the Primary
