@@ -825,12 +825,12 @@ def main() -> None:
             print(f"# skipped {contrast.name}: {error}")
     print(pl.DataFrame(exploratory, infer_schema_length=None).write_csv(float_precision=3), end="")
     print("== Winter breakdown of the planned contrasts and SH against the references ==")
-    for contrast in contrasts():
-        if contrast.planned or contrast.name in ("SH - N-full", "SH - climatology"):
-            print(
-                winter_table(contrast=contrast, level=PLANNED_LEVEL).write_csv(float_precision=3),
-                end="",
-            )
+    winter = [
+        winter_table(contrast=contrast, level=PLANNED_LEVEL)
+        for contrast in contrasts()
+        if contrast.planned or contrast.name in ("SH - N-full", "SH - climatology")
+    ]
+    print(pl.concat(winter).write_csv(float_precision=3), end="")
     print("== Reproduction of experiment 109's G and N (trigger 1) ==")
     reproduction = reproduction_table()
     print(reproduction.write_csv(float_precision=3), end="")
