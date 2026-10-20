@@ -588,13 +588,12 @@ def fit_joint(
         remainder_offsets[bsp.name] = slice(start, start + remainder_layouts[bsp.name].n_columns)
         start += remainder_layouts[bsp.name].n_columns
     square = (start, start)
-    options = {"dtype": dtype, "device": device}
     normal = _Normal(
-        base=torch.zeros(square, **options),
-        base_rhs=torch.zeros(start, **options),
-        base_cost=torch.zeros(start, **options),
-        hint=torch.zeros(square, **options),
-        hint_rhs=torch.zeros(start, **options),
+        base=torch.zeros(square, dtype=dtype, device=device),
+        base_rhs=torch.zeros(start, dtype=dtype, device=device),
+        base_cost=torch.zeros(start, dtype=dtype, device=device),
+        hint=torch.zeros(square, dtype=dtype, device=device),
+        hint_rhs=torch.zeros(start, dtype=dtype, device=device),
         constrained=np.zeros(start, dtype=bool),
     )
     _add_primary_blocks(
@@ -622,7 +621,7 @@ def fit_joint(
             device=device,
             dtype=dtype,
         )
-    w = torch.as_tensor(list(weights), **options)
+    w = torch.as_tensor(list(weights), dtype=dtype, device=device)
     theta, violation = solve_bounded_quadratic(
         matrix=normal.base[None] + w[:, None, None] * normal.hint[None],
         rhs=normal.base_rhs[None]

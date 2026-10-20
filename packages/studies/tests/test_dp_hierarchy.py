@@ -9,6 +9,7 @@ remainder agree.
 
 from dataclasses import replace
 from datetime import UTC, datetime
+from functools import partial
 from typing import Final
 
 import numpy as np
@@ -30,6 +31,7 @@ from studies.dp_gam import (  # noqa: E402
 from studies.dp_hierarchy import (  # noqa: E402
     BspMember,
     BspSeries,
+    JointFit,
     RemainderSpec,
     bsp_rows,
     fit_joint,
@@ -85,8 +87,8 @@ def _two_site_cache(*, cache: FeatureCache) -> tuple[FeatureCache, dict[str, np.
         y = np.full(len(cache.end_times), np.nan)
         for start in range(0, len(usable), 20000):
             rows = usable[start : start + 20000]
-            y[rows] = design_matrix(cache=cache, features=features, layout=layout, index=rows)
-            y[rows] = y[rows] @ theta
+            x = design_matrix(cache=cache, features=features, layout=layout, index=rows)
+            y[rows] = x @ theta
         sites[label] = replace(features, y=y)
         thetas[label] = theta
     return replace(cache, sites=sites, node_ids={s: (s,) for s in sites}), thetas
@@ -125,12 +127,14 @@ def _members() -> tuple[BspMember, ...]:
     return (BspMember(site="S1"), BspMember(site="S2"))
 
 
-def _fit(*, cache: FeatureCache, bsp: BspSeries, weights: list[float]):
+def _fit(
+    *, cache: FeatureCache, bsp: BspSeries, weights: list[float], step_penalty: float = 1.0
+) -> JointFit:
     return fit_joint(
         cache=cache,
         specs={"S1": SPEC, "S2": SPEC},
         bsps=[bsp],
-        remainder_spec=RemainderSpec(step_penalty=1.0, shape_ridge=1e-3),
+        remainder_spec=RemainderSpec(step_penalty=step_penalty, shape_ridge=1e-3),
         weights=weights,
         sigma_points=SIGMA_POINTS,
         cut=CUT,
@@ -229,10 +233,17 @@ def test_dropping_a_member_from_the_bsp_row_moves_the_remainder_by_that_members_
     assert abs(shift.mean() - s2_demand.mean()) < 0.1 * s2_demand.mean()
 
 
-def test_a_scale_error_at_one_primary_does_less_damage_with_the_bsp_hint(two_sites: FeatureCache):
-    # The positive control for the claim: a 30% scale error on 90 days of S1's training readings.
-    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+def test_the_bsp_hint_pulls_a_corrupted_primary_back_inside_the_corrupted_window(
+    two_sites: FeatureCache,
+):
+    # A 30% scale error on 90 days of S1's training readings, with S1 alone under the BSP and a
+    # drift term free to follow the error. The BSP is built from the clean truth. The remainder's
+    # level can absorb a constant offset, so the control reads the error inside the window, where
+    # the damage is, and the BSP residual, which the weight is there to shrink. The experiment's
+    # gate measures the whole damage reduction.
+    spec = GamSpec(drift="d1", ridge=1e-3, drift_step=10.0, drift_ridge=1e-3)
     s1 = two_sites.sites["S1"]
+    bsp = _bsp(cache=two_sites, members=(BspMember(site="S1"),), truth_members=("S1",))
     stamps = two_sites.end_times
     window = (stamps > np.datetime64("2024-01-01T00:00", "us")) & (
         stamps <= np.datetime64("2024-03-31T00:00", "us")
@@ -241,18 +252,39 @@ def test_a_scale_error_at_one_primary_does_less_damage_with_the_bsp_hint(two_sit
         two_sites,
         sites={**two_sites.sites, "S1": replace(s1, y=np.where(window, 1.3 * s1.y, s1.y))},
     )
-    joint = _fit(cache=corrupted, bsp=bsp, weights=[0.0, 30.0])
+    joint = fit_joint(
+        cache=corrupted,
+        specs={"S1": spec},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(step_penalty=1e9, shape_ridge=1e-3),
+        weights=[0.0, 30.0],
+        sigma_points={"S1": 0.5},
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
     index = bsp_rows(
         cache=two_sites, bsp=bsp, start=np.datetime64("2023-07-01T00:00", "us"), cut=CUT
-    )[::50]
-    clean = s1.y[index]
+    )
+    inside = window[index]
     damage = []
+    residual = []
     for member in (0, 1):
         predicted = predict_gam(
             cache=two_sites, fit=joint.site_fit(site="S1"), index=index, member=member
         )
-        damage.append(np.abs(predicted - clean).mean())
-    assert damage[1] < 0.7 * damage[0]
+        damage.append(np.abs(predicted - s1.y[index])[inside].mean())
+        bsp_hat = predict_bsp(
+            cache=two_sites,
+            fit=joint,
+            bsp=bsp,
+            index=index,
+            generators_mw=bsp.generators_mw[index],
+            member=member,
+        )
+        residual.append(np.abs(bsp_hat - bsp.reading_mw[index]).mean())
+    assert damage[1] < 0.5 * damage[0]
+    assert residual[1] < 0.01 * residual[0]
 
 
 def test_no_fit_reads_a_row_after_the_cut(two_sites: FeatureCache):
@@ -328,18 +360,61 @@ def test_the_remainder_design_has_the_documented_columns_and_signs(two_sites: Fe
 def test_a_primary_under_two_bsps_and_a_non_positive_sigma_are_refused(two_sites: FeatureCache):
     first = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
     second = replace(first, name="C", members=(BspMember(site="S2"),))
-    kwargs = {
-        "cache": two_sites,
-        "specs": {"S1": SPEC, "S2": SPEC},
-        "remainder_spec": RemainderSpec(),
-        "weights": [1.0],
-        "cut": CUT,
-        "window": WINDOW,
-        "season_years": SEASON_YEARS,
-    }
+    fit = partial(
+        fit_joint,
+        cache=two_sites,
+        specs={"S1": SPEC, "S2": SPEC},
+        remainder_spec=RemainderSpec(),
+        weights=[1.0],
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
     with pytest.raises(ValueError, match="sits under both"):
-        fit_joint(bsps=[first, second], sigma_points=SIGMA_POINTS, **kwargs)
+        fit(bsps=[first, second], sigma_points=SIGMA_POINTS)
     with pytest.raises(ValueError, match="no positive sigma"):
-        fit_joint(bsps=[first], sigma_points={"S1": 0.5, "S2": 0.0}, **kwargs)
+        fit(bsps=[first], sigma_points={"S1": 0.5, "S2": 0.0})
     with pytest.raises(ValueError, match="sigma that is not positive"):
-        fit_joint(bsps=[replace(first, sigma_mw=0.0)], sigma_points=SIGMA_POINTS, **kwargs)
+        fit(bsps=[replace(first, sigma_mw=0.0)], sigma_points=SIGMA_POINTS)
+
+
+def test_the_bsp_sigma_and_the_weight_enter_only_as_their_ratio(two_sites: FeatureCache):
+    # Halving sigma at fixed weight is the same as quadrupling the weight at the original sigma.
+    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    noisy = {
+        s: replace(f, y=f.y + 0.3 * np.sin(np.arange(len(f.y)))) for s, f in two_sites.sites.items()
+    }
+    cache = replace(two_sites, sites=noisy)
+    narrow = _fit(cache=cache, bsp=replace(bsp, sigma_mw=0.5), weights=[1.0])
+    wide = _fit(cache=cache, bsp=replace(bsp, sigma_mw=1.0), weights=[4.0])
+    assert np.allclose(narrow.theta, wide.theta, rtol=1e-6, atol=1e-6)
+
+
+def test_the_primary_step_costs_scale_with_the_sigma_like_the_loss(two_sites: FeatureCache):
+    # P1 with a spec that has a linear (L1) step cost: a joint fit that scaled the loss and the
+    # quadratic penalties by 1/sigma^2 but not the linear cost would move the minimiser.
+    steps = GamSpec(drift="d1_steps", ridge=1e-3, drift_step=10.0, step_penalty=30.0)
+    noisy = {
+        s: replace(f, y=f.y + 0.5 * np.sin(np.arange(len(f.y)) / 7.0))
+        for s, f in two_sites.sites.items()
+    }
+    cache = replace(two_sites, sites=noisy)
+    bsp = _bsp(cache=cache, members=_members(), truth_members=("S1", "S2"))
+    joint = fit_joint(
+        cache=cache,
+        specs={"S1": steps, "S2": steps},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(),
+        weights=[0.0],
+        sigma_points=SIGMA_POINTS,
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    separate = {
+        s: fit_gam(
+            cache=cache, site=s, specs=[steps], cut=CUT, window=WINDOW, season_years=SEASON_YEARS
+        )
+        for s in ("S1", "S2")
+    }
+    assert separate_fits_equal_joint_at_zero_weight(joint=joint, separate=separate, atol=1e-5)
