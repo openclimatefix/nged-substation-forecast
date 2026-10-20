@@ -8,6 +8,7 @@ level with 12 months.
 | Priority | Proposal | Waits for |
 |---|---|---|
 | 1 | Test a drift that re-estimates its level from recent demand | Part 3, which pools the model across substations |
+| 2 | [Experiment 114](../../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md): do interaction terms or a per-site heating threshold improve the convex model after its filter? | Planned; runs on the CPU now |
 
 Later parts are listed in their own themes.
 
