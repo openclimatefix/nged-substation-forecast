@@ -415,10 +415,13 @@ diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment h
 its size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
 --check`; any audit a trigger in "Audit before merge" calls for has run, with its findings triaged
 in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
-`data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). **Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
+`data/` or `.env` file, the branch contains `main`, a merge commit and not a squash).
+
+**Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
-`experiment_tables.py --check`; a failure found by CI costs a ten-minute rerun. **Before any
-merge, a fresh Sonnet agent reviews the prose of `result.md` and its `take_home_message`.** The
+`experiment_tables.py --check`. A failure found by CI costs a ten-minute rerun.
+
+**Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its `take_home_message`.** The
 agent receives the files and no account of the reasoning behind them, loads the `prose-review`
 skill, and reads the opening paragraph first. It reports every term, abbreviation, and number in the
 opening that a reader who has not seen the experiment could not parse, and then checks the rest of
