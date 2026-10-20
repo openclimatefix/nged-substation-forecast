@@ -317,6 +317,47 @@ columns are the same two shares on cold winter nights; fall sizes are in points)
 | D21 | 1% | 81% | 94% / 0% | 0.45 / 1.13 | 09:30 (+0.2) | none | cannot tell (+0.3) |
 | D22 | 11% | 73% | 90% / 0% | 0.36 / 1.02 | 09:30 (-1.3) | none | falls (-2.6) |
 
+### UTC-fixed and local-clock shares by year (post hoc and exploratory)
+
+The step could come from a tariff fixed to the local clock as well as from the legacy step fixed to
+UTC. The following start and end times are hypotheses from a search for equivalents, to be checked
+against Elexon's public tables, and are not sources: the legacy Economy 7 standard window 00:30 to
+07:30 on Greenwich Mean Time, Intelligent Octopus Go 23:30 to 05:30, Octopus Go 00:30 to 05:30, and
+a Cosy heat-pump tariff. This page does not say which of them follow Greenwich Mean Time or local
+time.
+
+For each cold British Summer Time night (daily mean below 8 C, March 2021 to October 2025) we found
+the half-hour entered by the largest rise between 23:30 and 03:00 on the local clock. The first
+percentage in each cell is the share of nights where it is the half-hour starting 01:30 local, where
+a step fixed to UTC at 00:30 would fall. The second is the share where it is the half-hour starting
+23:30 or 00:30 local, where tariffs fixed to the local clock would fall. The number of nights is in
+brackets, and `cannot tell` marks a year with fewer than 10 nights. The 2025 column holds spring and
+summer nights only. The shares do not sum to 100% because the largest rise can fall elsewhere.
+`e00123_clock_by_year.py` prints the table, and the night profiles in figure 8 and figure 9 are
+indexed on the local clock, with UTC one hour earlier in British Summer Time.
+
+| Series | 2021 | 2022 | 2023 | 2024 | 2025 |
+|---|---|---|---|---|---|
+| D5 | 96% / 0% (25) | 100% / 0% (12) | 100% / 0% (13) | 92% / 0% (13) | cannot tell (4) |
+| D9 | cannot tell | cannot tell | cannot tell (1) | 55% / 0% (11) | cannot tell (6) |
+| D10 | 45% / 0% (31) | 79% / 0% (14) | 71% / 0% (14) | 100% / 0% (15) | cannot tell (5) |
+| D11 | 61% / 3% (31) | 57% / 7% (14) | 57% / 0% (14) | 53% / 7% (15) | cannot tell (5) |
+| D14 | 12% / 0% (25) | 25% / 0% (12) | 46% / 0% (13) | 15% / 8% (13) | cannot tell (4) |
+| D16 | 100% / 0% (26) | 92% / 0% (12) | 77% / 0% (13) | 69% / 0% (13) | cannot tell (4) |
+| D2 | 100% / 0% (31) | 100% / 0% (12) | 100% / 0% (13) | 100% / 0% (11) | cannot tell (6) |
+| D3 | 100% / 0% (25) | 100% / 0% (12) | 100% / 0% (13) | 100% / 0% (13) | cannot tell (4) |
+| D4 | 100% / 0% (31) | 100% / 0% (12) | 100% / 0% (13) | 100% / 0% (11) | cannot tell (6) |
+| D8 | 88% / 0% (25) | 67% / 0% (12) | 31% / 31% (13) | 62% / 8% (13) | cannot tell (4) |
+| D12 | 76% / 0% (25) | 58% / 0% (12) | 15% / 8% (13) | 46% / 15% (13) | cannot tell (4) |
+| D19 | 100% / 0% (31) | 92% / 0% (12) | 100% / 0% (13) | 100% / 0% (11) | cannot tell (6) |
+| D21 | 97% / 0% (31) | 58% / 0% (12) | 85% / 0% (13) | 45% / 9% (11) | cannot tell (6) |
+| D22 | 88% / 0% (25) | 83% / 0% (12) | 38% / 38% (13) | 62% / 8% (13) | cannot tell (4) |
+
+The UTC share is 100% in every year with a reading at D2, D3, and D4, and 92% to 100% at D19, and a
+local-clock share above 10% appears only at D8 and D22 in 2023 (31% and 38%) and at D12 (15%) in
+2024. A local-clock component is therefore visible at a few substations in single years, and cannot
+be separated from noise with 13 nights; it would need a second winter or a larger sample to say.
+
 ## Limitations
 
 - **Summer is assumed step-free.** On summer nights the later half-hours average 0.7 to 13.4 points
