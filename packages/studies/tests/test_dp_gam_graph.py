@@ -452,12 +452,12 @@ def test_a_very_large_gamma_on_a_complete_graph_approaches_complete_pooling(
         for family in ("heating", "holiday"):
             columns = layout.slices[family]
             difference = solution.thetas[label][0, columns] - tied.fits[label].theta[0, columns]
-            assert np.abs(difference).max() < 5e-3
+            assert np.abs(difference).max() < (3e-4 if family == "heating" else 3e-3)
         profile = layout.slices["profile"]
         centre = centring_matrix(family="profile", size=profile.stop - profile.start)
         gap = solution.thetas[label][0, profile] - tied.fits[label].theta[0, profile]
         difference = centre @ gap
-        assert np.abs(difference).max() < 5e-2
+        assert np.abs(difference).max() < 3e-3
 
 
 def test_the_identification_rule_is_relative_for_profile_and_holiday_and_absolute_for_heating(
@@ -883,15 +883,17 @@ def test_the_cholesky_path_matches_the_lu_path_on_a_fifteen_node_fleet(
         rhs: torch.Tensor,
         constrained: torch.Tensor,
         start_free: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, float]:
+    ) -> tuple[torch.Tensor, torch.Tensor, float, bool]:
         solution, violation = solve_bounded_quadratic(
             matrix=matrix[None], rhs=rhs[None], constrained=constrained
         )
         theta = solution[0]
-        return theta, (theta > 0.0) | ~constrained | start_free, float(violation[0])
+        return theta, (theta > 0.0) | ~constrained | start_free, float(violation[0]), True
 
     monkeypatch.setattr(dp_gam_graph, "_solve_member", lu_member)
     slow = _solve(designs=designs, graph=graph, penalty=penalty, axis=axis, counts=counts)
+    assert fast.fallbacks == 0
+    assert slow.fallbacks == 4  # the patched member solver reports every member as an LU solve
     for node in nodes:
         assert np.abs(fast.thetas[node] - slow.thetas[node]).max() < 1e-7
     assert fast.fleet_mean is not None
@@ -900,14 +902,22 @@ def test_the_cholesky_path_matches_the_lu_path_on_a_fifteen_node_fleet(
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a CUDA device")
-def test_the_cuda_solve_matches_the_cpu_solve(graph_cache: FeatureCache):
-    designs = _designs(cache=graph_cache)
-    graph = _path(labels=LABELS)
+def test_the_cuda_solve_matches_the_cpu_solve_on_a_fifteen_node_fleet(graph_cache: FeatureCache):
+    base = _designs(cache=graph_cache)
+    designs = [
+        replace(base[k % 4], inputs=replace(base[k % 4].inputs, site=f"N{k:02d}"))
+        for k in range(15)
+    ]
+    nodes = tuple(design.site for design in designs)
+    graph = ring_with_chords(nodes=nodes, n_chords=6, rng=np.random.default_rng(3))
     axis = month_axis_of(designs=designs)
     counts = joint_month_counts(axis=axis, n_resamples=3, rng=np.random.default_rng(2))
     penalty = GraphPenalty.of(fleet_rows=3000.0, graph_rows=3000.0)
     solved = {}
+    seconds = {}
     for device in ("cpu", "cuda"):
+        torch.cuda.reset_peak_memory_stats()
+        started = time.perf_counter()
         solved[device] = solve_graph_fit(
             designs=designs,
             graph=graph,
@@ -917,8 +927,53 @@ def test_the_cuda_solve_matches_the_cpu_solve(graph_cache: FeatureCache):
             counts=counts,
             device=device,
         )
-    for label in LABELS:
-        assert np.abs(solved["cuda"].thetas[label] - solved["cpu"].thetas[label]).max() < 1e-7
+        seconds[device] = time.perf_counter() - started
+    for node in nodes:
+        assert np.abs(solved["cuda"].thetas[node] - solved["cpu"].thetas[node]).max() < 1e-7
     assert solved["cuda"].fleet_mean is not None
     assert solved["cpu"].fleet_mean is not None
     assert np.abs(solved["cuda"].fleet_mean - solved["cpu"].fleet_mean).max() < 1e-7
+    assert solved["cuda"].fallbacks == 0
+    assert solved["cpu"].fallbacks == 0
+    peak_gigabytes = torch.cuda.max_memory_allocated() / 1e9
+    assert peak_gigabytes < 2.0, f"the 15-node CUDA solve peaked at {peak_gigabytes:.2f} GB"
+    print(f"15 nodes, 4 members: cpu {seconds['cpu']:.1f} s, cuda {seconds['cuda']:.1f} s")
+
+
+def test_a_coupled_fit_larger_than_the_limit_is_refused(
+    graph_cache: FeatureCache, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(dp_gam_graph, "MAX_JOINT_PARAMETERS", 100)
+    designs = _designs(cache=graph_cache, labels=LABELS[:2])
+    with pytest.raises(ValueError, match="exceeds the limit"):
+        _solve(
+            designs=designs,
+            graph=_path(labels=LABELS[:2]),
+            penalty=GraphPenalty.of(graph_rows=1000.0),
+        )
+
+
+@pytest.mark.parametrize("seed", range(4))
+def test_a_near_singular_matrix_reaches_the_same_objective_as_the_lu_solver(seed: int):
+    generator = np.random.default_rng(seed)
+    size = 40
+    factor = generator.normal(size=(size, 10))
+    matrix = torch.as_tensor(factor @ factor.T + 1e-6 * np.eye(size))
+    rhs = torch.as_tensor(generator.normal(size=size))
+    constrained = torch.as_tensor(generator.random(size) < 0.5)
+    theta, _, _, fell_back = dp_gam_graph._solve_member(
+        matrix=matrix,
+        rhs=rhs,
+        constrained=constrained,
+        start_free=torch.ones(size, dtype=torch.bool),
+    )
+    reference, _ = solve_bounded_quadratic(
+        matrix=matrix[None], rhs=rhs[None], constrained=constrained
+    )
+
+    def objective(x: torch.Tensor) -> float:
+        return float(x @ matrix @ x - 2.0 * rhs @ x)
+
+    assert objective(theta) <= objective(reference[0]) + 1e-6 * abs(objective(reference[0]))
+    assert bool((theta[constrained] >= 0.0).all())
+    assert isinstance(fell_back, bool)

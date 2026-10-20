@@ -86,6 +86,15 @@ These columns are dense (a heating column is non-zero in a quarter of the rows),
 separates a band the substation trains on from one it does not.
 """
 
+MAX_JOINT_PARAMETERS: Final[int] = 9_000
+"""The most parameters a coupled fit may hold (all substations plus the fleet mean).
+
+A member of a coupled fit keeps about four dense float64 matrices of side `total` at once (the
+fixed penalty, its clone with the member's Gram blocks added, the free block, and its Cholesky
+factor). That is 0.7 GB at 15 substations (about 4,700 parameters) and 2.6 GB at this limit, on the
+solver's device and, while the matrix is assembled, on the host.
+"""
+
 RELATIVE_IDENTIFYING_SHARE: Final[float] = 0.05
 """A profile or holiday column is identified if its non-zero rows reach this share of the median.
 
@@ -527,7 +536,8 @@ def identified_columns(*, x: np.ndarray, layout: GamLayout) -> np.ndarray:
         A boolean array of length p. A heating or capacity column is identified if it is non-zero in
         at least `MIN_IDENTIFYING_ROWS` rows; a profile or holiday column if it is non-zero in at
         least `RELATIVE_IDENTIFYING_SHARE` of the median non-zero count of the family's non-zero
-        columns. Columns of no graph family are False.
+        columns. Columns of no graph family are False, and a profile or holiday family with no
+        non-zero column is all False, so an edge penalises nothing in that family.
     """
     non_zero_rows = (x != 0.0).sum(axis=0)
     identified = np.zeros(layout.n_columns, dtype=bool)
@@ -797,11 +807,14 @@ class GraphSolution:
         fleet_mean: The fleet mean of the pooled families, shape (batch, m), or `None` if the
             penalty has no fleet-mean weight.
         violation: Each fit's optimality violation, shape (batch,).
+        fallbacks: How many batch members the Cholesky solver could not solve, so that the LU
+            solver of `dp_gam` solved them instead. A healthy fit has 0.
     """
 
     thetas: dict[str, np.ndarray]
     fleet_mean: np.ndarray | None
     violation: np.ndarray
+    fallbacks: int = 0
 
 
 def _check_same_pooled_layout(*, designs: Sequence[NodeDesign]) -> None:
@@ -1001,18 +1014,26 @@ def _solve_member(
     rhs: torch.Tensor,
     constrained: torch.Tensor,
     start_free: torch.Tensor,
-) -> tuple[torch.Tensor, torch.Tensor, float]:
-    """Solve one member by Cholesky, falling back to the LU solver if that fails."""
+) -> tuple[torch.Tensor, torch.Tensor, float, bool]:
+    """Solve one member by Cholesky, falling back to the LU solver if that fails.
+
+    Returns:
+        `(theta, free, violation, fell_back)`, where `fell_back` is True if the LU solver solved
+        the member.
+    """
     try:
-        return solve_bounded_cholesky(
-            matrix=matrix, rhs=rhs, constrained=constrained, start_free=start_free
+        return (
+            *solve_bounded_cholesky(
+                matrix=matrix, rhs=rhs, constrained=constrained, start_free=start_free
+            ),
+            False,
         )
     except torch.linalg.LinAlgError, ValueError:
         solution, violation = solve_bounded_quadratic(
             matrix=matrix[None], rhs=rhs[None], constrained=constrained
         )
         theta = solution[0]
-        return theta, (theta > 0.0) | ~constrained, float(violation[0])
+        return theta, (theta > 0.0) | ~constrained, float(violation[0]), True
 
 
 def _solve_coupled(
@@ -1026,7 +1047,7 @@ def _solve_coupled(
     batch: int,
     device: torch.device | str,
 ) -> GraphSolution:
-    """Solve the joint problem in `[theta_1, ..., theta_S, mu]`, in chunks of the batch."""
+    """Solve the joint problem in `[theta_1, ..., theta_S, mu]`, one batch member at a time."""
     reference = designs[0].layout.slices
     offsets: dict[PooledFamilyType, slice] = {}
     cursor = 0
@@ -1039,6 +1060,9 @@ def _solve_coupled(
     starts = np.concatenate([[0], np.cumsum(sizes)]).astype(int)
     mu_start = int(starts[-1])
     total = mu_start + (cursor if has_fleet else 0)
+    if total > MAX_JOINT_PARAMETERS:
+        msg = f"a coupled fit of {total} parameters exceeds the limit of {MAX_JOINT_PARAMETERS}"
+        raise ValueError(msg)
     constrained = np.zeros(total, dtype=bool)
     fixed = torch.zeros((total, total), dtype=torch.float64)
     fixed_rhs = torch.zeros(total, dtype=torch.float64)
@@ -1062,6 +1086,7 @@ def _solve_coupled(
     fixed = fixed.to(device)
     constrained_tensor = torch.as_tensor(constrained, device=device)
     pieces, violations = [], []
+    fallbacks = 0
     free = torch.ones(total, dtype=torch.bool, device=device)
     for member in range(batch):
         matrix = fixed.clone()
@@ -1070,11 +1095,12 @@ def _solve_coupled(
             stop = int(start) + design.layout.n_columns
             matrix[start:stop, start:stop] += gram[member].to(device)
             rhs[start:stop] += node_rhs[member].to(device)
-        theta, free, violation = _solve_member(
+        theta, free, violation, fell_back = _solve_member(
             matrix=matrix, rhs=rhs, constrained=constrained_tensor, start_free=free
         )
         pieces.append(theta.cpu().numpy())
         violations.append(violation)
+        fallbacks += int(fell_back)
     solved = np.stack(pieces)
     thetas = {
         design.site: solved[:, int(start) : int(start) + design.layout.n_columns]
@@ -1084,6 +1110,7 @@ def _solve_coupled(
         thetas=thetas,
         fleet_mean=solved[:, mu_start:] if has_fleet else None,
         violation=np.array(violations),
+        fallbacks=fallbacks,
     )
 
 
@@ -1183,6 +1210,7 @@ def holiday_level(*, layout: GamLayout, theta: np.ndarray) -> np.ndarray:
 
 __all__ = [
     "GRAPH_FAMILIES",
+    "MAX_JOINT_PARAMETERS",
     "MIN_IDENTIFYING_ROWS",
     "RELATIVE_IDENTIFYING_SHARE",
     "GraphFamilyType",
