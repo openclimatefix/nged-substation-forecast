@@ -465,6 +465,12 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
       and scored cuts (shapes matched across cuts), with "cannot tell" where a substation has no
       fit at a cut, so a change over the radio-teleswitch meter retirement can be seen if the
       history allows.
+    - **The size of the step may change over time, per substation (maintainer, 2026-10-20).** Each
+      card shows the substation's weight on the step shape at the tuning, replicate, and scored
+      cuts, one value per winter's fit window ("cannot tell" where a cut has no fit). A labelled
+      exploratory arm, run after the Opus module review, lets each substation's mixing weight
+      evolve slowly: non-negative weights at season-year knots with a second-difference
+      smoothness penalty. It needs a module change and is not part of the verdict.
     - **K from 3 to 6.** The tuning year also runs K = 5 and 6 at the chosen pair (exploratory, never
       scored later); the report shows K = 2 to 6.
     - **Penalties against shape collapse and noise shapes.** The orthogonality penalty is the

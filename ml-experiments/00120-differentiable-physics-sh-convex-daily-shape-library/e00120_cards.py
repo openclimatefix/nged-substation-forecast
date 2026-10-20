@@ -194,6 +194,31 @@ def calendar_panel(*, arrays: dict[str, np.ndarray], label: str) -> alt.ChartTyp
     )
 
 
+def weight_by_winter_panel(*, site: str) -> alt.ChartType:
+    """The substation's weight share on the step shape at each cut (one per fit window)."""
+    table = report.weight_by_year_table().filter(pl.col("site") == site)
+    names = {"tuning": "2023-24", "replicate": "2024-25", "scored": "2025-26"}
+    data = table.with_columns(
+        winter=pl.col("cut").replace_strict(names), share=pl.col("weight share")
+    ).filter(pl.col("share").is_not_null())
+    if data.height == 0:
+        return (
+            alt.Chart(pl.DataFrame({"text": ["Weight by winter: cannot tell (no fit)"]}))  # ty: ignore[unresolved-attribute]
+            .mark_text(align="left")
+            .encode(text="text:N")
+            .properties(width=WIDTH, height=20)
+        )
+    return (
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
+        .mark_point(filled=True, size=80, color=ocf.DATA_BLUE)
+        .encode(
+            x=alt.X("winter:N", sort=list(names.values()), title="Winter of the fit window"),
+            y=alt.Y("share:Q", title="Share of weight on the step shape"),
+        )
+        .properties(width=WIDTH - 20, height=80)
+    )
+
+
 def forecast_weeks(*, site: str) -> alt.ChartType:
     """Four fixed weeks: SH's median and 80% and 90% bands, N's median, and the observed series."""
     sh = report.seeded(label="scored", arm="sh", pooled=False).filter(pl.col("site_name") == site)
@@ -376,6 +401,7 @@ def card(*, site: str, arrays: dict[str, np.ndarray], labels: list[str]) -> alt.
         alt.hconcat(
             heating_panel(arrays=arrays, label=site), calendar_panel(arrays=arrays, label=site)
         ),
+        weight_by_winter_panel(site=site),
         forecast_weeks(site=site),
         cold_night_panel(site=site),
     )
