@@ -508,11 +508,32 @@ def conditions(*, scored: dict, replicate: dict) -> None:
         )
 
 
+def print_v1_in_nats() -> None:
+    """Print V1's content in nats: the final objectives of the fits on one objective function."""
+    objectives = read_json(name="objectives.json")
+    gate = read_json(name="gate.json")
+    passed = all(gate.get(t, {}).get("passed", False) for t in ("test_2", "test_3", "test_4"))
+    if not passed:
+        print("######## GATE FAILED: the verdict below is capped at inconclusive ########")
+    print(
+        "\n######## V1 in nats (the VP objective, one function, same rows and noise scale) ########"
+    )
+    for cut, values in objectives.items():
+        print(cut, {name: round(value) for name, value in values.items()})
+        if "vp_p_s0" in values and "p_map_same" in values:
+            low = min(values.get("vp_p_s0", 1e99), values.get("vp_p_s1", 1e99))
+            print(f"   VP-P (lower start) minus P-map-same: {low - values['p_map_same']:+.0f} nats")
+        if "p_map_105" in values and "p_map_same" in values:
+            gap = values["p_map_105"] - values["p_map_same"]
+            print(f"   P-map of experiment 105 minus P-map-same: {gap:+.0f} nats")
+
+
 def main() -> None:
     """Print the full report, and write it and the contrasts under `work/`."""
     ids = site_of_id()
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
+        print_v1_in_nats()
         scored = report_year(year="scored", ids=ids)
         replicate = report_year(year="rep", ids=ids)
         conditions(scored=scored, replicate=replicate)

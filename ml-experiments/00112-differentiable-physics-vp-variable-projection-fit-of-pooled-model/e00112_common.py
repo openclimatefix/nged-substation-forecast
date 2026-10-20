@@ -355,6 +355,15 @@ PEAK_GPU_CAP_GB: Final[float] = 10.0
 """A fit may use up to this much GPU memory."""
 
 
+GATE_FAILURE_ACCEPTED: Final[bool] = True
+"""The manager ruled on 2026-10-20 that the scored fits run although the gate failed.
+
+The gate failed on its pre-registered definition (see `work/gate.json`), which stays the record.
+The ruling lets VP-P and P-map-same, the arms of V1 and C1v, run labelled "gate failed" in every
+output, with the verdict capped at `inconclusive`.
+"""
+
+
 def require_gate_passed() -> None:
     """Raise unless the known-answer gate has run and passed (tests 2, 3, and 4).
 
@@ -362,7 +371,8 @@ def require_gate_passed() -> None:
     script runs; the gate file records the other three.
 
     Raises:
-        RuntimeError: If the gate file is missing, lacks a test, or holds a failed test.
+        RuntimeError: If the gate file is missing, or holds a failed test and
+            `GATE_FAILURE_ACCEPTED` is false.
     """
     if not GATE_PATH.exists():
         msg = "the known-answer gate has not run: run e00112_gate.py first"
@@ -371,7 +381,12 @@ def require_gate_passed() -> None:
     failed = [
         name for name in ("test_2", "test_3", "test_4") if not gate.get(name, {}).get("passed")
     ]
-    if failed:
+    if failed and GATE_FAILURE_ACCEPTED:
+        print(
+            f"GATE FAILED ({failed}): running under the manager's ruling, verdict capped",
+            flush=True,
+        )
+    elif failed:
         msg = f"the known-answer gate has not passed: {failed}"
         raise RuntimeError(msg)
 
