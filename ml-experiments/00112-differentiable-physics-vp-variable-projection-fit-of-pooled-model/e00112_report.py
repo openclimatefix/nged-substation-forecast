@@ -383,12 +383,12 @@ BLOWUP_ARMS: Final[tuple[str, ...]] = (
 )
 
 
-def blowup_days(*, arms: dict[str, pl.DataFrame]) -> list:
+def blowup_days(*, arms: dict[str, pl.DataFrame], always: list[date]) -> list:
     """Print the days on which an arm's forecast is far off, and return their dates.
 
     For each arm, the error of a day is the mean over the five decision substations of the median
     forecast minus the actual, in points of effective capacity. A day is listed when any listed arm
-    exceeds `BLOWUP_POINTS` in absolute value.
+    exceeds `BLOWUP_POINTS` in absolute value, and so is each day in `always`.
     """
     table = {}
     for name in BLOWUP_ARMS:
@@ -401,6 +401,7 @@ def blowup_days(*, arms: dict[str, pl.DataFrame]) -> list:
         table[name] = dict(daily.iter_rows())
     days = sorted(
         {d for errors in table.values() for d, e in errors.items() if abs(e) > BLOWUP_POINTS}
+        | set(always)
     )
     print(f"\n== Days with an error over {BLOWUP_POINTS:.0f} points (five-site mean error) ==")
     for day in days:
@@ -492,7 +493,7 @@ def report_year(*, year: str, ids: dict[int, str]) -> dict:
         )
     print_tails(arms=arms)
     print_checks(arms=arms)
-    days = blowup_days(arms=arms)
+    days = blowup_days(arms=arms, always=EASTER_DAYS if year == "scored" else [])
     print_excluding_days(arms=arms, days=EASTER_DAYS if year == "scored" else days, out=out)
     if "g_all" in arms:
         five = arms["g_all"].filter(pl.col("site").is_in(common.ELIGIBLE_SITES))

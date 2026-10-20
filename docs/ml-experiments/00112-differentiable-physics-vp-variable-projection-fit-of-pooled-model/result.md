@@ -30,7 +30,7 @@ production_status: not-for-production
 take_home_message: >-
   Solving the pooled model's linear coefficients exactly did not make its forecasts better. With the
   interaction neural network on, the exact fit drove the network's last layer and the seasonal and
-  holiday terms to very large, weakly penalised values: it forecast 75 to 280 points too high on four
+  holiday terms to very large, weakly penalised values: it forecast up to 280 points too high on four
   days around Easter 2026, and it was 0.7 points worse on the other days. With the network off, the
   exact fit is stable and within 0.03 points of the gradient fit, so the optimiser was not what held
   the pooled model back; the known-answer test failed, and with the network on the model cannot
@@ -41,7 +41,7 @@ advice:
   - >-
     Penalise the interaction network's last layer and the seasonal and holiday coefficients before
     refitting the pooled model exactly: with the current penalties (1e-5 and 1e-6) the exact solve
-    found weights up to 40 times larger than the gradient fit's and forecast 75 to 280 points too
+    found weights up to 40 times larger than the gradient fit's and forecast up to 280 points too
     high on four days (V1, and the days table in Results).
   - >-
     Do not read a lower training objective as a better pooled model: an objective 16,000 nats lower
@@ -81,15 +81,17 @@ is one differentiable-physics demand model fitted to many Primary substations at
 projection (VP) is a fitting method that solves the coefficients entering the forecast linearly
 exactly at each step and moves the other parameters by gradient steps. VP reached a training
 objective (the negative log-likelihood of the training rows, in nats) 16,000 to 27,000 nats lower
-than the gradient (Adam) fit of the same objective. With the interaction neural network on, the
-scored year's quantile score, averaged over the five decision substations, was 5.49 points of
-effective capacity for VP against 3.27 for the gradient fit. **The excess comes from four days:** on
-28 and 29 March, Good Friday (3 April), and Easter Monday (6 April) 2026, VP forecast 75 to 280
-points too high, because the exact solve had made the network's last layer and the seasonal and
-holiday coefficients very large. Without those four days (a post hoc check) VP is still 0.70 points
-worse than the gradient fit, at all five substations. With the network off, VP is stable and within
-0.03 points of the gradient fit. The known-answer test failed on its pre-registered definition, so
-the verdict cannot exceed `inconclusive`.
+than the gradient fit of the same objective, which uses the Adam optimiser. The decision substations
+are the five Primary substations that carry the experiment's planned contrasts. The quantile score
+is twice the mean pinball loss over 11 quantiles, in points (percent) of effective capacity. With
+the interaction neural network on, the scored year's quantile score, averaged over the five decision
+substations, was 5.49 for VP against 3.27 for the gradient fit. **The excess comes from four days:**
+on 28 and 29 March, Good Friday (3 April), and Easter Monday (6 April) 2026, VP forecast 20 to 280
+points too high (75 to 280 on three of them), because the exact solve had made the network's last
+layer and the seasonal and holiday coefficients very large. Without those four days (a post hoc
+check) VP is still 0.70 points worse than the gradient fit, at all five substations. With the
+network off, VP is stable and within 0.03 points of the gradient fit. The known-answer test failed
+on its pre-registered definition, so the verdict cannot exceed `inconclusive`.
 
 We asked whether the pooled model lost to a per-substation model in experiment 105 because gradient
 descent stopped short of the optimum. We fitted the pooled model, and a model per substation, by VP
@@ -170,8 +172,9 @@ network-on fit fails even on noise-free data.
   (it was fitted on a different objective, so this is a reference only).
 - **Four days carry the headline (post hoc).** A per-day check of the mean median forecast error
   over the five decision sites finds the days below (a day is listed when any listed arm is over
-  30 points off). Good Friday is on the list because the numbers audit flagged it; its VP-P error is
-  smaller than the others'.
+  30 points off), plus Good Friday (3 April), which the numbers audit flagged although its VP-P error
+  is smaller. VP-P is also 47 points too high on 5 and 6 January; those two days are in the table
+  but outside the four-day exclusion below, so the "without" numbers still contain them.
 
   | Day (2026) | VP-P | VP-P start 1 | VP-onb4w | VP-P-nonet | P-map-same | G-2y |
   |---|---|---|---|---|---|---|
@@ -179,6 +182,7 @@ network-on fit fails even on noise-free data.
   | 6 January | +47.9 | -16.8 | -5.1 | -5.3 | -2.2 | -9.5 |
   | 28 March | +75.2 | +9.4 | +91.8 | -1.6 | +3.3 | -2.5 |
   | 29 March | +199.2 | +12.3 | +70.8 | -5.2 | -2.9 | -6.4 |
+  | 3 April | +19.5 | 0.0 | +5.3 | -1.4 | -1.6 | -3.5 |
   | 6 April | +278.2 | +8.6 | +17.6 | +1.9 | +3.3 | +0.3 |
 
 - **Without the four Easter days (28 and 29 March, 3 and 6 April; post hoc).** V1 falls to +0.696
@@ -293,7 +297,8 @@ network-on fit fails even on noise-free data.
   P-map-same: D10 -1.72, D11 0.73. D10's gap of about -1 to -1.8 points appears in every arm,
   including S (-1.74), so it is not a VP effect.
 - **Error of the mean forecast beside each contrast.** V1 +2.676 (+0.847 to +4.840); C1v +1.460
-  (-0.665 to +3.950); C2v -64.9; C3v -53.1. The quantile-score and mean-error contrasts agree in sign.
+  (-0.665 to +3.950); C2v -69.7 and C3v -47.6 (five decision sites, as the contrasts above). The
+  quantile-score and mean-error contrasts agree in sign.
 - **Leave one site out.** V1 stays +2.1 to +2.3 with any site dropped (0 of 4 better); C1v stays
   +1.2 to +1.7. Dropping D10's unlabelled jump (2025-11-17 to 2025-12-14), the winter or the summer
   half, or masked rows changes no sign.

@@ -11,8 +11,8 @@ substation and was worse at full history.
 | Part 5 (proposed) | Does the MVA observation layer (a model of how a meter that reads apparent power relates to real power) help the MW sites and recover MW at MVA sites? | 4 | Experiment 105 and a better capacity fit | Proposed |
 
 **Experiment 109 gives the pooled convex model N for the next experiments to start from, once its
-known-answer gate is rerun.** The gate failed under its pre-registered definition, so experiment
-112, Part 5, and Part 6 depend on N and on a rerun of the gate with an oracle that estimates every
+known-answer gate is rerun.** The gate failed under its pre-registered definition, so Part 5
+and Part 6 depend on N and on a rerun of the gate with an oracle that estimates every
 coefficient and a tuning rule checked on several seeds.
 
 ## Planned experiments

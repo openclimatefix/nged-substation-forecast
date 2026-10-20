@@ -175,7 +175,7 @@ weeks or 3 months of data extrapolates those terms badly: the per-site fits scor
 points at the five decision substations, against 15.1 and 5.5 for the gradient fits that stop
 before convergence. No window between 3 months and 2 years was tested. The pooled model with its
 interaction network failed the same way on four days of the scored year, where an exact fit with
-weak penalties forecast 75 to 280 points too high ([experiment
+weak penalties forecast up to 280 points too high ([experiment
 112](00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result.md); medium
 confidence; provisional). Applies to experiments.
 
