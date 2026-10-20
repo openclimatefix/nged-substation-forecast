@@ -247,6 +247,18 @@ are agreed with the experiment manager.
   under a G-label with normalised units and no dates. The result states the hand-built arms'
   winter-night scores plainly, so that the learned daily-shape library of experiment 120 can be
   compared with them.
+- **Cold nights in British Summer Time (maintainer request, before any replicate or scored fit).**
+  Most Economy 7 load is storage heating, so the night step should grow with cold and a small step
+  is expected in summer. UTC and local time differ only between the clock changes, so a clean test
+  of the clock needs nights that are both cold and in British Summer Time. The page reports, for
+  each decision substation and for the replicate and scored years, the number of such nights. A
+  night counts as cold when the daily mean ERA5 temperature at the substation's cell is below
+  8 C (the threshold of the cold-tail bin in the plan), fixed here before any score is read. Where
+  a substation has fewer than 10 cold British Summer Time nights in a year, the UTC-against-local
+  contrast for that substation is written "cannot tell". The fitted night step on the cards is
+  shown as a slope per degree below the 15.5 C hinge and a size on a stated cold night (daily mean
+  temperature 3 C), both in MW with intervals from the month-block bootstrap, beside a separate
+  small base level (the free night levels of NS-U), not a single fixed size.
 - **A winner is carried as a standard GAM-K piece in the recommendation** (subject to the ENS
   confirmation in "Handed on").
 
