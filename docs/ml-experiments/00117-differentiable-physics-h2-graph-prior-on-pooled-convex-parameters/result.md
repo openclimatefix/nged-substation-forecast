@@ -312,9 +312,10 @@ Written before any fit; each line can fail, and none overrides the decision rule
 **Only a failed plumbing control or planted failure caps the verdict at `inconclusive`.**
 
 - **`supported`:** the controls pass; readings (a), (b), (c) pass; R1 and R2 are non-inferior in
-  both years with the scored half-width at most 0.025; and the real width ratio of H against H-perm
-  is below 1 for heating slopes. Without the last condition the take-home is worded as
-  synthetic-only and the verdict is `partly supported`.
+  both years with the scored half-width at most 0.025; R1w and R2w pass the hold-back rule under
+  "Winter breakdown"; and the real width ratio of H against H-perm is below 1 for heating slopes.
+  Without the real-width condition the take-home is worded as synthetic-only and the verdict is
+  `partly supported`.
 - **`partly supported`:** the controls pass and (a) and (b) pass, but R1 or R2 fails in the
   replicate year only, is undecidable, or the real placebo does not separate H from H-perm.
 - **`small gain`:** the controls pass, R1 and R2 are non-inferior in both years, and the smooth-cell
@@ -333,6 +334,33 @@ Written before any fit; each line can fail, and none overrides the decision rule
 
 **Verdict wording** states the capacity family as synthetic-only. R3 and R3b are reported beside the
 verdict and never change it.
+
+## Winter breakdown (pre-fit clarification, 2026-10-20)
+
+**The forecast goes to production in about a month and NGED first sees it in winter, so every
+contrast is also read on the winter rows, and a winter loss holds an arm back.** This section was
+added before any fit, at the maintainer's request. It adds three things to the plan above and
+changes none of the other rules.
+
+- **Winter rows:** valid times from 1 November to 31 March (UTC) in the scored and replicate years,
+  without the clock-change days. Two row sets sit inside them: the **evening peak**, the half-hours
+  from 16:00 to 19:30 UTC, and the **cold-snap days**.
+- **Cold-snap rule (fixed before any score is read):** a winter day is a cold-snap day at a site if
+  its mean ERA5 temperature is at or below that site's 10th percentile of winter daily means over the
+  24 months before the cut. The script prints the number of cold-snap days per site and year before
+  any score is read. A site-year with fewer than 5 cold-snap days is reported as "too few days" and
+  gets no interval.
+- **Winter contrasts:** R1w (H minus G) and R2w (NH minus N) on all winter rows, with a 98.75%
+  interval from resampling whole weeks inside the winter (a winter holds only 5 calendar months, too
+  few blocks for a month resample), the same weeks drawn at every decision site. The evening-peak and
+  cold-snap rows are reported with the same intervals where there are enough days, and descriptively
+  otherwise. R3w reports P-hol minus G on the winter event days.
+- **Hold-back rule:** if R1w or R2w has its upper end above +0.03 points in the scored year, the
+  verdict is capped at `partly supported` and says that the arm is held back for winter, even if
+  the annual mean improves. A winter loss in R3w holds P-hol back in the same way.
+- **Independent winters:** the evidence holds two independent winters, 2024-25 (replicate) and
+  2025-26 (scored). The 2023-24 winter tunes gamma and lambda_hol, so it is not evidence. Every
+  winter reading is therefore descriptive of two winters, and the page says so.
 
 ## Substation cards (provisional)
 
@@ -362,6 +390,11 @@ series (G-c) and their sum are generator data: never beside a D-label, name, or 
 dates, own-capacity units, `aria=False`; this plan puts no G-c series on a card and has no
 arm that uses them. No generator public name appears with a series. The synthetic graph may be
 shown; the real graph is shown only as the allowed D-label pairs.
+
+**Cold-snap panel (added with the winter breakdown).** Each decision site's card gets a "how it does
+in a cold snap" panel: the quantile score and the 80% and 90% interval coverage of G, N, H, and NH
+on the site's cold-snap days of the scored year, with the day count printed, or "too few days" where
+the rule above leaves fewer than 5.
 
 ## Audit before merge: the seven triggers
 
