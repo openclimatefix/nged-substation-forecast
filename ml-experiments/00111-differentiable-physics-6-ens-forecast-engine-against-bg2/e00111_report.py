@@ -259,7 +259,8 @@ def main() -> None:
             summary["sites"] = sites_label
             summary["planned"] = False
             results["contrasts"].append(summary)
-    common.write_json_atomic(path=common.WORK_DIR / "results.json", content=results)
+    tag = "" if periods == {"scored"} else "_" + "_".join(sorted(periods))
+    common.write_json_atomic(path=common.WORK_DIR / f"results{tag}.json", content=results)
     lines = ["# Experiment 111 report", ""]
     for item in results["contrasts"]:
         q = item["quantile_score"]
@@ -271,7 +272,7 @@ def main() -> None:
             f"median-forecast error {item['median_error']['estimate']:+.3f}"
         )
     lines += ["", "Skipped (arm missing): " + "; ".join(results["skipped"])]
-    (common.WORK_DIR / "report.md").write_text("\n".join(lines) + "\n")
+    (common.WORK_DIR / f"report{tag}.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
 
