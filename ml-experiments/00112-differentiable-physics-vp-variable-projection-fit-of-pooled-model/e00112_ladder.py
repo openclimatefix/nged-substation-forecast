@@ -6,7 +6,7 @@ pinned to Part 2's convex path, fitted on every usable year by gradient descent.
 points worse than the convex model G-all. L1 here fits the same configuration by variable
 projection on the natural-scale objective: one substation at a time, the capacity pinned to the
 convex path fitted at the same cut, a deviation scale of 100, the heating threshold started from
-12 to 20 degrees in steps of 1, and the start with the lowest objective kept. L1 minus
+12 to 20 degrees in steps of 2, and the start with the lowest objective kept. L1 minus
 `s_equiv_all` is the optimiser's share of the 0.25, and it also contains the change from the
 pre-softplus slope prior and the learned noise scale to the natural-scale prior and a fixed noise
 scale. The heating form (one hinge at a learned threshold on a learned temperature mix, against the
@@ -38,7 +38,7 @@ from studies.dp_pooled import DpConfig, PooledBatch, PooledDemandModel, Populati
 from studies.dp_pooled_vp import VpSettings, fit_pooled_vp, freeze_operator_for_vp
 
 WEAK_DEVIATION_SCALE: Final[float] = 100.0
-THRESHOLD_STARTS_C: Final[tuple[float, ...]] = tuple(float(t) for t in range(12, 21))
+THRESHOLD_STARTS_C: Final[tuple[float, ...]] = (12.0, 14.0, 16.0, 18.0, 20.0)
 LADDER_FALLBACK_STEPS: Final[int] = 400
 
 

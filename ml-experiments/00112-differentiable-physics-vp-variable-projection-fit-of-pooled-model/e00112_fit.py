@@ -99,7 +99,7 @@ def stage_pooled(*, cache: FeatureCache, cut: datetime) -> None:
             batch=batch,
             settings=settings,
             start="s0",
-            fallback_steps=common.FALLBACK_STEPS_PRIMARY,
+            fallback_steps=common.FALLBACK_STEPS_SECONDARY,
             init_state=state,
         )
         vp.save_fit(

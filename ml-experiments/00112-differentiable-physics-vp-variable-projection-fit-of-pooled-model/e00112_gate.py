@@ -18,7 +18,7 @@ the other three, each fitted at the replicate cut (2024-07-01) with the interact
 4. **Injected farms**, one at a time at D10, D11, D14, and D16: the recovered capacity increment
    over the injected one has a median in [0.9, 1.1] (experiment 105's value was 0.78), and the other
    substations' capacities move under 5%. The shared modules' midday movement is reported beside a
-   second-seed base fit's. Only ratios appear.
+   second-seed base fit's, made once on the first farm's rows. Only ratios appear.
 
     uv run --no-sync python ml-experiments/00112-*/e00112_gate.py [--tests 2 3 4]
 """
@@ -514,14 +514,16 @@ def gate_4_injected(*, cache: FeatureCache) -> dict[str, Any]:
         base, _ = vp.fit_pooled_arm(
             batch=rows, settings=settings, start="s0", fallback_steps=GATE_FALLBACK_STEPS
         )
-        second, _ = vp.fit_pooled_arm(
-            batch=rows, settings=settings, start="s1", fallback_steps=GATE_FALLBACK_STEPS
-        )
+        second = None
+        if site == INJECTED_SITES[0]:
+            second, _ = vp.fit_pooled_arm(
+                batch=rows, settings=settings, start="s1", fallback_steps=GATE_FALLBACK_STEPS
+            )
         injected, _ = vp.fit_pooled_arm(
             batch=with_targets(batch=rows, y=injected_y),
             settings=settings,
             start="s0",
-            fallback_steps=GATE_FALLBACK_STEPS,
+            fallback_steps=0,
             init_state=base.state_dict(),
         )
         base_cap = base.capacities()[:, -1].detach().cpu().numpy()
@@ -538,9 +540,10 @@ def gate_4_injected(*, cache: FeatureCache) -> dict[str, Any]:
         mask_rows = summer_midday(batch=rows, cache=cache)
         before = module_midday_output(model=base, batch=rows, mask=mask_rows)
         after = module_midday_output(model=injected, batch=rows, mask=mask_rows)
-        noise = module_midday_output(model=second, batch=rows, mask=mask_rows)
         by_module[site] = {name: after[name] - before[name] for name in before}
-        floor[site] = {name: noise[name] - before[name] for name in before}
+        if second is not None:
+            noise = module_midday_output(model=second, batch=rows, mask=mask_rows)
+            floor[site] = {name: noise[name] - before[name] for name in before}
     median = float(np.median(list(ratios.values())))
     return {
         "recovery_ratio": ratios,

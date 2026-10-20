@@ -221,7 +221,7 @@ def run_config(*, cache: FeatureCache, config: ProfileConfig) -> dict[str, Any]:
             model=model,
             batch=batch,
             settings=settings,
-            adam_steps=common.FALLBACK_STEPS_PRIMARY,
+            adam_steps=common.FALLBACK_STEPS_SECONDARY,
             warm_start_steps=0 if state is not None else common.WARM_START_STEPS,
         )
         states[name] = model.state_dict()
