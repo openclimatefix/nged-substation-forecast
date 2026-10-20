@@ -150,8 +150,9 @@ synthetic substations per arm, the 80% interval covered 12 to 13 of 20 for K-bas
 and the 90% range covered 14 to 16 of 20 (bars: 70 to 90% and 80 to 100%). At noise made of real
 residuals, K-ii's 90% range and K-iii's 80% interval passed; K-i covered 7 of 20. The test is weak
 evidence (20 substations), and months are drawn independently, so it cannot see dependence between
-months. The cards below carry the line "weakly identified at real noise levels (experiment 112);
-compare across substations with care".
+months. The cards below carry the line "weakly identified at real noise levels ([experiment
+112](../00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result.md)); compare
+across substations with care".
 
 **The MVA layer (question 2): L0 beats N and LQ beats L0 by less than the bar.** C2 (L0 minus N on
 |S|) was −0.13 points at the 8 MVA substations (99% interval −0.22 to −0.06; replicate −0.13), with
@@ -178,9 +179,10 @@ B-clip minus B was −0.21 points in the scored year and −0.26 in the replicat
 −0.32 to −0.10 in the scored year), a gain wholly on April to October rows. Over all MW substations
 it was −0.03 (−0.04 to −0.01; −0.043 to −0.007). The fitted multiplier at D5 was 1.10 (the plan
 predicted 0.80 to 0.95) and the ceiling share 0.65, below the grid top, so the clause "P_max stays
-at the grid top at every substation Part 1 does not flag" fails at D16 (0.80). D5, which Part 1 does
-flag, also sits below the grid top. Gate test 5 passed at 0 of 4 substations for B-D1 and 2 of 4 for
-B, so the clip's level is not recovered from known answers.
+at the grid top at every substation [Part 1](../00103-differentiable-physics-1-data-look/result.md)
+does not flag" fails at D16 (0.80). D5, which Part 1 does flag, also sits below the grid top. Gate
+test 5 passed at 0 of 4 substations for B-D1 and 2 of 4 for B, so the clip's level is not recovered
+from known answers.
 
 **Against the baselines (descriptive).** The filtered B scored 2.28 points of capacity (all five
 decision substations, scored year); climatology scored 1.79 more and the manual heuristic 1.21 more
@@ -302,7 +304,8 @@ turn.
 
 1. **Capacity identification.** Does the fitted PV capacity stay put when the routes by which
    demand terms can imitate solar are closed, and does it land near the capacity estimates that
-   were available in real time (the "vintages" of experiment 45)?
+   were available in real time (the "vintages" of [experiment
+   45](../00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md))?
 2. **The MVA observation layer.** Does reading the 8 MVA Primaries through
    P = D − PV, Q = tanφ·D + q0, |S| = √(P² + Q² + ε) forecast |S| at least as well as reading |S|
    as P, and does a learned Q beat NGED's convention Q = 0?
@@ -311,14 +314,17 @@ turn.
 4. **The export clip.** Does the smooth clip recover an injected clip, stay open where Part 1 found
    none, and help at D5, the one decision site Part 1 flags (clipping in 4 of 7 summers)?
 
-**The bar is the convex model, not the pooled neural model.** In Part 3's scored year the pooled
-neural model lost to the per-site neural model (+0.385 points; verdict capped at `inconclusive` by a
-failed known-answer gate), while the convex model with every year of history scored 2.726 and, with
-Part 4's filter and pinned capacity, 2.29 (2.90 without the filter). Part 3 also found that the
-pooled model's fitted capacity follows its starting value, but that its profile has a minimum near
-the convex capacity: the data identify capacity to about 15%. The "near the vintage" band and the
-precision floor below are read with that figure in mind. Every decision contrast gets a replicate
-year, a season split, and a row without D16.
+**The bar is the convex model, not the pooled neural model.** In [Part
+3](../00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md)'s scored year the
+pooled neural model lost to the per-site neural model (+0.385 points; verdict capped at
+`inconclusive` by a failed known-answer gate), while the convex model with every year of history
+scored 2.726 and, with [Part
+4](../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md)'s filter and pinned
+capacity, 2.29 (2.90 without the filter). Part 3 also found that the pooled model's fitted capacity
+follows its starting value, but that its profile has a minimum near the convex capacity: the data
+identify capacity to about 15%. The "near the vintage" band and the precision floor below are read
+with that figure in mind. Every decision contrast gets a replicate year, a season split, and a row
+without D16.
 
 ## Which model and which base arm Part 5 runs on
 
@@ -366,8 +372,10 @@ filter.**
   half-hour], with ū u's month-by-half-hour mean over the training window and A ≥ 0 a free solar
   climatology per site under a ridge (A is aliased with the profile). A cannot grow with capacity,
   so K-iii trains on the last two season-years only. Forecasts use both terms.
-- **Fitted capacity** in each K arm follows Part 2's behaviour. K-base is A2 with fitted capacity.
-  The convex solver `solve_bounded_quadratic` takes no start, so the K arms need no start check.
+- **Fitted capacity** in each K arm follows [Part
+  2](../00104-differentiable-physics-2-simple-structural-model/result.md)'s behaviour. K-base is A2
+  with fitted capacity. The convex solver `solve_bounded_quadratic` takes no start, so the K arms
+  need no start check.
 - **The meter fit** (`fit_gam_through_meter`). The loss (|S| − √(P² + Q² + ε))² is not convex: a
   mirror basin exists wherever P can change sign, and tanφ·D(θ) is bilinear. The fit is
   Gauss-Newton: linearise √ at the current P and Q and solve each step with the existing
@@ -444,7 +452,7 @@ fit.
 
 | Arm | MVA rows | Meter | Role |
 |---|---|---|---|
-| N | dark and sunlit | none: \|S\| read as P (experiment 79's naive fit) | C2's comparator |
+| N | dark and sunlit | none: \|S\| read as P ([experiment 79](../00079-pvdis-7-mw-at-mva-only-primaries/result.md)'s naive fit) | C2's comparator |
 | L0 | dark and sunlit | Q = 0 | the decision arm: NGED's convention |
 | LQ | dark and sunlit | learned Q | tests the Q = 0 assumption |
 | G-dark | dark only | demand alone, Parts 2 to 4's rule | the no-solar reference |
@@ -465,13 +473,14 @@ measures training a solar term on sunlit MVA rows, not the meter.
   labelled hindsight and enters no forecast score. There is no forecast arm: the history before the
   2025-07-01 cut is too short to identify heating or a season.
 
-**XGBoost bars** (CPU, lagless, experiment 87's Primary hyperparameters without the three power
-lags, 11 quantiles, Part 2's ERA5 and CAMS inputs, on B's window). Part 4's X-best, X-bestz,
-X-bestamq, X-bestam, and its C6 bar (the tuning-year winner of X-best and X-bestamq) are reused as
-stored, with X-best+K (the filter on XGBoost's residuals) beside it. **X-mva** is X-best on |S| at
-each MVA site (no offset, because there is no vintage), filtered and unfiltered. Lagged XGBoost at
-24.5 to 48 hours is descriptive. BG2 does not enter Part 5, because it is Part 6's bar. References
-are climatology and `manual_heuristic`.
+**XGBoost bars** (CPU, lagless, [experiment
+87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)'s Primary hyperparameters
+without the three power lags, 11 quantiles, Part 2's ERA5 and CAMS inputs, on B's window). Part 4's
+X-best, X-bestz, X-bestamq, X-bestam, and its C6 bar (the tuning-year winner of X-best and
+X-bestamq) are reused as stored, with X-best+K (the filter on XGBoost's residuals) beside it.
+**X-mva** is X-best on |S| at each MVA site (no offset, because there is no vintage), filtered and
+unfiltered. Lagged XGBoost at 24.5 to 48 hours is descriptive. BG2 does not enter Part 5, because it
+is Part 6's bar. References are climatology and `manual_heuristic`.
 
 **Tuning (on 2023-24, fitted at the 2023-07-01 cut):**
 
@@ -497,9 +506,10 @@ be fixed inside the part, that component counts as failed, and the verdict follo
    otherwise the same. PV with the model's own shape lies in the capacity column's span, and any
    linear fit would recover it exactly, so only a mismatched plant tests anything. A K arm passes if
    the fitted capacity rises by the injected AC capacity within 20% at every site, level, and plant.
-2. **Injected farms** (experiment 39's harness, at D10, D11, D14, and D16, keeping night rows at the
-   injected site). A K arm passes if the median ratio of recovered to injected capacity lies in
-   [0.75, 1.25]. For K-iii the ratio is also reported divided by its K-base ratio.
+2. **Injected farms** ([experiment 39](../00039-pv-disaggregation-cams-injection/result.md)'s
+   harness, at D10, D11, D14, and D16, keeping night rows at the injected site). A K arm passes if
+   the median ratio of recovered to injected capacity lies in [0.75, 1.25]. For K-iii the ratio is
+   also reported divided by its K-base ratio.
 3. **The meter recovers sign, capacity, and power factor.** At the MW decision sites, inject a farm
    at experiment 79's level 1.0 (the window's median absolute midday power) so that reverse flow is
    common. Build Q = tanφ·D with power factor 0.97 from the demand component of the pinned B fit
@@ -528,9 +538,10 @@ both of these hold for the last trained season-year:**
 
 - **Precise:** the 90% bootstrap range (the 2nd to the 19th of the 20 ordered values) is at most
   max(3 points, 10% of the capacity).
-- **Near the vintage:** the capacity lies within ±20% of the vintage's season-year mean (experiment
-  40's capacity uncertainty). D14 is judged against `dp_pinned_capacity`'s held value and flagged.
-  Part 3's profile found capacity identified to about 15%, so a ±20% band is already loose.
+- **Near the vintage:** the capacity lies within ±20% of the vintage's season-year mean ([experiment
+  40](../00040-pv-capacity-error-bars/result.md)'s capacity uncertainty). D14 is judged against
+  `dp_pinned_capacity`'s held value and flagged. Part 3's profile found capacity identified to about
+  15%, so a ±20% band is already loose.
 
 **The label needs both capacity cuts and gate tests 1 and 2.** Otherwise the arm is `not
 identified`, with the failing clause named per site. The bootstrap measures sampling noise, not
@@ -539,8 +550,9 @@ route bias, so precision alone proves nothing, and the closed-route arms carry t
 within the precision floor at 4 or more of 5 sites. **K-iii is judged by its ratio to K-base:** it
 is
 `consistent` if, at 4 or more of 5 sites, the bootstrap range of K-iii / K-base overlaps [0.65,
-0.87], the slope with which CAMS tracks a real farm's anomaly (experiment 63). A ratio in range
-supports K-base, and a ratio near 1 or below 0.65 does not.
+0.87], the slope with which CAMS tracks a real farm's anomaly ([experiment
+63](../00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md)). A ratio in range supports K-base,
+and a ratio near 1 or below 0.65 does not.
 
 ## Planned contrasts
 
