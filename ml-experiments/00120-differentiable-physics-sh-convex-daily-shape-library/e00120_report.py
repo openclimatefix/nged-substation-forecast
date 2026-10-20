@@ -46,6 +46,8 @@ PLANNED_LEVEL: Final[float] = 100.0 - 5.0 / N_PLANNED
 EXPLORATORY_LEVEL: Final[float] = 95.0
 N_RESAMPLES: Final[int] = 20000
 WINTER_MONTHS: Final[tuple[int, ...]] = (11, 12, 1, 2, 3)
+NIGHT_HOURS: Final[tuple[int, ...]] = (23, 0, 1, 2, 3, 4, 5, 6)
+"""Valid-time hours of a winter night, where the Economy 7 step sits."""
 EVENING_HOURS: Final[tuple[int, ...]] = (16, 17, 18, 19)
 """Valid-time hours (UTC; local time in winter) whose half-hours count as the evening peak."""
 COLD_SNAP_C: Final[float] = 0.0
@@ -340,6 +342,7 @@ def season_filters(*, label: str) -> dict[str, pl.Expr]:
         "Nov-Mar": month,
         "Apr-Oct": ~month,
         "Nov-Mar evening peak": month & (valid.dt.hour().is_in(EVENING_HOURS)),
+        "Nov-Mar nights (23:00-07:00)": month & valid.dt.hour().is_in(NIGHT_HOURS),
         "cold-snap days": in_cold,
     }
 
@@ -661,6 +664,59 @@ def _number(*, entry: dict[str, object], key: str) -> float:
     return float(entry[key])  # ty: ignore[invalid-argument-type]
 
 
+STEP_COLUMN: Final[int] = 2
+"""The profile column of 01:00, where the Economy 7 step starts."""
+MIN_SHAPE_USERS: Final[int] = 2
+MIN_SHARE: Final[float] = 0.10
+"""A shape is a noise shape if fewer than this many substations give it this share of weight."""
+
+
+def step_table() -> pl.DataFrame:
+    """Return the 01:00 step in every substation's profile and in every shape (scored-year fit).
+
+    For each substation, the rise of the fitted weekday profile at 01:00 (column 2 minus column 1,
+    in points of capacity) and its contrast over 01:00 to 07:00 against the neighbouring half-hours;
+    for each shape, its rise at 01:00 and the substations that use it with a share of 10% or more.
+    """
+    fits = fit_files(label="scored", arm="sh")
+    best = min(fits, key=lambda fit: fit[2]["objective"])
+    arrays = best[1]
+    labels = [str(label) for label in arrays["labels"]]
+    shapes, weights, deviations = arrays["shapes"], arrays["weights"], arrays["deviations"]
+    rows = []
+    for position, label in enumerate(labels):
+        profile = weights[position] @ shapes + deviations[position]
+        weekday = profile[:48]
+        rows.append(
+            {
+                "kind": "substation profile (library + deviation)",
+                "name": label,
+                "rise at 01:00": float(weekday[STEP_COLUMN] - weekday[STEP_COLUMN - 1]),
+                "contrast 01:00-07:00": float(
+                    weekday[STEP_COLUMN : STEP_COLUMN + 12].mean()
+                    - weekday[[0, 1, STEP_COLUMN + 12, STEP_COLUMN + 13]].mean()
+                ),
+                "users": None,
+            }
+        )
+    shares = weights / weights.sum(axis=1, keepdims=True)
+    for k in range(shapes.shape[0]):
+        users = int((shares[:, k] >= MIN_SHARE).sum())
+        rows.append(
+            {
+                "kind": "shape",
+                "name": f"shape {k + 1}",
+                "rise at 01:00": float(shapes[k, STEP_COLUMN] - shapes[k, STEP_COLUMN - 1]),
+                "contrast 01:00-07:00": float(
+                    shapes[k, STEP_COLUMN : STEP_COLUMN + 12].mean()
+                    - shapes[k, [0, 1, STEP_COLUMN + 12, STEP_COLUMN + 13]].mean()
+                ),
+                "users": users,
+            }
+        )
+    return pl.DataFrame(rows, schema_overrides={"users": pl.Int64}, infer_schema_length=None)
+
+
 def audit_triggers(*, planned: pl.DataFrame, reproduction: pl.DataFrame) -> list[str]:
     """Return which of the plan's audit triggers the numbers fire (trigger 7 is judged by hand)."""
     fired = []
@@ -731,6 +787,8 @@ def main() -> None:
     print(stability_table().write_csv(float_precision=3), end="")
     print("== Shape mix of the scored-year headline fit ==")
     print(mix_table().write_csv(float_precision=3), end="")
+    print("== The 01:00 step in the profiles and shapes (scored-year headline fit) ==")
+    print(step_table().write_csv(float_precision=3), end="")
     print("== Audit triggers that the numbers fire ==")
     print(audit_triggers(planned=planned, reproduction=reproduction))
 

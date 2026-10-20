@@ -416,6 +416,34 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
   reason to hold SH back whatever the annual mean does; the verdict says so. The out-of-sample
   evidence holds two independent winters (2024-25 in the replicate year, 2025-26 in the scored
   year); the tuning winter (2023-24) chose the settings and does not count.
+- **Aim added by the maintainer (2026-10-20): the library should find behavioural shapes such as the
+  Economy 7 step at 01:00 by itself, especially where several substations share one.** Economy 7 is
+  a tariff that switches night-time storage heating on at a fixed hour. The additions below are
+  fixed before any replicate or scored fit.
+    - **Gate line 10, a step the library has to find without being told.** An Economy 7-like step is
+      injected into the profile of 2 of the 5 synthetic substations: a rise of 4 points of capacity
+      from 01:00 to 07:00 on every day type, all year. The library, fitted
+      with K = K* + 1 and no knowledge of the step, passes if some shape's 00:30 to 01:30 rise
+      matches the injected time within one half-hour and the fitted size at the two injected
+      substations is within 25% of the injected size. A placebo fleet with no step must show no
+      shape with a rise of that size at 01:00. Both count 30 of 40 fleets.
+    - **Real-data readout of the 01:00 step.** For every substation and every shape of the
+      scored-year headline fit, the report prints the size of the rise at 01:00 (the fitted profile
+      at 01:00 minus 00:30, weekdays) and the substation's weight on the shape, and says whether the
+      step appears at D5, D10, and D16 (the Primaries where GAM-K left winter 01:00 steps of 4 to
+      7 MW) and at other substations. The profile score is also reported on winter nights (23:00 to
+      07:00, November to March), beside the hand-built night-step arms of experiment 121 (NS-U and
+      NS-HW) once that experiment's page is merged. Those arms are the benchmark the learned shapes
+      must match or beat.
+    - **K from 3 to 6.** The tuning year also runs K = 5 and 6 at the chosen pair (exploratory, never
+      scored later); the report shows K = 2 to 6.
+    - **Penalties against shape collapse and noise shapes.** The orthogonality penalty is the
+      collapse guard. A noise shape is a shape that fewer than 2 substations use with a weight
+      above 10% of their total; the report counts them per fit (a minimum-substations check, not a
+      penalty).
+    - **Not covered before the module review.** Shapes that depend on heating (a winter and a summer
+      version of each shape) need new design columns in the module. They run as a labelled
+      exploratory arm after the Opus module review.
 - **Documents not carried over.** The briefs name `docs/ml-experiments/research-plan.md`, which
   the documentation restructure deleted; the theme's `plan.md` row is the only plan entry.
 

@@ -31,6 +31,11 @@ per-line rates and Wilson 90% intervals are printed).
 7. Local optima: of 5 starts (one singular value decomposition, four random Dirichlet), at least 4
    reach a training sum of squares within 1% of the best.
 8. Module tests pass.
+10. Economy 7-like step (the sparse fleets): a step of 4 points of capacity from 01:00
+    to 07:00, absent from every shape, is injected into 2 of the 5 substations. The library with
+    K = K* + 1, told nothing, must recover its time (largest rise within 1 half-hour) and size
+    (within 25%) at both substations, and a placebo (same truth, new noise) must show no step of
+    25% of the size or more.
 9. Score power (40 other fleets): the library's energy is scaled until the oracle's held-out score
    beats N's by 0.10 points; SH minus N on held-out rows must then be at most -0.05.
 
@@ -97,6 +102,13 @@ POWER_GAIN: Final[float] = 0.10
 """The oracle gain over N, in points, that line 9 sizes the truth to."""
 POWER_REQUIRED: Final[float] = -0.05
 """SH minus N must be at most this on a power fleet."""
+STEP_POINTS: Final[float] = 4.0
+"""The injected Economy 7-like step, in points of capacity."""
+STEP_FIRST_COLUMN: Final[int] = 2
+STEP_LAST_COLUMN: Final[int] = 13
+"""The step covers profile columns 2 to 13 (01:00 to 07:00) of every day type."""
+STEP_SIZE_TOLERANCE: Final[float] = 0.25
+STEP_SITES: Final[tuple[int, ...]] = (0, 2)
 K_TIE_MARGIN: Final[float] = 0.023
 """Scores within this many points tie in the tuning rule, and a tie goes to the smaller K."""
 LINE_PASS_COUNT: Final[int] = 30
@@ -344,6 +356,8 @@ def build_fleet(
     strength: float = 1.0,
     bump_site: int | None = None,
     sparse: bool = True,
+    step_sites: tuple[int, ...] = (),
+    noise_seed: int | None = None,
 ) -> Fleet:
     """Build one synthetic fleet on the template's real calendar, weather, and noise.
 
@@ -354,6 +368,9 @@ def build_fleet(
         strength: A factor on the library and the deviation (the power fleets rescale it).
         bump_site: The index of the site that gets a site-specific bump, or `None`.
         sparse: True for the sparse weight prior.
+        step_sites: The indices of sites that get the injected Economy 7-like step.
+        noise_seed: A seed for the noise alone, so two fleets share a truth and differ in noise;
+            `None` draws the noise from `rng`.
 
     Returns:
         The fleet.
@@ -385,6 +402,12 @@ def build_fleet(
         bump = centring_matrix(family="profile", size=PROFILE_COLUMNS) @ bump
         bump = bump / np.linalg.norm(bump) * (BUMP_ENERGY**0.5) * np.linalg.norm(library[bump_site])
         deviation[bump_site] = bump
+    step = np.zeros((n_sites, PROFILE_COLUMNS))
+    for site in step_sites:
+        for day_type in range(PROFILE_COLUMNS // common.HALF_HOURS_PER_DAY):
+            first = day_type * common.HALF_HOURS_PER_DAY + STEP_FIRST_COLUMN
+            step[site, first : first + STEP_LAST_COLUMN - STEP_FIRST_COLUMN + 1] = STEP_POINTS
+    noise_rng = rng if noise_seed is None else np.random.default_rng(noise_seed)
     n_rows = len(cache.end_times)
     donors_all = list(real_data.noise_bank)
     sites, vintage_rows = {}, []
@@ -394,13 +417,17 @@ def build_fleet(
         base = cache.sites[real]
         points = real_data.points[number]
         table = replace(base.table, site=label, time_series_id=9000 + number)
-        profile = real_data.band_means[number] + strength * (library[number] + deviation[number])
+        profile = (
+            real_data.band_means[number]
+            + strength * (library[number] + deviation[number])
+            + step[number]
+        )
         column = real_data.profile_column[real]
         y = real_data.base_y[real] + np.where(column >= 0, profile[np.maximum(column, 0)], np.nan)
         donors = [d for d in donors_all if d != real]
         for start in range(0, n_rows, WEEK_ROWS):
-            donor = real_data.noise_bank[donors[int(rng.integers(len(donors)))]]
-            block = donor[int(rng.integers(len(donor)))]
+            donor = real_data.noise_bank[donors[int(noise_rng.integers(len(donors)))]]
+            block = donor[int(noise_rng.integers(len(donor)))]
             stop = min(start + WEEK_ROWS, n_rows)
             y[start:stop] = y[start:stop] + block[: stop - start]
         sites[label] = replace(
@@ -654,6 +681,74 @@ def sparse_fleet_job(*, rng: np.random.Generator, overlapping: bool, tuned: dict
         "line6_chosen_k": chosen_k(scores=scores),
         "line7_near_best": int(near_best),
         "converged": [outcome.library.converged for outcome in starts],
+        **step_job(fleet_seed=fleet_seed, overlapping=overlapping, tuned=tuned),
+    }
+
+
+def fitted_profile(*, outcome: FitOutcome, label: str) -> np.ndarray:
+    """Return a site's fitted daily profile (band means included), shape (192,)."""
+    return outcome.library.fits[label].theta[0, :PROFILE_COLUMNS]
+
+
+def step_job(*, fleet_seed: int, overlapping: bool, tuned: dict[str, Any]) -> dict:
+    """Run line 10: can the library find an injected Economy 7-like step without being told?
+
+    Three fleets share one truth: with the step (noise A), without it (noise A), and without it
+    (noise B, the placebo). The step estimate at a site is the difference between the fitted
+    profiles of the stepped and the unstepped fleets, so the fits differ only by the step; the
+    placebo estimate is the difference between the two unstepped fits, which differ only by noise.
+
+    Args:
+        fleet_seed: The seed of the shared truth.
+        overlapping: True for truth shapes at cosines of 0.3 to 0.6.
+        tuned: The tuned settings.
+
+    Returns:
+        The injected sites' time error and size error, and the largest placebo step.
+    """
+    noise_a, noise_b = fleet_seed + 1, fleet_seed + 2
+    stepped = build_fleet(
+        rng=np.random.default_rng(fleet_seed),
+        kind="library",
+        overlapping=overlapping,
+        step_sites=STEP_SITES,
+        noise_seed=noise_a,
+    )
+    plain = build_fleet(
+        rng=np.random.default_rng(fleet_seed),
+        kind="library",
+        overlapping=overlapping,
+        noise_seed=noise_a,
+    )
+    placebo = build_fleet(
+        rng=np.random.default_rng(fleet_seed),
+        kind="library",
+        overlapping=overlapping,
+        noise_seed=noise_b,
+    )
+    k = TRUE_SHAPES + 1
+    fit_stepped = fit_sh(fleet=stepped, k=k, tuned=tuned)
+    fit_plain = fit_sh(fleet=plain, k=k, tuned=tuned)
+    fit_placebo = fit_sh(fleet=placebo, k=k, tuned=tuned)
+    window = slice(STEP_FIRST_COLUMN, STEP_LAST_COLUMN + 1)
+    time_errors, size_errors, placebo_steps = [], [], []
+    for position, label in enumerate(stepped.sites):
+        found = fitted_profile(outcome=fit_stepped, label=label) - fitted_profile(
+            outcome=fit_plain, label=label
+        )
+        false_step = fitted_profile(outcome=fit_placebo, label=label) - fitted_profile(
+            outcome=fit_plain, label=label
+        )
+        placebo_steps.append(float(abs(false_step[window].mean())))
+        if position in STEP_SITES:
+            weekday = found[: common.HALF_HOURS_PER_DAY]
+            rise_column = int(np.argmax(np.diff(weekday))) + 1
+            time_errors.append(abs(rise_column - STEP_FIRST_COLUMN))
+            size_errors.append(abs(float(found[window].mean()) - STEP_POINTS) / STEP_POINTS)
+    return {
+        "line10_max_time_error": int(max(time_errors)),
+        "line10_max_size_error": float(max(size_errors)),
+        "line10_placebo_step": float(max(placebo_steps)),
     }
 
 

@@ -186,13 +186,37 @@ def run(*, jobs: list[TuneJob], workers: int) -> pl.DataFrame:
     return pl.DataFrame([row for rows in results for row in rows])
 
 
+def add_exploratory_k(*, ks: list[int], workers: int) -> None:
+    """Run further exploratory values of K at the chosen pair and add them to `tuned.json`."""
+    path = common.WORK_DIR / "tuned.json"
+    chosen = json.loads(path.read_text())
+    jobs = [
+        TuneJob(k, chosen["lambda_dev"], chosen["gamma"], seed, init, exploratory=True)
+        for k in ks
+        for seed, init in SEEDS
+    ]
+    extra = run(jobs=jobs, workers=workers)
+    extra.write_parquet(
+        common.WORK_DIR / f"tuning_scores_exploratory_k{'_'.join(map(str, ks))}.parquet"
+    )
+    for k in ks:
+        chosen["exploratory_k"][str(k)] = float(
+            extra.filter(pl.col("k") == k)["score"].to_numpy().mean()
+        )
+    path.write_text(json.dumps(chosen, indent=2) + "\n")
+
+
 def main() -> None:
     """Tune on the real data and write `work/tuned.json` and the score tables."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--extra-k", nargs="+", type=int, default=None)
     arguments = parser.parse_args()
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     common.load_cache()
+    if arguments.extra_k:
+        add_exploratory_k(ks=arguments.extra_k, workers=arguments.workers)
+        return
     table = run(jobs=main_grid_jobs(), workers=arguments.workers)
     table.write_parquet(common.WORK_DIR / "tuning_scores.parquet")
     chosen = choose(table=table)
