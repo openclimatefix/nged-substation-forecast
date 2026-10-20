@@ -24,7 +24,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 import e00120_common as common
 import numpy as np
@@ -423,15 +423,26 @@ def save_library_fit(*, name: str, library: ShapeLibraryFit, extra: dict[str, ob
     path = FIT_DIR / f"{name}.npz"
     labels = sorted(library.weights)
     temporary = path.with_suffix(".tmp.npz")
-    np.savez(
-        temporary,
-        shapes=library.shapes,
-        labels=np.array(labels),
-        weights=np.stack([library.weights[label] for label in labels]),
-        deviations=np.stack([library.deviations[label] for label in labels]),
-        band_means=np.stack([library.band_means[label] for label in labels]),
-        objective_trace=np.array(library.objective_trace),
-    )
+    arrays: dict[str, Any] = {
+        f"{label}__{family}": library.fits[label].theta[
+            0, library.fits[label].layout.slices[family]
+        ]
+        for label in labels
+        for family in ("holiday", "tent", "harmonics", "heating", "lighting", "capacity")
+    }
+    pinned = [library.fits[label].pinned for label in labels]
+    arrays |= {
+        "shapes": library.shapes,
+        "labels": np.array(labels),
+        "weights": np.stack([library.weights[label] for label in labels]),
+        "deviations": np.stack([library.deviations[label] for label in labels]),
+        "band_means": np.stack([library.band_means[label] for label in labels]),
+        "objective_trace": np.array(library.objective_trace),
+        "pinned_points": np.array(
+            [np.nan if capacity is None else capacity.held_points for capacity in pinned]
+        ),
+    }
+    np.savez(temporary, **arrays)
     temporary.replace(path)
     facts = {
         "objective": library.objective_trace[-1],
