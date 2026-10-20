@@ -228,6 +228,22 @@ days per site), with a fleet-clustered 98.3% interval wholly below 1 (98.3% matc
 families after Bonferroni); (c) unlike-neighbours coverage within 10
 points of G's; (d) the bias under a quarter of the interval width.
 
+**Power check outcome and reading of the sizing rule (made after the 10-fleet power check and before
+the gate).** At 10 fleets the fleet-clustered standard error of a coverage was between 1.8 and 10.3
+points, so it was above 4 points for at least one family, and a literal reading of "the standard
+error is under 4 points" would always grow the cells to 60 fleets. The gate reads its coverages
+pooled over its three sets, so the rule is applied to the pooled size: the 10-fleet standard error
+scaled by the square root of 10 over 120 fleets is at most 3.0 points for every family (the largest
+is the profile scale, 10.3 points at 10 fleets). The planted failure sat 4.8 (heating slopes), 4.2
+(profile scale), and 6.0 (capacity) standard errors below G at 10 fleets, so the line can fail and
+sees over-shrinkage. The cells therefore stay at 40 fleets per set. The holiday family sat 1.5
+standard errors below G and is reported, not gated.
+
+**Code under test.** The tuning set, the gate, and the real-data stage run on `studies.dp_gam_graph`
+as of module commit 67deaa053 (module pull request 1411), which includes a Cholesky solver that a
+test shows equal to the LU solver on a 15-node fleet to 1e-7. If the later Opus review of the module
+changes it, the affected stages are re-run and the first-run results stay on the page.
+
 ## Tuning, years, and the real-data stage
 
 | Period | Cut | Role |
