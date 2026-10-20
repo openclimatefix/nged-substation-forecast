@@ -1403,6 +1403,8 @@ def causal_window_fit(
     cutoff: int,
     window_length: int,
     start: Mapping[str, np.ndarray] | None = None,
+    max_sweeps: int = DEFAULT_MAX_SWEEPS,
+    sweep_tolerance: float = SWEEP_TOLERANCE,
 ) -> tuple[FlowFit, int]:
     """Fit the flows on the trailing window of residuals that a forecast may see.
 
@@ -1416,6 +1418,8 @@ def causal_window_fit(
         cutoff: The newest usable grid position.
         window_length: How many rows the window holds.
         start: Optional warm start for each path, on the window's rows.
+        max_sweeps: The sweep limit of the block-coordinate fit.
+        sweep_tolerance: The sweeps' stopping tolerance.
 
     Returns:
         The fit, whose flows have `window_length` rows (fewer near the start of the stream), and
@@ -1429,7 +1433,15 @@ def causal_window_fit(
         raise ValueError(msg)
     first = max(cutoff - window_length + 1, 0)
     window = {node: residual[first : cutoff + 1] for node, residual in residuals.items()}
-    return fit_flows(paths=paths, residuals=window, noise=noise, start=start), first
+    fit = fit_flows(
+        paths=paths,
+        residuals=window,
+        noise=noise,
+        start=start,
+        max_sweeps=max_sweeps,
+        sweep_tolerance=sweep_tolerance,
+    )
+    return fit, first
 
 
 FLOW_AS_MOVED_FRACTION: Final[float] = 0.2
