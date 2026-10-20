@@ -132,18 +132,22 @@ less, and its position (UTC or local clock) cannot be told apart. The check used
 one summer pair, so the summer reading is weak. Winter local time equals UTC, so winter rows
 cannot separate the two indexings; only British Summer Time (BST) rows can.
 
-**Three arms, each B0 plus extra columns at B0's ridge 0.1, so each nests B0; each runs filtered
-(`-K`) and unfiltered.**
+**Four arms (NS-HW was added before any replicate or scored fit; see the clarifications), each B0
+plus extra columns at B0's ridge 0.1, so each nests B0; each runs filtered (`-K`) and unfiltered.**
 
 | Arm | Extra columns | Sign |
 |---|---|---|
 | NS-L | one level per half-hour of the 20 half-hours from 22:00 to 08:00 local time | free |
 | NS-U | the same, indexed on the UTC clock (22:00 to 08:00 UTC) | free |
 | NS-H | B0's 15.5 C hinge (4 smoothings) times an indicator for 00:00 to 07:00 UTC | non-negative |
+| NS-HW | the same hinge (4 smoothings) times each of the 20 UTC night half-hours (80 columns) | non-negative |
 
 **NS-H lets the step grow in cold weather**, as storage heating does. NS-L and NS-U agree on every
 winter row, so the NS-L against NS-U contrast uses BST nights only. The 20 levels are free, with
-B0's ridge.
+B0's ridge. Half-hour labels are start times (the 01:00 step is the half-hour 00:30 to 01:00).
+NS-H's window (00:00 to 07:00 UTC) is narrower than the 22:00 to 08:00 window of the other arms,
+so NS-H cannot see a step before midnight. NS-L is a null control, not a candidate (see the
+clarifications).
 
 ## Known-answer test and gate
 
@@ -238,6 +242,46 @@ are agreed with the experiment manager.
   stated in the verdict as a reason to hold the arm back. The page states how many independent
   winters the evidence holds. The substation cards gain a cold-snap panel and the fitted night step
   (as a score change, not a level).
+- **The night step was found on scored-year rows, so the replicate winter confirms it.** The step
+  was read from experiment 111's stored GAM-K residuals for November 2025 to February 2026 and for
+  two summer pairs, all in the scored year. The choice of the 01:00 half-hour, of D5, D10, and D16
+  as the large cases, and of the "3 of 5 sites" rule came from scored rows, so the scored winter is
+  not a clean test for the night arms. A night label of `gain` therefore also needs the replicate
+  winter (2024-25) winter-night estimate to be below zero with a 95% interval wholly below zero, or
+  at most half the scored estimate. Without it the label is `not replicated`. The evidence is two
+  winters (replicate and scored), plus the tuning winter (2023-24) for descriptive checks.
+- **Which gate covers which label.** A label whose gate fails is `not powered`, and the verdict
+  treats `not powered` as not `gain`. Gate 2 covers C1 (the MH label). Gate 4'(a) covers N2 (NS-U-K)
+  and the indexing contrast. Gate 4'(b) covers N4 (NS-HW-K), and the same test run for NS-H on the
+  `cold` truth (NS-H-K beats B0 on winter nights in at least 90% of draws) covers N3. N1 (NS-L-K)
+  is a null control with no label: its fitted values must equal B0's, so any gain is a bug and
+  audit trigger 5 fires. Gate 4 as written covers nothing. Gate 4' was written after gate 4 had
+  failed by construction; the first-run results of both are kept in the write-up. The NS label is
+  the best label among N2, N3, and N4.
+- **Scoring rows and wording of gate 4'.** "Beats" means a lower mean quantile score (unfiltered,
+  as in gate 4) over the stated rows, and a tie is not a beat. Gate 4'(a) scores all
+  22:00-to-08:00 British Summer Time (BST) night rows. Gate 4'(b) scores all winter-night rows. The
+  cold step in gate 4' is a step in the half-hour starting 00:30 UTC whose mean over the winter
+  rows of that half-hour is 4 points. Because a step in one of 20 night half-hours is diluted in
+  these scores, the **descriptive 01:00 gate** repeats 4' on the rows of the injected half-hour
+  only. It is labelled descriptive and cannot rescue a label.
+- **Non-inferiority bound against noise.** The +0.02 bound is smaller than the sister contrast's
+  half-width (about 0.023 at 97.5%). Night terms change few rows, so the contrast on all other rows
+  should be much tighter than that reference, and the report prints its width. A pass shows only
+  that the upper bound is under +0.02. It does not show equivalence. The winter-night subset has
+  fewer rows than the sister contrast, so its interval is wider, and the 0.05 margin is judged
+  against the printed width.
+- **One winter definition for labels.** Labels use winter nights (November to February, 22:00 to
+  08:00 local). The breakdown tables also show November to March, and "summer" in the
+  winter-against-summer contrast means June to August. A winter loss beside an annual gain is
+  stated in the verdict as a reason to hold the arm back from production; it does not change the
+  label. Intervals against BG2 and lagless XGBoost are 95% and exploratory, with no multiplicity
+  correction. The "daily mean" in the cold-night rules is the local calendar day.
+- **The indexing label ignores the cold-night count.** The indexing contrast pools the BST nights
+  of all five substations. The cold-BST-night count and "cannot tell" are reported per substation
+  and do not change the pooled label.
+- **If the MH-sh pick is again at the grid edge** (100000, nearly B0), the page reports "at the
+  edge" and MH-sh stays exploratory.
 - **The night step on the substation cards (maintainer request; Economy 7 may be reported to
   NGED).** For each decision substation (D-labels), the card shows the fitted night step from the
   best night arm: its size in MW, its start time, whether it follows local time or UTC (from the
@@ -279,7 +323,7 @@ bands, and leaving one site out.
   mean dilutes them. Each arm has its own filter hyperparameters, with the control below.
 - **Indexing contrast:** NS-U-K minus NS-L-K on BST nights (April to October), 95%, labelled `UTC`
   if wholly below zero (consistent with GMT-set timers), `local` if wholly above, `unresolved`
-  otherwise, only if gate 4 passes. The summer step is 1.7 MW or less, so `unresolved` is the
+  otherwise, only if gate 4'(a) passes. The summer step is 1.7 MW or less, so `unresolved` is the
   likely outcome.
 - **Filter-fit control:** MH-K and each night arm run with B0-K's stored filter hyperparameters
   (MH-K-b0 and so on). If C1's
@@ -317,9 +361,12 @@ Written before any fit; each line can fail, and none overrides the decision rule
 - **Gate 2:** (a) passes narrowly, recovering 50 to 70% of the oracle gain; (b) passes with a
   paired mean between 0 and +0.01 (per-site misses of 0.005 to 0.01 at up to 3 sites do not fail
   it). The chance of `not powered` is judged at about one in three.
-- **N1 to N3:** winter-night gain of −0.10 to −0.30 points at D5, D10, and D16 and under 0.03
-  at D11, D14, and D9; NS-H-K at least as good as NS-L-K in January and February; non-inferiority
-  holds. NS-U-K and NS-L-K within 0.01 on winter nights, and the indexing label `unresolved`.
+- **N2 to N4:** winter-night gain of −0.10 to −0.30 points at D5, D10, and D16 and under 0.03
+  at D11, D14, and D9 for the arm that fits the step; non-inferiority holds. **N1 (NS-L-K)** ties
+  B0-K to 1e-5 points. NS-U-K and NS-L-K are within 0.01 on winter nights. The indexing label is
+  `indexing not identified` if gate 4'(a) fails, and otherwise `unresolved`. The tuning year
+  already shows NS-U-K 0.043 points better than B0-K after the filter, which is not predicted to
+  carry over to winter nights.
 - **Pooled-curve coverage** under 70%, so no curve summary is drawn. **B0-K** within 0.01 of its
   experiment 114 value (2.255); the run under 1 hour.
 
@@ -334,27 +381,28 @@ Written before any fit; each line can fail, and none overrides the decision rule
   otherwise. The replicate condition is required because the MH-sh multiplier and the filter's
   hyperparameters are chosen on the tuning year. The replicate estimate is printed beside every
   scored estimate in the headline chart and tables.
-- **Label for N1 to N4 (gate 4' gates only N4 and the indexing contrast):** `gain` if the
+- **Label for N2 to N4 (each gated as the clarifications say; N1 is a null control):** `gain` if the
   winter-night estimate is at most −0.05 points, the 99.375% interval lies wholly below zero, the
-  replicate year's winter-night estimate is below zero, at least 3 of 5 sites improve (the step is
+  replicate year's winter-night estimate is below zero with its 95% interval wholly below zero or
+  at most half the scored estimate, at least 3 of 5 sites improve (the step is
   large at three substations), and non-inferiority holds. `small gain` if the interval lies wholly
   below zero, the estimate is between −0.05 and zero, and the replicate is below zero. `not
   replicated` and `worse` (interval wholly above zero) as for C1; `tie` otherwise. Failure of
   non-inferiority gives `worse on other rows` and no `gain`. The **NS label** is the best label
-  among N1 to N4. The reported winning indexing is whichever of NS-L and NS-U has the lower
-  winter-night filtered score, with the indexing contrast beside it.
+  among N2 to N4. The indexing contrast is the only statement about which clock the step follows.
 - **Gate failure or control disagreement (MH):** label `not powered` (gate) or `inconclusive`
   (filter
   control); the scored C1 is still computed and printed with no label, and the MH label
   is not `gain`. Take-home then says whether the printed estimate reached the margin, as
   information only.
 - **Verdict:** `supported` if both the MH label and the NS label are `gain`; `partly supported` if
-  one is; `small gain` if neither and one is `small gain`; `refuted` if none of those and a
-  decision contrast is `worse` (this refutes only these five hinge positions with this ridge, or
-  these night terms; the weakly identified fits could have overfitted, and the take-home says so);
-  `inconclusive` otherwise, including `not powered`, `not replicated`, `tie`, and a blocking test
-  that cannot be fixed. A failed MH gate leaves the MH label `not powered`, which counts as not
-  passing.
+  one is (a `not powered` label never counts as `gain`); `small gain` if neither and one is
+  `small gain`; `refuted` if
+  none of those and a decision contrast is `worse` (this refutes only these five hinge positions
+  with this ridge, or these night terms; the weakly identified fits could have overfitted, and the
+  take-home says so); `inconclusive` otherwise, including `not powered`, `not replicated`, `tie`,
+  and a blocking test that cannot be fixed. A failed MH gate leaves the MH label `not powered`,
+  which counts as not passing.
 - **Handed on:** a `gain` becomes a candidate for GAM-K's base only after an ENS confirmation with
   Part 6's monthly refits, which needs its own plan and approval. A `tie` or `not powered` keeps
   the single 15.5 C hinge. A night-step `gain` also needs an ENS confirmation, since the step is in
@@ -373,7 +421,9 @@ fired). Trigger 7 fires on any `gain`, so an Opus audit is planned for that case
    90% although experiment 113 found slopes weak; B0-K misses 114's B0-K.
 3. **Score and mean-forecast error disagree in sign** for C1.
 4. **Leaving one site out** flips the sign of C1 or changes its label.
-5. **A nested arm wins, or a null control moves:** B0 beats MH on the tuning year by more than
+5. **A nested arm wins, or a null control moves:** NS-L's unfiltered fitted values differ from B0's
+   by more than 1e-5 points, or NS-L-K scores differently from B0-K by more than its own paired
+   half-width; B0 beats MH on the tuning year by more than
    MH's paired half-width; the single-hinge reproduction moves the score at all; MH-K-b0 moves C1.
 6. **Interval width:** C1's 97.5% interval more than twice or under half the width of Part 4's C4
    at the same level (about ±0.023).
@@ -387,8 +437,15 @@ counts, never dates and never beside a D-label; none is fitted here. The page ma
 interconnected D-label pairs such as D5-D16, and no substation names and no other topology. Never
 print a generator's public name beside its series. **No per-site curve interpretation from weakly
 identified fits:** no per-site hinge slope, curve, or curve summary is printed; the only curve
-figure is the pooled summary of gate step 3, drawn only if its coverage lies within 70 to 90%. Night
-levels are reported per site as score changes only, not as fitted levels.
+figure is the pooled summary of gate step 3, drawn only if its coverage lies within 70 to 90%. The
+night step is the exception, by the maintainer's request: per D-label substation the cards show the
+step's size in MW, slope per degree, start time, and base level with intervals, because a step that
+grows with cold is the quantity NGED asked about, and the per-site NS-H or NS-HW slopes are
+identified by the sharp 01:00 timing rather than by the weakly identified band slopes of experiment
+113. A generator-linked series appears only under a G-label, normalised, without dates. The step's
+start time is the first half-hour whose fitted step exceeds a tenth of the largest half-hour step. A
+card shows the step of the night arm with the lowest winter-night score even if no arm earned a
+label, and says so.
 
 ## Substation cards
 
