@@ -185,6 +185,44 @@ def contrast(
     }
 
 
+TAIL_LEVELS: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
+
+
+def checks(*, losses: pl.DataFrame) -> dict[str, Any]:
+    """Return the median-minus-mean forecast per site and the tail scores of each arm.
+
+    Args:
+        losses: Every arm's day-ahead rows.
+
+    Returns:
+        For each cut: the mean of (median forecast minus mean forecast) by arm and site on rows
+        outside the events, and by arm the coverage and pinball loss at the four tail quantiles.
+    """
+    out: dict[str, Any] = {}
+    for cut_name in ("replicate", "scored"):
+        scope = losses.filter(
+            pl.col("cut") == cut_name,
+            ~pl.col("in_event"),
+            pl.col("site").is_in(DECISION_SITES),
+        )
+        gap = scope.group_by("arm", "site").agg(
+            (pl.col("q50") - pl.col("mean")).mean().alias("median_minus_mean")
+        )
+        tails: list[dict[str, Any]] = []
+        for arm in ARMS:
+            part = scope.filter(pl.col("arm") == arm)
+            entry: dict[str, Any] = {"arm": arm}
+            for column, level in TAIL_LEVELS.items():
+                error = (part["actual"] - part[column]).to_numpy()
+                entry[f"coverage_{column}"] = float(np.mean(error <= 0.0))
+                entry[f"pinball_{column}"] = float(
+                    np.mean(np.maximum(level * error, (level - 1.0) * error))
+                )
+            tails.append(entry)
+        out[cut_name] = {"median_minus_mean": gap.to_dicts(), "tails": tails}
+    return out
+
+
 def main() -> None:
     """Score the three arms in both years and write the contrasts."""
     cache = common.load_cache()
@@ -242,6 +280,7 @@ def main() -> None:
                     for arm in ARMS
                 },
             }
+    results["checks"] = checks(losses=losses)
     score.write_json(path=RESULT_PATH, payload=results)
     print(json.dumps(results["scored:outside_events"]["a4_minus_a0"], indent=2))
 

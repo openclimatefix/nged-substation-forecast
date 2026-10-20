@@ -243,10 +243,380 @@ def figure_examples() -> alt.TopLevelMixin:
     )
 
 
+def figure_variants() -> alt.TopLevelMixin:
+    """Recall over one day against placebo flow, for the registered setting and the variants."""
+    variants = read_json(name="variants.json")["post_hoc_variants"]
+    gate = read_json(name="gate_tuning_only_first_run.json")
+    rows = [
+        {
+            "label": "Registered (step 300, level 0, Huber 1.5)",
+            "recall": gate["3a_recall_over_1_day"]["value"],
+            "placebo": 0.0,
+            "kind": "registered",
+        }
+    ]
+    names = {
+        "huber10": "Post hoc: registered penalties, Huber 10",
+        "loose": "Post hoc: step 10, level 0.3, Huber 1.5",
+        "loose_huber10": "Post hoc: step 10, level 0.3, Huber 10",
+        "loosest_huber10": "Post hoc: step 3, level 0, Huber 10",
+    }
+    rows.extend(
+        {
+            "label": names[entry["variant"]],
+            "recall": entry["recall_over_1_day"],
+            "placebo": max(entry["placebo_mw_days"].values()),
+            "kind": "post hoc",
+        }
+        for entry in variants
+    )
+    table = pl.DataFrame(rows)
+    order = table["label"].to_list()
+    points = (
+        alt.Chart(table)  # ty: ignore[unresolved-attribute]
+        .mark_point(filled=True, size=90)
+        .encode(
+            x=alt.X(
+                "placebo:Q",
+                title=["Flow on the worse unconnected pair (MW-days per year; smaller is better)"],
+                scale=alt.Scale(type="symlog", domain=[0, 50]),
+                axis=alt.Axis(values=[0, 0.05, 1, 5, 20, 50]),
+            ),
+            y=alt.Y(
+                "recall:Q",
+                title=["Recall of transfers over 1 day (higher is better)"],
+                scale=alt.Scale(domain=[0, 1]),
+            ),
+            color=alt.Color(
+                "label:N",
+                sort=order,
+                scale=alt.Scale(
+                    domain=order,
+                    range=[DARK, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE, ocf.DATA_GREEN],
+                ),
+                legend=alt.Legend(title=None, orient="top", columns=1, labelLimit=380),
+            ),
+        )
+    )
+    recall_line = (
+        alt.Chart(pl.DataFrame({"y": [0.77]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(color=GREY, strokeDash=[4, 3])
+        .encode(y="y:Q")
+    )
+    placebo_line = (
+        alt.Chart(pl.DataFrame({"x": [0.05]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(color=GREY, strokeDash=[4, 3])
+        .encode(x="x:Q")
+    )
+    return (recall_line + placebo_line + points).properties(
+        width=WIDTH - 60,
+        height=260,
+        title=title(
+            text="Finding real transfers and finding false ones go together",
+            subtitle=(
+                "Tuning year, 100 of the gate's transfers of 25% or 40% of the receiving load "
+                "(recall; the registered dot reads all 200 such transfers) and the two placebo "
+                "pairs with no interconnection (flow). Dashed "
+                "lines: the gate's thresholds, recall 0.77 and flow 0.05 MW-days. Variants were "
+                "chosen after the registered gate failed and cannot change the verdict."
+            ),
+        ),
+    )
+
+
+def figure_fleet() -> alt.TopLevelMixin:
+    """Megawatt-days of flow on each edge of the decision graph, mean of two years."""
+    rows = []
+    for year in ("replicate", "scored"):
+        flows = flows_module.read_flows(year_name=year)
+        for name, flow in flows.items():
+            if name == "position" or name.startswith("outside"):
+                continue
+            rows.append({"pair": name, "year": year, "mw_days": float(np.sum(np.abs(flow)) / 48.0)})
+    table = pl.DataFrame(rows).group_by("pair").agg(pl.col("mw_days").mean())
+    order = table.sort("mw_days", descending=True)["pair"].to_list()
+    return (
+        alt.Chart(table)  # ty: ignore[unresolved-attribute]
+        .mark_bar(color=ocf.DATA_BLUE)
+        .encode(
+            y=alt.Y("pair:N", sort=order, title=None),
+            x=alt.X(
+                "mw_days:Q", title="Flow the registered fit puts on the edge (MW-days per year)"
+            ),
+        )
+        .properties(
+            width=WIDTH - 100,
+            height=14 * len(order),
+            title=title(
+                text="Where the registered fit puts flow",
+                subtitle=(
+                    "Mean over the replicate and scored years of the megawatt-days of flow on each "
+                    "edge of the decision graph, with the registered penalties. The placebo pairs "
+                    "carry about zero in this fit."
+                ),
+            ),
+        )
+    )
+
+
+WINTER_WEEK: Final[tuple[str, str]] = ("2025-12-01", "2025-12-08")
+SUMMER_WEEK: Final[tuple[str, str]] = ("2026-06-01", "2026-06-08")
+"""The two weeks every card shows. Fixed before any score was read: the first full weeks of
+December 2025 and June 2026, Monday to Sunday."""
+
+
+def _week_frame(*, site: str, week: tuple[str, str], arm: str = "a4") -> pl.DataFrame:
+    """Return the day-ahead forecast rows of a site over a week, in megawatts."""
+    losses = pl.read_parquet(common.WORK_DIR / "c2_losses.parquet").filter(
+        pl.col("arm") == arm, pl.col("site") == site, pl.col("cut") == "scored"
+    )
+    start = pl.lit(week[0]).str.to_datetime(time_zone="UTC")
+    stop = pl.lit(week[1]).str.to_datetime(time_zone="UTC")
+    return losses.filter(pl.col("time") > start, pl.col("time") <= stop)
+
+
+def _forecast_panel(*, site: str, week: tuple[str, str], label: str, scale: float) -> alt.Chart:
+    """Draw one week of observed power against the A4 forecast and its 80% and 90% bands."""
+    frame = _week_frame(site=site, week=week).with_columns(
+        pl.col(["actual", "mean", "q05", "q10", "q90", "q95"]) * scale
+    )
+    base = alt.Chart(frame).encode(  # ty: ignore[unresolved-attribute]
+        x=alt.X("time:T", title=None, axis=alt.Axis(format="%a %d %b"))
+    )
+    band90 = base.mark_area(opacity=0.18, color=ocf.DATA_BLUE).encode(y="q05:Q", y2="q95:Q")
+    band80 = base.mark_area(opacity=0.30, color=ocf.DATA_BLUE).encode(y="q10:Q", y2="q90:Q")
+    forecast = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5).encode(
+        y=alt.Y("mean:Q", title="Power (MW)", scale=alt.Scale(zero=False))
+    )
+    observed = base.mark_line(color=DARK, strokeWidth=1.2).encode(y="actual:Q")
+    event_rows = frame.filter(pl.col("in_event")).with_columns(
+        start=pl.col("time") - pl.duration(minutes=30)
+    )
+    layers = [band90, band80, forecast, observed]
+    if event_rows.height:
+        layers.insert(
+            0,
+            alt.Chart(event_rows)  # ty: ignore[unresolved-attribute]
+            .mark_rect(color=ocf.DATA_AMBER, opacity=0.15)
+            .encode(x="start:T", x2="time:T"),
+        )
+    return alt.layer(*layers).properties(width=WIDTH - 60, height=120, title=label)
+
+
+def _flow_panel(
+    *, site: str, week: tuple[str, str], label: str, cache_end: np.ndarray
+) -> alt.Chart:
+    """Draw one week of the hindsight edge flows at a site, and its outside path."""
+    flows = flows_module.read_flows(year_name="scored")
+    positions = flows["position"]
+    times = cache_end[positions]
+    start, stop = np.datetime64(week[0], "us"), np.datetime64(week[1], "us")
+    chosen = (times > start) & (times <= stop)
+    edges = [
+        name for name in flows if "-" in name and site in name.split("-") and "outside" not in name
+    ]
+    parts = []
+    for name in edges:
+        first, second = name.split("-")
+        sign = 1.0 if first == site else -1.0
+        parts.append(
+            pl.DataFrame(
+                {
+                    "time": times[chosen],
+                    "flow": sign * flows[name][chosen],
+                    "path": f"edge to {second if first == site else first}",
+                }
+            )
+        )
+    parts.append(
+        pl.DataFrame(
+            {
+                "time": times[chosen],
+                "flow": flows[f"outside:{site}"][chosen],
+                "path": "outside path",
+            }
+        )
+    )
+    table = pl.concat(parts).with_columns(pl.col("time").dt.replace_time_zone("UTC"))
+    return (
+        alt.Chart(table)  # ty: ignore[unresolved-attribute]
+        .mark_line(interpolate="step-after", strokeWidth=1.4)
+        .encode(
+            x=alt.X("time:T", title=None, axis=alt.Axis(format="%a %d %b")),
+            y=alt.Y("flow:Q", title="Flow onto the substation (MW)"),
+            color=alt.Color(
+                "path:N",
+                scale=alt.Scale(range=list(ocf.DATA_COLOURS)),
+                legend=alt.Legend(title=None, orient="top", direction="horizontal", columns=4),
+            ),
+        )
+        .properties(width=WIDTH - 60, height=90, title=label)
+    )
+
+
+def figure_card(*, site: str) -> alt.TopLevelMixin:
+    """Draw a substation's network card (provisional): forecasts and flows in two weeks."""
+    cache = common.load_cache()
+    scale = cache.sites[site].table.effective_capacity_mw / 100.0
+    return alt.vconcat(
+        _forecast_panel(
+            site=site, week=WINTER_WEEK, label="Winter week, 1 to 7 December 2025", scale=scale
+        ),
+        _forecast_panel(
+            site=site, week=SUMMER_WEEK, label="Summer week, 1 to 7 June 2026", scale=scale
+        ),
+        _flow_panel(
+            site=site,
+            week=WINTER_WEEK,
+            label="Fitted flows, winter week",
+            cache_end=cache.end_times,
+        ),
+        _flow_panel(
+            site=site,
+            week=SUMMER_WEEK,
+            label="Fitted flows, summer week",
+            cache_end=cache.end_times,
+        ),
+    ).properties(
+        title=title(
+            text=f"Network card for {site} (provisional: past weather, screening run)",
+            subtitle=(
+                "Top: day-ahead forecast of the model trained on power with the edge flows taken "
+                "out (line), its 80% and 90% bands, and the observed power (dark line); amber: "
+                "hours inside a hand-filtered switching event. Bottom: the registered fit's "
+                "hindsight flows on the substation's edges and its outside path. Weeks fixed "
+                "before any score was read."
+            ),
+        )
+    )
+
+
+def _forest(
+    *, table: pl.DataFrame, x_title: str, chart_title: str, zero_at: float = 0.0
+) -> alt.Chart:
+    """Draw dots with interval lines for a table of label, estimate, lower, upper, and colour."""
+    order = table["label"].to_list()
+    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
+        y=alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=300))
+    )
+    rule = base.mark_rule(strokeWidth=2).encode(
+        x=alt.X("lower:Q", title=x_title), x2="upper:Q", color=alt.Color("group:N", legend=None)
+    )
+    dot = base.mark_point(filled=True, size=70).encode(
+        x="estimate:Q", color=alt.Color("group:N", legend=None)
+    )
+    zero = (
+        alt.Chart(pl.DataFrame({"x": [zero_at]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(color=GREY, strokeDash=[4, 3])
+        .encode(x="x:Q")
+    )
+    return (zero + rule + dot).properties(
+        width=WIDTH - 250, height=22 * len(order), title=chart_title
+    )
+
+
+def figure_headline() -> alt.TopLevelMixin:
+    """The three planned contrasts, with winter breakdowns, as dots with 98.33% intervals."""
+    c1 = decide_summary_c1()
+    c2 = read_json(name="c2.json")
+    c3 = read_json(name="c3.json")
+    panel_1 = _forest(
+        table=pl.DataFrame(
+            [
+                {
+                    "label": "C1: share of injected MW rebuilt (needs 0.5 or more)",
+                    "estimate": c1["estimate"],
+                    "lower": c1["lower"],
+                    "upper": c1["upper"],
+                    "group": "c1",
+                }
+            ]
+        ),
+        x_title="Share of the injected megawatts that the edge flows rebuild (higher is better)",
+        chart_title="C1: does the fit rebuild injected transfers?",
+        zero_at=0.5,
+    )
+    rows_2 = []
+    for year in ("scored", "replicate"):
+        for scope, name in (
+            ("outside_events", "all rows outside events"),
+            ("winter", "winter"),
+            ("winter_cold_snap", "winter cold-snap days"),
+            ("winter_evening_peak", "winter evening peaks"),
+        ):
+            entry = c2[f"{year}:{scope}"]["a4_minus_a0"]
+            rows_2.append(
+                {
+                    "label": f"{year}, {name}",
+                    "estimate": entry["difference"],
+                    "lower": entry["lower"],
+                    "upper": entry["upper"],
+                    "group": year,
+                }
+            )
+    panel_2 = _forest(
+        table=pl.DataFrame(rows_2),
+        x_title="A4 minus A0, quantile score (points; negative is better; margin +0.05)",
+        chart_title="C2: does removing flows from training do harm outside events?",
+    )
+    rows_3 = []
+    for year in ("scored", "replicate"):
+        entry = c3[year]["contrasts"]["a5_minus_a4"]
+        rows_3.append(
+            {
+                "label": f"{year}, all injected rows",
+                "estimate": entry["estimate"],
+                "lower": entry["lower"],
+                "upper": entry["upper"],
+                "group": year,
+            }
+        )
+        winter = c3[year]["winter_scopes"]["winter"]["a5_minus_a4"]
+        if winter is not None:
+            rows_3.append(
+                {
+                    "label": f"{year}, winter rows",
+                    "estimate": winter["estimate"],
+                    "lower": winter["lower"],
+                    "upper": winter["upper"],
+                    "group": year,
+                }
+            )
+    panel_3 = _forest(
+        table=pl.DataFrame(rows_3),
+        x_title="A5 minus A4, quantile score (points; negative is better; needs -0.5 or lower)",
+        chart_title="C3: do causal flows help the forecast during and after a transfer?",
+    )
+    return alt.vconcat(panel_1, panel_2, panel_3).properties(
+        title=title(
+            text="No contrast shows a gain from fitted flows",
+            subtitle=(
+                "Dots: estimates; lines: 98.33% intervals from resampling whole calendar months "
+                "(C2 and C3 over the decision substations D5, D10, D11, D14, D16 and the four gate "
+                "sites; C1 over injected transfers). Dashed line: no difference (C1: the 0.5 "
+                "threshold). Registered configuration; C3 on a 100-transfer sample per year."
+            ),
+        )
+    )
+
+
+def decide_summary_c1() -> dict:
+    """Return the C1 summary from the stored seeds."""
+    import e00116_decide as decide
+
+    return decide.c1_summary()
+
+
 FIGURES: Final[dict[str, Callable[[], alt.TopLevelMixin]]] = {
     "tuning": figure_tuning,
     "recall_cells": figure_recall_cells,
     "examples": figure_examples,
+    "variants": figure_variants,
+    "headline": figure_headline,
+    "fleet": figure_fleet,
+    **{
+        f"card_{site}": (lambda site=site: figure_card(site=site)) for site in common.DECISION_SITES
+    },
 }
 
 

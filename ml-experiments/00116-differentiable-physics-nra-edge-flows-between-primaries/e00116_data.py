@@ -14,6 +14,7 @@ import e00116_gam as gam
 import numpy as np
 import polars as pl
 from studies.dp_edge_flow import (
+    HUBER_THRESHOLD_IN_SIGMAS,
     FlowFit,
     PathSpec,
     block_mean_residuals,
@@ -180,16 +181,22 @@ class FlowConfig:
         level_c: The level penalty is `level_c / sigma_e`.
         outside_factor: The multiple of the edge penalties charged on an outside path.
         block: Rows per block (1 for half-hourly flows, 6 for the 3-hour blocks of A2-b).
+        huber_sigmas: The Huber loss is quadratic within this many noise scales of zero; the
+            registered value is 1.5, and a larger one is a post hoc variant.
     """
 
     step_c: float
     level_c: float
     outside_factor: float = 1.0
     block: int = 1
+    huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS
 
     def label(self) -> str:
         """Return a short label for file names."""
-        return f"c{self.step_c:g}_l{self.level_c:g}_r{self.outside_factor:g}_b{self.block}"
+        suffix = (
+            "" if self.huber_sigmas == HUBER_THRESHOLD_IN_SIGMAS else f"_h{self.huber_sigmas:g}"
+        )
+        return f"c{self.step_c:g}_l{self.level_c:g}_r{self.outside_factor:g}_b{self.block}{suffix}"
 
 
 def build_graph_paths(
@@ -244,6 +251,7 @@ def fit_year_flows(
             start=start,
             max_sweeps=MAX_SWEEPS,
             sweep_tolerance=SWEEP_TOLERANCE,
+            huber_sigmas=config.huber_sigmas,
         )
     length = len(next(iter(chosen.values())))
     means, reliability = block_mean_residuals(residuals=chosen, block_size=config.block)
@@ -258,6 +266,7 @@ def fit_year_flows(
         start=block_start,
         max_sweeps=MAX_SWEEPS,
         sweep_tolerance=SWEEP_TOLERANCE,
+        huber_sigmas=config.huber_sigmas,
     )
     flows = {
         name: expand_blocks(block_values=flow, block_size=config.block, length=length)

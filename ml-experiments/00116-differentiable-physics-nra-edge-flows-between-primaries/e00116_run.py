@@ -29,6 +29,8 @@ import e00116_local as local
 import numpy as np
 import polars as pl
 
+REPLICA_DAY_STEP: Final[int] = 3
+"""The replica and own-year runs use the 09:00 UTC origin of every third day."""
 ORIGIN_STEP_HALF_HOURS: Final[int] = 12
 """Origins are every 6 hours."""
 PRE_ONSET_HALF_HOURS: Final[int] = 12
@@ -265,7 +267,8 @@ def run_replica(
     at_nine = (cache.end_times[window] - cache.end_times[window].astype("datetime64[D]")) == (
         np.timedelta64(9, "h")
     )
-    cutoffs = [int(position) - causal.DELAY_HALF_HOURS for position in window[at_nine]]
+    nine = window[at_nine][::REPLICA_DAY_STEP]
+    cutoffs = [int(position) - causal.DELAY_HALF_HOURS for position in nine]
     cutoffs = cutoffs[chunk::n_chunks]
     streams = data.out_of_sample()
     if arm == "a5":

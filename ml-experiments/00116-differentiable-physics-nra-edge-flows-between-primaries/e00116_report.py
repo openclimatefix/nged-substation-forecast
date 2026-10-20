@@ -26,7 +26,7 @@ def interval(*, entry: dict[str, Any]) -> str:
     return f"{estimate:+.3f} ({entry['lower']:+.3f} to {entry['upper']:+.3f})"
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912 - a flat sequence of prints, one block per result file
     """Print the tuning choice, the gate, C1, C2, C3, the verdict, and the controls."""
     work = common.WORK_DIR
     decisions = json.loads((work / "decisions.json").read_text())
@@ -54,6 +54,8 @@ def main() -> None:
     gate = json.loads((work / "gate.json").read_text())
     for name, reading in gate.items():
         show(label=name, value=f"{reading['value']} pass={reading['pass']}")
+    first = json.loads((work / "gate_tuning_only_first_run.json").read_text())
+    show(label="first run, reading 5 (outside-path bug)", value=first["5_nra_gap_closed"]["value"])
     print("== C1")
     c1 = decide.c1_summary()
     show(
@@ -68,6 +70,8 @@ def main() -> None:
     print("== C2")
     c2 = json.loads((work / "c2.json").read_text())
     for scope, entry in c2.items():
+        if scope == "checks":
+            continue
         for name in ("a4_minus_a0", "a4_minus_a1", "a1_minus_a0", "a4_minus_a0_mean_error"):
             show(
                 label=f"{scope} {name}",
@@ -78,6 +82,15 @@ def main() -> None:
             )
         show(label=f"{scope} absolute", value=entry["absolute"])
         show(label=f"{scope} days", value=entry["days"])
+    for cut_name, entry in c2["checks"].items():
+        show(label=f"{cut_name} median minus mean forecast", value=entry["median_minus_mean"])
+        for row in entry["tails"]:
+            show(label=f"{cut_name} tails", value=row)
+    print("== Post hoc variants")
+    for variant in json.loads((work / "variants.json").read_text())["post_hoc_variants"]:
+        show(label=variant["variant"], value=variant)
+    print("== Real events on the gate edges")
+    show(label="events", value=(work / "real_events.json").read_text())
     print("== C3")
     c3 = json.loads((work / "c3.json").read_text())
     for year, entry in c3.items():
