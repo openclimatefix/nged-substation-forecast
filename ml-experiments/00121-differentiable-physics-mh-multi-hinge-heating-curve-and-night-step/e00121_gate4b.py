@@ -18,9 +18,9 @@ draws (draws 0 to 19 at each of the 5 substations). An arm detects a step when i
 below the critical value. The false-positive rate is checked on 100 further placebo draws (draws
 100 to 119).
 
-**Pass.** (a) NS-U detects the 4-point `utc` step in at least 80% of draws and the 4-point `local` step
-in at most 10%; (b) NS-HW detects the 4-point `cold` step in at least 80%; (c) NS-H detects it in at
-least 80%; and the verification placebo false-positive rate is at most 8% for each
+**Pass.** (a) NS-U detects the 4-point `utc` step in at least 80% of draws and the 4-point
+`local` step in at most 10%; (b) NS-HW detects the 4-point `cold` step in at least 80%; (c) NS-H
+detects it in at least 80%; and the verification placebo false-positive rate is at most 8% for each
 (target 5%; 100 draws carry a Monte Carlo error of about 2 points).
 
     OMP_NUM_THREADS=1 uv run python ml-experiments/00121-*/e00121_gate4b.py run [--workers 5]
