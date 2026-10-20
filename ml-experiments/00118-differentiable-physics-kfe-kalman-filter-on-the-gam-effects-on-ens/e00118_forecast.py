@@ -67,6 +67,11 @@ OWN_SPREAD_ARMS: Final[tuple[str, ...]] = tuple(
 """Arms whose spread this experiment fits on the tuning months."""
 
 
+def available_arms(*, filters: dict[str, ArmFilter], arms_wanted: tuple[str, ...]) -> list[str]:
+    """Return the wanted arms whose filter state exists (an arm without a fitted noise has none)."""
+    return [arm for arm in arms_wanted if STATE_ARM_OF.get(arm, arm) in filters]
+
+
 @dataclass(frozen=True)
 class ArmFilter:
     """An arm's filter: its trace over the whole stream and its noise.
@@ -99,6 +104,8 @@ def build_filters(*, cache: FeatureCache, data: streams.SiteStreams) -> dict[str
     out: dict[str, ArmFilter] = {}
     noises = {"GK": arms.gk_noise(hyper=hyper, scale=data.scale)}
     for name in arms.FITTED_ARMS:
+        if not noise_io.noise_path(arm=name).exists():
+            continue
         stored = noise_io.read_noise(arm=name)["sites"][data.site]
         noises[name] = FilterNoise(
             q=np.array(stored["q"]),

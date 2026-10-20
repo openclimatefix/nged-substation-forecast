@@ -150,6 +150,7 @@ def p1() -> dict:
         spread = common.load_gamk_spread(site=site)
         quantile_difference = 0.0
         stored_difference = 0.0
+        joined_rows = 0
         for index in runs:
             members = fc.run_members(cache=cache, setup=setup, fits=fits, index=index)
             if members is None:
@@ -174,6 +175,7 @@ def p1() -> dict:
             joined = frame.join(
                 stored.filter(pl.col("run") == index), on=["run", "valid_time"], suffix="_111"
             )
+            joined_rows += joined.height
             for column in ("q01", "q25", "q50", "q75", "q99"):
                 quantile_difference = max(
                     quantile_difference,
@@ -188,7 +190,9 @@ def p1() -> dict:
             "level_anomaly_vs_run_kalman": difference,
             "quantiles_vs_stored": quantile_difference,
             "level_anomaly_vs_stored_float32": stored_difference,
-            "passed": difference < P1_FILTER_TOLERANCE
+            "rows_compared": joined_rows,
+            "passed": joined_rows > 0
+            and difference < P1_FILTER_TOLERANCE
             and quantile_difference < P1_QUANTILE_TOLERANCE
             and stored_difference < P1_STORED_FLOAT32_TOLERANCE,
         }

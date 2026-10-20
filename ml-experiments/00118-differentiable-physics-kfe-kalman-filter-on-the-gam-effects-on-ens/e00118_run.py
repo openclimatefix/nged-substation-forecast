@@ -115,10 +115,11 @@ def tune_site(site: str) -> dict:
         for index in runs
         if (piece := fc.run_members(cache=cache, setup=setup, fits=fits, index=index)) is not None
     ]
-    zero_frames: dict[str, list[pl.DataFrame]] = {arm: [] for arm in fc.OWN_SPREAD_ARMS}
-    corrected: dict[str, list[fc.Corrected]] = {arm: [] for arm in fc.OWN_SPREAD_ARMS}
+    own_arms = fc.available_arms(filters=filters, arms_wanted=fc.OWN_SPREAD_ARMS)
+    zero_frames: dict[str, list[pl.DataFrame]] = {arm: [] for arm in own_arms}
+    corrected: dict[str, list[fc.Corrected]] = {arm: [] for arm in own_arms}
     for members in pieces:
-        for arm in fc.OWN_SPREAD_ARMS:
+        for arm in own_arms:
             result = fc.corrected_members(
                 cache=cache,
                 setup=setup,
@@ -138,7 +139,7 @@ def tune_site(site: str) -> dict:
             if frame is not None:
                 zero_frames[arm].append(frame)
     out: dict = {"site": site, "factor_scores": {}}
-    for arm in fc.OWN_SPREAD_ARMS:
+    for arm in own_arms:
         spread = fc.fit_spread(frame=pl.concat(zero_frames[arm]))
         save_spread(arm=arm, site=site, spread=spread)
         scores = {}
@@ -168,6 +169,8 @@ def choose_factors(*, results: list[dict]) -> dict[str, list[float]]:
     """Return, per arm and lead band, the factor with the lowest decision-site mean score."""
     chosen: dict[str, list[float]] = {}
     for arm in fc.OWN_SPREAD_ARMS:
+        if arm not in results[0]["factor_scores"]:
+            continue
         totals = np.zeros((len(common.SPREAD_FACTOR_GRID), common.N_LEAD_BANDS, 2))
         for result in results:
             if result["site"] not in common.DECISION_SITES:
@@ -205,10 +208,11 @@ def forecast_site(job: tuple[str, list[str]]) -> str:
     started = time.monotonic()
     cache, setup, fits, data, filters = site_inputs(site=site)
     tuned = read_tuned()
-    spreads = {arm: spread_for(arm=arm, site=site, tuned=tuned) for arm in fc.FORECAST_ARMS}
+    todo = fc.available_arms(filters=filters, arms_wanted=fc.FORECAST_ARMS)
+    spreads = {arm: spread_for(arm=arm, site=site, tuned=tuned) for arm in todo}
     rows = 0
     for period in periods:
-        frames: dict[str, list[pl.DataFrame]] = {arm: [] for arm in fc.FORECAST_ARMS}
+        frames: dict[str, list[pl.DataFrame]] = {arm: [] for arm in todo}
         for index in setup.indices(periods={period}):
             first_usable = choose_fit(fits=fits, origin=setup.origins[index]) if fits else None
             if first_usable is None:
@@ -216,7 +220,7 @@ def forecast_site(job: tuple[str, list[str]]) -> str:
             members = fc.run_members(cache=cache, setup=setup, fits=fits, index=index)
             if members is None:
                 continue
-            for arm in fc.FORECAST_ARMS:
+            for arm in todo:
                 result = fc.corrected_members(
                     cache=cache,
                     setup=setup,
