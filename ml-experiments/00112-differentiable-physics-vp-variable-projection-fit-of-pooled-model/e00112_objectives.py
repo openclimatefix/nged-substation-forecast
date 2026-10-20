@@ -35,9 +35,12 @@ def p_map_105_objective(*, cache, batch, settings) -> float:  # noqa: ANN001
         initial_level=torch.full((len(batch.site_labels),), 50.0),
     ).to(device=batch.y.device, dtype=batch.y.dtype)
     state = torch.load(path, map_location=batch.y.device)
-    model.load_state_dict(
-        {k: v.to(batch.y.dtype) if v.is_floating_point() else v for k, v in state.items()}
-    )
+    converted = {k: v.to(batch.y.dtype) if v.is_floating_point() else v for k, v in state.items()}
+    # The stored state predates the `weeks_of_history` buffer, which onboarding alone uses.
+    incompatible = model.load_state_dict(converted, strict=False)
+    if incompatible.unexpected_keys or set(incompatible.missing_keys) - {"weeks_of_history"}:
+        msg = f"experiment 105's P-map does not fit the model: {incompatible}"
+        raise ValueError(msg)
     freeze_operator_for_vp(model=model)
     with torch.no_grad():
         return float(vp_objective(model=model, batch=batch, settings=settings))
