@@ -38,7 +38,7 @@ def choose(*, direction: cv.Direction, arm_name: str) -> dict:
     k0 = rows.select(
         [f"q{p}" for p in ("01", "05", "10", "25", "40", "50", "60", "75", "90", "95", "99")]
     ).to_numpy()
-    table = {}
+    table: dict[str, dict] = {}
     for decay in cv.DECAY_GRID:
         started = time.monotonic()
         oof = cv.run_oof(

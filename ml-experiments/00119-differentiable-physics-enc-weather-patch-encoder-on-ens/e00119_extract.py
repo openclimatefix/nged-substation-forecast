@@ -22,7 +22,8 @@ import numpy as np
 import polars as pl
 
 FIELD_COLUMNS: Final[list[str]] = list(common.FIELDS)
-_CELLS: dict[str, object] = {}
+_CELLS: list[int] = []
+_INDEX: dict[int, int] = {}
 
 
 def site_patches() -> dict[str, dict[str, list]]:
@@ -66,8 +67,7 @@ def read_run(run: datetime) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
         Three float32 arrays of shape (cells, steps, fields), NaN where a step or cell is absent,
         and the number of members found (the minimum over cells).
     """
-    cells = _CELLS["cells"]
-    index = _CELLS["index"]
+    cells, index = _CELLS, _INDEX
     folder = common.NWP_DIR / f"init_time={run:%Y-%m-%d}%2000%3A00%3A00.000000"
     frame = (
         pl.scan_parquet(list(folder.glob("*.parquet")))
@@ -97,12 +97,12 @@ def read_run(run: datetime) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
             mean[i, j, k] = row[f"{column}_mean"]
             std[i, j, k] = row[f"{column}_std"]
             control[i, j, k] = row[f"{column}_ctl"]
-    return mean, std, control, int(members["n"].min()) if members.height else 0
+    return mean, std, control, int(members["n"].to_numpy().min()) if members.height else 0
 
 
 def _initialise(cells: list[int]) -> None:
-    _CELLS["cells"] = cells
-    _CELLS["index"] = {cell: position for position, cell in enumerate(cells)}
+    _CELLS[:] = cells
+    _INDEX.update({cell: position for position, cell in enumerate(cells)})
 
 
 def main() -> None:

@@ -437,3 +437,26 @@ the patch**. That finding goes in the take-home whatever the rerun shows.
   spread at most 0.02 points and the training-to-out-of-fold gap at most 25%, as before.
 - **Power target:** the gate must detect a gain of 0.05 points, the size the plan calls worth
   seeing; the smaller 0.025 injection is reported and does not gate.
+
+## Gate rerun result (2026-10-20, before any scored-year prediction)
+
+**The rerun failed three of the pass rules, so the verdict is capped at `inconclusive` and the gate
+is not redefined again.** Readings are in `gate_run2.json`; the F1 training year only.
+
+- **ENC-c dense 0.05 passes:** 100% of the exactly recoverable gain, 4 of 5 sites, interval
+  [-0.087, -0.009]. The orthogonalised injection still leaves 33% of the east-west gradient's
+  variance for the encoder to find (the non-patch inputs explain 67% of the raw gradient and -1% of
+  the north-south gradient).
+- **ENC-c sparse 0.05 fails:** 90% of the gain, but 2 of 5 sites, and the interval's upper bound is
+  0.000. Real signal that sits on 10% of days is not reliably found, which is the power finding.
+- **ENC-r fails:** it recovers 16% of the dense 0.05 injection (1 of 5 sites, interval
+  [-0.060, +0.055]). The sparse ENC-r injection could not be sized (no site reached the target).
+- **Controls fail:** ENC-c0 recovers 59% and ENC-cpt 46% of the dense 0.05 injection (the rule
+  required under 20%). ENC-cps recovers 89% (descriptive).
+- **Gate 2 null passes for ENC-c (+0.009) and ENC-r (-0.002), and misses the 0.01 bound for ENC-cpt
+  (+0.013).** ENC-c0 +0.0100 and ENC-cps +0.0096.
+- **Reproduction, causality, purge, seeds pass:** zero difference from K0, zero change from later
+  weather, zero purge violations, seed spread 0.008, training-to-out-of-fold gap at most 13%.
+
+Scoring of the scored years goes ahead as descriptive: the manager's ruling is that a failed rerun
+leaves the verdict `inconclusive`.

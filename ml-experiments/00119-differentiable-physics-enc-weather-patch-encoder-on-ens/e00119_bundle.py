@@ -6,7 +6,6 @@ the same site's patch from another run of the same year, within 15 days either s
 of year and at least 2 days away, at the same step (seeded).
 """
 
-import json
 from datetime import UTC, datetime
 from typing import Final
 
@@ -60,7 +59,6 @@ def distant_sites(*, dataset: data.Dataset) -> list[int]:
     site shares no cell with another; `write_decisions` records the shared-cell counts.
     """
     cache = common.load_cache()
-    layout = json.loads(common.patch_path().read_text())["patches"]
     coords = {
         site: (cache.sites[site].table.latitude, cache.sites[site].table.longitude)
         for site in dataset.sites

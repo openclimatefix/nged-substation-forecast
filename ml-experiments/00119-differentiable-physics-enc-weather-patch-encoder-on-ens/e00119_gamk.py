@@ -14,6 +14,7 @@ import argparse
 import json
 import pickle
 import time
+from collections.abc import Sequence
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
 from functools import partial
@@ -76,7 +77,7 @@ def _spread(*, site: str, tuned: dict) -> LeadHourSpread:
     return base.with_factors(factors=tuned["spread_factors"]["gamk"])
 
 
-def _calibration(*, site: str, shrink: float) -> Calibration:
+def _calibration(*, site: str, shrink: Sequence[float]) -> Calibration:
     with np.load(WORK_111 / "calibration" / f"{site}.npz") as stored:
         calibration = Calibration(
             temperature_shift_c=stored["shift"],
@@ -207,7 +208,8 @@ def build_site(site: str) -> str:
     check = forecast_runs(site=site, run_indices=list(CHECK_RUNS))
     joined = check.join(stored, on=["run", "valid_time"], suffix="_stored", how="inner")
     worst = max(
-        float((joined[c] - joined[f"{c}_stored"]).abs().max()) for c in common.QUANTILE_COLUMNS
+        float((joined[c] - joined[f"{c}_stored"]).abs().to_numpy().max())
+        for c in common.QUANTILE_COLUMNS
     )
     if joined.is_empty() or worst > 1e-4:
         msg = f"{site}: re-forecast differs from stored GAM-K by {worst} over {joined.height} rows"

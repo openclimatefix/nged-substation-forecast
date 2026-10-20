@@ -8,7 +8,7 @@ the samples. Patches are 37 cells, centre first, then ring by ring.
 
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Final
 
 import e00119_common as common
@@ -133,30 +133,3 @@ def load_dataset() -> Dataset:
         sites=common.SCORED_SITES,
         run_dates=[d for d in common.run_dates() if d < common.HELD_OUT_START],
     )
-
-
-def in_period(*, rows: pl.DataFrame, period: tuple[datetime, datetime]) -> pl.Series:
-    """Return a mask of the rows whose run date lies in `[period[0], period[1])`."""
-    return (pl.col("run_date") >= period[0]) & (pl.col("run_date") < period[1])
-
-
-def month_blocks(*, rows: pl.DataFrame, period: tuple[datetime, datetime], months: int = 3) -> list:
-    """Return the month-block folds of a training period as lists of `month` values.
-
-    Args:
-        rows: The row table.
-        period: The training period.
-        months: The months per block.
-
-    Returns:
-        A list of month-number lists, each of `months` consecutive months.
-    """
-    first = period[0].year * 12 + period[0].month - 1
-    last = period[1].year * 12 + period[1].month - 2
-    all_months = list(range(first, last + 1))
-    return [all_months[i : i + months] for i in range(0, len(all_months), months)]
-
-
-def purge_days() -> timedelta:
-    """Return the purge on each side of a tuning block."""
-    return timedelta(days=7)

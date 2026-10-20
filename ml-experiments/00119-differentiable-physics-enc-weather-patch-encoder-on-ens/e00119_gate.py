@@ -21,6 +21,7 @@ import e00119_model as model
 import e00119_stats as stats
 import numpy as np
 import polars as pl
+from xgboost import XGBRegressor
 
 SEED = 11
 DENSE_TARGETS = (0.10, 0.05, 0.025)
@@ -152,25 +153,65 @@ def size_alpha(
     return 0.5 * (low + high)
 
 
-def permuted_actual(*, rows: pl.DataFrame, foreign: np.ndarray) -> np.ndarray:
-    """Return `actual` taken from another run of the same site at the same lead.
+def null_actual(*, rows: pl.DataFrame, foreign: np.ndarray) -> np.ndarray:
+    """Return a target with no link to the weather: K0's q50 plus another run's residual.
 
-    The partner is the placebo run of `bundles.foreign_runs` (the same year, 2 to 15 days away).
-    The patch of a row then has no link to its target, so no arm can gain from the weather. A row
-    whose partner has no row at that lead keeps its own actual.
+    The partner is the placebo run of `bundles.foreign_runs` (the same year, 2 to 15 days away) and
+    the residual is `actual` minus K0's `q50` of that run at the same lead. K0's quantiles stay
+    calibrated to the residual distribution. A row whose partner has no row at that lead keeps its
+    own actual.
     """
-    frame = rows.select("site_index", "run", "lead_hours", "actual")
+    frame = rows.select("site_index", "run", "lead_hours", "actual", "q50")
     partner = foreign[rows["site_index"].to_numpy().astype(np.int64), rows["run"].to_numpy()]
     keyed = frame.select(
-        site_index=pl.col("site_index"),
+        "site_index",
         partner=pl.col("run"),
         lead_hours=pl.col("lead_hours"),
-        permuted=pl.col("actual"),
+        residual=pl.col("actual") - pl.col("q50"),
     )
     joined = frame.with_columns(partner=pl.Series(partner)).join(
         keyed, on=["site_index", "partner", "lead_hours"], how="left"
     )
-    return joined["permuted"].fill_null(joined["actual"]).to_numpy().astype(np.float64)
+    target = joined["q50"] + joined["residual"]
+    return target.fill_null(joined["actual"]).to_numpy().astype(np.float64)
+
+
+def non_patch_features(*, dataset: data.Dataset, rows: pl.DataFrame) -> np.ndarray:
+    """Return the inputs the encoder has besides the patch's other cells, one row per row."""
+    site, run, step = (rows[c].to_numpy().astype(np.int64) for c in ("site_index", "run", "step"))
+    centre = np.nan_to_num(dataset.patch[site, run, step, 0, :])
+    scalars = rows.select("lead_hours", "hod_sin", "hod_cos", "mean").to_numpy()
+    return np.column_stack([centre, scalars, site]).astype(np.float32)
+
+
+def orthogonalise(
+    *, values: np.ndarray, features: np.ndarray, rows: pl.DataFrame, mask: np.ndarray
+) -> tuple[np.ndarray, dict[str, float]]:
+    """Return values minus a cross-fitted XGBoost prediction from the non-patch inputs.
+
+    Each of the five month blocks of the F1 training year is predicted by a model fitted on the
+    other four. Rows outside the mask get 0.
+
+    Returns:
+        The residuals, and the share of the variance the non-patch inputs explained, out of fold.
+    """
+    residual = np.zeros_like(values)
+    run_date = rows["run_date"]
+    for block in cv.blocks_of(direction=cv.F1):
+        held = mask & ((run_date >= block[0]) & (run_date < block[1])).to_numpy()
+        fit_rows = mask & ~held
+        booster = XGBRegressor(
+            n_estimators=150,
+            max_depth=6,
+            learning_rate=0.1,
+            subsample=0.5,
+            n_jobs=6,
+            tree_method="hist",
+        )
+        booster.fit(features[fit_rows], values[fit_rows])
+        residual[held] = values[held] - booster.predict(features[held])
+    explained = 1.0 - residual[mask].var() / values[mask].var()
+    return residual, {"explained_variance_share": float(explained)}
 
 
 def evaluate(
@@ -223,7 +264,7 @@ def evaluate(
 
 
 def main() -> None:  # noqa: PLR0915
-    """Run the gate and write `gate.json`."""
+    """Run the redefined gate (one rerun only) and write `gate.json`."""
     started = time.monotonic()
     dataset = data.load_dataset()
     rows = bundles.rows_with_sensitivities(dataset=dataset)
@@ -236,40 +277,53 @@ def main() -> None:  # noqa: PLR0915
     actual = rows["actual"].to_numpy().astype(np.float64)
     k0 = rows.select(common.QUANTILE_COLUMNS).to_numpy().astype(np.float64)
     ew, ns = gradients(dataset=dataset, rows=rows)
-    z_ew, z_ns = standardise(ew, mask=in_year), standardise(ns, mask=in_year)
+    features = non_patch_features(dataset=dataset, rows=rows)
+    ew_resid, ew_share = orthogonalise(
+        values=ew.astype(np.float64), features=features, rows=rows, mask=in_year
+    )
+    ns_resid, ns_share = orthogonalise(
+        values=ns.astype(np.float64), features=features, rows=rows, mask=in_year
+    )
+    z_ew, z_ns = standardise(ew_resid, mask=in_year), standardise(ns_resid, mask=in_year)
     g_dense = 0.5 * z_ew + 0.5 * z_ns
     sparse_mask = sparse_days(rows=rows, ew=ew, mask=in_year) & in_year
     sens_t = rows["sens_t"].to_numpy().astype(np.float64)
-    results = {"injections": {}, "clean": {}}
+    site = rows["site_index"].to_numpy()
+    results: dict = {
+        "injections": {},
+        "clean": {},
+        "orthogonalisation": {"east_west": ew_share, "north_south": ns_share},
+    }
     for injection in INJECTIONS:
         c_value = decisions[f"F1.{'ENC-r' if injection.kind == 'r' else 'ENC-c'}"]["c"]
         if injection.kind == "c":
-            shape = g_dense * (sparse_mask if injection.sparse else 1.0)
-            per_unit = shape
-            oracle_unit = per_unit[:, None]
+            per_unit = g_dense * (sparse_mask if injection.sparse else 1.0)
+            alpha_rows = np.full(
+                len(rows),
+                size_alpha(
+                    actual=actual, k0=k0, shift=per_unit, mask=in_year, target=injection.target
+                ),
+            )
         else:
-            shape = z_ew * (sparse_mask if injection.sparse else 1.0)
-            per_unit = sens_t * shape
-            oracle_unit = per_unit[:, None]
-        alpha = size_alpha(
-            actual=actual, k0=k0, shift=per_unit, mask=in_year, target=injection.target
-        )
-        injected = actual + alpha * per_unit
-        oracle = k0 + alpha * oracle_unit
+            per_unit = sens_t * z_ew * (sparse_mask if injection.sparse else 1.0)
+            alpha_rows = np.zeros(len(rows))
+            for index in range(len(common.SCORED_SITES)):
+                at = in_year & (site == index)
+                alpha_rows[site == index] = size_alpha(
+                    actual=actual, k0=k0, shift=per_unit, mask=at, target=injection.target
+                )
+        shift = alpha_rows * per_unit
+        injected = actual + shift
+        oracle = k0 + shift[:, None]
         arm = model.ARMS[injection.arm]
         bundle = bundles.make_bundle(
-            rows=rows,
-            tensors=tensors,
-            arm=arm,
-            distant=distant,
-            foreign=foreign,
-            actual=injected,
+            rows=rows, tensors=tensors, arm=arm, distant=distant, foreign=foreign, actual=injected
         )
         oof = cv.run_oof(
             rows=rows, bundle=bundle, arm=arm, direction=direction, decay_c=c_value, seed=SEED
         )
         reading = evaluate(rows=rows, oof=oof, actual=injected, k0=k0, oracle=oracle)
-        reading["alpha"] = alpha
+        reading["alpha_mean"] = float(alpha_rows[in_year].mean())
         results["injections"][injection.label] = reading
         print(
             f"{injection.label}: recovered {reading['recovered_share']:.2f}, "
@@ -277,64 +331,51 @@ def main() -> None:  # noqa: PLR0915
             f"[{reading['contrast']['lower']:.3f}, {reading['contrast']['upper']:.3f}]",
             flush=True,
         )
-    for arm_name in CLEAN_ARMS:
-        arm = model.ARMS[arm_name]
-        c_value = decisions[f"F1.{'ENC-r' if arm.kind == 'r' else 'ENC-c'}"]["c"]
-        bundle = bundles.make_bundle(
-            rows=rows, tensors=tensors, arm=arm, distant=distant, foreign=foreign
-        )
-        oof = cv.run_oof(
-            rows=rows, bundle=bundle, arm=arm, direction=direction, decay_c=c_value, seed=SEED
-        )
-        reading = evaluate(rows=rows, oof=oof, actual=actual, k0=k0, oracle=k0)
-        results["clean"][arm_name] = reading
-        print(f"clean {arm_name}: gain {reading['gain']:+.4f}", flush=True)
+    null = null_actual(rows=rows, foreign=foreign)
+    for label, target in (("clean", actual), ("null", null)):
+        results[label] = {}
+        for arm_name in CLEAN_ARMS:
+            arm = model.ARMS[arm_name]
+            c_value = decisions[f"F1.{'ENC-r' if arm.kind == 'r' else 'ENC-c'}"]["c"]
+            bundle = bundles.make_bundle(
+                rows=rows, tensors=tensors, arm=arm, distant=distant, foreign=foreign, actual=target
+            )
+            oof = cv.run_oof(
+                rows=rows, bundle=bundle, arm=arm, direction=direction, decay_c=c_value, seed=SEED
+            )
+            reading = evaluate(rows=rows, oof=oof, actual=target, k0=k0, oracle=k0)
+            results[label][arm_name] = reading
+            print(f"{label} {arm_name}: gain {reading['gain']:+.4f}", flush=True)
     arm = model.ARMS["ENC-c"]
     bundle = bundles.make_bundle(
         rows=rows, tensors=tensors, arm=arm, distant=distant, foreign=foreign
     )
-    c_value = decisions["F1.ENC-c"]["c"]
-    per_seed = {}
+    per_seed: dict[str, dict] = {}
+    differences: list[float] = []
     for seed in cv.SEEDS:
         oof = cv.run_oof(
-            rows=rows, bundle=bundle, arm=arm, direction=direction, decay_c=c_value, seed=seed
+            rows=rows,
+            bundle=bundle,
+            arm=arm,
+            direction=direction,
+            decay_c=decisions["F1.ENC-c"]["c"],
+            seed=seed,
         )
         enc = stats.quantile_score(actual=actual[oof.index], quantiles=oof.quantiles)
         base = stats.quantile_score(actual=actual[oof.index], quantiles=k0[oof.index])
+        differences.append(float((enc - base).mean()))
         per_seed[str(seed)] = {
-            "enc_minus_k0": float((enc - base).mean()),
-            "train_loss": oof.train_loss,
-            "oof_loss": oof.oof_loss,
+            "enc_minus_k0": differences[-1],
             "train_gap": [
                 abs(a - b) / b for a, b in zip(oof.train_loss, oof.oof_loss, strict=True)
             ],
         }
-    values = [v["enc_minus_k0"] for v in per_seed.values()]
+    values = differences
     results["seeds"] = {
         "per_seed": per_seed,
-        "spread": max(values) - min(values),
-        "passes_spread": (max(values) - min(values)) <= SEED_SPREAD_BOUND,
+        "spread": float(max(values) - min(values)),
+        "passes_spread": bool(max(values) - min(values) <= SEED_SPREAD_BOUND),
     }
-    print(f"seed spread {results['seeds']['spread']:.4f}", flush=True)
-    permuted = permuted_actual(rows=rows, foreign=foreign)
-    results["permuted"] = {}
-    for arm_name in CLEAN_ARMS:
-        arm = model.ARMS[arm_name]
-        c_value = decisions[f"F1.{'ENC-r' if arm.kind == 'r' else 'ENC-c'}"]["c"]
-        bundle = bundles.make_bundle(
-            rows=rows,
-            tensors=tensors,
-            arm=arm,
-            distant=distant,
-            foreign=foreign,
-            actual=permuted,
-        )
-        oof = cv.run_oof(
-            rows=rows, bundle=bundle, arm=arm, direction=direction, decay_c=c_value, seed=SEED
-        )
-        reading = evaluate(rows=rows, oof=oof, actual=permuted, k0=k0, oracle=k0)
-        results["permuted"][arm_name] = reading
-        print(f"permuted {arm_name}: gain {reading['gain']:+.4f}", flush=True)
     common.write_json_atomic(path=common.WORK_DIR / "gate.json", content=results)
     print(f"gate done in {time.monotonic() - started:.0f} s")
 
