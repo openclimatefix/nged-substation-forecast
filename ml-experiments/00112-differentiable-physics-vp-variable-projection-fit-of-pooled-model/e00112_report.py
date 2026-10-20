@@ -363,13 +363,15 @@ def print_checks(*, arms: dict[str, pl.DataFrame]) -> None:
 
 BLOWUP_POINTS: Final[float] = 30.0
 """A day on which an arm's mean median forecast error over the five sites exceeds this is listed."""
-EASTER_DAYS: Final[list[date]] = [
+EXCLUDED_DAYS: Final[list[date]] = [
     date(2026, 3, 28),
     date(2026, 3, 29),
     date(2026, 4, 3),
     date(2026, 4, 6),
 ]
-"""The four days around Easter 2026 on which the VP-P forecast was 75 to 280 points too high.
+"""The four days of 2026 on which the VP-P forecast was up to 280 points too high.
+
+They are the weekend of the spring clock change (28 and 29 March), Good Friday, and Easter Monday.
 
 The numbers audit found them; excluding them is a post hoc robustness check, not a planned one.
 """
@@ -493,8 +495,8 @@ def report_year(*, year: str, ids: dict[int, str]) -> dict:
         )
     print_tails(arms=arms)
     print_checks(arms=arms)
-    days = blowup_days(arms=arms, always=EASTER_DAYS if year == "scored" else [])
-    print_excluding_days(arms=arms, days=EASTER_DAYS if year == "scored" else days, out=out)
+    days = blowup_days(arms=arms, always=EXCLUDED_DAYS if year == "scored" else [])
+    print_excluding_days(arms=arms, days=EXCLUDED_DAYS if year == "scored" else days, out=out)
     if "g_all" in arms:
         five = arms["g_all"].filter(pl.col("site").is_in(common.ELIGIBLE_SITES))
         score = float(five["score"].to_numpy().mean())
