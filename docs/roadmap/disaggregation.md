@@ -232,9 +232,10 @@ latent parameters — most importantly each module's capacity — are inferred d
 substation's metered power and the local weather. The components are separable because each has a
 distinct exogenous driver and temporal signature (PV tracks irradiance, wind tracks wind speed,
 demand tracks time-of-week and temperature), so each substation's fit can pull them apart locally.
-The graph carries the structural prior — who can exchange load with whom — and a hard Kirchhoff
-balance closes the books. This mirrors the schematic in the [Milestone 1 report (Fig.
-10)](https://docs.google.com/document/d/1UF-mjfSdQfQxefAunDqEOr_GyYTjSlGk4EeuiNoXAxk/edit?tab=t.0#heading=h.ot06ofd0lqes):
+The graph carries the structural prior — who can exchange load with whom, and which substations sit
+beneath which — and a soft hierarchical loss ties the levels together (see [The hierarchy is a soft
+hint, not an exact sum](#the-hierarchy-is-a-soft-hint-not-an-exact-sum)). This mirrors the
+schematic in the [Milestone 1 report (Fig. 10)](https://docs.google.com/document/d/1UF-mjfSdQfQxefAunDqEOr_GyYTjSlGk4EeuiNoXAxk/edit?tab=t.0#heading=h.ot06ofd0lqes):
 
 ![Schematic of a possible implementation of a graph-structured model, capturing electrical and
 spatial relationship of different grid components](assets/graph_structure.png)
@@ -299,8 +300,8 @@ cross-site information genuinely helps the under-determined per-site fit, it ent
 universal basis shapes
 ([`UniversalSolarFleetNode`](../techniques/differentiable-physics.md#scaling-to-aggregate-fleets-universalsolarfleetnode);
 `BasisLoadNode` above), with only a per-site *style vector* learned locally. Each node's physics
-modules compute explicit physical generation. A hard Kirchhoff balance node then aggregates the
-elements:
+modules compute explicit physical generation. Each node's predicted meter reading then combines its
+own elements:
 
 $$\text{Net substation flow} = \text{Gross demand} -
 \gamma_{\text{PV}}\,(\text{PV}_{\text{metered}} + \text{PV}_{\text{unmetered}}) -
@@ -312,12 +313,40 @@ parameters, optimising them and the physical parameter posteriors simultaneously
 
 To be explicit about a design boundary: we do **not** currently plan to use message-passing graph
 neural networks (GNNs) anywhere in this project. The graph does its work as a data structure, and
-cross-site statistical strength arrives through the shared parameters and the hard flow balance
-above. We would not *completely* rule a GNN out towards the very end of the project — if measured
+cross-site statistical strength arrives through the shared parameters and the soft hierarchical loss
+below. We would not *completely* rule a GNN out towards the very end of the project — if measured
 residuals ever showed spatial structure that the gridded NWP and hierarchical sharing demonstrably
 miss — but nothing in the design depends on one. The same graph also underpins switching-event
 handling, where it is likewise used only as a data structure — see [Switching events & latent
 demand](switching-events.md), Part 2.
+
+### The hierarchy is a soft hint, not an exact sum
+
+**A parent substation's measured flow is never exactly the sum of its children's, so the model
+treats the hierarchy as evidence that nudges the fit, not as a constraint.** A Bulk Supply Point
+(BSP) reading differs from the sum of the Primaries beneath it by wire losses, by Primaries and
+generators that are not metered, and by AC power-flow effects that a real-power sum ignores. In the
+trial area, the unexplained part at each BSP swings by more from day to day than a typical
+switching transfer moves, and the Grid Supply Point (GSP) readings cannot be closed from the
+metered series at all.
+
+**The soft hierarchical loss models each parent as its metered children plus a penalised
+remainder.** The parent's predicted flow is the sum of its child nodes' modelled flows, plus its
+directly connected metered generators, plus a remainder term with its own small model: a level,
+a drift, an unmetered PV capacity, an unmetered wind capacity where the parent's area has wind, and
+a loss term. The remainder carries a heavier penalty than the children's terms, so it absorbs only
+what the children cannot explain. A weight on the parent's rows sets how hard the parent pulls on
+its children, from zero (each node fitted alone) upwards, and is tuned on held-out data. The same
+form repeats from GSP to BSP.
+
+**The hint is expected to help explanation and robustness more than average skill.** A transfer
+between two Primaries under one BSP leaves the BSP unchanged, which is evidence for switching
+rather than a change in demand. The parent also sees all the solar in its area, which helps pin
+down its children's PV capacities. A metering error at one child, such as a gap, a stuck value, or
+a scale error, conflicts with the parent's reading, which limits how far the error can pull that
+child's fit. In the studies we read, reconciling a hierarchy improved the aggregate by up to 10% but
+the bottom level by under 1%, so a hierarchy-aware forecast that is more explainable and more
+robust, with a similar average score, would meet the aim.
 
 ### Unmetered installed capacity grows monotonically
 
@@ -589,7 +618,7 @@ contribution.
 | **Graph** | Primary substations as nodes; reconfigurable boundaries as edges (a plain data structure) | Structural prior on which substations can exchange load |
 | **Forward model** | Differentiable physics (irradiance → PV, wind speed → wind power, state-space battery) | Converts latent demand + DER params → predicted meter reading |
 | **Reconstruction loss** | Squared residual, summed over nodes and time | Drives joint inversion of latent demand and DER parameters |
-| **Cross-site coupling** | Hierarchical parameter sharing (shared basis + per-site style vector) + hard Kirchhoff balance | Borrows statistical strength across sites |
+| **Cross-site coupling** | Hierarchical parameter sharing (shared basis + per-site style vector) + soft hierarchical loss | Borrows statistical strength across sites and levels |
 | **Transparent baseline** | [Convex dictionary disaggregator](#the-convex-dictionary-baseline) | The reproducible floor the engine must beat on the leaderboard |
 | **ARA handling** | Time-varying neighbourhood mixture with node-level flow balance — see [switching-events.md](switching-events.md) | Reconstructs latent demand under the normal running arrangement |
 | **Output** | Latent demand under nominal topology, per substation, per half-hour | Target variable for downstream probabilistic forecasting |
