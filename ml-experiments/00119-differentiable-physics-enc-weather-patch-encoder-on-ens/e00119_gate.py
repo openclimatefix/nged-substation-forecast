@@ -192,6 +192,12 @@ def orthogonalise(
     Each of the five month blocks of the F1 training year is predicted by a model fitted on the
     other four. Rows outside the mask get 0.
 
+    Args:
+        values: The target values to orthogonalise.
+        features: The non-patch input features, one row per target value.
+        rows: The row table, with a `run_date` column.
+        mask: Which rows are fitted and predicted.
+
     Returns:
         The residuals, and the share of the variance the non-patch inputs explained, out of fold.
     """

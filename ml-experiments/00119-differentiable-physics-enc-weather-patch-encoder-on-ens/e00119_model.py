@@ -177,12 +177,22 @@ def fit_standardiser(*, bundle: Bundle) -> Standardiser:
 
 
 def encoder_inputs(
-    *, bundle: Bundle, std: Standardiser, arm: Arm, drop: bool, generator: torch.Generator | None
+    *,
+    bundle: Bundle,
+    std: Standardiser,
+    arm: Arm,
+    drop: bool,
+    generator: torch.Generator | None,
+    patch_override: torch.Tensor | None = None,
 ) -> dict[str, torch.Tensor]:
-    """Return the encoder's tensors for a bundle's rows."""
+    """Return the encoder's tensors for a bundle's rows.
+
+    `patch_override`, shape (rows, 37, channels), replaces the gathered patch; the substation
+    cards use it to move one ENS box's temperature.
+    """
     col = bundle.columns
     src_site, src_run, step, band = col["src_site"], col["src_run"], col["step"], col["band"]
-    patch = bundle.patch[src_site, src_run, step]
+    patch = bundle.patch[src_site, src_run, step] if patch_override is None else patch_override
     ok = bundle.cell_ok[src_site, src_run, step]
     centre = patch[:, 0]
     rel = (patch[:, 1:] - centre[:, None]) / std.rel_std[band][:, None]

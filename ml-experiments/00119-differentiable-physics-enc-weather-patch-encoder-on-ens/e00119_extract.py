@@ -63,6 +63,9 @@ def site_patches() -> dict[str, dict[str, list]]:
 def read_run(run: datetime) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
     """Return one run's mean, standard deviation, and control value, and its member count.
 
+    Args:
+        run: The NWP initialisation time of the run to read.
+
     Returns:
         Three float32 arrays of shape (cells, steps, fields), NaN where a step or cell is absent,
         and the number of members found (the minimum over cells).

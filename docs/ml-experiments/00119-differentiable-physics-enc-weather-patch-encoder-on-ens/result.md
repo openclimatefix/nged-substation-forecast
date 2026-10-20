@@ -8,7 +8,7 @@ also_relevant_to:
   - weather-products-and-blending
   - calibration-and-uncertainty
   - differentiable-physics-demand-calendar-and-weather
-status: planned
+status: done
 size: >-
   medium. Stored private files only; the serving path, the degradation rules, and the asset graph
   are untouched. Several designs are defensible (patch, output, placebo, replicate), and the plan
@@ -32,431 +32,273 @@ benchmark: >-
   GAM-K as stored by experiment 111 (reproduced); the encoder given only the centre box, a distant
   site's patch, and the same site's patch from another date; climatology; manual_heuristic; BG2
 row_set_id: >-
-  experiment 111's GAM-K predictions at D5, D10, D11, D14, D16 (D9 beside), plus GAM-K fits for
-  2024-04 to 2024-06: 456 training runs and the 291 scored runs of 2025-07 to 2026-06
+  experiment 111's GAM-K predictions at D5, D10, D11, D14, D16 (D9 beside), plus GAM-K forecasts for
+  2024-04 to 2024-06: F1 has 447 training runs and 291 scored runs (2025-07 to 2026-06), F2 has 291
+  training runs and 365 scored runs
 metric: >-
   Quantile score (twice the mean pinball loss over experiment 87's 11 quantiles), points of
   effective capacity, outside switching events, leads 0.5 to 168 hours; D+1 and hard days beside it
+verdict: inconclusive
+best_arm: >-
+  ENC-c (full patch, correction), 2.739 points in F1 against GAM-K's 2.800; the centre-cell-only
+  ENC-c0 scores 2.740
 production_status: not-for-production
+take_home_message: >-
+  A small neural network that reads the ensemble weather around a Primary lowers GAM-K's quantile
+  score by 0.062 points of effective capacity in one scored year and 0.035 in the other (both
+  statistically significant, 5 of 5 substations better), and the gain is smaller in winter (0.041
+  and 0.027 points) but never a loss. About two-thirds of the gain survives when the network reads
+  the wrong date's weather (0.043 and 0.022), so it is probably a recalibration of GAM-K's quantiles
+  with the lead, the hour, and GAM-K's own forecast, and the surrounding boxes add nothing to the
+  centre box (patch minus centre box: -0.002 and +0.003 points). The known-answer gate failed, so
+  the verdict is inconclusive, and the next step is a plain recalibration of GAM-K's quantiles with
+  the centre box's extra fields (dew point, pressure, precipitation, and member spread), not a patch
+  encoder.
+advice:
+  - >-
+    Recalibrate GAM-K's quantiles with lead, hour, and GAM-K's own forecast before testing any
+    weather encoder, because an encoder reading another date's weather already gains 0.043 and 0.022
+    points (decomposition figure, C3).
+  - >-
+    Do not build a patch of neighbouring ENS boxes for a Primary: beyond the centre box the patch
+    changed the score by 0.002 and -0.003 points, intervals including zero (C2).
+  - >-
+    Test the centre box's extra fields (dew point, pressure, precipitation, member spread) as inputs
+    to the quantile correction, since the date-aligned gain of 0.019 and 0.013 points sits in the
+    centre box and its own date (C3).
+  - >-
+    Orthogonalise an injected known-answer signal against every non-patch input before using it as
+    a gate, and size it per site, because the first gate's centre-only control recovered 140% of an
+    injection (gate figure).
+  - >-
+    Report winter beside every annual score: the correction gained 0.041 and 0.027 points in winter
+    against 0.062 and 0.035 over the year, with no winter loss (winter and scopes figure).
+date: 2026-10-20
+pr: 1414
+adopted_in: none
 code: ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/
 ---
 
-**Planned; no result yet.** The plan below was committed before any code ran.
-
-## What ENC asks, and the prior it starts from
-
-**ENC asks whether the weather around a Primary carries information that GAM-K's single ENS box
-does not.** GAM-K reads the ENS temperature and calibrated irradiance at one box per Primary. A
-front, a sea breeze, or a convective line a box away moves demand, and the box-level ensemble
-spread only partly stands in for that. The idea follows neural post-processing of ensemble
-forecasts ([Rasp and Lerch, 2018](https://doi.org/10.1175/MWR-D-18-0187.1)).
-
-**The prior is a small average gain.** ERA5 ([Hersbach et al., 2020](https://doi.org/10.1002/qj.3803))
-quality weather lowered the Primary score by only about 0.10 points in the weather-products theme,
-and the patch partly duplicates the spread of the 51-member ECMWF ensemble
-([Molteni et al., 1996](https://doi.org/10.1002/qj.49712252905)) that GAM-K's mixture carries. The
-expected average gain is 0.02 to 0.08 points, and larger on hard days.
-
-**Builds on** experiments [111][e111] (GAM-K), [112][e112] (start dependence), and [113][e113]
-(weak identification).
-
-[e111]:
-    https://openclimatefix.github.io/nged-substation-forecast/ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result/
-[e112]:
-    https://openclimatefix.github.io/nged-substation-forecast/ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result/
-[e113]:
-    https://openclimatefix.github.io/nged-substation-forecast/ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result/
-
-**Wind and solar sites are not part of ENC.** The maintainer expects a larger gain there, but
-GAM-K is a demand model and 3 wind farms cannot rank an arm. A follow-up waits for C1 and C3.
-
-## Data on local disk, and what it leaves
-
-**Only `data/NWP/nwp_model_id=ECMWF_ENS_0_25_degree` is read. No fetch, no AWS.** On 2026-10-20:
-
-- **Runs:** 932 daily 00:00 UTC runs, 2024-04-01 to 2026-10-19, one per day. Extraction checks
-  every run for 51 members (0 to 50) and reports any short run.
-- **Leads:** 0 to 360 hours, 3-hourly to 144 and 6-hourly after: 53 steps up to 168 hours.
-- **Grid:** 1,671 H3 resolution-5 cells ([H3](https://h3geo.org)) over Great Britain, about 1,500
-  distinct ENS values per field, so neighbouring cells can share one 0.25° ENS box. The patch is a
-  Primary's cell plus three hexagonal rings (37 cells), fixed by geography alone.
-- **Fields:** the encoder reads five of 17 columns (temperature, dew point, shortwave,
-  precipitation, mean-sea-level pressure) as member mean and standard deviation. Experiment 111's
-  `ens_store` holds only the centre box, so the patch frames are new (at most 259 cells).
-
-| Months | Count | Role |
-|---|---|---|
-| 2024-04 to 2025-06 | 15 (456 runs) | F1 training year (GAM-K fits for 2024-04 to 06 made first) |
-| 2025-07 to 2026-06 | 12 (291 runs) | F1 scored year; F2 training year |
-| 2024-07 to 2025-06 | 12 (365 runs) | F2 scored year (replicate) |
-| 2026-07 to 2026-10-19 | 3.6 | reserved for a finalist (skill rule): never used in ENC |
-
-**Tuning is month-block cross-validation**
-([Roberts et al., 2017](https://doi.org/10.1111/ecog.02881)) with 7 days purged either side: F1 has
-five blocks of 3 months (12 train, 3 tune), F2 four (9 train, 3 tune). The final fit uses the whole
-training year, for the median of the blocks' early-stopped epochs, fixed before scoring.
-
-## The two designs, and the arms
-
-**Both designs take the stored GAM-K predictions as the base and change nothing in GAM-K.** The
-fits for 2024-04 to 2024-06 use experiment 111's code and protocol (each month's fit stops before
-the month) and are made before any scoring.
-
-**Encoder input and size.** One sample is a (site, run, 3-hourly step) triple: about 145,000
-samples in F1, but only about 456 independent weather days. Inputs are 5 fields × (member mean,
-member standard deviation) on 37 cells, each field minus the centre cell's value, plus the centre
-cell's absolute values, the lead, half-hour-of-day sine and cosine, and GAM-K's mean forecast.
-**All means and standard deviations used to standardise inputs come from the direction's training
-months only** (per lead band), and the scored year is transformed with those numbers. A half-hour
-takes the patch of the last 3-hourly step at or before its valid time (causal, no interpolation),
-for every arm and placebo. The encoder shares weights across sites (the weights see a cell's offset,
-not its coordinates), has at most 3,000 parameters, and gets one site-offset scalar per site under
-a heavy penalty.
-
-| Arm | Output and input | Role |
-|---|---|---|
-| K0 | GAM-K as stored | benchmark, reproduced |
-| ENC-c | signed shifts of GAM-K's 11 quantiles | design (a): decision arm |
-| ENC-c0 | ENC-c, centre cell only | patch against network flexibility |
-| ENC-cps | ENC-c trained and scored on the most distant decision site's patch, same date | placebo: regional weather |
-| ENC-cpt | ENC-c trained and scored on the same site's patch from another date | placebo: timing |
-| ENC-r | temperature and irradiance offsets through K0's sensitivities | design (b) |
-| ENC-r0 | ENC-r, centre cell only | design (b)'s control |
-
-- **Design (a), correction (ENC-c).** The output layer is zero-initialised, so the untrained arm is
-  K0 exactly. It adds a free signed shift to each of the 11 quantiles, then sorts them, so the
-  bands can narrow as well as widen. The loss is the pinball loss
-  ([Koenker and Bassett, 1978](https://doi.org/10.2307/1913643);
-  [Gneiting and Raftery, 2007](https://doi.org/10.1198/016214506000001437)) of the corrected
-  quantiles against `actual`. A factor λ in {0, 0.5, 1} scales the shifts and is chosen
-  out of fold and reported per arm; λ = 0 is labelled "no gain found", not `refuted`.
-- **Placebos are trained on the foreign input, not only scored on it.** ENC-cps uses the decision
-  site farthest from the Primary (no shared cells); ENC-cpt draws, for each (site, run), another
-  run of the same year within ±15 days of the same day of year and the same lead (seeded, at least
-  2 days away). **C3 uses ENC-cpt; ENC-cps is descriptive:** it keeps regional weather, so ENC-c
-  minus ENC-cps reads as local detail beyond regional weather.
-- **Design (b), replacement (ENC-r).** The encoder outputs ΔT in ±5 K and an irradiance multiplier
-  in [0.7, 1.3] per (site, step). The forecast moves by K0's own sensitivities ∂F/∂T and ∂F/∂G per
-  site and half-hour, from finite differences (±1 K, ±10%) of **the same per-month out-of-sample
-  GAM-K fit that produced each stored prediction**, so no scored-year information enters (about 1
-  CPU-hour). **First-order screening version:** the shift is applied after the filter, whose
-  residual stream and spread stay K0's; the exact version is the confirmation tier. The GAM cannot
-  be refitted on encoded weather, because ENS covers 27 months.
-- **Seeds and training.** Seeds 11 to 15; an arm's forecast is their mean, and per-seed scores are
-  the start-dependence reference. AdamW
-  ([Loshchilov and Hutter, 2019](https://arxiv.org/abs/1711.05101)), learning rate 3e-3, batch
-  4,096, at most 60 epochs, early stopping on out-of-fold pinball loss (patience 8), dropout 0.2 on
-  whole cells ([Srivastava et al., 2014](https://jmlr.org/papers/v15/srivastava14a.html)), width
-  16, weight decay c / N_days (c in {0.4, 4, 40}; N_days = training days). The best c is recorded
-  in `decisions.json` before any scored run. ENC-c0 and the placebos inherit ENC-c's; ENC-r has its
-  own grid, and ENC-r0 inherits it. Out-of-fold scores are optimistic, so **every reported score
-  comes from the final fit on the scored year**.
-
-## Hard cases, defined before scoring
-
-**The three subsets are fixed before any ENC prediction is scored (`hard_days.json`, committed
-with the planned result).** Days are UTC days; thresholds pool 2024-07-01 to 2026-06-30.
-
-1. **Coldest 5%.** Daily mean temperature over the five decision sites, from the centre-cell
-   control member of each day's 00:00 UTC run at leads 9 to 33 hours (experiment 111's analysis
-   proxy): about 36 days shared by all sites, about 18 per year. No power data.
-2. **Most convective or showery 5%.** ENS has no convective-available-potential-energy field, so
-   the proxy is the spatial spread of precipitation: the standard deviation across the 37 patch
-   cells of the control member's precipitation at each 3-hourly step, averaged over the day.
-   Among days with at least the median wet day's patch-mean total, the top 5% by that index, per
-   site (about 36 days per site). No power data.
-3. **Largest GAM-K errors 5%.** The 5% of (site, day) pairs with the largest mean absolute error
-   of K0's `q50` at D+1. **This subset is defined from the scored year's outcomes and flatters any
-   arm that differs from K0** (regression to the mean), so only the placebo-corrected contrast is
-   read, and it is not an out-of-sample finding like C1.
-
-**Power.** About 36 independent days give a 99% half-width near 0.2 points (per-day spread near
-0.5), so every subset under 60 independent days per year is **descriptive: no label**. The gate's
-sparse injection is repeated on each subset's days to show how much of a true 0.05-point gain is
-recovered, with its interval.
-
-## Known-answer gate (blocking, sized as a power check, before any F1 or F2 scored fit)
-
-**A failed blocking test stops scoring until fixed; if unfixable, the verdict is `inconclusive`.**
-The gate runs on F1's training year only (five blocks), so the scored year stays unopened.
-
-1. **Injected patch signal is recovered at realistic noise.** Add to `actual` a known zero-mean
-   function of the patch, g = 0.5 × (mean temperature east of the centre minus west, standardised)
-   and 0.5 × (mean shortwave north minus south, standardised), scaled by α. **Dense:** every day,
-   sized from the real residual standard deviation (about 3.5 points) so that an exactly recovered
-   g lowers the score by 0.10, 0.05, or 0.025 points. **Sparse:** g only on the 10% of days with
-   the largest east-minus-west gradient, sized for 0.05 points over all days (real signal is
-   sparse). **ENC-r's injection:** a standardised east-minus-west ΔT added through K0's
-   sensitivities, sized for 0.05, dense and sparse. **Blocking pass, for ENC-c and ENC-r, dense and
-   sparse, at 0.05:** at least half of the gain recovered at 4 of 5 decision sites, with the
-   contrast's interval wholly below zero. A gate that cannot detect 0.05 makes a
-   real C1 whose interval includes zero `inconclusive`. ENC-c0, ENC-cps, and ENC-cpt recover under
-   20% of every injection (the signal is not in their input).
-2. **No false gain on clean data.** With α = 0, ENC-c, ENC-r, and each placebo differ from K0 by
-   at most ±0.01, and the first two intervals include zero.
-3. **Reproduction:** at zero initialisation ENC-c and ENC-r equal K0's quantiles to 1e-6 (float64).
-4. **Causality and leakage, also a pytest in the experiment folder:** changing any ENS run issued
-   after τ, or any reading after τ minus 3.5 hours, leaves every arm's forecast at τ unchanged
-   exactly; a tuning block and its purge never enter that block's fit; changing any scored-year
-   value moves no standardisation statistic, epoch count, or setting.
-5. **Seed stability and overfit:** the five seeds' ENC-c − K0 on the training blocks spread by at
-   most 0.02 points (experiment 112: starts 1.6 points apart meant an under-regularised fit), and
-   training pinball loss is within 25% of out-of-fold loss, else c moves up one step.
-
-## Directions, sites, and rows
-
-- **F1** trains on 2024-04 to 2025-06 and scores 2025-07-02 to 2026-06-29 (the 291 stored runs): the
-  verdict. **F2** trains on 2025-07 to 2026-06 and scores 2024-07 to 2025-06 (365 runs): the replicate.
-- **F2 reverses time** because local ENS holds only two scoring years. **F2's settings are chosen on
-  F2's own training year.** Two caveats: K0's 2025-26 fits saw more history than its 2024-25 fits,
-  and ECMWF may have changed its model cycle between the years
-  ([IFS documentation](https://www.ecmwf.int/en/publications/ifs-documentation)). The cycle dates
-  are checked against the run dates before F2 is read.
-- **Sites.** D5, D10, D11, D14, D16 decide (4 of 5); D9 beside. D15, D18, MVA Primaries are out.
-- **Rows:** present rows outside the hand-filtered events, shared across a contrast's arms, all-rows
-  score beside. **Lead bands:** 0.5 to 168 hours (headline), D+1 (15.5 to 39), 0 to 24, 24 to 48,
-  48 to 144, 144 to 168.
-- **Robustness rows:** November to March against April to October; leaving one site out; working
-  days against weekends and bank holidays. Predictions carry the keys, `q01` to `q99`, `actual`,
-  `lead_hours`, `arm`, `seed`, `switching_mask`.
-
-## Planned contrasts and margins
-
-**Five planned contrasts, 99% paired intervals (Bonferroni over five) from `studies.bootstrap`,
-which resamples whole calendar months** ([Künsch, 1989](https://doi.org/10.1214/aos/1176347265)),
-3 resampling seeds, with site counts, every arm's absolute score, the MAE of the median, the
-mean-forecast error beside the quantile-score contrast, and the replicate year's estimate.
-
-- **C1, the correction (decision):** ENC-c minus K0, over leads 0.5 to 168 hours.
-- **C2, patch against network flexibility:** ENC-c minus ENC-c0 (descriptive).
-- **C3, date-aligned information:** ENC-c minus ENC-cpt. ENC-c minus ENC-cps is C3b, descriptive.
-- **C4, the replacement:** ENC-r minus K0 (labelled; it does not change the verdict).
-- **C5, hard days:** per subset, ENC-c minus K0 and ENC-c minus ENC-cpt (descriptive, see Power).
-
-**Noise reference.** Part 4's C4 half-width was about ±0.023 at 97.5% (near ±0.027 at 99%); W1's
-D+1 screen had about ±0.04 at 98.75%. **The smallest gain worth porting is 0.04 points**, above
-W1's 0.03, because the encoder adds a neural network and a patch-extraction step to serving.
-Hard-day subsets use a paired 7-day block bootstrap of whole days (some months hold no rows).
-
-## Predictions
-
-Written before any fit; each line can fail, and none overrides the decision rule.
-
-- **C1:** ENC-c minus K0 is -0.02 to -0.08 over all leads and -0.03 to -0.10 at D+1, in both
-  years, 3 to 5 of 5 sites better; q05, q95 coverage within 3 points of nominal, q01, q99 within 1.5.
-- **C2:** -0.01 to -0.05. **C3:** -0.02 to -0.07, most of C1. **C3b:** about half of C3 (a distant
-  patch keeps regional weather). **C4:** -0.01 to -0.05, smaller than C1 (a constrained output).
-- **C5:** ENC-c minus ENC-cpt is -0.10 to -0.40 on the coldest 5%, -0.05 to -0.30 on the showery
-  5%, and -0.05 to -0.25 on the largest errors; each interval is wide, and no label is given.
-
-## Decision rule
-
-**The verdict is C1's label.** C2 to C5 are labelled in the bullets and the take-home only, and a
-second year is required, as in W1.
-
-- **`supported`:** C1's scored-year (F1) interval lies wholly below zero, its estimate is at least
-  0.04 points, F2's estimate is below zero and at least half of F1's, at least 4 of 5 sites
-  improve in each year, C3 is below zero in both years, and the gate passed.
-- **`small gain`:** C1's scored-year interval lies wholly below zero with an estimate under 0.04
-  points, and F2's estimate is below zero.
-- **`partly supported`:** C1's estimate is below zero in both years but the scored-year interval
-  includes zero or fewer than 4 sites improve; or C1 is `supported` or `small gain` while C3 is
-  not below zero in one year (the gain does not come from date-aligned patch information).
-- **`refuted`:** C1's interval lies wholly above zero in either year.
-- **`inconclusive`:** anything else, a gate test that cannot be fixed, or the gate's power
-  finding with C1's interval including zero.
-
-**Hand-ons:** the encoder is a candidate for GAM-K if C1 is `supported`, or `small gain` with C3
-below zero in both years; if C4 beats C1, the replacement is. Patch extraction moves to a
-reviewed `studies` module only when C1 is `supported`.
-
-## Checks: the seven audit-before-merge triggers
-
-Also report median minus mean forecast per site and arm, and mean-forecast error beside each contrast.
-
-1. **A control fails:** a gate test, K0's reproduction, or a placebo recovering the injection.
-2. **A result contradicts a prediction or finding:** C1 beating the 0.10 ERA5 bound.
-3. **Quantile score and MAE of the median disagree in sign** on C1 to C4.
-4. **Leaving one decision site out flips a sign or label** of C1 to C4.
-5. **A nested arm beats its container:** ENC-c0, ENC-cps, or ENC-cpt beating ENC-c.
-6. **An interval over twice or under half its sister's:** W1's KW minus K0; 111's GAM-K minus GAM-0.
-7. **A later design depends on an unreplicated result:** encoder adopted while F2 disagrees.
-
-## What the write-up must contain
-
-The take-home says how much the patch lowers the score on average and on the hard days, whether
-the gain is local detail beyond regional weather (C3b), and what it narrows the next step to.
-
-- **Figures, raw data first:** the patch fields on three days (coldest, showery, ordinary); the
-  hard-day calendars; the C1 to C5 headline chart with intervals, site counts, and both years;
-  score by lead band per arm with BG2, GAM-0, and K0; gain by month and hour band; the gate
-  (dense and sparse); training against out-of-fold loss; the five seeds; the tails.
-- **Tails and absolute scores:** coverage and pinball at q01, q05, q95, q99 per arm and lead band
-  (`studies.tail_calibration`); every arm's and reference's absolute score on shared rows.
-- **Substation cards** ("Provisional: fitted to past weather, forecast on ENS, screening run";
-  ENC-c's F1 fit): per decision substation, by D-label, the number of distinct ENS boxes in its
-  patch; the learned weight of each distinct box (the sensitivity of the median shift to that
-  box's temperature), drawn on the hexagon patch without coordinates, with the spread across the
-  five seeds and five blocks as the error bar; the shift against lead; and **example forecasts**
-  on four weeks fixed here, before any score is read: the Monday-to-Sunday weeks starting
-  2025-07-21, 2025-10-20, 2026-01-19, and 2026-04-20 (the third Monday of the second month of each
-  season; the next fully present week if a run is missing). Each panel shows the median and 80%
-  and 90% bands of K0 and ENC-c against the observed series, switching events marked.
-  **Line on every card:** "Provisional; patch weights are not identified
-  individually (neighbouring cells share an ENS box); read the ring and east-west contrast, not
-  one cell", and no physical direction is claimed from one site.
-- **Caveats:** one frozen fit and no refits; F2's two caveats; the largest-error subset is selected
-  on outcomes; ENC-r is first-order and applied after the filter; the encoder sees member mean and
-  spread, not 51 members; the 3.5-hour delay is assumed; experiment 111's inherited leaks (ENS
-  calibration fitted on the odd months, hindsight pinned capacity, ERA5 in the GAM's last training
-  rows) and the hindsight masks apply to K0 and the encoder alike.
-
-## Privacy
-
-**D-labels only, with dates, for D5, D9, D10, D11, D14, and D16.** D15, D18, and their sum are
-generator data: ENC does not use them (any number from them would be G-c, normalised, no dates,
-never beside a D-label). The page may name interconnected pairs such as D5-D16 but no substation
-names, no other topology, and never a generator's public name with its series.
-
-## Run order and compute
-
-**Order:** extract the patch frames; make the 2024-04 to 06 GAM-K fits and the ENC-r sensitivities;
-write `hard_days.json`; code and gate tests 3 to 5; **time one ENC-c fit, record it in
-`decisions.json`**; F1 grid, gate, fit, scoring; F2 grid, fit, scoring; ENC-r arms; report.
-
-**Compute estimate, at the planned 1.0 minute per fit (GPU: one RTX A6000 share, up to 10 GB):**
-
-| Item | Fits | GPU hours |
-|---|---|---|
-| Grids: ENC-c and ENC-r, 3 values of c × 9 blocks each | 54 | 0.90 |
-| Gate on F1 blocks: ENC-c 5 injections, ENC-r 4, ENC-c0 and 2 placebos 1 each, × 5 blocks | 60 | 1.00 |
-| Final fits: 6 arms × 5 seeds × 2 directions | 60 | 1.00 |
-| Overhead: reruns, hard-day injections | | 0.50 |
-| **Total** | **174** | **about 3.4** |
-
-Peak GPU memory is under 3 GB; a fit under 30 seconds lets the 5 seeds be stacked. **If the timed
-fit exceeds 1.1 minutes, cut in this order:** seeds from five to three, ENC-r0, the gate's 0.10
-size, the sparse hard-day injections; never ENC-c0, the placebos, or the 0.05 gates. Data
-extraction is CPU (about 2 CPU-hours).
-
-## Pre-fit clarifications (2026-10-20, before any encoder is fitted)
-
-**Winter breakdown (maintainer priority, relayed by the manager).** The best model goes to
-production in about a month and NGED first sees it in winter, so the page reports a winter breakdown
-beside every annual score.
-
-- **Winter rows:** November to March, by the run date's month, for every arm and every contrast
-  (C1 to C5), with paired intervals from the same month-resampled bootstrap on the rows where all
-  compared arms have predictions, and the annual score beside it. Evening peaks within winter are
-  the half-hours 16:00 to 20:00 UTC.
-- **Cold snap:** the day belongs to the coldest 5% of days (`hard_days.json`, subset 1, 37 days
-  over the two years, about 18 per year, defined before any score). The cold-snap panel of each
-  substation card shows K0 and ENC-c against the observed series on that year's cold-snap days
-  that fall in the scored year, with the day count stated, and says "too few days" for fewer than
-  10 days with rows at the site.
-- **Independent winters:** the local ENS holds two winters, 2024-25 (scored in F2) and 2025-26
-  (scored in F1). Each direction's winter estimate rests on one winter, so no winter result is
-  labelled by itself, and the page says so.
-- **Verdict rule:** an arm that loses in winter (winter estimate above zero with an interval
-  wholly above zero in either year, or above zero in both years) is held back even if the annual
-  mean improves, and the verdict says so in its first sentence. This does not change the decision
-  rule's labels.
-
-**Corrections to the numbers above, found while building the data.** (1) The first 9 runs of
-2024-04 have no week of analysis-proxy weather before their origin, so experiment 111 never
-forecast them: F1 trains on 447 runs (2024-04-10 to 2025-06-30), not 456. (2) A run's half-hours
-reach 177 hours after its 00:00 initialisation, so the encoder reads 54 ENS steps (3-hourly to
-144 hours, 6-hourly to 174 hours), not 53. (3) Experiment 111 stored GAM-K for the tuning months
-(odd months of 2024-07 to 2025-06), the replicate months (even months), and the scored year, but
-not for 2024-04 to 2024-06; ENC re-forecast those 91 runs from experiment 111's stored monthly
-fits, and the check that the same code re-forecasts 4 stored runs per site gave a largest
-difference of 0 (`e00119_gamk.py`).
-
-**Two plan flaws, fixed before any gate or scored fit (2026-10-20).** The manager accepted both
-rulings. They were made after the data extraction, the K0 reproduction, and the first run of the
-settings grid (the grid showed an out-of-fold gain of about 0.035 points for ENC-c on the clean
-training year), and before any known-answer-gate fit and before any scored-year prediction.
-
-- **Gate test 2 cannot be a gate on real data.** The plan requires every arm to differ from K0 by
-  at most 0.01 points on the clean training year. A real gain of the predicted size (0.02 to 0.08
-  points) would fail that test, so it could never tell a false gain from a true one. Test 2 is
-  applied to permuted-actual data instead: each row's `actual` is replaced by the `actual` of the
-  same site at the same lead from another run of the same year (2 to 15 days away), so the patch
-  has no link to the target. The bounds are unchanged (at most 0.01 points, and the intervals of
-  ENC-c and ENC-r include zero). The literal clean-data reading is run and printed, and the page
-  reports it as descriptive.
-- **No decision site is free of shared ENS cells.** The six patches overlap by 12 to 30 of their 37
-  cells, so the plan's "farthest decision site, no shared cells" does not exist. ENC-cps uses the
-  farthest decision site by distance, and the page reports the shared-cell count for each site.
-  Shared cells mean the placebo can see some of the real patch's weather, so a gain by ENC-cps is
-  read as a leak-through warning and not as noise. ENC-cps stays descriptive (C3b).
-
-## Gate as first written, and redefined after seeing run 1 (2026-10-20)
-
-**The known-answer gate failed its first run, and its design is redefined here before one rerun.**
-Run 1 used only the F1 training year (the scored year stayed unopened). The rerun is the only one:
-if it fails, the verdict stays `inconclusive` and the gate is not redefined again. Run 1's numbers
-are kept in full in `gate_run1.json` in the experiment folder and on the page.
-
-| Run 1 reading (F1 training year, decision sites) | Value |
-|---|---|
-| ENC-c, dense injection of 0.10, 0.05, 0.025 points: share of exact recovery | 115%, 138%, 161%; all 5 of 5 sites |
-| ENC-c, sparse 0.05 | 105%, but 2 of 5 sites; interval upper bound 0.000 |
-| ENC-r, dense 0.05 / sparse 0.05 | 183% / 100%, but 1 of 5 sites each; intervals include zero |
-| ENC-c0 (centre cell only) and ENC-cps (distant patch), dense 0.05 | 140% and 136% (the plan required under 20%) |
-| ENC-cpt (patch from another date), dense 0.05 | 91% (the plan required under 20%) |
-| Gate 2 on permuted actuals: ENC-c gain | 0.56 points, so the test is invalid |
-| Clean data, gain over K0 | ENC-c 0.025, ENC-c0 0.042, ENC-cps 0.026, ENC-cpt 0.026, ENC-r 0.015 |
-| Seed spread (five seeds) / largest training-to-out-of-fold gap | 0.008 (pass) / 13% (pass) |
-
-**Reading of run 1.** The injected function leaks through the encoder's non-patch inputs (lead,
-hour of day, the centre cell's absolute values, and K0's mean), so the controls recover it too. The
-permuted-actual null gives K0 a target it was never calibrated to, so any recalibration reads as
-gain. On clean data the encoder with the patch from another date gains as much as the encoder with
-the right patch, so **most of the out-of-fold gain is a recalibration of K0, not information from
-the patch**. That finding goes in the take-home whatever the rerun shows.
-
-**Redefinition for the rerun, written before it runs.**
-
-- **Injection orthogonal to the non-patch inputs.** The east-minus-west temperature gradient and the
-  north-minus-south shortwave gradient are each replaced by their residual from a cross-fitted
-  XGBoost regression (five month-block folds, F1 training year only) on the non-patch inputs (lead,
-  hour sine and cosine, the centre cell's 10 channels, K0's mean, the site), then standardised. The
-  share of each gradient's variance the non-patch inputs explain is reported before and after.
-- **ENC-r's injection sized per site.** Each site's multiplier is sized so that exact recovery at
-  that site gains the stated size (0.10, 0.05, 0.025 points), because the pooled sizing let the
-  sites with large sensitivities set the scale.
-- **Gate 2 null.** The target is K0's `q50` plus the residual (`actual` minus `q50`) of another run
-  of the same site at the same lead (the placebo run of ENC-cpt). K0's quantiles stay calibrated to
-  the residual distribution, and the patch has no link to the target. The bounds are unchanged: at
-  most 0.01 points from K0, and the intervals of ENC-c and ENC-r include zero.
-- **Pass rules, unchanged from the plan except where stated.** ENC-c and ENC-r, dense and sparse at
-  0.05: at least half of the exactly recoverable gain at 4 of 5 decision sites, and the pooled 99%
-  interval wholly below zero. ENC-c0 and ENC-cpt recover under 20% of every injection. ENC-cps is
-  read as descriptive, because its patch shares 12 to 30 of 37 cells with the real patch. Seed
-  spread at most 0.02 points and the training-to-out-of-fold gap at most 25%, as before.
-- **Power target:** the gate must detect a gain of 0.05 points, the size the plan calls worth
-  seeing; the smaller 0.025 injection is reported and does not gate.
-
-## Gate rerun result (2026-10-20, before any scored-year prediction)
-
-**The rerun failed three of the pass rules, so the verdict is capped at `inconclusive` and the gate
-is not redefined again.** Readings are in `gate_run2.json`; the F1 training year only.
-
-- **ENC-c dense 0.05 passes:** 100% of the exactly recoverable gain, 4 of 5 sites, interval
-  [-0.087, -0.009]. The orthogonalised injection still leaves 33% of the east-west gradient's
-  variance for the encoder to find (the non-patch inputs explain 67% of the raw gradient and -1% of
-  the north-south gradient).
-- **ENC-c sparse 0.05 fails:** 90% of the gain, but 2 of 5 sites, and the interval's upper bound is
-  0.000. Real signal that sits on 10% of days is not reliably found, which is the power finding.
-- **ENC-r fails:** it recovers 16% of the dense 0.05 injection (1 of 5 sites, interval
-  [-0.060, +0.055]). The sparse ENC-r injection could not be sized (no site reached the target).
-- **Controls fail:** ENC-c0 recovers 59% and ENC-cpt 46% of the dense 0.05 injection (the rule
-  required under 20%). ENC-cps recovers 89% (descriptive).
-- **Gate 2 null passes for ENC-c (+0.009) and ENC-r (-0.002), and misses the 0.01 bound for ENC-cpt
-  (+0.013).** ENC-c0 +0.0100 and ENC-cps +0.0096.
-- **Reproduction, causality, purge, seeds pass:** zero difference from K0, zero change from later
-  weather, zero purge violations, seed spread 0.008, training-to-out-of-fold gap at most 13%.
-
-Scoring of the scored years goes ahead as descriptive: the manager's ruling is that a failed rerun
-leaves the verdict `inconclusive`.
+**We asked whether a small neural network that reads the weather forecast for the boxes around a
+Primary substation, and not only the box the substation sits in, would lower the error of our
+current demand forecast (GAM-K, the generalised additive demand model with a Kalman filter that was
+fitted in experiment 111).** The weather forecast is the 51-member ensemble (ENS) of the European
+Centre for Medium-Range Weather Forecasts (ECMWF). We trained the network on one year of GAM-K's
+forecasts and scored it on the other year. We then swapped the two years: direction F1 is scored on
+2025-26 and direction F2 on 2024-25. We also trained copies that saw only the centre box, the box of
+a distant substation, or the same substation's weather from another date, to find out where any gain
+comes from. The network lowered the quantile score (a pinball-loss score of the 11 forecast
+quantiles, in points of the substations' effective capacity, where smaller is better) by 0.062 in F1
+and 0.035 in F2. The copy that read another date's weather kept about two-thirds of that gain, and
+the copy that read only the centre box (the one ENS grid cell that holds the substation) kept nearly
+all of it (0.060 and 0.038 points). Most of the gain therefore does not come from the surrounding
+boxes, and is probably a recalibration of GAM-K's quantiles, which a later experiment has to test.
+
+**The verdict is `inconclusive`: the known-answer gate failed its one rerun, and the pre-registered
+plan, written before any scored-year prediction, caps the verdict there.** The gate checks that an
+injected signal can be found, and that controls which cannot see the signal do not find it. On the
+point estimates the pre-registered label would have been `supported` (it would be `partly supported`
+if C3's F2 interval, which includes zero, is read as not below zero). Either label would mislead,
+because the centre-only control scores as well as the full patch. Experiment 119 is not for
+production.
+
+## Result
+
+**The arms.** ENC-c is the network with the full 37-cell patch, correcting GAM-K's quantiles. ENC-c0
+sees only the centre box, ENC-cps the patch of the farthest decision substation, and ENC-cpt the
+same substation's patch from another date (the placebos). ENC-r uses the full patch to replace
+GAM-K's temperature and irradiance (through GAM-K's own sensitivities), and ENC-r0 sees only the
+centre box. The five decision substations are D5, D10, D11, D14, and D16.
+
+![The five planned contrasts in both years.](headline.svg)
+
+- **C1, the correction against GAM-K, is -0.062 [-0.090, -0.033] in F1 and -0.035 [-0.060, -0.017]
+  in F2** (99% intervals, points of capacity), with 5 of 5 decision substations better in each year
+  and the mean absolute error of the median moving the same way (-0.102 and -0.061). Leaving any one
+  substation out changes C1 by at most 0.005. The pre-registered smallest gain worth porting is 0.04
+  points, and F2 sits below it.
+- **C2, the patch against the centre box alone, is -0.002 [-0.010, +0.007] and +0.003 [-0.003,
+  +0.010].** The surrounding boxes add nothing the centre box lacks, although the plan predicted
+  -0.01 to -0.05.
+- **C3, the right date against another date, is -0.019 [-0.036, -0.006] and -0.013 [-0.028,
+  +0.002].** Date-aligned weather in the centre box accounts for about a third of C1. C3b, against
+  the distant substation's patch, is -0.002 and +0.001 and is read as a leak-through warning,
+  because the six patches share 12 to 30 of their 37 cells.
+- **C4, the replacement through GAM-K's own sensitivities, is -0.037 [-0.053, -0.020] and -0.035
+  [-0.054, -0.019].** Its centre-only control scores the same (-0.037 and -0.036), and the gate
+  shows ENC-r could not recover a small injection, so C4 carries no label.
+- **ENC-c scores 2.739 in F1 and 2.698 in F2 against GAM-K's 2.800 and 2.733 (annual quantile score
+  on shared rows, smaller is better).** All arms, F1: GAM-K 2.800, ENC-c 2.739, ENC-c0 2.740,
+  ENC-cps 2.740, ENC-cpt 2.758, ENC-r 2.763. F2: GAM-K 2.733, ENC-c 2.698, ENC-c0 2.696, ENC-cps
+  2.697, ENC-cpt 2.711, ENC-r 2.699. GAM-0 (no Kalman filter) scores 2.951 and 2.984 on the same
+  rows.
+
+![Each arm minus GAM-K.](decomposition.svg)
+
+**Most of the gain survives when the network reads the wrong date's weather.** ENC-cpt gains 0.043
+(F1) and 0.022 (F2), 69% and 63% of C1. The centre-only ENC-c0 gains 0.060 and 0.038. The gain
+therefore comes from inputs that are not the weather of the right day: the lead, the hour, GAM-K's
+own forecast, and the centre box's values. The median shift of ENC-c against lead (cards below)
+follows the daily cycle. That pattern is consistent with a recalibration and does not prove one.
+
+## Winter and the hard days
+
+![C1 by lead band, season, and day type.](scopes.svg)
+
+**The gain is smaller in winter than over the year, and it is never a loss.** In winter (November to
+March, by the run's month) C1 is -0.041 [-0.076, -0.020] in F1 and -0.027 [-0.042, -0.014] in F2. On
+winter evening peaks (16:00 to 20:00 UTC) C1 is -0.046 [-0.099, +0.004] and -0.049 [-0.067, -0.032].
+The evidence holds two winters, one scored in each direction (2024-25 in F2 and 2025-26 in F1), so
+no winter row is a finding by itself. The pre-registered rule holds an arm back for a winter loss,
+and ENC-c has no winter loss.
+
+![C1 and C3 on the hard days.](hard_days.svg)
+
+**On the hardest days the intervals are wide and carry no label.** The coldest 5% of days (13 days
+in F1, 22 in F2) show C1 of -0.115 [-0.197, -0.039] and -0.057 [-0.133, +0.008], but C3 on the same
+days is -0.077 [-0.199, -0.015] and -0.043 [-0.124, +0.028]. The showery days (18 and 27) and the
+largest-error days (69 and 84, chosen on GAM-K's own outcomes) are in the figure. No subset has more
+than 84 days a year, and its days cluster in weather spells, so none carries a label.
+
+![Tail coverage.](tails.svg)
+
+**The tail quantiles move towards their nominal levels, and the wrong-date copy does the same.** In
+F1 the share of observations below the q01 quantile falls from 0.018 (GAM-K) to 0.013 (ENC-c and
+ENC-cpt), and in F2 from 0.015 to 0.011. The q99 share moves from 0.983 to 0.984 (F1) and from 0.987
+to 0.990 (F2).
+
+## The known-answer gate
+
+![Recovery of the injected signal, run 1 and run 2.](gate.svg)
+
+**The gate was redefined once after run 1 failed, and the rerun failed as well.** Run 1 used the
+first-written gate: the controls ENC-c0 and ENC-cps recovered 140% and 136% of the injection, ENC-r
+recovered it at 1 of 5 substations, and the permuted-actual test of "no false gain" gave a gain of
+0.56 points because GAM-K was never calibrated to its target. The redefinition (committed before the
+rerun) orthogonalised the injection against the non-patch inputs, sized ENC-r's injection per
+substation, and replaced the null target with GAM-K's median plus another run's residual.
+
+**In the rerun, ENC-c recovered the dense injection but missed the sparse one, and the controls and
+ENC-r failed.** ENC-c recovers the dense 0.05-point injection (100%, 4 of 5 substations) and fails
+the sparse one (2 of 5, interval upper bound 0.000). ENC-r recovers 16% (1 of 5). The controls
+ENC-c0, ENC-cps, and ENC-cpt recover 59%, 89%, and 46% (the rule required under 20%, and ENC-cps is
+read as descriptive). On the null target ENC-c (+0.009) and ENC-r (-0.002) stay within 0.01 and the
+intervals include zero, and ENC-cpt misses by 0.003 (+0.013). The original clean-data test (at most
+0.01 from GAM-K on the real targets) also fails for every arm (ENC-c +0.025, ENC-c0 +0.042, ENC-cps
++0.026, ENC-cpt +0.026, ENC-r +0.015), because a real gain is not a false one. Reproduction (largest
+difference from GAM-K 0), causality (largest change 0 when later weather changes), the purge (0
+violations), and the seed spread (0.008 points) pass. Run 1's readings and the redefinition are in
+`gate_run1.json` and the commit history.
+
+## More figures
+
+![Absolute scores by lead.](absolute.svg)
+
+![Gain by month and hour.](month_hour.svg)
+
+![The five fitting seeds.](seeds.svg)
+
+![The patch fields on three days.](patch_fields.svg)
+
+![The hard days.](hard_day_calendar.svg)
+
+## Substation cards
+
+Provisional: fitted to past weather, forecast on ENS, screening run. **Patch weights are not
+identified individually (neighbouring cells share an ENS box); read the ring and east-west contrast,
+not one cell. No physical direction is claimed from one site.** Each card shows the number of
+distinct ENS boxes in the patch, the learned weight of each box (the change in the median forecast
+per kelvin added to that box, with the five seeds' range in the tooltip), the median shift against
+lead, the cold-snap scores, and four example weeks fixed before any score was read (the Monday to
+Sunday weeks starting 2025-07-21, 2025-10-20, 2026-01-19, and 2026-04-20). The cold-snap panel uses
+the coldest 5% of days, and says "too few days" below 10 days.
+
+![D5 card.](card_d5.svg)
+
+![D10 card.](card_d10.svg)
+
+![D11 card.](card_d11.svg)
+
+![D14 card.](card_d14.svg)
+
+![D16 card.](card_d16.svg)
+
+## Plan, predictions, and what changed
+
+**Hypothesis and decision rule.** The pre-registered plan is in the plan commit (`c4430fd72`). The
+verdict is C1's label (supported, small gain, partly supported, refuted, inconclusive), with a
+smallest gain worth porting of 0.04 points, a second year, 4 of 5 substations better, and C3 below
+zero in both years.
+
+**Predictions against outcome.**
+
+- **C1** (-0.02 to -0.08 overall, -0.03 to -0.10 day ahead, 3 to 5 of 5 substations, tail coverage
+  within 3 and 1.5 points): held (-0.062 and -0.035; -0.062 and -0.038; 5 of 5; q01 coverage 0.013
+  and 0.011).
+- **C2** (-0.01 to -0.05), **C3** (-0.02 to -0.07), and **C3b** (about half of C3): failed (C2
+  -0.002 and +0.003; C3 -0.019 and -0.013; C3b -0.002 and +0.001).
+- **C4** (-0.01 to -0.05, smaller than C1): the range held, and C4 was smaller than C1 in F1 (-0.037
+  against -0.062) but equal in F2 (-0.035 against -0.035).
+- **C5** (coldest -0.10 to -0.40, showery -0.05 to -0.30, largest error -0.05 to -0.25 for ENC-c
+  against ENC-cpt): failed (-0.077 and -0.043; -0.016 and -0.019; -0.036 and -0.011).
+
+**Deviations from the plan, all fixed before any scored-year prediction.** The first nine runs of
+2024-04 have no analysis-proxy week and experiment 111 never forecast them, so F1 trains on 447
+runs, not 456. The run's half-hours reach 177 hours after initialisation, so the encoder reads 54
+ENS steps, not 53. GAM-K for 2024-04 to 2024-06 was re-forecast from experiment 111's stored fits
+and reproduces its stored rows exactly. No decision substation is free of shared ENS cells, so the
+placebo ENC-cps uses the farthest decision substation. Settings: ENC-c uses c = 40 (the top of the
+grid) in both directions, with 11 and 4 epochs. ENC-r uses c = 0.4 with 1 epoch in F1 and c = 40
+with 2 epochs in F2. Lambda is 0.5 throughout. The rows with switching events are left out of every
+score; the plan's "all-rows score beside" was not computed.
+
+## Checks
+
+- **Median forecast minus mean forecast, per substation (GAM-K's, the same for every arm):** F1 D5
+  -0.117, D10 -0.037, D11 -0.043, D14 +0.015, D16 +0.002; F2 D5 -0.090, D10 -0.042, D11 -0.045, D14
+  +0.009, D16 +0.001. The encoder shifts the median and the mean together by construction, so it
+  adds no spread-induced shift.
+- **Mean absolute error of the median beside every quantile-score contrast:** agrees in sign for C1
+  to C4 in both years.
+- **Audit triggers that fired:** trigger 1 (the gate's controls and ENC-r failed), trigger 2 (C2,
+  C3, C3b, and C5 contradict the predictions, with an explanation recorded above and untested), and
+  trigger 5 (ENC-c0 and ENC-cps score 0.003 and 0.001 better than ENC-c in F2, by their contrasts
+  against GAM-K). An Opus audit is owed before the merge, and the manager runs it.
+- **Triggers that did not fire:** quantile score and mean absolute error disagree in sign (no),
+  leaving one substation out flips a sign (no), a headline interval more than twice or under half a
+  sister's (C1's 99% half-width of 0.029 against about 0.027 at 99% for the paired contrast of Part
+  4's experiment), and a later design depending on an unreplicated result (F2 replicates C1).
+
+## Caveats and what to try next
+
+- **Caveats.** One frozen fit per direction, no refits. F2 reverses time, K0's 2025-26 fits saw more
+  history than its 2024-25 fits, and ECMWF may have changed its model cycle between the years. The
+  largest-error subset is selected on outcomes. ENC-r is first-order and applied after the filter.
+  The encoder sees the member mean and spread, not 51 members, and the 3.5-hour delay is assumed.
+  The inherited leaks of experiment 111 (the ENS calibration fitted on odd months, hindsight pinned
+  capacity, ERA5 in the GAM's last training rows) apply to GAM-K and the encoder alike. The
+  out-of-fold gain on the F1 training year (0.025 on the clean data) is smaller than the scored
+  gain, and out-of-fold scores are optimistic.
+- **What the next experiment should answer.** Whether a plain recalibration of GAM-K's quantiles
+  from lead, hour, and GAM-K's own forecast, with no weather at all, reproduces the placebo's gain
+  of 0.043 and 0.022 points, and whether adding the centre box's dew point, pressure, precipitation,
+  and member spread adds the remaining 0.019 and 0.013.
+
+## Reproduce
+
+```bash
+uv sync --all-packages --group gpu
+.venv/bin/python ml-experiments/00119-*/e00119_extract.py
+.venv/bin/python ml-experiments/00119-*/e00119_gamk.py
+.venv/bin/python ml-experiments/00119-*/e00119_sensitivities.py
+.venv/bin/python ml-experiments/00119-*/e00119_hard_days.py
+.venv/bin/python ml-experiments/00119-*/e00119_grid.py
+.venv/bin/python ml-experiments/00119-*/e00119_checks.py
+.venv/bin/python ml-experiments/00119-*/e00119_gate.py
+.venv/bin/python ml-experiments/00119-*/e00119_final.py
+.venv/bin/python ml-experiments/00119-*/e00119_score.py
+.venv/bin/python ml-experiments/00119-*/e00119_extra.py
+.venv/bin/python ml-experiments/00119-*/e00119_report.py
+.venv/bin/python ml-experiments/00119-*/e00119_charts.py
+.venv/bin/python ml-experiments/00119-*/e00119_cards.py
+```

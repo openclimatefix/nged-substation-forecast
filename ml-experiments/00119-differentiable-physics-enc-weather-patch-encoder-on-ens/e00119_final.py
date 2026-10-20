@@ -75,6 +75,7 @@ def fit_arm(*, direction: cv.Direction, arm_name: str) -> str:
         forecasts.append(model.to_numpy(quantiles).astype(np.float32))
         if direction.name == "F1" and arm_name == "ENC-c":
             target = common.WORK_DIR / "final" / f"weights_F1_ENC-c_{seed}.pt"
+            target.parent.mkdir(parents=True, exist_ok=True)
             torch.save(
                 {"state": fitted.model.state_dict(), "standardiser": fitted.standardiser}, target
             )
