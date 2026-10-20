@@ -143,6 +143,7 @@ member of the latest run, leads 9 to 33 hours), as experiment 111's residuals do
 | KEZ-Q0 | level only moves (10 weights fixed) | yes | fitted for the level | the paper's static control (descriptive) |
 | KEZ-QI | all 14 | yes | one q for every weight, fitted | identity noise matrix: the test of a learned noise matrix |
 | KEZ-drop-g | all but group g | yes | fitted | which group earns the gain; g in profile, heating, PV, holiday |
+| KEZ-1s | all 14 | yes | fitted by the one-step likelihood, `log q` capped at 2 | the first run's KEZ, kept (pre-fit clarification below); descriptive |
 | KEZ-DT | all 14 | yes | fitted | the day-type-aware arm (pre-fit clarification below); descriptive for the verdict |
 | KEZ-sh | KEZ plus experiment W1's shape state | yes | fitted | labelled follow-up with no number, unless experiment 115 (W1) has merged a tested shape state by the end of the scored year |
 
@@ -350,6 +351,29 @@ before any filter was fitted. It does not change the verdict, which stays C1's.
   interval is at most +0.02 points.
 - **Also reported:** the same two contrasts against GK, and winter nights (November to March, hour
   band night) with the winter breakdown above.
+
+## Noise-fit likelihood (pre-fit clarification, added after the first tuning-month fit)
+
+**The first fit of the noise matrices, by the one-step likelihood, gave weights that move too fast
+to carry a state to the next day, so the noise matrices are refitted by a likelihood that matches
+the forecast's lead.** The first fit ran on the tuning months only. No replicate month and no scored
+run had been forecast, scored, or opened. The first run's tuning-month scores at D+1, in points
+(in-sample for the noise matrix and the spread, so optimistic), were 2.420 for GK and 2.524 for KEZ,
+and 2.429 for KEZ with its PV weight held. The level and PV weights sat at the upper bound of
+`log q` (2.0), which is below the value 2.25 that GAM-K's own fit reached at one site, so KEZ could
+not nest GK.
+
+- **Change 1:** the bounds of `log q` are those of `studies.dp_assimilation` (up to 6).
+- **Change 2:** the noise matrix is fitted by the **lead-matched likelihood**: each tuning-month
+  reading at D+1 is scored by its predictive density from the state at its day-ahead cutoff (the
+  newest half-hour that ended 3.5 hours before 09:00 UTC on the previous day), with the state
+  stepped forward with no further reading. A noise matrix that adapts too fast to carry its state
+  to the next day is penalised. [de Vilmarest et al. (2024)](https://doi.org/10.1109/TPWRS.2023.3310280)
+  work with one daily step, where the one-step likelihood is already a day-ahead likelihood.
+- **Change 3:** the first run's KEZ is kept as the arm KEZ-1s and forecast like every other arm, so
+  the page reports both likelihoods. Its fitted noise is the first run's, with the old bound.
+- **Unchanged:** the arms, the contrasts, the decision rule, the gate's readings and bars, and the
+  rule that the replicate months and the scored year are opened once.
 
 ## Audit before merge: the seven triggers
 

@@ -28,6 +28,7 @@ import numpy as np
 import torch
 from studies.dp_effects_filter import (
     SiteStream,
+    day_ahead_targets,
     fit_effects_noise_sites,
     relative_step_per_year,
 )
@@ -77,14 +78,17 @@ def fit_arm(name: str) -> str:
             sigma_eps_start = read_noise(arm="KE")["sites"][site]["sigma_eps"] * (
                 arms.INFLATION_VARIANCE**0.5
             )
+        resid = data.fit_residual(cache=cache, skip_holidays=arm.skip_holidays)
+        scored = data.tuning_mask & np.isfinite(resid)
         inputs[site] = SiteStream(
-            residual=(resid := data.fit_residual(cache=cache, skip_holidays=arm.skip_holidays)),
+            residual=resid,
             regressors=data.standardised,
             scale=data.scale,
-            likelihood_mask=data.tuning_mask & np.isfinite(resid),
+            likelihood_mask=scored,
             phi=noise.phi,
             sigma_z=noise.sigma_z,
             sigma_eps_start=sigma_eps_start,
+            lead_matched=day_ahead_targets(end_times=cache.end_times, rows=np.flatnonzero(scored)),
         )
         scales[site] = data.scale
     fitted, prior_mean, prior_spread = fit_effects_noise_sites(
@@ -125,7 +129,11 @@ def main() -> None:
     """Fit the arms in parallel; KE-infl waits for KE."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=6)
-    parser.add_argument("--arms", nargs="+", default=list(arms.FITTED_ARMS))
+    parser.add_argument(
+        "--arms",
+        nargs="+",
+        default=[name for name, arm in arms.FITTED_ARMS.items() if not arm.one_step],
+    )
     args = parser.parse_args()
     first = [name for name in args.arms if name != "KE-infl"]
     with ProcessPoolExecutor(max_workers=args.workers) as pool:

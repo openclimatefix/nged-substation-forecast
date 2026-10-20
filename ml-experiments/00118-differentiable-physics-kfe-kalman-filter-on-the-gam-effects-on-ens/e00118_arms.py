@@ -9,6 +9,7 @@
 | KEZ-Q0 | level (4) | yes | fitted for the level |
 | KEZ-QI | all 14 | yes | one q for every weight, fitted |
 | KEZ-drop-g | all but group g | yes | fitted |
+| KEZ-1s | all 14 | yes | the first run's, fitted by the one-step likelihood (q bound of 2) |
 | KEZ-DT | all 14 | yes | fitted on a stream without holiday-day readings |
 """
 
@@ -42,6 +43,8 @@ class ArmConfig:
         use_anomaly: Whether the anomaly states are in use.
         shared_q: Whether one q is fitted for every moving weight.
         inflated: Whether the observation noise is held at the inflated value of KE.
+        one_step: Whether the noise was fitted by the one-step likelihood (the first run, kept as an
+            arm) and not by the lead-matched likelihood.
         skip_holidays: Whether readings on holiday days are left out of the filter and the level
             and anomaly corrections are zero on holiday target days (the day-type-aware arm).
     """
@@ -52,6 +55,7 @@ class ArmConfig:
     shared_q: bool = False
     inflated: bool = False
     skip_holidays: bool = False
+    one_step: bool = False
 
     @property
     def variant(self) -> FilterVariant:
@@ -75,6 +79,7 @@ FITTED_ARMS: Final[dict[str, ArmConfig]] = {
     "KEZ": ArmConfig("KEZ", _moving_except(group=None), use_anomaly=True),
     "KEZ-Q0": ArmConfig("KEZ-Q0", LEVEL_ONLY, use_anomaly=True),
     "KEZ-QI": ArmConfig("KEZ-QI", _moving_except(group=None), use_anomaly=True, shared_q=True),
+    "KEZ-1s": ArmConfig("KEZ-1s", _moving_except(group=None), use_anomaly=True, one_step=True),
     "KEZ-DT": ArmConfig("KEZ-DT", _moving_except(group=None), use_anomaly=True, skip_holidays=True),
     **{
         f"KEZ-drop-{group}": ArmConfig(
