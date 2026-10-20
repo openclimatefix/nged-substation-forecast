@@ -262,6 +262,15 @@ winters.
 
 ![Actual demand on cold nights, E7-X series](figure_10_cold_nights_e7x.svg)
 
+## Follow-up checks to add (exploratory, none computed yet)
+
+**These checks come from an unverified summary of Economy 7 tariff practice. Each claim in it is a hypothesis to test against the data or against Elexon's public meter timeswitch code tables; nothing here cites it as a source.** None of them reads winter 2025-26, so the scored-year lock is unchanged.
+
+- **Clock share per substation (exploratory).** Report for each substation the share of cold British Summer Time nights consistent with a step fixed to UTC against a step fixed to the local clock, instead of one label. Legacy meters and radio teleswitches are said to stay on Greenwich Mean Time all year and some smart meters to follow local time, so a substation may hold a mixture. The two substations where the post hoc check did not show a one-hour shift (D14 and D9) may be mixtures.
+- **Window start, end, and split (exploratory).** Windows are said to last about 7 hours, staggered by region and meter code, and sometimes split in two. Report on the cards the fitted start and the end of the window (a drop near 07:30 UTC if the start is 00:30), the ramp at the start, and any second window. The gate's ramp-plateau shape already covers a ramped start.
+- **Step by year (exploratory).** The radio teleswitch service is said to be closing region by region in 2025 and 2026. Report the step by winter at each substation, from 2021-22 to the latest winter, with `cannot tell` where the history is short. The per-winter steps in figure 3 are the first version; the later winters wait for the scored-winter unlock. This also bears on how stable the step is in production.
+- **Descriptive only for now.** Fixed-window heat-pump and electric-vehicle tariffs that would add a night step on the local clock, and bespoke half-hourly contracts.
+
 ## Limitations
 
 - **Summer is assumed step-free.** On summer nights the later half-hours average 0.7 to 13.4 points
