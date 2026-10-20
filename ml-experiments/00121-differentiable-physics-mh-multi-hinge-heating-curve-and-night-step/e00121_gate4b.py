@@ -42,6 +42,8 @@ KINDS: Final[tuple[str, ...]] = ("utc", "local", "cold")
 ARMS: Final[tuple[str, ...]] = ("b0", "ns_u", "ns_h", "ns_hw")
 CALIBRATION_DRAWS: Final[range] = range(base_gate.N_DRAWS_PER_SITE)
 VERIFICATION_DRAWS: Final[range] = range(100, 100 + base_gate.N_DRAWS_PER_SITE)
+GATE_4B_SEED_TAG: Final[int] = 5
+"""A seed tag of its own, so the noise differs from gate 4' as first written (tag 4)."""
 FALSE_POSITIVE_RATE: Final[float] = 0.05
 MAX_VERIFIED_FALSE_POSITIVE: Final[float] = 0.08
 MIN_POWER: Final[float] = 0.80
@@ -60,9 +62,7 @@ def one_draw(
     *, setup: base_gate.SiteSetup, site_position: int, draw: int, with_steps: bool
 ) -> dict[str, float]:
     """Run one draw (a placebo, or the placebo plus every step) and return the scores."""
-    rng = np.random.default_rng(
-        [common.EXPERIMENT_ID, base_gate.GATE_SEED_TAG, site_position, draw]
-    )
+    rng = np.random.default_rng([common.EXPERIMENT_ID, GATE_4B_SEED_TAG, site_position, draw])
     noise_values = setup.inflation * _STATE["pool"].draw(site=setup.site, index=setup.rows, rng=rng)
     base_mean = setup.matrices[("b0", "all")] @ setup.theta_b0
     truths: dict[str, np.ndarray] = {"placebo": np.zeros_like(base_mean)}
@@ -148,6 +148,11 @@ def summary() -> dict[str, Any]:
                         frame=calibration, truth=f"{kind}{size:g}", arm=arm, subset=subset
                     )
                     result[f"detects_{kind}{size:g}"] = float((draws < critical).mean())
+                    for site in sorted(set(calibration["site"].to_list())):
+                        mask = (calibration["site"] == site).to_numpy()
+                        result[f"detects_{kind}{size:g}_{site}"] = float(
+                            (draws[mask] < critical).mean()
+                        )
             entry[rows_name] = result
         report["arms"][arm] = entry
     label = {arm: report["arms"][arm]["label_rows"] for arm in ROWS_OF}
