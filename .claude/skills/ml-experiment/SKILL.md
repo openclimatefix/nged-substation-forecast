@@ -188,7 +188,11 @@ time would have taken under an hour.
 ## Keep the theme's Research plan page current
 
 **Update the owning theme's Research plan page (`docs/ml-experiments/themes/<theme>/plan.md`) in the
-PR that commits the `planned` `result.md`, and again in the PR that adds the finished write-up.** The
+commit that adds the `planned` `result.md`, and again in the commit that adds the finished
+write-up.** An experiment uses one pull request for both commits, and the commit order on the branch
+proves the plan came first. Open a separate plan pull request only when another session has to read
+the plan from `main` before the experiment runs, as when a planner hands the plan to a session that
+has not yet started. The
 first PR updates the experiment's row in the priority table at the top of the page with its id, the
 question in one line, the priority, what it waits for, and the state, and commits the `result.md`
 with `status: planned`, which the page's generated planned-experiments table then lists. The finished
@@ -411,7 +415,9 @@ diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment h
 its size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
 --check`; any audit a trigger in "Audit before merge" calls for has run, with its findings triaged
 in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
-`data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). **Before any
+`data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). **Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
+file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
+`experiment_tables.py --check`; a failure found by CI costs a ten-minute rerun. **Before any
 merge, a fresh Sonnet agent reviews the prose of `result.md` and its `take_home_message`.** The
 agent receives the files and no account of the reasoning behind them, loads the `prose-review`
 skill, and reads the opening paragraph first. It reports every term, abbreviation, and number in the
