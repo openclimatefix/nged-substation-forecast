@@ -28,10 +28,12 @@ from studies.dp_features import FeatureCache
 from studies.dp_gam import TrainingWindow, fit_gam, predict_gam
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
-ArmType = Literal["a0", "a1"]
-"""`a0` keeps the switching events in training, `a1` drops them."""
+ArmType = Literal["a0", "a1", "a4"]
+"""`a0` keeps the switching events in training, `a1` drops them, and `a4` is `a0` refitted on power
+with the edge flows taken out (`e00116_refit.py`)."""
 
 ARMS: Final[tuple[ArmType, ...]] = ("a0", "a1")
+"""The arms this script fits; `a4` comes from `e00116_refit.py`."""
 SITES: Final[tuple[str, ...]] = (
     "D2",
     "D3",
