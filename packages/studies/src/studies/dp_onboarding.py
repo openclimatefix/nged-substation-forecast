@@ -16,7 +16,7 @@ prior leaves its parameters alone.
 would add memory and no speed. `fit_many` records each copy's peak memory.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 
 import numpy as np
@@ -242,6 +242,7 @@ def onboard_site(
     weeks_of_history: int | None = None,
     learning_rate: float = 0.05,
     seed: int = 0,
+    fitter: Callable[[PooledDemandModel, PooledBatch, int], float] | None = None,
 ) -> dict[str, float]:
     """Fit a new substation's site-level parameters into a fitted pooled model.
 
@@ -264,6 +265,11 @@ def onboard_site(
             model so the pooled residuals can be checked against the arm they are used for.
         learning_rate: Adam's learning rate.
         seed: Seeds the posterior draws.
+        fitter: Replaces the Adam loop. Given the model (with the substation reset to the
+            population mean and its trained years set), the substation's rows, and its index, it
+            fits the substation's site-level parameters in place and returns the final loss;
+            `steps` and `learning_rate` are then unused. `studies.dp_pooled_vp.vp_site_fitter`
+            supplies a variable-projection fitter.
 
     Returns:
         The rows used and the final loss, for the report.
@@ -311,18 +317,22 @@ def onboard_site(
     optimiser = torch.optim.Adam(trainable, lr=learning_rate)
     torch.manual_seed(seed)
     last = float("nan")
-    if batch.n_rows:
-        model.train()
-        for _ in range(steps):
-            optimiser.zero_grad(set_to_none=True)
-            loss = model.loss(batch=batch)
-            loss.backward()
-            optimiser.step()
-            last = float(loss.detach())
-    for handle in handles:
-        handle.remove()
-    for name, parameter in model.named_parameters():
-        parameter.requires_grad_(saved_flags[name])
+    try:
+        if batch.n_rows and fitter is not None:
+            last = fitter(model, batch, site)
+        elif batch.n_rows:
+            model.train()
+            for _ in range(steps):
+                optimiser.zero_grad(set_to_none=True)
+                loss = model.loss(batch=batch)
+                loss.backward()
+                optimiser.step()
+                last = float(loss.detach())
+    finally:
+        for handle in handles:
+            handle.remove()
+        for name, parameter in model.named_parameters():
+            parameter.requires_grad_(saved_flags[name])
     _restore_other_sites(
         model=model,
         batch=batch,

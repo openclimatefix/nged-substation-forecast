@@ -40,6 +40,7 @@ three.
 """
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Final, Literal, Protocol
 
@@ -76,6 +77,12 @@ MIN_TRAINED_SLOT_ROWS: Final[int] = 1440
 A cut on 1 July leaves a few dark half-hours in the next season-year, which must not count as a
 trained year: its capacity increment and centring mean would rest on them.
 """
+SHAPE_DECAY: Final[float] = 1e-4
+"""Weight decay on the shared daily shapes, in nats per unit squared."""
+HOLIDAY_DECAY: Final[float] = 1e-3
+"""Weight decay on the holiday coefficients."""
+NETWORK_DECAY: Final[float] = 1e-5
+"""Weight decay on every parameter of the interaction network."""
 INITIAL_POWER_FACTOR: Final[float] = 0.97
 """The power factor that the MVA substations' `tan(phi)` starts from."""
 SITE_FAMILIES: Final[tuple[str, ...]] = (
@@ -663,8 +670,7 @@ class PooledDemandModel(nn.Module):
         mixed = batch.smoothed_temperature @ inertia
         if self.interaction is not None:
             calendar = (
-                calendar
-                + self.interaction(self._interaction_inputs(batch=batch, mixed=mixed))[:, 0]
+                calendar + self.interaction(self.interaction_inputs(batch=batch, mixed=mixed))[:, 0]
             )
         return calendar, mixed
 
@@ -700,7 +706,7 @@ class PooledDemandModel(nn.Module):
             self.centre_means.copy_(means.detach())
         return values - means[slot]
 
-    def _interaction_inputs(self, *, batch: PooledBatch, mixed: torch.Tensor) -> torch.Tensor:
+    def interaction_inputs(self, *, batch: PooledBatch, mixed: torch.Tensor) -> torch.Tensor:
         """Stack the calendar and weather inputs of the interaction network."""
         temperature = (mixed - HEATING_THRESHOLD_C) / HEATING_SCALE_C
         if self.config.network_temperature_dark_only:
@@ -731,9 +737,9 @@ class PooledDemandModel(nn.Module):
 
     def penalty(self) -> torch.Tensor:
         """Return the weight decay, and in the `decay` prior the deviation and threshold priors."""
-        decay = 1e-4 * (self.shapes**2).sum() + 1e-3 * (self.holiday**2).sum()
+        decay = SHAPE_DECAY * (self.shapes**2).sum() + HOLIDAY_DECAY * (self.holiday**2).sum()
         if self.interaction is not None:
-            decay = decay + 1e-5 * sum((p**2).sum() for p in self.interaction.parameters())
+            decay = decay + NETWORK_DECAY * sum((p**2).sum() for p in self.interaction.parameters())
         if self.config.site_prior != "decay":
             return decay
         prior = (((self.threshold - HEATING_THRESHOLD_C) / THRESHOLD_PRIOR_SCALE_C) ** 2).sum()
@@ -780,8 +786,9 @@ def fit_pooled(
     steps: int,
     learning_rate: float = 0.05,
     final_rate_fraction: float = 1.0,
+    loss_function: Callable[[PooledDemandModel, PooledBatch], torch.Tensor] | None = None,
 ) -> PooledFitResult:
-    """Fit by full-batch Adam on the model's loss (`PooledDemandModel.loss`).
+    """Fit by full-batch Adam on the model's loss (`PooledDemandModel.loss`) or a given loss.
 
     The levels start from the training rows' own means (`start_from_batch`), whatever
     `initial_level` the model was built with. Adam is not deterministic on the GPU, because
@@ -795,6 +802,9 @@ def fit_pooled(
         learning_rate: Adam's starting learning rate.
         final_rate_fraction: The fraction of `learning_rate` left at the last step; the rate
             follows a cosine from 1 to this fraction, and 1.0 keeps it constant.
+        loss_function: Maps the model and the batch to the scalar loss to minimise; `None` uses
+            `PooledDemandModel.loss`. `studies.dp_pooled_vp.vp_loss_function` supplies the loss of
+            the variable-projection objective.
 
     Returns:
         The loss history, the wall-clock time, and the peak GPU memory.
@@ -814,7 +824,7 @@ def fit_pooled(
     losses: list[torch.Tensor] = []
     for _ in range(steps):
         optimiser.zero_grad(set_to_none=True)
-        loss = model.loss(batch=batch)
+        loss = model.loss(batch=batch) if loss_function is None else loss_function(model, batch)
         loss.backward()
         optimiser.step()
         schedule.step()
