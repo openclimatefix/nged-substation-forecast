@@ -13,7 +13,7 @@ daily run pooled into 11 mixture quantiles. They differ in the inputs and the st
 | `xlag_z` | 3 | leads to 168 h | zero | the same |
 | `xlag_o` | 3 | leads to 168 h | median label plus the solar offset (offset sites) | the same |
 | `gam_margin` | 3 | leads to 168 h | the DP's forecast, forward-chained | the same |
-| `xlag_o_prod`, `gam_margin_prod` | 3 | leads to 168 h | as `xlag_o`, as `gam_margin` | monthly, 500 rounds, eta 0.05 |
+| `*_prod` | 3 | leads to 168 h | `xlag_o` and `gam_margin` again | monthly, 500 rounds, eta 0.05 |
 
 The margin arms refit monthly, not weekly as the plan said, because the plan's compute estimate was
 20 times too low. They train on leads to 168 hours because the DP's forecast covers 168 hours; the
