@@ -41,7 +41,8 @@ jobs:
             # --no-renames lists the old path of a moved file too, so moving code into an
             # experiment folder still takes the full path.
             changed=$(git diff --name-only --no-renames HEAD^1 HEAD)
-            if [ -n "$changed" ] && ! echo "$changed" | grep -qvE '^(ml-experiments/|docs/ml-experiments/|mkdocs\.yml$)'; then
+            others=$(echo "$changed" | grep -vE '^(ml-experiments/|docs/ml-experiments/|mkdocs\.yml$)' || true)
+            if [ -n "$changed" ] && [ -z "$others" ]; then
               experiment_only=true
             fi
           fi
