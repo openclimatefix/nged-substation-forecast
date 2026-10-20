@@ -150,6 +150,13 @@ def leave_one_series_out(*, steps: pl.DataFrame) -> list[dict]:
     return out
 
 
+def night_end(*, winters: tuple[int, ...]) -> common.date:
+    """Return the first evening a stage does not read: the start of the next unread winter."""
+    if common.SELECTION_WINTER in winters:
+        return common.date(2026, 6, 29)
+    return common.date(common.SELECTION_WINTER, 10, 26)
+
+
 def timing_rows(*, table: pl.DataFrame, winters: tuple[int, ...]) -> list[dict]:
     """Return cold BST night counts per series, and `delta` where there are 10 or more."""
     rows = []
@@ -162,7 +169,7 @@ def timing_rows(*, table: pl.DataFrame, winters: tuple[int, ...]) -> list[dict]:
             & (pl.col("daily_mean_c") < common.COLD_BST_NIGHT_C)
             & pl.col("d").is_not_null()
             & pl.col("d_utc").is_not_null()
-            & (pl.col("evening").dt.year() < (max(winters) + 1))
+            & (pl.col("evening") < night_end(winters=winters))
         )
         count = own.height
         row: dict[str, object] = {"site": site, "cold_bst_nights": count}
@@ -306,7 +313,9 @@ def jump_location(*, profiles: np.ndarray) -> int:
     return int(np.argmax(window)) + JUMP_FIRST_SLOT
 
 
-def bst_jump_rows(*, infos: dict[str, common.SeriesInfo], table: pl.DataFrame) -> list[dict]:
+def bst_jump_rows(
+    *, infos: dict[str, common.SeriesInfo], table: pl.DataFrame, winters: tuple[int, ...]
+) -> list[dict]:
     """Post hoc: where is the largest jump on cold BST nights, against cold GMT nights?
 
     Both are read on the local clock. A step fixed to the local clock jumps at the same local
@@ -325,8 +334,8 @@ def bst_jump_rows(*, infos: dict[str, common.SeriesInfo], table: pl.DataFrame) -
             & ~pl.col("excluded")
             & (pl.col("daily_mean_c") < common.COLD_BST_NIGHT_C)
             & pl.col("season").is_in(["gmt", "bst_other"])
-            & (pl.col("winter").is_null() | (pl.col("winter") <= max(common.HEADLINE_WINTERS)))
-            & (pl.col("evening") < common.date(2025, 10, 26))
+            & (pl.col("winter").is_null() | (pl.col("winter") <= max(winters)))
+            & (pl.col("evening") < night_end(winters=winters))
         )
         groups: dict[str, list[list[float]]] = {"gmt": [], "bst_other": []}
         for row in nights.iter_rows(named=True):
@@ -394,6 +403,49 @@ def hand_filtered_rows(
     return rows
 
 
+def raw_cold_step_rows(*, infos: dict[str, common.SeriesInfo], table: pl.DataFrame) -> list[dict]:
+    """Return the raw half-hour-ending-01:00 step on cold GMT nights, in MW and in points.
+
+    Cold nights are GMT nights of the design winters whose daily mean is at most 3 C. The step is
+    the half-hour ending at 01:00 minus the mean of the 22:00 to 23:30 half-hours, in the series'
+    units; it reads the stored cleaned power directly and needs no fit.
+    """
+    ids = [infos[s].time_series_id for s in common.SELECTED_SERIES]
+    power = common.load_power(time_series_ids=ids)
+    rows = []
+    for site in common.SELECTED_SERIES:
+        info = infos[site]
+        own = power.filter(pl.col("time_series_id") == info.time_series_id)
+        lookup = dict(zip(own["time"].to_list(), own["power"].to_list(), strict=True))
+        nights = table.filter(
+            (pl.col("site") == site)
+            & (pl.col("season") == "gmt")
+            & ~pl.col("excluded")
+            & pl.col("winter").is_in(list(common.DESIGN_WINTERS))
+            & (pl.col("daily_mean_c") <= 3.0)
+        )["evening"].to_list()
+        steps = []
+        for evening in nights:
+            base = common.datetime.combine(evening, common.time.min).replace(tzinfo=common.UTC)
+            baseline = [
+                lookup.get(base + timedelta(hours=22, minutes=30 * k + 30)) for k in range(4)
+            ]
+            after = lookup.get(base + timedelta(hours=25))
+            if after is not None and all(v is not None for v in baseline):
+                steps.append(after - sum(v for v in baseline if v is not None) / 4.0)
+        mean = float(np.mean(steps))
+        rows.append(
+            {
+                "site": site,
+                "cold_nights": len(steps),
+                "step_mw": mean,
+                "step_points": mean * 100.0 / info.effective_capacity_mw,
+                "effective_capacity_mw": info.effective_capacity_mw,
+            }
+        )
+    return rows
+
+
 def main() -> None:
     """Print the report for one stage and save its numbers."""
     parser = argparse.ArgumentParser()
@@ -429,8 +481,9 @@ def main() -> None:
         "pooled": json.loads((common.WORK_DIR / f"pooled_{stage}.json").read_text()),
         "leave_one_out": leave_one_series_out(steps=headline),
         "timing": timing_rows(table=table, winters=winters),
-        "bst_jump": bst_jump_rows(infos=infos, table=table),
+        "bst_jump": bst_jump_rows(infos=infos, table=table, winters=winters),
         "hand_filtered": hand_filtered_rows(infos=infos, winters=winters),
+        "raw_cold_step": raw_cold_step_rows(infos=infos, table=table),
         "start_times": start_times(infos=infos, table=table, winters=winters),
         "gate": json.loads((common.WORK_DIR / "gate.json").read_text()),
     }
@@ -447,6 +500,7 @@ def main() -> None:
             "timing",
             "bst_jump",
             "hand_filtered",
+            "raw_cold_step",
         ):
             print(f"\n== {name} ==")
             print(pl.DataFrame(numbers[name]))

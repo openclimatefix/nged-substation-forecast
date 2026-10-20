@@ -2,8 +2,8 @@
 id: "00123"
 slug: differentiable-physics-e7-storage-heating-night-step-estimation
 title: >-
-  Differentiable physics, E7: how large is the winter night step, with the pattern of storage
-  heating, at Primary substations, and how does it grow with cold?
+  Differentiable physics, E7: how large is the winter night step at Primary substations, a pattern
+  like that of storage heating, and how does it grow with cold?
 part: n/a
 theme: differentiable-physics-demand-calendar-and-weather
 also_relevant_to: [differentiable-physics-forecast-engine]
@@ -15,11 +15,12 @@ size: >-
   (window, cold variable, estimator); this plan pre-registers one. Callers: this folder's scripts
   only. Asset graph: not touched.
 hypothesis: >-
-  At Primary substations, demand steps up at the 01:00 to 03:00 rows on winter nights, the step
-  grows with cold, and the pooled step over the six decision series is positive at a daily mean of
-  3 C. At D5, D10, and D16, which were chosen because winter 2025-26 showed the step, it is 5 to 10
-  points; at the other decision series it is smaller.
-prediction: see "Predictions"
+  At Primary substations, demand steps up in the half-hours from 00:30 to 02:30 on winter nights,
+  the step grows with cold, and the pooled step over the six decision series is positive at a daily
+  mean of 3 C. At D5, D10, and D16, which were chosen because winter 2025-26 showed the step, it is
+  5 to 10 points (1% of each series' 99th percentile of demand); at the other decision series it
+  is smaller.
+prediction: see "Predictions against outcome"
 decision_rule: see "Decision rule"
 benchmark: none (estimation); experiment 121's descriptive 01:00 steps are the reference
 row_set_id: >-
@@ -34,28 +35,40 @@ take_home_message: <written after the results>
 advice: <written after the results>
 ---
 
-**Status: results for winters 2021-22 to 2024-25. Winter 2025-26, the selection winter, is not yet
-read, because it waits for PR 1397 (experiment 114) to merge. The plan, committed before any code
-ran, follows the results.**
+**Status: results for winters 2021-22 to 2024-25.** Winter 2025-26, the winter in which D5, D10, and
+D16 were picked, has not been read yet, because it waits for the merge of experiment 114's pull
+request (PR 1397). The plan, committed before any code ran, follows the results.
 
-We asked how much demand at Primary substations rises in the small hours of a winter night, as it
-would if storage heaters (heaters that charge from cheap night-rate electricity, switched on by
-timers) came on, and whether the rise grows with cold. On each winter night we took the mean demand
-over the five half-hours starting 00:30 to 02:30 and subtracted the mean over the four half-hours
-starting 22:00 to 23:30. We fitted that difference against how far the day's mean temperature fell
-below 15.5 C, and compared the result with the same difference on summer nights. On a night with a
-daily mean of 3 C, the rise is 9.9 points pooled over the six decision substations (90% interval
-6.2 to 13.5), where one point is 1% of the series' own 99th percentile of demand. The eight further
-substations we added are as large: pooled 13.2 points (6.9 to 19.6).
+We examined 14 Primary substations, labelled D2 to D22 to keep them anonymous. Six of them (D5,
+D9, D10, D11, D14, and D16) were set before any fit as the substations the conclusion rests on; we
+call them the decision substations. D5, D10, and D16 are the three where earlier experiments first
+saw a step in winter 2025-26 demand. The other eight (D2, D3, D4, D8, D12, D19, D21, and D22) were
+added as a check; we call them E7-X.
 
-**Take-home message: demand at 13 of the 14 Primary substations we examined steps up around 01:00 on
-winter nights, and the step is larger on colder nights, but the step is not special to the three
-substations that prompted the study.** The eight substations that were not chosen for showing a
-step have a pooled step as large as the six decision substations, so the earlier impression that D5,
-D10, and D16 stand out came from where the earlier experiments looked. The full step depends on the
-assumption that summer nights have no step. The part that grows with cold needs no such assumption,
-and it is smaller: 1.1 to 4.7 points at the six decision substations (slope times 12.5 degrees).
-The provisional verdict is `supported`, pending the audit triggers below and winter 2025-26.
+We asked how much demand rises in the small hours of a winter night, the pattern that storage
+heaters (heaters that charge from cheap night-rate electricity, switched on by timers) would
+produce, and whether the rise grows with cold. On each winter night we took the mean demand over
+the five half-hours starting 00:30 to 02:30 and subtracted the mean over the four half-hours
+starting 22:00 to 23:30. We fitted that difference against how far the day's mean temperature (from
+the ERA5 reanalysis, a weather-agency estimate of past weather) fell below 15.5 C. We then
+subtracted the same difference measured on June to August nights, which we treat as the no-step
+baseline. We measure demand in points, where one point is 1% of that substation's 99th percentile
+of demand. On a night with a daily mean of 3 C, demand rises by 9.9 points averaged over the six
+decision substations (90% interval 6.2 to 13.5; the average weights each substation by how
+precisely its step is known, using Hartung-Knapp random-effects pooling). The eight E7-X
+substations, which were not chosen for showing a step, average 13.2 points (6.9 to 19.6), above the
+decision substations' 9.9.
+
+**Take-home message: demand at 13 of the 14 Primary substations steps up around 01:00 on winter
+nights, and the step is larger on colder nights. The step is not special to the three substations
+that prompted the study.** The eight E7-X substations have an average step as large as the six
+decision substations, so the analysis does not show that D5, D10, and D16 stand out (it does not
+rule that out, because the eight were not a random sample). The full step depends on the assumption
+that summer nights have no step. The part that grows with cold needs no such assumption, and that
+part is smaller: 1.1 to 4.7 points at the six decision substations (the slope times 12.5 degrees,
+the gap between 15.5 C and a 3 C night). The verdict word under the plan's decision rule is
+`inconclusive`, because the gate's pooled-interval row failed (it over-covered); the estimates
+above stand, and the verdict waits for the independent audit and for winter 2025-26.
 
 ![Step per series and pooled](figure_1_headline.svg)
 
@@ -72,12 +85,14 @@ The provisional verdict is `supported`, pending the audit triggers below and win
 - **Is the step specific to the chosen substations?** No. The eight further Primaries (E7-X) pool to
   13.2 points, above the six decision series. One of the eight (D8) has no step (0.5 points, 90%
   interval -0.7 to 1.7).
-- **Does the step have a fixed clock time?** The step starts in the half-hour starting 00:30 at all
-  14 series. On cold British Summer Time nights the largest jump falls one hour later by the clock at
-  12 of 14 series, which fits timers set to UTC (a post hoc check, uncalibrated).
-- **How much of the step do experiment 114's day-ahead forecasts already remove?** The step left in
-  the errors of its baseline model is 0.53 to 0.78 of the full step at D5, D10, and D16 (stored
-  predictions for winters 2023-24 and 2024-25 only).
+- **Does the step have a fixed clock time?** The step starts in the half-hour starting 00:30 (ending
+  at 01:00) at all 14 series (at D4 the interval reaches one half-hour earlier). On cold British
+  Summer Time nights the largest jump falls one hour later by the clock at 12 of 14 series, which
+  fits timers set to Coordinated Universal Time (UTC) (a post hoc check, chosen after seeing the
+  data).
+- **How much of the step do experiment 114's day-ahead forecasts already remove?** R, the step left
+  in the errors of its baseline model divided by the full step, is 0.53 to 0.78 at D5, D10, and D16
+  (stored predictions for winters 2023-24 and 2024-25 only).
 - **Where does the baseline forecast miss on cold nights?** At D5 and D16 actual demand runs 5.6 and
   9.4 points above the forecast in the half-hour starting 01:00; at D10 it runs 12.2 points below
   the forecast in the half-hour starting 23:30 (figure 9).
@@ -91,8 +106,10 @@ the true step. Coverage is 87.0 to 87.5% pooled over series for the four gated s
 95%) and 82 to 93% for each series (target 80 to 98%). The mean estimate is within 0.20 points of the
 truth everywhere (target 0.5). The Hartung-Knapp interval for the pooled mean covered the true mean
 in 100% of the 200 draws (target 85 to 95%), so the pooled intervals are conservative, not too
-narrow. The gate tests only the shapes this plan chose, with noise that is independent between
-14-day blocks.
+narrow. If the true step follows the 18:00 to 08:00 mean temperature instead of the daily mean,
+coverage falls to 79% pooled at 7 points and to 43% at the worst series (descriptive, no target),
+so the daily-mean proxy matters. The gate tests only the shapes this plan chose, with noise that is
+independent between 14-day blocks.
 
 ![Gate coverage](figure_4_gate.svg)
 
@@ -100,46 +117,52 @@ narrow. The gate tests only the shapes this plan chose, with noise that is indep
 
 **The raw nights show the pattern before any fitting.** On winter nights demand rises after
 midnight, where on summer nights it falls. At D10 the difference between the later and earlier
-half-hours averages -5.5 points in summer and about 5 to 15 points on winter nights. The mean of the
-cold nights (daily mean at most 8 C) sits within 0.4 points of the fitted line at all 14 series (the
-prediction was 2 points).
+half-hours averages -5.5 points in summer, and the raw mean on cold nights (daily mean at most 8 C)
+is 14.9 points above that summer value. That raw mean sits within 0.4 points of the fitted line at
+all 14 series (the plan allowed up to 2 points).
 
 ![Raw nights](figure_2_raw.svg)
 
-**The step is similar in each winter at most decision series.** At D10 it falls from 17.0 points in
-2021-22 to 14.2 in 2024-25, and at D14 it is 1.3 to 4.2 in the four winters.
+**The step has the same sign in every winter at the six decision substations, and falls over the four
+winters at D10.** At D10 it falls from 17.0 points in 2021-22 to 14.2 in 2024-25, and it falls
+steadily at four E7-X substations (D19, D2, D3, and D22). At D5, D11, and D16 the four winters stay
+within 3.4 points of each other, and at D14 the step is 1.3 to 4.2.
 
 ![Step per winter](figure_3_winters.svg)
 
-**Pooling does not show the selection effect the plan expected.** The mean over the three series
-that prompted the study (D5, D10, D16) is 13.2 points against 6.5 for D9, D11, and D14, but the
-eight E7-X series, chosen for nothing, also average 13.2. The between-series standard deviation is
+**The eight substations chosen for nothing have the same average step as the three that prompted the
+study.** The mean over D5, D10, and D16 is 13.2 points against 6.5 for D9, D11, and D14, but the
+eight E7-X substations also average 13.2. That does not rule out a selection effect, because the
+eight were not a random sample of Primary substations. The between-series standard deviation is
 4.1 points for the six decision series (profile-likelihood interval 2.7 to 7.2) and 8.9 for E7-X
 (6.2 to 14.3). One series, D19, has a step of 33.5 points, which pulls the E7-X and all-series means
 up.
 
 ![Pooled sets](figure_5_pooled.svg)
 
-**Experiment 114's day-ahead forecasts leave a large part of the step in their errors.** The same
-regression on the median residual of the baseline model gives 0.78, 0.63, and 0.53 of the full step
-at D5, D10, and D16 (and 2.05 at D14, where the residual step exceeds the full step). After the
-recent-error filter it gives 0.96, 0.74, and 0.59, and after the interaction model and filter 0.52,
-0.42, and 0.31.
+**Experiment 114's day-ahead forecast errors still contain a large part of the step.** R is the
+same regression run on the difference between actual demand and the median forecast of experiment
+114's baseline model, divided by the full step over the same two winters. R is 0.78, 0.63, and 0.53
+at D5, D10, and D16 (and 2.05 at D14, where the step in the errors exceeds the full step). With the
+model's recent-error filter R is 0.96, 0.74, and 0.59, and with the interaction model and the
+filter 0.52, 0.42, and 0.31.
 
 ![Share left by the baseline model](figure_6_absorbed.svg)
 
-**On cold summer-time nights the jump arrives one hour later on the clock.** The pre-registered
-rule (the sign of the difference between the local-clock and UTC-clock windows) labels all 14 series
-`UTC`, but both a local-clock step and a UTC-clock step make that difference negative, so the label
-carries no information. The post hoc check in the figure compares the half-hour of the largest mean
-rise on cold summer-time nights with the same half-hour on cold winter nights, and finds a shift of
-2 half-hours at 12 of 14 series (D14 shows 4; D9 shows 9 on 18 nights).
+**On cold British Summer Time nights the jump arrives one hour later on the clock.** The
+pre-registered rule (the sign of the difference between the local-clock and UTC-clock windows) printed
+`UTC` at all 14 series, but the rule did not separate the two clocks: by the arithmetic of the
+windows, a step fixed to either clock makes that difference negative (reasoning after the fact, not
+computed). The post hoc check in the figure compares the half-hour of the largest mean rise on cold
+summer-time nights with the same half-hour on cold winter nights, and finds a shift of 2 half-hours
+at 12 of 14 series (D14 shows 4; D9 shows 9, on 18 nights). The counts of cold summer-time nights in
+the cards and the figure are the same (18 at D9 and 68 to 90 at the others).
 
 ![Timing](figure_7_timing.svg)
 
-**Demand rises within about one half-hour around 01:00 and then stays raised until the morning
-rise.** The profile of cold-winter-night demand minus summer-night demand, relative to the 22:00 to
-23:30 level, has the same shape at nearly all series.
+**Demand rises within about one half-hour around 01:00.** Demand then stays raised until the morning
+rise. The profile of cold-winter-night demand minus summer-night demand, relative to the 22:00 to
+23:30 level, has the same shape at nearly all substations.
 
 ![Night profile](figure_8_profile.svg)
 
@@ -154,8 +177,9 @@ rise.** The profile of cold-winter-night demand minus summer-night demand, relat
 | Flat part within 2 points at every series | 1.8 and -2.0 at D14 and D8; the others 4.6 to 19.4 in size | No |
 | R against the full step 30 to 60% at D5, D10, D16 | 0.78, 0.63, 0.53 | Partly: D16 only |
 | Raw cold-night mean within 2 points of the line | gap at most 0.4 at all 14 series | Yes |
-| Timing `cannot tell` at most series | 64 to 85 cold summer-time nights at 13 series (12 at D9) | No |
-| Run time under 1.5 hours | a few minutes of fitting | Yes |
+| Timing `cannot tell` at most series, or `local` if a label is printed | 68 to 90 cold summer-time nights at 13 series (18 at D9); `UTC` printed at all 14 | No |
+| Gate coverage within the bands | the four gated shapes pass; the pooled-interval row fails (100%) | Partly |
+| Run time under 1.5 hours | not recorded | Not checked |
 
 ## Checks
 
@@ -164,23 +188,28 @@ rise.** The profile of cold-winter-night demand minus summer-night demand, relat
 - **Hand-filtered switching list:** refitting the six decision series without experiment 103's
   switching events changes no step by more than 0.3 points (11.0, 9.8, 15.4, 7.0, 3.0, and 13.5 for
   D5, D9, D10, D11, D14, and D16, against 10.8, 9.5, 15.4, 7.0, 3.0, and 13.4).
-- **Block length:** with 7, 14, and 28 days the coverage in the placebo and matched 4-point cells is
-  88%, 86%, and 84%, and the mean interval width 1.7, 1.9, and 2.1 points.
-- **Audit triggers.** Trigger 1 fires: the pooled-interval row of the gate fails (100% against 85 to
-  95%). Trigger 2 fires: the E7-X pooled step (13.2) is above the decision series' (9.9). Trigger 3
-  does not fire: no series has a step and a raw contrast of opposite sign. Trigger 4 does not fire:
-  leaving each decision series out moves the pooled mean to between 8.8 and 11.2, inside 6.2 to
-  13.5. Trigger 5 does not fire: bounding the slope at 0 changes no slope. Trigger 6 does not fire:
-  the widest decision-series interval is 1.8 points (D9). Trigger 7 fires. The manager's Opus audit
-  runs after the quota resets; this session's Sonnet code review and write-up review are triaged in
-  the pull request.
+- **Block length:** with blocks of 7, 14, and 28 days (100 draws), the coverage in the matched and
+  placebo cells is 88%, 86%, and 84%, and the mean interval width 1.7, 1.9, and 2.1 points. The
+  28-day coverage is just below the 85% edge of the pooled band.
+- **Audit triggers** (conditions in the plan under which a result needs an independent audit).
+  Trigger 1 (a control fails: test 1, the rank check, or the placebo coverage) does not fire; the
+  placebo coverage is inside its band, but the gate's pooled-interval row failed separately (100%
+  against 85 to 95%), which is why the verdict is `inconclusive`. Trigger 2 fires: the E7-X pooled
+  step (13.2) is above the decision substations' (9.9). Trigger 3 does not fire: no substation has a
+  step and a raw contrast of opposite sign. Trigger 4 does not fire: leaving each decision
+  substation out moves the pooled mean to between 8.8 and 11.2, inside 6.2 to 13.5. Trigger 5 does
+  not fire: bounding the slope at 0 changes no slope. Trigger 6 does not fire: the widest
+  decision-substation interval is 1.8 points (D9). Trigger 7 (a later design depends on the
+  result) fires, because the cards and experiment 121's night arms use these numbers. The audit has
+  not run yet; the code and write-up reviews are triaged in the pull request.
 
 ## Substation cards
 
 **Provisional: fitted to past weather, estimation only.** The MW column converts points with each
-series' own 99th percentile of demand and is not a headline.
+substation's own 99th percentile of demand and is not a headline. D12 reports apparent power in
+MVA, so its "MW" is MVA.
 
-| Series | Step at 3 C, points (90% interval) | Step, MW | Slope, points per degree | Cold-dependent part, points | Flat part, points | Summer reference, points | Winters |
+| Series | Step at 3 C, points (90% interval) | Step, MW (MVA at D12) | Slope, points per degree | Cold-dependent part, points | Flat part, points | Summer reference, points | Winters |
 |---|---|---|---|---|---|---|---|
 | D5 | 10.8 (10.4 to 11.2) | 0.62 | 0.25 (0.16 to 0.32) | 3.1 | 7.7 | -5.2 | 2021, 2022, 2023, 2024 |
 | D9 | 9.5 (8.6 to 10.4) | 0.68 | 0.38 (0.18 to 0.52) | 4.7 | 4.8 | -13.4 | 2023, 2024 |
@@ -201,33 +230,32 @@ Start of the step, timing, and share left by the baseline model (R):
 
 | Series | Start of the step (half-hour starting) | Cold BST nights | Pre-registered label | Post hoc jump shift on BST nights, half-hours | R / full step (baseline model) |
 |---|---|---|---|---|---|
-| D5 | 00:30 | 71 | UTC | 2 | 0.78 |
-| D9 | 00:30 | 12 | UTC | 9 | n/a |
-| D10 | 00:30 | 83 | UTC | 2 | 0.63 |
-| D11 | 00:30 | 85 | UTC | 2 | 0.68 |
-| D14 | 00:30 | 71 | UTC | 4 | 2.05 |
-| D16 | 00:30 | 64 | UTC | 2 | 0.53 |
-| D2 | 00:30 | 77 | UTC | 2 | n/a |
-| D3 | 00:30 | 71 | UTC | 2 | n/a |
-| D4 | 00:30 | 77 | UTC | 2 | n/a |
-| D8 | 00:30 | 71 | UTC | 2 | n/a |
-| D12 | 00:30 | 71 | UTC | 2 | n/a |
-| D19 | 00:30 | 77 | UTC | 2 | n/a |
-| D21 | 00:30 | 77 | UTC | 2 | n/a |
-| D22 | 00:30 | 71 | UTC | 2 | n/a |
-
-D12 reports apparent power in MVA, so its step is an apparent-power step.
+| D5 | 00:30 | 75 | UTC | 2 | 0.78 |
+| D9 | 00:30 | 18 | UTC | 9 | n/a |
+| D10 | 00:30 | 88 | UTC | 2 | 0.63 |
+| D11 | 00:30 | 90 | UTC | 2 | 0.68 |
+| D14 | 00:30 | 75 | UTC | 4 | 2.05 |
+| D16 | 00:30 | 68 | UTC | 2 | 0.53 |
+| D2 | 00:30 | 83 | UTC | 2 | n/a |
+| D3 | 00:30 | 75 | UTC | 2 | n/a |
+| D4 | 00:30 | 83 | UTC | 2 | n/a |
+| D8 | 00:30 | 75 | UTC | 2 | n/a |
+| D12 | 00:30 | 75 | UTC | 2 | n/a |
+| D19 | 00:30 | 83 | UTC | 2 | n/a |
+| D21 | 00:30 | 83 | UTC | 2 | n/a |
+| D22 | 00:30 | 75 | UTC | 2 | n/a |
 
 ## Cold nights: actual demand against the baseline forecast
 
-**On cold nights the baseline forecast of experiment 114 misses the 01:00 step at D5 and D16, and
-anticipates the rise before midnight at D10.** The figure shows the median and the 25th to 75th
-percentile across the 72 cold nights (the rule in pre-fit clarification 3) of actual demand and of
-the day-ahead median forecast, in points. The largest median misses, from the same nights: D5 +5.6
-points in the half-hour starting 01:00, D10 -12.2 starting 23:30, D11 -3.6 starting 23:00, D14 +2.8
-starting 02:00, and D16 +9.4 starting 01:00 (actual minus forecast). The half-hour of the largest
-rise between 05:00 and 08:00 differs between actual and forecast at D5 (07:00 against 06:00) and at
-D16 (06:00 against 06:30), and matches at D10, D11, and D14. D9 has no stored forecast for these
+**On cold nights the baseline forecast of experiment 114 runs below actual demand from 01:00 at D5
+and D16, and above it before midnight at D10 (-12.2 points in the half-hour starting 23:30).** The
+figure shows the median and the 25th to 75th percentile, across the 72 cold winter nights per
+substation (the coldest 10% of days, the plan's cold-snap rule), of actual demand and of the day-
+ahead median forecast, in points. The largest median misses, from the same nights: D5 +5.6 points in
+the half-hour starting 01:00, D10 -12.2 starting 23:30, D11 -3.6 starting 23:00, D14 +2.8 starting
+02:00, and D16 +9.4 starting 01:00 (actual minus forecast). The half-hour of the largest rise
+between 05:00 and 08:00 differs between actual and forecast at D5 (07:00 against 06:00) and at D16
+(06:00 against 06:30), and matches at D10, D11, and D14. D9 has no stored forecast for these
 winters.
 
 ![Actual demand against the baseline forecast, decision series](figure_9_cold_nights.svg)
@@ -241,11 +269,14 @@ winters.
   winter-night shape differs from it for reasons besides storage heating. The full step carries
   that difference. The slope does not.
 - **Four headline winters of one weather product, from one set of substations.** The winters are
-  separate years, not independent experiments, and neighbouring cells share one ERA5 product.
-- **The pooled intervals are conservative in the gate and optimistic in principle.** The gate shows
-  coverage of 100%, and the shared weather product makes the series not independent.
-- **The daily mean temperature is a proxy** for the temperature that sets heater charging.
-- **Winter 2025-26 is not yet read.**
+  separate years, and neighbouring cells share one ERA5 product.
+- **The pooled intervals were wider than needed in the gate, and may be too narrow in practice.**
+  The gate showed coverage of 100% against a target of 85 to 95%. The substations share one weather
+  product, so their errors are not independent, which would make the intervals too narrow.
+- **The daily mean temperature is a proxy** for the temperature that sets heater charging. In the
+  gate, a step that follows the 18:00 to 08:00 mean temperature was covered by the interval in 79%
+  of draws pooled at 7 points, and in 43% at the worst substation.
+- **Winter 2025-26 has not been analysed yet.**
 
 ## The plan, as committed before any fit
 
@@ -292,7 +323,8 @@ effective capacity is a scale taken from the demand itself: it matches each seri
 of cleaned half-hourly demand (D10: 5.398 MW against a 99th percentile of 5.413 MW; D5: 5.723 against
 5.734; D16: 9.115 against 9.143). It is neither the electrical rating of the substation nor a PV
 capacity. A point is therefore 1% of that near-peak demand. Computed from the stored cleaned power
-on cold GMT nights (daily mean at most 3 C) of winters 2023-24 and 2024-25, the half-hour ending at
+on cold GMT nights (daily mean at most 3 C) of winters 2023-24 and 2024-25 (printed in `report.txt`
+under `raw_cold_step`), the half-hour ending at
 01:00 minus the mean of the 22:00 to 23:30 half-hours is 0.27 MW (4.8 points) at D5, 0.44 MW (8.2
 points) at D10, and 0.87 MW (9.5 points) at D16. The raw step is therefore a few tenths of a
 megawatt, and the figures of 1.9 to 10.7 "MW" in the earlier descriptive check of the night step

@@ -135,12 +135,13 @@ def figure_1_headline(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
             text="Demand steps up at about 01:00 on cold winter nights; pooled over the six "
             "decision "
             f"series the step is {pooled[0]['mean']:.0f} points",
-            subtitle="Dot: estimate for winters 2021-22 to 2024-25. Line: 90% interval (pooled "
-            "rows: "
-            "Hartung-Knapp across series; series rows: resampling 14-day blocks of nights). One "
-            "point is 1% of the series' own 99th percentile of demand. The step is the rise from "
-            "22:00-23:30 to 00:30-02:30 on a night with daily mean 3 C, minus the same rise in "
-            "summer.",
+            subtitle="Dot: estimate for winters 2021-22 to 2024-25. Line: 90% interval. The six "
+            "decision substations were set before any fit as the ones the conclusion rests on; "
+            "the eight further substations (E7-X) were added as a check. Pooled rows average the "
+            "substations' steps, weighted by how precisely each is known, with a Hartung-Knapp "
+            "interval. Other rows: resampling 14-day blocks of nights. One point is 1% of the "
+            "substation's 99th percentile of demand. The step is the rise from 22:00-23:30 to "
+            "00:30-03:00 on a night with daily mean 3 C, minus the same rise in summer.",
         ),
     )
 
@@ -226,12 +227,13 @@ def figure_2_raw(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
     return alt.vconcat(*panels).properties(
         title=_title(
             text="On winter nights demand rises after midnight where in summer it falls, and "
-            "the rise grows with cold",
-            subtitle="Each dot is one winter night: mean demand over the half-hours starting "
-            "00:30 to "
-            "02:30 minus the mean over those starting 22:00 to 23:30, in points of the series' "
-            "effective capacity. Black line: the fitted line (average winter). Dashed grey line: "
-            "the same difference averaged over June to August nights.",
+            "the rise "
+            "grows with cold",
+            subtitle="Each dot is one winter night: mean demand over the half-hours starting 00:30 "
+            "to 02:30 minus the mean over those starting 22:00 to 23:30, in points (1% of the "
+            "substation's 99th percentile of demand). Black line: the fitted line, set on the "
+            "average winter. Dashed grey line: the same difference averaged over June to "
+            "August nights.",
         )
     )
 
@@ -270,9 +272,13 @@ def figure_3_winters(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
         width=WIDTH,
         height=170,
         title=_title(
-            text="The step is similar in each winter at most decision series",
-            subtitle="Dot: step fitted to that winter alone. Line: 90% interval from resampling "
-            "14-day blocks of nights. Winters 2021-22 to 2024-25 are the headline winters.",
+            text="The step has the same sign in every winter at the six decision substations, "
+            "and falls "
+            "over the four winters at D10",
+            subtitle="Dot: step at a daily mean of 3 C, in points, fitted to that winter alone. "
+            "Line: "
+            "90% interval from resampling 14-day blocks of nights. The six decision substations "
+            "were set before any fit as the ones the conclusion rests on.",
         ),
     )
 
@@ -327,13 +333,15 @@ def figure_4_gate() -> alt.TopLevelMixin:
         width=WIDTH,
         height=22 * len(order),
         title=_title(
-            text="Known-answer test: the interval holds the injected step in 80-98% of draws at "
-            "every "
-            "series, for the four gated shapes",
-            subtitle="Each dot is one of the 14 series. Green band: the per-series target of 80 "
-            "to 98%. "
-            "Black line: 90%. Shapes: matched (grows with cold), ramp then plateau, flat (no "
-            "cold dependence); the bottom two rows are descriptive and have no target.",
+            text="Known-answer test: the 90% interval holds the injected step in 80-98% of "
+            "draws at "
+            "every substation, for the four gated shapes",
+            subtitle="We added a known step to the real nights 200 times per substation and "
+            "counted "
+            "how often the interval held it. Each dot is one of the 14 substations. Green band: "
+            "the per-substation target of 80 to 98%. Black line: 90%. Shapes: matched (grows with "
+            "cold), ramp then plateau, flat (no cold dependence), and no step. The bottom two rows "
+            "are descriptive and have no target.",
         ),
     )
 
@@ -368,13 +376,14 @@ def figure_5_pooled(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
         width=WIDTH,
         height=30 * len(order),
         title=_title(
-            text="The three series chosen for showing the step are larger than the other three "
-            "decision series, but the eight E7-X series are as large",
-            subtitle="Dot: pooled mean (plain mean for sets of fewer than 5 series). Thick "
-            "purple line: "
-            "Hartung-Knapp 90% interval, or the range of the series' steps for a set of three. "
-            "Thin "
-            "dashed line: 90% interval from resampling whole series. k is the number of series.",
+            text="The three substations that prompted the study average a larger step than the "
+            "other "
+            "three decision substations, but the eight further substations (E7-X) average as "
+            "large",
+            subtitle="Dot: pooled mean (plain mean for sets of fewer than 5). Thick purple line: "
+            "Hartung-Knapp 90% interval, or the smallest to largest step for a set of three. Thin "
+            "dashed line: 90% interval from resampling whole substations. k is the number of "
+            "substations.",
         ),
     )
 
@@ -431,12 +440,14 @@ def figure_6_absorbed(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
         width=WIDTH,
         height=200,
         title=_title(
-            text="Experiment 114's day-ahead forecasts leave a large part of the step in their "
-            "errors",
-            subtitle="Winters 2023-24 and 2024-25 only (the winters with stored predictions). "
-            "Purple "
-            "dot: this experiment's full step. Other rows: the same regression on the median "
-            "residual of experiment 114's day-ahead forecasts. Line: 90% interval.",
+            text="Experiment 114's day-ahead forecast errors still contain a large part of the "
+            "step",
+            subtitle="Winters 2023-24 and 2024-25 only (the winters with stored forecasts). "
+            "Purple dot: "
+            "the full step over the same two winters. Other rows: the same regression on the "
+            "difference between actual demand and experiment 114's day-ahead median forecast, for "
+            "the baseline model, then with a recent-error filter, then with an interaction model "
+            "and the filter. Line: 90% interval.",
         ),
     )
 
@@ -478,12 +489,14 @@ def figure_7_timing(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
         width=WIDTH,
         height=20 * len(rows),
         title=_title(
-            text="On cold summer-time nights the jump arrives one hour later on the clock, so the "
-            "step follows UTC at 12 of 14 series",
-            subtitle="Post hoc and uncalibrated: each dot is the local-clock half-hour of the "
-            "largest "
-            "mean rise on nights with daily mean below 8 C in British Summer Time, minus the same "
-            "on winter nights. 18 nights at D9; 68 to 90 at the others.",
+            text="On cold British Summer Time nights the jump arrives one hour later on the "
+            "clock, so "
+            "the step follows UTC at 12 of 14 substations",
+            subtitle="Chosen after seeing the data, and its error rate has not been tested. "
+            "Each dot "
+            "is the local-clock half-hour of the largest mean rise on nights with a daily mean "
+            "below 8 C in British Summer Time, minus the same on winter nights, in half-hours "
+            "(positive is later). Nights counted: 18 at D9, 68 to 90 at the others.",
         ),
     )
 
@@ -535,10 +548,10 @@ def figure_8_profile(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
             height=240,
             title=_title(
                 text="On cold winter nights demand rises within one half-hour around 01:00",
-                subtitle="Each line is one series: mean demand over the night relative to the mean "
-                "of the half-hours starting 22:00 to 23:30, on winter nights with a daily mean "
-                "below "
-                "8 C, minus the same on June to August nights.",
+                subtitle="Each line is one substation: mean demand over the night relative to "
+                "the mean of "
+                "the half-hours starting 22:00 to 23:30, in points, on winter nights with a daily "
+                "mean below 8 C. Summer nights' value is subtracted.",
             ),
         )
     )
@@ -610,11 +623,12 @@ def figure_9_cold_nights(*, cold: dict[str, Any]) -> alt.TopLevelMixin:
         title=_title(
             text="On cold nights demand at D5 and D16 runs above the baseline forecast from 01:00, "
             "and D10 runs below it before midnight",
-            subtitle="Line: median over the cold winter nights of winters 2023-24 and "
-            "2024-25; band: 25th to 75th percentile. Cold nights are the coldest 10% of days "
-            "(the plan's cold-snap rule). Day-ahead baseline forecast of experiment 114; D9 "
-            "has no stored forecast for these winters. Points are 1% of each series' own 99th "
-            "percentile of demand.",
+            subtitle="Line: median over the cold winter nights of winters 2023-24 and 2024-25; "
+            "band: "
+            "25th to 75th percentile. Cold nights are the coldest 10% of days by daily mean "
+            "temperature. The baseline forecast is experiment 114's day-ahead forecast; D9 has no "
+            "stored forecast for these winters. Points are 1% of each substation's 99th percentile "
+            "of demand.",
         )
     )
 
@@ -633,11 +647,11 @@ def figure_10_cold_nights_e7x(*, cold: dict[str, Any]) -> alt.TopLevelMixin:
     pairs = [alt.hconcat(*panels[i : i + 2]) for i in range(0, len(panels), 2)]
     return alt.vconcat(*pairs).properties(
         title=_title(
-            text="Seven of the eight E7-X substations show a rise around 01:00 on cold nights; "
-            "D8 shows none",
+            text="Seven of the eight further substations (E7-X) show a rise around 01:00 on cold "
+            "nights; D8 shows none",
             subtitle="Line: median demand over the cold winter nights of winters 2023-24 and "
-            "2024-25; band: 25th to 75th percentile. No baseline forecast is stored for "
-            "these series.",
+            "2024-25; band: 25th to 75th percentile (orange). No baseline forecast is stored "
+            "for these substations.",
         )
     )
 

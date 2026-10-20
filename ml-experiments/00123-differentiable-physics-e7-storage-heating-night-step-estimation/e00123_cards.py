@@ -28,7 +28,8 @@ def main() -> None:
     jumps = {r["site"]: r for r in numbers["bst_jump"]}
     timing = {r["site"]: r for r in numbers["timing"]}
     print(
-        "| Series | Step at 3 C, points (90% interval) | Step, MW | Slope, points per degree | "
+        "| Series | Step at 3 C, points (90% interval) | Step, MW (MVA at D12) | "
+        "Slope, points per degree | "
         "Cold-dependent part, points | Flat part, points | "
         "Summer reference, points | Winters |"
     )
