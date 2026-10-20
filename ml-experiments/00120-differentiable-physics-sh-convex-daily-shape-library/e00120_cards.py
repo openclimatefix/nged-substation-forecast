@@ -241,42 +241,45 @@ def forecast_weeks(*, site: str) -> alt.ChartType:
             frames.append(
                 part.select("week", "model", "hours", "q05", "q10", "q50", "q90", "q95", "actual")
             )
-    data = pl.concat(frames)
-    labels = [f"Week of {start:%d %b %Y}" for start in starts]
     x = alt.X(
         "hours:Q",
         axis=alt.Axis(values=[0, 48, 96, 144], title="Hours from Monday 00:00 UTC"),
         scale=alt.Scale(domain=[0, 168]),
     )
-    sh_data = data.filter(pl.col("model") == "SH")
-    n_data = data.filter(pl.col("model") == "N")
-    band90 = (
-        alt.Chart(sh_data)  # ty: ignore[unresolved-attribute]
-        .mark_area(opacity=0.18, color=ocf.DATA_BLUE)
-        .encode(x=x, y="q05:Q", y2="q95:Q")
-    )
-    band80 = (
-        alt.Chart(sh_data)  # ty: ignore[unresolved-attribute]
-        .mark_area(opacity=0.28, color=ocf.DATA_BLUE)
-        .encode(x=x, y="q10:Q", y2="q90:Q")
-    )
-    median = (
-        alt.Chart(sh_data)  # ty: ignore[unresolved-attribute]
-        .mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5)
-        .encode(x=x, y=alt.Y("q50:Q", title="Points of capacity"))
-    )
-    fleet = (
-        alt.Chart(n_data)  # ty: ignore[unresolved-attribute]
-        .mark_line(color=ocf.DATA_PURPLE, strokeDash=[4, 3], strokeWidth=1.2)
-        .encode(x=x, y="q50:Q")
-    )
-    actual = (
-        alt.Chart(sh_data)  # ty: ignore[unresolved-attribute]
-        .mark_line(color="#202020", strokeWidth=1.2)
-        .encode(x=x, y="actual:Q")
-    )
-    layered = (band90 + band80 + median + fleet + actual).properties(width=WIDTH - 20, height=80)
-    return layered.facet(row=alt.Row("week:N", sort=labels, title=None))
+    panels = []
+    for label in [f"Week of {start:%d %b %Y}" for start in starts]:
+        part = pl.concat(frames).filter(pl.col("week") == label)
+        sh_part = part.filter(pl.col("model") == "SH")
+        n_part = part.filter(pl.col("model") == "N")
+        band90 = (
+            alt.Chart(sh_part)  # ty: ignore[unresolved-attribute]
+            .mark_area(opacity=0.18, color=ocf.DATA_BLUE)
+            .encode(x=x, y=alt.Y("q05:Q", title=label), y2="q95:Q")
+        )
+        band80 = (
+            alt.Chart(sh_part)  # ty: ignore[unresolved-attribute]
+            .mark_area(opacity=0.28, color=ocf.DATA_BLUE)
+            .encode(x=x, y="q10:Q", y2="q90:Q")
+        )
+        median = (
+            alt.Chart(sh_part)  # ty: ignore[unresolved-attribute]
+            .mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5)
+            .encode(x=x, y="q50:Q")
+        )
+        fleet = (
+            alt.Chart(n_part)  # ty: ignore[unresolved-attribute]
+            .mark_line(color=ocf.DATA_PURPLE, strokeDash=[4, 3], strokeWidth=1.2)
+            .encode(x=x, y="q50:Q")
+        )
+        actual = (
+            alt.Chart(sh_part)  # ty: ignore[unresolved-attribute]
+            .mark_line(color="#202020", strokeWidth=1.2)
+            .encode(x=x, y="actual:Q")
+        )
+        panels.append(
+            (band90 + band80 + median + fleet + actual).properties(width=WIDTH - 20, height=80)
+        )
+    return alt.vconcat(*panels)
 
 
 def cold_night_data(*, site: str) -> tuple[pl.DataFrame, int]:

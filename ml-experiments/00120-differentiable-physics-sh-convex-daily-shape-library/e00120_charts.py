@@ -167,7 +167,7 @@ def figure_headline(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         width=WIDTH,
         height=170,
         title=_title(
-            text="The shape library scores the same as the fleet-mean and per-site models",
+            text="The library matches the fleet mean and trails the per-site model (scored year)",
             subtitle=(
                 "Dot: estimate. Line: 98.33% interval from resampling whole calendar months. First "
                 "arm minus second; 0 means equal. Five decision substations, headline seed."
@@ -188,7 +188,12 @@ def figure_winter(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
     )
     y = alt.Y("season:N", sort=table["season"].unique(maintain_order=True).to_list(), title=None)
     offset = alt.YOffset("year:N", sort=["scored", "replicate"])
-    base = alt.Chart(table)
+    base = alt.Chart()
+    rule = (
+        alt.Chart()  # ty: ignore[unresolved-attribute]
+        .mark_rule(color="#808080", strokeDash=[4, 3])
+        .encode(x=alt.datum(0))
+    )
     bars = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "low:Q", title="Quantile score difference (points of capacity; negative is better)"
@@ -202,16 +207,17 @@ def figure_winter(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         x="QS:Q", y=y, yOffset=offset, color=colour
     )
     return (
-        (_zero_rule() + bars + dots)
+        alt.layer(rule, bars, dots)
         .properties(width=WIDTH, height=140)
-        .facet(row=alt.Row("contrast:N", title=None))
+        .facet(row=alt.Row("contrast:N", title=None), data=table)
         .properties(
             title=_title(
-                text="The library is no worse than the fleet mean in winter",
+                text="In the scored year the library loses to the per-site model in winter",
                 subtitle=(
                     "SH minus N (top) and SH minus G (bottom). Dot: estimate. Line: 98.33% "
-                    "interval from resampling whole calendar months. Winter is November to March; "
-                    "a winter loss would be a reason to hold the library back."
+                    "interval from resampling whole calendar months; the cold-snap interval is "
+                    "degenerate because those days fall in few months. Winter is November to "
+                    "March; a winter loss is a reason to hold the library back."
                 ),
             )
         )
@@ -261,10 +267,24 @@ def figure_gate() -> alt.TopLevelMixin:
     gate = json.loads((common.WORK_DIR / "gate_report.json").read_text())
     import e00120_gate as gate_module
 
+    short = {
+        "1": "1 shapes recovered",
+        "2": "2 weights recovered",
+        "3": "3 no duplicate shapes",
+        "4": "4 deviation bump kept out",
+        "5": "5 null fleet",
+        "6": "6 K chosen",
+        "7": "7 local optima",
+        "8": "8 module tests",
+        "9": "9 score power",
+        "10": "10 Economy 7 step",
+    }
     rows = []
     for name, (passed, n) in gate["lines"].items():
         low, high = gate_module.wilson(passed=passed, n=n)
-        rows.append({"line": name, "rate": passed / n, "low": low, "high": high, "n": n})
+        label = short[name.split(" ")[0]]
+        rows.append({"line": label, "rate": passed / n, "low": low, "high": high, "n": n})
+    rows.sort(key=lambda row: int(str(row["line"]).split(" ")[0]))
     data = pl.DataFrame(rows)
     base = alt.Chart(data)
     y = alt.Y("line:N", sort=data["line"].to_list(), title=None, axis=alt.Axis(labelLimit=330))
@@ -399,10 +419,18 @@ def figure_stability(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         [json.loads(path.read_text()) for path in (common.WORK_DIR / "gate").glob("null_*.json")]
     )
     null = float(np.median(gate["line5_median_seed_cosine"].to_numpy()))
+    names = {
+        "across seeds at tuning": "Seeds, tuning cut",
+        "across seeds at replicate": "Seeds, replicate cut",
+        "across seeds at scored": "Seeds, scored cut",
+        "headline fits, tuning against replicate": "Years: tuning vs replicate",
+        "headline fits, replicate against scored": "Years: replicate vs scored",
+        "headline fits, tuning against scored (disjoint windows)": "Years: tuning vs scored",
+    }
     data = pl.concat(
         [
-            table.select(pl.col("comparison"), cosine=pl.col("median cosine")),
-            pl.DataFrame({"comparison": ["null fleet, across two starts"], "cosine": [null]}),
+            table.select(pl.col("comparison").replace(names), cosine=pl.col("median cosine")),
+            pl.DataFrame({"comparison": ["Null fleet, two starts"], "cosine": [null]}),
         ]
     )
     return (
@@ -423,8 +451,9 @@ def figure_stability(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
                 text="How stable the shapes are across seeds and years",
                 subtitle=(
                     "Shapes of two fits are matched one to one on the signed cosine; 1 means the "
-                    "same shape. The bottom bar is the same measure on fleets of random profiles "
-                    "that share nothing."
+                    "same shape. Years: the two fits share a year of data except tuning vs scored. "
+                    "The bottom bar is the same measure on fleets of random profiles that share "
+                    "nothing."
                 ),
             ),
         )
@@ -535,7 +564,7 @@ def figure_step(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         .mark_bar()
         .encode(
             x=alt.X("site:N", sort=SITE_ORDER, title=None),
-            y=alt.Y("step at 01:00:Q", title="Step at 01:00 (points of capacity)"),
+            y=alt.Y("step at 01\\:00:Q", title=None),
             xOffset="series:N",
             color=colour,
         )
@@ -545,8 +574,9 @@ def figure_step(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         title=_title(
             text="Does the forecast reproduce the 01:00 step?",
             subtitle=(
-                "Mean of the half-hour ending 01:30 minus the half-hour ending 01:00, local time, "
-                "on cold nights (below 2 °C) and mild nights (above 10 °C), scored year."
+                "Points of capacity: the half-hour ending 01:00 minus the one ending 00:30, local "
+                "time, on cold nights (below 2 °C) and mild nights (above 10 °C), scored year. "
+                "Fewer than 20 cold nights at four of the five substations."
             ),
         )
     )

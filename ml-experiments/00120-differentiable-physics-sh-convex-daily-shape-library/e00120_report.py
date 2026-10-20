@@ -664,17 +664,27 @@ def _number(*, entry: dict[str, object], key: str) -> float:
     return float(entry[key])  # ty: ignore[invalid-argument-type]
 
 
-STEP_COLUMN: Final[int] = 2
-"""The profile column of 01:00, where the Economy 7 step starts."""
+STEP_COLUMN: Final[int] = 1
+"""The profile column of the half-hour that starts at 00:30, the first slot of the Economy 7 step.
+The slot ends at 01:00, which is why the step is called the 01:00 step."""
+STEP_SLOTS: Final[int] = 14
+"""The seven-hour window the step is said to cover, in half-hour slots."""
 MIN_SHAPE_USERS: Final[int] = 2
 MIN_SHARE: Final[float] = 0.10
 """A shape is a noise shape if fewer than this many substations give it this share of weight."""
 
 
-def step_table() -> pl.DataFrame:
-    """Return the 01:00 step in every substation's profile and in every shape (scored-year fit).
+def _window_contrast(*, values: np.ndarray) -> float:
+    """Return the mean of the seven-hour step window minus the mean of the slots beside it."""
+    inside = values[STEP_COLUMN : STEP_COLUMN + STEP_SLOTS].mean()
+    beside = values[[0, *range(STEP_COLUMN + STEP_SLOTS, STEP_COLUMN + STEP_SLOTS + 3)]].mean()
+    return float(inside - beside)
 
-    For each substation, the rise of the fitted weekday profile at 01:00 (column 2 minus column 1,
+
+def step_table() -> pl.DataFrame:
+    """Return the step at 01:00 (the slot ending at 01:00) in every profile and shape (scored year).
+
+    For each substation, the rise of the fitted weekday profile at 01:00 (column 1 minus column 0,
     in points of capacity) and its contrast over 01:00 to 07:00 against the neighbouring half-hours;
     for each shape, its rise at 01:00 and the substations that use it with a share of 10% or more.
     """
@@ -692,10 +702,7 @@ def step_table() -> pl.DataFrame:
                 "kind": "substation profile (library + deviation)",
                 "name": label,
                 "rise at 01:00": float(weekday[STEP_COLUMN] - weekday[STEP_COLUMN - 1]),
-                "contrast 01:00-07:00": float(
-                    weekday[STEP_COLUMN : STEP_COLUMN + 12].mean()
-                    - weekday[[0, 1, STEP_COLUMN + 12, STEP_COLUMN + 13]].mean()
-                ),
+                "contrast 00:30-07:30 slots": _window_contrast(values=weekday),
                 "users": None,
             }
         )
@@ -707,10 +714,7 @@ def step_table() -> pl.DataFrame:
                 "kind": "shape",
                 "name": f"shape {k + 1}",
                 "rise at 01:00": float(shapes[k, STEP_COLUMN] - shapes[k, STEP_COLUMN - 1]),
-                "contrast 01:00-07:00": float(
-                    shapes[k, STEP_COLUMN : STEP_COLUMN + 12].mean()
-                    - shapes[k, [0, 1, STEP_COLUMN + 12, STEP_COLUMN + 13]].mean()
-                ),
+                "contrast 00:30-07:30 slots": _window_contrast(values=shapes[k]),
                 "users": users,
             }
         )
@@ -722,10 +726,10 @@ MILD_NIGHT_C: Final[float] = 10.0
 
 
 def step_by_temperature() -> pl.DataFrame:
-    """Return the 01:00 step of the actual power and of SH's mean forecast on cold and mild nights.
+    """Return the step at 01:00 of the actual power and of SH's mean forecast, cold and mild nights.
 
-    The step is the mean over rows at 01:00 to 01:30 local time minus the mean over rows at 00:30
-    to 01:00, in points of capacity, separately for rows whose 6-hour-smoothed ERA5 temperature is
+    The step is the mean over rows that end at 01:00 local time minus the mean over rows that end
+    at 00:30, in points of capacity, separately for rows whose 6-hour-smoothed ERA5 temperature is
     below `COLD_NIGHT_C` (cold) and above `MILD_NIGHT_C` (mild). The profile columns are local
     time, so 01:00 local is 01:00 UTC in winter and 00:00 UTC in summer.
     """
@@ -755,8 +759,8 @@ def step_by_temperature() -> pl.DataFrame:
             ):
                 kept = part.filter(condition)
                 for quantity in ("actual", "mean"):
-                    after = kept.filter(pl.col("end_minutes") == 90)[quantity].to_numpy()
-                    before = kept.filter(pl.col("end_minutes") == 60)[quantity].to_numpy()
+                    after = kept.filter(pl.col("end_minutes") == 60)[quantity].to_numpy()
+                    before = kept.filter(pl.col("end_minutes") == 30)[quantity].to_numpy()
                     rows.append(
                         {
                             "year": label,
