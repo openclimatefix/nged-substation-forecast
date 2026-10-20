@@ -9,6 +9,12 @@ runs ask why, on the same eight-site synthetic fleet, and write `work/gate_diagn
   fitted with the network off, on, and on with temperature hidden by day. The noise-free network-off
   fit is the correctness control: when the problem is identified, the recovery must be exact.
 - **pre-registered noise, network off, and network on with temperature hidden by day.**
+- **no harmonics:** the pre-registered noise fleet generated and fitted without the day-of-year
+  harmonics (their input columns set to zero), with the network off and on. The hypothesis is that
+  the harmonics, the per-band profile, and the calendar terms absorb the seasonal cycle of
+  temperature and clear-sky output, leaving only day-to-day weather anomalies to identify the
+  slope, the threshold, and the capacity. If recovery improves sharply, the seasonal terms are the
+  cause. The model has no drift term.
 
 Every fit is a post hoc variant and is labelled as such where the write-up quotes it.
 
@@ -113,8 +119,22 @@ def main() -> None:
             (("off", False, False), ("dark_only", True, True)),
         ),
     )
+    plain = replace(batch, harmonics=torch.zeros_like(batch.harmonics))
+    truth.train()
+    with torch.no_grad():
+        plain_clean = truth(plain)
+    plain_targets = plain_clean + (batch.y - clean)
+    cases = (
+        *cases,
+        (
+            "no_harmonics",
+            plain_targets,
+            noise_sd,
+            (("off", False, False), ("on", True, False)),
+        ),
+    )
     for case, targets, sd, variants in cases:
-        rows = replace(batch, y=targets)
+        rows = replace(plain if case == "no_harmonics" else batch, y=targets)
         for label, network, dark_only in variants:
             model = new_variant(batch=rows, network=network, dark_only=dark_only)
             result = fit_pooled_vp(
