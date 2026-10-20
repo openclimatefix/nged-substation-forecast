@@ -1,30 +1,34 @@
-"""Fit the no-lag single N1 model of experiment 00102 for the demand series.
+"""Fit the no-lag single N1 model of experiment 00102 for the demand series, and D18's cut arms.
 
 Copied from experiment 00087's `e00087_fit_demand.py`, keeping only the `n1h` configuration (the
-weekly and monthly members of the BG2 blend) with the three origin lags removed from the input
-columns. The recipe is otherwise BG2's: the ENS control member's rows, a recency half-life of 0.5
-years anchored at the refit, 500 rounds, `eta` 0.05, Primary, BSP, and GSP, 51 ensemble members
-pooled into 11 mixture quantiles. No offset, so there is no base margin.
+weekly and monthly members of the BG2 blend). The recipe is BG2's: the ENS control member's rows, a
+recency half-life of 0.5 years anchored at the refit, 500 rounds, `eta` 0.05, 51 ensemble members
+pooled into 11 mixture quantiles, no offset and so no base margin. Three variants (`VARIANTS`):
+
+- `nolag` (default): the three origin lags removed from the input columns, Primary, BSP, and GSP.
+- `nolag_cut` and `lag_cut`: for D18 only, the model without and with the lags, trained on rows
+  from 2025-03-01 onwards, so that its commissioning months are cut as
+  `docs/ml-experiments/data-processing.md` says (D18's data starts on 2024-12-11 with zeros).
 
 One job is one refit for a chunk of series. A refit at time `t` trains each series' model on the
 control member's rows whose valid time is at least 3.5 hours before `t` and whose run began at or
 before `t`, and forecasts the daily runs that the regime assigns to it. Files go to
-`work/anchor_preds/n1h_nolag/<site>_s<seed>_<refit>.parquet`; existing files stay, so a stopped run
-resumes. Run the monthly regime first: its file for the shared refit of 2025-07-01 holds every run
-of July, a superset of the weekly regime's runs for that refit. Every job appends its wall-clock
-seconds to `work/gpu_hours.jsonl`.
+`work/anchor_preds/<variant folder>/<site>_s<seed>_<refit>.parquet`; existing files stay, so a
+stopped run resumes. Run the monthly regime first: its file for the shared refit of 2025-07-01
+holds every run of July, a superset of the weekly regime's runs for that refit. Every job appends
+its wall-clock seconds to `work/gpu_hours.jsonl`.
 
 Leakage check, raising `ValueError`: a refit's training rows have a valid time at most 3.5 hours
 before the refit and a run that began at or before the refit (`known_rows`).
 
     uv run python ml-experiments/00102-*/e00102_fit_demand.py --regime monthly [--workers 6]
-        [--cores 12] [--smoke]
+        [--cores 12] [--variant nolag_cut --sites D18] [--smoke]
 """
 
 import argparse
 import time
 from concurrent.futures import ProcessPoolExecutor
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -34,7 +38,17 @@ import numpy as np
 import polars as pl
 import xgboost as xgb
 
-CONFIG_NAME: Final[str] = "n1h_nolag"
+VARIANTS: Final[dict[str, tuple[str, bool, bool]]] = {
+    "nolag": ("n1h_nolag", False, False),
+    "nolag_cut": ("n1h_nolag_cut", False, True),
+    "lag_cut": ("n1h_lag_cut", True, True),
+}
+"""Each variant's folder name under `anchor_preds`, whether it keeps the three power lags, and
+whether it cuts the commissioning months of the series in `CUTS`."""
+CUTS: Final[dict[str, datetime]] = {"D18": datetime(2025, 3, 1, tzinfo=UTC)}
+"""The first valid time a cut series trains on. D18's data starts on 2024-12-11, and the 2.6-month
+start cut of `docs/ml-experiments/data-processing.md` ends on 2025-03-01 once rounded to the month.
+"""
 WEATHER: Final[tuple[str, ...]] = (
     "shortwave",
     "longwave",
@@ -51,12 +65,29 @@ SMOKE_REFITS: Final[int] = 2
 REGIME_NAMES: Final[tuple[str, ...]] = ("weekly", "monthly")
 
 
-def input_columns() -> list[str]:
-    """Return the input columns in matrix order: the features and `lead_hours`, no power lags."""
-    return [*common.feature_columns(), *common.N1_EXTRA_COLUMNS]
+def input_columns(*, lags: bool) -> list[str]:
+    """Return the input columns in matrix order: the features, `lead_hours`, and optionally lags."""
+    return [
+        *common.feature_columns(),
+        *common.N1_EXTRA_COLUMNS,
+        *(common.LAG_COLUMNS if lags else ()),
+    ]
 
 
-def training_rows(*, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
+def add_lags(*, frame: pl.DataFrame, power: np.ndarray) -> pl.DataFrame:
+    """Add the three origin lags to a frame of runs (copied from experiment 00087)."""
+    target = np.asarray(common.grid_index(times=frame["valid_time"]))
+    origin = np.asarray(common.grid_index(times=frame["power_fcst_init_time"]))
+    return frame.with_columns(
+        pl.DataFrame(
+            common.origin_lags(power=power, target=target, origin=origin),
+            schema=list(common.LAG_COLUMNS),
+            orient="row",
+        ).cast(pl.Float32)
+    )
+
+
+def training_rows(*, row: dict, arrays: common.SeriesArrays, variant: str) -> pl.DataFrame:
     """Return one series' control-member rows with derived columns and `lead_hours`.
 
     The rows run to 2026-06-29. The power of the rows after 2025-06-30 is filled from the dense
@@ -65,11 +96,13 @@ def training_rows(*, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
     Args:
         row: The series' row of `common.series_table()`.
         arrays: The series' arrays on the dense grid.
+        variant: A key of `VARIANTS`: whether to add the lags and whether to cut the series' start.
 
     Returns:
         The rows keyed by series, run, and valid time, with `ensemble_member`, `power` (in MW), the
-        weather columns, the derived columns, and `lead_hours`.
+        weather columns, the derived columns, `lead_hours`, and the lags if the variant keeps them.
     """
+    _, lags, cut = VARIANTS[variant]
     series_id = row["time_series_id"]
     before = (
         pl.scan_parquet(common.ENS_TRAIN_PATH)
@@ -93,10 +126,13 @@ def training_rows(*, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
     rows = rows.filter(
         pl.col("power").is_finite() & (pl.col("valid_time") > pl.col("power_fcst_init_time"))
     )
+    if cut and row["site"] in CUTS:
+        rows = rows.filter(pl.col("valid_time") >= CUTS[row["site"]])
     rows = common.with_derived(frame=rows, latitude=row["latitude"], longitude=row["longitude"])
-    return rows.with_columns(
+    rows = rows.with_columns(
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
     )
+    return add_lags(frame=rows, power=arrays.power) if lags else rows
 
 
 def known_rows(*, rows: pl.DataFrame, refit: datetime) -> pl.DataFrame:
@@ -141,9 +177,9 @@ def mixture_frame(*, keys: pl.DataFrame, raw: np.ndarray, members: int, seed: in
     ).with_columns(seed=pl.lit(seed).cast(pl.Int8))
 
 
-def job_path(*, root: Path, site: str, seed: int, refit: datetime) -> Path:
+def job_path(*, root: Path, variant: str, site: str, seed: int, refit: datetime) -> Path:
     """Return the file one refit's predictions for one series are written to."""
-    return root / CONFIG_NAME / f"{site}_s{seed}_{refit:%Y%m%dT%H%M}.parquet"
+    return root / VARIANTS[variant][0] / f"{site}_s{seed}_{refit:%Y%m%dT%H%M}.parquet"
 
 
 _CACHE: dict[str, object] = {}
@@ -159,23 +195,28 @@ def _series_and_arrays() -> tuple[pl.DataFrame, dict[str, common.SeriesArrays]]:
     return _CACHE["series"], _CACHE["arrays"]  # ty: ignore[invalid-return-type]
 
 
-def _training_rows_cached(*, row: dict, arrays: common.SeriesArrays) -> pl.DataFrame:
+def _training_rows_cached(*, row: dict, arrays: common.SeriesArrays, variant: str) -> pl.DataFrame:
     """Return a series' training rows, kept for the worker's later jobs."""
     cache: dict[str, pl.DataFrame] = _CACHE["rows"]  # ty: ignore[invalid-assignment]
     if row["site"] not in cache:
-        cache[row["site"]] = training_rows(row=row, arrays=arrays)
+        cache[row["site"]] = training_rows(row=row, arrays=arrays, variant=variant)
     return cache[row["site"]]
 
 
-def prepared_run(*, run_rows: pl.DataFrame, row: dict) -> pl.DataFrame:
+def prepared_run(
+    *, run_rows: pl.DataFrame, row: dict, arrays: common.SeriesArrays, lags: bool
+) -> pl.DataFrame:
     """Return one run's member rows for one series with derived columns, sorted.
 
     Args:
         run_rows: The run's frame rows for the series, every valid time with every member.
         row: The series' row of `common.series_table()`.
+        arrays: The series' arrays on the dense grid.
+        lags: Whether to add the three origin lags.
 
     Returns:
-        The rows sorted by valid time and member, with the derived columns and `lead_hours`.
+        The rows sorted by valid time and member, with the derived columns, `lead_hours`, and the
+        lags if asked.
 
     Raises:
         ValueError: If a valid time lacks a member.
@@ -185,6 +226,8 @@ def prepared_run(*, run_rows: pl.DataFrame, row: dict) -> pl.DataFrame:
     ).with_columns(
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_minutes() / 60.0
     )
+    if lags:
+        prepared = add_lags(frame=prepared, power=arrays.power)
     prepared = prepared.sort("valid_time", "ensemble_member")
     members = prepared["ensemble_member"].n_unique()
     if prepared.height != prepared.select(*common.KEYS).n_unique() * members:
@@ -195,6 +238,7 @@ def prepared_run(*, run_rows: pl.DataFrame, row: dict) -> pl.DataFrame:
 
 def run_job(
     *,
+    variant: str,
     refit: datetime,
     origins: list[datetime],
     sites: list[str],
@@ -208,6 +252,7 @@ def run_job(
     """Fit one refit for each series that lacks its file, forecast its runs, and write the files.
 
     Args:
+        variant: A key of `VARIANTS`.
         refit: The refit time.
         origins: The `power_fcst_init_time` of the runs the refit forecasts.
         sites: The series labels to fit.
@@ -222,13 +267,14 @@ def run_job(
         One progress line per series fitted.
     """
     series, arrays = _series_and_arrays()
+    name, lags, _ = VARIANTS[variant]
     todo = [
         site
         for site in sites
-        if not job_path(root=out_root, site=site, seed=seed, refit=refit).exists()
+        if not job_path(root=out_root, variant=variant, site=site, seed=seed, refit=refit).exists()
     ]
     if not todo:
-        return [f"{CONFIG_NAME} refit {refit:%Y-%m-%d %H:%M}: all files exist"]
+        return [f"{name} refit {refit:%Y-%m-%d %H:%M}: all files exist"]
     started_job = time.monotonic()
     rows_of = {row["site"]: row for row in series.iter_rows(named=True)}
     models: dict[str, xgb.Booster] = {}
@@ -236,10 +282,13 @@ def run_job(
     for site in todo:
         started = time.monotonic()
         row = rows_of[site]
-        known = known_rows(rows=_training_rows_cached(row=row, arrays=arrays[site]), refit=refit)
+        known = known_rows(
+            rows=_training_rows_cached(row=row, arrays=arrays[site], variant=variant),
+            refit=refit,
+        )
         age_days = (refit - known["valid_time"]).dt.total_seconds() / 86_400
         matrix = xgb.DMatrix(
-            known.select(input_columns()).to_numpy().astype(np.float32),
+            known.select(input_columns(lags=lags)).to_numpy().astype(np.float32),
             label=(known["power"] / row["effective_capacity_mw"]).to_numpy(),
             weight=0.5 ** (age_days.to_numpy() / common.SHORT_HALF_LIFE_DAYS),
         )
@@ -247,7 +296,7 @@ def run_job(
             parameters(seed=seed, nthread=nthread), matrix, num_boost_round=rounds
         )
         lines.append(
-            f"{CONFIG_NAME} {site} refit {refit:%Y-%m-%d %H:%M}: {known.height:,} rows, "
+            f"{name} {site} refit {refit:%Y-%m-%d %H:%M}: {known.height:,} rows, "
             f"{len(origins)} runs, fit {time.monotonic() - started:.0f} s"
         )
     pieces: dict[str, list[pl.DataFrame]] = {site: [] for site in todo}
@@ -256,11 +305,14 @@ def run_job(
         for site in todo:
             row = rows_of[site]
             prepared = prepared_run(
-                run_rows=frame.filter(pl.col("time_series_id") == row["time_series_id"]), row=row
+                run_rows=frame.filter(pl.col("time_series_id") == row["time_series_id"]),
+                row=row,
+                arrays=arrays[site],
+                lags=lags,
             )
             members = prepared["ensemble_member"].n_unique()
             raw = models[site].predict(
-                xgb.DMatrix(prepared.select(input_columns()).to_numpy().astype(np.float32))
+                xgb.DMatrix(prepared.select(input_columns(lags=lags)).to_numpy().astype(np.float32))
             )
             pieces[site].append(
                 mixture_frame(
@@ -273,11 +325,11 @@ def run_job(
     for site, tables in pieces.items():
         common.atomic_write(
             frame=pl.concat(tables),
-            target=job_path(root=out_root, site=site, seed=seed, refit=refit),
+            target=job_path(root=out_root, variant=variant, site=site, seed=seed, refit=refit),
         )
     if log_hours:
         common.log_gpu_seconds(
-            job=f"{CONFIG_NAME} {refit:%Y-%m-%d %H:%M} {','.join(todo)} s{seed}",
+            job=f"{name} {refit:%Y-%m-%d %H:%M} {','.join(todo)} s{seed}",
             seconds=time.monotonic() - started_job,
             workers=workers,
         )
@@ -288,6 +340,7 @@ def main() -> None:
     """Fit and write the requested regime's jobs."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--regime", choices=REGIME_NAMES, required=True)
+    parser.add_argument("--variant", choices=sorted(VARIANTS), default="nolag")
     parser.add_argument("--groups", nargs="+", choices=common.GROUPS)
     parser.add_argument("--sites", nargs="+", help="fit only these series labels, e.g. D2 D5")
     parser.add_argument("--seed", type=int, default=common.SEED)
@@ -321,6 +374,7 @@ def main() -> None:
         futures = [
             pool.submit(
                 run_job,
+                variant=args.variant,
                 refit=refit,
                 origins=runs,
                 sites=chunk,

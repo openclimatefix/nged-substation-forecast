@@ -400,6 +400,19 @@ def primary_contrasts(*, best_pair: str, best_triple: str) -> list[Contrast]:
             "p_nl_weekly_nospread",
             "p_nl_weekly",
         ),
+        Contrast(
+            "lags, weekly, D18 cut: no-lag - with lags",
+            "Primary",
+            "p_nl_weekly_d18cut",
+            "p_s4_weekly_d18cut",
+        ),
+        Contrast(
+            "lags, monthly, D18 cut: no-lag - with lags",
+            "Primary",
+            "p_nl_monthly_d18cut",
+            "p_s3_monthly_d18cut",
+        ),
+        Contrast("simplest candidate, D18 cut - BG2", "Primary", "p_nl_weekly_d18cut", bg2),
         Contrast("weekly with lags - BG2", "Primary", "p_s4_weekly", bg2),
         Contrast("weekly with lags and offset - BG2", "Primary", "p_a2_no_blend", bg2),
         Contrast("BG2 without offset - BG2", "Primary", "p_s5_blend_no_offset", bg2),
@@ -645,7 +658,10 @@ def analyse(*, results_dir: Path) -> None:
         notes += class_notes
     absolute_table = pl.concat(absolute_rows)
     contrast_table = pl.concat(contrast_rows).with_columns(
-        safe=pl.col("upper") < pl.col("cls").replace_strict(THRESHOLDS, return_dtype=pl.Float64)
+        safe=pl.col("upper")
+        < pl.when(pl.col("contrast").str.starts_with("C5"))
+        .then(pl.lit(0.0))
+        .otherwise(pl.col("cls").replace_strict(THRESHOLDS, return_dtype=pl.Float64))
     )
     tail_table = pl.concat(tail_rows)
     skew_table = pl.concat(skew_rows)

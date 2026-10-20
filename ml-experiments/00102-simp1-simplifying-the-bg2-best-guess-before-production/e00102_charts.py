@@ -269,15 +269,20 @@ def midday_figure(*, absolute: pl.DataFrame, contrasts: pl.DataFrame) -> alt.VCo
     )
 
 
-def anonymous_label(*, site: str, cls: str, primaries: Sequence[str]) -> str:
+def anonymous_label(
+    *, site: str, cls: str, primaries: Sequence[str], supply_points: Sequence[str] = ()
+) -> str:
     """Return the anonymous label of a series."""
     if cls == "Primary":
         return f"Primary {chr(ord('A') + list(primaries).index(site))}"
+    if cls == "BSP/GSP":
+        return f"Supply point {chr(ord('A') + list(supply_points).index(site))}"
     if cls == "solar":
         return f"Solar farm {site}"
     if cls == "wind":
         return f"Wind farm {chr(ord('A') + int(site[1:]) - 1)}"
-    return f"Supply point {site}"
+    msg = f"unknown class {cls!r}"
+    raise ValueError(msg)
 
 
 def read_arm_series(*, arm: str, site: str) -> pl.DataFrame:
@@ -294,10 +299,10 @@ def read_arm_series(*, arm: str, site: str) -> pl.DataFrame:
 def choose_weeks(*, bg2: pl.DataFrame) -> dict[str, datetime.datetime]:
     """Choose the first day of the example weeks from BG2's rows of one series.
 
-    A summer week is the week in June to August with the largest mean daytime actual-minus-median
-    swing, which for a solar series is the week with the highest output; a winter week is the
-    December to February week with the highest mean actual; and the large-error week has the
-    highest mean absolute error of the median.
+    The summer week is the week from June to August with the highest mean actual power, the
+    winter week is the week from December to February with the highest mean actual power, and the
+    large-error week is the week with the highest mean absolute error of the median. At a series
+    with embedded solar panels, the highest-power summer week need not be a sunny one.
     """
     daily = (
         bg2.with_columns(
@@ -362,14 +367,18 @@ def week_figure(
                 axis=alt.Axis(values=[1, 2, 3, 4, 5, 6, 7, 8], title="Day of the week (1 to 7)"),
             )
         )
-        outer = base.mark_area(color=BAND_COLOUR, opacity=0.6, clip=True).encode(  # ty: ignore[unresolved-attribute]
+        outer = base.mark_area(color=BAND_COLOUR, opacity=0.6, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("q05:Q", title="% of capacity"), y2="q95:Q"
         )
-        inner = base.mark_area(color=ocf.DATA_BLUE, opacity=0.35, clip=True).encode(  # ty: ignore[unresolved-attribute]
+        inner = base.mark_area(color=ocf.DATA_BLUE, opacity=0.35, clip=True, aria=False).encode(  # ty: ignore[unresolved-attribute]
             y="q25:Q", y2="q75:Q"
         )
-        median = base.mark_line(color=ocf.DATA_BLUE, strokeWidth=1.5, clip=True).encode(y="q50:Q")  # ty: ignore[unresolved-attribute]
-        actual = base.mark_line(color=ocf.BRAND_ORANGE, strokeWidth=1.5, clip=True).encode(  # ty: ignore[unresolved-attribute]
+        median = base.mark_line(  # ty: ignore[unresolved-attribute]
+            color=ocf.DATA_BLUE, strokeWidth=1.5, clip=True, aria=False
+        ).encode(y="q50:Q")
+        actual = base.mark_line(
+            color=ocf.BRAND_ORANGE, strokeWidth=1.5, clip=True, aria=False
+        ).encode(  # ty: ignore[unresolved-attribute]
             y="actual:Q"
         )
         panels.append(
@@ -440,7 +449,7 @@ def members_figure(
     ]
     return (
         alt.Chart(data.to_pandas())  # ty: ignore[unresolved-attribute]
-        .mark_line(clip=True, strokeWidth=1.5)
+        .mark_line(clip=True, strokeWidth=1.5, aria=False)
         .encode(
             x=alt.X(
                 "day:Q",
@@ -547,13 +556,27 @@ def lag_by_series_figure(*, results_dir: Path) -> alt.Chart:
             ("p_nl_monthly_p_s3_monthly", "Monthly refits"),
         )
     ]
-    data = pl.concat(frames).to_pandas()
-    order = (
-        pl.concat(frames)
-        .filter(pl.col("schedule") == "Weekly refits")
-        .sort("value", descending=True)["label"]
-        .to_list()
-    )
+    cut = [
+        pl.read_parquet(results_dir / f"checks_by_site_{name}.parquet")
+        .filter(pl.col("site") == "D18")
+        .with_columns(
+            schedule=pl.lit(schedule), label=pl.lit("Primary M, commissioning months cut")
+        )
+        for name, schedule in (
+            ("p_nl_weekly_d18cut_p_s4_weekly_d18cut", "Weekly refits"),
+            ("p_nl_monthly_d18cut_p_s3_monthly_d18cut", "Monthly refits"),
+        )
+    ]
+    data = pl.concat([*frames, *cut], how="diagonal").to_pandas()
+    order = [
+        *(
+            pl.concat(frames)
+            .filter(pl.col("schedule") == "Weekly refits")
+            .sort("value", descending=True)["label"]
+            .to_list()
+        ),
+        "Primary M, commissioning months cut",
+    ]
     return (
         alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70, aria=False)
@@ -583,8 +606,9 @@ def lag_by_series_figure(*, results_dir: Path) -> alt.Chart:
             title=alt.TitleParams(
                 text="Removing the three power lags, by Primary substation",
                 subtitle=wrapped(
-                    text="Positive means removing the lags makes the forecast worse. Two "
-                    f"substations carry most of the cost. {SCOPE}",
+                    text="Positive means removing the lags makes the forecast worse. Primary M's "
+                    "cost comes from its uncut first months, and Primary K's from a level change. "
+                    f"{SCOPE}",
                     width=95,
                 ),
             ),
@@ -612,7 +636,16 @@ EXAMPLES: Final[dict[str, tuple[str, str, tuple[str, ...]]]] = {
     "primary": (
         "Primary",
         "D10",
-        ("p_s6_bg2", "p_s5_blend_no_offset", "p_s4_weekly", "p_nl_weekly", "ref_manual_heuristic"),
+        (
+            "p_s6_bg2",
+            "p_s5_blend_no_offset",
+            "p_b_w_an_st",
+            "p_b_bg2_st_uncorrected",
+            "p_a5_spread_off",
+            "p_s4_weekly",
+            "p_nl_weekly",
+            "ref_manual_heuristic",
+        ),
     ),
     "supply": ("BSP/GSP", "D17", ("b_weekly", "b_nl_weekly", "b_stack", "ref_manual_heuristic")),
     "solar": (
@@ -633,11 +666,14 @@ def example_figures() -> dict[str, Callable[[], alt.TopLevelMixin]]:
     """Return the example-forecast and blend-member figures, which read the arm tables."""
     series = common.series_table()
     primaries = series.filter(pl.col("substation_type") == "Primary")["site"].to_list()
+    supply_points = series.filter(pl.col("substation_type") != "Primary")["site"].to_list()
     out: dict[str, Callable[[], alt.TopLevelMixin]] = {}
     for key, (cls, site, arms) in EXAMPLES.items():
         reference = read_arm_series(arm=arms[0], site=site)
         weeks = choose_weeks(bg2=reference)
-        title_site = anonymous_label(site=site, cls=cls, primaries=primaries)
+        title_site = anonymous_label(
+            site=site, cls=cls, primaries=primaries, supply_points=supply_points
+        )
         for week, start in weeks.items():
             out[f"figure_4_{key}_{week}"] = (
                 lambda s=start, w=week, c=cls, si=site, a=arms, t=title_site: week_figure(

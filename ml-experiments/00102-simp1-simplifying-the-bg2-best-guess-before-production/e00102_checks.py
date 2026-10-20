@@ -18,6 +18,9 @@ PRIMARY_PAIRS: tuple[tuple[str, str, str], ...] = (
     ("C1 weekly no-lag minus BG2", "p_nl_weekly", "p_s6_bg2"),
     ("weekly lags: no-lag minus with lags", "p_nl_weekly", "p_s4_weekly"),
     ("monthly lags: no-lag minus with lags", "p_nl_monthly", "p_s3_monthly"),
+    ("C1 with D18 cut: simplest minus BG2", "p_nl_weekly_d18cut", "p_s6_bg2"),
+    ("weekly lags, D18 cut: no-lag minus with lags", "p_nl_weekly_d18cut", "p_s4_weekly_d18cut"),
+    ("monthly lags, D18 cut: no-lag minus with lags", "p_nl_monthly_d18cut", "p_s3_monthly_d18cut"),
 )
 OTHER_PAIRS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "BSP/GSP": (("C2 weekly no-lag minus BG2", "b_nl_weekly", "b_weekly"),),
@@ -189,14 +192,18 @@ def _primary_extras(
     values = cases.qs[treatment] - cases.qs[reference]
     sites = cases.keys["site"].to_numpy()
     ranked = per_site.sort("value", descending=True)["site"].to_list()
-    out = [f"{label}: leave the two largest series ({ranked[0]}, {ranked[1]}) out"]
-    mean, lower, upper = pooled_interval(
-        cases=cases,
-        values=values,
-        keep=~np.isin(sites, ranked[:2]),
-        level=score.VERDICT_LEVEL,
-    )
-    out.append(f"  pooled contrast {mean:.3f} (99%: {lower:.3f} to {upper:.3f})")
+    out = []
+    for count in (1, 2):
+        mean, lower, upper = pooled_interval(
+            cases=cases,
+            values=values,
+            keep=~np.isin(sites, ranked[:count]),
+            level=score.VERDICT_LEVEL,
+        )
+        out.append(
+            f"{label}: leave the {count} largest series ({', '.join(ranked[:count])}) out: pooled "
+            f"contrast {mean:.3f} (99%: {lower:.3f} to {upper:.3f})"
+        )
     primaries = (
         common.series_table().filter(pl.col("substation_type") == "Primary")["site"].to_list()
     )

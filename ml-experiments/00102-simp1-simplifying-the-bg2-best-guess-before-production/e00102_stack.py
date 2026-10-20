@@ -16,12 +16,11 @@ only forecasts from runs that began at or before the half-hour. Both are asserte
 (`corrections_for` raises `ValueError`), and `--self-test` demonstrates that changing the observed
 power after `o - 3.5 h` leaves the correction unchanged.
 
-    uv run python ml-experiments/00087-*/e00102_stack.py --self-test [--smoke-dir]
+    uv run python ml-experiments/00102-*/e00102_stack.py --self-test
 """
 
 import argparse
 from datetime import timedelta
-from pathlib import Path
 from typing import Final
 
 import e00102_common as common
@@ -231,43 +230,12 @@ def _synthetic_check() -> None:
     )
 
 
-def _smoke_check(*, smoke_dir: Path) -> None:
-    """Apply the stack to the smoke run's frozen predictions and print what comes out.
-
-    Args:
-        smoke_dir: `work/anchor_preds_smoke`, as written by `e00102_fit_demand.py --smoke`.
-    """
-    files = sorted((smoke_dir / "frozen").glob("*.parquet"))
-    if not files:
-        print(f"no smoke predictions under {smoke_dir / 'frozen'}; skipped")
-        return
-    raw = pl.concat([pl.read_parquet(path) for path in files])
-    series = common.series_table()
-    arrays = common.load_series_arrays(series=series)
-    out = corrected_stack(raw=raw, series=series, arrays=arrays)
-    assert out.height == raw.height
-    quantiles = out.select(common.LEVEL_COLUMNS).to_numpy()
-    assert np.isfinite(quantiles).all()
-    assert (np.diff(quantiles, axis=1) >= 0).all()
-    widths_raw = (raw["q95"] - raw["q05"]).to_numpy()
-    widths_out = (out["q95"] - out["q05"]).to_numpy()
-    assert np.allclose(widths_out, common.SPREAD_FACTOR * widths_raw, rtol=1e-3, atol=1e-5)
-    print(
-        f"smoke check passed: {out.height:,} rows from {len(files)} files; with fewer than 3 days "
-        "of history the correction is 0, so only the spread factor acts"
-    )
-
-
 def main() -> None:
     """Run the self-test."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--self-test", action="store_true", required=True)
-    parser.add_argument(
-        "--smoke-dir", type=Path, default=common.ANCHOR_PREDS_DIR.with_name("anchor_preds_smoke")
-    )
-    args = parser.parse_args()
+    parser.parse_args()
     _synthetic_check()
-    _smoke_check(smoke_dir=args.smoke_dir)
 
 
 if __name__ == "__main__":

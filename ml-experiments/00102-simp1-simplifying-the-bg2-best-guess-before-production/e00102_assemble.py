@@ -627,7 +627,53 @@ def build_nolag_farms(*, ctx: Context) -> None:
     )
 
 
-PARTS: Final[tuple[str, ...]] = ("members", "nolag", "farms")
+D18_CUT_ARMS: Final[dict[str, tuple[str, str, str, str]]] = {
+    "p_nl_weekly_d18cut": ("p_nl_weekly", "n1h_nolag_cut", "weekly", "own"),
+    "p_s4_weekly_d18cut": ("p_s4_weekly", "n1h_lag_cut", "weekly", "bg2"),
+    "p_nl_monthly_d18cut": ("p_nl_monthly", "n1h_nolag_cut", "monthly", "own"),
+    "p_s3_monthly_d18cut": ("p_s3_monthly", "n1h_lag_cut", "monthly", "bg2"),
+}
+"""Each D18-cut arm: the arm whose D18 rows it replaces, the refit folder of the replacement, the
+regime, and whether the base arm is in this experiment's arms folder or experiment 00087's."""
+
+
+def build_d18_cut(*, ctx: Context) -> None:
+    """Write the Primary arms whose D18 rows come from refits that cut D18's commissioning months.
+
+    Each arm is an existing Primary arm with the rows of D18 replaced by the rows of the refit
+    trained from 2025-03-01 onwards, with the spread factor and no correction, as the base arm has.
+    """
+    for name, (base, config, regime, where) in D18_CUT_ARMS.items():
+        started = time.monotonic()
+        base_path = (ctx.arms_dir if where == "own" else BG2_ARMS_DIR) / f"{base}.parquet"
+        try:
+            raw = regime_rows(
+                root=ctx.own_demand_root,
+                config=config,
+                regime=regime,
+                site="D18",
+                origins=ctx.origins,
+                strict=ctx.strict,
+            )
+        except FileNotFoundError as error:
+            print(f"{name}: skipped, {error}", flush=True)
+            continue
+        replacement = finalise(ctx=ctx, frame=stack.stack(frame=raw, correct=False, spread=True))
+        table = pl.concat(
+            [
+                pl.read_parquet(base_path).filter(pl.col("site") != "D18"),
+                replacement.select(pl.read_parquet_schema(base_path).keys()),
+            ]
+        ).sort(*KEY_COLUMNS)
+        emit(
+            ctx=ctx,
+            name=name,
+            table=table.select(*KEY_COLUMNS, *common.LEVEL_COLUMNS),
+            started=started,
+        )
+
+
+PARTS: Final[tuple[str, ...]] = ("members", "nolag", "farms", "d18cut")
 
 
 def main() -> None:
@@ -641,6 +687,7 @@ def main() -> None:
         "members": build_members_and_blends,
         "nolag": build_nolag_demand,
         "farms": build_nolag_farms,
+        "d18cut": build_d18_cut,
     }
     for part in args.parts:
         builders[part](ctx=ctx)
