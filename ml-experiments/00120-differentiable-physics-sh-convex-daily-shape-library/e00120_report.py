@@ -847,6 +847,73 @@ def step_clock_table() -> pl.DataFrame:
     return pl.DataFrame(rows, infer_schema_length=None)
 
 
+def two_clock_table() -> pl.DataFrame:
+    """Return, per substation and year, how much of the night-time residual sits on each clock.
+
+    A labelled exploratory readout (no learned shape is indexed by UTC: the library's shapes use
+    the local clock). On nights below 10 °C, SH's residual (actual minus mean forecast) from
+    21:00 to 09:00 UTC is regressed on three indicators: the UTC window 00:30 to 07:30 (a legacy
+    UTC-fixed step), the local window 00:30 to 05:30 (Octopus Go), and the local window 23:30 to
+    05:30 (Intelligent Octopus Go), with an intercept. The coefficients are in points of capacity.
+    The UTC share is the UTC coefficient over the sum of the three, when all are positive; the
+    clocks are separable only because British Summer Time moves the local windows against UTC, so
+    fewer than `MIN_CLOCK_NIGHTS` such nights give "cannot tell".
+    """
+    cache_ = common.load_cache()
+    rows = []
+    for label in ("scored", "replicate"):
+        frame = seeded(label=label, arm="sh", pooled=False)
+        for site in DECISION:
+            temperature = pl.DataFrame(
+                {
+                    "valid_time": pl.Series(cache_.end_times).dt.replace_time_zone("UTC"),
+                    "temperature": cache_.sites[site].smoothed_temperature_c[:, 0],
+                }
+            )
+            local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
+            part = (
+                frame.filter(pl.col("site_name") == site)
+                .join(temperature, on="valid_time", how="left")
+                .filter(pl.col("temperature") < MILD_NIGHT_C)
+                .with_columns(
+                    utc=pl.col("valid_time").dt.hour() * 60 + pl.col("valid_time").dt.minute(),
+                    clock=local.dt.hour() * 60 + local.dt.minute(),
+                    summer=local.dt.dst_offset() > pl.duration(seconds=0),
+                    residual=pl.col("actual") - pl.col("mean"),
+                )
+                .filter((pl.col("utc") >= 21 * 60) | (pl.col("utc") <= 9 * 60))
+            )
+            n_summer = part.filter(pl.col("summer"))["valid_time"].dt.date().n_unique()
+            if n_summer < MIN_CLOCK_NIGHTS or part.height < 100:
+                rows.append({"year": label, "site": site, "note": "cannot tell"})
+                continue
+            utc = part["utc"].to_numpy()
+            clock = part["clock"].to_numpy()
+            design = np.column_stack(
+                [
+                    (utc >= 30) & (utc < 450),
+                    (clock >= 30) & (clock < 330),
+                    (clock >= 23 * 60 + 30) | (clock < 330),
+                    np.ones(part.height),
+                ]
+            ).astype(np.float64)
+            coefficients = np.linalg.lstsq(design, part["residual"].to_numpy(), rcond=None)[0]
+            total = coefficients[:3].sum()
+            share = float(coefficients[0] / total) if (coefficients[:3] > 0).all() else None
+            rows.append(
+                {
+                    "year": label,
+                    "site": site,
+                    "UTC 00:30-07:30": float(coefficients[0]),
+                    "local 00:30-05:30": float(coefficients[1]),
+                    "local 23:30-05:30": float(coefficients[2]),
+                    "UTC share": share,
+                    "note": "",
+                }
+            )
+    return pl.DataFrame(rows, infer_schema_length=None)
+
+
 def step_windows_table() -> pl.DataFrame:
     """Return the two largest rises and falls of each shape and profile in the first 12 hours.
 
@@ -993,6 +1060,8 @@ def main() -> None:
     print(step_by_temperature().write_csv(float_precision=3), end="")
     print("== Clock of the largest night-time rise on cold nights (post hoc style readout) ==")
     print(step_clock_table().write_csv(float_precision=3), end="")
+    print("== Two-clock night readout (exploratory): residual on UTC and local windows ==")
+    print(two_clock_table().write_csv(float_precision=3), end="")
     print("== Rises and falls of the shapes and profiles in the first 12 hours (local time) ==")
     print(step_windows_table().write_csv(float_precision=3), end="")
     print("== Weight on the step shape by cut ==")

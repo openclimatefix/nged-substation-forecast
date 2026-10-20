@@ -471,6 +471,15 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
       exploratory arm, run after the Opus module review, lets each substation's mixing weight
       evolve slowly: non-negative weights at season-year knots with a second-difference
       smoothness penalty. It needs a module change and is not part of the verdict.
+    - **Two clocks at once (Design request, 2026-10-20; labelled exploratory readout, no change to the
+      gate).** The library's shapes use the local clock, so no learned shape is indexed by UTC. The
+      report instead regresses SH's night-time residual (actual minus mean forecast, 21:00 to 09:00
+      UTC, nights below 10 °C) on three indicators: a UTC-fixed window (00:30 to 07:30 UTC), the
+      local window of Octopus Go (00:30 to 05:30), and the local window of Intelligent Octopus Go
+      (23:30 to 05:30). It prints the three coefficients and the UTC share per substation and year.
+      The clocks separate only through British Summer Time nights; with fewer than 5 such nights the
+      readout says "cannot tell". A UTC-indexed shape family is a module change and waits for the
+      exploratory arms after the Opus module review.
     - **K from 3 to 6.** The tuning year also runs K = 5 and 6 at the chosen pair (exploratory, never
       scored later); the report shows K = 2 to 6.
     - **Penalties against shape collapse and noise shapes.** The orthogonality penalty is the
