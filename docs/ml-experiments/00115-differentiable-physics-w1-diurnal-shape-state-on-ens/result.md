@@ -43,13 +43,14 @@ best_arm: >-
 headline: >-
   The shape state (KW) lowered GAM-K's day-ahead score by 0.075 points in both periods (replicate
   months -0.145 to -0.009; scored year -0.119 to -0.033; 5 of 5 substations each), and by 0.112 in
-  winter. The 14-day recipe did as well (KW minus R +0.014, -0.014 to +0.048). Gate test 1 failed
-  its 0.4 floor (0.35 and 0.30 recovered), so the verdict is capped at inconclusive.
+  winter (a post hoc breakdown). The 14-day recipe did as well (KW minus R +0.014, -0.014 to
+  +0.048). Gate test 1 failed its 0.4 floor (0.35 and 0.30 recovered), so the verdict is capped at
+  inconclusive.
 lessons:
   - >-
     The day-ahead error of the convex model on ensemble weather has a daily shape that a filter can
     learn from recent readings: the gain is 0.075 points in two separate periods at 5 of 5
-    substations, and 0.112 in the scored winter.
+    substations, and 0.112 in the scored winter (post hoc).
   - >-
     A plain average of the last 14 days' errors by half-hour (the recipe R) gains as much as the
     learned shape state, so the shape state's extra machinery is not yet justified. In winter
@@ -63,13 +64,14 @@ adopted_in: none
 date: 2026-10-20
 pr: 1398
 take_home_message: >-
-  Teaching the physics-based forecast the shape of the day from recent readings lowers its
-  day-ahead error by 0.075 points at five Primary substations (about 3%), in two separate periods
-  and more in winter (0.11), but averaging the last 14 days' errors by half-hour gains as much, so
-  the learned shape state is not needed on this evidence. The shape state's own check failed: it
-  learns an injected change too slowly (0.35 against a floor of 0.4), so the verdict is capped at
-  inconclusive. A faster shape state, tried afterwards and labelled post hoc, passed that check and
-  beat both K0 and the recipe, which a rerun with the check fixed in advance would need to confirm.
+  Teaching the physics-based forecast the shape of the day from recent readings lowers its day-ahead
+  error by 0.075 points at five Primary substations (about 3%), in two separate periods and more in
+  winter (0.11, a post hoc breakdown), but averaging the last 14 days' errors by half-hour gains as
+  much, so the learned shape state is not needed on this evidence. The shape state's own check
+  failed: it learns an injected change too slowly (0.35 against a floor of 0.4), so the verdict is
+  capped at inconclusive. A faster shape state, tried afterwards and labelled post hoc, passed that
+  check and beat both K0 and the recipe, which a rerun with the check fixed in advance would need to
+  confirm.
 advice:
   - >-
     Correct the day-ahead forecast's shape by half-hour from recent errors: the 14-day profile
@@ -99,11 +101,13 @@ code: ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/
 day-ahead error by 0.075 points (about 3%) at five Primary substations, but a simple average of the
 last 14 days' errors gains as much, and the shape state failed its own speed check.** The shape
 state cut the day-ahead score in two separate periods at 5 of 5 substations, and by 0.112 points in
-the scored winter. The 14-day average (recipe R) scored 0.014 points better than the shape state
-(interval -0.014 to +0.048, no difference), so the added machinery is not justified yet. The
-shape state recovered 0.35 of an injected change in two weeks against a pre-registered floor of
-0.4, so the verdict is `inconclusive`. A faster shape state, tried afterwards and labelled post
-hoc, passed that check and beat both K0 and R, and needs a pre-registered rerun to count.
+the scored winter (a post hoc breakdown). The 14-day average (recipe R) scored 0.014 points better
+than the shape state (interval -0.014 to +0.048, no difference), so the added machinery is not
+justified yet. The shape state recovered 0.35 of an injected change in two weeks against a
+pre-registered floor of 0.4, so the verdict is `inconclusive`. A faster shape state, tried
+afterwards, chosen from the gate's formula before any score of it was read, and labelled post hoc,
+passed that check and beat both K0 and R, and needs a
+pre-registered rerun to count.
 
 ## What was asked, and the answer in plain terms
 
@@ -131,7 +135,9 @@ recent-error filter follows the design of [experiment
 106](../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md).
 
 **The scored year chose the idea's form, which is why the replicate months exist.** A screening of
-the same data before this experiment had suggested the idea, so a gain in the scored year alone
+the same data, run by the session that planned this experiment and recorded in the [plan
+commit](https://github.com/openclimatefix/nged-substation-forecast/commit/4c8382008), had suggested
+the idea, so a gain in the scored year alone
 would not count. Both periods showed the same gain.
 
 **Gate failure: the verdict is capped at `inconclusive`.** The pre-registered check that the shape
@@ -169,10 +175,11 @@ state is a post hoc arm that never passed the pre-registered gate.
   the rows every reference holds. Retraining schedule: none, because experiment 111's monthly
   refits are reused; the contrasts compare filters on one set of fits. Run time: about 13 minutes
   on 6 cores for all arms.
-- **Headline: the shape state (C1, KW minus K0 at D+1, 98.75% intervals).** Replicate months -0.0745
-  (-0.1449 to -0.0091, 5 of 5 substations better); scored year -0.0750 (-0.1188 to -0.0329, 5 of
-  5). Absolute scores in the scored year: K0 2.525, KW 2.450. Over all leads: -0.0661 and -0.0543.
-  The gain at 48 to 144 hours is 0.049 (scored year), 66% of the D+1 gain, so more than half remains.
+- **Headline: the shape state (C1, KW minus K0 at D+1, 98.75% intervals).** Replicate months
+  -0.0745 (-0.1449 to -0.0091, 5 of 5 substations better); scored year -0.0750 (-0.1188 to -0.0329,
+  5 of 5). Absolute scores in the scored year: K0 2.525, KW 2.450. Over all leads: -0.0661 and
+  -0.0543. The gain at 48 to 144 hours is 0.049 (scored year), 66% of the D+1 gain, so more than
+  half remains.
 - **C2, lead-band tuning (KW-lb minus KW):** 0.0000 in both periods. The tuned multipliers
   ([4, 4, 0.5, 0.25] for KW) barely change the filter, because the observation noise sits at 0.05
   to 0.09 points at five of six substations, so the filter already trusts each reading.
@@ -181,20 +188,26 @@ state is a post hoc arm that never passed the pre-registered gate.
   year) and none in the midday and evening bands, where the readings of the forecast day arrive too
   late to help.
 - **C4, shape state against the recipe (KW minus R):** +0.0170 (-0.0164 to +0.0401) and +0.0136
-  (-0.0138 to +0.0483); 1 of 5 and 0 of 5 substations favour KW. Under the decision rule's hand-on,
-  R is the candidate because C4 is not below zero.
+  (-0.0138 to +0.0483); 1 of 5 and 0 of 5 substations favour KW. The plan's rule for
+  choosing between them makes R the candidate, because C4 is not below zero.
 - **Post hoc, KW-fast.** Against K0: -0.109 (-0.190 to -0.047) and -0.113 (-0.143 to -0.086), 5 of 5
   each. Against R: -0.0175 (-0.0405 to +0.0038) and -0.0244 (-0.0349 to -0.0141), 5 of 5 each.
-  Intervals are 95%; the arm was chosen from the gate's analytic recovery (the smallest step factor
-  on a fixed grid giving at least 0.6), before any score of it was read.
+  Intervals are 95%. The arm was chosen from the gate's analytic recovery (the smallest step factor
+  on the grid 2, 4, 8, 16, 32, 64 giving at least 0.6), before any score of it was read. Only the
+  docstring of `FAST_SHAPE_FACTOR` in `e00115_arms.py` and the file times of the private work
+  folder record that order (the recovery search finished at 10:31 UTC and the KW-fast forecasts
+  were written at 10:39 UTC on 20 October 2026); no commit predates the choice.
 - **Exploratory (95%, scored year, D+1).** KS minus KW 0.0000: the whole-day zero-mean shape adds
-  nothing over the band levels. KS1 (one level and one transient, no bands) minus KW -0.0492
+  nothing over the band levels (KS and KW are different arms, whose corrections differ by 0.0002
+  to 0.002 points on average and by at most 0.023 at D5, which is why their scores agree to four
+  decimals). KS1 (one level and one transient, no bands) minus KW -0.0492
   (-0.0930 to -0.0158, 4 of 5): bands may not be needed. KW-nomid minus KW +0.0008: the midday shape
   does not hurt. KW-pl52 minus K0 -0.0337 and minus KW +0.0412: last year's shape gains about
   half as much as the current one, so the shape drifts. K0-lb minus K0 -0.0027.
 - **Telemetry delay (assumed 3.5 hours, never measured).** KW minus K0 is -0.0751 at 0 hours,
   -0.0632 at 24, and -0.0634 at 33. K0's own score rises from 2.524 at 3.5 hours to 2.612 at 24 and
-  2.644 at 33.
+  2.644 at 33 (all on the rows the delay arms share; K0 is 2.525 on the rows it shares with the
+  references).
 - **References, scored year, on shared rows (D+1, all leads).** K0 2.525 and 2.812; KW 2.450 and
   2.757; R 2.436 and 2.743; KW-fast 2.412 and 2.725; BG2 2.535 and 2.780; Xlag-d 2.638 and 2.877;
   X-nl+K 2.693 and 2.934; GAM-0 2.830 and 2.951; climatology 3.826 and 3.804; manual heuristic
@@ -207,13 +220,14 @@ state is a post hoc arm that never passed the pre-registered gate.
 ### Winter (November to March; post hoc, because scores were already read)
 
 **KW does not lose to K0 in winter, but it loses to R, and KW-fast does not lose to either.** The
-scored year holds one independent winter (2025-26). The replicate months hold two winter months of
-a second one (December 2024 and February 2025), so those rows say little. A cold-snap day is a
-local day from November to March whose mean ERA5 temperature at the substation is below 3 °C; the
-rule was fixed before cold-snap scores were read. The scored year has 25, 25, 18, 7, and 5
-cold-snap days at D10, D11, D14, D16, and D5, so D16 and D5 have too few days to read alone. The
-replicate months have 6 to 8 per substation in one or two calendar months, so their cold-snap
-intervals are degenerate and are not quoted.
+scored year holds one independent winter (2025-26). The replicate months hold two winter months of a
+second one (December 2024 and February 2025), so those rows say little. A cold-snap day is a local
+day from November to March whose mean ERA5 temperature at the substation is below 3 °C; the rule was
+fixed before cold-snap scores were read, a fact that only the docstring of `cold_snap_mask` in
+`e00115_report.py` records, because no commit predates the scores. The scored year has 25, 25, 18,
+7, and 5 cold-snap days at D10, D11, D14, D16, and D5, so D16 and D5 have too few days to read
+alone. The replicate months have 6 to 8 per substation in one or two calendar months, so their
+cold-snap intervals are degenerate and are not quoted.
 
 | Scored year, D+1 | Winter | Winter evening | Cold-snap days |
 |---|---|---|---|
@@ -224,10 +238,11 @@ intervals are degenerate and are not quoted.
 | KW-fast minus R | -0.020 (-0.031 to -0.010), 5 of 5 | +0.009 (-0.019 to +0.038), 2 of 5 | -0.067 (-0.092 to -0.052), 4 of 5 |
 | KW minus BG2 | -0.330 (-0.426 to -0.255), 5 of 5 | not covered | -0.499 (-0.955 to -0.023), 4 of 5 |
 
-Intervals are 95%, resampling whole months. The winter row for KW minus R is a winter loss for KW
-at the tuned step, particularly in the evening, so under the maintainer's winter rule KW is held
-back in favour of R until a faster shape state is confirmed. Annual gains and winter gains point the
-same way for K0, KW, and KW-fast; the loss is only KW against R.
+Intervals are 95%, resampling whole months. The winter row for KW minus R is a winter loss for KW at
+the tuned step, particularly in the evening, so under the rule that a winter loss holds an arm back
+even when the annual mean improves, KW is held back in favour of R until a faster shape state is
+confirmed. Annual gains and winter gains point the same way for K0, KW, and KW-fast; the loss is
+only KW against R.
 
 ## The gate
 
@@ -271,8 +286,9 @@ replicate or scored score was read until the gate had run.
 **The verdict is C1's label, capped by the gate.** Without the cap, C1 meets `supported`: below
 zero in both periods with 5 of 5 substations better, the scored-year interval wholly below zero,
 and the estimate (0.075) above the 0.03 threshold. With the failed blocking test the plan's rule
-gives `inconclusive`. The hand-ons: KW-lb does not replace KW (C2 is zero); R, not KW, is the
-simpler candidate (C4 is not below zero); and a winter loss against R holds KW back.
+gives `inconclusive`. The plan's follow-on rules give three readings: KW-lb does not replace KW
+(C2 is zero); R, not KW, is the simpler candidate (C4 is not below zero); and a winter loss
+against R holds KW back.
 
 ## Checks
 
@@ -286,13 +302,19 @@ simpler candidate (C4 is not below zero); and a winter loss against R holds KW b
 - **Triggers that fired.** (1) A control failed: gate test 1, and the screening's R75 reproduction
   (-0.177 against -0.14 within 0.02). (2) A result contradicted its prediction: C3 at D+1, the
   midday band, and KW-nomid, listed above, each with an explanation in this page that no test
-  has confirmed. (6) C1's 98.75% interval (width 0.086, scored year) is under half as wide as the
+  has confirmed. (6) C1's 98.75% interval (width 0.086, scored year) is under a third as wide as the
   sister interval GAM-K minus GAM-0 from experiment 111 (0.291), because the sister contrast is
   four times larger. Triggers 3, 4, 5, and 7 did not fire: no sign differs across the quantile
   score and the errors; no leave-one-substation-out run flips a sign (C1 stays between -0.066 and
-  -0.085 in the scored year); no nested arm beats its container (K0 does not beat KW, and KW-day
-  does not beat KW); no later design depends on C1. The Opus audit these triggers call for is not
-  part of this page yet; its findings and their triage are added to the pull request when it runs.
+  -0.085 in the scored year); no nested arm beats its container (K0, which is KW with the shape
+  step set to zero, does not beat KW, and KW-day does not beat KW); no later design depends on C1.
+  Trigger 5 is a near miss: KW-fast beats KW by 0.038 and KS1 beats KW by 0.049 at D+1, but
+  neither arm is nested in KW (KW-fast is KW with a different shape step, and KS1 has one level
+  instead of four), so the trigger's definition does not cover them; the result says the
+  marginal-likelihood step is not the best step for the score, and the audit may read it
+  otherwise. The Opus audit these triggers call for has not run: status `done` means the runs and
+  this page are finished, and the audit and a prose review are conditions of the merge. Its
+  findings and their triage are added to the pull request.
 - **Tails (scored year, KW, D+1).** Coverage minus nominal: q01 +1.41, q05 +1.53, q95 -1.13, and
   q99 -1.11 percentage points; pinball loss 0.190, 0.617, 0.656, and 0.210. No curtailment cost:
   experiment 87 found no event at the MW Primaries that could rank forecasts. Threshold-weighted
