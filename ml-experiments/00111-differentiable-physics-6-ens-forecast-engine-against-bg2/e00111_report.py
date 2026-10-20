@@ -239,6 +239,53 @@ def headline_scores(*, loaded: dict[str, pl.DataFrame]) -> list[dict]:
     return rows
 
 
+def render_report(*, results: dict) -> list[str]:
+    """Return the report's lines: every contrast, then the checks tables."""
+    lines = ["# Experiment 111 report", ""]
+    for item in results["contrasts"]:
+        q = item["quantile_score"]
+        kind = "planned" if item["planned"] else "exploratory"
+        lines.append(
+            f"- {item['name']} [{item['sites']}, {kind}]: "
+            f"{q['estimate']:+.3f} ({q['lower']:+.3f} to {q['upper']:+.3f}), "
+            f"{q['sites_better']} of {q['n_sites']} sites better, {item['rows']:,} rows; "
+            f"median-forecast error {item['median_error']['estimate']:+.3f}"
+        )
+        absolute = ", ".join(f"{arm} {value:.3f}" for arm, value in item["absolute"].items())
+        lines.append(f"    - absolute quantile scores: {absolute}")
+        bands = "; ".join(
+            f"{band} {c['estimate']:+.3f} ({c['lower']:+.3f} to {c['upper']:+.3f})"
+            for band, c in item["by_lead_band"].items()
+        )
+        lines.append(f"    - by lead band: {bands}")
+        seasons = "; ".join(
+            f"{name} {c['estimate']:+.3f}" for name, c in item.get("seasons", {}).items()
+        )
+        lines.append(f"    - by season: {seasons}")
+        loso = "; ".join(
+            f"without {site} {c['estimate']:+.3f} ({c['lower']:+.3f} to {c['upper']:+.3f})"
+            for site, c in item["leave_one_site_out"].items()
+        )
+        lines.append(f"    - leave one site out: {loso}")
+    lines += ["", "Skipped (arm missing): " + "; ".join(results["skipped"])]
+    for sites_label in ("decision",):
+        lines += ["", f"## Median forecast minus mean forecast ({sites_label} sites, points)"]
+        table = pl.DataFrame(results[f"median_minus_mean_{sites_label}"])
+        if table.height:
+            lines.append(table.pivot(on="site", index="arm", values="median_minus_mean").__str__())
+        lines += [
+            "",
+            f"## Tails ({sites_label} sites): coverage at q01, q05, q95, q99 by lead band",
+        ]
+        tails = pl.DataFrame(results[f"tails_{sites_label}"])
+        if tails.height:
+            wide = tails.pivot(on="level", index=["arm", "lead_band"], values="coverage")
+            lines.append(wide.__str__())
+            pinball = tails.pivot(on="level", index=["arm", "lead_band"], values="pinball")
+            lines += ["", "Pinball loss at the same levels (points):", pinball.__str__()]
+    return lines
+
+
 def main() -> None:
     """Score and write the report."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -286,17 +333,7 @@ def main() -> None:
     if args.months:
         tag += "_" + "_".join(args.months)
     common.write_json_atomic(path=common.WORK_DIR / f"results{tag}.json", content=results)
-    lines = ["# Experiment 111 report", ""]
-    for item in results["contrasts"]:
-        q = item["quantile_score"]
-        kind = "planned" if item["planned"] else "exploratory"
-        lines.append(
-            f"- {item['name']} [{item['sites']}, {kind}]: "
-            f"{q['estimate']:+.3f} ({q['lower']:+.3f} to {q['upper']:+.3f}), "
-            f"{q['sites_better']} of {q['n_sites']} sites better, {item['rows']:,} rows; "
-            f"median-forecast error {item['median_error']['estimate']:+.3f}"
-        )
-    lines += ["", "Skipped (arm missing): " + "; ".join(results["skipped"])]
+    lines = render_report(results=results)
     (common.WORK_DIR / f"report{tag}.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
 
