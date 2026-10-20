@@ -120,9 +120,16 @@ we could not confirm in a document we read in full are marked as unverified.
   time, its size by winter, and the share that follows UTC against the local clock.
 - **Calendar and visible-feature checks.** A forecast-against-actual figure for cold winter nights
   goes on each card. A visible miss on a cold winter night counts against release.
-- **We look for the Octopus tariffs before modelling them.** The test is a local-clock step near
-  23:30 and 05:30, and Cosy windows on winter weekdays, by year, with "cannot tell" where the effect
-  is too small. No result yet.
+- **The Octopus and Cosy tariffs are not visible at Primary level, so they are not modelled.** A
+  check in experiment 123 looked for a rise at the window edges on British Summer Time nights
+  (Octopus) and on winter weekdays (Cosy), by year from 2021. The placebo control failed: at
+  half-hours with no tariff edge the interval excluded zero in 76% to 79% of series-years, because
+  the daily load shape is not flat. The year-on-year change cancels the shape, but the placebo
+  false-positive rate was still 21% to 43%.
+- **The detection limit is 1.19 points (about 0.06 to 0.22 MW).** Beyond it, with the expected sign,
+  only one Primary (D8) shows the Intelligent Octopus Go edges at 23:30 and 05:30, and that Primary
+  has no Economy 7 step and a large fall at 16:00, so it is a load change. No Primary shows the
+  Octopus Go opening at 00:30. Cosy is not distinguished from other load changes.
 
 ## Gaps
 
