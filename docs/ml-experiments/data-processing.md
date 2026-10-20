@@ -59,7 +59,8 @@ Primaries from April to September, and [experiment
 56](00056-mva-only-primaries-skill-against-mw-primaries/result.md) could not tell the best guess's
 skill at the 8 MVA-only Primaries from its skill at the 8 MW Primaries (inconclusive). [Experiment
 110](00110-differentiable-physics-5-embedded-generation-and-capacity/result.md) fitted a power
-factor to only 2 of the 8 MVA-only Primaries, because the other 6 have almost no reverse flow in
+factor to only 2 of the 8 MVA-only Primaries (and recovered one of them, D12), because the other 6
+have almost no reverse flow in
 their training rows. It held the power factor at 0.97 at those 6, and modelling the meter as
 apparent power scored 0.13 points of capacity better than reading it as real power.
 

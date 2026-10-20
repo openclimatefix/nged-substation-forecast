@@ -66,7 +66,17 @@ def meter_cards(*, sections: dict[str, pl.DataFrame]) -> pl.DataFrame:
         pl.col("reactive").alias("reactive pair"),
         pl.col("reverse-flow share").round(3),
         pl.col("power factor").round(3),
+        pl.format(
+            "{} to {}", pl.col("power_factor_low").round(3), pl.col("power_factor_high").round(3)
+        ).alias("power factor 90% range"),
         pl.col("q0 points").round(2),
+        pl.format("{} to {}", pl.col("q0_low").round(2), pl.col("q0_high").round(2)).alias(
+            "q0 90% range"
+        ),
+        pl.when(pl.col("recovered"))
+        .then(pl.lit("recovered"))
+        .otherwise(pl.lit("not recovered"))
+        .alias("recovered?"),
     ).sort("substation")
 
 

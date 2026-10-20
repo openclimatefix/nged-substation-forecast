@@ -168,9 +168,10 @@ across substations with care".
 dark rows). C3 (LQ minus L0) was −0.03 (99% interval −0.055 to −0.010), 7 of 8 substations better,
 which is below the 0.10 points the plan requires for replacing L0. Reverse flow occurred at one
 substation (D12, 25% of rows) and at D22 only on 0.7% of rows, so the learned reactive pair was
-fitted at those two substations and held at a power factor of 0.97 at the other six. L0 scored 2.50
-points better than G-dark (a solar term trained on sunlit MVA rows). On dark rows, where the two
-should agree, L0 was still 0.63 points better, so the control did not read zero.
+fitted at those two substations and held at a power factor of 0.97 at the other six. Only D12's
+power factor is recovered by the month bootstrap (0.950 to 0.955). L0 scored 2.50 points better than
+G-dark (a solar term trained on sunlit MVA rows). On dark rows, where the two should agree, L0 was
+still 0.63 points better, so the control did not read zero.
 
 **The node (question 3): it reads a generator everywhere.** B-gen's deepest outage reached 12 to 35
 points at the five decision substations at the scored cut (6 to 35 at the replicate cut), and 9
@@ -227,11 +228,15 @@ card shows no heating slope, because no arm in this part isolates one.
 | D14 | 32 | 30 to 34 | 30 | 1.09 | 12 | 0.95 | 1.00 |
 | D16 | 27 | 27 to 29 | 40 | 0.69 | 15 | 0.75 | 0.80 |
 
-| substation | reactive pair | reverse-flow share | power factor | q0 (points) |
-|---|---|---|---|---|
-| D12 | learned | 0.254 | 0.953 | 3.87 |
-| D22 | learned | 0.007 | 0.967 | 0.38 |
-| D2, D3, D4, D8, D19, D21 | held at 0.97 | 0.000 | 0.970 | 0.00 |
+| substation | reactive pair | reverse-flow share | power factor | 90% range | q0 (points) | 90% range | recovered? |
+|---|---|---|---|---|---|---|---|
+| D12 | learned | 0.254 | 0.953 | 0.950 to 0.955 | 3.87 | 3.32 to 4.82 | recovered |
+| D22 | learned | 0.007 | 0.967 | 0.966 to 0.970 | 0.38 | 0.00 to 0.46 | not recovered |
+| D2, D3, D4, D8, D19, D21 | held at 0.97 | 0.000 | 0.970 | held, no range | 0.00 | held, no range | not recovered |
+
+**The month bootstrap recovers a power factor at D12 only.** A substation counts as recovered when
+its interval does not span 0.95 to 0.99. D22's interval (0.966 to 0.970) lies inside that span, and
+the other six substations are held at 0.97 because they have almost no reverse flow.
 
 **Example forecasts.** The figure below shows B-gen's filtered day-ahead median with 80% and 90%
 bands against the measured series, for the first full Monday-to-Sunday week of January, April, July,
@@ -267,7 +272,7 @@ uninjected fit): test 4 passed. Components that depend on a failed test are capp
 | K-i and K-ii identified; K-ii 0.05 to 0.20 worse unfiltered | not identified; K-ii 0.07 worse unfiltered in the scored year (met) |
 | K-iii ratio 0.65 to 0.87 at 4 of 5 | consistent at the scored cut at 4 of 5 (D16 outside); not an identified arm |
 | Gate test 3: balanced accuracy 0.78 to 0.85 | failed, minimum 0.65 |
-| Real power factors recovered at 2 or fewer of 8 | recovered at 2 of 8 (D12, D22) |
+| Real power factors recovered at 2 or fewer of 8 | recovered at 1 of 8 (D12); D22 is learned but not recovered |
 | Node under 1 point at 4 of 5 | 12 to 35 points at all five; fails |
 | Clip m at D5 0.80 to 0.95 | 1.10; fails |
 | C1 within ±0.05 filtered and ±0.10 unfiltered | −0.04 filtered (met), +0.27 unfiltered scored and +1.57 replicate (failed) |
