@@ -1,0 +1,233 @@
+"""Draw the figures of experiment 124 as SVG into the docs folder, from the stored summaries.
+
+Only anonymised results appear: two bulk supply points by position, and Primaries by D-label.
+Afterwards optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline`.
+
+    uv run python ml-experiments/00124-*/e00124_charts.py
+"""
+
+import json
+import re
+import textwrap
+from pathlib import Path
+from typing import Final
+
+import altair as alt
+import plotting.ocf_theme as ocf
+import polars as pl
+from e00124_common import SLUG, WORK_DIR
+
+DOCS_DIR: Final[Path] = (
+    Path(__file__).resolve().parents[2] / "docs" / "ml-experiments" / f"00124-{SLUG}"
+)
+PNG_DIR: Final[Path] = Path(__file__).resolve().parents[2] / ".claude" / "worktrees" / "e00124_png"
+WIDTH: Final[int] = 560
+WRAP: Final[int] = 100
+CLEAN_LIMIT: Final[float] = 0.023
+
+
+def _title(*, text: str, subtitle: str) -> alt.TitleParams:
+    return alt.TitleParams(
+        text=textwrap.wrap(text, 80),
+        subtitle=textwrap.wrap(subtitle, WRAP),
+        anchor="start",
+        fontSize=14,
+        subtitleFontSize=11,
+    )
+
+
+def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
+    DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    PNG_DIR.mkdir(parents=True, exist_ok=True)
+    chart.save(DOCS_DIR / f"{name}.svg")
+    with (DOCS_DIR / f"{name}.svg").open("a", encoding="utf-8") as handle:
+        handle.write("\n")
+    chart.save(PNG_DIR / f"{name}.png", scale_factor=1.5)
+    print("wrote", name)
+
+
+def _weight_label(weight: float) -> str:
+    return f"{weight:g}"
+
+
+def figure_tradeoff() -> None:
+    """Figure 1: the damage from injected errors and the clean-score cost against the weight."""
+    tuning = json.loads((WORK_DIR / "tuning.json").read_text())
+    labels = [_weight_label(w) for w in tuning["weights"]]
+    damage = pl.DataFrame({"weight": labels, "damage": tuning["summed_damage"]})
+    clean_rows = []
+    for year, file in (
+        ("tuning year", "clean_grid_tuning.json"),
+        ("replicate year", "clean_grid_replicate.json"),
+        ("scored year", "clean_grid_scored.json"),
+    ):
+        grid = json.loads((WORK_DIR / file).read_text())
+        sites = list(grid["clean_mae"].values())
+        mean = [sum(s[i] for s in sites) / len(sites) for i in range(len(labels))]
+        clean_rows += [
+            {"weight": label, "cost": value - mean[0], "year": year}
+            for label, value in zip(labels, mean, strict=True)
+        ]
+    x = alt.X(
+        "weight:N",
+        sort=labels,
+        axis=alt.Axis(labelAngle=0),
+        title="Weight on the BSP reading (0 = no hint: the separate fits)",
+    )
+    top = (
+        alt.Chart(damage)  # ty: ignore[unresolved-attribute]
+        .mark_line(
+            point=alt.OverlayMarkDef(filled=True, size=70, color=ocf.BRAND_ORANGE),
+            color=ocf.BRAND_ORANGE,
+        )
+        .encode(
+            x=x,
+            y=alt.Y(
+                "damage:Q",
+                scale=alt.Scale(domain=[0, 36]),
+                title="Summed damage (points; smaller is better)",
+            ),
+        )
+        .properties(
+            width=WIDTH,
+            height=140,
+            title=alt.TitleParams(
+                "With the hint, 200 injected metering errors do less damage",
+                fontSize=12,
+                anchor="start",
+            ),
+        )
+    )
+    colours = alt.Color(
+        "year:N",
+        sort=None,
+        scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.DATA_PURPLE, ocf.DATA_SKY]),
+        legend=alt.Legend(title=None, orient="top"),
+    )
+    lines = (
+        alt.Chart(pl.DataFrame(clean_rows))  # ty: ignore[unresolved-attribute]
+        .mark_line(point=alt.OverlayMarkDef(filled=True, size=60))
+        .encode(
+            x=x,
+            y=alt.Y(
+                "cost:Q",
+                scale=alt.Scale(domain=[-0.5, 5.5]),
+                title="Extra clean error (points; smaller is better)",
+            ),
+            color=colours,
+        )
+    )
+    limit = (
+        alt.Chart(pl.DataFrame({"limit": [CLEAN_LIMIT]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[5, 3], color=ocf.BRAND_ORANGE)
+        .encode(y="limit:Q")
+    )
+    bottom = alt.layer(lines, limit).properties(
+        width=WIDTH,
+        height=160,
+        title=alt.TitleParams(
+            "but every weight above 0 makes clean forecasts worse", fontSize=12, anchor="start"
+        ),
+    )
+    chart = alt.vconcat(top, bottom).properties(
+        title=_title(
+            text=("The BSP hint cuts damage by 41% but costs 2.4 points or more of clean accuracy"),
+            subtitle=(
+                "Pilot BSP with 2 MW and 4 MVA Primaries; frozen fits scored by mean absolute "
+                "error "
+                "in points of effective capacity over the year after each cut, averaged over the "
+                "2 MW Primaries. Top: summed extra error from 200 injected errors in the tuning "
+                "year. Bottom: clean error minus weight 0's. Dashed line: the 0.023-point limit."
+            ),
+        )
+    )
+    _save(chart, name="figure_1_tradeoff")
+
+
+def _parse_audit() -> pl.DataFrame:
+    """Read the closure coefficients and their 80% intervals from the audit report."""
+    text = (DOCS_DIR / "audit_report.md").read_text()
+    rows = []
+    bsp = cut = ""
+    for line in text.splitlines():
+        if line.startswith("### Bulk supply point"):
+            bsp = "Bulk supply point " + line.rsplit(" ", 1)[1]
+        elif line.startswith("#### Cut"):
+            cut = line.split()[2]
+        elif line.startswith("- step penalty"):
+            for name, pattern in (
+                ("a_P (Primaries)", r"a_P ([\d.-]+) \(([\d.-]+) to ([\d.-]+)\)"),
+                ("a_G (generation)", r"a_G ([\d.-]+) \(([\d.-]+) to ([\d.-]+)\)"),
+                ("c (MVA Primaries)", r"; c ([\d.-]+) \(([\d.-]+) to ([\d.-]+)\)"),
+            ):
+                match = re.search(pattern, line)
+                if match:
+                    value, low, high = (float(g) for g in match.groups())
+                    rows.append(
+                        {
+                            "bsp": bsp,
+                            "cut": f"{cut} cut",
+                            "coefficient": name,
+                            "value": value,
+                            "low": low,
+                            "high": high,
+                        }
+                    )
+    return pl.DataFrame(rows)
+
+
+def figure_coefficients() -> None:
+    """Figure 2: the closure coefficients of the audit, with 80% month-block intervals."""
+    frame = _parse_audit()
+    colour = alt.Color(
+        "coefficient:N",
+        sort=None,
+        scale=alt.Scale(range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE]),
+        legend=alt.Legend(title=None, orient="top"),
+    )
+    panels = []
+    for bsp in sorted(frame["bsp"].unique().to_list()):
+        part = frame.filter(pl.col("bsp") == bsp)
+        base = alt.Chart(part).encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("cut:N", sort=None, title=None)
+        )
+        rule = base.mark_rule(strokeWidth=2).encode(
+            x=alt.X("low:Q", scale=alt.Scale(domain=[0, 1.6]), title="Fitted coefficient"),
+            x2="high:Q",
+            color=colour,
+            yOffset="coefficient:N",
+        )
+        dots = base.mark_point(filled=True, size=60).encode(
+            x="value:Q", color=colour, yOffset="coefficient:N"
+        )
+        one = (
+            alt.Chart(pl.DataFrame({"one": [1.0]}))  # ty: ignore[unresolved-attribute]
+            .mark_rule(strokeDash=[4, 3], color="#555555")
+            .encode(x="one:Q")
+        )
+        panels.append(
+            alt.layer(one, rule, dots).properties(
+                width=WIDTH,
+                height=110,
+                title=alt.TitleParams(bsp, fontSize=12, anchor="start"),
+            )
+        )
+    chart = alt.vconcat(*panels).properties(
+        title=_title(
+            text=(
+                "One BSP closes only up to factors of 0.85 to 1.16, and the other does not close "
+                "with the generation series available"
+            ),
+            subtitle=(
+                "Closure audit fitted on rows before each cut. Dot: fitted coefficient. Line: 80% "
+                "interval from resampling whole months. Dashed line: 1, the value the joint model "
+                "fixes. A panel without a cut has fewer than one year of complete rows there."
+            ),
+        )
+    )
+    _save(chart, name="figure_2_coefficients")
+
+
+if __name__ == "__main__":
+    figure_tradeoff()
+    figure_coefficients()

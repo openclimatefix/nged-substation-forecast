@@ -11,7 +11,6 @@ substation and was worse at full history.
 | Part 5 (proposed) | Does the MVA observation layer (a model of how a meter that reads apparent power relates to real power) help the MW sites and recover MW at MVA sites? | 4 | Experiment 105 and a better capacity fit | Proposed |
 | H2, graph prior on the pooled parameters | Does a prior that pulls the parameters of connected substations together improve the pooled convex model? | Running | Nothing | Running (experiment 117) |
 | N9, scale-up | Does the pooled model on every v1 series it can take, including MVA substations, improve full-history skill and capacity identification? | 5 | Experiment 109's gate rerun, and 3 to 5 GPU hours | Proposed |
-| H, hierarchy closure audit and BSP hint | Do the Primaries, the metered generators, and a level and unmetered-solar term close the bulk supply point (BSP) readings, and does fitting a BSP reading jointly with its Primaries limit the damage from a metering error at one Primary? | 6 | The module `studies.dp_hierarchy` merging, before any replicate-year or scored-year fit | Planned (experiment 124) |
 | Top-down against bottom-up | Does a direct forecast at a BSP or grid supply point (GSP) beat the sum of the Primary forecasts, and does reconciling the levels help either? | 7 | The closure audit | Proposed |
 | Metered generators in the graph | Do metered generators, entered as export-positive nodes at the BSP, make the BSP relation close better? | 8 | The closure audit | Proposed |
 | Unmetered wind at higher levels | Can unmetered wind at the BSP and GSP be estimated as the part of the residual that follows the wind forecast? | 9 | The closure audit | Proposed |
@@ -35,13 +34,14 @@ supports it, and otherwise from per-site fits with the shared meter layer. It ne
 
 ## Hierarchy: Primaries, BSPs, and GSPs
 
-**The first step is a descriptive closure audit, because the bottom-up relation has not yet been
-shown to close.** [Experiment 36](../../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) found that
+**[Experiment 124](../../00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/result.md) ran the closure audit and a pilot joint fit.** The
+audit found that the Primaries and generators close one of the two BSPs up to factors of 0.85 to
+1.16, and the other not at all with the generator history available. The joint fit, with the factors
+fixed at 1, cut the damage from injected metering errors by 41% but cost clean forecasts 2.4 or
+more points of capacity. A follow-on arm fixes the factors at the audit fit. [Experiment 36](../../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) had found that
 the sum of Primary forecasts added nothing at the two BSPs. A BSP reading should equal the sum of
 its Primaries minus the metered generators connected there, plus losses and an unmetered remainder.
-The audit fits that relation, with an MVA correction, an unmetered-solar term, a level, and a drift,
-and reports the residual by hour band and month. A forecast experiment follows only if the residual is
-small against the power that switching moves. Three facts shape the design:
+Three facts shape the design:
 
 - **The remainder is large.** In the data checked, the BSP residual has a daily-mean standard
   deviation larger than the typical switched load, so the audit has to say what the remainder

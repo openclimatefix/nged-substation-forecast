@@ -188,8 +188,31 @@ def score(*, cut_name: str) -> None:
         )
 
 
+def clean_grid(*, cut_name: str) -> None:
+    """Fit at a cut for the whole weight grid and score the clean year, with no injections."""
+    cache, pilot, assembly, cut = _setup(cut_name=cut_name)
+    fit = solve_joint(assembly=assembly, weights=WEIGHT_GRID)
+    scores = {
+        s: score_rows(cache=cache, assembly=assembly, fit=fit, site=s, cut=cut)
+        for s in pilot.mw_sites
+    }
+    result = {
+        "cut": cut_name,
+        "weights": list(WEIGHT_GRID),
+        "clean_mae": {s: mae(score=scores[s], fit=fit, site=s).tolist() for s in pilot.mw_sites},
+        "monthly_mae": {
+            s: monthly_mae(cache=cache, score=scores[s], fit=fit, site=s) for s in pilot.mw_sites
+        },
+    }
+    (WORK_DIR / f"clean_grid_{cut_name}.json").write_text(json.dumps(result, indent=2))
+    mean = np.mean([result["clean_mae"][s] for s in pilot.mw_sites], axis=0)
+    sys.stdout.write(f"{cut_name}: mean clean MAE by weight {np.round(mean, 3).tolist()}\n")
+
+
 if __name__ == "__main__":
     if sys.argv[1] == "tune":
         tune()
+    elif sys.argv[1] == "clean":
+        clean_grid(cut_name=sys.argv[2])
     else:
         score(cut_name=sys.argv[2])

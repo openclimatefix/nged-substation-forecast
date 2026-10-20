@@ -615,3 +615,11 @@ experiments, for the 12 to 36 hour lead band.
 each generator (for example "Solar farm A").** Substations are not covered by this rule. Public
 data, such as the settled output of Balancing Mechanism Units in Elexon's published data, may be
 named. Applies to experiments, studies, and production reports.
+
+**Give a bulk supply point's relation its own coefficients before using it.** *Applies to:
+experiments.* A bulk supply point (BSP) reading is import-positive, the generator series are
+export-positive, and the Primaries' apparent-power series are positive. At the one BSP that closes,
+the reading equals 1.01 to 1.16 times the MW Primaries plus 1.03 to 1.10 times the MVA Primaries
+minus 0.85 to 0.90 times the metered generation, plus unmetered solar and a level (the closure
+audit of [experiment 124](00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/result.md)). The scope is two BSPs, of which one closed; the
+confidence is moderate, and the entry is provisional until the follow-on arm has run.
