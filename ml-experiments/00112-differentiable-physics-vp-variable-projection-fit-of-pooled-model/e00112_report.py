@@ -17,6 +17,7 @@ substation. The decision set is D5, D10, D11, D14, and D16; D9 is reported besid
 
 import contextlib
 import io
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -402,6 +403,10 @@ def report_year(*, year: str, ids: dict[int, str]) -> dict:
         )
     print_tails(arms=arms)
     print_checks(arms=arms)
+    if "g_all" in arms:
+        five = arms["g_all"].filter(pl.col("site").is_in(common.ELIGIBLE_SITES))
+        score = float(five["score"].to_numpy().mean())
+        print(f"\nL0 control: G-all scores {score:.3f} at the five decision sites (expected 3.072)")
     start_spread = None
     if "vp_p_s0" in arms and "vp_p_s1" in arms:
         five = common.ELIGIBLE_SITES
@@ -415,35 +420,92 @@ def report_year(*, year: str, ids: dict[int, str]) -> dict:
     return out
 
 
+C1V: Final[str] = "C1v pooling on all rows under VP"
+V1: Final[str] = "V1 fitting method on one objective"
+
+
+def read_json(*, name: str) -> dict:
+    """Return a stored result file, or an empty dict when it does not exist."""
+    path = common.WORK_DIR / name
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def conditions(*, scored: dict, replicate: dict) -> None:
-    """Print the decision rule's conditions from the planned contrasts of both years."""
+    """Print the decision rule's conditions, the controls, and the verdict they give.
+
+    The rule is the plan's: `supported` needs the gate, C1v passing, V1 below zero in both years
+    with 4 of 5 sites better in the scored year, VP-S minus S at most +0.05, and a start spread of
+    at most 0.10; `partly supported` is V1 meeting its bar with C1v failing, or V1 below zero at 4
+    of 5 sites in the scored year only; `refuted` is V1 at or above zero in the scored year with
+    C1v's interval wholly above zero; anything else, or a start spread over 0.10, is
+    `inconclusive`.
+    """
     print("\n######## Decision rule conditions ########")
-    c1 = scored.get("C1v pooling on all rows under VP")
-    c1_rep = replicate.get("C1v pooling on all rows under VP")
-    v1 = scored.get("V1 fitting method on one objective")
-    v1_rep = replicate.get("V1 fitting method on one objective")
+    gate = read_json(name="gate.json")
+    gate_passed = all(gate.get(t, {}).get("passed", False) for t in ("test_2", "test_3", "test_4"))
+    print(f"known-answer gate (tests 2 to 4) passed: {gate_passed}")
+    objectives = read_json(name="objectives.json")
+    controls_ok = True
+    for cut, values in objectives.items():
+        if "p_map_polish" in values and "p_map_same" in values:
+            ok = values["p_map_polish"] <= values["p_map_same"] + 1.0
+            controls_ok &= ok
+            print(f"control at {cut}: P-map-polish not above P-map-same on the VP objective: {ok}")
+    c1, c1_rep = scored.get(C1V), replicate.get(C1V)
+    v1, v1_rep = scored.get(V1), replicate.get(V1)
     vp_s_vs_s = scored.get("vp_s-s")
-    if c1 and c1_rep:
-        passes = (
-            c1["estimate"] <= NON_INFERIORITY_MARGIN
-            and c1["low"] <= 0.0
-            and c1_rep["estimate"] <= NON_INFERIORITY_MARGIN
-        )
-        print(
-            f"C1v passes: {passes} (estimate {c1['estimate']:+.3f}, upper end {c1['high']:+.3f} "
-            f"against +{NON_INFERIORITY_MARGIN}, replicate {c1_rep['estimate']:+.3f})"
-        )
-    if v1 and v1_rep:
-        below_both = v1["estimate"] < 0 and v1_rep["estimate"] < 0
-        print(
-            f"V1 below zero in both years: {below_both}; scored sites better: {v1['better']} of "
-            f"{v1['better'] + v1['worse']}; replicate sites better: {v1_rep['better']}"
-        )
-    if vp_s_vs_s:
-        print(f"VP-S minus S at most +0.05 in the scored year: {vp_s_vs_s['estimate'] <= 0.05}")
     spread = scored.get("start_spread")
-    if spread is not None:
-        print(f"start spread at most {START_SPREAD_LIMIT}: {spread <= START_SPREAD_LIMIT}")
+    if not (c1 and c1_rep and v1 and v1_rep):
+        print("verdict: cannot be read, a planned contrast is missing")
+        return
+    c1_passes = (
+        c1["estimate"] <= NON_INFERIORITY_MARGIN
+        and c1["low"] <= 0.0
+        and c1_rep["estimate"] <= NON_INFERIORITY_MARGIN
+    )
+    sites = v1["better"] + v1["worse"]
+    v1_bar = v1["estimate"] < 0 and v1_rep["estimate"] < 0 and v1["better"] >= sites - 1
+    v1_scored_only = v1["estimate"] < 0 and v1["better"] >= sites - 1 and v1_rep["estimate"] >= 0
+    s_ok = vp_s_vs_s is not None and vp_s_vs_s["estimate"] <= 0.05
+    spread_ok = spread is not None and spread <= START_SPREAD_LIMIT
+    print(
+        f"C1v passes: {c1_passes} (estimate {c1['estimate']:+.3f}, interval {c1['low']:+.3f} to "
+        f"{c1['high']:+.3f}, upper end against +{NON_INFERIORITY_MARGIN}; replicate "
+        f"{c1_rep['estimate']:+.3f})"
+    )
+    print(
+        f"V1 below zero in both years with {sites - 1} of {sites} sites better: {v1_bar} "
+        f"(scored {v1['estimate']:+.3f}, {v1['better']} better; replicate "
+        f"{v1_rep['estimate']:+.3f}, {v1_rep['better']} better)"
+    )
+    print(f"VP-S minus S at most +0.05 in the scored year: {s_ok}")
+    print(f"start spread at most {START_SPREAD_LIMIT}: {spread_ok} ({spread})")
+    if not gate_passed or not spread_ok:
+        verdict = "inconclusive"
+    elif c1_passes and v1_bar and s_ok:
+        verdict = "supported"
+    elif (v1_bar and not c1_passes) or v1_scored_only:
+        verdict = "partly supported"
+    elif v1["estimate"] >= 0 and c1["low"] > 0:
+        verdict = "refuted"
+    else:
+        verdict = "inconclusive"
+    print(f"verdict by the plan's rule: {verdict}")
+    default_fitter = gate_passed and v1_bar
+    pooled_continues = c1["low"] <= NON_INFERIORITY_MARGIN
+    print(f"handoff: fitter='vp' becomes the pooled default: {default_fitter}")
+    print(
+        f"handoff: the pooled neural DP continues (C1v not wholly above +0.10): {pooled_continues}"
+    )
+    print(f"controls held: {controls_ok}")
+    profile = read_json(name="profile.json")
+    for name, result in profile.items():
+        checks = result["checks"]
+        print(
+            f"capacity profile {name}: starts agree {checks['line_1_starts_agree']}, "
+            f"objective {checks['line_2_objective']}, "
+            f"capacity near minimum {checks['line_3_capacity_near_minimum']}"
+        )
 
 
 def main() -> None:
