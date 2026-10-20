@@ -82,6 +82,10 @@ def clean_weeks(*, frame: pl.DataFrame, series_ids: list[int]) -> dict[str, tupl
     A week is not clean if any decision site has a holiday-period day or a hand-filtered event in
     it. The rule was fixed before scoring.
 
+    Args:
+        frame: One arm's scored-year predictions.
+        series_ids: The decision substations' series identifiers.
+
     Returns:
         For each season, the Monday used and whether it moved from the planned one.
     """
