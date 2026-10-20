@@ -304,6 +304,29 @@ a second.
 A post hoc change to a gate reading is labelled as such, and the first run's result is kept and
 never reported as a pass.
 
+## Winter breakdown (pre-fit clarification, added before any fit)
+
+**The best forecast model goes to production first for a winter, so every contrast is also reported
+for the winter, beside the annual score.** The clarification below was added to the plan after the
+plan was first committed and before any filter was fitted, at the maintainer's request.
+
+- **Winter rows:** the half-hours whose local date is in November to March. Each contrast (C1 to C5)
+  is reported on these rows at D+1 and over every lead band, with the same paired month-block
+  intervals where the rows allow, and with site counts. Evening peaks within the winter rows are the
+  half-hours ending 16:30 to 20:00 local time.
+- **Cold snap, defined now:** a local day in November to March whose mean ERA5 temperature at the
+  site is below the 10th percentile of such days in the site's ERA5 record from 2019-09 to 2024-06,
+  which is a threshold fixed from data before the tuning year. The code prints the threshold and the
+  number of cold-snap days per site in the tuning, replicate, and scored periods. Where a period
+  holds fewer than 15 cold-snap days at a site, the page says "too few days" and gives no interval.
+- **Independent winters:** the evidence holds one winter that was not used to choose anything
+  (2025-26, scored) and one winter whose odd months set the noise matrix and the spread (2024-25;
+  the even months are the replicate). The page states this beside every winter number.
+- **Verdict rule:** a winter loss is a reason to hold an arm back even if the annual mean improves.
+  If KEZ's C1 on the winter rows is above zero in the scored year with its interval wholly above
+  zero, or if the cold-snap days show KEZ worse than GK by more than 0.05 points, the verdict is
+  capped at `partly supported` and the take-home message says so.
+
 ## Audit before merge: the seven triggers
 
 The write-up carries "Checks" bullets: median minus mean forecast per site and arm, and the mean
@@ -331,6 +354,9 @@ year.** A card shows:
 - the fitted relative step per year of every weight;
 - a line "a heating slope is known to about 38% of its size at real noise (experiment 113)", with
   any "not interpretable" label;
+- a panel "how it does in a cold snap": the cold-snap days of the scored winter at the site, with
+  the day count and the rule above, GK and KEZ side by side ("too few days" where the count is under
+  15);
 - example forecasts on the **second Monday of July, October, January, and April**, a rule fixed
   now, before any score is read (the weeks beginning 2025-07-14, 2025-10-13, 2026-01-12, and
   2026-04-13): D+1 forecasts chained from each 09:00 UTC origin, median with 80% and 90% bands
