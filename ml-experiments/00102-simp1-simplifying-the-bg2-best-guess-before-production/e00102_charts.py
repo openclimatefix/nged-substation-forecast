@@ -276,7 +276,7 @@ def anonymous_label(
     if cls == "Primary":
         return f"Primary {chr(ord('A') + list(primaries).index(site))}"
     if cls == "BSP/GSP":
-        return f"Supply point {chr(ord('A') + list(supply_points).index(site))}"
+        return f"Supply point {list(supply_points).index(site) + 1}"
     if cls == "solar":
         return f"Solar farm {site}"
     if cls == "wind":

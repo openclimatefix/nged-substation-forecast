@@ -111,11 +111,13 @@ the dropped months look less different from the kept months, which fits their me
 for D18).** In [experiment 102](00102-simp1-simplifying-the-bg2-best-guess-before-production/result.md),
 D18's training rows began in December 2024 at zero output. A weekly-refitted XGBoost model without the
 three recent-power inputs forecast 20% of capacity in December 2025 against an actual of 75%, and its
-score at D18 was 5.7 points of capacity worse than the same model with the inputs. With the first 2.6
-months cut (training from 2025-03-01), the difference at D18 fell to -0.03 points. The cost of
-removing the inputs across the 16 Primaries fell from 0.710 to 0.361 points. Applies to experiments,
-and to any comparison of a model with and without recent power. A comparison that cuts the start for
-one arm must cut it for every arm.
+quantile score at D18 was 5.7 points of capacity worse than the score of the same model with the
+inputs. With the first 2.6 months cut (training from 2025-03-01), the difference at D18 fell to -0.03
+points. Removing the inputs raised the Primary score by 0.710 points across the 16 Primaries; with D18
+cut it raised the score by 0.361 points. Applies to experiments, and to any comparison of a model
+with and without recent power. A comparison that cuts the start for one arm must cut it for every
+arm. Experiment 102 refitted only the two D18 arms, not BG2 itself; the Primary score of the weekly
+model with lags moved from 5.355 to 5.346 when D18 was cut.
 
 ## Decide which rows are demand
 
