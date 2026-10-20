@@ -544,6 +544,104 @@ def figure_8_profile(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
     )
 
 
+def _cold_night_panel(
+    *, entry: dict[str, Any], labels: list[str], title: str, show_forecast: bool
+) -> alt.LayerChart:
+    rows = []
+    for name, key in (
+        ("Actual demand", "actual"),
+        ("Baseline forecast (experiment 114)", "forecast"),
+    ):
+        if key not in entry or (key == "forecast" and not show_forecast):
+            continue
+        block = entry[key]
+        rows.extend(
+            {
+                "slot": index,
+                "series": name,
+                "median": block["median"][index],
+                "low": block["low"][index],
+                "high": block["high"][index],
+            }
+            for index in range(len(labels))
+        )
+    frame = pl.DataFrame(rows)
+    colour = alt.Color(
+        "series:N",
+        scale=alt.Scale(
+            domain=["Actual demand", "Baseline forecast (experiment 114)"],
+            range=[ocf.BRAND_ORANGE, DECISION_COLOUR],
+        ),
+        legend=alt.Legend(title=None, orient="top", labelLimit=360) if show_forecast else None,
+    )
+    x = alt.X(
+        "slot:Q",
+        title="Half-hour start (clock time)",
+        axis=alt.Axis(values=[0, 4, 8, 12, 16], labelExpr=CLOCK_LABEL),
+        scale=alt.Scale(domain=[0, 19]),
+    )
+    band = (
+        alt.Chart(frame)
+        .mark_area(opacity=0.2)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=x,
+            y=alt.Y("low:Q", title="Demand (points)", scale=alt.Scale(zero=False)),
+            y2="high:Q",
+            color=colour,
+        )
+    )
+    line = alt.Chart(frame).mark_line(strokeWidth=2).encode(x=x, y="median:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    return (band + line).properties(width=WIDTH, height=120, title=title)
+
+
+def figure_9_cold_nights(*, cold: dict[str, Any]) -> alt.TopLevelMixin:
+    """Actual demand against the baseline forecast on cold nights, decision series."""
+    sites = [s for s in common.DECISION_SERIES if "forecast" in cold["series"][s]]
+    panels = [
+        _cold_night_panel(
+            entry=cold["series"][s],
+            labels=cold["labels"],
+            title=f"{s}: {cold['series'][s]['nights']} cold nights",
+            show_forecast=True,
+        )
+        for s in sites
+    ]
+    return alt.vconcat(*panels).properties(
+        title=_title(
+            text="On cold nights demand at D5 and D16 runs above the baseline forecast from 01:00, "
+            "and D10 runs below it before midnight",
+            subtitle="Line: median over the cold winter nights of winters 2023-24 and "
+            "2024-25; band: 25th to 75th percentile. Cold nights are the coldest 10% of days "
+            "(the plan's cold-snap rule). Day-ahead baseline forecast of experiment 114; D9 "
+            "has no stored forecast for these winters. Points are 1% of each series' own 99th "
+            "percentile of demand.",
+        )
+    )
+
+
+def figure_10_cold_nights_e7x(*, cold: dict[str, Any]) -> alt.TopLevelMixin:
+    """Actual demand on cold nights at the E7-X series (no stored forecast)."""
+    panels = [
+        _cold_night_panel(
+            entry=cold["series"][s],
+            labels=cold["labels"],
+            title=f"{s}: {cold['series'][s]['nights']} cold nights",
+            show_forecast=False,
+        )
+        for s in common.EXTENSION_SERIES
+    ]
+    pairs = [alt.hconcat(*panels[i : i + 2]) for i in range(0, len(panels), 2)]
+    return alt.vconcat(*pairs).properties(
+        title=_title(
+            text="Seven of the eight E7-X substations show a rise around 01:00 on cold nights; "
+            "D8 shows none",
+            subtitle="Line: median demand over the cold winter nights of winters 2023-24 and "
+            "2024-25; band: 25th to 75th percentile. No baseline forecast is stored for "
+            "these series.",
+        )
+    )
+
+
 def main() -> None:
     """Draw the figures of a stage."""
     parser = argparse.ArgumentParser()
@@ -558,6 +656,9 @@ def main() -> None:
     _save(figure_6_absorbed(numbers=numbers), name="figure_6_absorbed")
     _save(figure_7_timing(numbers=numbers), name="figure_7_timing")
     _save(figure_8_profile(numbers=numbers), name="figure_8_profile")
+    cold = json.loads((common.WORK_DIR / f"cold_nights_{stage}.json").read_text())
+    _save(figure_9_cold_nights(cold=cold), name="figure_9_cold_nights")
+    _save(figure_10_cold_nights_e7x(cold=cold), name="figure_10_cold_nights_e7x")
 
 
 if __name__ == "__main__":

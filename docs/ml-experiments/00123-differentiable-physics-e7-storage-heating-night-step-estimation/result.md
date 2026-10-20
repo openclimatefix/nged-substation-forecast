@@ -78,6 +78,9 @@ The provisional verdict is `supported`, pending the audit triggers below and win
 - **How much of the step do experiment 114's day-ahead forecasts already remove?** The step left in
   the errors of its baseline model is 0.53 to 0.78 of the full step at D5, D10, and D16 (stored
   predictions for winters 2023-24 and 2024-25 only).
+- **Where does the baseline forecast miss on cold nights?** At D5 and D16 actual demand runs 5.6 and
+  9.4 points above the forecast in the half-hour starting 01:00; at D10 it runs 12.2 points below
+  the forecast in the half-hour starting 23:30 (figure 9).
 - **What do the data and methods support?** An estimate of the size and shape of the night step in
   four winters of one weather product. They do not support a cause: daylight, lighting, and
   switching schedules also change at night, and NGED has not confirmed storage heating.
@@ -214,6 +217,22 @@ Start of the step, timing, and share left by the baseline model (R):
 | D22 | 00:30 | 71 | UTC | 2 | n/a |
 
 D12 reports apparent power in MVA, so its step is an apparent-power step.
+
+## Cold nights: actual demand against the baseline forecast
+
+**On cold nights the baseline forecast of experiment 114 misses the 01:00 step at D5 and D16, and
+anticipates the rise before midnight at D10.** The figure shows the median and the 25th to 75th
+percentile across the 72 cold nights (the rule in pre-fit clarification 3) of actual demand and of
+the day-ahead median forecast, in points. The largest median misses, from the same nights: D5 +5.6
+points in the half-hour starting 01:00, D10 -12.2 starting 23:30, D11 -3.6 starting 23:00, D14 +2.8
+starting 02:00, and D16 +9.4 starting 01:00 (actual minus forecast). The half-hour of the largest
+rise between 05:00 and 08:00 differs between actual and forecast at D5 (07:00 against 06:00) and at
+D16 (06:00 against 06:30), and matches at D10, D11, and D14. D9 has no stored forecast for these
+winters.
+
+![Actual demand against the baseline forecast, decision series](figure_9_cold_nights.svg)
+
+![Actual demand on cold nights, E7-X series](figure_10_cold_nights_e7x.svg)
 
 ## Limitations
 

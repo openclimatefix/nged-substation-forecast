@@ -442,3 +442,20 @@ shape: (6, 4)
 | D19 | 00:30 | 77 | UTC | 2 | n/a |
 | D21 | 00:30 | 77 | UTC | 2 | n/a |
 | D22 | 00:30 | 71 | UTC | 2 | n/a |
+
+## Cold nights: actual demand against the baseline forecast
+
+D5: 72 cold nights; largest median miss +5.6 points in the half-hour starting 01:00; morning rise at 07:00 (actual) and 06:00 (forecast)
+D9: 72 cold nights
+D10: 72 cold nights; largest median miss -12.2 points in the half-hour starting 23:30; morning rise at 06:30 (actual) and 06:30 (forecast)
+D11: 72 cold nights; largest median miss -3.6 points in the half-hour starting 23:00; morning rise at 06:00 (actual) and 06:00 (forecast)
+D14: 72 cold nights; largest median miss +2.8 points in the half-hour starting 02:00; morning rise at 06:00 (actual) and 06:00 (forecast)
+D16: 72 cold nights; largest median miss +9.4 points in the half-hour starting 01:00; morning rise at 06:00 (actual) and 06:30 (forecast)
+D2: 72 cold nights
+D3: 72 cold nights
+D4: 72 cold nights
+D8: 72 cold nights
+D12: 72 cold nights
+D19: 72 cold nights
+D21: 72 cold nights
+D22: 72 cold nights
