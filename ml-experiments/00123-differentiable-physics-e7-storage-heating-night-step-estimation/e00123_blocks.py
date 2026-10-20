@@ -1,5 +1,6 @@
-"""Design check of experiment 123: how much does the placebo and matched-shape coverage move with
-the bootstrap block length (7, 14, and 28 days)?
+"""Design check of experiment 123: coverage against the bootstrap block length.
+
+How much does the placebo and matched-shape coverage move with a block of 7, 14, or 28 days?
 
 Runs on the design winters 2023-24 and 2024-25 only, with 100 draws per cell, after the gate. The
 plan fixes 14 days; this check is descriptive and changes nothing.

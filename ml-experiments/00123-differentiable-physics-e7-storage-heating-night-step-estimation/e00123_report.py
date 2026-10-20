@@ -351,6 +351,49 @@ def bst_jump_rows(*, infos: dict[str, common.SeriesInfo], table: pl.DataFrame) -
     return rows
 
 
+def hand_filtered_rows(
+    *, infos: dict[str, common.SeriesInfo], winters: tuple[int, ...]
+) -> list[dict]:
+    """Sensitivity: refit the six decision series without experiment 103's switching events.
+
+    Readings inside the hand-filtered switching events (the `switching_mask` of the DP feature
+    cache) are dropped before the nights are built, on top of the rule-based flag.
+    """
+    from studies.dp_features import default_input_paths, load_or_build_feature_cache
+
+    cache = load_or_build_feature_cache(
+        paths=default_input_paths(),
+        cache_dir=common.ML_EXPERIMENTS_DATA_DIR
+        / "00106-differentiable-physics-4-all-years-drift-and-recent-level"
+        / "cache",
+    )
+    power = common.load_power(
+        time_series_ids=[infos[s].time_series_id for s in common.DECISION_SERIES]
+    )
+    rows = []
+    for site in common.DECISION_SERIES:
+        info = infos[site]
+        masked = pl.Series(cache.end_times[cache.sites[site].switching_mask]).dt.replace_time_zone(
+            "UTC"
+        )
+        own = power.filter(pl.col("time_series_id") == info.time_series_id).select("time", "power")
+        kept = own.filter(~pl.col("time").is_in(masked.implode()))
+        table = common.build_night_table(info=info, power=kept)
+        usable = tuple(w for w in winters if w in fit._winters_of(table=table, site=site))
+        result = fit.fit_one(table=table, info=info, winters=usable, seed=fit.SEED)
+        rows.append(
+            {
+                "site": site,
+                "readings_dropped": own.height - kept.height,
+                "step": result.step.value,
+                "step_low": result.step.low,
+                "step_high": result.step.high,
+                "slope": result.slope.value,
+            }
+        )
+    return rows
+
+
 def main() -> None:
     """Print the report for one stage and save its numbers."""
     parser = argparse.ArgumentParser()
@@ -387,6 +430,7 @@ def main() -> None:
         "leave_one_out": leave_one_series_out(steps=headline),
         "timing": timing_rows(table=table, winters=winters),
         "bst_jump": bst_jump_rows(infos=infos, table=table),
+        "hand_filtered": hand_filtered_rows(infos=infos, winters=winters),
         "start_times": start_times(infos=infos, table=table, winters=winters),
         "gate": json.loads((common.WORK_DIR / "gate.json").read_text()),
     }
@@ -402,6 +446,7 @@ def main() -> None:
             "leave_one_out",
             "timing",
             "bst_jump",
+            "hand_filtered",
         ):
             print(f"\n== {name} ==")
             print(pl.DataFrame(numbers[name]))
