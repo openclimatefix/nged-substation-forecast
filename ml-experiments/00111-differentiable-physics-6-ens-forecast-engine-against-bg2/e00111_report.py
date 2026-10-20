@@ -9,6 +9,7 @@ contrasts C1 to C4 are read at 98.75% (a Bonferroni correction across four), the
 """
 
 import argparse
+import contextlib
 from typing import Final
 
 import e00111_common as common
@@ -68,10 +69,8 @@ def load_all(*, periods: set[str], sites: tuple[str, ...]) -> dict[str, pl.DataF
             frame = None
         if frame is not None and frame.height:
             arms_found[name] = frame
-    try:
+    with contextlib.suppress(ValueError, FileNotFoundError):
         arms_found["xnl_k"] = score.load_xnl_k(periods=periods, sites=sites)
-    except ValueError, FileNotFoundError:
-        pass
     if "scored" in periods:
         arms_found["xnl"] = score.load_simp1_xnl(sites=sites)
         for key, folder in REFERENCES.items():
