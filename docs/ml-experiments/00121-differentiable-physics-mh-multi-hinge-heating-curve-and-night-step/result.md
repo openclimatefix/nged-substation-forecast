@@ -251,8 +251,8 @@ bands, and leaving one site out.
 
 - **C1:** MH-K minus B0-K (decision, if the gate passes). Beside it: MH minus B0 (unfiltered).
 - **N1, N2, N3, N4 (night family):** NS-L-K, NS-U-K, NS-H-K, and NS-HW-K each minus B0-K,
-  **on winter nights as the primary score** (November to February, valid times 22:00 to 08:00 local), at 99.375%
-  (Bonferroni over four). **Non-inferiority on all other rows:** the contrast on every row outside
+  **on winter nights as the primary score** (November to February, valid times 22:00 to 08:00
+  local), at 99.375% (Bonferroni over four). **Non-inferiority on all other rows:** the contrast on every row outside
   winter nights must have its 99.375% upper bound at most +0.02 points. The annual average is
   reported and is not decisive. Calendar-type terms act on a few hours of the year, so the annual
   mean dilutes them. Each arm has its own filter hyperparameters, with the control below.
