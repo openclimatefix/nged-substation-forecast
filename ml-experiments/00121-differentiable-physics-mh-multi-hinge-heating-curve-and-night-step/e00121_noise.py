@@ -13,6 +13,7 @@ from typing import Final
 import e00121_common as common
 import e00121_design as design
 import numpy as np
+import polars as pl
 from studies.dp_features import FeatureCache
 from studies.dp_pinned_capacity import read_vintages
 
@@ -125,3 +126,32 @@ class NoiseSummary:
 
     standard_deviation: float
     zero_share: float
+
+
+def tuning_inflation(*, cache: FeatureCache, vintages: pl.DataFrame, site: str) -> float:
+    """Return B0's out-of-sample over in-sample RMSE for the tuning year at one substation.
+
+    Donor residuals are in-sample, so a draw of real noise is multiplied by this ratio. Only the
+    fit at the 2023-07-01 cut and the year after it enter.
+
+    Args:
+        cache: The feature cache.
+        vintages: Experiment 45's real-time capacity vintages.
+        site: The substation's label.
+
+    Returns:
+        The ratio.
+    """
+    base = design.build_base(cache=cache, vintages=vintages, site=site, cut=common.TUNING_CUT)
+    fit = design.fit_arm(cache=cache, base=base, arm=design.B0)
+    in_sample = base.target - base.x0 @ fit.theta
+    index = common.scoring_index(
+        cache=cache,
+        site=site,
+        after=common.TUNING_CUT,
+        through=common.year_end(cut=common.TUNING_CUT),
+    )
+    out_of_sample = cache.sites[site].y[index] - design.predict_arm(
+        cache=cache, base=base, fit=fit, index=index
+    )
+    return float(np.sqrt(np.mean(out_of_sample**2) / np.mean(in_sample**2)))
