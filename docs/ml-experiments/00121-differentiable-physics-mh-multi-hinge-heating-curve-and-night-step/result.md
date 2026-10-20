@@ -238,6 +238,15 @@ are agreed with the experiment manager.
   stated in the verdict as a reason to hold the arm back. The page states how many independent
   winters the evidence holds. The substation cards gain a cold-snap panel and the fitted night step
   (as a score change, not a level).
+- **The night step on the substation cards (maintainer request; Economy 7 may be reported to
+  NGED).** For each decision substation (D-labels), the card shows the fitted night step from the
+  best night arm: its size in MW, its start time, whether it follows local time or UTC (from the
+  NS-U against NS-L comparison, with an interval), and the winter-against-summer contrast with an
+  interval. This replaces the plan's rule that night levels appear as score changes only. Sizes are
+  in MW because the substations are not generators. A generator-linked series, if any, appears only
+  under a G-label with normalised units and no dates. The result states the hand-built arms'
+  winter-night scores plainly, so that the learned daily-shape library of experiment 120 can be
+  compared with them.
 - **A winner is carried as a standard GAM-K piece in the recommendation** (subject to the ENS
   confirmation in "Handed on").
 

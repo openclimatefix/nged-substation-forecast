@@ -21,6 +21,11 @@ NS-U beats the other on British Summer Time nights in at least 80% of draws; (b)
 NS-L and NS-U both beat B0 on both truths in at least 90% of draws; (c) on each truth, the
 mismatched arm's fitted level at the injected half-hour is under half the injection.
 
+**Descriptive gate (cannot rescue a label).** Gate 4' repeated on the rows of the injected
+half-hour only. A 4-point step in one of 20 night half-hours is diluted below the draw-to-draw noise
+in the score over all night rows, so gate 4' has little power; the rows of the half-hour itself are
+where the step acts.
+
 **Gate 4' (clarification before any replicate or scored fit).** (a) on `utc`, NS-U beats B0 on
 British Summer Time nights in at least 80% of draws, and on `local`, B0 beats NS-U there in at
 least 80% of draws; (b) on `cold`, NS-HW beats B0 on winter nights in at least 90% of draws and the
@@ -52,7 +57,14 @@ INJECTED_HALF_HOUR: Final[int] = 1
 """The half-hour of day (start 00:30) of the 01:00 step."""
 ARM_NAMES: Final[tuple[str, ...]] = ("b0", "ns_l", "ns_u", "ns_h", "ns_hw")
 TRUTHS: Final[tuple[str, ...]] = ("utc", "local", "cold")
-SUBSETS: Final[tuple[str, ...]] = ("all", "bst_night", "winter_night")
+SUBSETS: Final[tuple[str, ...]] = (
+    "all",
+    "bst_night",
+    "winter_night",
+    "step_bst_utc",
+    "step_bst_local",
+    "step_winter_utc",
+)
 GATE_SEED_TAG: Final[int] = 4
 BST_MONTHS: Final[tuple[int, ...]] = (4, 5, 6, 7, 8, 9, 10)
 WINTER_MONTHS: Final[tuple[int, ...]] = (11, 12, 1, 2)
@@ -177,7 +189,18 @@ def build_setup(*, cache: FeatureCache, vintages: Any, site: str) -> SiteSetup:
     }
     keep = {name: ~features.switching_mask[sets[name]] for name in ("test_main", "test_rep")}
     night, month = night_and_month(cache=cache, index=sets["test_main"])
+    step_utc = design.start_half_hour(cache=cache, index=sets["test_main"], local=False)
+    step_local = design.start_half_hour(cache=cache, index=sets["test_main"], local=True)
     masks = {
+        "step_bst_utc": keep["test_main"]
+        & (step_utc == INJECTED_HALF_HOUR)
+        & np.isin(month, BST_MONTHS),
+        "step_bst_local": keep["test_main"]
+        & (step_local == INJECTED_HALF_HOUR)
+        & np.isin(month, BST_MONTHS),
+        "step_winter_utc": keep["test_main"]
+        & (step_utc == INJECTED_HALF_HOUR)
+        & np.isin(month, WINTER_MONTHS),
         "all": keep["test_main"],
         "bst_night": keep["test_main"] & night & np.isin(month, BST_MONTHS),
         "winter_night": keep["test_main"] & night & np.isin(month, WINTER_MONTHS),
@@ -349,6 +372,25 @@ def summary() -> dict[str, Any]:
         and shares["local:b0_beats_ns_u:bst_night"] >= 0.8
     )
     prime_b = bool(shares["cold:ns_hw_beats_b0:winter_night"] >= 0.9 and interval[1] < 0.0)
+    on_rows = {
+        "a_utc_ns_u_beats_b0": common.as_float(
+            (frame["utc_ns_u_step_bst_utc"] < frame["utc_b0_step_bst_utc"]).mean()
+        ),
+        "a_local_b0_beats_ns_u": common.as_float(
+            (frame["local_b0_step_bst_local"] < frame["local_ns_u_step_bst_local"]).mean()
+        ),
+        "b_cold_ns_hw_beats_b0": common.as_float(
+            (frame["cold_ns_hw_step_winter_utc"] < frame["cold_b0_step_winter_utc"]).mean()
+        ),
+    }
+    report["descriptive_gate_on_injected_half_hour_rows"] = {
+        **on_rows,
+        "would_pass": bool(
+            on_rows["a_utc_ns_u_beats_b0"] >= 0.8
+            and on_rows["a_local_b0_beats_ns_u"] >= 0.8
+            and on_rows["b_cold_ns_hw_beats_b0"] >= 0.9
+        ),
+    }
     report["gate4_prime"] = {
         "a": prime_a,
         "b": prime_b,

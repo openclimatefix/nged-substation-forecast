@@ -335,6 +335,7 @@ def scores(
         end_times=cache.end_times, replica=replica, run=build, delay_hours=DEFAULT_DELAY_HOURS
     )
     stream = np.full(len(cache.end_times), np.nan)
+    stream[rep_index] = residual
     stream[main_index] = actual - main_mean
     trace = build(residual=stream, band=band)
     cutoff = usable_cutoff_positions(
@@ -402,7 +403,9 @@ def pooled_curve(*, setup: SiteSetup, z: np.ndarray, amplitude: float, seed: int
     counts = np.concatenate(
         [
             np.ones((1, len(setup.mh_quarters))),
-            stratified_counts(quarter_of_month=setup.mh_quarters, n_resamples=50, rng=rng),
+            stratified_counts(
+                quarter_of_month=setup.mh_quarters, n_resamples=common.N_BOOTSTRAP, rng=rng
+            ),
         ]
     )
     cross = setup.mh_months.cross_products(x=x, target=target)
@@ -513,6 +516,11 @@ def calibrate_amplitude(*, pool: ProcessPoolExecutor) -> dict[str, float]:
         return float(np.mean(list(pool.map(_pilot_job, jobs))))
 
     low, high = AMPLITUDE_BRACKET
+    gain_low = gain(low)
+    print(f"pilot oracle gain at amplitude {low}: {gain_low:.4f}", flush=True)
+    if gain_low >= TARGET_GAIN_POINTS:
+        msg = f"amplitude {low} already gives a pilot gain of {gain_low:.4f} points"
+        raise ValueError(msg)
     gain_high = gain(high)
     if gain_high < TARGET_GAIN_POINTS:
         msg = f"even amplitude {high} gives a pilot gain of only {gain_high:.4f} points"
