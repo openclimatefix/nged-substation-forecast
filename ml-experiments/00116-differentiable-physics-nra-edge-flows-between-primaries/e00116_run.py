@@ -232,7 +232,9 @@ def _transfer_worker(job: tuple[dict, str, str]) -> str:
     return f"done {target.name}: {frame.height} rows"
 
 
-def run_replica(*, year_name: str, arm: str, chunk: int, n_chunks: int) -> pl.DataFrame:
+def run_replica(
+    *, year_name: str, arm: str, chunk: int, n_chunks: int, own_year: bool = False
+) -> pl.DataFrame:
     """Forecast the year before `year_name` at daily 09:00 UTC origins, for one arm and chunk.
 
     The replica of a year's forecasts is the same arm run over the previous year's real data, so
@@ -244,12 +246,14 @@ def run_replica(*, year_name: str, arm: str, chunk: int, n_chunks: int) -> pl.Da
         arm: `a0`, `a4`, or `a5`.
         chunk: Which share of the origins this call runs.
         n_chunks: How many shares the origins are split into.
+        own_year: True to run on the scored year's own real data instead of the previous year's,
+            for the check that causal flows do no harm outside the injected transfers.
 
     Returns:
         Rows with the node, the origin's cutoff, the target, the lead, the actual power, the frozen
         mean, and the corrections, over the 96 forecast rows of each origin.
     """
-    previous = {"replicate": "tuning", "scored": "replicate"}[year_name]
+    previous = year_name if own_year else {"replicate": "tuning", "scored": "replicate"}[year_name]
     ctx = contexts(cut_name=previous)
     context = ctx["a0" if arm == "a0" else "a4"]
     cache = context.cache
@@ -297,16 +301,19 @@ def run_replica(*, year_name: str, arm: str, chunk: int, n_chunks: int) -> pl.Da
     return pl.concat(frames)
 
 
-def _replica_worker(job: tuple[str, str, int, int]) -> str:
+def _replica_worker(job: tuple[str, str, int, int, bool]) -> str:
     """Run one replica chunk in a worker process with one thread, and write its file."""
     import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
-    year_name, arm, chunk, n_chunks = job
-    target = common.WORK_DIR / "replica" / f"{year_name}_{arm}_{chunk}of{n_chunks}.parquet"
+    year_name, arm, chunk, n_chunks, own_year = job
+    prefix = "real_" if own_year else ""
+    target = common.WORK_DIR / "replica" / f"{prefix}{year_name}_{arm}_{chunk}of{n_chunks}.parquet"
     if target.exists():
         return f"skip {target.name}"
-    frame = run_replica(year_name=year_name, arm=arm, chunk=chunk, n_chunks=n_chunks)
+    frame = run_replica(
+        year_name=year_name, arm=arm, chunk=chunk, n_chunks=n_chunks, own_year=own_year
+    )
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{target.name}.{os.getpid()}.tmp")
     frame.write_parquet(temporary)
@@ -325,6 +332,9 @@ def main() -> None:
     replica = sub.add_parser("replica")
     replica.add_argument("--year", choices=("replicate", "scored"), required=True)
     replica.add_argument("--chunks", type=int, default=6)
+    replica.add_argument(
+        "--own-year", action="store_true", help="run on the year's own real data, arms a4 and a5"
+    )
     parser.add_argument("--workers", type=int, default=6)
     arguments = parser.parse_args()
     os.environ["OMP_NUM_THREADS"] = "1"
@@ -338,9 +348,10 @@ def main() -> None:
         ]
         worker = _transfer_worker
     else:
+        arms = ("a4", "a5") if arguments.own_year else ("a0", "a4", "a5")
         jobs = [
-            (arguments.year, arm, chunk, arguments.chunks)
-            for arm in ("a0", "a4", "a5")
+            (arguments.year, arm, chunk, arguments.chunks, arguments.own_year)
+            for arm in arms
             for chunk in range(arguments.chunks)
         ]
         worker = _replica_worker

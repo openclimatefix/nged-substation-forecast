@@ -18,6 +18,8 @@ from studies.dp_gam import QUANTILE_COLUMNS, QUANTILE_LEVELS
 
 BURN_IN_HALF_HOURS: Final[int] = 14 * 48
 """The first days of a replica's origins are left out of its spread, while the filter converges."""
+N_RESAMPLES: Final[int] = 4000
+"""Resamples of the ratio bootstraps."""
 BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / 3.0)
 """The coverage of one of the three planned contrasts, 98.33%."""
 SPREAD_ARM: Final[dict[str, str]] = {"a0": "a0", "a4": "a4", "a5": "a5", "or": "a4"}
