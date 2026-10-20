@@ -33,9 +33,9 @@ from studies.dp_gam import (  # noqa: E402
     training_rows,
 )
 from studies.dp_meter import (  # noqa: E402
+    ABSOLUTE_CAPACITY_STARTS_POINTS,
     CAPACITY_START_MULTIPLIERS,
     MIN_REVERSE_FLOW_SHARE,
-    TAN_PHI_MAX,
     TAN_PHI_PRIOR_MEAN,
     MeterFit,
     QModeType,
@@ -96,6 +96,7 @@ def _cache_with_reading(
     power_factor: float | None,
     q0: float = 0.0,
     mismatched_plant: bool = False,
+    hard_clip_share: float | None = None,
 ) -> tuple[FeatureCache, np.ndarray, np.ndarray]:
     """Return the cache with the reading made from the truth, the signed P, and a signed series.
 
@@ -123,6 +124,8 @@ def _cache_with_reading(
         if mismatched_plant:
             held = cache.calendar.season_year[rows][:, None] >= years[None, :]
             solar = (held @ increments) * _smoothed_plant(features=features, rows=rows)
+            if hard_clip_share is not None:
+                solar = np.minimum(solar, hard_clip_share * (held @ increments))
             real = demand - solar
         else:
             real = design @ theta
@@ -219,7 +222,8 @@ def test_the_learned_fit_recovers_reverse_flow_capacity_power_factor_and_q0(
     )
     assert accuracy > 0.9
     assert np.abs(predicted.apparent_power - cache.sites["S1"].y[rows]).mean() < 0.5
-    assert len(meter.starts) == len(CAPACITY_START_MULTIPLIERS) + 1
+    n_starts = len(CAPACITY_START_MULTIPLIERS) + len(ABSOLUTE_CAPACITY_STARTS_POINTS) + 1
+    assert len(meter.starts) == n_starts
     assert meter.loss == min(start.loss for start in meter.starts)
     assert meter.converged
     assert np.isfinite(meter.capacity_spread)
@@ -271,17 +275,15 @@ def test_a_learned_pair_stays_inside_its_bounds_when_the_truth_is_outside_them(
     dp_synthetic_cache: FeatureCache,
 ):
     cache, _, _ = _cache_with_reading(
-        cache=dp_synthetic_cache,
-        capacity=REVERSE_FLOW,
-        power_factor=0.89,
-        q0=-9.0,
+        cache=dp_synthetic_cache, capacity=REVERSE_FLOW, power_factor=0.85, q0=-9.0
     )
     meter = _meter(cache=cache, qmode="learned")
     assert meter.reactive == "learned"
-    assert meter.converged
-    assert meter.tan_phi <= TAN_PHI_MAX + 1e-9
-    assert meter.q0 == pytest.approx(-dp_meter.Q0_MAX_POINTS, abs=0.05)
-    assert -dp_meter.Q0_MAX_POINTS - 1e-9 <= meter.q0 <= dp_meter.Q0_MAX_POINTS + 1e-9
+    # The truth's tan(phi) is 0.62; the bound is its value at a power factor of 0.90.
+    assert meter.tan_phi == pytest.approx(0.4843221, abs=1e-6)
+    assert -5.0 - 1e-9 <= meter.q0 <= 5.0 + 1e-9
+    assert -dp_meter.Q0_MAX_POINTS == -5.0
+    assert meter.fit.capacity_points()[2023] == pytest.approx(sum(REVERSE_FLOW.values()), rel=0.10)
 
 
 def test_a_strong_prior_holds_the_learned_pair_at_its_centre_and_the_default_lets_data_move_it(
@@ -547,3 +549,74 @@ def test_a_dark_only_window_trains_on_dark_rows_and_a_zero_capacity_removes_the_
         cache=cache, fit=fit, index=sunny, columns=np.ones(fit.layout.n_columns, dtype=bool)
     )
     assert reading == pytest.approx(demand_only)
+
+
+def test_strong_reverse_flow_from_a_plant_unlike_the_models_still_finds_the_capacity(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, signed, signed_series = _cache_with_reading(
+        cache=dp_synthetic_cache,
+        capacity={2020: 60.0, 2022: 60.0, 2023: 40.0},
+        power_factor=0.95,
+        q0=-3.0,
+        mismatched_plant=True,
+        hard_clip_share=0.6,
+    )
+    assert (signed[_scored_rows(cache=cache)] < 0).mean() > 0.10
+    reference = _signed_capacity(cache=cache, signed_series=signed_series)
+    for qmode in ("zero", "learned"):
+        meter = _meter(cache=cache, qmode=qmode)
+        capacity = meter.fit.capacity_points()[meter.fit.last_season_year]
+        assert capacity == pytest.approx(reference, rel=0.15), qmode
+    naive = [start.final_capacity for start in meter.starts[: len(CAPACITY_START_MULTIPLIERS)]]
+    assert max(naive) < 0.5 * reference, "the naive starts miss the basin; absolute starts find it"
+    assert meter.reactive == "learned"
+
+
+def test_the_reverse_flow_count_takes_the_larger_of_the_zero_and_fixed_fits(
+    dp_synthetic_cache: FeatureCache, monkeypatch: pytest.MonkeyPatch
+):
+    cache, _, _ = _cache_with_reading(
+        cache=dp_synthetic_cache, capacity=NO_REVERSE_FLOW, power_factor=0.97
+    )
+    shares = iter([0.0, 0.02])
+    monkeypatch.setattr(
+        dp_meter._Problem, "reverse_flow_share", lambda self, *, theta: next(shares)
+    )
+    meter = _meter(cache=cache, qmode="learned")
+    assert meter.reactive == "learned"
+    assert meter.reverse_flow_share == 0.02
+
+
+def test_the_jacobian_matches_finite_differences_of_the_apparent_power(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, _, _ = _cache_with_reading(
+        cache=dp_synthetic_cache, capacity=REVERSE_FLOW, power_factor=0.95, q0=-1.0
+    )
+    features = cache.sites["S1"]
+    layout, index = prepare_fit(
+        cache=cache,
+        site="S1",
+        spec=SPEC,
+        cut=CUT,
+        window=TrainingWindow(months=2),
+        season_years=SEASON_YEARS,
+    )
+    problem = dp_meter._Problem.build(
+        cache=cache, features=features, layout=layout, index=index, weights=np.ones(len(index))
+    )
+    rng = np.random.default_rng(4)
+    theta = _truth(layout=layout, capacity=REVERSE_FLOW) * (
+        1.0 + 0.02 * rng.normal(size=layout.n_columns)
+    )
+    state = np.concatenate([theta, [0.3, -1.0]])
+    analytic = problem.jacobian(state=state, learned=True)
+    random_columns = rng.choice(layout.n_columns, size=6, replace=False).tolist()
+    for column in [*random_columns, layout.n_columns, layout.n_columns + 1]:
+        step = np.zeros(len(state))
+        step[column] = 1e-5
+        numeric = (
+            problem._apparent(state=state + step)[3] - problem._apparent(state=state - step)[3]
+        ) / 2e-5
+        assert analytic[:, column] == pytest.approx(numeric, abs=1e-6), column

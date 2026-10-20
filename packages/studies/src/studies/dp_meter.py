@@ -14,10 +14,12 @@ wherever `P` can change sign, and `tan(phi) * D(theta)` is bilinear in the param
 linearises `sqrt` at the current `P` and `Q` and solves a bounded quadratic program with
 `studies.dp_gam.solve_bounded_quadratic`, which keeps the bounds exact. A step is accepted only if
 it lowers the penalised loss, and otherwise a damping term pulls it towards the current
-coefficients (Levenberg-Marquardt). Four starts are tried, each is flagged if it stopped without
+coefficients (Levenberg-Marquardt). Six starts are tried, each is flagged if it stopped without
 converging, and the lowest loss on a common scale is kept:
 
 - the naive fit, which reads `|S|` as `P`, with the capacity increments multiplied by 0.5, 1, and 2;
+- the naive demand with an absolute capacity of 50 and of 120 points, for strong reverse flow, where
+  the naive capacity is zero and its multiples are too;
 - the demand-only fit on the dark rows, with no solar (the naive fit with its capacity set to zero
   when the substation has no dark row).
 
@@ -28,7 +30,9 @@ coefficients, but only where the data can identify them. On dark rows `|S| = D *
 unknowns. Without reverse flow the pair absorbs any structural misfit instead of measuring a
 reactive load: on synthetic data it moved the power factor to 0.83 and the capacity 23% high. So
 `learned` first fits with `qmode="zero"` and counts the training rows where the signed power is
-negative. If that share is under `MIN_REVERSE_FLOW_SHARE`, the reactive pair is **not learned**: it
+negative, or, if it is the larger, under the pair held at the prior (the zero fit can sit in the
+mirror basin and count none). If that share is under `MIN_REVERSE_FLOW_SHARE`, the reactive pair is
+**not learned**: it
 is held at the prior (power factor 0.97, `q0` = 0), the fit records `reactive="fixed"`, and the
 power factor it reports is an assumption, not an estimate. Where the pair is learned, `tan(phi)` is
 bounded between zero (a lagging load; this removes the `(tan(phi), q0) -> (-tan(phi), -q0)` mirror
@@ -102,12 +106,18 @@ MIN_REVERSE_FLOW_SHARE: Final[float] = 0.005
 """The reactive pair is learned only if at least this share of the training rows has negative
 signed power under the zero-reactive fit."""
 CAPACITY_START_MULTIPLIERS: Final[tuple[float, ...]] = (0.5, 1.0, 2.0)
-"""The naive fit's capacity increments are multiplied by these to make three of the four starts."""
+"""The naive fit's capacity increments are multiplied by these to make three starts."""
+ABSOLUTE_CAPACITY_STARTS_POINTS: Final[tuple[float, ...]] = (50.0, 120.0)
+"""Starts with this capacity, in points, in the first season-year and nothing added later.
+
+The naive fit reads `|S|` as `P`, so under strong reverse flow it can put the capacity at zero, and
+every multiple of zero is zero. Absolute starts reach the basin with the true capacity.
+"""
 MAX_ITERATIONS: Final[int] = 100
 """The most Gauss-Newton iterations of one start."""
 MAX_DAMPING_TRIES: Final[int] = 8
 """The most times one iteration raises its damping before it gives up and stops."""
-RELATIVE_TOLERANCE: Final[float] = 1e-9
+RELATIVE_TOLERANCE: Final[float] = 1e-7
 """A start has converged when an iteration lowers its loss by less than this share."""
 INITIAL_DAMPING_SHARE: Final[float] = 1e-3
 """The first damping, as a share of the mean diagonal of the coefficient penalty plus one."""
@@ -309,8 +319,19 @@ def fit_gam_through_meter(
     runs = [problem.minimise(theta=theta, mode="zero") for _, theta in starts]
     reverse_flow_share = problem.reverse_flow_share(theta=min(runs, key=lambda r: r.squares).theta)
     if qmode == "learned":
-        reactive = "learned" if reverse_flow_share >= MIN_REVERSE_FLOW_SHARE else "fixed"
-        runs = [problem.minimise(theta=theta, mode=reactive) for _, theta in starts]
+        if reverse_flow_share >= MIN_REVERSE_FLOW_SHARE:
+            reactive = "learned"
+            runs = [problem.minimise(theta=theta, mode="learned") for _, theta in starts]
+        else:
+            reactive = "fixed"
+            runs = [problem.minimise(theta=theta, mode="fixed") for _, theta in starts]
+            reverse_flow_share = max(
+                reverse_flow_share,
+                problem.reverse_flow_share(theta=min(runs, key=lambda r: r.squares).theta),
+            )
+            if reverse_flow_share >= MIN_REVERSE_FLOW_SHARE:
+                reactive = "learned"
+                runs = [problem.minimise(theta=theta, mode="learned") for _, theta in starts]
     common_weight = problem.prior_weight(state=min(runs, key=lambda r: r.squares).state)
     losses = [
         problem.loss(state=run.state, weight=common_weight, learned=reactive == "learned")
@@ -497,6 +518,11 @@ class _Problem:
             theta = naive.copy()
             theta[capacity] *= multiplier
             result.append((f"naive capacity x{multiplier:g}", theta))
+        for points in ABSOLUTE_CAPACITY_STARTS_POINTS:
+            theta = naive.copy()
+            theta[capacity] = 0.0
+            theta[capacity.start] = points
+            result.append((f"capacity {points:g} points", theta))
         dark = features.dark[index]
         if dark.any():
             theta = self._solve_plain(weights=self.weights * dark)
@@ -611,15 +637,20 @@ class _Problem:
         reactive = tan_phi * demand + q0
         return real, demand, reactive, np.sqrt(real * real + reactive * reactive + DEFAULT_EPSILON)
 
-    def _step(
-        self, *, state: np.ndarray, weight: float, learned: bool, damping: float
-    ) -> np.ndarray:
-        """Return the state that minimises the linearised, damped, bounded problem."""
-        theta, tan_phi = state[:-2], state[-2]
+    def jacobian(self, *, state: np.ndarray, learned: bool) -> np.ndarray:
+        """Return the derivative of `|S|` with respect to the coefficients (and `tan(phi)`, `q0`).
+
+        Args:
+            state: The coefficients, then `tan(phi)` and `q0`.
+            learned: True to include the two reactive columns.
+
+        Returns:
+            An array of shape (rows, unknowns).
+        """
+        tan_phi = state[-2]
         real, demand, reactive, apparent = self._apparent(state=state)
-        n_coefficients = len(theta)
-        n_unknowns = n_coefficients + (2 if learned else 0)
-        jacobian = np.empty((len(self.readings), n_unknowns))
+        n_coefficients = len(state) - 2
+        jacobian = np.empty((len(self.readings), n_coefficients + (2 if learned else 0)))
         jacobian[:, :n_coefficients] = (real / apparent)[:, None] * self.design
         if tan_phi != 0.0:
             jacobian[:, :n_coefficients] += (reactive * tan_phi / apparent)[:, None] * (
@@ -628,6 +659,17 @@ class _Problem:
         if learned:
             jacobian[:, n_coefficients] = reactive * demand / apparent
             jacobian[:, n_coefficients + 1] = reactive / apparent
+        return jacobian
+
+    def _step(
+        self, *, state: np.ndarray, weight: float, learned: bool, damping: float
+    ) -> np.ndarray:
+        """Return the state that minimises the linearised, damped, bounded problem."""
+        theta = state[:-2]
+        apparent = self._apparent(state=state)[3]
+        n_coefficients = len(theta)
+        n_unknowns = n_coefficients + (2 if learned else 0)
+        jacobian = self.jacobian(state=state, learned=learned)
         root_weights = np.sqrt(self.weights)
         jacobian *= root_weights[:, None]
         target = root_weights * (self.readings - apparent) + jacobian @ state[:n_unknowns]

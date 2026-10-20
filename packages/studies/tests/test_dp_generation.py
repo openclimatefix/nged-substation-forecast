@@ -877,3 +877,82 @@ def test_the_node_costs_are_per_point_of_step_and_per_point_of_level_per_day(
     assert cost_long[layout_long.slices["node_up"]] == pytest.approx(200.0)
     tie = matrix[layout.slices["node_up"], layout.slices["node_up"]]
     assert tie[1, 1] > 0.99 * dp_gam.NODE_TIE_RATIO * 200.0
+
+
+def test_a_fit_with_bootstrap_weights_gives_each_member_its_own_covariance_penalty(
+    dp_synthetic_cache: FeatureCache,
+):
+    spec = GamSpec(ridge=0.01, orthogonal_penalty=10.0)
+    fixed_start = TrainingWindow(start=datetime(2022, 1, 1, tzinfo=UTC))
+    _, index = prepare_fit(
+        cache=dp_synthetic_cache,
+        site="S1",
+        spec=spec,
+        cut=CUT,
+        window=fixed_start,
+        season_years=SEASON_YEARS,
+    )
+    early_cut = datetime(2023, 7, 1, tzinfo=UTC)
+    keep = (
+        dp_synthetic_cache.end_times[index] <= np.datetime64(early_cut.replace(tzinfo=None), "us")
+    ).astype(np.float64)
+    batch = fit_gam(
+        cache=dp_synthetic_cache,
+        site="S1",
+        specs=[spec],
+        cut=CUT,
+        window=fixed_start,
+        season_years=SEASON_YEARS,
+        weights=np.stack([np.ones(len(index)), keep]),
+    )
+    shorter = fit_gam(
+        cache=dp_synthetic_cache,
+        site="S1",
+        specs=[spec],
+        cut=early_cut,
+        window=fixed_start,
+        season_years=SEASON_YEARS,
+    )
+    assert np.allclose(batch.theta[1], shorter.theta[0], atol=1e-5)
+
+
+def test_a_slow_ramp_costs_about_as_much_as_a_step_of_the_same_total_size(
+    dp_synthetic_cache: FeatureCache,
+):
+    spec = _node_spec()
+    layout, index = prepare_fit(
+        cache=dp_synthetic_cache,
+        site="S1",
+        spec=spec,
+        cut=CUT,
+        window=NODE_WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    matrix, cost = dp_gam.penalty_matrix(layout=layout, n_rows=len(index))
+    level, up = layout.slices["node_level"], layout.slices["node_up"]
+    step_cost = spec.node.step_penalty if spec.node else 0.0
+    n_blocks = level.stop - level.start
+    theta = np.zeros(layout.n_columns)
+    ramp = np.arange(n_blocks) / (n_blocks - 1)
+    theta[level] = ramp
+    threshold = step_cost / (2.0 * dp_gam.NODE_TIE_RATIO * step_cost)
+    theta[up.start + 1 : up.stop] = np.maximum(np.diff(ramp) - threshold, 0.0)
+    node = np.zeros(layout.n_columns, dtype=bool)
+    node[level] = node[up] = node[layout.slices["node_down"]] = True
+    total = float(theta @ matrix @ theta + cost @ theta)
+    level_cost = float(cost[level] @ ramp)
+    assert (total - level_cost) > 0.9 * step_cost * 1.0, "a ramp of one point costs a step's worth"
+
+
+def test_a_short_unmodelled_rise_in_demand_is_a_known_false_positive_of_the_evidence(
+    dp_synthetic_cache: FeatureCache,
+):
+    pinned = _pinned(cache=dp_synthetic_cache)
+    start = _epoch_day(year=2023, month=11, day=1)
+    cache = _generator_truth_cache(
+        cache=dp_synthetic_cache,
+        pinned=pinned,
+        generator=lambda day: np.where((day >= start) & (day < start + 7), -4.0, 0.0),
+    )
+    fit = _fit(cache=cache, spec=_node_spec(), pinned=pinned, window=NODE_WINDOW)
+    assert generator_evidence(path=generator_path(fit=fit)) > 1.0
