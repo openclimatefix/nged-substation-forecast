@@ -954,7 +954,7 @@ def solve_bounded_cholesky(
     epsilon = float(torch.finfo(matrix.dtype).eps)
     tolerance = default_tolerance(dtype=matrix.dtype)
     scale = float(rhs.abs().max().clamp(min=1.0))
-    indices = torch.arange(p)
+    indices = torch.arange(p, device=rhs.device)
     free = start_free | ~constrained
     best_broken, patience = p + 1, 0
     theta = torch.zeros_like(rhs)
@@ -1060,12 +1060,12 @@ def _solve_coupled(
         mu_start=mu_start,
     )
     fixed = fixed.to(device)
-    constrained_tensor = torch.as_tensor(constrained)
+    constrained_tensor = torch.as_tensor(constrained, device=device)
     pieces, violations = [], []
-    free = torch.ones(total, dtype=torch.bool)
+    free = torch.ones(total, dtype=torch.bool, device=device)
     for member in range(batch):
         matrix = fixed.clone()
-        rhs = fixed_rhs.clone()
+        rhs = fixed_rhs.to(device).clone()
         for design, gram, node_rhs, start in zip(designs, grams, rhss, starts[:-1], strict=True):
             stop = int(start) + design.layout.n_columns
             matrix[start:stop, start:stop] += gram[member].to(device)

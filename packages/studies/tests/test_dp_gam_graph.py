@@ -897,3 +897,28 @@ def test_the_cholesky_path_matches_the_lu_path_on_a_fifteen_node_fleet(
     assert fast.fleet_mean is not None
     assert slow.fleet_mean is not None
     assert np.abs(fast.fleet_mean - slow.fleet_mean).max() < 1e-7
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a CUDA device")
+def test_the_cuda_solve_matches_the_cpu_solve(graph_cache: FeatureCache):
+    designs = _designs(cache=graph_cache)
+    graph = _path(labels=LABELS)
+    axis = month_axis_of(designs=designs)
+    counts = joint_month_counts(axis=axis, n_resamples=3, rng=np.random.default_rng(2))
+    penalty = GraphPenalty.of(fleet_rows=3000.0, graph_rows=3000.0)
+    solved = {}
+    for device in ("cpu", "cuda"):
+        solved[device] = solve_graph_fit(
+            designs=designs,
+            graph=graph,
+            penalty=penalty,
+            scales=family_scales(designs=designs),
+            axis=axis,
+            counts=counts,
+            device=device,
+        )
+    for label in LABELS:
+        assert np.abs(solved["cuda"].thetas[label] - solved["cpu"].thetas[label]).max() < 1e-7
+    assert solved["cuda"].fleet_mean is not None
+    assert solved["cpu"].fleet_mean is not None
+    assert np.abs(solved["cuda"].fleet_mean - solved["cpu"].fleet_mean).max() < 1e-7
