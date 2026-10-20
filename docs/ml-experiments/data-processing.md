@@ -404,6 +404,22 @@ labels. Treat it as interpolated, not as a separate measurement
 experiments. Confidence: high, because the mean absolute difference from the neighbours' average is
 zero.
 
+**Do not read the PV capacity of a pooled demand model as a measurement, and do not expect a prior
+to hold it near the vintages.** In the pooled differentiable-physics model, the inferred capacity of
+a substation changed by up to 20 points of capacity with another start or with the network off (D5
+50 or 30, D9 12 or 23, in season-year 2023), and a prior centred on the vintage with scale 5 changed
+nothing, because the prior is a few nats against about 340,000 rows of data. A swap of the fitted
+capacity paths among substations still worsened the summer-midday error at 6 of 6 ([experiment
+105](00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md)). Applies to
+experiments that fit capacity inside a demand model. Confidence: medium. A capacity profile shows
+the free fit's loss is 4,563 nats above a fit with the capacities pinned at the convex model's, so
+the optimiser is the weak point; why it is slow is not tested.
+
+**Skip the solar-offset arms at D18, which has no capacity vintage before 2025-07-01.** Its first
+usable data begin in February 2025, so an origin on or before the cut does not exist
+([experiment 105](00105-differentiable-physics-3-pooled-and-per-site-demand-model/result.md)).
+Applies to experiments. Confidence: high.
+
 **Rebuild a new substation's effective capacity from its own rows before a model pools it in points,
 and fit its solar capacity from the same rows.** A power series is divided by its effective capacity,
 the 99th percentile of its absolute power over its history, and a substation with 4 weeks of history
@@ -436,9 +452,9 @@ set of [experiment 41](00041-sw2-0a-labeller-gate/result.md)). Applies to experi
 production once a detector runs there.
 
 **Expect D10 to carry unlabelled jumps of 15 to 20 points.** D10's night-time floor rose from 25 to
-45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to
-20 points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and
-both are probably unlabelled switching. Dropping the 2025 window lowered D10's scores by 0.09 to 0.53
+45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to 20
+points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and both
+are probably unlabelled switching. Dropping the 2025 window lowered D10's scores by 0.09 to 0.53
 points and moved the five-site contrasts by under 0.08 points ([experiment
 104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction). Masking both
 windows in the quarterly refits of [experiment
