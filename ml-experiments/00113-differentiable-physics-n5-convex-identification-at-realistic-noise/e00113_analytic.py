@@ -13,6 +13,7 @@ For each substation and window, with the full sample's Gram matrix `G` and penal
 import json
 from dataclasses import replace
 
+import e00113_cell as cell_module
 import e00113_common as common
 import e00113_design as design_module
 import numpy as np
@@ -31,7 +32,8 @@ def _arms_at(*, penalty: float) -> dict[str, design_module.Arm]:
     }
 
 
-def _inverse_quadratic(*, design: design_module.Design, arm: design_module.Arm) -> np.ndarray:
+def inverse_quadratic_form(*, design: design_module.Design, arm: design_module.Arm) -> np.ndarray:
+    """Return `v^T A^-1 v` for each scored functional, with `A = G + P` on the arm's columns."""
     keep = design_module.selection(design=design, arm=arm)
     chosen = np.flatnonzero(keep)
     gram = design_module.summed_gram(design=design).numpy()
@@ -72,13 +74,13 @@ def analytics_for(*, design: design_module.Design) -> list[dict]:
     gram = design_module.summed_gram(design=design).numpy()
     for penalty in (common.DRIFT_STEP_PART_2, common.DRIFT_STEP_PART_4):
         arms = _arms_at(penalty=penalty)
-        full = _inverse_quadratic(design=design, arm=arms["full"])
+        full = inverse_quadratic_form(design=design, arm=arms["full"])
         matrix = gram + design.penalties[penalty]
         v = design.functionals
         quad = np.einsum("pf,pq,qf->f", v, matrix, v)
         rho = np.einsum("pf,pf->f", v, v) ** 2 / (quad * full)
         for name in ("g_0", "g_h", "g_d"):
-            small = _inverse_quadratic(design=design, arm=arms[name])
+            small = inverse_quadratic_form(design=design, arm=arms[name])
             for functional, label in enumerate(design_module.FUNCTIONAL_NAMES):
                 rows.append(
                     {
@@ -113,20 +115,75 @@ def analytics_for(*, design: design_module.Design) -> list[dict]:
     return rows
 
 
+def bias_decomposition(*, design: design_module.Design, theta_real: np.ndarray) -> list[dict]:
+    """Return the penalty bias of the full fit on each synthetic truth, split by penalty block.
+
+    The bias of functional `v` is `-v^T (G + P)^-1 P theta`. `P` is split into its drift block and
+    the rest (the ridge on every other term), so the two parts add up to the total. The truths are
+    rebuilt from the same seeds as the grid's.
+    """
+    site_position = common.DECISION_SITES.index(design.site)
+    gram = design_module.summed_gram(design=design).numpy()
+    drift = design.layout.slices["drift"]
+    rows = []
+    for draw in range(common.N_DRAWS_PER_SITE):
+        rng = np.random.default_rng(
+            np.random.SeedSequence([common.EXPERIMENT_ID, site_position, draw])
+        )
+        truths = {}
+        truths["hd"], parameters = cell_module.make_truth(
+            design=design, theta_real=theta_real, kind="hd", rng=rng
+        )
+        truths["t0"], _ = cell_module.make_truth(
+            design=design, theta_real=theta_real, kind="t0", rng=rng, parameters=parameters
+        )
+        for step in (common.DRIFT_STEP_PART_2, common.DRIFT_STEP_PART_4):
+            penalty = design.penalties[step]
+            drift_penalty = np.zeros_like(penalty)
+            drift_penalty[drift, drift] = penalty[drift, drift]
+            solved = np.linalg.solve(gram + penalty, design.functionals)
+            for kind, truth in truths.items():
+                total = -(solved.T @ (penalty @ truth))
+                from_drift = -(solved.T @ (drift_penalty @ truth))
+                for functional, label in enumerate(design_module.FUNCTIONAL_NAMES):
+                    rows.append(
+                        {
+                            "site": design.site,
+                            "draw": draw,
+                            "truth": kind,
+                            "drift_step": step,
+                            "functional": label,
+                            "bias": float(total[functional]),
+                            "bias_from_drift_penalty": float(from_drift[functional]),
+                            "bias_from_other_penalties": float(
+                                total[functional] - from_drift[functional]
+                            ),
+                        }
+                    )
+    return rows
+
+
 def main() -> None:
     """Compute the analytic rows for every decision substation and window."""
     common.configure_threads(threads=1)
     cache = common.load_cache()
     rows = []
+    decomposition = []
+    stored = cell_module.load_real_fits()
     for site in common.DECISION_SITES:
         for window in ("all", "2y"):
             design = design_module.build_design(
                 cache=cache, site=site, cut=common.REPLICATE_CUT, window=window
             )
             rows += analytics_for(design=design)
+            if window == "all":
+                decomposition += bias_decomposition(
+                    design=design, theta_real=stored[f"theta_{site}"]
+                )
             print("done", site, window, flush=True)
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     pl.DataFrame(rows, infer_schema_length=None).write_parquet(common.WORK_DIR / "analytic.parquet")
+    pl.DataFrame(decomposition).write_parquet(common.WORK_DIR / "bias_decomposition.parquet")
     (common.WORK_DIR / "analytic.json").write_text(json.dumps(rows[:3], indent=1))
 
 

@@ -26,7 +26,7 @@ PNG_DIR: Final[Path] = Path("/tmp/e00113_png")
 WIDTH: Final[int] = 480
 WRAP: Final[int] = 95
 FAMILY_LABEL: Final[dict[str, str]] = {
-    "band": "Heating slope of an hour band",
+    "band": "Heating slope (per hour band)",
     "capacity": "Latest PV capacity",
 }
 
@@ -54,10 +54,12 @@ def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
 def figure_coverage(*, summary: pl.DataFrame) -> None:
     """Figure 1: I1 and I2 coverage of the truth in the decision cell and the iid5 cell."""
     rows = []
-    for method, method_label in (
-        ("i1", "I1 month-block bootstrap (decision)"),
-        ("i2", "I2 posterior"),
-    ):
+    series = (
+        ("i1", "g_full", "I1 month-block bootstrap (decision)"),
+        ("i1", "g_full_30", "I1 with drift step 30 (post hoc)"),
+        ("i2", "g_full", "I2 posterior"),
+    )
+    for method, arm, method_label in series:
         for noise, noise_label in (
             ("real", "real residuals (decision noise)"),
             ("iid5", "independent noise, sd 5"),
@@ -66,7 +68,7 @@ def figure_coverage(*, summary: pl.DataFrame) -> None:
                 pick = summary.filter(
                     (pl.col("window") == "all")
                     & (pl.col("truth") == "hd")
-                    & (pl.col("arm") == "g_full")
+                    & (pl.col("arm") == arm)
                     & (pl.col("method") == method)
                     & (pl.col("noise") == noise)
                     & (pl.col("family") == family)
@@ -79,15 +81,14 @@ def figure_coverage(*, summary: pl.DataFrame) -> None:
                         "coverage": 100 * pick["coverage_truth"],
                         "low": 100 * pick["coverage_truth_low"],
                         "high": 100 * pick["coverage_truth_high"],
-                        "of_noise_free": 100 * pick["coverage_noise_free"],
                     }
                 )
     frame = pl.DataFrame(rows)
     colour = alt.Color(
         "method:N",
         sort=None,
-        scale=alt.Scale(range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]),
-        legend=alt.Legend(title=None, orient="top"),
+        scale=alt.Scale(range=[ocf.BRAND_ORANGE, ocf.DATA_PURPLE, ocf.DATA_BLUE]),
+        legend=alt.Legend(title=None, orient="top", labelLimit=400),
     )
     panels = []
     for family in FAMILY_LABEL.values():
@@ -113,7 +114,7 @@ def figure_coverage(*, summary: pl.DataFrame) -> None:
         dots = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
             x="coverage:Q", color=colour, yOffset="method:N"
         )
-        panels.append(alt.layer(band, rule, dots).properties(width=WIDTH, height=70, title=family))
+        panels.append(alt.layer(band, rule, dots).properties(width=WIDTH, height=90, title=family))
     chart = alt.vconcat(*panels).properties(
         title=_title(
             text=(
@@ -160,7 +161,7 @@ def figure_recovery(*, frame: pl.DataFrame) -> None:
             color=alt.Color(
                 "family:N",
                 scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
-                legend=alt.Legend(title=None, orient="top"),
+                legend=alt.Legend(title=None, orient="top", labelLimit=400),
             ),
         )
     )
@@ -217,7 +218,7 @@ def figure_widths(*, summary: pl.DataFrame, analytic: pl.DataFrame) -> None:
             color=alt.Color(
                 "family_label:N",
                 scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
-                legend=alt.Legend(title=None, orient="top"),
+                legend=alt.Legend(title=None, orient="top", labelLimit=400),
             ),
             yOffset="family_label:N",
         )
@@ -250,8 +251,8 @@ def figure_absorption(*, analytic: pl.DataFrame) -> None:
     frame = pick.with_columns(
         removed_label=pl.col("removed").replace(removed),
         penalty=pl.when(pl.col("drift_step") > 100)
-        .then(pl.lit("Drift step 3,000 (experiment 104)"))
-        .otherwise(pl.lit("Drift step 30 (experiment 106)")),
+        .then(pl.lit("Drift step 3,000"))
+        .otherwise(pl.lit("Drift step 30")),
         quantity=pl.when(pl.col("functional") == "capacity")
         .then(pl.lit("Latest capacity"))
         .otherwise(pl.lit("Band heating slope")),
@@ -272,9 +273,11 @@ def figure_absorption(*, analytic: pl.DataFrame) -> None:
             color=alt.Color(
                 "quantity:N",
                 scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
-                legend=alt.Legend(title=None, orient="top"),
+                legend=alt.Legend(title=None, orient="top", labelLimit=400),
             ),
-            shape=alt.Shape("penalty:N", legend=alt.Legend(title=None, orient="top")),
+            shape=alt.Shape(
+                "penalty:N", legend=alt.Legend(title=None, orient="top", labelLimit=400)
+            ),
         )
         .properties(
             width=WIDTH,
@@ -322,7 +325,9 @@ def figure_real(*, real: pl.DataFrame) -> None:
     i1 = base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lo:Q", title="Latest season-year's PV capacity (points of effective capacity)"),
         x2="hi:Q",
-        color=alt.Color("interval:N", scale=colours, legend=alt.Legend(title=None, orient="top")),
+        color=alt.Color(
+            "interval:N", scale=colours, legend=alt.Legend(title=None, orient="top", labelLimit=400)
+        ),
     )
     i2 = base.mark_point(filled=True, color="#222222", size=40).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
     vintage = (

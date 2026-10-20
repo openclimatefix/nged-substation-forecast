@@ -115,7 +115,9 @@ def summarise(*, long: pl.DataFrame) -> pl.DataFrame:
                     (group["noise_free_value"] - group["truth_value"]).abs().median()
                 ),
                 "median_active_bound_share": common.as_float(group["active_bound_share"].median()),
-                "mean_boot_variance": common.as_float((group["boot_sd"] ** 2).mean()),
+                "mean_boot_variance": common.as_float(
+                    (group["boot_sd"] ** 2 * group["i1_inflate"] ** 2).mean()
+                ),
                 "mean_sandwich_variance": common.as_float((group["sandwich_sd"] ** 2).mean()),
             }
         )

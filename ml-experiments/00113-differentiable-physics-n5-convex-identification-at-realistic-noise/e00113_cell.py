@@ -78,6 +78,19 @@ def control_cells() -> list[CellSpec]:
     return cells
 
 
+def extra_cells() -> list[CellSpec]:
+    """Return the cells added after review: the real noise alone, fitted without the bounds.
+
+    The two dummy cells keep the same noise kinds and windows as `draw_cells`, so each draw's
+    random numbers, and so its noise and weightings, are the grid's.
+    """
+    return [
+        CellSpec("zero", "real", "g_full_unbounded"),
+        CellSpec("hd", "iid5", "g_full"),
+        CellSpec("hd", "real", "g_full", "2y"),
+    ]
+
+
 CONTROL_DRAW: Final[int] = 100
 """The draw index used for the noise-free and iid sd 1.0 controls."""
 

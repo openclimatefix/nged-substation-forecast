@@ -19,6 +19,7 @@ import e00113_common as common
 import e00113_design as design_module
 import numpy as np
 import polars as pl
+from e00113_cell import arm_analytics
 from studies.dp_calendar import SMOOTHING_HOURS
 from studies.dp_features import FeatureCache
 from studies.dp_gam import N_BANDS
@@ -93,6 +94,7 @@ def main() -> None:
                 cache=cache, site=site, cut=cut, years=design.layout.season_years
             )
             n_boot = common.N_BOOTSTRAP
+            gram_full = design_module.summed_gram(design=design).numpy()
             months_per_quarter = len(design.months) / 4.0
             for arm_name in REAL_ARMS:
                 arm = design_module.ARMS[arm_name]
@@ -100,15 +102,22 @@ def main() -> None:
                     design=design, arm=arm, gram=gram, rhs=rhs, pinned_increments=None
                 )
                 values = design_module.functional_values(design=design, theta=theta)
-                analytics_arm = analytic_module._inverse_quadratic(design=design, arm=arm)
-                from e00113_cell import arm_analytics
-
+                analytics_arm = analytic_module.inverse_quadratic_form(design=design, arm=arm)
                 moments = arm_analytics(design=design, arm=arm)
                 residual = target - design.x @ theta[0]
                 sigma2 = float(residual @ residual) / (design.n - moments.edf)
-                small = analytic_module._inverse_quadratic(
+                small = analytic_module.inverse_quadratic_form(
                     design=design, arm=replace(design_module.ARMS["g_0"], drift_step=arm.drift_step)
                 )
+                chosen = np.flatnonzero(design_module.selection(design=design, arm=arm))
+                v_arm = matrix[chosen]
+                quadratic = np.einsum(
+                    "pf,pq,qf->f",
+                    v_arm,
+                    (gram_full + design.penalties[arm.drift_step])[np.ix_(chosen, chosen)],
+                    v_arm,
+                )
+                rho = np.einsum("pf,pf->f", v_arm, v_arm) ** 2 / (quadratic * analytics_arm)
                 boot, boot_u = values[1 : 1 + n_boot], values[1 + n_boot :]
                 median = np.median(boot, axis=0)
                 q_low, q_high = np.quantile(boot, [0.1, 0.9], axis=0)
@@ -119,7 +128,7 @@ def main() -> None:
                     inflate = float(np.sqrt(m / (m - 1.0)))
                     sd_post = float(np.sqrt(moments.posterior[position] * sigma2))
                     sd_sand = float(np.sqrt(moments.sandwich[position] * sigma2))
-                    tau = float(boot[:, position].var(ddof=1) / sd_sand**2)
+                    tau = float(inflate**2 * boot[:, position].var(ddof=1) / sd_sand**2)
                     rows.append(
                         {
                             "cut": cut_label,
@@ -149,7 +158,8 @@ def main() -> None:
                                 small[position] / analytics_arm[position]
                             ),
                             "n_rows": design.n,
-                            "n_eff_rows": float(design.n / tau),
+                            "rho": float(rho[position]),
+                            "n_eff_rows": float(design.n * rho[position] / tau),
                         }
                     )
             print("done", cut_label, site, flush=True)

@@ -3,6 +3,7 @@
     uv run python ml-experiments/00113-*/e00113_grid.py reals
     uv run python ml-experiments/00113-*/e00113_grid.py main [--draws 20] [--workers 5]
     uv run python ml-experiments/00113-*/e00113_grid.py control [--workers 5]
+    uv run python ml-experiments/00113-*/e00113_grid.py extra [--draws 20] [--workers 5]
 
 `reals` fits the full model to each decision substation's real target and stores the residuals
 that the real noise reuses. `main` runs `--draws` draws per substation. `control` runs the
@@ -20,7 +21,11 @@ MAX_WORKERS: int = 6
 
 def _run(arguments: tuple[str, range, str]) -> str:
     site, draws, stage = arguments
-    cells = cell_module.draw_cells() if stage == "main" else cell_module.control_cells()
+    cells = {
+        "main": cell_module.draw_cells,
+        "control": cell_module.control_cells,
+        "extra": cell_module.extra_cells,
+    }[stage]()
     cell_module.run_site(site=site, draws=draws, cells=cells, tag=stage)
     return site
 
@@ -28,7 +33,7 @@ def _run(arguments: tuple[str, range, str]) -> str:
 def main() -> None:
     """Run the requested stage."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("stage", choices=("reals", "main", "control"))
+    parser.add_argument("stage", choices=("reals", "main", "control", "extra"))
     parser.add_argument("--draws", type=int, default=common.N_DRAWS_PER_SITE)
     parser.add_argument("--workers", type=int, default=len(common.DECISION_SITES))
     parser.add_argument("--sites", nargs="*", default=list(common.DECISION_SITES))
@@ -42,7 +47,7 @@ def main() -> None:
         return
     draws = (
         range(args.draws)
-        if args.stage == "main"
+        if args.stage in ("main", "extra")
         else range(cell_module.CONTROL_DRAW, cell_module.CONTROL_DRAW + 1)
     )
     jobs = [(site, draws, args.stage) for site in args.sites]
