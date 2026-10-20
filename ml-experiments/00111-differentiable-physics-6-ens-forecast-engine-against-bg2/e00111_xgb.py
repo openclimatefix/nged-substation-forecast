@@ -517,6 +517,15 @@ def run_job(job: tuple[str, str, datetime, list[datetime], int, int, str]) -> st
     booster, level, known = fit_refit(
         arm=arm, site_data=site_data, refit=refit, nthread=nthread, rounds=rounds
     )
+    if arm.start == "gam":
+        runs = [
+            run
+            for run in runs
+            if len(site_data.cache.end_times)
+            - site_data.setup.runs[common.run_dates().index(run)].origin_position
+            - 1
+            >= ens.MIN_WINDOW_HALF_HOURS
+        ]
     pieces = [
         predict_run(arm=arm, site_data=site_data, booster=booster, level=level, run=run)
         for run in runs
