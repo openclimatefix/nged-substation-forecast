@@ -500,8 +500,8 @@ step that
 grows with cold is the quantity NGED asked about, and the per-site NS-H or NS-HW slopes are
 identified by the sharp 01:00 timing rather than by the weakly identified band slopes of experiment
 113. A generator-linked series appears only under a G-label, normalised, without dates. The step's
-start time is the first half-hour whose fitted step exceeds a tenth of the largest half-hour step. A
-card shows the step of the night arm with the lowest winter-night score even if no arm earned a
+start time is the first half-hour whose fitted step exceeds a tenth of the largest half-hour
+step, and its end time is the last such half-hour. A card shows the step of the night arm with the lowest winter-night score even if no arm earned a
 label, and says so.
 
 ## Substation cards
