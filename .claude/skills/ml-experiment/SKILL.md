@@ -316,6 +316,15 @@ checked how much of it a fitting method could find again. The method found about
 At 2 of the 8 substations, other checks suggested the answer could not be trusted." The verdict word
 and its numbers follow in the next paragraph, with each term defined where it first appears.
 
+**Cite the work an experiment builds on, generously, in the plan and in `result.md`.** Whenever an
+arm, a method, a metric, or a design choice comes from someone else's paper, software, or
+published result, name the authors and link the work where it is first used, following the
+citation rule in `CLAUDE.md`. Credit colleagues inside the project the same way: link the earlier
+experiment, study, or docs page whose idea the experiment takes forward. An experiment that
+re-implements a published method, such as a Kalman filter on the coefficients of a fitted additive
+model, says so in its opening sentences, so a reader never mistakes the idea for ours. When in
+doubt, cite.
+
 **Keep the rest of `result.md` to about a screen:** the verdict in one sentence, the winner with its
 interval, each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and
 the lessons for later experiments, which also become `advice`. **A published page never names a
