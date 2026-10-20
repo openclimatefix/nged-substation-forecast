@@ -658,3 +658,33 @@ def test_an_mva_dark_member_enters_the_bsp_row_with_its_demand_terms_only(two_si
     )
     fitted_capacity = joint.site_fit(site="S2").capacity_points()[2023]
     assert abs(fitted_capacity - 6.0) < 0.6
+
+
+def test_a_window_per_primary_gives_the_same_fit_as_one_shared_window(two_sites: FeatureCache):
+    bsp = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    shared = _fit(cache=two_sites, bsp=bsp, weights=[1.0])
+    per_site = fit_joint(
+        cache=two_sites,
+        specs={"S1": SPEC, "S2": SPEC},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(step_penalty=1.0, shape_ridge=1e-3),
+        weights=[1.0],
+        sigma_points=SIGMA_POINTS,
+        cut=CUT,
+        window={"S1": WINDOW, "S2": WINDOW},
+        season_years=SEASON_YEARS,
+    )
+    assert np.array_equal(shared.theta, per_site.theta)
+    narrower = fit_joint(
+        cache=two_sites,
+        specs={"S1": SPEC, "S2": SPEC},
+        bsps=[bsp],
+        remainder_spec=RemainderSpec(step_penalty=1.0, shape_ridge=1e-3),
+        weights=[1.0],
+        sigma_points=SIGMA_POINTS,
+        cut=CUT,
+        window={"S1": WINDOW, "S2": TrainingWindow(months=6)},
+        season_years=SEASON_YEARS,
+    )
+    assert narrower.n_site_rows["S2"] < shared.n_site_rows["S2"]
+    assert narrower.n_site_rows["S1"] == shared.n_site_rows["S1"]

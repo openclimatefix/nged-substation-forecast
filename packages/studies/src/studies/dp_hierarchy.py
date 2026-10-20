@@ -519,7 +519,7 @@ def assemble_joint(
     remainder_spec: RemainderSpec,
     sigma_points: Mapping[str, float],
     cut: datetime,
-    window: TrainingWindow,
+    window: TrainingWindow | Mapping[str, TrainingWindow],
     season_years: Sequence[int],
     pinned: Mapping[str, PinnedCapacity | None] | None = None,
     device: torch.device | str = "cpu",
@@ -535,7 +535,8 @@ def assemble_joint(
         remainder_spec: The penalties of every BSP's remainder.
         sigma_points: Each Primary's robust half-hourly residual scale in points, from pre-cut rows.
         cut: The cut; every training row ends no later.
-        window: The window rule for the Primaries' rows.
+        window: The window rule for the Primaries' rows, or one rule per Primary (an `mva_dark`
+            Primary trains on dark rows only).
         season_years: The season-years with a capacity increment.
         pinned: Each Primary's pinned capacity built for `cut`, or `None`; a missing key means
             `None`.
@@ -561,7 +562,7 @@ def assemble_joint(
             site=site,
             spec=specs[site],
             cut=cut,
-            window=window,
+            window=window[site] if isinstance(window, Mapping) else window,
             season_years=season_years,
         )
         offsets[site] = slice(start, start + layouts[site].n_columns)
@@ -791,7 +792,7 @@ def fit_joint(
     weights: Sequence[float],
     sigma_points: Mapping[str, float],
     cut: datetime,
-    window: TrainingWindow,
+    window: TrainingWindow | Mapping[str, TrainingWindow],
     season_years: Sequence[int],
     pinned: Mapping[str, PinnedCapacity | None] | None = None,
     device: torch.device | str = "cpu",
@@ -811,7 +812,7 @@ def fit_joint(
         weights: The BSP weights `w`, one batch member each; 0 reproduces the separate fits.
         sigma_points: Each Primary's robust half-hourly residual scale in points, from pre-cut rows.
         cut: The cut; every training row ends no later.
-        window: The window rule for the Primaries' rows.
+        window: The window rule for the Primaries' rows, or one rule per Primary.
         season_years: The season-years with a capacity increment.
         pinned: Each Primary's pinned capacity built for `cut`, or `None`; a missing key means
             `None`.
