@@ -41,24 +41,28 @@ metric: >-
   and pinball at q01, q05, q95, and q99; for the gates, power, coverage, and width over 100
   synthetic substations
 verdict: partly supported
-labels: "N3 gain; N4 tie; N4 gate identified (on the margin)"
+labels: "N3 gain (rests on D5: without D5 it is small gain); N4 tie; N4 gate identified (on the margin)"
 best_arm: "T-all-K, 2.216 points (B0-K 2.255)"
 headline: >-
   T-all-K minus B0-K -0.039 points (97.5% interval -0.070 to -0.014), better at 5 of 5 sites in
   both years; H-site-K minus B0-K -0.012 (-0.030 to +0.007), a tie.
 lessons: >-
-  The convex model's heating response differs across the day. Splitting each heating slope between
-  the two halves of its hour band is worth about 0.04 points after the filter, and day-type
-  interactions add nothing. A per-site threshold is not worth carrying, and real loss profiles
-  prefer thresholds at or below 12 to 14 degrees C at 4 of 5 substations.
-production_status: candidate
+  Splitting each heating slope between the two halves of its hour band is worth about 0.04 points
+  after the filter, but the gain is a temperature-dependent shape of the day: about 38% of it
+  appears on warm rows with no heating term, and two placebo splits of the same size gain nothing.
+  Day-type interactions add nothing. A per-site threshold is not worth carrying, and only D10 passes
+  the rule that allows a threshold to be printed ("12 degrees C or lower").
+production_status: not-for-production
 take_home_message: >-
-  Letting the convex model's heating response differ between the first and second half of each part
-  of the day lowers its day-ahead error after the recent-error filter by about 0.04 points, at all
-  5 substations in both years. Letting heating or lighting differ between weekdays and weekends
-  adds nothing, and choosing a heating threshold separately for each substation did not clearly
-  help (0.01 points, within noise). Every number uses past weather and one scored year, so the
-  gain needs a test on weather forecasts before GAM-K's convex model changes.
+  Splitting the convex model's heating terms between the first and second half of each part of the
+  day lowered its day-ahead error after the recent-error filter by about 0.04 points (97.5% interval
+  0.014 to 0.070), at all 5 substations in both years, but the `gain` label rests on one substation
+  (D5), and the gain is a temperature-dependent shape of the day more than a heating effect.
+  Letting heating or lighting differ between weekdays and weekends adds nothing, and choosing a
+  heating threshold separately for each substation did not clearly help (0.01 points, within noise).
+  Every number uses past temperature, not forecasts, so the gain needs a test on weather forecasts
+  before GAM-K's convex model changes; the PV panel-orientation mix (N13) was dropped because
+  earlier experiments found it unidentified.
 advice:
   - >-
     Split each heating slope between the two halves of its hour band, with a weak penalty, in
@@ -76,11 +80,16 @@ advice:
     points with an interval spanning zero (C2, figure 1).
   - >-
     Extend the threshold grid below 12 degrees C before reading any fitted threshold, because the
-    arg-min sits at the grid edge at D5 and D10 (figure 4).
+    arg-min sits at the grid edge at D5 and D10, and gate 3's arg-min sat at a grid edge in 32 of
+    100 draws (figure 4, figure 5).
+  - >-
+    Run a placebo split of the same size (odd against even half-hours or days) beside any new
+    interaction term, because the half-band split's gain is partly a temperature-dependent shape of
+    the day, with 38% of it on rows with no heating term (Checks).
   - >-
     Print a per-site threshold only under the rule used here (interval wholly outside 13.5 to 17.5
-    degrees C and 15.5 at least 2 effective nats above the minimum, a loss difference scaled by the noise;
-    see Terms); 1 of 5 substations passed it (figure 4).
+    degrees C and 15.5 at least 2 effective nats above the minimum, a loss difference scaled by
+    the noise; see Terms); 1 of 5 substations passed it (figure 4).
 date: 2026-10-20
 pr: 1397
 adopted_in: none
@@ -89,25 +98,30 @@ code: ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating
 
 # Differentiable physics, N3 and N4: interaction terms and a per-site heating threshold
 
-**Letting the convex model's heating response differ between the first and second half of each
-hour band (for example 00:00 to 03:00 against 03:00 to 06:00) lowered its day-ahead error by about
-0.04 percentage points of substation capacity, at all 5 substations in both years.** The error is
-measured after a Kalman filter that corrects the forecast using its recent errors. The convex model
-is the demand model of each Primary substation (a substation that steps the voltage down for the
-local distribution network). [Experiment
+**Splitting each heating term of the convex model between the first and second half of each hour
+band (for example 00:00 to 03:00 against 03:00 to 06:00) lowered its day-ahead error by about 0.04
+percentage points of substation capacity (97.5% interval 0.014 to 0.070), at all 5 substations in
+both years.** The error is measured after a Kalman filter that corrects the forecast using its
+recent errors. The convex model is the demand model of each Primary substation (a substation that
+steps the voltage down for the local distribution network). [Experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md), the sixth part of
 the differentiable-physics (DP) series, chose it as the series' candidate and called it GAM-K.
-Every number here uses observed past temperature, not weather forecasts. Letting heating or
-lighting differ between weekdays and weekends adds nothing.
+Every number here uses observed past temperature, not weather forecasts.
+
+**The gain is a temperature-dependent shape of the day more than a heating effect, and the `gain`
+label rests on D5.** Two placebo splits of the same size gain nothing, but about 38% of the gain
+appears on warm rows where every heating term is zero. Without D5 the estimate is -0.0296, which is
+`small gain` (see Checks). Letting heating or lighting differ between weekdays and weekends adds
+nothing: the interval of the weekday split excludes a gain larger than 0.006 points.
 
 **Choosing the heating threshold separately for each substation did not clearly help (-0.012
 points, interval spanning zero).** The heating threshold is the temperature below which heating
-demand starts; the model uses 15.5 degrees C. The profiled loss prefers a lower threshold at 4 of 5
-substations, but only D10 passes the rule that allows a threshold to be printed, and its threshold
-sits at the edge of the 12 to 19 degree grid.
+demand starts; the model uses 15.5 degrees C. The profile minimum lies below 15.5 degrees C at 4 of
+5 substations, but only D10 passes the rule that allows a threshold to be printed, and D10's reads
+"12 degrees C or lower" because its minimum sits at the edge of the 12 to 19 degree grid.
 
-**The verdict is `partly supported` (N3 `gain`, N4 `tie`).** Two audit triggers fired (see Checks),
-so an Opus audit comes before the merge.
+**The verdict is `partly supported` (N3 `gain`, N4 `tie`).** Audit triggers 2, 4, and 7 fired. An
+Opus audit has run, and its findings are triaged under Checks.
 
 We fitted GAM-K's convex model per substation at 4 yearly cuts, froze each fit for the year after
 its cut, and corrected its day-ahead forecast with the Kalman filter. The base model (B0) was
@@ -141,7 +155,7 @@ unidentified or immaterial.
 **Figure 1 shows T-all-K ahead of B0-K by 0.039 points, with the interval wholly below zero and the
 replicate year matching.** The gain survives B0's filter settings (the control row) and is
 about three times larger after the filter than before. The per-site threshold's interval spans
-zero. T2 (the half-band split alone) carries the whole gain.
+zero. T2 (the half-band split alone) carries the whole gain, but see Checks for what that gain is.
 
 ![Interval chart: T-all-K minus B0-K is -0.039 points with a 97.5% interval of -0.070 to -0.014,
 and T2-K is -0.040; the per-site threshold is -0.012 with an interval spanning
@@ -172,13 +186,17 @@ the minimum at 12 to 15 degrees towards 19 degrees.](figure_4_profiles.svg)
 
 **Figure 5 shows gate 3, the synthetic test of the threshold rule.** The 80% interval covered the
 true threshold in 88 of 100 synthetic substations, and the median interval width was 3.0 degrees C.
+The arg-min sat at a grid edge in 32 of 100 draws, although every true threshold lay between 12.5
+and 18.5 degrees C, so the gate never tested recovery at the 12 degree edge where D10 sits.
 
 ![Scatter chart: recovered against true threshold for 100 synthetic substations, with 80%
 intervals.](figure_5_gate3.svg)
 
 **Figure 6 shows gate 2, the synthetic test of the interaction terms.** With a real interaction
 sized to a 0.03 point gain, T-all beat B0 in 80 of 100 draws. Without one, T-all lost 0.006 points
-on average.
+on average. The real interaction in this gate is weekday against weekend only, so the half-band
+split that carries C1 had no positive control, and the pass test counts the draws where T-all
+wins (91 of 100 pass at lambda 10,000 on a mean gain of 0.0019). It passed at exactly 80 of 100.
 
 ![Histogram: T-all minus B0 on 100 synthetic draws with and without a real
 interaction.](figure_6_gate2.svg)
@@ -190,14 +208,40 @@ interaction.](figure_6_gate2.svg)
 - **Mean-forecast error beside each contrast:** C1's mean absolute error of the mean forecast
   changed by -0.076 points (replicate -0.069), the same sign as its quantile score. C2's changed
   by -0.023 (replicate -0.034).
-- **Triggers fired:** 2 and 7 of the seven in the `ml-experiment` skill. **Trigger 2** fired because
-  gate 3 passed and one real substation (D10) passed the printing rule, against the plan's
-  prediction of neither. **Trigger 7** fired because a `gain` would change GAM-K's base on one year
-  plus a replicate at the screening tier. Triggers 1, 3, 4, 5, and 6 did not fire. The Opus audit
-  has not run at the time of writing.
-- **Not a trigger but worth reading:** gate 2 passed on the margin (80 of 100 draws against 80
-  needed), and gate 3 passed on the margin (median width 3.0 against at most 3.0, placebo recovery
-  0.70 against 0.70).
+- **Triggers fired:** 2, 4, and 7 of the seven in the `ml-experiment` skill; 1, 3, 5, and 6 did
+  not fire. The Opus numbers review and audit
+  (two independent runs) reproduced every number and changed no label, and its findings are
+  triaged here.
+    - **Trigger 4 fired.** Without D5, C1 is -0.0296 (97.5% interval -0.0537 to -0.0106), above the
+      -0.03 that a `gain` needs, so C1 would read `small gain` and the verdict `small gain`. The
+      `gain` label therefore rests on D5, the substation with the largest gain (-0.080 against a
+      median of -0.036), and on an estimate that clears the threshold by 0.009 points. The 97.5%
+      interval's upper end is -0.014, under half the threshold. Without any other substation, C1
+      stays a `gain`. The report script now recomputes the label for each leave-one-out set.
+    - **Trigger 2 fired four times.** The plan predicted the opposite of each of these: gate 3
+      passed; D10 passed the printing rule; T2's unfiltered gain was a third of its filtered gain
+      (-0.013 against -0.040) where at least twice was predicted; and C2's replicate year is
+      negative at 5 of 5 sites where at most 3 was predicted. The third has the tested explanation
+      in the next bullet.
+    - **Trigger 7 fired** because a `gain` would change GAM-K's base on one year plus a replicate
+      at the screening tier.
+- **What the T2 gain is.** Two placebo splits with T2's column count, penalty, and lambda (even
+  against odd local half-hours, and even against odd days; every arm through B0's filter settings,
+  `e00114_placebo.py`) give -0.0008 and +0.0024 against T2's -0.0370 in the scored year, and
+  -0.0007 and +0.0011 against -0.0348 in the tuning year. So extra columns do not explain the gain.
+  Splitting the scored year by temperature, T2-K minus B0-K is -0.069 on warm rows (20% of rows,
+  all four smoothed temperatures at or above 15.5 degrees C, so every heating column is zero) and
+  -0.029 on cold rows (all four below it). Unfiltered, T2 minus B0 is -0.065 on warm rows and
+  +0.0075 (worse) on cold rows. About 38% of the filtered gain, and all of the unfiltered gain,
+  therefore arrives through the refitted daily profile and not through a heating slope. A likely
+  mechanism is that the profile no longer averages cold-day and warm-day shapes; the experiment did
+  not test that. The unfiltered gain is also an April-to-October gain (T2 minus B0 is +0.017 from
+  November to March), which is why the filtered gain was three times the unfiltered one.
+- **Gate margins and limits.** Gate 2 passed at exactly 80 of 100 draws, and its real interaction
+  has no half-band component, so T2 had no positive control (the truth-0 run is its only null
+  control). Gate 3 passed on the margin on three criteria: median width 3.0 against at most 3.0,
+  placebo recovery 0.70 against at least 0.70, and recovery of far thresholds 0.64 against at least
+  0.60.
 
 ## Substation cards
 
@@ -214,9 +258,9 @@ flat. D9 has 9 months of history at the replicate cut.
 compare across substations with care.** Do not rank substations by their heating slopes. The fitted
 capacities carry no interval and are not measurements.
 
-**A threshold is printed only for D10:** 12 degrees C (80% interval 11.75 to 12.75), at the edge of
-the grid, so the true minimum may lie lower. The other substations read "threshold not identified
-at this substation".
+**A threshold is printed only for D10:** 12 degrees C or lower (80% interval 11.75 to 12.75), because
+the grid starts at 12 degrees C and gate 3 never tested recovery at that edge. The other
+substations read "threshold not identified at this substation".
 
 ![Cross-substation comparison of pinned and fitted PV capacity, the weekend-to-weekday heating
 ratio, and the loss-profile ranges.](figure_cross_substation.svg)
@@ -272,8 +316,9 @@ Every number on this page is printed by `e00114_report.py` into `report.txt`.
       filter's settings (the filter-fit difference is -0.0029, -0.0120 to +0.0029).
     - **Exploratory (95%):** T2-K -0.0396 (-0.0590 to -0.0232), 5 of 5 sites, replicate -0.0334;
       T1-K +0.0019 (-0.0058 to +0.0094); T3-K -0.0001 (-0.0002 to +0.00004).
-    - **Leaving one site out:** the estimate runs from -0.0296 (without D5) to -0.0470 (without
-      D11), and every interval stays below zero.
+    - **Leaving one site out:** the estimate runs from -0.0296 (without D5, a `small gain`) to
+      -0.0470 (without D11), every interval stays below zero, and only the D5 case changes the
+      label.
 - **C2 (N4), H-site-K minus B0-K:** scored -0.0120 (-0.0296 to +0.0069), 5 of 5 sites better by
   small amounts; replicate -0.0210, 5 of 5. Unfiltered -0.0023 (-0.0437 to +0.0405), 2 of 5.
   **Label: `tie`** (gate 3 passed, so the contrast is labelled).
@@ -283,8 +328,9 @@ Every number on this page is printed by `e00114_report.py` into `report.txt`.
   (11.75 to 12.75), D11 12.5 (11.75 to 13.75), D14 15.5 (13.25 to 16.25), D16 13.5 (11.75 to
   14.75), and D9 14.5 (12.7 to 15.3). Only D10 passes the rule.
 - **Capacity check (descriptive):** T-all with a fitted PV capacity minus B0 with a fitted capacity
-  is -1.2 points at D5 down to -0.4 at D9 (every 80% interval lies within about -1.8 and -0.1), so
-  no capacity move is flagged beyond 2 points.
+  is -1.2 points at D5 down to -0.4 at D9 (every 80% interval lies within about -1.8 and -0.1): a
+  small, systematic shift below B0's, under the 2-point flag, so no capacity move is flagged. The
+  contrasts pin the capacity.
 - **Tails, scored year, 5 substations (coverage, pinball):**
 
     | Arm | q01 | q05 | q95 | q99 |
@@ -305,7 +351,7 @@ Every number on this page is printed by `e00114_report.py` into `report.txt`.
 - **C1 between -0.06 and +0.01 in both years:** held (-0.039 and -0.038).
 - **T2-K carries most of any gain, in winter and in the morning and evening bands:** held.
 - **T2-K's unfiltered gain at least twice its filtered gain:** failed. The unfiltered gain (-0.013)
-  is a third of the filtered one (-0.040).
+  is a third of the filtered one (-0.040). Explained by the warm and cold split under Checks.
 - **T1-K and T3-K within 0.02 points, filtered or not:** held.
 - **Gate 2 passes, and no capacity move is flagged:** held.
 - **N4 gate fails on width, B0's tau 10 to 40, no real substation passes the printing rule, the
@@ -316,7 +362,8 @@ Every number on this page is printed by `e00114_report.py` into `report.txt`.
 - **C2 between -0.04 and +0.03, replicate negative at 3 of 5 sites at most:** partly held. C2 was
   -0.012, inside the predicted range, but the replicate was negative at 5 of 5 sites against a
   prediction of at most 3.
-- **B0-K within 0.06 of WK, run under 1.5 hours:** held (-0.012; about 10 minutes of compute).
+- **B0-K within 0.06 of WK, run under 1.5 hours:** held (-0.012). The stages together took about
+  20 minutes of wall clock on 6 cores (the work file times are in `report.txt`).
 
 ## Work this builds on
 
@@ -354,16 +401,27 @@ Every number on this page is printed by `e00114_report.py` into `report.txt`.
 - **One scored year plus a replicate, frozen fits, hindsight switching masks** shared by every arm.
 - **Lambda sits at the weakest penalty tried** for T1, T2, and T-all. A weaker penalty was not
   tried, and the tuning-year gain was still growing towards it.
-- **Edits to the plan, all before any fit:** test 1's tolerance for the fitted-value gap at lambda
-  10^10 went from 1e-6 to 1e-5 points, because the penalised solve in float64 has a floor of 0.8e-6
-  to 2.6e-6 points (the plan commit is amended in its own commit). Gate 2's amplitude was set on
-  the gain attributable to the interaction (the gap to the true-parameter forecast under truth I,
-  less the gap under truth 0), because the estimation error alone is about 0.1 points. T-all splits
-  each heating column four ways, and its two difference penalties share one lambda.
+- **Edits to the plan.** Test 1's tolerance for the fitted-value gap at lambda 10^10 went from 1e-6
+  to 1e-5 points, because development runs on the penalised solve alone showed a float64 floor of
+  0.8e-6 to 2.6e-6 points (12 of the 40 checks exceed 1e-6, none exceeds 2.6e-6); the plan commit
+  is amended in its own commit, before the experiment's arms were fitted. **Gate 2's amplitude rule
+  is a post-tuning clarification, recorded only in this write-up:** it was set on the gain
+  attributable to the interaction (the gap to the true-parameter forecast under truth I, less the
+  gap under truth 0), because the estimation error alone is about 0.1 points and the plan's wording
+  would have chosen an amplitude near zero. It came after the tuning fits and the pilot draws, and
+  before any replicate-year or scored-year row was read. T-all splits each heating column four
+  ways, and its two difference penalties share one lambda.
+- **Placebo arms and the leave-one-out label check** were added after the Opus audit, by
+  `e00114_placebo.py` and `e00114_report.py`.
 - **Leaks, none reaching a scored row:** the 2022-07-01 replica, which supplies the tuning year's
   spread, reads the 2023-08-07 capacity vintage, 13 months late; the 2023-07-01 cut has the 5-week
   vintage leak; D9's 2024-07-01 fit reads the 2025-04-14 vintage; the replicate year's filter
-  spread is in sample for the filter's hyperparameters.
+  spread is in sample for the filter's hyperparameters. The first day of the scored year (288 of
+  104,897 rows) is forecast from an issue time of 2025-06-30 09:00, after the fit's 2025-07-01 cut,
+  for every arm alike.
+- **Run history:** `e00114_fit.py` ran twice (the predictions date from the first run, the profiles
+  and coefficients from the second), and the stored predictions' manifests record the commit as
+  dirty. A refit of three arms agrees with the stored sets to 4e-6 points.
 - **Synthetic substations share the model's own form,** so gates 2 and 3 cannot show a wrong PV
   shape.
 - **No new data-processing finding** for `docs/ml-experiments/data-processing.md`.

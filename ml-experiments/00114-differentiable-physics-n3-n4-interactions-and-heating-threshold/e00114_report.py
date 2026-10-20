@@ -18,9 +18,12 @@ pairs arms row by row at day D+1.
 """
 
 import json
+import math
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import cache
+from pathlib import Path
 from typing import Any, Final
 
 import e00114_common as common
@@ -44,6 +47,8 @@ PART_4_DIR: Final = (
     common.ML_EXPERIMENTS_DATA_DIR
     / "00106-differentiable-physics-4-all-years-drift-and-recent-level"
 )
+MAX_PREDICTED_REPLICATE_SITES: Final[int] = 3
+"""The plan predicted the replicate year's C2 to be negative at 3 of 5 sites at most."""
 PART_4_C4_HALF_WIDTH: Final[float] = 0.023
 """Half the 97.5% interval of Part 4's C4 (A2 minus A3), the sister contrast on these rows."""
 PART_4_SETS: Final[tuple[str, ...]] = (
@@ -71,6 +76,10 @@ OWN_ARMS: Final[tuple[str, ...]] = (
     "h_site_k",
 )
 YEARS: Final[tuple[str, ...]] = ("tuning", "replicate", "scored")
+WARM_COLD_THRESHOLD_C: Final[float] = 15.5
+"""A row is warm when all four smoothed temperatures are at or above this, so every heating column
+is zero, and cold when all four are below it, so every heating column is active."""
+MIN_SITE_SHARE: Final[float] = 0.8
 
 
 @dataclass(frozen=True)
@@ -106,6 +115,15 @@ EXPLORATORY: Final[tuple[Contrast, ...]] = (
     Contrast("T2 - B0 (unfiltered)", "t2", "b0"),
     Contrast("T3 - B0 (unfiltered)", "t3", "b0"),
 )
+PLACEBO_CONTRASTS: Final[tuple[Contrast, ...]] = (
+    Contrast("T2-K, B0's filter settings - B0-K", "t2_kb0", "b0_k"),
+    Contrast("Placebo odd/even half-hour, B0's filter - B0-K", "p_halfhour_kb0", "b0_k"),
+    Contrast("Placebo odd/even day, B0's filter - B0-K", "p_day_kb0", "b0_k"),
+    Contrast("Placebo odd/even half-hour - B0 (unfiltered)", "p_halfhour", "b0"),
+    Contrast("Placebo odd/even day - B0 (unfiltered)", "p_day", "b0"),
+)
+"""T2 against two placebo splits of the same number of columns and the same penalty, run through
+B0's filter settings so that only the terms differ."""
 REFERENCE_CONTRASTS: Final[tuple[Contrast, ...]] = (
     Contrast("B0-K - Part 4's WK", "b0_k", "p4:wk"),
     Contrast("B0-K - Part 4's A2", "b0_k", "p4:a2"),
@@ -153,13 +171,46 @@ def load_arm(*, year: str, arm: str, drop_switching: bool = True) -> pl.DataFram
         .then(1)
         .otherwise(0)
     )
+    site_names = frame["time_series_id"].replace_strict(SITE_OF_ID).to_numpy()
+    warm, cold = _warm_cold(valid_time=frame["valid_time"], site_names=site_names)
     return frame.with_columns(
         qs=pl.Series(common.quantile_score(actual=actual, quantiles=quantiles)),
         ae=(pl.col("actual") - pl.col("mean")).abs(),
         site_name=pl.col("time_series_id").replace_strict(SITE_OF_ID),
         band=band,
         calendar_month=pl.col("valid_time").dt.month(),
+        warm=pl.Series(warm),
+        cold=pl.Series(cold),
     )
+
+
+@cache
+def _feature_cache() -> Any:
+    """Return the feature cache, for the temperature of each scored row."""
+    return common.load_cache()
+
+
+def _warm_cold(*, valid_time: pl.Series, site_names: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Return, for each row, whether all heating columns are zero (warm) or all are active (cold).
+
+    Args:
+        valid_time: The rows' UTC valid times (the end of the half-hour).
+        site_names: Each row's substation label.
+
+    Returns:
+        Two boolean arrays, warm and cold; a row with some columns active is neither.
+    """
+    feature_cache = _feature_cache()
+    valid = valid_time.dt.replace_time_zone(None).to_numpy().astype("datetime64[us]")
+    position = np.searchsorted(feature_cache.end_times, valid)
+    warm = np.zeros(len(valid), dtype=bool)
+    cold = np.zeros(len(valid), dtype=bool)
+    for site in np.unique(site_names):
+        rows = np.flatnonzero(site_names == site)
+        smoothed = feature_cache.sites[str(site)].smoothed_temperature_c[position[rows]]
+        warm[rows] = (smoothed >= WARM_COLD_THRESHOLD_C).all(axis=1)
+        cold[rows] = (smoothed < WARM_COLD_THRESHOLD_C).all(axis=1)
+    return warm, cold
 
 
 def paired(
@@ -171,6 +222,7 @@ def paired(
     drop_switching: bool = True,
     months: tuple[int, ...] | None = None,
     band: int | None = None,
+    temperature: str | None = None,
 ) -> pl.DataFrame:
     """Return both arms' rows on the sites, paired, as the frame `studies.bootstrap` reads.
 
@@ -182,6 +234,8 @@ def paired(
         drop_switching: True to leave out the rows inside the switching masks.
         months: Calendar months of the valid time to keep, or `None` for all.
         band: The hour band to keep, or `None` for all.
+        temperature: `warm` to keep rows with every heating column zero, `cold` to keep rows with
+            every heating column active, or `None` for all rows.
 
     Returns:
         The paired loss frame.
@@ -195,6 +249,8 @@ def paired(
             frame = frame.filter(pl.col("calendar_month").is_in(months))
         if band is not None:
             frame = frame.filter(pl.col("band") == band)
+        if temperature is not None:
+            frame = frame.filter(pl.col(temperature))
         arms[name] = frame.select(
             "time_series_id", "power_fcst_init_time", "valid_time", "seed", "qs", "ae"
         )
@@ -248,7 +304,15 @@ def sites_improving(*, year: str, contrast: Contrast) -> int:
     )
 
 
-def label_of(*, low: float, high: float, scored: float, replicate: float, improving: int) -> str:
+def label_of(
+    *,
+    low: float,
+    high: float,
+    scored: float,
+    replicate: float,
+    improving: int,
+    min_sites: int = MIN_SITES_IMPROVING,
+) -> str:
     """Return the decision rule's label for one question.
 
     Args:
@@ -257,6 +321,7 @@ def label_of(*, low: float, high: float, scored: float, replicate: float, improv
         scored: The scored year's estimate.
         replicate: The replicate year's estimate.
         improving: The number of decision sites that improve in the scored year.
+        min_sites: The number of improving sites a `gain` needs (4 of 5 decision sites).
 
     Returns:
         `gain`, `small gain`, `not replicated`, `worse`, or `tie`.
@@ -266,7 +331,7 @@ def label_of(*, low: float, high: float, scored: float, replicate: float, improv
     if high < 0.0:
         if scored > -GAIN_THRESHOLD_POINTS:
             return "small gain"
-        return "gain" if replicate < 0.0 and improving >= MIN_SITES_IMPROVING else "not replicated"
+        return "gain" if replicate < 0.0 and improving >= min_sites else "not replicated"
     return "tie"
 
 
@@ -297,23 +362,54 @@ def contrast_row(*, contrast: Contrast, level: float) -> dict[str, Any]:
     )
     for position, name in enumerate(BAND_NAMES):
         row[f"band {name}"] = estimate(year="scored", contrast=contrast, band=position)[0]
+    try:
+        row["tuning QS"] = estimate(year="tuning", contrast=contrast)[0]
+    except FileNotFoundError:
+        row["tuning QS"] = None
+    total_rows = estimate(year="scored", contrast=contrast)[2]
+    for kind, text in (
+        ("warm", "warm rows (no heating term)"),
+        ("cold", "cold rows (all heating)"),
+    ):
+        scored_part, _, n_rows = estimate(year="scored", contrast=contrast, temperature=kind)
+        row[f"{text}, scored"] = scored_part
+        row[f"{text}, replicate"] = estimate(year="replicate", contrast=contrast, temperature=kind)[
+            0
+        ]
+        row[f"{text}, share of rows"] = n_rows / total_rows
     return row
 
 
 def leave_one_site_out(*, contrast: Contrast) -> pl.DataFrame:
-    """Return the contrast with each decision site left out: estimate and 97.5% interval."""
+    """Return the contrast with each decision site left out: estimate, interval, and label.
+
+    The label uses the decision rule with a `gain` needing 80% of the remaining sites to improve.
+    """
     rows = []
     for left_out in (None, *DECISION):
         sites = tuple(s for s in DECISION if s != left_out)
         point = estimate(year="scored", contrast=contrast, sites=sites)[0]
         low, high = interval(year="scored", contrast=contrast, level=PLANNED_LEVEL, sites=sites)
+        replicate = estimate(year="replicate", contrast=contrast, sites=sites)[0]
+        improving = sum(
+            int(estimate(year="scored", contrast=contrast, sites=(s,))[0] < 0.0) for s in sites
+        )
         rows.append(
             {
                 "left out": left_out or "none",
                 "estimate": point,
                 "low": low,
                 "high": high,
-                "replicate": estimate(year="replicate", contrast=contrast, sites=sites)[0],
+                "replicate": replicate,
+                "sites better": improving,
+                "label": label_of(
+                    low=low,
+                    high=high,
+                    scored=point,
+                    replicate=replicate,
+                    improving=improving,
+                    min_sites=math.ceil(MIN_SITE_SHARE * len(sites)),
+                ),
             }
         )
     return pl.DataFrame(rows)
@@ -462,7 +558,34 @@ def gate_summary() -> dict[str, Any]:
                 f"by site {part['wins_by_site']}"
             )
     print(f"gate 3: {json.dumps(gate3)}")
+    print(f"test 1 fitted-value gaps at lambda 1e10 (points): {test1_gaps()}")
+    print_table(title="work file times (UTC)", frame=work_file_times())
     return {"test1": test1, "gate2": gate2, "gate3": gate3}
+
+
+def test1_gaps() -> str:
+    """Return test 1's largest fitted-value gap at lambda 1e10 and how many exceed the old bound."""
+    gaps = [
+        (float(line.rsplit(" ", 1)[-1]), line.split(" at lambda")[0])
+        for line in (common.WORK_DIR / "test1.txt").read_text().splitlines()
+        if "at lambda 1e10 against B0" in line
+    ]
+    worst = max(gaps)
+    above = sum(gap > 1e-6 for gap, _ in gaps)
+    return (
+        f"largest {worst[0]:.2e} ({worst[1]}); {above} of {len(gaps)} checks exceed the "
+        "plan's original 1e-6 bound, and all lie below the amended 1e-5"
+    )
+
+
+def work_file_times() -> pl.DataFrame:
+    """Return the modification time of each private work file, which dates each stage."""
+    rows = []
+    for path in sorted(Path(common.WORK_DIR).iterdir()):
+        if path.is_file():
+            stamp = datetime.fromtimestamp(path.stat().st_mtime, tz=UTC)
+            rows.append({"file": path.name, "modified": stamp.strftime("%Y-%m-%d %H:%M:%S")})
+    return pl.DataFrame(rows)
 
 
 def profile_summary(*, gate3: dict[str, Any]) -> None:
@@ -551,17 +674,27 @@ def trigger_table(*, rows: dict[str, Any], gates: dict[str, Any]) -> pl.DataFram
         f"test 1 '{gates['test1']}'; gate 2 passed {gates['gate2']['passed']}; "
         f"N4 placebo passed {gates['gate3']['placebo_pass']}",
     )
+    t2_filtered = rows["t2_filtered"]["scored QS"]
+    t2_unfiltered = rows["t2_unfiltered"]["scored QS"]
+    filter_prediction_failed = abs(t2_unfiltered) < 2.0 * abs(t2_filtered)
+    replicate_sites = c2["replicate sites better"]
     contradiction = (
         c1["scored QS"] < -0.10
         or gates["gate3"]["identified"]
         or reference > 0.10
-        or rows["printable"]
+        or bool(rows["printable"])
+        or filter_prediction_failed
+        or replicate_sites > MAX_PREDICTED_REPLICATE_SITES
     )
     add(
         2,
         contradiction,
-        f"C1 {c1['scored QS']:+.4f}; gate 3 identified {gates['gate3']['identified']}; "
-        f"a site passes the printing rule {rows['printable']}; B0-K minus WK {reference:+.4f}",
+        f"C1 {c1['scored QS']:+.4f}; (i) gate 3 identified {gates['gate3']['identified']} "
+        f"against a predicted failure; (ii) a site passes the printing rule {rows['printable']} "
+        f"against a prediction of none; (iii) T2's unfiltered gain {t2_unfiltered:+.4f} against "
+        f"its filtered gain {t2_filtered:+.4f}, where at least twice was predicted; (iv) C2's "
+        f"replicate year is negative at {replicate_sites} of 5 sites, where at most "
+        f"{MAX_PREDICTED_REPLICATE_SITES} was predicted; B0-K minus WK {reference:+.4f}",
     )
     sign_disagrees = [
         c["contrast"] for c in (c1, c2) if (c["scored QS"] < 0.0) != (c["scored MAE of mean"] < 0.0)
@@ -572,7 +705,12 @@ def trigger_table(*, rows: dict[str, Any], gates: dict[str, Any]) -> pl.DataFram
         f"score and mean-error contrasts disagree in sign for {sign_disagrees or 'none'}",
     )
     flips = rows["leave_out_flips"]
-    add(4, bool(flips), f"leaving one site out flips sign or interval status: {flips or 'none'}")
+    add(
+        4,
+        bool(flips),
+        "leaving one site out flips the sign, the interval's status, or the label: "
+        f"{flips or 'none'}",
+    )
     nested = tuning > tuning_half
     moved = abs(control - c1["scored QS"]) > (c1["high"] - c1["low"]) / 2.0
     add(
@@ -623,10 +761,16 @@ def main() -> None:
         title="beside the planned contrasts",
         frame=pl.DataFrame([contrast_row(contrast=c, level=PLANNED_LEVEL) for c in BESIDE]),
     )
+    exploratory_rows = {
+        c.name: contrast_row(contrast=c, level=EXPLORATORY_LEVEL) for c in EXPLORATORY
+    }
     print_contrasts(
-        title="exploratory contrasts (95%)",
+        title="exploratory contrasts (95%)", frame=pl.DataFrame(list(exploratory_rows.values()))
+    )
+    print_contrasts(
+        title="T2 placebo splits and the warm and cold rows (95%)",
         frame=pl.DataFrame(
-            [contrast_row(contrast=c, level=EXPLORATORY_LEVEL) for c in EXPLORATORY]
+            [contrast_row(contrast=c, level=EXPLORATORY_LEVEL) for c in PLACEBO_CONTRASTS]
         ),
     )
     print_contrasts(
@@ -701,6 +845,7 @@ def main() -> None:
             if (row["estimate"] < 0.0) != (base_row["estimate"] < 0.0)
             or (row["high"] < 0.0) != (base_row["high"] < 0.0)
             or (row["low"] > 0.0) != (base_row["low"] > 0.0)
+            or row["label"] != base_row["label"]
         )
     wk_gap = estimate(year="scored", contrast=REFERENCE_CONTRASTS[0])[0]
     control = estimate(year="scored", contrast=BESIDE[1])[0]
@@ -713,6 +858,8 @@ def main() -> None:
             "printable": printable,
             "leave_out_flips": flips,
             "labels": labels,
+            "t2_filtered": exploratory_rows["T2-K - B0-K (heating by half-band)"],
+            "t2_unfiltered": exploratory_rows["T2 - B0 (unfiltered)"],
         },
         gates=gates,
     )
