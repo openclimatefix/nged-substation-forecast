@@ -118,11 +118,12 @@ quantiles.
 
 **The proposal lets the Kalman filter learn a diagonal process noise and track its own observation
 variance online, instead of using fixed values, on the batched filter grid.** [de Vilmarest and
-Wintenberger (2021)](https://arxiv.org/abs/2104.10777) call the variance-tracking method VIKING. In [de Vilmarest and Goude (2022)](https://arxiv.org/abs/2110.00334), it matched a
-hand-set large process noise on a linear model (mean absolute error 11.5 MW against 11.2 MW) and
-beat a dynamic model with fixed noise (14.9 MW), so the main benefit is less tuning. It would give
-the filter a variance that adapts to noisy periods, which also feeds the filter-variance arm of CAL.
-The run takes CPU seconds.
+Wintenberger (2021)](https://arxiv.org/abs/2104.10777) call the variance-tracking method VIKING. In
+[de Vilmarest and Goude (2022)](https://arxiv.org/abs/2110.00334), it matched a hand-set large
+process noise on a linear model (mean absolute error 11.5 MW against 11.2 MW) and beat a dynamic
+model with fixed noise (14.9 MW), so the main benefit is less tuning. It would give the filter a
+variance that adapts to noisy periods, which also feeds the filter-variance arm of CAL. The run
+takes about 1 GPU hour.
 
 ## ERA5-only winter-by-winter backtest, earlier winters
 
