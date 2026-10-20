@@ -15,6 +15,8 @@ order for the maintainer to change.
 | Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals calibrate the tails better than residual quantiles? | 6 | CAL, if the maintainer restarts it | Proposed |
 | Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles? | 7 | CAL, and the quantile regression above | Proposed |
 | Learned observation variance | Does tracking the filter's observation variance online beat a fixed value? | 8 | Nothing | Proposed |
+| ERA5-only winter-by-winter backtest of the release candidate | Does the release candidate rank above XGBoost on past weather in every winter the power history covers, and does that ranking agree with the ensemble-weather result? | Queued | Nothing | Queued, not started |
+| Event-day comparison of DP models against XGBoost | Do the DP models beat XGBoost on Economy 7 nights, clock changes, Easter, Christmas and New Year, bank holidays, and big events? | Queued | Nothing | Queued, not started |
 | CAL, tail calibration and coherence | Can the convex model's tails on ensemble weather be calibrated per lead band, and do its summed ensembles match the observed sum across substations? | Postponed | The maintainer's decision to restart (postponed on 2026-10-20) | Postponed |
 
 ## CAL: tail calibration and a coherence pass
@@ -112,6 +114,23 @@ hand-set large process noise on a linear model (mean absolute error 11.5 MW agai
 beat a dynamic model with fixed noise (14.9 MW), so the main benefit is less tuning. It would give
 the filter a variance that adapts to noisy periods, which also feeds the filter-variance arm of CAL.
 The run takes CPU seconds.
+
+## ERA5-only winter-by-winter backtest of the release candidate
+
+**The backtest replaces the forecast weather with ERA5, so that the release candidate and XGBoost
+can be judged over every winter the power history covers.** The release candidate is the convex
+model with the Kalman filter (GAM-K), plus whichever of the night steps and the multi-hinge heating
+terms win their experiments. XGBoost is the production recipe (BG2) and its lagless version. ERA5
+removes forecast-weather error, so the result ranks model structure on past weather and does not give production skill. The
+report gives winter-by-winter paired contrasts next to the ensemble-weather result, and says whether
+the two rankings agree. The run is cheap and uses the CPU only. It is queued and not started.
+
+## Event-day comparison of DP models against XGBoost
+
+**The comparison scores the stored forecasts of the DP models and XGBoost on the days when demand
+follows an unusual rule.** The days are Economy 7 nights, the two clock changes, Easter, Christmas
+and New Year, bank holidays, and big events. It reads forecasts that are already stored, so it fits
+no model. It is queued and not started.
 
 ## Planned experiments
 
