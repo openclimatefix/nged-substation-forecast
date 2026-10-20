@@ -8,15 +8,15 @@ order for the maintainer to change.
 |---|---|---|---|---|
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
-| Filter in the production serving path (proposed) | Does a Kalman filter on the recent residuals of the production XGBoost blend lower its day-ahead score as it does for the convex model? | 1 | Nothing; a candidate for the next release review | Proposed |
+| Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |
 | W1, a diurnal-shape state | Does a second filter state for the shape of the day lower the convex model's day-ahead error? | Running | Nothing | Running (experiment 115) |
 | N8, ensemble members through the DP | Does running each ensemble member through the DP give better-calibrated spread than residual quantiles? | 4 | Part 6 merged, and a free GPU | Proposed |
-| N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly zero where both sides are metered? | 5 | Nothing | Proposed |
-| Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals calibrate the tails better than residual quantiles? | 6 | CAL, if the maintainer restarts it | Proposed |
-| Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles? | 7 | CAL, and the quantile regression above | Proposed |
-| Learned observation variance | Does tracking the filter's observation variance online beat a fixed value? | 8 | Nothing | Proposed |
-| ERA5-only winter-by-winter backtest of the release candidate | Does the release candidate rank above XGBoost on past weather in every winter the power history covers, and does that ranking agree with the ensemble-weather result? | Queued | Nothing | Queued, not started |
-| Event-day comparison of DP models against XGBoost | Do the DP models beat XGBoost on Economy 7 nights, clock changes, Easter, Christmas and New Year, bank holidays, and big events? | Queued | Nothing | Queued, not started |
+| Schaake shuffle against ECC | Do ensemble copula coupling and the Schaake shuffle give summed ensembles with the same calibration against the observed sum across substations? | 4 | N8's ensemble members | Queued, after N8 |
+| N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly the moved power where both sides are metered? | 5 | Nothing; can run with the cheap screens or with the edge-flow experiment | Proposed |
+| Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals, with the prediction, its square, and the hour as covariates, calibrate the tails better than residual quantiles? | 6 | The stored residuals only; independent of CAL | Proposed |
+| Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles, for the curtailment tail? | 7 | The tail quantile regression above | Proposed |
+| Learned process noise and observation variance | On the batched filter grid, do a learned diagonal process noise and an online observation variance beat fixed values? | 8 | The batched-filter module (pull request 1419) merged; about 1 GPU hour | Queued |
+| ERA5-only winter-by-winter backtest, earlier winters | Does the release candidate rank above XGBoost on past weather in the winters of 2019-20 to 2022-23, and does that ranking agree with the ensemble-weather result? | Low | Nothing | Queued, not started |
 | CAL, tail calibration and coherence | Can the convex model's tails on ensemble weather be calibrated per lead band, and do its summed ensembles match the observed sum across substations? | Postponed | The maintainer's decision to restart (postponed on 2026-10-20) | Postponed |
 
 ## CAL: tail calibration and a coherence pass
@@ -83,6 +83,15 @@ that a later model can treat a transfer as a conserved flow between two nodes. O
 events have both sides metered, so the result describes those events and does not generalise to the
 rest. The run takes minutes on the CPU.
 
+## Schaake shuffle against ECC
+
+**The comparison tests which way of restoring dependence across substations gives the better summed
+ensemble.** Ensemble copula coupling (ECC) orders each substation's calibrated quantiles by the
+ranks of the ensemble members. The Schaake shuffle orders them by a template taken from history.
+Both then give members whose sums across substations are scored against the observed sum, with the
+variogram score. It reuses the members of N8, takes about 1 CPU hour, and starts after N8. It is the
+comparison that CAL's coherence pass needs, so CAL can reuse its result.
+
 ## Tail quantile regression on filtered residuals
 
 **The proposal fits a quantile regression on the Kalman filter's residuals, with the model's
@@ -105,33 +114,28 @@ package `mgcv`, so a Python version needs a small custom maximum-likelihood fit,
 minutes per substation. The proposal serves the curtailment goal, which depends on the extreme upper
 quantiles.
 
-## Learned observation variance
+## Learned process noise and observation variance
 
-**The proposal lets the Kalman filter track its own observation variance online instead of using a
-fixed value.** [de Vilmarest and Wintenberger (2021)](https://arxiv.org/abs/2104.10777) call the
-method VIKING. In [de Vilmarest and Goude (2022)](https://arxiv.org/abs/2110.00334), it matched a
-hand-set large process noise on a linear model (mean absolute error 11.5 MW against 11.2 MW) and
-beat a dynamic model with fixed noise (14.9 MW), so the main benefit is less tuning. It would give
-the filter a variance that adapts to noisy periods, which also feeds the filter-variance arm of CAL.
-The run takes CPU seconds.
+**The proposal lets the Kalman filter learn a diagonal process noise and track its own observation
+variance online, instead of using fixed values, on the batched filter grid.** [de Vilmarest and
+Wintenberger (2021)](https://arxiv.org/abs/2104.10777) call the variance-tracking method VIKING. In
+[de Vilmarest and Goude (2022)](https://arxiv.org/abs/2110.00334), it matched a hand-set large
+process noise on a linear model (mean absolute error 11.5 MW against 11.2 MW) and beat a dynamic
+model with fixed noise (14.9 MW), so the main benefit is less tuning. It would give the filter a
+variance that adapts to noisy periods, which also feeds the filter-variance arm of CAL. The run
+takes about 1 GPU hour.
 
-## ERA5-only winter-by-winter backtest of the release candidate
+## ERA5-only winter-by-winter backtest, earlier winters
 
 **The backtest replaces the forecast weather with ERA5, so that the release candidate and XGBoost
-can be judged over every winter the power history covers.** The release candidate is the convex
-model with the Kalman filter (GAM-K), plus whichever of the night steps and the multi-hinge heating
-terms win their experiments. XGBoost is the production recipe (BG2) and its lagless version. ERA5
-removes forecast-weather error, so the result ranks model structure on past weather and does not
-give production skill. The report gives winter-by-winter paired contrasts next to the
-ensemble-weather result, and says whether the two rankings agree. The run is cheap and uses the CPU
-only. It is queued and not started.
-
-## Event-day comparison of DP models against XGBoost
-
-**The comparison scores the stored forecasts of the DP models and XGBoost on the days when demand
-follows an unusual rule.** The days are Economy 7 nights, the two clock changes, Easter, Christmas
-and New Year, bank holidays, and big events. It reads forecasts that are already stored, so it fits
-no model. It is queued and not started.
+can be judged over the winters that the ensemble-weather experiments do not cover.** Experiment 122
+covers the winters of 2023-24 to 2025-26, so this backtest covers 2019-20 to 2022-23 and has low
+priority. The release candidate is the convex model with the Kalman filter (GAM-K), plus whichever
+of the night steps and the multi-hinge heating terms win their experiments. XGBoost is the production
+recipe (BG2) and its lagless version. ERA5 removes forecast-weather error, so the result ranks model
+structure on past weather and does not give production skill. The report gives winter-by-winter
+paired contrasts next to the ensemble-weather result, and says whether the two rankings agree. The
+run is cheap and uses the CPU only.
 
 ## Planned experiments
 
