@@ -284,7 +284,8 @@ non-commercial use ([experiment 53](00053-ukv-vs-ens-solar-anomaly/result.md)). 
 experiments and production.
 
 **Calibrate the ECMWF ensemble's temperature and irradiance before it drives a model trained on ERA5
-and CAMS, and expect a small map (medium confidence).** Per substation, season, lead band, and hour
+and CAMS, and expect shifts of up to about 2 K in temperature and 20% in irradiance (medium
+confidence).** Per substation, season, lead band, and hour
 band, the ensemble-mean temperature needed a shift of -1.15 to +2.05 K (mean +0.20) and the
 daylight irradiance a ratio of 0.80 to 1.11 (mean 0.95) at five Primary substations, fitted on the
 odd months of 2024-07 to 2025-06. Shrinking the forecast solar anomaly towards CAMS's
@@ -296,7 +297,7 @@ forecasts.
 **Drop an ensemble member that has a missing weather value from its run at that substation, and
 refuse a run whose control member is incomplete (medium confidence).** Member 36 of the run of
 2025-06-04 has 12 missing shortwave values at two Primaries, which would fail every half-hour of
-the run at those substations; the mixture then pools 50 members
+the run at those substations; the ensemble mixture then pools the remaining 50 members' forecasts
 ([experiment 111](00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)).
 Applies to experiments and production.
 
