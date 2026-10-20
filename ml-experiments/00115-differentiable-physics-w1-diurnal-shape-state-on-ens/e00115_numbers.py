@@ -38,7 +38,8 @@ def gate(report: dict) -> None:
         print(f"{label}: passed={block['passed']}")
         for name, entry in block["shapes"].items():
             print(
-                f"  {name}: KW median {entry['kw_median']:.3f} (expected {entry['expected_median']:.3f}), "
+                f"  {name}: KW median {entry['kw_median']:.3f} (expected "
+                f"{entry['expected_median']:.3f}), "
                 f"max site {entry['kw_max']:.3f}, K0 median {entry['k0_median']:.3f}, "
                 f"R median {entry['r_median']:.3f}, spillover max {entry['spillover_max']:.3f}, "
                 f"R spillover max {entry['r_spillover_max']:.3f}, in brief target "
@@ -48,29 +49,34 @@ def gate(report: dict) -> None:
     print(f"test 2 (clean data): passed={t2['passed']}")
     for kind, block in t2["kinds"].items():
         print(
-            f"  {kind}: score gap KW minus K0 {block['score_gap_kw_minus_k0']:+.4f}, {block['checks']}"
+            f"  {kind}: score gap KW minus K0 {block['score_gap_kw_minus_k0']:+.4f}, "
+            f"{block['checks']}"
         )
         for row in block["per_site"]:
             print(
-                f"    {row['site']}: refit q_s {row['refit_q_s']:.2e} (tuned {row['tuned_q_s']:.4f}), "
+                f"    {row['site']}: refit q_s {row['refit_q_s']:.2e} (tuned "
+                f"{row['tuned_q_s']:.4f}), "
                 f"refit s RMS {row['refit_s_rms']:.3f}, tuned s RMS {row['tuned_s_rms']:.3f}, "
                 f"sqrt mean P_s {row['tuned_p_s_rms']:.3f}"
             )
     t3 = report["test_3_reproduction"]
     print(
-        f"test 3 (reproduction): passed={t3['passed']}, worst vs code {t3['worst_vs_code_float64']:.2e}, "
+        f"test 3 (reproduction): passed={t3['passed']}, worst vs code "
+        f"{t3['worst_vs_code_float64']:.2e}, "
         f"worst level vs stored {t3['worst_level_vs_stored']:.2e}, worst quantile vs stored "
         f"{t3['worst_quantile_vs_stored']:.2e}, rows match {t3['rows_match']}"
     )
     t4 = report["test_4_causality"]
     print(
-        f"test 4 (causality): passed={t4['passed']}, worst reading change {t4['worst_reading_change']}, "
+        f"test 4 (causality): passed={t4['passed']}, worst reading change "
+        f"{t4['worst_reading_change']}, "
         f"worst recipe change {t4['worst_recipe_change']}, ensemble inputs identical "
         f"{t4['ensemble_inputs_identical']}"
     )
     t5 = report["test_5_zero_mean"]
     print(
-        f"test 5 (zero mean): passed={t5['passed']}, worst block sum {t5['worst_abs_block_sum']:.2e}"
+        f"test 5 (zero mean): passed={t5['passed']}, worst block sum "
+        f"{t5['worst_abs_block_sum']:.2e}"
     )
 
 
@@ -80,11 +86,13 @@ def settings(hypers: dict, tuned: dict) -> None:
     print("KW (log q_s, log sigma_eps) per site:")
     for site, (log_q_s, log_eps) in hypers["KW"].items():
         print(
-            f"  {site}: q_s {math.exp(log_q_s):.4f} points^2/day, sigma_eps {math.exp(log_eps):.3f} points"
+            f"  {site}: q_s {math.exp(log_q_s):.4f} points^2/day, sigma_eps "
+            f"{math.exp(log_eps):.3f} points"
         )
     print(f"lead-band multipliers: {tuned['multipliers']}")
     print(
-        f"recipe kappa grid scores {tuned['kappa']['grid_scores']}, chosen {tuned['kappa']['chosen']}"
+        f"recipe kappa grid scores {tuned['kappa']['grid_scores']}, chosen "
+        f"{tuned['kappa']['chosen']}"
     )
     print("spread factors per lead band (0-24, 24-48, 48-144, 144-168 h):")
     for arm, factors in tuned["spread_factors"].items():
@@ -114,7 +122,8 @@ def planned(results: dict) -> None:
                     if cell is None or (kind == "leave_one_site_out" and name == "D9"):
                         continue
                     print(
-                        f"    robust {kind} {name}: {cell['estimate']:+.4f} ({cell['sites_better']}/{cell['n_sites']})"
+                        f"    robust {kind} {name}: {cell['estimate']:+.4f} "
+                        f"({cell['sites_better']}/{cell['n_sites']})"
                     )
 
 
@@ -125,7 +134,8 @@ def exploratory(results: dict) -> None:
         for label, entry in block.items():
             d1, full = entry["bands"]["D+1"], entry["bands"]["0.5-168 h"]
             print(
-                f"{period} | {label} | D+1 {interval(d1['qs'])} | all leads {interval(full['qs'])} | "
+                f"{period} | {label} | D+1 {interval(d1['qs'])} | all leads "
+                f"{interval(full['qs'])} | "
                 f"MAE median D+1 {d1['mae_median']['estimate']:+.4f}"
             )
 
@@ -140,9 +150,8 @@ def absolute(results: dict) -> None:
     print("D9 beside the decision substations:")
     for period, block in results["absolute_d9"].items():
         for arm, bands in block.items():
-            print(
-                f"{period} | D9 | {arm} | D+1 {bands['D+1']['qs']:.3f}, all leads {bands['0.5-168 h']['qs']:.3f}"
-            )
+            d1, full = bands["D+1"]["qs"], bands["0.5-168 h"]["qs"]
+            print(f"{period} | D9 | {arm} | D+1 {d1:.3f}, all leads {full:.3f}")
     print("== References on rows every listed arm holds ==")
     for period, block in results["references"].items():
         print(f"{period}: {block['rows']:,} rows")
@@ -169,7 +178,8 @@ def winter(results: dict) -> None:
                     continue
                 print(
                     f"  {pair} | {label} | {interval(cell['qs'])} | absolute "
-                    f"{ {k: round(v, 3) for k, v in cell['absolute'].items()} } | rows {cell['rows']:,}"
+                    f"{ {k: round(v, 3) for k, v in cell['absolute'].items()} } | rows "
+                    f"{cell['rows']:,}"
                 )
 
 
@@ -180,7 +190,8 @@ def tails(results: dict) -> None:
         for arm, bands in block.items():
             for band, entries in bands.items():
                 cells = ", ".join(
-                    f"q{round(e['level'] * 100):02d} gap {100 * e['gap']:+.2f} pinball {e['pinball']:.4f}"
+                    f"q{round(e['level'] * 100):02d} gap {100 * e['gap']:+.2f} pinball "
+                    f"{e['pinball']:.4f}"
                     for e in entries
                 )
                 print(f"{period} | {arm} | {band} | {cells}")
@@ -197,7 +208,8 @@ def tails(results: dict) -> None:
         max(abs(g[95]) for g in kw_gaps.values()),
     )
     print(
-        f"scored KW worst |gap| over lead bands: q01 {worst_outer[0]:.2f}, q99 {worst_outer[1]:.2f}, q05 {worst_inner[0]:.2f}, q95 {worst_inner[1]:.2f}"
+        f"scored KW worst |gap| over lead bands: q01 {worst_outer[0]:.2f}, q99 "
+        f"{worst_outer[1]:.2f}, q05 {worst_inner[0]:.2f}, q95 {worst_inner[1]:.2f}"
     )
 
 
@@ -214,7 +226,8 @@ def checks(results: dict) -> None:
     for period, block in results["sisters"].items():
         for label, entry in block.items():
             print(
-                f"{period} | {label} | {entry['estimate']:+.4f} [{entry['lower']:+.4f}, {entry['upper']:+.4f}] width {entry['width']:.4f}"
+                f"{period} | {label} | {entry['estimate']:+.4f} [{entry['lower']:+.4f}, "
+                f"{entry['upper']:+.4f}] width {entry['width']:.4f}"
             )
 
 

@@ -90,7 +90,7 @@ def load_arm(
 
 
 def stored_reference(*, name: str, period: str, sites: tuple[str, ...]) -> pl.DataFrame:
-    """Return a stored experiment 111 prediction set in the common frame shape, scorable rows only."""
+    """Return a stored experiment 111 prediction set as scorable rows in the common frame shape."""
     row_set = common.ROW_SET_ID if period == "scored" else REPLICATE_ROW_SET
     frame = read_predictions(experiment_id=111, name=f"{name}_{period}", row_set_id=row_set)
     labels = site_of_series()
@@ -150,6 +150,11 @@ def quantile_score(*, frame: pl.DataFrame) -> pl.Series:
         np.maximum(LEVELS[None, :] * error, (LEVELS[None, :] - 1.0) * error), axis=1
     )
     return pl.Series("qs", score)
+
+
+def mean_of(series: pl.Series) -> float:
+    """Return the mean of a polars series as a float."""
+    return float(np.mean(series.to_numpy()))
 
 
 def with_losses(*, frame: pl.DataFrame) -> pl.DataFrame:

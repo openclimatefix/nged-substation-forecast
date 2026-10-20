@@ -1,12 +1,13 @@
-"""The known-answer gate of experiment 115, run on the tuning months before any replicate or scored run.
+"""The known-answer gate of experiment 115, run on the tuning months before any scored run.
 
 Five tests, each able to fail. A failed blocking reading stops scoring, and the verdict is capped at
-`inconclusive` if it cannot be fixed inside the experiment. The tests run on real streams at the five
-decision substations:
+`inconclusive` if it cannot be fixed inside the experiment. The tests run on real streams at the
+five decision substations:
 
 1. **An injected persistent profile change is recovered** (`test_recovery`).
 2. **No false shape on clean data** (`test_clean`): permuted real streams and synthetic streams.
-3. **Reproduction** (`test_reproduction`): with no shape state, KW is GAM-K as experiment 111 stored it.
+3. **Reproduction** (`test_reproduction`): with no shape state, KW is GAM-K as experiment 111
+   stored it.
 4. **Causality** (`test_causality`): readings and ensemble runs after the cut change nothing.
 5. **Zero mean** (`test_zero_mean`): the shape sums to zero in its blocks after every update.
 
@@ -108,7 +109,7 @@ def injection(*, data: site_module.SiteData, start: date, amounts: dict[int, flo
 
 
 def read_rows(*, data: site_module.SiteData, start: date) -> np.ndarray:
-    """Return the grid rows of days 8 to 14 of an injection that have a reading outside the masks."""
+    """Return the grid rows of days 8 to 14 of an injection with a reading outside the masks."""
     local_date = data.cache.calendar.local_date
     first = np.datetime64(start, "D")
     days = (local_date >= first + np.timedelta64(DAYS_READ.start, "D")) & (
@@ -277,6 +278,11 @@ def summarise_recovery(*, per_site: list[dict]) -> dict:
     return out
 
 
+def max_abs(series: pl.Series) -> float:
+    """Return the largest absolute value of a polars series as a float."""
+    return float(np.abs(series.to_numpy()).max())
+
+
 def reproduction_site(site: str) -> dict:
     """Test 3 at one site: KW with no shape equals GAM-K as experiment 111 stored it."""
     data = tune.get_site(site)
@@ -322,14 +328,10 @@ def reproduction_site(site: str) -> dict:
         )
         joined = frame.join(stored, on=["run", "valid_time"], suffix="_stored")
         out[f"{period}_rows"] = [frame.height, stored.height, joined.height]
-        out[f"{period}_level_max_abs"] = float(
-            (joined["level"] - joined["level_stored"]).abs().max()
-        )
-        out[f"{period}_anomaly_max_abs"] = float(
-            (joined["anomaly"] - joined["anomaly_stored"]).abs().max()
-        )
+        out[f"{period}_level_max_abs"] = max_abs(joined["level"] - joined["level_stored"])
+        out[f"{period}_anomaly_max_abs"] = max_abs(joined["anomaly"] - joined["anomaly_stored"])
         out[f"{period}_quantile_max_abs"] = max(
-            float((joined[q] - joined[f"{q}_stored"]).abs().max()) for q in arms.QUANTILE_COLUMNS
+            max_abs(joined[q] - joined[f"{q}_stored"]) for q in arms.QUANTILE_COLUMNS
         )
     return out
 
@@ -357,7 +359,7 @@ def summarise_reproduction(*, per_site: list[dict]) -> dict:
 
 
 def causality_site(job: tuple[str, dict]) -> dict:
-    """Test 4 at one site: a change after the cut leaves every arm's correction at the origin alone."""
+    """Test 4 at one site: a change after the cut leaves each correction at the origin alone."""
     site, hypers = job
     data = tune.get_site(site)
     rng = np.random.default_rng(115)
@@ -390,7 +392,7 @@ def causality_site(job: tuple[str, dict]) -> dict:
             trace = shape.run_shape_filter(
                 residual=perturbed, half_hour=data.half_hour, structure=structure, hyper=hyper
             )
-            for name, reference in (("KW", base["KW"]),):
+            for reference in (base["KW"],):
                 before = shape.lookup(
                     trace=reference,
                     structure=structure,
@@ -563,7 +565,7 @@ def zero_mean_site(job: tuple[str, dict]) -> dict:
     data = tune.get_site(site)
     out: dict = {"site": site, "worst": {}}
     for family in ("KW", "KS", "KS1", "KWnomid"):
-        if family not in hypers and family not in ("KWnomid",):
+        if family not in hypers and family != "KWnomid":
             continue
         structure = arms.structure_of(family=family, band_of_half_hour=data.band_of_half_hour)
         hyper = arms.family_hyper(data=data, family=family, hypers=hypers)
@@ -738,6 +740,7 @@ def clean_readings_site(job: tuple[str, str, int, list[float], dict]) -> dict:
         usable = in_tuning[trace.positions]
         s_state = trace.state[usable][:, 2 * trace.n_groups :]
         results[f"{name}_s_rms"] = float(np.sqrt((s_state**2).mean()))
+        assert trace.shape_variance is not None
         results[f"{name}_p_s_rms"] = float(np.sqrt(trace.shape_variance[usable].mean()))
     results["tuned_q_s"] = float(tuned_hyper.q_s)
     # D+1 score of KW against K0 when the stream is the clean one: the readings the forecasts
@@ -765,6 +768,7 @@ def clean_readings_site(job: tuple[str, str, int, list[float], dict]) -> dict:
         )
         correction = found.total
         spread = arms.fit_spread(data=clean_data, correction=correction)
+        assert spread is not None
         total, count = arms.d1_tuning_score(data=clean_data, correction=correction, spread=spread)
         scores[name] = [total, count]
     results["d1_scores"] = scores

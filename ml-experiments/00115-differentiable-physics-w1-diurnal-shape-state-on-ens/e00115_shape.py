@@ -25,9 +25,9 @@ decays across a band's daily gap whether or not another band was read meanwhile.
 group's level and transient equals the independent filters' values, so the two forms agree to
 rounding.
 
-**Information cut.** `lookup` returns, for each case, the state after the newest reading at or before
-the case's cutoff, and the transient decays by `phi` per half-hour from that reading to the target.
-The cutoff is the caller's; the filter has no mask.
+**Information cut.** `lookup` returns, for each case, the state after the newest reading at or
+before the case's cutoff, and the transient decays by `phi` per half-hour from that reading to the
+target. The cutoff is the caller's; the filter has no mask.
 """
 
 from dataclasses import dataclass
@@ -213,7 +213,7 @@ class Lookup:
         return self.level + self.anomaly + self.shape
 
 
-def run_shape_filter(
+def run_shape_filter(  # noqa: PLR0915
     *,
     residual: np.ndarray,
     half_hour: np.ndarray,
@@ -439,7 +439,7 @@ def fit_shape_hypers_shared(
                 base=bases[site],
                 prior_mean=prior_mean,
                 prior_spread=prior_spread,
-                start=fitted[site] if site in fitted else prior_mean,
+                start=fitted.get(site, prior_mean),
             )
             for site, stream in residuals.items()
         }

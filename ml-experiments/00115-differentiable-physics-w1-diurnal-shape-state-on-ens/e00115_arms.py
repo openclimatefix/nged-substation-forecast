@@ -42,9 +42,12 @@ FACTOR_GRID: Final[tuple[float, ...]] = (0.8, 0.85, 0.9, 1.0, 1.15, 1.3)
 MULTIPLIER_GRID: Final[tuple[float, ...]] = (0.25, 0.5, 1.0, 2.0, 4.0)
 KAPPA_GRID: Final[tuple[float, ...]] = (0.0, 0.25, 0.5, 0.75, 1.0)
 FAST_SHAPE_FACTOR: Final[float] = 16.0
-"""The post hoc faster shape: `q_s` times this factor. 16 is the smallest factor on the grid 2, 4, 8,
-16, 32, 64 at which the tuned filter's analytic recovery of both injections is at least 0.6 (0.62 and
-0.72), chosen from the gate's analytic quantity before any score of the arm was read."""
+"""The post hoc faster shape: `q_s` times this factor.
+
+16 is the smallest factor on the grid 2, 4, 8, 16, 32, 64 at which the tuned filter's analytic
+recovery of both injections is at least 0.6 (0.62 and 0.72). It was chosen from that gate quantity
+before any score of the arm was read.
+"""
 PROFILE_DAYS: Final[int] = 14
 MIN_PROFILE_DAYS: Final[int] = 3
 MIN_DAY_READINGS: Final[int] = 40
@@ -190,14 +193,15 @@ def family_hyper(*, data: site_module.SiteData, family: str, hypers: dict) -> sh
 
 
 class TraceCache:
-    """Filter traces of one site, kept so an arm family runs each filter once.
-
-    Args:
-        data: The site data.
-        hypers: The stored shape hyperparameters.
-    """
+    """Filter traces of one site, kept so an arm family runs each filter once."""
 
     def __init__(self, *, data: site_module.SiteData, hypers: dict) -> None:
+        """Keep the site data and hyperparameters; traces are built on demand.
+
+        Args:
+            data: The site data.
+            hypers: The stored shape hyperparameters.
+        """
         self.data = data
         self.hypers = hypers
         self._traces: dict[tuple[str, float], shape.ShapeTrace] = {}
@@ -420,7 +424,7 @@ def write_npz_atomic(*, path: Path, **arrays: np.ndarray) -> None:
     """Write arrays through a temporary name so an interrupted write leaves no file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f"{path.stem}.{os.getpid()}.tmp.npz")
-    np.savez(temporary, **arrays)
+    np.savez(temporary, **arrays)  # ty: ignore[invalid-argument-type]
     temporary.rename(path)
 
 

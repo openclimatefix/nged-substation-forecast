@@ -16,6 +16,7 @@ with the origin and the valid time both in those months. The stages, in order:
 import argparse
 import json
 import time
+from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
 from functools import lru_cache
 from pathlib import Path
@@ -283,10 +284,14 @@ def _frame_job(job: tuple[str, str]) -> str:
     return f"{name} {site}: {frame.height:,} rows"
 
 
-def _run(pool: ProcessPoolExecutor, function, jobs: list) -> list:
+def _run(pool: ProcessPoolExecutor, function: Callable, jobs: list) -> list:
     started = time.monotonic()
     results = list(pool.map(function, jobs))
-    print(f"{function.__name__}: {len(jobs)} jobs, {time.monotonic() - started:.0f} s", flush=True)
+    print(
+        f"{getattr(function, '__name__', 'job')}: {len(jobs)} jobs, "
+        f"{time.monotonic() - started:.0f} s",
+        flush=True,
+    )
     return results
 
 
@@ -334,7 +339,7 @@ def main() -> None:
 
 
 def choose_factors(*, scores: dict[str, dict[str, list]]) -> list[float]:
-    """Return, per lead band, the factor with the lowest pooled tuning score at the decision sites."""
+    """Return, per lead band, the factor with the lowest pooled tuning score at decision sites."""
     totals = np.zeros((len(arms.FACTOR_GRID), N_LEAD_BANDS, 2))
     for site, per_factor in scores.items():
         if site not in common.DECISION_SITES:

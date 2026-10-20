@@ -6,21 +6,21 @@ part: "W1"
 theme: differentiable-physics-forecast-engine
 also_relevant_to: [lagged-power-and-error-correction, differentiable-physics-long-history-and-drift,
 production-reference-and-best-guess]
-status: planned
+status: done
 size: >-
-  medium. Stored: private files under the experiment's folder in data/ml-experiments/ only. Serving path: not
-  touched. Degradation rule: not touched. Designs: more than one is defensible (the shape's
-  constraint, a joint filter or a second stage, the lead-band tuning), and the plan pre-registers
-  one of each. Callers: this experiment's scripts only; the shape filter lives in the experiment
-  folder and moves to studies.dp_assimilation, with unit tests, only if it is adopted.
+  medium. Stored: private files under the experiment's folder in data/ml-experiments/ only. Serving
+  path: not touched. Degradation rule: not touched. Designs: more than one is defensible (the
+  shape's constraint, a joint filter or a second stage, the lead-band tuning), and the plan
+  pre-registered one of each. Callers: this experiment's scripts only; the shape filter lives in
+  the experiment folder and moves into studies.dp_assimilation, with unit tests, only if adopted.
 hypothesis: >-
   GAM-K's remaining day-ahead error on ENS is mostly in the shape of the day inside each hour band,
   and that shape drifts faster than the convex model's monthly knots follow. A 48-half-hour shape
   state with zero mean in each hour band, added to the Kalman filter and updated from every reading
   the telemetry delay allows, lowers GAM-K's day-ahead quantile score at most decision substations,
   in months that played no part in choosing the idea's form and in the scored year.
-prediction: see "Predictions"
-decision_rule: see "Decision rule"
+prediction: see "Predictions against results"
+decision_rule: see "Decision rule and verdict"
 benchmark: >-
   GAM-K as stored by experiment 111 (2.800 over leads 0.5 to 168 hours at the five decision
   substations, scored year), reproduced; the 14-day profile recipe of the debate's round 2 with its
@@ -35,284 +35,335 @@ metric: >-
   effective capacity, on rows outside the hand-filtered switching events at the scored site, at day
   D+1 (leads 15.5 to 39 hours from the 09:00 UTC power_fcst_init_time, a UTC day); every lead band
   beside it
+verdict: inconclusive
+best_arm: >-
+  R (the 14-day error-profile recipe), 2.436 points at day D+1 and 2.743 over all leads, against
+  2.450 and 2.757 for KW and 2.525 and 2.812 for K0, scored year, five decision substations; the
+  post hoc KW-fast scored 2.412 and 2.725
+headline: >-
+  The shape state (KW) lowered GAM-K's day-ahead score by 0.075 points in both periods (replicate
+  months -0.145 to -0.009; scored year -0.119 to -0.033; 5 of 5 substations each), and by 0.112 in
+  winter. The 14-day recipe did as well (KW minus R +0.014, -0.014 to +0.048). Gate test 1 failed
+  its 0.4 floor (0.35 and 0.30 recovered), so the verdict is capped at inconclusive.
+lessons:
+  - >-
+    The day-ahead error of the convex model on ensemble weather has a daily shape that a filter can
+    learn from recent readings: the gain is 0.075 points in two separate periods at 5 of 5
+    substations, and 0.112 in the scored winter.
+  - >-
+    A plain average of the last 14 days' errors by half-hour (the recipe R) gains as much as the
+    learned shape state, so the shape state's extra machinery is not yet justified. In winter
+    evenings KW lost to R by 0.078 (0 of 5 substations better).
+  - >-
+    The shape state chosen by marginal likelihood learns slowly: it recovers 0.35 of an injected
+    evening change in two weeks, below the 0.4 floor. A shape step 16 times larger recovers 0.62
+    and scored 0.113 points better than K0 (post hoc), 0.024 better than R.
 production_status: not-for-production
+adopted_in: none
+date: 2026-10-20
+pr: 1398
+take_home_message: >-
+  Teaching the physics-based forecast the shape of the day from recent readings lowers its
+  day-ahead error by 0.075 points at five Primary substations (about 3%), in two separate periods
+  and more in winter (0.11), but averaging the last 14 days' errors by half-hour gains as much, so
+  the learned shape state is not needed on this evidence. The shape state's own check failed: it
+  learns an injected change too slowly (0.35 against a floor of 0.4), so the verdict is capped at
+  inconclusive. A faster shape state, tried afterwards and labelled post hoc, passed that check and
+  beat both K0 and the recipe, which a rerun with the check fixed in advance would need to confirm.
+advice:
+  - >-
+    Correct the day-ahead forecast's shape by half-hour from recent errors: the 14-day profile
+    recipe lowered the score by 0.089 points at 5 of 5 substations (R75 minus K0, scored year;
+    exploratory), and the shape state by 0.075 (C1).
+  - >-
+    Prefer the 14-day profile recipe to the shape state at the tuned step until a faster shape
+    state wins in winter evenings: KW lost to R there by 0.078 (C4, winter evening, scored year).
+  - >-
+    Let the filter read every reading up to the telemetry delay: withholding the readings of the
+    forecast day cost 0.055 points at day D+1 (C3).
+  - >-
+    Do not tune the filter's state step per lead band while the observation noise sits at its lower
+    bound: the tuning moved the score by 0.000 (C2).
+  - >-
+    Test the speed of a new filter state with an injected change before scoring it, and fix the
+    floor first: the tuned shape recovered 0.35 of the injection, a 16-fold larger step 0.62 (gate
+    test 1 and its post hoc reading).
+  - >-
+    Measure the live telemetry delay: on ensemble weather a delay of 24 hours instead of 3.5 raised
+    K0's day-ahead score by 0.088 points and 33 hours by 0.120, and the shape state's gain fell from
+    0.075 to 0.063.
 code: ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/
 ---
 
-**Status: planned. No fit has run.** This page is the plan, committed before any result exists.
+**Take-home: a daily shape learned from recent readings lowers the physics-based forecast's
+day-ahead error by 0.075 points (about 3%) at five Primary substations, but a simple average of the
+last 14 days' errors gains as much, and the shape state failed its own speed check.** The shape
+state cut the day-ahead score in two separate periods at 5 of 5 substations, and by 0.112 points in
+the scored winter. The 14-day average (recipe R) scored 0.014 points better than the shape state
+(interval -0.014 to +0.048, no difference), so the added machinery is not justified yet. The
+shape state recovered 0.35 of an injected change in two weeks against a pre-registered floor of
+0.4, so the verdict is `inconclusive`. A faster shape state, tried afterwards and labelled post
+hoc, passed that check and beat both K0 and R, and needs a pre-registered rerun to count.
 
-**W1 asks whether the part of GAM-K's day-ahead error that lies in the shape of the day inside each
-hour band can be removed by a filter that learns that shape from recent readings.** GAM-K is the
-convex demand model driven by ECMWF ensemble (ENS) weather forecasts, with a Kalman filter on its
-recent residuals (experiment 111). W1 adds a 48-half-hour shape state to that filter and scores
-the change on the same rows, with every setting chosen on months that the scored year does not
-include.
+## What was asked, and the answer in plain terms
 
-## What W1 asks, and the evidence it starts from
+**The question was whether the part of a demand forecast's error that lies in the shape of the
+day can be removed by learning that shape from the last few days of readings.** The forecast is for
+the electricity demand of five Primary substations (the stations that step power down from 33 kV to
+11 kV) for the day after the forecast is made, up to 168 hours ahead. It comes from a
+physics-based demand model driven by ECMWF ensemble (ENS) weather forecasts, with a Kalman filter
+that estimates from recent readings how far the model has been off ([experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md); [Kalman
+(1960)](https://doi.org/10.1115/1.3662552)). That arm is called K0 here. The shape state (arm KW)
+gives the filter 48 more numbers, one per half-hour of the day, which it adjusts from every
+reading and adds to the forecast.
 
-**GAM-K's day-ahead error on ENS sits mostly in the shape of the day.** On experiment 111's
-scored-year predictions at six MW Primaries, its D+1 MAE of the median is 4.3 to 4.5 points, against
-2.77 for the daily mean's error. Subtracting κ times the 14-day mean D+1 error profile by local
-half-hour, day mean removed, lowered the MAE from 4.313 to 4.170 (the reviewer's reproduction):
-0.04 to 0.22 per site at 6 of 6, 11 of 12 months, largest in winter, a loss at midday; κ = 0.5 ties
-0.75. As a shift of K0's quantiles, the D+1 quantile-score gain at the 5 decision sites is −0.074
-(98.75% about −0.112 to −0.037, 5 of 5); by lead band −0.072, −0.071, −0.056, −0.048; at midday
-+0.035 to +0.053. **These numbers are a prior, not evidence:** the form and κ were chosen on the
-scored year, so W1 re-chooses every setting on the tuning months, treats the even months of 2024-25
-(never opened for W1) as the clean replicate, and requires the scored year to agree.
+**Scores are in points of effective capacity, and lower is better.** A point is 1% of a
+substation's effective capacity (the capacity its readings are scaled by). The quantile score is
+twice the mean pinball loss over 11 quantiles, as in [experiment
+87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md). Day D+1 is the UTC day
+after the forecast's 09:00 UTC origin (leads of 15.5 to 39 hours). Every setting was chosen on the
+odd months of July 2024 to June 2025 (the tuning months). The even months of the same year are the
+replicate months, which no setting had seen. The scored year is 2 July 2025 to 29 June 2026, the 292
+runs of experiment 87's `fold_a_daily_gap_v1`. Rows inside the hand-filtered switching events are
+left out. Weather is ENS, and the demand model is fitted to estimates of past weather. The
+recent-error filter follows the design of [experiment
+106](../00106-differentiable-physics-4-all-years-drift-and-recent-level/result.md).
 
-**GAM-K already carries a coarse shape:** its level and transient are per hour band (night 00:00 to
-05:59, morning 06:00 to 10:59, midday 11:00 to 15:59, evening 16:00 to 23:59 local). The decision arm
-adds only the shape inside each band, which nests GAM-K exactly; a daily zero-mean shape would also
-speed up the band levels and mix the two effects. Also in scope: noise settings per lead band, and
-the newest intraday readings. **NGED's live telemetry delay has never been measured**
-(`data-processing.md`); W1 assumes 3.5 hours and sweeps it.
+**The scored year chose the idea's form, which is why the replicate months exist.** A screening of
+the same data before this experiment had suggested the idea, so a gain in the scored year alone
+would not count. Both periods showed the same gain.
 
-**Earlier advice followed, none departed from:** experiment 111's "feed the filter ensemble-driven
-residuals" and "check a filter gain per substation before pooling" (per-site and leave-one-out
-rows); experiment 113's weakly identified heating slopes (no per-site heating panel on the cards).
+**Gate failure: the verdict is capped at `inconclusive`.** The pre-registered check that the shape
+state learns an injected change fast enough failed its floor, so all scoring below was run after a
+failed blocking test. The first gate run is kept in full (see "The gate"), and the faster shape
+state is a post hoc arm that never passed the pre-registered gate.
 
-## The shape state
+## Figures
 
-**Decision arm KW, a joint filter.** Per site, on experiment 111's analysis-proxy residual stream
-r(t) (observation minus the DP driven by the latest ENS control run at lead 9 to 33 hours), with
-h(t) the local half-hour (0 to 47, Europe/London, from the half-hour's local start time) and b(t)
-its hour band:
+![GAM-K's day-ahead error by local half-hour and month, five substations](figure_01_residual_heat.svg)
 
-- r(t) = ℓ_b(t) + z_b(t) + s_h(t) + ε(t), with ℓ_b and z_b GAM-K's per-band level and transient;
-- s, 48 values, a random walk per day with step covariance q_s·P_W, where P_W projects onto shapes
-  with zero mean inside each band; the initial covariance P_s0 is a multiple of P_W too;
-- the forecast at any lead is GAM-K's forecast + s_h at the target's local half-hour, held flat.
-- **Clock change:** on a 46-half-hour day the missing local hour gives no reading; on a 50-half-hour
-  day the repeated local hour updates its two h values twice.
+![The planned contrasts at day D+1 in both periods](figure_03_headline.svg)
 
-**Hyperparameters.** GAM-K's q, φ, and σ_z stay as experiment 111 fitted them; log q_s and log σ_ε
-are fitted jointly per site by marginal likelihood on the tuning months' stream, under a shared
-normal prior (empirical Bayes), q_s started at a 14-day-window gain.
+![Score by lead band for the arms and references](figure_04_by_lead.svg)
 
-**No switching masks in the filter**, as the series brief rules; a half-hour that ended less than
-the delay before τ (09:00 UTC) is invisible; the state runs warm on experiment 111's stitched
-out-of-sample stream. **The code** is `e<id>_shape.py` in the experiment folder, a vectorised numpy
-update, copying `e00111_arms.py` and `e00111_ens.py`; if KW is adopted, a later PR moves it into
-`studies.dp_assimilation` with unit tests.
+![Where the shape state helps, by hour band and month](figure_05_gain.svg)
 
-## Arms
+![Gate test 1: expected and measured recovery of an injected change](figure_06_gate.svg)
 
-**Screening tier: no new GAM fit.** Every arm reuses experiment 111's monthly GAM-K fits, pinned
-capacity, calibration, solar shrink, and ENS store, and changes only the correction. One seed.
+![Coverage of the tail quantiles](figure_07_tails.svg)
 
-| Arm | Correction | Role |
-|---|---|---|
-| K0 | GAM-K's per-band filter, as experiment 111 | benchmark, reproduced |
-| KW | K0 + within-band zero-mean shape state, delay 3.5 h | the decision arm |
-| KW-lb | KW with noise settings chosen per lead band | per-lead-band tuning |
-| K0-lb | K0 with noise settings chosen per lead band | separates tuning from shape |
-| KW-day | KW seeing only readings up to local midnight before τ | the newest intraday readings |
-| R | K0 minus κ × the 14-day D+1 error profile, day mean removed | the round-2 recipe, κ re-chosen |
-| R75 | R with κ = 0.75 | the screen's setting, for reproduction |
-| KS | shape with daily zero mean only (exploratory) | KS − KW is the across-band part |
-| KW-nomid | KW with s fixed at 0 from 11:00 to 15:59 local (exploratory) | the expected midday loss |
-| KS1 | one daily level + one transient + daily zero-mean s, no bands (exploratory) | do bands matter? |
-| KW-pl52 | KW's shape from 52 weeks earlier, scored year only (diagnostic) | drift or a seasonal shape? |
-| KW-dX, K0-dX | KW and K0 at delays of 0, 24, and 33 hours (exploratory) | delay sweep |
+## Results
 
-- **Per-lead-band noise settings (KW-lb, K0-lb).** For each lead band (0–24, 24–48, 48–144,
-  144–168 hours) one multiplier m on every state step variance (q, σ_z², and q_s) against σ_ε², from
-  {0.25, 0.5, 1, 2, 4}, chosen on the tuning months by quantile score; each band takes its m's state.
-- **KS1's hyperparameters** (q, φ, σ_z, σ_ε, q_s) are fitted jointly by marginal likelihood on the
-  tuning months, from GAM-K's prior.
-- **The recipe (R).** At τ, for each of the last 14 local days fully observed by τ minus the delay,
-  take GAM-K's q50 error from the run that forecast that day at D+1 (raw residuals, switching rows
-  included, as the series' no-mask rule says), remove the day's mean, average by local half-hour,
-  and subtract κ times the profile at every lead. κ from {0, 0.25, 0.5, 0.75, 1} on the tuning
-  months, with the spread rebuilt for each κ.
-- **KW-pl52** uses the 2024-25 stream's shape on the same local date a year before each scored
-  origin. A gain near KW's says the shape is seasonal and the GAM lacks it; a gain near zero says
-  it is persistent drift.
-- **Spread.** Each arm's quantiles are rebuilt by experiment 111's routine (`spread_with_factors`:
-  post-filter residual quantiles per hour band, quarter, and lead band from the tuning months), with
-  a spread factor per lead band from {0.8, 0.85, 0.9, 1.0, 1.15, 1.3} for every arm (experiment 111
-  chose 0.9, its lower edge, for GAM-K in three bands); any factor at the new edge is reported. The
-  51 members are pooled by `mixture_quantiles`. A shift-only check (K0's quantiles moved by KW's
-  correction) is reported beside KW, tails included, so a gain in the spread cannot pass for one in
-  the mean.
-- **References as stored by experiment 111, re-scored on W1's shared rows:** GAM-0, X-nl+K, Xlag-d,
-  BG2 (`p_s6_bg2`, "production recipe, not like for like"), climatology, manual_heuristic.
-- **Past-weather check (exploratory).** KW's filter, q_s and σ_ε refitted on 2023-24, on experiment
-  106's A2 residual streams for 2024-25 and 2025-26, against A2. A2 is the convex model without
-  drift on ERA5 and CAMS, which reach a live service about 5 days late, so this is a lab condition,
-  and A2's base differs from GAM-K's. A gain on both weathers puts the shape in demand; a gain on
-  ENS alone puts part of it in ENS error; a gain on past weather alone means ENS noise swamps a
-  demand shape.
+- **Arms.** K0 (GAM-K, reproduced exactly from experiment 111's stored output); KW (the decision
+  arm: K0 plus a shape with zero mean inside each of the four hour bands); KW-lb and K0-lb (noise
+  settings chosen per lead band); KW-day (no readings from the day of the forecast); R (K0 minus
+  kappa times the 14-day mean D+1 error profile by local half-hour, kappa 0.75 chosen on the tuning
+  months); R75 (the same as R, kappa fixed at 0.75, so identical); KS and KS1 (exploratory shape
+  variants); KW-nomid (midday shape frozen at zero); KW-pl52 (the shape from 52 weeks earlier);
+  delay arms at 0, 24, and 33 hours; and KW-fast (post hoc: the shape step 16 times larger).
+  No arm refits the demand model, so the experiment reuses experiment 111's fits and member
+  forecasts.
+- **Rows and compute.** Five decision substations (D5, D10, D11, D14, D16) with D9 beside them;
+  41,126 D+1 rows in the replicate months and 464,228 rows over all leads in the scored year on
+  the rows every reference holds. Retraining schedule: none, because experiment 111's monthly
+  refits are reused; the contrasts compare filters on one set of fits. Run time: about 13 minutes
+  on 6 cores for all arms.
+- **Headline: the shape state (C1, KW minus K0 at D+1, 98.75% intervals).** Replicate months -0.0745
+  (-0.1449 to -0.0091, 5 of 5 substations better); scored year -0.0750 (-0.1188 to -0.0329, 5 of
+  5). Absolute scores in the scored year: K0 2.525, KW 2.450. Over all leads: -0.0661 and -0.0543.
+  The gain at 48 to 144 hours is 0.049 (scored year), 66% of the D+1 gain, so more than half remains.
+- **C2, lead-band tuning (KW-lb minus KW):** 0.0000 in both periods. The tuned multipliers
+  ([4, 4, 0.5, 0.25] for KW) barely change the filter, because the observation noise sits at 0.05
+  to 0.09 points at five of six substations, so the filter already trusts each reading.
+- **C3, the newest readings (KW minus KW-day):** -0.0564 (replicate) and -0.0546 (scored) at D+1,
+  5 of 5 substations. The gain is in the night and morning bands (-0.167 and -0.061 in the scored
+  year) and none in the midday and evening bands, where the readings of the forecast day arrive too
+  late to help.
+- **C4, shape state against the recipe (KW minus R):** +0.0170 (-0.0164 to +0.0401) and +0.0136
+  (-0.0138 to +0.0483); 1 of 5 and 0 of 5 substations favour KW. Under the decision rule's hand-on,
+  R is the candidate because C4 is not below zero.
+- **Post hoc, KW-fast.** Against K0: -0.109 (-0.190 to -0.047) and -0.113 (-0.143 to -0.086), 5 of 5
+  each. Against R: -0.0175 (-0.0405 to +0.0038) and -0.0244 (-0.0349 to -0.0141), 5 of 5 each.
+  Intervals are 95%; the arm was chosen from the gate's analytic recovery (the smallest step factor
+  on a fixed grid giving at least 0.6), before any score of it was read.
+- **Exploratory (95%, scored year, D+1).** KS minus KW 0.0000: the whole-day zero-mean shape adds
+  nothing over the band levels. KS1 (one level and one transient, no bands) minus KW -0.0492
+  (-0.0930 to -0.0158, 4 of 5): bands may not be needed. KW-nomid minus KW +0.0008: the midday shape
+  does not hurt. KW-pl52 minus K0 -0.0337 and minus KW +0.0412: last year's shape gains about
+  half as much as the current one, so the shape drifts. K0-lb minus K0 -0.0027.
+- **Telemetry delay (assumed 3.5 hours, never measured).** KW minus K0 is -0.0751 at 0 hours,
+  -0.0632 at 24, and -0.0634 at 33. K0's own score rises from 2.524 at 3.5 hours to 2.612 at 24 and
+  2.644 at 33.
+- **References, scored year, on shared rows (D+1, all leads).** K0 2.525 and 2.812; KW 2.450 and
+  2.757; R 2.436 and 2.743; KW-fast 2.412 and 2.725; BG2 2.535 and 2.780; Xlag-d 2.638 and 2.877;
+  X-nl+K 2.693 and 2.934; GAM-0 2.830 and 2.951; climatology 3.826 and 3.804; manual heuristic
+  3.520 and 3.497. KW minus BG2: -0.0855 (-0.2255 to +0.0625) at D+1 and -0.0230 (-0.1621 to
+  +0.1212) over all leads, not like for like. K0 rebuilt with a refitted spread is 0.011 worse
+  than experiment 111's stored GAM-K over all leads (2.812 against 2.800).
+- **D9 beside the decision substations.** D+1 scored year: K0 2.194, KW 2.146; replicate months:
+  1.942 and 1.860.
 
-## Periods and rows
+### Winter (November to March; post hoc, because scores were already read)
 
-| Period | Role |
-|---|---|
-| Odd months of 2024-07 to 2025-06 | tuning: q_s, σ_ε, the multipliers, κ, the spread factors |
-| Even months of 2024-07 to 2025-06 | replicate: never seen by the screen; the clean test |
-| 2025-07-02 to 2026-06-29, the 292 runs | scored: must agree; it chose the form, not the settings |
+**KW does not lose to K0 in winter, but it loses to R, and KW-fast does not lose to either.** The
+scored year holds one independent winter (2025-26). The replicate months hold two winter months of
+a second one (December 2024 and February 2025), so those rows say little. A cold-snap day is a
+local day from November to March whose mean ERA5 temperature at the substation is below 3 °C; the
+rule was fixed before cold-snap scores were read. The scored year has 25, 25, 18, 7, and 5
+cold-snap days at D10, D11, D14, D16, and D5, so D16 and D5 have too few days to read alone. The
+replicate months have 6 to 8 per substation in one or two calendar months, so their cold-snap
+intervals are degenerate and are not quoted.
 
-- **Period rows.** A tuning or replicate row needs both its origin and its valid time in the
-  period's months, so long leads from late-month origins never score the other period's targets.
-  The 14-day profile reaching into a neighbouring month is causal input, not leakage.
-- **Sites.** Decision sites D5, D10, D11, D14, and D16 (4 of 5 needed); D9 beside them. No
-  onboarding or short-history arms. Two series that carry embedded generation are out (see "Privacy").
-- **Rows:** present rows outside the hand-filtered events, shared across a contrast's arms, all-rows
-  score beside. **Lead bands:** D+1 (headline), 0–24, 24–48, 48–144, 144–168, and 12–36 hours.
-- **Robustness rows for every planned contrast:** November to March against April to October;
-  leaving one decision site out; each hour band; working days against weekends and bank holidays.
-- **Predictions written:** the keys, `q01` to `q99` (11 levels), `actual`, `lead_hours`, `arm`,
-  `seed`, `switching_mask`, plus `level`, `anomaly`, and `shape` (the s_h added) for filter arms.
+| Scored year, D+1 | Winter | Winter evening | Cold-snap days |
+|---|---|---|---|
+| KW minus K0 | -0.112 (-0.155 to -0.074), 5 of 5 | -0.056 (-0.111 to -0.005), 4 of 5 | -0.148 (-0.222 to -0.103), 5 of 5 |
+| R minus K0 | -0.136 (-0.166 to -0.099), 5 of 5 | -0.134 (-0.181 to -0.084), 4 of 5 | -0.134 (-0.196 to -0.091), 4 of 5 |
+| KW minus R | +0.024 (+0.004 to +0.055), 0 of 5 | +0.078 (+0.019 to +0.150), 0 of 5 | -0.014 (-0.043 to +0.023), 4 of 5 |
+| KW-fast minus K0 | -0.155 (-0.192 to -0.115), 5 of 5 | -0.125 (-0.177 to -0.073), 5 of 5 | -0.201 (-0.275 to -0.176), 5 of 5 |
+| KW-fast minus R | -0.020 (-0.031 to -0.010), 5 of 5 | +0.009 (-0.019 to +0.038), 2 of 5 | -0.067 (-0.092 to -0.052), 4 of 5 |
+| KW minus BG2 | -0.330 (-0.426 to -0.255), 5 of 5 | not covered | -0.499 (-0.955 to -0.023), 4 of 5 |
 
-## Known-answer gate (blocking, on the tuning months, before any replicate or scored run)
+Intervals are 95%, resampling whole months. The winter row for KW minus R is a winter loss for KW
+at the tuned step, particularly in the evening, so under the maintainer's winter rule KW is held
+back in favour of R until a faster shape state is confirmed. Annual gains and winter gains point the
+same way for K0, KW, and KW-fast; the loss is only KW against R.
 
-**A failed blocking test stops scoring until it is fixed; if it cannot be fixed inside the
-experiment, the verdict is `inconclusive`.** Tests 1 and 2 run on real streams at the five decision
-sites, outside the hand-filtered events.
+## The gate
 
-1. **An injected persistent profile change is recovered.** Add to the stream for 60 days, from
-   2024-11-01 and separately from 2025-01-01 (tuning months, after the October clock change):
-   (a) +3 points from 17:00 to 20:00 local, inside the evening band; (b) a morning peak moved
-   earlier, +2 points 06:30 to 07:30 and −2 points 08:00 to 09:00, zero mean in the morning band.
-   Recovery is (KW's D+1 correction with the injection minus without) over the injected amount at
-   the injected half-hours, averaged over days 8 to 14. From the tuned q_s and σ_ε, the plan's code
-   computes the expected recovery analytically before the test runs. **Blocking pass:** the median
-   over sites and starts is within ±0.15 of the expected recovery and at least 0.4, no site exceeds
-   1.25, and the correction at every un-injected half-hour stays under 25% of the amplitude. **The
-   brief's target (60 to 100% within 14 days)** is reported against the same reading; if the tuned
-   q_s predicts a recovery under 0.60, the tuned filter is slower than the brief asked, which is a
-   finding about the data, not a code fault. K0's and R's recoveries are reported beside (K0 about
-   0.375 on shape a and 0 on shape b).
-2. **No false shape on clean data.** Clean streams: (a) real streams with each day's half-hours
-   randomly permuted within their band; (b) synthetic AR(1) streams at each site's fitted σ and φ
-   with a random-walk level and no diurnal term. **Blocking pass, on each:** q_s and σ_ε refitted on
-   the clean stream fall so that q_s is under a tenth of the tuned value; at that refit the RMS of
-   s over the 48 half-hours is under 0.3 points and KW's D+1 score is within +0.02 of K0's. At the
-   tuned q_s, the RMS of s is at most 1.2 × the square root of the mean diagonal of P_s and at most
-   half its RMS on the real stream.
-3. **Reproduction:** with q_s = 0, P_s0 = 0, and K0's σ_ε, KW equals K0's stored
-   `work/dp_preds/gamk_tuning_<site>.parquet`: `level` and `anomaly` in float64 to 1e-9, the
-   quantiles to 1e-4 (they are float32 after the 51-member mixture).
-4. **Causality:** changing any reading of a half-hour that ended after τ minus the delay, or any ENS
-   run issued after τ, leaves every arm's forecast at τ unchanged exactly; KW-day ignores readings
-   after local midnight; the recipe uses only fully observed days.
-5. **Zero mean:** s sums to zero within each band to 1e-9 after every update (daily for KS, KS1).
+**The gate failed its blocking test 1 on the first run, and the first run is kept.** All five tests
+ran on the tuning months. The forecasts of every period were built before tests 1 and 2 ran, but no
+replicate or scored score was read until the gate had run.
 
-## Planned contrasts and margins
+- **Test 1, an injected change is recovered: failed.** Median share of the injected change that
+  KW's day-ahead correction carries on days 8 to 14: 0.350 of a +3-point evening shift and 0.295 of
+  a morning peak moved earlier, against a floor of 0.4. K0 recovers 0.196 and 0.000; R recovers
+  0.422 and 0.482. The tuned filter's own formula, evaluated on a complete stream, predicts 0.350
+  and 0.295, so the code is right and the tuned shape state is slow. The brief's 0.6 to 1.0 target
+  was not reached either.
+- **Post hoc reading of test 1 for KW-fast:** 0.621 and 0.720, equal to its expected values. This
+  is a labelled post hoc reading and never counts as passing the pre-registered gate.
+- **Test 2, no false shape on clean data: passed.** On permuted real streams and synthetic streams,
+  the refitted shape step falls to between 4e-5 and 1e-4 points² per day (0.1% to 2% of the tuned
+  values), the refitted shape's root mean square is at most 0.053 points, and KW's score is
+  within +0.0000 and -0.0051 of K0's.
+- **Tests 3 to 5: passed.** K0 reproduces experiment 111's stored output exactly (worst difference
+  0 in the stored quantiles and 2e-14 against the code in float64); a change after the cut changes
+  no forecast (0 maximum difference, including the ensemble runs and the recipe); the shape sums to
+  zero in its blocks to 1e-14.
 
-**Four planned contrasts, 98.75% (Bonferroni) month-resampled paired intervals from
-`studies.bootstrap`, 3 seeds,** with site counts, absolute scores, the MAE of the median, and the
-robustness rows, in the replicate months and the scored year.
+## Predictions against results
 
-- **C1, the shape state:** KW minus K0 at D+1. The decision contrast.
-- **C2, per-lead-band tuning:** KW-lb minus KW, over 0.5 to 168 hours and per lead band.
-- **C3, the newest intraday readings:** KW minus KW-day at D+1 and at 0–24 hours.
-- **C4, state against recipe:** KW minus R at D+1.
+- **Held:** C1 between -0.03 and -0.10 in both periods at 5 of 5 substations; largest in winter
+  (-0.112 against -0.051 from April to October); at least half of the gain at 48 to 144 hours; C2
+  between 0 and -0.04; C4 within 0.03 and kappa 0.75; KS minus KW within 0.02; KW-pl52 minus K0
+  above KW minus K0; tails within the limits (largest coverage gaps at q05, q95, q01, and q99:
+  1.60, 1.33, 1.46, and 1.12 points).
+- **Failed:** the gain was largest in the night band (-0.154), not the evening band (-0.059); KW
+  was not worse than K0 at midday (-0.004 scored, -0.026 replicate) and KW-nomid did not beat KW;
+  C3 at D+1 was -0.055, not under 0.02; R75 minus K0 on the median's error was -0.177, not within
+  0.02 of the screening's -0.14; the gate's test 1.
+- **Not run:** the past-weather check against experiment 106's A2 residual streams, which the plan
+  listed among the first arms to cut.
 
-**The smallest gain worth porting is 0.03 points at D+1.** The shape state adds no data and no
-model, but it adds 48 states and a tuned setting to the serving filter. The threshold sits below
-the D+1 noise (the screen's half-width is about 0.04), so it is a judgement about what is worth
-porting, not a detection limit.
+## Decision rule and verdict
 
-**Exploratory at 95%:** K0-lb minus K0; KS minus KW; KW-nomid and KS1 minus KW; R75 minus K0; the
-delay sweep, read as (KW − K0) at each delay; KW-pl52 against K0 and KW; the shift-only check; the
-past-weather check; the best W1 arm minus X-nl+K, minus Xlag-d, and minus BG2; D9.
+**The verdict is C1's label, capped by the gate.** Without the cap, C1 meets `supported`: below
+zero in both periods with 5 of 5 substations better, the scored-year interval wholly below zero,
+and the estimate (0.075) above the 0.03 threshold. With the failed blocking test the plan's rule
+gives `inconclusive`. The hand-ons: KW-lb does not replace KW (C2 is zero); R, not KW, is the
+simpler candidate (C4 is not below zero); and a winter loss against R holds KW back.
 
-## Predictions
+## Checks
 
-Written before any fit; each line can fail, and none overrides the decision rule.
+- **Median forecast minus mean forecast per site at D+1 (scored year, points).** KW: D10 +0.002,
+  D11 -0.031, D14 +0.022, D16 -0.010, D5 -0.114. K0: +0.003, -0.022, +0.014, -0.014, -0.097. R: D5
+  -0.037. The shift of the mean at D5 is the only one over 0.04, and KW-shift (K0's quantiles
+  moved by KW's correction) has K0's values by construction.
+- **Error of the mean and median forecast beside each contrast (scored year, D+1).** C1: median
+  -0.148, mean -0.150. C2: -0.0001 and -0.0001. C3: -0.089 and -0.089. C4: +0.029 and +0.029. The
+  quantile score, the median's error, and the mean's error point the same way for every contrast.
+- **Triggers that fired.** (1) A control failed: gate test 1, and the screening's R75 reproduction
+  (-0.177 against -0.14 within 0.02). (2) A result contradicted its prediction: C3 at D+1, the
+  midday band, and KW-nomid, listed above, each with an explanation in this page that no test
+  has confirmed. (6) C1's 98.75% interval (width 0.086, scored year) is under half as wide as the
+  sister interval GAM-K minus GAM-0 from experiment 111 (0.291), because the sister contrast is
+  four times larger. Triggers 3, 4, 5, and 7 did not fire: no sign differs across the quantile
+  score and the errors; no leave-one-substation-out run flips a sign (C1 stays between -0.066 and
+  -0.085 in the scored year); no nested arm beats its container (K0 does not beat KW, and KW-day
+  does not beat KW); no later design depends on C1. The Opus audit these triggers call for is not
+  part of this page yet; its findings and their triage are added to the pull request when it runs.
+- **Tails (scored year, KW, D+1).** Coverage minus nominal: q01 +1.41, q05 +1.53, q95 -1.13, and
+  q99 -1.11 percentage points; pinball loss 0.190, 0.617, 0.656, and 0.210. No curtailment cost:
+  experiment 87 found no event at the MW Primaries that could rank forecasts. Threshold-weighted
+  CRPS is not computed, because `studies.tail_calibration` has no function for it.
 
-- **C1:** KW minus K0 is −0.03 to −0.10 at D+1 in both periods, 4 or 5 of 5 sites better in each;
-  largest in November to February and in the evening band.
-- **Midday:** KW is worse than K0 at midday by +0.01 to +0.05, and KW-nomid beats KW over all rows.
-- **C1 by lead:** at least half of the D+1 gain remains at 48–144 hours.
-- **C2:** KW-lb minus KW is 0 to −0.04 over all leads, m at 144–168 hours below m at 0–24 hours.
-- **C3:** KW minus KW-day is −0.01 to −0.05 at 0–24 hours and under 0.02 at D+1.
-- **C4:** KW minus R lies within ±0.03; κ is 0.5 or 0.75 (near certain, after the reproduction).
-- **KS minus KW** within ±0.02; **KW-pl52 minus K0** above KW minus K0 (persistent drift); **R75
-  minus K0** reproduces the screen's −0.14 MAE within 0.02; KW − K0 shrinks towards zero at delays
-  of 24 and 33 hours; KW minus A2 below zero in both past-weather years.
-- **Tails:** KW's q05 and q95 coverage within 3 points of nominal and q01 and q99 within 1.5 points
-  in every lead band, as GAM-K's were. **Run time:** under 45 minutes of wall clock on 6 cores.
+## Caveats
 
-## Decision rule
+- The scored year chose the idea's form, the tuning and replicate months interleave, the 3.5-hour
+  delay is assumed, the switching masks are hindsight, the analysis proxy is the control member of
+  the latest run, and there are five substations and one independent winter.
+- Inherited from experiment 111: the calibration of ENS to past weather is fitted per hour band on
+  the tuning months and applied in-sample there, which shrinks the daily error in the tuning stream
+  and biases the shape step and kappa against this experiment; the pinned capacity reads
+  hindsight weeks; the demand model's last training rows use past weather a live refit would not
+  have; and the spread is fitted on the tuning months.
+- The tuned observation noise sits at the lower bound (0.05 points) at D9 and close to it at D16,
+  D11, D10, and D5, so the filter nearly interpolates the readings. D14 alone has 0.57.
+- Generator series are not used. Two series with embedded generation are outside this experiment.
 
-**The verdict is C1's label.** C2 to C4 are labelled in the bullets and the take-home only. **This
-rule departs from the series' Phase A rule on purpose:** W1 is not a numbered part, its contrast
-compares two filters on one base with a half-width near 0.04, and the scored year chose its form, so
-an interval and a second period are required, as in Phase B, with W1's own porting threshold of 0.03
-in place of Phase B's 0.1.
+## What to try next
 
-- **`supported`:** C1 is below zero in both periods with at least 4 of 5 decision sites better in
-  each, the scored-year interval lies wholly below zero, the scored-year estimate is at least 0.03
-  points, and the gate passed.
-- **`small gain`:** the scored-year interval lies wholly below zero with an estimate under 0.03,
-  and the replicate months' estimate is below zero (an interval there is not required).
-- **`partly supported`:** C1's estimate is below zero in both periods, but the scored-year interval
-  includes zero or fewer than 4 sites improve in one period; or the scored year is `supported` and
-  the replicate months reverse the sign.
-- **`refuted`:** C1's interval lies wholly above zero in either period.
-- **`inconclusive`:** anything else, or a gate test that cannot be fixed.
+- **Rerun the shape state with its speed fixed in advance.** Tune the shape step so the injected
+  change is recovered at or above 0.6 within two weeks, state the floor before scoring, and score
+  it against R in winter evenings, which is where KW lost.
+- **If KW-fast holds its gain against R, test one level and transient with a shape (KS1)**, which
+  scored 0.049 better than KW and has no hour bands to tune.
+- **Measure the live telemetry delay.** The shape state's gain and K0's score both depend on it.
 
-**Hand-ons, each needing the same sign in both periods:** KW-lb replaces KW only if C2 is below zero
-in both at 4 of 5 sites; if C4 is not below zero, the simpler recipe R is the candidate; a
-`supported` or `small gain` C1 makes the shape state a candidate for GAM-K.
+## Substation cards
 
-## Checks: the seven audit-before-merge triggers
+**Provisional: fitted to past weather, forecast on ENS, screening run (KW, scored year).** Each
+card shows the shape state by week and local half-hour, the working-day profile at D+1 with and
+without the shape, and the cold-snap panel (days counted by the rule above; "too few days to read"
+where fewer than 10). The forecast panels show eight fixed weeks, two per season, which were fixed
+by calendar before any score was read, plus the week with the largest mean absolute shape state
+(chosen from the shape alone). Each week panel shows the readings against the K0 and KW median and
+5% to 95% bands.
 
-"Checks" gives median minus mean forecast per site and arm, the MAE of the median per contrast, and:
+| Substation | Shape step q_s (points² per day) | Observation noise (points) | Cold-snap days, scored year |
+|---|---|---|---|
+| D5 | 0.0286 | 0.090 | 5, too few days |
+| D10 | 0.0235 | 0.071 | 25 |
+| D11 | 0.0042 | 0.057 | 25 |
+| D14 | 0.0103 | 0.569 | 18 |
+| D16 | 0.0203 | 0.053 | 7, too few days |
+| D9 (beside) | 0.0116 | 0.050 | not counted |
 
-1. **A control fails:** a blocking gate test; K0's reproduction; R75's reproduction of the screen.
-2. **A result contradicts a prediction or an earlier finding:** C1 against the screen's −0.074;
-   the midday band; the past-weather check against ENS.
-3. **Quantile score and MAE of the median disagree in sign** on any of C1 to C4.
-4. **Leaving one decision site out flips a sign or a label** of C1 to C4.
-5. **A nested arm beats its container:** K0 beating KW (which nests it), or KW-day beating KW.
-   KW-pl52 is a diagnostic, not a null control, and is not read here.
-6. **An interval more than twice or under half as wide as its sister's:** C1 against R75 − K0 at
-   D+1 on the same rows and at the same level, and against GAM-K − GAM-0 at D+1 from experiment
-   111's stored predictions.
-7. **A later design depends on an unreplicated result:** fires if C1 is adopted while the replicate
-   months disagree.
+The lead-band multipliers of KW-lb are shared by the substations: 4, 4, 0.5, and 0.25 for the
+bands of 0 to 24, 24 to 48, 48 to 144, and 144 to 168 hours.
 
-## What the write-up must contain
+![Shape state magnitude by month and substation](figure_09_amplitude.svg)
 
-The take-home says how much day-ahead error the shape removes, where and when, whether the newest
-readings and per-lead tuning add to it, and what that narrows the next step to.
+![D5 card](figure_08a_card_D5.svg)
 
-- **Figures, raw data first:** a winter and a summer week per site (actual, K0, KW at D+1); GAM-K's
-  residual by local half-hour per month; the C1 to C4 headline chart with intervals, site counts,
-  and both periods; score by lead band per arm with BG2, X-nl+K, and GAM-0; gain by hour band and
-  month; the gate (expected and measured recovery for KW, K0, and R); the tails.
-- **Tails table:** coverage and pinball at q01, q05, q95, and q99, every arm and the shift-only
-  check, per lead band, with threshold-weighted CRPS (`studies.tail_calibration`). No curtailment
-  cost: experiment 87 found no event at the MW Primaries that could rank forecasts. **Absolute
-  scores** of every arm and reference at D+1 and over 0.5 to 168 hours, on shared rows.
-- **Substation cards** ("Provisional: fitted to past weather, forecast on ENS, screening run"; KW in
-  the scored year): per decision site, the shape state as a half-hour-by-week heat map, the band
-  level plus shape at four dates, the weekday GAM profile with and without the final shape, and the
-  site's q_s, σ_ε, and lead-band multipliers. One cross-substation figure compares the shape's
-  amplitude by month and its gain by hour band.
-- **Caveats:** the scored year chose the idea's form; tuning and replicate months interleave; the
-  3.5-hour delay is assumed; hindsight switching masks in scoring; the analysis proxy is the control
-  member of the latest run; five substations. Inherited from experiment 111: the ENS calibration is
-  fitted per hour band on the tuning months and applied in-sample there, which shrinks the diurnal
-  error in the tuning stream and biases q_s and κ against W1; the pinned capacity reads hindsight
-  weeks; the GAM's last training rows use ERA5 a live refit would not have; the spread is fitted
-  on the tuning months.
+![D10 card](figure_08b_card_D10.svg)
 
-## Privacy
+![D11 card](figure_08c_card_D11.svg)
 
-**Substations appear by D-label, with dates, for D5, D9, D10, D11, D14, and D16.** Two further
-series carry embedded generation and are not used. Any number taken from them would be labelled
-G-c, normalised by its own capacity, with day counts and no dates, and never placed beside a
-D-label. No generator's name appears with its series.
+![D14 card](figure_08d_card_D14.svg)
 
-## Run order and compute
+![D16 card](figure_08e_card_D16.svg)
 
-**Order:** code; gate tests 3 to 5; tuning; gate tests 1 and 2; replicate; scored year; exploratory
-arms; report. **Compute: 30 to 45 minutes on 6 CPU cores, no GPU.** The 56-state filter, vectorised
-in numpy, takes seconds per site and run (about 50 runs for q_s and σ_ε); experiment 111's
-per-member run took about 35 s per arm and site, and W1 needs about 25 per site (15 to 20 minutes
-over 6 workers). **Cut first:** KS1, KS, the delay sweep, the past-weather check.
+![D5 sample weeks](figure_02a_weeks_D5.svg)
+
+![D10 sample weeks](figure_02b_weeks_D10.svg)
+
+![D11 sample weeks](figure_02c_weeks_D11.svg)
+
+![D14 sample weeks](figure_02d_weeks_D14.svg)
+
+![D16 sample weeks](figure_02e_weeks_D16.svg)
+
+Every number above is printed by `ml-experiments/00115-*/e00115_numbers.py`; its output is
+[`report.txt`](report.txt).

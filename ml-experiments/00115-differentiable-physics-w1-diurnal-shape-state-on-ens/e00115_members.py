@@ -1,4 +1,4 @@
-"""Cache each run's member forecasts of GAM-K, so every arm of experiment 115 only adds a correction.
+"""Cache each run's member forecasts of GAM-K, so each arm of experiment 115 adds a correction.
 
 **The correction is the same for every ensemble member**, so the DP forecast of each member never
 changes between arms. This script runs `studies.dp_ens.member_means` once per run and substation,
@@ -71,7 +71,7 @@ def load_calibration(*, site: str) -> Calibration:
             solar_shrink=stored["shrink"],
         )
     shrink = json.loads((common.SRC_WORK_DIR / "tuned.json").read_text())["solar_shrink"]
-    return calibration.with_solar_shrink(solar_shrink=np.array(shrink))
+    return calibration.with_solar_shrink(solar_shrink=shrink)
 
 
 def build_site(site: str) -> str:

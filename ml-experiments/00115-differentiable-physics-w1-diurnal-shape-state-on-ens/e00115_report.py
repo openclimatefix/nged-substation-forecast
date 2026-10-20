@@ -36,6 +36,10 @@ EXPLORATORY: Final[dict[str, tuple[str, str]]] = {
     "KW - K0 at 3.5 h": ("KW", "K0"),
     "KW-pl52 - K0": ("KW-pl52", "K0"),
     "KW-pl52 - KW": ("KW-pl52", "KW"),
+    "R - K0": ("R", "K0"),
+    "KW-fast - K0 (post hoc)": ("KW-fast", "K0"),
+    "KW-fast - KW (post hoc)": ("KW-fast", "KW"),
+    "KW-fast - R (post hoc)": ("KW-fast", "R"),
 }
 WINTER: Final[frozenset[int]] = frozenset({11, 12, 1, 2, 3})
 HEADLINE: Final[str] = "D+1"
@@ -85,10 +89,10 @@ def contrast_block(
                 losses=losses, treatment=treatment, reference=reference, metric="abs_median"
             ),
             "absolute_qs": {
-                arm: float(score.quantile_score(frame=subset[arm]).mean()) for arm in pair
+                arm: score.mean_of(score.quantile_score(frame=subset[arm])) for arm in pair
             },
             "absolute_mae_median": {
-                arm: float((subset[arm]["actual"] - subset[arm]["q50"]).abs().mean())
+                arm: score.mean_of((subset[arm]["actual"] - subset[arm]["q50"]).abs())
                 for arm in pair
             },
         }
@@ -226,8 +230,8 @@ def absolute_table(*, frames: dict[str, pl.DataFrame]) -> dict:
         for band in score.LEAD_BANDS:
             subset = score.lead_filter(frame=frame, band=band)
             out[arm][band[0]] = {
-                "qs": float(score.quantile_score(frame=subset).mean()),
-                "mae_median": float((subset["actual"] - subset["q50"]).abs().mean()),
+                "qs": score.mean_of(score.quantile_score(frame=subset)),
+                "mae_median": score.mean_of((subset["actual"] - subset["q50"]).abs()),
                 "rows": subset.height,
             }
     return out
@@ -287,8 +291,8 @@ def reference_scores(*, period: str, arms: list[str]) -> dict:
     out: dict = {"absolute": {}, "rows": next(iter(shared.values())).height}
     for arm, frame in shared.items():
         out["absolute"][arm] = {
-            band[0]: float(
-                score.quantile_score(frame=score.lead_filter(frame=frame, band=band)).mean()
+            band[0]: score.mean_of(
+                score.quantile_score(frame=score.lead_filter(frame=frame, band=band))
             )
             for band in score.LEAD_BANDS
         }
@@ -330,6 +334,7 @@ WINTER_PAIRS: Final[tuple[tuple[str, str], ...]] = (
     ("R", "K0"),
     ("KW", "R"),
     ("KW-fast", "K0"),
+    ("KW-fast", "R"),
     ("KW", "X-nl+K"),
     ("KW", "Xlag-d"),
     ("KW", "BG2"),
@@ -369,7 +374,6 @@ def winter_breakdown(*, period: str) -> dict:
         frames["BG2"] = score.e87_reference(folder=E87_REFERENCES["BG2"], sites=sites)
     out: dict = {"cold_days": {}, "pairs": {}}
     for site in sites:
-        cache = common.load_cache()
         part = score.lead_filter(frame=frames["K0"], band=score.LEAD_BANDS[0]).filter(
             pl.col("site") == site
         )
@@ -422,7 +426,7 @@ def winter_breakdown(*, period: str) -> dict:
             entry[label] = {
                 "qs": score.contrast(losses=losses, treatment=treatment, reference=reference),
                 "absolute": {
-                    arm: float(score.quantile_score(frame=subset[arm]).mean())
+                    arm: float(score.quantile_score(frame=subset[arm]).mean())  # ty: ignore[invalid-argument-type]
                     for arm in (treatment, reference)
                 },
                 "rows": subset[treatment].height,
@@ -466,7 +470,7 @@ def sister_intervals() -> dict:
     return out
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912
     """Print the report."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--part", default="core")
@@ -516,7 +520,8 @@ def main() -> None:
                 m = entry["bands"][band_name]["mae_median"]
                 print(
                     f"{period:9s} {label:45s} {band_name:9s} qs {q['estimate']:+.4f} "
-                    f"[{q['lower']:+.4f}, {q['upper']:+.4f}] sites {q['sites_better']}/{q['n_sites']} "
+                    f"[{q['lower']:+.4f}, {q['upper']:+.4f}] sites "
+                    f"{q['sites_better']}/{q['n_sites']} "
                     f"| mae median {m['estimate']:+.4f}"
                 )
 
