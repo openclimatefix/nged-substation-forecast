@@ -56,7 +56,9 @@ WINTER_MONTHS: Final[tuple[int, ...]] = (11, 12, 1, 2, 3)
 COLD_SNAP_QUANTILE: Final[float] = 0.05
 """A cold-snap day is a winter day whose mean temperature is in the coldest 5% of the winter days
 before the tuning cut. Fixed here, before any residual is read."""
-MIN_BLOCKS: Final[int] = 5
+PRIVATE: Final[str] = "PRIVATE: "
+"""Marks a report line that stays in the private copy: counts that would reveal the grouping."""
+MIN_BLOCKS: Final[int] = 8
 """Fewer complete blocks than this and a block-mean sd is reported as 'cannot tell'."""
 MIN_COVERAGE: Final[float] = 0.8
 """A block counts only if at least this share of its rows hold a residual."""
@@ -93,6 +95,7 @@ class Sums:
     generators: np.ndarray
     gc: np.ndarray
     left_out: dict[str, tuple[int, int]]
+    kept_mw: list[np.ndarray]
 
 
 def select_series(*, cache: FeatureCache, bsp: BspSeries, cut: np.datetime64) -> Sums:
@@ -110,8 +113,10 @@ def select_series(*, cache: FeatureCache, bsp: BspSeries, cut: np.datetime64) ->
         left_out[name] = (len(series) - len(kept), len(series))
         return kept
 
+    kept_mw = keep("MW Primaries", bsp.mw_list)
     return Sums(
-        primaries_mw=sum_all(arrays=keep("MW Primaries", bsp.mw_list), n=n),
+        kept_mw=kept_mw,
+        primaries_mw=sum_all(arrays=kept_mw, n=n),
         primaries_mva=sum_all(arrays=keep("MVA Primaries", bsp.mva_list), n=n),
         generators=sum_all(arrays=keep("generation series", bsp.generator_list), n=n),
         gc=sum_all(arrays=bsp.gc_list, n=n),
@@ -302,16 +307,19 @@ def band_and_month_table(
     )
 
 
-def cold_snap_days(*, cache: FeatureCache, bsp: BspSeries) -> set[np.datetime64]:
-    """Return the cold-snap days: the coldest 5% of winter days before the tuning cut."""
+def cold_snap_threshold(*, cache: FeatureCache, bsp: BspSeries) -> float:
+    """Return the cold-snap temperature: the 5% quantile of winter-day means before the tuning cut.
+
+    A day is a cold-snap day, in any winter, when its mean temperature is at or below this value.
+    The threshold is fixed from rows before the tuning cut and before any residual is read.
+    """
     cut = to_64(moment=CUTS["tuning"])
     days = cache.end_times.astype("datetime64[D]")
     month = cache.end_times.astype("datetime64[M]").astype(int) % 12 + 1
     mask = (cache.end_times <= cut) & np.isin(month, WINTER_MONTHS)
     unique = np.unique(days[mask])
     means = np.array([np.nanmean(bsp.temperature_c[mask & (days == d)]) for d in unique])
-    threshold = np.quantile(means[np.isfinite(means)], COLD_SNAP_QUANTILE)
-    return set(unique[means <= threshold])
+    return float(np.quantile(means[np.isfinite(means)], COLD_SNAP_QUANTILE))
 
 
 def winter_table(
@@ -329,7 +337,10 @@ def winter_table(
     year = ends.astype("datetime64[Y]").astype(int) + 1970
     winter_year = np.where(month >= 11, year + 1, year)
     days = ends.astype("datetime64[D]")
-    snaps = cold_snap_days(cache=cache, bsp=bsp)
+    threshold = cold_snap_threshold(cache=cache, bsp=bsp)
+    all_days = cache.end_times.astype("datetime64[D]")
+    day_mean = {d: np.nanmean(bsp.temperature_c[all_days == d]) for d in np.unique(days)}
+    snaps = {d for d, m in day_mean.items() if m <= threshold}
     is_snap = (
         np.isin(days, np.array(sorted(snaps), dtype="datetime64[D]"))
         if snaps
@@ -365,6 +376,87 @@ def winter_table(
     )
 
 
+def prefix_fits(
+    *, x: np.ndarray, y: np.ndarray, months: np.ndarray, design: Design, penalty: float
+) -> dict[np.datetime64, np.ndarray]:
+    """Fit on the rows before each month's start; return the coefficients by month."""
+    gram = np.zeros((x.shape[1], x.shape[1]))
+    rhs = np.zeros(x.shape[1])
+    seen = 0
+    fits = {}
+    for month in np.unique(months):
+        if seen >= 4 * ROWS_PER_DAY * 30:
+            fits[month] = solve_gram(
+                gram=gram, rhs=rhs, design=design, step_penalty=penalty, n=seen
+            )
+        in_month = months == month
+        gram = gram + x[in_month].T @ x[in_month]
+        rhs = rhs + x[in_month].T @ y[in_month]
+        seen += int(in_month.sum())
+    return fits
+
+
+def false_alarm_rates(
+    *, residual: np.ndarray, thresholds: dict[int, float | None], rng: np.random.Generator
+) -> dict[int, float | None]:
+    """Return the share of placebo windows of `residual` whose mean beats each threshold."""
+    finite = np.flatnonzero(np.isfinite(residual))
+    out: dict[int, float | None] = {}
+    for length, threshold in thresholds.items():
+        if threshold is None or len(finite) < 2 * length:
+            out[length] = None
+            continue
+        starts = rng.integers(finite[0], finite[-1] - length, size=PLACEBO_WINDOWS)
+        means = np.array(
+            [
+                np.nanmean(residual[s : s + length])
+                if np.isfinite(residual[s : s + length]).mean() >= MIN_COVERAGE
+                else np.nan
+                for s in starts
+            ]
+        )
+        out[length] = float(np.mean(np.abs(means[np.isfinite(means)]) > threshold))
+    return out
+
+
+def window_detections(
+    *,
+    xw: np.ndarray,
+    y_window: np.ndarray,
+    delta: np.ndarray,
+    gram0: np.ndarray,
+    rhs0: np.ndarray,
+    pre_fit: np.ndarray | None,
+    theta: np.ndarray,
+    design: Design,
+    penalty: float,
+    n: int,
+    threshold: float,
+) -> dict[str, bool]:
+    """Say which fits show an injected error `delta` in the window rows `xw`, `y_window`.
+
+    The injection adds `delta` to the first design column over the window, which changes the Gram
+    system by a rank-two update.
+    """
+    v = xw.T @ delta
+    gram = gram0.copy()
+    gram[0, :] += v
+    gram[:, 0] += v
+    gram[0, 0] += float(delta @ delta)
+    rhs = rhs0.copy()
+    rhs[0] += float(delta @ y_window)
+    refit = solve_gram(gram=gram, rhs=rhs, design=design, step_penalty=penalty, n=n)
+    xw_new = xw.copy()
+    xw_new[:, 0] += delta
+    fits = {"refit": refit, "in-sample clean fit": theta}
+    if pre_fit is not None:
+        fits["pre-injection fit"] = pre_fit
+    return {
+        name: abs(float(np.mean(y_window - xw_new @ fitted))) > threshold
+        for name, fitted in fits.items()
+    }
+
+
 def injection_audit(
     *,
     cache: FeatureCache,
@@ -375,50 +467,51 @@ def injection_audit(
     theta: np.ndarray,
     penalty: float,
     cut: np.datetime64,
+    out_of_sample: np.ndarray,
     lines: list[str],
 ) -> dict[str, float]:
     """Inject metering errors into the included MW Primaries; count detections.
 
     A window is detected if the absolute mean of the residual over it exceeds 3 block-mean standard
-    deviations of the clean residual for that window length. The false-alarm rate comes from placebo
-    windows of the clean residual. 'Refit' includes the injected series in the fit; 'pre-injection'
-    keeps the clean fit's coefficients.
+    deviations of the clean residual for that window length. Three fits are read: the refit, which
+    includes the injected series (the reading the decision rule uses); the clean fit trained on all
+    pre-cut rows, including the uninjected rows of the window itself (in-sample, so it flatters
+    detection); and a fit trained on the rows before the window's month only. Each scale error
+    is injected with both signs, in the size of the stated share of the Primary's median load, and
+    the lower detection rate of the two signs is reported. The false-alarm rate comes from placebo
+    windows of the in-sample residual and of the frozen fit's residual over the year after the cut.
     """
     x, y = design.matrix[index], bsp.reading[index]
     gram0, rhs0 = x.T @ x, x.T @ y
-    clean = y - x @ theta
     grid_clean = np.full(len(cache.end_times), np.nan)
-    grid_clean[index] = clean
+    grid_clean[index] = y - x @ theta
     last_year = index[cache.end_times[index] > cut - np.timedelta64(365, "D")]
-    series = [s for s in bsp.mw_list if np.isfinite(s[index]).mean() >= MIN_SERIES_COVERAGE]
+    kept = [id(s) for s in (sums.kept_mw)]
+    series = [s for s in bsp.mw_list if id(s) in kept]
     cells = [("stuck 24 h", 48, "stuck", 0.0)] + [
         (f"scale {name} {int(100 * s)}%", rows, "scale", s)
         for name, rows in (("30 d", 1440), ("90 d", 4320))
         for s in SIZES
     ]
     rng = np.random.default_rng(1)
-    thresholds = {
-        L: DETECTION_SIGMAS
-        * (block_sd(residual=grid_clean[index[0] : index[-1] + 1], block=L) or np.inf)
-        for L in (48, 1440, 4320)
-    }
-    placebo = {}
-    for length in (48, 1440, 4320):
-        starts = rng.integers(index[0], index[-1] - length, size=PLACEBO_WINDOWS)
-        means = np.array(
-            [
-                np.nanmean(grid_clean[s : s + length])
-                if np.isfinite(grid_clean[s : s + length]).mean() >= MIN_COVERAGE
-                else np.nan
-                for s in starts
-            ]
-        )
-        placebo[length] = float(np.mean(np.abs(means[np.isfinite(means)]) > thresholds[length]))
+    lengths = (48, 1440, 4320)
+    sds = {L: block_sd(residual=grid_clean[index[0] : index[-1] + 1], block=L) for L in lengths}
+    thresholds = {L: None if v is None else DETECTION_SIGMAS * v for L, v in sds.items()}
+    placebo = false_alarm_rates(residual=grid_clean, thresholds=thresholds, rng=rng)
+    placebo_out = false_alarm_rates(residual=out_of_sample, thresholds=thresholds, rng=rng)
+    months = cache.end_times[index].astype("datetime64[M]")
+    pre = prefix_fits(x=x, y=y, months=months, design=design, penalty=penalty)
     position = {g: i for i, g in enumerate(index)}
     results: dict[str, float] = {}
     for label, length, kind, size in cells:
-        detected_refit, detected_fixed, total = 0, 0, 0
+        if thresholds[length] is None:
+            lines.append(f"- injected {label}: cannot tell (too few blocks for its threshold)")
+            continue
+        hits = {"refit": [0, 0], "in-sample clean fit": [0, 0], "pre-injection fit": [0, 0]}
+        counts = {"refit": [0, 0], "in-sample clean fit": [0, 0], "pre-injection fit": [0, 0]}
+        signs = (1.0, -1.0) if kind == "scale" else (1.0,)
         for s in series:
+            median_load = float(np.nanmedian(s[index]))
             for _ in range(SEEDS):
                 for _try in range(20):
                     start = int(rng.choice(last_year[: max(len(last_year) - length, 1)]))
@@ -429,38 +522,48 @@ def injection_audit(
                 else:
                     continue
                 rows = window[present]
-                delta = (
-                    size * s[rows]
-                    if kind == "scale"
-                    else s[start - 1 if np.isfinite(s[start - 1]) else rows[0]] - s[rows]
-                )
                 local = np.array([position[g] for g in rows])
                 xw = x[local]
-                v = xw.T @ delta
-                gram = gram0.copy()
-                gram[0, :] += v
-                gram[:, 0] += v
-                gram[0, 0] += float(delta @ delta)
-                rhs = rhs0.copy()
-                rhs[0] += float(delta @ y[local])
-                new = solve_gram(gram=gram, rhs=rhs, design=design, step_penalty=penalty, n=len(y))
-                xw_new = xw.copy()
-                xw_new[:, 0] += delta
-                shift_refit = abs(float(np.mean(y[local] - xw_new @ new)))
-                shift_fixed = abs(float(np.mean(y[local] - xw_new @ theta)))
-                detected_refit += shift_refit > thresholds[length]
-                detected_fixed += shift_fixed > thresholds[length]
-                total += 1
-        if total:
-            results[label + " refit"] = detected_refit / total
-            results[label + " fixed"] = detected_fixed / total
-            lines.append(
-                f"- injected {label}: detected {100 * detected_refit / total:.0f}% with a refit, "
-                f"{100 * detected_fixed / total:.0f}% with the pre-injection fit "
-                f"({total} injections; false-alarm rate {100 * placebo[length]:.1f}%)"
-            )
-        else:
+                month = cache.end_times[start].astype("datetime64[M]")
+                for sign_number, sign in enumerate(signs):
+                    delta = (
+                        sign * size * median_load * np.ones(len(rows))
+                        if kind == "scale"
+                        else s[start - 1 if np.isfinite(s[start - 1]) else rows[0]] - s[rows]
+                    )
+                    detected = window_detections(
+                        xw=xw,
+                        y_window=y[local],
+                        delta=delta,
+                        gram0=gram0,
+                        rhs0=rhs0,
+                        pre_fit=pre.get(month),
+                        theta=theta,
+                        design=design,
+                        penalty=penalty,
+                        n=len(y),
+                        threshold=thresholds[length],
+                    )
+                    for name, hit in detected.items():
+                        hits[name][sign_number] += hit
+                        counts[name][sign_number] += 1
+        rates = {
+            k: min(h[s] / counts[k][s] for s in range(len(signs)))
+            for k, h in hits.items()
+            if min(counts[k][: len(signs)]) > 0
+        }
+        if "refit" not in rates:
             lines.append(f"- injected {label}: cannot tell (no window with enough complete rows)")
+            continue
+        results.update({f"{label} {k}": v for k, v in rates.items()})
+        in_sample = fmt(None if placebo[length] is None else 100 * placebo[length], 1)
+        out_sample = fmt(None if placebo_out[length] is None else 100 * placebo_out[length], 1)
+        lines.append(
+            f"- injected {label}: detected "
+            + ", ".join(f"{100 * v:.0f}% with the {k}" for k, v in rates.items())
+            + f" ({counts['refit'][0]} injections per sign; false-alarm rate {in_sample}% "
+            f"in-sample, {out_sample}% in the year after the cut)"
+        )
     return results
 
 
@@ -555,7 +658,7 @@ def report_cut(
     injections: dict[str, float] = {}
     cut64 = to_64(moment=cut)
     first_day = float(
-        cache.end_times[np.flatnonzero(np.isfinite(bsp.reading))[0]]
+        cache.end_times[np.flatnonzero(np.isfinite(bsp.reading) & (cache.end_times <= cut64))[0]]
         .astype("datetime64[s]")
         .astype(np.int64)
         / 86400.0
@@ -572,7 +675,8 @@ def report_cut(
         f"{len(index)} training rows ({n_years:.1f} years)"
     )
     lines.append(
-        "- left out for too little history (their power stays in the remainder): "
+        PRIVATE
+        + "- left out for too little history (their power stays in the remainder): "
         + ", ".join(f"{a} of {b} {k}" for k, (a, b) in sums.left_out.items())
     )
     if n_years < 1.0:
@@ -616,19 +720,6 @@ def report_cut(
     )
     if cut_name == "scored":
         scored_tables(cache=cache, bsp=bsp, design=design, theta=theta, cut64=cut64, lines=lines)
-    if cut_name in ("tuning", "replicate") and n_years >= 1.5:
-        inj = injection_audit(
-            cache=cache,
-            bsp=bsp,
-            sums=sums,
-            design=design,
-            index=index,
-            theta=theta,
-            penalty=penalty,
-            cut=cut64,
-            lines=lines,
-        )
-        injections = inj
     facts = {
         "scale": scale,
         "a_P": theta[0],
@@ -641,6 +732,22 @@ def report_cut(
     out = residual_on_grid(
         cache=cache, bsp=bsp, design=design, theta=theta, start=cut64, stop=to_64(moment=stop)
     )
+    out_grid = np.full(len(cache.end_times), np.nan)
+    out_grid[(cache.end_times > cut64) & (cache.end_times <= to_64(moment=stop))] = out
+    if cut_name in ("tuning", "replicate") and n_years >= 1.5:
+        inj = injection_audit(
+            cache=cache,
+            bsp=bsp,
+            sums=sums,
+            design=design,
+            index=index,
+            theta=theta,
+            penalty=penalty,
+            cut=cut64,
+            out_of_sample=out_grid,
+            lines=lines,
+        )
+        injections = inj
     valid = out[np.isfinite(out)]
     if len(valid) >= ROWS_PER_DAY * 90:
         lines.append(
@@ -662,12 +769,14 @@ def report_bsp(
 ) -> dict[str, dict[str, float]]:
     """Fit one BSP at the three cuts and print its closure residual; return the fitted facts."""
     cap = bsp.effective_capacity_mw
-    median_load = float(np.nanmedian(bsp.reading))
+    median_load = float(np.nanmedian(bsp.reading[cache.end_times <= to_64(moment=CUTS["scored"])]))
     lines.append(f"### Bulk supply point {bsp.index + 1}")
     lines.append("")
+    lines.append(f"- effective capacity {cap:.1f} MW; median load {median_load:.1f} MW")
     lines.append(
-        f"- {bsp.n_primaries} metered Primaries, {bsp.n_generators} metered generation series "
-        f"(G-c included); effective capacity {cap:.1f} MW; median load {median_load:.1f} MW"
+        PRIVATE
+        + f"- {bsp.n_primaries} metered Primaries, {bsp.n_generators} metered generation series "
+        "(G-c included)"
     )
     facts: dict[str, dict[str, float]] = {}
     injections: dict[str, dict[str, float]] = {}
@@ -690,8 +799,10 @@ def main() -> None:
     lines = ["# Experiment 124, step 0: the BSP closure audit", ""]
     for bsp in bsps:
         report_bsp(cache=cache, bsp=bsp, lines=lines)
-    text = "\n".join(lines) + "\n"
-    (WORK_DIR / "audit_report.md").write_text(text)
+    (WORK_DIR / "audit_report.md").write_text(
+        "\n".join(line.removeprefix(PRIVATE) for line in lines) + "\n"
+    )
+    text = "\n".join(line for line in lines if not line.startswith(PRIVATE)) + "\n"
     (
         Path(__file__).parents[2]
         / "docs"
@@ -699,7 +810,7 @@ def main() -> None:
         / Path(__file__).parent.name
         / "audit_report.md"
     ).write_text(text)
-    sys.stdout.write("\n".join(lines) + "\n")
+    sys.stdout.write(text)
 
 
 if __name__ == "__main__":

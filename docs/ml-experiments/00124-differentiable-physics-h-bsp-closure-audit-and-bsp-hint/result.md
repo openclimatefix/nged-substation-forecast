@@ -201,7 +201,7 @@ flatters the hint (experiment 113's caveat). Readings, at W\* and at W0:
    one synthetic Primary, W\* cuts that Primary's damage by at least 0.30 at the median system, in both
    halves of the systems. This reading fails if the weight is effectively zero. **Clarified after
    the module was written, before any fit (see "Clarifications"): the damage is scored on the clean
-   scored year, outside the corrupted window, at the default step penalty and at the tuned one.**
+   scored year, outside the corrupted window, with the pilot's one remainder step penalty.**
 7. **Power for C1:** the paired half-width (99.17% interval) of W\* minus W0 on the clean synthetic
    systems, at the **real site count** under the chosen BSPs (2 to 3 sites, not 5), is measured and
    printed before any real fit. If it exceeds 0.03 points, the verdict is capped at
@@ -324,7 +324,7 @@ original plan.**
   weight pulls a corrupted Primary back inside the corrupted window (error 11.3 to about 3.3
   points) while the remainder's free level absorbs the constant offset elsewhere. The damage that
   matters in C2 arrives on the clean scored year, so reading 6 scores that year, and also reports
-  the in-window error and the BSP residual, at the default step penalty (30) and at the tuned one.
+  the in-window error and the BSP residual (the module's own test does this; the gate reports the clean-year damage only, since the pilot has one remainder step penalty).
 - **The BSP rows start where the Primaries' training window starts,** so the hint does not
   constrain a Primary's coefficients at times its own block ignores.
 - **The remainder's last step knot (at the cut) is dropped,** because its indicator is true for the
@@ -373,6 +373,36 @@ The first-run numbers stay as printed.
 - **By the pre-registered rule neither BSP is informative (`recall30` under 0.2),** so step 1 runs
   as the capped pilot on the BSP with the highest `recall30`, and the verdict cannot exceed
   `partly supported`.
+
+## Clarifications made after a Sonnet code review of the scripts, before the tuning, gate, and scored fits
+
+**The audit was re-run after the review with the fixes below; its first-run report is kept as
+`audit_report_first_run.md`, and the first-run numbers in "Step 0 result (first run)" stay as
+printed.**
+
+- **The step 0 rule reads the refit variant of detection.** The rule's `recall30` is the detection
+  rate when the fit includes the injected series, because that is the fit a running service would
+  make. The report also gives the clean fit trained on all pre-cut rows (in-sample, so it flatters
+  detection) and a fit trained only on the rows before the injected window's month. In the re-run
+  at the tuning cut, the pilot BSP detects a 30-day 25% scale error in 0% (refit), 50% (in-sample
+  clean fit), and 50% (pre-injection fit) of injections. The pre-injection fit's false-alarm rate is
+  1.2% in-sample but 61% in the year after the cut, because a frozen fit drifts, so a 3-standard-
+  deviation detector would not hold up in service. The pilot decision stands.
+- **The audit's injected scale error is a share of the Primary's median load, with both signs,**
+  and the lower rate of the two signs is reported (before: a share of the instantaneous reading).
+  A 90-day threshold with fewer than 8 blocks is reported as "cannot tell".
+- **The cold-snap rule is a temperature threshold,** the 5% quantile of winter-day means before the
+  tuning cut, applied to every winter (before: a fixed list of past days).
+- **The published audit report drops the counts of Primaries and generation series per BSP,**
+  which would narrow down which Primaries sit under which BSP.
+- **Tuning uses 10 seeds per cell and Primary (plan: 30 per kind),** and the gate adds the missing
+  sabotage reading, builds the BSP from the Primaries' noisy series, gives the first MW Primary the
+  same winter-evening hump in half the systems, and freezes its thresholds in
+  `e00124_gate_readings.py` before the gate runs.
+- **The pilot uses the smooth-drift form without L1 steps, fitted capacity, a frozen fit, and the
+  mean absolute error as its score,** with no Kalman filter. The filter-on reading, which the
+  manager's ruling makes the production-relevant one, is therefore not produced, and the verdict is
+  capped at `partly supported`.
 
 ## Rulings made before the run
 

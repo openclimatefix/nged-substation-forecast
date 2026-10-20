@@ -1,9 +1,11 @@
 """Shared inputs of experiment 124: the paths, the cuts, and the series of each bulk supply point.
 
-Everything private is read at run time from NGED's hierarchy files and the cleaned power table, and
-nothing here holds a time series identifier, a substation name, or the membership of a bulk supply
-point. A bulk supply point (BSP) is labelled by its position (0 or 1) in the order of the hierarchy
-file, never by a D-label.
+Everything private is read at run time from NGED's hierarchy files and the cleaned power table.
+Nothing here holds a time series identifier, a substation name, or the membership of a bulk supply
+point. The D-labels of the generator-case and battery series below are public elsewhere in the
+repository; the membership of a BSP is read at run time and never printed. A bulk supply point
+(BSP) is labelled by its position (0 or 1) in the order of the hierarchy file, never by a D-label.
+
 """
 
 import csv
@@ -70,6 +72,8 @@ class BspSeries:
         generator_list: All metered generation series in MW, the generator-case series (G-c)
             included, export-positive.
         gc_list: The generator-case series alone (G-c).
+        mw_labels: The cache label of each series in `mw_list`; private, never printed.
+        mva_labels: The cache label of each series in `mva_list`; private, never printed.
         temperature_c: The mean of the members' ERA5 temperatures.
         pv_shape: The mean of the members' unit PV shapes.
         effective_capacity_mw: The BSP's effective capacity, which converts MW to points.
@@ -85,6 +89,8 @@ class BspSeries:
     mva_list: list[np.ndarray]
     generator_list: list[np.ndarray]
     gc_list: list[np.ndarray]
+    mw_labels: list[str]
+    mva_labels: list[str]
     temperature_c: np.ndarray
     pv_shape: np.ndarray
     effective_capacity_mw: float
@@ -160,6 +166,7 @@ def load_bsps(*, cache: FeatureCache) -> list[BspSeries]:
             and substations.get(r["SubstationNumber"]) == number
         ]
         mw, mva, gen, gc = [], [], [], []
+        mw_labels, mva_labels = [], []
         keys: dict[str, np.ndarray] = {}
         temperature, shape = [], []
         for r in members:
@@ -182,8 +189,10 @@ def load_bsps(*, cache: FeatureCache) -> list[BspSeries]:
                     gc.append(values)
             elif r["Units"] == "MVA":
                 mva.append(values)
+                mva_labels.append(label)
             else:
                 mw.append(values)
+                mw_labels.append(label)
                 keys[str(len(keys))] = values
         out.append(
             BspSeries(
@@ -193,6 +202,8 @@ def load_bsps(*, cache: FeatureCache) -> list[BspSeries]:
                 mva_list=mva,
                 generator_list=gen,
                 gc_list=gc,
+                mw_labels=mw_labels,
+                mva_labels=mva_labels,
                 temperature_c=np.mean(np.stack(temperature), axis=0),
                 pv_shape=np.mean(np.stack(shape), axis=0),
                 effective_capacity_mw=float(capacity_of[bsp_id]),
