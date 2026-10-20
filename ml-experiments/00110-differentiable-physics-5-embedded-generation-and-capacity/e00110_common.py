@@ -54,10 +54,12 @@ DECISION_SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D14", "D16")
 """The MW sites counted for the decision; D9 holds 9 months at 2024-07-01."""
 MW_SCORED_SITES: Final[tuple[str, ...]] = ("D5", "D9", "D10", "D11", "D14", "D16")
 """The MW sites fitted: the decision sites and D9 beside them. D18 has no usable rows before the
-replica cut (its first usable date is in 2025), so it has no replica spread and is not fitted."""
+replica cut, so it has no replica spread and is not fitted."""
 MVA_SITES: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D8", "D12", "D19", "D21", "D22")
 COASTAL_SITES: Final[tuple[str, ...]] = ("D5", "D9")
 """Possible sunshine-tracking loads (PVDIS), reported separately."""
+HELD_VINTAGE_SITE: Final[str] = "D14"
+"""D14's vintage stops in 2023, so its reference is the capacity held after the cut, flagged."""
 FLAGGED_CLIP_SITE: Final[str] = "D5"
 """The one decision site where Part 1 found clipping (4 of 7 summers)."""
 INJECTION_SITES: Final[tuple[str, ...]] = ("D10", "D11", "D14", "D16")

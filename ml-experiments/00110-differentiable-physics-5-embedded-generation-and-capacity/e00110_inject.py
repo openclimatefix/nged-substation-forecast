@@ -94,20 +94,23 @@ def plant_shape(
 def inject_pv(
     *, cache: FeatureCache, site: str, shape: np.ndarray, capacity_points: float
 ) -> FeatureCache:
-    """Subtract `capacity_points` times a per-MW-AC shape from a substation's power."""
+    """Subtract `capacity_points` times a per-MW-AC shape from a substation's power.
+
+    A `NaN` in the shape makes the power `NaN` there, so the row drops out of training.
+    """
     features = cache.sites[site]
-    return with_reading(
-        cache=cache, site=site, y=features.y - capacity_points * np.nan_to_num(shape, nan=0.0)
-    )
+    return with_reading(cache=cache, site=site, y=features.y - capacity_points * shape)
 
 
 def farm_norm(*, cache: FeatureCache, farm: str) -> np.ndarray:
     """Return a farm's power divided by its 99th percentile, on the cache's grid.
 
     The 99th percentile is over the farm's daylight half-hours in all history, as in experiment 39.
-    A half-hour at or below zero power while the irradiance exceeds `FARM_DROPOUT_GHI_W_M2` is a
-    dropout and counts as missing, and remaining negative readings are set to zero. Missing
-    half-hours return 0, so nothing is injected there.
+    A daylight half-hour with no reading, or at or below zero power while the irradiance exceeds
+    `FARM_DROPOUT_GHI_W_M2` (a dropout), returns `NaN`, so a substation's power becomes `NaN` there
+    and the row drops out of training instead of carrying a farm that produced nothing. Remaining
+    negative readings are set to zero. A half-hour outside the daylight rows of the farm's frame
+    returns 0, because the farm injects nothing in the dark.
 
     Args:
         cache: The cache, for the grid.
@@ -121,11 +124,15 @@ def farm_norm(*, cache: FeatureCache, farm: str) -> np.ndarray:
     )
     power = frame.filter(pl.col("power").is_not_null())
     p99 = float(np.nanpercentile(power["power"].to_numpy(), 99))
-    kept = power.filter(
-        ~((pl.col("power") <= 0.0) & (pl.col("ghi_u") > FARM_DROPOUT_GHI_W_M2))
-    ).select("time", norm=pl.col("power").clip(lower_bound=0.0) / p99)
+    dropout = (pl.col("power") <= 0.0) & (pl.col("ghi_u") > FARM_DROPOUT_GHI_W_M2)
+    daylight = frame.select(
+        "time",
+        norm=pl.when(pl.col("power").is_null() | dropout)
+        .then(float("nan"))
+        .otherwise(pl.col("power").clip(lower_bound=0.0) / p99),
+    )
     grid = pl.DataFrame({"time": cache.times_series()})
-    joined = grid.join(kept, on="time", how="left", validate="1:1", maintain_order="left")
+    joined = grid.join(daylight, on="time", how="left", validate="1:1", maintain_order="left")
     return joined["norm"].fill_null(0.0).to_numpy().astype(np.float64)
 
 
@@ -144,10 +151,12 @@ def inject_farm(
 def midday_median_absolute(*, cache: FeatureCache, site: str, before: datetime) -> float:
     """Return the median absolute power at midday in the year before `before`, in points.
 
-    Midday is 10:00 to 14:00 UTC. This is experiment 79's injection level 1.0.
+    Midday is the half-hours that start from 10:00 to before 14:00 UTC. This is experiment 79's
+    injection level 1.0.
     """
     features = cache.sites[site]
-    hours = cache.end_times.astype("datetime64[h]").astype(np.int64) % 24
+    starts = cache.end_times - np.timedelta64(30, "m")
+    hours = starts.astype("datetime64[h]").astype(np.int64) % 24
     start = common.to_64(moment=before.replace(year=before.year - 1))
     keep = (
         np.isfinite(features.y)
@@ -218,23 +227,24 @@ def inject_meter(
 
 
 def clipped_total(
-    *, pinned_pv: np.ndarray, farm: np.ndarray, share_of_peak: float, beta: float
+    *, pinned_pv: np.ndarray, scale: float, share_of_peak: float, beta: float
 ) -> tuple[np.ndarray, float]:
-    """Return the clipped sum of rooftop and farm output, and the clip level in points.
+    """Return the clipped, scaled rooftop output, and the clip level in points.
 
-    The clip level is `share_of_peak` times the peak of the sum over the whole series, which falls
-    in summer.
+    The truth has the model's own form: the pinned rooftop output times a capacity multiplier
+    `scale`, clipped smoothly at `share_of_peak` times its peak, which falls in summer. Because the
+    multiplier is inside the profile's grid, the profile can represent the truth exactly.
 
     Args:
         pinned_pv: The model's own rooftop solar output (the pinned capacity times the shape).
-        farm: The injected farm's output, in points.
-        share_of_peak: The clip as a share of the total's peak.
+        scale: The capacity multiplier, such as 1.25.
+        share_of_peak: The clip as a share of the scaled output's peak.
         beta: The smooth clip's sharpness, per point.
 
     Returns:
-        The clipped total on the grid and the clip level.
+        The clipped output on the grid and the clip level.
     """
-    total = np.nan_to_num(pinned_pv, nan=0.0) + farm
+    total = scale * np.nan_to_num(pinned_pv, nan=0.0)
     level = share_of_peak * float(np.max(total))
     return clipped_pv(unclipped=total, p_max=level, beta=beta), level
 

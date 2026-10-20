@@ -133,14 +133,34 @@ def _details(*, run: arms.SiteRun) -> dict[str, Any]:
     return details
 
 
+def _check_gate(*, ignore: bool) -> None:
+    """Refuse to fit the scored arms before the gate has run, unless told to ignore it.
+
+    A failed blocking test stops scoring of the component it tests, so the gate's summary must
+    exist; which tests passed is read by the report, and the plan's rule decides what is scored.
+    """
+    path = common.WORK_DIR / "gate.json"
+    if ignore:
+        return
+    if not path.exists():
+        msg = "the known-answer gate has not run: work/gate.json is missing"
+        raise SystemExit(msg)
+    summary = json.loads(path.read_text())["summary"]
+    failed = [name for name in ("test_3", "test_4", "test_5") if not summary[name]["passed"]]
+    if failed:
+        print(f"WARNING: blocking tests failed: {failed}; their components count as failed")
+
+
 def main() -> None:
     """Fit the arms and write one prediction set per cut and arm."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuts", nargs="+", default=["replicate", "scored"])
     parser.add_argument("--arms", nargs="*", default=None)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--ignore-gate", action="store_true")
     arguments = parser.parse_args()
     os.environ["OMP_NUM_THREADS"] = "2"
+    _check_gate(ignore=arguments.ignore_gate)
     common.load_cache()
     definitions = arms.arm_definitions(part_4=arms.read_part_4_tuned(), tuned=arms.read_tuned())
     wanted = arguments.arms or list(definitions)

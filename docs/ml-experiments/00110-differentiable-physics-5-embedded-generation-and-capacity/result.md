@@ -211,12 +211,12 @@ measures training a solar term on sunlit MVA rows, not the meter.
 - **B-clip:** B with the clip at D5 only. **B-clip-all:** the clip at every MW site, where the clip
   must stay open at each site Part 1 did not flag.
 - **B-gen:** B-D1 with the node at every MW site and the clip at D5, the full generation-side model.
-- **The real generator case (hindsight only).** G-c is the sum of two adjacent series, usable from
-  2025-03-01: a Primary with an embedded generator, summed with its neighbour. The node is fitted
-  over 2025-03 to 2026-06, and the node's level is compared with the mean dark-row export of the
-  series that carries the generator, which is mostly the generator (no temperature slope). The fit
-  covers the scored months, so it is labelled hindsight and enters no forecast score. There is no
-  forecast arm: 4 months before the 2025-07-01 cut cannot identify heating or a season.
+- **The real generator case (hindsight only).** G-c is a Primary with an embedded generator, summed
+  with its neighbour. The node is fitted over the whole usable history of the sum, and the node's
+  level is compared with the mean dark-row export of the series that carries the generator, which
+  is mostly the generator (no temperature slope). The fit covers the scored months, so it is
+  labelled hindsight and enters no forecast score. There is no forecast arm: the history before the
+  2025-07-01 cut is too short to identify heating or a season.
 
 **XGBoost bars** (CPU, lagless, experiment 87's Primary hyperparameters without the three power
 lags, 11 quantiles, Part 2's ERA5 and CAMS inputs, on B's window). Part 4's X-best, X-bestz,
@@ -232,8 +232,8 @@ are climatology and `manual_heuristic`.
   u falls under 0.05 in every daylight cell. If none does, λ = 100 and the residual correlations
   are reported; the arm is still judged.
 - **The node's step and level penalties** (3 × 3 grid) on an injection that gate test 4 never uses:
-  flat generators of 6 and 15 points with one step and one 3-day outage, injected at D5 and D9 on
-  other dates. The chosen values are the largest at which that injection is recovered.
+  flat generators of 6 and 15 points with one step and one 14-day outage, injected at D5 (D9 has
+  no usable rows at the tuning cut) on other dates. The chosen values are the largest at which that injection is recovered.
 - **C4's arm:** among the K arms, the one with the best tuning-year score, recorded before any later
   fit.
 
@@ -261,10 +261,10 @@ be fixed inside the part, that component counts as failed, and the verdict follo
    series, and the median recovered power factor is within 0.01 of 0.97. A variant at experiment
    79's level 0.5 (little reverse flow, the real sites' regime) is reported, not blocking.
 4. **The node recovers a generator.** Into D10, D11, D14, and D16 (one fit each, on B-D1), inject a
-   flat generator of 10 points, with one +5-point step on a known date, a 7-day outage, and a 1-day
-   outage. The test passes if the step is placed within 7 days and sized within 30%, the 7-day
-   outage is found, and the level, read at that outage, is within 20%. The 1-day outage is reported
-   only.
+   flat generator of 10 points, with one +5-point step on a known date, a 14-day outage, and a
+   1-day outage. The test passes if the step is placed within 7 days and sized within 30%, the
+   14-day outage is found, and the level, read at that outage, is within 20%. The 1-day outage is
+   reported only.
 5. **The clip recovers an injected clip.** At D10, D11, D14, and D16, inject a farm and clip the
    total PV (pinned rooftop C·u plus the farm) at 60% of that total's summer peak, so that the truth
    has the model's form. Fit the 2-D profile. The test passes if P_max is within 10% of the injected
@@ -325,6 +325,41 @@ part as a control that should be zero; each K arm minus B; K-ii+iii; per-site po
 with bootstrap intervals; B-node minus B-D1 and B-clip minus B per site; and L0 minus X-mva.
 **Descriptive only:** D9; D18; coastal D5 and D9; bank holidays, the Christmas run, and days below
 0 °C; L0's MW against experiment 79's fit, which includes the scored months.
+
+## Changes made before any scored fit
+
+These follow the module reviews and the script review, and the maintainer's wish for a quick look
+at the node. They change this plan's text above; the rest of the plan stands.
+
+- **The node's blocks are 7 days long, a deliberate choice for a quick look.** A node fit takes 2
+  to 10 seconds at 7-day blocks and 14 to 34 seconds at 3-day blocks. Outages of 14 days or more
+  are resolved, so the tuning outages and the gate's long outage are 14 days, not 3 and 7. If the
+  node arm looks promising, a follow-up at 3-day blocks is the next step.
+- **The node's costs do not depend on the window length** (the step cost per point, the level cost
+  per point per day), and a node needs a drift term beside it. A generator is evidenced only by an
+  outage, so the real-data clause "node under 1 point" reads the depth of the deepest outage
+  (`generator_evidence`), not the range of the level path.
+- **Known false positives of that readout, pre-registered:** a short unmodelled rise in demand
+  (7 days, 4 points reads as 2.3 to 2.6 points) and D10's jump in November 2024.
+- **The learned reactive power is fitted only where the data hold reverse flow** (at least 0.5% of
+  training rows); otherwise it is held at a power factor of 0.97 and the fit says so.
+- **The gate certifies the configuration the scored arms use:** every gate fit uses the scored
+  arm's window (all years), tests 1 and 3 include D5, a farm half-hour with no reading or a dropout
+  leaves training instead of being injected as zero, and test 5's truth is the rooftop output times
+  1.25, clipped at 60% of its peak, so that the truth lies in the profile's grid.
+- **Intervals.** The capacity bootstrap keeps each calendar quarter's months and is widened by
+  sqrt(m / (m - 1)) (experiment 113), and the ratio of K-iii to K-base uses the same month draws.
+  Gate tests 1 and 2 also report an 80% month-block bootstrap interval for the recovered capacity
+  with its coverage over at least 20 synthetic sites, at independent noise of 5.0 points and at
+  noise made of month blocks of real residuals; the point tolerances stay as the pre-registered
+  record. The substation cards show heating slopes and capacities with intervals, and the line
+  "weakly identified at real noise levels (experiment 112); compare across substations with care".
+- **C4's arm** is chosen among K-base, K-i, and K-ii, because K-iii has no `identified` label, and
+  C4 runs only if its arm is `identified`. `robust` does not require K-base, and handing fitted
+  capacity to Part 6 also requires K-base `identified`. D14 is judged against its held capacity.
+- **Hypothesis to test:** day-of-year harmonics, drift, and the per-band profile absorb the seasonal
+  cycle of temperature and clear-sky PV, leaving only day-to-day weather anomalies to identify slope
+  and capacity.
 
 ## Predictions
 

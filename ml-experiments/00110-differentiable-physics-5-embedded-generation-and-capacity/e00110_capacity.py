@@ -20,6 +20,8 @@ import polars as pl
 from studies.dp_pinned_capacity import read_vintages
 
 K_ARMS = ("k_base", "k_i", "k_ii", "k_iii", "k_iiiii")
+NARROW_ARMS = ("k_iii", "k_iiiii")
+"""The arms on the last two season-years, fitted beside K-base under the same month draws."""
 _STATE: dict[str, Any] = {}
 
 
@@ -38,12 +40,14 @@ def _init_worker() -> None:
 def _job(job: tuple[str, str, str]) -> dict[str, Any]:
     """Return one arm's capacity result at one site and cut as a table row."""
     label, arm, site = job
+    definitions = _STATE["definitions"]
     result = arms.capacity_with_bootstrap(
         cache=_STATE["cache"],
         vintages=_STATE["vintages"],
         site=site,
         cut=common.CUTS[label],
-        definition=_STATE["definitions"][arm],
+        definition=definitions[arm],
+        paired_base=definitions["k_base"] if arm in NARROW_ARMS else None,
     )
     low, high = result.range_90
     return {
@@ -55,6 +59,11 @@ def _job(job: tuple[str, str, str]) -> dict[str, Any]:
         "range_low": low,
         "range_high": high,
         "bootstrap": result.bootstrap.tolist(),
+        "paired_base_bootstrap": (
+            None if result.paired_base_bootstrap is None else result.paired_base_bootstrap.tolist()
+        ),
+        "n_months": result.n_months,
+        "vintage_held": site == common.HELD_VINTAGE_SITE,
         "vintage_mean": result.vintage_mean,
         "vintage_source": result.vintage_source,
     }

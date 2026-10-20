@@ -19,12 +19,19 @@ quantity. A failed blocking test stops scoring of the component it tests.
    site's capacity within 15% of the plain fit to the signed series, and the median recovered
    power factor within 0.01 of 0.97. Level 0.5 is reported only.
 4. **The node recovers a generator (blocking for the node).** A flat generator of 10 points with
-   a +5-point step, a 7-day outage, and a 1-day outage is subtracted. The step must be placed within
-   7 days and sized within 30%, the 7-day outage found, and its level within 20%. The 1-day outage
-   is reported only.
-5. **The clip recovers an injected clip (blocking for the clip).** A farm is added to the model's
-   own rooftop output and the total is clipped at 60% of its peak. The profiled ceiling must be
-   within 10% of the injected clip at 3 or more of 4 sites.
+   a +5-point step, a 14-day outage, and a 1-day outage is subtracted. The step must be placed
+   within 7 days and sized within 30%, the 14-day outage found, and its level within 20%. The
+   1-day outage is reported only. The plan's outage is 7 days; the node's blocks are 7 days long, so
+   a 7-day outage that straddles two blocks would be read at half its depth.
+5. **The clip recovers an injected clip (blocking for the clip).** The model's own rooftop output
+   times 1.25 (a capacity multiplier inside the profile's grid, so the truth has the model's form)
+   is clipped at 60% of its peak. The profiled ceiling must be within 10% of the injected clip at 3
+   or more of 4 sites.
+
+Tests 1 and 3 run at the five decision substations, and tests 2, 4, and 5 at D10, D11, D14, and
+D16. Every fit uses the window of the scored arm it certifies (all years for the K arms, the meter
+arms, the node, and the clip), so the gate tests the configuration the scored arms use. A farm
+half-hour with no reading or a dropout makes the power `NaN`, so that row leaves training.
 
 Only ratios leave the private folder, because the farms are metered generators.
 
@@ -51,7 +58,6 @@ from studies.dp_gam import (
     LAST_TRAINED_MIN_SHAPE,
     GamSpec,
     NodeSpec,
-    TrainingWindow,
     derated_unit_shape,
     fit_gam,
     pinned_solar_points,
@@ -67,16 +73,17 @@ PLANT_SETS: Final[dict[str, tuple[Any, ...]]] = {
     "east-west": inject.EAST_WEST_PLANTS,
     "south-west": inject.SOUTH_WEST_PLANTS,
 }
+CLIP_SCALE: Final[float] = 1.25
+"""The injected rooftop multiplier of gate test 5, inside the clip profile's grid of 0.7 to 1.3."""
 FARM_POINTS: Final[float] = 20.0
 """The injected 99th percentile of a farm, in points (experiment 39's headline size)."""
-GATE_WINDOW: Final[TrainingWindow] = TrainingWindow(months=24)
 POWER_FACTOR_TRUTH: Final[float] = 0.97
 METER_LEVELS: Final[tuple[float, ...]] = (1.0, 0.5)
 NODE_GENERATOR: Final[dict[str, Any]] = {
     "level": 10.0,
     "step": 5.0,
     "step_date": (2022, 3, 15),
-    "long_outage": (2022, 9, 12, 7),
+    "long_outage": (2022, 9, 12, 14),
     "short_outage": (2023, 1, 17, 1),
 }
 CLIP_SHARE_OF_PEAK: Final[float] = 0.6
@@ -197,7 +204,7 @@ def _meter_job(site: str) -> list[dict[str, Any]]:
         site=site,
         specs=[spec_b],
         cut=common.TUNING_CUT,
-        window=GATE_WINDOW,
+        window=_STATE["definitions"]["b"].window,
         season_years=common.SEASON_YEARS,
         pinned=pinned,
     )
@@ -228,7 +235,7 @@ def _meter_job(site: str) -> list[dict[str, Any]]:
             site=site,
             specs=[spec],
             cut=common.TUNING_CUT,
-            window=GATE_WINDOW,
+            window=_STATE["definitions"]["lq"].window,
             season_years=common.SEASON_YEARS,
         )
         reference_capacity = reference.capacity_points()[reference.last_season_year]
@@ -238,7 +245,7 @@ def _meter_job(site: str) -> list[dict[str, Any]]:
                 site=site,
                 spec=spec,
                 cut=common.TUNING_CUT,
-                window=GATE_WINDOW,
+                window=_STATE["definitions"]["lq"].window,
                 season_years=common.SEASON_YEARS,
                 qmode=qmode,
             )
@@ -300,7 +307,7 @@ def _node_job(site: str) -> dict[str, Any]:
         site=site,
         specs=[spec],
         cut=common.TUNING_CUT,
-        window=GATE_WINDOW,
+        window=_STATE["definitions"]["b_gen"].window,
         season_years=common.SEASON_YEARS,
         pinned=pinned,
     )
@@ -335,9 +342,11 @@ def _clip_job(site: str) -> dict[str, Any]:
     rows = np.flatnonzero(np.isfinite(features.y) & np.isfinite(features.pv_unit_shape))
     rooftop = np.full(len(cache.end_times), np.nan)
     rooftop[rows] = pinned_solar_points(cache=cache, features=features, pinned=pinned, index=rows)
-    farm = FARM_POINTS * _farm_norm("A")
     clipped, level = inject.clipped_total(
-        pinned_pv=rooftop, farm=farm, share_of_peak=CLIP_SHARE_OF_PEAK, beta=CLIP_BETA_PER_POINT
+        pinned_pv=rooftop,
+        scale=CLIP_SCALE,
+        share_of_peak=CLIP_SHARE_OF_PEAK,
+        beta=CLIP_BETA_PER_POINT,
     )
     demand = features.y + np.nan_to_num(rooftop, nan=0.0)
     injected = inject.with_reading(cache=cache, site=site, y=demand - clipped)
@@ -346,7 +355,7 @@ def _clip_job(site: str) -> dict[str, Any]:
         site=site,
         spec=spec,
         cut=common.TUNING_CUT,
-        window=GATE_WINDOW,
+        window=_STATE["definitions"]["b_clip"].window,
         season_years=common.SEASON_YEARS,
         pinned=pinned,
     )
@@ -411,14 +420,16 @@ def main() -> None:
     os.environ["OMP_NUM_THREADS"] = "2"
     common.load_cache()
     sites = common.INJECTION_SITES
+    decision_sites = common.DECISION_SITES
     results: dict[str, list[dict[str, Any]]] = {"1": [], "2": [], "3": [], "4": [], "5": []}
     with ProcessPoolExecutor(max_workers=arguments.workers, initializer=_init_worker) as pool:
-        pairs = [(site, arm) for site in sites for arm in K_ARMS]
-        for rows in pool.map(_mismatched_job, pairs):
+        mismatched = [(site, arm) for site in decision_sites for arm in K_ARMS]
+        farms = [(site, arm) for site in sites for arm in K_ARMS]
+        for rows in pool.map(_mismatched_job, mismatched):
             results["1"] += rows
-        for rows in pool.map(_farm_job, pairs):
+        for rows in pool.map(_farm_job, farms):
             results["2"] += rows
-        for rows in pool.map(_meter_job, sites):
+        for rows in pool.map(_meter_job, decision_sites):
             results["3"] += rows
         results["4"] += list(pool.map(_node_job, sites))
         results["5"] += list(pool.map(_clip_job, sites))

@@ -110,7 +110,7 @@ def main() -> None:
         "within_tolerance": bool(reference > 0 and abs(level / reference - 1.0) <= LEVEL_TOLERANCE),
         "step_days": tuned["node"]["step_days"],
         "n_blocks": len(path),
-        "path_normalised": (path / combined.table.effective_capacity_mw).tolist(),
+        "path_points": path.tolist(),
     }
     (common.WORK_DIR / "g_c.json").write_text(json.dumps(result, indent=2) + "\n")
     print({k: v for k, v in result.items() if k != "path_normalised"})

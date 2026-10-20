@@ -52,7 +52,6 @@ from studies.dp_gam import (
     ResidualSpread,
     TrainingWindow,
     fit_gam,
-    month_block_weights,
     predict_gam,
     prepare_fit,
     profile_clip,
@@ -284,11 +283,16 @@ def profiled_clip(
     window: TrainingWindow,
     pinned: PinnedCapacity,
 ) -> ClipSpec:
-    """Return the clip with the lowest penalised objective on the training rows before `cut`."""
+    """Return the clip with the lowest penalised objective on the training rows before `cut`.
+
+    The profile is fitted on the spec without its node: it solves 170 systems at once, which with a
+    node's thousands of columns would need gigabytes and more pivoting than its solver allows. The
+    node is added to the fit that uses the clip.
+    """
     return profile_clip(
         cache=cache,
         site=site,
-        spec=spec,
+        spec=replace(spec, node=None),
         cut=cut,
         window=window,
         season_years=common.SEASON_YEARS,
@@ -514,8 +518,12 @@ class CapacityResult:
         season_year: The last trained season-year.
         capacity: The capacity of the unweighted fit, in points.
         bootstrap: The capacity of each month-block weighting, in points.
-        vintage_mean: The vintage's mean capacity over that season-year, in points.
+        n_months: The number of calendar months in the training window.
+        vintage_mean: The vintage's mean capacity over that season-year, in points; for D14 the
+            capacity held after the cut, which is the plan's reference there.
         vintage_source: Where the vintage came from.
+        paired_base_bootstrap: For a narrow-window arm, the base arm's capacity under the same
+            month draws, so that a ratio of the two keeps the shared noise; `None` otherwise.
     """
 
     site: str
@@ -524,14 +532,88 @@ class CapacityResult:
     season_year: int
     capacity: float
     bootstrap: np.ndarray
+    n_months: int
     vintage_mean: float
     vintage_source: str
+    paired_base_bootstrap: np.ndarray | None = None
 
     @property
     def range_90(self) -> tuple[float, float]:
-        """The 2nd to the 19th of the 20 ordered bootstrap values."""
+        """The 2nd to the 19th of the 20 ordered values, widened by sqrt(m / (m - 1)).
+
+        The widening is experiment 113's: the resample's spread understates the sampling noise of a
+        window of `m` months, and it scales the distance of each end from the median.
+        """
         ordered = np.sort(self.bootstrap)
-        return float(ordered[1]), float(ordered[-2])
+        median = float(np.median(ordered))
+        widen = float(np.sqrt(self.n_months / max(self.n_months - 1, 1)))
+        return (
+            median + widen * (float(ordered[1]) - median),
+            median + widen * (float(ordered[-2]) - median),
+        )
+
+
+def stratified_month_weights(
+    *, cache: FeatureCache, index: np.ndarray, n_resamples: int, seed: int
+) -> np.ndarray:
+    """Return month-block bootstrap weights that keep each calendar quarter's months.
+
+    Each resample draws, within each quarter of the year, as many months as that quarter has in the
+    window, with replacement (experiment 113's stratified bootstrap), so that every resample holds
+    the same number of summers and winters.
+
+    Args:
+        cache: The cache.
+        index: The training rows.
+        n_resamples: The number of resamples.
+        seed: Seeds the draws.
+
+    Returns:
+        Weights of shape (n_resamples, len(index)): how many times each row's month was drawn.
+    """
+    month = cache.end_times[index].astype("datetime64[M]")
+    months, inverse = np.unique(month, return_inverse=True)
+    quarter = (months.astype("datetime64[M]").astype(np.int64) % 12) // 3
+    generator = np.random.default_rng(seed)
+    counts = np.zeros((n_resamples, len(months)))
+    for resample in range(n_resamples):
+        for part in range(4):
+            members = np.flatnonzero(quarter == part)
+            if len(members):
+                drawn = generator.choice(members, size=len(members), replace=True)
+                counts[resample] += np.bincount(drawn, minlength=len(months))
+    return counts[:, inverse]
+
+
+def paired_weights(
+    *, cache: FeatureCache, narrow: np.ndarray, wide: np.ndarray, n_resamples: int, seed: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return weights for two windows from the same month draws.
+
+    The narrow window's months are drawn as in `stratified_month_weights`. The wide window uses
+    those counts for the months it shares with the narrow window and a count of 1 for its earlier
+    months, so the two fits share the noise of the shared months.
+
+    Args:
+        cache: The cache.
+        narrow: The narrow window's training rows.
+        wide: The wide window's training rows, which include the narrow window's months.
+        n_resamples: The number of resamples.
+        seed: Seeds the draws.
+
+    Returns:
+        The narrow window's weights and the wide window's weights.
+    """
+    narrow_weights = stratified_month_weights(
+        cache=cache, index=narrow, n_resamples=n_resamples, seed=seed
+    )
+    narrow_month = cache.end_times[narrow].astype("datetime64[M]")
+    wide_month = cache.end_times[wide].astype("datetime64[M]")
+    wide_weights = np.ones((n_resamples, len(wide)))
+    for month in np.unique(narrow_month):
+        counts = narrow_weights[:, np.flatnonzero(narrow_month == month)[0]]
+        wide_weights[:, wide_month == month] = counts[:, None]
+    return narrow_weights, wide_weights
 
 
 def vintage_season_mean(*, pinned: PinnedCapacity, season_year: int) -> float:
@@ -559,8 +641,9 @@ def capacity_with_bootstrap(
     site: str,
     cut: datetime,
     definition: ArmDefinition,
+    paired_base: ArmDefinition | None = None,
 ) -> CapacityResult:
-    """Fit a fitted-capacity arm once and under 20 month-block weightings.
+    """Fit a fitted-capacity arm once and under 20 stratified month-block weightings.
 
     Args:
         cache: The feature cache.
@@ -568,6 +651,7 @@ def capacity_with_bootstrap(
         site: The substation's label.
         cut: The cut.
         definition: A fitted-capacity arm.
+        paired_base: A wider-window arm to fit under the same month draws, for a ratio.
 
     Returns:
         The capacity of the last trained season-year, with its bootstrap values and the vintage's
@@ -590,12 +674,46 @@ def capacity_with_bootstrap(
         window=definition.window,
         season_years=common.SEASON_YEARS,
     )
-    weights = month_block_weights(
-        cache=cache,
-        index=index,
-        n_resamples=common.N_BOOTSTRAP_WEIGHTINGS,
-        seed=common.BOOTSTRAP_SEED,
-    )
+    year = single.last_season_year
+    paired_boot = None
+    if paired_base is None:
+        weights = stratified_month_weights(
+            cache=cache,
+            index=index,
+            n_resamples=common.N_BOOTSTRAP_WEIGHTINGS,
+            seed=common.BOOTSTRAP_SEED,
+        )
+    else:
+        _, wide_index = prepare_fit(
+            cache=cache,
+            site=site,
+            spec=paired_base.spec,
+            cut=cut,
+            window=paired_base.window,
+            season_years=common.SEASON_YEARS,
+        )
+        weights, wide_weights = paired_weights(
+            cache=cache,
+            narrow=index,
+            wide=wide_index,
+            n_resamples=common.N_BOOTSTRAP_WEIGHTINGS,
+            seed=common.BOOTSTRAP_SEED,
+        )
+        wide_batch = fit_gam(
+            cache=cache,
+            site=site,
+            specs=[paired_base.spec],
+            cut=cut,
+            window=paired_base.window,
+            season_years=common.SEASON_YEARS,
+            weights=wide_weights,
+        )
+        paired_boot = np.array(
+            [
+                wide_batch.capacity_points(member=m)[wide_batch.last_season_year]
+                for m in range(common.N_BOOTSTRAP_WEIGHTINGS)
+            ]
+        )
     batch = fit_gam(
         cache=cache,
         site=site,
@@ -605,8 +723,12 @@ def capacity_with_bootstrap(
         season_years=common.SEASON_YEARS,
         weights=weights,
     )
-    year = single.last_season_year
     pinned = pinned_capacity(vintages=vintages, table=cache.sites[site].table, cut=cut)
+    reference = (
+        pinned.held_points
+        if site == common.HELD_VINTAGE_SITE
+        else vintage_season_mean(pinned=pinned, season_year=year)
+    )
     return CapacityResult(
         site=site,
         cut=cut,
@@ -616,8 +738,10 @@ def capacity_with_bootstrap(
         bootstrap=np.array(
             [batch.capacity_points(member=m)[year] for m in range(common.N_BOOTSTRAP_WEIGHTINGS)]
         ),
-        vintage_mean=vintage_season_mean(pinned=pinned, season_year=year),
+        n_months=len(np.unique(cache.end_times[index].astype("datetime64[M]"))),
+        vintage_mean=reference,
         vintage_source=pinned.source,
+        paired_base_bootstrap=paired_boot,
     )
 
 

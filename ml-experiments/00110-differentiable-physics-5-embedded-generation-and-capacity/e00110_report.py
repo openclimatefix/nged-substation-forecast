@@ -217,7 +217,7 @@ def paired(
             frame = frame.filter(pl.col("valid_time").dt.month().is_in(months))
         if midday:
             frame = frame.filter(
-                pl.col("valid_time")
+                (pl.col("valid_time") - pl.duration(minutes=30))
                 .dt.hour()
                 .is_between(MIDDAY_HOURS_UTC[0], MIDDAY_HOURS_UTC[1] - 1)
             )
@@ -290,12 +290,18 @@ def sites_improving(*, label: str, contrast: Contrast) -> int:
     )
 
 
+def _unfiltered_side(*, side: Side) -> Side:
+    """Return the same arm without its filter; Part 4's X-best+K becomes plain X-best."""
+    arm = "x_best" if side.part_4 and side.arm == "x_best_k" else side.arm
+    return Side(arm, filtered=False, part_4=side.part_4)
+
+
 def unfiltered(*, contrast: Contrast) -> Contrast:
     """Return the same contrast on the unfiltered forecasts (Part 4's sets stay as they are)."""
     return Contrast(
         contrast.name + " (unfiltered)",
-        Side(contrast.treatment.arm, filtered=False, part_4=contrast.treatment.part_4),
-        Side(contrast.reference.arm, filtered=False, part_4=contrast.reference.part_4),
+        _unfiltered_side(side=contrast.treatment),
+        _unfiltered_side(side=contrast.reference),
         sites=contrast.sites,
         years=contrast.years,
     )
@@ -338,12 +344,60 @@ def _contrast_row(*, contrast: Contrast, level: float) -> dict[str, object]:
     return row
 
 
+def c4_runs() -> bool:
+    """Return True if C4's arm is `identified`; the plan runs C4 only then."""
+    try:
+        _, labels = capacity_labels()
+    except FileNotFoundError:
+        return False
+    row = labels.filter(pl.col("arm") == tuned()["c4_arm"])
+    return bool(row.height and row["identified"][0])
+
+
+def reproduction_check() -> pl.DataFrame:
+    """Compare B with Part 4's stored A2, the plan's base arm, row by row.
+
+    B is refitted here, not read from Part 4's files, so this check shows how far the refit and
+    its filter are from the stored sets. Both are filtered, day-ahead, outside the switching masks.
+    """
+    rows = []
+    for label in ("scored", "replicate"):
+        mine = load_side(label=label, side=Side("b")).filter(
+            pl.col("site_name").is_in(common.DECISION_SITES)
+        )
+        theirs = load_side(label=label, side=Side("a2", filtered=True, part_4=True)).filter(
+            pl.col("site_name").is_in(common.DECISION_SITES)
+        )
+        joined = mine.select(*KEYS, "mean", "qs").join(
+            theirs.select(*KEYS, pl.col("mean").alias("mean_p4"), pl.col("qs").alias("qs_p4")),
+            on=KEYS,
+            how="inner",
+        )
+        rows.append(
+            {
+                "year": label,
+                "rows": joined.height,
+                "B score": mine["qs"].mean(),
+                "Part 4 A2 score": theirs["qs"].mean(),
+                "mean |forecast difference|": float(
+                    np.abs(joined["mean"].to_numpy() - joined["mean_p4"].to_numpy()).mean()
+                ),
+            }
+        )
+    return pl.DataFrame(rows)
+
+
 def contrast_table(*, planned: bool) -> pl.DataFrame:
     """Return the contrast table: scored-year interval and splits, with the replicate beside."""
     level = PLANNED_LEVEL if planned else EXPLORATORY_LEVEL
     rows = []
     for contrast in build_contrasts():
         if contrast.planned != planned:
+            continue
+        if contrast.name.startswith("C4") and not c4_runs():
+            rows.append(
+                {"contrast": contrast.name, "missing": "not run: its arm is not identified"}
+            )
             continue
         try:
             rows.append(_contrast_row(contrast=contrast, level=level))
@@ -442,8 +496,10 @@ def capacity_labels() -> tuple[pl.DataFrame, pl.DataFrame]:
     the 90% bootstrap range is at most max(3 points, 10% of the capacity) and the capacity lies
     within 20% of the vintage's season-year mean. The label needs both capacity cuts and gate
     tests 1 and 2. `robust` needs two non-base arms `identified`, both agreeing with K-base within
-    the floor at 4 or more of 5 sites. K-iii is `consistent` if the bootstrap range of K-iii over
-    K-base overlaps [0.65, 0.87] at 4 or more of 5 sites.
+    the floor at 4 or more of 5 sites; handing fitted capacity to Part 6 also needs K-base
+    `identified`. K-iii is `consistent` if the bootstrap range of K-iii over K-base, both fitted
+    under the same month draws, overlaps [0.65, 0.87] at 4 or more of 5 sites. The bootstrap keeps
+    each calendar quarter's months and is widened by sqrt(m / (m - 1)), as experiment 113 advises.
 
     Returns:
         A per-site table, and a per-arm table of the labels.
@@ -484,9 +540,13 @@ def capacity_labels() -> tuple[pl.DataFrame, pl.DataFrame]:
     identified = set(arm_table.filter(pl.col("identified"))["arm"].to_list())
     non_base = identified - {"k_base"}
     agree = {arm: _agrees_with_base(sites=sites, arm=arm) for arm in non_base}
-    robust = "k_base" in identified and len(non_base) >= 2 and all(agree.values())
+    robust = len(non_base) >= 2 and all(agree.values())
     _, consistent = _k_iii_ratio(sites=sites)
-    arm_table = arm_table.with_columns(robust=pl.lit(robust), k_iii_consistent=pl.lit(consistent))
+    arm_table = arm_table.with_columns(
+        robust=pl.lit(robust),
+        k_iii_consistent=pl.lit(consistent),
+        fitted_capacity_may_go_to_part_6=pl.lit(robust and "k_base" in identified),
+    )
     return sites, arm_table
 
 
@@ -514,8 +574,11 @@ def _k_iii_ratio(*, sites: pl.DataFrame) -> tuple[list[dict[str, object]], bool]
         other = sites.filter((pl.col("arm") == "k_iii") & (pl.col("cut") == cut)).sort("site")
         overlaps = 0
         for b, o in zip(base.iter_rows(named=True), other.iter_rows(named=True), strict=True):
-            ratios = np.sort(np.array(o["bootstrap"]) / np.array(b["bootstrap"]))
-            low, high = float(ratios[1]), float(ratios[-2])
+            ratios = np.sort(np.array(o["bootstrap"]) / np.array(o["paired_base_bootstrap"]))
+            median = float(np.median(ratios))
+            widen = float(np.sqrt(o["n_months"] / max(o["n_months"] - 1, 1)))
+            low = median + widen * (float(ratios[1]) - median)
+            high = median + widen * (float(ratios[-2]) - median)
             overlap = high >= common.K_III_RATIO_RANGE[0] and low <= common.K_III_RATIO_RANGE[1]
             overlaps += int(overlap)
             rows.append(
@@ -641,6 +704,8 @@ def main() -> None:
     print(contrast_table(planned=False).write_csv(float_precision=3), end="")
     print("== Planned MW contrasts with each decision site left out (quantile score) ==")
     print(leave_one_site_out().write_csv(float_precision=3), end="")
+    print("== Reproduction of Part 4's A2 by B ==")
+    print(reproduction_check().write_csv(float_precision=4), end="")
     print("== Capacity by site, arm, and cut ==")
     sites, labels = capacity_labels()
     print(sites.drop("bootstrap").write_csv(float_precision=2), end="")
