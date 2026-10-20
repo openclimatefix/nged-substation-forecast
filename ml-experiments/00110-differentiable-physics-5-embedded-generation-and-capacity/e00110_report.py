@@ -731,7 +731,7 @@ def main() -> None:
     print(reproduction_check().write_csv(float_precision=4), end="")
     print("== Capacity by site, arm, and cut ==")
     sites, labels = capacity_labels()
-    print(sites.drop("bootstrap").write_csv(float_precision=2), end="")
+    print(sites.drop("bootstrap", "paired_base_bootstrap").write_csv(float_precision=2), end="")
     print("== Capacity labels ==")
     print(labels.write_csv(float_precision=3), end="")
     print("== K-iii over K-base ==")

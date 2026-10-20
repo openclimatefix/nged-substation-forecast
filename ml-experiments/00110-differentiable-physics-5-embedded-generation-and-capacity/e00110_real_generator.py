@@ -60,8 +60,10 @@ def combined_features(*, cache: FeatureCache, members: tuple[str, str]) -> SiteF
         table=table,
         y=100.0 * power_mw / capacity,
         present=first.present & second.present,
-        in_pool=first.in_pool & second.in_pool,
-        default_rows=first.default_rows & second.default_rows,
+        # One member is outside experiment 103's pool, so the pool masks come from whichever
+        # member has them, restricted to the rows where both members report.
+        in_pool=first.present & second.present,
+        default_rows=(first.present & second.present) & (first.default_rows | second.default_rows),
         switching_mask=first.switching_mask | second.switching_mask,
     )
 
