@@ -322,31 +322,36 @@ demand](switching-events.md), Part 2.
 
 ### The hierarchy is a soft hint, not an exact sum
 
-**A parent substation's measured flow is never exactly the sum of its children's, so the model
-treats the hierarchy as evidence that nudges the fit, not as a constraint.** A Bulk Supply Point
-(BSP) reading differs from the sum of the Primaries beneath it by wire losses, by Primaries and
-generators that are not metered, and by AC power-flow effects that a real-power sum ignores. In the
-trial area, the unexplained part at each BSP swings by more from day to day than a typical
-switching transfer moves, and the Grid Supply Point (GSP) readings cannot be closed from the
-metered series at all.
+**A parent substation's measured flow is never exactly the sum of its children's, so the graph
+engine treats the hierarchy as evidence that nudges the fit, not as a constraint.** A Bulk Supply
+Point (BSP) reading differs from the sum of the Primary substations beneath it. Likely causes
+include wire losses, Primaries and generators that are not metered (unmetered 33 kV PV among them),
+series metered in MVA that cannot show the direction of flow, and AC power-flow effects that a
+real-power sum ignores. In the trial area, the unexplained part at each BSP swings by more from day
+to day than a typical switching transfer moves, and the Grid Supply Point (GSP) readings cannot be
+closed from the metered series at all.
 
 **The soft hierarchical loss models each parent as its metered children plus a penalised
 remainder.** The parent's predicted flow is the sum of its child nodes' modelled flows, plus its
 directly connected metered generators, plus a remainder term with its own small model: a level,
 a drift, an unmetered PV capacity, an unmetered wind capacity where the parent's area has wind, and
-a loss term. The remainder carries a heavier penalty than the children's terms, so it absorbs only
-what the children cannot explain. A weight on the parent's rows sets how hard the parent pulls on
-its children, from zero (each node fitted alone) upwards, and is tuned on held-out data. The same
-form repeats from GSP to BSP.
+a loss term. The remainder would carry a heavier penalty than the children's terms, so that it
+absorbs only what the children cannot explain. A weight on the parent's rows would set how hard the
+parent pulls on its children, from zero (each node fitted alone) upwards, tuned on held-out data.
+At GSP level, where most of the flow is not metered beneath, the remainder term does most of the
+work.
 
 **The hint is expected to help explanation and robustness more than average skill.** A transfer
-between two Primaries under one BSP leaves the BSP unchanged, which is evidence for switching
-rather than a change in demand. The parent also sees all the solar in its area, which helps pin
-down its children's PV capacities. A metering error at one child, such as a gap, a stuck value, or
-a scale error, conflicts with the parent's reading, which limits how far the error can pull that
-child's fit. In the studies we read, reconciling a hierarchy improved the aggregate by up to 10% but
-the bottom level by under 1%, so a hierarchy-aware forecast that is more explainable and more
-robust, with a similar average score, would meet the aim.
+between two Primaries under one BSP leaves the BSP's reading unchanged. That is evidence for
+switching rather than a change in demand. The parent also sees all the solar in its area, which
+helps pin down its children's PV capacities. A metering error at one child, such as a gap, a stuck
+value, or a scale error, conflicts with the parent's reading, which limits how far the error can
+pull that child's fit. Average skill may not move much: in the one study of hierarchical
+reconciliation on real distribution-network data we found, [Nespoli et al.
+(2020)](https://arxiv.org/abs/1910.03976) gained up to 10% in root-mean-square error at the upper
+levels and under 1% at the bottom. That study reconciled forecasts after the fact rather than using
+a soft loss inside the fit, so the hint is worth having for the explanation and the robustness it
+adds even if the average score barely changes.
 
 ### Unmetered installed capacity grows monotonically
 
