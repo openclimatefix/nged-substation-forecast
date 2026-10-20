@@ -736,7 +736,7 @@ def step_by_temperature() -> pl.DataFrame:
             pl.col("site_name").is_in(DECISION)
         )
         local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
-        end_minutes = local.dt.hour() * 60 + local.dt.minute()
+        end_minutes = local.dt.hour().cast(pl.Int32) * 60 + local.dt.minute()
         for site in DECISION:
             features = cache_.sites[site]
             temperature = pl.DataFrame(
@@ -783,7 +783,8 @@ def step_clock_table() -> pl.DataFrame:
     For each decision substation and year, the mean actual power at each half-hour end from 21:30
     to 04:00 UTC is taken over cold nights (6-hour-smoothed ERA5 temperature below
     `COLD_BST_NIGHT_C`), separately for nights in British Summer Time and in Greenwich Mean Time.
-    The rise is the half-hour with the largest increase on the half-hour before. A step on the
+    The rise is the half-hour with the largest mean increase on the half-hour before, taken per
+    night so that missing half-hours do not make a step. A step on the
     local clock rises one hour earlier in UTC in summer time; a UTC-fixed step rises at the same
     UTC time in both. Fewer than `MIN_CLOCK_NIGHTS` cold nights in a clock give "cannot tell".
     """
@@ -802,7 +803,7 @@ def step_clock_table() -> pl.DataFrame:
                 frame.filter(pl.col("site_name") == site)
                 .join(temperature, on="valid_time", how="left")
                 .with_columns(
-                    utc_minutes=pl.col("valid_time").dt.hour() * 60
+                    utc_minutes=pl.col("valid_time").dt.hour().cast(pl.Int32) * 60
                     + pl.col("valid_time").dt.minute(),
                     summer=pl.col("valid_time")
                     .dt.convert_time_zone("Europe/London")
@@ -816,24 +817,36 @@ def step_clock_table() -> pl.DataFrame:
             for clock, summer in (("British Summer Time", True), ("Greenwich Mean Time", False)):
                 kept = part.filter(pl.col("summer") == summer)
                 n_nights = kept["night"].n_unique()
-                night_rows = kept.filter(
-                    (pl.col("utc_minutes") >= 21 * 60 + 30) | (pl.col("utc_minutes") <= 4 * 60)
+                night_rows = (
+                    kept.sort("valid_time")
+                    .with_columns(
+                        step=pl.col("actual") - pl.col("actual").shift(1),
+                        gap=(
+                            pl.col("valid_time") - pl.col("valid_time").shift(1)
+                        ).dt.total_minutes(),
+                    )
+                    .filter(
+                        (pl.col("gap") == 30)
+                        & (
+                            (pl.col("utc_minutes") >= 21 * 60 + 30)
+                            | (pl.col("utc_minutes") <= 4 * 60)
+                        )
+                    )
                 )
                 curve = (
                     night_rows.with_columns(order=(pl.col("utc_minutes") + 150) % 1440)
                     .group_by("order")
-                    .agg(pl.col("actual").mean())
+                    .agg(pl.col("step").mean())
                     .sort("order")
                 )
                 rise = float("nan")
                 rise_time = "cannot tell"
                 if n_nights >= MIN_CLOCK_NIGHTS and curve.height > 2:
-                    values = curve["actual"].to_numpy()
-                    step = np.diff(values)
-                    position = int(np.argmax(step)) + 1
+                    values = curve["step"].to_numpy()
+                    position = int(np.argmax(values))
                     minutes = (int(curve["order"][position]) - 150) % 1440
                     rise_time = f"{minutes // 60:02d}:{minutes % 60:02d} UTC"
-                    rise = float(step.max())
+                    rise = float(values.max())
                 rows.append(
                     {
                         "year": label,
@@ -876,8 +889,9 @@ def two_clock_table() -> pl.DataFrame:
                 .join(temperature, on="valid_time", how="left")
                 .filter(pl.col("temperature") < MILD_NIGHT_C)
                 .with_columns(
-                    utc=pl.col("valid_time").dt.hour() * 60 + pl.col("valid_time").dt.minute(),
-                    clock=local.dt.hour() * 60 + local.dt.minute(),
+                    utc=pl.col("valid_time").dt.hour().cast(pl.Int32) * 60
+                    + pl.col("valid_time").dt.minute(),
+                    clock=local.dt.hour().cast(pl.Int32) * 60 + local.dt.minute(),
                     summer=local.dt.dst_offset() > pl.duration(seconds=0),
                     residual=pl.col("actual") - pl.col("mean"),
                 )

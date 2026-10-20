@@ -304,7 +304,7 @@ def cold_night_data(*, site: str) -> tuple[pl.DataFrame, int]:
             .join(temperature, on="valid_time", how="left")
         )
         local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
-        minutes = local.dt.hour() * 60 + local.dt.minute()
+        minutes = local.dt.hour().cast(pl.Int32) * 60 + local.dt.minute()
         is_night = (minutes >= 23 * 60) | (minutes <= 7 * 60)
         night = (local - pl.duration(hours=7, minutes=30)).dt.date()
         frame = frame.filter(is_night & local.dt.month().is_in(WINTER_MONTHS)).with_columns(
