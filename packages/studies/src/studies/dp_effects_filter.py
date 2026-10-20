@@ -657,6 +657,7 @@ def fit_effects_noise(
     prior_spread: np.ndarray,
     start_log_q: np.ndarray | None = None,
     greedy: bool = True,
+    sigma_eps_spread: float = SIGMA_EPS_PRIOR_SPREAD,
 ) -> FittedNoise:
     """Fit one site's noise matrix by maximum a posteriori.
 
@@ -679,6 +680,8 @@ def fit_effects_noise(
 
         start_log_q: Where the polish starts (a previous fit); this skips the greedy search.
         greedy: Whether to run the greedy search before the polish.
+        sigma_eps_spread: The standard deviation of the normal prior on `log sigma_eps`, centred
+            on `sigma_eps_start`; a small value holds the observation noise near its start.
 
     Returns:
         The fitted noise.
@@ -707,7 +710,7 @@ def fit_effects_noise(
             penalty = ((theta_q[:, 0] - shared_mean) / shared_spread) ** 2
         else:
             penalty = (((theta_q - prior_mean[free_index]) / prior_spread[free_index]) ** 2).sum(1)
-        eps = ((theta[:, -1] - log(sigma_eps_start)) / SIGMA_EPS_PRIOR_SPREAD) ** 2
+        eps = ((theta[:, -1] - log(sigma_eps_start)) / sigma_eps_spread) ** 2
         return -0.5 * (penalty + eps)
 
     def evaluate(theta: np.ndarray) -> np.ndarray:

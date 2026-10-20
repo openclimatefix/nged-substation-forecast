@@ -761,3 +761,26 @@ def test_a_held_weight_stays_at_exactly_zero():
     held = noise.initial_sd == 0.0
     assert held.any()
     assert not trace.state[:, :N_WEIGHTS][:, held].any()
+
+
+def test_a_small_observation_noise_spread_holds_sigma_eps_near_its_start():
+    true_q = np.zeros(N_WEIGHTS)
+    true_q[HEATING.start] = 1e-2
+    residual, regressors, band = _simulate_stream(true_q=true_q, seed=17, n=48 * 100)
+    moving = np.zeros(N_WEIGHTS, dtype=bool)
+    moving[HEATING.start] = True
+    fitted = fit_effects_noise(
+        residual=residual,
+        regressors=regressors,
+        band=band,
+        scale=np.ones(N_WEIGHTS),
+        variant=FilterVariant(moving=moving, use_anomaly=False),
+        phi=0.98,
+        sigma_z=0.3,
+        sigma_eps_start=2.0,
+        likelihood_mask=np.ones(len(residual), dtype=bool),
+        prior_mean=np.full(N_WEIGHTS, -3.0),
+        prior_spread=np.full(N_WEIGHTS, 20.0),
+        sigma_eps_spread=1e-3,
+    )
+    assert fitted.noise.sigma_eps == pytest.approx(2.0, rel=0.01)
