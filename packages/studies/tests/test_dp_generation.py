@@ -27,6 +27,7 @@ from studies.dp_gam import (  # noqa: E402
     clipped_pv,
     design_matrix,
     fit_gam,
+    generator_evidence,
     generator_path,
     month_half_hour_mean,
     orthogonal_penalty_matrix,
@@ -171,21 +172,14 @@ def _pinned_truth_cache(
     return _with_power(cache=cache, power=power)
 
 
-def test_an_open_clip_and_every_option_switched_off_reproduce_the_base_fit_exactly(
+def test_an_infinite_ceiling_clip_reproduces_the_base_fit_exactly(
     dp_synthetic_cache: FeatureCache,
 ):
     pinned = _pinned(cache=dp_synthetic_cache)
     base = GamSpec(capacity="pinned", ridge=0.01)
     cache = _pinned_truth_cache(cache=dp_synthetic_cache, spec=base, pinned=pinned)
     reference = _fit(cache=cache, spec=base, pinned=pinned)
-    off = replace(
-        base,
-        orthogonal_penalty=0.0,
-        shared_harmonics=False,
-        slow_heating_only=False,
-        node=None,
-        clip=ClipSpec(multiplier=1.0, p_max_share=float("inf")),
-    )
+    off = replace(base, clip=ClipSpec(multiplier=1.0, p_max_share=float("inf")))
     open_fit = _fit(cache=cache, spec=off, pinned=pinned)
     assert np.array_equal(open_fit.theta, reference.theta)
 
@@ -198,6 +192,8 @@ def test_the_smooth_clip_follows_its_input_far_below_the_ceiling_and_the_ceiling
     assert np.all(np.diff(clipped) >= 0.0)
     assert np.all(clipped <= 20.0)
     assert np.array_equal(clipped_pv(unclipped=x, p_max=float("inf"), beta=2.0), x)
+    night = clipped_pv(unclipped=np.zeros(3), p_max=0.8, beta=2.0)
+    assert (night >= 0.0).all()
 
 
 def test_the_orthogonal_penalty_matrix_equals_a_direct_sum_of_squared_covariances(
@@ -292,8 +288,13 @@ def test_the_slow_heating_option_uses_the_72_and_168_hour_temperatures(
         np.clip(15.5 - features.smoothed_temperature_c[rows][:, 3], 0.0, None)
         / dp_gam.HEATING_SCALE_C
     )
+    first_hinge = (
+        np.clip(15.5 - features.smoothed_temperature_c[rows][:, 2], 0.0, None)
+        / dp_gam.HEATING_SCALE_C
+    )
     heating = layout.slices["heating"]
-    # The second column of the slow block is the 168-hour temperature, at the row's band.
+    # The slow block's first column is the 72-hour temperature and its second the 168-hour one.
+    assert design[np.arange(50), heating.start + band] == pytest.approx(first_hinge)
     assert design[np.arange(50), heating.start + N_BANDS + band] == pytest.approx(hinge)
 
 
@@ -436,12 +437,24 @@ def test_a_clip_or_an_anomaly_form_with_the_wrong_capacity_mode_is_refused():
 NODE_WINDOW: Final[TrainingWindow] = TrainingWindow(months=12)
 
 
-def _node_spec(*, step_penalty: float = 300.0, level_penalty: float = 1.0) -> GamSpec:
+def _node_spec(*, step_penalty: float = 300.0, level_penalty: float = 0.03) -> GamSpec:
     return GamSpec(
         capacity="pinned",
         ridge=0.01,
-        node=NodeSpec(step_penalty=step_penalty, level_penalty=level_penalty),
+        drift="d1",
+        node=NodeSpec(step_penalty=step_penalty, level_penalty=level_penalty, step_days=3),
     )
+
+
+def _levels_by_day(*, fit: dp_gam.GamFit) -> dict[int, float]:
+    """Return the node's level on each day, in days since 1970-01-01."""
+    path = generator_path(fit=fit)
+    node = fit.layout.spec.node
+    assert node is not None
+    first = int(fit.layout.node_first_day)
+    return {
+        first + day: float(path[day // node.step_days]) for day in range(len(path) * node.step_days)
+    }
 
 
 def _epoch_day(*, year: int, month: int, day: int) -> int:
@@ -478,7 +491,8 @@ def test_a_node_on_a_series_with_no_generator_stays_under_half_a_point(
     cache = _generator_truth_cache(cache=dp_synthetic_cache, pinned=pinned, generator=None)
     fit = _fit(cache=cache, spec=_node_spec(), pinned=pinned, window=NODE_WINDOW)
     path = generator_path(fit=fit)
-    assert path.max() - path.min() < 0.5
+    assert path.max() < 0.5
+    assert generator_evidence(path=path) < 0.5
     assert (fit.violation <= 1e-5).all()
 
 
@@ -497,13 +511,14 @@ def test_a_node_finds_an_injected_step_and_a_week_long_outage_and_never_goes_neg
     fit = _fit(cache=cache, spec=_node_spec(), pinned=pinned, window=NODE_WINDOW)
     path = generator_path(fit=fit)
     assert path.min() >= -1e-6
-    first_day = int(fit.layout.node_first_day)
-    levels = {first_day + i: value for i, value in enumerate(path)}
+    levels = _levels_by_day(fit=fit)
     during = np.mean([levels[outage_start + k] for k in range(1, 6)])
     before = np.mean([levels[outage_start - k] for k in range(2, 8)])
     after = np.mean([levels[outage_start + 7 + k] for k in range(2, 8)])
     assert before - during > 0.8 * 10.0
     assert after == pytest.approx(before, abs=1.5)
+    assert path.min() < 0.5, "the level is pinned at the deepest outage, where the generator is off"
+    assert generator_evidence(path=path) > 8.0
     assert levels[step_day + 10] - levels[step_day - 10] == pytest.approx(5.0, abs=1.5)
 
 
@@ -520,8 +535,9 @@ def test_a_rise_in_demand_is_read_as_a_generator_switching_off_never_as_negative
     fit = _fit(cache=cache, spec=_node_spec(), pinned=pinned, window=NODE_WINDOW)
     path = generator_path(fit=fit)
     assert path.min() >= -1e-6
-    levels = {int(fit.layout.node_first_day) + i: value for i, value in enumerate(path)}
-    assert levels[rise_day - 20] - levels[rise_day + 20] == pytest.approx(4.0, abs=1.0)
+    levels = _levels_by_day(fit=fit)
+    assert levels[rise_day - 20] - levels[rise_day + 20] > 2.0
+    assert generator_evidence(path=path) < 1.0, "an unpaired step is not evidence of a generator"
 
 
 def test_the_node_level_is_held_after_the_cut(dp_synthetic_cache: FeatureCache):
@@ -531,19 +547,71 @@ def test_the_node_level_is_held_after_the_cut(dp_synthetic_cache: FeatureCache):
     )
     fit = _fit(cache=cache, spec=_node_spec(), pinned=pinned, window=NODE_WINDOW)
     path = generator_path(fit=fit)
-    plain = _fit(
-        cache=cache, spec=GamSpec(capacity="pinned", ridge=0.01), pinned=pinned, window=NODE_WINDOW
-    )
     rows = np.flatnonzero(
         (cache.end_times > np.datetime64("2024-07-01T00:00", "us"))
         & (cache.end_times <= np.datetime64("2024-08-01T00:00", "us"))
     )
-    with_node = predict_gam(cache=cache, fit=fit, index=rows)
-    without = predict_gam(cache=cache, fit=plain, index=rows)
-    # A constant generator is aliased with the profile, so both fits forecast the same net power
-    # within the noise, and the node holds its last day's level.
-    assert path[-1] >= 0.0
-    assert np.abs(with_node - without).mean() < 1.0
+    node_only = np.zeros(fit.layout.n_columns, dtype=bool)
+    node_only[fit.layout.slices["node_level"]] = True
+    contribution = predict_gam(cache=cache, fit=fit, index=rows, columns=node_only)
+    assert contribution == pytest.approx(-path[-1])
+
+
+def test_the_node_costs_do_not_depend_on_the_window_length(dp_synthetic_cache: FeatureCache):
+    pinned = _pinned(cache=dp_synthetic_cache)
+    outage_start = _epoch_day(year=2024, month=2, day=1)
+    cache = _generator_truth_cache(
+        cache=dp_synthetic_cache,
+        pinned=pinned,
+        generator=lambda day: np.where((day >= outage_start) & (day < outage_start + 6), 0.0, 10.0),
+    )
+    spec = _node_spec()
+    depths = []
+    for months in (12, 24):
+        fit = _fit(cache=cache, spec=spec, pinned=pinned, window=TrainingWindow(months=months))
+        depths.append(generator_evidence(path=generator_path(fit=fit)))
+    assert depths[0] > 7.0
+    assert depths[1] == pytest.approx(depths[0], abs=1.5)
+
+
+def test_a_fall_in_demand_with_no_generator_is_not_evidence_of_one(
+    dp_synthetic_cache: FeatureCache,
+):
+    pinned = _pinned(cache=dp_synthetic_cache)
+    fall_day = _epoch_day(year=2023, month=12, day=15)
+    cache = _generator_truth_cache(
+        cache=dp_synthetic_cache,
+        pinned=pinned,
+        generator=lambda day: np.where(day >= fall_day, 8.0, 0.0),
+    )
+    fit = _fit(cache=cache, spec=_node_spec(), pinned=pinned, window=NODE_WINDOW)
+    path = generator_path(fit=fit)
+    assert path.max() - path.min() > 5.0, "the node does read the fall as a step"
+    assert generator_evidence(path=path) < 1.0
+
+
+def test_a_slow_ramp_in_demand_is_not_followed_as_a_cheap_generator(
+    dp_synthetic_cache: FeatureCache,
+):
+    pinned = _pinned(cache=dp_synthetic_cache)
+    start = _epoch_day(year=2023, month=8, day=1)
+    cache = _generator_truth_cache(
+        cache=dp_synthetic_cache,
+        pinned=pinned,
+        generator=lambda day: np.clip((day - start) / 300.0, 0.0, 1.0) * 1.0,
+    )
+    fit = _fit(cache=cache, spec=_node_spec(), pinned=pinned, window=NODE_WINDOW)
+    path = generator_path(fit=fit)
+    assert generator_evidence(path=path) < 0.5
+    assert path.max() < 1.5
+
+
+def test_generator_evidence_is_the_deepest_dip_higher_on_both_sides():
+    assert generator_evidence(path=np.array([5.0, 5.0, 0.0, 0.0, 5.0, 5.0])) == 5.0
+    assert generator_evidence(path=np.array([0.0, 0.0, 7.0, 7.0])) == 0.0
+    assert generator_evidence(path=np.array([7.0, 7.0, 0.0, 0.0])) == 0.0
+    assert generator_evidence(path=np.array([3.0, 8.0, 2.0, 6.0])) == 4.0
+    assert generator_evidence(path=np.array([2.0])) == 0.0
 
 
 def test_a_node_with_weekly_blocks_is_smaller_and_still_places_a_step_within_a_week(
@@ -557,7 +625,7 @@ def test_a_node_with_weekly_blocks_is_smaller_and_still_places_a_step_within_a_w
         generator=lambda day: np.where(day >= step_day, 10.0, 5.0),
     )
     weekly = replace(_node_spec(), node=NodeSpec(step_days=7))
-    daily = _node_spec()
+    daily = replace(_node_spec(), node=NodeSpec(step_days=1))
     layout_weekly, _ = prepare_fit(
         cache=cache,
         site="S1",
@@ -684,3 +752,128 @@ def test_the_clip_scales_the_output_by_the_multiplier_and_the_ceiling_by_the_hel
     )
     assert clipped.max() <= ceiling
     assert clipped.max() > 0.9 * ceiling
+
+
+def test_a_node_without_a_drift_term_is_refused():
+    with pytest.raises(ValueError, match="needs a drift term"):
+        GamSpec(capacity="pinned", node=NodeSpec())
+
+
+def test_specs_that_differ_in_a_structure_field_cannot_share_one_fit(
+    dp_synthetic_cache: FeatureCache,
+):
+    base = GamSpec(capacity="pinned", ridge=0.01)
+    pinned = _pinned(cache=dp_synthetic_cache)
+    for other in (
+        replace(base, shared_harmonics=True),
+        replace(base, slow_heating_only=True),
+        replace(base, clip=ClipSpec()),
+        replace(base, drift="d1", node=NodeSpec()),
+    ):
+        with pytest.raises(ValueError, match="must share"):
+            fit_gam(
+                cache=dp_synthetic_cache,
+                site="S1",
+                specs=[base, other],
+                cut=CUT,
+                window=WINDOW,
+                season_years=SEASON_YEARS,
+                pinned=pinned,
+            )
+
+
+def test_a_layout_needs_an_anomaly_mean_exactly_when_the_solar_term_has_the_anomaly_form():
+    earliest = np.datetime64("2021-01-01T00:30", "us")
+    with pytest.raises(ValueError, match="anomaly mean is required exactly"):
+        dp_gam.make_layout(
+            spec=GamSpec(solar="anomaly"), season_years=[2022], cut=CUT, earliest=earliest
+        )
+    with pytest.raises(ValueError, match="anomaly mean is required exactly"):
+        dp_gam.make_layout(
+            spec=GamSpec(),
+            season_years=[2022],
+            cut=CUT,
+            earliest=earliest,
+            anomaly_mean=np.zeros((12, 48)),
+        )
+
+
+def test_predicting_chosen_columns_sums_only_those_terms_and_leaves_the_pinned_solar_out(
+    dp_synthetic_cache: FeatureCache,
+):
+    pinned = _pinned(cache=dp_synthetic_cache)
+    base = GamSpec(capacity="pinned", ridge=0.01)
+    cache = _pinned_truth_cache(cache=dp_synthetic_cache, spec=base, pinned=pinned)
+    fit = _fit(cache=cache, spec=base, pinned=pinned)
+    rows = np.flatnonzero(
+        (cache.end_times > np.datetime64("2024-07-01T00:00", "us"))
+        & (cache.end_times <= np.datetime64("2024-07-08T00:00", "us"))
+        & (cache.sites["S1"].pv_unit_shape > 0.3)
+    )
+    everything = np.ones(fit.layout.n_columns, dtype=bool)
+    demand_only = predict_gam(cache=cache, fit=fit, index=rows, columns=everything)
+    net = predict_gam(cache=cache, fit=fit, index=rows)
+    solar = pinned_solar_points(cache=cache, features=cache.sites["S1"], pinned=pinned, index=rows)
+    assert net == pytest.approx(demand_only - solar)
+    profile_only = np.zeros(fit.layout.n_columns, dtype=bool)
+    profile_only[fit.layout.slices["profile"]] = True
+    assert predict_gam(cache=cache, fit=fit, index=rows, columns=profile_only).std() < 10.0
+
+
+def test_weighted_orthogonal_matrices_equal_the_unweighted_one_for_ones_and_a_subset_for_zeros(
+    dp_synthetic_cache: FeatureCache,
+):
+    spec = GamSpec(capacity="pinned")
+    layout, index = prepare_fit(
+        cache=dp_synthetic_cache,
+        site="S1",
+        spec=spec,
+        cut=CUT,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    features = dp_synthetic_cache.sites["S1"]
+    plain = orthogonal_penalty_matrix(
+        cache=dp_synthetic_cache, features=features, layout=layout, index=index
+    )
+    keep = dp_synthetic_cache.end_times[index] <= np.datetime64("2024-01-01T00:00", "us")
+    weights = np.stack([np.ones(len(index)), keep.astype(np.float64)])
+    weighted = orthogonal_penalty_matrix(
+        cache=dp_synthetic_cache, features=features, layout=layout, index=index, weights=weights
+    )
+    subset = orthogonal_penalty_matrix(
+        cache=dp_synthetic_cache, features=features, layout=layout, index=index[keep]
+    )
+    assert np.allclose(weighted[0], plain)
+    assert np.allclose(weighted[1], subset)
+
+
+def test_the_node_costs_are_per_point_of_step_and_per_point_of_level_per_day(
+    dp_synthetic_cache: FeatureCache,
+):
+    spec = replace(_node_spec(), node=NodeSpec(step_penalty=200.0, level_penalty=0.5, step_days=3))
+    layout, index = prepare_fit(
+        cache=dp_synthetic_cache,
+        site="S1",
+        spec=spec,
+        cut=CUT,
+        window=NODE_WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    matrix, cost = dp_gam.penalty_matrix(layout=layout, n_rows=len(index))
+    assert cost[layout.slices["node_level"]] == pytest.approx(0.5 * 3)
+    assert cost[layout.slices["node_up"]] == pytest.approx(200.0)
+    assert cost[layout.slices["node_down"]] == pytest.approx(200.0)
+    longer = replace(spec, node=NodeSpec(step_penalty=200.0, level_penalty=0.5, step_days=3))
+    layout_long, index_long = prepare_fit(
+        cache=dp_synthetic_cache,
+        site="S1",
+        spec=longer,
+        cut=CUT,
+        window=TrainingWindow(months=24),
+        season_years=SEASON_YEARS,
+    )
+    _, cost_long = dp_gam.penalty_matrix(layout=layout_long, n_rows=len(index_long))
+    assert cost_long[layout_long.slices["node_up"]] == pytest.approx(200.0)
+    tie = matrix[layout.slices["node_up"], layout.slices["node_up"]]
+    assert tie[1, 1] > 0.99 * dp_gam.NODE_TIE_RATIO * 200.0
