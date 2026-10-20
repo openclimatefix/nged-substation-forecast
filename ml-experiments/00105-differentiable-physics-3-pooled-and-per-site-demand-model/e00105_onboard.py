@@ -144,7 +144,7 @@ def spread_without(  # noqa: ANN201
 
 
 def run_c2(*, cache: FeatureCache) -> None:
-    """Fit the onboarding arms and write p_onb<weeks>w and s_4w."""
+    """Fit the onboarding arms and write `p_onb<weeks>w` and `s_4w`."""
     config = arms.config_for(kind="p", settings=arms.tuned())
     residuals = replica_residuals_by_arm(
         cache=cache, config=config, cut=common.FINAL_CUT, stage="c2"
