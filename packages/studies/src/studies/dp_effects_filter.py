@@ -809,7 +809,11 @@ class SiteStream:
 
 
 def fit_effects_noise_sites(
-    *, streams: Mapping[str, SiteStream], band: np.ndarray, variant: FilterVariant
+    *,
+    streams: Mapping[str, SiteStream],
+    band: np.ndarray,
+    variant: FilterVariant,
+    sigma_eps_spread: float = SIGMA_EPS_PRIOR_SPREAD,
 ) -> tuple[dict[str, FittedNoise], np.ndarray, np.ndarray]:
     """Fit every site's noise matrix under a prior shared across sites.
 
@@ -822,6 +826,7 @@ def fit_effects_noise_sites(
         streams: Each site's inputs.
         band: The hour band of each grid row.
         variant: Which weights move and whether `q` is shared.
+        sigma_eps_spread: The standard deviation of the prior on each site's `log sigma_eps`.
 
     Returns:
         Each site's fit, and the final prior mean and spread of `log q` per weight.
@@ -851,6 +856,7 @@ def fit_effects_noise_sites(
                 prior_spread=prior_spread,
                 start_log_q=fitted[site].log_q if site in fitted else None,
                 greedy=round_index == 0,
+                sigma_eps_spread=sigma_eps_spread,
             )
             for site, stream in streams.items()
         }
