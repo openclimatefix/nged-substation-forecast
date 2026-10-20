@@ -155,7 +155,7 @@ def _folder(*, label: str, arm: str) -> Path:
     if arm in EXTERNAL_SETS:
         template, _ = EXTERNAL_SETS[arm]
         return Path(str(template).format(label=label))
-    return common.DATA_DIR / "predictions" / f"{label}_{arm}"
+    return common.PREDICTIONS_DIR / f"{label}_{arm}"
 
 
 @cache
@@ -388,7 +388,7 @@ def absolute_table() -> pl.DataFrame:
     """Return every arm's quantile score by site for each cut, on rows outside the masks."""
     rows = []
     for label in ("scored", "replicate", "winter", "tuning"):
-        folder = common.DATA_DIR / "predictions"
+        folder = common.PREDICTIONS_DIR
         for name in sorted(path.name for path in folder.iterdir()):
             if not name.startswith(f"{label}_"):
                 continue
@@ -577,9 +577,10 @@ def main() -> None:
     print(f"== Planned contrasts ({PLANNED_LEVEL:.2f}% intervals), negative = treatment better ==")
     print(contrast_table(planned=True).write_csv(float_precision=3), end="")
     print("== Decision rule ==")
-    print("The gate failed under the pre-registered definition (runs 1 to 3); a post hoc")
-    print("redefinition passes in run 4. The plan counts the gate as failed, so the verdict")
-    print("is capped at inconclusive. Beside it, the verdict if the post hoc gate were accepted:")
+    print("The gate failed under the pre-registered definition (run 1) and under three post hoc")
+    print("redefinitions (runs 2, 3, and 5, which fails line d); only run 4 passes every line.")
+    print("The plan counts the gate as failed, so the verdict is capped at inconclusive.")
+    print("Beside it, the verdict if the post hoc gate were accepted:")
     print(json.dumps(decision(gate_passed=False), indent=2))
     print(json.dumps(decision(gate_passed=True), indent=2))
     print("== Exploratory contrasts (95% intervals) ==")

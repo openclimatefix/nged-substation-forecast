@@ -11,6 +11,7 @@ written once, against a day-ahead initialisation at 09:00 UTC on the previous da
 """
 
 import math
+import os
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -28,6 +29,11 @@ EXPERIMENT_ID: Final[int] = 109
 SLUG: Final[str] = "differentiable-physics-n0-partially-pooled-convex-model"
 ROW_SET_ID: Final[str] = "dp_mw_v1"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
+PREDICTIONS_DIR: Final[Path] = Path(
+    os.environ.get("E109_PREDICTIONS_DIR", DATA_DIR / "predictions")
+)
+"""Where the report reads prediction sets; the environment variable points it at the sets of the
+first run, in which D18 was pooled on its whole-history scale."""
 CACHE_DIR: Final[Path] = DATA_DIR / "cache"
 WORK_DIR: Final[Path] = DATA_DIR / "work"
 """Small result files (tuning, gate, reports); private and never committed."""

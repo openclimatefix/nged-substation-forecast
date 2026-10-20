@@ -312,9 +312,9 @@ def figure_5_gate() -> alt.TopLevelMixin:
         title=_title(
             text="The known-answer gate failed under its pre-registered definition",
             subtitle=(
-                "Runs 1 to 3 each failed at least one line. Run 4 passes under a second post hoc "
-                "definition of line (b), on one seed. Line (b)'s error test is weak, and line (d) "
-                "passed on 3 of 4 seeds."
+                "Run 1 is the pre-registered definition; runs 2 to 5 are post hoc changes, each on "
+                "a new seed. Only run 4 passes every line. Line (b) has little power, and line (d) "
+                "passed on 3 of 5 seeds."
             ),
         ),
     )

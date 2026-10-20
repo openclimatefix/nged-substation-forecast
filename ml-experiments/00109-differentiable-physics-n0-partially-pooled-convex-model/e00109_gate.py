@@ -74,14 +74,15 @@ TUNING_DECISION: Final[tuple[str, ...]] = SYNTHETIC_LABELS[:5]
 VARIANTS: Final[dict[str, float]] = {"base": 1.0, "tau_x10": 10.0, "tau_x0.1": 0.1}
 WEEK_ROWS: Final[int] = 7 * HALF_HOURS_PER_DAY
 FLEET_CUT: Final[datetime] = common.SCORED_CUT
-SEED: Final[int] = 20261022
-"""The seed of the synthetic fleets. Run 1 used 20261019 with shrinkage measured on raw heating
-coefficients. Run 2 used 20261020 with shrinkage measured on the heating contribution to the
-prediction and an independent-noise closed form. Run 3, 20261021, kept the contribution and used a
-closed form that accounts for the noise's persistence (kept in `gate_run3_first.json`). This run,
-20261022, compares with a joint oracle posterior mean, which estimates every pooled coefficient as
-the pooled model does and knows none of them. The earlier
-results are kept in `work/gate/gate_run1.json` and `gate_run2.json`."""
+SEED: Final[int] = 20261023
+"""The seed of the synthetic fleets; every run used a new one, so a change of definition and a
+change of seed are confounded. Run 1 (20261019) measured shrinkage on raw heating coefficients
+against the plan's closed form. Run 2 (20261020) measured it on the heating contribution to the
+prediction, a post hoc change after run 1 failed. Run 3 (20261021) replaced the closed form by one
+with serially correlated noise (kept as `gate_run3.json`), post hoc. Run 4 (20261022) compared with
+a joint oracle posterior mean, post hoc again. This run, 20261023, corrects that oracle's prior
+mean after a code review found it was the mean before the heating slopes were clipped at zero. The
+earlier results are kept in `gate_run1.json` to `gate_run4.json`."""
 
 
 def _g_fits(*, cache: FeatureCache, vintages: pl.DataFrame) -> tuple[Any, dict[str, np.ndarray]]:
@@ -264,7 +265,7 @@ def build_variant(
     truth = {
         "thetas": truths,
         "mean_fit": mean_fit,
-        "scale": scale,
+        "scale": {family: multiplier * value for family, value in scale.items()},
         "noise_variance": noise_variance,
         "capacity_points": capacity_truth,
         "layout": layout,
@@ -410,11 +411,14 @@ def joint_oracle_heating(
 ) -> np.ndarray:
     """Return the heating slopes of the oracle posterior mean given the window's rows.
 
-    The oracle knows the population fleet mean, each family's true scale `tau_f`, and the noise
-    variance (independent noise of the true variance). It estimates every pooled coefficient
-    jointly, as the pooled model does, with a Gaussian prior of mean `mu` and precision
+    The oracle knows the realised mean of the eight substations' true coefficients (the fleet
+    mean after the heating slopes were clipped at zero), each family's true scale `tau_f`, the
+    noise variance (independent noise of the true variance), and the substation's true capacity,
+    which the pooled model has to fit from the same rows. It estimates every pooled coefficient
+    jointly, as the pooled model does, with a Gaussian prior of that mean and precision
     `1 / tau_f^2` on each family's deviations (on the profile's shape only, so the band means
-    stay free). It does not know any coefficient.
+    stay free). Runs 1 to 4 used the population mean before the clipping, which sits 8% to 21%
+    below the realised heating band totals; run 5 corrects that.
 
     Args:
         cache: The synthetic cache.
@@ -437,7 +441,7 @@ def joint_oracle_heating(
     for family in POOLED_FAMILIES:
         block = layout.slices[family]
         centre = centring_matrix(family=family, size=block.stop - block.start)
-        prior_mean[block] = truth["mean_fit"][family]
+        prior_mean[block] = np.mean([theta[block] for theta in truth["thetas"]], axis=0)
         precision[block, block] = centre.T @ centre / truth["scale"][family] ** 2
     variance = truth["noise_variance"]
     posterior = np.linalg.solve(

@@ -24,9 +24,10 @@ DOCS_DIR: Final[Path] = (
 )
 RUNS: Final[dict[str, tuple[str, str]]] = {
     "run 1": ("gate_run1.json", "raw heating coefficients; original closed form"),
-    "run 2": ("gate_run2.json", "heating contribution; original closed form"),
-    "run 3": ("gate_run3.json", "post hoc 1: closed form with serially correlated noise"),
-    "run 4": ("gate_run4.json", "post hoc 2: joint oracle posterior mean"),
+    "run 2": ("gate_run2.json", "post hoc 1: heating contribution; original closed form"),
+    "run 3": ("gate_run3.json", "post hoc 2: closed form with serially correlated noise"),
+    "run 4": ("gate_run4.json", "post hoc 3: joint oracle posterior mean"),
+    "run 5": ("gate_run5.json", "post hoc 4: oracle prior mean corrected for clipping"),
 }
 LINES: Final[dict[str, str]] = {
     "a_fleet_mean": "(a) fleet mean",
