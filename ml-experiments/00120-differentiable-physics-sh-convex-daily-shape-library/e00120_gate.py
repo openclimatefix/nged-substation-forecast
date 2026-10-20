@@ -887,14 +887,13 @@ def wilson(*, passed: int, n: int, z: float = 1.645) -> tuple[float, float]:
 
 
 def module_tests_pass() -> bool:
-    """Run the module's unit tests and return True if they pass."""
+    """Run the module's unit tests from the repository root and return True if they pass."""
+    root = Path(__file__).resolve().parents[2]
     result = subprocess.run(
         [
             "uv",
             "run",
-            "--all-packages",
-            "--group",
-            "gpu",
+            "--no-sync",
             "pytest",
             "packages/studies/tests/test_dp_shape_library.py",
             "--run-studies",
@@ -903,6 +902,7 @@ def module_tests_pass() -> bool:
         capture_output=True,
         text=True,
         check=False,
+        cwd=root,
     )
     return result.returncode == 0
 
@@ -937,6 +937,13 @@ def report() -> dict[str, Any]:
         sparse,
         (pl.col("line4_min_cosine") >= SHAPE_COSINE)
         & (pl.col("line4_deviation_share") >= DEVIATION_SHARE),
+    )
+    count(
+        "10 step recovery (time within 1 half-hour, size within 25%, placebo under 25%)",
+        sparse,
+        (pl.col("line10_max_time_error") <= 1)
+        & (pl.col("line10_max_size_error") <= STEP_SIZE_TOLERANCE)
+        & (pl.col("line10_placebo_step") < STEP_SIZE_TOLERANCE * STEP_POINTS),
     )
     count(
         "5 null fleet (SH - G >= 0, seed cosine < 0.6)",
