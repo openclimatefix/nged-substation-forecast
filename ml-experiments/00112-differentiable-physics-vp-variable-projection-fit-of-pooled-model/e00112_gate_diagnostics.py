@@ -22,8 +22,9 @@ import e00112_common as common
 import e00112_gate as gate
 import e00112_vp as vp
 import torch
+from studies.dp_features import FeatureCache
 from studies.dp_pooled import DpConfig, PooledBatch, PooledDemandModel, PopulationScales
-from studies.dp_pooled_vp import VpSettings, fit_pooled_vp, freeze_operator_for_vp
+from studies.dp_pooled_vp import VpFitResult, VpSettings, fit_pooled_vp, freeze_operator_for_vp
 
 EVALUATIONS: Final[int] = 600
 CONTINUED_EVALUATIONS: Final[int] = 1500
@@ -53,7 +54,12 @@ def new_variant(*, batch: PooledBatch, network: bool, dark_only: bool) -> Pooled
 
 
 def summarise(
-    *, model: PooledDemandModel, truth: PooledDemandModel, batch: PooledBatch, result: Any, cache
+    *,
+    model: PooledDemandModel,
+    truth: PooledDemandModel,
+    batch: PooledBatch,
+    result: VpFitResult,
+    cache: FeatureCache,
 ) -> dict[str, Any]:
     """Return a fit's objective, convergence, and worst-case recovery errors."""
     recovery = gate.recovery(model=model, truth=truth, batch=batch, cache=cache)
