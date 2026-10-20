@@ -44,6 +44,7 @@ from studies.dp_effects_filter import (
     N_BANDS,
     N_WEIGHTS,
     PV_INDEX,
+    DayAheadTargets,
     EffectsTrace,
     FilterNoise,
     fit_effects_noise,
@@ -360,6 +361,7 @@ def run_draw(job: tuple[str, str, str, str, int]) -> str:
         likelihood_mask=inputs.likelihood_mask & np.isfinite(stream),
         prior_mean=inputs.prior_mean,
         prior_spread=inputs.prior_spread,
+        lead_matched=day_ahead_scored(inputs=inputs, stream=stream),
     )
     kez = run_effects_filter(
         residual=stream, regressors=standardised, band=inputs.band, noise=fitted.noise
@@ -392,6 +394,14 @@ def run_draw(job: tuple[str, str, str, str, int]) -> str:
     temporary.write_text(json.dumps(content))
     temporary.rename(path)
     return str(path)
+
+
+def day_ahead_scored(*, inputs: GateInputs, stream: np.ndarray) -> DayAheadTargets:
+    """Return the stream's tuning-month readings with a day-ahead cutoff, and their cutoffs."""
+    rows = np.flatnonzero(
+        inputs.likelihood_mask & np.isfinite(stream) & (inputs.day_ahead_cutoff >= 0)
+    )
+    return DayAheadTargets(target_rows=rows, cutoff_rows=inputs.day_ahead_cutoff[rows])
 
 
 def power_check() -> dict:

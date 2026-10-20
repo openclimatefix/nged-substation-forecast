@@ -116,7 +116,7 @@ def load_mine(*, arm: str, periods: set[str], sites: tuple[str, ...]) -> pl.Data
             path = PREDS_DIR / f"{arm}_{period}_{site}.parquet"
             if path.exists():
                 pieces.append(pl.read_parquet(path).with_columns(site=pl.lit(site)))
-    frame = pl.concat(pieces).select(FRAME_COLUMNS)
+    frame = pl.concat(pieces).select(*FRAME_COLUMNS, "mean")
     return drop_unscorable(frame=in_period(frame=frame, periods=periods), sites=sites)
 
 
@@ -153,6 +153,8 @@ def load_xlag_d(*, periods: set[str], sites: tuple[str, ...]) -> pl.DataFrame:
             continue
         frame = pl.concat([pl.read_parquet(f) for f in files])
         features = cache.sites[site]
+        last = cache.end_times[-1].astype("datetime64[us]").astype(datetime).replace(tzinfo=UTC)
+        frame = frame.filter(pl.col("valid_time") <= last)
         position = np.searchsorted(
             cache.end_times, frame["valid_time"].dt.replace_time_zone(None).to_numpy()
         )
@@ -257,6 +259,7 @@ def contrast(
     metric: str = "qs",
     level: float = 95.0,
     by_day: bool = False,
+    interval: bool = True,
 ) -> dict:
     """Return a paired contrast: the estimate, its interval, and the sites it favours.
 
@@ -266,6 +269,7 @@ def contrast(
         reference: The second-named arm.
         metric: The loss column.
         level: The interval's coverage in percent.
+        interval: Whether to compute the interval; a secondary read of the estimate alone skips it.
         by_day: Resample whole local days instead of whole calendar months. With fewer than
             `MIN_DAYS_FOR_INTERVAL` days the interval is `None` and `too_few_days` is true.
 
@@ -281,7 +285,7 @@ def contrast(
     )
     too_few = by_day and n_days < MIN_DAYS_FOR_INTERVAL
     lower = upper = None
-    if t.height and not too_few and (by_day or t["month"].n_unique() > 1):
+    if interval and t.height and not too_few and (by_day or t["month"].n_unique() > 1):
         scope = losses.with_columns(month=pl.col("local_date")) if by_day else losses
         lower, upper = bootstrap_difference_at_level(
             losses=scope, treatment=treatment, reference=reference, metric=metric, level=level

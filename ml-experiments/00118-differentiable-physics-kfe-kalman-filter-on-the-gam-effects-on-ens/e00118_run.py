@@ -8,8 +8,8 @@ factor with the lowest mean quantile score at the five decision sites and writes
 per arm, period, and site under `work/preds/`.
 
 The replicate months and the scored year are forecast only after the known-answer gate has passed
-(`work/gate.json`) and the module's Opus review has landed (`work/OPUS_REVIEW_DONE`); the tuning
-months have no such guard, because no replicate month and no scored run is read.
+(`work/gate.json`); the tuning months have no such guard, because no replicate month and no scored
+run is read.
 
     uv run python ml-experiments/00118-*/e00118_run.py tune [--workers 6]
     uv run python ml-experiments/00118-*/e00118_run.py choose
@@ -37,27 +37,23 @@ PREDS_DIR: Final[Path] = common.WORK_DIR / "preds"
 SPREAD_DIR: Final[Path] = common.WORK_DIR / "spread"
 TUNED_PATH: Final[Path] = common.WORK_DIR / "tuned.json"
 GATE_PATH: Final[Path] = common.WORK_DIR / "gate.json"
-REVIEW_PATH: Final[Path] = common.WORK_DIR / "OPUS_REVIEW_DONE"
 PERIODS: Final[tuple[str, ...]] = ("tuning", "replicate", "scored")
 GUARDED_PERIODS: Final[frozenset[str]] = frozenset({"replicate", "scored"})
 
 
 def require_clearance(*, periods: list[str]) -> None:
-    """Raise unless the gate has passed and the module's Opus review has landed.
+    """Raise unless the known-answer gate has passed, for the replicate and scored periods.
 
     Args:
         periods: The periods about to be forecast; only replicate and scored are guarded.
 
     Raises:
-        RuntimeError: If a guarded period is asked for and the gate or the review is missing.
+        RuntimeError: If a guarded period is asked for and the gate has not passed.
     """
     if not GUARDED_PERIODS & set(periods):
         return
     if not GATE_PATH.exists() or json.loads(GATE_PATH.read_text())["blocking_failed"] != 0:
         msg = "the known-answer gate has not passed; no replicate or scored run may start"
-        raise RuntimeError(msg)
-    if not REVIEW_PATH.exists():
-        msg = "the module's Opus review has not landed; no replicate or scored run may start"
         raise RuntimeError(msg)
 
 

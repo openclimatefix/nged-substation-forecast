@@ -341,6 +341,7 @@ def p4() -> dict:
             likelihood_mask=inputs.likelihood_mask & np.isfinite(stream),
             prior_mean=np.full(N_WEIGHTS, -3.0),
             prior_spread=np.full(N_WEIGHTS, 20.0),
+            lead_matched=gate.day_ahead_scored(inputs=inputs, stream=stream),
         )
         trace = run_effects_filter(
             residual=stream,

@@ -141,16 +141,16 @@ def contrast_table(
                     treatment=treatment,
                     reference=reference,
                     metric="abs_mean",
-                    level=95.0,
                     by_day=by_day,
+                    interval=False,
                 )["estimate"]
                 result["median_error"] = score.contrast(
                     losses=part,
                     treatment=treatment,
                     reference=reference,
                     metric="abs_median",
-                    level=95.0,
                     by_day=by_day,
+                    interval=False,
                 )["estimate"]
                 # Leaving each decision site out in turn: the sign of the estimate.
                 result["leave_one_out_signs"] = {
@@ -160,8 +160,8 @@ def contrast_table(
                                 losses=part.filter(pl.col("site") != series),
                                 treatment=treatment,
                                 reference=reference,
-                                level=95.0,
                                 by_day=True,
+                                interval=False,
                             )["estimate"]
                         )
                     )
@@ -231,10 +231,11 @@ def absolute_scores(*, losses: pl.DataFrame, labels: dict[int, str]) -> dict:
                         "abs_mean": float(part["abs_mean"].mean()),
                         "n": part.height,
                     }
+        all_sites_arm = losses.filter(pl.col("arm") == arm)
         out[arm]["per_site"] = {
             labels[int(series)]: {
                 lead: float(
-                    rows_arm.filter(
+                    all_sites_arm.filter(
                         (pl.col("site") == series)
                         & (pl.col("lead_hours") > BAND_OF_LEAD[lead][1])
                         & (pl.col("lead_hours") <= BAND_OF_LEAD[lead][2])
@@ -339,14 +340,23 @@ def run_period(*, period: str) -> dict:
     present = set(mine)
     planned = {k: v for k, v in PLANNED.items() if set(v) <= present}
     exploratory = {k: v for k, v in EXPLORATORY.items() if set(v) <= present}
+    decision_series = [series for series, site in labels.items() if site in common.DECISION_SITES]
+    decision = stacked.filter(pl.col("site").is_in(decision_series))
+    d9 = stacked.filter(~pl.col("site").is_in(decision_series))
     results["planned"] = contrast_table(
-        losses=stacked, pairs=planned, level=PLANNED_LEVEL, labels=labels
+        losses=decision, pairs=planned, level=PLANNED_LEVEL, labels=labels
     )
     results["exploratory"] = contrast_table(
-        losses=stacked, pairs=exploratory, level=95.0, labels=labels
+        losses=decision, pairs=exploratory, level=95.0, labels=labels
     )
+    results["d9_planned"] = contrast_table(losses=d9, pairs=planned, level=95.0, labels=labels)
     results["absolute"] = absolute_scores(losses=stacked, labels=labels)
-    results["tails"] = tails(arms_by_name=mine)
+    results["tails"] = tails(
+        arms_by_name={
+            arm: frame.filter(pl.col("site").is_in(common.DECISION_SITES))
+            for arm, frame in mine.items()
+        }
+    )
     results["median_minus_mean"] = median_minus_mean(arms_by_name=mine, labels=labels)
     results["against_references"] = reference_contrasts(
         mine=mine, references=references, labels=labels
