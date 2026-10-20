@@ -410,12 +410,14 @@ requires. The experiment either waits for that PR or records the unchecked prope
 
 ## Merging
 
-**An experiment's PR may be merged without waiting for the maintainer when all four hold:** the
-diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews
-its size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
+**An experiment's PR may be merged without waiting for the maintainer when all four hold:** the diff
+touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews its
+size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
 --check`; any audit a trigger in "Audit before merge" calls for has run, with its findings triaged
 in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
-`data/` or `.env` file, the branch contains `main`, a merge commit and not a squash).
+`data/` or `.env` file, the branch contains `main` or everything that landed on `main` since the
+branch was cut sits under `docs/` or `ml-experiments/` and touches no file the PR changes, a merge
+commit and not a squash).
 
 **Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
 file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
