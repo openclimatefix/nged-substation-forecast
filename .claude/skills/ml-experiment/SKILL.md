@@ -92,7 +92,8 @@ review as `implement-issue` does.
   `experiment_store.write_predictions`. The folder is private and never committed.
 
 **`result.md` is the plan first and the write-up second.** Commit it with status `planned` before
-the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
+the code runs, so the commit order proves the hypothesis came first. Push that commit to the
+experiment's own branch, and do not open a pull request for it. Its front matter holds the
 `id`, `slug`, `theme`, `also_relevant_to`, `status`, `size`, `hypothesis`, `prediction`,
 `decision_rule`, `benchmark`, `row_set_id`, and `metric`, and, when finished, the `verdict`
 (`supported`, `partly supported`, `small gain`, `not supported`, `refuted`, `inconclusive`,
@@ -189,10 +190,10 @@ time would have taken under an hour.
 
 **Update the owning theme's Research plan page (`docs/ml-experiments/themes/<theme>/plan.md`) in the
 commit that adds the `planned` `result.md`, and again in the commit that adds the finished
-write-up.** An experiment uses one pull request for both commits, and the commit order on the branch
-proves the plan came first. Open a separate plan pull request only when another session has to read
-the plan from `main` before the experiment runs, as when a planner hands the plan to a session that
-has not yet started. The planning commit updates the experiment's row in the priority table at the
+write-up.** An experiment opens one pull request, when its result is ready, and the plan commit is the first
+commit in that pull request's history. No pull request is opened at plan time. A change to
+`packages/studies/` that the experiment needs is the exception: open its pull request as soon as the
+module is ready for review, because the module needs its own review. The planning commit updates the experiment's row in the priority table at the
 top of the page with its id, the question in one line, the priority, what it waits for, and the
 state, and commits the `result.md` with `status: planned`, which the page's generated
 planned-experiments table then lists. The finished commit deletes that row and the experiment's
