@@ -9,10 +9,10 @@ import numpy as np
 import pytest
 from scipy.optimize import minimize
 
-torch = pytest.importorskip("torch")
+torch = pytest.importorskip("torch", reason="studies.dp_gam needs torch: uv sync --group gpu")
 
 from studies.dp_assimilation import FilterHyperparameters, run_kalman  # noqa: E402
-from studies.dp_edge_flow import (  # noqa: E402  # noqa: E402
+from studies.dp_edge_flow import (  # noqa: E402
     BandFilterRun,
     LeadHoursSpread,
     PathProblem,
@@ -29,11 +29,13 @@ from studies.dp_edge_flow import (  # noqa: E402  # noqa: E402
     expand_held_flat,
     fit_flows,
     fit_survival,
+    flow_mw_days,
     huber_loss,
     joint_objective,
     moved_mw_ratio,
     mw_weighted_recall,
     node_flow,
+    noise_before,
     path_objective,
     release_delay,
     robust_residual_scale,
@@ -646,3 +648,159 @@ def test_the_seed_month_bootstrap_is_zero_width_for_a_constant_and_rejects_bad_i
         seed_month_bootstrap(values=np.zeros(3), seeds=seeds, months=months, level=95.0)
     with pytest.raises(ValueError, match="percent"):
         seed_month_bootstrap(values=np.zeros(48), seeds=seeds, months=months, level=0.95)
+
+
+def test_a_month_effect_shared_by_every_seed_widens_the_seed_month_interval():
+    rng = np.random.default_rng(10)
+    seeds = np.repeat(np.arange(20), 120)
+    months = np.tile(np.repeat(np.arange(12), 10), 20)
+    month_effect = rng.normal(0.0, 1.0, 12)
+    values = month_effect[months] + rng.normal(0.0, 0.1, len(seeds))
+
+    _, lower, upper = seed_month_bootstrap(values=values, seeds=seeds, months=months, level=95.0)
+
+    # The 20 seeds share the 12 month effects, so the mean has the spread of 12 draws, about 0.29.
+    assert upper - lower > 0.5
+
+
+def test_a_warm_start_of_the_wrong_length_and_a_reliability_weight_are_handled():
+    rng = np.random.default_rng(11)
+    residuals = {"A": rng.normal(0, 1, 200), "B": rng.normal(0, 1, 200)}
+    paths = [PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=5.0)]
+    noise = {"A": 1.0, "B": 1.0}
+
+    with pytest.raises(ValueError, match="one value per row"):
+        causal_window_fit(
+            paths=paths,
+            residuals=residuals,
+            noise=noise,
+            cutoff=150,
+            window_length=100,
+            start={"A-B": np.zeros(99)},
+        )
+    fit, first = causal_window_fit(
+        paths=paths,
+        residuals=residuals,
+        noise=noise,
+        cutoff=150,
+        window_length=100,
+        start={"A-B": np.zeros(100)},
+        reliability={"A": np.ones(200), "B": np.full(200, 0.5)},
+    )
+
+    assert first == 51
+    assert len(fit.flows["A-B"]) == 100
+
+
+def test_noise_before_uses_only_rows_up_to_the_last_known_row():
+    stream = np.concatenate([np.random.default_rng(12).normal(0, 1, 500), np.full(500, 1000.0)])
+
+    scale = noise_before(residuals={"A": stream}, last_row=499)
+
+    assert scale["A"] == pytest.approx(1.0, rel=0.15)
+
+
+def test_a_path_with_zero_gains_has_a_zero_flow_and_matches_admm_elsewhere():
+    n = 40
+    rng = np.random.default_rng(13)
+    gain = np.where(np.arange(n) % 8 < 4, 0.0, 1.0)
+    a = rng.normal(0, 1, n) + 2.0 * (np.arange(n) > 20)
+    b = -a + rng.normal(0, 1, n)
+    flat = PathProblem(
+        residual_a=a, noise_a=1.0, residual_b=b, noise_b=1.0, gain_a=np.zeros(n), gain_b=np.zeros(n)
+    )
+    shaped = PathProblem(
+        residual_a=a,
+        noise_a=1.0,
+        residual_b=b,
+        noise_b=1.0,
+        gain_a=gain,
+        gain_b=gain,
+        step_penalty=4.0,
+        level_penalty=0.2,
+    )
+
+    exact, iterative = solve_path(problem=shaped), solve_path(problem=shaped, method="admm")
+
+    assert np.all(np.isfinite(solve_path(problem=flat).flow))
+    assert np.all(solve_path(problem=flat).flow == 0.0)
+    assert exact.objective == pytest.approx(iterative.objective, abs=1e-5)
+
+
+def test_the_graph_builder_rejects_a_node_with_no_edge_and_a_dash_in_a_name():
+    common = {"step_penalty_by_edge": {"A-B": 1.0}, "level_penalty_by_edge": {"A-B": 1.0}}
+    with pytest.raises(ValueError, match="no edge"):
+        build_paths(edges=[("A", "B")], nodes=["A", "B", "C"], outside_factor=1.0, **common)
+    with pytest.raises(ValueError, match="'-'"):
+        build_paths(edges=[("A", "B-2")], nodes=["A", "B-2"], outside_factor=1.0, **common)
+
+
+def test_the_sweep_limit_stops_a_coupled_fit_early_and_reports_it():
+    rng = np.random.default_rng(14)
+    n = 120
+    transfer = np.where((np.arange(n) > 30) & (np.arange(n) < 90), 3.0, 0.0)
+    residuals = {
+        "A": transfer + rng.normal(0, 0.5, n),
+        "B": -0.5 * transfer + rng.normal(0, 0.5, n),
+        "C": -0.5 * transfer + rng.normal(0, 0.5, n),
+    }
+    paths = [
+        PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=2.0),
+        PathSpec(name="A-C", node_a="A", node_b="C", step_penalty=2.0),
+        PathSpec(name="B-C", node_a="B", node_b="C", step_penalty=2.0),
+    ]
+    noise = {"A": 0.5, "B": 0.5, "C": 0.5}
+
+    stopped = fit_flows(paths=paths, residuals=residuals, noise=noise, max_sweeps=1)
+    settled = fit_flows(paths=paths, residuals=residuals, noise=noise, sweep_tolerance=1e-3)
+
+    assert stopped.sweeps == 1
+    assert not stopped.converged
+    assert settled.sweeps > 1
+    assert settled.objective <= stopped.objective + 1e-9
+
+
+def test_a_slow_opposite_drift_is_an_edge_flow_unless_the_level_penalty_is_large():
+    n = 600
+    drift = np.linspace(0.0, 2.0, n)
+    residuals = {"A": drift, "B": -drift * 0.8}
+    noise = {"A": 0.5, "B": 0.5}
+    free = [PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=5.0, level_penalty=0.0)]
+    costly = [PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=5.0, level_penalty=200.0)]
+
+    assert (
+        flow_mw_days(flow=fit_flows(paths=free, residuals=residuals, noise=noise).flows["A-B"])
+        > 1.0
+    )
+    assert (
+        flow_mw_days(flow=fit_flows(paths=costly, residuals=residuals, noise=noise).flows["A-B"])
+        < 1e-6
+    )
+
+
+def test_a_noisy_transfer_on_one_edge_leaves_the_other_edges_nearly_empty():
+    rng = np.random.default_rng(15)
+    n = 400
+    transfer = np.where((np.arange(n) > 100) & (np.arange(n) < 300), 4.0, 0.0)
+    residuals = {
+        "A": transfer + rng.normal(0, 0.3, n),
+        "B": -transfer + rng.normal(0, 0.3, n),
+        "C": rng.normal(0, 0.3, n),
+    }
+    paths = build_paths(
+        edges=[("A", "B"), ("A", "C"), ("B", "C")],
+        nodes=["A", "B", "C"],
+        step_penalty_by_edge={"A-B": 20.0, "A-C": 20.0, "B-C": 20.0},
+        level_penalty_by_edge={"A-B": 1.0, "A-C": 1.0, "B-C": 1.0},
+        outside_factor=2.0,
+    )
+
+    fit = fit_flows(paths=paths, residuals=residuals, noise={"A": 0.3, "B": 0.3, "C": 0.3})
+
+    assert fit.flows["A-B"][150:250].mean() > 3.0
+    assert flow_mw_days(flow=fit.flows["A-C"]) < 0.5
+    assert flow_mw_days(flow=fit.flows["B-C"]) < 0.5
+
+
+def test_flow_mw_days_sums_magnitudes_over_forty_eight():
+    assert flow_mw_days(flow=np.array([2.0, -2.0, 0.0, 4.0])) == pytest.approx(8.0 / 48.0)
