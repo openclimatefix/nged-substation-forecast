@@ -719,3 +719,42 @@ def test_excluding_rows_from_a_primary_equals_fitting_without_those_readings(
     fresh = _fit(cache=cache, bsp=bsp, weights=[0.0, 5.0])
     assert np.allclose(cached.theta, fresh.theta, rtol=1e-6, atol=1e-6)
     assert not np.allclose(cached.theta, solve_joint(assembly=assembly, weights=[0.0, 5.0]).theta)
+
+
+def test_fixed_closure_coefficients_are_recovered_and_change_the_fit(two_sites: FeatureCache):
+    # A BSP built with 1.1 on S1, 0.9 on S2, and 0.85 on the generators is matched when the fit
+    # is given the same constants, and is not matched with the default factors of 1.
+    base = _bsp(cache=two_sites, members=_members(), truth_members=("S1", "S2"))
+    n = len(two_sites.end_times)
+    remainder = base.reading_mw + base.generators_mw
+    for site in ("S1", "S2"):
+        remainder = remainder - CAPACITY_MW[site] * two_sites.sites[site].y
+    factors = {"S1": 1.1, "S2": 0.9}
+    reading = remainder - 0.85 * base.generators_mw
+    for site in ("S1", "S2"):
+        reading = reading + factors[site] * CAPACITY_MW[site] * two_sites.sites[site].y
+    assert len(reading) == n
+    members = tuple(BspMember(site=s, coefficient=factors[s]) for s in ("S1", "S2"))
+    calibrated = replace(base, members=members, reading_mw=reading, generator_coefficient=0.85)
+    uncalibrated = replace(base, reading_mw=reading)
+    index = bsp_rows(
+        cache=two_sites, bsp=calibrated, start=np.datetime64("2023-07-01T00:00", "us"), cut=CUT
+    )
+    errors = []
+    primary_errors = []
+    for bsp in (calibrated, uncalibrated):
+        joint = _fit(cache=two_sites, bsp=bsp, weights=[1e3])
+        predicted = predict_bsp(
+            cache=two_sites,
+            fit=joint,
+            bsp=bsp,
+            index=index,
+            generators_mw=base.generators_mw[index],
+        )
+        errors.append(np.abs(predicted - reading[index]).mean() / np.abs(reading[index]).mean())
+        fitted = predict_gam(cache=two_sites, fit=joint.site_fit(site="S1"), index=index)
+        primary_errors.append(np.abs(fitted - two_sites.sites["S1"].y[index]).mean())
+    assert errors[0] < 1e-3
+    # The remainder's level absorbs most of a constant factor error, so the wrong factors leave
+    # S1 nearly where it was, but the BSP residual shows them.
+    assert errors[1] > 2 * errors[0]

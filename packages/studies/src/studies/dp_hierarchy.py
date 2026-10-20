@@ -130,10 +130,14 @@ class BspMember:
     Attributes:
         site: The Primary's label in the feature cache.
         kind: `mw` or `mva_dark`.
+        coefficient: The factor on the Primary's contribution to the BSP row, 1 unless the caller
+            has fitted it (a closure audit before the cut). It is a constant of the fit, not a
+            parameter.
     """
 
     site: str
     kind: MemberKind = "mw"
+    coefficient: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -149,6 +153,8 @@ class BspSeries:
         temperature_c: The BSP area's mean temperature, shape (T,).
         pv_shape: The unmetered PV's per-unit output shape, shape (T,), `NaN` where unknown.
         loss: A loss series for the optional loss term, shape (T,), or `None`.
+        generator_coefficient: The factor on the generators in the BSP row, 1 unless the caller has
+            fitted it before the cut; a constant of the fit.
         sigma_mw: The robust half-hourly residual scale of the BSP row, in MW. The caller must
             compute it from rows before the fit's cut; nothing here can check that.
     """
@@ -161,6 +167,7 @@ class BspSeries:
     pv_shape: np.ndarray
     sigma_mw: float
     loss: np.ndarray | None = None
+    generator_coefficient: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -380,13 +387,15 @@ def bsp_target(
     Returns:
         The target at the rows, in MW.
     """
-    target = bsp.reading_mw[index] + bsp.generators_mw[index]
+    target = bsp.reading_mw[index] + bsp.generator_coefficient * bsp.generators_mw[index]
     for member in bsp.members:
         capacity = pinned.get(member.site)
         if member.kind != "mw" or capacity is None:
             continue
         features = cache.sites[member.site]
-        target = target + features.table.effective_capacity_mw * pinned_solar_points(
+        target = target + (
+            member.coefficient * features.table.effective_capacity_mw
+        ) * pinned_solar_points(
             cache=cache,
             features=features,
             pinned=capacity,
@@ -408,7 +417,7 @@ def _member_design(
     x = design_matrix(cache=cache, features=features, layout=layout, index=index)
     if member.kind == "mva_dark":
         x[:, layout.slices["capacity"]] = 0.0
-    return features.table.effective_capacity_mw * x
+    return member.coefficient * features.table.effective_capacity_mw * x
 
 
 @dataclass
@@ -917,7 +926,7 @@ def predict_bsp(
     total = remainder_prediction(
         cache=cache, fit=fit, bsp=bsp, index=index, weight_index=weight_index
     )
-    total = total - generators_mw
+    total = total - bsp.generator_coefficient * generators_mw
     for m in bsp.members:
         site_fit = fit.site_fit(site=m.site)
         columns = None
@@ -927,7 +936,7 @@ def predict_bsp(
         predicted = predict_gam(
             cache=cache, fit=site_fit, index=index, member=weight_index, columns=columns
         )
-        total = total + cache.sites[m.site].table.effective_capacity_mw * predicted
+        total = total + m.coefficient * cache.sites[m.site].table.effective_capacity_mw * predicted
     return total
 
 
