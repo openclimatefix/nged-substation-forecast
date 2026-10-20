@@ -73,6 +73,18 @@ LOCAL_ZONE: Final[str] = "Europe/London"
 ARM_PERIOD_ORDER: Final[tuple[str, ...]] = ("tuning", "replicate", "scored")
 
 
+def mean_of(series: pl.Series) -> float:
+    """Return a series' mean as a float (NaN for an empty series)."""
+    value = series.mean()
+    return float("nan") if value is None else float(value)  # ty: ignore[invalid-argument-type]
+
+
+def max_of(series: pl.Series) -> float:
+    """Return a series' maximum as a float (NaN for an empty series)."""
+    value = series.max()
+    return float("nan") if value is None else float(value)  # ty: ignore[invalid-argument-type]
+
+
 def site_meta(*, sites: tuple[str, ...]) -> tuple[dict[str, int], dict[str, np.ndarray]]:
     """Return each site's series identifier and switching mask on the grid."""
     cache = common.load_cache()

@@ -29,6 +29,7 @@ import e00118_common as common
 import e00118_forecast as fc
 import e00118_gate as gate
 import e00118_noise as noise_io
+import e00118_score as score_module
 import e00118_streams as streams
 import numpy as np
 import polars as pl
@@ -184,12 +185,12 @@ def p1() -> dict:
             for column in ("q01", "q25", "q50", "q75", "q99"):
                 quantile_difference = max(
                     quantile_difference,
-                    float((joined[column] - joined[f"{column}_111"]).abs().max()),
+                    score_module.max_of((joined[column] - joined[f"{column}_111"]).abs()),
                 )
             for column in ("level", "anomaly"):
                 stored_difference = max(
                     stored_difference,
-                    float((joined[column] - joined[f"{column}_111"]).abs().max()),
+                    score_module.max_of((joined[column] - joined[f"{column}_111"]).abs()),
                 )
         result[site] = {
             "level_anomaly_vs_run_kalman": difference,

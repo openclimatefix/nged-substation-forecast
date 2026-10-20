@@ -234,20 +234,20 @@ def absolute_scores(*, losses: pl.DataFrame, labels: dict[int, str]) -> dict:
                 )
                 if part.height:
                     out[arm][subset][lead] = {
-                        "qs": float(part["qs"].mean()),
-                        "abs_median": float(part["abs_median"].mean()),
-                        "abs_mean": float(part["abs_mean"].mean()),
+                        "qs": score.mean_of(part["qs"]),
+                        "abs_median": score.mean_of(part["abs_median"]),
+                        "abs_mean": score.mean_of(part["abs_mean"]),
                         "n": part.height,
                     }
         all_sites_arm = losses.filter(pl.col("arm") == arm)
         out[arm]["per_site"] = {
             labels[int(series)]: {
-                lead: float(
+                lead: score.mean_of(
                     all_sites_arm.filter(
                         (pl.col("site") == series)
                         & (pl.col("lead_hours") > BAND_OF_LEAD[lead][1])
                         & (pl.col("lead_hours") <= BAND_OF_LEAD[lead][2])
-                    )["qs"].mean()
+                    )["qs"]
                 )
                 for lead in ("D+1", "all leads")
             }
@@ -284,11 +284,9 @@ def median_minus_mean(*, arms_by_name: dict[str, pl.DataFrame], labels: dict[int
     by_label = {site: series for series, site in labels.items()}
     for arm, frame in arms_by_name.items():
         out[arm] = {
-            site: float(
-                (
-                    frame.filter(pl.col("time_series_id") == series)["q50"]
-                    - frame.filter(pl.col("time_series_id") == series)["mean"]
-                ).mean()
+            site: score.mean_of(
+                frame.filter(pl.col("time_series_id") == series)["q50"]
+                - frame.filter(pl.col("time_series_id") == series)["mean"]
             )
             for site, series in by_label.items()
         }
@@ -344,11 +342,11 @@ def reference_scores(
             kept = rows.filter(pl.col("site").is_in(decision))
             scored = kept.with_columns(score.quantile_score(frame=kept))
             out[name][arm] = {
-                lead: float(
+                lead: score.mean_of(
                     scored.filter(
                         (pl.col("lead_hours") > BAND_OF_LEAD[lead][1])
                         & (pl.col("lead_hours") <= BAND_OF_LEAD[lead][2])
-                    )["qs"].mean()
+                    )["qs"]
                 )
                 for lead in LEADS
             }

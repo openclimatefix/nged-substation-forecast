@@ -161,7 +161,7 @@ def figure_headline(*, scored: dict, replicate: dict) -> alt.TopLevelMixin:
             )
     table = pl.DataFrame(rows)
     order = list(dict.fromkeys(table["contrast"].to_list()))
-    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(table).encode(
         y=alt.Y("contrast:N", sort=order, title=None, axis=alt.Axis(labelLimit=330)),
         yOffset=alt.YOffset("period:N", sort=["scored year", "replicate months"]),
         color=alt.Color(
@@ -276,7 +276,7 @@ def figure_subsets(*, scored: dict) -> alt.TopLevelMixin:
             )
     table = pl.DataFrame(rows)
     order = list(SUBSET_LABELS.values())
-    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(table).encode(
         y=alt.Y("subset:N", sort=order, title=None, axis=alt.Axis(labelLimit=300)),
         yOffset=alt.YOffset("contrast:N"),
         color=alt.Color(
@@ -345,7 +345,7 @@ def figure_gate() -> alt.TopLevelMixin:
     ]
     table = pl.DataFrame(rows).with_columns(group=pl.col("form") + ", " + pl.col("condition"))
     order = sorted(set(table["reading"].to_list()))
-    base = alt.Chart(table).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(table).encode(
         y=alt.Y("reading:N", sort=order, title=None, axis=alt.Axis(labelLimit=260)),
         yOffset=alt.YOffset("group:N"),
         color=alt.Color(
@@ -715,10 +715,10 @@ def figure_week(*, month: str) -> alt.TopLevelMixin:
             )
         )
         actual = (
-            alt.Chart(kez)
+            alt.Chart(kez)  # ty: ignore[unresolved-attribute]
             .mark_line(color=DARK, strokeWidth=1.0)
             .encode(x="hours:Q", y="actual:Q", detail="day:N")
-        )  # ty: ignore[unresolved-attribute]
+        )
         panels.append(
             (band90 + band80 + gk_line + median + actual).properties(
                 width=WIDTH - 90, height=100, title=site
@@ -762,7 +762,7 @@ def figure_cold(*, scored: dict) -> alt.TopLevelMixin:
                 {
                     "site": f"{site} ({cold_days} cold days)",
                     "arm": ARM_LABELS[arm],
-                    "qs": float(score.quantile_score(frame=frame).mean()),
+                    "qs": score.mean_of(score.quantile_score(frame=frame)),
                 }
             )
     table = pl.DataFrame(rows)
