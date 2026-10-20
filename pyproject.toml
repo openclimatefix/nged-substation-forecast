@@ -465,6 +465,7 @@ include = [
     "packages/studies/tests/test_dp_meter.py",
     "packages/studies/tests/test_dp_gam_pooled.py",
     "packages/studies/tests/test_dp_gam_graph.py",
+    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_capacity_diagnosis.py",
     "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_controls.py",
     "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_gate.py",
     "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_leave_one_out.py",
