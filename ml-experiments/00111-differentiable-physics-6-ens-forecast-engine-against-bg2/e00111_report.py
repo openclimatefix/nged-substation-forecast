@@ -257,6 +257,17 @@ def settings_lines() -> list[str]:
     )
     passed = sum(1 for c in gate["checks"] if c["passed"])
     lines.append(f"- gate: {passed} of {len(gate['checks'])} readings pass")
+    lines.extend(
+        f"    - gate {c['test']}: {c['check']} = {c['value']:.4f} (limit {c['limit']})"
+        for c in gate["checks"]
+        if not c["test"].startswith("2")
+    )
+    midday = [c["value"] for c in gate["checks"] if "midday ratio" in c["check"]]
+    offsets = [c["value"] for c in gate["checks"] if "peak slot" in c["check"]]
+    lines.append(
+        f"    - gate 2: midday ratio {min(midday):.3f} to {max(midday):.3f} over {len(midday)} "
+        f"substations; largest peak offset {max(offsets):.0f} half-hours"
+    )
     shifts, ratios = [], []
     for site in common.DECISION_SITES:
         calibration = arms.load_calibration(site=site)
@@ -309,7 +320,8 @@ def render_report(*, results: dict) -> list[str]:
         lines += ["", f"## Median forecast minus mean forecast ({sites_label} sites, points)"]
         table = pl.DataFrame(results[f"median_minus_mean_{sites_label}"])
         if table.height:
-            lines.append(table.pivot(on="site", index="arm", values="median_minus_mean").__str__())
+            with pl.Config(tbl_rows=-1, tbl_cols=-1):
+                lines.append(str(table.pivot(on="site", index="arm", values="median_minus_mean")))
         lines += [
             "",
             f"## Tails ({sites_label} sites): coverage at q01, q05, q95, q99 by lead band",
@@ -317,9 +329,16 @@ def render_report(*, results: dict) -> list[str]:
         tails = pl.DataFrame(results[f"tails_{sites_label}"])
         if tails.height:
             wide = tails.pivot(on="level", index=["arm", "lead_band"], values="coverage")
-            lines.append(wide.__str__())
+            with pl.Config(tbl_rows=-1, tbl_cols=-1):
+                lines.append(str(wide))
+            errors = tails.with_columns(
+                error=100.0 * (pl.col("coverage") - pl.col("nominal"))
+            ).pivot(on="level", index=["arm", "lead_band"], values="error")
+            with pl.Config(tbl_rows=-1, tbl_cols=-1):
+                lines += ["", "Coverage minus nominal (percentage points):", str(errors)]
             pinball = tails.pivot(on="level", index=["arm", "lead_band"], values="pinball")
-            lines += ["", "Pinball loss at the same levels (points):", pinball.__str__()]
+            with pl.Config(tbl_rows=-1, tbl_cols=-1):
+                lines += ["", "Pinball loss at the same levels (points):", str(pinball)]
     return lines
 
 

@@ -437,7 +437,13 @@ def figure_correction() -> alt.TopLevelMixin:
             color=alt.Color(
                 "series:N",
                 scale=alt.Scale(
-                    range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY, ocf.DATA_PURPLE]
+                    domain=[
+                        "ensemble residuals, persistent level",
+                        "ensemble residuals, decaying transient",
+                        "ERA5 and CAMS residuals, persistent level",
+                        "ERA5 and CAMS residuals, decaying transient",
+                    ],
+                    range=[ocf.BRAND_ORANGE, ocf.DATA_PURPLE, ocf.DATA_BLUE, ocf.DATA_SKY],
                 ),
                 legend=alt.Legend(title=None, orient="top", columns=2, labelLimit=300),
             ),
