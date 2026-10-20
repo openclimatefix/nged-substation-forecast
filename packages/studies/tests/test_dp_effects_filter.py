@@ -8,7 +8,7 @@ decomposition of a fit into effects is checked on the synthetic substation of `c
 
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -886,7 +886,7 @@ def test_the_day_ahead_likelihood_matches_a_dense_filter_stepped_without_updates
 def test_with_each_cutoff_just_before_its_target_the_day_ahead_likelihood_is_the_one_step_one():
     residual, regressors, band, noise = _random_problem(seed=22)
     positions = np.flatnonzero(np.isfinite(residual))
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "residual": residual,
         "regressors": regressors,
         "band": band,
