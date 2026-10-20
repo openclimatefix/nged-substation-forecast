@@ -438,6 +438,23 @@ def _site_priors(*, model: PooledDemandModel, settings: VpSettings) -> torch.Ten
     slope = nn.functional.softplus(model.slope_raw)
     slope_mean = nn.functional.softplus(model.population_mean["slope_raw"])
     term = term + (_tie(values=slope, centre=slope_mean, scale=settings.slope) * both).sum()
+    return term + capacity_prior_term(model=model, settings=settings)
+
+
+def capacity_prior_term(*, model: PooledDemandModel, settings: VpSettings) -> torch.Tensor:
+    """Return the prior on the capacity increments of the objective, in nats.
+
+    Only increments that are coefficients of the fit count (`learned_increment_mask`), so a fully
+    pinned capacity contributes 0. Subtracting this term from `vp_objective` gives an objective
+    that a pinned-capacity fit and a free fit share.
+
+    Args:
+        model: The pooled model.
+        settings: The prior scales.
+
+    Returns:
+        A scalar.
+    """
     increment = nn.functional.softplus(model.capacity_raw)
     first, growth = model.capacity_masks()
     learned = learned_increment_mask(model=model).to(increment.dtype)
@@ -445,7 +462,7 @@ def _site_priors(*, model: PooledDemandModel, settings: VpSettings) -> torch.Ten
     growth_mean = nn.functional.softplus(model.population_mean["capacity_raw"])
     first_term = _tie(values=increment, centre=first_mean, scale=settings.first_increment)
     growth_term = _tie(values=increment, centre=growth_mean, scale=settings.growth_increment)
-    return term + (first_term * first * learned).sum() + (growth_term * growth * learned).sum()
+    return (first_term * first * learned).sum() + (growth_term * growth * learned).sum()
 
 
 def vp_loss_function(
