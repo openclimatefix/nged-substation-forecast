@@ -342,7 +342,7 @@ def figure_4_k_iii(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
 
 
 def figure_5_forecast_weeks() -> alt.TopLevelMixin:
-    """Measured power and B-gen's median, 80% band and 90% band in four fixed weeks per site."""
+    """Measured power and B-gen's median and bands in four calendar-rule weeks per site."""
     frame = report.load_side(
         label="scored", side=report.Side(arm="b_gen", filtered=True), drop_switching=False
     ).filter(pl.col("site_name").is_in(SITE_ORDER))
@@ -390,13 +390,14 @@ def figure_5_forecast_weeks() -> alt.TopLevelMixin:
         )
         .properties(
             title=_title(
-                text="Day-ahead forecasts and measured net power in four fixed weeks",
+                text="Day-ahead forecasts and measured net power in four calendar-rule weeks",
                 subtitle=(
                     "Net power as a percentage of each substation's effective capacity (negative "
                     "is export). Black: measured. Blue line: median of B-gen with the filter. "
                     "Darker band: 80% interval (q10 to q90). Lighter band: 90% interval (q05 to "
                     "q95). The weeks are the first full Monday-to-Sunday week of January, April, "
-                    "July, and October in the scored year, fixed before any score was read."
+                    "July, and October in the scored year, chosen by a calendar rule that does not "
+                    "depend on any score."
                 ),
             )
         )

@@ -37,11 +37,13 @@ verdict: inconclusive
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  The convex demand model could not yet represent the generation side of a Primary substation. Reading
-  the MVA meter as apparent power improved the forecast by 0.13 points of capacity, but fitted solar
-  capacity was not precise or consistent enough to be called identified, the unmetered generator node
-  reported a generator at every decision substation, and the export clip helped only at the one
-  substation known to clip. Keep capacity pinned and the node behind its switch.
+  The demand forecast could not yet account for generators connected behind a substation. Rooftop
+  solar capacity fitted from the data was not precise or consistent enough to trust, so the capacity
+  from outside estimates stays in use. A generator-finding component reported a generator at every
+  substation tested, so it stays switched off. A limit on exported solar helped only at the one
+  substation known to export-limit. Treating the meter as apparent power improved the forecast at
+  the 8 substations that report only apparent power by 0.13 points of capacity, but the test of the
+  meter's flow direction failed, so that gain is provisional.
 date: 2026-10-20
 pr: 1405
 lessons:
@@ -54,17 +56,18 @@ headline: >-
   Adding the node and the clip left the filtered MW forecast within 0.04 points (C1 passes), the MVA
   layer improved apparent-power forecasts by 0.13 points (5 of 8 substations), and no capacity arm
   was identified.
-best_arm: L0 for MVA substations (|S| score 0.13 points better than reading the meter as real power)
-advice:
+best_arm: L0 at MVA substations, provisional (0.13 points better than reading the meter as real
+power) advice:
   - >-
     Keep PV capacity pinned in the convex model; none of K-base, K-i, and K-ii was identified (the
     capacity rule), and K-iii failed the known-answer gate (gate tests 1 and 2).
   - >-
-    Use the MVA observation layer L0 at MVA substations, and keep the learned reactive power off
-    until it beats Q = 0 by 0.10 points (C2 and C3).
+Treat the MVA observation layer L0 as provisional: it scored 0.13 points better than reading the
+    meter as real power (C2), but gate test 3 failed, so the layer does not pass the decision rule.
+    Keep the learned reactive power off until it beats Q = 0 by 0.10 points (C3).
   - >-
     Leave the unmetered generator node and the export clip behind their switches; the node reads 12
-    to 35 points of generator at all five decision substations (node table).
+    to 35 points of generator at all five decision substations (figure 7 and the cards).
   - >-
     Test any new capacity arm with a mismatched-plant injection before reading its score (gate
     tests 1 and 2).
@@ -78,23 +81,25 @@ substation, and its fitted solar capacity is not identified.** The MVA meter lay
 power slightly better than reading the meter as real power (0.13 points of capacity, 5 of 8
 substations better). Capacity fitted from the data was not precise enough, or not close enough to
 the capacities known in real time, for any of the three tested arms to be called identified. The
-unmetered generator node reported a generator of 6 to 35 points at all five decision substations,
-and the export clip's ceiling sat below the grid top at the one substation where clipping is known.
-The verdict is `inconclusive`, and the pinned capacity stays in place for Part 6.
+unmetered generator node reported a generator of 12 to 35 points at all five decision substations (6
+to 35 at the replicate cut), and the export clip's ceiling sat below the grid top at the one
+substation where clipping is known. The verdict is `inconclusive`, and the pinned capacity stays in
+place for Part 6.
 
-**What this means for the forecast.** Adding the node and the clip did not harm the filtered MW
-forecast at the five decision substations (C1 passes: −0.04 points, 99% interval −0.08 to −0.003,
-both years). The node and the clip do harm the unfiltered forecast (+0.27 points in the scored year
-and +1.57 in the replicate year), because an unfiltered forecast cannot correct a wrong level. The
-only forecast gain from this part is the clip at the one substation known to clip: −0.21 points (95%
-interval −0.32 to −0.10) at that substation.
+**Adding the node and the clip left the filtered MW forecast unharmed and harmed the unfiltered
+one.** Adding the node and the clip did not harm the filtered MW forecast at the five decision
+substations (C1 passes: −0.04 points, 99% interval −0.08 to −0.003, both years). The node and the
+clip do harm the unfiltered forecast (+0.27 points in the scored year and +1.57 in the replicate
+year), because an unfiltered forecast cannot correct a wrong level. The only gain from the node and
+the clip is the clip at the one substation known to clip: −0.21 points (95% interval −0.32 to −0.10)
+at that substation.
 
-**Next step.** Keep capacity pinned. Use the MVA layer L0 for MVA substations (it is at least as
-good as the real-power reading), keep the learned reactive power out (C3 is −0.03, short of the
-−0.10 bar), and leave the node and the clip behind their switches. A follow-up on capacity should
-start from the finding that K-iii, the arm that closes the routes by which demand terms imitate
-solar, recovered only 0.72 of an injected farm's capacity in the gate, so closing those routes is
-not enough on its own.
+**Keep capacity pinned, treat L0 as provisional, and leave the node and the clip switched off.** Use
+the MVA layer L0 only as a provisional choice: it beats the real-power reading (C2), but gate test 3
+failed and the decision rule needs both. Keep the learned reactive power out (C3 is −0.03, short of
+the −0.10 bar). A follow-up on capacity should start from the finding that K-iii, the arm that
+closes the routes by which demand terms imitate solar, recovered only 0.72 of an injected farm's
+capacity in the gate, so closing those routes is not enough on its own.
 
 ## Checks
 
@@ -110,8 +115,8 @@ not enough on its own.
   capacity 0.72, against the bar of 0.75 to 1.25), which was settled before its score was read. Its
   better score (−0.08 points against K-base) therefore supports no claim about capacity.
 - **Test 3 limits what the page can say about flow direction at MVA substations.** Balanced accuracy
-  of the flow direction was at least 0.65, against a bar of 0.78. The recovered power factor (median
-  0.965 against the injected 0.97) and the capacity ratio (1.01 to 1.06) were close.
+  of the flow direction was as low as 0.65, against a bar of 0.78. The recovered power factor
+  (median 0.965 against the injected 0.97) and the capacity ratio (1.01 to 1.06) were close.
 - **Quantile score and the mean forecast's absolute error disagree in direction for C5** in the
   scored year (QS −0.02, error of the mean +0.21). Trigger 3 fires, and C5 carries no verdict.
 - **The median forecast equals the mean forecast** at every site and arm (difference 0.000 points),
@@ -121,12 +126,15 @@ not enough on its own.
   (+0.127) is left out. C1's effect comes from D5 alone (without D5 it is −0.001). Trigger 4 fires
   for both.
 - **Triggers that fire** (the seven audit triggers of the `ml-experiment` skill): trigger 1 (failed
-  controls: gate tests 3 and 5, the node switched on at every decision substation, and the
-  0.63-point dark-row gap between L0 and G-dark); trigger 2 (the unfiltered C1 of +0.27 and +1.57
-  against a prediction of within ±0.10; K-iii outside the capacity prediction); trigger 3 (C5);
-  trigger 4 (C5 and C1); trigger 5 (B-D1 beats B-gen unfiltered, 2.90 against 3.16 at the five
-  decision substations, although B-D1 is nested inside B-gen); trigger 7 (Part 6 and N9 take the
-  capacity and the layer choices from this page). Trigger 6 does not fire. The audit is planned.
+  controls: gate tests 1 and 2 for K-iii and K-ii+iii, gate tests 3 and 5, test 4 as pre-registered,
+  the node switched on at every decision substation, the 0.63-point dark-row gap between L0 and
+  G-dark, and the interval calibration gate for most arms); trigger 2 (the unfiltered C1 of +0.27
+  and +1.57 against a prediction of within ±0.10, and the clip multiplier at D5 of 1.10 against a
+  predicted 0.80 to 0.95); trigger 3 (C5); trigger 4 (C5 and C1); trigger 5 (B-D1 beats B-gen
+  unfiltered, 2.90 against 3.16 at the five decision substations, although B-D1 is nested inside
+  B-gen); trigger 7 (Part 6 and N9 take the capacity and the layer choices from this page). Trigger
+  6 was not checked: no interval width from Part 4 was compared with this page's. The audit is
+  planned.
 
 ## Findings
 
@@ -134,12 +142,12 @@ not enough on its own.
 was at most max(3 points, 10%) wide at D5 and D16 only, and its capacity lay within ±20% of the
 real-time vintage at D5, D10, D11, and D14 (D16 at 0.69). Both clauses were needed at 4 of 5
 substations. The label also needs gate tests 1 and 2, which K-base, K-i, and K-ii passed. K-i's
-covariance penalty raised every substation's capacity by 10 to 30% over K-base and cost 0.40 points
-of score (95% interval 0.29 to 0.51). K-ii was within 0.05 points of K-base. K-iii's capacity
-divided by K-base's had a 90% range that overlapped the band 0.65 to 0.87 at 5 of 5 substations at
-the replicate cut and 4 of 5 at the scored cut (D16, at 1.09, is outside), but K-iii is not an
-identified arm. Fitting capacity gave no score gain: K-base minus B was +0.02 in the scored year and
-−0.005 in the replicate year, so C4 did not run.
+covariance penalty raised every substation's capacity by 20 to 39% over K-base and worsened
+the score by 0.40 points (95% interval 0.29 to 0.51). K-ii was within 0.05 points of K-base. K-iii's
+capacity divided by K-base's had a 90% range that overlapped the band 0.65 to 0.87 at 5 of 5
+substations at the replicate cut and 4 of 5 at the scored cut (D16, at 1.09, is outside), but K-iii
+is not an identified arm. Fitting capacity gave no score gain: K-base minus B was +0.02 in the
+scored year and −0.005 in the replicate year, so C4 did not run.
 
 ![Fitted capacity at the scored cut for each capacity arm, with the vintage band](figure_03_capacity.svg)
 
@@ -180,9 +188,9 @@ B-clip minus B was −0.21 points in the scored year and −0.26 in the replicat
 it was −0.03 (−0.04 to −0.01; −0.043 to −0.007). The fitted multiplier at D5 was 1.10 (the plan
 predicted 0.80 to 0.95) and the ceiling share 0.65, below the grid top, so the clause "P_max stays
 at the grid top at every substation [Part 1](../00103-differentiable-physics-1-data-look/result.md)
-does not flag" fails at D16 (0.80). D5, which Part 1 does flag, also sits below the grid top. Gate
-test 5 passed at 0 of 4 substations for B-D1 and 2 of 4 for B, so the clip's level is not recovered
-from known answers.
+does not flag" fails at D16 (0.80 at both cuts) and, at the replicate cut, at D11 (0.90). D5, which
+Part 1 does flag, also sits below the grid top. Gate test 5 passed at 0 of 4 substations for B-D1
+and 2 of 4 for B, so the clip's level is not recovered from known answers.
 
 **Against the baselines (descriptive).** The filtered B scored 2.28 points of capacity (all five
 decision substations, scored year); climatology scored 1.79 more and the manual heuristic 1.21 more
@@ -197,9 +205,12 @@ interval −0.35 to −0.07).
 
 ![Tail calibration of the MW substation arms](figure_06_tails.svg)
 
-**Tails.** B-gen's filtered forecast covered 5.5% below q05 and 94.1% below q95 (nominal 5% and
-95%), and 1.6% below q01 and 98.3% below q99 (nominal 1% and 99%), within the plan's 3-point and
-1.5-point limits. Unfiltered, B-gen undercovered the upper tail (90.7% below q95, 96.5% below q99).
+**B-gen's filtered tails were within the limits in both years, and its unfiltered tails were not.**
+In the scored year, B-gen's filtered forecast covered 5.5% below q05 and 94.1% below q95 (nominal 5%
+and 95%), and 1.6% below q01 and 98.3% below q99 (nominal 1% and 99%), within the plan's 3-point and
+1.5-point limits. In the replicate year the filtered figures were 5.8%, 93.3%, 1.7%, and 97.8%, also
+within the limits. Unfiltered, B-gen undercovered the upper tail: 90.7% below q95 and 96.5% below
+q99 in the scored year, and 69.6% and 81.8% in the replicate year.
 
 ## Substation cards
 
@@ -224,11 +235,12 @@ card shows no heating slope, because no arm in this part isolates one.
 
 **Example forecasts.** The figure below shows B-gen's filtered day-ahead median with 80% and 90%
 bands against the measured series, for the first full Monday-to-Sunday week of January, April, July,
-and October in the scored year at each decision substation. The weeks were fixed by that rule before
-any score was read. No forecast panel is drawn for the capacity profiles, because a capacity has no
-time series, and none for the real generator case G-c, which has no forecast arm.
+and October in the scored year at each decision substation. The weeks were chosen by that calendar
+rule, which does not depend on any score. No forecast panel is drawn for the capacity profiles,
+because a capacity has no time series, and none for the real generator case G-c, which has no
+forecast arm.
 
-![Day-ahead forecasts against measured power in four fixed weeks at each decision substation](figure_05_forecast_weeks.svg)
+![Day-ahead forecasts and measured power in four weeks](figure_05_forecast_weeks.svg)
 
 ## Known-answer gate results
 
@@ -416,8 +428,8 @@ filter.**
 | 2024-07-01 to 2025-06-30 | 2024-07-01 | replicate, and the first capacity cut |
 | 2025-07-01 to 2026-06-30 | 2025-07-01 | scored: the verdict, and the second capacity cut |
 
-- **Sites.** MW: D5, D9, D10, D11, D14, D16, D18 (decision count over D5, D10, D11, D14, D16; D9
-  beside it; D18 descriptive). MVA: D2, D3, D4, D8, D12, D19, D21, D22.
+- **Sites.** MW: D5, D9, D10, D11, D14, D16 (decision count over D5, D10, D11, D14, D16; D9
+  beside it). MVA: D2, D3, D4, D8, D12, D19, D21, D22.
 - **Rows and windows.** As Part 4's A2 (all years, lockdown out, `default_rows == True`, 24-hour
   switching masks, none before 2022-03). `dp_mva_sunlit_v1` is the MVA rows with CAMS GHI of 1 W/m²
   or more under the same rules. Pinned capacity follows `dp_pinned_capacity` exactly, including
@@ -445,8 +457,8 @@ filter.**
 | K-iii | (iii) anomalies only | last two season-years |
 | K-ii+iii | (ii) and (iii) together (exploratory) | last two season-years |
 
-Each arm gets 20 month-block bootstrap weightings in the batched Gram matrix, at the cost of one
-fit.
+**The capacity bootstrap costs one batched solve per arm.** Each arm gets 20 month-block bootstrap
+weightings in the batched Gram matrix, at the cost of one fit.
 
 **The MVA layer (all three cuts):**
 
@@ -457,8 +469,9 @@ fit.
 | LQ | dark and sunlit | learned Q | tests the Q = 0 assumption |
 | G-dark | dark only | demand alone, Parts 2 to 4's rule | the no-solar reference |
 
-L0 and N differ only in reading |P| against P, so L0 minus N isolates the meter. L0 minus G-dark
-measures training a solar term on sunlit MVA rows, not the meter.
+**L0 minus N isolates the meter.** L0 and N differ only in reading |P| against P, so L0 minus N
+isolates the meter. L0 minus G-dark measures training a solar term on sunlit MVA rows, not the
+meter.
 
 **The generator node and the clip:**
 
@@ -529,7 +542,8 @@ be fixed inside the part, that component counts as failed, and the verdict follo
    clip at 3 or more of 4 sites.
 6. **Module tests 1 to 5** pass.
 
-Injected farms are metered generators, so only ratios appear in any output.
+**No output shows an injected farm's power.** Injected farms are metered generators, so only ratios
+appear in any output.
 
 ## The capacity rule (pre-registered; labels, not contrasts)
 
@@ -556,13 +570,13 @@ and a ratio near 1 or below 0.65 does not.
 
 ## Planned contrasts
 
-Five planned contrasts, Bonferroni-corrected (99% intervals from `studies.bootstrap`, resampling
-whole calendar months of stored predictions, paired across arms), at day D+1. Each is reported with
-site counts, every arm's absolute score, the mean-forecast error, the replicate year's estimate and
-count, the unfiltered contrast, and the robustness rows. **The margin is 0.10 points.** One year's
-screening interval is about ±0.4 points, so non-inferiority is decided on the point estimate, as in
-Part 3's screening ruling. The interval is reported, and an interval wholly above zero means
-`refuted`.
+**Five contrasts were pre-registered.** Five planned contrasts, Bonferroni-corrected (99% intervals
+from `studies.bootstrap`, resampling whole calendar months of stored predictions, paired across
+arms), at day D+1. Each is reported with site counts, every arm's absolute score, the mean-forecast
+error, the replicate year's estimate and count, the unfiltered contrast, and the robustness rows.
+**The margin is 0.10 points.** One year's screening interval is about ±0.4 points, so
+non-inferiority is decided on the point estimate, as in Part 3's screening ruling. The interval is
+reported, and an interval wholly above zero means `refuted`.
 
 - **C1, the generation side does not harm the MW forecast:** B-gen minus B-D1 at the MW decision
   sites. It passes if the point estimate is at most +0.10 in both years. The arms are nested and
@@ -584,13 +598,14 @@ interval). Each is reported descriptively, with no verdict word, wherever its in
 **Exploratory at 95%:** L0 minus G-dark (a solar term trained on sunlit MVA rows), with its dark-row
 part as a control that should be zero; each K arm minus B; K-ii+iii; per-site power factor and q0
 with bootstrap intervals; B-node minus B-D1 and B-clip minus B per site; and L0 minus X-mva.
-**Descriptive only:** D9; D18; coastal D5 and D9; bank holidays, the Christmas run, and days below
+**Descriptive only:** D9; coastal D5 and D9; bank holidays, the Christmas run, and days below
 0 °C; L0's MW against experiment 79's fit, which includes the scored months.
 
 ## Changes made before any scored fit
 
-These follow the module reviews and the script review, and the maintainer's wish for a quick look
-at the node. They change this plan's text above; the rest of the plan stands.
+**Five changes were made before any scored fit.** These follow the module reviews and the script
+review, and the maintainer's wish for a quick look at the node. They change this plan's text above;
+the rest of the plan stands.
 
 - **The node's blocks are 7 days long, a deliberate choice for a quick look.** A node fit takes 2
   to 10 seconds at 7-day blocks and 14 to 34 seconds at 3-day blocks. Outages of 14 days or more
@@ -618,8 +633,7 @@ at the node. They change this plan's text above; the rest of the plan stands.
   an interval that truly covers 80% about 84% of the time, and one that covers 60% or 95% about a
   quarter of the time. Months are drawn independently, so it cannot catch dependence between
   months. The point tolerances of the main gate stay as the pre-registered record. The substation
-cards
-  show heating slopes and capacities with intervals, and the line
+  cards show capacities with intervals, and the line
   "weakly identified at real noise levels (experiment 112); compare across substations with care".
 - **C4's arm** is chosen among K-base, K-i, and K-ii, because K-iii has no `identified` label, and
   C4 runs only if its arm is `identified`. `robust` does not require K-base, and handing fitted
@@ -630,7 +644,8 @@ cards
 
 ## Predictions
 
-Written before any fit. Each line can fail, and none overrides the decision rule.
+**Each prediction was written before any fit, and each can fail.** Written before any fit. Each line
+can fail, and none overrides the decision rule.
 
 - **K-base:** precise at 5 of 5 sites; within ±20% of the vintage at 3 or 4 (Part 2's convex
   capacity runs 4 to 21% below the vintage); `identified` at one cut or both.
