@@ -163,8 +163,10 @@ def figure_by_lead(*, data: dict) -> alt.TopLevelMixin:
                 scale=alt.Scale(zero=False),
             ),
             color=alt.Color(
-                "arm:N",
-                scale=alt.Scale(domain=domain, range=[ARM_COLOURS[a] for a in domain]),
+                "label:N",
+                scale=alt.Scale(
+                    domain=[ARM_LABELS[a] for a in domain], range=[ARM_COLOURS[a] for a in domain]
+                ),
                 legend=alt.Legend(
                     title=None, orient="top", columns=2, labelLimit=330, symbolType="stroke"
                 ),
@@ -204,8 +206,10 @@ def figure_by_site(*, data: dict) -> alt.TopLevelMixin:
             y=alt.Y("site_label:N", sort=list(common.DECISION_SITES), title=None),
             x=alt.X("qs:Q", title="Mean quantile score (points of capacity; smaller is better)"),
             color=alt.Color(
-                "arm:N",
-                scale=alt.Scale(domain=domain, range=[ARM_COLOURS[a] for a in domain]),
+                "label:N",
+                scale=alt.Scale(
+                    domain=[ARM_LABELS[a] for a in domain], range=[ARM_COLOURS[a] for a in domain]
+                ),
                 legend=alt.Legend(title=None, orient="top", columns=2, labelLimit=330),
             ),
         )
@@ -433,9 +437,112 @@ def figure_correction() -> alt.TopLevelMixin:
     )
 
 
+WEEK_ARMS: Final[tuple[str, ...]] = ("gamk", "gam_margin", "xnl", "bg2")
+SEASONS: Final[dict[str, tuple[int, ...]]] = {"winter": (11, 12, 1, 2), "summer": (6, 7, 8)}
+
+
+def _loaded_for_weeks() -> dict[str, pl.DataFrame]:
+    """Load the arms of the weeks figure on the rows they share, at the decision substations."""
+    import e00111_report as report
+    import e00111_score as score
+
+    loaded = report.load_all(periods={"scored"}, sites=common.DECISION_SITES)
+    present = {arm: loaded[arm] for arm in WEEK_ARMS if arm in loaded}
+    return score.common_rows(arms_by_name=present)
+
+
+def figure_weeks(*, season: str, shared: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
+    """Actual power and the arms' median forecasts for the week of largest swing in a season.
+
+    The week of each substation is the 7-day block of the scored year, inside the season's months,
+    in which the observed power ranges most between its lowest and highest half-hour.
+    """
+    cache = common.load_cache()
+    label_of = {cache.sites[s].table.time_series_id: s for s in common.DECISION_SITES}
+    rows = []
+    for site_id, site in label_of.items():
+        reference = shared["gamk"].filter(pl.col("time_series_id") == site_id)
+        daily = (
+            reference.filter(pl.col("valid_time").dt.month().is_in(list(SEASONS[season])))
+            .with_columns(week=pl.col("valid_time").dt.truncate("1w"))
+            .group_by("week")
+            .agg(swing=pl.col("actual").max() - pl.col("actual").min(), n=pl.len())
+            .filter(pl.col("n") > 300)
+            .sort("swing", descending=True)
+        )
+        week = daily["week"][0]
+        for arm, frame in shared.items():
+            part = frame.filter(
+                (pl.col("time_series_id") == site_id)
+                & (pl.col("valid_time") >= week)
+                & (pl.col("valid_time") < week + pl.duration(days=7))
+            )
+            for panel, (low, high) in (
+                ("1 day ahead", (15.0, 39.0)),
+                ("6 days ahead", (111.0, 135.0)),
+            ):
+                chosen = part.filter((pl.col("lead_hours") > low) & (pl.col("lead_hours") <= high))
+                rows += [
+                    {
+                        "site": site,
+                        "panel": panel,
+                        "time": r["valid_time"],
+                        "series": ARM_LABELS[arm],
+                        "power": r["q50"],
+                    }
+                    for r in chosen.select("valid_time", "q50").iter_rows(named=True)
+                ]
+                if arm == "gamk":
+                    rows += [
+                        {
+                            "site": site,
+                            "panel": panel,
+                            "time": r["valid_time"],
+                            "series": "Observed power",
+                            "power": r["actual"],
+                        }
+                        for r in chosen.select("valid_time", "actual").iter_rows(named=True)
+                    ]
+    table = pl.DataFrame(rows)
+    domain = ["Observed power", *[ARM_LABELS[a] for a in WEEK_ARMS if a in shared]]
+    colours = [DARK, *[ARM_COLOURS[a] for a in WEEK_ARMS if a in shared]]
+    colours[1:] = [c if c != DARK else GREY for c in colours[1:]]
+    chart = (
+        alt.Chart(table)  # ty: ignore[unresolved-attribute]
+        .mark_line(strokeWidth=1.3)
+        .encode(
+            x=alt.X("time:T", title=None, axis=alt.Axis(format="%d %b", tickCount=7)),
+            y=alt.Y("power:Q", title="Power (% of capacity)", scale=alt.Scale(zero=False)),
+            color=alt.Color(
+                "series:N",
+                scale=alt.Scale(domain=domain, range=colours),
+                legend=alt.Legend(title=None, orient="top", columns=2, labelLimit=330),
+            ),
+        )
+        .properties(width=250, height=70)
+    )
+    return chart.facet(
+        row=alt.Row("site:N", sort=list(common.DECISION_SITES), title=None),
+        column=alt.Column("panel:N", sort=["1 day ahead", "6 days ahead"], title=None),
+    ).properties(
+        title=_title(
+            text=f"A {season} week at each decision substation: observed power and four forecasts",
+            subtitle=(
+                "Median forecast made one day ahead (left) and six days ahead (right) of each "
+                "half-hour, against the observed power. Each substation's week is the 7-day block "
+                f"of the scored year in the {season} months with the largest swing in "
+                "observed power."
+            ),
+        )
+    )
+
+
 def main() -> None:
     """Draw every figure."""
     data = results()
+    shared = _loaded_for_weeks()
+    _save(figure_weeks(season="winter", shared=shared), name="figure_01a_winter_week")
+    _save(figure_weeks(season="summer", shared=shared), name="figure_01b_summer_week")
     _save(figure_headline(data=data), name="figure_02_headline")
     _save(figure_by_lead(data=data), name="figure_03_by_lead")
     _save(figure_by_site(data=data), name="figure_04_by_site")

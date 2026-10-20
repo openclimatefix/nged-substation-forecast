@@ -109,6 +109,15 @@ def summarise(
             reference=pair[1],
             level=95.0,
         )
+    out["leave_one_site_out"] = {}
+    cache = common.load_cache()
+    for site in common.DECISION_SITES:
+        series = cache.sites[site].table.time_series_id
+        part = losses.filter(pl.col("site") != series)
+        if part.filter(pl.col("arm") == pair[0]).height and part.height < losses.height:
+            out["leave_one_site_out"][site] = score.contrast(
+                losses=part, treatment=pair[0], reference=pair[1], level=95.0
+            )
     month = losses["month"].str.slice(5, 2).cast(pl.Int32)
     for label, keep in (
         ("November to March", month.is_in(list(WINTER_MONTHS))),
