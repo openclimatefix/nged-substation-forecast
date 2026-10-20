@@ -13,6 +13,7 @@ from typing import Final
 
 import e00111_common as common
 import e00111_score as score
+import numpy as np
 import polars as pl
 
 SCREENING: Final[dict[str, tuple[str, str]]] = {
@@ -121,6 +122,65 @@ def summarise(
     return out
 
 
+TAIL_LEVELS: Final[tuple[str, ...]] = ("q01", "q05", "q95", "q99")
+TAIL_PROBABILITY: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
+
+
+def tail_table(*, loaded: dict[str, pl.DataFrame]) -> list[dict]:
+    """Return coverage and pinball loss at the four tail levels, per arm and lead band.
+
+    Coverage is the share of rows whose observed power lies at or below the level's quantile; the
+    nominal value is the level itself. The pinball loss is in points of effective capacity.
+    """
+    rows = []
+    for arm, frame in loaded.items():
+        for band in score.LEAD_BANDS[:4]:
+            part = score.lead_filter(frame=frame, band=band)
+            if part.height == 0:
+                continue
+            actual = part["actual"].to_numpy().astype(np.float64)
+            for level in TAIL_LEVELS:
+                quantile = part[level].to_numpy().astype(np.float64)
+                tau = TAIL_PROBABILITY[level]
+                error = actual - quantile
+                rows.append(
+                    {
+                        "arm": arm,
+                        "lead_band": band[0],
+                        "level": level,
+                        "nominal": tau,
+                        "coverage": float(np.mean(actual <= quantile)),
+                        "pinball": float(np.mean(np.maximum(tau * error, (tau - 1.0) * error))),
+                    }
+                )
+    return rows
+
+
+def median_minus_mean(*, loaded: dict[str, pl.DataFrame], sites: tuple[str, ...]) -> list[dict]:
+    """Return, per DP arm and site, the mean of (median forecast minus mean forecast), in points."""
+    rows = []
+    for arm in DP_ARMS:
+        if arm not in loaded:
+            continue
+        pieces = []
+        for period in ("scored",):
+            for site in sites:
+                path = score.dp_run.out_path(arm=arm, period=period, site=site)
+                if path.exists():
+                    pieces.append(
+                        pl.read_parquet(path)
+                        .filter(~pl.col("switching_mask"))
+                        .select(site=pl.lit(site), gap=pl.col("q50") - pl.col("mean"))
+                    )
+        if pieces:
+            table = pl.concat(pieces).group_by("site").agg(pl.col("gap").mean()).sort("site")
+            rows += [
+                {"arm": arm, "site": r["site"], "median_minus_mean": r["gap"]}
+                for r in table.iter_rows(named=True)
+            ]
+    return rows
+
+
 def main() -> None:
     """Score and write the report."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -134,6 +194,8 @@ def main() -> None:
     ):
         loaded = load_all(periods=periods, sites=sites)
         results[f"arms_{sites_label}"] = sorted(loaded)
+        results[f"tails_{sites_label}"] = tail_table(loaded=loaded)
+        results[f"median_minus_mean_{sites_label}"] = median_minus_mean(loaded=loaded, sites=sites)
         for name, pair in SCREENING.items():
             summary = summarise(name=name, pair=pair, loaded=loaded, level=score.BONFERRONI_LEVEL)
             if summary is None:

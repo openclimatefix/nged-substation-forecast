@@ -233,7 +233,7 @@ def common_rows(*, arms_by_name: dict[str, pl.DataFrame]) -> dict[str, pl.DataFr
         current = frame.select(keys).unique()
         shared = current if shared is None else shared.join(current, on=keys, how="inner")
     assert shared is not None
-    schema = {
+    schema: dict[str, pl.DataType | type[pl.DataType]] = {
         "time_series_id": pl.Int32,
         "lead_hours": pl.Float64,
         "seed": pl.Int8,
@@ -241,7 +241,9 @@ def common_rows(*, arms_by_name: dict[str, pl.DataFrame]) -> dict[str, pl.DataFr
         **dict.fromkeys(LEVEL_COLUMNS, pl.Float32),
     }
     return {
-        name: frame.join(shared, on=keys, how="inner").sort(keys).cast(schema)
+        name: frame.join(shared, on=keys, how="inner")
+        .sort(keys)
+        .with_columns(pl.col(column).cast(dtype) for column, dtype in schema.items())
         for name, frame in arms_by_name.items()
     }
 
