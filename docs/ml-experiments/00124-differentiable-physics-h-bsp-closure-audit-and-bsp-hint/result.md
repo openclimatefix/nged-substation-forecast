@@ -28,18 +28,21 @@ production_status: not-for-production
 take_home_message: >-
   The bulk supply point reading halved the damage from injected scale errors (41% over all
   injected errors), but it made clean forecasts at least 2.3 points of capacity worse at every
-  weight above zero, about 100 times the 0.023-point limit on that worsening, in all three years
-  tested, so the tuning rule chooses no hint. The cause is untested and a coding fault is not
-  excluded, because the known-answer gate was not run; the closure audit fits the generation
-  factor at 0.85 where the joint fit fixes it at 1. As a monitor the reading is weak: at the tuning
-  cut a 25% scale error lasting 30 days is seen in 0% of cases when the fit includes the injected
-  series, and in 50% when the fit is trained only on earlier rows, which then raises a false alarm
-  on 61% of windows in the year after the cut.
+  weight above zero, about 100 times the 0.023-point limit, in all three years tested. A synthetic
+  system that closes exactly, with the Primaries' own noise in the BSP reading, loses clean
+  accuracy the same way (0.05 points at weight 0.0003, 6 points at 0.1), so the loss is built into
+  adding a BSP term to the Primaries' fit and is not mainly a wrong multiplier. As a monitor the
+  reading is weak: at the tuning cut a 25% scale error lasting 30 days is seen in 0% of cases when
+  the fit includes the injected series, and in 50% when the fit is trained only on earlier rows,
+  which then raises a false alarm on 61% of windows in the year after the cut.
 advice:
   - >-
-    Fit the closure multipliers of a bulk supply point (Primaries, MVA Primaries, generation)
-    before fixing them in a joint fit, because the audit gave 0.85 to 1.16 and not 1 (closure
-    audit, Figure 2).
+    Do not add a bulk supply point term to the Primaries' loss: even an exactly specified synthetic
+    system lost clean accuracy at every weight from 0.0003 up, because the reading carries the
+    Primaries' own autocorrelated noise (Figure 3).
+  - >-
+    Set the scale of a bulk supply point row from its residual against the Primaries' fitted values
+    and not their readings, which was 2.9 MW and not 1.2 MW here (arm B).
   - >-
     Check the rise in clean-forecast error from a hint at the smallest weight before tuning
     anything else; a weight of 0.1 already raised it by 2.4 points here (Figure 1).
@@ -93,10 +96,12 @@ equation fixed at 1.
   pass because the chosen weight is 0; we read the tuning rule's "C2 cannot pass" together with the
   rise at weight 30 (the arm W-max), which is above the margin in all three years, as `not
   supported`.
-- **The cause is untested.** The closure audit fits the generation multiplier at 0.85 at the tuning
-  cut (the Primaries' multiplier is 1.01 there and 1.16 at the scored cut), where the joint fit
-  fixes both at 1 (Figure 2). A coding fault, a remainder that is too rigid, and the unmetered
-  Primaries are not excluded, because the known-answer gate was not run.
+- **The loss is built into the design.** A synthetic system built exactly from the model's form,
+  with the audit's multipliers and the Primaries' own noise in the BSP reading, loses clean accuracy
+  at every weight we tried: a median 0.05 points at weight 0.0003 and 6.0 points at 0.1 (Figure 3).
+  The reading carries the sum of the Primaries' noise, which the fit then tries to explain. The
+  closure audit's multipliers (0.85 to 1.16, Figure 2) are not the main cause. Arm B found the first
+  fit's BSP-row scale too small (see the arm B section), which made its weights act 5 times larger.
 - **The BSP reading is a weak monitor.** At the tuning cut a 30-day 25% scale error is found in 0%
   of injections when the fit includes the injected series and in 50% when the fit is trained only
   on earlier rows (2% and 29% at the replicate cut). The fit trained only on earlier rows raises a
@@ -144,102 +149,11 @@ too little generator history, so its power sits in the remainder: 11 points in-s
 
 ## Lessons
 
-- **The hint as built was far over the limit on this BSP.** The audit's generation multiplier is
-  0.85 at the tuning cut and the Primaries' multiplier reaches 1.16 at the scored cut. Whether
-  fitted multipliers would remove the extra error is untested.
-- **One possible next experiment.** Fix the multipliers at the audit fit made before each cut and
-  repeat the weight tuning against the same 0.023-point limit. Whether to run it is the
-  maintainer's decision.
-
-## Follow-on arm B (planned): the audit-calibrated hint
-
-**This section is the plan for a second arm of the same experiment, written before any fit of
-arm B.** The first joint fit above stays as written and keeps its first-run numbers. Arm B asks
-whether the same hint stops hurting clean forecasts once its multipliers are fixed at the closure
-audit's fit. A Sonnet review of this plan found 14 issues; all are applied except where noted in
-"Review triage" below. Because the decision rule gains a minimum damage reduction that the first
-fit's rule did not have, that addition is labelled post hoc.
-
-**Hypothesis.** A BSP hint whose multipliers on the MW Primaries, the MVA Primaries, and the
-generation are fixed at the closure audit's fit raises the clean forecast error of the MW Primaries
-by no more than 0.023 points at some weight above 0, and at that weight it removes at least 30% of
-the summed damage from injected errors.
-
-**Prediction (can fail).** We put the chance that some weight meets both conditions at about 10%.
-The module's test `test_fixed_closure_coefficients_are_recovered_and_change_the_fit` finds that a
-constant multiplier error is mostly absorbed by the remainder's level, and a throwaway run with
-only the MW Primaries in the fit still raised clean error by 2.5 to 3.5 points at weight 0.1, so
-the multipliers are probably not the cause.
-
-**Design, with the leakage rules.**
-
-- **Which BSP and cut.** The pilot BSP (the one the audit closes, with a generation multiplier of
-  0.85 at the tuning cut), at the tuning cut 2023-07-01 and its tuning year. The first BSP has too
-  little complete history there ("cannot tell") and is not used.
-- **Which values are fixed.** Only the three multipliers of the audit's fit at the tuning cut: the
-  Primaries' (1.01), the MVA Primaries' (1.03), and the generation's (0.85). The unmetered solar
-  capacity, the heating slope, the level, and the steps stay free parameters of the joint fit's
-  remainder. The audit's regression uses the observed series and the joint fit's remainder has the
-  same terms, so the multipliers carry over; the audit's L1 step penalty differs in form and is not
-  carried over.
-- **Frozen file.** The multipliers are written to one file before arm B runs and read from it, so
-  no later run can change them. They come from rows before the cut only: the audit's step penalty
-  is chosen by its own 4-fold block cross-validation on those rows, the fit sees the observed
-  Primary series and never an injected one (the tuning-year injections lie after the cut and enter
-  only the joint fit's Primary readings), and none of the audit's after-the-cut diagnostics sets
-  anything.
-- **Weights.** {0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1}, because the first grid's 0.1
-  already cost 2.4 points and a cost linear in the weight would still be about 0.07 at 0.003.
-- **Injections and score.** The same 200 injections (10 seeds per cell and Primary, same seeds), the
-  same frozen-fit mean absolute error in points of effective capacity, and the same 0.023-point
-  limit as the first joint fit. Units are points of effective capacity throughout, and the BSP row
-  converts them to MW once, through each Primary's effective capacity.
-
-**Plumbing check first, blocking.** Twenty synthetic systems at the tuning cut are built as the
-known-answer gate builds them: the Primaries' truth is their separate fits plus autocorrelated
-noise, the remainder's truth is the real joint fit's remainder, and the BSP is built exactly from
-these with the audit's multipliers. At weight 0.1 the clean error rise must be under 0.023 points,
-which excludes a coding fault of the kind the first fit's missing gate left open. A paired negative
-control uses the same systems with the fit's multipliers deliberately 15% wrong: it must cost more
-than the exact fit, otherwise the check cannot show that it detects a fault, and arm B's conclusion
-carries that caveat. If the exact check fails, arm B stops as `inconclusive` until the fault is
-found; the first run is kept and the fix is labelled post hoc.
-
-**Decision rule, fixed now.** A weight passes if all of these hold: the clean error rise at the
-weight has a 95% month-resampled interval whose upper end is at most 0.023 points (the clean score
-is deterministic, so its noise is the month-to-month swing); the clean rise in the winter months
-(November to March), judged with the audit's cold-snap threshold, is also at most 0.023 points, so a
-winter loss holds the arm back even if the annual mean passes; and the summed damage over the 200
-injections is at least 30% below weight 0's, with a 95% bootstrap interval over injections whose
-lower end is above 0. The chosen weight is the passing weight with the largest damage reduction.
-
-- **If a weight passes,** the replicate and scored years and the gate run for it under the first
-  plan's rules. A failed gate reading caps the verdict at `inconclusive`; every change after seeing
-  the module or a result is labelled post hoc; and a gate reading must be able to fail.
-- **If no weight passes,** arm B stops at `not supported`, including when the clean error rise at
-  0.0003 is still above 0.023 points: we then conclude that a BSP term added to the Primaries'
-  loss costs clean accuracy at every weight tried, fixed multipliers or not. The BSP reading is
-  recorded as a weak monitor (the first run's 50% detection and 61% false alarms in the year after
-  the cut), not as a recommendation.
-
-**Reports.** Figure A plots the damage reduction (percent of weight 0's summed damage, with its
-bootstrap interval over injections) against the clean error rise (points, with its month-resampled
-interval), one point per weight, on a logarithmic weight axis, with the 30% and 0.023 limits as
-reference lines. A table gives the winter breakdown (November to March, with the number of winters
-and cold-snap days; fewer than three cold-snap days is "cannot tell"). Figure B repeats the audit's
-multipliers with their 80% intervals from resampling whole calendar months, per BSP by position,
-and no count of a BSP's series is shown.
-
-**Compute.** One GPU job at a time, under 8 GB of host memory (the first run used 1.7 GB) and about
-6 GB of GPU memory. The tuning grid is 200 injections at about 17 seconds for a batch of 8 weights
-(the first run took 35 minutes for 200 injections with 7 weights), so about an hour; the plumbing
-check is 20 systems with 3 solves each, about 20 minutes. If a weight passes, each of the two later
-cuts is 200 injections with 3 weights and an oracle fit, about 40 minutes each, and the gate is 100
-systems with 3 solves at about 15 seconds, about 80 minutes: about 3 hours more.
-
-**Review triage.** Applied: all 14 findings. Finding 12 (a probability) is stated as about 10%.
-Finding 7's per-BSP count rule also changes the page's audit paragraph, which no longer says how
-much of the other BSP's generation is missing. No finding was rejected.
+- **The hint as built was far over the limit, and so was an exactly specified synthetic system.**
+  The cost does not depend mainly on the closure multipliers.
+- **One possible next experiment.** Keep the BSP reading out of the Primaries' loss and use its
+  residual against the Primaries' fitted values as a monitoring signal, scored for detection and
+  false alarms in the year after the cut. Whether to run it is the maintainer's decision.
 
 ## The plan as committed, with its clarifications
 

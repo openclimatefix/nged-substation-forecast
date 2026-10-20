@@ -33,11 +33,20 @@ MAX_WEIGHT: Final[float] = 30.0
 DEVICE: Final[str] = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-def _setup(*, cut_name: str) -> tuple[FeatureCache, Pilot, JointAssembly, datetime]:
+def setup(
+    *, cut_name: str, multipliers: dict[str, float] | None = None, sigma_b_from: str = "observed"
+) -> tuple[FeatureCache, Pilot, JointAssembly, datetime]:
+    """Build the pilot and its assembly at a cut, with optional fixed closure multipliers."""
     cache = load_cache()
     bsps = load_bsps(cache=cache)
     cut = CUTS[cut_name]
-    pilot = build_pilot(cache=cache, bsps=bsps, cut=cut)
+    pilot = build_pilot(
+        cache=cache,
+        bsps=bsps,
+        cut=cut,
+        multipliers=multipliers,
+        sigma_b_from=sigma_b_from,
+    )
     assembly = assemble_joint(
         cache=cache,
         specs=pilot.specs,
@@ -52,7 +61,7 @@ def _setup(*, cut_name: str) -> tuple[FeatureCache, Pilot, JointAssembly, dateti
     return cache, pilot, assembly, cut
 
 
-def _inject_all(
+def inject_all(
     *,
     cache: FeatureCache,
     pilot: Pilot,
@@ -113,7 +122,7 @@ def _inject_all(
 def tune() -> None:
     """Choose W* on the tuning year's injections and write it with the clean costs."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
-    cache, pilot, assembly, cut = _setup(cut_name="tuning")
+    cache, pilot, assembly, cut = setup(cut_name="tuning")
     clean = solve_joint(assembly=assembly, weights=WEIGHT_GRID)
     scores = {
         s: score_rows(cache=cache, assembly=assembly, fit=clean, site=s, cut=cut)
@@ -122,7 +131,7 @@ def tune() -> None:
     clean_mae = {s: mae(score=scores[s], fit=clean, site=s) for s in pilot.mw_sites}
     path = WORK_DIR / "tuning_injections.jsonl"
     with path.open("w") as out:
-        _inject_all(
+        inject_all(
             cache=cache,
             pilot=pilot,
             assembly=assembly,
@@ -158,7 +167,7 @@ def score(*, cut_name: str) -> None:
     """Fit at a cut and run the C1 and C2 injections for weight 0, W*, and 30."""
     w_star = json.loads((WORK_DIR / "tuning.json").read_text())["w_star"]
     weights = [0.0, w_star, MAX_WEIGHT]
-    cache, pilot, assembly, cut = _setup(cut_name=cut_name)
+    cache, pilot, assembly, cut = setup(cut_name=cut_name)
     clean = solve_joint(assembly=assembly, weights=weights)
     scores = {
         s: score_rows(cache=cache, assembly=assembly, fit=clean, site=s, cut=cut)
@@ -174,7 +183,7 @@ def score(*, cut_name: str) -> None:
     }
     (WORK_DIR / f"clean_{cut_name}.json").write_text(json.dumps(summary, indent=2))
     with (WORK_DIR / f"injections_{cut_name}.jsonl").open("w") as out:
-        _inject_all(
+        inject_all(
             cache=cache,
             pilot=pilot,
             assembly=assembly,
@@ -190,7 +199,7 @@ def score(*, cut_name: str) -> None:
 
 def clean_grid(*, cut_name: str) -> None:
     """Fit at a cut for the whole weight grid and score the clean year, with no injections."""
-    cache, pilot, assembly, cut = _setup(cut_name=cut_name)
+    cache, pilot, assembly, cut = setup(cut_name=cut_name)
     fit = solve_joint(assembly=assembly, weights=WEIGHT_GRID)
     scores = {
         s: score_rows(cache=cache, assembly=assembly, fit=fit, site=s, cut=cut)

@@ -6,16 +6,18 @@ sit beneath it, which generation series it has) is read at run time and never pr
 """
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Final
 
 import numpy as np
 from e00124_audit import (
     MIN_SERIES_COVERAGE,
+    Design,
     build_design,
     robust_scale,
     select_series,
+    tune_step_penalty,
     usable_rows,
 )
 from e00124_audit import fit as audit_fit
@@ -97,32 +99,11 @@ def _sigma(
     return float(store[key])
 
 
-def build_pilot(*, cache: FeatureCache, bsps: list[BspSeries], cut: datetime) -> Pilot:
-    """Build the pilot's inputs at `cut` from the audit's series.
-
-    Args:
-        cache: The feature cache.
-        bsps: The audit's BSP series, from `load_bsps`.
-        cut: The cut.
-
-    Returns:
-        The pilot, whose members are the MW and MVA Primaries and whose generators are the
-        generation series with enough history before the cut.
-    """
-    series = bsps[PILOT_BSP]
+def closure_inputs(
+    *, cache: FeatureCache, series: BspSeries, cut: datetime
+) -> tuple[Design, np.ndarray]:
+    """Return the closure audit's design and its training rows at `cut` (rows before the cut)."""
     cut64 = to_64(moment=cut)
-    mw = _covered(series=series.mw_list, reading=series.reading, cache=cache, cut=cut64)
-    mva = _covered(series=series.mva_list, reading=series.reading, cache=cache, cut=cut64)
-    gen = _covered(series=series.generator_list, reading=series.reading, cache=cache, cut=cut64)
-    members = tuple(BspMember(site=series.mw_labels[i], kind="mw") for i in mw) + tuple(
-        BspMember(site=series.mva_labels[i], kind="mva_dark") for i in mva
-    )
-    specs = {m.site: SPEC for m in members}
-    windows = {m.site: FULL_WINDOW if m.kind == "mw" else DARK_WINDOW for m in members}
-    sigma_points = {
-        m.site: _sigma(cache=cache, site=m.site, spec=SPEC, window=windows[m.site], cut=cut)
-        for m in members
-    }
     sums = select_series(cache=cache, bsp=series, cut=cut64)
     first_day = float(
         cache.end_times[np.flatnonzero(np.isfinite(series.reading) & (cache.end_times <= cut64))[0]]
@@ -138,6 +119,136 @@ def build_pilot(*, cache: FeatureCache, bsps: list[BspSeries], cut: datetime) ->
         first_day=first_day,
     )
     index = usable_rows(cache=cache, bsp=series, design=design, cut=cut64)
+    return design, index
+
+
+def closure_multipliers(
+    *, cache: FeatureCache, bsps: list[BspSeries], cut: datetime
+) -> dict[str, float]:
+    """Fit the closure audit at `cut` on rows before it and return its three multipliers.
+
+    The step penalty is the audit's own choice by 4-fold block cross-validation on those rows.
+    """
+    series = bsps[PILOT_BSP]
+    design, index = closure_inputs(cache=cache, series=series, cut=cut)
+    x, y = design.matrix[index], series.reading[index]
+    penalty = tune_step_penalty(x=x, y=y, design=design)
+    theta = audit_fit(x=x, y=y, design=design, step_penalty=penalty)
+    return {
+        "a_P": float(theta[0]),
+        "a_G": float(-theta[1]),
+        "c": float(theta[2]),
+        "penalty": penalty,
+    }
+
+
+def _fitted_sigma_b(
+    *,
+    cache: FeatureCache,
+    series: BspSeries,
+    members: tuple[BspMember, ...],
+    specs: dict[str, GamSpec],
+    windows: dict[str, TrainingWindow],
+    cut: datetime,
+    gen: list[int],
+) -> float:
+    """Return the BSP row's residual scale when the Primaries enter as their fitted values.
+
+    The closure regression is run with each Primary's separate fit in place of its readings, so the
+    residual includes the Primaries' own unmodelled variation, which the joint fit's BSP row also
+    carries. Cached on disk with the sigma of each Primary.
+    """
+    path = WORK_DIR / "sigma_points.json"
+    store = json.loads(path.read_text()) if path.exists() else {}
+    key = f"bsp-fitted|{cut.date()}|{[m.site for m in members]}"
+    if key in store:
+        return float(store[key])
+    _design, index = closure_inputs(cache=cache, series=series, cut=cut)
+    n = len(cache.end_times)
+    totals = {"mw": np.zeros(n), "mva_dark": np.zeros(n)}
+    for m in members:
+        fit = fit_gam(
+            cache=cache,
+            site=m.site,
+            specs=[specs[m.site]],
+            cut=cut,
+            window=windows[m.site],
+            season_years=SEASON_YEARS,
+        )
+        columns = None
+        if m.kind == "mva_dark":
+            columns = np.ones(fit.layout.n_columns, dtype=bool)
+            columns[fit.layout.slices["capacity"]] = False
+        rows = index
+        predicted = predict_gam(cache=cache, fit=fit, index=rows, columns=columns)
+        totals[m.kind][rows] += cache.sites[m.site].table.effective_capacity_mw * predicted
+    sums = select_series(cache=cache, bsp=series, cut=to_64(moment=cut))
+    fitted_sums = replace(sums, primaries_mw=totals["mw"], primaries_mva=totals["mva_dark"])
+    fitted_design = build_design(
+        cache=cache,
+        bsp=series,
+        sums=fitted_sums,
+        cut_day=float(to_64(moment=cut).astype("datetime64[s]").astype(np.int64) / 86400.0),
+        first_day=float(
+            cache.end_times[index[0]].astype("datetime64[s]").astype(np.int64) / 86400.0
+        ),
+    )
+    theta = audit_fit(
+        x=fitted_design.matrix[index],
+        y=series.reading[index],
+        design=fitted_design,
+        step_penalty=CLOSURE_STEP_PENALTY,
+    )
+    scale = robust_scale(values=series.reading[index] - fitted_design.matrix[index] @ theta)
+    store[key] = scale
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(store))
+    temporary.replace(path)
+    return scale
+
+
+def build_pilot(
+    *,
+    cache: FeatureCache,
+    bsps: list[BspSeries],
+    cut: datetime,
+    multipliers: dict[str, float] | None = None,
+    sigma_b_from: str = "observed",
+) -> Pilot:
+    """Build the pilot's inputs at `cut` from the audit's series.
+
+    Args:
+        cache: The feature cache.
+        bsps: The audit's BSP series, from `load_bsps`.
+        cut: The cut.
+        multipliers: Fixed closure multipliers `a_P`, `a_G`, and `c`, or `None` for 1 each.
+        sigma_b_from: `observed` takes the BSP row's scale from the closure regression on the
+            Primaries' observed readings (the first joint fit); `fitted` takes it from the same
+            regression on the Primaries' fitted values, which is the residual the joint fit's
+            BSP row actually has (arm B, after the first plumbing check failed).
+
+    Returns:
+        The pilot, whose members are the MW and MVA Primaries and whose generators are the
+        generation series with enough history before the cut.
+    """
+    series = bsps[PILOT_BSP]
+    cut64 = to_64(moment=cut)
+    mw = _covered(series=series.mw_list, reading=series.reading, cache=cache, cut=cut64)
+    mva = _covered(series=series.mva_list, reading=series.reading, cache=cache, cut=cut64)
+    gen = _covered(series=series.generator_list, reading=series.reading, cache=cache, cut=cut64)
+    fixed = multipliers or {"a_P": 1.0, "a_G": 1.0, "c": 1.0}
+    members = tuple(
+        BspMember(site=series.mw_labels[i], kind="mw", coefficient=fixed["a_P"]) for i in mw
+    ) + tuple(
+        BspMember(site=series.mva_labels[i], kind="mva_dark", coefficient=fixed["c"]) for i in mva
+    )
+    specs = {m.site: SPEC for m in members}
+    windows = {m.site: FULL_WINDOW if m.kind == "mw" else DARK_WINDOW for m in members}
+    sigma_points = {
+        m.site: _sigma(cache=cache, site=m.site, spec=SPEC, window=windows[m.site], cut=cut)
+        for m in members
+    }
+    design, index = closure_inputs(cache=cache, series=series, cut=cut)
     theta = audit_fit(
         x=design.matrix[index],
         y=series.reading[index],
@@ -145,6 +256,16 @@ def build_pilot(*, cache: FeatureCache, bsps: list[BspSeries], cut: datetime) ->
         step_penalty=CLOSURE_STEP_PENALTY,
     )
     sigma_b = robust_scale(values=series.reading[index] - design.matrix[index] @ theta)
+    if sigma_b_from == "fitted":
+        sigma_b = _fitted_sigma_b(
+            cache=cache,
+            series=series,
+            members=members,
+            specs=specs,
+            windows=windows,
+            cut=cut,
+            gen=gen,
+        )
     bsp = HierarchyBsp(
         name="pilot",
         members=members,
@@ -155,6 +276,7 @@ def build_pilot(*, cache: FeatureCache, bsps: list[BspSeries], cut: datetime) ->
         temperature_c=series.temperature_c,
         pv_shape=np.nanmean(np.stack([cache.sites[m.site].pv_unit_shape for m in members]), axis=0),
         sigma_mw=sigma_b,
+        generator_coefficient=fixed["a_G"],
     )
     return Pilot(
         cache=cache, bsp=bsp, specs=specs, windows=windows, sigma_points=sigma_points, cut=cut

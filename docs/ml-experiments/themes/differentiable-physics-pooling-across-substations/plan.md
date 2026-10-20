@@ -38,7 +38,7 @@ supports it, and otherwise from per-site fits with the shared meter layer. It ne
 audit found that the Primaries and generators close one of the two BSPs up to factors of 0.85 to
 1.16, and the other not at all with the generator history available. The joint fit, with the factors
 fixed at 1, cut the damage from injected metering errors by 41% but cost clean forecasts 2.4 or
-more points of capacity. A follow-on arm fixes the factors at the audit fit. [Experiment 36](../../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) had found that
+more points of capacity. A follow-on arm that fixes the factors at the audit fit stopped at its synthetic check: an exactly specified synthetic system also loses clean accuracy at every weight, so the loss comes from adding a BSP term to the Primaries' fit and not mainly from the factors. [Experiment 36](../../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) had found that
 the sum of Primary forecasts added nothing at the two BSPs. A BSP reading should equal the sum of
 its Primaries minus the metered generators connected there, plus losses and an unmetered remainder.
 Three facts shape the design:

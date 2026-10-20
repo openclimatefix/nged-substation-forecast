@@ -147,6 +147,68 @@ def figure_tradeoff() -> None:
     _save(chart, name="figure_1_tradeoff")
 
 
+def figure_plumbing() -> None:
+    """Figure 3: arm B's synthetic check, the clean-error rise of an exactly specified system."""
+    result = json.loads((WORK_DIR / "armb_plumbing.json").read_text())
+    weights = [0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0]
+    labels = [f"{w:g}" for w in weights]
+    frame = pl.DataFrame(
+        [
+            {"weight": label, "rise": value, "fit": name}
+            for name, curve in (
+                ("multipliers exact", result["median_curve_exact"][1:]),
+                ("multipliers 15% wrong", result["median_curve_wrong"][1:]),
+            )
+            for label, value in zip(labels, curve, strict=True)
+        ]
+    )
+    x = alt.X(
+        "weight:N",
+        sort=labels,
+        axis=alt.Axis(labelAngle=0),
+        title="Weight on the synthetic BSP reading",
+    )
+    lines = (
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
+        .mark_line(point=alt.OverlayMarkDef(filled=True, size=60))
+        .encode(
+            x=x,
+            y=alt.Y(
+                "rise:Q",
+                scale=alt.Scale(type="symlog", constant=0.05),
+                axis=alt.Axis(values=[0, 0.023, 0.1, 0.3, 1, 3, 10]),
+                title="Extra clean error (points; smaller is better)",
+            ),
+            color=alt.Color(
+                "fit:N",
+                sort=None,
+                scale=alt.Scale(range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]),
+                legend=alt.Legend(title=None, orient="top"),
+            ),
+        )
+    )
+    limit = (
+        alt.Chart(pl.DataFrame({"limit": [CLEAN_LIMIT]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[5, 3], color="#555555")
+        .encode(y="limit:Q")
+    )
+    chart = alt.layer(lines, limit).properties(
+        width=WIDTH,
+        height=220,
+        title=_title(
+            text="Even a synthetic system that closes exactly loses clean accuracy at every weight",
+            subtitle=(
+                "Median over 20 synthetic systems built from the pilot's fitted Primaries, "
+                "with the audit's multipliers and the Primaries' own autocorrelated noise in "
+                "the BSP reading. Extra error is the mean absolute error minus the separate "
+                "fits' (points of effective capacity; symmetric-logarithmic axis). Dashed "
+                "line: the 0.023-point limit."
+            ),
+        ),
+    )
+    _save(chart, name="figure_3_plumbing")
+
+
 def _parse_audit() -> pl.DataFrame:
     """Read the closure coefficients and their 80% intervals from the audit report."""
     text = (DOCS_DIR / "audit_report.md").read_text()
@@ -235,3 +297,4 @@ def figure_coefficients() -> None:
 if __name__ == "__main__":
     figure_tradeoff()
     figure_coefficients()
+    figure_plumbing()
