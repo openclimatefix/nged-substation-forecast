@@ -122,10 +122,11 @@ def figure_coverage(*, gate: dict, cells: tuple[str, ...]) -> alt.TopLevelMixin:
         .resolve_scale(x="shared")
         .properties(
             title=_title(
-                text="Coverage of the 80% parameter intervals, by arm",
+                text="The graph prior leaves scale and capacity intervals overconfident",
                 subtitle=(
-                    "Dot: coverage. Line: 95% range over fleets. Grey band: 70 to 90%. "
-                    "Synthetic fleets with the real noise; smooth: neighbours alike; unlike: not."
+                    "Share of 80% intervals that hold the true value, over 120 synthetic fleets "
+                    "per panel. Dot: estimate. Line: 95% range over fleets. Grey band: 70 to 90%. "
+                    "Smooth: neighbours alike. Unlike: neighbours not alike."
                 ),
             )
         )
@@ -176,7 +177,7 @@ def figure_width_ratio(*, gate: dict, cells: tuple[str, ...]) -> alt.TopLevelMix
         .facet(row=alt.Row("cell:N", title=None))
         .properties(
             title=_title(
-                text="The graph prior narrows heating-slope intervals",
+                text="The graph prior narrows heating-slope intervals and little else",
                 subtitle=(
                     "Dot: median ratio over fleets. Line: 98.3% interval from resampling fleets. H "
                     "against G, NH against N, on the same parameters of the same fleets."
