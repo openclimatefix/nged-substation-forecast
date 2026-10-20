@@ -259,6 +259,12 @@ tuning year (the 2023-07-01 cut, scored 2023-24) gave these values.
   rises, so the rule picks the top of the grid, 10,000. A value at the grid edge means the event-day
   score might fall further at a larger weight, which this plan does not try.
 
+**Labelled deviation for compute (approved by the manager during the gate).** Fleets took about 10
+to 12 minutes each on six threads at a machine load of 27, so the gate would have run for about 33
+hours. Set 1 keeps the two exploratory arms at the next gamma (H and NH at 30,000); sets 2 and 3
+leave them out. No reading (a) to (d) and no verdict row uses those arms, so the verdict is
+unaffected; the exploratory arms rest on 40 fleets instead of 120.
+
 **Code under test.** The tuning set, the gate, and the real-data stage run on `studies.dp_gam_graph`
 as of module commit 67deaa053 (module pull request 1411), which includes a Cholesky solver that a
 test shows equal to the LU solver on a 15-node fleet to 1e-7. If the later Opus review of the module
