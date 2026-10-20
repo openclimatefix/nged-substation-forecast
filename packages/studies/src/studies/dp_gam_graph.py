@@ -51,11 +51,14 @@ import torch
 from studies.dp_calendar import DAY_TYPES, HALF_HOURS_PER_DAY, band_of_hour
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (
+    DEFAULT_MAX_ITERATIONS,
     N_BANDS,
+    PIVOT_PATIENCE,
     GamFit,
     GamLayout,
     accumulate_gram,
     check_pinned_capacity,
+    default_tolerance,
     design_matrix,
     last_signal_season_year,
     penalty_matrix,
@@ -93,9 +96,6 @@ without an identified coordinate, and a share of the substation's own typical co
 the same for a 12-month and a 24-month window. A column that is non-zero in a handful of twilight
 rows is not identified.
 """
-
-MAX_MATRIX_BYTES: Final[int] = 800_000_000
-"""The most memory one batch of dense joint matrices may take; larger batches are split."""
 
 
 @dataclass(frozen=True)
@@ -823,12 +823,6 @@ def _slice_counts(
     return counts[:, positions]
 
 
-def _batch_size(*, total: int, batch: int) -> int:
-    """Return how many batch members fit in `MAX_MATRIX_BYTES` of dense joint matrices."""
-    per_member = total * total * 8
-    return max(1, min(batch, MAX_MATRIX_BYTES // per_member))
-
-
 def solve_graph_fit(
     *,
     designs: Sequence[NodeDesign],
@@ -914,6 +908,113 @@ def _solve_separable(
     return GraphSolution(thetas=thetas, fleet_mean=None, violation=violation)
 
 
+def _kkt_violation(
+    *, theta: torch.Tensor, gradient: torch.Tensor, constrained: torch.Tensor
+) -> float:
+    """Return the largest violation of the optimality conditions of one problem."""
+    free = ~constrained | (theta > 0.0)
+    free_violation = torch.where(free, gradient.abs(), torch.zeros_like(gradient)).max()
+    bound_violation = torch.where(
+        ~free, (-gradient).clamp(min=0.0), torch.zeros_like(gradient)
+    ).max()
+    return float(torch.maximum(free_violation, bound_violation))
+
+
+def solve_bounded_cholesky(
+    *,
+    matrix: torch.Tensor,
+    rhs: torch.Tensor,
+    constrained: torch.Tensor,
+    start_free: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, float]:
+    """Minimise `theta^T A theta - 2 b^T theta` with `theta_j >= 0` where `constrained[j]`.
+
+    Block principal pivoting as in `dp_gam.solve_bounded_quadratic`, for one problem, with a
+    Cholesky factorisation of the free block in place of an LU solve of the whole matrix and a
+    starting free set the caller supplies. The members of a bootstrap batch share nearly the same
+    active set, so a start from the previous member's free set usually needs one or two
+    factorisations, where the LU version needs three or more.
+
+    Args:
+        matrix: `A`, shape (p, p), positive definite.
+        rhs: `b`, shape (p,).
+        constrained: Boolean, shape (p,), True for the non-negative parameters.
+        start_free: Boolean, shape (p,), the starting free set; unconstrained parameters are
+            always free.
+
+    Returns:
+        `(theta, free, violation)`: the solution, the free set it ended on, and the largest
+        violation of the optimality conditions relative to the largest entry of `b`.
+
+    Raises:
+        ValueError: If the problem has not converged.
+        torch.linalg.LinAlgError: If a free block is not positive definite in floating point.
+    """
+    p = rhs.shape[0]
+    epsilon = float(torch.finfo(matrix.dtype).eps)
+    tolerance = default_tolerance(dtype=matrix.dtype)
+    scale = float(rhs.abs().max().clamp(min=1.0))
+    indices = torch.arange(p)
+    free = start_free | ~constrained
+    best_broken, patience = p + 1, 0
+    theta = torch.zeros_like(rhs)
+    for _ in range(DEFAULT_MAX_ITERATIONS):
+        held = torch.nonzero(free).squeeze(1)
+        reduced = matrix.index_select(0, held).index_select(1, held)
+        factor, info = torch.linalg.cholesky_ex(reduced)
+        if int(info) != 0:
+            msg = "a free block is not positive definite"
+            raise torch.linalg.LinAlgError(msg)
+        theta = torch.zeros_like(rhs)
+        theta[held] = torch.cholesky_solve(rhs[held][:, None], factor)[:, 0]
+        gradient = matrix @ theta - rhs
+        theta_tolerance = 100.0 * epsilon * float(theta.abs().max().clamp(min=1.0))
+        broken = (free & constrained & (theta < -theta_tolerance)) | (
+            ~free & (gradient < -tolerance * scale)
+        )
+        count = int(broken.sum())
+        if count == 0:
+            break
+        if count < best_broken:
+            best_broken, patience = count, 0
+        else:
+            patience += 1
+        if patience >= PIVOT_PATIENCE:
+            largest = int(torch.where(broken, indices, -torch.ones_like(indices)).max())
+            broken = indices == largest
+        free = free ^ broken
+    else:
+        msg = "the bounded Cholesky solver did not converge"
+        raise ValueError(msg)
+    theta = torch.where(constrained, theta.clamp(min=0.0), theta)
+    gradient = matrix @ theta - rhs
+    violation = _kkt_violation(theta=theta, gradient=gradient, constrained=constrained) / scale
+    if violation > 10.0 * tolerance:
+        msg = f"the bounded Cholesky solver did not converge: worst violation {violation:.3g}"
+        raise ValueError(msg)
+    return theta, free, violation
+
+
+def _solve_member(
+    *,
+    matrix: torch.Tensor,
+    rhs: torch.Tensor,
+    constrained: torch.Tensor,
+    start_free: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, float]:
+    """Solve one member by Cholesky, falling back to the LU solver if that fails."""
+    try:
+        return solve_bounded_cholesky(
+            matrix=matrix, rhs=rhs, constrained=constrained, start_free=start_free
+        )
+    except torch.linalg.LinAlgError, ValueError:
+        solution, violation = solve_bounded_quadratic(
+            matrix=matrix[None], rhs=rhs[None], constrained=constrained
+        )
+        theta = solution[0]
+        return theta, (theta > 0.0) | ~constrained, float(violation[0])
+
+
 def _solve_coupled(
     *,
     designs: Sequence[NodeDesign],
@@ -959,23 +1060,22 @@ def _solve_coupled(
         mu_start=mu_start,
     )
     fixed = fixed.to(device)
-    chunk = _batch_size(total=total, batch=batch)
+    constrained_tensor = torch.as_tensor(constrained)
     pieces, violations = [], []
-    for first in range(0, batch, chunk):
-        last = min(first + chunk, batch)
-        matrix = fixed[None].repeat(last - first, 1, 1)
-        rhs = fixed_rhs[None].repeat(last - first, 1).to(device)
+    free = torch.ones(total, dtype=torch.bool)
+    for member in range(batch):
+        matrix = fixed.clone()
+        rhs = fixed_rhs.clone()
         for design, gram, node_rhs, start in zip(designs, grams, rhss, starts[:-1], strict=True):
             stop = int(start) + design.layout.n_columns
-            matrix[:, start:stop, start:stop] += gram[first:last].to(device)
-            rhs[:, start:stop] += node_rhs[first:last].to(device)
-        solution, violation = solve_bounded_quadratic(
-            matrix=matrix, rhs=rhs, constrained=torch.as_tensor(constrained)
+            matrix[start:stop, start:stop] += gram[member].to(device)
+            rhs[start:stop] += node_rhs[member].to(device)
+        theta, free, violation = _solve_member(
+            matrix=matrix, rhs=rhs, constrained=constrained_tensor, start_free=free
         )
-        pieces.append(solution.cpu().numpy())
-        violations.append(violation.cpu().numpy())
-        del matrix
-    solved = np.concatenate(pieces)
+        pieces.append(theta.cpu().numpy())
+        violations.append(violation)
+    solved = np.stack(pieces)
     thetas = {
         design.site: solved[:, int(start) : int(start) + design.layout.n_columns]
         for design, start in zip(designs, starts[:-1], strict=True)
@@ -983,7 +1083,7 @@ def _solve_coupled(
     return GraphSolution(
         thetas=thetas,
         fleet_mean=solved[:, mu_start:] if has_fleet else None,
-        violation=np.concatenate(violations),
+        violation=np.array(violations),
     )
 
 

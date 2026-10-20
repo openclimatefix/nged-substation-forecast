@@ -25,6 +25,7 @@ from studies.dp_gam import (  # noqa: E402
     fit_gam,
     penalty_matrix,
     prepare_fit,
+    solve_bounded_quadratic,
 )
 from studies.dp_gam_graph import (  # noqa: E402
     GRAPH_FAMILIES,
@@ -50,6 +51,7 @@ from studies.dp_gam_graph import (  # noqa: E402
     profile_scale,
     ring_with_chords,
     sample_smooth_fields,
+    solve_bounded_cholesky,
     solve_graph_fit,
 )
 from studies.dp_gam_pooled import (  # noqa: E402
@@ -820,3 +822,39 @@ def test_nothing_after_the_cut_in_a_neighbours_weather_or_solar_shape_reaches_a_
     )
     for label in LABELS[:2]:
         assert np.abs(changed.thetas[label] - baseline.thetas[label]).max() < 1e-10
+
+
+@pytest.mark.parametrize("seed", range(6))
+def test_the_cholesky_solver_matches_the_lu_solver_from_any_starting_free_set(seed: int):
+    generator = np.random.default_rng(seed)
+    size = 40
+    factor = generator.normal(size=(size, size))
+    matrix = torch.as_tensor(factor @ factor.T + 0.5 * np.eye(size))
+    rhs = torch.as_tensor(generator.normal(size=size) * 3.0)
+    constrained = torch.as_tensor(generator.random(size) < 0.6)
+    reference, _ = solve_bounded_quadratic(
+        matrix=matrix[None], rhs=rhs[None], constrained=constrained
+    )
+    for start in (
+        torch.ones(size, dtype=torch.bool),
+        torch.zeros(size, dtype=torch.bool),
+        torch.as_tensor(generator.random(size) < 0.5),
+    ):
+        theta, free, violation = solve_bounded_cholesky(
+            matrix=matrix, rhs=rhs, constrained=constrained, start_free=start
+        )
+        assert torch.allclose(theta, reference[0], atol=1e-8)
+        assert violation < 1e-6
+        assert bool(free[~constrained].all())
+        assert bool((theta[constrained] >= 0.0).all())
+
+
+def test_the_cholesky_solver_refuses_a_matrix_that_is_not_positive_definite():
+    matrix = torch.as_tensor(-np.eye(3))
+    with pytest.raises(torch.linalg.LinAlgError):
+        solve_bounded_cholesky(
+            matrix=matrix,
+            rhs=torch.ones(3, dtype=torch.float64),
+            constrained=torch.zeros(3, dtype=torch.bool),
+            start_free=torch.ones(3, dtype=torch.bool),
+        )
