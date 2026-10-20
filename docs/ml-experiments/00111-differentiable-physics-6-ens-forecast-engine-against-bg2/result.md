@@ -93,7 +93,19 @@ advice:
     March and +0.215 from April to October (C1).
 ---
 
-**With ECMWF ensemble weather forecasts as input, the Kalman filter on recent errors lowers the convex differentiable-physics demand model's score, and that is the part of the hypothesis this year of data supports; the model's standing against lagless XGBoost and against the production recipe (BG2) is undecided.** Scores are quantile scores in points of the substation's effective capacity (lower is better), at the five decision Primary substations D5, D10, D11, D14, and D16, over leads of 0.5 to 168 hours, on every half-hour outside the hand-filtered switching events. The scored year is 1 July 2025 to 30 June 2026. The filter lowered the convex model's score by 0.151 points (98.75% interval -0.295 to -0.008), by 0.392 points at leads under 24 hours and by 0.017 beyond 144 hours. The convex model with the filter (GAM-K) was 0.134 points better than lagless XGBoost with the same filter (-0.305 to +0.014, which includes zero) and differed from BG2 by +0.020 points (-0.109 to +0.157, not like for like, with BG2 better at 3 of 5 substations). GAM-K is the DP's candidate for the roughly 1,300 substations of version 2. The DP's own forecast, given to lagged XGBoost as a starting point, changed nothing measurable.
+**With ECMWF ensemble weather forecasts as input, the Kalman filter on recent errors lowers the
+convex differentiable-physics demand model's score, and that is the part of the hypothesis this year
+of data supports; the model's standing against lagless XGBoost and against the production recipe
+(BG2) is undecided.** Scores are quantile scores in points of the substation's effective capacity
+(lower is better), at the five decision Primary substations D5, D10, D11, D14, and D16, over leads
+of 0.5 to 168 hours, on every half-hour outside the hand-filtered switching events. The scored year
+is 1 July 2025 to 30 June 2026. The filter lowered the convex model's score by 0.151 points (98.75%
+interval -0.295 to -0.008), by 0.392 points at leads under 24 hours and by 0.017 beyond 144 hours.
+The convex model with the filter (GAM-K) was 0.134 points better than lagless XGBoost with the same
+filter (-0.305 to +0.014, which includes zero) and differed from BG2 by +0.020 points (-0.109 to
++0.157, not like for like, with BG2 better at 3 of 5 substations). GAM-K is the DP's candidate for
+the roughly 1,300 substations of version 2. The DP's own forecast, given to lagged XGBoost as a
+starting point, changed nothing measurable.
 
 We asked whether the physical model, driven by real weather forecasts as production would be,
 forecasts demand better than XGBoost when both see the same weather forecast and the same recent
@@ -146,8 +158,8 @@ only if C3 showed a gain, and an interval from -0.217 to +0.183 shows none.
   temperature shift ranged from -1.15 to +2.05 K (mean +0.20) and the daylight irradiance ratio from
   0.80 to 1.11 (mean 0.95) over the decision substations (Figure 6).
 - **DP arms.** GAM-0 (drift, no correction), GAM-K (the main arm), GAM-E (14-day weighted mean in
-  place of the filter), GAM-K-era5 (the filter on ERA5 and CAMS residuals, which a live service would
-  not have), and GAM-ens (trained on ensemble control rows, fitted once at 2025-07-01).
+  place of the filter), GAM-K-era5 (the filter on ERA5 and CAMS residuals, which a live service
+  would not have), and GAM-ens (trained on ensemble control rows, fitted once at 2025-07-01).
 - **XGBoost arms.** X-nl is SIMP1's no-lag monthly recipe (500 rounds, eta 0.05, half-life 0.5
   years), reused for the scored year from SIMP1's stored refits after one refit at D10 reproduced
   within -0.003 points of quantile score, and refitted here for the 12 tuning and replicate months.
@@ -176,10 +188,10 @@ only if C3 showed a gain, and an interval from -0.217 to +0.183 shows none.
   so the verdict is not `refuted`.
 - **Production status is `candidate`.** GAM-K with the filter is the DP's candidate for the roughly
   1,300 substations of version 2, because its filter gain survives ensemble weather and it is not
-  distinguishably different from BG2 (+0.020, -0.109 to +0.157; BG2 better at 3 of 5 substations; not
-  like for like: BG2 has three lags, a five-member blend, and weekly refits). The candidate carries
-  four caveats: C2 is undecided, XGBoost's history is short, five substations over one year is a
-  small sample, and the margin gave no gain.
+  distinguishably different from BG2 (+0.020, -0.109 to +0.157; BG2 better at 3 of 5 substations;
+  not like for like: BG2 has three lags, a five-member blend, and weekly refits). The candidate
+  carries four caveats: C2 is undecided, XGBoost's history is short, five substations over one year
+  is a small sample, and the margin gave no gain.
 
 ## Headline numbers
 
@@ -198,8 +210,8 @@ resampling whole calendar months of run initialisations, paired across arms. The
   and 2.877; median-forecast error +0.001. Without D5 it is +0.014.
 - **C4, GAM-K minus GAM-0: -0.151 (-0.295 to -0.008), 3 of 5 better.** By lead: -0.392 (-0.498 to
   -0.288) under 24 hours, -0.244 from 24 to 48 hours, -0.100 from 48 to 144 hours, and -0.017
-  (-0.165 to +0.159) from 144 to 168 hours. It is -0.026 from November to March and -0.234 from April
-  to October.
+  (-0.165 to +0.159) from 144 to 168 hours. It is -0.026 from November to March and -0.234 from
+  April to October.
 - **Replicate months.** All even months of 2024-07 to 2025-06, where XGBoost trained on 3 to 14
   months of ensemble rows: C1 -0.679 (-2.193 to +0.257), 4 of 5 better; C2 -0.316 (-0.721 to
   +0.035), 5 of 5; C3 -0.103 (-0.691 to +0.386); C4 -0.215 (-0.396 to -0.057), 5 of 5. In February,
@@ -217,12 +229,13 @@ resampling whole calendar months of run initialisations, paired across arms. The
   refit with D18's commissioning months cut, so its rows are descriptive: GAM-K minus GAM-0 -0.756
   (-1.924 to +0.413), GAM-K minus BG2 +0.215 (-0.411 to +0.982), X-nl minus BG2 +0.314 (+0.022 to
   +0.572), GAM-0 minus X-nl +0.675 (-0.399 to +2.156).
-- **Exploratory, scored year.** GAM-K minus BG2 +0.020 (-0.109 to +0.157, not like for like), better at 0 to 24 hours
-  (-0.060) and worse beyond 144 hours (+0.063). X-nl minus BG2 +0.308 (+0.196 to +0.450). GAM-K
-  minus Xlag-d -0.077 (-0.218 to +0.067). X-nl+K minus X-nl -0.154 (-0.308 to -0.023). GAM-K-era5
-  minus GAM-K -0.008 (-0.024 to +0.008). GAM-E minus GAM-K +0.034 (-0.011 to +0.082), worse at 0 to
-  24 hours (+0.174). GAM-ens minus GAM-0 +0.248 (+0.007 to +0.513). GAM-margin minus Xlag-o -0.020 (-0.192 to +0.150), which agrees with C3. X-nl-o minus X-nl-z -0.023
-  (-0.077 to +0.023) and X-nl-o minus X-nl -0.006 (-0.039 to +0.037).
+- **Exploratory, scored year.** GAM-K minus BG2 +0.020 (-0.109 to +0.157, not like for like), better
+  at 0 to 24 hours (-0.060) and worse beyond 144 hours (+0.063). X-nl minus BG2 +0.308 (+0.196 to
+  +0.450). GAM-K minus Xlag-d -0.077 (-0.218 to +0.067). X-nl+K minus X-nl -0.154 (-0.308 to
+  -0.023). GAM-K-era5 minus GAM-K -0.008 (-0.024 to +0.008). GAM-E minus GAM-K +0.034 (-0.011 to
+  +0.082), worse at 0 to 24 hours (+0.174). GAM-ens minus GAM-0 +0.248 (+0.007 to +0.513).
+  GAM-margin minus Xlag-o -0.020 (-0.192 to +0.150), which agrees with C3. X-nl-o minus X-nl-z
+  -0.023 (-0.077 to +0.023) and X-nl-o minus X-nl -0.006 (-0.039 to +0.037).
 
 ## Absolute scores
 
@@ -245,15 +258,15 @@ differ in the third decimal. Climatology and the manual heuristic are in Figure 
 ## What the filter does
 
 - **The filter's gain sits in the first two days for the convex model, and the two model families
-  gain in different places.** GAM-K minus GAM-0 is -0.392 under 24 hours and -0.017 beyond 144 hours,
-  and the first two lead days carry about 60% of the pooled gain. X-nl+K minus X-nl is -0.382 and
-  -0.028 by lead, but its pooled gain of -0.154 is almost all at D14 (-0.648; -0.027 without D14),
-  while the filter worsens GAM-K at D5 (+0.128) and D16 (+0.130). The families also gain in opposite
-  seasons: GAM-K from April to October (-0.234) and X-nl+K from November to March (-0.379). In the
-  replicate months the two disagree in size (-0.377 against -0.058 in February, April, and June
-  2025; -0.215 against -0.578 over all even months), so "the filter helps both families equally" is
-  not supported. Part 4 found -0.61 on past weather at the day-ahead lead; the ensemble gain at 0 to
-  24 hours is about two thirds of that.
+  gain in different places.** GAM-K minus GAM-0 is -0.392 under 24 hours and -0.017 beyond 144
+  hours, and the first two lead days carry about 60% of the pooled gain. X-nl+K minus X-nl is -0.382
+  and -0.028 by lead, but its pooled gain of -0.154 is almost all at D14 (-0.648; -0.027 without
+  D14), while the filter worsens GAM-K at D5 (+0.128) and D16 (+0.130). The families also gain in
+  opposite seasons: GAM-K from April to October (-0.234) and X-nl+K from November to March (-0.379).
+  In the replicate months the two disagree in size (-0.377 against -0.058 in February, April, and
+  June 2025; -0.215 against -0.578 over all even months), so "the filter helps both families
+  equally" is not supported. Part 4 found -0.61 on past weather at the day-ahead lead; the ensemble
+  gain at 0 to 24 hours is about two thirds of that.
 - **The persistent level carries the correction (Figure 5).** The transient part is about 0 at every
   lead.
 - **ERA5 residuals add nothing.** GAM-K-era5 minus GAM-K is -0.008 (-0.024 to +0.008), so a live
@@ -263,8 +276,8 @@ differ in the third decimal. Climatology and the manual heuristic are in Figure 
 
 ## What did not help
 
-- **The DP's forecast as a base margin.** C3 -0.023 in the scored year and +0.334 in February, April,
-  and June 2025. D5 contributes the gain: without D5 C3 is +0.014.
+- **The DP's forecast as a base margin.** C3 -0.023 in the scored year and +0.334 in February,
+  April, and June 2025. D5 contributes the gain: without D5 C3 is +0.014.
 - **Training the convex model on ensemble rows.** GAM-ens minus GAM-0 +0.248 (+0.007 to +0.513),
   +0.591 from November to March, which is the opposite of what the train-each-weather-on-its-own-
   history rule would predict for this model, and agrees with the plan's note that GAM-ens tests the
@@ -333,33 +346,34 @@ BG2 also carries BG2's five-member blend and its weekly refits, which X-nl does 
 The gate ran on the tuning months before any replicate month or scored run and passed 22 of 22
 readings: the calibration recovered a temperature bias of +1.5 to +3 K and an irradiance factor of
 0.8 within 15% (and the calibrated fake scored within 0.05 points of ERA5 and CAMS); the calibrated
-ensemble's irradiance peaked within one half-hour of CAMS's at every site (a pass at the limit: the offset was exactly one half-hour at 6 of 7 sites), with a midday ratio of
-0.88 to 0.90; the filter carried a median 1.07 of an injected transfer by the end of day 2, 0.93
-from day 2 to the end, and 0.000 three days after the end (16 transfers at D10, D11, D14, and D16);
-the margin's error on earlier runs was 0.98 of its error on the tuning months' runs; and the module's
-tests passed (Figure 8). The recovery readings are exact (0.000) by construction, because the fake's member noise has
+ensemble's irradiance peaked within one half-hour of CAMS's at every site (a pass at the limit: the
+offset was exactly one half-hour at 6 of 7 sites), with a midday ratio of 0.88 to 0.90; the filter
+carried a median 1.07 of an injected transfer by the end of day 2, 0.93 from day 2 to the end, and
+0.000 three days after the end (16 transfers at D10, D11, D14, and D16); the margin's error on
+earlier runs was 0.98 of its error on the tuning months' runs; and the module's tests passed (Figure
+8). The recovery readings are exact (0.000) by construction, because the fake's member noise has
 zero mean across the 51 members, so they check the indexing and the arithmetic and not the
-calibration's response to noise. The calibrated fake's error differed from ERA5's by 0.049 against
-a limit of 0.05, and that reading compares mean absolute errors where the plan says quantile
-score, with the real ensemble's analysis proxy kept in the noise-free fake. Test 4 is a stability
-check, not a leakage check: it compares margin errors by period, cannot catch a leak in the
-training join, omits the replicate months, and compares April to June 2024 with the odd months, so
-the season differs.
+calibration's response to noise. The calibrated fake's error differed from ERA5's by 0.049 against a
+limit of 0.05, and that reading compares mean absolute errors where the plan says quantile score,
+with the real ensemble's analysis proxy kept in the noise-free fake. Test 4 is a stability check,
+not a leakage check: it compares margin errors by period, cannot catch a leak in the training join,
+omits the replicate months, and compares April to June 2024 with the odd months, so the season
+differs.
 
 ## Departures from the plan
 
 - **Compute.** The plan estimated 1.5 to 2 GPU-hours for the XGBoost arms; one 500-round refit on
   the whole history took 247 s while the GPU was shared, matching SIMP1's log, so the estimate was
   about 20 times too low. The margin family therefore refitted monthly, not weekly, on leads to 168
-  hours at 150 rounds and eta 0.15; X-nl for the scored year reused SIMP1's refits; X-nl-z and X-nl-o
-  ran for the scored year only; the placebo margin, the zero-start lagged arm, GAM-K-w, GAM-K-fc,
-  and the tuning-month choice among start rules were not run, so X-bar is X-nl with its default
-  start; and C5, the like-for-like comparison with BG2, was not run. The plan's literal trigger
-  (C3 below zero) was met by the estimate of -0.023, but the manager ruled that C5 runs only if C3
-  shows a gain, judged -0.023 (-0.217 to +0.183) not to be one, and the budget was short. The
-  production-setting pair was coded and then removed from the scripts. The
-  XGBoost jobs logged 7.88 job-hours (including about 0.02 job-hours of smoke jobs), plus the
-  early refits, which were not logged.
+  hours at 150 rounds and eta 0.15; X-nl for the scored year reused SIMP1's refits; X-nl-z and
+  X-nl-o ran for the scored year only; the placebo margin, the zero-start lagged arm, GAM-K-w,
+  GAM-K-fc, and the tuning-month choice among start rules were not run, so X-bar is X-nl with its
+  default start; and C5, the like-for-like comparison with BG2, was not run. The plan's literal
+  trigger (C3 below zero) was met by the estimate of -0.023, but the manager ruled that C5 runs only
+  if C3 shows a gain, judged -0.023 (-0.217 to +0.183) not to be one, and the budget was short. The
+  production-setting pair was coded and then removed from the scripts. The XGBoost jobs logged 7.88
+  job-hours (including about 0.02 job-hours of smoke jobs), plus the early refits, which were not
+  logged.
 - **Implementation.** No `WeatherInputLayer` was filled (the pooled arms did not run). The PV shape
   is not derated by the member's temperature in the weather layer, because the convex model derates
   it itself. A member with a missing shortwave value is dropped from its run at that site (member 36
@@ -371,9 +385,9 @@ the season differs.
 - **The XGBoost arms' spread was not tuned,** where the plan tunes a factor per arm on the tuning
   months. The code review found that even the best factor chosen on the scored year would gain at
   most 0.004 points, so C1 and C2 are unaffected.
-- **Xlag-bar is Xlag-d,** fixed in advance of the margin results, where the plan chose it among Xlag-d,
-  Xlag-o, and Xlag-z on the tuning months. Xlag-o minus Xlag-d is -0.003, and C3 against Xlag-o
-  would be -0.020.
+- **Xlag-bar is Xlag-d,** fixed in advance of the margin results, where the plan chose it among
+  Xlag-d, Xlag-o, and Xlag-z on the tuning months. Xlag-o minus Xlag-d is -0.003, and C3 against
+  Xlag-o would be -0.020.
 - **X-nl+K at D10 in July 2025** uses this experiment's own reproduction refit and not SIMP1's (an
   effect of about 0.003 points).
 - **The offset arms use held capacity.** X-nl-o, and the offset start in general, take experiment
@@ -388,8 +402,8 @@ the season differs.
 - **The substation cards omit panels the series asks for** (no heating slope and no fitted
   capacity, and no per-site intervals beyond the note under the cards).
 - **The pinned capacity uses hindsight weeks,** as Part 4 discloses for its vintages.
-- **C1's shared rows** are 464,358 half-hours, and C4's are 464,363, because 5 half-hours are present
-  in the GAM-0 and GAM-K rows and absent from the X-nl rows.
+- **C1's shared rows** are 464,358 half-hours, and C4's are 464,363, because 5 half-hours are
+  present in the GAM-0 and GAM-K rows and absent from the X-nl rows.
 - **D18.** SIMP1's refit with D18's commissioning months cut is the source of D18's X-nl rows;
   D18 enters no contrast.
 
@@ -440,8 +454,9 @@ anomalies, which is a reason a longer history could help interpretability.
   The maintainer decides whether to fetch it.
 - Does the filter lower the production XGBoost blend's score as it lowers X-nl's? The result is
   a candidate for the next release review.
-- Does the filter, which lowers GAM-K's score at only 3 of 5 substations, gain more at substations whose level changes (D15, D18 predicted)? D18's descriptive
-  row (-0.756) points that way, from one substation.
+- Does the filter, which lowers GAM-K's score at only 3 of 5 substations, gain more at substations
+  whose level changes (D15, D18 predicted)? D18's descriptive row (-0.756) points that way, from one
+  substation.
 - Does the margin help at weekly cadence? The plan's cadence needs about 60 GPU-hours at the speed
   measured here.
 
