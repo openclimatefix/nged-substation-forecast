@@ -17,7 +17,7 @@ hypothesis: >-
   weather, replacing the single fixed 15.5 C heating hinge by five hinges (10, 12, 14, 16, and
   18 C) with non-negative slopes, so the heating curve never falls as it gets colder and stays
   convex, lowers the day-ahead quantile score after the recent-error filter. Second question (NS):
-  GAM-K leaves a 4 to 7 MW step at 01:00 on winter nights at three substations (a pattern like
+  GAM-K leaves a 4 to 7 point step at 01:00 on winter nights at three substations (a pattern like
   storage heating switching on), and a night-step term lowers the score on winter nights without
   worsening the other rows by more than 0.02 points. Indexed in UTC against local time, the
   winning indexing is reported.
@@ -126,8 +126,10 @@ ENS confirmation in "Handed on" tests transfer.
 **Why:** a read-only check of experiment 111's stored GAM-K predictions (one winter, November 2025
 to February 2026, and one summer pair, July to August 2025 and May to June 2026, weekdays only)
 found an unmodelled step at 01:00 (the 00:30 to 01:00 half-hour) in winter. Actual demand steps up
-by 7.1, 10.7, and 7.4 MW at D5, D10, and D16 (1.9 to 3.4 MW at D11, D14, and D9), and GAM-K's
-residual step is 4.3, 7.1, and 5.3 MW at D5, D10, and D16. In summer the step shrinks to 1.7 MW or
+by 7.1, 10.7, and 7.4 points at D5, D10, and D16 (1.9 to 3.4 points at D11, D14, and D9), and
+GAM-K's
+residual step is 4.3, 7.1, and 5.3 points at D5, D10, and D16. In summer the step shrinks to 1.7
+points or
 less, and its position (UTC or local clock) cannot be told apart. The check used one winter and
 one summer pair, so the summer reading is weak. Winter local time equals UTC, so winter rows
 cannot separate the two indexings; only British Summer Time (BST) rows can.
@@ -267,13 +269,22 @@ are agreed with the experiment manager.
   derives its thresholds from both, and they are fixed here before the gate runs. If gate 4'' fails,
   the labels it covers stay `not powered`, the verdict stays `inconclusive`, and the gate is not
   redefined again.
-    - **Injected steps.** A step of 4 MW and a step of 7 MW (the sizes seen at D5, D10, and D16,
-      where one point of the quantile score's unit is one MW) in the half-hour starting 00:30. The
-      night-row noise has a standard deviation of 4.6 to 7.7 points at D5 and D10, so 4 MW is about
-      one noise standard deviation. Three kinds: a flat step on the UTC clock all year (`utc`), a flat
-      step on the local clock all year (`local`), and a cold-dependent step on the UTC clock (`cold`,
-      equal to a constant times the 15.5 C hinge of the first smoothed temperature, scaled so the mean
-      over the winter rows of that half-hour equals the stated size). A `placebo` has no step.
+    - **Injected steps.** A step of 4 points and a step of 7 points of effective capacity (the sizes
+      seen at D5, D10, and D16; the units bullet below converts to MW) in the half-hour
+      starting 00:30. The night-row noise has a standard deviation of 4.6 to 7.7 points at D5 and
+      D10, so 4 points is about one noise standard deviation. Three kinds: a flat step on the UTC
+      clock all year (`utc`), a flat step on the local clock all year (`local`), and a
+      cold-dependent step on the UTC clock (`cold`, equal to a constant times the 15.5 C hinge of
+      the first smoothed temperature, scaled so the mean over the winter rows of that half-hour
+      equals the stated size). A `placebo` has no step.
+    - **Units.** The quantile score and every step are in points, that is, percent of the
+      substation's effective capacity, and not in MW. A step of `p` points is `p` times the
+      effective capacity divided by 100 in MW. The effective capacity is a single table value per
+      substation (5.72 MW at D5, 5.40 MW at D10, 10.78 MW at D11, 11.71 MW at D14, and 9.12 MW at
+      D16), so the MW conversion of a step carries the interval of the step in points and no
+      additional interval. A 4-point step is 0.23, 0.22, 0.43, 0.47, and 0.36 MW at D5, D10, D11,
+      D14, and D16, and a 7-point step is 0.40, 0.38, 0.75, 0.82, and 0.64 MW. The measured residual
+      steps of 4.4, 7.3, and 5.4 points at D5, D10, and D16 are 0.25, 0.39, and 0.49 MW.
     - **Statistic.** For an arm, the mean quantile score minus B0's on the label's own rows (BST
       nights for NS-U, winter nights for NS-H and NS-HW), unfiltered, on the same noise.
     - **Critical value.** The 5th percentile of the statistic over 100 placebo draws (20 per
@@ -281,12 +292,13 @@ are agreed with the experiment manager.
       critical value, so the false-positive rate on the placebo is 5% by construction. It is checked
       on 100 further placebo draws (draws 100 to 119), where at most 8% may detect (the target is
       5%; 100 draws carry a Monte Carlo error of about 2 points).
-    - **Pass.** (a) NS-U detects the 4 MW `utc` step in at least 80% of draws, and detects the 4 MW
-      `local` step in at most 10% of draws (so the clock is identified); (b) NS-HW detects the 4 MW
-      `cold` step in at least 80% of draws; (c) NS-H detects the 4 MW `cold` step in at least 80%
-      of draws. (a) covers N2 and the indexing contrast, (b) covers N4, and (c) covers N3.
-    - **Descriptive.** The same statistics for 7 MW, and on the rows of the injected half-hour only,
-      per substation. These cannot rescue a label.
+    - **Pass.** (a) NS-U detects the 4-point `utc` step in at least 80% of draws, and detects the
+      4-point `local` step in at most 10% of draws (so the clock is identified); (b) NS-HW detects
+      the 4-point `cold` step in at least 80% of draws; (c) NS-H detects the 4-point `cold` step in
+      at least 80% of draws. (a) covers N2 and the indexing contrast, (b) covers N4, and (c) covers
+      N3.
+    - **Descriptive.** The same statistics for 7 points, and on the rows of the injected half-hour
+      only, per substation. These cannot rescue a label.
 - **Scoring rows and wording of gate 4'.** "Beats" means a lower mean quantile score (unfiltered,
   as in gate 4) over the stated rows, and a tie is not a beat. Gate 4'(a) scores all
   22:00-to-08:00 British Summer Time (BST) night rows. Gate 4'(b) scores all winter-night rows. The
@@ -313,25 +325,25 @@ are agreed with the experiment manager.
   edge" and MH-sh stays exploratory.
 - **The night step on the substation cards (maintainer request; Economy 7 may be reported to
   NGED).** For each decision substation (D-labels), the card shows the fitted night step from the
-  best night arm: its size in MW, its start time, whether it follows local time or UTC (from the
-  NS-U against NS-L comparison, with an interval), and the winter-against-summer contrast with an
-  interval. This replaces the plan's rule that night levels appear as score changes only. Sizes are
-  in MW because the substations are not generators. A generator-linked series, if any, appears only
-  under a G-label with normalised units and no dates. The result states the hand-built arms'
-  winter-night scores plainly, so that the learned daily-shape library of experiment 120 can be
-  compared with them.
+  best night arm: its size in points of effective capacity and in MW, its start time, whether it
+  follows local time or UTC (from the NS-U against NS-L comparison, with an interval), and the
+  winter-against-summer contrast with an interval. This replaces the plan's rule that night levels
+  appear as score changes only. Sizes are in points and in MW because the substations are not
+  generators. A generator-linked series, if any, appears only under a G-label with normalised units
+  and no dates. The result states the hand-built arms' winter-night scores plainly, so that the
+  learned daily-shape library of experiment 120 can be compared with them.
 - **Cold nights in British Summer Time (maintainer request, before any replicate or scored fit).**
   Most Economy 7 load is storage heating, so the night step should grow with cold and a small step
   is expected in summer. UTC and local time differ only between the clock changes, so a clean test
   of the clock needs nights that are both cold and in British Summer Time. The page reports, for
   each decision substation and for the replicate and scored years, the number of such nights. A
-  night counts as cold when the daily mean ERA5 temperature at the substation's cell is below
-  8 C (the threshold of the cold-tail bin in the plan), fixed here before any score is read. Where
-  a substation has fewer than 10 cold British Summer Time nights in a year, the UTC-against-local
-  contrast for that substation is written "cannot tell". The fitted night step on the cards is
-  shown as a slope per degree below the 15.5 C hinge and a size on a stated cold night (daily mean
-  temperature 3 C), both in MW with intervals from the month-block bootstrap, beside a separate
-  small base level (the free night levels of NS-U), not a single fixed size.
+  night counts as cold when the daily mean ERA5 temperature at the substation's cell is below 8 C
+  (the threshold of the cold-tail bin in the plan), fixed here before any score is read. Where a
+  substation has fewer than 10 cold British Summer Time nights in a year, the UTC-against-local
+  contrast for that substation is written "cannot tell". The fitted night step on the cards is shown
+  as a slope per degree below the 15.5 C hinge and a size on a stated cold night (daily mean
+  temperature 3 C), both in points and in MW with intervals from the month-block bootstrap, beside a
+  separate small base level (the free night levels of NS-U), not a single fixed size.
 - **A winner is carried as a standard GAM-K piece in the recommendation** (subject to the ENS
   confirmation in "Handed on").
 
@@ -352,8 +364,8 @@ bands, and leaving one site out.
   mean dilutes them. Each arm has its own filter hyperparameters, with the control below.
 - **Indexing contrast:** NS-U-K minus NS-L-K on BST nights (April to October), 95%, labelled `UTC`
   if wholly below zero (consistent with GMT-set timers), `local` if wholly above, `unresolved`
-  otherwise, only if gate 4'(a) passes. The summer step is 1.7 MW or less, so `unresolved` is the
-  likely outcome.
+  otherwise, only if gate 4'(a) passes. The summer step is 1.7 points or less, so `unresolved` is
+  the likely outcome.
 - **Filter-fit control:** MH-K and each night arm run with B0-K's stored filter hyperparameters
   (MH-K-b0 and so on). If C1's
   label differs between MH-K and MH-K-b0, or the estimate moves by more than its half-width, C1
@@ -468,7 +480,8 @@ print a generator's public name beside its series. **No per-site curve interpret
 identified fits:** no per-site hinge slope, curve, or curve summary is printed; the only curve
 figure is the pooled summary of gate step 3, drawn only if its coverage lies within 70 to 90%. The
 night step is the exception, by the maintainer's request: per D-label substation the cards show the
-step's size in MW, slope per degree, start time, and base level with intervals, because a step that
+step's size in points and MW, slope per degree, start time, and base level with intervals, because a
+step that
 grows with cold is the quantity NGED asked about, and the per-site NS-H or NS-HW slopes are
 identified by the sharp 01:00 timing rather than by the weakly identified band slopes of experiment
 113. A generator-linked series appears only under a G-label, normalised, without dates. The step's

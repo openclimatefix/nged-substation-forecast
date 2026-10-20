@@ -1,4 +1,4 @@
-"""Gate 4'' of experiment 121: can the night arms find a 4 MW step, with a stated power target?
+"""Gate 4'' of experiment 121: can the night arms find a 4-point step, with a stated power target?
 
 Gate 4' as first written (`e00121_gate4.py`) failed with thresholds that stated no effect size and
 no power target. Gate 4'' is redefined after seeing that failure and before any replicate-year or
@@ -6,7 +6,7 @@ scored-year fit. The plan's "Clarifications" section fixes its thresholds.
 
 **Synthetic substations.** As in `e00121_gate4`: B0's real fit at the 2024-07-01 cut, plus an
 injected step, plus whole donor months of real noise inflated by the tuning-year out-of-sample over
-in-sample RMSE ratio. Steps of 4 and 7 MW (1 point of the quantile score's unit is 1 MW here) in
+in-sample RMSE ratio. Steps of 4 and 7 points of effective capacity (percent, not MW) in
 the half-hour starting 00:30: `utc` (flat, UTC clock), `local` (flat, local clock), and `cold`
 (a constant times the 15.5 degree hinge of the first smoothed temperature, scaled so its mean over
 the winter rows of that half-hour equals the size), and a `placebo` with no step.
@@ -18,8 +18,8 @@ draws (draws 0 to 19 at each of the 5 substations). An arm detects a step when i
 below the critical value. The false-positive rate is checked on 100 further placebo draws (draws
 100 to 119).
 
-**Pass.** (a) NS-U detects the 4 MW `utc` step in at least 80% of draws and the 4 MW `local` step
-in at most 10%; (b) NS-HW detects the 4 MW `cold` step in at least 80%; (c) NS-H detects it in at
+**Pass.** (a) NS-U detects the 4-point `utc` step in at least 80% of draws and the 4-point `local` step
+in at most 10%; (b) NS-HW detects the 4-point `cold` step in at least 80%; (c) NS-H detects it in at
 least 80%; and the verification placebo false-positive rate is at most 8% for each
 (target 5%; 100 draws carry a Monte Carlo error of about 2 points).
 
@@ -37,7 +37,7 @@ import e00121_gate4 as base_gate
 import numpy as np
 import polars as pl
 
-SIZES_MW: Final[tuple[float, ...]] = (4.0, 7.0)
+SIZES_POINTS: Final[tuple[float, ...]] = (4.0, 7.0)
 KINDS: Final[tuple[str, ...]] = ("utc", "local", "cold")
 ARMS: Final[tuple[str, ...]] = ("b0", "ns_u", "ns_h", "ns_hw")
 CALIBRATION_DRAWS: Final[range] = range(base_gate.N_DRAWS_PER_SITE)
@@ -68,7 +68,7 @@ def one_draw(
     truths: dict[str, np.ndarray] = {"placebo": np.zeros_like(base_mean)}
     if with_steps:
         for kind in KINDS:
-            for size in SIZES_MW:
+            for size in SIZES_POINTS:
                 scale = size / base_gate.INJECTED_POINTS
                 truths[f"{kind}{size:g}"] = scale * setup.steps[kind]
     out: dict[str, float] = {}
@@ -143,7 +143,7 @@ def summary() -> dict[str, Any]:
                 "verification_false_positive": float((checked < critical).mean()),
             }
             for kind in KINDS:
-                for size in SIZES_MW:
+                for size in SIZES_POINTS:
                     draws = statistic(
                         frame=calibration, truth=f"{kind}{size:g}", arm=arm, subset=subset
                     )
