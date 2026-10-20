@@ -41,6 +41,7 @@ from studies.dp_edge_flow import (  # noqa: E402  # noqa: E402
     run_known_input_filter,
     run_lengths,
     runs_to_trace,
+    seed_month_bootstrap,
     solve_path,
     undirected_edges,
 )
@@ -611,3 +612,37 @@ def test_the_lead_hours_spread_is_wider_where_the_residuals_are_wider():
         5,
         5,
     ]
+
+
+def test_the_seed_month_bootstrap_covers_the_true_mean_and_widens_with_noise():
+    rng = np.random.default_rng(9)
+    seeds = np.repeat(np.arange(5), 240)
+    months = np.tile(np.repeat(np.arange(12), 20), 5)
+    quiet = rng.normal(1.0, 0.1, len(seeds))
+    noisy = rng.normal(1.0, 3.0, len(seeds))
+
+    estimate, lower, upper = seed_month_bootstrap(
+        values=quiet, seeds=seeds, months=months, level=95.0
+    )
+    _, noisy_lower, noisy_upper = seed_month_bootstrap(
+        values=noisy, seeds=seeds, months=months, level=95.0
+    )
+
+    assert lower < estimate < upper
+    assert lower < 1.0 < upper
+    assert noisy_upper - noisy_lower > 5 * (upper - lower)
+
+
+def test_the_seed_month_bootstrap_is_zero_width_for_a_constant_and_rejects_bad_input():
+    seeds = np.repeat([0, 1], 24)
+    months = np.tile(np.repeat([1, 2, 3], 8), 2)
+
+    estimate, lower, upper = seed_month_bootstrap(
+        values=np.full(48, 2.5), seeds=seeds, months=months, level=95.0
+    )
+
+    assert (estimate, lower, upper) == pytest.approx((2.5, 2.5, 2.5))
+    with pytest.raises(ValueError, match="one entry per row"):
+        seed_month_bootstrap(values=np.zeros(3), seeds=seeds, months=months, level=95.0)
+    with pytest.raises(ValueError, match="percent"):
+        seed_month_bootstrap(values=np.zeros(48), seeds=seeds, months=months, level=0.95)

@@ -1615,3 +1615,67 @@ def decision_edges(
         for edge in undirected_edges(pairs=pairs)
         if set(edge) <= metered and not set(edge) & excluded
     )
+
+
+N_SEED_MONTH_RESAMPLES: Final[int] = 4000
+"""How many resamples `seed_month_bootstrap` draws."""
+
+SEED_MONTH_BOOTSTRAP_SEED: Final[int] = 116
+"""Seeds the draws of `seed_month_bootstrap`."""
+
+
+def seed_month_bootstrap(
+    *,
+    values: np.ndarray,
+    seeds: np.ndarray,
+    months: np.ndarray,
+    level: float,
+    n_resamples: int = N_SEED_MONTH_RESAMPLES,
+) -> tuple[float, float, float]:
+    """Bound the mean of row values by resampling whole calendar months within each seed.
+
+    Each resample draws, for every seed, as many months as that seed has with replacement, takes
+    the mean of the rows in the drawn months, and averages those means over the seeds. A seed is a
+    set of independent injected transfers, so the seeds are pooled and not resampled.
+
+    Args:
+        values: One value per row, such as a paired difference in quantile score.
+        seeds: Each row's seed.
+        months: Each row's calendar month label.
+        level: The interval's coverage in percent, above 1 and below 100.
+        n_resamples: The number of resamples.
+
+    Returns:
+        The point estimate (the mean over seeds of each seed's mean), and the lower and upper
+        bounds of the interval.
+
+    Raises:
+        ValueError: If the arrays differ in length, or `level` is not above 1 and below 100.
+    """
+    if not len(values) == len(seeds) == len(months):
+        msg = "values, seeds, and months must have one entry per row"
+        raise ValueError(msg)
+    if not 1.0 < level < 100.0:
+        msg = f"level is a coverage in percent, above 1 and below 100: {level}"
+        raise ValueError(msg)
+    generator = np.random.default_rng(SEED_MONTH_BOOTSTRAP_SEED)
+    cells = []
+    for seed in np.unique(seeds):
+        chosen = seeds == seed
+        month_labels, inverse = np.unique(months[chosen], return_inverse=True)
+        sums = np.bincount(inverse, weights=values[chosen], minlength=len(month_labels))
+        counts = np.bincount(inverse, minlength=len(month_labels)).astype(float)
+        cells.append((sums, counts))
+    estimate = float(np.mean([sums.sum() / counts.sum() for sums, counts in cells]))
+    resampled = np.zeros(n_resamples)
+    for sums, counts in cells:
+        draws = generator.integers(0, len(sums), size=(n_resamples, len(sums)))
+        weight = np.stack([np.bincount(row, minlength=len(sums)) for row in draws])
+        resampled += (weight @ sums) / (weight @ counts)
+    resampled /= len(cells)
+    tail = (100.0 - level) / 2.0
+    return (
+        estimate,
+        float(np.percentile(resampled, tail)),
+        float(np.percentile(resampled, 100.0 - tail)),
+    )
