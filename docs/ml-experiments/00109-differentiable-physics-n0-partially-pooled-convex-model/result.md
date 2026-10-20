@@ -39,7 +39,7 @@ verdict: inconclusive
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-20
-pr: 1387
+pr: 1392
 take_home_message: >-
   One convex model shared across substations forecast a new substation with only 4 weeks of history
   3.2 points better than a model fitted to that substation alone (and 0.8 points better with 3
