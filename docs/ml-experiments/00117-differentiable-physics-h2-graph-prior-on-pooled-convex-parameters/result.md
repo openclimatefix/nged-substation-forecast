@@ -120,12 +120,20 @@ counted, never named, on the page.
 
 **An edge penalises a coordinate only if both ends identify it:** a node identifies a coordinate if
 the rows its fit trains on make the column non-zero in at least 1,000 rows (heating and capacity
-columns) or at least one row (profile and holiday columns). **This is a clarification made after
-seeing the module and before any fit; the Opus review of the module will rule on it:** a profile
-column (one half-hour of one day type) is non-zero in about 100 to 500 rows over two years and a
-holiday column in 48 to 96, so a 1,000-row rule would leave both families with no identified
-coordinate. An MVA node trains on dark rows (solar elevation below the horizon plus a 1-hour
-margin), so its daytime-band heating columns and its capacity are not identified. D5–D16 and D10–D11
+columns), or in at least 5% of the median non-zero count of its own family's non-zero columns
+(profile and holiday columns). **This is a clarification made after seeing the module and before any
+fit; the Opus review of the module will rule on it.** The plan's single rule of 1,000 rows would
+leave profile columns (one half-hour of one day type, non-zero in about 100 to 500 rows over two
+years) and holiday columns (48 to 96 rows) with no identified coordinate, and a one-row test would
+count a column that is non-zero in a handful of twilight rows. A share of the family's own median
+count scales with the window length. **The profile's centring runs over the coordinates both ends
+identify,** so a level shift of an hour band is never penalised, as in the fleet-mean penalty. **The
+graph weight is per edge:** a substation with `d` edges is pulled `d` times as hard as one with one
+edge, and a complete graph on `S` substations with weight gamma equals the fleet-mean penalty with
+weight `S` times gamma, so the grid of gamma values is read against N's 3,000 with the graph's mean
+degree of about 2.8 in mind. An MVA node trains on dark rows (CAMS irradiance below 1 W/m², the
+series rule for dark rows; this replaces the plan's elevation-plus-margin wording, made before any
+fit), so its daytime-band heating columns and its capacity are not identified. D5–D16 and D10–D11
 carry capacity and daytime bands; the other edges carry night-band heating, profile, and holiday
 terms. Parameters are in points of effective capacity. An MVA node's effective capacity is built
 from pre-cut rows only (experiment 109's advice); the 0.97 power-factor rescale is a sensitivity.
