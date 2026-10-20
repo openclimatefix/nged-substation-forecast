@@ -43,7 +43,7 @@ take_home_message: >-
   reported a generator at every decision substation, and the export clip helped only at the one
   substation known to clip. Keep capacity pinned and the node behind its switch.
 date: 2026-10-20
-pr: <pr>
+pr: 1405
 lessons:
   - >-
     A smooth export clip helps where clipping is known, and the node and clip are harmless once the
