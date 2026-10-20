@@ -2,7 +2,8 @@ name: Studies tests
 
 # Runs the slow tests under packages/studies/tests, which the per-PR gate in ci.yml skips
 # (`--run-studies` lifts the skip). A pull request runs them only when it touches code or pages a
-# study depends on; every push to main runs them in full, so a PR that skipped them is still
+# study depends on (an experiment-only pull request does not: `ci.yml` runs the study boundaries test
+# for it); every push to main runs them in full, so a PR that skipped them is still
 # checked before the next one starts from it.
 # https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#studies-tests
 
@@ -12,8 +13,6 @@ on:
       - "packages/studies/**"
       - "studies/**"
       - "docs/studies/**"
-      - "ml-experiments/**"
-      - "docs/ml-experiments/**"
       - ".github/workflows/studies_tests.yml"
   push:
     branches: [main]
