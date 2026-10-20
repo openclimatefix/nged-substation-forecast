@@ -323,6 +323,21 @@ are agreed with the experiment manager.
   and do not change the pooled label.
 - **If the MH-sh pick is again at the grid edge** (100000, nearly B0), the page reports "at the
   edge" and MH-sh stays exploratory.
+- **Does the forecast show the 01:00 step on cold winter nights? (maintainer steer; an operator who
+  sees the step in demand and none in the forecast will distrust the rest.)** A **cold winter
+  night** is a night from 22:00 to 08:00 local time in November to February whose local calendar day
+  has a daily mean ERA5 temperature below 8 C at the substation's cell, a rule fixed here before any
+  score is read; the report prints the number of such nights per substation and year. The
+  descriptive readout, per decision substation, in the scored and replicate years, for B0-K and each
+  night arm: the median over cold winter weekday nights of the forecast step (median forecast of the
+  half-hour starting 00:30 minus the median forecast of the half-hour starting 00:00) against the
+  actual step (the same difference in observed power), in points with the MW conversion once (the
+  units bullet above), with a 95% interval from resampling whole days. The figure for the cards
+  shows the median over cold winter nights of the forecast median and 80% band, and of the observed
+  power, from 22:00 to 08:00, B0-K against the best night arm, at every decision substation. A
+  one-line list names any other miss visible on those nights (for example the timing of the morning
+  rise). This readout is descriptive and does not change a label, but a visible miss on cold winter
+  nights counts against release even when the mean score is unchanged, and the verdict says so.
 - **The night step on the substation cards (maintainer request; Economy 7 may be reported to
   NGED).** For each decision substation (D-labels), the card shows the fitted night step from the
   best night arm: its size in points of effective capacity and in MW, its start time, whether it
