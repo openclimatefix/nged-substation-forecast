@@ -262,29 +262,60 @@ winters.
 
 ![Actual demand on cold nights, E7-X series](figure_10_cold_nights_e7x.svg)
 
-## Follow-up checks to add (exploratory, none computed yet)
+## Follow-up readouts (post hoc and exploratory)
 
-**These checks come from an unverified summary of Economy 7 tariff practice. Each claim in it is a
-hypothesis to test against the data or against Elexon's public meter timeswitch code tables; nothing
-here cites it as a source.** None of them reads winter 2025-26, so the scored-year lock is
-unchanged.
+**These readouts come from an unverified summary of Economy 7 tariff practice, whose claims are
+hypotheses to test; nothing here cites it as a source.** They were chosen after seeing the main
+results, so they are post hoc, and they read winters 2021-22 to 2024-25 only (cold British Summer
+Time nights up to October 2025), leaving the scored-year lock unchanged. The script is
+`e00123_followups.py`, and `report.txt` prints every number.
 
-- **Clock share per substation (exploratory).** Report for each substation the share of cold British
-  Summer Time nights consistent with a step fixed to UTC against a step fixed to the local clock,
-  instead of one label. Legacy meters and radio teleswitches are said to stay on Greenwich Mean Time
-  all year and some smart meters to follow local time, so a substation may hold a mixture. The two
-  substations where the post hoc check did not show a one-hour shift (D14 and D9) may be mixtures.
-- **Window start, end, and split (exploratory).** Windows are said to last about 7 hours, staggered
-  by region and meter code, and sometimes split in two. Report on the cards the fitted start and the
-  end of the window (a drop near 07:30 UTC if the start is 00:30), the ramp at the start, and any
-  second window. The gate's ramp-plateau shape already covers a ramped start.
-- **Step by year (exploratory).** The radio teleswitch service is said to be closing region by
-  region in 2025 and 2026. Report the step by winter at each substation, from 2021-22 to the latest
-  winter, with `cannot tell` where the history is short. The per-winter steps in figure 3 are the
-  first version; the later winters wait for the scored-winter unlock. This also bears on how stable
-  the step is in production.
-- **Descriptive only for now.** Fixed-window heat-pump and electric-vehicle tariffs that would add a
+- **No substation shows a local-clock component on cold British Summer Time nights.** For each cold
+  night we found the half-hour entered by the largest rise between 23:30 and 03:00. On cold winter
+  nights that half-hour is the one starting 00:30 on 66% to 100% of nights (11 of 14 substations are
+  at 85% or more). On cold British Summer Time nights it falls at the local-clock step (starting
+  00:30) on at most 11% of nights (D22) and at the UTC step (starting 01:30, one hour later on the
+  clock) on 24% to 100% of nights, with the remainder at other half-hours. D14 (24%) and D9 (50%)
+  have the weakest UTC share, and their steps are the smallest or the least observed (3.0 points at
+  D14, 18 cold British Summer Time nights at D9), so a mixture of clocks is not shown, and not ruled
+  out.
+
+- **The step ramps over about one half-hour and has no visible second window.** Averaged over cold
+  winter nights and minus the summer shape, demand reaches 7% to 56% of its plateau in the half-hour
+  starting 00:00 and 81% to 119% in the half-hour starting 00:30. No substation has a second rise of
+  at least 30% of the main one. The end of the window is not visible: the largest fall between 05:00
+  and 10:00 is small (0.5 points or less at seven substations) and falls at 07:30 at only four
+  substations (D9, D10, D2, and D19), where the roughly 7-hour window would end if it began at
+  00:30. The morning demand rise overlaps the end of any window.
+
+- **The step by winter falls at five substations, rises at one, and cannot be told at eight.** The
+  label compares the first and last winter's 90% intervals. It falls at D10, D2, D3, D19, and D22,
+  rises at D11, and is `cannot tell` elsewhere, including D9, which has two winters. Only winter
+  2024-25 is the latest winter here, so the step by year cannot yet say anything about the 2025 and
+  2026 closures; that waits for winter 2025-26.
+
+- **Descriptive only for now:** fixed-window heat-pump and electric-vehicle tariffs that would add a
   night step on the local clock, and bespoke half-hourly contracts.
+
+Follow-up card rows, one per substation (percentages are shares of cold nights; the reference
+columns are the same two shares on cold winter nights; fall sizes are in points):
+
+| Series | Largest rise at the local-clock step, cold BST nights | At the UTC step, cold BST nights | Same two shares, cold winter nights | Plateau reached by the half-hour starting 00:00 / 00:30 | Largest fall 05:00 to 10:00 | Second rise | Step by winter |
+|---|---|---|---|---|---|---|---|
+| D5 | 0% | 92% | 100% / 0% | 0.18 / 0.93 | 09:30 (-1.2) | none | cannot tell (-1.0) |
+| D9 | 0% | 50% | 90% / 0% | 0.36 / 0.91 | 07:30 (-0.5) | none | cannot tell (-0.0) |
+| D10 | 0% | 72% | 97% / 0% | 0.34 / 0.99 | 07:30 (-0.4) | none | falls (-2.8) |
+| D11 | 3% | 59% | 75% / 1% | 0.27 / 0.85 | 08:00 (+0.2) | none | rises (+1.2) |
+| D14 | 0% | 24% | 72% / 0% | 0.07 / 1.16 | 05:30 (-0.4) | none | cannot tell (-1.2) |
+| D16 | 0% | 85% | 87% / 0% | 0.47 / 1.09 | 09:30 (-0.3) | none | cannot tell (-0.7) |
+| D2 | 0% | 100% | 100% / 0% | 0.44 / 1.19 | 07:30 (-0.8) | none | falls (-2.8) |
+| D3 | 0% | 100% | 100% / 0% | 0.17 / 1.09 | 09:30 (+0.3) | none | falls (-2.1) |
+| D4 | 0% | 96% | 100% / 0% | 0.56 / 1.03 | 09:00 (-2.7) | none | cannot tell (-0.5) |
+| D8 | 8% | 65% | 85% / 0% | no step | 09:30 (-1.2) | none | cannot tell (+0.2) |
+| D12 | 3% | 59% | 66% / 4% | 0.19 / 0.81 | 08:30 (-9.1) | none | cannot tell (-1.3) |
+| D19 | 0% | 99% | 100% / 0% | 0.38 / 1.02 | 07:30 (-4.8) | none | falls (-9.9) |
+| D21 | 1% | 81% | 94% / 0% | 0.45 / 1.13 | 09:30 (+0.2) | none | cannot tell (+0.3) |
+| D22 | 11% | 73% | 90% / 0% | 0.36 / 1.02 | 09:30 (-1.3) | none | falls (-2.6) |
 
 ## Limitations
 
