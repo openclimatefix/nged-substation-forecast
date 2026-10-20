@@ -418,7 +418,7 @@ def leave_one_site_out(*, contrast: Contrast, level: float, where: pl.Expr | Non
 
 def own_arms() -> list[str]:
     """Return every stored arm of this experiment, in a fixed order."""
-    base = ["b0", "mh", "mh5", shrunk_name(), "ns_l", "ns_u", "ns_h", "ns_hw"]
+    base = ["b0", "mh", "mh5", shrunk_name(), "ns_l", "ns_u", "ns_h", "ns_hw", "ns_ut"]
     arms = []
     for name in base:
         arms += [name, f"{name}_k"]
@@ -750,6 +750,12 @@ def main() -> None:  # noqa: PLR0915
         for name, row, c in zip(NIGHT_ARMS, night_rows, night_contrasts, strict=True)
     }
     print(f"\nnight labels: {night_labels}")
+    evolving = Contrast("NS-UT-K - NS-U-K (evolving against fixed step)", "ns_ut_k", "ns_u_k")
+    evolving_row = contrast_row(contrast=evolving, level=EXPLORATORY_LEVEL, where=WINTER_NIGHT)
+    print_table(
+        title="Evolving against fixed UTC step, winter nights (95%, exploratory)",
+        frame=pl.DataFrame([evolving_row]),
+    )
     indexing = Contrast("NS-U-K - NS-L-K on BST nights", "ns_u_k", "ns_l_k")
     index_row = contrast_row(contrast=indexing, level=EXPLORATORY_LEVEL, where=pl.col("bst_night"))
     print_table(title="Indexing contrast (BST nights, 95%)", frame=pl.DataFrame([index_row]))

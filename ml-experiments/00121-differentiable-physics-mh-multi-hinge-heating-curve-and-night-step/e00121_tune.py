@@ -111,7 +111,13 @@ def _edf_job(site: str) -> dict[str, float]:
 def _edf(*, cache: FeatureCache, base: design.BaseFit, arm: design.ArmSpec) -> float:
     """Return an arm's effective degrees of freedom at the base fit."""
     x = design.arm_matrix(
-        cache=cache, layout=base.layout, site=base.site, index=base.index, x0=base.x0, arm=arm
+        cache=cache,
+        layout=base.layout,
+        site=base.site,
+        index=base.index,
+        x0=base.x0,
+        arm=arm,
+        cut=base.cut,
     )
     xt = torch.as_tensor(x)
     penalty = design.penalty_for(cache=cache, base=base, arm=arm, x=x)

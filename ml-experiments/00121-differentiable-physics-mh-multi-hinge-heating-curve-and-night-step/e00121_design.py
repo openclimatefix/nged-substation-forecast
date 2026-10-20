@@ -38,7 +38,7 @@ from studies.dp_gam import (
 )
 from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity
 
-Kind = Literal["b0", "hinges", "night_l", "night_u", "night_h", "night_hw"]
+Kind = Literal["b0", "hinges", "night_l", "night_u", "night_h", "night_hw", "night_ut"]
 """What an arm adds to B0: nothing, heating hinges, free night levels (local or UTC clock), or
 the night-hinge interaction."""
 N_HEATING_COLUMNS: Final[int] = len(SMOOTHING_HOURS) * N_BANDS
@@ -56,6 +56,7 @@ class ArmSpec:
         thresholds_c: The heating hinge thresholds a `hinges` arm adds, in degrees C.
         replace_heating: True to drop B0's own heating columns (MH-5).
         shrink: The multiplier on the added columns' ridge.
+        smooth: The weight of a second-difference penalty on the added columns (NS-UT).
     """
 
     name: str
@@ -63,6 +64,7 @@ class ArmSpec:
     thresholds_c: tuple[float, ...] = ()
     replace_heating: bool = False
     shrink: float = 1.0
+    smooth: float = 0.0
 
 
 B0: Final[ArmSpec] = ArmSpec(name="b0")
@@ -74,6 +76,10 @@ MH5: Final[ArmSpec] = ArmSpec(
 NS_L: Final[ArmSpec] = ArmSpec(name="ns_l", kind="night_l")
 NS_U: Final[ArmSpec] = ArmSpec(name="ns_u", kind="night_u")
 NS_H: Final[ArmSpec] = ArmSpec(name="ns_h", kind="night_h")
+NS_UT: Final[ArmSpec] = ArmSpec(name="ns_ut", kind="night_ut", smooth=common.NS_UT_SMOOTH)
+"""Added before any replicate or scored fit: a UTC night step (00:30 to 07:30) whose level evolves
+slowly, with one non-negative level per month of the training window, a second-difference penalty,
+and the last level held through the forecast year."""
 NS_HW: Final[ArmSpec] = ArmSpec(name="ns_hw", kind="night_hw")
 """Post hoc, exploratory: the 15.5 degree hinge of each smoothing times each UTC night half-hour
 (80 columns, non-negative), so the cold-weather night step can differ by half-hour."""
@@ -100,6 +106,7 @@ def all_arms() -> dict[str, ArmSpec]:
         NS_U,
         NS_H,
         NS_HW,
+        NS_UT,
     ]
     return {arm.name: arm for arm in arms}
 
@@ -256,8 +263,36 @@ def night_hinge_columns(*, cache: FeatureCache, site: str, index: np.ndarray) ->
     return cache_hinge(cache=cache, site=site, index=index) * indicator[:, None]
 
 
+def night_ut_columns(*, cache: FeatureCache, index: np.ndarray, cut: datetime) -> np.ndarray:
+    """Return NS-UT's monthly hat-function columns times the UTC night-window indicator.
+
+    Knots sit at 30.4375-day spacing from 24 months before the cut to the cut (25 knots). A row
+    after the cut takes the last knot's level.
+    """
+    start = np.datetime64(cut.replace(tzinfo=None), "us") - np.timedelta64(
+        round(common.WINDOW_MONTHS * 30.4375 * 86400), "s"
+    )
+    days = (cache.end_times[index] - start) / np.timedelta64(1, "D")
+    n_knots = common.WINDOW_MONTHS + 1
+    position = np.clip(days / 30.4375, 0.0, n_knots - 1.0)
+    lower = np.minimum(np.floor(position).astype(np.int64), n_knots - 2)
+    weight = position - lower
+    basis = np.zeros((len(index), n_knots))
+    rows = np.arange(len(index))
+    basis[rows, lower] = 1.0 - weight
+    basis[rows, lower + 1] = weight
+    half = start_half_hour(cache=cache, index=index, local=False)
+    window = np.isin(half, list(common.NS_UT_WINDOW)).astype(np.float64)
+    return basis * window[:, None]
+
+
 def added_block(
-    *, cache: FeatureCache, site: str, index: np.ndarray, arm: ArmSpec
+    *,
+    cache: FeatureCache,
+    site: str,
+    index: np.ndarray,
+    arm: ArmSpec,
+    cut: datetime | None = None,
 ) -> tuple[np.ndarray, bool]:
     """Return the columns an arm adds and whether their slopes must be non-negative.
 
@@ -266,6 +301,7 @@ def added_block(
         site: The substation's label.
         index: Grid rows.
         arm: The arm.
+        cut: The cut of the fit (NS-UT's knots depend on it).
 
     Returns:
         The added columns (shape (n, 0) for B0) and the sign constraint.
@@ -276,6 +312,11 @@ def added_block(
             for t in arm.thresholds_c
         ]
         return np.hstack(blocks), True
+    if arm.kind == "night_ut":
+        if cut is None:
+            msg = "NS-UT needs the cut"
+            raise ValueError(msg)
+        return night_ut_columns(cache=cache, index=index, cut=cut), True
     if arm.kind == "night_h":
         return night_hinge_columns(cache=cache, site=site, index=index), True
     if arm.kind == "night_hw":
@@ -303,6 +344,7 @@ def arm_matrix(
     index: np.ndarray,
     x0: np.ndarray,
     arm: ArmSpec,
+    cut: datetime | None = None,
 ) -> np.ndarray:
     """Return an arm's design matrix: B0's kept columns, then the added columns.
 
@@ -313,13 +355,14 @@ def arm_matrix(
         index: Grid rows.
         x0: B0's design matrix at `index`.
         arm: The arm.
+        cut: The cut of the fit (NS-UT's knots depend on it).
 
     Returns:
         The arm's design matrix.
     """
     drop = set(dropped_columns(layout=layout, arm=arm))
     keep = [j for j in range(x0.shape[1]) if j not in drop]
-    block, _ = added_block(cache=cache, site=site, index=index, arm=arm)
+    block, _ = added_block(cache=cache, site=site, index=index, arm=arm, cut=cut)
     return np.hstack([x0[:, keep], block])
 
 
@@ -360,6 +403,9 @@ def arm_penalty(
     matrix = np.zeros((size, size))
     matrix[: len(keep), : len(keep)] = base[np.ix_(keep, keep)]
     matrix[len(keep) :, len(keep) :] = common.RIDGE * arm.shrink * np.eye(n_added)
+    if arm.smooth > 0.0:
+        second = np.diff(np.eye(n_added), n=2, axis=0)
+        matrix[len(keep) :, len(keep) :] += arm.smooth * second.T @ second
     constrained = np.full(size, added_constrained)
     constrained[: len(keep)] = layout.constrained[keep]
     return ArmPenalty(matrix=matrix, constrained=constrained, n_new_columns=size - base.shape[0])
@@ -478,7 +524,9 @@ class ArmFit:
 
 def penalty_for(*, cache: FeatureCache, base: BaseFit, arm: ArmSpec, x: np.ndarray) -> ArmPenalty:
     """Return an arm's penalty given its design matrix `x` at the base fit."""
-    _, constrained = added_block(cache=cache, site=base.site, index=base.index[:1], arm=arm)
+    _, constrained = added_block(
+        cache=cache, site=base.site, index=base.index[:1], arm=arm, cut=base.cut
+    )
     n_added = x.shape[1] - (base.x0.shape[1] - len(dropped_columns(layout=base.layout, arm=arm)))
     return arm_penalty(
         layout=base.layout,
@@ -501,7 +549,13 @@ def fit_arm(*, cache: FeatureCache, base: BaseFit, arm: ArmSpec) -> ArmFit:
         The fit.
     """
     x = arm_matrix(
-        cache=cache, layout=base.layout, site=base.site, index=base.index, x0=base.x0, arm=arm
+        cache=cache,
+        layout=base.layout,
+        site=base.site,
+        index=base.index,
+        x0=base.x0,
+        arm=arm,
+        cut=base.cut,
     )
     penalty = penalty_for(cache=cache, base=base, arm=arm, x=x)
     xt = torch.as_tensor(x)
@@ -533,7 +587,15 @@ def predict_arm(
     """
     features = cache.sites[base.site]
     x0 = design_matrix(cache=cache, features=features, layout=base.layout, index=index)
-    x = arm_matrix(cache=cache, layout=base.layout, site=base.site, index=index, x0=x0, arm=fit.arm)
+    x = arm_matrix(
+        cache=cache,
+        layout=base.layout,
+        site=base.site,
+        index=index,
+        x0=x0,
+        arm=fit.arm,
+        cut=base.cut,
+    )
     if not np.isfinite(x).all():
         msg = f"{base.site} has a non-finite input among the rows to predict"
         raise ValueError(msg)

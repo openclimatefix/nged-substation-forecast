@@ -44,7 +44,7 @@ def _init_worker() -> None:
 def arm_names(*, decisions: dict[str, Any]) -> list[str]:
     """Return the fitted arms, with MH-sh at the chosen multiplier."""
     shrink = float(decisions["shrink"])
-    return ["b0", "mh", "mh5", f"mh_sh{shrink:g}", "ns_l", "ns_u", "ns_h", "ns_hw"]
+    return ["b0", "mh", "mh5", f"mh_sh{shrink:g}", "ns_l", "ns_u", "ns_h", "ns_hw", "ns_ut"]
 
 
 def _hyper(*, decisions: dict[str, Any], arm: str, site: str) -> FilterHyperparameters:

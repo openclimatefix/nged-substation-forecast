@@ -323,6 +323,19 @@ are agreed with the experiment manager.
   and do not change the pooled label.
 - **If the MH-sh pick is again at the grid edge** (100000, nearly B0), the page reports "at the
   edge" and MH-sh stays exploratory.
+- **NS-UT, an evolving UTC night step, is added as an exploratory arm (maintainer steer, before any
+  replicate or scored fit).** The size of the Economy 7 effect may change from winter to winter at
+  each substation (experiment 121's tuning year does not show this; the E7 step-by-winter table of
+  PR 1416 suggests it). NS-UT is B0 plus one non-negative level per month of the 24-month training
+  window (25 monthly knots, linear between them) times an indicator for the UTC half-hours starting
+  00:30 to 07:00, a second-difference penalty of weight 1000 between neighbouring knots (fixed here,
+  not tuned) on top of B0's ridge, and the last knot's level held through the forecast year. It is
+  judged against the fixed-step NS-U on winter nights (a 95% exploratory contrast, NS-UT-K minus
+  NS-U-K), carries no label and no gate, and is outside the Bonferroni family. The cards show its
+  fitted step by winter (mean of the monthly levels from November to February), in points and MW.
+  The UTC-against-local split by year is read descriptively from the NS-U-K minus NS-L-K contrast on
+  British Summer Time nights in the replicate and scored years, with "cannot tell" where a year has
+  fewer than 10 cold British Summer Time nights.
 - **Does the forecast show the 01:00 step on cold winter nights? (maintainer steer; an operator who
   sees the step in demand and none in the forecast will distrust the rest.)** A **cold winter
   night** is a night from 22:00 to 08:00 local time in November to February whose local calendar day

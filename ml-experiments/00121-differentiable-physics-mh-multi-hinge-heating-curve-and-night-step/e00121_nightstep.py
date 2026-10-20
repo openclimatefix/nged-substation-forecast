@@ -19,7 +19,7 @@ import e00121_report as report
 import numpy as np
 import polars as pl
 
-ARMS: Final[tuple[str, ...]] = ("b0_k", "ns_l_k", "ns_u_k", "ns_h_k", "ns_hw_k")
+ARMS: Final[tuple[str, ...]] = ("b0_k", "ns_l_k", "ns_u_k", "ns_h_k", "ns_hw_k", "ns_ut_k")
 YEARS: Final[tuple[str, ...]] = ("replicate", "scored")
 COLD_NIGHT_C: Final[float] = report.COLD_BST_THRESHOLD_C
 N_RESAMPLES: Final[int] = 2000

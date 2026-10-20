@@ -85,7 +85,7 @@ def check_b0(*, cache: FeatureCache, vintages: pl.DataFrame, site: str, label: s
         cache=cache, site=site, after=cut, through=common.year_end(cut=cut)
     )
     b0_values = design.predict_arm(cache=cache, base=base, fit=fit, index=index)
-    for arm in (design.MH, design.NS_L, design.NS_U, design.NS_H, design.NS_HW):
+    for arm in (design.MH, design.NS_L, design.NS_U, design.NS_H, design.NS_HW, design.NS_UT):
         tight = replace(arm, name=f"{arm.name}_tight", shrink=TIGHT_SHRINK)
         arm_fit = design.fit_arm(cache=cache, base=base, arm=tight)
         values = design.predict_arm(cache=cache, base=base, fit=arm_fit, index=index)
@@ -111,7 +111,9 @@ def check_signs(*, cache: FeatureCache, base: design.BaseFit, site: str, label: 
     for arm in design.all_arms().values():
         if arm.kind == "b0":
             continue
-        block, constrained = design.added_block(cache=cache, site=site, index=base.index, arm=arm)
+        block, constrained = design.added_block(
+            cache=cache, site=site, index=base.index, arm=arm, cut=base.cut
+        )
         x = design.arm_matrix(
             cache=cache, layout=base.layout, site=site, index=base.index, x0=base.x0, arm=arm
         )

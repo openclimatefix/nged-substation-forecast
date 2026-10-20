@@ -72,6 +72,10 @@ MH_THRESHOLDS_C: Final[tuple[float, ...]] = (10.0, 12.0, 14.0, 16.0, 18.0)
 """The five added heating hinges, fixed before any fit from experiment 114's loss profile."""
 SHRINK_GRID: Final[tuple[float, ...]] = (10.0, 100.0, 1000.0, 10000.0, 100000.0)
 """The ridge multipliers of MH-sh's five added blocks (multiplier 1 is MH itself)."""
+NS_UT_SMOOTH: Final[float] = 1000.0
+"""NS-UT's second-difference penalty on its monthly knots, fixed before any fit."""
+NS_UT_WINDOW: Final[range] = range(1, 15)
+"""UTC half-hours (start 00:30 to 07:00) in which NS-UT's evolving step acts."""
 NIGHT_START_HALF_HOUR: Final[int] = 44
 """The first night half-hour (start 22:00); the night runs 22:00 to 08:00, 20 half-hours."""
 NIGHT_HALF_HOURS: Final[int] = 20
