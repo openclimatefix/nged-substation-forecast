@@ -10,6 +10,7 @@ level with 12 months.
 | Drift from recent demand (proposed) | Does a drift that re-estimates its level from recent demand beat a drift held constant? | 1 | Part 3, which pools the model across substations | Proposed |
 | N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Running | Nothing | Running (experiment 114) |
 | Smoothed temperatures at two time constants | Do exponentially smoothed temperatures with two decay rates, plus smoothed daily minimum and maximum, lower the convex model's error? | 2 | Experiment 114, which changes the same temperature terms | Proposed |
+| S1, cheap screens added to GAM-K (experiment 126) | Do nine cheap additions in six families (temperature curve shape, smoothed temperatures, apparent temperature, school terms, solar-elevation lighting, regime filter noise) lower the day-ahead score, winter first? | Running | Experiment 114 merging, for replicate and scored fits | Planned (experiment 126) |
 | UTC-indexed night term | Does a small level per hour band in UTC hours, from 22:00 to 08:00 UTC, remove error that the local-time daily profile leaves around the clock changes? | 3 | A descriptive check of residuals against UTC hour | Waiting on a descriptive check |
 | N11, weather encoder | Does a small learned encoder over a 5 by 5 patch of weather cells around each substation lower the error on convective and frontal days? | 4 | GPU hours (4 to 8 for the run) | Proposed |
 
