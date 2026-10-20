@@ -319,7 +319,7 @@ def figure_4_weeks() -> alt.TopLevelMixin:
             color=alt.Color(
                 "series:N",
                 scale=alt.Scale(domain=domain, range=colours),
-                legend=alt.Legend(orient="top", title=None),
+                legend=alt.Legend(orient="top", title=None, labelLimit=400, symbolLimit=10),
             ),
             row=alt.Row("site:N", sort=SITE_ORDER[:5], title=None),
             column=alt.Column("week:N", title=None),
@@ -457,10 +457,11 @@ def figure_6_gate() -> alt.TopLevelMixin | None:
         panels.append((bars + rule).properties(width=WIDTH - 220, height=130))
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="The synthetic fleet is recovered exactly without noise, not at realistic noise",
+            text="Only the network-off fit recovers the synthetic fleet, and only without noise",
             subtitle=(
                 "Worst-case error over eight synthetic substations for the pre-registered gate and "
-                "the post hoc diagnostics; the orange line is the gate's limit."
+                "the post hoc diagnostics (network on unless labelled off); the orange line is the "
+                "gate's limit."
             ),
         )
     )
