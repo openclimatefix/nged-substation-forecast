@@ -61,6 +61,8 @@ from studies.dp_gam_pooled import (  # noqa: E402
     fit_pooled,
 )
 
+from studies import dp_gam_graph  # noqa: E402
+
 CUT: Final[datetime] = datetime(2024, 7, 1, tzinfo=UTC)
 SEASON_YEARS: Final[tuple[int, ...]] = tuple(range(2019, 2026))
 LABELS: Final[tuple[str, ...]] = ("D1", "D2", "D3", "D4")
@@ -858,3 +860,40 @@ def test_the_cholesky_solver_refuses_a_matrix_that_is_not_positive_definite():
             constrained=torch.zeros(3, dtype=torch.bool),
             start_free=torch.ones(3, dtype=torch.bool),
         )
+
+
+def test_the_cholesky_path_matches_the_lu_path_on_a_fifteen_node_fleet(
+    graph_cache: FeatureCache, monkeypatch: pytest.MonkeyPatch
+):
+    base = _designs(cache=graph_cache)
+    designs = [
+        replace(base[k % 4], inputs=replace(base[k % 4].inputs, site=f"N{k:02d}"))
+        for k in range(15)
+    ]
+    nodes = tuple(design.site for design in designs)
+    graph = ring_with_chords(nodes=nodes, n_chords=6, rng=np.random.default_rng(3))
+    axis = month_axis_of(designs=designs)
+    counts = joint_month_counts(axis=axis, n_resamples=3, rng=np.random.default_rng(2))
+    penalty = GraphPenalty.of(fleet_rows=3000.0, graph_rows=3000.0)
+    fast = _solve(designs=designs, graph=graph, penalty=penalty, axis=axis, counts=counts)
+
+    def lu_member(
+        *,
+        matrix: torch.Tensor,
+        rhs: torch.Tensor,
+        constrained: torch.Tensor,
+        start_free: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, float]:
+        solution, violation = solve_bounded_quadratic(
+            matrix=matrix[None], rhs=rhs[None], constrained=constrained
+        )
+        theta = solution[0]
+        return theta, (theta > 0.0) | ~constrained | start_free, float(violation[0])
+
+    monkeypatch.setattr(dp_gam_graph, "_solve_member", lu_member)
+    slow = _solve(designs=designs, graph=graph, penalty=penalty, axis=axis, counts=counts)
+    for node in nodes:
+        assert np.abs(fast.thetas[node] - slow.thetas[node]).max() < 1e-7
+    assert fast.fleet_mean is not None
+    assert slow.fleet_mean is not None
+    assert np.abs(fast.fleet_mean - slow.fleet_mean).max() < 1e-7
