@@ -146,8 +146,12 @@ def jobs_for(*, cuts: list[str]) -> list[FitJob]:
     """Return every (cut, arm, seed) job."""
     jobs = []
     for cut_name in cuts:
-        jobs += [FitJob(cut_name, arm, 0, "svd") for arm in REFERENCE_ARMS]
-        jobs += [FitJob(cut_name, arm, seed, init) for arm in LIBRARY_ARMS for seed, init in STARTS]
+        # The tuning cut needs the decision arm only: its fits give the disjoint-window stability
+        # reading and the weights by winter.
+        arms_here = ("sh",) if cut_name == "tuning" else LIBRARY_ARMS
+        if cut_name != "tuning":
+            jobs += [FitJob(cut_name, arm, 0, "svd") for arm in REFERENCE_ARMS]
+        jobs += [FitJob(cut_name, arm, seed, init) for arm in arms_here for seed, init in STARTS]
     return jobs
 
 
