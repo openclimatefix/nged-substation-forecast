@@ -190,7 +190,7 @@ def calendar_panel(*, arrays: dict[str, np.ndarray], label: str) -> alt.ChartTyp
                 legend=alt.Legend(orient="right", title="Points"),
             ),
         )
-        .properties(width=WIDTH // 2 - 40, height=max(90, 7 * len(HOLIDAY_PERIODS)))
+        .properties(width=WIDTH // 2 - 40, height=max(90, 12 * len(HOLIDAY_PERIODS)))
     )
 
 

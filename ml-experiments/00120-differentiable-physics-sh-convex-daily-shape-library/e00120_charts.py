@@ -529,8 +529,9 @@ def figure_tails(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
                 "level:N",
                 title="Quantile level",
                 sort=["q01 coverage", "q05 coverage", "q95 coverage", "q99 coverage"],
+                axis=alt.Axis(labelExpr="replace(datum.value, ' coverage', '')", labelAngle=0),
             ),
-            y=alt.Y("coverage:Q", title="Share of actuals below the quantile"),
+            y=alt.Y("coverage:Q", title=None),
             color=colour,
         )
         .properties(width=WIDTH, height=110)
@@ -539,8 +540,9 @@ def figure_tails(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         title=_title(
             text="Tail calibration of the headline arms, scored year",
             subtitle=(
-                "A calibrated quantile covers its own level (0.01, 0.05, 0.95, 0.99). The spread "
-                "of every arm comes from one replica year."
+                "Share of actuals below each quantile; a calibrated quantile covers its own level "
+                "(0.01, 0.05, 0.95, 0.99). The three arms overlap. The spread of every arm comes "
+                "from one replica year."
             ),
         )
     )
@@ -576,7 +578,7 @@ def figure_step(*, sections: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
             subtitle=(
                 "Points of capacity: the half-hour ending 01:00 minus the one ending 00:30, local "
                 "time, on cold nights (below 2 °C) and mild nights (above 10 °C), scored year. "
-                "Fewer than 20 cold nights at four of the five substations."
+                "Each substation has only 4 to 13 cold nights in the scored year."
             ),
         )
     )

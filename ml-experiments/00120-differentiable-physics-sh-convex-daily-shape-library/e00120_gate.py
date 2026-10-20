@@ -301,6 +301,9 @@ def truth_weights(*, rng: np.random.Generator, n_sites: int, sparse: bool) -> np
         rng: The random generator.
         n_sites: The number of synthetic substations.
         sparse: True for Dirichlet 0.3 with one site near each vertex; false for Dirichlet 1.
+
+    Returns:
+        The weights.
     """
     alpha = 0.3 if sparse else 1.0
     weights = rng.dirichlet(np.full(TRUE_SHAPES, alpha), size=n_sites)
@@ -333,12 +336,10 @@ class Fleet:
     Attributes:
         cache: The synthetic cache (labels S1 to S5).
         vintages: Constant pinned-capacity vintages for the synthetic ids.
-        truth_profile: Each site's true centred profile pieces: library, deviation, band means.
         shapes: The truth shapes, or `None` for a null fleet.
         weights: The truth weights in points, shape (sites, K*), or `None` for a null fleet.
         library: Each site's library part, shape (sites, 192).
         deviation: Each site's deviation part, shape (sites, 192).
-        noise: Each site's noise on the grid.
         sites: The synthetic labels.
     """
 

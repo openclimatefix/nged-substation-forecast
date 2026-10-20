@@ -1,32 +1,32 @@
 == Lagless XGBoost bar (better of x_2y and x_2yamq on the tuning year): x_2yamq ==
 == Absolute quantile score by arm, points of capacity (headline seed) ==
-cut,arm,five sites QS,five sites MAE of mean,D16,D5,D11,D14,D9,D18,D10
-replicate,sh_all,3.053,5.218,3.043,2.980,2.621,2.107,2.604,,4.581
-replicate,sh,3.159,5.383,3.273,3.227,3.257,1.984,2.612,,4.092
-replicate,sh_g0,3.159,5.383,3.273,3.227,3.257,1.984,2.612,,4.092
-replicate,sh_wd,3.159,5.383,3.275,3.228,3.257,1.983,2.612,,4.092
-replicate,sh_k1,3.160,5.384,3.274,3.227,3.257,1.988,2.613,,4.092
-replicate,n,3.163,5.390,3.279,3.228,3.256,1.994,2.622,,4.095
-replicate,sh_nodev,3.163,5.408,3.222,3.250,3.265,2.018,2.629,,4.096
-replicate,g,3.166,5.389,3.300,3.233,3.265,1.989,2.196,,4.080
-replicate,x_2yamq,3.199,5.276,3.286,2.963,3.157,2.120,,,4.531
-replicate,x_2y,3.212,5.293,3.311,2.956,3.179,2.130,2.310,,4.543
-replicate,n_full,3.580,6.195,3.340,3.380,4.227,2.174,3.551,,4.816
-replicate,manual_heuristic,3.839,6.813,2.946,4.225,3.864,2.740,,,5.447
-replicate,climatology,3.910,7.111,3.467,4.203,3.707,2.831,,,5.386
-scored,g,2.884,5.048,2.991,3.413,2.556,2.325,2.337,12.059,3.200
-scored,sh_k1,2.912,5.081,3.086,3.431,2.566,2.371,2.373,4.431,3.175
-scored,sh,2.914,5.082,3.088,3.431,2.567,2.375,2.371,4.454,3.176
-scored,sh_g0,2.914,5.082,3.088,3.431,2.567,2.375,2.371,4.454,3.176
-scored,sh_wd,2.914,5.082,3.089,3.430,2.567,2.375,2.370,4.467,3.176
-scored,n,2.915,5.084,3.089,3.435,2.571,2.372,2.380,4.291,3.176
-scored,sh_nodev,2.924,5.115,3.061,3.495,2.581,2.369,2.360,4.350,3.188
-scored,x_2yamq,3.048,5.078,3.029,3.076,2.950,2.499,2.001,,3.684
-scored,x_2y,3.056,5.097,3.051,3.073,2.952,2.507,2.017,,3.692
-scored,sh_all,3.063,5.251,3.768,3.460,2.336,2.397,2.375,4.593,3.431
-scored,manual_heuristic,3.488,6.214,3.142,3.886,3.381,2.931,2.899,,4.129
-scored,n_full,3.553,6.186,3.497,3.579,3.636,2.814,3.850,4.532,4.232
-scored,climatology,4.068,7.317,4.198,4.486,3.559,3.211,3.036,,4.937
+cut,arm,five sites QS,five sites MAE of mean,D5,D10,D18,D9,D14,D11,D16
+replicate,sh_all,3.053,5.218,2.980,4.581,,2.604,2.107,2.621,3.043
+replicate,sh,3.159,5.383,3.227,4.092,,2.612,1.984,3.257,3.273
+replicate,sh_g0,3.159,5.383,3.227,4.092,,2.612,1.984,3.257,3.273
+replicate,sh_wd,3.159,5.383,3.228,4.092,,2.612,1.983,3.257,3.275
+replicate,sh_k1,3.160,5.384,3.227,4.092,,2.613,1.988,3.257,3.274
+replicate,n,3.163,5.390,3.228,4.095,,2.622,1.994,3.256,3.279
+replicate,sh_nodev,3.163,5.408,3.250,4.096,,2.629,2.018,3.265,3.222
+replicate,g,3.166,5.389,3.233,4.080,,2.196,1.989,3.265,3.300
+replicate,x_2yamq,3.199,5.276,2.963,4.531,,,2.120,3.157,3.286
+replicate,x_2y,3.212,5.293,2.956,4.543,,2.310,2.130,3.179,3.311
+replicate,n_full,3.580,6.195,3.380,4.816,,3.551,2.174,4.227,3.340
+replicate,manual_heuristic,3.839,6.813,4.225,5.447,,,2.740,3.864,2.946
+replicate,climatology,3.910,7.111,4.203,5.386,,,2.831,3.707,3.467
+scored,g,2.884,5.048,3.413,3.200,12.059,2.337,2.325,2.556,2.991
+scored,sh_k1,2.912,5.081,3.431,3.175,4.431,2.373,2.371,2.566,3.086
+scored,sh,2.914,5.082,3.431,3.176,4.454,2.371,2.375,2.567,3.088
+scored,sh_g0,2.914,5.082,3.431,3.176,4.454,2.371,2.375,2.567,3.088
+scored,sh_wd,2.914,5.082,3.430,3.176,4.467,2.370,2.375,2.567,3.089
+scored,n,2.915,5.084,3.435,3.176,4.291,2.380,2.372,2.571,3.089
+scored,sh_nodev,2.924,5.115,3.495,3.188,4.350,2.360,2.369,2.581,3.061
+scored,x_2yamq,3.048,5.078,3.076,3.684,,2.001,2.499,2.950,3.029
+scored,x_2y,3.056,5.097,3.073,3.692,,2.017,2.507,2.952,3.051
+scored,sh_all,3.063,5.251,3.460,3.431,4.593,2.375,2.397,2.336,3.768
+scored,manual_heuristic,3.488,6.214,3.886,4.129,,2.899,2.931,3.381,3.142
+scored,n_full,3.553,6.186,3.579,4.232,4.532,3.850,2.814,3.636,3.497
+scored,climatology,4.068,7.317,4.486,4.937,,3.036,3.211,3.559,4.198
 == Seeds of SH ==
 cut,seed,five sites QS,objective,converged,sweeps,headline
 scored,1,2.914,-883171667.813,false,50,false
@@ -124,7 +124,7 @@ scored,n,2.915,2.915,0.000
 replicate,g,3.166,3.166,0.000
 replicate,n,3.163,3.163,0.000
 == Median forecast minus mean forecast, points ==
-year,arm,D16,D10,D14,D9,D18,D5,D11
+year,arm,D18,D11,D5,D16,D9,D10,D14
 scored,g,0.000,0.000,0.000,0.000,0.000,0.000,0.000
 scored,n,0.000,0.000,0.000,0.000,0.000,0.000,0.000
 scored,n_full,0.000,0.000,0.000,0.000,0.000,0.000,0.000
@@ -134,15 +134,15 @@ scored,sh_g0,0.000,0.000,0.000,0.000,0.000,0.000,0.000
 scored,sh_nodev,0.000,0.000,0.000,0.000,0.000,0.000,0.000
 scored,sh_wd,0.000,0.000,0.000,0.000,0.000,0.000,0.000
 scored,sh_all,0.000,0.000,0.000,0.000,0.000,0.000,0.000
-replicate,g,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,n,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,n_full,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,sh,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,sh_k1,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,sh_g0,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,sh_nodev,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,sh_wd,0.000,0.000,0.000,0.000,,0.000,0.000
-replicate,sh_all,0.000,0.000,0.000,0.000,,0.000,0.000
+replicate,g,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n_full,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_k1,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_g0,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_nodev,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_wd,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_all,,0.000,0.000,0.000,0.000,0.000,0.000
 == Tail calibration on the five decision sites ==
 year,arm,season,q01 coverage,q01 pinball,q05 coverage,q05 pinball,q95 coverage,q95 pinball,q99 coverage,q99 pinball
 scored,g,all,0.0070,0.1672,0.0266,0.6278,0.8407,0.8512,0.9393,0.2838
@@ -197,59 +197,59 @@ D9,1,0.138,0.000,0.688,0.001
 D9,2,0.107,0.000,0.452,0.001
 D9,3,0.755,0.213,0.755,0.001
 == The 01:00 step in the profiles and shapes (scored-year headline fit) ==
-kind,name,rise at 01:00,contrast 01:00-07:00,users
-substation profile (library + deviation),D10,1.525,-3.991,
-substation profile (library + deviation),D11,1.104,-1.583,
-substation profile (library + deviation),D14,-0.044,-4.570,
-substation profile (library + deviation),D16,0.432,-3.608,
-substation profile (library + deviation),D18,0.551,-4.604,
-substation profile (library + deviation),D5,0.456,-2.830,
-substation profile (library + deviation),D9,-0.478,-1.694,
-shape,shape 1,0.026,-0.032,5
-shape,shape 2,0.006,-0.046,7
-shape,shape 3,-0.007,0.003,7
+kind,name,rise at 01:00,contrast 00:30-07:30 slots,users
+substation profile (library + deviation),D10,3.333,-9.334,
+substation profile (library + deviation),D11,1.584,-5.069,
+substation profile (library + deviation),D14,0.273,-9.039,
+substation profile (library + deviation),D16,1.883,-7.099,
+substation profile (library + deviation),D18,2.648,-6.763,
+substation profile (library + deviation),D5,2.668,-4.981,
+substation profile (library + deviation),D9,0.448,-5.719,
+shape,shape 1,0.061,-0.037,5
+shape,shape 2,0.011,-0.078,7
+shape,shape 3,-0.006,-0.020,7
 == The 01:00 step on cold and mild nights (actual and SH mean forecast) ==
 year,site,nights,series,step at 01:00,rows
-scored,D5,cold (below 2 C),actual,1.569,5
-scored,D5,cold (below 2 C),mean,-0.425,5
-scored,D5,mild (above 10 C),actual,-0.628,189
-scored,D5,mild (above 10 C),mean,0.145,189
-scored,D10,cold (below 2 C),actual,1.019,16
-scored,D10,cold (below 2 C),mean,1.420,16
-scored,D10,mild (above 10 C),actual,0.405,182
-scored,D10,mild (above 10 C),mean,1.343,182
-scored,D11,cold (below 2 C),actual,-3.439,16
-scored,D11,cold (below 2 C),mean,-2.114,16
-scored,D11,mild (above 10 C),actual,0.092,184
-scored,D11,mild (above 10 C),mean,0.971,184
-scored,D14,cold (below 2 C),actual,0.666,13
-scored,D14,cold (below 2 C),mean,-0.317,13
-scored,D14,mild (above 10 C),actual,-0.335,188
-scored,D14,mild (above 10 C),mean,-0.315,188
-scored,D16,cold (below 2 C),actual,2.159,5
-scored,D16,cold (below 2 C),mean,0.486,5
-scored,D16,mild (above 10 C),actual,0.097,193
-scored,D16,mild (above 10 C),mean,0.217,193
-replicate,D5,cold (below 2 C),actual,1.874,24
-replicate,D5,cold (below 2 C),mean,0.644,24
-replicate,D5,mild (above 10 C),actual,-0.472,188
-replicate,D5,mild (above 10 C),mean,0.638,188
-replicate,D10,cold (below 2 C),actual,1.803,26
-replicate,D10,cold (below 2 C),mean,1.806,26
-replicate,D10,mild (above 10 C),actual,0.496,161
-replicate,D10,mild (above 10 C),mean,1.695,161
-replicate,D11,cold (below 2 C),actual,2.039,26
-replicate,D11,cold (below 2 C),mean,1.194,26
-replicate,D11,mild (above 10 C),actual,0.410,175
-replicate,D11,mild (above 10 C),mean,1.135,175
-replicate,D14,cold (below 2 C),actual,0.426,24
-replicate,D14,cold (below 2 C),mean,-0.134,24
-replicate,D14,mild (above 10 C),actual,-0.303,183
-replicate,D14,mild (above 10 C),mean,-0.128,183
-replicate,D16,cold (below 2 C),actual,1.026,25
-replicate,D16,cold (below 2 C),mean,0.545,25
-replicate,D16,mild (above 10 C),actual,-0.173,186
-replicate,D16,mild (above 10 C),mean,0.512,186
+scored,D5,cold (below 2 C),actual,5.740,4
+scored,D5,cold (below 2 C),mean,2.601,4
+scored,D5,mild (above 10 C),actual,2.257,194
+scored,D5,mild (above 10 C),mean,2.471,194
+scored,D10,cold (below 2 C),actual,11.308,13
+scored,D10,cold (below 2 C),mean,3.371,13
+scored,D10,mild (above 10 C),actual,0.693,183
+scored,D10,mild (above 10 C),mean,3.262,183
+scored,D11,cold (below 2 C),actual,3.807,13
+scored,D11,cold (below 2 C),mean,1.512,13
+scored,D11,mild (above 10 C),actual,0.131,185
+scored,D11,mild (above 10 C),mean,1.481,185
+scored,D14,cold (below 2 C),actual,1.574,11
+scored,D14,cold (below 2 C),mean,0.147,11
+scored,D14,mild (above 10 C),actual,-0.427,194
+scored,D14,mild (above 10 C),mean,0.192,194
+scored,D16,cold (below 2 C),actual,7.072,5
+scored,D16,cold (below 2 C),mean,1.859,5
+scored,D16,mild (above 10 C),actual,0.222,196
+scored,D16,mild (above 10 C),mean,1.652,196
+replicate,D5,cold (below 2 C),actual,6.873,23
+replicate,D5,cold (below 2 C),mean,2.623,23
+replicate,D5,mild (above 10 C),actual,0.225,193
+replicate,D5,mild (above 10 C),mean,2.462,193
+replicate,D10,cold (below 2 C),actual,9.048,26
+replicate,D10,cold (below 2 C),mean,3.146,26
+replicate,D10,mild (above 10 C),actual,0.415,167
+replicate,D10,mild (above 10 C),mean,2.935,167
+replicate,D11,cold (below 2 C),actual,3.204,26
+replicate,D11,cold (below 2 C),mean,1.463,26
+replicate,D11,mild (above 10 C),actual,0.522,181
+replicate,D11,mild (above 10 C),mean,1.406,181
+replicate,D14,cold (below 2 C),actual,1.194,23
+replicate,D14,cold (below 2 C),mean,0.379,23
+replicate,D14,mild (above 10 C),actual,-0.748,188
+replicate,D14,mild (above 10 C),mean,0.185,188
+replicate,D16,cold (below 2 C),actual,6.884,24
+replicate,D16,cold (below 2 C),mean,1.512,24
+replicate,D16,mild (above 10 C),actual,-0.300,190
+replicate,D16,mild (above 10 C),mean,1.461,190
 == Clock of the largest night-time rise on cold nights (post hoc style readout) ==
 year,site,clock,cold nights,largest rise ends at,rise (points)
 scored,D5,British Summer Time,16,01:00 UTC,3.285
