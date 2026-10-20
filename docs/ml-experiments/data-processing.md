@@ -218,6 +218,15 @@ and drift against no drift)
 Applies to experiments and to production. Confidence: high, because the centred and uncentred sets
 differ only in this shift.
 
+**Give a capacity increment only to a season-year with enough training rows (provisional).** A fit
+whose cut is 2024-07-01 includes the half-hour that ends exactly at the cut, which belongs to
+season-year 2024 and leaves that season-year 2 rows at D5. A free capacity increment for those 2 rows
+reached -56 points in an unconstrained fit. The N5 scripts drop any season-year with fewer than 1,000
+training rows from the capacity columns, so the rows count towards the previous season-year's
+capacity ([experiment 113](00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result.md)).
+Applies to experiments that fit the convex model's capacity. Evidence: D5 at the 2024-07-01 cut.
+Confidence: high.
+
 ## Timestamps and availability
 
 **Treat ERA5 as available about 5 days after the event, so ERA5 at lag times is a ceiling and not an

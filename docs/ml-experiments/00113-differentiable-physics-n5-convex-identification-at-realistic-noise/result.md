@@ -1,10 +1,12 @@
 ---
 id: "00113"
 slug: differentiable-physics-n5-convex-identification-at-realistic-noise
-title: "Differentiable physics, N5: does the convex model identify heating slopes and PV capacity at realistic noise?"
 theme: differentiable-physics-embedded-generation
-also_relevant_to: [differentiable-physics-pooling-across-substations, differentiable-physics-demand-calendar-and-weather, solar-disaggregation]
-status: planned
+also_relevant_to:
+  - differentiable-physics-pooling-across-substations
+  - differentiable-physics-demand-calendar-and-weather
+  - solar-disaggregation
+status: done
 size: >-
   medium: experiment scripts only, no module change (every variant fit is a column subset of one
   Gram matrix per substation, solved with studies.dp_gam's solver). See "Size triggers".
@@ -28,257 +30,219 @@ metric: >-
   Coverage of 80% intervals over 100 synthetic substations, with site-clustered bootstrap intervals,
   for each hour band's total heating slope and the latest season-year's PV capacity; median width
   in points and as a share of the truth; variance ratios and effective sample size
+verdict: refuted
 production_status: not-for-production
+take_home_message: >-
+  At the noise the real fits actually have, the convex model's 80% bootstrap intervals for heating
+  slopes and for rooftop PV capacity contain the true value 84% of the time, so they can go on
+  substation cards, but the heating slopes are weak (the intervals are about 38% of the slope wide)
+  and the posterior interval of the same fit is not usable (20%). The pre-registered verdict is
+  refuted, because in the low-noise control the capacity interval missed the truth 48% of the
+  time, because the penalty's shrinkage bias of about 0.35 points is small against a real-noise
+  interval 2.8 points wide, and large against a low-noise one. Pooled estimates stay weakly
+  identified, because the seasonal terms absorb about 80% of a heating slope's variance.
+advice:
+  - >-
+    Report the 80% month-block bootstrap with stratified quarters and the
+    square-root-of-m-over-m-minus-1 inflation for the convex model's heating slopes and capacity,
+    never the posterior interval, which covered 20% at real noise (figure 1).
+  - >-
+    Treat a convex heating slope as weakly identified at real noise, since the 80% interval is
+    about 38% of the slope wide, because the day-of-year harmonics absorb about 80% of the variance
+    (figure 3, figure 4).
+  - >-
+    Score a penalised fit's interval against the noise-free fit's value as well as the truth, and
+    print the bias over the width, because the ridge shrinks capacity by about 0.35 points (the
+    low-noise capacity row of figure 1).
+  - >-
+    Do not remove the harmonics to tighten heating slopes unless the heating-slope bias is checked:
+    a fit without harmonics on a truth with them overstates slopes by 66% and covers 27% (G-0 on
+    T-HD).
+  - >-
+    Test the pooled model's identification with the same real-residual noise before reading any
+    pooled capacity or slope, since a pooled fit with no drift and harmonics is the G-0 case here.
+date: 2026-10-20
+pr: 1393
 adopted_in: none
 code: ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/
 ---
 
 # Differentiable physics, N5: does the convex model identify heating slopes and PV capacity at realistic noise?
 
-**Theme: embedded generation, because N5 feeds Part 5's capacity question** (fitted or pinned, and
-what interval a card may print).
+**At the noise the real fits have, the convex model's 80% month-block bootstrap intervals contain
+the true heating slope and the true PV capacity 84% of the time each, but a heating slope is only
+known to within about 38% of its size, and the pre-registered verdict is `refuted` because the
+capacity interval failed the low-noise control.** The failure is a deterministic shrinkage bias of
+the ridge penalty (about 0.35 points of capacity). It is small against a real-noise interval 2.8
+points wide and large against a low-noise one 0.69 points wide. Against the noise-free fit's own
+value the same intervals cover 85%, so the interval method works and the bias is the problem. The
+posterior interval of the same fit covers only 20% at real noise and must not go on a card. The
+cause of the weak heating slopes is plain: the day-of-year harmonics and the drift term can
+reproduce the seasonal cycles of temperature and clear-sky PV, and so they absorb about 80% of a
+heating slope's variance. Experiment 112's failure to identify slopes and capacities at real noise
+is therefore expected of any fit with those seasonal terms, not a flaw of the pooled optimiser.
 
-## What N5 asks, and why now
+We built 100 synthetic substations on the real calendar, weather, and PV shape of 5 Primary
+substations (20 each), put a known heating slope per hour band and a known PV capacity into each,
+added either real residuals borrowed from other substations (the decision noise, standard deviation
+4.97 points, autocorrelation 0.83 at one half-hour) or independent noise (standard deviation 5),
+and asked how often each 80% interval contains the truth. No forecast is scored, so there is no
+quantile score, tail table, or curtailment number. "Identified" means the data fix a quantity
+within a narrow range. A "calibrated" interval contains the truth as often as its nominal 80%. The
+"effective sample size" is the number of independent half-hours that carry the same information as
+the autocorrelated rows.
 
-**N5 asks whether the convex per-site model can tell how much heating and how much rooftop PV sits
-in a substation's demand at real noise levels.** Experiment 112's gate (noise sd 5.01 points, week
-blocks from any season of a donor's residuals) saw the pooled VP fit miss thresholds by up to
-5.7 °C, band slopes by 40 to 76%, and growth by up to 2.5 points (most capacities within 10%, the
-worst 42 to 44% off); network off, it failed at sd 5.0, was exact with no noise, and fine at sd 1.0
-(numbers from the design session; 112's write-up is quoted for them).
+## Figures
 
-**The mechanism to test.** The convex model carries two day-of-year harmonics per hour band, a
-monthly drift path per band (D1), and a daily profile per day type. Together these terms can
-reproduce the seasonal cycles of temperature and of clear-sky PV, which leaves day-to-day weather
-anomalies to identify the slopes and the capacity. Removing columns always narrows a nested fit,
-so the question is only how much: the label below is pre-registered as a size.
+**Figure 1 shows the month-block bootstrap (I1) covering the truth 84% of the time at real noise,
+and the posterior interval (I2) 20%.** Under independent noise the posterior interval is fine for
+heating slopes (80%), and the capacity row shows the shrinkage bias: I1 covers the truth 52% of the
+time, and the noise-free fit's value 85%.
 
-**Weak identification is acceptable if the interval says so.** **Size triggers:** private files
-only; serving path untouched; one design of several pre-registered; no caller in `packages/`.
+![Coverage of the 80% intervals](figure_1_coverage.svg)
 
-## Synthetic substations
+**Figure 2 shows the estimates scattering around the truth with a median signed relative error of
+-1.4% for band slopes and -1.3% for capacity.**
 
-**One hundred synthetic substations: 20 draws on each decision site's real rows** (`default_rows`,
-all years to the 2024-07-01 cut, lockdown out, masks applied), with its real calendar, weather, PV
-shape, and `dp_gam.design_matrix`; only the target is synthetic. For a linear fit on a fixed design
-the estimation error and the bootstrap width depend only on the noise, not on θ_truth, so draws at
-one site are independent trials only as far as their noise is. The noise pool below makes two draws
-share a month's noise rarely (about one month in 24), and coverage is judged with site-clustered
-intervals, whose design effect the write-up quotes. For scale: a correct 80% interval lands in 70
-to 90% about 95% of the time over 50 independent trials, but only 67% of the time over 15.
+![Estimate against truth](figure_2_recovery.svg)
 
-**Generator F:** target = X·θ_truth + noise, X the full convex design with D1. θ_truth starts from
-Part 2's tuned all-years D1 fit at that site and cut:
+**Figure 3 shows the seasonal terms widening the heating-slope intervals.** Where the truth has no
+harmonics or drift, the fit that omits them has an I1 interval about 0.55 times as wide (relative
+width 0.21 against 0.38; real noise, band slopes), and an I2 interval 0.44 times as wide, matching
+the exact variance ratio's prediction of 0.44.
 
-- **Heating:** each band's total slope (the sum over the 6, 24, 72, and 168 hour smoothings: the
-  response to a sustained cold spell) is the real band total times U(0.7, 1.3), floored at 2 points
-  per 10 °C, split across smoothings as (0.2, 0.1, 0.3, 0.4).
-- **Capacity:** first season-year U(5, 25) points, each later increment U(1, 5) points.
-- **Truth T-HD:** the real fit's harmonics and its D1 drift path (a path the tuned penalty already
-  supports). **Truth T-0:** harmonics and drift zero.
-- Profile, holidays, tent, and lighting at the real fit's values.
+![Interval width by arm](figure_3_widths.svg)
 
-**The truth is in the model's form but not free of its penalty.** The ridge and the drift penalty
-shrink every fit deterministically. The script computes that bias analytically for each functional,
-b = −vᵀ(G + P)⁻¹Pθ_truth, and coverage is scored twice: of the truth (primary), and of the
-noise-free fit's value, truth + b (the interval method's own coverage). Bias over width is reported.
+**Figure 4 shows which term absorbs the information.** The harmonics carry the heating slopes
+(removing them leaves 26 to 32% of the variance); the drift carries part of the capacity (removing
+it leaves 73%). At the looser drift penalty of experiment 106 (step 30) the drift absorbs less of
+the heating slopes and more of the capacity.
 
-**Noise, drawn independently per synthetic substation:**
+![Variance absorbed by each term](figure_4_absorption.svg)
 
-- **iid5:** Gaussian, sd 5.0 points. **Controls:** noise-free, and iid sd 1.0 (error only), one
-  draw per site.
-- **Real (the decision noise):** each target month takes a whole month of real convex training
-  residuals (from each donor's all-years D1 fit at the same cut), drawn uniformly from all four other
-  decision sites and every year other than the target's in the same calendar month (about 10 to 12
-  options), with a random sign per month block, aligned by day and half-hour; missing slots are
-  zero, and their share is reported. The calendar month keeps the season's noise level; the other
-  year stops the donor's weather lining up with the target's. This differs from 112's noise (week
-  blocks from any season), which the write-up says wherever N5 is read against 112. Reported: the
-  noise's sd and autocorrelation at lags of 1, 48, and 336 half-hours; and the bias from seasonal
-  misfit in the donor residuals, measured by fitting G-full to the noise alone, averaged over draws.
+**Figure 5 shows the real fits at the 2025-07-01 cut.** The fitted latest capacity is 0 to 20% below
+the weekly vintage's season-year mean at the 4 substations that have one, and I1 is about 5 times as
+wide as I2.
 
-## Fits
+![Real latest capacity per substation](figure_5_real_capacity.svg)
 
-**Every fit is a column subset of one design, so each site needs one Gram matrix per window.** Per
-site and window, `dp_gam.accumulate_gram` builds `X^T W X` with the full layout for 201 weightings
-(unweighted, 100 for I1, 100 for I1u; about 400 MB at about 500 columns); each target then needs only
-`X^T W y`. A fit drops the rows and columns of the terms it omits and calls
-`dp_gam.solve_bounded_quadratic` with `dp_gam.penalty_matrix`'s penalties. A pinned fit drops the
-capacity columns and shifts the right-hand side by the Gram block times the pinned increments, which
-equals adding the pinned PV to net power (the capacity columns carry a minus sign).
+## Headline numbers
 
-| Arm | Harmonics | D1 | Capacity | Run on |
-|---|---|---|---|---|
-| G-full | yes | yes, Part 2's `drift_step` 3,000 | fitted | T-HD and T-0 |
-| G-full-30 | yes | yes, Part 4's `drift_step` 30 | fitted | T-HD and T-0 |
-| G-full-pin | yes | yes, 3,000 | pinned to the truth | T-HD |
-| G-full-pin80 | yes | yes, 3,000 | pinned to 0.8 × truth (inside experiment 40's ±20%) | T-HD (exploratory) |
-| G-0 | no | no | fitted | T-0 (the diagnostic); T-HD (misspecified, exploratory) |
-| G-0-pin | no | no | pinned to the truth | T-0 |
-| G-H, G-D | one of the two | | fitted | T-0 (which term absorbs more, exploratory) |
+- **Design:** convex model of `studies.dp_gam` with fitted capacity and D1 drift (ridge 0.1, drift
+  step 3,000), one design per substation, cut 2024-07-01, all years, lockdown out. Every fit is a
+  column subset of that design; control 1 shows it reproduces `fit_gam`. 20 draws at each of D5,
+  D10, D11, D14, and D16; truth heating totals U(0.7, 1.3) times the real fit's (floor 2 points per
+  10 °C); capacity U(5, 25) points then U(1, 5) increments; truth T-HD keeps the real fit's
+  harmonics and drift, T-0 zeroes them. Real noise: whole months of other decision substations'
+  residuals, other years, random sign; 4.7% of slots were empty (set to zero).
+- **Decision rule, per family (I1 coverage of the truth in the decision cell and the
+  independent-noise cell):** band slopes `calibrated` (84% with site-clustered 95% interval 76 to
+  90%, and 83%, 78 to 88%); capacity `overconfident` (84%, 76 to 91%, and 52%, 30 to 74%). Verdict
+  `refuted`.
+- **Width, decision cell:** band slopes 3.3 points per 10 °C, 38% of the truth, so `weak`; capacity
+  2.8 points, 12% of the truth, so `precise`. Under independent noise 8% and 3%.
+- **Posterior interval (I2) at real noise:** 20% (bands) and 19% (capacity). The
+  bootstrap-to-sandwich variance ratio is 24 (bands) and 21 (capacity), so the effective sample
+  size is 0.25% (bands) and 0.84% (capacity) of the rows. I1 is 5.0 and 4.5 times as wide as I2.
+- **Penalty bias:** median 0.35 points for capacity; over width 0.51 at independent noise and 0.13
+  at real noise. Heating slopes: 0.07 points, 0.02 of the width at real noise. Fitting the full
+  model to the real noise alone returns 5.1 to 5.9% of the true slope and 3.6% of the true capacity.
+- **Absorption (G-0 against G-full, drift step 3,000):** r is 0.18 to 0.22 for band slopes and 0.67
+  for capacity; at step 30 it is 0.17 to 0.20 and 0.60. The capacity ratio is above the 0.56 limit,
+  so the label is `absorption partial` at both penalties, though the heating slopes alone would be
+  `absorption large`. The Monte Carlo width ratios (0.44 and 0.83 at real noise) match the square
+  roots of r (0.44 and 0.82).
+- **Other arms (I1 coverage, real noise, T-HD unless stated):** G-full-30 83% and 80%; capacity
+  pinned to the truth 84%; pinned to 0.8 times the truth 83% (the median slope error moves by 1.2
+  percentage points from the pinned-truth arm); no bounds 84% and 79% (95% of fits have an active
+  heating bound); G-0 on T-HD 27% and 0%, with
+  slopes overstated by 66% and capacity by 35%; the 2-year window 85% and 81%, only 1.2 times as
+  wide for slopes and 0.93 times for capacity. On T-0: G-0 73% and 71%, G-H 84% and 75%, G-D 75%
+  and 80%.
+- **Noise:** autocorrelation 0.83, 0.44, and 0.21 at lags of 1, 48, and 336 half-hours; standard
+  deviation 4.97 points.
 
-**The decision cell is G-full on T-HD with the real noise; the iid5 cell is G-full on T-HD with
-iid5.** The diagnostic pair is G-0 against G-full (and G-full-30) on T-0 with the same draws. G-full
-on the 2-year window before the cut (112's window) runs beside the decision cell. **Generator V
-(112's) is dropped:** its heating, relu(threshold − mixed temperature), has no band total slope to
-score, and thresholds belong to N4.
+## Predictions against outcome
 
-## Intervals and scored functionals
+- **Held:** decision-cell I1 coverage 70 to 90% for both families; band slopes `weak`; capacity
+  width under 25%; I2 under 60% at real noise; τ between 3 and 30; I1 and I2 both 70 to 90% for
+  band slopes under independent noise; r at most 0.36 for every band slope; Monte Carlo width ratio
+  within 0.1 of √r; G-0 on T-HD under 50%; the pinned-0.8 arm within 10%; an active bound in over
+  30% of fits; unbounded coverage within 5 points; spectral share over 70% in G-full; I1 2 to 5
+  times I2; the night-band slope excluding zero at all 5 real sites.
+- **Failed:** I1 and I2 both 70 to 90% for capacity under independent noise (52% and 39%); the
+  penalty bias under a quarter of the width at independent noise (0.51); the noise-only bias under
+  5% of the true slope (5.1 to 5.9%); r at most 0.56 for capacity (0.67);
+  drift absorbing more of the night band than harmonics (the harmonics absorb it); G-0's spectral
+  share under 50% (70 to 83%); 2-year widths 1.3 to 2 times the all-years widths (1.2 and 0.93).
+- **Real data (scored cut):** I1 capacity intervals are 2.7 to 5.9 points wide (D5 4.2, D10 5.9, D11
+  3.1, D14 2.7, D16 4.2); they overlap the vintage's ±20% band at all 4 sites that have a vintage
+  (D14's stops in 2023). The night-band slope excludes zero at 5 of 5 sites.
 
-**Three 80% interval methods:**
+## Substation cards for the five decision substations
 
-- **I1 (decision):** a month-block bootstrap of 100 weightings, stratified by calendar quarter, so
-  every resample keeps every season. **Pre-registered inflation:** its half-widths about the
-  bootstrap median are multiplied by √(m/(m − 1)), with m the months per quarter in the window for
-  band slopes (about 13 on all years, 6 on 2 years) and m = 6 for the latest capacity, which rests
-  on its season-year's six summer months. The uninflated interval is reported beside it, with each
-  functional's supporting-month count and the share of resamples holding under half of them.
-- **I1u:** the unstratified `dp_gam.month_block_weights`, 100 weightings.
-- **I2 (posterior):** Gaussian, from A⁻¹σ̂², A the penalised Gram matrix.
+Provisional: fitted to past weather on a screening run, fit up to 2025-07-01, 80% month-block
+bootstrap (I1), points of effective capacity (heating: per 10 °C). Heating slopes carry the label
+"80% month-block bootstrap; calibrated for noise on in-family synthetic data (N5); excludes
+PV-shape bias; weak". The capacity intervals carry no N5 label, because the capacity family failed
+its gate, and are printed with "overconfident in the low-noise control (experiment 113)". Pooled or
+variable-projection numbers carry "weakly identified at real noise levels (experiment 112)".
 
-**Scored:** each band's total heating slope (400 intervals per cell) and the latest season-year's
-capacity (100). The cut falls on a season-year boundary, so that season-year is complete.
-Reported: every season-year's capacity, the latest growth increment, and the share of each band's
-slope on the 6 and 24 hour smoothings; single smoothing slopes are never scored (nearly collinear).
-**Per functional and cell:** coverage of the truth and of truth + b, with a site-clustered bootstrap
-interval (sites resampled, then draws); median signed relative error; root mean square relative
-error; median width, in points and relative; coverage per real site. A family is `precise` if its
-median relative width is at most 20% (capacity) or 30% (band slope), otherwise `weak`.
+| Substation | Night | Morning | Midday | Evening | Capacity, 2024 season-year |
+|---|---|---|---|---|---|
+| D5 | 7.9 to 10.5 | 9.7 to 13.3 | 9.6 to 13.0 | 8.3 to 10.9 | 56.3 to 60.5 |
+| D10 | 15.5 to 19.8 | 17.8 to 22.5 | 18.8 to 23.7 | 16.1 to 20.2 | 39.3 to 45.2 |
+| D11 | 6.9 to 9.7 | 9.2 to 12.1 | 8.9 to 12.2 | 6.7 to 9.9 | 25.1 to 28.2 |
+| D14 | 5.2 to 7.0 | 7.8 to 9.2 | 9.3 to 10.7 | 7.0 to 9.0 | 29.4 to 32.2 |
+| D16 | 4.3 to 6.6 | 5.5 to 8.0 | 6.1 to 8.9 | 3.4 to 5.8 | 29.8 to 34.0 |
 
-**Active bounds:** the near-collinear heating columns hit non-negativity in many bootstrap fits, so
-the decision cell is also solved unbounded; reported: the share of fits with an active heating
-bound, and the unbounded interval's coverage.
+## Checks
 
-## Variance ratios and effective sample size
+- **Median forecast minus mean forecast, per site:** not applicable; no forecast is made. The
+  estimates' own bias is the median signed relative error: -1.4% (bands), -1.3% (capacity).
+- **Mean-forecast error beside the quantile score:** not applicable for the same reason.
+- **Triggers fired:** (2) the convex model's capacity is `precise` at real noise where experiment
+  112's pooled fit failed, and the diagnostics that explain why (the seasonal terms absorb
+  information, and the in-family truth excludes PV-shape bias) are recorded in this page but not
+  yet tested by a fresh agent; (3) the capacity family's coverage fails at independent noise with a
+  bias 0.51 of the width, so coverage and bias point in different directions; (7) the cards, Part
+  5's capacity reading, and the next pooled test depend on the result. Not fired: (1) all five
+  controls pass (the largest relative difference from `fit_gam` is 4.9e-10, noise-free recovery is
+  exact to 1.6e-12 over 235 checks, I2 covers 79.5% of the noise-free value over 500
+  independent-noise draws, I1's coverage on the cell's 100 draws is 78% and 81%, every resample
+  keeps every quarter's size, and no row is past its cut); (4) the gate labels do not change with
+  any one site left out (the capacity row stays `overconfident` and the band row `calibrated`); (5)
+  G-full never beats the true smaller G-0 on T-0 in error (3.2% against 1.6% for band slopes at
+  independent noise); (6) Part 5's K-base ranges were not read, so the trigger is unchecked. A
+  fresh Opus audit and numbers review are requested.
 
-- **Absorption ratio (the label's quantity):** r = vᵀA₀⁻¹v / vᵀA⁻¹v, the exact variance of
-  c = vᵀθ in the smaller fit over the full fit (G-0, harmonics only removed, drift only removed),
-  at both drift penalties. Under iid noise √r predicts the diagnostic pair's width ratio; the Monte
-  Carlo widths check it.
-- **Collinearity share ρ (descriptive):** (vᵀv)² / (vᵀAv · vᵀA⁻¹v). For a sum of coefficients ρ
-  depends on how the other directions are parameterised, so it carries no threshold.
-- **Autocorrelation factor τ:** I1's variance over the sandwich variance A⁻¹GA⁻¹σ̂², the frequentist
-  variance of a penalised fit under independent noise (G the unpenalised Gram matrix).
-- **Effective sample n_eff = n · ρ / τ,** in rows and site-days, on the synthetic and real designs.
-- **Spectral check:** the share of the partialled column's variance at periods under 10 days.
+## Caveats and what to try next
 
-## Real data: five decision sites
+- **Caveats:** ERA5 and CAMS flatter the solar term; in-family truths cannot show PV-shape bias
+  (experiment 112's gate test 1); the donors are the other decision substations; the m over m minus
+  1 inflation is an approximation (uninflated I1 covers 83% and 80%); N5's noise is not 112's
+  (whole months of
+  the same season from another year, not weeks from any season); capacity's supporting months, as
+  counted, are 11 and not the planned 6; the 2024 season-year column is dropped (see the
+  data-processing page).
+- **Next:** a test of the pooled model with the real-residual noise before reading any pooled
+  capacity or slope; a capacity interval centred on the noise-free fit (bias-corrected) would put
+  the capacity family through the gate again, which needs a new pre-registration; Part 5's capacity
+  rule may use I1's range at real noise, but the gate says not to print it as calibrated.
 
-**Bootstrap intervals for the cards.** At the 2025-07-01 cut (replicate 2024-07-01), all years,
-lockdown out, fitted capacity, with and without D1: I1, I1u, and I2 for each band's slope and each
-season-year's capacity at D5, D10, D11, D14, and D16, beside the vintage's season-year mean,
-`dp_pinned_capacity`'s value (D14 flagged), Part 5's K-base range where stored, and Part 3's pooled
-fit; r, τ, and n_eff on the real design. **Card labels, per family:** where that family's gate
-passes, "80% month-block bootstrap; calibrated for noise on in-family synthetic data (N5); excludes
-PV-shape bias", with N5's `precise` or `weak`; otherwise no convex interval. A pooled DP estimate
-carries "weakly identified at real noise levels (experiment 112)".
+## Reproduce
 
-## Known-answer controls (blocking, before any noisy cell is read)
+```bash
+uv run python ml-experiments/00113-*/e00113_grid.py reals
+uv run python ml-experiments/00113-*/e00113_grid.py control
+uv run python ml-experiments/00113-*/e00113_controls.py static
+uv run python ml-experiments/00113-*/e00113_controls.py noisy
+uv run python ml-experiments/00113-*/e00113_grid.py main
+uv run python ml-experiments/00113-*/e00113_analytic.py
+uv run python ml-experiments/00113-*/e00113_real.py
+uv run python ml-experiments/00113-*/e00113_summary.py
+uv run python ml-experiments/00113-*/e00113_report.py
+uv run python ml-experiments/00113-*/e00113_charts.py
+```
 
-**A failed control stops the noisy cells; if it cannot be fixed, the verdict is `inconclusive`.**
-(1) The G-full and no-drift subsets reproduce `dp_gam.fit_gam` with the matching `GamSpec` on each
-real target to 1e-8 relative; G-0 and the pinned shift match a dense float64 bounded least-squares
-fit of the same columns on the adjusted target (net power plus the pinned PV) to 1e-8.
-`PinnedCapacity` is weekly and cannot reproduce season-year steps, so it is not the reference.
-(2) Generator F with no noise: every fit containing the truth's columns returns truth + b for every
-scored functional to 1e-6. (3) G-0 on T-0 with iid5 on 500 draws (one solve each): I2's coverage
-within 77 to 83% for both families; I1's on the cell's 100 draws within 70 to 90%. (4) Every
-stratified resample keeps each quarter's month count. (5) No training row after its cut; nothing
-on or after 2026-07-01.
-
-## Predictions
-
-Written before any fit; each line can fail, and none overrides the decision rule.
-
-- **Decision cell (I1):** coverage of the truth 70 to 90% for both families; band slopes `weak`
-  (median relative width 30 to 80%); latest capacity median relative width 10 to 25%; |b| under a
-  quarter of the median width; the noise-only bias under 5% of the truth.
-- **I2 at real noise:** coverage under 60% for both families; τ 3 to 30. **iid5:** I1 and I2 both
-  70 to 90%, widths 30 to 60% of the real-noise widths.
-- **Absorption (Part 2's penalty):** r (G-0 over G-full) at most 0.36 for each band slope and at
-  most 0.56 for the latest capacity; harmonics give the smaller r for the capacity, drift for the
-  night-band slope; at Part 4's penalty r is smaller still for every functional.
-- **Diagnostic pair (T-0, same draws):** the Monte Carlo width ratio within 0.1 of √r under iid5;
-  G-0 calibrated under both noises.
-- **Spectral and n_eff:** over 70% of each partialled column's variance at periods under 10 days in
-  G-full, under 50% in G-0; n_eff for each band slope under 5% of the rows in G-full.
-- **Bounds:** an active heating bound in over 30% of the decision cell's bootstrap fits; unbounded
-  coverage within 5 points of bounded.
-- **Other arms:** G-0 on T-HD covers band slopes under 50%; G-full-pin80 moves them under 10%
-  from G-full-pin; 2-year widths 1.3 to 2 times all years'.
-- **Real data:** I1's capacity interval no wider than max(3 points, 20%) and overlapping the
-  vintage's ±20% band at 4 of 5 sites; the night-band slope excludes zero at 5 of 5; I1 2 to 5
-  times as wide as I2.
-
-## Decision rule
-
-**Each family (band slopes, latest capacity) gets its own gate label from I1's coverage of the
-truth in the decision cell and in the iid5 cell:** `calibrated` if both are within 70 to 90%;
-`overconfident` if either is under 70%; `too wide` if either is over 90% and neither under 70%.
-The point estimate decides; the site-clustered interval is reported beside it.
-
-- **`supported`:** both families `calibrated`.
-- **`partly supported`:** one family `calibrated`, the other `too wide`.
-- **`refuted`:** either family `overconfident` (its intervals overstate what the data identify).
-- **`inconclusive`:** a control cannot be fixed, or both families `too wide`.
-
-**Absorption label, never in the verdict, stated at each drift penalty:** `absorption large` if r
-is at most 0.36 for every band slope and at most 0.56 for the latest capacity (a 40% and 25%
-narrower interval), and the Monte Carlo pair agrees within 0.1 of √r; `absorption small` if r is
-over 0.72 everywhere (under 15% narrower); otherwise `partial`. The write-up says the label holds
-at the penalty it names.
-
-**Handed on, per family:** a `calibrated` family's I1 intervals go on the cards, and Part 5's
-capacity rule may use the capacity's I1 for its 20-weighting range. A `calibrated`, `precise`
-capacity overlapping the vintage band at 4 of 5 real sites is evidence for Part 5's fitted-capacity
-variant, without changing Part 5's rule. If absorption is large, the next pooled test removes
-per-band harmonics and drift from the shared modules (nearest planned arm: Part 5's route (ii)),
-not a new optimiser.
-
-## Audit before merge: the seven triggers
-
-**N5 scores parameters, not forecasts, so triggers 3 and 6 are adapted; trigger 7 fires by
-construction and an Opus audit is planned.** (1) Control: any of the five. (2) Contradiction: the
-convex model `calibrated` and `precise` where 112 failed with no diagnostic saying why, or a real
-capacity outside experiment 40's ±20% of the vintage. (3) Bias against coverage: coverage in range
-with median bias over half the median width, or coverage failing with bias near zero. (4) Leaving
-one real site out moves a family's site-clustered interval across 70 or 90%, or changes the
-absorption label. (5) Nested arms: G-full beating the true smaller G-0 on T-0 beyond Monte Carlo
-error; a pinned-truth arm recovering slopes worse than G-full. (6) Real I1 capacity widths over
-twice or under half Part 5's K-base ranges. (7) The cards, Part 5's capacity reading, and the next
-pooled test depend on it.
-
-## Run order, compute, and time
-
-**Order:** (1) scripts and controls 1, 4, and 5 (about 3 hours of agent time); (2) Gram matrices
-(5 sites × 2 windows, 5 sites × 2 cuts) and the analytic b, r, ρ, and sandwich terms; (3) controls
-2 and 3; (4) **time one full cell** (100 targets × 201 bounded solves; the solver handles one system
-at a time, so a 1-hour grid estimate may be 2 to 5 times short); (5) the grid; (6) real data; (7)
-write-up (about 3 hours), numbers review, audit, prose sweep. CPU only, at most 6 cores.
-
-**If the timed cell projects the grid over 4 hours, cut in this order:** I1u outside the decision
-cell, G-H and G-D, G-full-pin80, G-0 on T-HD, the 2-year window, then 10 draws per site (the noise
-pool unchanged). **Data:** Part 2's `tuned.json`, Part 4's `tuned.json` (`drift_step` 30),
-`studies.dp_pinned_capacity`, experiment 45's vintages, Part 5's and Part 3's stored capacities.
-
-## What the write-up must contain (beyond the series brief's standing rules)
-
-The take-home says plainly whether the convex model's intervals for heating and rooftop PV can be
-trusted, family by family, how wide they are at real noise, how much the seasonal terms widen them
-and at which drift penalty, and what that means for 112's failure. Gloss "identified", "calibrated
-interval", and "effective sample size". No forecast is scored, so there is no quantile score, tail
-table, or curtailment number; say so.
-
-- **Figures:** coverage per family and cell with clustered intervals (first); recovered against
-  true values; width, G-full against G-0, beside √r; r by term at both penalties; n_eff; noise
-  autocorrelation; real intervals per site beside the vintage band, K-base, and the pooled fit.
-- **Cards** ("Provisional: fitted to past weather on a screening run"): band heating and capacity
-  with I1 and the per-family label, the pooled fit with 112's line, the vintage; one fleet figure.
-- **Caveats:** ERA5 and CAMS flatter the solar term; in-family truths cannot show PV-shape bias;
-  donors are other decision sites; the inflation is an approximation; N5's noise is not 112's.
-- **Privacy:** D-labels only; synthetic substations as site and draw (D10-s3); never a Primary's
-  name (experiment 45's file carries names); G-a, G-b, and D15 out.
-
-**Decisions (2026-10-20):** 20 draws per site with the widened noise pool and site-clustered
-intervals; the stratified bootstrap with its inflation decides; the card wording is split by
-family; generator V is dropped; the 2-year window runs beside the decision cell only.
+Every number above is printed in `report.txt` next to this page.
