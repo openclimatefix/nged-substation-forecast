@@ -542,6 +542,109 @@ def figure_weeks(*, season: str, shared: dict[str, pl.DataFrame]) -> alt.TopLeve
     )
 
 
+def figure_cards() -> alt.TopLevelMixin:
+    """Substation cards: weekday profile, pinned capacity, and the filter's level, per site.
+
+    The profile and capacity come from GAM-K's fit at the 2025-07-01 cut; the level is the filter's
+    persistent correction over the scored year on ensemble residuals and on ERA5 and CAMS residuals.
+    """
+    import e00111_fits as fits_module
+
+    profile_rows, capacity_rows, level_rows = [], [], []
+    for site in common.DECISION_SITES:
+        fits = fits_module.load_fits(arm="gamk", site=site)
+        fit = next(f for f in fits if f.cut.year == 2025 and f.cut.month == 7)
+        theta = fit.theta[0]
+        profile = theta[fit.layout.slices["profile"]].reshape(4, 48)[0]
+        profile_rows += [
+            {"site": site, "hour": (slot + 1) / 2.0, "profile": float(value)}
+            for slot, value in enumerate(profile)
+        ]
+        pinned = fit.pinned
+        assert pinned is not None
+        capacity_rows += [
+            {"site": site, "week": week.astype("datetime64[D]").astype(str), "capacity": float(p)}
+            for week, p in zip(pinned.weeks, pinned.points, strict=True)
+        ]
+        for arm, label in (
+            ("gamk", "ensemble residuals"),
+            ("gamk_era5", "ERA5 and CAMS residuals"),
+        ):
+            frame = pl.read_parquet(dp_run.out_path(arm=arm, period="scored", site=site)).filter(
+                (pl.col("lead_hours") > 15.0) & (pl.col("lead_hours") <= 39.0)
+            )
+            weekly = (
+                frame.with_columns(week=pl.col("valid_time").dt.truncate("1w"))
+                .group_by("week")
+                .agg(level=pl.col("level").mean())
+                .sort("week")
+            )
+            level_rows += [
+                {"site": site, "week": r["week"], "level": r["level"], "residuals": label}
+                for r in weekly.iter_rows(named=True)
+            ]
+    site_order = list(common.DECISION_SITES)
+    profile = (
+        alt.Chart(pl.DataFrame(profile_rows))  # ty: ignore[unresolved-attribute]
+        .mark_line(color=ocf.BRAND_ORANGE, strokeWidth=2)
+        .encode(
+            x=alt.X(
+                "hour:Q",
+                title="Hour of day, UTC (period end)",
+                axis=alt.Axis(values=[0, 6, 12, 18, 24]),
+            ),
+            y=alt.Y("profile:Q", title="Weekday profile (points)", scale=alt.Scale(zero=False)),
+        )
+        .properties(width=170, height=80)
+    )
+    capacity = (
+        alt.Chart(pl.DataFrame(capacity_rows).with_columns(pl.col("week").str.to_date()))  # ty: ignore[unresolved-attribute]
+        .mark_line(color=ocf.DATA_BLUE, strokeWidth=2)
+        .encode(
+            x=alt.X("week:T", title="Week start", axis=alt.Axis(format="%Y")),
+            y=alt.Y(
+                "capacity:Q", title="Pinned solar capacity (points)", scale=alt.Scale(zero=True)
+            ),
+        )
+        .properties(width=170, height=80)
+    )
+    level = (
+        alt.Chart(pl.DataFrame(level_rows))  # ty: ignore[unresolved-attribute]
+        .mark_line(strokeWidth=1.6)
+        .encode(
+            x=alt.X("week:T", title="Week start, scored year", axis=alt.Axis(format="%b")),
+            y=alt.Y("level:Q", title="Filter level (points)"),
+            color=alt.Color(
+                "residuals:N",
+                scale=alt.Scale(
+                    domain=["ensemble residuals", "ERA5 and CAMS residuals"],
+                    range=[ocf.BRAND_ORANGE, ocf.DATA_SKY],
+                ),
+                legend=alt.Legend(title=None, orient="top"),
+            ),
+        )
+        .properties(width=170, height=80)
+    )
+    panels = [
+        chart.facet(row=alt.Row("site:N", sort=site_order, title=None)).resolve_scale(
+            y="independent"
+        )
+        for chart in (profile, capacity, level)
+    ]
+    return alt.hconcat(*panels).properties(
+        title=_title(
+            text="Provisional substation cards: what the convex model learned at each substation",
+            subtitle=(
+                "Provisional: fitted to past weather, forecast on ensemble weather, screening "
+                "run. Left: weekday daily profile of GAM-K's fit at the 2025-07-01 cut. Middle: "
+                "the pinned solar capacity of that fit, in points of effective capacity. Right: "
+                "weekly mean of the Kalman filter's persistent level over the scored year at "
+                "day-ahead leads."
+            ),
+        )
+    )
+
+
 def main() -> None:
     """Draw every figure."""
     data = results()
@@ -555,6 +658,7 @@ def main() -> None:
     _save(figure_calibration(), name="figure_06_calibration")
     _save(figure_tails(data=data), name="figure_07_tails")
     _save(figure_gate(), name="figure_08_gate")
+    _save(figure_cards(), name="figure_09_cards")
 
 
 if __name__ == "__main__":
