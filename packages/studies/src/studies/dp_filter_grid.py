@@ -17,6 +17,25 @@ depends on that reading and the earlier ones only. A forecast at any initialisat
 looks up the state after the newest reading that the information cut allows, which
 `correction_at_cutoffs` does for a whole batch of cuts at once.
 
+**Usage in a tuning script.** Replace the per-site `scipy` search over `site_log_likelihood` with a
+grid over the four unconstrained hyperparameters, then refine the best cell per site:
+
+```python
+grid = np.array(
+    list(
+        itertools.product(log_q_values, logit_phi_values, log_sigma_z_values, log_sigma_eps_values)
+    )
+)
+trace = run_kalman_grid(
+    residuals=stacked_site_residuals, band=band, hyper=grid, n_bands=N_BANDS, keep_states=False
+)
+best = trace.log_likelihood.argmax(dim=1)  # one best setting per site
+```
+
+Add the log prior to `trace.log_likelihood` before the `argmax` to match
+`fit_site_hyperparameters`. To score forecasts, rerun the best settings with `keep_states=True`
+and call `correction_at_cutoffs`. Keep `S * H * B * K * 8` bytes of states under the memory budget.
+
 **Shapes.** `S` streams (sites), `H` settings, `B` hour bands, `K` readings per band (the longest
 band, with shorter bands padded).
 """
