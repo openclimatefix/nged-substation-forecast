@@ -461,6 +461,10 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
     - **Not covered before the module review.** Shapes that depend on heating (a winter and a summer
       version of each shape) need new design columns in the module. They run as a labelled
       exploratory arm after the Opus module review.
+- **The gate runs on one set of 20 fleets with a pass threshold of 15** (the plan's cut order, taken
+  because one sparse-prior fleet needed 13 library fits and 25 minutes at 6 threads). The 30 of 40
+  threshold is the same 75%, so the gate is no easier to pass. The decision was made after the first
+  fleet's timing and before the other 19 fleets' results.
 - **Documents not carried over.** The briefs name `docs/ml-experiments/research-plan.md`, which
   the documentation restructure deleted; the theme's `plan.md` row is the only plan entry.
 

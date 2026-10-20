@@ -12,8 +12,9 @@ one site near each vertex), plus a deviation holding 10% of the library's energy
 training and held-out rows alike, is whole weeks block-resampled from G's residuals on rows before
 the cut. No tuning-year residual enters it.
 
-**Lines** (a line passes at 30 or more of the 40 sparse-prior fleets, two sets of 20 pooled;
-per-line rates and Wilson 90% intervals are printed).
+**Lines** (a line passes at 15 or more of the 20 fleets of its kind. The plan asked for 30 of 40
+fleets, two sets pooled; one fleet took 25 minutes to fit, so the plan's cut order applies, with the
+same 75% threshold. Per-line rates and Wilson 90% intervals are printed).
 
 1. Shapes: with K = K*, every truth shape has a matched fitted shape (Hungarian, signed cosine)
    with cosine at least 0.9.
@@ -23,7 +24,7 @@ per-line rates and Wilson 90% intervals are printed).
    0.5. With `gamma` = 0 it is reported only.
 4. Deviation: one site-specific evening bump absent from every shape leaves every shape cosine at
    least 0.9, and the fitted deviation holds at least 60% of the bump (projection coefficient).
-5. Null fleet (40 other fleets): independent random profiles with the same energy. SH minus G on
+5. Null fleet (20 other fleets): independent random profiles with the same energy. SH minus G on
    held-out rows is at least 0, and the median signed cosine between the shapes of two starts is
    under 0.6.
 6. K choice: the tuning rule over K in {2, 3, 4, 6} (the K = 3 and 4 tie goes to the smaller K,
@@ -36,7 +37,7 @@ per-line rates and Wilson 90% intervals are printed).
     K = K* + 1, told nothing, must recover its time (largest rise within 1 half-hour) and size
     (within 25%) at both substations, and a placebo (same truth, new noise) must show no step of
     25% of the size or more.
-9. Score power (40 other fleets): the library's energy is scaled until the oracle's held-out score
+9. Score power (20 other fleets): the library's energy is scaled until the oracle's held-out score
    beats N's by 0.10 points; SH minus N on held-out rows must then be at most -0.05.
 
 The dense prior (Dirichlet 1) is reported with lines 1 and 2 as identification-limited and is not
@@ -89,7 +90,8 @@ from studies.dp_shape_library import (
 )
 
 GATE_DIR: Final[Path] = common.WORK_DIR / "gate"
-N_SETS: Final[int] = 2
+N_SETS: Final[int] = 1
+"""One set of 20 fleets, the plan's cut order for a gate that takes more than 8 hours."""
 FLEETS_PER_SET: Final[int] = 20
 SET_SEEDS: Final[tuple[int, ...]] = (20261031, 20261101)
 TRUE_SHAPES: Final[int] = 3
@@ -111,7 +113,7 @@ STEP_SIZE_TOLERANCE: Final[float] = 0.25
 STEP_SITES: Final[tuple[int, ...]] = (0, 2)
 K_TIE_MARGIN: Final[float] = 0.023
 """Scores within this many points tie in the tuning rule, and a tie goes to the smaller K."""
-LINE_PASS_COUNT: Final[int] = 30
+LINE_PASS_COUNT: Final[int] = 15
 SHAPE_COSINE: Final[float] = 0.9
 WEIGHT_ERROR: Final[float] = 0.15
 DUPLICATE_COSINE: Final[float] = 0.5

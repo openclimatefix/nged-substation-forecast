@@ -178,6 +178,9 @@ def main() -> None:
         return
     os.environ["OMP_NUM_THREADS"] = "1"
     common.load_cache()
+    (common.WORK_DIR / f"fit_run_{'_'.join(arguments.cuts)}.json").write_text(
+        json.dumps(common.run_metadata(), indent=2) + "\n"
+    )
     with ProcessPoolExecutor(max_workers=arguments.workers) as pool:
         for message in pool.map(run_job, jobs_for(cuts=arguments.cuts)):
             print(message, flush=True)

@@ -31,7 +31,7 @@ from studies.dp_shape_library import InitialShapesType, LibraryConfig
 K_GRID: Final[tuple[int, ...]] = (3, 4)
 LAMBDA_DEV_GRID: Final[tuple[float, ...]] = (300.0, 1000.0, 3000.0, 10000.0)
 GAMMA_GRID: Final[tuple[float, ...]] = (0.0, 0.1, 1.0, 10.0)
-EXPLORATORY_K: Final[tuple[int, ...]] = (2, 6)
+EXPLORATORY_K: Final[tuple[int, ...]] = (2, 5, 6)
 SEEDS: Final[tuple[tuple[int, InitialShapesType], ...]] = (
     (1, "svd"),
     (2, "dirichlet"),
@@ -99,13 +99,19 @@ def run_job(job: TuneJob) -> list[dict[str, Any]]:
     torch.set_num_threads(1)
     cache, vintages = arms.load_source()
     spec = spec_of(job=job)
-    result = arms.fit_and_score(
-        cache=cache,
-        vintages=vintages,
-        cut=common.TUNING_CUT,
-        spec=spec,
-        score_sites=common.DECISION_SITES,
-    )
+    try:
+        result = arms.fit_and_score(
+            cache=cache,
+            vintages=vintages,
+            cut=common.TUNING_CUT,
+            spec=spec,
+            score_sites=common.DECISION_SITES,
+        )
+    except torch.linalg.LinAlgError as error:
+        # A library with more shapes than the pool can use has a dead shape, which makes the
+        # weights step singular. Only the exploratory K can reach this; the fit is reported failed.
+        print(f"{spec.name}: failed, {error}", flush=True)
+        return []
     library = result.library
     assert library is not None
     rows = []
@@ -200,8 +206,9 @@ def add_exploratory_k(*, ks: list[int], workers: int) -> None:
         common.WORK_DIR / f"tuning_scores_exploratory_k{'_'.join(map(str, ks))}.parquet"
     )
     for k in ks:
-        chosen["exploratory_k"][str(k)] = float(
-            extra.filter(pl.col("k") == k)["score"].to_numpy().mean()
+        part = extra.filter(pl.col("k") == k) if extra.height else extra
+        chosen["exploratory_k"][str(k)] = (
+            float(part["score"].to_numpy().mean()) if part.height else None
         )
     path.write_text(json.dumps(chosen, indent=2) + "\n")
 
@@ -217,23 +224,20 @@ def main() -> None:
     if arguments.extra_k:
         add_exploratory_k(ks=arguments.extra_k, workers=arguments.workers)
         return
-    table = run(jobs=main_grid_jobs(), workers=arguments.workers)
-    table.write_parquet(common.WORK_DIR / "tuning_scores.parquet")
+    scores_path = common.WORK_DIR / "tuning_scores.parquet"
+    if scores_path.exists():
+        table = pl.read_parquet(scores_path)
+    else:
+        table = run(jobs=main_grid_jobs(), workers=arguments.workers)
+        table.write_parquet(scores_path)
     chosen = choose(table=table)
-    extra_jobs = [
-        TuneJob(k, chosen["lambda_dev"], chosen["gamma"], seed, init, exploratory=True)
-        for k in EXPLORATORY_K
-        for seed, init in SEEDS
-    ]
-    extra = run(jobs=extra_jobs, workers=arguments.workers)
-    extra.write_parquet(common.WORK_DIR / "tuning_scores_exploratory.parquet")
-    chosen["exploratory_k"] = {
-        str(k): float(extra.filter(pl.col("k") == k)["score"].to_numpy().mean())
-        for k in EXPLORATORY_K
-    }
+    chosen["exploratory_k"] = {}
     chosen["run"] = common.run_metadata()
-    (common.WORK_DIR / "tuned.json").write_text(json.dumps(chosen, indent=2) + "\n")
-    print(json.dumps({k: v for k, v in chosen.items() if k != "configurations"}, indent=2))
+    tuned_path = common.WORK_DIR / "tuned.json"
+    tuned_path.write_text(json.dumps(chosen, indent=2) + "\n")
+    summary = {k: v for k, v in chosen.items() if k != "configurations"}
+    print(json.dumps(summary, indent=2), flush=True)
+    add_exploratory_k(ks=list(EXPLORATORY_K), workers=arguments.workers)
 
 
 if __name__ == "__main__":

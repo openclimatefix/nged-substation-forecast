@@ -207,7 +207,7 @@ def quantile_score(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
 
 
 def run_metadata() -> dict[str, str]:
-    """Return the commit of the checkout and of the last change to the library module.
+    """Return the commit of the checkout and the blob hash of the library module it holds.
 
     Returns:
         The two commit hashes, so a result records the code that produced it.
@@ -221,7 +221,10 @@ def run_metadata() -> dict[str, str]:
             check=True,
         ).stdout.strip()
 
+    module = "packages/studies/src/studies/dp_shape_library.py"
     return {
         "checkout": last_commit(),
-        "library_module": last_commit("--", "packages/studies/src/studies/dp_shape_library.py"),
+        "library_module_blob": subprocess.run(
+            ["git", "rev-parse", f"HEAD:{module}"], capture_output=True, text=True, check=True
+        ).stdout.strip(),
     }
