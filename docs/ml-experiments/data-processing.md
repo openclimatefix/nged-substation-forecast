@@ -170,9 +170,9 @@ date after the experiment's window, not rechecked there), and D5 shows a flat mi
 
 **Do not fit calendar and seasonal terms exactly to a window of under three months.** An exact
 least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
-weeks or 3 months of data extrapolates those terms badly: the per-site variable-projection fits
-scored 70.6 and 48.4 points at the five decision substations, against 15.1 and 5.5 for the
-gradient fits that stop early ([experiment
+weeks or 3 months of data extrapolates those terms badly: the per-site variable-projection fits (which
+solve the linear coefficients exactly) scored 70.6 and 48.4 points at the five decision substations, against 15.1 and 5.5 for the
+gradient fits that stop before convergence ([experiment
 112](00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result.md); medium
 confidence; provisional). Applies to experiments.
 
