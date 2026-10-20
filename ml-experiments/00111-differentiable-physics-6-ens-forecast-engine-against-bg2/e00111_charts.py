@@ -197,7 +197,9 @@ def figure_by_site(*, data: dict) -> alt.TopLevelMixin:
     )
     cache = common.load_cache()
     label_of = {cache.sites[s].table.time_series_id: s for s in common.DECISION_SITES}
-    table = table.with_columns(site_label=pl.col("site").replace_strict(label_of, default=None))
+    table = table.with_columns(
+        site_label=pl.col("site").cast(pl.Int64).replace_strict(label_of, default=None)
+    ).filter(pl.col("site_label").is_not_null())
     domain = [a for a in ARM_LABELS if a in set(table["arm"].to_list())]
     chart = (
         alt.Chart(table)  # ty: ignore[unresolved-attribute]

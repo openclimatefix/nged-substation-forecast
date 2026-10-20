@@ -28,7 +28,8 @@ EXPLORATORY: Final[dict[str, tuple[str, str]]] = {
     "GAM-K minus BG2 (not like for like)": ("gamk", "bg2"),
     "X-nl minus BG2 (SIMP1's lag gap)": ("xnl", "bg2"),
     "GAM-K minus Xlag-bar (not like for like)": ("gamk", "xlag_d"),
-    "GAM-margin minus BG2's recipe is C5; not run": ("gam_margin", "bg2"),
+    "GAM-margin minus BG2 (not like for like)": ("gam_margin", "bg2"),
+    "GAM-margin minus Xlag-o": ("gam_margin", "xlag_o"),
     "GAM-K-era5 minus GAM-K": ("gamk_era5", "gamk"),
     "GAM-E minus GAM-K": ("game", "gamk"),
     "GAM-ens minus GAM-0": ("gamens", "gam0"),
@@ -134,6 +135,33 @@ def summarise(
             out["leave_one_site_out"][site] = score.contrast(
                 losses=part, treatment=pair[0], reference=pair[1], level=95.0
             )
+    label_of = {cache.sites[s].table.time_series_id: s for s in common.ALL_SITES}
+    per_site = (
+        losses.group_by("arm", "site")
+        .agg(pl.col("qs").mean())
+        .pivot(on="arm", index="site", values="qs")
+    )
+    out["by_site"] = {
+        label_of[row["site"]]: float(row[pair[0]] - row[pair[1]])
+        for row in per_site.iter_rows(named=True)
+    }
+    per_month = (
+        losses.group_by("arm", "month")
+        .agg(pl.col("qs").mean())
+        .pivot(on="arm", index="month", values="qs")
+        .sort("month")
+    )
+    out["by_month"] = {
+        row["month"]: float(row[pair[0]] - row[pair[1]]) for row in per_month.iter_rows(named=True)
+    }
+    daytime = losses.filter(
+        pl.col("valid_time").dt.month().is_between(4, 9)
+        & pl.col("valid_time").dt.hour().is_between(8, 15)
+    )
+    if daytime.filter(pl.col("arm") == pair[0]).height:
+        out["april_to_september_daytime"] = score.contrast(
+            losses=daytime, treatment=pair[0], reference=pair[1], level=95.0
+        )
     month = losses["month"].str.slice(5, 2).cast(pl.Int32)
     for label, keep in (
         ("November to March", month.is_in(list(WINTER_MONTHS))),
@@ -309,6 +337,16 @@ def render_report(*, results: dict) -> list[str]:
             f"{name} {c['estimate']:+.3f}" for name, c in item.get("seasons", {}).items()
         )
         lines.append(f"    - by season: {seasons}")
+        by_site = "; ".join(f"{site} {value:+.3f}" for site, value in item["by_site"].items())
+        lines.append(f"    - by site (estimate): {by_site}")
+        by_month = "; ".join(f"{month} {value:+.3f}" for month, value in item["by_month"].items())
+        lines.append(f"    - by run month (estimate): {by_month}")
+        if "april_to_september_daytime" in item:
+            d = item["april_to_september_daytime"]
+            lines.append(
+                f"    - April to September, 08:00 to 16:00 UTC rows: {d['estimate']:+.3f} "
+                f"({d['lower']:+.3f} to {d['upper']:+.3f})"
+            )
         loso = "; ".join(
             f"without {site} {c['estimate']:+.3f} ({c['lower']:+.3f} to {c['upper']:+.3f})"
             for site, c in item["leave_one_site_out"].items()

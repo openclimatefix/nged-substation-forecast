@@ -194,8 +194,8 @@ def load_simp1_raw(*, sites: tuple[str, ...]) -> pl.DataFrame:
     return pl.concat(pieces).filter(pl.col("lead_hours") <= 168.0)
 
 
-def load_xnl_k(*, periods: set[str], sites: tuple[str, ...]) -> pl.DataFrame:
-    """Return X-nl plus the Kalman correction for the periods, in the common frame shape."""
+def load_xnl_k_raw(*, sites: tuple[str, ...]) -> pl.DataFrame:
+    """Return X-nl plus the Kalman correction for every run, in the common frame shape."""
     import e00111_xnl_k as xnl_k
 
     pieces = [
@@ -203,7 +203,12 @@ def load_xnl_k(*, periods: set[str], sites: tuple[str, ...]) -> pl.DataFrame:
         for site in sites
         if xnl_k.out_path(site=site).exists()
     ]
-    frame = pl.concat(pieces)
+    return pl.concat(pieces)
+
+
+def load_xnl_k(*, periods: set[str], sites: tuple[str, ...]) -> pl.DataFrame:
+    """Return X-nl plus the Kalman correction for the periods, in the common frame shape."""
+    frame = load_xnl_k_raw(sites=sites)
     return drop_unscorable(frame=in_period(frame=frame, periods=periods), sites=sites)
 
 

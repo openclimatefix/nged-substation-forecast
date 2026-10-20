@@ -29,7 +29,7 @@ from studies.dp_ens import member_means
 from studies.experiment_store import HOLDOUT_START, write_predictions
 
 REPLICATE_ROW_SET: Final[str] = "dp_replicate_v1"
-DP_ARMS: Final[tuple[str, ...]] = ("gam0", "gamk", "game", "gamk_era5")
+DP_ARMS: Final[tuple[str, ...]] = ("gam0", "gamk", "game", "gamk_era5", "gamens")
 XGB_ARMS: Final[tuple[str, ...]] = ("xnl_z", "xnl_o", "xlag_d", "xlag_o", "gam_margin")
 
 
@@ -135,6 +135,8 @@ def main() -> None:
     sites = common.SCORED_SITES
     for period, row_set in (("scored", common.ROW_SET_ID), ("replicate", REPLICATE_ROW_SET)):
         for arm in DP_ARMS:
+            if arm == "gamens" and period != "scored":
+                continue
             store(
                 name=f"{arm}_{period}",
                 frame=dp_frame(arm=arm, period=period, sites=sites).with_columns(arm=pl.lit(arm)),
@@ -149,6 +151,13 @@ def main() -> None:
             if arm == "gam_margin":
                 frame = margin_column(frame=frame, sites=sites)
             store(name=f"{arm}_{period}", frame=frame, row_set_id=row_set)
+    for period, row_set in (("scored", common.ROW_SET_ID), ("replicate", REPLICATE_ROW_SET)):
+        filtered = score.in_period(frame=score.load_xnl_k_raw(sites=sites), periods={period})
+        store(
+            name=f"xnl_k_{period}",
+            frame=with_switching(frame=filtered, sites=sites).with_columns(arm=pl.lit("xnl_k")),
+            row_set_id=row_set,
+        )
     own = score.load_xgb_raw(arm="xnl", sites=sites)
     replicate = score.in_period(frame=own, periods={"replicate"})
     store(
