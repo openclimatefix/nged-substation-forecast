@@ -85,6 +85,13 @@ def summarise(
     if pair[0] not in loaded or pair[1] not in loaded:
         return None
     shared = score.common_rows(arms_by_name={pair[0]: loaded[pair[0]], pair[1]: loaded[pair[1]]})
+    if months:
+        shared = {
+            arm: frame.filter(
+                pl.col("power_fcst_init_time").dt.strftime("%Y-%m").is_in(list(months))
+            )
+            for arm, frame in shared.items()
+        }
     losses = score.stack_losses(arms_by_name=shared)
     out: dict = {
         "name": name,
@@ -231,6 +238,9 @@ def main() -> None:
     """Score and write the report."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--periods", nargs="+", default=["scored"])
+    parser.add_argument(
+        "--months", nargs="+", default=[], help="keep only runs of these months, as YYYY-MM"
+    )
     args = parser.parse_args()
     periods = set(args.periods)
     results: dict = {"periods": sorted(periods), "contrasts": [], "skipped": []}
@@ -244,7 +254,13 @@ def main() -> None:
         results[f"headline_scores_{sites_label}"] = headline_scores(loaded=loaded)
         results[f"median_minus_mean_{sites_label}"] = median_minus_mean(loaded=loaded, sites=sites)
         for name, pair in SCREENING.items():
-            summary = summarise(name=name, pair=pair, loaded=loaded, level=score.BONFERRONI_LEVEL)
+            summary = summarise(
+                name=name,
+                pair=pair,
+                loaded=loaded,
+                level=score.BONFERRONI_LEVEL,
+                months=tuple(args.months),
+            )
             if summary is None:
                 results["skipped"].append(f"{name} at {sites_label}")
                 continue
@@ -252,7 +268,9 @@ def main() -> None:
             summary["planned"] = True
             results["contrasts"].append(summary)
         for name, pair in EXPLORATORY.items():
-            summary = summarise(name=name, pair=pair, loaded=loaded, level=95.0)
+            summary = summarise(
+                name=name, pair=pair, loaded=loaded, level=95.0, months=tuple(args.months)
+            )
             if summary is None:
                 results["skipped"].append(f"{name} at {sites_label}")
                 continue
@@ -260,6 +278,8 @@ def main() -> None:
             summary["planned"] = False
             results["contrasts"].append(summary)
     tag = "" if periods == {"scored"} else "_" + "_".join(sorted(periods))
+    if args.months:
+        tag += "_" + "_".join(args.months)
     common.write_json_atomic(path=common.WORK_DIR / f"results{tag}.json", content=results)
     lines = ["# Experiment 111 report", ""]
     for item in results["contrasts"]:
