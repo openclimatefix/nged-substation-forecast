@@ -450,6 +450,7 @@ include = [
     "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_objectives.py",
     "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_report.py",
     "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_budget.py",
+    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gate_diagnostics.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
 ]
