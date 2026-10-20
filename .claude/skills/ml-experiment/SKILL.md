@@ -189,12 +189,12 @@ time would have taken under an hour.
 ## Keep the theme's Research plan page current
 
 **Update the owning theme's Research plan page (`docs/ml-experiments/themes/<theme>/plan.md`) in the
-commit that adds the `planned` `result.md`, and again in the commit that adds the finished
-write-up.** An experiment opens one pull request, when its result is ready, and the plan commit is the first
-commit in that pull request's history. No pull request is opened at plan time. A change to
-`packages/studies/` that the experiment needs is the exception: open its pull request as soon as the
-module is ready for review, because the module needs its own review. The planning commit updates the experiment's row in the priority table at the
-top of the page with its id, the question in one line, the priority, what it waits for, and the
+first commit that adds the `planned` `result.md`, and again in the pull request that adds the
+finished write-up.** An experiment opens one pull request, when its result is ready, and the plan
+commit is the first commit in that pull request's history. No pull request is opened at plan time. A
+change to `packages/studies/` that the experiment needs is the exception: open its pull request as
+soon as the module is ready for review, because the module needs its own review. The planning commit
+updates the experiment's row in the priority table at the top of the page with its id, the question in one line, the priority, what it waits for, and the
 state, and commits the `result.md` with `status: planned`, which the page's generated
 planned-experiments table then lists. The finished commit deletes that row and the experiment's
 proposal section from the page, sets the final `status`, `verdict`, and `production_status` in the
