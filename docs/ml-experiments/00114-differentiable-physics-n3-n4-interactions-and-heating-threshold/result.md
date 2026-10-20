@@ -166,8 +166,10 @@ stops that question's scored reading; if it cannot be fixed, the label is `incon
 can fail by design: its failure sets `not identified`.
 
 1. **Reproduction.** The augmented code with no extra columns reproduces `dp_gam.fit_gam` for B0 to
-   1e-8 relative in the parameters; each N3 arm at λ = 10¹⁰ reproduces B0's fitted values to 1e-6
-   points; θ = 15.5 reproduces B0 exactly; B0-K's filter on stored B0 residuals reproduces
+   1e-8 relative in the parameters; each N3 arm at λ = 10¹⁰ reproduces B0's fitted values to 1e-5
+   points (amended from 1e-6 before any fit ran: development runs of the penalised solve showed a
+   float64 conditioning floor of 0.8e-6 to 2.6e-6 points at every penalty weight, with no scored
+   outcome read); θ = 15.5 reproduces B0 exactly; B0-K's filter on stored B0 residuals reproduces
    `run_kalman` called directly; no training row after its cut.
 2. **N3 power check (synthetic, unfiltered, can fail).** The truth is B0's real fit at the
    2024-07-01 cut plus truth I, weekend heating and lighting scaled by a common amplitude. The
