@@ -332,6 +332,24 @@ original plan.**
 - **The generator sign is tested with a time-varying series.** A constant would be absorbed by the
   remainder's level.
 
+## Clarification: the closure audit runs first, on its own
+
+**Step 0 runs before the gate and before the joint fits, as a descriptive audit of whether the
+Primaries, the metered generators, a level, and unmetered solar close the BSP readings.** The
+design session asked for this on 2026-10-20, so it is a labelled clarification made before any
+audit result exists.
+
+- **What it reports, by BSP:** the closure residual in points of effective capacity and in MW, the
+  residual by hour band and calendar month, and a winter breakdown (November to March, with the
+  cold-snap rule fixed before the residual is read).
+- **"Cannot tell":** a BSP or winter whose history is too short to give a block-mean standard
+  deviation at a window length is reported as "cannot tell", never as a number.
+- **Cost:** descriptive only, on CPU, about 2 to 3 hours and under 8 GB.
+- **Privacy:** the page names no substation and no topology beyond interconnected D-label pairs,
+  and shows the metered generators only as the sum "G-c", without dates.
+- **Decisions:** the pre-registered step 0 decision rule is unchanged, and step 1 and the gate
+  follow it.
+
 ## Rulings made before the run
 
 - **A pilot is capped.** A pilot on the better BSP caps the verdict at `partly supported`.
