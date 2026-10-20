@@ -441,6 +441,17 @@ copies experiment 109's single replica year (q95 and q99 covered 83% and 93%), a
       2 °C) and mild nights (above 10 °C) at each decision substation, and each shape's start time
       in local time and in UTC (01:00 local is 00:00 UTC in summer). Shapes that depend on heating
       themselves wait for the exploratory arm below.
+    - **A cold-winter-night figure on the substation cards (maintainer, 2026-10-20).** Credibility
+      with the network operator depends on the forecast reproducing the 01:00 step visibly, so the
+      cards show it and not only the quantile score. A **cold winter night** is a night from 23:00
+      to 07:00 local time, between November and March, whose mean 6-hour-smoothed ERA5 temperature
+      at the site is below 2 °C; the rule is fixed here, before any score is read, and the figure
+      says how many nights it holds ("too few nights" under 5). For each decision substation the
+      figure plots the median over those nights of the actual power, of SH's median forecast with
+      its 80% and 90% bands, and of N and G (the per-site convex model) for comparison. The Kalman
+      filter variant GAM-K (the per-site convex model with recent-level assimilation) is outside
+      this experiment, so G stands in as the per-site reference. A visible miss on cold winter
+      nights counts against release even when the mean score is unchanged, and the verdict says so.
     - **K from 3 to 6.** The tuning year also runs K = 5 and 6 at the chosen pair (exploratory, never
       scored later); the report shows K = 2 to 6.
     - **Penalties against shape collapse and noise shapes.** The orthogonality penalty is the
