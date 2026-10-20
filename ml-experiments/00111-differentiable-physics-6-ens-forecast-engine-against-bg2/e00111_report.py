@@ -68,6 +68,10 @@ def load_all(*, periods: set[str], sites: tuple[str, ...]) -> dict[str, pl.DataF
             frame = None
         if frame is not None and frame.height:
             arms_found[name] = frame
+    try:
+        arms_found["xnl_k"] = score.load_xnl_k(periods=periods, sites=sites)
+    except ValueError, FileNotFoundError:
+        pass
     if "scored" in periods:
         arms_found["xnl"] = score.load_simp1_xnl(sites=sites)
         for key, folder in REFERENCES.items():

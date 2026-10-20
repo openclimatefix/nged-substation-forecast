@@ -89,3 +89,24 @@ def correct_site(*, site: str) -> pl.DataFrame:
         content={"hyper": hyper.as_array().tolist()},
     )
     return shifted
+
+
+def out_path(*, site: str):  # noqa: ANN201
+    """Return the file that holds X-nl plus the Kalman correction at a site."""
+    return common.WORK_DIR / "xnl_k" / f"{site}.parquet"
+
+
+def main() -> None:
+    """Correct X-nl at every site with a lagless XGBoost history and write the frames."""
+    for site in common.SCORED_SITES:
+        frame = correct_site(site=site)
+        target = out_path(site=site)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_name(f"{target.name}.tmp")
+        frame.write_parquet(temporary)
+        temporary.rename(target)
+        print(f"{ARM} {site}: {frame.height:,} rows", flush=True)
+
+
+if __name__ == "__main__":
+    main()
