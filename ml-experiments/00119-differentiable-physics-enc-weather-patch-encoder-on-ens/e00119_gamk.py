@@ -86,12 +86,21 @@ def _calibration(*, site: str, shrink: float) -> Calibration:
     return calibration.with_solar_shrink(solar_shrink=shrink)
 
 
-def forecast_runs(*, site: str, run_indices: list[int] | None) -> pl.DataFrame:
+def forecast_runs(
+    *,
+    site: str,
+    run_indices: list[int] | None,
+    temperature_shift_k: float = 0.0,
+    irradiance_scale: float = 1.0,
+) -> pl.DataFrame:
     """Forecast GAM-K at one site with experiment 111's stored pieces.
 
     Args:
         site: The substation's label.
         run_indices: Indices into `common.run_dates()`; `None` for the 91 warm-up runs.
+        temperature_shift_k: Added to every ensemble member's temperature in the forecast window
+            only; the analysis proxy and the filter's residuals stay unperturbed.
+        irradiance_scale: Multiplies every member's shortwave flux in the forecast window only.
 
     Returns:
         The rows of `K0_COLUMNS`, in points of effective capacity, plus `run`.
@@ -140,7 +149,11 @@ def forecast_runs(*, site: str, run_indices: list[int] | None) -> pl.DataFrame:
         forecast = forecast_run(
             cache=cache,
             context=context,
-            run=run,
+            run=EnsSiteRun(
+                origin_position=run.origin_position,
+                temperature_c=run.temperature_c + temperature_shift_k,
+                shortwave_w_m2=run.shortwave_w_m2 * irradiance_scale,
+            ),
             origin=origins[index],
             fits=fits,
             spread=spread,

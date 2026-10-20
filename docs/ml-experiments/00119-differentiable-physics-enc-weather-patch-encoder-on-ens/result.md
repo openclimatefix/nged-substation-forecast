@@ -371,3 +371,22 @@ reach 177 hours after its 00:00 initialisation, so the encoder reads 54 ENS step
 not for 2024-04 to 2024-06; ENC re-forecast those 91 runs from experiment 111's stored monthly
 fits, and the check that the same code re-forecasts 4 stored runs per site gave a largest
 difference of 0 (`e00119_gamk.py`).
+
+**Two plan flaws, fixed before any gate or scored fit (2026-10-20).** The manager accepted both
+rulings. They were made after the data extraction, the K0 reproduction, and the first run of the
+settings grid (the grid showed an out-of-fold gain of about 0.035 points for ENC-c on the clean
+training year), and before any known-answer-gate fit and before any scored-year prediction.
+
+- **Gate test 2 cannot be a gate on real data.** The plan requires every arm to differ from K0 by
+  at most 0.01 points on the clean training year. A real gain of the predicted size (0.02 to 0.08
+  points) would fail that test, so it could never tell a false gain from a true one. Test 2 is
+  applied to permuted-actual data instead: each row's `actual` is replaced by the `actual` of the
+  same site at the same lead from another run of the same year (2 to 15 days away), so the patch
+  has no link to the target. The bounds are unchanged (at most 0.01 points, and the intervals of
+  ENC-c and ENC-r include zero). The literal clean-data reading is run and printed, and the page
+  reports it as descriptive.
+- **No decision site is free of shared ENS cells.** The six patches overlap by 12 to 30 of their 37
+  cells, so the plan's "farthest decision site, no shared cells" does not exist. ENC-cps uses the
+  farthest decision site by distance, and the page reports the shared-cell count for each site.
+  Shared cells mean the placebo can see some of the real patch's weather, so a gain by ENC-cps is
+  read as a leak-through warning and not as noise. ENC-cps stays descriptive (C3b).
