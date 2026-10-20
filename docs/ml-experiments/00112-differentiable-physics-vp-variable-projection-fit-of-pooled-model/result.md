@@ -31,7 +31,8 @@ take_home_message: >-
   Solving the pooled model's linear coefficients exactly did not make its forecasts better. With the
   interaction neural network on, the exact fit drove the network's last layer and the seasonal and
   holiday terms to very large, weakly penalised values: it forecast up to 280 points too high on four
-  days around Easter 2026, and it was 0.7 points worse on the other days. With the network off, the
+  days of spring 2026 (the weekend of the clock change, Good Friday, and Easter Monday), and it
+  was 0.7 points worse on the other days. With the network off, the
   exact fit is stable and within 0.03 points of the gradient fit, so the optimiser was not what held
   the pooled model back; the known-answer test failed, and with the network on the model cannot
   recover heating even from noise-free data.
@@ -86,12 +87,13 @@ are the five Primary substations that carry the experiment's planned contrasts. 
 is twice the mean pinball loss over 11 quantiles, in points (percent) of effective capacity. With
 the interaction neural network on, the scored year's quantile score, averaged over the five decision
 substations, was 5.49 for VP against 3.27 for the gradient fit. **The excess comes from four days:**
-on 28 and 29 March, Good Friday (3 April), and Easter Monday (6 April) 2026, VP forecast 20 to 280
-points too high (75 to 280 on three of them), because the exact solve had made the network's last
-layer and the seasonal and holiday coefficients very large. Without those four days (a post hoc
-check) VP is still 0.70 points worse than the gradient fit, at all five substations. With the
-network off, VP is stable and within 0.03 points of the gradient fit. The known-answer test failed
-on its pre-registered definition, so the verdict cannot exceed `inconclusive`.
+on 28 and 29 March 2026 (the weekend of the spring clock change), Good Friday (3 April), and Easter
+Monday (6 April), VP forecast 20 to 280 points too high (75 to 280 on three of them), because the
+exact solve had made the network's last layer and the seasonal and holiday coefficients very large.
+Without those four days (a post hoc check) VP is still 0.70 points worse than the gradient fit, at
+all five substations. With the network off, VP is stable and within 0.03 points of the gradient fit.
+The known-answer test failed on its pre-registered definition, so the verdict cannot exceed
+`inconclusive`.
 
 We asked whether the pooled model lost to a per-substation model in experiment 105 because gradient
 descent stopped short of the optimum. We fitted the pooled model, and a model per substation, by VP
@@ -170,11 +172,15 @@ network-on fit fails even on noise-free data.
   P-map-same is -16,747 nats at the 2025-07-01 cut (172,257 against 189,005), -16,014 at
   2024-07-01, and -27,257 at 2023-07-01. Experiment 105's own P-map is 239,053 on this objective
   (it was fitted on a different objective, so this is a reference only).
-- **Four days carry the headline (post hoc).** A per-day check of the mean median forecast error
-  over the five decision sites finds the days below (a day is listed when any listed arm is over
-  30 points off), plus Good Friday (3 April), which the numbers audit flagged although its VP-P error
-  is smaller. VP-P is also 47 points too high on 5 and 6 January; those two days are in the table
-  but outside the four-day exclusion below, so the "without" numbers still contain them.
+- **Four days carry the headline (post hoc).** The first two, 28 and 29 March 2026, are the Saturday
+  and the Sunday of the spring clock change (a 23-hour local day); the other two are Good Friday and
+  Easter Monday. A separate check of the clock-change handling in the differentiable-physics
+  features and the ensemble weather join is under way; this page claims no bug in either. A per-day
+  check of the mean median forecast error over the five decision sites finds the days below (a day
+  is listed when any listed arm is over 30 points off), plus Good Friday (3 April), which the
+  numbers audit flagged although its VP-P error is smaller. VP-P is also 47 points too high on 5 and
+  6 January; those two days are in the table but outside the four-day exclusion below, so the
+  "without" numbers still contain them.
 
   | Day (2026) | VP-P | VP-P start 1 | VP-onb4w | VP-P-nonet | P-map-same | G-2y |
   |---|---|---|---|---|---|---|
@@ -185,7 +191,7 @@ network-on fit fails even on noise-free data.
   | 3 April | +19.5 | 0.0 | +5.3 | -1.4 | -1.6 | -3.5 |
   | 6 April | +278.2 | +8.6 | +17.6 | +1.9 | +3.3 | +0.3 |
 
-- **Without the four Easter days (28 and 29 March, 3 and 6 April; post hoc).** V1 falls to +0.696
+- **Without the four days (28 and 29 March, 3 and 6 April; post hoc).** V1 falls to +0.696
   (+0.317 to +1.264), still 0 of 5 better; C1v falls from +1.394 to -0.132 (-1.107 to +0.896); the
   VP-P five-site score falls from 5.49 to 3.97 (P-map-same 3.28); and the spread between the two
   VP-P starts falls from 1.599 to 0.104 points. In the replicate year the only day over 30 points
