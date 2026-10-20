@@ -35,6 +35,7 @@ from studies.dp_gam import (
     GamSpec,
     ReplicaResiduals,
     ResidualSpread,
+    TrainingWindow,
     predict_gam,
     replica_cut,
     training_rows,
@@ -80,6 +81,7 @@ class ArmSpec:
         seed: The seed of the starting shapes; also written to the `seed` column.
         pool: The substations of the joint fit.
         tag: Names the data the arm runs on, so stored replicas never mix.
+        all_years: True to train on every year before the cut instead of the 2 years before it.
     """
 
     name: str
@@ -89,11 +91,14 @@ class ArmSpec:
     seed: int = 0
     pool: tuple[str, ...] = common.POOL_SITES
     tag: str = "real"
+    all_years: bool = False
 
     @property
     def family(self) -> str:
         """A key that names the recipe, so replicas are shared between arms that fit alike."""
-        return f"{self.tag}|{self.kind}|{self.library}|{self.init_method}|{self.seed}"
+        return (
+            f"{self.tag}|{self.kind}|{self.library}|{self.init_method}|{self.seed}|{self.all_years}"
+        )
 
 
 @dataclass(frozen=True)
@@ -123,7 +128,12 @@ def trainable(*, cache: FeatureCache, site: str, cut: datetime) -> bool:
 
 
 def build_pool(
-    *, cache: FeatureCache, vintages: pl.DataFrame, cut: datetime, pool: tuple[str, ...]
+    *,
+    cache: FeatureCache,
+    vintages: pl.DataFrame,
+    cut: datetime,
+    pool: tuple[str, ...],
+    all_years: bool = False,
 ) -> Built:
     """Build the substations of a joint fit at a cut.
 
@@ -132,6 +142,7 @@ def build_pool(
         vintages: The real-time capacity vintages.
         cut: The cut.
         pool: The candidate substations; each enters only if it holds enough rows.
+        all_years: True to train on every year before the cut.
 
     Returns:
         The substations, the cache, the rebuilt scales, and how each capacity was set.
@@ -161,7 +172,7 @@ def build_pool(
                 spec=GamSpec(
                     ridge=common.BASE_RIDGE, capacity="pinned" if use_pinned else "fitted"
                 ),
-                window=common.FULL_WINDOW,
+                window=TrainingWindow() if all_years else common.FULL_WINDOW,
                 season_years=common.SEASON_YEARS,
                 pinned=pinned if use_pinned else None,
             )
@@ -282,7 +293,9 @@ def replica_of(
         Each site's residuals, in the rebuilt points the replica was fitted in.
     """
     fit_cut = replica_cut(cut=cut)
-    built = build_pool(cache=cache, vintages=vintages, cut=fit_cut, pool=spec.pool)
+    built = build_pool(
+        cache=cache, vintages=vintages, cut=fit_cut, pool=spec.pool, all_years=spec.all_years
+    )
     wanted = [site.site for site in built.sites]
     paths = {site: _replica_path(cut=cut, spec=spec, site=site, cache=cache) for site in wanted}
     if all(path.exists() for path in paths.values()):
@@ -352,7 +365,9 @@ def fit_and_score(
     Returns:
         The predictions in original points, and the readouts of the fit.
     """
-    built = build_pool(cache=cache, vintages=vintages, cut=cut, pool=spec.pool)
+    built = build_pool(
+        cache=cache, vintages=vintages, cut=cut, pool=spec.pool, all_years=spec.all_years
+    )
     fits, library = fit_arm(built=built, cut=cut, spec=spec)
     replicas = replica_of(cache=cache, vintages=vintages, cut=cut, spec=spec)
     targets = score_sites or tuple(site.site for site in built.sites)
