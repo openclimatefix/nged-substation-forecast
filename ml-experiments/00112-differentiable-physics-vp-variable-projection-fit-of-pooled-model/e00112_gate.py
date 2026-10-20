@@ -1,9 +1,9 @@
 """The blocking known-answer gate of experiment 112, before any replicate-year or scored-year fit.
 
 Module tests 1 to 5 of the plan are `packages/studies/tests/test_dp_pooled_vp.py`. This script runs
-the other three, each fitted at the replicate cut (2024-07-01) with the interaction network on. Every
-fit starts cold and is saved, so a rerun loads it. The results go to `work/gate.json`, which the fit,
-forecast, onboarding, profile, and ladder scripts check before they run.
+the other three, each fitted at the replicate cut (2024-07-01) with the interaction network on.
+Every fit starts cold and is saved, so a rerun loads it. The results go to `work/gate.json`, which
+the fit, forecast, onboarding, profile, and ladder scripts check before they run.
 
 **Test 2, a synthetic fleet.** Eight sites on the real calendar and weather tensors of the MW
 Primaries, 2 years each, with K = 2 shared daily shapes of known loadings, a 14 degree threshold, a
@@ -19,10 +19,11 @@ summer-midday output under 0.1 points.
 within 1 nat per 10,000 rows, and each threshold agrees with a 0.1 degree grid profile within 0.2
 degrees.
 
-**Test 4, injected farms**, one at a time at D10, D11, D14, and D16: the recovered capacity increment
-over the injected one has a median in [0.9, 1.1] (experiment 105's value was 0.78), and the other
-scored substations' capacities move under 5%. The shared modules' midday movement is reported
-beside a second-seed base fit's, made once on the first farm's rows. Only ratios appear.
+**Test 4, injected farms**, one at a time at D10, D11, D14, and D16: the recovered capacity
+increment over the injected one has a median in [0.9, 1.1] (experiment 105's value was 0.78),
+and the other scored substations' capacities move under 5%. The shared modules' midday movement
+is reported beside a second-seed base fit's, made once on the first farm's rows. Only ratios
+appear.
 
     uv run --no-sync python ml-experiments/00112-*/e00112_gate.py [--tests 2 3 4]
 """
