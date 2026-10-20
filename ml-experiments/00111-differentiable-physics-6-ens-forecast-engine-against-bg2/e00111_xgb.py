@@ -432,7 +432,7 @@ def predict_run(
         frame = site_data.with_lags(frame=frame)
     margin = None
     if arm.start == "gam":
-        margin = member_margins(site_data=site_data, run=run, frame=frame)
+        frame, margin = member_margins(site_data=site_data, run=run, frame=frame)
     matrix = xgb.DMatrix(
         frame.select(data.input_columns(lagged=arm.lagged)).to_numpy().astype(np.float32),
         base_margin=start_margin(
@@ -448,8 +448,15 @@ def predict_run(
     )
 
 
-def member_margins(*, site_data: SiteData, run: datetime, frame: pl.DataFrame) -> np.ndarray:
-    """Return each member row's DP forecast fraction, driven by that member's weather."""
+def member_margins(
+    *, site_data: SiteData, run: datetime, frame: pl.DataFrame
+) -> tuple[pl.DataFrame, np.ndarray]:
+    """Return the rows that have a DP margin, and each one's forecast fraction.
+
+    Each member's rows take the DP forecast driven by that member's weather. A row has no margin
+    when its member has missing weather (the DP drops that member from the run) or its valid time
+    is past the DP's window, which ends on a whole hour; those rows are left out of the mixture.
+    """
     from studies.dp_ens import member_means
 
     index = common.run_dates().index(run)
@@ -468,18 +475,14 @@ def member_margins(*, site_data: SiteData, run: datetime, frame: pl.DataFrame) -
             "margin": (result.means / 100.0).ravel(),
         }
     )
-    joined = frame.select("ensemble_member", "valid_time").join(
+    joined = frame.join(
         table,
         on=["ensemble_member", "valid_time"],
-        how="left",
+        how="inner",
         validate="m:1",
         maintain_order="left",
     )
-    if joined["margin"].null_count():
-        missing = joined["margin"].null_count()
-        msg = f"{missing} member rows have no DP margin in the {run:%Y-%m-%d} run"
-        raise ValueError(msg)
-    return joined["margin"].to_numpy()
+    return joined.drop("margin"), joined["margin"].to_numpy()
 
 
 def job_path(*, arm: str, site: str, refit: datetime) -> Path:
