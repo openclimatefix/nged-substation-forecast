@@ -350,6 +350,30 @@ audit result exists.
 - **Decisions:** the pre-registered step 0 decision rule is unchanged, and step 1 and the gate
   follow it.
 
+## Step 0 result (first run)
+
+**The closure audit ran before the gate; its numbers are in `audit_report.md`, printed by
+`ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_audit.py`.**
+The first-run numbers stay as printed.
+
+- **A coverage rule was added after seeing the history coverage and before any residual was read
+  (post hoc).** A series enters a fit only if it holds readings in at least 90% of the rows where
+  the BSP does. A series that fails the rule stays inside the remainder, and the report counts it.
+- **One BSP closes in the training years and does not hold out of sample.** In-sample residuals are
+  2.2 to 3.2 points of effective capacity, with a_P 1.01 to 1.16 and a_G 0.85 to 0.90, and over six
+  winters the median residual stays within 1 MW. In the scored year the frozen fit has a 5.5-point
+  residual with a +3.7 MW median offset, because its frozen steps do not hold.
+- **The other BSP cannot be closed with the generator history available.** Five of its nine
+  generation series have too little history, so their power sits in the remainder: in-sample 11
+  points and a_G 0.24. Whether its generators close it is "cannot tell".
+- **A fit that may refit hides metering errors from the BSP.** With a refit that includes the
+  injected series, a 30-day scale error of 25% is detected in 0% to 3% of injections, and the 24 h
+  stuck run in 0% to 1%. A fit trained only on pre-injection rows detects the same 30-day error in
+  8% to 50%.
+- **By the pre-registered rule neither BSP is informative (`recall30` under 0.2),** so step 1 runs
+  as the capped pilot on the BSP with the highest `recall30`, and the verdict cannot exceed
+  `partly supported`.
+
 ## Rulings made before the run
 
 - **A pilot is capped.** A pilot on the better BSP caps the verdict at `partly supported`.
