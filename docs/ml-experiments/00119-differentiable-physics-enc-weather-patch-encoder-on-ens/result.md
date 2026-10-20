@@ -390,3 +390,50 @@ training year), and before any known-answer-gate fit and before any scored-year 
   farthest decision site by distance, and the page reports the shared-cell count for each site.
   Shared cells mean the placebo can see some of the real patch's weather, so a gain by ENC-cps is
   read as a leak-through warning and not as noise. ENC-cps stays descriptive (C3b).
+
+## Gate as first written, and redefined after seeing run 1 (2026-10-20)
+
+**The known-answer gate failed its first run, and its design is redefined here before one rerun.**
+Run 1 used only the F1 training year (the scored year stayed unopened). The rerun is the only one:
+if it fails, the verdict stays `inconclusive` and the gate is not redefined again. Run 1's numbers
+are kept in full in `gate_run1.json` in the experiment folder and on the page.
+
+| Run 1 reading (F1 training year, decision sites) | Value |
+|---|---|
+| ENC-c, dense injection of 0.10, 0.05, 0.025 points: share of exact recovery | 115%, 138%, 161%; all 5 of 5 sites |
+| ENC-c, sparse 0.05 | 105%, but 2 of 5 sites; interval upper bound 0.000 |
+| ENC-r, dense 0.05 / sparse 0.05 | 183% / 100%, but 1 of 5 sites each; intervals include zero |
+| ENC-c0 (centre cell only) and ENC-cps (distant patch), dense 0.05 | 140% and 136% (the plan required under 20%) |
+| ENC-cpt (patch from another date), dense 0.05 | 91% (the plan required under 20%) |
+| Gate 2 on permuted actuals: ENC-c gain | 0.56 points, so the test is invalid |
+| Clean data, gain over K0 | ENC-c 0.025, ENC-c0 0.042, ENC-cps 0.026, ENC-cpt 0.026, ENC-r 0.015 |
+| Seed spread (five seeds) / largest training-to-out-of-fold gap | 0.008 (pass) / 13% (pass) |
+
+**Reading of run 1.** The injected function leaks through the encoder's non-patch inputs (lead,
+hour of day, the centre cell's absolute values, and K0's mean), so the controls recover it too. The
+permuted-actual null gives K0 a target it was never calibrated to, so any recalibration reads as
+gain. On clean data the encoder with the patch from another date gains as much as the encoder with
+the right patch, so **most of the out-of-fold gain is a recalibration of K0, not information from
+the patch**. That finding goes in the take-home whatever the rerun shows.
+
+**Redefinition for the rerun, written before it runs.**
+
+- **Injection orthogonal to the non-patch inputs.** The east-minus-west temperature gradient and the
+  north-minus-south shortwave gradient are each replaced by their residual from a cross-fitted
+  XGBoost regression (five month-block folds, F1 training year only) on the non-patch inputs (lead,
+  hour sine and cosine, the centre cell's 10 channels, K0's mean, the site), then standardised. The
+  share of each gradient's variance the non-patch inputs explain is reported before and after.
+- **ENC-r's injection sized per site.** Each site's multiplier is sized so that exact recovery at
+  that site gains the stated size (0.10, 0.05, 0.025 points), because the pooled sizing let the
+  sites with large sensitivities set the scale.
+- **Gate 2 null.** The target is K0's `q50` plus the residual (`actual` minus `q50`) of another run
+  of the same site at the same lead (the placebo run of ENC-cpt). K0's quantiles stay calibrated to
+  the residual distribution, and the patch has no link to the target. The bounds are unchanged: at
+  most 0.01 points from K0, and the intervals of ENC-c and ENC-r include zero.
+- **Pass rules, unchanged from the plan except where stated.** ENC-c and ENC-r, dense and sparse at
+  0.05: at least half of the exactly recoverable gain at 4 of 5 decision sites, and the pooled 99%
+  interval wholly below zero. ENC-c0 and ENC-cpt recover under 20% of every injection. ENC-cps is
+  read as descriptive, because its patch shares 12 to 30 of 37 cells with the real patch. Seed
+  spread at most 0.02 points and the training-to-out-of-fold gap at most 25%, as before.
+- **Power target:** the gate must detect a gain of 0.05 points, the size the plan calls worth
+  seeing; the smaller 0.025 injection is reported and does not gate.

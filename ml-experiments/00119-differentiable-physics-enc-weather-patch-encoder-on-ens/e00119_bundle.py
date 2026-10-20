@@ -65,7 +65,6 @@ def distant_sites(*, dataset: data.Dataset) -> list[int]:
         site: (cache.sites[site].table.latitude, cache.sites[site].table.longitude)
         for site in dataset.sites
     }
-    cells = {site: set(layout[site]["cells"]) for site in dataset.sites}
     out = []
     for site in dataset.sites:
         lat, lon = coords[site]

@@ -238,7 +238,6 @@ def main() -> None:  # noqa: PLR0915
     ew, ns = gradients(dataset=dataset, rows=rows)
     z_ew, z_ns = standardise(ew, mask=in_year), standardise(ns, mask=in_year)
     g_dense = 0.5 * z_ew + 0.5 * z_ns
-    dense_mask = in_year
     sparse_mask = sparse_days(rows=rows, ew=ew, mask=in_year) & in_year
     sens_t = rows["sens_t"].to_numpy().astype(np.float64)
     results = {"injections": {}, "clean": {}}
@@ -290,6 +289,33 @@ def main() -> None:  # noqa: PLR0915
         reading = evaluate(rows=rows, oof=oof, actual=actual, k0=k0, oracle=k0)
         results["clean"][arm_name] = reading
         print(f"clean {arm_name}: gain {reading['gain']:+.4f}", flush=True)
+    arm = model.ARMS["ENC-c"]
+    bundle = bundles.make_bundle(
+        rows=rows, tensors=tensors, arm=arm, distant=distant, foreign=foreign
+    )
+    c_value = decisions["F1.ENC-c"]["c"]
+    per_seed = {}
+    for seed in cv.SEEDS:
+        oof = cv.run_oof(
+            rows=rows, bundle=bundle, arm=arm, direction=direction, decay_c=c_value, seed=seed
+        )
+        enc = stats.quantile_score(actual=actual[oof.index], quantiles=oof.quantiles)
+        base = stats.quantile_score(actual=actual[oof.index], quantiles=k0[oof.index])
+        per_seed[str(seed)] = {
+            "enc_minus_k0": float((enc - base).mean()),
+            "train_loss": oof.train_loss,
+            "oof_loss": oof.oof_loss,
+            "train_gap": [
+                abs(a - b) / b for a, b in zip(oof.train_loss, oof.oof_loss, strict=True)
+            ],
+        }
+    values = [v["enc_minus_k0"] for v in per_seed.values()]
+    results["seeds"] = {
+        "per_seed": per_seed,
+        "spread": max(values) - min(values),
+        "passes_spread": (max(values) - min(values)) <= SEED_SPREAD_BOUND,
+    }
+    print(f"seed spread {results['seeds']['spread']:.4f}", flush=True)
     permuted = permuted_actual(rows=rows, foreign=foreign)
     results["permuted"] = {}
     for arm_name in CLEAN_ARMS:

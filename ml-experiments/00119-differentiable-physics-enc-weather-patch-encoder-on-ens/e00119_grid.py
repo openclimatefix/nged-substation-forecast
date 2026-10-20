@@ -1,4 +1,4 @@
-"""Choose the weight-decay constant c, the epoch count, and lambda on each direction's training year.
+"""Choose the weight decay, the epoch count, and lambda on each direction's training year.
 
 For ENC-c and ENC-r, in each direction, fit every block of the month-block cross-validation for
 each c in {0.4, 4, 40} and keep the c with the lowest mean out-of-fold pinball loss. The median of

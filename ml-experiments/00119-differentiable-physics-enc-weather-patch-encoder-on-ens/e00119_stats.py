@@ -58,21 +58,20 @@ def month_interval(
     n_seeds, n_rows = treatment.shape
     key = [f"{s}|{r}|{i}" for i, (s, r) in enumerate(zip(site.tolist(), run.tolist(), strict=True))]
     label = np.array([f"{m // 12}-{m % 12 + 1:02d}" for m in month.tolist()])
-    frames = []
-    for arm, values in (("treatment", treatment), ("reference", reference)):
-        for seed in range(n_seeds):
-            frames.append(
-                pl.DataFrame(
-                    {
-                        "arm": arm,
-                        "site": site.astype(np.int64),
-                        "time": key,
-                        "seed": seed,
-                        "month": label,
-                        "score": values[seed],
-                    }
-                )
-            )
+    frames = [
+        pl.DataFrame(
+            {
+                "arm": arm,
+                "site": site.astype(np.int64),
+                "time": key,
+                "seed": seed,
+                "month": label,
+                "score": values[seed],
+            }
+        )
+        for arm, values in (("treatment", treatment), ("reference", reference))
+        for seed in range(n_seeds)
+    ]
     losses = pl.concat(frames)
     lower, upper = bootstrap_difference_at_level(
         losses=losses,
