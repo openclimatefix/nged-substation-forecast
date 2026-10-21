@@ -91,15 +91,20 @@ a transfer, which none of this experiment's arms tested.
 We asked whether the refit-offset neighbour-count detector (RO-NC, the detector of
 [experiment 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md)) lowers the forecast's
 error when its output is fed into GAM-K's Kalman filter. The detector looks for steps in the
-forecast error that appear at a substation and are matched by opposite steps at its neighbours. We added transfers of 25% or more of the
-receiving load that last over a day (the headline-band transfers drawn in experiment 147) to the real
-forecast errors, in 44 simulated versions of the data that touch six Primary substations. We ran the detector with the
+forecast error that appear at a substation and are matched by opposite steps at its neighbours. We
+added transfers of 25% or more of the
+receiving load that last over a day (the headline-band transfers drawn in experiment 147) to the
+real
+forecast errors, in 44 simulated versions of the data that touch six Primary substations. We ran the
+detector with the
 causal end rule of
 [experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md), and gave the filter a second
 "switched" regime whose level variance is a multiple of the fitted one. The filter did not improve:
-every setting scored worse than the filter alone on the tuning months, so the stop rule (stop before the real year if the tuning months show no gain) ended the
+every setting scored worse than the filter alone on the tuning months, so the stop rule (stop before
+the real year if the tuning months show no gain) ended the
 experiment before the real year was scored. The method follows
-[Kalman filtering of GAM residuals](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)
+[Kalman filtering of GAM
+residuals](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)
 (experiment 111) and a two-model mixture filter in the style of the interacting multiple model
 filter.
 
@@ -112,14 +117,16 @@ filter.
   months from prior {0.5, 0.9} and multiplier {4, 16, 64, 256}). S-HE (the same filter with the
   hindsight end, not deployable). S-ORACLE (prior from the true transfer interval, not deployable).
   Placebo (the causal prior shifted by a random whole number of weeks). Variance inflation (the
-  placebo prior with no likelihood update). All use K0's uncertainty bands, so each contrast is a difference
+  placebo prior with no likelihood update). All use K0's uncertainty bands, so each contrast is a
+difference
   in the forecast's location only.
 - **Rows.** `fold_a_daily_gap_v1` runs at the five decision substations and D9 (labels as in
   [experiment 134](../00134-differentiable-physics-same-weekday-error-profile-on-gam-k/result.md)),
   replicate months (even months 2024-07 to 2025-06) and the scored year (2025-07 to 2026-06), leads
   0.5 to 168 h, rows outside the hand-filtered switching events. The rows scored are those inside an
   injected transfer (and 72 h after) or within 48 hours after a causal alarm is known: 592,087 rows
-  in the alarm window and 440,353 inside a transfer before any alarm. Intervals resample calendar months of target time
+  in the alarm window and 440,353 inside a transfer before any alarm. Intervals resample calendar
+months of target time
   (16 months for the alarm window, 12 for the rows inside a transfer).
 - **C1 (S-KF minus K0, 48 hours after a causal alarm):** +0.026 points (-0.017 to +0.062); K0's
   own score on these rows is 4.35 points (3.15 to 5.55). Mean-forecast absolute error: +0.022
@@ -127,8 +134,11 @@ filter.
 - **S-ORACLE minus K0:** +0.022 (+0.009 to +0.062) in the alarm window and +0.096 (+0.065 to +0.282)
   inside a transfer. **S-HE minus K0:** -0.008 (-0.067 to +0.048) in the alarm window and +0.083
   (+0.059 to +0.215) inside a transfer.
-- **Controls.** Placebo +0.016 (-0.004 to +0.052) and variance inflation +0.015 (-0.004 to +0.052) in
-  the alarm window: S-KF is numerically worse than both (+0.026 against +0.016 and +0.015), and the intervals overlap, so the three are not distinguishable. These controls were run on the simulated data only.
+- **Controls.** Placebo +0.016 (-0.004 to +0.052) and variance inflation +0.015 (-0.004 to +0.052)
+  in
+  the alarm window: S-KF is numerically worse than both (+0.026 against +0.016 and +0.015), and the
+intervals overlap, so the three are not distinguishable. These controls were run on the simulated
+data only.
 - **A possible reason (not tested by any arm).** GAM-K's fitted level variance `q` is 0.4 to 9.5
   per day and its observation noise 0.2 to 0.8, in points of effective capacity, over the six
   substations (the units are as the filter code defines them). A synthetic 8-point step in the
@@ -159,7 +169,8 @@ filter.
   The known-answer arm (S-ORACLE) does not show the gain it should, and S-ORACLE, which has more
   information than K0, is worse than K0 (triggers 1 and 5 of the `ml-experiment` skill). The
   audit by a fresh Opus agent that the `ml-experiment` skill requires has not run: the brief allows
-  one Opus review only with the maintainer's approval. The experiment waits for that decision before merging.
+  one Opus review only with the maintainer's approval. The experiment waits for that decision before
+merging.
 
 ## Departures from the plan
 
@@ -191,7 +202,8 @@ the predicted end, on the same injected worlds, with the oracle end as its ceili
 itself? Earlier results measured the ceiling only: a perfect detector lowers the best guess's score
 by 0.42% ([experiment 44](../00044-sw2-2-switching-share-of-best-guess-score/result.md)), and true
 moved megawatts close 83% of the gap that the refit-offset neighbour-count detector (RO-NC) closes
-16% of ([experiment 88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)).
+16% of ([experiment
+88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)).
 RO-NC is the detector of [experiment 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md).
 Lab conditions are allowed (maintainer, 2026-10-18); every shortcut is named in the write-up.
 
