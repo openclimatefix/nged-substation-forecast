@@ -624,9 +624,9 @@ load, and the pooling is the random-effects meta-analysis of [DerSimonian and La
 [111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md),
 [113](../00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result.md),
 [114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md),
-[120](../00120-differentiable-physics-sh-convex-daily-shape-library/result.md),
-[121](../00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/result.md), and
-[122](../00122-differentiable-physics-three-winter-backtest-gam-k/result.md). One targeted search
+120 (PR 1410),
+121 (PR 1413), and
+122 (PR 1415). One targeted search
 for a DOI on Economy 7 or storage-heating load found none on temperature dependence. The nearest
 sources are [Elexon
 CP1058A](https://assets.elexon.co.uk/wp-content/uploads/sites/11/2012/02/28171857/cp1058a.pdf),
