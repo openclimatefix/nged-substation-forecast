@@ -196,9 +196,7 @@ def main() -> None:
         ("g3", "ANALOG+R-ref"): "G3 cold days: ANALOG+R",
         ("g3", "ANALOG+R-ref-notemp"): "G3: without temperature",
     }
-    frame = pl.DataFrame(
-        {"arm": list(shown.values()), "share": [gate[g][k] for g, k in shown]}
-    )
+    frame = pl.DataFrame({"arm": list(shown.values()), "share": [gate[g][k] for g, k in shown]})
     chart = (
         alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_bar(color=ocf.DATA_BLUE, aria=False)

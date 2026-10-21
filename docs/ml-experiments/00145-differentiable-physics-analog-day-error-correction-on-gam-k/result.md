@@ -16,9 +16,9 @@ hypothesis: >-
   Averaging GAM-K's past day-ahead errors over the days most similar to the target day (same day
   type, with holiday identity for holidays, similar forecast daily mean temperature, and a season
   window of a few weeks either side of the date) gives a better correction than averaging the last
-  14 days alike (recipe R of experiment 115) or the last weeks' same-day-type days (experiment
-  134), because demand errors repeat on days that resemble each other and the largest repeats,
-  holidays and cold days, are the ones the 14-day profile averages away.
+  14 days alike (recipe R of experiment 115) or the same-day-type days of the last few weeks
+  (experiment 134). The reasoning is that demand errors repeat on days that resemble each other. The
+  errors that repeat most, on holidays and on cold days, are the ones that a 14-day average dilutes.
 prediction: >-
   Written before any fit, see "Predictions" below. Headline: ANALOG+R minus R is -0.005 to -0.03
   points at D+1 in the scored year; the pure analog arm is 0.00 to +0.05 worse than R; on holiday
@@ -40,20 +40,24 @@ metric: >-
 code: ml-experiments/00145-differentiable-physics-analog-day-error-correction-on-gam-k/
 verdict: small gain
 best_arm: >-
-  ANALOG+R (tuned k 20, N 13 weeks, lambda 0.5, kappa 1.0), 2.395 points at D+1 in the scored year
+  ANALOG+R (tuned k 20, season window 13 weeks, lambda 0.5, kappa 1.0), 2.395 points at D+1 in the
+  scored year
   against 2.436 for R and 2.524 for K0
 headline: >-
   Adding the mean error of the 20 most similar past days to recipe R's 14-day profile lowered the
   day-ahead score by 0.041 points against R in the scored year (99% interval -0.057 to -0.017; 4 of
   5 substations) and by 0.033 in the replicate months (-0.056 to -0.005). Ranking by forecast
-  temperature added nothing, and the analog correction for holidays was worse than R.
+  temperature improved the score by only 0.005, and the analog correction for holidays was worse
+  than R.
 lessons:
   - >-
-    The gain comes from averaging more same-day-type days over a wider season window, and about 40%
-    of it comes from days of the previous year (a recent-only variant gained 0.024 against R).
+    The best arm averaged 20 same-day-type days over a 13-week season window, and about 40% of its
+    gain comes from days of the previous year (a recent-only variant gained 0.024 against R); no
+    ablation separates the pool size from kappa and lambda.
   - >-
-    Similarity in forecast daily mean temperature added 0.005 points (interval -0.001 to +0.011), so
-    the day type and the season window carry the information.
+    Ranking by forecast daily mean temperature improved the score by 0.005 points (interval -0.001
+    to +0.011), too little to justify the lookup, although the gain was 0.016 to 0.017 on winter
+    evenings in both periods; the day type and the season window carry most of the information.
   - >-
     One earlier occurrence of a holiday is a worse correction than R's 14-day profile on the
     holiday itself (+0.071 points, 1 of 5 substations better).
@@ -64,42 +68,51 @@ adopted_in: none
 date: 2026-10-21
 take_home_message: >-
   Averaging the errors of the 20 most similar past days (same day type, within 13 weeks of the same
-  date, last year's days included) beat recipe R by 0.041 points at day D+1 (about 1.7%), a small
-  gain that is larger than the weekday term of experiment 134. Matching on forecast temperature
-  added nothing, and copying the error of the same holiday last year made holidays worse, so the
-  next step is a day-type profile with a season window and no holiday analog.
+  date, last year's days included) beat recipe R (the 0.75-weighted mean error of the last 14 days)
+  by 0.041 points at day D+1, the calendar day after the forecast origin (about 1.7% of R's score of
+  2.436). That gain is larger than the 0.011 points that the weekday term of experiment 134 gained.
+  Matching on forecast temperature helped by only 0.005 points, and copying the error of the same
+  holiday last year made holidays worse, so the next step is a day-type profile with a season window
+  and no correction copied from an earlier holiday.
 advice:
   - >-
     Add a day-type error profile with a 13-week season window, 20 days, and last year's days to
-    recipe R at day D+1, and leave holiday-like days on R's 14-day profile alone (C1, C4).
+    recipe R at day D+1, and leave holiday-like days on R's 14-day profile alone (contrasts C1 and
+    C4).
   - >-
-    Do not rank past days by forecast daily mean temperature for the error correction: it added
-    0.005 points (diagnostic against ANALOG+R-notemp).
+    Treat ranking past days by forecast daily mean temperature as optional for the error correction:
+    it improved the score by 0.005 points at day D+1 and by 0.016 to 0.017 on winter evenings
+    (diagnostic against ANALOG+R-notemp).
   - >-
-    Do not use one earlier occurrence of a holiday as its correction: it scored 0.071 points worse
-    than R on the holiday-like days (C4).
+    Do not use one earlier occurrence of a holiday as its correction: that correction scored 0.071
+    points worse than R on the holiday-like days (C4).
   - >-
-    Apply the analog shift at day D+1 only, because it loses 0.018 points at 48 to 144 hours (C1
-    lead bands).
+    Apply the analog shift at day D+1 only, because the shift loses 0.018 points at 48 to 144 hours
+    (contrast C1, lead bands).
 ---
 
 **Take-home: averaging the errors of the 20 most similar past days gave a small, real gain over
-recipe R at day D+1 (0.041 points, about 1.7% of 2.44), and the part of the idea that was about
+recipe R at day D+1 (0.041 points, about 1.7% of recipe R's score of 2.436), and the part of the
+idea that was about
 weather and holidays did not help.** Recipe R is the baseline correction: it subtracts 0.75 times
 the mean of the last 14 days' errors by half-hour from the forecast of GAM-K, the physics-based
-demand model with a Kalman filter on ECMWF ensemble weather. One point is 1% of a substation's
+demand model (a generalised additive model with a Kalman filter that updates it using ensemble
+weather forecasts from the European Centre for Medium-Range Weather Forecasts, ECMWF). One point is
+1% of a substation's
 capacity, and lower scores are better. The gain comes from using many same-day-type days over a
-13-week season window, including last year's days. Ranking days by forecast temperature added
-nothing. Using the same holiday of the year before made holidays worse. The verdict is `small gain`:
-the 99% interval is wholly below zero, and its upper end (-0.017) is above the pre-registered -0.02
-bar.
+13-week season window, including last year's days. Ranking days by forecast temperature helped by
+only 0.005 points. Using the same holiday of the year before made holidays worse. The verdict is
+`small gain`, not a stronger one. The 99% interval for the difference from R lies wholly below zero,
+but the upper end of that interval (-0.017) is above the -0.02 threshold written into the plan
+before any fit.
 
 ## What was asked, and the answer in plain terms
 
 **The question was whether the day-ahead correction should average the errors of the past days that
-look most like the day being forecast, instead of the most recent days.** The forecast is the
-electricity demand of five Primary substations (the stations that step power down from 33 kV to 11
-kV) for the day after the 09:00 UTC forecast origin. [Experiment
+look most like the day being forecast, instead of the most recent days.** The quantity forecast is
+the electricity demand at five Primary substations (the stations that step power down from 33 kV to
+11 kV). Each forecast covers day D+1, the calendar day after the 09:00 UTC forecast origin, which is
+15.5 to 39 hours ahead. [Experiment
 115](../00115-differentiable-physics-w1-diurnal-shape-state-on-ens/result.md) found recipe R, and
 [experiment 134](../00134-differentiable-physics-same-weekday-error-profile-on-gam-k/result.md)
 found that a weekday term added only 0.011 points. This experiment looked for the most similar past
@@ -109,7 +122,8 @@ holidays. It is a nearest-neighbour ("analog") correction as in [Delle Monache e
 (2013)](https://doi.org/10.1175/MWR-D-12-00281.1), applied to forecast errors.
 
 **Answer.** The best arm, ANALOG+R, scored 2.395 points at day D+1 in the scored year (2 July 2025
-to 29 June 2026, 292 runs) against 2.436 for R. Rows inside the hand-filtered switching events are
+to 29 June 2026, 292 daily forecast runs) against 2.436 for R. Rows inside the hand-filtered
+switching events are
 left out. The settings were chosen on the odd months of July 2024 to June 2025; the even months are
 the replicate months.
 
@@ -125,14 +139,18 @@ the replicate months.
 
 ## Results
 
-- **Arms and settings.** K0 (GAM-K); R (recipe R, kappa 0.75); ANALOG-k (kappa 0.75, k 20 days, 8
+- **Arms and settings.** Kappa is the fraction of the mean error subtracted, k is the number of
+  similar days averaged, the season window is the number of weeks either side of the date from which
+  days are drawn, and lambda is the weight of the analog profile against R's 14-day profile. K0
+  (GAM-K); R (recipe R, kappa 0.75); ANALOG-k (kappa 0.75, k 20 days, 8
   weeks); ANALOG+R (kappa 1.0, k 20, 13 weeks, lambda 0.5, the weight of the analog profile against
   R's profile); ANALOG-holiday (R, with the analog profile at weight 0.5 on holiday-like days only;
   fixed settings); ANALOG+R-notemp (no temperature ranking; k 20, 8 weeks); ANALOG+R-recent (post
   hoc: ANALOG+R without days older than 300 days). Settings are fleet-wide, chosen by the tuning
   rows' mean absolute error of the median at D+1; **k reached its largest value on the grid (20) for
   all three tuned arms**. Tuning rows' error: K0 4.299, R 4.131, ANALOG+R 4.053. No demand model was
-  refitted, so no retraining schedule applies and the contrasts do not depend on one.
+  refitted, so no retraining schedule applies and the contrasts do not depend on a retraining
+  schedule.
 - **Rows.** 66,844 D+1 rows in the scored year and 41,126 in the replicate months at the five
   decision substations (D5, D10, D11, D14, D16), D9 beside them.
 - **Absolute scores, scored year, D+1 (all leads).** K0 2.524 (2.812), R 2.436 (2.744), RB 2.424
@@ -150,18 +168,24 @@ the replicate months.
 - **Where C1 gains (scored year, D+1).** Monday -0.0928 and Friday -0.1375 (both 5 of 5), Saturday
   -0.0296, Sunday -0.0363, Tuesday -0.0251, Wednesday and Thursday within noise. Winter evening
   16:00 to 20:00 -0.1095 (-0.1625 to -0.0375), 4 of 5. Cold-snap days (forecast daily mean under 3
-  degrees C, 80 site-days) -0.1092 (-0.2264 to -0.0593), 5 of 5, but against RB-day-types -0.0738
+  degrees C, 80 site-days) -0.1092 (-0.2264 to -0.0593), 5 of 5 substations; cold-snap nights (22:00
+  to 06:00, 900 rows) -0.0442 (-0.1664 to +0.0362), 4 of 5, with an interval that includes zero.
+  Against RB-day-types the cold-snap days score -0.0738
   (-0.3648 to +0.0501). Non-winter -0.0325 (-0.0557 to +0.0009).
 - **Temperature.** ANALOG+R-notemp minus ANALOG+R is +0.0046 (-0.0012 to +0.0110) in the scored year
-  and +0.0029 in the replicate months: ranking by temperature adds nothing measurable. On cold days
+  and +0.0029 in the replicate months: ranking by temperature gains 0.005 points, too little to
+  justify the lookup under the plan's 0.02 rule. The gain is larger where weather matters: winter
+  evenings +0.0174 (-0.0165 to +0.0450) scored and +0.0160 (+0.0076 to +0.0253) replicate, and all
+  leads +0.0066 (+0.0018 to +0.0117) scored. On cold days
   the chosen analogs differ from the target by 3.0 degrees C on average (site D10), against 1.3 on
-  other days, because few cold days exist.
+  other days, probably because few cold days exist.
 - **Last year's days.** In the scored year the mean pool of candidates at D10 is 80, of which 51 are
   from the previous year; in the tuning and replicate months it is 34, of which 8 are.
   ANALOG+R-recent minus ANALOG+R is +0.0162 (+0.0107 to +0.0224) in the scored year and +0.0016 in
-  the replicate months, which have no previous year to use. About 40% of the gain over R therefore
-  comes from last year's days (recent-only minus R: -0.0243, -0.0375 to -0.0072). The tuned settings
-  were chosen on a pool with little previous-year history, so they may under-use it.
+  the replicate months, which have few days from the previous year (8 on average). About 40% of the
+  gain over R (roughly 26 to 55% from the interval of the difference) therefore comes from last
+  year's days (recent-only minus R: -0.0243, -0.0375 to -0.0072). The tuned settings
+  were chosen on a pool with little previous-year history, so they may under-use last year's days.
 - **Holidays.** C4 (ANALOG-holiday minus R) on holiday-like days is +0.0713 (+0.0192 to +0.1424), 1
   of 5 substations better; Christmas window +0.0053; Easter +0.1161 (one set of 720 rows). ANALOG+R
   minus R on holiday-like days is +0.1595 (+0.0441 to +0.2851). All 16 holiday-like targets of the
@@ -169,25 +193,39 @@ the replicate months.
   fallback. One earlier occurrence is a worse correction than R's 14-day profile. Non-holiday rows
   carry the whole gain (-0.0486, 5 of 5). The days 1 to 3 after a holiday-like day gain -0.0279
   (-0.0620 to +0.1369) against R, and -0.0672 (5 of 5) against RB-day-types. About 13 holiday-like
-  days fall on scored runs, so the intervals are coarse.
-- **Tails (scored year, D+1; coverage gap in points, pinball).** ANALOG+R: q01 +1.27 (0.1843), q05
+  days fall on scored runs, so the intervals are coarse. Christmas window (4 substations): C1
+  +0.0133 (-0.0050 to +0.0181), C3 -0.0647 (-0.0702 to -0.0437), C5 -0.1242 (-0.1442 to -0.0477).
+  Easter: C1 +0.2786, 0 of 5 substations better. Holiday-like days: C2 +0.3747 (+0.2352 to +0.5498).
+  Replicate months, which test the fallback path only because no holiday there has an earlier
+  occurrence: C4 on holiday-like days +0.0663 (-0.1248 to +0.0845), 1 of 5 substations better.
+  **Holiday verdict: ANALOG-holiday is not a candidate**, because C4 is positive on holiday-like
+  days and in the Christmas window, and only 1 of 5 substations is better.
+- **Tails (scored year, D+1; coverage gap, observed minus nominal coverage in percentage points,
+  then pinball loss).** ANALOG+R: q01 +1.27 (0.1843), q05
   +1.65 (0.5910), q95 -0.94 (0.6570), q99 -1.16 (0.2130); R: +1.39 (0.1875), +1.76 (0.6138), -1.01
-  (0.6573), -1.16 (0.2124). On cold-snap nights (900 rows) the share of readings at or below q95 is
-  0.839 for K0, 0.888 for R, and 0.891 for ANALOG+R; below q99 it is 0.953, 0.976, and 0.978.
+  (0.6573), -1.16 (0.2124). On cold-snap nights (900 rows; nominal levels 0.95 and 0.99, so every
+  arm under-covers) the share of readings at or below q95 is
+  0.839 for K0, 0.888 for R, and 0.891 for ANALOG+R; below q99 it is 0.953, 0.976, and 0.978. In the
+  replicate months the 468 cold-night rows show 0.998 and 1.000 for R and ANALOG+R, so cold-night
+  coverage differs between periods.
 - **Not computed.** The curtailment-cost metric was not scored, because the experiment changes only
-  the day-ahead mean correction and the tail pinball losses above barely move.
+  the day-ahead mean correction. The q95 and q99 pinball losses barely move (0.6573 to 0.6570 and
+  0.2124 to 0.2130), and the upper tail is the one that matters for curtailment; q05 improves by
+  0.023.
 - **Predictions.** Held: P4 (temperature adds 0.00 to +0.02: +0.005), P7 (the gain reverses beyond
-  48 hours), P8 (tuned k at least 5), and P6's first half (the gain is largest on winter evenings).
+  48 hours), P8 (tuned k at least 5), and P6's first half (the gain is largest on winter evenings
+  among the season and time-of-day cuts; Friday is larger).
   Failed: P1 (C1 was -0.041, below the predicted -0.005 to -0.03), P2 (the pure analog arm was not
   worse than R), P3 (ANALOG+R beat RB-day-types by 0.0185, not within 0.01), P5 (the holiday arm was
-  worse than R, not better), and P6's second half (the non-winter estimate was -0.033, not within
+  worse than R, not better, in the Christmas window too, and the interval lay wholly above zero),
+  and P6's second half (the non-winter estimate was -0.033, not within
   0.005 of zero).
 
 ## Gate
 
 **The known-answer gates G0, G1, and G2 passed, and they ran on the tuning months before any
-replicate or scored forecast was read.** The shares match the expected values in the plan to three
-digits.
+replicate or scored forecast was read.** The recovered shares (the fraction of an injected shift
+that each arm's correction picks up) agree with the expected values in the plan.
 
 - **G0, no lookahead.** Injecting +3 points on the target day and on the origin's own day changed no
   arm's profile at all (largest change 0.0).
@@ -200,8 +238,8 @@ digits.
 - **G3, a recurring weather state (informative, did not cap the verdict).** On cold days ANALOG+R
   recovered 0.300 and ANALOG+R-notemp 0.265. The difference, 0.035, is below the 0.05 the plan asked
   for. Together with the null result for temperature above, **the temperature part of the hypothesis
-  is untested in the gate and unsupported in the scores**, so it is `inconclusive` rather than
-  refuted.
+  is untested in the gate and only weakly supported in the scores.** The verdict for that part is
+  `inconclusive`, not `refuted`.
 
 ## Checks
 
@@ -209,16 +247,20 @@ digits.
   D11 -0.018, D14 +0.007, D16 -0.021, D5 -0.060. R: +0.009, -0.019, +0.002, -0.015, -0.037. K0 at D5
   is -0.097.
 - **Error of the median and of the mean forecast beside each contrast (scored year, D+1).** C1:
-  -0.0675 and -0.0689. C3: -0.0320 and -0.0323. C5: -0.2447 and -0.2482. The quantile score and both
-  errors point the same way.
-- **Triggers.** Three fired and none led to an audit, by the manager's decision (quota). Trigger 1:
-  G3, a known-answer gate that failed, reported as informative above. Trigger 2: the C1 gain is
-  larger than predicted; the recent-only ablation tests an explanation (last year's days carry about
-  40% of it). Trigger 5: R, which the holiday arm contains, beats it on holiday-like days (+0.0713);
-  the cause is the one-sample holiday profile. Trigger 3 did not fire. Trigger 4 did not fire:
-  leaving out one substation never flips C1. Trigger 6 did not fire: experiment 134's C1 interval is
-  0.026 wide and this one is 0.040 wide. Trigger 7 did not fire: no later experiment depends on this
-  result yet.
+  -0.0675 and -0.0689. C2: -0.0109 and -0.0128. C3: -0.0320 and -0.0323. C4: +0.0036 and +0.0038.
+  C5: -0.2447 and -0.2482. The quantile score and both errors point the same way.
+- **Triggers.** Four of the plan's seven audit triggers fired, and none led to an audit: the ML
+  manager decided against one to save usage quota (a message to this session on 2026-10-21, not
+  committed). The Opus audit is the step the manager skipped. Trigger 1: G3, a known-answer gate
+  that failed, reported as informative above. Trigger 2: the C1 gain is larger than predicted (P1),
+  the pure analog arm did not lose to R (P2), and ANALOG+R beat RB-day-types by more than predicted
+  (P3); the recent-only ablation explains part of P1 (last year's days carry about 40% of the gain)
+  and nothing explains P2 and P3. Trigger 4: C2 (ANALOG-k minus R, -0.0138) flips sign when D14 is
+  left out (+0.0017); C1, C3, C4, and C5 keep their sign when any one substation is left out.
+  Trigger 5: R, which the holiday arm contains as a special case, beats the holiday arm on
+  holiday-like days (+0.0713); the cause is the one-sample holiday profile. Trigger 3 did not fire.
+  Trigger 6 did not fire: experiment 134's C1 interval is 0.026 wide and this one is 0.040 wide.
+  Trigger 7 did not fire: no later experiment depends on this result yet.
 
 ## Caveats
 
@@ -230,7 +272,19 @@ digits.
   pool is larger.
 - The shift applies at every lead as R does; the gain reverses beyond 48 hours, so a serving version
   would apply it at day D+1 only.
-- ANALOG+R-recent is post hoc and was not re-tuned.
+- ANALOG+R-recent is post hoc and was not re-tuned. Its cap of 300 days leaves out days older than
+  300 days; with the tuned 13-week window, days 274 to 300 days old are still allowed, so it leaves
+  out most but not all of the previous year.
+- The tuned arms' spread is fitted on the tuning rows after the settings were chosen on the same
+  rows, so the spread is slightly too narrow out of sample, and R, which was not tuned, does not
+  have this bias. Quantile-score and tail contrasts against R are therefore slightly biased against
+  the analog arms.
+- The gate's shares are fractions of the raw +3-point shift. Removing each day's mean and the kappa
+  shrink put the ceiling near 0.62 at kappa 0.75, and the plan's expected values already include
+  that.
+- The report's cold-snap rows use the observed daily mean below 3 degrees C in winter months, while
+  the gate's cold days use the forecast daily mean below 5 degrees C in the tuning months, so they
+  are different sets of days.
 
 ## What to try next
 
