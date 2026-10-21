@@ -55,13 +55,14 @@ headline: >-
   resampled real residuals, so the verdict is capped at inconclusive.
 lessons:
   - >-
-    Fit the noise of a filter that serves day-ahead forecasts by a day-ahead likelihood. The same
-    14-weight filter fitted by the one-step likelihood scored 0.127 points worse at D+1 (KEZ-1s minus
-    KEZ, scored year, interval +0.084 to +0.171).
+    Fitting the noise of a filter that serves day-ahead forecasts by a day-ahead likelihood, with a
+    wider bound on log q, helped. The same 14-weight filter fitted by the one-step likelihood and the
+    narrower bound scored 0.127 points worse at D+1 (KEZ-1s minus KEZ, scored year, interval +0.084
+    to +0.171); the two changes were made together, so this experiment cannot separate them.
   - >-
-    A PV capacity weight that moves every day makes the day-ahead forecast worse: KEZ without it
-    scored 0.028 points better (interval -0.046 to -0.010, 95%, scored year), though not in the
-    replicate months (-0.013, -0.060 to +0.042).
+    In the scored year, a PV capacity weight that moves every day made the day-ahead forecast worse at
+    4 of 5 substations, led by D10: KEZ without it scored 0.028 points better (interval -0.046 to
+    -0.010, 95%, exploratory), though not in the replicate months (-0.013, -0.060 to +0.042).
   - >-
     The heating and profile-scale weights each earn a little when the others are present (dropping
     them costs 0.032 and 0.060 points at D+1), but moving them does not beat moving the level alone
@@ -90,8 +91,9 @@ advice:
     Keep the level-and-anomaly filter of experiment 111 as the DP's recent-level correction for
     Primaries; do not port the 14-weight effects filter (C1 +0.015, interval -0.013 to +0.048).
   - >-
-    Fit the noise of a filter that serves day-ahead forecasts by a day-ahead likelihood, not the
-    one-step likelihood (KEZ-1s minus KEZ +0.127 at D+1).
+    Fit the noise of a filter that serves day-ahead forecasts by a day-ahead likelihood and a wide
+    bound on log q, not the one-step likelihood and a narrow bound (KEZ-1s minus KEZ +0.127 at D+1;
+    the two changes were made together).
   - >-
     Do not let a PV capacity weight move day to day in a day-ahead filter at Primaries (KEZ without
     the PV weight minus KEZ -0.028 at D+1).
@@ -120,7 +122,9 @@ followed its own model, but not when the noise was resampled from real residuals
 heating weights are not interpretable, and P4 adds that the PV and holiday variances are not
 recovered (a holiday variance simulated at 0 was fitted between 9e-7 and 3e-2 per day in the first
 run). The verdict is `inconclusive`. The evidence supports keeping GAM-K's filter, and fitting a new
-filter's noise by a day-ahead likelihood, which improved KEZ by 0.127 points here.
+filter's noise by a day-ahead likelihood with a wide bound on log q, which together improved KEZ by
+0.127 points here. The scored-year interval excludes any gain over GAM-K above about 0.05, so the
+data answer "not worth porting"; `inconclusive` refers to what the weights mean.
 
 **This experiment re-implements the method of [de Vilmarest et al.
 (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) on our convex model and our data.** They froze
@@ -208,9 +212,14 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   (-0.046 to -0.010; replicate months -0.013, -0.060 to +0.042). KEZ without the PV weight minus GK
   is -0.013 (-0.027 to +0.002) in the scored year and +0.008 (-0.070 to +0.073) in the replicate
   months.
-- **The likelihood change was worth 0.127 points** (KEZ-1s minus KEZ, scored year, +0.084 to +0.171;
+- **The likelihood and bound change together were worth 0.127 points** (KEZ-1s minus KEZ, scored
+  year, +0.084 to +0.171;
   replicate months +0.083, +0.031 to +0.139). The first run fitted the noise by the one-step
-  likelihood (a pre-fit clarification, below), and KEZ-1s is that run.
+  likelihood and the narrower bound on log q (a pre-fit clarification, below), and KEZ-1s is that run.
+  The two changes were made together, so this experiment cannot say which one caused the gain. KEZ-Q0
+  (level only, day-ahead-fitted noise) scored worse than GK, whose hyperparameters come from the
+  one-step likelihood, by +0.022 (scored year) and +0.066 (replicate months), which points the other
+  way.
 
 ## Controls
 
@@ -324,7 +333,13 @@ fitted on the odd months of 2024-07 to 2025-06 only.
 
 ## Checks
 
-- **Median forecast minus mean forecast, per substation** (scored year, points; GK / KEZ): D5 -0.117
+- **Bar calibration.** Two gate readings failed on bars the filter cannot meet even when correct:
+  the P4 zero-variance bar of 1e-7 is below the optimiser's grid (a true zero fits at 8e-7, a
+  `GREEDY_GRID` value), and the S0 no-false-movement bar of 0.10 is tighter than the filter's own
+  posterior spread for the heating weights (0.09 to 0.33). The failures that stand are PV and heating
+  tracking on resampled real residuals, and the holiday variances (fitted 1e-3 to 3e-2).
+- **Median forecast minus mean forecast, per substation** (all leads, scored year, points; GK /
+  KEZ): D5 -0.117
   / -0.088, D10 -0.037 / -0.041, D11 -0.043 / -0.008, D14 +0.015 / +0.019, D16 +0.002 / -0.010, D9
   -0.014 / -0.005. The spread shifts no forecast by more than 0.12 points.
 - **Mean-forecast error beside each contrast** (D+1, scored year, KEZ-first contrast of the mean
@@ -332,10 +347,14 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   agrees with the quantile-score contrast.
 - **Triggers that fired** (the seven triggers of the plan): 1, controls failed (the known-answer
   gate, and P4's known-q recovery for the PV and holiday weights); 2, a result contradicts its own
-  prediction (C1 was predicted at -0.02 to -0.10; the explanation tested here is the PV weight and
-  the likelihood, above, and it is not settled); 4, leaving one substation out flips a sign (C1 in
-  the replicate months turns negative without D16; C4 in the scored year turns positive without D10;
-  C5 in the replicate months turns positive without D10); 5, a nested arm beats the arm that
+  prediction (C1 was predicted at -0.02 to -0.10; the PV weight explains part of the scored-year
+  shortfall at three substations (D10, D11, D16) but not the replicate months, where the level noise
+  fitted by the day-ahead likelihood is worse than GAM-K's, KEZ-Q0 minus GK +0.066; it is not
+  settled); 4, leaving one substation out flips a sign (C1 in
+  the replicate months turns negative without D5; C4 in the scored year turns positive without D11;
+  C5 in the replicate months turns positive without D11; each flip is a move of about 0.01, inside
+  an interval of plus or minus 0.05 or more, and C1 in the scored year is positive whichever
+  substation is left out); 5, a nested arm beats the arm that
   contains it (GK beats KEZ by 0.015, inside the noise); 6, the replicate months' C1 interval
   (half-width 0.09) is about four times as wide as the sister experiment's. Triggers 3 and 7 did not
   fire. Triggers 1, 2, 4, 5, and 6 therefore call for an audit.
