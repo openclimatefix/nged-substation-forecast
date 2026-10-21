@@ -1,0 +1,339 @@
+== Lagless XGBoost bar (better of x_2y and x_2yamq on the tuning year): x_2yamq ==
+== Absolute quantile score by arm, points of capacity (headline seed) ==
+cut,arm,five sites QS,five sites MAE of mean,D5,D10,D18,D9,D14,D11,D16
+replicate,sh_all,3.053,5.218,2.980,4.581,,2.604,2.107,2.621,3.043
+replicate,sh,3.159,5.383,3.227,4.092,,2.612,1.984,3.257,3.273
+replicate,sh_g0,3.159,5.383,3.227,4.092,,2.612,1.984,3.257,3.273
+replicate,sh_wd,3.159,5.383,3.228,4.092,,2.612,1.983,3.257,3.275
+replicate,sh_k1,3.160,5.384,3.227,4.092,,2.613,1.988,3.257,3.274
+replicate,n,3.163,5.390,3.228,4.095,,2.622,1.994,3.256,3.279
+replicate,sh_nodev,3.163,5.408,3.250,4.096,,2.629,2.018,3.265,3.222
+replicate,g,3.166,5.389,3.233,4.080,,2.196,1.989,3.265,3.300
+replicate,x_2yamq,3.199,5.276,2.963,4.531,,,2.120,3.157,3.286
+replicate,x_2y,3.212,5.293,2.956,4.543,,2.310,2.130,3.179,3.311
+replicate,n_full,3.580,6.195,3.380,4.816,,3.551,2.174,4.227,3.340
+replicate,manual_heuristic,3.839,6.813,4.225,5.447,,,2.740,3.864,2.946
+replicate,climatology,3.910,7.111,4.203,5.386,,,2.831,3.707,3.467
+scored,g,2.884,5.048,3.413,3.200,12.059,2.337,2.325,2.556,2.991
+scored,sh_k1,2.912,5.081,3.431,3.175,4.431,2.373,2.371,2.566,3.086
+scored,sh,2.914,5.082,3.431,3.176,4.454,2.371,2.375,2.567,3.088
+scored,sh_g0,2.914,5.082,3.431,3.176,4.454,2.371,2.375,2.567,3.088
+scored,sh_wd,2.914,5.082,3.430,3.176,4.467,2.370,2.375,2.567,3.089
+scored,n,2.915,5.084,3.435,3.176,4.291,2.380,2.372,2.571,3.089
+scored,sh_nodev,2.924,5.115,3.495,3.188,4.350,2.360,2.369,2.581,3.061
+scored,x_2yamq,3.048,5.078,3.076,3.684,,2.001,2.499,2.950,3.029
+scored,x_2y,3.056,5.097,3.073,3.692,,2.017,2.507,2.952,3.051
+scored,sh_all,3.063,5.251,3.460,3.431,4.593,2.375,2.397,2.336,3.768
+scored,manual_heuristic,3.488,6.214,3.886,4.129,,2.899,2.931,3.381,3.142
+scored,n_full,3.553,6.186,3.579,4.232,4.532,3.850,2.814,3.636,3.497
+scored,climatology,4.068,7.317,4.486,4.937,,3.036,3.211,3.559,4.198
+== Seeds of SH ==
+cut,seed,five sites QS,objective,converged,sweeps,headline
+scored,1,2.914,-883171667.813,false,50,false
+scored,2,2.914,-883179608.518,false,50,false
+scored,3,2.914,-883179471.872,false,50,false
+scored,4,2.914,-883178064.627,false,50,false
+scored,5,2.914,-883180004.202,true,42,true
+replicate,1,3.159,-724635937.179,false,50,false
+replicate,2,3.159,-724642410.544,false,50,false
+replicate,3,3.159,-724642503.392,false,50,false
+replicate,4,3.159,-724641497.717,false,50,false
+replicate,5,3.159,-724642558.472,true,23,true
+== Planned contrasts (98.33% intervals), negative = treatment better ==
+contrast,scored QS,scored MAE of mean,scored rows,scored sites better,scored sites with rows,scored all rows,scored low,scored high,scored pooled-seed low,scored pooled-seed high,replicate QS,replicate MAE of mean,replicate rows,replicate sites better,replicate sites with rows,replicate all rows,replicate low,replicate high,replicate pooled-seed low,replicate pooled-seed high,without D5,without D10,without D11,without D14,without D16
+C1 SH - N,-0.001,-0.003,83865,4,5,-0.002,-0.005,0.002,-0.005,0.002,-0.004,-0.007,85594,4,5,-0.004,-0.006,-0.001,-0.006,-0.001,-0.001,-0.002,-0.001,-0.002,-0.002
+C2 SH - G,0.030,0.033,83865,1,5,0.021,0.009,0.056,0.010,0.056,-0.007,-0.006,85594,4,5,-0.004,-0.039,0.025,-0.039,0.026,0.032,0.044,0.035,0.024,0.013
+C3 SH - SH-K1,0.001,0.001,83865,0,5,0.001,-0.000,0.003,-0.000,0.003,-0.001,-0.001,85594,3,5,-0.001,-0.002,0.000,-0.002,0.000,0.002,0.002,0.002,0.001,0.001
+== Exploratory contrasts (95% intervals) ==
+contrast,scored QS,scored MAE of mean,scored rows,scored sites better,scored sites with rows,scored all rows,scored low,scored high,scored pooled-seed low,scored pooled-seed high,replicate QS,replicate MAE of mean,replicate rows,replicate sites better,replicate sites with rows,replicate all rows,replicate low,replicate high,replicate pooled-seed low,replicate pooled-seed high,without D5,without D10,without D11,without D14,without D16
+SH - SH-g0,-0.000,0.000,83865,3,5,-0.000,-0.000,0.000,-0.000,0.000,-0.000,-0.000,85594,3,5,-0.000,-0.000,-0.000,-0.000,0.000,-0.000,-0.000,-0.000,-0.000,-0.000
+SH - SH-nodev,-0.011,-0.034,83865,3,5,-0.008,-0.022,0.002,-0.021,0.002,-0.004,-0.025,85594,4,5,-0.003,-0.012,0.004,-0.012,0.005,0.001,-0.010,-0.010,-0.015,-0.020
+SH - N-full,-0.640,-1.104,83865,5,5,-0.647,-0.982,-0.387,-0.989,-0.384,-0.422,-0.812,85594,5,5,-0.409,-0.663,-0.231,-0.667,-0.230,-0.749,-0.531,-0.527,-0.692,-0.697
+SH - x_2yamq,-0.135,0.004,83865,3,5,-0.139,-0.375,0.082,-0.373,0.082,-0.040,0.107,85594,3,5,-0.038,-0.249,0.144,-0.247,0.145,-0.243,-0.037,-0.069,-0.138,-0.183
+SH-wd - SH,0.000,-0.000,83865,1,5,0.000,-0.000,0.001,-0.000,0.001,0.000,-0.000,85594,2,5,0.000,0.000,0.001,-0.000,0.001,0.001,0.000,0.000,0.000,0.000
+SH-all - SH,0.149,0.170,83865,1,5,0.162,-0.070,0.325,-0.066,0.326,-0.106,-0.165,85594,3,5,-0.121,-0.366,0.110,-0.368,0.109,0.175,0.121,0.249,0.182,0.018
+N - G,0.031,0.036,83865,1,5,0.022,0.016,0.050,,,-0.003,0.001,85594,3,5,-0.001,-0.029,0.022,,,0.033,0.046,0.035,0.027,0.015
+SH - climatology,-1.154,-2.235,83865,5,5,-1.078,-1.391,-0.896,-1.390,-0.894,-0.751,-1.729,85594,5,5,-0.707,-1.082,-0.437,-1.074,-0.436,-1.176,-0.995,-1.197,-1.236,-1.165
+SH - manual_heuristic,-0.575,-1.133,83865,5,5,-0.485,-0.850,-0.251,-0.852,-0.253,-0.680,-1.431,85594,4,5,-0.656,-1.013,-0.349,-1.013,-0.345,-0.601,-0.476,-0.512,-0.580,-0.703
+== Winter breakdown of the planned contrasts and SH against the references ==
+contrast,year,season,QS,MAE of mean,low,high,rows,cold site-days,note
+C1 SH - N,scored,all,-0.001,-0.003,-0.005,0.002,83865,,""
+C1 SH - N,scored,Nov-Mar,0.004,0.002,-0.001,0.008,32944,,""
+C1 SH - N,scored,Apr-Oct,-0.005,-0.006,-0.007,-0.002,50921,,""
+C1 SH - N,scored,Nov-Mar evening peak,0.023,0.030,0.006,0.038,5496,,""
+C1 SH - N,scored,Nov-Mar nights (23:00-07:00),-0.005,-0.016,-0.011,0.002,10990,,""
+C1 SH - N,scored,cold-snap days,0.003,0.013,0.003,0.003,576,20,""
+C1 SH - N,replicate,all,-0.004,-0.007,-0.006,-0.001,85594,,""
+C1 SH - N,replicate,Nov-Mar,-0.001,-0.005,-0.005,0.002,35576,,""
+C1 SH - N,replicate,Apr-Oct,-0.006,-0.009,-0.009,-0.003,50018,,""
+C1 SH - N,replicate,Nov-Mar evening peak,0.002,-0.006,-0.004,0.012,5928,,""
+C1 SH - N,replicate,Nov-Mar nights (23:00-07:00),-0.003,-0.008,-0.005,-0.002,11870,,""
+C1 SH - N,replicate,cold-snap days,0.001,-0.000,0.000,0.001,1200,25,""
+C2 SH - G,scored,all,0.030,0.033,0.009,0.056,83865,,""
+C2 SH - G,scored,Nov-Mar,0.068,0.072,0.041,0.099,32944,,""
+C2 SH - G,scored,Apr-Oct,0.005,0.008,-0.002,0.012,50921,,""
+C2 SH - G,scored,Nov-Mar evening peak,0.072,0.070,0.051,0.095,5496,,""
+C2 SH - G,scored,Nov-Mar nights (23:00-07:00),0.077,0.066,0.045,0.124,10990,,""
+C2 SH - G,scored,cold-snap days,-0.040,0.006,-0.040,-0.040,576,20,""
+C2 SH - G,replicate,all,-0.007,-0.006,-0.039,0.025,85594,,""
+C2 SH - G,replicate,Nov-Mar,-0.000,0.019,-0.070,0.067,35576,,""
+C2 SH - G,replicate,Apr-Oct,-0.011,-0.024,-0.036,0.011,50018,,""
+C2 SH - G,replicate,Nov-Mar evening peak,-0.013,0.009,-0.086,0.063,5928,,""
+C2 SH - G,replicate,Nov-Mar nights (23:00-07:00),0.005,0.025,-0.054,0.070,11870,,""
+C2 SH - G,replicate,cold-snap days,0.024,0.092,0.024,0.024,1200,25,""
+C3 SH - SH-K1,scored,all,0.001,0.001,-0.000,0.003,83865,,""
+C3 SH - SH-K1,scored,Nov-Mar,0.003,0.002,0.000,0.006,32944,,""
+C3 SH - SH-K1,scored,Apr-Oct,0.000,0.000,-0.001,0.001,50921,,""
+C3 SH - SH-K1,scored,Nov-Mar evening peak,0.011,0.012,0.003,0.017,5496,,""
+C3 SH - SH-K1,scored,Nov-Mar nights (23:00-07:00),-0.001,-0.004,-0.003,0.001,10990,,""
+C3 SH - SH-K1,scored,cold-snap days,0.002,0.005,0.002,0.002,576,20,""
+C3 SH - SH-K1,replicate,all,-0.001,-0.001,-0.002,0.000,85594,,""
+C3 SH - SH-K1,replicate,Nov-Mar,-0.000,-0.001,-0.002,0.002,35576,,""
+C3 SH - SH-K1,replicate,Apr-Oct,-0.001,-0.002,-0.003,-0.000,50018,,""
+C3 SH - SH-K1,replicate,Nov-Mar evening peak,0.002,-0.003,-0.002,0.005,5928,,""
+C3 SH - SH-K1,replicate,Nov-Mar nights (23:00-07:00),-0.001,0.001,-0.002,0.000,11870,,""
+C3 SH - SH-K1,replicate,cold-snap days,0.002,0.001,-0.001,0.003,1200,25,""
+SH - N-full,scored,all,-0.640,-1.104,-1.085,-0.345,83865,,""
+SH - N-full,scored,Nov-Mar,-0.921,-1.598,-1.870,-0.366,32944,,""
+SH - N-full,scored,Apr-Oct,-0.458,-0.785,-0.708,-0.210,50921,,""
+SH - N-full,scored,Nov-Mar evening peak,-0.948,-1.735,-2.081,-0.233,5496,,""
+SH - N-full,scored,Nov-Mar nights (23:00-07:00),-0.918,-1.545,-2.020,-0.368,10990,,""
+SH - N-full,scored,cold-snap days,-1.595,-2.290,-1.595,-1.595,576,20,""
+SH - N-full,replicate,all,-0.422,-0.812,-0.734,-0.202,85594,,""
+SH - N-full,replicate,Nov-Mar,-0.404,-0.927,-1.124,-0.004,35576,,""
+SH - N-full,replicate,Apr-Oct,-0.434,-0.730,-0.554,-0.337,50018,,""
+SH - N-full,replicate,Nov-Mar evening peak,-0.363,-0.994,-1.157,0.125,5928,,""
+SH - N-full,replicate,Nov-Mar nights (23:00-07:00),-0.532,-1.111,-1.343,-0.021,11870,,""
+SH - N-full,replicate,cold-snap days,-0.412,-0.506,-0.589,0.295,1200,25,""
+SH - climatology,scored,all,-1.154,-2.235,-1.435,-0.831,83865,,""
+SH - climatology,scored,Nov-Mar,-1.224,-2.267,-1.444,-0.780,32944,,""
+SH - climatology,scored,Apr-Oct,-1.109,-2.215,-1.530,-0.654,50921,,""
+SH - climatology,scored,Nov-Mar evening peak,-1.059,-1.651,-1.587,-0.331,5496,,""
+SH - climatology,scored,Nov-Mar nights (23:00-07:00),-0.507,-1.049,-1.076,0.245,10990,,""
+SH - climatology,scored,cold-snap days,-2.612,-4.821,-2.612,-2.612,576,20,""
+SH - climatology,replicate,all,-0.751,-1.729,-1.155,-0.365,85594,,""
+SH - climatology,replicate,Nov-Mar,-0.824,-2.075,-1.322,-0.140,35576,,""
+SH - climatology,replicate,Apr-Oct,-0.700,-1.483,-1.273,-0.338,50018,,""
+SH - climatology,replicate,Nov-Mar evening peak,-0.606,-1.823,-1.463,0.279,5928,,""
+SH - climatology,replicate,Nov-Mar nights (23:00-07:00),-0.345,-1.152,-0.761,0.069,11870,,""
+SH - climatology,replicate,cold-snap days,-1.740,-3.922,-2.332,0.632,1200,25,""
+== Reproduction of experiment 109's G and N (trigger 1) ==
+year,arm,here,experiment 109,difference
+scored,g,2.884,2.884,0.000
+scored,n,2.915,2.915,0.000
+replicate,g,3.166,3.166,0.000
+replicate,n,3.163,3.163,0.000
+== Median forecast minus mean forecast, points ==
+year,arm,D18,D11,D5,D16,D9,D10,D14
+scored,g,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n_full,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,sh,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,sh_k1,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,sh_g0,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,sh_nodev,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,sh_wd,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,sh_all,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,g,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n_full,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_k1,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_g0,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_nodev,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_wd,,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,sh_all,,0.000,0.000,0.000,0.000,0.000,0.000
+== Tail calibration on the five decision sites ==
+year,arm,season,q01 coverage,q01 pinball,q05 coverage,q05 pinball,q95 coverage,q95 pinball,q99 coverage,q99 pinball
+scored,g,all,0.0070,0.1672,0.0266,0.6278,0.8407,0.8512,0.9393,0.2838
+scored,g,Nov-Mar,0.0011,0.1809,0.0069,0.6937,0.7944,0.9258,0.9207,0.3026
+scored,n,all,0.0073,0.1682,0.0270,0.6333,0.8323,0.8820,0.9336,0.2968
+scored,n,Nov-Mar,0.0006,0.1814,0.0064,0.7023,0.7731,0.9969,0.9074,0.3341
+scored,n_full,all,0.0203,0.2108,0.0507,0.7896,0.8131,1.0583,0.9178,0.3624
+scored,n_full,Nov-Mar,0.0029,0.2194,0.0090,0.8929,0.7325,1.2650,0.8889,0.4212
+scored,sh,all,0.0074,0.1686,0.0273,0.6338,0.8321,0.8819,0.9339,0.2971
+scored,sh,Nov-Mar,0.0008,0.1818,0.0063,0.7028,0.7724,0.9992,0.9073,0.3376
+scored,sh_k1,all,0.0073,0.1683,0.0271,0.6334,0.8324,0.8811,0.9340,0.2967
+scored,sh_k1,Nov-Mar,0.0007,0.1816,0.0063,0.7024,0.7731,0.9973,0.9075,0.3362
+replicate,g,all,0.0194,0.1849,0.0549,0.6828,0.7995,1.0367,0.9052,0.4011
+replicate,g,Nov-Mar,0.0164,0.1965,0.0497,0.7397,0.7591,1.3642,0.8696,0.5791
+replicate,n,all,0.0193,0.1844,0.0550,0.6819,0.7991,1.0297,0.9075,0.3887
+replicate,n,Nov-Mar,0.0157,0.1956,0.0484,0.7425,0.7577,1.3426,0.8754,0.5479
+replicate,n_full,all,0.0288,0.2201,0.0742,0.8117,0.8122,1.0626,0.9141,0.3962
+replicate,n_full,Nov-Mar,0.0155,0.2206,0.0478,0.8647,0.7931,1.2616,0.9089,0.4875
+replicate,sh,all,0.0191,0.1839,0.0544,0.6809,0.7998,1.0294,0.9069,0.3917
+replicate,sh,Nov-Mar,0.0159,0.1954,0.0483,0.7427,0.7582,1.3436,0.8738,0.5534
+replicate,sh_k1,all,0.0191,0.1842,0.0543,0.6812,0.7997,1.0289,0.9070,0.3914
+replicate,sh_k1,Nov-Mar,0.0159,0.1955,0.0481,0.7429,0.7583,1.3425,0.8745,0.5530
+== Stability of the shapes ==
+comparison,median cosine,minimum cosine,largest pair |cosine| (headline)
+across seeds at tuning,0.589,0.185,0.000
+across seeds at replicate,0.562,0.218,0.000
+across seeds at scored,0.613,0.237,0.000
+"headline fits, tuning against replicate",0.479,0.387,NaN
+"headline fits, replicate against scored",0.946,0.817,NaN
+"headline fits, tuning against scored (disjoint windows)",0.526,0.288,NaN
+== Shape mix of the scored-year headline fit ==
+site,shape,share,low over seeds,high over seeds,deviation share of profile
+D10,1,0.246,0.235,0.879,0.011
+D10,2,0.341,0.113,0.430,0.011
+D10,3,0.413,0.000,0.413,0.011
+D11,1,0.156,0.141,0.687,0.009
+D11,2,0.337,0.131,0.500,0.009
+D11,3,0.507,0.131,0.507,0.009
+D14,1,0.075,0.075,0.633,0.008
+D14,2,0.522,0.253,0.593,0.008
+D14,3,0.403,0.000,0.403,0.008
+D16,1,0.100,0.100,0.668,0.007
+D16,2,0.479,0.230,0.570,0.007
+D16,3,0.421,0.000,0.421,0.007
+D18,1,0.313,0.313,0.902,0.025
+D18,2,0.349,0.098,0.489,0.025
+D18,3,0.338,0.000,0.338,0.025
+D5,1,0.153,0.118,0.666,0.023
+D5,2,0.320,0.108,0.511,0.023
+D5,3,0.527,0.148,0.527,0.023
+D9,1,0.138,0.000,0.688,0.001
+D9,2,0.107,0.000,0.452,0.001
+D9,3,0.755,0.213,0.755,0.001
+== The 01:00 step in the profiles and shapes (scored-year headline fit) ==
+kind,name,rise at 01:00,contrast 00:30-07:30 slots,users
+substation profile (library + deviation),D10,3.333,-9.334,
+substation profile (library + deviation),D11,1.584,-5.069,
+substation profile (library + deviation),D14,0.273,-9.039,
+substation profile (library + deviation),D16,1.883,-7.099,
+substation profile (library + deviation),D18,2.648,-6.763,
+substation profile (library + deviation),D5,2.668,-4.981,
+substation profile (library + deviation),D9,0.448,-5.719,
+shape,shape 1,0.061,-0.037,5
+shape,shape 2,0.011,-0.078,7
+shape,shape 3,-0.006,-0.020,7
+== The 01:00 step on cold and mild nights (actual and SH mean forecast) ==
+year,site,nights,series,step at 01:00,rows
+scored,D5,cold (below 2 C),actual,5.740,4
+scored,D5,cold (below 2 C),mean,2.601,4
+scored,D5,mild (above 10 C),actual,2.257,194
+scored,D5,mild (above 10 C),mean,2.471,194
+scored,D10,cold (below 2 C),actual,11.308,13
+scored,D10,cold (below 2 C),mean,3.371,13
+scored,D10,mild (above 10 C),actual,0.693,183
+scored,D10,mild (above 10 C),mean,3.262,183
+scored,D11,cold (below 2 C),actual,3.807,13
+scored,D11,cold (below 2 C),mean,1.512,13
+scored,D11,mild (above 10 C),actual,0.131,185
+scored,D11,mild (above 10 C),mean,1.481,185
+scored,D14,cold (below 2 C),actual,1.574,11
+scored,D14,cold (below 2 C),mean,0.147,11
+scored,D14,mild (above 10 C),actual,-0.427,194
+scored,D14,mild (above 10 C),mean,0.192,194
+scored,D16,cold (below 2 C),actual,7.072,5
+scored,D16,cold (below 2 C),mean,1.859,5
+scored,D16,mild (above 10 C),actual,0.222,196
+scored,D16,mild (above 10 C),mean,1.652,196
+replicate,D5,cold (below 2 C),actual,6.873,23
+replicate,D5,cold (below 2 C),mean,2.623,23
+replicate,D5,mild (above 10 C),actual,0.225,193
+replicate,D5,mild (above 10 C),mean,2.462,193
+replicate,D10,cold (below 2 C),actual,9.048,26
+replicate,D10,cold (below 2 C),mean,3.146,26
+replicate,D10,mild (above 10 C),actual,0.415,167
+replicate,D10,mild (above 10 C),mean,2.935,167
+replicate,D11,cold (below 2 C),actual,3.204,26
+replicate,D11,cold (below 2 C),mean,1.463,26
+replicate,D11,mild (above 10 C),actual,0.522,181
+replicate,D11,mild (above 10 C),mean,1.406,181
+replicate,D14,cold (below 2 C),actual,1.194,23
+replicate,D14,cold (below 2 C),mean,0.379,23
+replicate,D14,mild (above 10 C),actual,-0.748,188
+replicate,D14,mild (above 10 C),mean,0.185,188
+replicate,D16,cold (below 2 C),actual,6.884,24
+replicate,D16,cold (below 2 C),mean,1.512,24
+replicate,D16,mild (above 10 C),actual,-0.300,190
+replicate,D16,mild (above 10 C),mean,1.461,190
+== Clock of the largest night-time rise on cold nights (post hoc style readout) ==
+year,site,clock,cold nights,largest rise ends at,rise (points)
+scored,D5,British Summer Time,16,01:00 UTC,3.285
+scored,D5,Greenwich Mean Time,62,01:00 UTC,7.017
+scored,D10,British Summer Time,27,01:00 UTC,4.864
+scored,D10,Greenwich Mean Time,98,01:00 UTC,10.812
+scored,D11,British Summer Time,27,01:00 UTC,1.466
+scored,D11,Greenwich Mean Time,98,01:00 UTC,3.458
+scored,D14,British Summer Time,18,01:00 UTC,0.609
+scored,D14,Greenwich Mean Time,93,01:00 UTC,1.861
+scored,D16,British Summer Time,26,01:00 UTC,3.118
+scored,D16,Greenwich Mean Time,79,01:00 UTC,7.139
+replicate,D5,British Summer Time,17,01:00 UTC,3.892
+replicate,D5,Greenwich Mean Time,100,01:00 UTC,7.387
+replicate,D10,British Summer Time,20,01:00 UTC,3.898
+replicate,D10,Greenwich Mean Time,107,01:00 UTC,8.773
+replicate,D11,British Summer Time,24,01:00 UTC,2.395
+replicate,D11,Greenwich Mean Time,107,01:00 UTC,3.214
+replicate,D14,British Summer Time,17,02:00 UTC,0.587
+replicate,D14,Greenwich Mean Time,100,01:00 UTC,1.623
+replicate,D16,British Summer Time,19,01:00 UTC,2.655
+replicate,D16,Greenwich Mean Time,95,01:00 UTC,6.878
+== Two-clock night readout (exploratory): residual on UTC and local windows ==
+year,site,UTC 00:30-07:30,local 00:30-05:30,local 23:30-05:30,UTC share,note
+scored,D5,0.873,4.476,-1.903,,""
+scored,D10,-0.308,4.395,-0.976,,""
+scored,D11,-0.136,1.764,1.181,,""
+scored,D14,-1.102,3.435,-0.137,,""
+scored,D16,0.080,2.038,0.469,0.031,""
+replicate,D5,0.418,3.203,-1.278,,""
+replicate,D10,-0.650,2.596,-0.526,,""
+replicate,D11,0.442,1.878,-0.501,,""
+replicate,D14,1.091,2.016,-0.544,,""
+replicate,D16,0.054,2.373,-0.577,,""
+== Rises and falls of the shapes and profiles in the first 12 hours (local time) ==
+name,kind,local time,size
+shape 1,rise 1,07:00,0.082
+shape 1,rise 2,00:30,0.061
+shape 1,fall 1,03:30,-0.042
+shape 1,fall 2,02:30,-0.038
+shape 2,rise 1,06:30,0.046
+shape 2,rise 2,10:30,0.033
+shape 2,fall 1,10:00,-0.031
+shape 2,fall 2,09:30,-0.021
+shape 3,rise 1,08:00,0.046
+shape 3,rise 2,07:30,0.039
+shape 3,fall 1,06:00,-0.156
+shape 3,fall 2,11:00,-0.112
+D10,rise 1,07:00,8.166
+D10,rise 2,06:30,6.824
+D10,fall 1,06:00,-12.288
+D10,fall 2,11:00,-7.456
+D11,rise 1,08:00,4.183
+D11,rise 2,07:00,3.954
+D11,fall 1,06:00,-8.227
+D11,fall 2,11:00,-6.851
+D14,rise 1,06:30,5.644
+D14,rise 2,07:00,5.503
+D14,fall 1,06:00,-7.857
+D14,fall 2,11:00,-7.596
+D16,rise 1,07:00,6.085
+D16,rise 2,06:30,4.920
+D16,fall 1,06:00,-8.247
+D16,fall 2,11:00,-7.936
+D5,rise 1,07:00,7.080
+D5,rise 2,06:30,3.912
+D5,fall 1,11:00,-9.974
+D5,fall 2,06:00,-8.912
+== Weight on the step shape by cut ==
+cut,site,shape with largest 01:00 rise,weight share,note
+tuning,D5,1,0.669,""
+tuning,D10,1,0.856,""
+tuning,D11,1,0.734,""
+tuning,D14,1,0.651,""
+tuning,D16,1,0.694,""
+replicate,D5,1,0.153,""
+replicate,D10,1,0.230,""
+replicate,D11,1,0.153,""
+replicate,D14,1,0.069,""
+replicate,D16,1,0.092,""
+scored,D5,1,0.153,""
+scored,D10,1,0.246,""
+scored,D11,1,0.156,""
+scored,D14,1,0.075,""
+scored,D16,1,0.100,""
+== Audit triggers that the numbers fire ==
+['6 (C1 interval 0.007 wide)']
