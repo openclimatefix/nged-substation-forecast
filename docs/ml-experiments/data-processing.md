@@ -299,8 +299,13 @@ that experiments 87 and 104 use for lagged power (3 hours plus the half-hour a r
 experiment has measured the delay of the live telemetry. Readings 0 hours old instead of 3.5
 lowered the score by 0.035 points (95% interval -0.060 to -0.016). Readings 9 hours old raised it by
 0.026 (0.000 to 0.046), and readings 24 hours old raised it by 0.099 (0.059 to 0.142), on five
-Primaries in the scored year. Applies to experiments and production. Provisional: the delay was not
-measured on live telemetry. Confidence: low for the delay, medium for the size of its effect.
+Primaries in the scored year. [Experiment
+115](00115-differentiable-physics-w1-diurnal-shape-state-on-ens/result.md) repeated the sweep on
+ensemble weather at day D+1 (scored year, five Primaries, difference of mean scores without an
+interval): readings 0 hours old lowered the score by 0.016 points, readings 24 hours old raised it by
+0.088, and readings 33 hours old raised it by 0.120. Applies to experiments and production.
+Provisional: the delay was not measured on live telemetry. Confidence: low for the delay, medium for
+the size of its effect.
 
 ## Weather products
 
@@ -573,9 +578,10 @@ threshold-weighted error rose 57% on half-hours outside logged switching ([exper
 of that experiment is an early version.
 
 **Count overlapping detected intervals once when summing the megawatts, and end each interval when
-the transfer ends.** Summing overlapping intervals made the detector's megawatts about 1.5 times the
-true value from the second day, and the detector kept reporting megawatts for days after a transfer
-ended ([experiment
+the transfer ends.** Of the cases where the detector marked a transfer, 21% held two or more overlapping
+intervals, whose megawatts were added together, and the detector kept reporting megawatts for a
+median of 48 hours (90th percentile 96 hours) after a transfer ended, because it alarmed the return
+step as a new transfer of opposite sign ([experiment
 88](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)).
 Applies to experiments and production.
 
