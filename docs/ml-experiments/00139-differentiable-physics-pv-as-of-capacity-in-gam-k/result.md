@@ -28,13 +28,15 @@ prediction: >-
 decision_rule: >-
   Contrast C1 is the as-of arm minus the pin, read on the sunniest third of half-hours (by CAMS
   irradiance) and on the darkest third, at the 98.75% level of the month-block bootstrap on paired
-  differences, as experiment 111. The hypothesis is `supported` when C1's interval on the sunniest
-  third lies wholly below -0.05 points and the darkest-third upper bound is at most +0.02 points.
-  The threshold is 0.05 points and not zero because the as-of capacity adds a fitting step (a
-  capacity fit per origin) that the pin does not need. It is `partly supported` when the sunniest-
-  third interval lies wholly below zero but not below -0.05, or the darkest-third bound is above
-  +0.02. It is `refuted` when the sunniest-third interval lies wholly above zero. It is
-  `inconclusive` otherwise. The hindsight arm is a labelled ceiling and never a result. The no-PV
+  differences, as experiment 111, pooled over the five Primaries (D9 has no as-of arm). The
+  hypothesis is `supported` when the sunniest-third difference is at most -0.05 points with an
+  interval that excludes zero, and the darkest-third difference is at most +0.02 points. These are
+  the thresholds the maintainer agreed on 2026-10-21. The 0.05 points is not zero because the as-of
+  capacity adds a fitting step (a capacity fit per origin) that the pin does not need. It is `partly
+  supported` when the sunniest-third interval lies wholly below zero but the difference is smaller
+  than 0.05, or the darkest-third difference is above +0.02. It is `refuted` when the sunniest-third
+  interval lies wholly above zero. It is `inconclusive` otherwise. The hindsight arm is a labelled
+  ceiling and never a result. The no-PV
   arm is a floor. The verdict is capped at `inconclusive` if the known-answer stage fails.
 benchmark: >-
   Arm 1, the pin (experiment 45's `frozen` vintage, as experiment 111), on the same rows; absolute
@@ -73,7 +75,7 @@ ensemble mean, as in the best-guess assembly of [experiment
 | Arm | Capacity | Role |
 |---|---|---|
 | 1. Pin | Experiment 45's `frozen` vintage | Control |
-| 2. As-of | Experiment 129's arm 2 capacity, fitted on data before each 1 July origin and held for the following season-year | Scored arm; the only arm a live forecast could have had |
+| 2. As-of | Experiment 129's arm 2 capacity, fitted on data before each 1 July origin and held for the following season-year | Scored arm; uses only data a live forecast would have had. A live forecast could refit more often, and the pin updates weekly, so contrast C1 includes the as-of capacity's staleness |
 | 3. Hindsight | Experiment 129's capacity fitted on data to 2026-07-31 | Labelled ceiling, never a result |
 | 4. No PV | Capacity zero | Floor: how much any explicit solar term is worth |
 
@@ -84,35 +86,54 @@ holds the 2024 value for 2025) and the origin 2024-07-01 for the replicate year 
 2023). `e00129_asof.py` builds one origin; this experiment loops it over the two origins. Before the
 first complete season-year at a Primary the adaptor falls back to the pin and flags the row.
 
-**Adaptor.** A `PinnedCapacity`-shaped object (`studies.dp_pinned_capacity`) built from the as-of
-table: the weekly path is each season-year's capacity from the origin's fit, and the capacity after
-the origin is the latest season-year's value held forward. It lives in this experiment's folder.
-Moving it into `packages/studies` would be a module change that needs the maintainer's review.
+**Adaptor.** `fit_gam` raises unless the `PinnedCapacity` it receives (`studies.dp_pinned_capacity`)
+has the same `cut` as the fit, so the experiment builds one adaptor per Primary and monthly cut. The
+adaptor's weekly path is each season-year's capacity from the latest origin at or before the cut,
+converted to points of effective capacity (experiment 129 scales by `effective_capacity_mw / 100`),
+and its `held_points` is the latest season-year's value. Rows after the cut read `held_points`. The
+scripts call `fit_gam(..., pinned=adaptor)` directly, which accepts a prebuilt object, and do not
+use experiment 111's replica wrapper, which builds the pin itself. Neither `dp_gam` nor
+`dp_pinned_capacity` is edited. The adaptor lives in this experiment's folder, and moving it into
+`packages/studies` would be a module change that needs the maintainer's review. A season-year with
+fewer than 12,000 training half-hours at the origin (experiment 129's rule) takes the pin's value,
+and the write-up counts the rows that took it.
 
-**Leakage check, first.** The as-of fit at an origin sees only rows before the origin. Experiment 129
-divided its estimates by a divisor taken from recoveries fitted with data to 2026-06-30, which is
-disclosed there and is hindsight at the origin. This experiment either rebuilds the divisor per
-origin or states the size of the effect: it compares the divisor of each season-year with the
-median across season-years, and reports the as-of arm with the divisor fixed at 1 as a sensitivity
-arm. A Sonnet code reviewer checks the table for any use of data after the origin.
+**Wiring identity check.** Feed the adaptor experiment 45's own frozen weekly path and require arm
+1's scores to reproduce to the last digit. Log the ratio of the as-of capacity to the pin per Primary
+and origin, to catch a unit mismatch.
+
+**Leakage check, first.** The as-of fit at an origin sees only rows before the origin. Experiment
+129 divided its estimates by a divisor taken from the median recovery of the known-answer fits of
+the same season-year, and those fits used data to 2026-07-31, so the divisor is hindsight at the
+origin. This experiment rebuilds the divisor from known-answer fits cut at each origin (the
+`cut` argument of `arms.fitted_capacity`), for the season-years 2023 and 2024 (experiment 129's
+known-answer table covers 2019 to 2024). If that rebuild is too slow, the fallback is a constant
+divisor from season-years before the origin, and the write-up discloses which was used. A sensitivity
+arm with the hindsight divisor shows how much the divisor matters. A Sonnet code reviewer checks the
+table for any use of data after the origin.
 
 **Known-answer stage, before any forecast arm.** Add a real metered farm's output (anonymised) at
-50% of a Primary's as-of capacity to its net power for the forecast year, with the capacity left
-unchanged. Check that the GAM-K forecast under-predicts by about the injection on sunny half-hours.
-Then raise the capacity by the injected amount and check that the error falls by 0.75 to 1.25 of the
-injection, as in experiment 129. Also rerun experiment 111's gate: the calibrated fake ENS scores
-within 0.05 points of ERA5 and CAMS.
+50% of a Primary's as-of capacity to the Primary's net power in the scored rows only and not in any
+training window, so the demand terms cannot absorb it. With the capacity unchanged, check that the
+forecast under-predicts the injected power on sunny half-hours (mean signed error, in MW, on the
+sunniest third). Then raise the capacity by the injected amount and check that the mean signed error
+on those half-hours falls by 0.75 to 1.25 of the injection, as in experiment 129. Repeat with the
+east-west and south-west plants of experiment 129, which tests the fixed fleet shape. A recovery
+outside the band can come from the ensemble mean damping cloud variability and not from a wiring
+fault, so the write-up reports the ratio beside the same test on CAMS irradiance. Also rerun
+experiment 111's gate: the calibrated fake ensemble scores within 0.05 points of ERA5 and CAMS.
 
 **Stop rules.** Stop and report a wiring fault if the injection is not recovered within 0.75 to 1.25
-at 4 of the 5 Primaries. After the first replicate, stop if arm 2 minus arm 1 has an interval lying
+at 4 of the 5 Primaries. The run order is the replicate months first (origin 2024-07-01), then the scored year. After the replicate months, stop if arm 2 minus arm 1 has an interval lying
 wholly above zero on the sunniest third, and diagnose it (an as-of capacity too low at the growing
 Primaries D10 and D16 is the likely cause) instead of running more arms.
 
 **Rows and slices.** `fold_a_daily_gap_v1` (the 292 daily ENS runs of experiment 87), with the
 replicate on the even months of 2024-07 to 2025-06 as in experiment 111. Slices: sunniest and
-darkest third of half-hours by CAMS irradiance, season, lead band, D11 alone, and per Primary.
+darkest third of half-hours by irradiance from the Copernicus Atmosphere Monitoring Service (CAMS), season, lead band, D11 alone, and per Primary.
 Absolute skill per arm beside every contrast, and tail calibration at the 0.01, 0.05, 0.95, and 0.99
-quantiles. Forecast rows stay before 2026-07-01.
+quantiles, plus the 0.1 and 0.9 quantiles of the design note, using the nearest of experiment
+87's 11 quantiles where one is missing. Forecast rows stay before 2026-07-01.
 
 **Records.** Ratio calibration of an ensemble mean damps cloud variability, so report the forecast
 solar output minus the CAMS-driven output by CAMS clear-sky index band. The capacity unit is the
