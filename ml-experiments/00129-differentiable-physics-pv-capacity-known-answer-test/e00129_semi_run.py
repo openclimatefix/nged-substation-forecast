@@ -9,8 +9,10 @@ calendar month, whose true solar capacity is zero). On each target it fits arms 
   difference of fits, and drift: the slope of the recovery over season-years, per 5 years), and
 - the same two cases again with the placebo sky (the previous year's PV shape).
 
+```bash
     uv run --no-sync python ml-experiments/00129-*/e00129_semi_run.py [--device cuda] \
         [--sites D10 D16] [--draws 10]
+```
 """
 
 import argparse
