@@ -82,9 +82,9 @@ DATA_CUT: Final[datetime] = (
 )
 """The cut of every fit: the feature cache holds no later row."""
 if THROUGH_JULY:
-    dp_features.HOLDOUT_START = DATA_CUT  # ty: ignore[invalid-assignment]
-    dp_features.GRID_END = DATA_CUT - timedelta(minutes=30)  # ty: ignore[invalid-assignment]
-    dp_gam.HOLDOUT_START = DATA_CUT  # ty: ignore[invalid-assignment]
+    dp_features.HOLDOUT_START = DATA_CUT
+    dp_features.GRID_END = DATA_CUT - timedelta(minutes=30)
+    dp_gam.HOLDOUT_START = DATA_CUT
 TRAINING_WINDOW: Final[TrainingWindow] = TrainingWindow()
 """Every row from the substation's first usable instant to the cut."""
 RIDGE: Final[float] = 0.1

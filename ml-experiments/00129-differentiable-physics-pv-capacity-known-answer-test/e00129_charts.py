@@ -37,19 +37,21 @@ ARM_LABELS: Final[dict[str, str]] = {
 GREY: Final[str] = "#808080"
 
 
-def _title(*, text: str, subtitle: str) -> alt.TitleParams:
+def chart_title(*, text: str, subtitle: str) -> alt.TitleParams:
+    """Return a left-aligned title with the subtitle wrapped to the plot width."""
     return alt.TitleParams(
         text=text, subtitle=textwrap.wrap(subtitle, WRAP), anchor="start", subtitleColor="#444444"
     )
 
 
-def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
+def save_chart(chart: alt.TopLevelMixin, *, name: str) -> None:
+    """Write the chart as an SVG into the docs folder and as a PNG for checking."""
     PNG_DIR.mkdir(parents=True, exist_ok=True)
     chart.save(DOCS_DIR / f"{name}.svg")
     chart.save(PNG_DIR / f"{name}.png", scale_factor=1.5)
 
 
-def figure_capacity() -> alt.Chart:
+def figure_capacity() -> alt.TopLevelMixin:
     """Return the unmetered solar capacity per Primary and season-year, with 80% ranges."""
     table = pl.concat(
         [
@@ -76,11 +78,15 @@ def figure_capacity() -> alt.Chart:
         ),
         xOffset=alt.XOffset("arm:N"),
     )
-    bars = base.mark_rule(strokeWidth=2.5).encode(
+    bars = base.mark_rule(strokeWidth=2.5).encode(  # ty: ignore[unresolved-attribute]
         y=alt.Y("range_low_mw:Q", title="AC capacity (MW)"), y2="range_high_mw:Q"
     )
-    points = base.mark_point(filled=True, size=45).encode(y="estimate_mw:Q")
-    pinned = alt.Chart().mark_rule(strokeDash=[4, 3], color=GREY).encode(y="pinned_mw:Q")
+    points = base.mark_point(filled=True, size=45).encode(  # ty: ignore[unresolved-attribute]
+        y="estimate_mw:Q"
+    )
+    pinned = (
+        alt.Chart().mark_rule(strokeDash=[4, 3], color=GREY).encode(y="pinned_mw:Q")  # ty: ignore[unresolved-attribute]
+    )
     return (
         alt.layer(bars, points, pinned)
         .properties(width=WIDTH, height=110)
@@ -94,8 +100,8 @@ def figure_capacity() -> alt.Chart:
             data=table,
         )
         .properties(
-            title=_title(
-                text="Unmetered solar behind each Primary has grown; the range is 1.2 to 1.6 MW wide",
+            title=chart_title(
+                text="Unmetered solar behind each Primary has grown; ranges are 1.2 to 1.6 MW wide",
                 subtitle=(
                     "Dot: estimate of AC capacity in MW. Line: 80% range from resampling whole"
                     " months, divided by the recovery of known farms. Grey dashed line: the"
@@ -130,7 +136,7 @@ def figure_recovery() -> alt.Chart:
     return (
         alt.Chart(table)
         .mark_point(filled=True, size=70, opacity=0.8)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "recovery:Q",
                 title="Share of the injected capacity recovered (1 is exact; no divisor applied)",
@@ -150,7 +156,7 @@ def figure_recovery() -> alt.Chart:
         .properties(
             width=WIDTH - 150,
             height=80,
-            title=_title(
+            title=chart_title(
                 text="Arm 2 recovers about 80% of injected solar; a cloud-driven load adds 20%",
                 subtitle=(
                     "One dot per Primary, season-year 2024/25, injection at 100% of the pinned"
@@ -175,7 +181,7 @@ def figure_step() -> alt.Chart:
     return (
         alt.Chart(table)
         .mark_line(point=True)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "year:O",
                 title="Season-year (2022 holds the step, on 1 March 2022)",
@@ -199,7 +205,7 @@ def figure_step() -> alt.Chart:
         .properties(
             width=WIDTH,
             height=200,
-            title=_title(
+            title=chart_title(
                 text="Only the arms without a step penalty follow a sudden rise in capacity",
                 subtitle=(
                     "Median over five Primaries. Half of the pinned capacity was added from "
@@ -213,9 +219,9 @@ def figure_step() -> alt.Chart:
 
 def main() -> None:
     """Draw every figure."""
-    _save(figure_capacity(), name="figure_01_capacity")
-    _save(figure_recovery(), name="figure_02_recovery")
-    _save(figure_step(), name="figure_03_step")
+    save_chart(figure_capacity(), name="figure_01_capacity")
+    save_chart(figure_recovery(), name="figure_02_recovery")
+    save_chart(figure_step(), name="figure_03_step")
 
 
 if __name__ == "__main__":

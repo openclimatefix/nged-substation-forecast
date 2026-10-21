@@ -87,7 +87,9 @@ def pilot_rows(*, cache: FeatureCache, site: str, device: str) -> list[dict[str,
     injected_points = pinned_capacity(
         vintages=read_vintages(), table=cache.sites[site].table, cut=common.DATA_CUT
     ).held_points
-    cases = [("arm2", ridge) for ridge in RIDGES] + [("arm3", common.RIDGE)]
+    cases: list[tuple[arms.ArmType, float]] = [("arm2", ridge) for ridge in RIDGES] + [
+        ("arm3", common.RIDGE)
+    ]
     injected = {
         scenario: injection_for(
             cache=cache, site=site, scenario=scenario, capacity_points=injected_points
@@ -154,7 +156,7 @@ def main() -> None:
     table.write_parquet(common.WORK_DIR / "pilot.parquet")
     with pl.Config(tbl_rows=100, tbl_cols=12):
         print(summarise(table=table))
-    print(np.round(table["recovery"].median(), 3))
+    print(round(float(np.median(table["recovery"].to_numpy())), 3))
 
 
 if __name__ == "__main__":

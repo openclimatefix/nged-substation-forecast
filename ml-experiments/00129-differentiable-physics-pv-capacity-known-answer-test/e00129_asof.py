@@ -47,13 +47,15 @@ def asof_rows(*, site: str, arm_name: str, kat: pl.DataFrame, device: str) -> di
         )
     )
     divisor = float(
-        kat.filter(
-            pl.col("site") == site,
-            pl.col("plant") == "matched",
-            pl.col("fraction") == 1.0,
-            ~pl.col("cloud_load"),
-            pl.col("season_year") == LATEST_SEASON_YEAR,
-        )["recovery"].median()
+        np.median(
+            kat.filter(
+                pl.col("site") == site,
+                pl.col("plant") == "matched",
+                pl.col("fraction") == 1.0,
+                ~pl.col("cloud_load"),
+                pl.col("season_year") == LATEST_SEASON_YEAR,
+            )["recovery"].to_numpy()
+        )
     )
     ratios = np.concatenate(
         [

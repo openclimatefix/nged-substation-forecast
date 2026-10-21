@@ -11,6 +11,7 @@ import json
 from typing import Final
 
 import e00129_common as common
+import numpy as np
 import polars as pl
 
 RECOVERY_BAND: Final[tuple[float, float]] = (0.75, 1.25)
@@ -110,10 +111,10 @@ def main() -> None:
                 "recovery_primaries_passing": int(recovery["passes"].sum()),
                 "coverage_cells_covered": int(cells["covered"].sum()),
                 "coverage_cells": cells.height,
-                "placebo_share_median": float(arm_semi["placebo_share"].median()),
-                "placebo_share_max": float(arm_semi["placebo_share"].max()),
-                "drift_5y_mean": float(arm_semi["drift"].mean()),
-                "drift_5y_max": float(arm_semi["drift"].max()),
+                "placebo_share_median": float(np.median(arm_semi["placebo_share"].to_numpy())),
+                "placebo_share_max": float(np.max(arm_semi["placebo_share"].to_numpy())),
+                "drift_5y_mean": float(np.mean(arm_semi["drift"].to_numpy())),
+                "drift_5y_max": float(np.max(arm_semi["drift"].to_numpy())),
             }
     summary["limits"] = {
         "recovery_primaries_needed": RECOVERY_PRIMARIES_NEEDED,

@@ -55,7 +55,7 @@ def real_rows(*, site: str, arm_name: str, kat: pl.DataFrame, device: str) -> li
         )["recovery"]
         if own.is_empty():
             continue
-        divisor = float(own.median())
+        divisor = float(np.median(own.to_numpy()))
         ratios = np.concatenate(
             [
                 stage_c.calibration_ratios(

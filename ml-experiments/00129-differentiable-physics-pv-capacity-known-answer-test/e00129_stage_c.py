@@ -47,7 +47,7 @@ def parse_arm(*, name: str) -> tuple[arms.ArmType, float]:
     if arm not in arms.ARMS:
         msg = f"unknown arm {arm!r}"
         raise ValueError(msg)
-    return arm, float(share) if share else 0.0  # ty: ignore[invalid-return-type]
+    return arm, float(share) if share else 0.0
 
 
 def plant_class(*, source: str) -> str:

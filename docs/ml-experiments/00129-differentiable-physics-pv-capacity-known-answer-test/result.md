@@ -45,8 +45,8 @@ take_home_message: >-
   substations' power, with an 80% range 1.2 to 1.6 MW wide, and the capacity at the five Primaries
   grew by 0.7 to 2.5 MW between each Primary's first estimable season-year and 2025/26 (arm 2).
   Only one of the three methods tested, which penalises sudden jumps, passed every pre-registered
-  gate, and the same penalty makes it slow to follow a sudden rise in capacity. The range is not yet safe to show on a card when demand rises on
-  overcast days, so a card should state that bias.
+  gate, and the same penalty makes it slow to follow a sudden rise in capacity. The range is not
+  yet safe to show on a card when demand rises on overcast days, so a card should state that bias.
 date: 2026-10-21
 pr: 1429
 headline: >-
@@ -123,6 +123,20 @@ share at every Primary, and the south-west plant then covers 0 or 1 of 5 coverag
 **Arm 4 follows a sudden rise in capacity more slowly than arm 2.** Half of the pinned capacity was
 added from March 2022. Arm 2 and arm 3 recover nothing before it and about 0.82 to 0.87 after it.
 Arm 4 at penalty 0.1 recovers 0.47 before it, and at penalty 1.0 recovers 0.65 before it.
+
+## Primary power beside the estimated solar power
+
+![Primary power and estimated solar power](figure_04_timeseries.svg)
+
+**Figure 4 shows the metered power of three Primaries on a cloudy, a median, and a sunny day in May
+to July 2026.** The days were chosen at each Primary by mean daylight irradiance, by a rule fixed
+before any plot was drawn: D5 on 4 May, 15 June and 2 July; D10 on 3 May, 1 July and 2 July; D14 on
+4 May, 1 July and 2 July. On the sunny days the metered power falls during daylight, by about 1.3 to
+1.8 MW at the three Primaries, against estimated solar peaks of 3.3 to 4.5 MW. The estimate is
+therefore not visible as a one-for-one dip, because the demand the solar hides is not constant
+through the day. The flat tops of the estimated solar power are the inverter limit in the solar
+shape. The estimate is arm 2's capacity times that shape before temperature derating, so it is
+slightly high at midday.
 
 ## Register and as-of checks
 
