@@ -114,9 +114,10 @@ a detected load transfer into a separate offset state, give a better forecast of
 filters we have? The maintainer wants the switching detector for two purposes: reading recent power
 observations better, and producing an NRA forecast. Experiment 141 ([PR
 1453](https://github.com/openclimatefix/nged-substation-forecast/pull/1453), not merged when this
-page was written) scored observed power, which rewards following a transfer. [Experiment
-151](../00151-nra-forecast-rescored-against-the-true-nra-series/result.md) re-scores the existing
-filters against the true NRA. This experiment changes the filter: no earlier design ties the Kalman
+page was written) scored observed power, which rewards following a transfer. Experiment
+151 (not merged when this page was written) re-scores the existing
+filters against the true NRA. This experiment changes the filter: none of the earlier designs in
+this project ties the Kalman
 state to a latent NRA. The edge-flow design of [experiment
 116](../00116-differentiable-physics-nra-edge-flows-between-primaries/result.md) treats the NRA as
 the frozen GAM, and 141's regime S is a variance switch on the same level state. The filter is a
