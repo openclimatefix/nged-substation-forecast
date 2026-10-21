@@ -34,6 +34,11 @@ import polars as pl
 STEP_CONSTANTS: Final[tuple[float, ...]] = (3.0, 10.0, 30.0, 100.0, 300.0)
 LEVEL_CONSTANTS: Final[tuple[float, ...]] = (0.3, 1.0)
 DRIFT_Q: Final[tuple[float | None, ...]] = (None, 0.0001, 0.0004, 0.0016, 0.0064, 0.0256)
+EXTRA_STEP_CONSTANTS: Final[tuple[float, ...]] = (1.0, 3.0, 10.0)
+EXTRA_LEVEL_CONSTANTS: Final[tuple[float, ...]] = (0.5, 0.7)
+"""A deviation from the registered grid, added after stage 1 and before any gate reading: no
+registered setting both found transfers and met the placebo limit, and the two level constants
+(0.3 and 1.0) straddled the target."""
 HUBER_CHECKS: Final[tuple[float, ...]] = (1.0, 3.0)
 PLACEBO_LIMIT_MW_DAYS: Final[float] = 0.05
 RECALL_SHORT_TARGET: Final[float] = 0.5
@@ -49,11 +54,16 @@ DECISIONS_PATH: Final[Path] = common.WORK_DIR / "decisions.json"
 _STATE: dict[str, Any] = {}
 
 
-def configurations() -> list[data_module.FlowConfig]:
-    """Return every stage-1 configuration."""
+def configurations(*, extra: bool = False) -> list[data_module.FlowConfig]:
+    """Return every registered stage-1 configuration, or the extra grid of the deviation."""
+    steps, levels = (
+        (EXTRA_STEP_CONSTANTS, EXTRA_LEVEL_CONSTANTS)
+        if extra
+        else (STEP_CONSTANTS, LEVEL_CONSTANTS)
+    )
     return [
         data_module.FlowConfig(step_c=step, level_c=level, drift_q=q)
-        for step, level, q in product(STEP_CONSTANTS, LEVEL_CONSTANTS, DRIFT_Q)
+        for step, level, q in product(steps, levels, DRIFT_Q)
     ]
 
 
@@ -150,14 +160,14 @@ def _screen_worker(config: data_module.FlowConfig) -> str:
     if target.exists():
         return f"skip {config.label()}"
     _setup()
-    result = {
-        "config": asdict(config),
-        **recall_by_band(config=config),
-        "placebo": placebo_readings(config=config, tiles=local.screen_tiles(data=_STATE["data"])),
-    }
+    placebo = placebo_readings(config=config, tiles=local.screen_tiles(data=_STATE["data"]))
+    result: dict[str, Any] = {"config": asdict(config), "placebo": placebo}
+    if worst(readings=placebo) < PLACEBO_LIMIT_MW_DAYS:
+        result.update(recall_by_band(config=config))
     _write(target=target, payload=result)
     worst_placebo = max(result["placebo"].values())
-    return f"done {config.label()}: {result['recall']}, worst placebo {worst_placebo:.3f}"
+    recall = result.get("recall", "not read: placebo over the limit")
+    return f"done {config.label()}: {recall}, worst placebo {worst_placebo:.3f}"
 
 
 def _full_worker(config: data_module.FlowConfig) -> str:
@@ -283,10 +293,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("stage", choices=("screen", "finalists", "huber", "decide"))
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--extra", action="store_true", help="screen the deviation's extra grid")
+    parser.add_argument(
+        "--reverse", action="store_true", help="screen in reverse order, beside a forward run"
+    )
     arguments = parser.parse_args()
     os.environ["OMP_NUM_THREADS"] = "1"
     if arguments.stage == "screen":
-        _run(worker=_screen_worker, configs=configurations(), workers=arguments.workers)
+        configs = configurations(extra=arguments.extra)[:: -1 if arguments.reverse else 1]
+        _run(worker=_screen_worker, configs=configs, workers=arguments.workers)
     elif arguments.stage == "finalists":
         flat = [c for group in finalists().values() for c in group]
         _run(worker=_full_worker, configs=flat, workers=arguments.workers)
