@@ -116,10 +116,12 @@ def cut_label(*, cut: datetime) -> str:
 
 
 def history_months(*, cache: FeatureCache, site: str, cut: datetime) -> float:
-    """Return the months from a site's first usable row to the cut (30.4375-day months)."""
+    """Return the months from a site's first trainable row to the cut (30.4375-day months)."""
     features = cache.sites[site]
-    usable = np.flatnonzero(features.present & np.isfinite(features.y))
-    return float((to_64(moment=cut) - cache.end_times[usable[0]]) / np.timedelta64(1, "D")) / 30.4375
+    usable = np.flatnonzero(features.default_rows & features.present & np.isfinite(features.y))
+    return (
+        float((to_64(moment=cut) - cache.end_times[usable[0]]) / np.timedelta64(1, "D")) / 30.4375
+    )
 
 
 def sites_for_cut(*, cache: FeatureCache, cut: datetime) -> tuple[str, ...]:

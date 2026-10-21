@@ -9,7 +9,7 @@ theme: differentiable-physics-long-history-and-drift
 also_relevant_to:
 - retraining-and-training-history
 - differentiable-physics-embedded-generation
-status: planned
+status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00167-dp-full-history-gam-24-months-or-all-years-with-drift/ only. Serving
@@ -58,66 +58,142 @@ row_set_id: >-
 metric: >-
   Quantile score in points of effective capacity, on rows outside the hand-filtered switching
   events; tail coverage and pinball loss at q01, q05, q95, and q99
+verdict: supported
+best_arm: >-
+  all years with drift (all_d1), quantile score 2.673 points, against 3.177 for 24 months without drift
+headline: >-
+  All years with drift scored 0.503 points better than 24 months (98.33% interval -0.770 to -0.234),
+  with 10 of 12 refits below zero, but drift alone on 24 months gives 0.402 of that, so the extra
+  years add 0.101 (post hoc, interval -0.188 to -0.019).
+production_status: candidate
+adopted_in: none
+date: 2026-10-21
+take_home_message: >-
+  Giving the demand model a drift term lowered its score at 11 of 12 quarterly refits, by 0.40
+  points on the last 24 months and by 0.55 on all years, so a drift term is the change to port.
+  Training on all years instead of 24 months adds only 0.10 points on top of drift, and without
+  drift it gives no gain, so old history helps little.
+advice:
+  - >-
+    Give the GAM a drift term (D1) at every refit, with the last 24 months or all years: it lowered
+    the quantile score by 0.402 points on 24 months (98.33% interval -0.639 to -0.154) and by 0.547
+    on all years (-0.756 to -0.341), at 11 of 12 refits each (E1, C3).
+  - >-
+    Treat extra history as worth little: with drift, all years beat 24 months by 0.101 points (post
+    hoc E2, -0.188 to -0.019, 8 of 12 refits), and without drift they were level (C2, +0.043, -0.092
+    to +0.167).
+  - >-
+    Check D14 before porting a drift term: it was worse with drift (+0.186 on C1) while every other
+    substation improved (per-site table).
+  - >-
+    Widen the tails with the upper quantiles: even the best arm covers 91.6% at q95 and 97.4% at
+    q99, and 3.9% below q01 (tail checks).
 code: ml-experiments/00167-dp-full-history-gam-24-months-or-all-years-with-drift/
 ---
 
-*Planned: the write-up replaces this page when the fits have been scored.*
+**A drift term is what lowered the score; extra years of history added little.** Training the demand
+model on all years with a drift term scored 0.50 points better than training it on the last 24
+months without one. Drift alone on the last 24 months gives 0.40 of that. The extra years add 0.10
+more, and without drift the extra years gave no gain. The verdict is `supported` by the rule written
+before the fits, but it needs this reading: the rule tested "all years with drift against 24 months",
+and most of that gain belongs to the drift term.
 
-## Question
+We asked whether the demand model with an explicit solar term can now train on every year of
+history back to late 2019, instead of the last 24 months. The model is the GAM (the convex model of
+demand minus solar output) from [experiment
+107](../00107-differentiable-physics-rolling-origin-history-and-tails/result.md), with the heating
+split by day type from [experiment
+136](../00136-dp-bg-stage1-assembly-on-the-ensemble-mean/result.md) and the solar capacity pinned to
+the as-of table. We refitted it every quarter from July 2023 to April 2026, 12 refits, each scored on
+the next 3 months at 5 Primary substations (D5, D10, D11, D14, and D16), on past weather only
+(ERA5 and CAMS). It followed experiment 107's rolling-origin design and its baseline spread. "Drift"
+is a slow, smooth level term fitted to the history and held at its last value over the scored
+months. "Score" is the quantile score: twice the mean pinball loss over 11 quantiles, in points of
+each substation's effective capacity, where lower is better.
 
-**We ask whether the demand model can now use every year of history.** Experiments 104, 106, and 107
-gave answers of changing sign for the last-12-months against all-years contrast. One suspected
-cause is the solar capacity that grew over those years and that the model had to fit. Experiment
-139 kept the pinned capacity, so the solar term is explicit in every arm here.
+![Three contrasts at each refit: drift lowers the score at most refits](figure_01_per_origin.svg)
 
-## Arms
+**Figure 1 shows the drift gain at most refits and the extra-years gain mixed in sign.** C1 is below
+zero at 10 of 12 refits, with one clear exception (the July 2025 refit, +0.563). C3 (drift on all
+years) is below zero at 11 of 12. E2, the contrast of all years against 24 months with drift in both
+arms, is below zero at 8 of 12 and ranges from -0.45 to +0.13.
 
-All arms are the GAM of `studies.dp_gam` with experiment 136's T-all heating split, the PV capacity
-pinned to experiment 45's real-time vintage, experiment 104's tuned penalties, and past weather
-only (ERA5 and CAMS, no ensemble weather). Each arm is refitted at 16 quarterly cuts (2022-07-01 to
-2026-04-01), frozen from its cut, and scored on the next 3 months; the 4 earliest cuts only feed the
-spread pool of the first scored origins.
+![Mean quantile score of each arm at each substation](figure_02_absolute.svg)
 
-| Arm | Training window | Drift |
-|---|---|---|
-| m24 | the last 24 months | none |
-| all | every year from the site's first usable row | none |
-| all_d1 | every year | D1 |
-| m24_d1 (exploratory) | the last 24 months | D1 |
+**Figure 2 shows both drift arms ahead of both no-drift arms at D5, D10, D11, and D16, and behind
+at D14.** The mean scores are in the bullets below.
 
-## Row set and the history rule
+![Contrasts at each substation: D10 gains most from drift and D14 loses](figure_03_per_site.svg)
 
-- **Sites.** The five decision sites of experiment 107 (D5, D10, D11, D14, D16), plus D9 described
-  beside them.
-- **History rule.** A site is scored at an origin only if it has at least 24 months of usable rows
-  before the origin, so the 24-month window is full and the arms differ in what they train on.
-  A site with at least 12 months is still fitted at earlier cuts, only to build the spread pool.
-  D9 starts on 2023-08-23, so it is scored at the three origins from 2025-10-01.
-  Experiment 103 found that the first months of 13 of 16 Primary substations are cut, which the
-  cache already applies.
-- **D10.** Its two unlabelled-jump windows (2024-11-08 to 2024-12-01 and 2025-11-17 to 2025-12-14)
-  are removed from training and scoring in every arm, because experiment 107 found they drove the
-  sign of its history contrasts.
-- **Spread.** Experiment 107's baseline spread (S0): each arm's own out-of-sample residuals of the
-  four previous scored windows, per hour band and calendar quarter, centred.
+**Figure 3 shows that the drift gain is largest at D10 and has the opposite sign at D14.** With D10
+left out, C1 is still -0.311 (interval -0.531 to -0.104), 9 of 12 refits below zero.
 
-## Contrasts
+![Tail coverage of each arm: the drift arms are closer to nominal but still too narrow](figure_04_tails.svg)
 
-- **C1 (headline):** all_d1 minus m24.
-- **C2:** all minus m24.
-- **C3:** all_d1 minus all.
-- **Exploratory:** m24_d1 minus m24 (drift on a short window), and the same contrasts without the
-  D10 mask.
+**Figure 4 shows that every arm is too narrow in the tails, and the drift arms least.** At q95 the
+all-years drift arm covers 91.6% of measured values.
 
-## Checks planned
+## Results
 
-Median minus mean forecast per site; the mean-absolute-error contrast beside every quantile-score
-contrast; leave-one-site-out; per-origin intervals; tail coverage at q01, q05, q95, and q99.
-The curtailment-cost saving is not scored, because past weather is not available at forecast time
-and the experiment ranks training windows, not forecasts.
+- **Arms and rows.** T-all GAM with pinned capacity, experiment 104's penalties, past weather.
+  m24 (24 months, no drift), all (all years, no drift), all_d1 (all years, drift), and the
+  exploratory m24_d1 (24 months, drift). The five decision substations at 12 origins (243,741 scored
+  half-hours per arm, outside the hand-filtered switching events), identical across arms. D10's two
+  unlabelled-jump windows are removed from training and scoring.
+- **Absolute scores (points).** m24 3.177, all 3.220, all_d1 2.673, m24_d1 2.774. D9, described
+  beside the five and scored at 3 origins only: 2.232, 2.249, 2.376, and 2.360.
+- **C1, all_d1 minus m24 (headline):** -0.503 (98.33% interval -0.770 to -0.234); 10 of 12 refits
+  below zero. Winter-quarter refits -0.772 (-1.123 to -0.403), 5 of 6 below zero; summer-quarter
+  refits -0.233 (-0.571 to +0.092), 5 of 6. Leaving one site out gives -0.311 to -0.671, always
+  `supported`.
+- **C2, all minus m24:** +0.043 (-0.092 to +0.167); 5 of 12 below zero.
+- **C3, all_d1 minus all:** -0.547 (-0.756 to -0.341); 11 of 12 below zero.
+- **E1, m24_d1 minus m24 (exploratory):** -0.402 (-0.639 to -0.154); 11 of 12 below zero.
+- **E2, all_d1 minus m24_d1 (post hoc, not pre-registered):** -0.101 (-0.188 to -0.019); 8 of 12
+  below zero; winter-quarter -0.133 (-0.269 to +0.001), summer-quarter -0.069 (-0.168 to +0.012).
+  The drift penalty scales with the training rows, so all years smooths the drift about three times
+  more than 24 months, and E2 mixes history length with that smoothing.
+- **Tails, decision sites (coverage at q01 / q05 / q95 / q99; nominal 1 / 5 / 95 / 99%).** m24 5.2 /
+  9.9 / 84.9 / 93.8%; all 7.1 / 13.5 / 86.7 / 94.4%; all_d1 3.9 / 9.9 / 91.6 / 97.4%; m24_d1 4.2 /
+  10.5 / 91.0 / 96.9%. Pinball loss at q99: 0.302, 0.288, 0.205, 0.224.
+- **Without the D10 mask,** C1 is -0.455 (-0.723 to -0.191) and C3 -0.484 (-0.703 to -0.277), so
+  the mask moves each by about 0.05 and the verdict is unchanged.
 
-## Advice followed
+## Checks
 
-From experiment 107: report every contrast per origin and split winter and summer origins; keep the
-two day-of-year harmonics; do not judge a window on one site or origin year (the leave-one-site-out
-table). From experiment 104: all years without drift is the arm to doubt.
+- **Median minus mean forecast.** Zero at every site and arm, because the baseline spread is centred
+  on the median residual.
+- **Mean-forecast error beside the quantile score.** The mean absolute error contrast has the same
+  sign as the quantile score on every contrast: C1 -0.780, C2 +0.026, C3 -0.806, E1 -0.618, E2
+  -0.162 points.
+- **Triggers.** Trigger 2 (the result contradicts its prediction) held: the prediction was C1 of
+  -0.10 to +0.05 and C3 of -0.15 to -0.40, and the printed C1 is -0.503 and C3 -0.547. The
+  explanation was tested: experiment 107 found a drift gain of -0.451 as well, and masking D10's
+  jump windows moves C3 by only 0.06, so the prediction wrongly assumed the jumps carried the drift
+  gain. Trigger 5 did not fire, because all-years-without-drift against 24 months is a tie
+  (+0.043, interval spanning zero). Triggers 1, 3, 4, and 6 did not fire (leave-one-site-out keeps
+  the verdict), and trigger 7 is open until a later experiment depends on this result. No Opus audit
+  was run. A Sonnet code review found no lookahead; it caught a history rule that counted meter
+  readings instead of trainable rows (fixed: D14 and D16 are no longer scored at the first origin,
+  which moved C1 from -0.483 to -0.503).
+
+## Caveats
+
+- **The pinned capacity is hindsight at the earliest origins.** The first capacity vintage dates
+  from 2023-08-07, so the origin of 2023-07-01 uses an early vintage and the four burn-in cuts use
+  a growth prior. All arms share this, but the all-years arms lean on the old capacity path more.
+- **Drift is a recent-level term here.** Its last value is held over the scored 3 months, so part of
+  its gain may be a recent-level effect, which [experiment
+  111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md) did not
+  separate.
+- **Past weather, not forecasts.** Both arms use ERA5 and CAMS at forecast time, which is not
+  available live; the contrasts rank training windows, not forecasts.
+- **Not scored:** the curtailment-cost saving against the manual heuristic, because the experiment
+  ranks training windows on past weather.
+- **Schedule.** Quarterly refits on the whole history, frozen between refits, as in experiment 107.
+
+## What to try next
+
+- Port the drift term to the GAM with ensemble weather and check D14 first.
+- Test whether all-years training still adds 0.10 points under the same drift smoothing in both
+  windows.

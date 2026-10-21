@@ -9,7 +9,8 @@ The arms differ only in the training window (the last 24 months or all years) an
 earlier cuts. D10's two unlabelled-jump windows are removed from training and scoring.
 
 Each job (substation, cut) writes `work/means/<site>_<cut>.parquet` atomically and is skipped if the
-file exists.
+file exists. `--variant unmasked` refits D10 alone with the jump windows left in, into
+`work/means_unmasked/`, to test whether the mask explains D10's share of a contrast.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00167-*/e00167_fit.py --workers 6
@@ -124,26 +125,32 @@ def fit_job(
 _STATE: dict[str, Any] = {}
 
 
-def _worker(job: tuple[str, datetime]) -> str:
+def _worker(job: tuple[str, datetime, str]) -> str:
     """Fit one job in a worker process with one thread, and write its files."""
-    import torch  # ty: ignore[unresolved-import]
+    import torch
 
     torch.set_num_threads(1)
-    site, cut = job
+    site, cut, variant = job
     label = common.cut_label(cut=cut)
-    target = common.WORK_DIR / "means" / f"{site}_{label}.parquet"
+    folder = common.WORK_DIR / ("means" if variant == "masked" else "means_unmasked")
+    target = folder / f"{site}_{label}.parquet"
     if target.exists():
         return f"skip {target.name}"
     if "cache" not in _STATE:
-        _STATE["cache"] = common.d10_masked_cache(cache=common.load_cache())
+        cache = common.load_cache()
+        _STATE["cache"] = common.d10_masked_cache(cache=cache) if variant == "masked" else cache
         _STATE["vintages"] = read_vintages()
         _STATE["tuned"] = json.loads(common.TUNED_PATH.read_text())
     started = time.monotonic()
     frame, records = fit_job(
-        cache=_STATE["cache"], site=site, cut=cut, vintages=_STATE["vintages"], tuned=_STATE["tuned"]
+        cache=_STATE["cache"],
+        site=site,
+        cut=cut,
+        vintages=_STATE["vintages"],
+        tuned=_STATE["tuned"],
     )
     common.write_atomic(
-        frame=pl.DataFrame(records), path=common.WORK_DIR / "records" / f"{site}_{label}.parquet"
+        frame=pl.DataFrame(records), path=folder / "records" / f"{site}_{label}.parquet"
     )
     common.write_atomic(frame=frame, path=target)
     return f"done {target.name}: {frame.height} rows, {time.monotonic() - started:.0f} s"
@@ -153,12 +160,22 @@ def main() -> None:
     """Fit every (site, cut) job in parallel worker processes."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument(
+        "--variant",
+        choices=("masked", "unmasked"),
+        default="masked",
+        help="`unmasked` refits D10 alone with its two jump windows left in.",
+    )
     parser.add_argument("--only-first", action="store_true", help="Time a single job and stop.")
     arguments = parser.parse_args()
     os.environ["OMP_NUM_THREADS"] = "1"
     cache = common.d10_masked_cache(cache=common.load_cache())
+    sites = ("D10",) if arguments.variant == "unmasked" else None
     jobs = [
-        (site, cut) for cut in common.CUTS for site in common.sites_for_cut(cache=cache, cut=cut)
+        (site, cut, arguments.variant)
+        for cut in common.CUTS
+        for site in common.sites_for_cut(cache=cache, cut=cut)
+        if sites is None or site in sites
     ]
     if arguments.only_first:
         jobs = jobs[-1:]

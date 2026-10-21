@@ -1,4 +1,6 @@
-"""A copy of experiment 136's T-all design code (from experiment 114), for experiment 167: B0's columns, split interaction columns, and hinge thresholds.
+"""Experiment 136's T-all design code (from experiment 114), copied for experiment 167.
+
+The designs of experiment 114: B0's columns, split interaction columns, and hinge thresholds.
 
 **B0 is `studies.dp_gam`'s model with GAM-K's settings.** Every other arm is B0 with some of the
 heating or lighting columns changed:
