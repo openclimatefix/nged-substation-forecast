@@ -2,8 +2,9 @@
 """Join the stack's per-row scores to BG2 and the references, and print every number the page quotes.
 
 Reads the private `rows_*.parquet`, `events_*.parquet`, `rowsets_*.parquet`, `flags_*.parquet` and
-`quiet_*.parquet` files of `e00165_run.py`, experiment 87's stored predictions (BG2, the manual heuristic, and
-climatology), and experiment 155's arm C. Writes `report.json` and `joined.parquet` beside them.
+`quiet_*.parquet` files of `e00165_run.py`, experiment 87's stored predictions (BG2, the manual
+heuristic, and climatology), and experiment 155's arm C. Writes `report.json`, `wide.parquet`, and
+`event_rows.parquet` beside them.
 
     OMP_NUM_THREADS=1 uv run --no-sync python e00165_report.py
 """
