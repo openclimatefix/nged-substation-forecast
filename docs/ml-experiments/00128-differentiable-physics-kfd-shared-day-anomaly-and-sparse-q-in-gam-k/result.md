@@ -10,12 +10,12 @@ also_relevant_to:
   - production-reference-and-best-guess
 status: planned
 size: >-
-  complex, by the design trigger alone: more than one design is defensible (how the day-level state
-  couples the hour bands, the sparse search for the process noise, the placebo), and the plan
-  pre-registers one of each. What gets stored: private files under
-  data/ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/
-  only. Serving path: not touched. Degradation rule: not touched. Callers: this experiment's
-  scripts only; packages/studies/ is not changed. The maintainer's brief sets the process (one
+  complex, by the design trigger alone (one of the five fires). (1) What gets stored: private
+  files under data/ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/
+  only. (2) Serving path: not touched. (3) Degradation rule: not touched. (4) More than one design
+  is defensible (how the day-level state couples the hour bands, the sparse search for the process
+  noise, the placebo), and the plan pre-registers one of each. (5) Callers: this experiment's
+  scripts only, and packages/studies/ is not changed. The maintainer's brief sets the process (one
   Sonnet plan review, one Opus code review before the first run, Sonnet numbers and prose reviews).
 hypothesis: >-
   Adding to experiment 111's level-and-anomaly filter (GAM-K) one day-level error state shared by all
@@ -23,7 +23,7 @@ hypothesis: >-
   correction track an injected solar-panel-shaped change in real residuals better than GAM-K, and
   lowers the day-ahead score on ENS. Real residuals carry a day-level error shared across the four
   hour bands (correlation of the daily-mean residuals between bands 0.58 in real residuals against
-  0.00 under the filter's own AR(1) model), which GAM-K's independent bands cannot represent.
+  0.00 under the filter's own AR(1) error model), which GAM-K's independent bands cannot represent.
 prediction: see "Predictions"
 decision_rule: see "Decision rule, smallest gain, and stop rule"
 benchmark: >-
@@ -55,10 +55,13 @@ correction to a Primary substation's day-ahead demand forecast follow recent err
 The forecast comes from a convex model (a physical demand model fitted by least squares) driven by
 ECMWF ensemble weather forecasts. After each forecast, a Kalman filter (a method that updates an
 estimate of the current forecast error each time a new reading arrives) corrects the next forecast
-with the recent errors, separately for four times of day: night, morning, midday, and evening. The
-filter treats the four times of day as unrelated. Real errors are not unrelated: at five substations
-over one year, the daily averages of the error in two different times of day correlated at 0.58,
-against 0.00 in the filter's own model of the error.
+with the recent errors, separately for four times of day: night, morning, midday, and evening. Errors
+and scores are in points, where one point is 1% of the substation's effective capacity. The filter
+treats the four times of day as unrelated. Real errors are not unrelated: at five substations over
+one year, the daily averages of the error in two different times of day correlated at 0.58, against
+0.00 in the filter's own error model. That correlation could also come from a slow drift shared by
+all four times of day, which the filter's levels already follow, so the plan first checks the
+day-to-day part (control P-premise).
 
 **The experiment adds a single day-level error that all four times of day share, and changes how
 the filter decides which of its estimates may drift.** The second change keeps an estimate fixed
@@ -69,7 +72,7 @@ version over one year. No code has run: this page is the plan, and a later commi
 
 **The filter and the search for its noise re-implement published methods.** [de Vilmarest et al.
 (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) put a random walk on the weights of a frozen
-additive model of regional electricity load and fitted a sparse, diagonal noise matrix by
+additive regression model of regional electricity load and fitted a sparse, diagonal noise matrix by
 likelihood. [de Vilmarest and Goude (2022)](https://doi.org/10.48550/arXiv.2110.00334) describe the
 greedy search that starts every noise variance at zero, and the R package
 [viking](https://CRAN.R-project.org/package=viking) implements it. The shared day-level state is the
@@ -83,15 +86,16 @@ convex fits, calibration, forecasts, and filter settings it reuses, and on [expe
 
 - **Experiment 118 found that a 14-weight filter did no better than GAM-K, and that its
   known-answer gate failed on real residuals.** The filter recovered an injected solar-panel
-  capacity change in 85% to 95% of draws when the noise followed its own model, and in 16% to 21%
+  capacity change in 85% to 95% of draws when the noise followed its own error model, and in 16% to 21%
   of draws when the noise was resampled real residuals.
 - **A follow-up diagnosis (private notes, 2026-10-21) traced the failure to the noise.** Shuffling
   the days of the real residuals failed the gate as badly as keeping their order. Masking the
   switching days did not help. The shared day-level error remained: the daily means of the four
   hour bands correlated at 0.58 in real residuals and 0.00 in the AR(1) noise, so the weights
-  absorbed the shared error.
-- **The same diagnosis found that estimating the noise sparsely fixes false movement when the model
-  is right.** Holding a variance at exactly zero unless a single-weight likelihood gain of 2 nats
+  absorbed the shared error. The statistic ignores day order, so it cannot separate a day-level
+  error from a slow shared drift.
+- **The same diagnosis found that estimating the noise sparsely fixes false movement when the error
+  model is right.** Holding a variance at exactly zero unless a single-weight likelihood gain of 2 nats
   justified it raised the share of clean AR(1) draws with no false movement from 5% to 90%. On
   real month-block residuals it did not help alone.
 - **Experiments 106 and 122 credit most of GAM-K's gain to its level state.** The level carries the
@@ -111,9 +115,11 @@ through the other months.
 | KD | GK plus one shared day-level state d | one shared variance, refitted | planned |
 | KS | GK | one variance per band, sparse from zero | planned |
 | KDS | GK plus d | one variance per band, sparse from zero | hypothesis arm |
-| KDS-shuf | KDS | KDS's | placebo, must not help |
+| KDS-shuf | KDS | KDS's | d term of the forecast taken from another day (variance check) |
 | KDS-nod | KDS | KDS's | exploratory: d removed from the forecast only |
 | KDS-1n, KDS-4n | GK plus d | sparse, thresholds of 1 and 4 nats | sensitivity, exploratory |
+| KDS-floor | GK plus d | sparse, with every `q_b` at least 1e-4 points squared per day | exploratory: keeps the levels able to move |
+| KDS-da | GK plus d | sparse, with KD's continuous hyperparameters fitted by the day-ahead likelihood | exploratory |
 
 The monthly weight reset, the 14-weight state, noise pooling across substations, and any PV or
 effect weight are not in the experiment. Experiment 127 stays parked.
@@ -125,10 +131,15 @@ reading in band b at half-hour t is `r = level_b + z_b + d + eps`, in points of 
 The levels follow a random walk with variance `q` per day. The anomalies `z_b` are AR(1) with
 factor `phi` per half-hour and innovation standard deviation `sigma_z`, as in GAM-K. Observation
 noise has standard deviation `sigma_eps`. The joint filter runs over all readings in time order, so
-every band's reading updates d, and d's estimate updates the other bands.
+every band's reading updates d, and d's estimate updates the other bands. The per-band code of
+`studies.dp_assimilation` cannot be reused for this, so the nine-state filter is new code, written
+so that its operations match the per-band code when d is switched off (control P1).
 
 **The state d is constant within a local day and follows an AR(1) across days.** The day is the
-local calendar day, because the hour bands are local hours, so each day holds all four bands once.
+local calendar day in the Europe/London time zone, because the hour bands are local hours (00:00
+to 05:59, 06:00 to 10:59, 11:00 to 15:59, and 16:00 to 23:59), so each day holds all four bands
+once and no band spans local midnight. A day lasts 23 or 25 hours at a clock change, and the
+midnight count `m` below uses local dates, so d is not reset twice or skipped (control P-day).
 At each local midnight d becomes `phi_d * d + eta`, where `eta` has standard deviation `sigma_d`.
 Across a gap that crosses `m` midnights, d decays by `phi_d**m` and its variance moves towards the
 stationary value `sigma_d**2 / (1 - phi_d**2)`, with the covariance between d and every other state
@@ -150,7 +161,12 @@ about two weeks land in the levels, and d cannot carry a permanent level (its st
 deviation is `sigma_d / sqrt(1 - phi_d**2)`). The anomalies `z_b` are band-specific, and d is the
 only state that loads on all four bands, so only the cross-band covariance of the residuals
 identifies `sigma_d`. With no cross-band covariance the likelihood drives `sigma_d` to its floor
-and d becomes inert, which makes KD equal GK. Control P-ident checks this on simulated data.
+and d becomes inert, which makes KD equal GK. Controls P-ident and P-shift check this on
+simulated and on real data. With sparse noise the argument weakens: a band with `q_b = 0` has a
+fixed level, so a permanent shift of all bands can only land in d, which re-asserts it every day.
+Control P-ident runs the step test on KDS and states the expectation. Within one cutoff day, d,
+`z_night`, and the night level share the same readings and are split only by their prior variances,
+so the fit report gives the share of each night innovation that goes to d.
 
 **Hyperparameters of KD.** Six unconstrained values per substation: log `q`, logit `phi`, log
 `sigma_z`, log `sigma_eps` (bounds and normal prior shared across substations exactly as in
@@ -174,33 +190,48 @@ whose removal costs less than the threshold.
 **The estimator uses a flat prior on `q_b` and the one-step likelihood.** The diagnosis found that
 the shared prior on log `q` inflates variances that should be zero. Every other hyperparameter is
 held: KS holds `phi`, `sigma_z`, and `sigma_eps` at experiment 111's values, and KDS holds all five
-of KD's other values. The thresholds of 1 and 4 nats are sensitivity runs; they report the selected
+of KD's other values. KDS-da takes those five values from a KD fitted by the day-ahead likelihood
+of `studies.dp_effects_filter` (each reading scored from the state at its day-ahead cutoff), and
+KDS-floor lets no `q_b` fall below 1e-4 points squared per day. The thresholds of 1 and 4 nats are
+sensitivity runs; they report the selected
 supports and the gate, and KDS-1n and KDS-4n are scored as exploratory arms. A post hoc refit of the
 held values given the chosen support (KS-refit) is allowed and labelled as such.
 
-### The placebo and the exploratory arm
+### The variance check and the d-removal arm
 
 **KDS-shuf keeps KDS's filter and replaces the d term of the forecast with the d of another day.**
 For each forecast, the d term is taken from the cutoff state (same clock time, 05:30 UTC) of a day
 drawn by a fixed permutation (seed 128) of the local days of the same calendar month. The levels
-and anomalies stay those of KDS. The permutation keeps the size of d and removes its link to the
-errors of the target day. KDS-shuf must not beat KDS, and must not beat GK by a gain like KDS's.
+and anomalies stay those of KDS. **This arm is not a placebo for the hypothesis.** Replacing d by
+the d of another day adds independent noise of d's size, so KDS-shuf scores worse than KDS by about
+the variance of the d term whenever d is nonzero, with or without predictive value. The informative
+contrasts are KDS-nod minus KDS (does d's role in the forecast help?) and KDS-shuf minus KDS-nod.
 KDS-nod drops the d term from the forecast and keeps the levels and anomalies that KDS's joint
-filter produced. The pair separates two roles of d: tidying the levels, and predicting the next
-day. Both arms refit nothing.
+filter produced. Neither arm refits.
+
+**The placebo for the claim that the gain comes from cross-band structure is a real-data control.**
+Control P-shift shifts each band of the tuning-month stream circularly by an independent random
+number of days, which keeps every band's own behaviour and destroys the cross-band covariance. KD
+refitted on that stream must return `sigma_d` at its floor.
 
 ## The known-answer gate on real residuals
 
 **The gate runs after the hyperparameters are fitted on the tuning months and before any replicate
 or scored forecast.** It copies the construction of experiment 118's gate (`e00118_gate.py`) for the
-five decision substations over 2024-07-01 to 2025-06-30, and changes only what the arms need.
+five decision substations over 2024-07-01 to 2025-06-30, and changes only what the arms need. Inside
+the gate, every refit counts only the odd months' readings in its likelihood, as the real fit does,
+while the state runs through all twelve months. The block resample draws on all twelve months,
+including the even replicate months. The gate selects nothing that the replicate months or the
+scored year use, and a revised gate would be rerun on new draws.
 
 **How a solar-panel capacity change shows in GAM-K's state.** GAM-K has no weight on the solar
 term. A rise in capacity makes the residual (observed minus forecast) more negative in the daylight
-hours, so the change is absorbed by the midday band's level, with the AR(1) anomaly taking the fast
-part. The tracked quantity is therefore the midday band's level at the end of each local day, plus
-d for the arms that have it, because d is part of the midday correction. For GK and KS it is the
-level alone. The level alone is reported beside it for every arm.
+hours, so the midday band's level absorbs the change, with the AR(1) anomaly taking the fast part.
+**The primary tracked quantity is the midday band's level alone, for every arm.** The secondary
+quantity is the midday level plus d, which is the arm's whole midday correction. The primary
+quantity is the main one because d has a stationary standard deviation of several points, is bounded
+to `phi_d <= 0.90`, and cannot hold a 180-day ramp, so adding d to the reading adds noise and no
+tracking.
 
 **Scenarios.** S0 injects nothing. S1 injects experiment 118's change: the PV weight rises from 1
 to 1.30 over 180 days from 2024-07-01, so the stream gains `deviation * pv_regressor` at each
@@ -210,47 +241,59 @@ change, the size of a new solar farm connecting at 90% of the existing capacity.
 forms. The real form is a circular month-block resample of the substation's real tuning-year
 residuals, which keeps the cross-band structure and is the decision form. The AR(1) form is
 experiment 118's, at each substation's GAM-K `phi`, `sigma_z`, and `sigma_eps`, and is the
-reference. Seeds depend on the site, scenario, form, and draw, with the namespace `e128`, so no
-draw repeats an injection of experiment 118.
+reference. **Each S1 and S1x3 draw is paired with an S0 draw on the identical noise realisation**
+(the seed depends on the site, form, and draw, with the namespace `e128`, and not on the scenario),
+and a reading subtracts the same arm's own S0 trace from the paired stream. The subtraction removes
+the draw's own level noise, which an average over S0 draws would leave in. No draw repeats an
+injection of experiment 118.
 
 **The truth path** is `I_k = deviation_k * R_k`, where `R_k` is the mean of the PV regressor over
 the midday-band half-hours of the 30 days up to local day `k`. Because the injected change starts in
 July and the regressor falls in winter, `I_k` peaks in autumn. The read day `k*` is the day between
 30 and 200 on which `I_k` peaks, computed per substation from the regressors before any draw runs.
+A tracked quantity at `k*` is the mean of its end-of-day values over the 7 days up to `k*`.
 
 **Draws and fits.** Each draw refits every arm's hyperparameters on the synthetic stream, starting
-from the real fit and with the real fit's priors, as experiment 118 did. The real-form cells hold 12
-draws per substation for S0, S1, and S1x3 (60 per cell), and the AR(1) cells hold 6 per substation
-for S0 and S1 (30 per cell). A cell reports the share of draws that pass, with a 95% binomial
-half-width. The bar is experiment 118's: a reading passes when at least 80% of draws pass.
+from the real fit and with the real fit's priors, as experiment 118 did. The real form holds 12 noise
+draws per substation (60 per cell), each run as S0, S1, and S1x3 (180 streams). The AR(1) form holds
+6 noise draws per substation (30 per cell), each run as S0 and S1 (60 streams). A cell reports the
+share of draws that pass, with a 95% binomial half-width.
 
-**Readings** (all four must pass for KDS in the real form at the decision amplitude to clear the
-gate):
+**Readings:**
 
-1. **Tracking (S1, S1x3).** The tracked quantity minus the mean of the same arm's S0 draws at the
-   same substation recovers at least 70% of `I_{k*}` on day `k*`, and its daily correlation with
-   `I_k` over days 1 to 200 is at least 0.70.
-2. **No cross-talk (S1, S1x3).** The night band's level and d (arm by arm), each minus its S0 mean,
-   stay below 25% of the peak of `I_k` in absolute value after day 60.
+1. **Tracking (S1, S1x3).** The paired difference of the tracked quantity, averaged over the 7 days
+   up to `k*`, recovers at least 70% of `I_{k*}`, and its daily correlation with `I_k` over days 1
+   to 200 is at least 0.70.
+2. **No cross-talk (S1, S1x3).** The night band's level and d, each as a paired difference, stay
+   below 25% of the peak of `I_k` in absolute value after day 60. The reading also fails KDS if the
+   secondary quantity passes reading 1 and the level alone does not, because d then carried the
+   change. The page reports d and each band's level at the peak of `I_k`, by season and by band,
+   because the PV regressor is also nonzero in the morning and evening bands in summer, so the
+   injection itself creates cross-band covariance.
 3. **No false movement (S0).** The median over draws of the largest change of the tracked quantity
    after day 60, in units of the peak of `I_k`, is at most 1.25 times GAM-K's. Experiment 118's
    absolute bar of 0.10 does not apply to a level, which follows real residuals by design.
 4. **Forecast error follows (S1, S1x3).** The arm's mean absolute day-ahead error on the stream
-   after day 60 is below GAM-K's in at least 80% of draws.
+   after day 60 is below GAM-K's, and the reading counts the share of draws where it is.
 
 **Power check, before the gate.** For each substation, the peak of `I_k` is divided by the posterior
-standard deviation of the tracked quantity on day `k*` from KD's filter on the real tuning stream.
-If it is below 3 at 2 or more of the 5 decision substations at S1, S1 is labelled underpowered (as in
-experiment 118), the decision amplitude becomes S1x3, and the page says so. The reading at S1 is
-reported regardless.
+standard deviation of each tracked quantity (primary and secondary) on day `k*` from KD's filter on
+the real tuning stream. If the primary ratio is below 3 at 2 or more of the 5 decision substations
+at S1, S1 is labelled underpowered (as in experiment 118), the decision amplitude becomes S1x3, and
+the page says so. The reading at S1 is reported regardless.
 
-**Gate outcome.** The gate passes when KDS passes readings 1 to 4 in the real form at the decision
-amplitude. A failed gate caps the verdict at `inconclusive`, as in experiment 118, and the replicate
-and scored forecasts still run, because the maintainer's brief asks for the day-ahead score either
-way. The tracking rates of all four arms in both noise forms are reported beside the gate. Experiment
-118's weight-based rates (90% in the AR(1) form, 20% to 25% on real residuals) are a different
-quantity, so they are quoted for context and not as a bar. A gate pass that follows a change of the
-gate after seeing draws does not count: the revised test must be written down and rerun on new draws.
+**One gate rule.** The gate passes when KDS meets all of these in the real form at the decision
+amplitude. First, for readings 1, 2, and 4, the real-form pass rate is at least 0.8 times KDS's own
+pass rate in the AR(1) form, so that the bar measures what real residuals take away from the filter
+and not the weakness of a level reading. Second, the tracking pass rate of KDS exceeds GAM-K's by at
+least 0.10, and the paired 95% interval of that difference excludes zero. Third, reading 3 holds.
+The fixed pass rate of 0.80 from experiment 118 is reported beside each rate as a labelled
+exploration and does not decide the gate. A failed gate caps the verdict at `inconclusive`, as in
+experiment 118, and the replicate and scored forecasts still run, because the maintainer's brief
+asks for the day-ahead score either way. The rates of all arms in both noise forms are reported.
+Experiment 118's weight-based rates (90% in the AR(1) form, 20% to 25% on real residuals) are a
+different quantity and are quoted for context only. A change of the gate after seeing draws does not
+count: the revised test must be written down and rerun on new draws.
 
 ## Scoring
 
@@ -322,15 +365,22 @@ at D+1 in the scored year; negative favours the first-named arm.
 | C3 KS minus GK | within +-0.02 of zero |
 | C4 KDS minus KD | -0.01 (-0.03 to +0.01) |
 | C5 KDS minus KS | -0.04 (-0.09 to 0.00) |
-| Winter nights, KDS minus GK | -0.06 (-0.15 to 0.00), a larger gain than the annual C1 |
+| Winter nights, KDS minus GK | -0.06 (-0.15 to 0.00), a larger gain than the annual C1, because a shared day-level weather error (a missed cold night shifts every hour of that night and the next day) is largest on winter nights |
 | Holiday days, KDS minus GK | not worse than +0.30 on the 17 holiday days |
 | Tails | coverage at q01, q05, q95, and q99 within 1 percentage point of GK's |
 | Fitted d | `sigma_d` above its floor of 0.02 points at 5 of 5 decision substations; `phi_d` between 0.4 and 0.8; `sigma_z` and `sigma_eps` each lower than GAM-K's by at least 5% |
 | Sparse support at 2 nats | at least 3 of the 4 bands keep a nonzero `q_b` at 4 or more of 5 substations |
-| Gate, tracking, real form, decision amplitude | KDS 60% of draws (range 40% to 80%), so the 80% bar is likely to be missed; GK 45% (25% to 65%); KDS minus GK +0.15 (+0.05 to +0.30) |
-| Gate, tracking, AR(1) form | KDS within 0.10 of GK, both at least 70% |
+| Gate, tracking of the primary quantity, real form, decision amplitude | KDS 50% of draws (range 30% to 70%); GK 40% (20% to 60%); KDS minus GK +0.10 (0.00 to +0.25) |
+| Gate, tracking, AR(1) form | KDS within 0.10 of GK, both at least 70%, so the relative bar of 0.8 times the AR(1) rate is met only if the real-form rate of KDS reaches about 56% |
 | Gate, S0 movement | KDS at most 1.25 times GK's |
-| Placebo | KDS-shuf minus KDS +0.03 to +0.15, and KDS-shuf minus GK at least -0.01 |
+| d's role in the forecast | KDS-nod minus KDS +0.01 to +0.05 (d's forecast term helps); KDS-shuf minus KDS is positive by construction and is no evidence |
+| Cross-band control | P-shift returns `sigma_d` at its floor at 4 or more of 5 substations |
+| Premise | P-premise gives a cross-band correlation of daily innovations of at least 0.25 and a lag-1 autocorrelation of the shared component of at least 0.3 |
+
+**The likeliest verdict is `small gain` or `inconclusive`.** The predicted C1 range reaches 0.00,
+and a true
+gain of 0.04 has little power against an interval half-width of about 0.03. The gate is likelier to
+fail than to pass.
 
 **The mean-forecast error is predicted to agree in sign with every quantile-score contrast.** If a
 contrast and its mean-forecast error disagree, audit trigger 3 fires.
@@ -341,15 +391,18 @@ contrast and its mean-forecast error disagree, audit trigger 3 fires.
 
 - `supported`: the scored-year 99% interval of C1 lies wholly below zero, its estimate is at least
   0.03 points below zero, at least 4 of 5 decision substations are better in both the scored year
-  and the replicate months, the placebo passes, and the gate shows KDS tracking at least 0.10
-  higher than GAM-K's in the real form.
+  and the replicate months, and the gate passes. A wholly negative interval with an estimate of at
+  least 0.03 but only 3 of 5 substations better is `inconclusive`.
 - `small gain`: the C1 interval lies wholly below zero in the predicted direction, but the estimate
   is under 0.03 points in size.
-- `not supported`: the C1 interval lies above -0.03 (the data exclude a gain worth porting).
+- `not supported`: the lower limit of the C1 interval is above -0.03 (the data exclude a gain worth
+  porting).
 - `refuted`: the C1 interval lies wholly above zero in the scored year and the replicate months.
 - `inconclusive`: every other result, and any result that would be `supported` or `small gain` but
-  has a failed gate, as in experiment 118. A failed placebo (KDS-shuf minus KDS below +0.01, or
-  KDS-shuf better than GK by more than half of C1) also gives `inconclusive` and triggers an audit.
+  has a failed gate, as in experiment 118. A KDS-nod that scores as well as KDS or better means d's
+  forecast term does not drive any gain, and the page says so. A failed P-shift (KD keeps a
+  `sigma_d` above its floor on band-shifted streams) also gives `inconclusive` and triggers an
+  audit.
 
 **The smallest gain worth porting is 0.03 points at D+1, about 1.2% of GAM-K's 2.521.** The change
 adds one state and two fitted hyperparameters per substation to the recent-level filter that sits
@@ -360,27 +413,43 @@ The 0.03 matches the half-width of a paired scored-year interval at five substat
 
 **Stop rules.**
 
-- Stop and report, without running the gate, if control P1 (nesting) or P-ident fails, because
-  either is a coding fault.
+- Stop and report, without running the gate, if control P1 (nesting), P-ident, or P-day fails,
+  because each is a coding fault. Stop and report if P-premise gives a cross-band correlation of
+  daily innovations near 0 (below 0.10), because the premise then fails. If the lag-1
+  autocorrelation of the shared component is below 0.3, the page states that the C1 prediction was
+  implausible, and the experiment still runs.
+- Stop and report if all four `q_b` are zero at any decision substation, because the levels there
+  are frozen and d takes any permanent shift. The report goes to the coordinator before the scored
+  run.
 - If KD's `sigma_d` sits at its floor at 4 or more of the 5 decision substations, d is inert and KD
   equals GK. Record the result as `not supported` for the day state, drop KD, KDS, and KDS-shuf, and
   score KS against GK only.
 - If KDS tracks worse than GK by more than 0.10 in the AR(1) form, the added state damages tracking
-  under the filter's own model. Stop and report before any scored forecast.
+  under the filter's own error model. Stop and report before any scored forecast.
 - No arm is added after a replicate or scored result is read, except one labelled post hoc.
 
 ## Controls
 
 - **P1, nesting.** KD with `sigma_d` set to 0 (outside the fitted bounds, for this control only),
-  and KS with every `q_b` set to GAM-K's `q`,
-  reproduce GAM-K's states to 1e-9 on the tuning stream, and the quantiles of GK equal experiment
-  111's stored files exactly on the rows experiment 118 reproduced.
+  and KS with every `q_b` set to GAM-K's `q`, reproduce GAM-K's states to 1e-9 on the tuning
+  stream, and the quantiles of GK equal experiment 111's stored files exactly on the rows experiment
+  118 reproduced.
 - **P2, causality.** Changing every reading after the cutoff leaves the joint filter's state and the
   forecasts unchanged.
-- **P-ident.** On streams simulated from the KD model with a known `sigma_d` and `phi_d` (30 draws per
-  substation), the fit recovers `sigma_d` within a factor of 2 in at least 80% of draws. On streams
-  with no cross-band covariance it returns `sigma_d` at its floor. A permanent common level step
-  of 3 points, held for 60 days, ends mostly in the levels (d below 25% of the step after 30 days).
+- **P-day.** Every band's half-hours fall on one local date, d's midnight count uses local dates
+  across the clock changes of 2024-10-27 and 2025-03-30, and no day is reset twice or skipped.
+- **P-premise.** On the tuning months, per decision substation: the mean pairwise cross-band
+  correlation of the daily means of GAM-K's standardised one-step innovations, and the lag-1
+  autocorrelation (within months) of the mean of those four daily means. These replace the 0.58
+  statistic, which cannot separate a day-level error from a slow common drift.
+- **P-ident.** On streams simulated from the KD filter with a known `sigma_d` and `phi_d` (30 draws
+  per substation), the fit recovers `sigma_d` within a factor of 2 in at least 80% of draws. A
+  permanent common level step of 3 points, held for 60 days, ends mostly in the levels for KD (d
+  below 25% of the step after 30 days). For KDS the same step test is run and the expectation is
+  the opposite when all `q_b` are zero: d carries more than half of the step.
+- **P-shift.** KD refitted on real tuning-month streams with each band shifted circularly by an
+  independent random number of days (20 shifts per substation) returns `sigma_d` below 0.1 points,
+  while the unshifted fit returns it above.
 - **P-sparse.** On AR(1) streams with true `q_b = 0` (30 draws per substation), a band keeps a
   nonzero `q_b` at 2 nats in at most 10% of draws; on streams with a true `q_b` of 0.05, the band is
   kept in at least 80% of draws.
@@ -411,10 +480,13 @@ The 0.03 matches the half-width of a paired scored-year interval at five substat
   ([data processing](../data-processing.md)).
 
 **Departed from:** experiment 118 advised fitting a filter's noise by a day-ahead likelihood with a
-wide bound on log `q`, but its two changes were made together, and the gate diagnosis found the
-one-step likelihood with a flat prior suits the sparse search. KD, KS, and KDS use the one-step
-likelihood, as GAM-K does, so that the contrasts differ in the state and the noise search only. A
-day-ahead likelihood is left for a later arm.
+wide bound on log `q`. Its first run used the one-step likelihood and a narrower bound on log `q`,
+and the 14-weight filter scored 0.127 points worse at D+1 (KEZ-1s minus KEZ, interval +0.084 to
++0.171), three times the size of the C1 gain predicted here. The two changes (the day-ahead
+likelihood and the wider bound) were made together, and the gate diagnosis rated the evidence for
+the likelihood as suggestive only. KD, KS, and KDS use the one-step likelihood, as GAM-K does, so
+that the contrasts differ in the state and the noise search only. The exploratory arm KDS-da tests
+the day-ahead likelihood on KD's continuous hyperparameters.
 
 ## Compute, storage, and size
 
@@ -436,14 +508,16 @@ day-ahead likelihood is left for a later arm.
 - **Resources.** CPU only, at most 6 cores, each command under `systemd-run --user --scope -p
   MemoryMax=16G -p OOMPolicy=continue`, `free -g` first (25 GB available or wait), 6 worker
   processes with 1 thread each. Estimates, to be replaced by one timed filter pass before any other
-  step runs: one joint-filter likelihood evaluation over the tuning stream takes 0.3 to 0.8 s, so
+  step runs: one joint-filter likelihood evaluation over the tuning stream takes 0.3 to 0.9 s (new nine-state
+  code in plain NumPy; the low end is optimistic), so
   fitting KD at six substations takes 5 to 10 minutes of wall time; KS and KDS take 10 to 20 minutes
-  each; the power check and controls take 20 to 40 minutes; the gate (180 synthetic streams and 3
-  refits each) takes 3 to 7 hours of wall time and dominates, against 3.4 hours for experiment 118's
-  1,600 draws of a heavier fit; tuning the spreads and forecasting the replicate months and scored
+  each; the power check and controls take 20 to 40 minutes; the gate (240 synthetic streams, each
+  refitting KD, KS, and KDS at 500 to 800 likelihood evaluations) takes about 10 minutes per stream
+  per core, so 6 to 10 hours of wall time on 6 cores, and dominates, against 3.4 hours for
+  experiment 118's 1,600 draws; tuning the spreads and forecasting the replicate months and scored
   year take 15 to 30 minutes, since experiment 118's tune and forecast steps each took under 3
   minutes per substation group; scoring, figures, and the substation cards take 20 minutes. If one
-  gate refit takes more than 4 minutes once timed, the draws fall to 8 per substation in the real
+  gate refit takes more than 4 minutes once timed, the noise draws fall to 8 per substation in the real
   form and 4 in the AR(1) form, and the write-up says so.
 
 ## Order of work
@@ -451,7 +525,8 @@ day-ahead likelihood is left for a later arm.
 1. Write `e00128_*.py` in the experiment folder: the joint filter and its likelihood, the sparse
    search, the forecast hooks, copied helpers from experiment 118 (streams, gate, scoring), and the
    reports. Time one filter pass.
-2. Run the controls P1, P2, P-ident, and P-sparse. Stop on a failure of P1 or P-ident.
+2. Run the controls P-premise, P1, P2, P-day, P-ident, P-shift, and P-sparse. Stop on the failures
+   named in the stop rules.
 3. Fit KD, KS, and KDS on the tuning months, and apply the stop rule on `sigma_d`.
 4. Run the power check and the gate. Report it before any replicate or scored forecast.
 5. Tune the spreads on the tuning months, then forecast the replicate months and the scored year.
@@ -466,11 +541,11 @@ before step 2, and Sonnet reviews of the numbers and the prose before the pull r
   band mean of the injected change, and the change peaks in autumn. The plan answers with a power
   check and an S1x3 row, and a different ramp (for example one starting in January) would depart
   from experiment 118's S1.
-- **The 80% bar is inherited from a weight-based reading.** Whether it suits a level-based reading
-  is untested, and the plan predicts KDS misses it in the real form.
-- **The placebo shuffles the d term of the forecast, not the feed of the filter.** A shuffled feed
-  would need a second filter run on reordered days that cannot be aligned to the real forecast
-  times.
+- **The 80% pass rate is inherited from a weight-based reading.** It is reported as a labelled
+  exploration, and the gate uses a bar relative to each arm's AR(1) rate.
+- **KDS-shuf shuffles the d term of the forecast, not the feed of the filter,** and is a variance
+  check. A shuffled feed would need a second filter run on reordered days that cannot be aligned to
+  the real forecast times, so P-shift is the placebo for the cross-band claim.
 - **KS holds `phi`, `sigma_z`, and `sigma_eps` at GAM-K's values,** which were fitted with a shared
   `q`. The post hoc refit (KS-refit) is the check.
 - **Whether `sigma_d` and `phi_d` need the weak priors.** Their spread of 1.5 was chosen without

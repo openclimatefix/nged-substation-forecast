@@ -28,7 +28,7 @@ against 0.00 in the filter's own model), and that the 14-weight filter absorbed 
 weights. The plan, in [experiment
 128](../../00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/result.md),
 pre-registers a known-answer gate on real residuals and a day-ahead score against GAM-K on the rows
-of experiment 118. The run is CPU only, and the gate dominates its 3 to 7 hours.
+of experiment 118. The run is CPU only, and the gate dominates its 6 to 10 hours.
 
 ## CAL: tail calibration and a coherence pass
 
