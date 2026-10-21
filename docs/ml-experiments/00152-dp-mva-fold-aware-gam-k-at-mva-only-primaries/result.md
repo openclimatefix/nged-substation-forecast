@@ -177,6 +177,28 @@ F2 only if F fails K1 near crossings. A learned-Q arm at D12 is exploratory. D8'
 **Compute.** CPU only, at most 4 cores, every thread cap at 1, run under `systemd-run --user
 --scope -p MemoryMax=16G -p OOMPolicy=continue`: about 10 to 20 core-hours.
 
+## Stage 0 results (written before stage 1 ran)
+
+**F1 does not contradict the sign at D12, and gives only weak support for it.** On 1,185
+sunny-midday half-hours of 2024-07 to 2026-06, the BSP regression put a coefficient of 1.02 on D12's
+signed flow (the coefficient of an exact closure is 1) and 0.00 on D12's unsigned reading. The
+signed version lowered the residual standard deviation by 0.7% (6.97 to 6.92 MW), and the
+month-block interval of the variance drop (-0.29 to 1.98 MW squared) includes zero. Under the rule
+written above, "no gain fails it" would stop the experiment, but a clear contradiction would be
+the signed version fitting worse, and it fits slightly better. The experiment goes on, and the page
+reports the sign at D12 as unestablished.
+
+**F2 triggers stop rule S0 in the scored year, so the latent filter is dropped.** Replaying the
+filters on experiment 110's stored D12 predictions (day-ahead, past weather), the gated
+signed-flow filter minus the additive filter was +0.02 points (95% interval -0.24 to +0.30) on
+scored-year sunny-midday rows, under the 0.05-point threshold, and -0.37 (-0.91 to -0.03) in the
+replicate year, so the sign is not stable. On all rows it was worse in both years (+1.57 and +0.80
+points). Folded quantiles on the additive filter's corrected reading moved the sunny-midday score
+by +0.03 and +0.04 points. Following S0, arm F becomes arm A plus folded quantiles, and R2 compares
+those two. The replay reproduced experiment 110's stored filtered mean. The replicate-year
+residual pool came from the scored year and the scored-year pool from the replicate year; the
+convention is for screening only.
+
 ## Size triggers
 
 - **What gets stored:** private files under the experiment's data folder only.

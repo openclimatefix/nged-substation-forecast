@@ -30,6 +30,7 @@ import e00124_common as c124  # isort: skip
 N_BOOTSTRAP = 10_000
 SEED = 152
 SITE = "D12"
+MIN_SERIES_COVERAGE = 0.9
 
 
 def _design(*, columns: list[np.ndarray]) -> np.ndarray:
@@ -41,7 +42,7 @@ def _fit(*, x: np.ndarray, y: np.ndarray, lower: np.ndarray) -> tuple[np.ndarray
     return result.x, y - x @ result.x
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Run F1 and write `work/f1.json`."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     cache = c124.load_cache()
@@ -95,12 +96,18 @@ def main() -> None:
     index = np.where(clear > 20.0, ghi / np.maximum(clear, 1.0), np.nan)
     sunny = midday & (np.nan_to_num(index, nan=0.0) >= CLEAR_SKY_INDEX_MINIMUM)
 
-    others = [
-        values for values, label in zip(bsp.mva_list, bsp.mva_labels, strict=True) if label != SITE
-    ]
+    window = sunny & ~flag & np.isfinite(reading_mva) & np.isfinite(bsp.reading) & np.isfinite(sign)
+
+    def covered(series: list[np.ndarray]) -> list[np.ndarray]:
+        """Keep series that hold a reading on 90% of the window, as experiment 124 does."""
+        return [s for s in series if np.isfinite(s[window]).mean() >= MIN_SERIES_COVERAGE]
+
+    others = covered(
+        [v for v, label in zip(bsp.mva_list, bsp.mva_labels, strict=True) if label != SITE]
+    )
     n = len(ends)
-    mw_sum = c124.sum_all(arrays=bsp.mw_list, n=n)
-    gen_sum = c124.sum_all(arrays=bsp.generator_list, n=n)
+    mw_sum = c124.sum_all(arrays=covered(bsp.mw_list), n=n)
+    gen_sum = c124.sum_all(arrays=covered(bsp.generator_list), n=n)
     other_sum = c124.sum_all(arrays=others, n=n)
     out: dict[str, object] = {"n_mw": len(bsp.mw_list), "n_other_mva": len(others)}
     base = (

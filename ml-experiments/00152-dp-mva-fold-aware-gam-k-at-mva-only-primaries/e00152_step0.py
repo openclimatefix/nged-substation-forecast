@@ -65,7 +65,7 @@ def main() -> None:
     for cut in ("replicate", "scored"):
         frame = pl.read_parquet(
             EXPERIMENT_110_DIR / "predictions" / f"{cut}_l0" / "predictions.parquet"
-        )
+        ).filter(pl.col("filtered"))
         label_of = {cache.sites[s].table.time_series_id: s for s in MVA_ONLY_PRIMARIES}
         frame = frame.with_columns(
             pl.col("time_series_id").replace_strict(label_of, default=None).alias("site"),
