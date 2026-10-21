@@ -143,8 +143,8 @@ def median_minus_mean(*, frames: dict[str, pl.DataFrame]) -> dict:
     """Return the mean of the median forecast minus the mean forecast, per arm and site."""
     return {
         name: {
-            site: float((part["q50"] - part["mean"]).to_numpy().mean())
-            for site, part in frame.group_by("site")
+            str(key[0]): float((part["q50"] - part["mean"]).to_numpy().mean())
+            for key, part in frame.group_by("site")
         }
         for name, frame in frames.items()
     }
