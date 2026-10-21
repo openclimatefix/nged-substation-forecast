@@ -126,12 +126,21 @@ families under one penalty, so PS cannot pool the heating curve and the profile 
 strengths from the calendar families. Splitting them would change the reviewed module and is left
 for a follow-up if PS gains.
 
-**The penalty.** The deviation penalty is in rows of evidence (a substation with far more training
-rows keeps its own curve). PH tunes the heating penalty over 100, 300, 1000, 3000, and 10000 on the
-odd tuning months of 2024-07 to 2025-06 by the all-lead score at the decision substations, and PS
-then tunes the other families' penalty over 100, 300, 1000, and 3000 with the heating penalty at
-PH's value. The 24-month and 3-month arms are tuned separately. A tie within 0.005 points goes to
-the smaller penalty (less pooling).
+**The penalty (amended 2026-10-21, after the tuning-month scores of K0 and PH were read and before
+any replicate-month or scored-year score).** The deviation penalty is in rows of evidence (a
+substation with far more training rows keeps its own curve). The first plan tuned PH's heating
+penalty over 100 to 10000 and each history separately. The tuning months showed that at 24 months
+every penalty up to 10000 scored the same as K0 within 0.002 points (a substation has about 35,000
+training rows, so a penalty of 10000 rows barely pools), and that the tie rule would then pick the
+penalty that pools least, which makes C1 and C2 uninformative. The amended rule is one penalty pair
+for both histories, as in experiment 109, because a joint fit in production serves a mature
+substation and a new one with the same penalty. PS is tuned over the heating penalty `h` and the
+penalty `o` of the other families, each in 300, 3000, and 30000 rows (9 pairs), on the odd tuning
+months of 2024-07 to 2025-06. The chosen pair is the one with the lowest all-lead score at the
+decision substations of the 3-month arm, among the pairs whose 24-month score is at most 0.02
+points above K0's on the same months; a tie within 0.005 points goes to the smaller `h + o`. PH
+takes the chosen `h` with `o` = 0. The 24-month arm tuned separately (the first plan) is reported as
+a labelled variant. The tuned penalties are therefore the same for both histories.
 
 **Switching.** The switching terms of experiments 141 and 147 are not part of this fit. Experiment
 141 found that feeding the detector's causal alarm to the filter did no better than a random
