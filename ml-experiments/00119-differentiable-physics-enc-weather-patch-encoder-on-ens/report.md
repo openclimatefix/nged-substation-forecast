@@ -1,3 +1,5 @@
+# Experiment 119: numbers quoted on the page
+
 ## Direction F1 (291 runs, 464,363 decision-site rows)
 
 ### Planned contrasts, 99% intervals, points of capacity
@@ -65,7 +67,9 @@ D10 -0.037, D11 -0.043, D14 +0.015, D16 +0.002, D5 -0.117
 - ENC-c: 2.739, 2.740, 2.744, 2.741, 2.743
 - ENC-r: 2.764, 2.768, 2.760, 2.764, 2.765
 
-Quantile score and MAE of the median agree in sign: {'C1': True, 'C2': True, 'C3': True, 'C3b': True, 'C4': True}
+Quantile score and MAE of the median agree in sign:
+
+{'C1': True, 'C2': True, 'C3': True, 'C3b': True, 'C4': True}
 
 ## Direction F2 (365 runs, 599,158 decision-site rows)
 
@@ -134,7 +138,9 @@ D10 -0.042, D11 -0.045, D14 +0.009, D16 +0.001, D5 -0.090
 - ENC-c: 2.696, 2.702, 2.699, 2.700, 2.701
 - ENC-r: 2.700, 2.702, 2.700, 2.698, 2.700
 
-Quantile score and MAE of the median agree in sign: {'C1': True, 'C2': True, 'C3': True, 'C3b': True, 'C4': True}
+Quantile score and MAE of the median agree in sign:
+
+{'C1': True, 'C2': True, 'C3': True, 'C3b': True, 'C4': True}
 
 ## Settings chosen on each training year
 
@@ -153,7 +159,9 @@ Quantile score and MAE of the median agree in sign: {'C1': True, 'C2': True, 'C3
 - D16: D5 30, D10 18, D11 16, D14 24, D16 37, D9 12
 - D9: D5 16, D10 30, D11 30, D14 23, D16 12, D9 37
 
-Placebo ENC-cps partner (farthest decision site): {'D10': 'D16', 'D11': 'D16', 'D14': 'D11', 'D16': 'D10', 'D5': 'D11', 'D9': 'D16'}
+Placebo ENC-cps partner (farthest decision site):
+
+{'D10': 'D16', 'D11': 'D16', 'D14': 'D11', 'D16': 'D10', 'D5': 'D11', 'D9': 'D16'}
 
 ## Gate gate_run1.json
 

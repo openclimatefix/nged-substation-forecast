@@ -43,7 +43,7 @@ def fmt(item: dict) -> str:
 
 def main() -> None:  # noqa: PLR0915
     """Write the report."""
-    out: list[str] = []
+    out: list[str] = ["# Experiment 119: numbers quoted on the page\n"]
     for direction in ("F1", "F2"):
         r = load(f"results_{direction}.json")
         e = load(f"extra_{direction}.json")
@@ -125,7 +125,7 @@ def main() -> None:  # noqa: PLR0915
             == (r["contrasts"][n]["mae_median"]["difference"] < 0)
             for n in ("C1", "C2", "C3", "C3b", "C4")
         }
-        out.append(f"Quantile score and MAE of the median agree in sign: {sign}\n")
+        out.append(f"Quantile score and MAE of the median agree in sign:\n\n{sign}\n")
     decisions = load("decisions.json")
     out.append("## Settings chosen on each training year\n")
     for key in ("F1.ENC-c", "F1.ENC-r", "F2.ENC-c", "F2.ENC-r"):
@@ -141,7 +141,8 @@ def main() -> None:  # noqa: PLR0915
             f"- {a_name}: " + ", ".join(f"{b} {c}" for b, c in zip(names, counts, strict=True))
         )
     out.append(
-        f"\nPlacebo ENC-cps partner (farthest decision site): {decisions['placebo_distant_site']}"
+        f"\nPlacebo ENC-cps partner (farthest decision site):\n\n"
+        f"{decisions['placebo_distant_site']}"
     )
     for run in ("gate_run1.json", "gate_run2.json"):
         gate = json.loads((HERE / run).read_text())
