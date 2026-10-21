@@ -14,8 +14,9 @@ instant. The maintainer approved fitting to 2026-08-31 for the final hindsight t
 the feature cache rebuilt; nothing here reads data after `DATA_CUT`.
 """
 
+import os
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -31,6 +32,8 @@ from studies.dp_gam import GamFit, GamSpec, TrainingWindow, fit_gam
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 from studies.pv_physics import PlantParameters, half_hour_sun_and_sky, plant_power_mw
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+from studies import dp_features, dp_gam
 
 EXPERIMENT_ID: Final[int] = 129
 SLUG: Final[str] = "differentiable-physics-pv-capacity-known-answer-test"
@@ -70,8 +73,18 @@ SEASON_YEARS: Final[range] = range(2019, 2026)
 """Season-years (September to August, named by the September's year) with a capacity increment."""
 COMPLETE_SEASON_YEARS: Final[range] = range(2019, 2025)
 """The season-years complete before `DATA_CUT`: 2019/20 to 2024/25."""
-DATA_CUT: Final[datetime] = datetime(2026, 7, 1, tzinfo=UTC)
+THROUGH_JULY: Final[bool] = os.environ.get("E00129_THROUGH_JULY") == "1"
+"""Set `E00129_THROUGH_JULY=1` to fit to 2026-08-01 on the rows `e00129_july.py` builds. This is the
+maintainer-approved hold-out exception: season-year 2025/26 ends in July because August's final
+ERA5 is not out. It moves the two `HOLDOUT_START` constants and `GRID_END` in this process only."""
+DATA_CUT: Final[datetime] = (
+    datetime(2026, 8, 1, tzinfo=UTC) if THROUGH_JULY else datetime(2026, 7, 1, tzinfo=UTC)
+)
 """The cut of every fit: the feature cache holds no later row."""
+if THROUGH_JULY:
+    dp_features.HOLDOUT_START = DATA_CUT  # ty: ignore[invalid-assignment]
+    dp_features.GRID_END = DATA_CUT - timedelta(minutes=30)  # ty: ignore[invalid-assignment]
+    dp_gam.HOLDOUT_START = DATA_CUT  # ty: ignore[invalid-assignment]
 TRAINING_WINDOW: Final[TrainingWindow] = TrainingWindow()
 """Every row from the substation's first usable instant to the cut."""
 RIDGE: Final[float] = 0.1
@@ -99,8 +112,18 @@ SOUTH_WEST_PLANTS: Final[tuple[PlantParameters, ...]] = (
 
 
 def load_cache() -> FeatureCache:
-    """Return the feature cache of experiment 106, which holds data to `DATA_CUT`."""
-    return load_or_build_feature_cache(paths=default_input_paths(), cache_dir=CACHE_DIR)
+    """Return the feature cache that holds data to `DATA_CUT`.
+
+    Experiment 106's cache ends at 2026-07-01. Through July, the cache is rebuilt from
+    `work/rows_to_july.parquet` in this experiment's own folder.
+    """
+    paths = default_input_paths()
+    if not THROUGH_JULY:
+        return load_or_build_feature_cache(paths=paths, cache_dir=CACHE_DIR)
+    return load_or_build_feature_cache(
+        paths=replace(paths, rows=WORK_DIR / "rows_to_july.parquet"),
+        cache_dir=WORK_DIR / "cache_to_july",
+    )
 
 
 def fit_site(*, cache: FeatureCache, site: str, spec: GamSpec, device: str) -> GamFit:
