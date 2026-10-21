@@ -83,9 +83,8 @@ def write_site(*, site: str, period: str, tuned: dict) -> str:
         valid = post.stacked_months_mask(runs=runs, months=PERIOD_MONTHS[period])
     else:
         valid = None
-    for arm, rows in arm_rows(site=site, runs=runs, tuned=tuned).items():
-        if valid is not None:
-            rows = post.select(rows=rows, mask=valid)
+    for arm, all_rows in arm_rows(site=site, runs=runs, tuned=tuned).items():
+        rows = all_rows if valid is None else post.select(rows=all_rows, mask=valid)
         path = preds_path(arm=arm, period=period, site=site)
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
