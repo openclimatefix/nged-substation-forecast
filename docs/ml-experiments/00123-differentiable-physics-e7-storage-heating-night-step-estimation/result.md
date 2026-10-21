@@ -7,7 +7,7 @@ title: >-
 part: n/a
 theme: differentiable-physics-demand-calendar-and-weather
 also_relevant_to: [differentiable-physics-forecast-engine]
-status: planned
+status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00123-differentiable-physics-e7-storage-heating-night-step-estimation/ only.
@@ -29,10 +29,55 @@ row_set_id: >-
 metric: >-
   Per series: slope (points per degree below 15.5 C) and step at a daily mean of 3 C (points), each
   with a 90% interval; pooled values; gate: interval coverage over repeated draws
-verdict: <supported | partly supported | inconclusive | invalid | failed>
+verdict: inconclusive
+labels: >-
+  gate: per-series and pooled coverage within bands, pooled-interval row over-covers (100%);
+  clock: UTC-fixed (post hoc); tariff edges: not visible at Primary level (control failed)
+best_arm: >-
+  none (estimation): pooled step at a daily mean of 3 C over the six decision series 9.9 points
+  (Hartung-Knapp 6.2 to 13.5), winters 2021-22 to 2024-25
+headline: >-
+  Pooled over the six decision series the night step at a daily mean of 3 C is 9.9 points (6.2 to
+  13.5), 13.2 over the eight further Primaries (6.9 to 19.6); the slope is positive at all 14
+  series; the step follows UTC on British Summer Time nights at 12 of 14; winter 2025-26, read
+  afterwards (first run), gives 10.9 (6.3 to 15.4) pooled over the six.
+lessons: >-
+  The night step is not special to the three substations that prompted the study, and its full size
+  depends on summer nights having no step; the cold-dependent part alone is 1.1 to 4.7 points at the
+  decision series. The baseline forecast of experiment 114 runs below actual demand from about 01:00
+  on cold nights at D5, D10, and D16. Tariff edges on the local clock cannot be separated from the
+  load shape at Primary level with this design.
 production_status: not-for-production
-take_home_message: <written after the results>
-advice: <written after the results>
+take_home_message: >-
+  The night step at Primary substations is about 10 points of a substation's near-peak demand on a
+  3 C day, it is fixed to UTC rather than the local clock, and the cold-night rise from about 01:00
+  is the operator-visible feature: on cold winter nights the day-ahead forecast runs 6 to 10 points
+  below actual demand from then at D5, D10, and D16. The step appears at 13 of the 14 substations
+  examined, not only the three that prompted the study, and the full size rests on summer nights
+  having no step (the part that grows with cold is 1 to 5 points). The verdict is inconclusive
+  because the known-answer gate's pooled interval over-covered, and the winter 2025-26 numbers are a
+  first run.
+advice:
+  - >-
+    Give demand models of Primary substations a night term fixed to UTC, not the local clock
+    (timing readouts, figures 7 and the by-year table).
+  - >-
+    Judge forecasts on cold winter nights from 01:00 at D5, D10, and D16, where the day-ahead
+    forecast runs 6 to 10 points below actual demand (cold-night figure 9).
+  - >-
+    Check an effect that prompted a study on substations that were not chosen for it before
+    treating the effect as special (E7-X pooled step, figure 5).
+  - >-
+    Test a pooled random-effects interval with a known-answer gate on its own row before quoting
+    it: the Hartung-Knapp interval over six series covered 100% of draws (gate, pooled-interval
+    row).
+  - >-
+    Read local-clock tariff edges at Primary level only against a placebo limit, because the
+    ordinary load shape makes every half-hour look like an edge (about 1.2 points; tariff edges
+    section).
+date: 2026-10-21
+pr: 1416
+code: ml-experiments/00123-differentiable-physics-e7-storage-heating-night-step-estimation/
 ---
 
 **Status: results for winters 2021-22 to 2024-25 (the headline winters), with winter 2025-26 (the
@@ -167,7 +212,7 @@ rise. The profile of cold-winter-night demand minus summer-night demand, relativ
 
 ![Night profile](figure_8_profile.svg)
 
-## Selection winter 2025-26
+## Selection winter 2025-26 (first run)
 
 **Winter 2025-26 gives a similar step to the headline winters at every substation except D12, and
 the three substations picked on that winter are about 2 points higher in it.** The step fitted to
