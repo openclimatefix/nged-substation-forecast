@@ -119,10 +119,16 @@ on cold nights. Absolute skill is reported for BG2, climatology, and manual_heur
 contrasts. The curtailment cost saving against the manual heuristic follows once a node metric exists
 for these substations; if not run, the write-up says so.
 
-**Controls.** P1: the FIX arm of experiment 133 reproduces experiment 111's GAM-K within 1e-4
-(passed in experiment 133). P2: the T-all fit on the monthly cut of 2025-07-01 is compared with
-experiment 114's yearly T-all fit of the same cut, whose coefficients must agree to numerical
-precision.
+**Spread factors.** Every spread factor is fixed at 1, because [experiment
+125](../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md)
+found that factors tuned on alternate months scored worse out of period.
+
+**Controls.** P1: the FIX arm of experiment 133 reproduced experiment 111's GAM-K within 1e-4 (passed
+in experiment 133). P2: the T-all code, run with a difference penalty so large that the arm becomes
+B0, must reproduce experiment 111's stored `gamk` forecasts at the same cut to within 1e-6 points;
+this checks the copy of experiment 114's design code. P3: A0's forecast frames, scored on the
+rows of experiment 111's stored GAM-K, differ from it only through the weather input, so C1 is read
+against a within-method difference of 0 +/- 0.03.
 
 **Five triggers.** Stored: private files only. Serving path: not touched. Degradation rule: not
 touched. More than one design defensible: yes (mean input, spread refit), pre-registered above. Callers
