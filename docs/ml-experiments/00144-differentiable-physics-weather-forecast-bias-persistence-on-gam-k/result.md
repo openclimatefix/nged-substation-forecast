@@ -14,9 +14,9 @@ hypothesis: >-
   one day to the next, so the trailing mean of recent weather errors can correct GAM-K's demand
   forecast beyond what the Kalman filter already does.
 prediction: >-
-  Lag-1 autocorrelation of the daily weather-forecast error of 0.2 to 0.4 in at least one season.
-  Below 0.2 in every season ends the experiment, because a demand correction built on that error has no
-  signal to use.
+  The correlation between one day's weather-forecast error and the next day's is 0.2 to 0.4 in at
+  least one season. Below 0.2 in every season ends the experiment, because a demand correction
+  built on that error has no signal to use.
 decision_rule: >-
   Stop before any demand arm if the lag-1 autocorrelation, averaged over the seven stored
   substations, is under about 0.2 in every season for both variables.
