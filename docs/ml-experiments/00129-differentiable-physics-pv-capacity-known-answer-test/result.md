@@ -60,12 +60,13 @@ lessons:
   - >-
     The drift gate and the ability to follow a sudden rise in capacity pull in opposite directions.
   - >-
-    A day-long cloud-driven demand adds about 0.20 to the recovered share and breaks coverage for
-    mismatched plants.
+    A day-long load that rises on overcast days adds about 0.2 of the injected capacity to the
+    recovered capacity and breaks coverage for the south-west plant.
 advice:
   - >-
-    Put the 80% range, not only a single value, on a substation card, and state the 20% upward
-    bias that a cloud-driven demand can cause (the cloud-load cells).
+    Put the 80% range, not only a single value, on a substation card, with a note that a
+    synthetic overcast-day load of 10% of capacity raised the estimate by about 0.2 of the true
+    capacity (the cloud-load cells).
   - >-
     Refit the capacity only after the final ERA5 for the last month is out, and test a method that
     penalises jumps for its slowness on a step-up injection before adopting it (the step test).
@@ -78,32 +79,50 @@ code: ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/
 # Differentiable physics: can the embedded solar capacity behind a Primary be inferred, with an honest range?
 
 **Take-home message: the capacity of the unmetered solar behind five Primary substations can be read
-from their power, with an 80% range 1.2 to 1.6 MW wide, and it grew at all five by 0.7 to 2.5 MW
-since each Primary's first estimable season-year (arm 2).** The estimate of AC capacity in 2025/26
-was 3.3 to 4.5 MW across the five Primaries (figure 1). The range is not yet safe to put on a card
-where demand rises on overcast days, because such a demand adds about 20% to the recovered capacity.
-The verdict is `partly supported`: arm 4, which penalises steps between season-years, passed every
-pre-registered gate, but it follows a sudden rise in capacity slowly (figure 3). Arm 2 and arm 3
-follow the rise and fail the drift gate. No forecast gain is scored.
+from their power, with an 80% range 1.2 to 1.6 MW wide, and the capacity grew at all five.** The arm
+2 estimate of AC capacity in 2025/26 was 3.3 to 4.5 MW across the five Primary substations, 0.7 to
+2.5 MW above each Primary's first estimable season-year (figure 1). A card should show the range
+with a note on its bias: a synthetic load of 10% of capacity that rises on overcast days raised the
+estimate by about 0.2 of the true capacity. The verdict is `partly supported`. Arm 4, which
+penalises steps between season-years, passed every pre-registered gate when the drift gate is read
+as a pooled mean, but arm 4 follows a sudden rise in capacity slowly (figure 3). The verdict `partly
+supported` is a judgement beyond the pre-registered rule, which gives `supported` under the pooled
+reading and no passing arm under a per-Primary reading. Arm 2 and arm 3 follow a sudden rise in
+capacity and fail the drift gate, so the growth above is quoted from arm 2 with that caveat. No
+forecast gain is scored.
 
-**Exception to the hold-out:** the maintainer approved fitting to 2026-08-31 so that season-year
-2025/26 is complete. The final ERA5 for August 2026 is not out, so all fits stop at 2026-07-31 and
-season-year 2025/26 ends in July. The two `HOLDOUT_START` constants and the grid end are moved
-inside the experiment's scripts only (`E00129_THROUGH_JULY=1`); `packages/` is unchanged. Adding
-July moved arm 2's capacities by under 1% at the two Primaries checked.
+**Terms used below.** D5, D10, D11, D14, and D16 are the five decision Primary substations of
+experiment 103's data set. A season-year runs from September to August and is labelled by the year
+of the September. The four arms are the experiment 45 frozen capacity (arm 1, a control and not a
+truth), arm 2 (a capacity that steps up each season-year), arm 3 (arm 2 plus demand terms that
+cannot see the sun), and arm 4 (arm 2 with a penalty on the steps). Recovery is the capacity found
+with a known solar farm's output added to a Primary's power, minus the capacity found without it,
+divided by the added capacity. The divisor is the median recovery of the other real farms at the
+same Primary, which rescales a recovery to 1. A coverage cell is one Primary, one plant class, and
+one load, with the known capacity checked against the 80% range. CAMS is the Copernicus Atmosphere
+Monitoring Service's satellite irradiance, ERA5 is the European Centre's reanalysis of past weather,
+and DESNZ is the UK Department for Energy Security and Net Zero.
+
+**The fits stop at 2026-07-31, not 2026-08-31, because the final ERA5 for August 2026 is not out.**
+The maintainer approved fitting to 2026-08-31 as an exception to the hold-out, so that season-year
+2025/26 is complete. Season-year 2025/26 therefore ends in July. The code constants that mark where
+the hold-out begins, and the grid end, are moved inside this experiment's scripts only
+(`E00129_THROUGH_JULY=1`), and `packages/` is unchanged.
 
 ![Capacity per Primary and season-year](figure_01_capacity.svg)
 
-**Figure 1 shows the capacity over time at each Primary.** Early years at D10 and D11 are a flat
-level before the unmetered solar there grew in 2022/23. Where an early year has no point, the
-Primary's usable data starts later. The dashed line is experiment 45's earlier pinned capacity, a
-control and not the truth. At D16 it sits above the range in every year.
+**Capacity rose at all five Primaries, and experiment 45's pinned value sits above the range at D16
+in every year.** The estimates at D10 and D11 are nearly flat before 2022/23 and then step up, and
+the cause of the step was not tested. Arm 2 has no point for D14 and D16 in 2019/20 and 2020/21
+because the known-answer test found no estimable recovery there. The dashed line is experiment 45's
+pinned capacity, a control and not the truth.
 
 ## Gates
 
-**Three arms were tested against the gates fixed before stage C.** Arm 2 lets the capacity step up
-each season-year. Arm 3 adds sun-blind demand terms and is descriptive. Arm 4 penalises the steps at
-a ridge share of 0.1.
+**Only arm 4 passed all four gates.** Arms 2, 3, and 4 were tested against the gates fixed before
+stage C. Arm 3 is descriptive and cannot win. Arm 4 uses an increment penalty of 0.1. Its coverage
+is 23 of 30 cells (77%), against a nominal 80%, so the range reaches the 21-cell gate but not its
+nominal level.
 
 | Gate | Limit | Arm 2 | Arm 3 | Arm 4 |
 |---|---|---|---|---|
@@ -114,66 +133,75 @@ a ridge share of 0.1.
 
 ![Recovery of injected solar](figure_02_recovery.svg)
 
-**Injected solar was recovered at about 80% before the divisor, at 20, 50 and 100% of the pinned
-capacity alike.** A day-long demand that rises on overcast days adds about 0.20 to the recovered
-share at every Primary, and the south-west plant then covers 0 or 1 of 5 coverage cells.
+**Real farms' output was recovered at about 0.8 before the divisor, and the published estimates are
+already divided by that recovery,, at 20, 50, and 100% of the pinned capacity alike.** A synthetic
+load that rises on overcast days, of 0.1 of the injected capacity, adds about 0.2 to the recovery at
+every Primary. When that load is present, the true capacity lies inside the 80% range for the
+south-west plant in only 0 or 1 of 5 cells.
 
 ![Step-up injection](figure_03_step.svg)
 
-**Arm 4 follows a sudden rise in capacity more slowly than arm 2.** Half of the pinned capacity was
-added from March 2022. Arm 2 and arm 3 recover nothing before it and about 0.82 to 0.87 after it.
-Arm 4 at penalty 0.1 recovers 0.47 before it, and at penalty 1.0 recovers 0.65 before it.
+**Arm 4 follows a sudden rise in capacity more slowly than arm 2 does.** Half of experiment 45's
+pinned capacity was injected as a step-up in March 2022. At the median Primary, arm 2 and arm 3
+recover nothing before March 2022 and about 0.82 to 0.87 after it. D10 is the exception, where arm 2
+recovers 0.43 and arm 3 0.47 before the step. Arm 4 at penalty 0.1 recovers 0.47 before March 2022,
+and at penalty 1.0 recovers 0.65. These are leakage into earlier years, because the true added
+capacity there is zero.
 
 ## Primary power beside the estimated solar power
 
 ![Primary power and estimated solar power](figure_04_timeseries.svg)
 
-**Figure 4 shows the metered power of three Primaries on a cloudy, a median, and a sunny day in May
-to July 2026.** The days were chosen at each Primary by mean daylight irradiance, by a rule fixed
-before any plot was drawn: D5 on 4 May, 15 June and 2 July; D10 on 3 May, 1 July and 2 July; D14 on
-4 May, 1 July and 2 July. On the sunny days the metered power falls during daylight, by about 1.3 to
-1.8 MW at the three Primaries, against estimated solar peaks of 3.3 to 4.5 MW. The estimate is
-therefore not visible as a one-for-one dip, because the demand the solar hides is not constant
-through the day. The flat tops of the estimated solar power are the inverter limit in the solar
-shape. The estimate is arm 2's capacity times that shape before temperature derating, so it is
-slightly high at midday.
+**The estimated solar power is not visible as a one-for-one dip in the metered power.** Figure 4
+shows the metered power of D5, D10, and D14 on a cloudy, a median, and a sunny day in May to July
+2026. At each Primary the days are the lowest, the median, and the highest mean CAMS irradiance
+      between 06:00 and 18:00 UTC among days with a full day of readings outside the switching
+      events, chosen before any plot was drawn: D5 on 4 May, 15 June, and 2 July; D10 on 3 May, 1
+      July, and 2 July; D14 on 4 May, 1 July, and 2 July. On the sunny days the metered power falls
+      during daylight by about 1.6 to 2.3 MW between the 06:00 UTC level and the noon level (D5
+      about 1.6, D10 about 1.7, D14 about 2.3), against estimated solar peaks of 3.9, 3.3, and 4.5
+      MW, because the demand that the solar hides is not constant through the day. The flat tops of
+      the estimated solar power are the inverter limit in the solar shape. The estimated solar power
+      is arm 2's capacity times that shape before temperature derating, so the estimate is a little
+      high at midday.
 
-## Register and as-of checks
+## Every range reaches the register totals
 
-- **Every 80% range reaches the Feed-in Tariff total.** The Feed-in Tariff (FiT) register, shared to
-  each Primary by postcode district, lists 1.9 to 2.6 MW of declared net capacity at sites of at
-  most 1 MW (2.0 to 2.8 MW installed capacity) and 2.1 to 3.2 MW at sites of at most 5 MW (2.2 to
-  3.5 MW installed). The ranges reach the total in every case. DESNZ's domestic solar by
-  constituency, shared by area, gives 2.1 to 3.8 MW.
+- **The Feed-in Tariff (FiT) register lies below every 80% range.** The register, shared to each
+  Primary by postcode district, lists 1.9 to 2.6 MW of declared net capacity at sites of at most 1
+  MW (2.0 to 2.8 MW of DC capacity) and 2.1 to 3.2 MW at sites of at most 5 MW (2.2 to 3.5 MW of DC
+  capacity). The ranges reach these totals at all five Primaries. The register's "declared net
+  capacity" is its name for AC capacity.
+- **DESNZ's domestic solar by constituency, shared by area, gives 2.1 to 3.8 MW.** Its capacity
+  basis (DC or AC) is not stated.
 - **Holding the 1 September 2025 estimate forward undershoots the hindsight 2025/26 estimate by 0.02
-  to 0.69 MW.** The largest gaps are at D16 and D10, where capacity is still growing.
-- **Beam and diffuse irradiance changes the latest estimate by 0.04 MW or less.** CAMS' own beam and
-  diffuse columns were already in the downloaded files, so no new download was needed. Recovery
-  falls by 0.02 and the divided estimate rises by at most 0.04 MW.
+  to 0.69 MW for arm 2.** The largest gaps are at D16 and D10, where capacity is still growing.
+- **CAMS' own beam and diffuse irradiance changes the latest arm 2 estimate by 0.04 MW or less.**
+  The beam and diffuse columns were already in the downloaded files, so no new download was needed.
+  Recovery falls by 0.02 and the divided estimate rises by at most 0.04 MW.
 
-## Checks
+## Caveats and departures from the plan
 
-- **The pre-registered rule gives the verdict.** Only arm 4 passes every gate.
-- **The drift gate is read as the pooled mean over the five Primaries.** The plan did not say
-  whether the limit applies per Primary or pooled. Read per Primary, arm 4 fails at D10 (0.054) and
-  D11 (0.050).
+- **Arm 4 passes the drift gate on its pooled mean only.** The plan did not say whether the limit
+  applies per Primary or pooled. Read per Primary, arm 4 fails at D10 (0.054) and D11 (0.050).
 - **The arm 4 penalty was fixed at 0.1 without the planned tuning.** The plan tuned the penalty on
   D9 from semi-synthetic drift, but D9's drift is undefined (under 3 estimable years) and every
-  share from 0.001 to 1.0 gave a recovery of about 0.75. The middle value 0.1 was fixed, and 0.01
-  and 1.0 are sensitivities (drift 0.034 to 0.120, and 0.010 to 0.014).
+  penalty from 0.001 to 1.0 gave a recovery of about 0.75. The middle value 0.1 was fixed. Penalty
+  0.01 gave drift 0.034 to 0.120, and penalty 1.0 gave 0.009 to 0.014, at the five Primaries.
 - **The placebo limit of 0.20 is a post-pilot choice,** set after seeing arm 2 at 0.10 of the
   injection in the pilot.
-- **Not run:** the December-factor comparison, experiment 45's semi-synthetic constant-path re-run,
-  and the Embedded Capacity Register and the Renewable Energy Planning Database comparisons, because
-  experiment 45's processed files do not hold them. The register figures are lower bounds.
-- **The helpers copied from experiment 110** (the fits of the monotone arm and the sun-blind arm)
-  should move into `packages/studies` in a separate module PR.
+- **Four planned comparisons were not run.** They are the December-factor comparison, experiment
+  45's semi-synthetic constant-path re-run, and the Embedded Capacity Register and the Renewable
+  Energy Planning Database comparisons, because experiment 45's processed files do not hold the last
+  two. The register figures are lower bounds.
+- **The monotone-arm and sun-blind-arm fits are copied from experiment 110 and are not yet in
+  `packages/studies`.** Moving them there needs a separate module PR.
 
 ## What the next experiment should answer
 
-**Does explicit solar modelling lower the net-demand forecast error on the sunniest half-hours,
-without raising it on dark ones?** A follow-on experiment would test that. Refitting each March
-instead of each September, or each quarter, is a further question.
+**The next experiment should test whether explicit solar modelling lowers the net-demand forecast
+error on the sunniest half-hours without raising it on dark ones.** Refitting each March instead of
+each September, or each quarter, is a further question.
 
 ## Plan (written before any fit)
 
@@ -184,10 +212,10 @@ The full plan, with the Opus review's triage, is `data/ml-experiments/briefs/dp_
   card and for NGED. A forecast gain is not scored here. A follow-on experiment tests whether
   explicit solar modelling lowers the net-demand forecast error on the sunniest half-hours, without
   raising it on dark ones.
-- **Inputs:** CAMS global irradiance at the Primary (beam and diffuse fetched at the five points for
-  one sensitivity row), ERA5 2 m temperature, cleaned Primary net power with metered generators
-  already subtracted, the hand-labelled switching events of experiment 103 (66 events, plus and
-  minus 24 hours), and five metered solar farms as the injection source.
+- **Inputs:** CAMS global irradiance at the Primary (beam and diffuse, found already in the
+  downloaded files, for one sensitivity row), ERA5 2 m temperature, cleaned Primary net power with
+  metered generators already subtracted, the hand-labelled switching events of experiment 103 (66
+  events, plus and minus 24 hours), and five metered solar farms as the injection source.
 - **Model:** experiment 110's convex model, with a fixed south-facing tilt-35 shape (orientation is
   not identified at a Primary, experiment 73) and one capacity per season-year, each year the
   previous year plus a non-negative increment. Fits run on the GPU where possible.
@@ -200,9 +228,9 @@ The full plan, with the Opus review's triage, is `data/ml-experiments/briefs/dp_
   a step-up injection. Recovery is the difference of two fits divided by the injected capacity; it
   measures bias only, because the fit is nearly linear in its target. Coverage, drift and the
   placebo run on a semi-synthetic target with a known capacity.
-- **Stages, each ending in a one-line report:** A, fetch beam and diffuse irradiance at the five
-  points; B, pilot on two Primaries; C, full grid; D, real-data tables; E, register comparison and
-  write-up.
+- **Stages, each ending in a one-line report:** A, a beam and diffuse fetch at the five points (not
+  needed: the columns were already downloaded); B, pilot on two Primaries; C, full grid; D,
+  real-data tables; E, register comparison and write-up.
 
 ## Register comparison
 
@@ -220,14 +248,14 @@ pilot's and are not results.
   takes minutes.
 - **The ridge does not matter.** Ridge 0.01, 0.1 and 1.0 move the recovery by 0.01 or less, so the
   ridge pilot is dropped and 0.1 (experiment 104's value) is kept.
-- **A real farm's output is recovered at 0.76 to 0.84 without load,** as experiments 39 and 63
+- **A real farm's output is recovered at 0.73 to 0.88 without load,** as experiments 39 and 63
   found. A day-long cloud-driven load of 10% of capacity adds about 0.21 to arm 2's recovery and
   0.20 to arm 3's.
 - **Arm 3 recovers 0.02 to 0.03 more than arm 2 and does not cut the cloud-load bias.** Its placebo
   difference of fits (0.17 to 0.18 of the injection) is larger than arm 2's (0.10).
 - **On the semi-synthetic target (true capacity zero), the capacity found from noise is 1 to 4% of
   the injected capacity.** The recovery's drift on a constant farm is +0.18 per 5 years at D10
-  (standard deviation 0.16 over 10 draws) and +0.045 at D16, against a limit of 0.05.
+  (standard deviation 0.16 over 10 draws and 5 farms) and +0.045 at D16, against a limit of 0.05.
 
 **Rules for stage C, written before it runs.**
 
