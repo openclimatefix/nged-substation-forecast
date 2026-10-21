@@ -113,7 +113,7 @@ def check_t_all(*, cache: FeatureCache, vintages: pl.DataFrame, site: str) -> li
         {"valid_time": cache.end_times[run.index], "mean_mine": run.mean}
     ).with_columns(pl.col("valid_time").dt.replace_time_zone("UTC"))
     joined = stored.join(mine, on="valid_time", how="inner")
-    gap = float((joined["mean"].cast(pl.Float64) - joined["mean_mine"]).abs().max())
+    gap = common.as_float((joined["mean"].cast(pl.Float64) - joined["mean_mine"]).abs().max())
     print(f"{site}: T-all against 114's stored mean, {joined.height} rows, max gap {gap:.2e}")
     failures = []
     if joined.height != run.index.size or gap > STORED_TOLERANCE_POINTS:
@@ -156,7 +156,7 @@ def check_arms(*, cache: FeatureCache, vintages: pl.DataFrame, site: str) -> lis
             block = _o(cache=cache, site=site, index=index, arm=arm, context=context)
             return None if block is None else np.zeros_like(block)
 
-        design.extra_block = zeros
+        design.extra_block = zeros  # ty: ignore[invalid-assignment]
         try:
             fit = design.fit_arm(cache=cache, base=base, arm=arm, context=arm_context)
             values = design.predict_arm(cache=cache, base=base, fit=fit, index=index)

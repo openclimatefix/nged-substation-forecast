@@ -108,7 +108,7 @@ def arm_spec(*, arm_name: str, penalty_weight: float) -> design.ArmSpec:
     if arm_name == "t_all":
         return design.interaction_arm(name="t_all", penalty_weight=penalty_weight)
     if arm_name in design.EXTRA_TYPES:
-        return design.screen_arm(extra=arm_name, penalty_weight=penalty_weight)  # ty: ignore[invalid-argument-type]
+        return design.screen_arm(extra=arm_name, penalty_weight=penalty_weight)
     msg = f"unknown arm {arm_name!r}"
     raise ValueError(msg)
 

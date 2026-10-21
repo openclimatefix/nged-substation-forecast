@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from functools import cache as memoise
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import e00126_common as common
 import numpy as np
@@ -265,7 +265,8 @@ def station_gap_by_day(
     table = cache.sites[site].table
     hourly = _station_hourly()
     coordinates = _station_coordinates()
-    start, stop = hourly["time"].min(), hourly["time"].max()
+    start = cast("datetime", hourly["time"].min())
+    stop = cast("datetime", hourly["time"].max())
     hours = (stop - start).total_seconds() / 3600.0 + 1.0
     coverage = hourly.group_by("src_id").agg(share=pl.col("air_c").is_not_null().sum() / hours)
     stations = coordinates.join(coverage, on="src_id").filter(

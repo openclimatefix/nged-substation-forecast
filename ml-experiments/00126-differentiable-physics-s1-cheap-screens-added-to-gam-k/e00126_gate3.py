@@ -81,6 +81,7 @@ class SiteSetup:
         year_end = common.to_64(moment=common.year_end(cut=common.TUNING_CUT))
         self.index = np.flatnonzero(np.isfinite(features.y) & (cache.end_times <= year_end))
         base = design.build_base(cache=cache, vintages=vintages, site=site, cut=common.TUNING_CUT)
+        assert base.pinned is not None
         self.solar = pinned_solar_points(
             cache=cache, features=features, pinned=base.pinned, index=self.index
         )
@@ -286,7 +287,7 @@ def summary() -> dict[str, Any]:
             "low": float(low),
             "high": float(high),
             "draws": len(difference),
-            "mean_oracle_gain": float(part["oracle"].mean()),
+            "mean_oracle_gain": common.as_float(part["oracle"].mean()),
             "powered": bool(mean <= -TARGET_GAIN_POINTS / 2.0 and high < 0.0),
         }
     (common.WORK_DIR / "gate3.json").write_text(json.dumps(report, indent=2) + "\n")

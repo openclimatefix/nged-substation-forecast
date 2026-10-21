@@ -279,7 +279,7 @@ def tail_table() -> pl.DataFrame:
                 {
                     "set": name,
                     "level": column,
-                    "coverage": float((actual <= quantile).mean()),
+                    "coverage": common.as_float((actual <= quantile).mean()),
                     "pinball": pinball,
                 }
             )
@@ -295,7 +295,7 @@ def absolute_table() -> pl.DataFrame:
                 frame = load_arm(year=year, arm=arm).filter(pl.col("site_name").is_in(DECISION))
             except FileNotFoundError:
                 continue
-            rows.append({"year": year, "set": arm, "score": float(frame["qs"].mean())})
+            rows.append({"year": year, "set": arm, "score": common.as_float(frame["qs"].mean())})
     return pl.DataFrame(rows).pivot(on="year", index="set", values="score")
 
 

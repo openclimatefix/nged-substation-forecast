@@ -23,6 +23,7 @@ import e00126_fmix as fmix
 import numpy as np
 import polars as pl
 from studies.bootstrap import bootstrap_difference_at_level
+from studies.dp_features import FeatureCache
 from studies.dp_gam import QUANTILE_COLUMNS
 from studies.experiment_store import losses_for_bootstrap
 
@@ -47,21 +48,21 @@ def load(*, name: str) -> pl.DataFrame:
     )
 
 
-def subset_masks(*, frame: pl.DataFrame, cache: object) -> dict[str, np.ndarray]:
+def subset_masks(*, frame: pl.DataFrame, cache: FeatureCache) -> dict[str, np.ndarray]:
     """Return the boolean mask of each row subset on a stored frame."""
     valid = frame["valid_time"].dt.replace_time_zone(None).to_numpy().astype("datetime64[us]")
-    position = np.searchsorted(cache.end_times, valid)  # type: ignore[attr-defined]
+    position = np.searchsorted(cache.end_times, valid)
     ids = frame["time_series_id"].to_numpy()
-    site_of = {cache.sites[s].table.time_series_id: s for s in common.SCORED_SITES}  # type: ignore[attr-defined]
+    site_of = {cache.sites[s].table.time_series_id: s for s in common.SCORED_SITES}
     month = frame["valid_time"].dt.month().to_numpy()
-    half_hour = cache.calendar.half_hour[position]  # type: ignore[attr-defined]
+    half_hour = cache.calendar.half_hour[position]
     cold = np.zeros(len(frame), dtype=bool)
     school = np.zeros(len(frame), dtype=bool)
     for tsid, site in site_of.items():
         rows = np.flatnonzero(ids == tsid)
-        regimes = fmix.regime_map(cache=cache, site=site).regime  # type: ignore[arg-type]
+        regimes = fmix.regime_map(cache=cache, site=site).regime
         cold[rows] = regimes[position[rows]] == fmix.COLD_SNAP
-        school[rows] = design.site_aux(cache=cache, site=site).school_holiday[position[rows]]  # type: ignore[arg-type]
+        school[rows] = design.site_aux(cache=cache, site=site).school_holiday[position[rows]]
     winter = np.isin(month, fmix.WINTER_MONTHS)
     return {
         "Nov-Mar": winter,

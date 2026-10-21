@@ -55,7 +55,7 @@ def _title(*, text: str, subtitle: str) -> alt.TitleParams:
     )
 
 
-def headline() -> alt.LayerChart:
+def headline() -> alt.LayerChart | alt.FacetChart:
     """Return the forest chart of X1 to X13: estimate and interval on each arm's primary rows."""
     rows = json.loads((common.WORK_DIR / "numbers.json").read_text())
     frame = pl.DataFrame(
@@ -79,12 +79,12 @@ def headline() -> alt.LayerChart:
             legend=alt.Legend(title="Label before gates", orient="top"),
         ),
     )
-    rule = base.mark_rule(strokeWidth=2).encode(
+    rule = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("low:Q", title="Arm minus T-all (points of capacity; more negative is better)"),
         x2="high:Q",
     )
-    dot = base.mark_point(filled=True, size=70).encode(x="estimate:Q")
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")
+    dot = base.mark_point(filled=True, size=70).encode(x="estimate:Q")  # ty: ignore[unresolved-attribute]
+    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     return (
         alt.layer(zero, rule, dot)
         .properties(
@@ -104,7 +104,7 @@ def headline() -> alt.LayerChart:
     )
 
 
-def gate3() -> alt.LayerChart:
+def gate3() -> alt.LayerChart | alt.FacetChart:
     """Return the injected-effect gate: what each arm recovers of an oracle gain of 0.03 points."""
     report = json.loads((common.WORK_DIR / "gate3.json").read_text())
     rows = [
@@ -130,14 +130,14 @@ def gate3() -> alt.LayerChart:
             ),
         ),
     )
-    rule = base.mark_rule(strokeWidth=2).encode(
+    rule = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "low:Q", title="Arm minus T-all on injected data (points; more negative is better)"
         ),
         x2="high:Q",
     )
-    dot = base.mark_point(filled=True, size=70).encode(x="estimate:Q")
-    target = alt.Chart(pl.DataFrame({"x": [-0.015]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")
+    dot = base.mark_point(filled=True, size=70).encode(x="estimate:Q")  # ty: ignore[unresolved-attribute]
+    target = alt.Chart(pl.DataFrame({"x": [-0.015]})).mark_rule(strokeDash=[4, 3]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     return alt.layer(target, rule, dot).properties(
         width=WIDTH - 230,
         height=26 * len(order),
