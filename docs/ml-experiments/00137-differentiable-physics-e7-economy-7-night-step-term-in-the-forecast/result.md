@@ -27,8 +27,8 @@ prediction: >-
   C1 (the per-substation term minus the base, quantile score on the E7 window rows of cold winter
   nights at leads 12 to 36 hours, scored year, six decision substations) is -0.5 to -2.0 points.
   The term recovers at least half of the oracle's gain (the oracle is the same term fitted on the
-  scored year itself). The mean forecast's error on the same rows (actual minus mean) shrinks by
-  at least a third. The all-rows quantile score changes by -0.03 to 0.00 points.
+  scored year itself; the ratio is read only if the oracle's C1 interval lies wholly below zero). The mean forecast's error on the same rows (actual minus mean) shrinks by
+  at least a third. The all-rows quantile score (C4) changes by -0.03 to +0.01 points.
 decision_rule: >-
   Five planned contrasts, each read at the 99% level of the month-resampled paired bootstrap (the
   12 calendar months of the scored year, 20,000 resamples). C1 is the headline and is `supported`
@@ -74,10 +74,11 @@ forecast's own past errors, closes the miss.
 - **The term.** For a half-hour at UTC clock time `h` in the night set (21:00 to 08:30 UTC, 24
   half-hours) on the night of evening date `D`, the correction to every quantile is
   `a[h] + b[h] * cold + c[h] * weekend`, where `cold = max(0, 15.5 - T)`, `T` is the ENS-mean
-  temperature averaged over the half-hours of UTC day `D` that follow the forecast origin, and
+  temperature averaged over the 24 hours from 09:00 UTC on `D` to 09:00 UTC on the next day, which
+  a 09:00 UTC run always covers in full for the night it forecasts, and
   `weekend` flags Saturday and Sunday evenings. Coefficients are a ridge regression of the base
   forecast's error (actual minus the mean forecast) on those 72 columns, fitted per substation
-  (`T_SITE`) or shared across the six substations (`T_POOL`), on all rows whose valid time is
+  (`T_SITE`) or shared across the six substations (`T_POOL`), on all rows whose run origin and valid time are both
   before the first of the month being forecast (an expanding window, refitted monthly, starting
   from 2024-07). The ridge penalty is chosen on the odd tuning months from a fixed grid. The
   spread around the shifted median is unchanged.
@@ -91,6 +92,10 @@ forecast's own past errors, closes the miss.
 - **Weather at forecast time.** `T` is the ENS-mean forecast available at the origin. No ERA5
   value enters any score. Experiment 123's winters are used only by `FIXED123`, and end before the
   scored year.
+- **Resampling.** Month resampling for C1 draws only the calendar months that hold C1 rows; the
+  contrast is readable only if at least 3 months and 50 rows per substation hold them, and is
+  otherwise reported as not assessable. With one winter the expected verdict is `inconclusive`,
+  and the write-up says so rather than relaxing the rule.
 - **Limits stated now.** The expanding window holds one training winter (2024-25) for the first
   scored winter months and grows through winter 2025-26. The scored year holds one winter, so the
   cold-night rows are few and the month-resampled interval will be wide.
@@ -100,7 +105,8 @@ forecast's own past errors, closes the miss.
 - Rows: `fold_a_daily_gap_v1`, 09:00 UTC init, six decision series, scored year (the runs
   stored by experiment 133).
 - **E7 window rows**: valid time 01:00 to 03:00 UTC (the half-hours ending 01:30 to 03:00).
-- **Cold nights**: ENS-mean daily temperature below 3 C on the evening date.
+- **Cold nights**: `T` below 3 C (the same `T` as the term's regressor; a 24-hour mean shifted 9
+  hours from the calendar day, so it is not experiment 123's daily mean).
 - **Winter**: November to March.
 - Headline subset: E7 window rows, cold winter nights, leads 12 to 36 hours. Beside it: all
   winter nights, all E7 window rows, all rows, and a figure of the step against the forecast on the
@@ -115,6 +121,9 @@ forecast's own past errors, closes the miss.
   (8 + 0.5 * 12.5 = 14.25 points) at 5 of 6 substations, from the first scored winter month on.
 - **Shuffled-night placebo.** Permute `cold` across the nights of each substation and refit.
   Pass: the C1 contrast on the permuted term is within +/-0.1 points of zero.
+- **Leakage.** Corrupt `actual` (add 100 points) at every valid time on or after each monthly cut
+  in a copy of the frames and refit. Pass: the coefficients of every monthly fit are identical to
+  the uncorrupted fit, and the corrections applied to the month are unchanged.
 - **Reproduction.** The stored base rows reproduce experiment 133's `pool` score at 12 to 36 hours
   to within 1e-4 points.
 - **Stop rule.** If the injected-step control fails at 3 or more substations, stop, record the
