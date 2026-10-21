@@ -125,10 +125,11 @@ capacity per season-year and a calibrated ENS sunshine anomaly.** The steps are:
   from the season-year vintage by -0.005 (95% interval -0.013 to +0.003, exploratory).
 - **A zero start is untested in production-style forecasts, so it is not yet a candidate.**
   Experiment 78 advised testing it; experiment 80 could not tell the two starts apart.
-- **The offset's gain inside the full forecast is small and not scoped to daylight.** In BG2 (a
-  blend of XGBoost forecasts, with the offset at 5 of 16 Primaries) the offset lowers the score by
-  0.010 (0.000 to 0.019) over all rows of the 16 Primaries. The read on the 5 offset Primaries in
-  April-to-September daylight was not run ([experiment
+- **The offset's gain inside the full forecast is 0.114 on the rows it can touch.** In BG2 (a blend
+  of XGBoost forecasts, with the offset at 5 of 16 Primaries) the offset lowers the score by 0.114
+  (0.075 to 0.164) on April-to-September daylight rows of the 5 offset Primaries, and by 0.010
+  (0.000 to 0.019) over all rows of the 16 Primaries, because only 8.5% of those rows can carry an
+  offset. The gate was chosen on the same validation year ([experiment
   87](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)).
 
 ## Gotchas and implementation details
@@ -161,7 +162,8 @@ correction window.
 
 **Score a solar term on daylight April-to-September rows that have both a CAMS shape and an observed
 power, and name the row set.** Experiments 46, 64, 74, 77, and 78 share 68,903 rows per seed.
-Experiment 87 scored all rows of all 16 Primaries, so its 0.010 cannot be compared with 0.15
+Experiment 87's headline scored all rows of all 16 Primaries, so its 0.010 cannot be compared
+with 0.15; on the matching gated rows it found 0.114
 ([experiment 46](../../00046-embedded-solar-share-of-primary-forecast-error/result.md),
 [experiment 87](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)). Re-check:
 a study that scores winter or night rows. CAMS is the Copernicus satellite sunshine estimate

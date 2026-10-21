@@ -9,7 +9,6 @@ order for the maintainer to change.
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |
-| W1, a diurnal-shape state | Does a second filter state for the shape of the day lower the convex model's day-ahead error? | Running | Nothing | Running (experiment 115) |
 | N8, ensemble members through the DP | Does running each ensemble member through the DP give better-calibrated spread than residual quantiles? | 4 | Part 6 merged, and a free GPU | Proposed |
 | Schaake shuffle against ECC | Do ensemble copula coupling and the Schaake shuffle give summed ensembles with the same calibration against the observed sum across substations? | 4 | N8's ensemble members | Queued, after N8 |
 | N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly the moved power where both sides are metered? | 5 | Nothing; can run with the cheap screens or with the edge-flow experiment | Proposed |
@@ -57,13 +56,6 @@ forecast already specifies [ECC and the coherence
 scores](../../../roadmap/staged-probabilistic-forecast.md) for the production forecast. The pass asks
 whether the convex model's spread, once calibrated, keeps the cross-substation dependence that
 those scores reward. It runs after the per-substation calibration, on the same rows.
-
-## W1: a diurnal-shape state
-
-**Experiment 115 is running.** It tests whether a second filter state holding the deviation of the
-day's shape from the model's day-type profile lowers the day-ahead error of the convex model with the
-Kalman filter. The idea comes from the remaining day-ahead error being mostly in the shape of the
-day, and not in its level. The result goes in the experiment's own write-up.
 
 ## N8: ensemble members through the DP
 
