@@ -117,4 +117,3 @@ Sensitivity, 2025-26 with D9 added (six Primaries):
 
 Contrasts meeting the bar (estimate at most -1.0 and interval below 0): 6 of 6.
 Verdict by the decision rule: supported.
-
