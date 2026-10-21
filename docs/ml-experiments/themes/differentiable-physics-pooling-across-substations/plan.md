@@ -6,6 +6,7 @@ substation and was worse at full history.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| Partly pooled GAM shapes (proposed) | Do partly pooled GAM shapes (shared heating curve, per-substation offset from full history) beat per-site GAM fits now that PV and switching are explicit terms? | 1 | The explicit PV work, the full-history arm, and the switching terms; experiment 154 supports sharing the heating curve but not offsets learned from 4 weeks | Proposed |
 | Onboarding design (proposed) | Does a pooled model for onboarding and a per-site model for mature substations beat either alone? | 2 | Experiment 105: pooled onboarding scored 4.04 against 14.38 for a per-site model on 4 weeks, and was worse at full history | Proposed |
 | Part 4 (proposed) | Does a drift term (a slowly changing demand level), trained from 2019-09, beat the same model on its best window? | 3 | Experiment 112 (finished: an exact variable-projection fit did not improve the pooled model, and its known-answer test failed at realistic noise) | Proposed |
 | Part 5 (proposed) | Does the MVA observation layer (a model of how a meter that reads apparent power relates to real power) help the MW sites and recover MW at MVA sites? | 4 | Experiment 105 and a better capacity fit | Proposed |
@@ -20,8 +21,12 @@ substation and was worse at full history.
 reran its known-answer gate.** The rerun was `inconclusive`: capacity from 4 weeks was within 25% at
 8 of 8 substations on 5 of 5 seeds, the tuning rule was within one grid step of the best penalty on 5
 of 5 seeds, and the pooled fit's heating error beat a fair oracle's, but the shrinkage line could not
-tell a good fit from a bad one on 4 June weeks. A gate that scores the heating error against the
-injected truth on 4 winter weeks would settle it.
+tell a good fit from a bad one on 4 June weeks. [Experiment
+154](../../00154-differentiable-physics-n0-gate-2-heating-error-against-truth/result.md) then scored
+the heating error against the injected truth on 4 winter weeks: the pooled fit beat no pooling and
+complete pooling on 5 of 5 seeds and recovered the fleet's shared curve as well as separate fits,
+but the sign of a substation's own offset was found on only 2 of 5 seeds, by the fair oracle no
+more reliably.
 
 ## Planned experiments
 
