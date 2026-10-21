@@ -90,6 +90,13 @@ def read_run(*, run: datetime, sites: pl.DataFrame) -> dict[str, tuple[np.ndarra
     `_upsample_nwp_to_half_hourly`, as experiment 111's frame builder did, and cut to valid times
     from the run's `power_fcst_init_time` to 351 hours later.
 
+    Args:
+        run: The run's date.
+        sites: One row per site, with `time_series_id`, `h3_res_5`, `latitude`, and `longitude`.
+
+    Returns:
+        Each site's label mapped to its temperature and shortwave arrays.
+
     Raises:
         ValueError: If a site lacks a member or a half-hour, or a key repeats.
     """
