@@ -934,6 +934,12 @@ def fit_flows(
     flows are removed. The sweeps stop when the joint objective's relative change and the largest
     path change in megawatts are both under `sweep_tolerance`.
 
+    The minimiser is not unique when every path has a level penalty of 0. A constant flow then
+    costs nothing, so a constant offset that an edge could explain can equally sit on the outside
+    paths of its two nodes, and the result depends on the order of `paths` and on `start`. Give
+    every path a positive level penalty, with each edge's cheaper than its two nodes' outside
+    paths combined, to make the minimiser unique and the fit independent of the path order.
+
     Args:
         paths: The graph's paths.
         residuals: Each node's residual in megawatts on one common grid, `NaN` where there is no
