@@ -7,9 +7,9 @@ experiment, so this page lists the input screens only.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Running | Nothing | Running (experiment 114) |
+| N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Done, partly supported | None | Interaction terms (N3) gained, mostly at one substation, and the per-site heating threshold (N4) tied (experiment 114) |
 | S1, cheap screens added to GAM-K (experiment 126) | Do cheap additions to the day-ahead GAM-K lower the score, winter first? | Done, inconclusive | None | None of 13 screens showed a trusted gain; E-sol (-0.036 on dark winter evenings) is the lead for a retest on ENS weather; W-basis worse in every month, site and year; F-mix, W-stn undecided on 2 to 3 months |
-| Weather encoder retest | Does a small learned encoder over a patch of weather cells lower the error on hard cases (convective and frontal days, wind and solar sites) once the base forecast is recalibrated? | 3 | The audit of the encoder experiment | Queued, after the audit |
+| Weather encoder retest | Does a small learned encoder over a patch of weather cells lower the error on hard cases (convective and frontal days, wind and solar sites) once the base forecast is recalibrated? | 3 | A plain recalibration of GAM-K's quantiles, which experiment 119 found accounts for most of the encoder's gain | Queued, after the recalibration |
 
 Later parts are listed in their own themes.
 
@@ -39,7 +39,9 @@ hypothesis:
 **The retest repeats the weather-encoder comparison on the hard cases, with a recalibrated base
 forecast.** The encoder replaces single-cell inputs with a learned view of a patch of cells, and the
 aim is a lower error on convective and frontal days, when a single cell misses the neighbouring
-weather. It waits for the audit of the first encoder experiment, and runs on the GPU. The [encoders
+weather. Experiment 119, the first encoder experiment, ended inconclusive, and about two-thirds of
+its gain survived when the network read the wrong date's weather. The retest therefore waits for a
+plain recalibration of GAM-K's quantiles, and runs on the GPU. The [encoders
 technique page](../../../techniques/encoders.md) is the first thing to read.
 
 ## Planned experiments
