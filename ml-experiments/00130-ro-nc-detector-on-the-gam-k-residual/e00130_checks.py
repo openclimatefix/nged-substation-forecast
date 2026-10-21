@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 import polars as pl
-from e00130_common import SERIES_IDS, TUNING_MONTHS, stamp_months
+from e00130_common import SERIES_IDS, TUNING_MONTHS, WORK_DIR, stamp_months
 from e00130_contrasts import BLANK_SERIES, contrast, fmt, pooled, populations
 from e00130_detectors import level_shift, robust_scale
 from e00130_variants import load_both
@@ -42,7 +42,7 @@ def tail_ratios() -> None:
 
 def leave_one_donor_out(*, data: pl.DataFrame) -> None:
     """C1 and C2 with each donor series left out in turn."""
-    events = pl.read_parquet(__import__("e00130_common").WORK_DIR / "A15" / "events.parquet")
+    events = pl.read_parquet(WORK_DIR / "A15" / "events.parquet")
     donor = dict(zip(events["event_id"].to_list(), events["donor"].to_list(), strict=True))
     print("\nLeave one donor series out (base, even months): C1 B minus A, C2 C minus A")
     base = pooled(data=data, population="base", parity="even")
