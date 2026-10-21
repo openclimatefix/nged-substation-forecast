@@ -528,8 +528,8 @@ def score_seed(*, run: dict[str, Any]) -> dict[str, Any]:
     def rms(arm: str) -> float:
         return float(np.sqrt(np.mean([t[arm]["heating_rmse"] ** 2 for t in run["turns"]])))
 
-    def curve(key: str) -> float:
-        return float(np.sqrt(np.mean([t["pooled"][key] ** 2 for t in run["turns"]])))
+    def curve(arm: str, key: str) -> float:
+        return float(np.sqrt(np.mean([t[arm][key] ** 2 for t in run["turns"]])))
 
     errors = {arm: rms(arm) for arm in (*ARMS, "oracle")}
     right_sign = sum(
@@ -542,12 +542,13 @@ def score_seed(*, run: dict[str, Any]) -> dict[str, Any]:
     return {
         "seed": run["seed"],
         "errors": errors,
-        "fleet_curve_rmse": curve("fleet_curve_rmse"),
-        "per_site_mean_curve_rmse": curve("per_site_mean_curve_rmse"),
+        "fleet_curve_rmse": curve("pooled", "fleet_curve_rmse"),
+        "per_site_mean_curve_rmse": curve("no_pooling", "per_site_mean_curve_rmse"),
         "sites_with_right_offset_sign": int(right_sign),
         "offset_slope": offset_slope,
         "W1_shared_curve": bool(
-            curve("fleet_curve_rmse") <= CURVE_FACTOR * curve("per_site_mean_curve_rmse")
+            curve("pooled", "fleet_curve_rmse")
+            <= CURVE_FACTOR * curve("no_pooling", "per_site_mean_curve_rmse")
         ),
         "W2_close_to_fair_oracle": bool(errors["pooled"] <= ORACLE_FACTOR * errors["oracle"]),
         "W2b_beats_both_controls": bool(
