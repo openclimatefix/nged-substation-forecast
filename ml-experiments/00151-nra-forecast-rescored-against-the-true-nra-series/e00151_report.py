@@ -14,13 +14,16 @@ import numpy as np
 import polars as pl
 from e00151_common import WORK_DIR
 
-SCORES: Final[Path] = WORK_DIR / "scores"
+SCORES: Final[Path] = WORK_DIR / "scores_v2"
 ARMS: Final[tuple[str, ...]] = (
     "K0",
     "CLEAN",
     "SKF",
     "SORACLE",
     "SUB_DET",
+    "SUB_DET_LAG96",
+    "MASK",
+    "GAM_ONLY",
     "SUB_TRUE_LAG",
     "SUB_TRUE_CONST",
     "SUB_PLACEBO",
@@ -47,6 +50,7 @@ def load() -> pl.DataFrame:
         "period",
         "origin",
         "event",
+        "event_hours",
         "inside",
         "after48",
         "after_det",
@@ -113,6 +117,27 @@ def share(
     return out
 
 
+def event_share(*, frame: pl.DataFrame, arm: str, seed: int = SEED) -> dict:
+    """The share of the gap with every (site, world, event) weighted equally, bootstrap over events."""
+    per = frame.group_by("site", "world", "event").agg(
+        num=(pl.col("qs__K0") - pl.col(f"qs__{arm}")).mean(),
+        gap=(pl.col("qs__K0") - pl.col("qs__CLEAN")).mean(),
+    )
+    num, gap = per["num"].to_numpy(), per["gap"].to_numpy()
+    rng = np.random.default_rng(seed)
+    picks = rng.integers(0, len(num), size=(5000, len(num)))
+    g = gap[picks].mean(axis=1)
+    ok = g > 0
+    ratio = num[picks].mean(axis=1)[ok] / g[ok]
+    return {
+        "events": int(per.height),
+        "point": float(num.mean() / gap.mean()),
+        "lo95": float(np.percentile(ratio, 2.5)),
+        "hi95": float(np.percentile(ratio, 97.5)),
+        "median_event_share": float(np.median(num[np.abs(gap) > 0.3] / gap[np.abs(gap) > 0.3])),
+    }
+
+
 def fmt(r: dict, level: str = "95") -> str:
     """Format a share as 'point% (lo% to hi%)'."""
     if not r.get("n") or "point" not in r or f"lo{level}" not in r:
@@ -166,6 +191,42 @@ def main() -> None:
                 f"  gap K0-CLEAN mean {r['gap_mean']:.3f} points (95% {r['gap_lo']:.3f} to "
                 f"{r['gap_hi']:.3f}; 99% lower {r['gap_lo99']:.3f}); months {r['months']}"
             )
+    print("\n== robustness of C1 (post rows) ==")
+    for arm in ("SUB_DET", "SUB_DET_LAG96", "MASK", "GAM_ONLY", "SUB_TRUE_LAG", "SUB_TRUE_CONST"):
+        r = event_share(frame=primary, arm=arm)
+        report[f"event_weighted/{arm}"] = r
+        print(
+            f"  {arm:15s} events equal-weight {100 * r['point']:.0f}% "
+            f"({100 * r['lo95']:.0f}% to {100 * r['hi95']:.0f}%) over {r['events']} events; "
+            f"median per-event share (events with |gap| > 0.3) {100 * r['median_event_share']:.0f}%"
+        )
+    for arm in ("SUB_DET", "MASK", "GAM_ONLY"):
+        by_site = {}
+        for site in sorted(primary["site"].unique().to_list()):
+            sub = primary.filter(pl.col("site") == site)
+            by_site[site] = float(
+                (sub[f"qs__K0"] - sub[f"qs__{arm}"]).sum() / (sub["qs__K0"] - sub["qs__CLEAN"]).sum()
+            )
+        report[f"by_site/{arm}"] = by_site
+        print(f"  {arm} share by site: " + ", ".join(f"{k} {100 * v:.0f}%" for k, v in by_site.items()))
+        print(f"  {arm} share by site, mean of sites {100 * np.mean(list(by_site.values())):.0f}%")
+    sizes = primary.group_by("site").agg(rows=pl.len(), gap=(pl.col("qs__K0") - pl.col("qs__CLEAN")).sum())
+    print("  rows and gap by site:", sizes.sort("site").rows())
+    print("\n== C1 by transfer duration (post rows) ==")
+    bands = {
+        "1-3 d": (pl.col("event_hours") <= 72),
+        "3-7 d": (pl.col("event_hours") > 72) & (pl.col("event_hours") <= 168),
+        "over 7 d": (pl.col("event_hours") > 168),
+    }
+    for name, cond in bands.items():
+        sub = primary.filter(cond)
+        report[f"duration/{name}"] = {}
+        for arm in ("SUB_DET", "SUB_DET_LAG96", "MASK", "GAM_ONLY", "SUB_TRUE_LAG"):
+            r = share(frame=sub, arm=arm)
+            report[f"duration/{name}"][arm] = r
+            print(f"  {name:9s} {arm:14s} rows {sub.height:6d} share {fmt(r)}")
+    months = primary["month"].n_unique()
+    print(f"\n  months with post rows: {months} (decision rule needs at least {MIN_MONTHS})")
     print("\n== absolute mean quantile score by arm (points of capacity) ==")
     for name, frame in (("post", primary), ("lag", lag)):
         report[f"abs_{name}"] = {a: float(frame[f"qs__{a}"].mean()) for a in ARMS}
@@ -211,7 +272,8 @@ def main() -> None:
             pin = float(
                 pl.DataFrame({"d": a - q}).select(
                     pl.when(pl.col("d") >= 0).then(tau * pl.col("d")).otherwise((tau - 1) * pl.col("d"))
-                )["d"].mean()
+                    .alias("p")
+                )["p"].mean()
             )
             parts.append(f"{name} cov {cover:.3f} pin {pin:.3f}")
         print(f"  {arm:15s} " + "; ".join(parts))

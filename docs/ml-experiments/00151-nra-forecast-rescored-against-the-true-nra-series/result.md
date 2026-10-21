@@ -175,6 +175,31 @@ it, and it stays out of the headline.
   the gap is 100% for CLEAN by construction and a failure of the identity is a bug.
 - **Leave one site out** is reported for C1, since five or six sites give few independent units.
 
+## Changes made after the first run
+
+The decision rule, the prediction, and the arms above were fixed and committed before any run. The
+first run gave a share of the gap closed by SUB-DET of 71% (99% interval 25% to 85%) on the
+post-alarm rows. Four reviews then changed the plan, and each change is post hoc:
+
+- **Added arms** (the ML experiment manager's request): GAM-ONLY (the member forecasts with no
+  filter), MASK (the filter reads no readings inside known intervals), and SUB-DET-LAG96 (SUB-DET
+  with the end known 96 half-hours after the end, the 90th percentile of the 6-hour rule's call
+  lag).
+- **Strata and robustness** (the audit): shares by transfer duration (1 to 3 days, 3 to 7 days,
+  over 7 days), shares with every transfer weighted equally, shares by substation, and the share
+  without the substation that supplies most rows. Shape of the injected profile is not stored in
+  the worlds, so shares by shape are not reported.
+- **Corrections** (the code review): SUB-TRUE-LAG used the true end before it was known, and now
+  holds the amount it had when the interval became known until the end is known. SUB-TRUE-CONST is
+  an oracle ceiling, because its constant is the mean over the whole transfer.
+- **Real-stream check redesigned** (the manager's request): the first design added the labelled
+  MW to observed power, which is circular with the detector's step. It now scores forecasts issued
+  inside a logged real transfer for targets after the logged end, against observed power, and adds
+  a no-harm contrast on all real rows outside the logged transfers.
+- **Not applied:** the manager asked for a placebo made of real alarms (the D8 and D9 runs, bank
+  holidays, flagged zeros). The sources of those alarms are not stored for this experiment, so the
+  placebo stays the week-shifted detected intervals.
+
 ## Results
 
 To be written after the run.

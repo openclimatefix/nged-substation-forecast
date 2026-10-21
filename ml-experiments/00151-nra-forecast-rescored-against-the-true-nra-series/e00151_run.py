@@ -25,7 +25,7 @@ WORLDS: Final[Path] = WORK_DIR.parent / "00141-switching-detector-fed-into-gam-k
 CHOSEN: Final[Path] = (
     WORK_DIR.parent / "00141-switching-detector-fed-into-gam-k" / "scores" / "chosen.json"
 )
-OUT: Final[Path] = WORK_DIR / "scores"
+OUT: Final[Path] = WORK_DIR / "scores_v2"
 PERIODS: Final[tuple[str, ...]] = ("replicate", "scored")
 PLACEBO_WEEKS: Final[tuple[int, ...]] = (-6, -3, 3, 6)
 
@@ -113,6 +113,7 @@ def injected_job(args: tuple[str, int]) -> str:
     stream = np.where(np.isfinite(data.stream), data.stream + points, np.nan)
     evs = site_events(delta=stamp_delta, events=events)
     spans_det = nra.detected_spans(data=data, site=site, intervals=intervals)
+    spans_det96 = nra.detected_spans(data=data, site=site, intervals=intervals, end_lag=96)
     spans_true = nra.true_spans(events=evs, delta_points=points, data=data)
     tags = window_tags(data=data, events=evs, spans=spans_det, n=n)
     # the detected intervals feed the two-regime filter as its causal signal
@@ -166,6 +167,13 @@ def injected_job(args: tuple[str, int]) -> str:
             "SUB_DET": nra.subtraction_correction(
                 data=data, stream=stream, spans=spans_det, cutoffs=cutoffs, rows=rows
             ),
+            "GAM_ONLY": np.zeros(len(data.run_of_row)),
+            "MASK": nra.subtraction_correction(
+                data=data, stream=stream, spans=spans_det, cutoffs=cutoffs, rows=rows, mask=True
+            ),
+            "SUB_DET_LAG96": nra.subtraction_correction(
+                data=data, stream=stream, spans=spans_det96, cutoffs=cutoffs, rows=rows
+            ),
             "SUB_TRUE_LAG": nra.subtraction_correction(
                 data=data, stream=stream, spans=spans_true, cutoffs=cutoffs, rows=rows
             ),
@@ -204,6 +212,7 @@ def injected_job(args: tuple[str, int]) -> str:
                 "after48": tags["after48"][pos],
                 "after_det": tags["after_det"][pos],
                 "missed": ~np.isfinite(tags["alarm_known"][ev]),
+                "event_hours": np.array([(en - on) / 2 for on, en in evs])[ev],
             }
         )
         frames.append(

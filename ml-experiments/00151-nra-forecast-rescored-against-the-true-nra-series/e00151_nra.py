@@ -45,6 +45,8 @@ class Span:
         start: First cutoff at which the interval is known.
         known: First cutoff at which the end is known.
         amount: The points to subtract: a constant, or an array over the whole grid.
+        open_amount: The array used while the end is not yet known: the amount held at its value
+            when the interval becomes known, so the true end is not used before it is known.
     """
 
     onset: int
@@ -52,9 +54,12 @@ class Span:
     start: int
     known: int
     amount: float | np.ndarray
+    open_amount: np.ndarray | None = None
 
 
-def detected_spans(*, data, site: str, intervals: pl.DataFrame) -> list[Span]:
+def detected_spans(
+    *, data, site: str, intervals: pl.DataFrame, end_lag: int = END_LAG
+) -> list[Span]:
     """Detected spans of a site from the offline-end intervals, known as the 6-hour rule knows them.
 
     The onset is known `ONSET_LAG` after the step. The end is known at the later of the interval's
@@ -72,7 +77,7 @@ def detected_spans(*, data, site: str, intervals: pl.DataFrame) -> list[Span]:
             continue
         onset, end = row["onset"] + offset, row["end"] + offset
         start = onset + ONSET_LAG
-        known = max(row["known_from"] + offset, end + END_LAG, start + 1)
+        known = max(row["known_from"] + offset, end + end_lag, start + 1)
         spans.append(Span(onset, end, start, known, points))
     return spans
 
@@ -90,7 +95,10 @@ def true_spans(
         onset, end = on + offset, en + offset
         masked = np.zeros_like(delta_points)
         masked[onset:end] = delta_points[onset:end]
-        spans.append(Span(onset, end, onset + ONSET_LAG, end + END_LAG, masked))
+        start = onset + ONSET_LAG
+        held = masked.copy()
+        held[end:] = masked[min(start, end - 1)]
+        spans.append(Span(onset, end, start, end + END_LAG, masked, held))
     return spans
 
 
@@ -110,28 +118,45 @@ def shifted(*, spans: list[Span], weeks: int, n: int) -> list[Span]:
         d = weeks * WEEK
         if s.onset + d < 0 or s.end + d >= n or s.known + d >= n:
             continue
-        out.append(Span(s.onset + d, s.end + d, s.start + d, s.known + d, s.amount))
+        out.append(Span(s.onset + d, s.end + d, s.start + d, s.known + d, s.amount, s.open_amount))
     return out
 
 
-def cleaned_stream(*, stream: np.ndarray, spans: list[Span], cutoff: int | None) -> np.ndarray:
-    """The stream with every span known at `cutoff` subtracted, using the end where it is known."""
+def cleaned_stream(
+    *, stream: np.ndarray, spans: list[Span], cutoff: int | None, mask: bool = False
+) -> np.ndarray:
+    """The stream with every span known at `cutoff` removed, using the end where it is known.
+
+    By default the span's MW is subtracted. With `mask` the readings inside the span are set to
+    missing instead, so the filter treats them as absent.
+    """
     out = stream.copy()
     if cutoff is None:
         return out
     for s in spans:
         if s.start > cutoff:
             continue
-        stop = s.end if s.known <= cutoff else len(out)
-        if isinstance(s.amount, np.ndarray):
-            out[s.onset : stop] -= s.amount[s.onset : stop]
+        ended = s.known <= cutoff
+        stop = s.end if ended else len(out)
+        if mask:
+            out[s.onset : stop] = np.nan
+            continue
+        amount = s.amount if (ended or s.open_amount is None) else s.open_amount
+        if isinstance(amount, np.ndarray):
+            out[s.onset : stop] -= amount[s.onset : stop]
         else:
-            out[s.onset : stop] -= s.amount
+            out[s.onset : stop] -= amount
     return out
 
 
 def subtraction_correction(
-    *, data, stream: np.ndarray, spans: list[Span], cutoffs: np.ndarray, rows: np.ndarray
+    *,
+    data,
+    stream: np.ndarray,
+    spans: list[Span],
+    cutoffs: np.ndarray,
+    rows: np.ndarray,
+    mask: bool = False,
 ) -> np.ndarray:
     """The total filter correction at `rows`, each from the stream cleaned as known at its cutoff.
 
@@ -146,7 +171,7 @@ def subtraction_correction(
         cutoff = int(breaks[s - 1]) if s > 0 else None
         correction = fed.correction_for(
             data=data,
-            stream=cleaned_stream(stream=stream, spans=spans, cutoff=cutoff),
+            stream=cleaned_stream(stream=stream, spans=spans, cutoff=cutoff, mask=mask),
             prior=np.zeros(len(stream)),
             multiplier=1.0,
         )
