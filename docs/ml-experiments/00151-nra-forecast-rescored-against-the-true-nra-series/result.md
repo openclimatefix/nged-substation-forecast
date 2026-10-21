@@ -85,15 +85,16 @@ lessons: >-
   After the detector raises its alarm, correcting the recent power for the transfer recovers most of
   the normal-running-arrangement forecast, but ignoring recent power altogether recovers nearly as
   much, and masking the readings recovers more than subtracting the detected MW. Before the alarm
-  nothing deployable helps, and on all rows after the onset, counting missed transfers, the
-  detector-driven arms gain nothing.
+  the detector-driven arms do not help (only ignoring recent power does), and on all rows after the
+  onset, counting missed transfers, subtracting the detected MW gains nothing and masking gains 21%.
 take_home_message: >-
   Once the detector has raised its alarm, taking the transfer out of the recent power closes most of
   the gap to a forecast fed the true normal-running-arrangement series, but ignoring recent power
   altogether closes nearly as much. Subtracting the detected megawatts is fragile (it rests on a few
-  transfers at one substation), and masking the readings is steadier. Counting the 63% of
-  transfers that the detector missed and the 2 days before the alarm, the detector-driven
-  arms gain nothing, so the next step is a detector that alarms sooner and a forecast that drops
+  transfers at one substation), and masking the readings is steadier. Counting the 64% of
+  transfers that the detector missed and the 2 days before the alarm, subtracting the
+  detected MW gains nothing and masking gains 21%, so the next step is a detector that alarms
+  sooner and a forecast that drops
   recent power while a transfer is suspected.
 advice:
   - >-
@@ -118,36 +119,40 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**Take-home message.** Once the detector has raised its alarm, taking the transfer out of the
-forecast's recent power closes most of the gap to a forecast fed the true normal-running-arrangement
-series. Ignoring recent power altogether closes nearly as much, and masking the readings closes more
-than subtracting the detected megawatts (MW). Counting the transfers the detector missed and the
-first 2 days before its alarm, the detector-driven arms gain nothing, and on real days with no logged
+**Take-home message.** Once the refit-offset neighbour-count detector (RO-NC) has raised its alarm
+that a load transfer is under way, taking the transfer out of the forecast's recent power closes most
+of the gap in forecast error between a filter that ignores transfers and a filter fed the true
+normal running arrangement (NRA) series. Ignoring recent power altogether closes nearly as much, and
+masking the readings closes more than subtracting the detected megawatts (MW). Counting the
+transfers the detector missed and the first 2 days before its alarm, the forecasts that use detected
+transfers gain little (subtracting: nothing; masking: 21% of the gap), and on real days with no logged
 transfer they make the forecast worse.
 
-We asked whether a forecast of the power a substation would draw with no load transfer (the normal
-running arrangement, NRA) improves when the forecast's recent-power input is corrected for the
-transfers that the refit-offset neighbour-count detector (RO-NC) finds. We added
-simulated load transfers (475 pairs of a transfer and a Primary substation, in the 44 worlds of
-experiment 141, at six substations) to recorded substation power, so the true NRA series is the
-recorded power without them. We
-scored every forecast against that true series, which experiment 141 did not: it scored against the
-observed power, which rewards a filter for following a transfer. The filter is the Kalman filter of
-GAM-K (the weather-driven demand forecast of earlier experiments). The detector's intervals come
-from [experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md) and
-[experiment 148](../00148-switching-end-rule-lookahead-ro-nc/result.md). The share of the gap
-closed is the measure of
+**We tested the correction on simulated load transfers added to recorded power, so the true NRA
+series is known.** We asked whether a forecast of the power a substation would draw with no load
+transfer (the NRA) improves when the forecast's recent-power input is corrected for the transfers
+that RO-NC finds. The simulation uses the 44 worlds of experiment 141 (a world is one simulated copy
+of the recorded power series), six substations, and 475 pairs of a transfer and a Primary substation.
+The true NRA series is the recorded power without the simulated transfers. We scored every forecast
+against that true series, which experiment 141 did not: it scored against the observed power, which
+rewards a filter for following a transfer. The filter is the Kalman filter of GAM-K (the
+weather-driven demand forecast of earlier experiments). The detector's intervals come from
+[experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md) and
+[experiment 148](../00148-switching-end-rule-lookahead-ro-nc/result.md). The share of the gap closed
+is the measure used in
 [experiment 88](../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md),
-which closed 16% with the detector.
+where the detector closed 16% of the gap.
 
 **By the pre-registered rule the verdict is `partly supported`, and the headline is fragile.** The
 pre-registered arm (SUB-DET) closed 71% of the gap on forecasts issued after the alarm, with a 99%
-interval of 25% to 85%. The lower end is under the 40% line. Two checks that the audit asked for
-change the reading: with each transfer weighted equally the share is -31%, and without substation
-D11 it is 33%. The detector-driven arms also do worse than no correction before the alarm, and on
-real rows outside logged transfers.
+interval of 25% to 85%. The pre-registered rule calls the result `supported` only if the lower end
+is at least 40%; here it is 25%. Two further checks change the reading: with each transfer weighted
+equally the share is -31%, and without substation D11 it is 33%. The detector-driven arms also do
+worse than no correction before the alarm, and on real rows outside logged transfers.
 
 ![Share of the gap closed after the alarm](figure_1_headline.svg)
+
+Figure 1 draws 95% intervals; the verdict uses the 99% interval of 25% to 85%.
 
 ![The share under four weightings](figure_2_robustness.svg)
 
@@ -158,7 +163,8 @@ real rows outside logged transfers.
 ![Subtract detected MW by month](figure_5_months.svg)
 
 - **Arms.** All arms are GAM-K's member forecasts plus a correction from a Kalman filter run on a
-  stream, with experiment 141's spread. K0 reads the stream with the transfers in it. CLEAN reads
+  stream (the power series the filter reads), with experiment 141's spread. The gap is K0's score
+  minus CLEAN's. K0 (no correction) reads the stream with the transfers in it. CLEAN reads
   the stream without them (the ceiling, 100%). SUB-DET subtracts the detected MW (the stored step of
   the detector, a constant per interval) over every interval known at the forecast origin. MASK
   treats the readings inside known intervals as missing. GAM-only ignores recent power. SUB-DET-LAG96
@@ -167,7 +173,7 @@ real rows outside logged transfers.
   (an oracle, because the mean uses the whole transfer). S-KF and S-ORACLE are experiment 141's
   two-regime filter fed detected and true intervals. SUB-PLACEBO shifts the detected intervals by
   whole weeks. SUB-FALSE subtracts only the detected intervals that match one of the 148 unexplained
-  real alarms of the false-alarm analysis.
+  real alarms that match no logged transfer.
 - **Intervals.** The injected worlds store the offline-end intervals (`R0_M48`), so those are used,
   with the onset known 96 half-hours after the step and the end known at the later of the stored
   `known_from` and 60 half-hours after the end. Experiment 148's 6-hour rule has the same onset and
@@ -178,23 +184,24 @@ real rows outside logged transfers.
   months and the scored year) with a target inside a transfer or in the 48 hours after its true end.
   The rows are the same for every arm. The C1 rows are the 24,716 whose forecast origin is after the
   alarm is known (11 calendar months); 188,817 rows have the origin between the onset and the alarm,
-  and the detector found 36.4% of the 475 transfer-and-substation pairs (45% of the larger ones).
+  and the detector found 36.4% of the 475 transfer-and-substation pairs (45% of the larger ones; the
+  475 pairs come from 145 distinct transfers).
   The median ratio of the detected step to the true mean MW is 1.03.
-- **Headline, C1.** SUB-DET closes 71% (99% interval 25% to 85%) of the K0-to-CLEAN gap of 2.872
-  points of capacity (95% interval 1.490 to 3.481). Inside the transfer it closes 84% (78% to 97%)
-  and in the 48 hours after the end 62% (29% to 78%). On the absolute error of the median forecast
-  it closes 69% (43% to 82%).
+- **Headline, C1 (the share of the gap SUB-DET closes after the alarm).** SUB-DET closes 71% (99%
+  interval 25% to 85%) of the K0-to-CLEAN gap of 2.872 points of capacity (95% interval 1.490 to
+  3.481). Inside the transfer it closes 84% (78% to 97%) and in the 48 hours after the end 62% (29%
+  to 78%). On the absolute error of the median forecast it closes 69% (43% to 82%).
 - **Other arms on the C1 rows (95%).** MASK 84% (61% to 95%). GAM-only 78% (67% to 82%).
   SUB-DET-LAG96 69% (37% to 82%). SUB-TRUE-LAG 83% (64% to 88%) and SUB-TRUE-CONST 82% (70% to 87%).
   S-KF -10% (-13% to -4%) and S-ORACLE -27% (-42% to -24%): the two-regime filters follow the
   transfer, as predicted. SUB-PLACEBO -6% (-15% to 13%) and SUB-FALSE -9% (-20% to 4%).
-- **Robustness of SUB-DET.** With each of 145 transfers weighted equally: -31% (-107% to 17%). With
-  each substation weighted equally: 65%. Without D11, which supplies 12,203 of the 24,716 rows and
-  61% of the gap: 33% (-66% to 73%). By substation: D10 55%, D11 94%, D14 105%, D16 -23%, D5 81%, D9
-  77%. By duration of the transfer: 1 to 3 days -72% (-625% to 17%), 3 to 7 days 69% (41% to 88%),
-  over 7 days 89% (85% to 99%). MASK with each transfer weighted equally is 65% (37% to 82%), and
-  without D11 62% (-8% to 93%). Shares by the shape of the injected profile are not available,
-  because the shape is not stored in experiment 141's worlds.
+- **Robustness of SUB-DET.** With each of the 145 distinct transfers weighted equally: -31% (-107%
+  to 17%). With each substation weighted equally: 65%. Without D11, which supplies 12,203 of the
+  24,716 rows and 61% of the gap: 33% (-66% to 73%). By substation: D10 55%, D11 94%, D14 105%, D16
+  -23%, D5 81%, D9 77%. By duration of the transfer: 1 to 3 days -72% (-625% to 17%), 3 to 7 days
+  69% (41% to 88%), over 7 days 89% (85% to 99%). MASK with each transfer weighted equally is 65%
+  (37% to 82%), and without D11 62% (-8% to 93%). Shares by the shape of the injected profile are
+  not available, because the shape is not stored in experiment 141's worlds.
 - **Before the alarm and on all rows.** On the 188,817 rows whose origin is after the onset and
   before the alarm: SUB-DET -28% (-111% to 15%), MASK -3% (-35% to 25%), GAM-only 35% (18% to 55%),
   SUB-TRUE-LAG 57% (9% to 63%). On all 213,533 rows after the onset, including the missed
@@ -225,21 +232,18 @@ real rows outside logged transfers.
   D16 +0.031, D14 +0.106.
 - **Mean-forecast contrasts** point the same way as the quantile score. The error of the median
   forecast gives SUB-DET 69%, MASK 83%, and GAM-only 74%.
-- **Triggers.** Three fired. SUB-DET (71%) is above its predicted 30% to 60%. Weighting by transfer
-  flips SUB-DET's sign, and leaving out D11 lowers it to 33%, but the verdict stays `partly
-  supported` on the leave-out. A later experiment (153) copies this code and reads this headline.
-  A fresh Sonnet audit re-derived the first run's headline from the stored scores and reproduced it
-  (71%), then found the dependence on D11 and on a few transfers (three D11 transfers hold 45% of
-  the gap), which this page reports. The audit was Sonnet because the brief excluded Opus.
-- **Code review (Sonnet).** One medium finding was applied: SUB-TRUE-LAG used the true end before it
-  was known; fixing it lowered its share from 94% to 83%. SUB-TRUE-CONST is labelled an oracle.
-  The finding about overlapping windows was not applied: at one substation the 48-hour window
+- **Triggers.** Three fired: SUB-DET above its predicted band, a sign flip under per-transfer
+  weighting, and dependence on D11. SUB-DET (71%) is above its predicted 30% to 60%. Weighting by
+  transfer flips SUB-DET's sign, and leaving out D11 lowers the share to 33%, but the verdict stays
+  `partly supported` when D11 is left out. Re-deriving the headline from the stored scores
+  reproduces 71%. Three D11 transfers hold 45% of the gap.
+- **Overlapping windows.** SUB-TRUE-CONST is labelled an oracle. At one substation the 48-hour window
   after a transfer overlaps the next transfer in 271 of 906 consecutive pairs, and a row takes the
-  latest transfer that has begun.
+  latest transfer that has begun; the overlap is not corrected.
 
 ## Caveats
 
-- **C1 conditions on detection.** The detector missed 63.6% of the transfers; the share on all
+- **C1 conditions on detection.** The detector missed 64% of the transfers; the share on all
   rows after the onset is the figure that includes them.
 - **Intervals come from the offline end rule with a 30-hour call lag**, not from rerunning the
   6-hour rule on each world.
@@ -254,7 +258,7 @@ real rows outside logged transfers.
 
 Whether a forecast that masks the readings inside a suspected transfer, and uses a detector that
 alarms within hours instead of about 2 days, beats the weather model alone on all rows, including
-the rows before the alarm and the normal rows where the weather model alone costs 0.289 points.
+the rows before the alarm and the normal rows where the weather model alone scores 0.289 points worse.
 
 ## Changes made after the first run
 
@@ -266,8 +270,9 @@ still reports as C1. The reviews that followed changed the experiment, and each 
   (a placebo of real alarms). The week-shifted placebo stays.
 - **Added strata and robustness** (the audit): shares by transfer duration, with each transfer
   weighted equally, by substation, and without D11.
-- **Corrections** (the code review): SUB-TRUE-LAG holds the amount it had when the interval became
-  known until the end is known.
+- **Corrections** (the code review): SUB-TRUE-LAG used the true end before it was known; it now
+  holds the amount it had when the interval became known until the end is known, which lowered its
+  share from 94% to 83%.
 - **Real-stream check redesigned** (the manager's request): the first design added the labelled MW
   to observed power, which is circular with the detector's step.
 - **Not applied:** shares by the shape of the injected profile, because the shape is not stored in

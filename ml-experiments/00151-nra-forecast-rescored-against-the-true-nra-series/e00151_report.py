@@ -258,6 +258,16 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         r = share(frame=primary.filter(pl.col("site") != site), arm="SUB_DET", n_resamples=5000)
         print(f"  without {site}: {fmt(r)}")
         report[f"loo_{site}"] = r
+    r = share(frame=primary.filter(pl.col("site") != "D11"), arm="MASK", n_resamples=5000)
+    print(f"  MASK without D11: {fmt(r)}")
+    report["loo_mask_D11"] = r
+    per_event_gap = (
+        primary.group_by("site", "world", "event")
+        .agg(gap=(pl.col("qs__K0") - pl.col("qs__CLEAN")).sum())
+        .sort("gap", descending=True)
+    )
+    top3 = per_event_gap.filter(pl.col("site") == "D11").head(3)["gap"].sum()
+    print(f"  three largest D11 transfers hold {top3 / per_event_gap['gap'].sum():.1%} of the gap")
     print("\n== checks ==")
     med_minus_mean = primary.group_by("site").agg(
         (pl.col("err_median__K0") - pl.col("err_median__K0")).mean().alias("zero")
