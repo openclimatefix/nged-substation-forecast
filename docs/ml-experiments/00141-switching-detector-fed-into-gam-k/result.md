@@ -41,160 +41,180 @@ metric: >-
 code: ml-experiments/00141-switching-detector-fed-into-gam-k/
 verdict: not supported
 best_arm: >-
-  none: no arm beat K0 (GAM-K's filter without a detector). S-KF, the deployable arm, scored +0.026
-  points worse (95% interval -0.017 to +0.062) on the rows 48 hours after a causal alarm.
+  none: no deployable arm beat K0 (GAM-K's filter without a detector). S-KF scored +0.059 points
+  worse (95% interval -0.004 to +0.378) on the 48 hours after a causal alarm on a simulated
+  transfer.
 headline: >-
-  C1, S-KF minus K0 in quantile score on the 48 hours after a causal alarm, is +0.026 points (-0.017
-  to +0.062). The arm given the true transfer interval (S-ORACLE) is also worse than K0, at +0.022
-  (+0.009 to +0.062).
+  C1, S-KF minus K0 on the 48 hours after a causal alarm on a simulated transfer, is +0.059 points
+  (-0.004 to +0.378). Inside a transfer, S-KF is -0.027 (-0.224 to +0.002), the same as the placebo
+  (-0.028). An arm given the true transfer interval gains inside the transfer (-0.126, -0.219 to
+  -0.075)
+  and loses in the 72 hours after it ends (+0.310, +0.195 to +0.695).
 lessons: >-
-  Telling GAM-K's filter that a transfer has begun adds nothing, and the arms that knew the true
-  transfer interval scored worse than the filter alone. A likely reason is that the filter already
-  follows a step within about a day, but no arm tested that, and the loss inside a transfer is
-  unexplained.
+  Knowing a transfer's true start would help the filter inside the transfer, but the gain is lost
+  after the transfer ends, because the filter holds its level flat over every lead. The causal alarm
+  arrives 48 hours after the step, and with that delay it does no better than a random placebo.
 take_home_message: >-
-  Telling the forecast's Kalman filter that a load transfer has begun did not lower its error, even
-  when the filter was given the true start and end of a simulated transfer. The filter may already
-  adapt to a step within about a day, which would leave the detector's value at the end of a
-  transfer, when the step reverses. That is untested here, and the next experiment can test it with
-  the detector's end signal.
+  Telling the forecast's filter about a load transfer helped only when the filter knew the true
+  start
+  of the transfer, and then only inside the transfer. After the transfer ended, the same filter did
+  worse than the plain filter, because it held the transfer's step over the whole 7-day forecast.
+  The
+  detector's real alarm arrives about 2 days after the step and did no better than a random placebo.
+  The next test is a filter that expects a transfer to end, using the typical duration of transfers.
 advice:
   - >-
-    Do not feed the switching detector's alarm into GAM-K's Kalman filter as a regime probability
-    for a faster level; neither the causal alarm nor the true interval lowered the score (C1,
-    S-ORACLE).
+    Do not feed the switching detector's causal alarm into GAM-K's filter as a regime probability:
+    with the alarm 48 hours late it matched a random placebo (C1, placebo rows).
   - >-
-    Test the detector's value at the end of a transfer, where the filter's level may carry the step
-    forward after the transfer has reversed, rather than at the start (untested here).
+    When testing a detector in a forecast, score rows inside the transfer and after it separately;
+    a gain inside the transfer can be cancelled after it ends (S-ORACLE panels).
   - >-
-    Before building a detector input for a filter, check how fast the filter already follows a step
-    of the size to be caught (its fitted level variance and observation noise are the first thing
-    to read).
+    Make the correction for a transfer decay toward zero over the typical transfer duration instead
+    of holding it flat at every lead, which is the loss after the transfer ends (untested here).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Take-home message.** Telling GAM-K's Kalman filter that a load transfer has begun did not lower
-the forecast's error. GAM-K is the weather-driven demand forecast of earlier experiments, and its
-Kalman filter corrects each forecast with the most recent errors. A load transfer moves a block of
-demand from one substation to another, for example when a switch is thrown. We simulated transfers
-and told the filter, using the switching detector, when each began. The score did not improve: the
-difference was +0.026 points of effective capacity (95% interval -0.017 to +0.062; positive is
-worse). The arm given the true start and end of each simulated transfer also scored worse than the
-filter alone. A likely reason is that the fitted filter already follows a step in demand within
-about a day, so there is little for the detector to speed up. No arm tested that reason, and the
-loss inside a transfer is not explained by it. The detector's remaining value may lie at the end of
-a transfer, which none of this experiment's arms tested.
+**Take-home message.** Telling GAM-K's Kalman filter about a load transfer helped only when the
+filter knew the transfer's true start, and then only inside the transfer. GAM-K is the
+weather-driven demand forecast of earlier experiments, and its Kalman filter corrects each forecast
+with the most recent errors. A load transfer moves a block of demand from one substation to another,
+for example when a switch is thrown. We simulated transfers and gave the filter either the
+switching detector's alarm or the true interval. The alarm arrives about 2 days after the step,
+and the arm that used it scored the same as a placebo that used random times. The arm given the true
+interval scored 0.126 points better than the filter alone inside a transfer (95% interval 0.075 to
+0.219), and 0.310 points worse in the 72 hours after the transfer ended (0.195 to 0.695), because
+the filter holds the step flat over the whole 7-day forecast. On the pre-registered measure (the 48
+hours after an alarm) the deployable arm scored +0.059 points (-0.004 to +0.378; positive is worse).
 
 ## What we asked, and the answer
 
 We asked whether the refit-offset neighbour-count detector (RO-NC, the detector of
-[experiment 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md)) lowers the forecast's
-error when its output is fed into GAM-K's Kalman filter. The detector looks for steps in the
-forecast error that appear at a substation and are matched by opposite steps at its neighbours. We
-added transfers of 25% or more of the
-receiving load that last over a day (the headline-band transfers drawn in experiment 147) to the
-real
-forecast errors, in 44 simulated versions of the data that touch six Primary substations. We ran the
-detector with the
-causal end rule of
-[experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md), and gave the filter a second
-"switched" regime whose level variance is a multiple of the fitted one. The filter did not improve:
-every setting scored worse than the filter alone on the tuning months, so the stop rule (stop before
-the real year if the tuning months show no gain) ended the
-experiment before the real year was scored. The method follows
-[Kalman filtering of GAM
-residuals](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)
-(experiment 111) and a two-model mixture filter in the style of the interacting multiple model
-filter.
+[experiment 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md), which looks for steps in
+the forecast error that appear at a substation and are matched by opposite steps at its neighbours)
+lowers the forecast's error when its output is fed into GAM-K's Kalman filter. We added transfers of
+25% or more of the receiving load that last over a day (the headline-band transfers drawn in
+[experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md)) to the real forecast errors, in
+44 simulated versions of the data that touch six Primary substations. We ran the detector with the
+causal end rule of experiment 147, and gave the filter a second "switched" regime whose level
+variance is a multiple of the fitted one. The method follows
+[experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s
+Kalman filter and a two-model mixture filter in the style of the interacting multiple model filter.
+Every setting scored worse than the filter alone on the tuning months, so the stop rule (stop before
+the real year if the tuning months show no gain) ended the experiment before the real year was
+scored. An Opus audit then found that the first version of this page mislabelled its rows: the
+numbers below are from the re-run that fixes them.
 
 ![Each arm's quantile score minus K0's, with 95% intervals](arms_vs_k0.svg)
 
 ## Arms, rows, and numbers
 
 - **Arms.** K0 (GAM-K's filter, no detector). S-KF (the two-regime filter; prior 0.5 of the switched
-  regime while a causal alarm is active, level variance 4 times the fitted one, chosen on the tuning
-  months from prior {0.5, 0.9} and multiplier {4, 16, 64, 256}). S-HE (the same filter with the
-  hindsight end, not deployable). S-ORACLE (prior from the true transfer interval, not deployable).
-  Placebo (the causal prior shifted by a random whole number of weeks). Variance inflation (the
-  placebo prior with no likelihood update). All use K0's uncertainty bands, so each contrast is a
-difference
-  in the forecast's location only.
+  regime while a causal alarm is active, level variance 4 times the fitted one, chosen on the
+  tuning months from prior {0.5, 0.9} and multiplier {4, 16, 64, 256}). S-HE (the same filter with
+  the hindsight end, not deployable). S-ORACLE (prior 0.5 inside the true transfer interval, not
+  deployable). Placebo (the causal prior shifted by a random whole number of weeks). Variance
+  inflation (the placebo prior with no likelihood update). Two post hoc arms keep the prior on
+  longer: S-KF 48 hours after the end is called, and S-ORACLE 72 hours after the true end. All arms
+  use K0's uncertainty bands, so each contrast is a difference in the forecast's location only.
 - **Rows.** `fold_a_daily_gap_v1` runs at the five decision substations and D9 (labels as in
   [experiment 134](../00134-differentiable-physics-same-weekday-error-profile-on-gam-k/result.md)),
   replicate months (even months 2024-07 to 2025-06) and the scored year (2025-07 to 2026-06), leads
-  0.5 to 168 h, rows outside the hand-filtered switching events. The rows scored are those inside an
-  injected transfer (and 72 h after) or within 48 hours after a causal alarm is known: 592,087 rows
-  in the alarm window and 440,353 inside a transfer before any alarm. Intervals resample calendar
-months of target time
-  (16 months for the alarm window, 12 for the rows inside a transfer).
-- **C1 (S-KF minus K0, 48 hours after a causal alarm):** +0.026 points (-0.017 to +0.062); K0's
-  own score on these rows is 4.35 points (3.15 to 5.55). Mean-forecast absolute error: +0.022
-  (-0.038 to +0.069). The point estimate is positive and the interval includes zero.
-- **S-ORACLE minus K0:** +0.022 (+0.009 to +0.062) in the alarm window and +0.096 (+0.065 to +0.282)
-  inside a transfer. **S-HE minus K0:** -0.008 (-0.067 to +0.048) in the alarm window and +0.083
-  (+0.059 to +0.215) inside a transfer.
-- **Controls.** Placebo +0.016 (-0.004 to +0.052) and variance inflation +0.015 (-0.004 to +0.052)
-  in
-  the alarm window: S-KF is numerically worse than both (+0.026 against +0.016 and +0.015), and the
-intervals overlap, so the three are not distinguishable. These controls were run on the simulated
-data only.
-- **A possible reason (not tested by any arm).** GAM-K's fitted level variance `q` is 0.4 to 9.5
-  per day and its observation noise 0.2 to 0.8, in points of effective capacity, over the six
-  substations (the units are as the filter code defines them). A synthetic 8-point step in the
-  residual, filtered with illustrative settings (`q` 0.5 per day, noise 2.0, transient AR(1) factor
-  0.88), reaches a correction of 7.9 points after 12 hours without a switched regime
-  (`e00141_synthetic.py`). The correction there is the level plus the transient. The S-ORACLE and
-  S-HE losses of +0.08 to +0.10 inside a transfer are not explained by this account, because a
-  filter that already adapts would show no change rather than a loss. A higher level variance in
-  the switched regime making the level track noise is a hypothesis, not a result.
-- **Tail calibration** (alarm-window rows, K0 and S-KF alike): q95 coverage 92.2% against a nominal
-  95%, q05 coverage 84.5% against 95% above q05. On winter nights (a proxy for cold nights: UTC
-  00:00 to 06:00, November to March, 62,564 rows) q95 coverage is 91.1% for K0 and 91.2% for S-KF.
-  No q01 or q99 results were computed.
-- **By site, S-KF minus K0 in the alarm window:** D16 +0.123, D5 +0.059, D14 +0.017, D9 +0.004,
-  D11 -0.004, D10 -0.046. By period: scored year +0.054, replicate months -0.018, so the sign is
-  not stable across periods. Dropping any one site leaves the S-KF estimate between +0.006 and
-  +0.040, never below zero. The experiment did not detect a benefit; it does not rule out a small
-  one.
+  0.5 to 168 h, rows outside the hand-filtered switching events. Three row sets, by target time:
+  inside a simulated transfer (279,332 rows, 11 months), the 48 hours after a causal alarm on a
+  simulated transfer (127,468 rows, 10 months; this is C1), and the 72 hours after a simulated
+  transfer ends (281,864 rows, 12 months). Alarms from the real stream alone are not scored.
+  Intervals resample calendar months of target time.
+- **C1, S-KF minus K0, 48 hours after a causal alarm:** +0.059 points (-0.004 to +0.378); K0's own
+  score on these rows is 5.46 points (4.24 to 6.94). Mean-forecast absolute error: +0.064 (-0.008
+  to +0.397). The interval includes zero, so C1 does not show a gain.
+- **Inside a simulated transfer** (K0's own score 8.84, 7.24 to 15.03): S-KF -0.027 (-0.224 to
+  +0.002), placebo -0.028 (-0.218 to -0.009), variance inflation -0.027 (-0.211 to -0.009), S-HE
+  -0.111 (-0.250 to -0.068), S-ORACLE -0.126 (-0.219 to -0.075).
+- **72 hours after the transfer ends:** S-KF +0.071 (-0.008 to +0.446), placebo +0.074 (+0.023 to
+  +0.390), S-HE +0.264 (+0.169 to +0.602), S-ORACLE +0.310 (+0.195 to +0.695).
+- **48 hours after a causal alarm, other arms:** S-HE +0.084 (+0.017 to +0.402), S-ORACLE +0.124
+  (+0.065 to +0.484), placebo +0.047 (-0.006 to +0.399), variance inflation +0.046 (-0.005 to
+  +0.390). The controls were run on the simulated data only.
+- **The post hoc longer-prior arms** (labelled post hoc): S-KF kept on 48 hours longer is +0.061
+  (+0.000 to +0.377) after an alarm, -0.024 (-0.235 to +0.007) inside a transfer, +0.074 (-0.007 to
+  +0.450) after the end. S-ORACLE kept on 72 hours longer is -0.121 (-0.213 to -0.074) inside,
+  +0.264 (+0.166 to +0.549) after the end. Keeping the switched regime on after the end did not
+  remove the loss.
+- **What the pattern says.** The filter's correction is a level held flat at every lead. The true
+  interval lets the filter correct fast inside the transfer. For a forecast made inside the
+  transfer, the same correction is wrong at the targets after the transfer ends. The causal alarm
+  is known only 48 hours after the step, by which time K0 has adapted too. The inside-transfer
+  gains of S-KF, the placebo, and variance inflation are the same (about -0.027), so the detector's
+  timing adds nothing to them.
+- **The filter does not adapt within a day.** On D9's real residuals with an 8-point step lasting
+  4 days, the Opus audit found that K0 still misses 5.4 of 8 points after 24 to 36 hours and 3.3
+  after three days. `e00141_synthetic.py` uses illustrative settings and a single hour band, so it
+  does not represent the fitted filter.
+- **Tail calibration** (48 hours after a causal alarm; K0 and S-KF alike): q95 coverage 88.2%
+  against a nominal 95%, and q05 coverage (the share of actuals above q05) 85.0% against 95%. On
+  winter nights (a proxy for cold nights: UTC 00:00 to 06:00, November to March, 6,696 rows) q95
+  coverage is 85.7% for K0, 85.6% for S-KF, and 83.3% for S-ORACLE. No q01 or q99 results were
+  computed.
+- **By site, S-KF minus K0 after an alarm:** D10 +0.257, D14 +0.040, D16 +0.027, D9 +0.026,
+  D11 +0.008, D5 -0.001. By period: replicate months +0.002, scored year +0.031. Dropping D10 leaves
+  +0.020, and dropping any other site leaves +0.063 to +0.071.
 
 ## Checks
 
-- **Median minus mean forecast per site** (alarm-window rows; K0 and S-KF share the same value, as
-  the correction is common): D10 -0.08, D11 -0.03, D14 -0.01, D16 +0.05, D5 -0.04, D9 -0.02 points
-  of effective capacity. No large shift.
-- **The mean-forecast error beside each quantile-score contrast** is in the bullets above; it points
-  the same way as the quantile score for every arm (the printed values are in `report.json`).
+- **Median minus mean forecast per site** (rows after an alarm; K0 and S-KF share the same value):
+  D10 -0.12, D14 +0.02, D11 -0.05, D16 +0.00, D9 -0.07, D5 -0.48 points of effective capacity. D5's
+  median sits half a point under its mean on these rows; the correction is common to all arms, so
+  contrasts are unaffected.
+- **The mean-forecast error beside each quantile-score contrast** points the same way as the
+  quantile score for every arm (printed in `report.json`).
 - **Triggers fired: a failed known-answer control, and an arm with more information scoring worse.**
-  The known-answer arm (S-ORACLE) does not show the gain it should, and S-ORACLE, which has more
-  information than K0, is worse than K0 (triggers 1 and 5 of the `ml-experiment` skill). The
-  audit by a fresh Opus agent that the `ml-experiment` skill requires has not run: the brief allows
-  one Opus review only with the maintainer's approval. The experiment waits for that decision before
-merging.
+  S-ORACLE scored worse than K0 on the pre-registered rows (triggers 1 and 5 of the `ml-experiment`
+  skill). The Opus audit (one review, approved by the manager) found no bug in the filter, the
+  prior, the injection, or the scoring, and traced the loss to the 72 hours after the transfer ends.
+  Its findings and their triage:
+    - **Accepted:** the rows labelled "inside a transfer" included the 72 hours after it. The page
+      now scores the two separately.
+    - **Accepted:** 88% of the alarm intervals in the first version were alarms from the real stream
+      repeated in every simulated version. Only alarms on a simulated transfer are scored now.
+    - **Accepted:** "the filter adapts within about a day" was false for the fitted settings, and
+      S-ORACLE is not an upper bound because its prior is off at the reverse step. Both claims are
+      removed.
+    - **Accepted:** the first tuning used the mixed rows and favoured the smallest multiplier. It is
+      re-run on the corrected row sets and still picks prior 0.5 and multiplier 4 (mean gain +0.003,
+      so the stop rule still fires).
+    - **Not applied:** the audit's suggestion to re-tune on rows inside the transfer only, which
+      would tune the deployable arm on rows that it can only see 48 hours late.
+    - **Noted, no change:** the detector's stamps sit one half-hour later than the site's grid
+      positions. The stream and the scored actual shift together, so no number moves.
 
 ## Departures from the plan
 
 - **S-KF's prior is binary** (0.5 while an alarm is active, 0 otherwise), not a logistic function of
   the detector's score. **S-F (plain features) was not built**, and **the real year was not scored**
   (C3 and C5 have no number), because the stop rule fired on the tuning months. The placebo and
-  variance-inflation controls were run on the injected worlds only.
+  variance-inflation controls were run on the simulated data only.
 - **The causal alarm is known from 96 half-hours (48 hours) after the step starts**, a conservative
   stand-in for the statistic's 24-hour window plus the 24-hour peak test. The planned unit test
   (truncating the residual stream and checking the score is unchanged) was **not written**, so the
   claim that the alarm time is causal rests on this lag and on the end rule's own `known_from`.
   A leak would favour the detector, which makes the negative result stronger, not weaker.
 - **Intervals are 95%, not the planned family-wise level**, because only one contrast carries a
-  verdict. The injected worlds use the ERA5-driven residuals of experiment 130 (cleaner than live
-  residuals), the fast-path injection, and K0's spread, which was not refitted per arm.
+  verdict. The simulated data use the ERA5-driven residuals of experiment 130 (cleaner than live
+  residuals), the fast-path injection, and K0's uncertainty bands, which were not refitted per arm.
 - **"Within 48 hours of an alarm" means target valid time** from the stamp at which the alarm is
-  known. The detector and the moved megawatts are those of experiment 147's headline draw.
+  known. The detector and the moved megawatts are those of experiment 147's headline draw. The two
+  longer-prior arms are post hoc.
 
 ## What the next experiment should answer
 
-The filter does not need help finding the start of a transfer. The open question is the return: when
-a transfer ends, GAM-K's level still holds the old step for about a day. An experiment can test a
-forecast that uses the detector's causal end call (R2, experiment 147) to drop the level shift at
-the predicted end, on the same injected worlds, with the oracle end as its ceiling.
+A filter that holds the transfer's step flat at every lead is wrong once the transfer ends, and the
+true interval does not help for forecasts made inside it. An experiment can test a correction for a
+detected transfer that decays toward zero over the typical transfer duration (from the logged
+operations), on the same simulated data, with the true-interval arm as its ceiling and the causal
+alarm as the deployable arm. It should also test the alarm at the shorter lag that a 24-hour step
+statistic allows if the peak test is dropped.
 
 ## Plan (written before any fit)
 

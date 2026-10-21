@@ -49,6 +49,10 @@ ONSET_LAG: Final[int] = 96
 DELAY_HOURS: Final[float] = 3.5
 AFTER_STAMPS: Final[int] = 96
 """48 hours of target time after a causal alarm is known; rows in it are the C1 rows."""
+END_STAMPS: Final[int] = 96
+"""48 hours of target time the post hoc arms keep the prior on after the end is called."""
+ONSET_TOLERANCE: Final[int] = 4
+"""Stamps (2 hours) within which an alarm counts as at the start of an injected transfer."""
 TAIL_STAMPS: Final[int] = 144
 """72 hours of target time after an event ends are scored as well."""
 
@@ -100,8 +104,12 @@ class Signals:
         oracle: The prior from the injected truth (zeros in the real year).
         step_points: The signed step of the active causal alarm, in points (0 when none).
         age_days: Days since the active causal alarm was known (0 when none).
-        alarm_window: True within 48 hours after an alarm is known (the C1 rows' target window).
-        event_window: True within an injected event and 72 hours after it.
+        alarm_window: True within 48 hours after an alarm on an injected transfer is known (the
+            C1 rows' target window). Alarms from the real stream alone are left out.
+        event_window: True within an injected transfer and 72 hours after it.
+        transfer: True inside an injected transfer.
+        causal_end: The causal prior kept on for 48 hours after the end is called (post hoc).
+        oracle_end: The true-interval prior kept on for 72 hours after the transfer (post hoc).
     """
 
     causal: np.ndarray
@@ -111,6 +119,9 @@ class Signals:
     age_days: np.ndarray
     alarm_window: np.ndarray
     event_window: np.ndarray
+    transfer: np.ndarray
+    causal_end: np.ndarray
+    oracle_end: np.ndarray
 
 
 def build_signals(
@@ -141,6 +152,15 @@ def build_signals(
     causal, hindsight, oracle = np.zeros(n), np.zeros(n), np.zeros(n)
     step, age = np.zeros(n), np.zeros(n)
     alarm_window, event_window = np.zeros(n, dtype=bool), np.zeros(n, dtype=bool)
+    causal_end, oracle_end = np.zeros(n), np.zeros(n)
+    moving = np.zeros(n, dtype=bool)
+    if delta_mw is not None:
+        moving = (
+            to_positions(array=(np.abs(np.nan_to_num(delta_mw)) > 0).astype(float), data=data) > 0
+        )
+    near_transfer = (
+        np.convolve(moving.astype(float), np.ones(2 * ONSET_TOLERANCE + 1), mode="same") > 0
+    )
     for row in intervals.filter(pl.col("series") == series).iter_rows(named=True):
         onset, end, known = row["onset"] + offset, row["end"] + offset, row["known_from"] + offset
         if row["setting"] == "R2_M48":
@@ -149,25 +169,36 @@ def build_signals(
             lo, hi = max(start, 0), min(stop, n)
             if lo < hi:
                 causal[lo:hi] = p_on
+                causal_end[lo : min(hi + END_STAMPS, n)] = p_on
                 points = 100.0 * row["step_mw"] / CAPACITY_MW[site]
                 step[lo:hi] = points if np.isfinite(points) else 0.0
                 age[lo:hi] = (np.arange(lo, hi) - start) / 48.0
             wlo, whi = max(start, 0), min(start + AFTER_STAMPS, n)
-            alarm_window[wlo:whi] = True
+            if 0 <= onset < n and near_transfer[onset]:
+                alarm_window[wlo:whi] = True
         else:
             lo, hi = max(onset, 0), min(max(end, onset + 1), n)
             hindsight[lo:hi] = p_on
     if delta_mw is not None:
-        moving = (
-            to_positions(array=(np.abs(np.nan_to_num(delta_mw)) > 0).astype(float), data=data) > 0
-        )
         oracle[moving] = p_on
         cumulative = np.concatenate([[0], np.cumsum(moving)])
         lagged = np.concatenate([np.zeros(TAIL_STAMPS + 1, dtype=cumulative.dtype), cumulative])[
             : len(cumulative)
         ]
         event_window = (cumulative[1:] - lagged[: len(moving)]) > 0
-    return Signals(causal, hindsight, oracle, step, age, alarm_window, event_window)
+        oracle_end[event_window] = p_on
+    return Signals(
+        causal,
+        hindsight,
+        oracle,
+        step,
+        age,
+        alarm_window,
+        event_window,
+        moving,
+        causal_end,
+        oracle_end,
+    )
 
 
 def correction_for(

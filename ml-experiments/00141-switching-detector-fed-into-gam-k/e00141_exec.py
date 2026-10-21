@@ -59,6 +59,8 @@ def arm_priors(*, signals: fed.Signals, p_on: float, seed: int, site: str) -> di
         "SHE": signals.hindsight,
         "SORACLE": signals.oracle,
         "PLACEBO": placebo_shift(prior=signals.causal, seed=seed, site=site),
+        "SKF_END": signals.causal_end,
+        "SORACLE_END": signals.oracle_end,
     }
 
 
@@ -117,9 +119,15 @@ def injected_job(args: tuple[str, int, str]) -> str:
             scored = fed.score_arms(
                 data=data, site=site, corrections=corrections, delta_points=points, rows=rows
             )
-            in_alarm = signals.alarm_window[data.position[rows]]
-            in_event = signals.event_window[data.position[rows]]
-            tags = pl.DataFrame({"row": rows, "in_alarm48": in_alarm, "in_event": in_event})
+            position = data.position[rows]
+            tags = pl.DataFrame(
+                {
+                    "row": rows,
+                    "in_alarm48": signals.alarm_window[position],
+                    "in_event": signals.event_window[position],
+                    "in_transfer": signals.transfer[position],
+                }
+            )
             frames.append(
                 scored.join(tags, on="row").with_columns(
                     world=pl.lit(seed), period=pl.lit(period), p_on=p_on, multiplier=multiplier

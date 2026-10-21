@@ -19,7 +19,15 @@ from e00141_common import WORK_DIR
 
 SCORES: Final[Path] = WORK_DIR / "scores"
 N_RESAMPLES: Final[int] = 20_000
-ARMS: Final[tuple[str, ...]] = ("SKF", "SHE", "SORACLE", "PLACEBO", "VARINF")
+ARMS: Final[tuple[str, ...]] = (
+    "SKF",
+    "SHE",
+    "SORACLE",
+    "PLACEBO",
+    "VARINF",
+    "SKF_END",
+    "SORACLE_END",
+)
 
 
 def load() -> pl.DataFrame:
@@ -93,7 +101,8 @@ def main() -> None:
     out: dict = {}
     for tag, mask in (
         ("alarm48", pl.col("in_alarm48")),
-        ("event_only", pl.col("in_event") & ~pl.col("in_alarm48")),
+        ("transfer", pl.col("in_transfer")),
+        ("tail", pl.col("in_event") & ~pl.col("in_transfer")),
         ("all_event_rows", pl.col("in_event") | pl.col("in_alarm48")),
     ):
         for arm in ARMS:
@@ -103,6 +112,9 @@ def main() -> None:
                 "mean_forecast_abs_error": interval(frame=sub, column="err_mean_diff"),
             }
     sub = frame.filter(pl.col("arm") == "K0")
+    out["K0_absolute_qs_transfer"] = interval(
+        frame=sub.filter(pl.col("in_transfer")), column="k0_qs"
+    )
     out["K0_absolute_qs_alarm48"] = interval(frame=sub.filter(pl.col("in_alarm48")), column="k0_qs")
     out["K0_absolute_qs_all_event_rows"] = interval(
         frame=sub.filter(pl.col("in_event") | pl.col("in_alarm48")), column="k0_qs"

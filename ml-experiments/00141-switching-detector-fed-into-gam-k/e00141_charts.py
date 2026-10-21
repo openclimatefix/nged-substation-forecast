@@ -17,21 +17,26 @@ DOCS: Final[Path] = (
 )
 LABELS: Final[dict[str, str]] = {
     "SKF": "S-KF (causal alarm)",
-    "SHE": "S-HE (hindsight end, not deployable)",
-    "SORACLE": "S-ORACLE (true interval, not deployable)",
-    "PLACEBO": "Placebo (alarms shifted by weeks)",
-    "VARINF": "Variance inflation (unrelated to events)",
+    "SHE": "S-HE (hindsight end)",
+    "SORACLE": "S-ORACLE (true interval)",
+    "PLACEBO": "Placebo",
+    "VARINF": "Variance inflation",
+    "SKF_END": "S-KF, on 48 h longer",
+    "SORACLE_END": "S-ORACLE, on 72 h longer",
 }
 COLOURS: Final[dict[str, str]] = {
     "S-KF (causal alarm)": ocf.BRAND_ORANGE,
-    "S-HE (hindsight end, not deployable)": ocf.DATA_BLUE,
-    "S-ORACLE (true interval, not deployable)": ocf.DATA_PURPLE,
-    "Placebo (alarms shifted by weeks)": ocf.DATA_SKY,
-    "Variance inflation (unrelated to events)": ocf.DATA_GREEN,
+    "S-HE (hindsight end)": ocf.DATA_BLUE,
+    "S-ORACLE (true interval)": ocf.DATA_PURPLE,
+    "Placebo": ocf.DATA_SKY,
+    "Variance inflation": ocf.DATA_GREEN,
+    "S-KF, on 48 h longer": ocf.BRAND_ORANGE,
+    "S-ORACLE, on 72 h longer": ocf.DATA_PURPLE,
 }
 ROWSETS: Final[dict[str, str]] = {
-    "alarm48": "Rows in the 48 hours after a causal alarm",
-    "event_only": "Rows inside an injected transfer, before any alarm",
+    "transfer": "Targets inside a simulated transfer",
+    "alarm48": "Targets in the 48 hours after a causal alarm",
+    "tail": "Targets in the 72 hours after a transfer ends",
 }
 
 
@@ -48,7 +53,7 @@ def main() -> None:
     frame = pl.DataFrame(rows)
     order = list(LABELS.values())
     base = alt.Chart(frame).encode(
-        y=alt.Y("arm:N", sort=order, title=None, axis=alt.Axis(labelLimit=320)),
+        y=alt.Y("arm:N", sort=order, title=None, axis=alt.Axis(labelLimit=200)),
         color=alt.Color(
             "arm:N", scale=alt.Scale(domain=order, range=[COLOURS[a] for a in order]), legend=None
         ),
@@ -64,21 +69,22 @@ def main() -> None:
         + alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="black").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
     chart = (
-        layer.properties(width=330, height=130)
+        layer.properties(width=380, height=170)
         .facet(
             row=alt.Row(
                 "rows:N",
                 title=None,
+                sort=list(ROWSETS.values()),
                 header=alt.Header(labelOrient="top", labelAngle=0, labelAlign="left"),
             )
         )
         .properties(
             title=alt.TitleParams(
-                "Telling the filter about a transfer does not lower the score",
+                "The true transfer interval helps inside a transfer and hurts after it",
                 subtitle=[
-                    "Dot: estimate. Line: 95% interval from resampling whole calendar months.",
-                    "Rule at zero: GAM-K's filter without a detector (K0). 44 injected worlds,",
-                    "6 substations, 2024-07 to 2026-06, transfers of 25%+ of the receiving load.",
+                    "Dot: estimate. Line: 95% interval over calendar months. Rule at zero:",
+                    "GAM-K's filter with no detector (K0). 44 simulated versions, 6 sites,",
+                    "2024-07 to 2026-06. Transfers of 25%+ of the receiving load.",
                 ],
             )
         )
