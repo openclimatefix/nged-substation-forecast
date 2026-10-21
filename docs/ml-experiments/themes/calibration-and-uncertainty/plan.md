@@ -7,7 +7,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
-| [Experiment 125 (N8)](../../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md) | Does GAM-K's residual table count the weather error twice, and does a table fitted on analysis-driven forecasts, placed around each ensemble member, calibrate the tails better? | 1 | Nothing | Planned |
 
 ## Planned experiments
 

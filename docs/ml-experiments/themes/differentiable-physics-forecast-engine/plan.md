@@ -9,8 +9,7 @@ order for the maintainer to change.
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |
-| [Experiment 125 (N8)](../../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md), ensemble members through GAM-K and the spread around them | Does GAM-K's residual table, fitted on ensemble-mean residuals, count the weather error twice, and does a table fitted on analysis-driven forecasts, placed around each of the 51 members, calibrate the tails better than today's table rescaled by the same factors? | 1 | Nothing (CPU only; the new metric module waits for its review before the scored-year fit) | Planned |
-| Schaake shuffle against ECC | Do ensemble copula coupling and the Schaake shuffle give summed ensembles with the same calibration against the observed sum across substations? | 4 | N8's ensemble members | Queued, after N8 |
+| Schaake shuffle against ECC | Do ensemble copula coupling and the Schaake shuffle give summed ensembles with the same calibration against the observed sum across substations? | 4 | The ensemble members of N8 (experiment 125) | Queued |
 | N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly the moved power where both sides are metered? | 5 | Nothing; can run with the cheap screens or with the edge-flow experiment | Proposed |
 | Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals, with the prediction, its square, and the hour as covariates, calibrate the tails better than residual quantiles? | 6 | The stored residuals only; independent of CAL | Proposed |
 | Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles, for the curtailment tail? | 7 | The tail quantile regression above | Proposed |
@@ -55,15 +54,6 @@ scores](../../../roadmap/staged-probabilistic-forecast.md) for the production fo
 whether the convex model's spread, once calibrated, keeps the cross-substation dependence that
 those scores reward. It runs after the per-substation calibration, on the same rows.
 
-## N8: ensemble members through GAM-K and the spread around them
-
-**Experiment 125 tests whether the weather error is counted twice in GAM-K's bands.** The residual
-table is fitted on observed demand minus the corrected ensemble mean, so it already holds the
-weather error that the 51 members carry, and it is then placed around every member. The plan
-compares today's table, today's table re-tuned on a wider factor grid, and a table fitted on forecasts
-driven by the analysis proxy and placed around each member, on tail coverage and tail pinball,
-winter first. The work reuses experiment 111's stored fits and runs on the CPU.
-
 ## N7: paired residuals at switching events
 
 **Where both sides of a hand-filtered switching event are metered, the donor's and the receiver's
@@ -79,7 +69,7 @@ rest. The run takes minutes on the CPU.
 ensemble.** Ensemble copula coupling (ECC) orders each substation's calibrated quantiles by the
 ranks of the ensemble members. The Schaake shuffle orders them by a template taken from history.
 Both then give members whose sums across substations are scored against the observed sum, with the
-variogram score. It reuses the members of N8, takes about 1 CPU hour, and starts after N8. It is the
+variogram score. It reuses the members of N8 (experiment 125) and takes about 1 CPU hour. It is the
 comparison that CAL's coherence pass needs, so CAL can reuse its result.
 
 ## Tail quantile regression on filtered residuals

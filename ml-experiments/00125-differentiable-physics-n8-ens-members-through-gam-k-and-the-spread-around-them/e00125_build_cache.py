@@ -1,7 +1,6 @@
 """Build experiment 125's cache of corrected member means (see `e00125_cache`).
 
-uv run python ml-experiments/00125-*/e00125_build_cache.py --periods tuning replicate \
-        [--workers 4]
+uv run python ml-experiments/00125-*/e00125_build_cache.py --periods tuning replicate
 """
 
 import argparse

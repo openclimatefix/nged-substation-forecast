@@ -7,7 +7,7 @@ title: >-
 part: "N8"
 theme: differentiable-physics-forecast-engine
 also_relevant_to: [calibration-and-uncertainty, curtailment-cost, weather-products-and-blending]
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/ only. Serving path and
   degradation rule: not touched. Several designs are defensible (how the residual table is
@@ -33,24 +33,214 @@ metric: >-
   pinball over those four levels; non-inferiority on the quantile score (twice the mean pinball
   over experiment 87's 11 quantiles) in points of effective capacity, leads 0.5 to 168 hours,
   rows outside the hand-filtered switching events
-verdict: <supported, partly supported, refuted, or inconclusive>
+verdict: inconclusive
 production_status: not-for-production
 adopted_in: none
-take_home_message: <written after the results>
-date: <date>
-pr: <pr>
-advice: <written after the results>
+best_arm: >-
+  K0-w, experiment 111's table with its factors re-tuned (0.4689 mean tail pinball in the scored
+  year); MP scored 0.4759, and no arm had 14 of 16 calibration cells in both periods
+headline: >-
+  A residual table fitted on analysis-driven forecasts and placed around each of the 51 members
+  (MP) scored 0.007 points worse than today's table re-tuned (K0-w) on mean tail pinball in the
+  scored year (98.3% interval -0.001 to +0.013) and 0.004 worse in the replicate months (-0.006
+  to +0.017). The members' variance is 4 to 19 points squared against 27 to 52 for the table, so
+  the weather error counted twice is too small to matter. On cold winter nights every arm's q95
+  covers only 73% to 78% of the observed values.
+lessons:
+  - >-
+    The weather error that the 51 members carry is small beside GAM-K's own error at Primaries, so
+    refitting the residual table to exclude it changes the band's total variance by under 6% (K0-w
+    over MP, 0.95 to 1.05 in every lead band) and does not improve any tail
+    score.
+  - >-
+    A spread factor tuned on alternate months scored worse out of period: MP with its tuned factors
+    (0.9 to 1.0) had 6 of 16 calibration cells in the scored year, and the same arm with every
+    factor at 1 had 12 of 16.
+  - >-
+    The 51 members alone are not a usable distribution for demand: their quantile score was 3.75
+    against 2.81 for MP, and the observed value fell outside the range of all 51 members in 55% to
+    74% of rows, by lead band.
+  - >-
+    On the cold-snap nights of the scored winter, demand exceeded the q95 forecast in 22% to 27% of
+    half-hours in every arm, so the miss is in the centre or the width of the day-ahead
+    forecast on cold nights, and is not caused by how the residual table is built.
+date: 2026-10-21
+pr: 1422
+take_home_message: >-
+  Putting the forecast-error table around each of the 51 weather members, and fitting it on
+  analysis-driven forecasts so that it holds no weather error, did not improve the tails of GAM-K's
+  demand forecast. The weather members' spread is small against the model's own error, so the
+  weather error was counted twice in the code but is too small to matter. The next step is the
+  cold winter nights, where demand exceeds the 95% quantile about a quarter of the time in every
+  arm. The verdict is inconclusive, because no arm reached 14 of 16 calibration cells.
+advice:
+  - >-
+    Do not build a member-aware residual table for GAM-K at Primaries: a table fitted on
+    analysis-driven forecasts and placed around the members is no better than today's table
+    re-tuned (C1, tail pinball +0.007 in the scored year, 98.3% interval -0.001 to +0.013).
+  - >-
+    Treat GAM-K's band width as a model-error problem, not a weather-error problem, at Primaries:
+    the members' variance is 4 to 19 points squared against 27 to 52 for the table (variance
+    accounting).
+  - >-
+    Check a tuned spread factor on months outside the tuning set before adopting it; the factors
+    tuned on odd months gave 6 of 16 cells in the scored year and factor 1 gave 12 of 16 (MP against
+    MP-1).
+  - >-
+    Do not use the 51 weather members alone as a demand distribution; they are far too narrow
+    (MO quantile score 3.75 against 2.81 for MP, and the rank histogram's end bars).
+  - >-
+    Work on the tails on cold winter nights next, because the q95 of every arm covers only 73% to
+    78% of the observed values there (cold-night figure).
 code: ml-experiments/00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/
 ---
 
-**This experiment asks whether the weather forecast error is counted twice in the convex demand
-model's uncertainty bands, and tests a fix.** The model runs on each of the 51 members of ECMWF's
-ensemble weather forecast, then puts a table of past errors around every member. That table was
-measured as observed demand minus the ensemble's average forecast, so it already contains the
-weather error that the 51 members carry. We refit the table on forecasts driven by the weather
-analysis (almost no weather error), place it around each member, and compare the bands against
-today's bands and against today's bands rescaled by the same factors, on the same rows. The plan
-below is committed before any fit runs.
+**This experiment asked whether the weather forecast error is counted twice in the convex demand
+model's uncertainty bands, and tested a fix.** The model (GAM-K, from [experiment 111][e111]) runs on
+each of the 51 members of ECMWF's ensemble weather forecast, then puts a table of past errors around
+every member. The table was measured as observed demand minus the ensemble's average forecast, so it
+already contains the weather error that the 51 members carry. We refitted the table on forecasts
+driven by an analysis of the weather (almost no weather error), placed it around each member, and
+compared the bands with today's bands and with today's bands rescaled by the same factors, on the
+same rows, at five substations. **The fix did not improve the tails.** The weather members' variance
+is 4 to 19 points of capacity squared against 27 to 52 for the table, so the double count is real in
+the code and too small to matter. The verdict is inconclusive, because no arm reached the 14 of 16
+calibration cells that the decision rule asks for. On the cold winter nights, every arm's 95%
+quantile is exceeded about a quarter of the time.
+
+## Results
+
+**Take-home message.** Placing a table of forecast errors around each of the 51 weather members,
+fitted so that it holds no weather error, scored 0.007 points of tail pinball worse than today's
+table re-tuned on the same grid in the scored year (98.3% interval −0.001 to +0.013, five
+substations, 291 runs). The replicate months agree in sign (+0.004, −0.006 to +0.017). The reason is
+in the variance accounting: demand error is dominated by the model's own error, and the weather
+members carry little of it. The larger finding is on cold winter nights, where all arms leave the
+upper tail too low. The `verdict` is `inconclusive`: MP had 6 of 16 calibration cells in band in the
+scored year and 12 in the replicate months, and K0-w had 5 and 11.
+
+**The known-answer gate passed every blocking test, on the first run.** The synthetic twin
+recovered the injected weather variance within 5% per lead band, the analytic double-count ratio of
+K0's variance to MP's within 3%, and a halved member spread as an s of 2.0 in 3 of 4 lead bands
+(the second lead band chose 1.0 against a true factor near 2.0). K0 rebuilt from the cache reproduced
+experiment 111's stored tuning quantiles to 4e-6 (float32 rounding). A positive control confirmed
+that the causality test detects a changed reading before the filter's cutoff. The twin's numbers are
+in `work/gate.json`, printed by `e00125_gate.py`. The twin confirms the arithmetic and the code, and
+does not show that the real ensemble behaves like the twin.
+
+**Figure 1 shows that no planned contrast improves on today's table.**
+
+![Tail pinball differences of the planned and secondary contrasts](figure_01_headline.svg)
+
+- **C1, MP minus K0-w (decision):** quantile score +0.0077 (95% interval +0.0006 to +0.0133) and tail
+  pinball +0.0070 (−0.0013 to +0.0134) in the scored year; +0.0006 (−0.0092 to +0.0121) and +0.0035
+  (−0.0056 to +0.0173) in the replicate months. MP improved tail pinball at 1 of 5 substations in the
+  scored year and 2 of 5 in the replicate months.
+- **MP minus the stored K0:** the same within 0.0005, so re-tuning K0's factors on the wide grid
+  (K0-w minus K0: +0.0001, −0.0008 to +0.0013) changed nothing.
+- **C2, MP minus MM (two designs compared):** −0.0254 in quantile score (−0.0379 to −0.0139) and
+  −0.0086 in tail pinball (−0.0189 to −0.0010) in the scored year. Pooling the members as a mixture
+  helps, so the gain of MP over MM is the members' use and not the table.
+- **C4, MP-s minus MP:** −0.0005 (−0.0009 to −0.0001). Rescaling the members about their mean by an
+  s chosen on the tuning months (1.25 at 0 to 24 hours, 1.0 elsewhere) is a gain of no practical
+  size.
+- **Absolute scores, scored year, leads 0.5 to 168 hours** (points of capacity; smaller is better):
+
+  | Arm | Quantile score | Tail pinball | Cells in band (of 16) | Mean absolute error of the median |
+  |---|---|---|---|---|
+  | K0 (today's table, stored factors) | 2.800 | 0.4685 | 9 | 4.907 |
+  | K0-w (today's table, factors re-tuned) | 2.801 | 0.4689 | 5 | 4.907 |
+  | MP (analysis-proxy table) | 2.808 | 0.4759 | 6 | 4.904 |
+  | MP-s (members rescaled) | 2.808 | 0.4756 | 8 | 4.904 |
+  | MP-1 (MP, every factor 1) | 2.808 | 0.4753 | 12 | 4.904 |
+  | MM (ensemble mean, today's table) | 2.834 | 0.4845 | 8 | 4.912 |
+  | MO (members only) | 3.747 | 1.3508 | 0 | 4.910 |
+
+  K0's 2.800 is experiment 111's score, reproduced. The replicate months give the same ordering.
+  The day-ahead (D+1) score was not computed separately; the lead bands are in `e00125_tables.py`.
+
+**Figure 2 shows that the cold winter nights are the main miss, and no arm fixes it.** A cold day is
+a local day whose ERA5 mean temperature is at or below the 10th percentile of the site's winter days
+in 2019 to 2024; a cold snap is two or more such days in a row. The rule was fixed in
+`work/decisions.json` (hash `019a763a…`) before any score was read. On the 36 substation-days of the
+scored winter's cold snaps, K0's q95 covered 77.7%, K0-w's 72.9%, MP's 73.7%, and MM's 77.9% of the
+observed night half-hours at day-ahead leads (the target is 95%); the q99 covered 91% to 94%. The
+lower tail is fine (q05 covered 7.3% in every arm). The miss is therefore in the centre or the width
+of the day-ahead forecast on cold nights, and the way the residual table is built does not change it.
+
+![Share of observed night values at or below q95 and q99 on cold-snap days](figure_02_cold_nights.svg)
+
+**Figure 3 shows all four arms with a table slightly too narrow, and the tuned factor of 0.9 makes it
+worse.** Coverage lies within 2.4 points of the level at every level and lead band. The calibration
+rule is stricter than that (a half-width of 2.5 standard errors with one effective case per
+substation-day), so MP-1 with every factor at 1 had 12 cells in band while MP, with factors of 0.9
+to 1.0 tuned on the odd months, had 6. The factors tuned on the tuning months narrowed bands that
+were already slightly too narrow out of period.
+
+![Coverage minus nominal level at 11 quantile levels, by lead band](figure_03_reliability.svg)
+
+**Figure 4 shows why the fix cannot matter: the table's variance is several times the members'.**
+The members' variance (σ_w², the variance of the 51 corrected member forecasts) is 4.1, 6.1, 12.7,
+and 18.6 points squared in the four lead bands, against 27 to 52 for the table's 11 atoms and 34 to 61
+for the squared error of the ensemble mean. The total variance of K0-w's mixture over MP's is 0.98,
+1.01, 0.95, and 1.05, not the 1.05 to 2 predicted. The residual table fitted on ensemble-mean
+residuals and the one fitted on analysis-driven residuals have nearly the same width, which means the
+ensemble mean's error is almost all model error and filter error.
+
+![Members' variance, table variance, and squared error of the mean](figure_04_variance.svg)
+
+**Figure 5 shows that the 51 members alone are far too narrow for demand.** The observed value fell
+outside the range of all 51 members in 74%, 71%, 62%, and 55% of rows in the four lead bands (a flat
+histogram would put 4% there). The fair CRPS of the members is 3.69 to 4.46 points
+([Ferro (2014)](https://doi.org/10.1002/qj.2270)). The threshold-weighted CRPS of the two mixtures
+([Gneiting and Ranjan (2011)](https://doi.org/10.1198/jbes.2010.08110)) differs between K0-w and MP
+by at most 0.005 in any band (upper tail 0.2975 against 0.2976 at 0 to 24 hours).
+
+![Rank histogram of the observed value among the 51 corrected members](figure_05_ranks.svg)
+
+**Predictions and what happened.** The prediction that K0's variance was 1.05 to 2 times MP's failed
+(0.95 to 1.05). The prediction that K0-w moves its factor to 0.7 to 0.8 at long leads failed (K0-w's
+factors are 0.9 in every band). MP's factors are 0.9 to 1.0, as predicted, but MP was in band in
+fewer than 14 cells (6 and 12). The predicted gain on cold nights (MP's night q95 within 1 to 3 points
+of K0-w's) holds in the sense that MP is within 1 point of K0-w, and both are 21 points from nominal.
+The decision rule gave `inconclusive`, not `refuted`, because the quantile-score interval of C1 does
+not lie wholly above +0.02.
+
+**Checks.**
+
+- **Median minus mean forecast per site (scored year, points):** MP's median lies 0.14 below the
+  ensemble mean at D5, 0.05 below at D11, 0.02 below at D10 and D16, and 0.02 above at D14. K0-w's
+  are −0.10, −0.04, −0.04, +0.00, and +0.01 at D5, D11, D10, D16, and D14. MM has zero by
+  construction.
+- **Mean absolute error of the median beside C1:** MP is 0.0025 points better (4.904 against 4.907)
+  while its quantile score is 0.0077 worse.
+- **Triggers fired:** trigger 2 (the variance-ratio and C1 predictions failed; the variance accounting
+  above is the tested explanation), trigger 3 (the error of the median and the quantile score point
+  in different directions, by 0.0025 points, and MP's median at D5 sits 0.04 points below K0-w's,
+  above the plan's 0.01 threshold), trigger
+  4 (leaving out D5 or D16 flips the sign of C1's replicate quantile-score estimate, which is within
+  0.001 of zero and has an interval spanning zero; the scored-year sign and the verdict do not
+  change), and trigger 6 (C1's 95% score interval has a half-width of 0.0064, under half of experiment
+  111's sister contrast at 0.016, because the two arms differ only in the width of the table).
+  The audit has not been run; the maintainer decides whether it is needed.
+
+**Caveats.**
+
+- K0's scored-year tails were read before the plan, so the scored year is not blind for K0.
+- The analysis proxy is a control member of the ensemble and not an independent analysis.
+- The replicate months are interleaved with the tuning months and are not out of time.
+- The scored year has 291 runs (the 2026-06-30 run is excluded, as in experiment 111), and one
+  winter. The cold-snap read rests on 36 substation-days.
+- The 11-atom mixture caps q01 and q99, for every arm alike.
+- The substation cards of the plan were not produced.
+- The rank histogram is of demand among the members. The plan's rank histogram of ERA5 temperature
+  was not drawn, because the cache holds demand forecasts and not member weather.
+- The cold-snap rule was written after the predictions were stored and before any score was read.
+
+**Lessons for later experiments.** The cold-night shortfall is a larger and clearer target than the
+double count: a quantile of demand on cold nights, conditioned on temperature, is the likeliest
+improvement. A factor tuned on alternate months cannot be trusted out of period without a check.
+The weather members are worth keeping as a mixture (C2) and not as a distribution on their own (MO).
 
 ## What N8 asks, and why it starts from the code
 
