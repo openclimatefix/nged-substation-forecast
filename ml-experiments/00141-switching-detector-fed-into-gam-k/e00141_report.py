@@ -137,6 +137,12 @@ def main() -> None:
             "period"
         )
     }
+    out["median_minus_mean_forecast_K0_alarm48"] = {
+        site: float(cast("float", (g["err_median"] - g["err_mean"]).mean()))
+        for (site,), g in frame.filter((pl.col("arm") == "K0") & pl.col("in_alarm48")).group_by(
+            "site"
+        )
+    }
     out["tuning"] = json.loads((SCORES / "chosen.json").read_text())
     (WORK_DIR / "report.json").write_text(json.dumps(out, indent=1))
     print(json.dumps(out, indent=1))
