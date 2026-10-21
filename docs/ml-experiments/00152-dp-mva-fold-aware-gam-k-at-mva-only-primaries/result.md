@@ -37,8 +37,8 @@ decision_rule: >-
   wholly below zero. R3, harmless elsewhere: F minus N pooled over D2, D3, D4, D19, D21, D22, and D8
   after its cut; passes at +0.03 or lower. R4, against production: F minus BG2 at D12, labelled and
   never in the verdict. R2's all-rows value is reported beside it, and R3 also needs its
-  replicate point estimate at +0.03 or lower. `supported` needs the known-answer test and R1, R2, R3. `partly supported`
-  needs the known-answer test, R1 and R3, with R2 failing. `refuted` when R1's interval lies wholly
+  replicate point estimate at +0.03 or lower. `supported` needs the known-answer test and R1, R2,
+  R3. `partly supported` needs the known-answer test, R1 and R3, with R2 failing. `refuted` when R1's interval lies wholly
   above zero or R3's point estimate exceeds +0.10. `inconclusive` otherwise. A failed
   known-answer test caps the verdict at `inconclusive`, except that `refuted` takes precedence when
   its own condition holds. The thresholds are those of the private design, which set them above the
@@ -53,8 +53,9 @@ row_set_id: >-
 metric: >-
   Quantile score (twice the mean pinball loss over the 11 quantiles of experiment 87) on the MVA
   reading |S| in points of effective capacity, rows outside the hand-filtered switching events,
-  leads 0.5 to 168 hours from the 09:00 UTC power_fcst_init_time; sliced by sunny midday (by CAMS irradiance, not observed power), near-zero
-  readings, the morning and afternoon crossing bands, season, lead band, and site; tail calibration at q01, q05, q95, and q99
+  leads 0.5 to 168 hours from the 09:00 UTC power_fcst_init_time; sliced by sunny midday (by CAMS irradiance, not observed power),
+  near-zero readings, the morning and afternoon crossing bands, season, lead band, and site; tail
+  calibration at q01, q05, q95, and q99
 code: ml-experiments/00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/
 production_status: not-for-production
 adopted_in: none
