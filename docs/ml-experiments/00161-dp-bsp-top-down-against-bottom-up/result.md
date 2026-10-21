@@ -19,7 +19,8 @@ size: >-
 hypothesis: >-
   A bulk supply point (BSP) is forecast better bottom-up than top-down. The top-down forecast is the
   best-guess GAM-K chain (experiment 155's arm D) applied to the BSP's reading
-  as a stand-alone series. The bottom-up forecast adds the arm D forecasts of the BSP's child Primary
+  as a stand-alone series. The bottom-up forecast adds the arm D forecasts of the BSP's child
+  Primary
   substations that report real power, each times a weight learned from earlier readings, to arm D's
   forecast of the remainder (the BSP's reading minus those children's weighted readings). The
   mechanism is that the child Primaries' own forecasts are better than the BSP's chain can infer
@@ -79,7 +80,8 @@ lessons:
     remainder's error has a standard deviation of 9.4 points at D13 and 16.6 at D17, against 2.3
     and 3.5 for the covered children's summed error (figure 3).
   - >-
-    Even with the children's readings known exactly, the oracle gained only 12% (D13) and 7% (D17) of
+    Even with the children's readings known exactly, the oracle gained only 12% (D13) and 7% (D17)
+    of
     the top-down score, so a better forecast of the covered children cannot lift the BSP's score
     much (C7).
   - >-
@@ -96,9 +98,11 @@ take_home_message: >-
 advice:
   - >-
     Keep forecasting a BSP as a stand-alone series with the best-guess chain: the bottom-up arm
-    scored 0.5% to 0.6% worse and needs the children's forecasts at serving time (C1).
+    scored no better (0.5% to 0.6% worse, from its narrower spread table; the means tie) and needs
+    the children's forecasts at serving time (C1).
   - >-
-    Do not expect a bottom-up arm to help until the children cover most of the BSP's load: the oracle
+    Do not expect a bottom-up arm to help until the children cover most of the BSP's load: the
+    oracle
     with exact children gained 7% to 12%, so the unmetered load and the MVA-metered children (4 of 7
     at D13 and 4 of 9 at D17) need their own demand forecasts first (C7, figure 3).
   - >-
@@ -132,7 +136,7 @@ the best-guess GAM-K chain ([experiment
 bottom-up arm forecasts each covered child Primary with the same chain, weights the forecasts by
 learned weights, and adds the chain's forecast of the remainder, the BSP's reading minus the
 weighted children's readings. Quantile scores are in points: percentages of the BSP's effective
-capacity, lower is better. Scored rows are the 292 daily runs of 2025-07-02 to 2026-06-29, leads 0.5
+capacity, lower is better. Scored rows are the 291 daily runs of 2025-07-02 to 2026-06-29, leads 0.5
 to 168 hours, outside switching events.
 
 **Scope.** Two BSPs have child Primaries with usable data: D13 (seven children) and D17 (nine
@@ -150,8 +154,10 @@ sits under, and no other BSP is in scope until then.
 variants against zero, and the oracle far below it. The fixed-sum variant (every weight 1) scored
 the same as the learned weights (C3: -0.003 at D13, +0.003 at D17, both intervals including zero).
 Giving the bottom-up arm the top-down arm's spread table moved the score by -0.016 at D13 and
-+0.002 at D17 (C5), so the bottom-up mean is as good as the top-down mean and its own spread table
-is slightly worse at D13.
++0.002 at D17 (C5), so the two means tie. The positive sign of C1 comes from the spread table:
+bottom-up
+refits its table on the corrected errors, which narrows its band and under-covers the tails,
+while top-down keeps the table fitted before the corrections.
 
 ![Quantile score by lead band for top-down, bottom-up, and the oracle](figure_2_by_lead.svg)
 
@@ -165,8 +171,10 @@ in every band.
 
 **Most of the BSP's error is in the remainder.** At D13 the remainder's error has a standard
 deviation of 9.4 points and the weighted children's summed error 2.3 points; at D17 the figures are
-16.6 and 3.5. The top-down error (10.9 and 18.2) is the two parts added, so correcting the children
-cannot remove the remainder's error. The two parts' errors correlate positively (0.56 at D13, 0.39
+16.6 and 3.5. The two parts add up to the bottom-up error (10.9 and 18.2), which is close to the
+top-down
+error, so correcting the children cannot remove the remainder's error. The two parts' errors
+correlate positively (0.56 at D13, 0.39
 at D17), so they add up to nearly the top-down error. Even the oracle, which removes the children's
 error, only gets from 4.361 to 3.838 points at D13 and from 7.672 to 7.108 at D17.
 
@@ -222,9 +230,14 @@ brings bottom-up's coverage back to top-down's (D13 0.017, 0.066, 0.921, 0.969).
   `BSP = remainder + weighted children` holds exactly in the observed readings (passed).
   **Oracle: failed.** The oracle gained 0.523 points at D13 and 0.563 at D17, against thresholds of
   0.918 and 2.140 (half of the covered capacity share times the top-down score). The
-  threshold assumed the BSP's error falls in proportion to the covered load. The error decomposition
-  shows it does not, so the failure reflects the mis-specified threshold and not a plumbing fault,
-  which the exact decomposition would have exposed.
+  threshold assumed the BSP's error falls in proportion to the covered load, and an exact sum does
+  not imply that: it fixes which error the oracle has, not how large it is. The audit found the
+  oracle's error equal to the remainder's error to within 1e-5 on every scored row, and the ratio of
+  standard deviations in figure 3 predicts gains of 13.7% (D13) and 8.9% (D17) against the
+  observed 12.0% and 7.3%. The failure therefore reflects the mis-specified threshold and not a
+  plumbing fault. The cap does not bind, because both C1 intervals include zero and the decision
+  rule gives `inconclusive` anyway. In the replicate months the D17 oracle gain is -0.361 (-0.652 to
+  +0.070), which includes zero.
 - **Triggers fired.** Trigger 1 (the oracle control failed). Trigger 2 (the prediction missed:
   C1 predicted -2% to -8% and found +0.6% and +0.5%; the oracle predicted -15% to -40% and found
   -12% and -7%; the explanation in the error decomposition is stated above and was tested by it).
@@ -236,7 +249,15 @@ brings bottom-up's coverage back to top-down's (D13 0.017, 0.066, 0.921, 0.969).
 
 ## Audit and triage
 
-Pending.
+- **Finding 1, the spread table carries C1's sign (accepted).** Bottom-up's own table adds +0.042
+  points at D13 and +0.033 at D17; with matched tables the means tie (C5). The text now says the
+  means tie and no gain was found.
+- **Finding 2, the oracle threshold (accepted).** The threshold was wrong before the run, and the
+  plumbing is sound (see Checks). The cap does not bind.
+- **Findings 3 and 4, wrong arm named and 291 runs (accepted).** Both are corrected.
+- **Finding 5, when the weight bounds were set (accepted).** The bounds were added after the first
+  unbounded fit, before any score was read, and bounding changes no score (C3).
+- **Finding 6, the D17 oracle in the replicate months (accepted).** It is reported in Checks.
 
 ## Caveats
 
@@ -249,7 +270,8 @@ Pending.
   with no bottom-up gain to split, the question did not arise.
 - **The weight-refit variant (C9) was replaced by the unbounded-weights variant,** which tests the
   same question (does the weight estimate matter) with the weights that failed.
-- **The curtailment metric was not scored,** because this experiment did not build the generator inputs
+- **The curtailment metric was not scored,** because this experiment did not build the generator
+inputs
   it needs for these BSPs.
 - **Weather is past-weather ensemble means calibrated as in experiment 136,** the same as every
   arm uses, so the comparison is fair and the absolute scores are not production scores.
@@ -264,7 +286,9 @@ Pending.
 
 ## Plan
 
-**Departures from this plan.** The weights are bounded (0.8 to 1.2), because the first unbounded fit
+**Departures from this plan.** The scored year holds 291 runs, not 292, and the bounds were set
+after the first unbounded fit and before any score was read. The weights are bounded (0.8 to 1.2),
+because the first unbounded fit
 was unstable, and the unbounded fit is the `free` variant, which replaces BU-w2 (C9). BU-fc (C8) was
 not run. The oracle threshold and the prediction missed, as the Checks list says.
 
