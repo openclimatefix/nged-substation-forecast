@@ -6,20 +6,22 @@ substation and was worse at full history.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| Experiment 109 gate rerun (experiment 150) | Does the pooled convex model recover the injected truth against a fair oracle, and is the tuning rule stable across 5 seeds? | 1 | Nothing | Planned |
 | Onboarding design (proposed) | Does a pooled model for onboarding and a per-site model for mature substations beat either alone? | 2 | Experiment 105: pooled onboarding scored 4.04 against 14.38 for a per-site model on 4 weeks, and was worse at full history | Proposed |
-| Part 4 (proposed) | Does a drift term (a slowly changing demand level), trained from 2019-09, beat the same model on its best window? | 3 | Experiment 112 (finished: an exact variable-projection fit did not improve the pooled model, and its known-answer test failed at realistic noise) and a rerun of experiment 109's gate | Proposed |
+| Part 4 (proposed) | Does a drift term (a slowly changing demand level), trained from 2019-09, beat the same model on its best window? | 3 | Experiment 112 (finished: an exact variable-projection fit did not improve the pooled model, and its known-answer test failed at realistic noise) | Proposed |
 | Part 5 (proposed) | Does the MVA observation layer (a model of how a meter that reads apparent power relates to real power) help the MW sites and recover MW at MVA sites? | 4 | Experiment 105 and a better capacity fit | Proposed |
-| N9, scale-up | Does the pooled model on every v1 series it can take, including MVA substations, improve full-history skill and capacity identification? | 5 | A rerun of experiment 109's gate, which is outstanding; 3 to 5 GPU hours | Queued |
+| N9, scale-up | Does the pooled model on every v1 series it can take, including MVA substations, improve full-history skill and capacity identification? | 5 | Nothing; 3 to 5 GPU hours | Queued |
 | BSP as a Kalman observation | Does treating the BSP reading as an extra observation in the Kalman filter improve the Primaries' forecasts? | 6 | Experiment 124 (finished: a BSP term in the joint fit raised clean-forecast error) | Proposed |
 | Top-down against bottom-up | Does a direct forecast at a BSP or grid supply point (GSP) beat the sum of the Primary forecasts, and does reconciling the levels help either? | 7 | The closure audit | Proposed |
 | Metered generators in the graph | Do metered generators, entered as export-positive nodes at the BSP, make the BSP relation close better? | 8 | The closure audit | Proposed |
 | Unmetered wind at higher levels | Can unmetered wind at the BSP and GSP be estimated as the part of the residual that follows the wind forecast? | 9 | The closure audit | Proposed |
 
-**Experiment 109 gives the pooled convex model N for the next experiments to start from, once its
-known-answer gate is rerun.** The gate failed under its pre-registered definition, so Part 5
-and Part 6 depend on N and on a rerun of the gate with an oracle that estimates every
-coefficient and a tuning rule checked on several seeds.
+**Experiment 109 gives the pooled convex model N for the next experiments to start from, and
+[experiment 150](../../00150-differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds/result.md)
+reran its known-answer gate.** The rerun was `inconclusive`: capacity from 4 weeks was within 25% at
+8 of 8 substations on 5 of 5 seeds, the tuning rule was within one grid step of the best penalty on 5
+of 5 seeds, and the pooled fit's heating error beat a fair oracle's, but the shrinkage line could not
+tell a good fit from a bad one on 4 June weeks. A gate that scores the heating error against the
+injected truth on 4 winter weeks would settle it.
 
 ## Planned experiments
 

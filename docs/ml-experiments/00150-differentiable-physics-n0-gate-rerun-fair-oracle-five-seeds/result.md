@@ -3,7 +3,7 @@ id: "00150"
 slug: differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds
 theme: differentiable-physics-pooling-across-substations
 also_relevant_to: [hierarchy-and-pooling]
-status: planned
+status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00150-differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds/ (a copy of
@@ -43,28 +43,121 @@ row_set_id: >-
   Primaries; no scored forecast rows)
 metric: >-
   Gate lines (a) to (e) as defined under "Pre-registered lines", counted over seeds
+verdict: inconclusive
+production_status: not-for-production
+adopted_in: none
+date: 2026-10-21
+pr: 1452
+take_home_message: >-
+  The gate rerun could not tell a good pooled fit from a bad one in the pre-registered form: with 4
+  June weeks the heating signal is so weak that complete pooling passed the shrinkage line on 2 of 5
+  seeds. The pooled fit's other results were good: it recovered capacity within 25% at 8 of 8
+  substations on every seed, the tuning rule landed within one grid step of the best penalty on 5 of
+  5 seeds, and its heating error was smaller than the fair oracle's on 5 of 5 seeds. The next step
+  is a gate whose shrinkage line measures error against the truth, not a slope against an oracle
+  that treats the noise as independent.
+advice:
+  - >-
+    Do not use a slope against an oracle with independent noise as a shrinkage test for the pooled
+    model: with 4 weeks of data the fair oracle's heating error was 2.4 to 4.1 against 1.9 to 2.5
+    for the pooled fit in January, so the oracle is the worse estimator (post hoc January rerun).
+  - >-
+    Hold 4 winter weeks, not 4 June weeks, when a gate tests heating shrinkage: in June complete
+    pooling passed line (b) on 2 of 5 seeds, in January it failed on 5 of 5 (line (b) controls).
+  - >-
+    Start later experiments from the pooled convex model N with its tuning rule: capacity from 4
+    weeks was within 25% at 8 of 8 substations on 5 of 5 seeds, and the rule was within one grid
+    step of the best penalty on 5 of 5 seeds (lines (e) and (d)).
+  - >-
+    Keep the 0.85 bar for line (c) only if the gate is rerun with it justified: the full-history
+    slope was 0.82 to 0.94 and passed on 2 of 5 seeds, so the line as set sits at the noise level
+    (line (c)).
+code: ml-experiments/00150-differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds/
 ---
 
 # Differentiable physics, N0: rerunning experiment 109's known-answer gate with a fair oracle and five seeds
 
+**The rerun could not say whether the shrinkage of the pooled model is right, because the test line
+that measures shrinkage could not tell a good fit from a bad one; the rest of the pooled model's
+results were good.** With 4 June weeks of data a substation's heating signal is so weak that
+complete pooling (no per-substation deviation at all) passed the shrinkage line on 2 of 5 seeds. The
+pooled fit recovered capacity within 25% at 8 of 8 substations on every seed, the tuning rule chose a
+penalty within one grid step of the best on 5 of 5 seeds, and the pooled fit's heating error was
+smaller than the fair oracle's on 5 of 5 seeds. The verdict by the pre-registered rule is
+`inconclusive`. The next gate should measure the heating error against the injected truth and hold
+winter weeks.
+
 **This experiment asks whether the partially pooled convex model of
 [experiment 109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) finds
-the answer when we know it.** The model gives each substation a fleet-shared set of coefficients plus a
-penalised deviation. Experiment 109's known-answer test (the "gate") built eight synthetic
-substations with injected coefficients and checked the fit against them. It failed under its
-pre-registered definition, and four redefinitions followed on four new seeds, so a change of
-definition and a change of seed were confounded.
+the answer when we know it.** The model gives each substation fleet-shared coefficients plus a
+penalised deviation. Experiment 109's known-answer test (the "gate") built 8 synthetic substations
+with injected coefficients, and failed under its pre-registered definition. Four redefinitions
+followed on four new seeds, so a change of definition and a change of seed were confounded. Two
+faults made that gate unfair. The reference estimator (the "oracle") was given each substation's true
+capacity, which the pooled fit had to estimate from the same 4 weeks, and the tuning rule was checked
+on one seed per definition. Here the oracle estimates every coefficient, the capacity included, and
+the gate runs 5 seeds under one definition. The gate code is copied from
+[`e00109_gate.py`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_gate.py).
 
-**Two faults made that gate unfair, and this experiment removes both.** First, the reference
-estimator (the "oracle") knew each substation's true capacity while the pooled fit had to estimate it
-from the same 4 weeks, so the oracle beat the pooled fit on heating error by construction. The new
-oracle estimates every coefficient, the capacity included. Second, the tuning rule was checked on
-one seed per definition. The new gate runs 5 seeds under one definition and counts passes.
+![The pooled fit has a smaller heating error than the fair oracle on all 5 seeds](figure_01_heating_error.svg)
 
-The method follows experiment 109's gate (see its page, and
-[`e00109_gate.py`](https://github.com/openclimatefix/nged-substation-forecast/blob/main/ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_gate.py)),
-which uses the pooled fit of `studies.dp_gam_pooled` unchanged. Nothing here is tuned on real
-substations' scored years.
+![In January the pooled fit shrinks heating deviations harder than the oracle](figure_02_shrinkage_slope.svg)
+
+![The tuning rule is within one grid step of the best penalty on 5 of 5 seeds](figure_03_tuning.svg)
+
+## Results
+
+Every number below is printed in [`report.txt`](report.txt).
+
+| Line (pre-registered) | Seeds passed | Detail |
+|---|---|---|
+| (a) fleet mean | 4 of 5 | Seed 1 missed by 0.02 points (profile 0.518 against 0.5). |
+| (b) shrinkage against the fair oracle | 2 of 5 | Passes on seeds 4 and 5, where the oracle's slope is near 0. |
+| controls for (b) both fail | 3 of 5 | Complete pooling passed on seeds 4 and 5; no pooling never passed. |
+| (c) full history keeps its own coefficients | 2 of 5 | Slopes 0.82 to 0.94 against the 0.85 bar. |
+| (d) tuning within one grid step | 5 of 5 | Exactly the best penalty on 3 of 5 seeds. |
+| (e) capacity from a short window | 5 of 5 | 8 of 8 within 25% at 4 weeks and at 3 months on every seed. |
+
+- **Verdict rule as pre-registered.** The gate is not passed (line (b) passed on 2 of 5 seeds, below
+  the 4 needed). The tuning rule is stable. Complete pooling passed line (b) on 2 seeds, so the
+  rule's `inconclusive` clause applies.
+- **The oracle is the worse heating estimator in January and in June.** The oracle's heating error
+  was 2.35 to 3.45 against 2.01 to 2.38 for the pooled fit in June, and 2.30 to 4.06 against 1.87 to
+  2.46 in January. The oracle treats the noise as independent, but the noise keeps multi-day
+  persistence, so the oracle trusts four weeks of evidence too much.
+- **Line (b) fails by design in June.** The slope half asks the pooled fit to match the oracle's
+  slope. The oracle's slope was 0.35, 0.43, 0.42, -0.10, and 0.08 on the 5 seeds, so a fit that
+  keeps nothing (slope 0) is within 0.15 of the oracle on seeds 4 and 5.
+- **Capacity is estimated well.** The fair oracle's fitted capacity was 0.90 to 1.20 of the truth
+  (report section "Fair oracle capacity ratios").
+- **Tuning.** The rule picked 1,000 rows on 4 seeds and 300 on seed 4. The best penalty on the
+  noise-free truth was 1,000, 300, 1,000, 100, and 1,000.
+
+## Post hoc: line (b) with 4 January weeks
+
+**This rerun is labelled post hoc and changes no pre-registered verdict.** It holds the 4 weeks
+before 2025-02-01 on the same 5 fleets, with the seed's tuned penalty.
+
+- **The controls failed on 5 of 5 seeds**, so with winter weeks line (b) can detect both no pooling
+  (error 4.3 to 8.4) and complete pooling (error 2.1 to 2.6).
+- **The pooled fit failed line (b) on 5 of 5 seeds, on the slope half only.** Its slope was 0.20 to
+  0.50 against the oracle's 0.63 to 1.06, while its error (1.87 to 2.46) was below the oracle's (2.30
+  to 4.06). The pooled fit shrinks harder than the oracle and is more accurate, which fits the
+  oracle's independent-noise assumption being wrong.
+
+## Checks
+
+- **Median forecast minus mean forecast, per site.** Not applicable: the gate scores coefficients and
+  noise-free truth, not forecast spreads.
+- **Error of the mean forecast beside each contrast.** The tuning check scores the mean forecast
+  against the noise-free truth (line (d)); the quantile-score rule gave the same penalty as the
+  truth-based rule on 3 of 5 seeds. Tuning on the median's absolute error instead picked 1,000, 300,
+  300, 300, and 1,000, which agrees with the quantile-score rule on 3 of 5 seeds.
+- **Audit triggers that fired.** Trigger 1 (a known-answer test fails), trigger 2 (the result
+  contradicts the prediction that line (b) passes on 4 or 5 seeds; explained above), and trigger 7
+  (the pooled experiments listed in the theme's plan depend on this gate). Triggers 3 to 6 do not
+  apply, because the gate has no per-site forecast contrast. A Sonnet audit ran in place of an Opus
+  audit, as the brief required; its findings and their triage are under "Review".
 
 ## Pre-registered lines
 
@@ -89,7 +182,7 @@ substations' scored years.
 - **(d) Tuning rule picks the best penalty within one grid step.** The rule is experiment 109's
   (the penalty minimising the mean of the 4-week and 3-month score ratios against no pooling, subject
   to the all-rows score within 0.02 points). The best penalty is found by applying the same rule to
-  the root mean square error of the median forecast against the noise-free injected truth, on the
+  the root mean square error of the mean forecast against the noise-free injected truth, on the
   same rows. Line (d) passes when the rule's penalty is within one step of the best on
   `common.LAMBDA_GRID` (nine values from 0 to 1,000,000). Experiment 109's line (d), which
   multiplied every spread by 10 or by 0.1, is dropped, and the two extra fleets that it needed are
@@ -100,18 +193,32 @@ substations' scored years.
   control values), the fair oracle's capacity ratio, and the error of each pooled family against the
   oracle.
 
-## Runs
-
-- **Compute.** CPU only, at most 8 cores with one thread each, inside `systemd-run --user --scope`
-  with a 16 GB memory cap. Each seed builds one fleet, runs one tuning grid (9 penalties by 3
-  histories, plus the per-site comparator's ridges), and runs the gate fits. Experiment 109's gate
-  took 7 to 22 minutes per seed with three fleets; one fleet per seed should take under 10.
-- **Schedule.** One refit at the 2025-07-01 cut per fit, as in experiment 109, so the result does not
-  depend on a retraining schedule.
-- **Anonymisation.** The fleets are synthetic and carry no generator data.
-- **Torch.** The scripts that fit the pooled model import torch inside the worker function (as
-  experiment 109's did); they are added to the `ty` torch override list.
-
 ## Predictions against outcome
 
-To be filled in when the experiment finishes.
+- **Predicted: line (b) passes on 4 or 5 of 5 seeds.** It passed on 2. The prediction assumed the
+  oracle's capacity advantage was the only fault; the oracle's independent-noise assumption was a
+  second one.
+- **Predicted: the tuning rule within one grid step on 3 or 4 of 5 seeds.** It was within one step on
+  5 of 5.
+
+## Caveats
+
+- **The pooled fit is given the true capacity of the seven full-history substations**, because the
+  synthetic vintages equal the truth (inherited from experiment 109). Lines (a), (c), and the tuning
+  feasibility rule run with capacity known; lines (b) and (e) estimate the held-out substation's
+  capacity.
+- **The oracle's prior mean is the mean of all 8 true coefficient vectors**, including the held-out
+  substation's own, which slightly flatters the oracle and biases against passing line (b).
+- **The 5 fleets share the real calendar, weather, and noise weeks**, and differ only in the
+  injected coefficients, so they are not independent replicates of the noise.
+- **Schedule.** One refit per fit at the 2025-07-01 cut (2025-02-01 for the post hoc rerun), so the
+  contrasts do not depend on a retraining schedule.
+- **Torch.** `e00150_tune.py` imports torch inside its worker function and is on the `ty` torch
+  override list.
+
+## What to try next
+
+**Replace line (b) by the error of the pooled fit against the injected truth, held on 4 winter
+weeks, with the complete- and no-pooling errors as controls.** The pooled fit's heating error
+(1.87 to 2.46) beat complete pooling (2.1 to 2.6) on 4 of 5 seeds and no pooling (4.3 to 8.4) on 5 of
+5 in January, which such a line would test directly.
