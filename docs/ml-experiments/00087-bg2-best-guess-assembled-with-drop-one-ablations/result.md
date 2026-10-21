@@ -127,7 +127,7 @@ trained once, with a correction from the last 14 days of errors. At the 4 supply
 12.925, against 13.559 for the stack. The solar offset (the forecast output of the unmetered solar
 panels behind the substation, experiments 64 and 78) lowers the score by 0.114 points (0.075 to
 0.164) on the rows it can touch: daylight from April to September at the 5 Primaries that carry
-an offset, 8.5% of the Primary rows. That is inside the prediction of 0.10 to 0.15. Averaged over
+an offset, 8.5% of the Primary rows. The point value is inside the prediction of 0.10 to 0.15. Averaged over
 all rows of all 16 Primaries the gain dilutes to 0.010.
 For the solar and wind farms, training on the archived
 ECMWF ensemble forecasts scored 0.050 and 0.228 points worse than experiment 33's mixture trained
@@ -254,9 +254,8 @@ resampling whole months. Negative differences mean BG2 scores lower, which is be
   training labels plus the offset. Ablation A6 holds the capacity at experiment 64's value, which
   was estimated before July 2025. The offset lowers the score by 0.114 on its daylight
   April-to-September rows at the 5 offset Primaries (0.010 over all rows of all 16 Primaries).
-  An audit found no flaw that dilutes or
-  cancels the effect: the base margin, blend weights, gate, and member twins are consistent between
-  training and prediction. Using the held capacity at prediction instead of the vintage capacity
+  Nothing dilutes or cancels the effect: the base margin, blend weights, gate, and member twins
+  are the same in training and prediction. Using the held capacity at prediction instead of the vintage capacity
   gives 0.105 (ablation A6), so the vintage capacity helps slightly. The spread factor is a fixed
   1.15 around the median and the 14-day correction uses the stack member's own errors, so neither
   carries a replica-year bias into the offset.
