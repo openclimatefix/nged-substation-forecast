@@ -34,7 +34,7 @@ READOUTS: Final[dict[str, str]] = {
     "two_stage": "Two-stage (experiment 129's arm 2)",
     "joint_year": "Joint, mean over the season-year (the gate)",
     "joint_last": "Joint, last month (what a forecast holds)",
-    "joint_energy": "Joint, mean weighted by solar energy (post hoc)",
+    "joint_weighted": "Joint, mean weighted by squared solar shape (post hoc)",
 }
 READOUT_COLOURS: Final[list[str]] = [
     ocf.DATA_BLUE,
@@ -61,7 +61,7 @@ def readouts(*, table: pl.DataFrame) -> pl.DataFrame:
     for name, column in (
         ("joint_year", "recovery_year"),
         ("joint_last", "recovery_last_month"),
-        ("joint_energy", "recovery_energy"),
+        ("joint_weighted", "recovery_weighted"),
     ):
         parts.append(joint.select("site", "farm", readout=pl.lit(name), recovery=column))
     return pl.concat(parts)
@@ -103,7 +103,7 @@ def print_numbers(*, table: pl.DataFrame) -> None:
             .agg(
                 year=pl.col("recovery_year").median(),
                 last=pl.col("recovery_last_month").median(),
-                energy=pl.col("recovery_energy").median(),
+                weighted=pl.col("recovery_weighted").median(),
             )
             .sort("share", "site")
         )
@@ -195,7 +195,7 @@ def figure_recovery(*, table: pl.DataFrame) -> alt.TopLevelMixin:
                 "Dot: median over five real farms injected at 50% of the Primary's pinned"
                 " capacity. Line: range over the farms. Green band: pre-registered gate"
                 " (0.95 to 1.05). Dashed line: 0.88, the best two-stage figure. Black tick:"
-                " the most any fit of the fixed solar shape can find (shape ceiling)."
+                " the share of the farm that one scale of the fixed solar shape fits (shape ceiling)."
                 " Fits use rows before 2025-07-01."
             ),
         ),

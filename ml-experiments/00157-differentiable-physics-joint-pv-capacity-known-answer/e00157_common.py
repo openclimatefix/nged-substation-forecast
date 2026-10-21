@@ -58,9 +58,6 @@ RIDGE: Final[float] = 0.1
 GROWTH_SHARES: Final[tuple[float, ...]] = (0.1, 0.01, 1.0)
 """The joint fit's growth penalty as a share of the mean diagonal of the Gram matrix over the
 capacity columns: the pre-registered value first, then the two sensitivity checks."""
-MIN_YEAR_ROWS: Final[int] = 12000
-"""A season-year counts as a data year at a Primary when it has at least this many training
-half-hours (a full season-year has 17,520)."""
 FARM_MAX_ZENITH_DEG: Final[float] = 75.0
 FARM_DROPOUT_GHI_W_M2: Final[float] = 100.0
 """A farm half-hour at or below zero power while the irradiance exceeds this is a dropout."""

@@ -258,11 +258,11 @@ def fit_one(
                 "fit": kind,
                 "year_mean": by_year[common.LATEST_SEASON_YEAR],
                 "last_month": by_year[common.LATEST_SEASON_YEAR],
-                "year_energy_mean": by_year[common.LATEST_SEASON_YEAR],
+                "year_weighted_mean": by_year[common.LATEST_SEASON_YEAR],
             }
         )
     in_year = design.season_year_of_month == common.LATEST_SEASON_YEAR
-    energy = torch.diagonal(gram)[cap.start : cap.start + design.n_months].numpy()
+    shape_weight = torch.diagonal(gram)[cap.start : cap.start + design.n_months].numpy()
     paths = []
     for share in common.GROWTH_SHARES:
         matrix, cost, constrained = joint_penalty(
@@ -279,7 +279,9 @@ def fit_one(
                     "fit": kind,
                     "year_mean": float(path[in_year].mean()),
                     "last_month": float(path[-1]),
-                    "year_energy_mean": float(np.average(path[in_year], weights=energy[in_year])),
+                    "year_weighted_mean": float(
+                        np.average(path[in_year], weights=shape_weight[in_year])
+                    ),
                 }
             )
             paths += [
@@ -312,7 +314,7 @@ def run_site(*, cache: FeatureCache, site: str) -> pl.DataFrame:
     frame = pl.DataFrame(rows)
     keys = ["farm", "arm", "share"]
     wide = frame.pivot(
-        on="fit", index=[*keys, "n_rows"], values=["year_mean", "last_month", "year_energy_mean"]
+        on="fit", index=[*keys, "n_rows"], values=["year_mean", "last_month", "year_weighted_mean"]
     ).with_columns(site=pl.lit(site))
     return wide.with_columns(
         injected_points=pl.lit(injected_points),
@@ -321,7 +323,9 @@ def run_site(*, cache: FeatureCache, site: str) -> pl.DataFrame:
         recovery_year=(pl.col("year_mean_injected") - pl.col("year_mean_base")) / injected_points,
         recovery_last_month=(pl.col("last_month_injected") - pl.col("last_month_base"))
         / injected_points,
-        recovery_energy=(pl.col("year_energy_mean_injected") - pl.col("year_energy_mean_base"))
+        recovery_weighted=(
+            pl.col("year_weighted_mean_injected") - pl.col("year_weighted_mean_base")
+        )
         / injected_points,
     )
 
