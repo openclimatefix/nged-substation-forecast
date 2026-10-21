@@ -127,7 +127,7 @@ _STATE: dict[str, Any] = {}
 
 def _worker(job: tuple[str, datetime, str]) -> str:
     """Fit one job in a worker process with one thread, and write its files."""
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
     site, cut, variant = job
