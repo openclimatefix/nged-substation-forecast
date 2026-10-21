@@ -38,7 +38,7 @@ verdict: inconclusive
 labels: "MH tie; N1 null control; N2, N3, N4 not powered; indexing not identified"
 production_status: candidate
 take_home_message: >-
-  Adding night-time levels fixed to the UTC clock lowers the day-ahead error on winter nights by
+  Adding night-time levels indexed on the UTC clock lowers the day-ahead error on winter nights by
   about 0.23 points after the recent-error filter, at all 5 substations in both winters, and the
   forecast then shows the 01:00 jump in demand that the current forecast misses on cold winter
   nights. Five heating bends instead of one gain only 0.016 points, within noise. The synthetic
@@ -52,20 +52,23 @@ headline: >-
   NS-U-K minus B0-K -0.233 points on winter nights (99.375% interval -0.276 to -0.180), better at
   5 of 5 substations in both winters; MH-K minus B0-K -0.0155 (-0.035 to +0.004), a tie.
 lessons: >-
-  A night term fixed to the UTC clock removes most of the missing 01:00 step on cold winter nights,
-  and the gain holds in the previous winter. Five heating bends add almost nothing, and the screening
-  gates could not show that a 4-point night step is detectable, so no night label is earned.
+  A night term indexed on the UTC clock removes most of the missing 01:00 step on cold winter
+  nights, and the gain holds in the previous winter. The experiment cannot say whether the clock
+  matters, because in winter local time equals UTC. Five heating bends add almost nothing, and the
+  screening gates could not show that a 4-point night step is detectable, so no night label is earned.
 advice:
   - >-
-    Add UTC-clock night levels (NS-U) to GAM-K's convex model as a candidate standard piece, and
-    confirm it on ENS with monthly refits before porting (N2, figure 1).
+    Night levels indexed on the UTC clock (NS-U) are worth an ENS confirmation plan with monthly
+    refits. The label is `not powered`, so the decision rule does not make them a candidate for
+    GAM-K yet (N2, figure 1).
   - >-
     Judge any night or Economy 7 term on winter nights and on the forecast's 01:00 step, not on the
     annual mean, because the annual gain is 0.05 against 0.23 on winter nights (figure 3, figure 2).
   - >-
-    Index night terms on the UTC clock, not the local clock, because a local-clock level is
-    collinear with the day-type profile and adds nothing (N1), while the UTC clock moves with the
-    clock change (N2).
+    Try a UTC-indexed night term first, because the local-clock level is collinear with the
+    day-type profile and adds nothing (N1). Whether the clock matters is not identified: the
+    observed step sits at 01:30 local (00:30 UTC) on British Summer Time nights, which is
+    descriptive evidence only.
   - >-
     Do not add a five-hinge heating curve to GAM-K: the filtered gain is 0.016 points with an
     interval spanning zero, and a shrunk version (−0.017, 95% interval −0.030 to −0.005) is the
@@ -82,21 +85,20 @@ code: ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-a
 
 # Differentiable physics, MH: multi-hinge heating curve and night step
 
-**Adding night-time levels fixed to the UTC clock removes most of the 01:00 jump in demand that the
-current forecast misses on cold winter nights, and a five-hinge heating curve adds almost nothing.**
-We asked two questions of GAM-K, the fitted model of primary substation demand (a primary substation
-is a substation of the electricity distribution network that supplies local feeders) that the
-differentiable-physics series
-of experiments uses. First, does letting its heating response bend at five temperatures instead of
-one lower the forecast error? Second, does a night-time step term, such as the load that Economy 7
-meters and storage heaters switch on at about 01:00, lower the error on winter nights? (Economy 7 is
-a UK off-peak electricity tariff.) We fitted each change at five substations, forecast each one day
-ahead for the 12 months from July 2025, and scored it on the same rows as the unchanged model, which
-the page calls B0-K. We tested the fitting code on synthetic substations first. The five-hinge curve
-lowered the error by 0.016 points against B0-K, a tie. The UTC-clock night term lowered the error on
-winter nights by 0.23 points, and the gain held in the previous winter (2024-25). The synthetic
-tests could not show that a step this small can be detected, so every night label stays `not
-powered` and the verdict is `inconclusive`.
+**Adding night-time levels indexed on the UTC clock removes most of the 01:00 jump in demand that
+the current forecast misses on cold winter nights, and a five-hinge heating curve adds almost
+nothing.** We asked two questions of GAM-K, the fitted model of primary substation demand (a primary
+substation is a substation of the electricity distribution network that supplies local feeders) that
+the differentiable-physics series of experiments uses. First, does letting its heating response bend
+at five temperatures instead of one lower the forecast error? Second, does a night-time step term,
+such as the load that Economy 7 meters and storage heaters switch on at about 01:00, lower the error
+on winter nights? (Economy 7 is a UK off-peak electricity tariff.) We fitted each change at five
+substations, forecast each one day ahead for the 12 months from July 2025, and scored it on the same
+rows as the unchanged model, which the page calls B0-K. We tested the fitting code on synthetic
+substations first. The five-hinge curve lowered the error by 0.016 points against B0-K, a tie. The
+UTC-indexed night term lowered the error on winter nights by 0.23 points, and the gain held in the
+previous winter (2024-25). The synthetic tests could not show that a step this small can be
+detected, so every night label stays `not powered` and the verdict is `inconclusive`.
 
 **The quantile score is twice the mean pinball loss over 11 quantile levels, so lower is
 better.** It is measured in points, which are percent of a substation's effective capacity and not
@@ -119,33 +121,37 @@ D11, 11.71 at D14, and 9.12 at D16).
 ## Take-home message and verdict
 
 - **Night terms lower the winter-night score by 0.233 points.** NS-U-K (free night levels on the UTC
-  clock) minus B0-K is −0.233 points on winter nights (99.375% interval −0.276 to −0.180), better at
-  5 of 5 substations, with −0.153 (95% interval −0.183 to −0.121) in the replicate winter 2024-25.
-  The forecast of the 01:00 step on cold winter nights rises from 15 to 45% of the observed step to
+  clock) minus B0-K is −0.233 points on winter nights (99.375% interval −0.276 to −0.180, drawn from
+  only 5 resampled init-time months, so lean on the site and winter consistency), better at 5 of 5
+  substations, with −0.153 (95% interval −0.183 to −0.121) in the replicate winter 2024-25. The
+  forecast of the 01:00 step on cold winter nights rises from 15 to 45% of the observed step to
   within 0.2 to 3.1 points of it (figure 2, table below).
 - **The five-hinge heating curve ties with the single hinge.** MH-K minus B0-K is −0.0155 (97.5%
   interval −0.035 to +0.004), −0.022 in the replicate year, better at 5 of 5 substations in both
-  years. The label is `tie`. The gain sits in cold snaps (−0.140) and not in winter evening peaks
-  (+0.005).
+  years. The label is `tie`. The gain sits in cold snaps (−0.140 in the scored winter, −0.077 in the
+  replicate winter) and not in winter evening peaks (+0.005).
 - **The verdict is `inconclusive`.** The MH label is `tie`. Every night label is `not powered`
   because all three synthetic detection gates failed: a 4-point step is detected in 14%, 14%, and 8%
   of draws (80% needed, figure 5). The estimates for NS-U-K and MH-K above are results on real data
   and are reported in full; the pre-registered rule does not let them earn a label.
-- **Production status is `candidate`, not adopted.** NS-U and NS-HW are the arms to confirm on ENS
-  with monthly refits, after an independent audit by a reviewing agent (triggers 4, 5, and 7 below).
+- **Production status is `candidate`, not adopted.** NS-U and NS-HW are the arms worth an ENS
+  confirmation plan with monthly refits, after an independent audit by a reviewing agent (triggers
+  1, 2, 4, 5, and 7 below).
 
 ![The heating and night contrasts with intervals](figure_1_headline.svg)
 
-**Figure 1 shows the heating contrasts near zero and the UTC-clock night contrasts well below it.**
-The evolving night step (NS-UT) is worse than the fixed one.
+**Figure 1 shows the heating contrasts near zero and the UTC-indexed night contrasts well below
+it.** The evolving night step (NS-UT) is worse than the fixed one.
 
-## The forecast reproduces the 01:00 step only with a UTC-clock night term
+## The forecast reproduces the 01:00 step only with a night term
 
-**B0-K gets 15 to 45% of the observed step; NS-U-K and NS-HW-K get most of it.** The table
-gives, over cold winter weekday nights (22:00 to 08:00, daily mean temperature below 8 C, 55 to 59
-nights per substation in the scored winter, 64 to 65 in the replicate winter), the median observed
-step (half-hour starting 00:30 minus the half-hour starting 00:00) in points and MW, and each
-forecast's median step minus it, with a 95% interval from resampling nights.
+**B0-K gets 15 to 45% of the observed step; NS-U-K and NS-HW-K get most of it.** The table gives,
+over cold winter weekday nights (22:00 to 08:00, daily mean temperature below 8 C, 55 to 59 nights
+per substation in the scored winter, 64 to 65 in the replicate winter), the median observed step
+(half-hour starting 00:30 minus the half-hour starting 00:00) in points and MW, and each forecast's
+median step minus it, with a 95% interval from resampling nights. This readout includes rows inside
+the switching masks, which every score on the page excludes; excluding them moves the gaps by at
+most 0.5 points.
 
 | Substation | Observed step, points (MW) | B0-K minus observed | NS-U-K minus observed | NS-HW-K minus observed |
 |---|---|---|---|---|
@@ -175,9 +181,11 @@ NS-U-K minus B0-K on winter nights is −0.299 at D5, −0.359 at D10, −0.092 
 −0.001, so the +0.02 upper bound holds), and +0.012 on 676 cold British Summer Time (BST) night
 rows. NS-HW-K is −0.137 on winter nights, −0.012 on other rows (upper bound +0.001), and −0.094 on
 cold BST nights. MH-K's gain is −0.140 in cold snaps (the coldest 10% of days of each winter, 16
-days per substation and winter) and +0.005 on winter evening peaks, +0.019 on cold BST nights. The
-evidence rests on two independent winters (replicate 2024-25 and scored 2025-26); the tuning winter
-2023-24 is descriptive only.
+days per substation and winter; the rule uses the 6-hour trailing mean of temperature, not the daily
+mean of ERA5, so the cold-day subsets shift slightly under the other definition) and +0.005 on
+winter evening peaks, +0.019 on cold BST nights. The step was found on scored-winter rows, so only
+the replicate winter 2024-25 (−0.153) is a clean test; the tuning winter 2023-24 is descriptive
+only.
 
 ## Pooled scores of every arm
 
@@ -235,12 +243,16 @@ per-substation curve is shown.
 
 ## Night terms in detail
 
-**The UTC clock, not the local clock, is the night index.** NS-U-K minus NS-L-K on BST nights is
+**The clock that indexes the night step is not identified.** NS-U-K minus NS-L-K on BST nights is
 −0.029 (95% interval −0.069 to +0.013) in the scored year and −0.077 (−0.107 to −0.040) in the
 replicate year, better at 5 of 5 substations in both. The indexing label is `indexing not
 identified` because gate 4'' failed. Cold BST nights (daily mean below 8 C) number 5 to 7 per
 substation in the replicate year and 5 to 11 in the scored year, so the clock contrast is
-`cannot tell` per substation, except at D10 and D11 in the scored year (11 nights each).
+`cannot tell` per substation, except at D10 and D11 in the scored year (11 nights each). As
+descriptive evidence only, on BST weekday nights the observed step sits at 01:30 local (00:30 UTC)
+at D10, D16, and D5 (about 1 point), with no step at 00:30 local. The winter gain cannot separate
+the clocks, because in winter local time equals UTC. Trigger 2 below gives the likely source of the
+winter gain.
 
 **An evolving night step (NS-UT) is worse than a fixed one.** NS-UT-K minus NS-U-K is +0.286
 (95% interval +0.264 to +0.302) on winter nights, and NS-UT-K is 0.084 points worse than B0-K on
@@ -252,7 +264,8 @@ is outside every fit.
 
 **NS-H, one cold-hinge window from 00:00 to 07:00 UTC, adds nothing (+0.0005).** NS-HW, which
 lets the cold hinge differ by half-hour, gains −0.137. NS-L is a null control: its scores equal
-B0's to 1e-4 points.
+B0's to 1e-4 points. The filter-fit control for the night arms agrees: NS-U-K with B0's filter
+minus B0-K on winter nights is −0.224, against −0.233.
 
 ## Consistency checks
 
@@ -263,13 +276,18 @@ B0's to 1e-4 points.
   −0.465 (−0.233), N4 −0.280 (−0.137); the signs agree.
 - **No arm moves a tail more than 1 point from nominal.** After the filter the q95 coverage is 0.941
   to 0.942 and the q99 coverage 0.983 for B0-K, MH-K, NS-U-K, and NS-HW-K.
-- **Three audit triggers fired.** (4) leaving D10 out changes C1 from `tie` to `small gain`; (5,
-  applied by analogy) NS-UT-K scores worse than B0-K, which it nests (the explanation, the held last
-  level meeting the filter, is untested); (7, by judgement, since no label is `gain`) the UTC-clock
-  night term is meant to enter GAM-K. An independent audit by a reviewing agent is planned before
-  the night result is used. No trigger fired for the others: test 1, gate 2(b), and B0-K's
-  reproduction of experiment 114 all passed, and C1's interval width (±0.019) sits inside the sister
-  contrast's ±0.023.
+- **Four audit triggers fired.** (1) The positive controls failed: gates 4, 4', and 4'' and the
+  pooled-curve coverage check (66% against 70 to 90%). (2) The plan predicted NS-U-K and NS-L-K
+  within 0.01 on winter nights, and they differ by 0.233. The explanation, which is post hoc: B0's
+  profile is one year-round level per local half-hour and day type, so it cannot hold a step that is
+  large in winter and small in summer. NS-U can, so the winter gain may come from the difference
+  between the GMT and BST seasons and not from the UTC clock. (4) Leaving D10 out changes C1 from
+  `tie` to `small gain`. (5, applied by analogy) NS-UT-K scores worse than B0-K, which it nests (the
+  explanation, the held last level meeting the filter, is untested); (7, by judgement, since no
+  label is `gain`) the night term is meant to enter GAM-K. An independent audit by a reviewing agent
+  is planned before the night result is used. No trigger fired for the others: test 1, gate 2(b),
+  and B0-K's reproduction of experiment 114 passed, and C1's interval width (±0.019) sits inside the
+  sister contrast's ±0.023.
 
 ## Predictions against outcome
 
@@ -403,7 +421,7 @@ to February 2026, and one summer pair, July to August 2025 and May to June 2026,
 found an unmodelled step at 01:00 (the 00:30 to 01:00 half-hour) in winter. Actual demand steps up
 by 7.1, 10.7, and 7.4 points at D5, D10, and D16 (1.9 to 3.4 points at D11, D14, and D9), and
 GAM-K's
-residual step is 4.3, 7.1, and 5.3 points at D5, D10, and D16. In summer the step shrinks to 1.7
+residual step is 4.4, 7.3, and 5.4 points at D5, D10, and D16. In summer the step shrinks to 1.7
 points or
 less, and its position (UTC or local clock) cannot be told apart. The check used one winter and
 one summer pair, so the summer reading is weak. Winter local time equals UTC, so winter rows
