@@ -67,7 +67,8 @@ best_arm: POOL, one shared filter setting, scored 2.462 points at leads 12 to 36
   to +0.030).
 headline: Choosing each substation's filter noise by next-day score changed the quantile score
   by -0.044 points on the months that chose it (99% interval -0.062 to -0.019) and by -0.009
-  (-0.044 to +0.030) on the scored year, so the gain did not carry over. The online observation variance changed neither
+  (-0.044 to +0.030) on the scored year, so the gain did not carry over.
+  The online observation variance changed neither
   the score (C3a -0.013, -0.045 to +0.005) nor the coverage of the 0.95 quantile on cold nights
   (+0.003, -0.003 to +0.011).
 lessons: Filter noise chosen by next-day score improved the months it was chosen on and not the
