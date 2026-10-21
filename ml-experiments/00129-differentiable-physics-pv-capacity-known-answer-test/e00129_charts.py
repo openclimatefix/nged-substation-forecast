@@ -58,12 +58,14 @@ def figure_capacity() -> alt.TopLevelMixin:
             pl.read_parquet(common.WORK_DIR / f"real_{arm}_to_july.parquet")
             for arm in ("arm2", "arm4@0.1")
         ]
-    ).with_columns(year=pl.col("season_year") + 1)
+    ).with_columns(
+        year=pl.format("{}/{}", pl.col("season_year"), (pl.col("season_year") + 1) % 100)
+    )
     arm_scale = alt.Scale(domain=["arm2", "arm4@0.1"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE])
     base = alt.Chart().encode(
         x=alt.X(
             "year:O",
-            title="Season-year, labelled by the August in which it ends (2026 ends in July)",
+            title="Season-year (July to June); 2025/26 also holds July 2026",
             axis=alt.Axis(labelAngle=0),
         ),
         color=alt.Color(
@@ -103,10 +105,11 @@ def figure_capacity() -> alt.TopLevelMixin:
             title=chart_title(
                 text="Unmetered solar behind each Primary has grown; ranges are 1.2 to 1.6 MW wide",
                 subtitle=(
-                    "Dot: estimate of AC capacity in MW. Line: 80% range from resampling whole"
-                    " months, divided by the recovery of known farms. Grey dashed line: the"
-                    " capacity pinned by experiment 45's earlier method, a control and not a"
-                    " truth. Primaries D5, D10, D11, D14, D16."
+                    "Dot: estimate of AC capacity in MW. Line: range from resampling whole months,"
+                    " divided by the recoveries measured on known farms and plants at other"
+                    " Primaries, so a spread over test scenarios and not a calibrated 80%"
+                    " interval. Grey dashed line: experiment 45's pinned capacity, a control and"
+                    " not a truth."
                 ),
             )
         )
@@ -175,7 +178,9 @@ def figure_step() -> alt.Chart:
     table = (
         step.group_by("arm", "season_year")
         .agg(recovery=pl.col("recovery").median())
-        .with_columns(year=pl.col("season_year") + 1)
+        .with_columns(
+            year=pl.format("{}/{}", pl.col("season_year"), (pl.col("season_year") + 1) % 100)
+        )
         .filter(pl.col("arm").is_in(["arm2", "arm3", "arm4@0.1", "arm4@1.0"]))
     )
     return (
@@ -184,7 +189,7 @@ def figure_step() -> alt.Chart:
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "year:O",
-                title="Season-year (2022 holds the step, on 1 March 2022)",
+                title="Season-year (July to June); the step is on 1 March 2024, in 2023/24",
                 axis=alt.Axis(labelAngle=0),
             ),
             y=alt.Y("recovery:Q", title="Share of the added capacity recovered"),
@@ -206,10 +211,10 @@ def figure_step() -> alt.Chart:
             width=WIDTH,
             height=200,
             title=chart_title(
-                text="Only the arms without a step penalty follow a sudden rise in capacity",
+                text="A step penalty makes arm 4 follow a sudden rise in capacity more slowly",
                 subtitle=(
                     "Median over five Primaries. Half of the pinned capacity was added from "
-                    "March 2022. Arm 4 spreads that rise over earlier years, more so with a "
+                    "March 2024. Arm 4 spreads that rise over earlier years, more so with a "
                     "larger penalty."
                 ),
             ),

@@ -76,7 +76,7 @@ def stratified_month_weights(
     months, inverse = np.unique(month, return_inverse=True)
     month_number = months.astype(np.int64)
     quarter = (month_number % 12) // 3
-    season_year = (month_number + 4) // 12  # September starts a season-year
+    season_year = (month_number + 6) // 12  # July starts a season-year, as in `dp_calendar`
     stratum = season_year * 4 + quarter
     generator = np.random.default_rng(seed)
     counts = np.zeros((n_resamples, len(months)))

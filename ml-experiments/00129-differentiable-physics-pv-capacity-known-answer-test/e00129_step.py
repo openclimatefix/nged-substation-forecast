@@ -22,11 +22,11 @@ import polars as pl
 from studies.dp_features import FeatureCache
 
 STEP_FRACTION: Final[float] = 0.5
-STEP_DATE: Final[datetime] = datetime(2022, 3, 1, tzinfo=UTC)
-"""The middle of season-year 2021 (September 2021 to August 2022)."""
-STEP_START: Final[np.datetime64] = np.datetime64("2022-03-01T00:00", "us")
+STEP_DATE: Final[datetime] = datetime(2024, 3, 1, tzinfo=UTC)
+"""The middle of season-year 2023 (July 2023 to June 2024)."""
+STEP_START: Final[np.datetime64] = np.datetime64("2024-03-01T00:00", "us")
 """`STEP_DATE` as a naive UTC `datetime64`, for comparison with the cache's grid."""
-STEP_SEASON_YEAR: Final[int] = 2021
+STEP_SEASON_YEAR: Final[int] = 2023
 STEP_ARMS: Final[tuple[str, ...]] = (
     "arm2",
     "arm3",
@@ -40,7 +40,7 @@ def sun_weighted_share_after_step(*, cache: FeatureCache, site: str) -> float:
     shape = np.nan_to_num(cache.sites[site].pv_unit_shape, nan=0.0)
     starts = cache.end_times - np.timedelta64(30, "m")
     month = starts.astype("datetime64[M]").astype(np.int64)
-    season_year = (month + 4) // 12 + 1970 - 1
+    season_year = (month + 6) // 12 + 1970 - 1
     in_year = season_year == STEP_SEASON_YEAR
     after = starts >= STEP_START
     return float(shape[in_year & after].sum() / shape[in_year].sum())
@@ -72,7 +72,7 @@ def step_rows(*, cache: FeatureCache, site: str, arm_name: str, device: str) -> 
                 "in_step_year": year == STEP_SEASON_YEAR,
                 "after_step_year": year > STEP_SEASON_YEAR,
             }
-            for year in common.COMPLETE_SEASON_YEARS
+            for year in common.data_years(cache=cache, site=site)
             if capacity[year] > stage_c.ESTIMABLE_SHARE * stepped or year < STEP_SEASON_YEAR
         )
     return rows

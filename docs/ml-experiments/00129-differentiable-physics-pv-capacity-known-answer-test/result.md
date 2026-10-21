@@ -42,111 +42,121 @@ production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   The capacity of the small solar panels behind five Primary substations can be read from the
-  substations' power, with an 80% range 1.2 to 1.6 MW wide, and the capacity at the five Primaries
-  grew by 0.7 to 2.5 MW between each Primary's first estimable season-year and 2025/26 (arm 2).
-  Only one of the three methods tested, which penalises sudden jumps, passed every pre-registered
-  gate, and the same penalty makes it slow to follow a sudden rise in capacity. The range is not
-  yet safe to show on a card when demand rises on overcast days, so a card should state that bias.
+  substations' power. For 2025/26 the arm 2 estimate is 3.3 to 4.5 MW of AC capacity per Primary, and
+  it grew by 0.4 to 2.8 MW since 2021/22. The range around each estimate is 1.2 to 1.6 MW wide, but it
+  is a spread over test scenarios and not a calibrated 80% interval. The method has not been shown to
+  work on real panels that face other ways or on overcast-day demand, so a card should show the range
+  with those caveats.
 date: 2026-10-21
 pr: 1429
 headline: >-
-  Arm 4 (increments penalised, 0.1) passed all four gates (recovery 5 of 5 Primaries, coverage 23 of
-  30 cells, placebo 0.12, pooled drift 0.037 per 5 years); arm 2 failed on drift (0.095) and arm 3
-  failed on placebo (0.21) and drift (0.105).
+  Arms 2 and 4 passed all four pre-registered gates (recovery 5 of 5 Primaries, coverage 23 of 30
+  cells, placebo 0.12, drift 0.041 and 0.034 per 5 years); arm 3 failed the placebo gate (0.21).
 best_arm: >-
-  arm 4 at increment penalty 0.1, on the pooled-drift reading of the gate (D10 0.054 and D11 0.050
-  sit just over it)
+  arm 2 (arm 4 at increment penalty 0.1 passes the same gates and follows a sudden rise more slowly)
 lessons:
   - >-
-    The drift gate and the ability to follow a sudden rise in capacity pull in opposite directions.
+    A drift or coverage gate is only as good as its test target: a first run that counted
+    season-years with no training rows made arm 2 fail the drift gate, and counting only data years
+    made it pass.
   - >-
-    A day-long load that rises on overcast days adds about 0.2 of the injected capacity to the
-    recovered capacity and breaks coverage for the south-west plant.
+    The 0.2 recovery bias under an overcast-day load is twice the 10% load that was assumed, so
+    it is an input and not a measurement of real data.
 advice:
   - >-
-    Put the 80% range, not only a single value, on a substation card, with a note that a
-    synthetic overcast-day load of 10% of capacity raised the estimate by about 0.2 of the true
-    capacity (the cloud-load cells).
+    Count only season-years with at least 12,000 training half-hours when estimating drift or
+    growth, because the convex model copies the capacity of a year without rows (the gates table).
   - >-
-    Refit the capacity only after the final ERA5 for the last month is out, and test a method that
-    penalises jumps for its slowness on a step-up injection before adopting it (the step test).
+    Show the range on a substation card as a spread over test scenarios, and add a recalibration
+    of the known-answer recovery at the Primary's own irradiance (limitations).
   - >-
-    Do not treat arm 3's sun-blind demand terms as a fix for the cloud-load bias: they recover
-    0.02 to 0.03 more and raise the placebo share to 0.21 (stage C table).
+    In any forecast test, use an as-of capacity fitted before each forecast origin, never a
+    hindsight capacity from data to 2026-07-31 (the as-of table).
+  - >-
+    Test a method that penalises jumps on a step-up injection before adopting it (the step test).
 code: ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/
 ---
 
 # Differentiable physics: can the embedded solar capacity behind a Primary be inferred, with an honest range?
 
 **Take-home message: the capacity of the unmetered solar behind five Primary substations can be read
-from their power, with an 80% range 1.2 to 1.6 MW wide, and the capacity grew at all five.** The arm
-2 estimate of AC capacity in 2025/26 was 3.3 to 4.5 MW across the five Primary substations, 0.7 to
-2.5 MW above each Primary's first estimable season-year (figure 1). A card should show the range
-with a note on its bias: a synthetic load of 10% of capacity that rises on overcast days raised the
-estimate by about 0.2 of the true capacity. The verdict is `partly supported`. Arm 4, which
-penalises steps between season-years, passed every pre-registered gate when the drift gate is read
-as a pooled mean, but arm 4 follows a sudden rise in capacity slowly (figure 3). The verdict `partly
-supported` is a judgement beyond the pre-registered rule, which gives `supported` under the pooled
-reading and no passing arm under a per-Primary reading. Arm 2 and arm 3 follow a sudden rise in
-capacity and fail the drift gate, so the growth above is quoted from arm 2 with that caveat. No
-forecast gain is scored.
+from their power, but the range around each estimate is a spread over test scenarios and not yet a
+calibrated 80% interval.** The arm 2 estimate of AC capacity in 2025/26 is 3.3 to 4.5 MW across the
+five Primary substations, which is 0.4 to 2.8 MW above the 2021/22 estimate (figure 1). The range is
+1.2 to 1.6 MW wide. Arm 2 and arm 4 passed every pre-registered gate, so the pre-registered rule
+gives `supported`. The verdict is `partly supported` because the coverage test is close to circular
+and the known-answer recovery was measured on farms and not on embedded panels (see "Limitations").
+That downgrade is a judgement beyond the rule. No forecast gain is scored.
 
 **Terms used below.** D5, D10, D11, D14, and D16 are the five decision Primary substations of
-experiment 103's data set. A season-year runs from September to August and is labelled by the year
-of the September. The four arms are the experiment 45 frozen capacity (arm 1, a control and not a
+experiment 103's data set. A season-year runs from July to June and is labelled by the year of the
+July, so 2025/26 is the label 2025. The plan below says September to August, which is not what the
+convex model uses. The four arms are the experiment 45 frozen capacity (arm 1, a control and not a
 truth), arm 2 (a capacity that steps up each season-year), arm 3 (arm 2 plus demand terms that
 cannot see the sun), and arm 4 (arm 2 with a penalty on the steps). Recovery is the capacity found
 with a known solar farm's output added to a Primary's power, minus the capacity found without it,
 divided by the added capacity. The divisor is the median recovery of the other real farms at the
-same Primary, which rescales a recovery to 1. A coverage cell is one Primary, one plant class, and
-one load, with the known capacity checked against the 80% range. CAMS is the Copernicus Atmosphere
-Monitoring Service's satellite irradiance, ERA5 is the European Centre's reanalysis of past weather,
-and DESNZ is the UK Department for Energy Security and Net Zero.
+same Primary, which rescales a recovery to 1; the published estimates are already divided by it. A
+coverage cell is one Primary, one plant class, and one load, with the known capacity checked against
+the range. CAMS is the Copernicus Atmosphere Monitoring Service's satellite irradiance, ERA5 is the
+European Centre's reanalysis of past weather, and DESNZ is the UK Department for Energy Security and
+Net Zero.
 
-**The fits stop at 2026-07-31, not 2026-08-31, because the final ERA5 for August 2026 is not out.**
-The maintainer approved fitting to 2026-08-31 as an exception to the hold-out, so that season-year
-2025/26 is complete. Season-year 2025/26 therefore ends in July. The code constants that mark where
-the hold-out begins, and the grid end, are moved inside this experiment's scripts only
-(`E00129_THROUGH_JULY=1`), and `packages/` is unchanged.
+**The fits stop at 2026-07-31 and add one month to the original cut.** The maintainer approved
+fitting to 2026-08-31 as an exception to the hold-out, on the understanding that season-year 2025/26
+would then be complete. Season-years run from July to June, so 2025/26 was already complete at
+2026-06-30. The final ERA5 for August 2026 is not out, so the exception added July 2026 only, and
+the model fits July 2026 at the 2025/26 level because it has no 2026/27 increment. The code
+constants that mark where the hold-out begins, and the grid end, are moved inside this experiment's
+scripts only (`E00129_THROUGH_JULY=1`), and `packages/` is unchanged.
 
 ![Capacity per Primary and season-year](figure_01_capacity.svg)
 
 **Capacity rose at all five Primaries, and experiment 45's pinned value sits above the range at D16
-in every year.** The estimates at D10 and D11 are nearly flat before 2022/23 and then step up, and
-the cause of the step was not tested. Arm 2 has no point for D14 and D16 in 2019/20 and 2020/21
-because the known-answer test found no estimable recovery there. The dashed line is experiment 45's
-pinned capacity, a control and not the truth.
+in every year.** The estimates at D10 and D11 step up in 2022/23, and the cause of the step was not
+tested. The figure starts in 2021/22. Season-year 2020/21 has no training rows at any Primary
+because of the lockdown exclusion, and 2019/20 has none at D14 and D16 and only winter rows at D5,
+D10, and D11, so the fit copies or barely identifies a capacity there and the page does not show it.
 
 ## Gates
 
-**Only arm 4 passed all four gates.** Arms 2, 3, and 4 were tested against the gates fixed before
-stage C. Arm 3 is descriptive and cannot win. Arm 4 uses an increment penalty of 0.1. Its coverage
-is 23 of 30 cells (77%), against a nominal 80%, so the range reaches the 21-cell gate but not its
-nominal level.
+**Arm 2 and arm 4 passed all four gates; arm 3 failed the placebo gate.** Arms 2, 3, and 4 were
+tested against the gates fixed before stage C. Arm 3 is descriptive and cannot win. Arm 4 uses an
+increment penalty of 0.1, and the plan ran arm 4 only if arm 2 failed the drift gate, which it did
+not in the final run. Coverage is 23 of 30 cells for arm 2 (77%), against a nominal 80%, so the
+range reaches the 21-cell gate but not its nominal level.
 
 | Gate | Limit | Arm 2 | Arm 3 | Arm 4 |
 |---|---|---|---|---|
 | Recovery of both mismatched plants within 0.75 to 1.25 after the divisor | 4 of 5 Primaries | 5 | 5 | 5 |
-| Semi-synthetic coverage cells with the truth in the 80% range | 21 of 30 | 23 | 21 | 23 |
-| Placebo difference of fits, share of the real-sky recovery (median, max) | at most 0.20 | 0.12, 0.13 | 0.21, 0.24 | 0.12, 0.12 |
-| Drift per 5 years, pooled mean (max Primary) | under 0.05 | 0.095 (0.18) | 0.105 (0.20) | 0.037 (0.054) |
+| Semi-synthetic coverage cells with the truth in the range | 21 of 30 | 23 | 22 | 23 |
+| Placebo difference of fits, share of the real-sky recovery (median, max) | at most 0.20 | 0.12, 0.13 | 0.21, 0.22 | 0.12, 0.12 |
+| Drift per 5 years, pooled mean (max Primary), data years only | under 0.05 | 0.041 (0.047) | 0.039 (0.047) | 0.034 (0.038) |
+
+**A first run of the drift gate counted season-years with no training rows and failed arm 2
+(0.095).** The Opus science review found that the convex model copies the capacity of a season-year
+with no rows from its neighbour. The gate was re-run on season-years with at least 12,000 training
+half-hours (a full season-year has 17,520), which are 2021/22 to 2025/26. The first run is kept in
+`work/before_data_year_filter/`. The recovery gate does not discriminate: divided recoveries are
+about 0.9 for the east-west plant and 1.1 for the south-west plant, so every arm passes at 5 of 5
+Primaries, and the pre-registered prediction of 3 of 5 was wrong.
 
 ![Recovery of injected solar](figure_02_recovery.svg)
 
-**Real farms' output was recovered at about 0.8 before the divisor, and the published estimates are
-already divided by that recovery,, at 20, 50, and 100% of the pinned capacity alike.** A synthetic
-load that rises on overcast days, of 0.1 of the injected capacity, adds about 0.2 to the recovery at
-every Primary. When that load is present, the true capacity lies inside the 80% range for the
-south-west plant in only 0 or 1 of 5 cells.
+**Real farms' output was recovered at about 0.8 before the divisor, at 20, 50, and 100% of the
+pinned capacity alike.** A synthetic load that rises on overcast days, of 0.1 of the injected
+capacity, adds about 0.2 to the recovery at every Primary. The 0.2 is twice the assumed load, so it
+measures the model's sensitivity and not a bias found in real data. When that load is present, the
+true capacity lies inside the range for the south-west plant in only 1 of 5 cells and for real farms
+in 3 of 5.
 
 ![Step-up injection](figure_03_step.svg)
 
 **Arm 4 follows a sudden rise in capacity more slowly than arm 2 does.** Half of experiment 45's
-pinned capacity was injected as a step-up in March 2022. At the median Primary, arm 2 and arm 3
-recover nothing before March 2022 and about 0.82 to 0.87 after it. D10 is the exception, where arm 2
-recovers 0.43 and arm 3 0.47 before the step. Arm 4 at penalty 0.1 recovers 0.47 before March 2022,
-and at penalty 1.0 recovers 0.65. These are leakage into earlier years, because the true added
-capacity there is zero.
+pinned capacity was injected as a step-up on 1 March 2024, in 2023/24. At the median Primary, arm 2
+recovers -0.07 and -0.06 in the two years before (no leakage) and 0.84 and 0.87 in the two years
+after. Arm 4 at penalty 0.1 recovers 0.04 before 2023/24 in 2022/23 and 0.77 and 0.85 after, and at
+penalty 1.0 recovers 0.19 and 0.26 before and 0.57 and 0.64 after.
 
 ## Primary power beside the estimated solar power
 
@@ -160,42 +170,78 @@ shows the metered power of D5, D10, and D14 on a cloudy, a median, and a sunny d
       July, and 2 July; D14 on 4 May, 1 July, and 2 July. On the sunny days the metered power falls
       during daylight by about 1.6 to 2.3 MW between the 06:00 UTC level and the noon level (D5
       about 1.6, D10 about 1.7, D14 about 2.3), against estimated solar peaks of 3.9, 3.3, and 4.5
-      MW, because the demand that the solar hides is not constant through the day. The flat tops of
-      the estimated solar power are the inverter limit in the solar shape. The estimated solar power
-      is arm 2's capacity times that shape before temperature derating, so the estimate is a little
-      high at midday.
+      MW. Two explanations fit: the demand that the solar hides is not constant through the day, or
+      the estimate is too high (see "Limitations"). The flat tops of the estimated solar power are
+      the inverter limit in the solar shape. The estimated solar power is arm 2's capacity times
+      that shape before temperature derating.
 
 ## Every range reaches the register totals
 
-- **The Feed-in Tariff (FiT) register lies below every 80% range.** The register, shared to each
-  Primary by postcode district, lists 1.9 to 2.6 MW of declared net capacity at sites of at most 1
-  MW (2.0 to 2.8 MW of DC capacity) and 2.1 to 3.2 MW at sites of at most 5 MW (2.2 to 3.5 MW of DC
+- **The Feed-in Tariff (FiT) register lies below every range.** The register, shared to each Primary
+  by postcode district, lists 1.9 to 2.6 MW of declared net capacity at sites of at most 1 MW (2.0
+  to 2.8 MW of DC capacity) and 2.1 to 3.2 MW at sites of at most 5 MW (2.2 to 3.5 MW of DC
   capacity). The ranges reach these totals at all five Primaries. The register's "declared net
-  capacity" is its name for AC capacity.
+  capacity" is its name for AC capacity. A lower-bound check cannot detect an overestimate.
 - **DESNZ's domestic solar by constituency, shared by area, gives 2.1 to 3.8 MW.** Its capacity
   basis (DC or AC) is not stated.
-- **Holding the 1 September 2025 estimate forward undershoots the hindsight 2025/26 estimate by 0.02
-  to 0.69 MW for arm 2.** The largest gaps are at D16 and D10, where capacity is still growing.
+- **Holding the 1 July 2025 estimate forward undershoots the hindsight 2025/26 estimate by 0.00 to
+  0.70 MW for arm 2.** The as-of fit at that origin sees season-years to 2024/25, and the held value
+  is its 2024/25 capacity. The largest gaps are at D16 (0.70) and D10 (0.30), where capacity is
+  still growing. The as-of divisors come from known-answer fits that use data to 2026-06-30, which
+  is future information, with a small effect because recovery is stable at 0.80 to 0.82.
 - **CAMS' own beam and diffuse irradiance changes the latest arm 2 estimate by 0.04 MW or less.**
   The beam and diffuse columns were already in the downloaded files, so no new download was needed.
-  Recovery falls by 0.02 and the divided estimate rises by at most 0.04 MW.
+  Recovery falls by 0.02 and the divided estimate rises by at most 0.04 MW, partly because the
+  divisor moves with the raw estimate.
 
-## Caveats and departures from the plan
+## Limitations
 
-- **Arm 4 passes the drift gate on its pooled mean only.** The plan did not say whether the limit
-  applies per Primary or pooled. Read per Primary, arm 4 fails at D10 (0.054) and D11 (0.050).
-- **The arm 4 penalty was fixed at 0.1 without the planned tuning.** The plan tuned the penalty on
-  D9 from semi-synthetic drift, but D9's drift is undefined (under 3 estimable years) and every
-  penalty from 0.001 to 1.0 gave a recovery of about 0.75. The middle value 0.1 was fixed. Penalty
-  0.01 gave drift 0.034 to 0.120, and penalty 1.0 gave 0.009 to 0.014, at the five Primaries.
+- **The range is a spread over test scenarios.** A bootstrap over resampled months spreads the
+  2025/26 capacity by only 3 to 7% of the estimate (reviewer's check). The rest of the width comes
+  from dividing by 240 recovery ratios (10th to 90th percentile 0.73 to 1.08) measured on three
+  plant shapes, with and without the overcast-day load, at the other four Primaries. A coverage cell
+  is covered when its own recovery lies inside that pool, so 23 of 30 is close to guaranteed, and
+  the cells that fail are the extreme scenarios. The test does not say how often the range holds on
+  real panels.
+- **The point estimate sits near the top of its range.** The point divides by the Primary's own
+  median real-farm recovery (about 0.80), and the range divides by the pooled ratios (median about
+  0.92).
+- **The divisor may overstate embedded capacity by roughly 5 to 10%.** A farm's recovery rises with
+  the correlation of its irradiance with the Primary's (r = 0.79 over 25 farm and Primary pairs,
+  reviewer's check). Embedded panels sit at the Primary's irradiance point, so their recovery is
+  probably above the farms'. The unit is also the 99th-percentile output of a farm-like plant, not
+  nameplate AC capacity. A synthetic plant driven by the Primary's own CAMS would test both.
+- **The semi-synthetic target flatters every arm.** It uses arm 3's demand terms, which the fit can
+  represent exactly, and shuffles residuals across years by month, which removes demand trends and
+  weather-correlated residuals. Coverage, drift, and the placebo were measured with no demand
+  misspecification. Coverage was tested only for 2024/25 at 100% injection.
+- **Growth is not separated from demand trends.** The convex model has no drift term here, so a
+  multi-year fall in daytime demand would load onto the capacity steps. The D10 and D11 steps in
+  2022/23 are unexplained. The sign of the growth survives resampling, which covers sampling error
+  only.
+- **The arm 4 penalty was not tuned.** The plan tuned it on D9 from semi-synthetic drift, but D9's
+  drift is undefined (under 3 estimable years) and every penalty from 0.001 to 1.0 gave a recovery
+  of about 0.75. The middle value 0.1 was fixed, and arm 4 was not needed under the plan's rule.
 - **The placebo limit of 0.20 is a post-pilot choice,** set after seeing arm 2 at 0.10 of the
-  injection in the pilot.
+  injection in the pilot. It changes no verdict among arms 2 and 4.
+- **The fits use mixed cuts.** The known-answer, coverage, semi-synthetic, and step fits stop at
+  2026-07-01, and the real, as-of, and beam fits stop at 2026-08-01. July 2026 may contain unmasked
+  switching, because the switching labels may not cover April to July 2026.
 - **Four planned comparisons were not run.** They are the December-factor comparison, experiment
   45's semi-synthetic constant-path re-run, and the Embedded Capacity Register and the Renewable
   Energy Planning Database comparisons, because experiment 45's processed files do not hold the last
-  two. The register figures are lower bounds.
+  two.
 - **The monotone-arm and sun-blind-arm fits are copied from experiment 110 and are not yet in
   `packages/studies`.** Moving them there needs a separate module PR.
+
+## What a later experiment must not take for granted
+
+- **That the range is a calibrated 80% interval,** or that the estimate is nameplate AC capacity.
+- **Any capacity for 2019/20 or 2020/21,** and any year-to-year change beyond what the step test
+  shows arm 2 can follow.
+- **That hindsight capacities can be used in a forecast test.** A net-demand forecast test must use
+  an as-of fit at each forecast origin and must never use capacities fitted through July 2026 when
+  scoring rows on or after 2026-07-01.
 
 ## What the next experiment should answer
 
@@ -204,6 +250,11 @@ error on the sunniest half-hours without raising it on dark ones.** Refitting ea
 each September, or each quarter, is a further question.
 
 ## Plan (written before any fit)
+
+**This section is the plan as written before any fit and is kept unedited, except for two facts the
+finished work overturned.** The convex model's season-years run from July to June, not September to
+August. The stage B drift figures below were measured before the data-year filter described under
+"Gates", so they include season-years with no training rows.
 
 The full plan, with the Opus review's triage, is `data/ml-experiments/briefs/dp_pv_design_note.md`
 (private). Its content is repeated here in short.

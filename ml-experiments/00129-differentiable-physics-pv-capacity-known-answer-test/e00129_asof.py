@@ -1,7 +1,8 @@
-"""Stage D of experiment 129: what the capacity estimate says on 1 September 2025, and how it ages.
+"""Stage D of experiment 129: what the capacity estimate says on 1 July 2025, and how it ages.
 
-At the origin 2025-09-01 the fit sees only rows before the origin, so the latest season-year with
-data is 2024. The as-of estimate for 2024, held forward as the estimate for season-year 2025, is
+At the origin 2025-07-01 the fit sees only rows before the origin, so the latest season-year with
+data is 2024 (July 2024 to June 2025). The as-of estimate for 2024, held forward as the
+estimate for season-year 2025, is
 compared with the hindsight estimate for 2025 (fitted to 2026-07-31) and with the hindsight
 estimate for 2024. Estimates and ranges are built as in `e00129_real.py`.
 
@@ -19,7 +20,7 @@ import e00129_stage_c as stage_c
 import numpy as np
 import polars as pl
 
-ORIGIN: Final[datetime] = datetime(2025, 9, 1, tzinfo=UTC)
+ORIGIN: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
 LATEST_SEASON_YEAR: Final[int] = 2024
 
 

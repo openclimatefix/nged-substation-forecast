@@ -49,6 +49,7 @@ def draw_rows(
     device: str,
 ) -> list[dict[str, object]]:
     """Return table rows for one arm and draw: the none and farm cases, real and placebo sky."""
+    usable = common.data_years(cache=cache, site=site)
     rows: list[dict[str, object]] = []
     for sky, source in (("real", cache), ("placebo", placebo_cache)):
         none_capacity = arms.fitted_capacity(
@@ -67,7 +68,7 @@ def draw_rows(
             years = [
                 y
                 for y in common.COMPLETE_SEASON_YEARS
-                if capacity[y] > pilot.ESTIMABLE_SHARE * injected_points
+                if y in usable and capacity[y] > pilot.ESTIMABLE_SHARE * injected_points
             ]
             recovery = np.array([(capacity[y] - none_capacity[y]) / injected_points for y in years])
             rows.append(

@@ -10,8 +10,10 @@ a series scaled to a known capacity, and only ratios of recovered to injected ca
 the private data folder.
 
 **Hold-out.** The feature cache of experiment 106 stops at 2026-07-01, and `DATA_CUT` is that
-instant. The maintainer approved fitting to 2026-08-31 for the final hindsight table, which needs
-the feature cache rebuilt; nothing here reads data after `DATA_CUT`.
+instant. With `E00129_THROUGH_JULY=1`, `DATA_CUT` is 2026-08-01 and the cache is rebuilt from
+`work/rows_to_july.parquet`. The convex model's season-years run from July to June, labelled by the
+year of the July, so July 2026 has its own label (2026) with no capacity increment; its rows are
+fitted at the 2025 level. Nothing here reads data after `DATA_CUT`.
 """
 
 import os
@@ -28,7 +30,7 @@ from studies.dp_features import (
     default_input_paths,
     load_or_build_feature_cache,
 )
-from studies.dp_gam import GamFit, GamSpec, TrainingWindow, fit_gam
+from studies.dp_gam import GamFit, GamSpec, TrainingWindow, fit_gam, training_rows
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 from studies.pv_physics import PlantParameters, half_hour_sun_and_sky, plant_power_mw
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -70,7 +72,7 @@ IRRADIANCE_FARM: Final[str] = "A"
 """The farm whose CAMS irradiance builds the synthetic plants, so that their irradiance error
 differs from the Primary's own CAMS."""
 SEASON_YEARS: Final[range] = range(2019, 2026)
-"""Season-years (September to August, named by the September's year) with a capacity increment."""
+"""Season-years (July to June, named by the July's year) with a capacity increment."""
 COMPLETE_SEASON_YEARS: Final[range] = range(2019, 2025)
 """The season-years complete before `DATA_CUT`: 2019/20 to 2024/25."""
 THROUGH_JULY: Final[bool] = os.environ.get("E00129_THROUGH_JULY") == "1"
@@ -138,6 +140,25 @@ def fit_site(*, cache: FeatureCache, site: str, spec: GamSpec, device: str) -> G
         device=device,
         dtype=torch.float64,
     )
+
+
+MIN_YEAR_ROWS: Final[int] = 12000
+"""A season-year counts as a data year at a Primary when it has at least this many training
+half-hours (a full season-year has 17,520). Season-years with none have a capacity that the fit
+copies from the previous year, and part-year winter-only years do not identify a summer capacity."""
+
+
+def data_years(*, cache: FeatureCache, site: str) -> list[int]:
+    """Return the season-years (July to June, labelled by the July's year) with enough rows."""
+    index = training_rows(
+        features=cache.sites[site], cache=cache, cut=DATA_CUT, window=TRAINING_WINDOW
+    )
+    years, counts = np.unique(np.asarray(cache.calendar.season_year)[index], return_counts=True)
+    return [
+        int(year)
+        for year, count in zip(years, counts, strict=True)
+        if count >= MIN_YEAR_ROWS and year in SEASON_YEARS
+    ]
 
 
 def pinned_points(*, cache: FeatureCache, site: str) -> float:

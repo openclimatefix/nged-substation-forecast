@@ -44,7 +44,7 @@ def real_rows(*, site: str, arm_name: str, kat: pl.DataFrame, device: str) -> li
     boot = arms.capacities(fit=boot_fit)
     pinned = common.pinned_points(cache=cache, site=site)
     rows: list[dict] = []
-    for year in common.SEASON_YEARS:
+    for year in common.data_years(cache=cache, site=site):
         calibration_year = min(year, LAST_CALIBRATED_YEAR)
         own = kat.filter(
             pl.col("site") == site,
