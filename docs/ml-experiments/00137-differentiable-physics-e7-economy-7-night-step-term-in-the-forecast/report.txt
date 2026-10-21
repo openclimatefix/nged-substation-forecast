@@ -1,0 +1,89 @@
+Running as unit: run-p3607648-i49771480.scope; invocation ID: 3241fdae3ea14ba1815148856c3c0fe4
+C4@all: -0.032 (-0.054 to -0.012) rows 561363 months 12 readable True sites_better 6/6 months_neg 11 rows/site {'D10': 96370, 'D11': 97046, 'D14': 95056, 'D16': 91754, 'D5': 84137, 'D9': 97000}
+C4@all@abs_mean: -0.059 (-0.100 to -0.025) rows 561363 months 12 readable True sites_better 6/6 months_neg 11 rows/site {'D10': 96370, 'D11': 97046, 'D14': 95056, 'D16': 91754, 'D5': 84137, 'D9': 97000}
+C1@day_ahead: -0.034 (-0.056 to -0.015) rows 80796 months 12 readable True sites_better 6/6 months_neg 11 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+C1@day_ahead@abs_mean: -0.061 (-0.101 to -0.028) rows 80796 months 12 readable True sites_better 6/6 months_neg 11 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+C2@day_ahead: -0.026 (-0.045 to -0.010) rows 80796 months 12 readable True sites_better 6/6 months_neg 11 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+C3@day_ahead: +1.235 (+1.106 to +1.364) rows 80796 months 12 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+C3b@day_ahead: +1.021 (+0.894 to +1.155) rows 80796 months 12 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+Cconst@day_ahead: -0.006 (-0.020 to +0.008) rows 80796 months 12 readable True sites_better 5/6 months_neg 7 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+C5@day_ahead: -0.008 (-0.013 to -0.002) rows 80796 months 12 readable True sites_better 6/6 months_neg 10 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+oracle@day_ahead: -0.047 (-0.077 to -0.025) rows 80796 months 12 readable True sites_better 6/6 months_neg 12 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+placebo@day_ahead: -0.011 (-0.023 to +0.001) rows 80796 months 12 readable True sites_better 6/6 months_neg 9 rows/site {'D10': 13852, 'D11': 13967, 'D14': 13678, 'D16': 13228, 'D5': 12113, 'D9': 13958}
+C1@winter_nights: -0.115 (-0.178 to -0.056) rows 16089 months 6 readable True sites_better 6/6 months_neg 5 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+C1@winter_nights@abs_mean: -0.199 (-0.331 to -0.082) rows 16089 months 6 readable True sites_better 6/6 months_neg 5 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+C2@winter_nights: -0.098 (-0.147 to -0.048) rows 16089 months 6 readable True sites_better 6/6 months_neg 5 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+C3@winter_nights: +2.431 (+2.083 to +2.801) rows 16089 months 6 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+C3b@winter_nights: +1.931 (+1.641 to +2.277) rows 16089 months 6 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+Cconst@winter_nights: -0.040 (-0.074 to -0.001) rows 16089 months 6 readable True sites_better 6/6 months_neg 4 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+C5@winter_nights: -0.017 (-0.030 to -0.001) rows 16089 months 6 readable True sites_better 6/6 months_neg 4 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+oracle@winter_nights: -0.161 (-0.256 to -0.085) rows 16089 months 6 readable True sites_better 6/6 months_neg 6 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+placebo@winter_nights: -0.047 (-0.080 to -0.012) rows 16089 months 6 readable True sites_better 6/6 months_neg 5 rows/site {'D10': 2855, 'D11': 2903, 'D14': 2870, 'D16': 2519, 'D5': 2039, 'D9': 2903}
+C1@window: -0.180 (-0.308 to -0.072) rows 8414 months 12 readable True sites_better 6/6 months_neg 12 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+C1@window@abs_mean: -0.331 (-0.572 to -0.131) rows 8414 months 12 readable True sites_better 6/6 months_neg 11 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+C2@window: -0.155 (-0.281 to -0.047) rows 8414 months 12 readable True sites_better 6/6 months_neg 10 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+C3@window: +3.559 (+2.637 to +4.408) rows 8414 months 12 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+C3b@window: +2.864 (+1.882 to +3.760) rows 8414 months 12 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+Cconst@window: -0.032 (-0.117 to +0.059) rows 8414 months 12 readable True sites_better 6/6 months_neg 7 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+C5@window: -0.025 (-0.039 to -0.009) rows 8414 months 12 readable True sites_better 4/6 months_neg 10 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+oracle@window: -0.212 (-0.376 to -0.075) rows 8414 months 12 readable True sites_better 6/6 months_neg 11 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+placebo@window: -0.050 (-0.131 to +0.039) rows 8414 months 12 readable True sites_better 5/6 months_neg 8 rows/site {'D10': 1445, 'D11': 1455, 'D14': 1428, 'D16': 1375, 'D5': 1260, 'D9': 1451}
+C1@window_winter: -0.352 (-0.482 to -0.245) rows 3353 months 6 readable True sites_better 6/6 months_neg 5 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+C1@window_winter@abs_mean: -0.646 (-0.903 to -0.442) rows 3353 months 6 readable True sites_better 6/6 months_neg 5 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+C2@window_winter: -0.325 (-0.436 to -0.213) rows 3353 months 6 readable True sites_better 6/6 months_neg 5 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+C3@window_winter: +2.252 (+1.657 to +2.863) rows 3353 months 6 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+C3b@window_winter: +1.474 (+0.852 to +2.096) rows 3353 months 6 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+Cconst@window_winter: -0.148 (-0.203 to -0.101) rows 3353 months 6 readable True sites_better 5/6 months_neg 6 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+C5@window_winter: -0.027 (-0.055 to +0.011) rows 3353 months 6 readable True sites_better 4/6 months_neg 4 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+oracle@window_winter: -0.447 (-0.597 to -0.335) rows 3353 months 6 readable True sites_better 6/6 months_neg 6 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+placebo@window_winter: -0.159 (-0.223 to -0.107) rows 3353 months 6 readable True sites_better 5/6 months_neg 6 rows/site {'D10': 595, 'D11': 605, 'D14': 598, 'D16': 525, 'D5': 425, 'D9': 605}
+C1@headline: -0.484 (-0.777 to -0.169) rows 365 months 4 readable False sites_better 5/6 months_neg 4 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+C1@headline@abs_mean: -0.884 (-1.356 to -0.335) rows 365 months 4 readable False sites_better 5/6 months_neg 3 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+C2@headline: -0.454 (-0.731 to -0.190) rows 365 months 4 readable False sites_better 5/6 months_neg 4 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+C3@headline: +2.643 (+1.541 to +3.551) rows 365 months 4 readable False sites_better 2/6 months_neg 0 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+C3b@headline: +1.979 (+1.247 to +2.615) rows 365 months 4 readable False sites_better 1/6 months_neg 0 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+Cconst@headline: -0.156 (-0.268 to -0.112) rows 365 months 4 readable False sites_better 5/6 months_neg 4 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+C5@headline: -0.030 (-0.094 to +0.089) rows 365 months 4 readable False sites_better 3/6 months_neg 3 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+oracle@headline: -0.540 (-0.840 to -0.226) rows 365 months 4 readable False sites_better 5/6 months_neg 4 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+placebo@headline: -0.170 (-0.271 to -0.091) rows 365 months 4 readable False sites_better 5/6 months_neg 4 rows/site {'D10': 75, 'D11': 85, 'D14': 75, 'D16': 35, 'D5': 35, 'D9': 60}
+C1@cold_nights: -0.194 (-0.249 to -0.134) rows 1752 months 4 readable True sites_better 5/6 months_neg 4 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+C1@cold_nights@abs_mean: -0.343 (-0.453 to -0.180) rows 1752 months 4 readable True sites_better 6/6 months_neg 4 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+C2@cold_nights: -0.141 (-0.236 to -0.095) rows 1752 months 4 readable True sites_better 5/6 months_neg 4 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+C3@cold_nights: +2.741 (+2.223 to +3.328) rows 1752 months 4 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+C3b@cold_nights: +2.283 (+1.871 to +2.761) rows 1752 months 4 readable True sites_better 0/6 months_neg 0 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+Cconst@cold_nights: -0.076 (-0.105 to -0.013) rows 1752 months 4 readable True sites_better 6/6 months_neg 4 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+C5@cold_nights: -0.053 (-0.101 to +0.026) rows 1752 months 4 readable True sites_better 4/6 months_neg 3 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+oracle@cold_nights: -0.221 (-0.292 to -0.068) rows 1752 months 4 readable True sites_better 6/6 months_neg 4 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+placebo@cold_nights: -0.086 (-0.108 to -0.032) rows 1752 months 4 readable True sites_better 6/6 months_neg 3 rows/site {'D10': 360, 'D11': 408, 'D14': 360, 'D16': 168, 'D5': 168, 'D9': 288}
+all 561363
+   mean_qs {'base': 2.706, 't_site': 2.675, 't_pool': 2.679, 'fixed123': 3.918, 'fixed123b': 3.703, 't_const': 2.702, 'oracle': 2.661, 'placebo': 2.7}
+   mean_abs_mean_error {'base': 4.752, 't_site': 4.693, 't_pool': 4.701, 'fixed123': 6.483, 'fixed123b': 6.266, 't_const': 4.742, 'oracle': 4.664, 'placebo': 4.738}
+   mean_signed_error {'base': -0.255, 't_site': -0.236, 't_pool': -0.242, 'fixed123': -3.125, 'fixed123b': -2.904, 't_const': -0.234, 'oracle': -0.214, 'placebo': -0.232}
+day_ahead 80796
+   mean_qs {'base': 2.405, 't_site': 2.372, 't_pool': 2.379, 'fixed123': 3.64, 'fixed123b': 3.426, 't_const': 2.399, 'oracle': 2.358, 'placebo': 2.394}
+   mean_abs_mean_error {'base': 4.234, 't_site': 4.173, 't_pool': 4.19, 'fixed123': 6.006, 'fixed123b': 5.787, 't_const': 4.222, 'oracle': 4.145, 'placebo': 4.212}
+   mean_signed_error {'base': -0.248, 't_site': -0.23, 't_pool': -0.236, 'fixed123': -3.089, 'fixed123b': -2.867, 't_const': -0.226, 'oracle': -0.208, 'placebo': -0.225}
+winter_nights 16089
+   mean_qs {'base': 1.889, 't_site': 1.775, 't_pool': 1.792, 'fixed123': 4.321, 'fixed123b': 3.82, 't_const': 1.85, 'oracle': 1.728, 'placebo': 1.843}
+   mean_abs_mean_error {'base': 3.296, 't_site': 3.097, 't_pool': 3.134, 'fixed123': 6.591, 'fixed123b': 6.101, 't_const': 3.232, 'oracle': 3.015, 'placebo': 3.221}
+   mean_signed_error {'base': 0.201, 't_site': 0.362, 't_pool': 0.367, 'fixed123': -5.644, 'fixed123b': -5.174, 't_const': 0.239, 'oracle': 0.386, 'placebo': 0.247}
+window 8414
+   mean_qs {'base': 1.635, 't_site': 1.456, 't_pool': 1.48, 'fixed123': 5.195, 'fixed123b': 4.499, 't_const': 1.603, 'oracle': 1.424, 'placebo': 1.586}
+   mean_abs_mean_error {'base': 2.849, 't_site': 2.518, 't_pool': 2.566, 'fixed123': 7.412, 'fixed123b': 6.775, 't_const': 2.788, 'oracle': 2.461, 'placebo': 2.758}
+   mean_signed_error {'base': 0.762, 't_site': 0.38, 't_pool': 0.395, 'fixed123': -7.123, 'fixed123b': -6.509, 't_const': 0.376, 'oracle': 0.071, 'placebo': 0.381}
+window_winter 3353
+   mean_qs {'base': 1.961, 't_site': 1.609, 't_pool': 1.636, 'fixed123': 4.213, 'fixed123b': 3.435, 't_const': 1.813, 'oracle': 1.514, 'placebo': 1.803}
+   mean_abs_mean_error {'base': 3.469, 't_site': 2.823, 't_pool': 2.887, 'fixed123': 6.108, 'fixed123b': 5.396, 't_const': 3.213, 'oracle': 2.664, 'placebo': 3.195}
+   mean_signed_error {'base': 2.569, 't_site': 1.38, 't_pool': 1.277, 'fixed123': -5.541, 'fixed123b': -4.89, 't_const': 2.2, 'oracle': 1.031, 'placebo': 2.214}
+headline 365
+   mean_qs {'base': 2.19, 't_site': 1.706, 't_pool': 1.736, 'fixed123': 4.833, 'fixed123b': 4.169, 't_const': 2.034, 'oracle': 1.65, 'placebo': 2.02}
+   mean_abs_mean_error {'base': 3.748, 't_site': 2.864, 't_pool': 2.907, 'fixed123': 6.789, 'fixed123b': 6.207, 't_const': 3.445, 'oracle': 2.781, 'placebo': 3.418}
+   mean_signed_error {'base': 2.519, 't_site': 0.23, 't_pool': -0.041, 'fixed123': -6.338, 'fixed123b': -5.847, 't_const': 2.161, 'oracle': -0.223, 'placebo': 2.134}
+cold_nights 1752
+   mean_qs {'base': 2.225, 't_site': 2.032, 't_pool': 2.085, 'fixed123': 4.966, 'fixed123b': 4.508, 't_const': 2.149, 'oracle': 2.004, 'placebo': 2.139}
+   mean_abs_mean_error {'base': 3.861, 't_site': 3.518, 't_pool': 3.618, 'fixed123': 7.32, 'fixed123b': 6.895, 't_const': 3.72, 'oracle': 3.476, 'placebo': 3.705}
+   mean_signed_error {'base': 0.177, 't_site': 0.431, 't_pool': 0.473, 'fixed123': -6.208, 'fixed123b': -5.854, 't_const': 0.191, 'oracle': 0.431, 'placebo': 0.171}
+tails {'all': {'base': {'cov_q01': 0.018, 'cov_q05': 0.061, 'cov_q95': 0.948, 'cov_q99': 0.984, 'pin_q01': 0.193, 'pin_q05': 0.667, 'pin_q95': 0.701, 'pin_q99': 0.215}, 't_site': {'cov_q01': 0.017, 'cov_q05': 0.057, 'cov_q95': 0.951, 'cov_q99': 0.984, 'pin_q01': 0.191, 'pin_q05': 0.661, 'pin_q95': 0.695, 'pin_q99': 0.213}, 't_pool': {'cov_q01': 0.017, 'cov_q05': 0.058, 'cov_q95': 0.951, 'cov_q99': 0.984, 'pin_q01': 0.191, 'pin_q05': 0.661, 'pin_q95': 0.696, 'pin_q99': 0.213}, 'fixed123': {'cov_q01': 0.146, 'cov_q05': 0.238, 'cov_q95': 0.968, 'cov_q99': 0.99, 'pin_q01': 0.759, 'pin_q05': 1.504, 'pin_q95': 0.792, 'pin_q99': 0.222}, 'fixed123b': {'cov_q01': 0.131, 'cov_q05': 0.227, 'cov_q95': 0.968, 'cov_q99': 0.99, 'pin_q01': 0.57, 'pin_q05': 1.301, 'pin_q95': 0.781, 'pin_q99': 0.22}, 't_const': {'cov_q01': 0.019, 'cov_q05': 0.061, 'cov_q95': 0.949, 'cov_q99': 0.984, 'pin_q01': 0.194, 'pin_q05': 0.669, 'pin_q95': 0.699, 'pin_q99': 0.214}, 'oracle': {'cov_q01': 0.017, 'cov_q05': 0.057, 'cov_q95': 0.952, 'cov_q99': 0.985, 'pin_q01': 0.189, 'pin_q05': 0.658, 'pin_q95': 0.691, 'pin_q99': 0.212}, 'placebo': {'cov_q01': 0.018, 'cov_q05': 0.061, 'cov_q95': 0.949, 'cov_q99': 0.984, 'pin_q01': 0.193, 'pin_q05': 0.668, 'pin_q95': 0.699, 'pin_q99': 0.214}}, 'headline': {'base': {'cov_q01': 0.033, 'cov_q05': 0.041, 'cov_q95': 0.8, 'cov_q99': 0.959, 'pin_q01': 0.217, 'pin_q05': 0.599, 'pin_q95': 0.613, 'pin_q99': 0.132}, 't_site': {'cov_q01': 0.038, 'cov_q05': 0.047, 'cov_q95': 0.932, 'cov_q99': 0.995, 'pin_q01': 0.27, 'pin_q05': 0.568, 'pin_q95': 0.444, 'pin_q99': 0.113}, 't_pool': {'cov_q01': 0.041, 'cov_q05': 0.077, 'cov_q95': 0.94, 'cov_q99': 1.0, 'pin_q01': 0.281, 'pin_q05': 0.589, 'pin_q95': 0.431, 'pin_q99': 0.116}, 'fixed123': {'cov_q01': 0.299, 'cov_q05': 0.529, 'cov_q95': 1.0, 'cov_q99': 1.0, 'pin_q01': 2.294, 'pin_q05': 3.005, 'pin_q95': 0.62, 'pin_q99': 0.178}, 'fixed123b': {'cov_q01': 0.307, 'cov_q05': 0.526, 'cov_q95': 1.0, 'cov_q99': 1.0, 'pin_q01': 1.507, 'pin_q05': 2.377, 'pin_q95': 0.595, 'pin_q99': 0.174}, 't_const': {'cov_q01': 0.027, 'cov_q05': 0.038, 'cov_q95': 0.83, 'cov_q99': 0.97, 'pin_q01': 0.228, 'pin_q05': 0.592, 'pin_q95': 0.558, 'pin_q99': 0.118}, 'oracle': {'cov_q01': 0.036, 'cov_q05': 0.06, 'cov_q95': 0.951, 'cov_q99': 1.0, 'pin_q01': 0.274, 'pin_q05': 0.56, 'pin_q95': 0.421, 'pin_q99': 0.117}, 'placebo': {'cov_q01': 0.027, 'cov_q05': 0.038, 'cov_q95': 0.833, 'cov_q99': 0.97, 'pin_q01': 0.232, 'pin_q05': 0.593, 'pin_q95': 0.544, 'pin_q99': 0.116}}}
+leave one out (C1) {'D5': -0.46752143719045236, 'D9': -0.5985008247250418, 'D10': -0.4881209700533591, 'D11': -0.5312478982752022, 'D14': -0.40003184401652647, 'D16': -0.42333453743254146}
+median minus mean {'base': {'D5': -0.12541814148426056, 'D9': -0.019411085173487663, 'D10': -0.04453073814511299, 'D11': -0.035062581300735474, 'D14': 0.012512965127825737, 'D16': 9.949327795766294e-05}, 't_site': {'D5': -0.12541814148426056, 'D9': -0.019411085173487663, 'D10': -0.04453073814511299, 'D11': -0.035062581300735474, 'D14': 0.012512965127825737, 'D16': 9.949327795766294e-05}}
+base five-site QS 12-36 h (133 pool: 2.462) 2.4621807284813504
