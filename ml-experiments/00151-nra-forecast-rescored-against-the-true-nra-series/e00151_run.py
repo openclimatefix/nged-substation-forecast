@@ -27,7 +27,22 @@ CHOSEN: Final[Path] = (
 )
 OUT: Final[Path] = WORK_DIR / "scores_v2"
 PERIODS: Final[tuple[str, ...]] = ("replicate", "scored")
+FALSE_ALARMS: Final[Path] = (
+    WORK_DIR.parent / "briefs" / "sw_false_alarms" / "work" / "alarms_flagged.parquet"
+)
+"""The unexplained RO-NC alarms (no logged closure, no labelled transfer) of the false-alarm
+analysis: the real alarms the placebo arm subtracts."""
 PLACEBO_WEEKS: Final[tuple[int, ...]] = (-6, -3, 3, 6)
+
+
+def false_alarm_spans(*, spans: list[nra.Span], series: int, offset: int) -> list[nra.Span]:
+    """The detected spans of a series whose onset matches an unexplained real alarm."""
+    stamps = (
+        pl.read_parquet(FALSE_ALARMS)
+        .filter(pl.col("unexplained") & (pl.col("series") == series))["stamp"]
+        .to_numpy()
+    )
+    return [s for s in spans if np.any(np.abs(stamps + offset - s.onset) <= nra.ONSET_TOLERANCE)]
 
 
 def worlds_list() -> list[int]:
@@ -181,6 +196,17 @@ def injected_job(args: tuple[str, int]) -> str:
                 data=data,
                 stream=stream,
                 spans=nra.constant_true_spans(spans=spans_true, delta_points=points),
+                cutoffs=cutoffs,
+                rows=rows,
+            ),
+            "SUB_FALSE": nra.subtraction_correction(
+                data=data,
+                stream=stream,
+                spans=false_alarm_spans(
+                    spans=spans_det,
+                    series=fed.SERIES_OF_SITE[site],
+                    offset=fed.stamp_offset(data),
+                ),
                 cutoffs=cutoffs,
                 rows=rows,
             ),

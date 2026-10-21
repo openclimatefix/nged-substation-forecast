@@ -196,9 +196,13 @@ post-alarm rows. Four reviews then changed the plan, and each change is post hoc
   MW to observed power, which is circular with the detector's step. It now scores forecasts issued
   inside a logged real transfer for targets after the logged end, against observed power, and adds
   a no-harm contrast on all real rows outside the logged transfers.
-- **Not applied:** the manager asked for a placebo made of real alarms (the D8 and D9 runs, bank
-  holidays, flagged zeros). The sources of those alarms are not stored for this experiment, so the
-  placebo stays the week-shifted detected intervals.
+- **A placebo of real alarms** (the manager's request): SUB-FALSE subtracts only the detected
+  intervals whose onset is within 4 stamps of one of the 148 unexplained alarms of the false-alarm
+  analysis (alarms with no logged closure and no labelled transfer). The week-shifted placebo stays
+  beside it.
+- **Not applied:** shares by the shape of the injected profile. The shape of each injected
+  transfer is not stored in experiment 141's worlds, and regenerating the worlds is outside this
+  experiment.
 
 ## Results
 

@@ -27,6 +27,7 @@ ARMS: Final[tuple[str, ...]] = (
     "SUB_TRUE_LAG",
     "SUB_TRUE_CONST",
     "SUB_PLACEBO",
+    "SUB_FALSE",
 )
 N_RESAMPLES: Final[int] = 20_000
 SEED: Final[int] = 151
