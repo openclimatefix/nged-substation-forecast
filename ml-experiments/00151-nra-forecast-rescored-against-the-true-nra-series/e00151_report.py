@@ -320,7 +320,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             f"  K0 median minus mean forecast at {site}: "
             f"{float((sub['err_median'] - sub['err_mean']).mean()):.4f}"  # ty: ignore[invalid-argument-type]
         )
-    Path(__file__).with_name("report.json").write_text(json.dumps(report, indent=1, default=str))
+    Path(__file__).with_name("report.json").write_text(
+        json.dumps(report, indent=1, default=str) + "\n"
+    )
     _ = timedelta
 
 
