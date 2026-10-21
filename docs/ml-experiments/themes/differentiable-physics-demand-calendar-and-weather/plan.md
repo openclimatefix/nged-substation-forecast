@@ -8,7 +8,7 @@ experiment, so this page lists the input screens only.
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Running | Nothing | Running (experiment 114) |
-| Bundled cheap screens | One experiment of six screens, each with the one-line hypothesis in the section below | 2 | A check for overlap with the multi-hinge heating experiment before planning; its final contrast uses experiment 114 | Queued, planner next |
+| S1, cheap screens added to GAM-K (experiment 126) | Do cheap additions to the day-ahead GAM-K lower the score, winter first? | Done, inconclusive | None | None of 13 screens showed a trusted gain; E-sol (-0.036 on dark winter evenings) is the lead for a retest on ENS weather; W-basis worse in every month, site and year; F-mix, W-stn undecided on 2 to 3 months |
 | Weather encoder retest | Does a small learned encoder over a patch of weather cells lower the error on hard cases (convective and frontal days, wind and solar sites) once the base forecast is recalibrated? | 3 | The audit of the encoder experiment | Queued, after the audit |
 
 Later parts are listed in their own themes.
