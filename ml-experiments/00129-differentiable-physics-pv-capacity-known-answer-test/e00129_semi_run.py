@@ -16,13 +16,13 @@ calendar month, whose true solar capacity is zero). On each target it fits arms 
 import argparse
 from typing import Final
 
+import e00129_arms as arms
 import e00129_common as common
 import e00129_pilot as pilot
 import e00129_semi as semi
 import numpy as np
 import polars as pl
 from studies.dp_features import FeatureCache
-from studies.dp_gam import GamSpec
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
 N_DRAWS: Final[int] = 10
@@ -42,8 +42,8 @@ def draw_rows(
     cache: FeatureCache,
     placebo_cache: FeatureCache,
     site: str,
-    arm: pilot.ArmType,
-    spec: GamSpec,
+    arm: arms.ArmType,
+    increment_share: float,
     draw: int,
     injected_points: float,
     device: str,
@@ -51,14 +51,19 @@ def draw_rows(
     """Return table rows for one arm and draw: the none and farm cases, real and placebo sky."""
     rows: list[dict[str, object]] = []
     for sky, source in (("real", cache), ("placebo", placebo_cache)):
-        none = common.fit_site(cache=source, site=site, spec=spec, device=device)
-        none_capacity = none.capacity_points()
+        none_capacity = arms.fitted_capacity(
+            arm=arm, cache=source, site=site, device=device, increment_share=increment_share
+        )
         for farm in common.FARMS:
             output = injected_points * common.farm_norm(cache=cache, farm=farm)
             injected_cache = common.inject(cache=source, site=site, output=output)
-            capacity = common.fit_site(
-                cache=injected_cache, site=site, spec=spec, device=device
-            ).capacity_points()
+            capacity = arms.fitted_capacity(
+                arm=arm,
+                cache=injected_cache,
+                site=site,
+                device=device,
+                increment_share=increment_share,
+            )
             years = [
                 y
                 for y in common.COMPLETE_SEASON_YEARS
@@ -82,13 +87,21 @@ def draw_rows(
     return rows
 
 
-def run_site(*, cache: FeatureCache, site: str, draws: int, device: str) -> list[dict[str, object]]:
+def run_site(
+    *,
+    cache: FeatureCache,
+    site: str,
+    draws: int,
+    device: str,
+    arm_names: list[arms.ArmType],
+    increment_share: float,
+) -> list[dict[str, object]]:
     """Return every table row of one Primary."""
     injected_points = pinned_capacity(
         vintages=read_vintages(), table=cache.sites[site].table, cut=common.DATA_CUT
     ).held_points
     real_fit = common.fit_site(
-        cache=cache, site=site, spec=pilot.arm_spec(arm="arm3", ridge=common.RIDGE), device=device
+        cache=cache, site=site, spec=arms.arm_spec(arm="arm3", ridge=common.RIDGE), device=device
     )
     demand, residual = semi.demand_and_residual(cache=cache, site=site, fit=real_fit)
     rows: list[dict[str, object]] = []
@@ -100,13 +113,13 @@ def run_site(*, cache: FeatureCache, site: str, draws: int, device: str) -> list
             cache=cache, site=site, demand=demand, resampled=resampled
         )
         placebo = semi.placebo_sky(cache=target, site=site)
-        for arm in ("arm2", "arm3"):
+        for arm in arm_names:
             rows += draw_rows(
                 cache=target,
                 placebo_cache=placebo,
                 site=site,
                 arm=arm,
-                spec=pilot.arm_spec(arm=arm, ridge=common.RIDGE),
+                increment_share=increment_share,
                 draw=draw,
                 injected_points=injected_points,
                 device=device,
@@ -121,14 +134,24 @@ def main() -> None:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--sites", nargs="+", default=list(common.PILOT_SITES))
     parser.add_argument("--draws", type=int, default=N_DRAWS)
+    parser.add_argument("--arms", nargs="+", default=["arm2", "arm3"])
+    parser.add_argument("--increment-share", type=float, default=0.0)
+    parser.add_argument("--out", default="semi.parquet")
     arguments = parser.parse_args()
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
     cache = common.load_cache()
     rows: list[dict[str, object]] = []
     for site in arguments.sites:
-        rows += run_site(cache=cache, site=site, draws=arguments.draws, device=arguments.device)
+        rows += run_site(
+            cache=cache,
+            site=site,
+            draws=arguments.draws,
+            device=arguments.device,
+            arm_names=arguments.arms,
+            increment_share=arguments.increment_share,
+        )
     table = pl.DataFrame(rows)
-    table.write_parquet(common.WORK_DIR / "semi.parquet")
+    table.write_parquet(common.WORK_DIR / arguments.out)
     summary = (
         table.group_by("site", "arm", "sky")
         .agg(

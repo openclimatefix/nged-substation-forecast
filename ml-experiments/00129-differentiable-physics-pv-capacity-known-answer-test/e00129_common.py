@@ -28,6 +28,7 @@ from studies.dp_features import (
     load_or_build_feature_cache,
 )
 from studies.dp_gam import GamFit, GamSpec, TrainingWindow, fit_gam
+from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 from studies.pv_physics import PlantParameters, half_hour_sun_and_sky, plant_power_mw
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -114,6 +115,13 @@ def fit_site(*, cache: FeatureCache, site: str, spec: GamSpec, device: str) -> G
         device=device,
         dtype=torch.float64,
     )
+
+
+def pinned_points(*, cache: FeatureCache, site: str) -> float:
+    """Return the Primary's pinned capacity at `DATA_CUT`, in points; it scales the injections."""
+    return pinned_capacity(
+        vintages=read_vintages(), table=cache.sites[site].table, cut=DATA_CUT
+    ).held_points
 
 
 def with_reading(*, cache: FeatureCache, site: str, y: np.ndarray) -> FeatureCache:

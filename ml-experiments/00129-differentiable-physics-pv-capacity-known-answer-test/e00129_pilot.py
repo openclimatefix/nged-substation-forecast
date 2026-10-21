@@ -15,9 +15,10 @@ experiment 110's sun-blind terms (`k_ii`). The ridge is shared by the demand and
 """
 
 import argparse
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Final, Literal
 
+import e00129_arms as arms
 import e00129_common as common
 import numpy as np
 import polars as pl
@@ -27,8 +28,6 @@ from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
 RIDGES: Final[tuple[float, ...]] = (0.01, 0.1, 1.0)
 """The ridge values compared for arm 2, whose value of 0.1 is experiment 104's."""
-ArmType = Literal["arm2", "arm3"]
-"""Arm 2 is the monotone season-year capacity; arm 3 adds the sun-blind terms."""
 ESTIMABLE_SHARE: Final[float] = 0.01
 """A season-year is estimable when the capacity fitted with the injection exceeds this share of
 the injected capacity; a season-year with no usable row fits to zero."""
@@ -56,14 +55,6 @@ def scenarios() -> list[Scenario]:
     sources: list[tuple[PlantType, str]] = [("matched", farm) for farm in common.FARMS]
     sources.append(("east_west", "synthetic"))
     return [Scenario(plant, source, load) for plant, source in sources for load in (False, True)]
-
-
-def arm_spec(*, arm: ArmType, ridge: float) -> GamSpec:
-    """Return the fit's penalties and terms for an arm at a ridge value."""
-    fitted = GamSpec(ridge=ridge, capacity="fitted")
-    if arm == "arm2":
-        return fitted
-    return replace(fitted, shared_harmonics=True, slow_heating_only=True)
 
 
 def fitted_capacity(
@@ -105,7 +96,7 @@ def pilot_rows(*, cache: FeatureCache, site: str, device: str) -> list[dict[str,
     }
     rows: list[dict[str, object]] = []
     for arm, ridge in cases:
-        spec = arm_spec(arm=arm, ridge=ridge)
+        spec = arms.arm_spec(arm=arm, ridge=ridge)
         base = fitted_capacity(cache=cache, site=site, spec=spec, device=device)
         for scenario, injected_cache in injected.items():
             with_injection = fitted_capacity(
