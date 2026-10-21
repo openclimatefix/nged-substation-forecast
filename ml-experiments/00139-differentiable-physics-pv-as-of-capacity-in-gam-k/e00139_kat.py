@@ -119,8 +119,6 @@ def kat_site(site: str) -> pl.DataFrame:
     which = np.clip(np.searchsorted(cuts, origin64, side="right") - 1, 0, len(fits) - 1)
     injected_capacity = INJECTED_SHARE * held_by_cut[which]
     shapes = shapes_of(cache=cache, site=site)
-    table = pl.read_parquet(common.WORK_DIR / "asof" / f"asof_{site}_20250701.parquet")
-    divisor = float(table.filter(pl.col("season_year") == 2024)["divisor"][0])
     out = []
     for source in SOURCES:
         output = injected_capacity * shapes[source][rows]

@@ -69,10 +69,11 @@ take_home_message: >-
 lessons:
   - >-
     A capacity fitted once a year and held flat may lag a growing fleet, and the pin's weekly update
-    beats it on sunny half-hours (at D16: 3.0 MW as-of against 3.9 to 4.7 MW pinned; at D5 and D14 the as-of arm is level or better).
+    beats it on sunny half-hours (at D16: 3.0 MW as-of against 3.9 to 4.7 MW pinned; at D5 and D14
+    the as-of arm is level or better).
   - >-
-    A known-answer test that passes (0.78 to 0.88 recovered at 5 of 5 Primaries) does not predict a
-    forecast gain: the plumbing was right and the capacity still did not matter.
+    A known-answer test that passes (0.78 to 0.88 recovered at five of five Primaries) does not
+    predict a forecast gain: the plumbing was right and the capacity still did not matter.
 advice:
   - >-
     Keep experiment 45's pinned capacity in GAM-K; do not replace it with a once-a-year as-of
@@ -103,8 +104,8 @@ rule: the interval of the as-of arm minus the pin on the sunniest third lies who
 replicate months agree in sign but their interval includes zero, so the scored year carries the
 verdict.
 
-In this page, the **pin** is experiment 45's capacity held fixed, the **as-of** capacity is read from
-data before each 1 July, the **hindsight** capacity is fitted on all data (a ceiling), and the
+In this page, the **pin** is experiment 45's capacity held fixed, the **as-of** capacity is read
+from data before each 1 July, the **hindsight** capacity is fitted on all data (a ceiling), and the
 **sunniest third** is the third of daylight half-hours with the highest unit solar shape at each
 Primary. The quantile score is twice the mean pinball loss over 11 quantiles, in points of effective
 capacity. GAM is a generalised additive model, CAMS is the Copernicus Atmosphere Monitoring Service
@@ -112,14 +113,16 @@ capacity. GAM is a generalised additive model, CAMS is the Copernicus Atmosphere
 for Medium-Range Weather Forecasts (ECMWF).
 
 We asked whether the solar capacity subtracted by the convex demand model with a Kalman filter
-(GAM-K, [experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md))
-should come from [experiment 129](../00129-differentiable-physics-pv-capacity-known-answer-test/result.md)'s
-capacity read from the substation's own power, fitted only on data before each 1 July, instead of
+(GAM-K, [experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)) should come from
+[experiment 129](../00129-differentiable-physics-pv-capacity-known-answer-test/result.md)'s capacity
+read from the substation's own power, fitted only on data before each 1 July, instead of
 [experiment
-45](../00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md)'s pinned capacity. The pin and the as-of capacity both feed the same
-convex demand model, driven by the mean of the European Centre's weather ensemble as in [experiment 136][e136].
-Only the capacity changed. The known-answer test passed and the forecast got worse. Experiment 111's design also fixed the
-injection: the test adds a synthetic plant to the scored half-hours only, so no fit or filter sees it.
+45](../00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md)'s pinned capacity. The pin and the
+as-of capacity both feed the same convex demand model, driven by the mean of the European Centre's
+weather ensemble as in [experiment 136][e136]. Only the capacity changed. The known-answer test
+passed and the forecast got worse. Experiment 111's design also fixed the injection: the test adds a
+synthetic plant to the scored half-hours only, so no fit or filter sees it.
 
 ![Paired contrasts of the quantile score, scored year](figure_01_contrasts_scored.svg)
 
@@ -132,23 +135,23 @@ injection: the test adds a synthetic plant to the scored half-hours only, so no 
 ## Arms and rows
 
 - **Pin (control):** experiment 45's `frozen` vintage, passed through the adaptor. It reproduces
-  experiment 111's fits (largest coefficient difference 0.0 at all six Primaries) and experiment 136's
+experiment 111's fits (largest coefficient difference 0.0 at all six Primaries) and experiment 136's
   `a0` forecasts at D5 exactly.
 - **As-of (scored arm):** experiment 129's arm 2, fitted on rows before the latest 1 July origin
   (2023, 2024, or 2025) and held for the following season-year, divided by a recovery divisor
   rebuilt from known-answer fits cut at the same origin. The rebuilt estimates for 2025-07-01 agree
   with experiment 129's published ones within 0.05 MW (leakage check). The origin is 1 July and not
-  the 1 September of the design note, because the convex demand model's season-years run July to June.
+the 1 September of the design note, because the convex demand model's season-years run July to June.
 - **Hindsight (ceiling, never a result):** experiment 129's published estimates, fitted on data to
   2026-07-31. **No PV (floor):** capacity zero.
 - **Post hoc, not pre-registered:** as-of x 1.15 (one over the known-answer recovery of 0.87) and
   as-of in the convex demand model's own units (the raw capacity, before the divisor).
 - **Rows:** `fold_a_daily_gap_v1`, 09:00 UTC `power_fcst_init_time`, leads 0.5 to 168 hours, outside
-  the hand-filtered switching events. D5, D10, D11, D14, and D16 are pooled. D9 has no experiment 129
+the hand-filtered switching events. D5, D10, D11, D14, and D16 are pooled. D9 has no experiment 129
   table, so it has the pin and no-PV arms only. Monthly refits on a 24-month window, filter noise as
   experiment 111, 4 to 8 seconds per Primary for a whole year of fits and forecasts.
-- **Slices:** the thirds are per Primary, over daylight half-hours (CAMS-driven unit solar shape above
-  0.01), by that shape. Night half-hours are in no third.
+- **Slices:** the thirds are per Primary, over daylight half-hours (CAMS-driven unit solar shape
+  above 0.01), by that shape. Night half-hours are in no third.
 
 ## Headline numbers
 
@@ -165,7 +168,7 @@ Intervals are 98.75% intervals from the month-block bootstrap with 20,000 resamp
 | As-of, model units (post hoc) | 2.874 | 4.569 | 3.050 |
 
 - **C1, as-of minus pin:** all half-hours +0.013 (-0.003 to 0.028); sunniest third **+0.110
-  (0.038 to 0.181)**; darkest third -0.042 (-0.076 to -0.003). The error of the mean forecast agrees:
+(0.038 to 0.181)**; darkest third -0.042 (-0.076 to -0.003). The error of the mean forecast agrees:
   sunniest third +0.221 (0.114 to 0.359).
 - **C2, hindsight minus pin:** sunniest third +0.029 (-0.020 to 0.085); all half-hours +0.001
   (-0.011 to 0.013). The ceiling gives no gain over the pin.
@@ -173,28 +176,28 @@ Intervals are 98.75% intervals from the month-block bootstrap with 20,000 resamp
   holds one value per season-year, so the gap comes from the information date: the hindsight arm
   sees the following year's power, and the as-of arm does not. The comparison is therefore not a
   pure test of staleness.
-- **No PV minus pin:** all half-hours +0.549 (0.407 to 0.727); sunniest third +1.051 (0.467 to 1.650).
-  At D9, +0.275 (0.062 to 0.460). An explicit solar term is worth about 0.55 points over all half-hours
-  (1.05 on the sunniest third). The choice of capacity moves the sunniest-third score by 0.03 to
-  0.16 points in the arms above.
+- **No PV minus pin:** all half-hours +0.549 (0.407 to 0.727); sunniest third +1.051 (0.467 to
+  1.650). At D9, +0.275 (0.062 to 0.460). An explicit solar term is worth about 0.55 points over all
+  half-hours (1.05 on the sunniest third). The choice of capacity moves the sunniest-third score by
+  0.03 to 0.16 points in the arms above.
 - **Post hoc arms:** as-of x 1.15 minus pin on the sunniest third +0.163 (0.100 to 0.218); as-of in
-  model units minus pin +0.117 (-0.024 to 0.255). Scaling worsens the as-of arm on sunny half-hours; the model-units arm
-  is level with it. The post hoc scale of 1.15 came from the scored-year known-answer recovery, so
-  its scored-year contrast is not out of sample.
+model units minus pin +0.117 (-0.024 to 0.255). Scaling worsens the as-of arm on sunny half-hours;
+  the model-units arm is level with it. The post hoc scale of 1.15 came from the scored-year
+  known-answer recovery, so its scored-year contrast is not out of sample.
 - **Replicate months (even months of 2024-07 to 2025-06, origin 2024-07-01):** the sign is the same.
   As-of minus pin on the sunniest third +0.072 (-0.030 to 0.115) and on the darkest third -0.028
   (-0.070 to 0.014). Absolute scores: pin 2.765, as-of 2.774, hindsight 2.768, no PV 3.265. The stop
   rule (as-of worse than the pin on the sunniest third after the replicate, interval wholly above
   zero) did not fire, because the interval includes zero.
-- **By Primary:** leaving out any one Primary leaves the sunniest-third sign positive (+0.060 without
-  D16 to +0.153 without D14); the interval includes zero when D10 or D16 is left out.
+- **By Primary:** leaving out any one Primary leaves the sunniest-third sign positive (+0.060
+  without D16 to +0.153 without D14); the interval includes zero when D10 or D16 is left out.
 
 ## Known-answer test
 
-- **Passed at five of five Primaries for all three plant classes** (real farm, east-west, south-west):
-  raising the capacity by half the as-of capacity removed 0.86 to 0.88 (real farm), 0.84 to 0.87
-  (east-west), and 0.78 to 0.80 (south-west) of the injected output on the sunniest third.
-  The real-farm figures are medians over five real farms. The pre-registered band was 0.75 to
+- **Passed at five of five Primaries for all three plant classes** (real farm, east-west,
+  south-west): raising the capacity by half the as-of capacity removed 0.86 to 0.88 (real farm),
+  0.84 to 0.87 (east-west), and 0.78 to 0.80 (south-west) of the injected output on the sunniest
+  third. The real-farm figures are medians over five real farms. The pre-registered band was 0.75 to
   1.25.
 - **The injection enters the scored rows only,** so no fit or filter sees it. The test checks the
   shape match between the ensemble-driven forecast and each plant, not whether a fit absorbs a
@@ -204,8 +207,9 @@ Intervals are 98.75% intervals from the month-block bootstrap with 20,000 resamp
 
 ## Tail calibration and checks
 
-Nominal levels are 0.01, 0.05, 0.95, and 0.99. Both arms leave too many actuals in the tails: 0.021 of
-actuals fall below the 0.01 quantile, and 0.054 rise above the 0.95 quantile. Pinball columns are in points of effective capacity.
+Nominal levels are 0.01, 0.05, 0.95, and 0.99. Both arms leave too many actuals in the tails: 0.021
+of actuals fall below the 0.01 quantile, and 0.054 rise above the 0.95 quantile. Pinball columns are
+in points of effective capacity.
 
 | Arm | Below q01 | Below q05 | Below q95 | Below q99 | Pinball q01 | q05 | q95 | q99 |
 |---|---|---|---|---|---|---|---|---|
@@ -214,13 +218,13 @@ actuals fall below the 0.01 quantile, and 0.054 rise above the 0.95 quantile. Pi
 
 - **Audit triggers:** two of the experiment-audit triggers fired. The result contradicts the
   pre-registered prediction of a 0.03 to 0.10 gain, and the session tested two explanations: the
-  information date (the hindsight arm, which closes 0.081 of the 0.110 gap) and units or damping (the
+information date (the hindsight arm, which closes 0.081 of the 0.110 gap) and units or damping (the
   two post hoc arms, which do not). Downstream work (the full-history arm, the calibration
   experiments, the partly pooled GAM, and the card rebuild) waits for this headline. No Opus audit
   was run; Sonnet reviews of the code and the write-up were.
-- **Predictions missed:** three pre-registered predictions failed. The as-of gain had the wrong sign.
-  The hindsight arm beat the as-of arm by 0.081 and not under 0.03 points. The no-PV loss on the
-  sunniest third was 1.05 and not 0.2 to 0.6 points.
+- **Predictions missed:** three pre-registered predictions failed. The as-of gain had the wrong
+  sign. The hindsight arm beat the as-of arm by 0.081 and not under 0.03 points. The no-PV loss on
+  the sunniest third was 1.05 and not 0.2 to 0.6 points.
 - **Benchmarks:** climatology and `manual_heuristic` were not rescored here. Their absolute skill at
   these Primaries is in experiment 111's results, on the same rows.
 - **Median minus mean forecast:** 0.0 at every Primary and arm, because the spread table is centred
@@ -240,11 +244,11 @@ actuals fall below the 0.01 quantile, and 0.054 rise above the 0.95 quantile. Pi
   D16 +0.313 (0.138 to 0.490), D10 +0.222 (0.163 to 0.303), D11 +0.034 (-0.001 to 0.071), D5 +0.040
   (-0.183 to 0.344), and D14 -0.060 (-0.131 to 0.008). Staleness fits D16, where the pin (3.9 to
   4.7 MW) sits above the as-of capacity (2.98 MW). At D5 and D14 the as-of arm is level with or
-  better than the pin, so the pooled loss leans on two Primaries. The post hoc arms rule out a simple
+better than the pin, so the pooled loss leans on two Primaries. The post hoc arms rule out a simple
   unit or damping fix but do not identify the cause.
 - **Tertile edges** come from the pin frame over the scored period, including D9.
-- **The origin is 1 July,** so the 2025 estimate used for the scored year covers the 2025 season-year
-  from the 2025-07-01 cut.
+- **The origin is 1 July,** so the 2025 estimate used for the scored year covers the 2025
+  season-year from the 2025-07-01 cut.
 - **Replicate months cover six months only,** so the replicate intervals are wide.
 - **The adaptor lives in this folder** (`e00139_adaptor.py`). Moving it into `packages/studies`
   would be a module change that needs the maintainer's review.
