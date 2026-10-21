@@ -616,6 +616,7 @@ include = [
     "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_data.py",
     "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_model.py",
     "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_run.py",
+    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_members.py",
     "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_members.py",
     "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_run.py",
     "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_tune.py",
