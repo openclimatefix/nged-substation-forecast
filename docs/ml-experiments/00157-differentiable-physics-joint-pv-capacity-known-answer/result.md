@@ -79,8 +79,7 @@ advice:
     forecast arms on a better capacity (shape ceiling bullet).
 ---
 
-# Experiment 157: does fitting the solar capacity jointly with the demand terms recover an injected
-farm?
+# Experiment 157: does fitting the solar capacity jointly with the demand terms recover an injected farm?
 
 **Take-home message: in this test, letting the solar capacity change month by month did not find
 more of an injected solar farm than a capacity that changes once a year, so the forecast stage is
@@ -205,13 +204,9 @@ same demand terms, so that only the capacity differs.
 
 | Arm | Capacity | Role |
 |---|---|---|
-| 1. Pin | Experiment 45's `frozen` vintage, held | Reference. It does not refit, so it recovers
-none of the injection |
-| 2. Two-stage as-of | Experiment 129's arm 2: non-negative increments per season-year, ridge 0.1 on
-the cumulative capacity | Benchmark |
-| 3. Joint | A non-negative level for each calendar month (the derated unit shape times the level),
-a penalty on the squared change of the level from month to month, and a near-zero ridge on the level
-| The arm under test |
+| 1. Pin | Experiment 45's `frozen` vintage, held | Reference. It does not refit, so it recovers none of the injection |
+| 2. Two-stage as-of | Experiment 129's arm 2: non-negative increments per season-year, ridge 0.1 on the cumulative capacity | Benchmark |
+| 3. Joint | A non-negative level for each calendar month (the derated unit shape times the level), a penalty on the squared change of the level from month to month, and a near-zero ridge on the level | The arm under test |
 
 **The joint fit's growth penalty is fixed in advance.** It is 0.1 times the mean diagonal of the
 Gram matrix over the capacity columns, the share experiment 129's arm 4 used. Two values, 0.01 and
