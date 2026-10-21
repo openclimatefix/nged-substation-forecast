@@ -212,6 +212,56 @@ def fit_kd(
     )
 
 
+def fit_gk(
+    *,
+    inputs: StreamInputs,
+    start: np.ndarray,
+    prior_mean: np.ndarray,
+    prior_spread: np.ndarray,
+) -> joint.JointParams:
+    """Fit GAM-K's four values by maximum a posteriori, as experiment 111 does, with d off.
+
+    This is the KD fit with `sigma_d` pinned to 0, so GAM-K nests in KD. The prior is the first
+    four entries of the shared prior.
+
+    Args:
+        inputs: The stream and the likelihood rows.
+        start: The four starting values (log q, logit phi, log sigma_z, log sigma_eps).
+        prior_mean: The prior mean of the four values.
+        prior_spread: The prior standard deviation of the four values.
+
+    Returns:
+        GAM-K's constants.
+
+    Raises:
+        ValueError: If the fit returns a non-finite objective.
+    """
+
+    def negative_posterior(values: np.ndarray) -> float:
+        trace = joint.run_joint_filter(
+            residual=inputs.residual,
+            band=inputs.band,
+            day=inputs.day,
+            params=joint.gamk_params(hyper=values.tolist()),
+            likelihood_mask=inputs.likelihood_mask,
+            keep_trace=False,
+        )
+        prior = -0.5 * float((((values - prior_mean) / prior_spread) ** 2).sum())
+        return -(trace.log_likelihood + prior)
+
+    result = minimize(
+        negative_posterior,
+        x0=start,
+        method="L-BFGS-B",
+        bounds=GAMK_BOUNDS,
+        options={"eps": FINITE_DIFFERENCE_STEP, "maxiter": MAX_ITERATIONS},
+    )
+    if not np.isfinite(result.fun):
+        msg = f"the GAM-K hyperparameter fit returned a non-finite objective: {result.message}"
+        raise ValueError(msg)
+    return joint.gamk_params(hyper=result.x.tolist())
+
+
 def start_vector(*, site: str) -> np.ndarray:
     """Return KD's starting values: experiment 111's four, then `phi_d` 0.5 and `sigma_d` 1."""
     return np.r_[np.array(common.gamk_hyper(site=site)), NEW_PRIOR_MEAN]

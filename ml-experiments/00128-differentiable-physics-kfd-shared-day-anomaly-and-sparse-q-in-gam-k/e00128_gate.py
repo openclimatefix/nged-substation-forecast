@@ -2,7 +2,7 @@
 
 Each stream is built on the real PV regressor and the real tuning-year residuals of one decision
 substation (2024-07-01 to 2025-06-30). The script injects a known change shaped like a rise in
-solar-panel capacity, adds noise, refits KD, KS, and KDS on the synthetic stream (starting from the
+solar-panel capacity, adds noise, refits GK, KD, KS, and KDS on the synthetic stream (starting from the
 real fit and with the real fit's prior), runs GK, KD, KS, and KDS over it, and stores the arms'
 end-of-day midday level, night level, and d, and their day-ahead absolute error.
 
@@ -231,10 +231,11 @@ def read_day(*, truth: np.ndarray) -> int:
 
 
 def refit_arms(*, inputs: GateInputs, stream: np.ndarray) -> dict[str, joint.JointParams]:
-    """Refit KD, KS, and KDS on a synthetic stream, as the real pipeline fits them.
+    """Refit GK, KD, KS, and KDS on a synthetic stream, as the real pipeline fits them.
 
-    KD starts from the real fit and uses the real fit's prior. KS holds GAM-K's other values, and
-    KDS holds the refitted KD's, each searching its level variances from zero at 2 nats.
+    GK and KD start from the real fits and use the real fit's prior (GK is KD with `sigma_d` pinned
+    to 0). KS holds the refitted GK's other values, and KDS holds the refitted KD's, each searching
+    its level variances from zero at 2 nats.
     """
     stream_inputs = fit.StreamInputs(
         residual=stream,
@@ -243,18 +244,24 @@ def refit_arms(*, inputs: GateInputs, stream: np.ndarray) -> dict[str, joint.Joi
         likelihood_mask=inputs.likelihood_mask & np.isfinite(stream),
     )
     prior_mean, prior_spread = fit.gamk_prior()
+    gk = fit.fit_gk(
+        inputs=stream_inputs,
+        start=np.array(common.gamk_hyper(site=inputs.site)),
+        prior_mean=prior_mean[:4],
+        prior_spread=prior_spread[:4],
+    )
     kd = fit.fit_kd(
         inputs=stream_inputs,
         start=joint.vector_from_params(params=inputs.real_kd),
         prior_mean=prior_mean,
         prior_spread=prior_spread,
     )
-    ks = fit.sparse_search(inputs=stream_inputs, base=inputs.gk, threshold=fit.THRESHOLD_NATS)
+    ks = fit.sparse_search(inputs=stream_inputs, base=gk, threshold=fit.THRESHOLD_NATS)
     kds = fit.sparse_search(inputs=stream_inputs, base=kd.params, threshold=fit.THRESHOLD_NATS)
     return {
-        "GK": inputs.gk,
+        "GK": gk,
         "KD": kd.params,
-        "KS": inputs.gk.with_q(q=ks.q),
+        "KS": gk.with_q(q=ks.q),
         "KDS": kd.params.with_q(q=kds.q),
     }
 
