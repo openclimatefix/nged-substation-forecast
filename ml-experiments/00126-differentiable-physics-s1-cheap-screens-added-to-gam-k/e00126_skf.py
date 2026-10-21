@@ -71,6 +71,7 @@ class SwitchingResult:
         level: The collapsed level after each reading, shape (streams, readings).
         anomaly: The collapsed transient after each reading.
         p_bad: The posterior probability of the shift or outlier regime after each reading.
+        innovation: The reading minus the collapsed prediction before it, `NaN` where missing.
         log_likelihood: The marginal log likelihood of each stream's readings, shape (streams,).
         counts: The expected one-step transition counts, shape (3, 3), summed over streams.
     """
@@ -78,6 +79,7 @@ class SwitchingResult:
     level: np.ndarray
     anomaly: np.ndarray
     p_bad: np.ndarray
+    innovation: np.ndarray
     log_likelihood: np.ndarray
     counts: np.ndarray
 
@@ -133,6 +135,7 @@ def gpb1_band(  # noqa: PLR0915 (one loop body: the three-regime update)
     out_level = np.empty((streams, readings))
     out_anomaly = np.empty((streams, readings))
     out_bad = np.empty((streams, readings))
+    out_innovation = np.full((streams, readings), np.nan)
     log_likelihood = np.zeros(streams)
     counts = np.zeros((N_REGIMES, N_REGIMES))
     for k in range(readings):
@@ -183,10 +186,12 @@ def gpb1_band(  # noqa: PLR0915 (one loop body: the three-regime update)
         out_level[:, k] = level
         out_anomaly[:, k] = anomaly
         out_bad[:, k] = regime[:, SHIFT] + regime[:, OUTLIER]
+        out_innovation[:, k] = np.where(valid, innovation, np.nan)
     return SwitchingResult(
         level=out_level,
         anomaly=out_anomaly,
         p_bad=out_bad,
+        innovation=out_innovation,
         log_likelihood=log_likelihood,
         counts=counts,
     )
