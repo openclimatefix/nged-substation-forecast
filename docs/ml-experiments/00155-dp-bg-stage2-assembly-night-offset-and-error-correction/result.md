@@ -16,7 +16,8 @@ size: >-
   error correction applies at every lead), and this plan pre-registers one of each and runs the
   alternative of the last as a labelled variant. Callers: this folder's scripts, which read
   experiment 136's stored forecasts and copy the night-term code of experiment 137 and the
-  error-correction code of experiment 145; they call the reviewed `studies.*` modules without changing them. No new modelling.
+  error-correction code of experiment 145; they call the reviewed `studies.*` modules without
+  changing them. No new modelling.
 hypothesis: >-
   A GAM-K forecast (the convex demand model with a Kalman filter on recent errors, experiment 111)
   that already has the heating split by day type, one shared filter noise setting, the pinned solar
