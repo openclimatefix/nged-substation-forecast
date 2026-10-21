@@ -1,0 +1,509 @@
+== Gate (first run kept) ==
+tests failed: 1 of 5
+pre-registered test 1: passed=False
+  a_evening_plus3: KW median 0.350 (expected 0.350), max site 0.414, K0 median 0.196, R median 0.422, spillover max 0.217, R spillover max 0.062, in brief target False, checks {'at_least_floor': False, 'no_site_above_ceiling': True, 'spillover_below_limit': True, 'within_tolerance': True}
+  b_morning_earlier: KW median 0.295 (expected 0.295), max site 0.349, K0 median -0.000, R median 0.482, spillover max 0.158, R spillover max 0.000, in brief target False, checks {'at_least_floor': False, 'no_site_above_ceiling': True, 'spillover_below_limit': True, 'within_tolerance': True}
+POST HOC test 1, KW-fast: passed=True
+  a_evening_plus3: KW median 0.621 (expected 0.621), max site 0.707, K0 median 0.196, R median 0.422, spillover max 0.162, R spillover max 0.062, in brief target True, checks {'at_least_floor': True, 'no_site_above_ceiling': True, 'spillover_below_limit': True, 'within_tolerance': True}
+  b_morning_earlier: KW median 0.720 (expected 0.720), max site 0.784, K0 median -0.000, R median 0.482, spillover max 0.215, R spillover max 0.000, in brief target True, checks {'at_least_floor': True, 'no_site_above_ceiling': True, 'spillover_below_limit': True, 'within_tolerance': True}
+test 2 (clean data): passed=True
+  permuted: score gap KW minus K0 -0.0051, {'kw_score_within_limit_of_k0': True, 'refit_q_s_under_tenth_of_tuned': True, 'refit_s_rms_under_limit': True, 'tuned_rms_at_most_1.2_prior_sd': True}
+    D5: refit q_s 9.19e-05 (tuned 0.0286), refit s RMS 0.042, tuned s RMS 0.736, sqrt mean P_s 0.826
+    D10: refit q_s 1.01e-04 (tuned 0.0235), refit s RMS 0.053, tuned s RMS 0.666, sqrt mean P_s 0.657
+    D11: refit q_s 8.57e-05 (tuned 0.0042), refit s RMS 0.046, tuned s RMS 0.371, sqrt mean P_s 0.365
+    D14: refit q_s 9.35e-05 (tuned 0.0103), refit s RMS 0.051, tuned s RMS 0.437, sqrt mean P_s 0.471
+    D16: refit q_s 9.01e-05 (tuned 0.0203), refit s RMS 0.045, tuned s RMS 0.505, sqrt mean P_s 0.587
+  synthetic: score gap KW minus K0 +0.0000, {'kw_score_within_limit_of_k0': True, 'refit_q_s_under_tenth_of_tuned': True, 'refit_s_rms_under_limit': True, 'tuned_rms_at_most_1.2_prior_sd': True}
+    D5: refit q_s 3.89e-05 (tuned 0.0286), refit s RMS 0.030, tuned s RMS 0.636, sqrt mean P_s 0.826
+    D10: refit q_s 3.62e-05 (tuned 0.0235), refit s RMS 0.034, tuned s RMS 0.468, sqrt mean P_s 0.657
+    D11: refit q_s 3.61e-05 (tuned 0.0042), refit s RMS 0.038, tuned s RMS 0.263, sqrt mean P_s 0.365
+    D14: refit q_s 3.82e-05 (tuned 0.0103), refit s RMS 0.043, tuned s RMS 0.377, sqrt mean P_s 0.471
+    D16: refit q_s 3.87e-05 (tuned 0.0203), refit s RMS 0.035, tuned s RMS 0.408, sqrt mean P_s 0.587
+test 3 (reproduction): passed=True, worst vs code 2.15e-14, worst level vs stored 0.00e+00, worst quantile vs stored 0.00e+00, rows match True
+test 4 (causality): passed=True, worst reading change 0.0, worst recipe change 0.0, ensemble inputs identical True
+test 5 (zero mean): passed=True, worst block sum 1.07e-14
+== Tuned settings ==
+KW (log q_s, log sigma_eps) per site:
+  D10: q_s 0.0235 points^2/day, sigma_eps 0.071 points
+  D11: q_s 0.0042 points^2/day, sigma_eps 0.057 points
+  D14: q_s 0.0103 points^2/day, sigma_eps 0.569 points
+  D16: q_s 0.0203 points^2/day, sigma_eps 0.053 points
+  D5: q_s 0.0286 points^2/day, sigma_eps 0.090 points
+  D9: q_s 0.0116 points^2/day, sigma_eps 0.050 points
+lead-band multipliers: {'K0': [0.25, 0.25, 0.25, 0.25], 'KW': [4.0, 4.0, 0.5, 0.25]}
+recipe kappa grid scores [2.4264415712417167, 2.378347974465136, 2.3501635036013577, 2.343718402817707, 2.3580901315146323], chosen 0.75
+spread factors per lead band (0-24, 24-48, 48-144, 144-168 h):
+  K0: [0.9, 0.9, 0.9, 0.9]
+  K0-d0: [0.9, 0.9, 0.9, 0.9]
+  K0-d24: [1.0, 0.9, 0.9, 0.9]
+  K0-d33: [1.0, 0.9, 0.9, 0.9]
+  K0-lb: [0.9, 0.9, 0.9, 0.9]
+  KS: [0.9, 0.9, 0.9, 0.9]
+  KS1: [0.9, 0.9, 0.9, 0.9]
+  KW: [0.9, 0.9, 0.9, 0.9]
+  KW-d0: [0.9, 0.9, 0.9, 0.9]
+  KW-d24: [1.0, 0.9, 0.9, 0.9]
+  KW-d33: [1.0, 0.9, 0.9, 0.9]
+  KW-day: [0.9, 0.9, 0.9, 0.9]
+  KW-fast: [0.9, 0.9, 0.9, 0.9]
+  KW-lb: [0.9, 0.9, 0.9, 0.9]
+  KW-nomid: [0.9, 0.9, 0.9, 0.9]
+  KW-pl52: [1.0, 0.9, 0.9, 0.9]
+  R: [0.9, 0.9, 0.9, 0.9]
+  R75: [0.9, 0.9, 0.9, 0.9]
+== Planned contrasts (98.75% intervals) ==
+replicate | C1 shape state (KW - K0) | D+1 | qs -0.0745 [-0.1449, -0.0091] 5/5 sites better | MAE median -0.1440 | MAE mean -0.1443
+    absolute qs {'K0': 2.4254616837056626, 'KW': 2.350995601991853}, rows 41126
+replicate | C1 shape state (KW - K0) | 0.5-168 h | qs -0.0661 [-0.1390, -0.0006] 5/5 sites better | MAE median -0.1301 | MAE mean -0.1327
+replicate | C1 shape state (KW - K0) | 0-24 h | qs -0.0781 [-0.1532, -0.0115] 5/5 sites better | MAE median -0.1508 | MAE mean -0.1493
+replicate | C1 shape state (KW - K0) | 24-48 h | qs -0.0708 [-0.1452, -0.0041] 5/5 sites better | MAE median -0.1376 | MAE mean -0.1382
+replicate | C1 shape state (KW - K0) | 48-144 h | qs -0.0623 [-0.1338, +0.0029] 5/5 sites better | MAE median -0.1249 | MAE mean -0.1291
+replicate | C1 shape state (KW - K0) | 144-168 h | qs -0.0622 [-0.1375, +0.0039] 5/5 sites better | MAE median -0.1181 | MAE mean -0.1211
+    robust day_type weekends and bank holidays: -0.0727 (5/5)
+    robust day_type working days: -0.0753 (5/5)
+    robust hour_band evening: -0.0822 (5/5)
+    robust hour_band midday: -0.0265 (5/5)
+    robust hour_band morning: -0.0721 (5/5)
+    robust hour_band night: -0.1061 (5/5)
+    robust leave_one_site_out D10: -0.0684 (4/4)
+    robust leave_one_site_out D11: -0.0876 (4/4)
+    robust leave_one_site_out D14: -0.0744 (4/4)
+    robust leave_one_site_out D16: -0.0730 (4/4)
+    robust leave_one_site_out D5: -0.0689 (4/4)
+    robust season April to October: -0.0714 (5/5)
+    robust season November to March: -0.0806 (5/5)
+replicate | C2 lead-band tuning (KW-lb - KW) | D+1 | qs -0.0000 [-0.0001, +0.0001] 5/5 sites better | MAE median -0.0001 | MAE mean -0.0001
+    absolute qs {'KW': 2.350995601991853, 'KW-lb': 2.350992551973522}, rows 41126
+replicate | C2 lead-band tuning (KW-lb - KW) | 0.5-168 h | qs +0.0001 [-0.0001, +0.0002] 2/5 sites better | MAE median +0.0001 | MAE mean +0.0000
+replicate | C2 lead-band tuning (KW-lb - KW) | 0-24 h | qs +0.0000 [-0.0001, +0.0001] 3/5 sites better | MAE median -0.0001 | MAE mean -0.0001
+replicate | C2 lead-band tuning (KW-lb - KW) | 24-48 h | qs +0.0000 [-0.0001, +0.0001] 4/5 sites better | MAE median -0.0000 | MAE mean -0.0001
+replicate | C2 lead-band tuning (KW-lb - KW) | 48-144 h | qs +0.0001 [-0.0000, +0.0002] 2/5 sites better | MAE median +0.0001 | MAE mean +0.0001
+replicate | C2 lead-band tuning (KW-lb - KW) | 144-168 h | qs +0.0003 [-0.0005, +0.0010] 2/5 sites better | MAE median +0.0003 | MAE mean -0.0000
+    robust day_type weekends and bank holidays: +0.0000 (3/5)
+    robust day_type working days: -0.0000 (3/5)
+    robust hour_band evening: -0.0001 (3/5)
+    robust hour_band midday: -0.0000 (2/5)
+    robust hour_band morning: +0.0001 (3/5)
+    robust hour_band night: +0.0000 (4/5)
+    robust leave_one_site_out D10: -0.0000 (4/4)
+    robust leave_one_site_out D11: -0.0000 (4/4)
+    robust leave_one_site_out D14: -0.0000 (4/4)
+    robust leave_one_site_out D16: -0.0000 (4/4)
+    robust leave_one_site_out D5: -0.0000 (4/4)
+    robust season April to October: -0.0000 (3/5)
+    robust season November to March: +0.0001 (2/5)
+replicate | C3 newest intraday readings (KW - KW-day) | D+1 | qs -0.0564 [-0.0688, -0.0433] 5/5 sites better | MAE median -0.0931 | MAE mean -0.0931
+    absolute qs {'KW': 2.350995601991853, 'KW-day': 2.4074400644900207}, rows 41126
+replicate | C3 newest intraday readings (KW - KW-day) | 0.5-168 h | qs -0.0341 [-0.0445, -0.0216] 5/5 sites better | MAE median -0.0550 | MAE mean -0.0545
+replicate | C3 newest intraday readings (KW - KW-day) | 0-24 h | qs -0.0576 [-0.0707, -0.0456] 5/5 sites better | MAE median -0.0954 | MAE mean -0.0953
+replicate | C3 newest intraday readings (KW - KW-day) | 24-48 h | qs -0.0409 [-0.0553, -0.0273] 5/5 sites better | MAE median -0.0656 | MAE mean -0.0662
+replicate | C3 newest intraday readings (KW - KW-day) | 48-144 h | qs -0.0262 [-0.0372, -0.0133] 5/5 sites better | MAE median -0.0408 | MAE mean -0.0401
+replicate | C3 newest intraday readings (KW - KW-day) | 144-168 h | qs -0.0313 [-0.0441, -0.0179] 5/5 sites better | MAE median -0.0544 | MAE mean -0.0532
+    robust day_type weekends and bank holidays: -0.0664 (5/5)
+    robust day_type working days: -0.0521 (5/5)
+    robust hour_band evening: +0.0000 (1/5)
+    robust hour_band midday: +0.0000 (3/5)
+    robust hour_band morning: -0.0648 (5/5)
+    robust hour_band night: -0.1719 (5/5)
+    robust leave_one_site_out D10: -0.0363 (4/4)
+    robust leave_one_site_out D11: -0.0594 (4/4)
+    robust leave_one_site_out D14: -0.0653 (4/4)
+    robust leave_one_site_out D16: -0.0552 (4/4)
+    robust leave_one_site_out D5: -0.0662 (4/4)
+    robust season April to October: -0.0576 (5/5)
+    robust season November to March: -0.0542 (5/5)
+replicate | C4 state against recipe (KW - R) | D+1 | qs +0.0170 [-0.0164, +0.0401] 1/5 sites better | MAE median +0.0450 | MAE mean +0.0462
+    absolute qs {'KW': 2.350995601991853, 'R': 2.333962413105311}, rows 41126
+replicate | C4 state against recipe (KW - R) | 0.5-168 h | qs +0.0101 [-0.0215, +0.0315] 1/5 sites better | MAE median +0.0335 | MAE mean +0.0347
+replicate | C4 state against recipe (KW - R) | 0-24 h | qs +0.0198 [-0.0119, +0.0511] 0/5 sites better | MAE median +0.0506 | MAE mean +0.0506
+replicate | C4 state against recipe (KW - R) | 24-48 h | qs +0.0137 [-0.0160, +0.0355] 1/5 sites better | MAE median +0.0426 | MAE mean +0.0442
+replicate | C4 state against recipe (KW - R) | 48-144 h | qs +0.0093 [-0.0251, +0.0311] 2/5 sites better | MAE median +0.0320 | MAE mean +0.0324
+replicate | C4 state against recipe (KW - R) | 144-168 h | qs -0.0027 [-0.0270, +0.0079] 2/5 sites better | MAE median +0.0076 | MAE mean +0.0142
+    robust day_type weekends and bank holidays: +0.0166 (1/5)
+    robust day_type working days: +0.0172 (0/5)
+    robust hour_band evening: +0.0738 (0/5)
+    robust hour_band midday: -0.0316 (3/5)
+    robust hour_band morning: +0.0012 (3/5)
+    robust hour_band night: -0.0051 (3/5)
+    robust leave_one_site_out D10: +0.0225 (0/4)
+    robust leave_one_site_out D11: +0.0202 (1/4)
+    robust leave_one_site_out D14: +0.0205 (1/4)
+    robust leave_one_site_out D16: +0.0179 (1/4)
+    robust leave_one_site_out D5: +0.0040 (1/4)
+    robust season April to October: +0.0286 (1/5)
+    robust season November to March: -0.0062 (4/5)
+scored | C1 shape state (KW - K0) | D+1 | qs -0.0750 [-0.1188, -0.0329] 5/5 sites better | MAE median -0.1478 | MAE mean -0.1499
+    absolute qs {'K0': 2.524218773648168, 'KW': 2.449252662983881}, rows 66844
+scored | C1 shape state (KW - K0) | 0.5-168 h | qs -0.0543 [-0.0913, -0.0175] 5/5 sites better | MAE median -0.1085 | MAE mean -0.1103
+scored | C1 shape state (KW - K0) | 0-24 h | qs -0.0770 [-0.1197, -0.0371] 5/5 sites better | MAE median -0.1470 | MAE mean -0.1480
+scored | C1 shape state (KW - K0) | 24-48 h | qs -0.0676 [-0.1112, -0.0264] 5/5 sites better | MAE median -0.1370 | MAE mean -0.1384
+scored | C1 shape state (KW - K0) | 48-144 h | qs -0.0492 [-0.0841, -0.0127] 5/5 sites better | MAE median -0.0999 | MAE mean -0.1020
+scored | C1 shape state (KW - K0) | 144-168 h | qs -0.0385 [-0.0737, -0.0034] 5/5 sites better | MAE median -0.0755 | MAE mean -0.0770
+    robust day_type weekends and bank holidays: -0.0824 (5/5)
+    robust day_type working days: -0.0716 (5/5)
+    robust hour_band evening: -0.0588 (5/5)
+    robust hour_band midday: -0.0039 (4/5)
+    robust hour_band morning: -0.0766 (5/5)
+    robust hour_band night: -0.1544 (5/5)
+    robust leave_one_site_out D10: -0.0660 (4/4)
+    robust leave_one_site_out D11: -0.0847 (4/4)
+    robust leave_one_site_out D14: -0.0768 (4/4)
+    robust leave_one_site_out D16: -0.0708 (4/4)
+    robust leave_one_site_out D5: -0.0766 (4/4)
+    robust season April to October: -0.0510 (5/5)
+    robust season November to March: -0.1116 (5/5)
+scored | C2 lead-band tuning (KW-lb - KW) | D+1 | qs -0.0000 [-0.0001, +0.0001] 2/5 sites better | MAE median -0.0001 | MAE mean -0.0001
+    absolute qs {'KW': 2.449252662983881, 'KW-lb': 2.449245816503817}, rows 66844
+scored | C2 lead-band tuning (KW-lb - KW) | 0.5-168 h | qs -0.0000 [-0.0001, +0.0000] 4/5 sites better | MAE median +0.0000 | MAE mean -0.0000
+scored | C2 lead-band tuning (KW-lb - KW) | 0-24 h | qs -0.0000 [-0.0001, +0.0000] 3/5 sites better | MAE median -0.0001 | MAE mean -0.0001
+scored | C2 lead-band tuning (KW-lb - KW) | 24-48 h | qs +0.0000 [-0.0001, +0.0001] 1/5 sites better | MAE median -0.0000 | MAE mean -0.0001
+scored | C2 lead-band tuning (KW-lb - KW) | 48-144 h | qs -0.0000 [-0.0001, +0.0001] 5/5 sites better | MAE median +0.0000 | MAE mean +0.0000
+scored | C2 lead-band tuning (KW-lb - KW) | 144-168 h | qs +0.0000 [-0.0002, +0.0003] 4/5 sites better | MAE median -0.0000 | MAE mean -0.0002
+    robust day_type weekends and bank holidays: -0.0001 (3/5)
+    robust day_type working days: +0.0000 (1/5)
+    robust hour_band evening: -0.0001 (2/5)
+    robust hour_band midday: +0.0002 (2/5)
+    robust hour_band morning: -0.0001 (3/5)
+    robust hour_band night: +0.0001 (2/5)
+    robust leave_one_site_out D10: -0.0000 (2/4)
+    robust leave_one_site_out D11: -0.0000 (2/4)
+    robust leave_one_site_out D14: +0.0000 (1/4)
+    robust leave_one_site_out D16: -0.0000 (2/4)
+    robust leave_one_site_out D5: -0.0000 (1/4)
+    robust season April to October: -0.0000 (2/5)
+    robust season November to March: +0.0000 (1/5)
+scored | C3 newest intraday readings (KW - KW-day) | D+1 | qs -0.0546 [-0.0709, -0.0392] 5/5 sites better | MAE median -0.0886 | MAE mean -0.0887
+    absolute qs {'KW': 2.449252662983881, 'KW-day': 2.5038091821713047}, rows 66844
+scored | C3 newest intraday readings (KW - KW-day) | 0.5-168 h | qs -0.0282 [-0.0386, -0.0185] 5/5 sites better | MAE median -0.0467 | MAE mean -0.0461
+scored | C3 newest intraday readings (KW - KW-day) | 0-24 h | qs -0.0579 [-0.0762, -0.0421] 5/5 sites better | MAE median -0.0943 | MAE mean -0.0944
+scored | C3 newest intraday readings (KW - KW-day) | 24-48 h | qs -0.0334 [-0.0450, -0.0234] 5/5 sites better | MAE median -0.0512 | MAE mean -0.0514
+scored | C3 newest intraday readings (KW - KW-day) | 48-144 h | qs -0.0194 [-0.0304, -0.0088] 5/5 sites better | MAE median -0.0332 | MAE mean -0.0323
+scored | C3 newest intraday readings (KW - KW-day) | 144-168 h | qs -0.0283 [-0.0375, -0.0192] 5/5 sites better | MAE median -0.0484 | MAE mean -0.0474
+    robust day_type weekends and bank holidays: -0.0491 (5/5)
+    robust day_type working days: -0.0570 (5/5)
+    robust hour_band evening: +0.0000 (0/5)
+    robust hour_band midday: +0.0000 (2/5)
+    robust hour_band morning: -0.0613 (5/5)
+    robust hour_band night: -0.1673 (5/5)
+    robust leave_one_site_out D10: -0.0412 (4/4)
+    robust leave_one_site_out D11: -0.0620 (4/4)
+    robust leave_one_site_out D14: -0.0605 (4/4)
+    robust leave_one_site_out D16: -0.0484 (4/4)
+    robust leave_one_site_out D5: -0.0606 (4/4)
+    robust season April to October: -0.0589 (5/5)
+    robust season November to March: -0.0479 (5/5)
+scored | C4 state against recipe (KW - R) | D+1 | qs +0.0136 [-0.0138, +0.0483] 0/5 sites better | MAE median +0.0294 | MAE mean +0.0294
+    absolute qs {'KW': 2.449252662983881, 'R': 2.4356286664071933}, rows 66844
+scored | C4 state against recipe (KW - R) | 0.5-168 h | qs +0.0139 [-0.0115, +0.0425] 1/5 sites better | MAE median +0.0390 | MAE mean +0.0397
+scored | C4 state against recipe (KW - R) | 0-24 h | qs +0.0145 [-0.0141, +0.0481] 1/5 sites better | MAE median +0.0320 | MAE mean +0.0308
+scored | C4 state against recipe (KW - R) | 24-48 h | qs +0.0144 [-0.0126, +0.0479] 0/5 sites better | MAE median +0.0342 | MAE mean +0.0341
+scored | C4 state against recipe (KW - R) | 48-144 h | qs +0.0140 [-0.0121, +0.0447] 1/5 sites better | MAE median +0.0414 | MAE mean +0.0422
+scored | C4 state against recipe (KW - R) | 144-168 h | qs +0.0125 [-0.0101, +0.0336] 1/5 sites better | MAE median +0.0411 | MAE mean +0.0448
+    robust day_type weekends and bank holidays: +0.0080 (2/5)
+    robust day_type working days: +0.0162 (1/5)
+    robust hour_band evening: +0.0582 (1/5)
+    robust hour_band midday: -0.0399 (5/5)
+    robust hour_band morning: +0.0173 (1/5)
+    robust hour_band night: -0.0043 (2/5)
+    robust leave_one_site_out D10: +0.0141 (0/4)
+    robust leave_one_site_out D11: +0.0170 (0/4)
+    robust leave_one_site_out D14: +0.0125 (0/4)
+    robust leave_one_site_out D16: +0.0164 (0/4)
+    robust leave_one_site_out D5: +0.0083 (0/4)
+    robust season April to October: +0.0069 (2/5)
+    robust season November to March: +0.0240 (0/5)
+== Exploratory contrasts (95% intervals), D+1 and all leads ==
+replicate | K0-lb - K0 | D+1 -0.0014 [-0.0026, -0.0003] 3/5 sites better | all leads -0.0014 [-0.0028, -0.0000] 4/5 sites better | MAE median D+1 -0.0022
+replicate | KS - KW | D+1 +0.0000 [+0.0000, +0.0000] 1/5 sites better | all leads +0.0000 [-0.0000, +0.0000] 1/5 sites better | MAE median D+1 +0.0000
+replicate | KS1 - KW | D+1 -0.0354 [-0.0933, +0.0098] 3/5 sites better | all leads -0.0032 [-0.0292, +0.0188] 3/5 sites better | MAE median D+1 -0.0484
+replicate | KW - K0 at 3.5 h | D+1 -0.0745 [-0.1296, -0.0236] 5/5 sites better | all leads -0.0661 [-0.1258, -0.0135] 5/5 sites better | MAE median D+1 -0.1440
+replicate | KW-d0 - K0-d0 | D+1 -0.0766 [-0.1292, -0.0254] 5/5 sites better | all leads -0.0658 [-0.1211, -0.0156] 5/5 sites better | MAE median D+1 -0.1477
+replicate | KW-d24 - K0-d24 | D+1 -0.0650 [-0.1172, -0.0163] 5/5 sites better | all leads -0.0611 [-0.1164, -0.0103] 5/5 sites better | MAE median D+1 -0.1286
+replicate | KW-d33 - K0-d33 | D+1 -0.0644 [-0.1150, -0.0172] 5/5 sites better | all leads -0.0605 [-0.1121, -0.0118] 5/5 sites better | MAE median D+1 -0.1282
+replicate | KW-fast - K0 (post hoc) | D+1 -0.1090 [-0.1900, -0.0469] 5/5 sites better | all leads -0.0977 [-0.1816, -0.0357] 5/5 sites better | MAE median D+1 -0.2283
+replicate | KW-fast - KW (post hoc) | D+1 -0.0346 [-0.0667, -0.0042] 5/5 sites better | all leads -0.0317 [-0.0641, -0.0032] 5/5 sites better | MAE median D+1 -0.0842
+replicate | KW-fast - R (post hoc) | D+1 -0.0175 [-0.0405, +0.0038] 5/5 sites better | all leads -0.0215 [-0.0462, -0.0020] 5/5 sites better | MAE median D+1 -0.0392
+replicate | KW-nomid - KW | D+1 +0.0055 [-0.0004, +0.0103] 0/5 sites better | all leads +0.0060 [-0.0008, +0.0114] 0/5 sites better | MAE median D+1 +0.0117
+replicate | KW-pl52 - K0 | D+1 -0.0096 [-0.0255, +0.0027] 5/5 sites better | all leads -0.0098 [-0.0235, -0.0001] 5/5 sites better | MAE median D+1 -0.0238
+replicate | KW-pl52 - KW | D+1 +0.0649 [+0.0178, +0.1083] 0/5 sites better | all leads +0.0563 [+0.0082, +0.1031] 0/5 sites better | MAE median D+1 +0.1202
+replicate | R - K0 | D+1 -0.0915 [-0.1510, -0.0365] 5/5 sites better | all leads -0.0762 [-0.1369, -0.0243] 5/5 sites better | MAE median D+1 -0.1890
+replicate | R75 - K0 | D+1 -0.0915 [-0.1510, -0.0365] 5/5 sites better | all leads -0.0762 [-0.1369, -0.0243] 5/5 sites better | MAE median D+1 -0.1890
+scored | K0-lb - K0 | D+1 -0.0027 [-0.0037, -0.0017] 5/5 sites better | all leads -0.0024 [-0.0031, -0.0016] 5/5 sites better | MAE median D+1 -0.0044
+scored | KS - KW | D+1 +0.0000 [+0.0000, +0.0000] 1/5 sites better | all leads +0.0000 [+0.0000, +0.0000] 1/5 sites better | MAE median D+1 +0.0000
+scored | KS1 - KW | D+1 -0.0492 [-0.0930, -0.0158] 4/5 sites better | all leads -0.0157 [-0.0316, -0.0000] 2/5 sites better | MAE median D+1 -0.0787
+scored | KW - K0 at 3.5 h | D+1 -0.0750 [-0.1095, -0.0427] 5/5 sites better | all leads -0.0543 [-0.0838, -0.0261] 5/5 sites better | MAE median D+1 -0.1478
+scored | KW-d0 - K0-d0 | D+1 -0.0751 [-0.1101, -0.0426] 5/5 sites better | all leads -0.0531 [-0.0819, -0.0263] 5/5 sites better | MAE median D+1 -0.1503
+scored | KW-d24 - K0-d24 | D+1 -0.0632 [-0.0960, -0.0325] 5/5 sites better | all leads -0.0487 [-0.0778, -0.0214] 5/5 sites better | MAE median D+1 -0.1321
+scored | KW-d33 - K0-d33 | D+1 -0.0634 [-0.0956, -0.0329] 5/5 sites better | all leads -0.0512 [-0.0797, -0.0237] 5/5 sites better | MAE median D+1 -0.1317
+scored | KW-fast - K0 (post hoc) | D+1 -0.1130 [-0.1425, -0.0856] 5/5 sites better | all leads -0.0867 [-0.1106, -0.0651] 5/5 sites better | MAE median D+1 -0.2275
+scored | KW-fast - KW (post hoc) | D+1 -0.0380 [-0.0593, -0.0201] 5/5 sites better | all leads -0.0324 [-0.0517, -0.0155] 5/5 sites better | MAE median D+1 -0.0797
+scored | KW-fast - R (post hoc) | D+1 -0.0244 [-0.0349, -0.0141] 5/5 sites better | all leads -0.0185 [-0.0267, -0.0094] 5/5 sites better | MAE median D+1 -0.0503
+scored | KW-nomid - KW | D+1 +0.0008 [-0.0024, +0.0039] 1/5 sites better | all leads +0.0022 [-0.0006, +0.0048] 1/5 sites better | MAE median D+1 +0.0033
+scored | KW-pl52 - K0 | D+1 -0.0337 [-0.0555, -0.0123] 5/5 sites better | all leads -0.0276 [-0.0480, -0.0080] 5/5 sites better | MAE median D+1 -0.0632
+scored | KW-pl52 - KW | D+1 +0.0412 [+0.0193, +0.0625] 0/5 sites better | all leads +0.0267 [+0.0054, +0.0460] 1/5 sites better | MAE median D+1 +0.0846
+scored | R - K0 | D+1 -0.0886 [-0.1189, -0.0605] 5/5 sites better | all leads -0.0683 [-0.0922, -0.0463] 5/5 sites better | MAE median D+1 -0.1772
+scored | R75 - K0 | D+1 -0.0886 [-0.1189, -0.0605] 5/5 sites better | all leads -0.0683 [-0.0922, -0.0463] 5/5 sites better | MAE median D+1 -0.1772
+== Absolute quantile scores (points), arms on their own common rows ==
+replicate | K0 | 0-24 h 2.307, 0.5-168 h 2.756, 12-36 h 2.403, 144-168 h 3.145, 24-48 h 2.490, 48-144 h 2.866, D+1 2.425 | MAE median D+1 4.238
+replicate | K0-d0 | 0-24 h 2.252, 0.5-168 h 2.738, 12-36 h 2.385, 144-168 h 3.135, 24-48 h 2.477, 48-144 h 2.857, D+1 2.408 | MAE median D+1 4.207
+replicate | K0-d24 | 0-24 h 2.432, 0.5-168 h 2.825, 12-36 h 2.500, 144-168 h 3.214, 24-48 h 2.566, 48-144 h 2.918, D+1 2.514 | MAE median D+1 4.376
+replicate | K0-d33 | 0-24 h 2.473, 0.5-168 h 2.851, 12-36 h 2.541, 144-168 h 3.223, 24-48 h 2.598, 48-144 h 2.942, D+1 2.554 | MAE median D+1 4.436
+replicate | K0-lb | 0-24 h 2.306, 0.5-168 h 2.754, 12-36 h 2.401, 144-168 h 3.143, 24-48 h 2.488, 48-144 h 2.865, D+1 2.424 | MAE median D+1 4.236
+replicate | KS | 0-24 h 2.229, 0.5-168 h 2.689, 12-36 h 2.325, 144-168 h 3.082, 24-48 h 2.419, 48-144 h 2.804, D+1 2.351 | MAE median D+1 4.094
+replicate | KS1 | 0-24 h 2.169, 0.5-168 h 2.686, 12-36 h 2.287, 144-168 h 3.108, 24-48 h 2.397, 48-144 h 2.815, D+1 2.316 | MAE median D+1 4.046
+replicate | KW | 0-24 h 2.229, 0.5-168 h 2.689, 12-36 h 2.325, 144-168 h 3.082, 24-48 h 2.419, 48-144 h 2.804, D+1 2.351 | MAE median D+1 4.094
+replicate | KW-d0 | 0-24 h 2.174, 0.5-168 h 2.673, 12-36 h 2.306, 144-168 h 3.076, 24-48 h 2.406, 48-144 h 2.794, D+1 2.331 | MAE median D+1 4.059
+replicate | KW-d24 | 0-24 h 2.368, 0.5-168 h 2.764, 12-36 h 2.434, 144-168 h 3.162, 24-48 h 2.501, 48-144 h 2.857, D+1 2.449 | MAE median D+1 4.247
+replicate | KW-d33 | 0-24 h 2.410, 0.5-168 h 2.791, 12-36 h 2.476, 144-168 h 3.173, 24-48 h 2.534, 48-144 h 2.881, D+1 2.490 | MAE median D+1 4.308
+replicate | KW-day | 0-24 h 2.286, 0.5-168 h 2.724, 12-36 h 2.383, 144-168 h 3.114, 24-48 h 2.460, 48-144 h 2.830, D+1 2.407 | MAE median D+1 4.187
+replicate | KW-fast | 0-24 h 2.189, 0.5-168 h 2.658, 12-36 h 2.290, 144-168 h 3.057, 24-48 h 2.387, 48-144 h 2.773, D+1 2.316 | MAE median D+1 4.010
+replicate | KW-lb | 0-24 h 2.229, 0.5-168 h 2.690, 12-36 h 2.325, 144-168 h 3.083, 24-48 h 2.419, 48-144 h 2.804, D+1 2.351 | MAE median D+1 4.094
+replicate | KW-nomid | 0-24 h 2.233, 0.5-168 h 2.696, 12-36 h 2.331, 144-168 h 3.090, 24-48 h 2.425, 48-144 h 2.810, D+1 2.357 | MAE median D+1 4.106
+replicate | KW-pl52 | 0-24 h 2.296, 0.5-168 h 2.746, 12-36 h 2.393, 144-168 h 3.135, 24-48 h 2.480, 48-144 h 2.857, D+1 2.416 | MAE median D+1 4.215
+replicate | R | 0-24 h 2.209, 0.5-168 h 2.679, 12-36 h 2.307, 144-168 h 3.085, 24-48 h 2.405, 48-144 h 2.795, D+1 2.334 | MAE median D+1 4.049
+replicate | R75 | 0-24 h 2.209, 0.5-168 h 2.679, 12-36 h 2.307, 144-168 h 3.085, 24-48 h 2.405, 48-144 h 2.795, D+1 2.334 | MAE median D+1 4.049
+scored | K0 | 0-24 h 2.375, 0.5-168 h 2.812, 12-36 h 2.499, 144-168 h 3.169, 24-48 h 2.591, 48-144 h 2.889, D+1 2.524 | MAE median D+1 4.416
+scored | K0-d0 | 0-24 h 2.325, 0.5-168 h 2.797, 12-36 h 2.483, 144-168 h 3.162, 24-48 h 2.580, 48-144 h 2.880, D+1 2.508 | MAE median D+1 4.390
+scored | K0-d24 | 0-24 h 2.494, 0.5-168 h 2.873, 12-36 h 2.595, 144-168 h 3.241, 24-48 h 2.661, 48-144 h 2.930, D+1 2.612 | MAE median D+1 4.558
+scored | K0-d33 | 0-24 h 2.527, 0.5-168 h 2.898, 12-36 h 2.628, 144-168 h 3.265, 24-48 h 2.688, 48-144 h 2.954, D+1 2.644 | MAE median D+1 4.605
+scored | K0-lb | 0-24 h 2.373, 0.5-168 h 2.809, 12-36 h 2.497, 144-168 h 3.167, 24-48 h 2.589, 48-144 h 2.887, D+1 2.522 | MAE median D+1 4.412
+scored | KS | 0-24 h 2.298, 0.5-168 h 2.758, 12-36 h 2.423, 144-168 h 3.131, 24-48 h 2.523, 48-144 h 2.840, D+1 2.449 | MAE median D+1 4.269
+scored | KS1 | 0-24 h 2.219, 0.5-168 h 2.742, 12-36 h 2.371, 144-168 h 3.158, 24-48 h 2.479, 48-144 h 2.836, D+1 2.400 | MAE median D+1 4.190
+scored | KW | 0-24 h 2.298, 0.5-168 h 2.758, 12-36 h 2.423, 144-168 h 3.131, 24-48 h 2.523, 48-144 h 2.840, D+1 2.449 | MAE median D+1 4.269
+scored | KW-d0 | 0-24 h 2.248, 0.5-168 h 2.744, 12-36 h 2.406, 144-168 h 3.124, 24-48 h 2.513, 48-144 h 2.833, D+1 2.433 | MAE median D+1 4.240
+scored | KW-d24 | 0-24 h 2.429, 0.5-168 h 2.824, 12-36 h 2.531, 144-168 h 3.208, 24-48 h 2.601, 48-144 h 2.885, D+1 2.549 | MAE median D+1 4.426
+scored | KW-d33 | 0-24 h 2.462, 0.5-168 h 2.847, 12-36 h 2.563, 144-168 h 3.229, 24-48 h 2.627, 48-144 h 2.905, D+1 2.581 | MAE median D+1 4.473
+scored | KW-day | 0-24 h 2.356, 0.5-168 h 2.786, 12-36 h 2.479, 144-168 h 3.159, 24-48 h 2.557, 48-144 h 2.859, D+1 2.504 | MAE median D+1 4.357
+scored | KW-fast | 0-24 h 2.258, 0.5-168 h 2.725, 12-36 h 2.384, 144-168 h 3.102, 24-48 h 2.488, 48-144 h 2.809, D+1 2.411 | MAE median D+1 4.189
+scored | KW-lb | 0-24 h 2.298, 0.5-168 h 2.758, 12-36 h 2.423, 144-168 h 3.131, 24-48 h 2.523, 48-144 h 2.840, D+1 2.449 | MAE median D+1 4.268
+scored | KW-nomid | 0-24 h 2.300, 0.5-168 h 2.760, 12-36 h 2.424, 144-168 h 3.132, 24-48 h 2.524, 48-144 h 2.843, D+1 2.450 | MAE median D+1 4.272
+scored | KW-pl52 | 0-24 h 2.340, 0.5-168 h 2.784, 12-36 h 2.467, 144-168 h 3.146, 24-48 h 2.559, 48-144 h 2.863, D+1 2.490 | MAE median D+1 4.353
+scored | R | 0-24 h 2.284, 0.5-168 h 2.744, 12-36 h 2.409, 144-168 h 3.118, 24-48 h 2.509, 48-144 h 2.826, D+1 2.436 | MAE median D+1 4.239
+scored | R75 | 0-24 h 2.284, 0.5-168 h 2.744, 12-36 h 2.409, 144-168 h 3.118, 24-48 h 2.509, 48-144 h 2.826, D+1 2.436 | MAE median D+1 4.239
+D9 beside the decision substations:
+replicate | D9 | K0 | D+1 1.942, all leads 2.161
+replicate | D9 | KW | D+1 1.860, all leads 2.093
+scored | D9 | K0 | D+1 2.194, all leads 2.429
+scored | D9 | KW | D+1 2.146, all leads 2.397
+== References on rows every listed arm holds ==
+replicate: 265,286 rows
+  GAM-0: 0-24 h 2.830, 0.5-168 h 2.955, 12-36 h 2.841, 144-168 h 3.099, 24-48 h 2.837, 48-144 h 2.989, D+1 2.839
+  GAM-K (stored): 0-24 h 2.308, 0.5-168 h 2.748, 12-36 h 2.403, 144-168 h 3.134, 24-48 h 2.488, 48-144 h 2.855, D+1 2.425
+  K0: 0-24 h 2.307, 0.5-168 h 2.756, 12-36 h 2.403, 144-168 h 3.145, 24-48 h 2.490, 48-144 h 2.866, D+1 2.425
+  KW: 0-24 h 2.229, 0.5-168 h 2.689, 12-36 h 2.325, 144-168 h 3.082, 24-48 h 2.419, 48-144 h 2.804, D+1 2.351
+  KW-fast: 0-24 h 2.189, 0.5-168 h 2.658, 12-36 h 2.290, 144-168 h 3.057, 24-48 h 2.387, 48-144 h 2.773, D+1 2.316
+  KW-lb: 0-24 h 2.229, 0.5-168 h 2.690, 12-36 h 2.325, 144-168 h 3.083, 24-48 h 2.419, 48-144 h 2.804, D+1 2.351
+  R: 0-24 h 2.209, 0.5-168 h 2.679, 12-36 h 2.307, 144-168 h 3.085, 24-48 h 2.405, 48-144 h 2.795, D+1 2.334
+  X-nl: 0-24 h 3.428, 0.5-168 h 3.584, 12-36 h 3.449, 144-168 h 3.734, 24-48 h 3.463, 48-144 h 3.627, D+1 3.453
+  X-nl+K: 0-24 h 2.519, 0.5-168 h 2.995, 12-36 h 2.646, 144-168 h 3.375, 24-48 h 2.755, 48-144 h 3.108, D+1 2.676
+  Xlag-d: 0-24 h 2.926, 0.5-168 h 3.214, 12-36 h 2.998, 144-168 h 3.499, 24-48 h 3.045, 48-144 h 3.276, D+1 3.013
+scored: 464,228 rows
+  BG2: 0-24 h 2.434, 0.5-168 h 2.780, 12-36 h 2.518, 144-168 h 3.085, 24-48 h 2.578, 48-144 h 2.843, D+1 2.535
+  GAM-0: 0-24 h 2.765, 0.5-168 h 2.951, 12-36 h 2.832, 144-168 h 3.165, 24-48 h 2.833, 48-144 h 2.975, D+1 2.830
+  GAM-K (stored): 0-24 h 2.373, 0.5-168 h 2.800, 12-36 h 2.498, 144-168 h 3.148, 24-48 h 2.589, 48-144 h 2.875, D+1 2.521
+  K0: 0-24 h 2.375, 0.5-168 h 2.812, 12-36 h 2.499, 144-168 h 3.170, 24-48 h 2.591, 48-144 h 2.888, D+1 2.525
+  KW: 0-24 h 2.298, 0.5-168 h 2.757, 12-36 h 2.423, 144-168 h 3.132, 24-48 h 2.524, 48-144 h 2.839, D+1 2.450
+  KW-fast: 0-24 h 2.258, 0.5-168 h 2.725, 12-36 h 2.384, 144-168 h 3.103, 24-48 h 2.488, 48-144 h 2.809, D+1 2.412
+  KW-lb: 0-24 h 2.298, 0.5-168 h 2.757, 12-36 h 2.423, 144-168 h 3.132, 24-48 h 2.524, 48-144 h 2.839, D+1 2.450
+  R: 0-24 h 2.283, 0.5-168 h 2.743, 12-36 h 2.409, 144-168 h 3.120, 24-48 h 2.509, 48-144 h 2.825, D+1 2.436
+  X-nl: 0-24 h 2.917, 0.5-168 h 3.088, 12-36 h 2.988, 144-168 h 3.258, 24-48 h 2.995, 48-144 h 3.113, D+1 2.990
+  X-nl+K: 0-24 h 2.535, 0.5-168 h 2.934, 12-36 h 2.666, 144-168 h 3.230, 24-48 h 2.754, 48-144 h 3.007, D+1 2.693
+  Xlag-d: 0-24 h 2.538, 0.5-168 h 2.877, 12-36 h 2.624, 144-168 h 3.192, 24-48 h 2.674, 48-144 h 2.935, D+1 2.638
+  climatology: 0-24 h 3.803, 0.5-168 h 3.804, 12-36 h 3.827, 144-168 h 3.837, 24-48 h 3.821, 48-144 h 3.792, D+1 3.826
+  manual_heuristic: 0-24 h 3.508, 0.5-168 h 3.497, 12-36 h 3.517, 144-168 h 3.524, 24-48 h 3.514, 48-144 h 3.483, D+1 3.520
+== Contrasts against references (95%) ==
+replicate | K0 - GAM-0 | D+1 -0.4140 [-0.5454, -0.2734] 5/5 sites better | all leads -0.1991 [-0.3326, -0.0722] 5/5 sites better
+replicate | K0 - GAM-K (stored) | D+1 +0.0002 [-0.0013, +0.0017] 4/5 sites better | all leads +0.0078 [+0.0003, +0.0170] 1/5 sites better
+replicate | K0 - X-nl | D+1 -1.0274 [-2.0818, -0.3042] 5/5 sites better | all leads -0.8286 [-1.8718, -0.0978] 4/5 sites better
+replicate | K0 - X-nl+K | D+1 -0.2508 [-0.4903, -0.0203] 4/5 sites better | all leads -0.2393 [-0.4931, +0.0080] 4/5 sites better
+replicate | K0 - Xlag-d | D+1 -0.5870 [-1.2623, -0.0355] 4/5 sites better | all leads -0.4581 [-1.1683, +0.1229] 4/5 sites better
+replicate | KW - GAM-0 | D+1 -0.4884 [-0.6314, -0.3293] 5/5 sites better | all leads -0.2652 [-0.4016, -0.1164] 5/5 sites better
+replicate | KW - GAM-K (stored) | D+1 -0.0743 [-0.1304, -0.0229] 5/5 sites better | all leads -0.0583 [-0.1216, +0.0008] 5/5 sites better
+replicate | KW - X-nl | D+1 -1.1019 [-2.1351, -0.4101] 5/5 sites better | all leads -0.8947 [-1.9232, -0.2018] 5/5 sites better
+replicate | KW - X-nl+K | D+1 -0.3252 [-0.5378, -0.1382] 5/5 sites better | all leads -0.3054 [-0.5325, -0.0985] 5/5 sites better
+replicate | KW - Xlag-d | D+1 -0.6615 [-1.2975, -0.1589] 5/5 sites better | all leads -0.5242 [-1.1826, +0.0133] 5/5 sites better
+replicate | KW-fast - GAM-0 | D+1 -0.5230 [-0.6953, -0.3452] 5/5 sites better | all leads -0.2968 [-0.4662, -0.1289] 5/5 sites better
+replicate | KW-fast - GAM-K (stored) | D+1 -0.1089 [-0.1902, -0.0474] 5/5 sites better | all leads -0.0899 [-0.1753, -0.0261] 5/5 sites better
+replicate | KW-fast - X-nl | D+1 -1.1364 [-2.1647, -0.4602] 5/5 sites better | all leads -0.9264 [-1.9519, -0.2478] 5/5 sites better
+replicate | KW-fast - X-nl+K | D+1 -0.3598 [-0.5590, -0.1892] 5/5 sites better | all leads -0.3371 [-0.5523, -0.1570] 5/5 sites better
+replicate | KW-fast - Xlag-d | D+1 -0.6961 [-1.3249, -0.2113] 5/5 sites better | all leads -0.5559 [-1.2040, -0.0525] 5/5 sites better
+replicate | R - GAM-0 | D+1 -0.5055 [-0.6622, -0.3376] 5/5 sites better | all leads -0.2753 [-0.4194, -0.1311] 5/5 sites better
+replicate | R - GAM-K (stored) | D+1 -0.0913 [-0.1520, -0.0368] 5/5 sites better | all leads -0.0684 [-0.1341, -0.0107] 5/5 sites better
+replicate | R - X-nl | D+1 -1.1189 [-2.1501, -0.4282] 5/5 sites better | all leads -0.9048 [-1.9335, -0.2153] 5/5 sites better
+replicate | R - X-nl+K | D+1 -0.3423 [-0.5553, -0.1594] 5/5 sites better | all leads -0.3155 [-0.5458, -0.1132] 5/5 sites better
+replicate | R - Xlag-d | D+1 -0.6785 [-1.3150, -0.1667] 5/5 sites better | all leads -0.5343 [-1.1978, -0.0120] 5/5 sites better
+scored | K0 - BG2 | D+1 -0.0105 [-0.1397, +0.1208] 3/5 sites better | all leads +0.0314 [-0.1009, +0.1685] 2/5 sites better
+scored | K0 - GAM-0 | D+1 -0.3055 [-0.4288, -0.1927] 4/5 sites better | all leads -0.1395 [-0.2565, -0.0291] 3/5 sites better
+scored | K0 - GAM-K (stored) | D+1 +0.0034 [+0.0008, +0.0064] 1/5 sites better | all leads +0.0114 [+0.0056, +0.0173] 0/5 sites better
+scored | K0 - X-nl | D+1 -0.4657 [-0.7575, -0.2220] 4/5 sites better | all leads -0.2765 [-0.5049, -0.0815] 4/5 sites better
+scored | K0 - X-nl+K | D+1 -0.1680 [-0.3077, -0.0444] 4/5 sites better | all leads -0.1224 [-0.2553, -0.0007] 4/5 sites better
+scored | K0 - Xlag-d | D+1 -0.1129 [-0.2710, +0.0343] 4/5 sites better | all leads -0.0652 [-0.2035, +0.0773] 3/5 sites better
+scored | K0 - climatology | D+1 -1.3015 [-1.7299, -0.9474] 5/5 sites better | all leads -0.9921 [-1.3577, -0.6679] 5/5 sites better
+scored | K0 - manual_heuristic | D+1 -0.9949 [-1.3127, -0.7045] 5/5 sites better | all leads -0.6851 [-0.9999, -0.4063] 5/5 sites better
+scored | KW - BG2 | D+1 -0.0855 [-0.2255, +0.0625] 4/5 sites better | all leads -0.0230 [-0.1621, +0.1212] 3/5 sites better
+scored | KW - GAM-0 | D+1 -0.3805 [-0.4994, -0.2550] 5/5 sites better | all leads -0.1938 [-0.3045, -0.0846] 3/5 sites better
+scored | KW - GAM-K (stored) | D+1 -0.0716 [-0.1068, -0.0388] 5/5 sites better | all leads -0.0430 [-0.0768, -0.0110] 5/5 sites better
+scored | KW - X-nl | D+1 -0.5406 [-0.8562, -0.2795] 4/5 sites better | all leads -0.3308 [-0.5789, -0.1194] 4/5 sites better
+scored | KW - X-nl+K | D+1 -0.2430 [-0.3897, -0.1141] 4/5 sites better | all leads -0.1767 [-0.3172, -0.0462] 4/5 sites better
+scored | KW - Xlag-d | D+1 -0.1879 [-0.3493, -0.0337] 4/5 sites better | all leads -0.1195 [-0.2654, +0.0268] 3/5 sites better
+scored | KW - climatology | D+1 -1.3765 [-1.8245, -1.0089] 5/5 sites better | all leads -1.0465 [-1.4308, -0.7145] 5/5 sites better
+scored | KW - manual_heuristic | D+1 -1.0699 [-1.3957, -0.7784] 5/5 sites better | all leads -0.7394 [-1.0516, -0.4575] 5/5 sites better
+scored | KW-fast - BG2 | D+1 -0.1235 [-0.2643, +0.0223] 4/5 sites better | all leads -0.0554 [-0.1968, +0.0898] 3/5 sites better
+scored | KW-fast - GAM-0 | D+1 -0.4185 [-0.5443, -0.2934] 5/5 sites better | all leads -0.2262 [-0.3413, -0.1143] 3/5 sites better
+scored | KW-fast - GAM-K (stored) | D+1 -0.1096 [-0.1389, -0.0828] 5/5 sites better | all leads -0.0753 [-0.1006, -0.0525] 5/5 sites better
+scored | KW-fast - X-nl | D+1 -0.5786 [-0.8892, -0.3152] 5/5 sites better | all leads -0.3632 [-0.6095, -0.1556] 4/5 sites better
+scored | KW-fast - X-nl+K | D+1 -0.2810 [-0.4190, -0.1524] 4/5 sites better | all leads -0.2091 [-0.3444, -0.0816] 4/5 sites better
+scored | KW-fast - Xlag-d | D+1 -0.2259 [-0.3976, -0.0688] 4/5 sites better | all leads -0.1519 [-0.3048, +0.0018] 4/5 sites better
+scored | KW-fast - climatology | D+1 -1.4145 [-1.8677, -1.0427] 5/5 sites better | all leads -1.0788 [-1.4683, -0.7483] 5/5 sites better
+scored | KW-fast - manual_heuristic | D+1 -1.1080 [-1.4448, -0.8028] 5/5 sites better | all leads -0.7718 [-1.0987, -0.4802] 5/5 sites better
+scored | R - BG2 | D+1 -0.0991 [-0.2456, +0.0522] 4/5 sites better | all leads -0.0369 [-0.1824, +0.1147] 3/5 sites better
+scored | R - GAM-0 | D+1 -0.3941 [-0.5269, -0.2648] 5/5 sites better | all leads -0.2077 [-0.3240, -0.0974] 3/5 sites better
+scored | R - GAM-K (stored) | D+1 -0.0852 [-0.1157, -0.0572] 5/5 sites better | all leads -0.0569 [-0.0828, -0.0342] 5/5 sites better
+scored | R - X-nl | D+1 -0.5543 [-0.8725, -0.2896] 4/5 sites better | all leads -0.3447 [-0.5956, -0.1347] 4/5 sites better
+scored | R - X-nl+K | D+1 -0.2566 [-0.3990, -0.1215] 4/5 sites better | all leads -0.1907 [-0.3302, -0.0584] 4/5 sites better
+scored | R - Xlag-d | D+1 -0.2015 [-0.3747, -0.0366] 4/5 sites better | all leads -0.1335 [-0.2869, +0.0231] 3/5 sites better
+scored | R - climatology | D+1 -1.3901 [-1.8454, -1.0156] 5/5 sites better | all leads -1.0604 [-1.4510, -0.7257] 5/5 sites better
+scored | R - manual_heuristic | D+1 -1.0836 [-1.4214, -0.7747] 5/5 sites better | all leads -0.7534 [-1.0835, -0.4583] 5/5 sites better
+== Winter breakdown, November to March (POST HOC; scores were already read) ==
+replicate: cold-snap days per site {'D10': 6, 'D11': 6, 'D14': 6, 'D16': 8, 'D5': 6}
+  KW - K0 | cold snap days, D+1 | -0.1204 [-0.1204, -0.1204] 5/5 sites better | absolute {'K0': 2.267, 'KW': 2.147} | rows 1,248
+  KW - K0 | winter evening, D+1 | -0.0521 [-0.0680, -0.0192] 4/5 sites better | absolute {'K0': 2.437, 'KW': 2.385} | rows 4,565
+  KW - K0 | winter, D+1 | -0.0806 [-0.0885, -0.0192] 5/5 sites better | absolute {'K0': 2.571, 'KW': 2.49} | rows 13,685
+  KW - K0 | winter, all leads | -0.0637 [-0.0729, -0.0340] 5/5 sites better | absolute {'K0': 2.931, 'KW': 2.867} | rows 87,815
+  KW - R | cold snap days, D+1 | -0.0214 [-0.0214, -0.0214] 4/5 sites better | absolute {'KW': 2.147, 'R': 2.168} | rows 1,248
+  KW - R | winter evening, D+1 | +0.0348 [+0.0235, +0.1003] 1/5 sites better | absolute {'KW': 2.385, 'R': 2.35} | rows 4,565
+  KW - R | winter, D+1 | -0.0062 [-0.0387, +0.1003] 4/5 sites better | absolute {'KW': 2.49, 'R': 2.496} | rows 13,685
+  KW - R | winter, all leads | -0.0070 [-0.0414, +0.1159] 4/5 sites better | absolute {'KW': 2.867, 'R': 2.874} | rows 87,815
+  KW - X-nl+K | cold snap days, D+1 | -0.3935 [-0.3935, -0.3935] 4/5 sites better | absolute {'KW': 2.147, 'X-nl+K': 2.54} | rows 1,248
+  KW - X-nl+K | winter, D+1 | -0.5910 [-0.7394, -0.3195] 5/5 sites better | absolute {'KW': 2.49, 'X-nl+K': 3.081} | rows 13,685
+  KW - X-nl+K | winter, all leads | -0.5678 [-0.7603, -0.1341] 5/5 sites better | absolute {'KW': 2.867, 'X-nl+K': 3.435} | rows 87,815
+  KW - Xlag-d | cold snap days, D+1 | -0.3899 [-0.3899, -0.3899] 4/5 sites better | absolute {'KW': 2.147, 'Xlag-d': 2.537} | rows 1,248
+  KW - Xlag-d | winter, D+1 | -1.2289 [-1.9763, -0.2253] 5/5 sites better | absolute {'KW': 2.49, 'Xlag-d': 3.719} | rows 13,685
+  KW - Xlag-d | winter, all leads | -1.1334 [-1.8685, -0.2548] 5/5 sites better | absolute {'KW': 2.867, 'Xlag-d': 4.001} | rows 87,815
+  KW-fast - K0 | cold snap days, D+1 | -0.0904 [-0.0904, -0.0904] 3/5 sites better | absolute {'K0': 2.267, 'KW-fast': 2.177} | rows 1,248
+  KW-fast - K0 | winter evening, D+1 | -0.0508 [-0.2230, -0.0110] 4/5 sites better | absolute {'K0': 2.437, 'KW-fast': 2.386} | rows 4,565
+  KW-fast - K0 | winter, D+1 | -0.0902 [-0.2230, -0.0797] 5/5 sites better | absolute {'K0': 2.571, 'KW-fast': 2.48} | rows 13,685
+  KW-fast - K0 | winter, all leads | -0.0735 [-0.1819, -0.0653] 5/5 sites better | absolute {'K0': 2.931, 'KW-fast': 2.857} | rows 87,815
+  KW-fast - R | cold snap days, D+1 | +0.0085 [+0.0085, +0.0085] 3/5 sites better | absolute {'KW-fast': 2.177, 'R': 2.168} | rows 1,248
+  KW-fast - R | winter evening, D+1 | +0.0361 [-0.1035, +0.0708] 1/5 sites better | absolute {'KW-fast': 2.386, 'R': 2.35} | rows 4,565
+  KW-fast - R | winter, D+1 | -0.0158 [-0.1035, -0.0031] 4/5 sites better | absolute {'KW-fast': 2.48, 'R': 2.496} | rows 13,685
+  KW-fast - R | winter, all leads | -0.0168 [-0.0338, -0.0017] 4/5 sites better | absolute {'KW-fast': 2.857, 'R': 2.874} | rows 87,815
+  R - K0 | cold snap days, D+1 | -0.0990 [-0.0990, -0.0990] 3/5 sites better | absolute {'K0': 2.267, 'R': 2.168} | rows 1,248
+  R - K0 | winter evening, D+1 | -0.0869 [-0.1195, -0.0818] 5/5 sites better | absolute {'K0': 2.437, 'R': 2.35} | rows 4,565
+  R - K0 | winter, D+1 | -0.0744 [-0.1195, -0.0498] 5/5 sites better | absolute {'K0': 2.571, 'R': 2.496} | rows 13,685
+  R - K0 | winter, all leads | -0.0567 [-0.1499, -0.0315] 5/5 sites better | absolute {'K0': 2.931, 'R': 2.874} | rows 87,815
+scored: cold-snap days per site {'D10': 25, 'D11': 25, 'D14': 18, 'D16': 7, 'D5': 5}
+  K0 - BG2 | cold snap days, D+1 | -0.3510 [-0.8616, +0.1670] 4/5 sites better | absolute {'BG2': 3.466, 'K0': 3.115} | rows 2,400
+  K0 - BG2 | winter, D+1 | -0.2178 [-0.3016, -0.1458] 5/5 sites better | absolute {'BG2': 2.798, 'K0': 2.58} | rows 26,432
+  K0 - BG2 | winter, all leads | -0.1836 [-0.2482, -0.1077] 4/5 sites better | absolute {'BG2': 3.105, 'K0': 2.921} | rows 184,611
+  KW - BG2 | cold snap days, D+1 | -0.4991 [-0.9545, -0.0231] 4/5 sites better | absolute {'BG2': 3.466, 'KW': 2.967} | rows 2,400
+  KW - BG2 | winter, D+1 | -0.3295 [-0.4264, -0.2554] 5/5 sites better | absolute {'BG2': 2.798, 'KW': 2.469} | rows 26,432
+  KW - BG2 | winter, all leads | -0.2672 [-0.3543, -0.1828] 4/5 sites better | absolute {'BG2': 3.105, 'KW': 2.837} | rows 184,611
+  KW - K0 | cold snap days, D+1 | -0.1481 [-0.2217, -0.1032] 5/5 sites better | absolute {'K0': 3.115, 'KW': 2.967} | rows 2,400
+  KW - K0 | winter evening, D+1 | -0.0558 [-0.1110, -0.0046] 4/5 sites better | absolute {'K0': 2.283, 'KW': 2.227} | rows 8,841
+  KW - K0 | winter, D+1 | -0.1116 [-0.1548, -0.0736] 5/5 sites better | absolute {'K0': 2.58, 'KW': 2.469} | rows 26,432
+  KW - K0 | winter, all leads | -0.0836 [-0.1149, -0.0544] 5/5 sites better | absolute {'K0': 2.921, 'KW': 2.837} | rows 184,611
+  KW - R | cold snap days, D+1 | -0.0139 [-0.0433, +0.0229] 4/5 sites better | absolute {'KW': 2.967, 'R': 2.981} | rows 2,400
+  KW - R | winter evening, D+1 | +0.0783 [+0.0191, +0.1499] 0/5 sites better | absolute {'KW': 2.227, 'R': 2.149} | rows 8,841
+  KW - R | winter, D+1 | +0.0240 [+0.0037, +0.0550] 0/5 sites better | absolute {'KW': 2.469, 'R': 2.445} | rows 26,432
+  KW - R | winter, all leads | +0.0226 [+0.0039, +0.0494] 0/5 sites better | absolute {'KW': 2.837, 'R': 2.815} | rows 184,611
+  KW - X-nl+K | cold snap days, D+1 | -0.5981 [-1.0676, +0.3233] 5/5 sites better | absolute {'KW': 2.967, 'X-nl+K': 3.565} | rows 2,400
+  KW - X-nl+K | winter, D+1 | -0.4332 [-0.6295, -0.2409] 5/5 sites better | absolute {'KW': 2.469, 'X-nl+K': 2.902} | rows 26,432
+  KW - X-nl+K | winter, all leads | -0.3868 [-0.5437, -0.2067] 5/5 sites better | absolute {'KW': 2.837, 'X-nl+K': 3.224} | rows 184,611
+  KW - Xlag-d | cold snap days, D+1 | -0.9124 [-1.8339, +0.0063] 4/5 sites better | absolute {'KW': 2.967, 'Xlag-d': 3.88} | rows 2,400
+  KW - Xlag-d | winter, D+1 | -0.4344 [-0.6216, -0.2582] 4/5 sites better | absolute {'KW': 2.469, 'Xlag-d': 2.903} | rows 26,432
+  KW - Xlag-d | winter, all leads | -0.3487 [-0.4767, -0.2095] 3/5 sites better | absolute {'KW': 2.837, 'Xlag-d': 3.186} | rows 184,611
+  KW-fast - K0 | cold snap days, D+1 | -0.2012 [-0.2754, -0.1755] 5/5 sites better | absolute {'K0': 3.115, 'KW-fast': 2.914} | rows 2,400
+  KW-fast - K0 | winter evening, D+1 | -0.1254 [-0.1765, -0.0727] 5/5 sites better | absolute {'K0': 2.283, 'KW-fast': 2.158} | rows 8,841
+  KW-fast - K0 | winter, D+1 | -0.1553 [-0.1923, -0.1149] 5/5 sites better | absolute {'K0': 2.58, 'KW-fast': 2.425} | rows 26,432
+  KW-fast - K0 | winter, all leads | -0.1215 [-0.1459, -0.0928] 5/5 sites better | absolute {'K0': 2.921, 'KW-fast': 2.799} | rows 184,611
+  KW-fast - R | cold snap days, D+1 | -0.0669 [-0.0918, -0.0517] 4/5 sites better | absolute {'KW-fast': 2.914, 'R': 2.981} | rows 2,400
+  KW-fast - R | winter evening, D+1 | +0.0088 [-0.0191, +0.0383] 2/5 sites better | absolute {'KW-fast': 2.158, 'R': 2.149} | rows 8,841
+  KW-fast - R | winter, D+1 | -0.0197 [-0.0308, -0.0096] 5/5 sites better | absolute {'KW-fast': 2.425, 'R': 2.445} | rows 26,432
+  KW-fast - R | winter, all leads | -0.0152 [-0.0262, -0.0006] 5/5 sites better | absolute {'KW-fast': 2.799, 'R': 2.815} | rows 184,611
+  R - K0 | cold snap days, D+1 | -0.1343 [-0.1961, -0.0907] 4/5 sites better | absolute {'K0': 3.115, 'R': 2.981} | rows 2,400
+  R - K0 | winter evening, D+1 | -0.1341 [-0.1808, -0.0835] 4/5 sites better | absolute {'K0': 2.283, 'R': 2.149} | rows 8,841
+  R - K0 | winter, D+1 | -0.1356 [-0.1662, -0.0990] 5/5 sites better | absolute {'K0': 2.58, 'R': 2.445} | rows 26,432
+  R - K0 | winter, all leads | -0.1062 [-0.1313, -0.0776] 5/5 sites better | absolute {'K0': 2.921, 'R': 2.815} | rows 184,611
+== Tails: coverage minus nominal (percentage points) and pinball loss ==
+replicate | K0 | 0-24 h | q01 gap +1.35 pinball 0.1989, q05 gap +1.58 pinball 0.6248, q95 gap -1.10 pinball 0.5727, q99 gap -0.80 pinball 0.1614
+replicate | K0 | 144-168 h | q01 gap +1.77 pinball 0.3040, q05 gap +1.96 pinball 0.8685, q95 gap -0.20 pinball 0.7577, q99 gap -0.35 pinball 0.2041
+replicate | K0 | 24-48 h | q01 gap +1.41 pinball 0.2251, q05 gap +1.62 pinball 0.6793, q95 gap -0.52 pinball 0.6166, q99 gap -0.53 pinball 0.1684
+replicate | K0 | 48-144 h | q01 gap +1.62 pinball 0.2775, q05 gap +2.13 pinball 0.7939, q95 gap +0.60 pinball 0.6928, q99 gap +0.02 pinball 0.1848
+replicate | K0 | D+1 | q01 gap +1.38 pinball 0.2149, q05 gap +1.55 pinball 0.6587, q95 gap -0.89 pinball 0.5995, q99 gap -0.61 pinball 0.1653
+replicate | KW | 0-24 h | q01 gap +1.29 pinball 0.1928, q05 gap +1.34 pinball 0.6064, q95 gap -0.85 pinball 0.5615, q99 gap -0.69 pinball 0.1606
+replicate | KW | 144-168 h | q01 gap +1.75 pinball 0.2991, q05 gap +1.76 pinball 0.8515, q95 gap +0.13 pinball 0.7496, q99 gap -0.26 pinball 0.1999
+replicate | KW | 24-48 h | q01 gap +1.35 pinball 0.2190, q05 gap +1.25 pinball 0.6616, q95 gap -0.41 pinball 0.6092, q99 gap -0.39 pinball 0.1675
+replicate | KW | 48-144 h | q01 gap +1.57 pinball 0.2730, q05 gap +1.85 pinball 0.7776, q95 gap +0.75 pinball 0.6863, q99 gap +0.14 pinball 0.1831
+replicate | KW | D+1 | q01 gap +1.32 pinball 0.2083, q05 gap +1.27 pinball 0.6398, q95 gap -0.69 pinball 0.5902, q99 gap -0.47 pinball 0.1645
+replicate | KW-day | 0-24 h | q01 gap +1.44 pinball 0.2015, q05 gap +1.43 pinball 0.6265, q95 gap -0.74 pinball 0.5779, q99 gap -0.70 pinball 0.1626
+replicate | KW-day | 144-168 h | q01 gap +1.87 pinball 0.3077, q05 gap +1.96 pinball 0.8683, q95 gap -0.05 pinball 0.7523, q99 gap -0.27 pinball 0.2003
+replicate | KW-day | 24-48 h | q01 gap +1.45 pinball 0.2268, q05 gap +1.30 pinball 0.6766, q95 gap -0.29 pinball 0.6109, q99 gap -0.36 pinball 0.1685
+replicate | KW-day | 48-144 h | q01 gap +1.63 pinball 0.2781, q05 gap +2.04 pinball 0.7892, q95 gap +0.77 pinball 0.6867, q99 gap +0.13 pinball 0.1835
+replicate | KW-day | D+1 | q01 gap +1.46 pinball 0.2173, q05 gap +1.38 pinball 0.6594, q95 gap -0.56 pinball 0.6051, q99 gap -0.47 pinball 0.1665
+replicate | KW-lb | 0-24 h | q01 gap +1.29 pinball 0.1928, q05 gap +1.34 pinball 0.6064, q95 gap -0.84 pinball 0.5616, q99 gap -0.69 pinball 0.1606
+replicate | KW-lb | 144-168 h | q01 gap +1.75 pinball 0.2991, q05 gap +1.77 pinball 0.8516, q95 gap +0.13 pinball 0.7496, q99 gap -0.26 pinball 0.1999
+replicate | KW-lb | 24-48 h | q01 gap +1.35 pinball 0.2190, q05 gap +1.25 pinball 0.6616, q95 gap -0.41 pinball 0.6092, q99 gap -0.39 pinball 0.1676
+replicate | KW-lb | 48-144 h | q01 gap +1.57 pinball 0.2730, q05 gap +1.85 pinball 0.7776, q95 gap +0.74 pinball 0.6863, q99 gap +0.14 pinball 0.1831
+replicate | KW-lb | D+1 | q01 gap +1.32 pinball 0.2083, q05 gap +1.26 pinball 0.6397, q95 gap -0.68 pinball 0.5903, q99 gap -0.47 pinball 0.1645
+replicate | KW-shift | 0-24 h | q01 gap +1.06 pinball 0.1946, q05 gap +1.00 pinball 0.6091, q95 gap -0.62 pinball 0.5625, q99 gap -0.61 pinball 0.1591
+replicate | KW-shift | 144-168 h | q01 gap +1.64 pinball 0.3016, q05 gap +1.66 pinball 0.8571, q95 gap +0.07 pinball 0.7474, q99 gap -0.24 pinball 0.1990
+replicate | KW-shift | 24-48 h | q01 gap +1.21 pinball 0.2204, q05 gap +1.16 pinball 0.6652, q95 gap -0.16 pinball 0.6072, q99 gap -0.30 pinball 0.1656
+replicate | KW-shift | 48-144 h | q01 gap +1.44 pinball 0.2749, q05 gap +1.67 pinball 0.7812, q95 gap +0.78 pinball 0.6838, q99 gap +0.18 pinball 0.1817
+replicate | KW-shift | D+1 | q01 gap +1.15 pinball 0.2103, q05 gap +1.04 pinball 0.6442, q95 gap -0.52 pinball 0.5893, q99 gap -0.36 pinball 0.1628
+replicate | R | 0-24 h | q01 gap +1.42 pinball 0.1933, q05 gap +1.66 pinball 0.6055, q95 gap -0.82 pinball 0.5652, q99 gap -0.73 pinball 0.1625
+replicate | R | 144-168 h | q01 gap +2.05 pinball 0.3049, q05 gap +2.23 pinball 0.8526, q95 gap +0.03 pinball 0.7603, q99 gap -0.39 pinball 0.2054
+replicate | R | 24-48 h | q01 gap +1.54 pinball 0.2209, q05 gap +1.57 pinball 0.6602, q95 gap -0.19 pinball 0.6121, q99 gap -0.53 pinball 0.1698
+replicate | R | 48-144 h | q01 gap +1.72 pinball 0.2767, q05 gap +2.12 pinball 0.7782, q95 gap +0.83 pinball 0.6919, q99 gap -0.00 pinball 0.1873
+replicate | R | D+1 | q01 gap +1.58 pinball 0.2116, q05 gap +1.62 pinball 0.6388, q95 gap -0.49 pinball 0.5930, q99 gap -0.53 pinball 0.1656
+scored | K0 | 0-24 h | q01 gap +1.13 pinball 0.1784, q05 gap +1.53 pinball 0.6019, q95 gap -1.74 pinball 0.6145, q99 gap -1.29 pinball 0.1964
+scored | K0 | 144-168 h | q01 gap +1.17 pinball 0.2534, q05 gap +0.78 pinball 0.8138, q95 gap -1.11 pinball 0.8170, q99 gap -1.12 pinball 0.2552
+scored | K0 | 24-48 h | q01 gap +1.40 pinball 0.2004, q05 gap +1.86 pinball 0.6601, q95 gap -1.20 pinball 0.6820, q99 gap -1.02 pinball 0.2158
+scored | K0 | 48-144 h | q01 gap +1.17 pinball 0.2256, q05 gap +1.06 pinball 0.7396, q95 gap -0.27 pinball 0.7621, q99 gap -0.70 pinball 0.2366
+scored | K0 | D+1 | q01 gap +1.31 pinball 0.1912, q05 gap +1.75 pinball 0.6362, q95 gap -1.57 pinball 0.6613, q99 gap -1.21 pinball 0.2090
+scored | KW | 0-24 h | q01 gap +1.20 pinball 0.1753, q05 gap +1.43 pinball 0.5838, q95 gap -1.33 pinball 0.6054, q99 gap -1.12 pinball 0.1969
+scored | KW | 144-168 h | q01 gap +1.25 pinball 0.2509, q05 gap +0.71 pinball 0.8023, q95 gap -0.90 pinball 0.8154, q99 gap -0.95 pinball 0.2545
+scored | KW | 24-48 h | q01 gap +1.46 pinball 0.2001, q05 gap +1.60 pinball 0.6412, q95 gap -0.87 pinball 0.6807, q99 gap -1.05 pinball 0.2175
+scored | KW | 48-144 h | q01 gap +1.16 pinball 0.2228, q05 gap +0.94 pinball 0.7246, q95 gap -0.11 pinball 0.7626, q99 gap -0.59 pinball 0.2350
+scored | KW | D+1 | q01 gap +1.41 pinball 0.1897, q05 gap +1.53 pinball 0.6169, q95 gap -1.13 pinball 0.6561, q99 gap -1.11 pinball 0.2102
+scored | KW-day | 0-24 h | q01 gap +1.30 pinball 0.1812, q05 gap +1.62 pinball 0.6017, q95 gap -1.29 pinball 0.6269, q99 gap -1.19 pinball 0.2037
+scored | KW-day | 144-168 h | q01 gap +1.33 pinball 0.2563, q05 gap +0.90 pinball 0.8119, q95 gap -0.92 pinball 0.8209, q99 gap -0.95 pinball 0.2567
+scored | KW-day | 24-48 h | q01 gap +1.41 pinball 0.2022, q05 gap +1.48 pinball 0.6511, q95 gap -0.89 pinball 0.6947, q99 gap -1.07 pinball 0.2223
+scored | KW-day | 48-144 h | q01 gap +1.19 pinball 0.2240, q05 gap +0.98 pinball 0.7292, q95 gap -0.18 pinball 0.7662, q99 gap -0.64 pinball 0.2371
+scored | KW-day | D+1 | q01 gap +1.47 pinball 0.1954, q05 gap +1.68 pinball 0.6341, q95 gap -1.07 pinball 0.6762, q99 gap -1.16 pinball 0.2166
+scored | KW-lb | 0-24 h | q01 gap +1.20 pinball 0.1753, q05 gap +1.43 pinball 0.5838, q95 gap -1.33 pinball 0.6054, q99 gap -1.12 pinball 0.1969
+scored | KW-lb | 144-168 h | q01 gap +1.25 pinball 0.2508, q05 gap +0.72 pinball 0.8022, q95 gap -0.89 pinball 0.8153, q99 gap -0.95 pinball 0.2545
+scored | KW-lb | 24-48 h | q01 gap +1.46 pinball 0.2001, q05 gap +1.62 pinball 0.6413, q95 gap -0.87 pinball 0.6807, q99 gap -1.05 pinball 0.2175
+scored | KW-lb | 48-144 h | q01 gap +1.16 pinball 0.2228, q05 gap +0.94 pinball 0.7245, q95 gap -0.11 pinball 0.7626, q99 gap -0.59 pinball 0.2350
+scored | KW-lb | D+1 | q01 gap +1.41 pinball 0.1897, q05 gap +1.53 pinball 0.6169, q95 gap -1.13 pinball 0.6561, q99 gap -1.11 pinball 0.2103
+scored | KW-shift | 0-24 h | q01 gap +0.89 pinball 0.1729, q05 gap +1.03 pinball 0.5858, q95 gap -1.03 pinball 0.6047, q99 gap -1.07 pinball 0.1950
+scored | KW-shift | 144-168 h | q01 gap +1.13 pinball 0.2526, q05 gap +0.52 pinball 0.8065, q95 gap -0.93 pinball 0.8148, q99 gap -1.01 pinball 0.2530
+scored | KW-shift | 24-48 h | q01 gap +1.15 pinball 0.1957, q05 gap +1.37 pinball 0.6442, q95 gap -0.73 pinball 0.6779, q99 gap -0.95 pinball 0.2153
+scored | KW-shift | 48-144 h | q01 gap +1.01 pinball 0.2228, q05 gap +0.73 pinball 0.7283, q95 gap -0.01 pinball 0.7588, q99 gap -0.62 pinball 0.2344
+scored | KW-shift | D+1 | q01 gap +1.07 pinball 0.1862, q05 gap +1.19 pinball 0.6193, q95 gap -0.91 pinball 0.6534, q99 gap -1.04 pinball 0.2078
+scored | R | 0-24 h | q01 gap +1.13 pinball 0.1732, q05 gap +1.60 pinball 0.5805, q95 gap -1.30 pinball 0.6073, q99 gap -1.17 pinball 0.1984
+scored | R | 144-168 h | q01 gap +1.30 pinball 0.2510, q05 gap +0.77 pinball 0.7970, q95 gap -0.87 pinball 0.8256, q99 gap -1.06 pinball 0.2591
+scored | R | 24-48 h | q01 gap +1.43 pinball 0.1972, q05 gap +1.74 pinball 0.6375, q95 gap -0.79 pinball 0.6830, q99 gap -1.12 pinball 0.2215
+scored | R | 48-144 h | q01 gap +1.20 pinball 0.2235, q05 gap +0.99 pinball 0.7201, q95 gap -0.11 pinball 0.7678, q99 gap -0.76 pinball 0.2390
+scored | R | D+1 | q01 gap +1.39 pinball 0.1875, q05 gap +1.76 pinball 0.6138, q95 gap -1.01 pinball 0.6573, q99 gap -1.16 pinball 0.2124
+scored KW worst |gap| over lead bands: q01 1.46, q99 1.12, q05 1.60, q95 1.33
+== Checks: median forecast minus mean forecast at D+1, per site (points) ==
+replicate | K0 | D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+replicate | KW | D10 -0.006, D11 -0.029, D14 +0.016, D16 -0.012, D5 -0.108
+replicate | KW-day | D10 -0.007, D11 -0.032, D14 +0.012, D16 -0.009, D5 -0.112
+replicate | KW-lb | D10 -0.006, D11 -0.029, D14 +0.016, D16 -0.012, D5 -0.108
+replicate | KW-shift | D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+replicate | R | D10 +0.007, D11 -0.022, D14 +0.000, D16 -0.010, D5 -0.026
+scored | K0 | D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+scored | KW | D10 +0.002, D11 -0.031, D14 +0.022, D16 -0.010, D5 -0.114
+scored | KW-day | D10 +0.001, D11 -0.034, D14 +0.018, D16 -0.006, D5 -0.118
+scored | KW-lb | D10 +0.002, D11 -0.031, D14 +0.022, D16 -0.010, D5 -0.114
+scored | KW-shift | D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+scored | R | D10 +0.009, D11 -0.019, D14 +0.002, D16 -0.015, D5 -0.037
+== Sister intervals at 98.75%, D+1 (trigger 6) ==
+replicate | C1 KW - K0 | -0.0745 [-0.1449, -0.0091] width 0.1359
+replicate | GAM-K - GAM-0 (experiment 111, stored) | -0.4208 [-0.5904, -0.2489] width 0.3415
+replicate | R75 - K0 | -0.0915 [-0.1702, -0.0265] width 0.1437
+scored | C1 KW - K0 | -0.0750 [-0.1188, -0.0329] width 0.0859
+scored | GAM-K - GAM-0 (experiment 111, stored) | -0.3089 [-0.4583, -0.1675] width 0.2908
+scored | R75 - K0 | -0.0886 [-0.1265, -0.0538] width 0.0727

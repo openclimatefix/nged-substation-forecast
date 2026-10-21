@@ -299,8 +299,13 @@ that experiments 87 and 104 use for lagged power (3 hours plus the half-hour a r
 experiment has measured the delay of the live telemetry. Readings 0 hours old instead of 3.5
 lowered the score by 0.035 points (95% interval -0.060 to -0.016). Readings 9 hours old raised it by
 0.026 (0.000 to 0.046), and readings 24 hours old raised it by 0.099 (0.059 to 0.142), on five
-Primaries in the scored year. Applies to experiments and production. Provisional: the delay was not
-measured on live telemetry. Confidence: low for the delay, medium for the size of its effect.
+Primaries in the scored year. [Experiment
+115](00115-differentiable-physics-w1-diurnal-shape-state-on-ens/result.md) repeated the sweep on
+ensemble weather at day D+1 (scored year, five Primaries, difference of mean scores without an
+interval): readings 0 hours old lowered the score by 0.016 points, readings 24 hours old raised it by
+0.088, and readings 33 hours old raised it by 0.120. Applies to experiments and production.
+Provisional: the delay was not measured on live telemetry. Confidence: low for the delay, medium for
+the size of its effect.
 
 ## Weather products
 
