@@ -1,3 +1,4 @@
+# ruff: noqa: ANN001, PLR0915
 """Score the NRA arms of experiment 153 at one site in one injected world, or on the real year.
 
 Usage (inside `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue`):

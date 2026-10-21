@@ -1,3 +1,4 @@
+# ruff: noqa: DTZ001, PLR0912, PLR0915, E501
 """Report experiment 153: shares of the oracle gap closed by the latent-NRA filter, with intervals.
 
 Usage: uv run --no-sync python e00153_report.py   (prints every number the write-up quotes)
@@ -14,8 +15,8 @@ import numpy as np
 import polars as pl
 from e00153_common import WORK_DIR
 
-SCORES: Final[Path] = WORK_DIR / "scores"
-PLACEBO: Final[Path] = WORK_DIR / "placebo"
+SCORES: Final[Path] = WORK_DIR / "scores_v2"
+PLACEBO: Final[Path] = WORK_DIR / "placebo_v2"
 RATIOS: Final[tuple[int, ...]] = (10, 100, 1000, 10000)
 N_RESAMPLES: Final[int] = 20_000
 SEED: Final[int] = 153
@@ -43,7 +44,17 @@ def load(directory: Path) -> pl.DataFrame:
     keys = ["site", "world", "row"]
     tag_columns = [
         c
-        for c in ("period", "origin", "event", "inside", "after48", "after_det", "missed")
+        for c in (
+            "period",
+            "origin",
+            "event",
+            "inside",
+            "after48",
+            "after_det",
+            "missed",
+            "duration_days",
+            "in_alarm",
+        )
         if c in long.columns
     ]
     wide = long.filter(pl.col("arm") == "K0").select(
@@ -86,6 +97,8 @@ def share(*, frame: pl.DataFrame, arm: str, reference: str, metric: str = "qs") 
         "dropped": float((~ok).sum()),
     }
     for tag, (lo, hi) in {"95": (2.5, 97.5), "99": (0.5, 99.5)}.items():
+        if not len(ratio):
+            break
         out[f"lo{tag}"], out[f"hi{tag}"] = (
             float(np.percentile(ratio, lo)),
             float(np.percentile(ratio, hi)),
@@ -126,7 +139,8 @@ def month_mean_difference(*, frame: pl.DataFrame, a: str, b: str, metric: str = 
 def pinball(*, frame: pl.DataFrame, arm: str, level: float, name: str) -> tuple[float, float]:
     """Coverage and pinball loss of one quantile of `arm`."""
     q, y = frame[f"{name}__{arm}"], frame["actual"]
-    loss = pl.max_horizontal(level * (y - q), (level - 1.0) * (y - q)).mean()
+    diff = y - q
+    loss = pl.select(pl.max_horizontal(level * diff, (level - 1.0) * diff).mean()).item()
     return float((y <= q).mean()), float(loss)
 
 
@@ -153,6 +167,17 @@ def main() -> None:
         ),
         "post-alarm, inside the transfer": post.filter(pl.col("inside")),
         "post-alarm, 48 h after the true end": post.filter(pl.col("after48")),
+        "post-alarm, duration 1 to 3 days": post.filter(
+            (pl.col("inside") | pl.col("after48")) & (pl.col("duration_days") < 3)
+        ),
+        "post-alarm, duration 3 to 7 days": post.filter(
+            (pl.col("inside") | pl.col("after48"))
+            & (pl.col("duration_days") >= 3)
+            & (pl.col("duration_days") < 7)
+        ),
+        "post-alarm, duration over 7 days": post.filter(
+            (pl.col("inside") | pl.col("after48")) & (pl.col("duration_days") >= 7)
+        ),
         "rest: detection lag (inside or after48)": scored.filter(
             (pl.col("origin") == "lag") & (pl.col("inside") | pl.col("after48"))
         ),
@@ -160,7 +185,18 @@ def main() -> None:
             pl.col("after_det") & ~pl.col("inside") & ~pl.col("after48")
         ),
     }
-    arms = {"S-KF": "SKF", "NEW-DET": det, "NEW-TRUEEND": tru, "NEW-ORACLE": orc, "CLEAN": "CLEAN"}
+    arms = {
+        "GAM-ONLY": "GAM_ONLY",
+        "MASK": "MASK",
+        "S-KF": "SKF",
+        "NEW-DET": det,
+        "NEW-DET96": f"NEW_DET96_{best}",
+        "NEW-DETNOCAP": f"NEW_DETNOCAP_{best}",
+        "NEW-TRUEEND": tru,
+        "NEW-ORACLE": orc,
+        "MASK-ORACLE": "MASK_ORACLE",
+        "CLEAN": "CLEAN",
+    }
     for name, frame in sets.items():
         print(f"\n== {name}: {frame.height} rows ==")
         report[name] = {}
@@ -178,7 +214,7 @@ def main() -> None:
             },
         )
         for label, arm in arms.items():
-            if label in ("NEW-ORACLE",):
+            if label in ("NEW-ORACLE", "CLEAN"):
                 continue
             for ref_label, ref in (("oracle", orc), ("clean", "CLEAN")):
                 level = (
@@ -234,19 +270,22 @@ def main() -> None:
             f"  mean |{s} error| on C1 rows:",
             {k: round(x, 3) for k, x in report[f"abs_error_{s}"].items()},
         )
-    # ---- placebo
+    # ---- placebo: real alarms on the recorded power
     if PLACEBO.exists() and any(PLACEBO.glob("*.parquet")):
         pl_df = load(PLACEBO)
-        pl_df = pl_df.filter(pl.col("run") >= 0)
-        print(f"\n== placebo: {pl_df.height} rows ==")
-        for r in RATIOS:
-            d = month_mean_difference(frame=pl_df, a=f"NEW_DET_{r}", b="K0")
-            shift = float(
-                (pl_df[f"err_median__NEW_DET_{r}"] - pl_df["err_median__K0"]).abs().mean()
-            )
-            print(
-                f"  ratio {r}: NEW-DET minus K0 mean qs {d['mean']:+.4f} ({d['lo']:+.4f} to {d['hi']:+.4f}); mean |median shift| {shift:.3f} points"
-            )
+        print(f"\n== placebo (real alarms, recorded power): {pl_df.height} rows ==")
+        for name, frame in (
+            ("all rows near a real alarm", pl_df),
+            ("rows inside an open real alarm", pl_df.filter(pl.col("in_alarm"))),
+        ):
+            print(f"  -- {name}: {frame.height} rows")
+            for arm in [f"NEW_DET_{r}" for r in RATIOS] + ["MASK", "GAM_ONLY"]:
+                d = month_mean_difference(frame=frame, a=arm, b="K0")
+                shift = float((frame[f"err_median__{arm}"] - frame["err_median__K0"]).abs().mean())
+                print(
+                    f"    {arm:14s} minus K0 mean qs {d['mean']:+.4f} "
+                    f"({d['lo']:+.4f} to {d['hi']:+.4f}); mean |median shift| {shift:.3f} points"
+                )
         d = month_mean_difference(frame=pl_df, a=det, b="K0")
         shift = float((pl_df[f"err_median__{det}"] - pl_df["err_median__K0"]).abs().mean())
         report["placebo"] = {**d, "shift": shift}
