@@ -38,16 +38,18 @@ code: ml-experiments/00132-ro-nc-rescored-with-p12-and-p13-residuals-in-2025/
 
 # Experiment 132: does RO-NC find the 6 real transfers at P12 and P13 with a residual?
 
-**Plan only; no result yet.** [Experiment
-101](../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md) found that 6 of the 35 real transfers over 1 day lie at two Primary substations, P12 and P13, whose
+**Plan only; no result yet.**
+[Experiment 101](../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md) found
+that 6 of the 35 real transfers over 1 day lie at two Primary substations, P12 and P13, whose
 residual panel holds no readings in the transfer windows. The task was written as "restore the
 missing readings". The diagnosis changed the question.
 
 ## What was missing
 
 - **The readings are not missing.** In the raw `power_time_series` table and the
-  `cleaned_power_time_series` table, both series start on 2025-02-06 and cover all 6 transfers (March to
-  November 2025). Cleaning flags `substation_zero` on under 5% of half-hours in those months.
+  `cleaned_power_time_series` table, both series start on 2025-02-06 and cover all 6 transfers
+  (March to November 2025). Cleaning flags `substation_zero` on 0% to 12% of the half-hours of a
+  month. The experiment counts the flagged half-hours inside each transfer window and prints them.
 - **The residual is missing.** The panel of experiment 37 reads the out-of-sample fits of experiment
   17, which start a series only when it has 17,520 observed half-hours (one year) before the
   purge. P13 therefore enters in February 2026 and P12 in March 2026, after all 6 transfers.
