@@ -679,6 +679,20 @@ def solve(*, gram: torch.Tensor, rhs: torch.Tensor, penalty: ArmPenalty) -> np.n
     return theta.numpy()
 
 
+def effective_degrees_of_freedom(*, gram: torch.Tensor, penalty: ArmPenalty) -> float:
+    """Return `trace((G + P)^-1 G)`, the unconstrained effective degrees of freedom of a fit.
+
+    Args:
+        gram: The unweighted Gram matrix, shape (p, p).
+        penalty: The arm's penalty.
+
+    Returns:
+        The trace, ignoring the sign bounds.
+    """
+    matrix = gram + torch.as_tensor(penalty.matrix)
+    return float(torch.trace(torch.linalg.solve(matrix, gram)))
+
+
 @dataclass(frozen=True)
 class ArmFit:
     """A fitted arm at one site and cut.
