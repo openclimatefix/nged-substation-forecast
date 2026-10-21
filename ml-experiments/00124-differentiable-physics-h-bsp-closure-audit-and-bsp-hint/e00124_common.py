@@ -5,7 +5,6 @@ Nothing here holds a time series identifier, a substation name, or the membershi
 point. The D-labels of the generator-case and battery series below are public elsewhere in the
 repository; the membership of a BSP is read at run time and never printed. A bulk supply point
 (BSP) is labelled by its position (0 or 1) in the order of the hierarchy file, never by a D-label.
-
 """
 
 import csv
@@ -135,6 +134,9 @@ def sum_all(*, arrays: list[np.ndarray], n: int) -> np.ndarray:
 
 def load_bsps(*, cache: FeatureCache) -> list[BspSeries]:
     """Build each BSP's series from the hierarchy files, the cleaned power table, and the cache.
+
+    Args:
+        cache: The feature cache that holds the series.
 
     Returns:
         The two BSPs in the order of the hierarchy file.

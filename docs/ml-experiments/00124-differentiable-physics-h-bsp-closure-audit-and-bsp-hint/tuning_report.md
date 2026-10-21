@@ -23,4 +23,3 @@
 - clean cost by weight, tuning year (mean over the MW Primaries of the clean error minus weight 0's): 0.000, 0.385, 0.585, 0.765, 1.083, 1.733, 2.989, 3.917, 4.396, 4.564
 - clean cost by weight, replicate year: 0.000, 0.704, 1.063, 1.315, 1.685, 2.107, 2.838, 3.544, 3.982, 4.124
 - clean cost by weight, scored year: 0.000, 0.574, 1.059, 1.483, 1.991, 2.437, 3.203, 4.151, 4.879, 5.160
-
