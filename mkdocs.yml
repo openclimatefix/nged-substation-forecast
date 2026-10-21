@@ -188,6 +188,10 @@ nav:
               - Summary: ml-experiments/themes/differentiable-physics-forecast-engine/index.md
               - Experiments: ml-experiments/themes/differentiable-physics-forecast-engine/experiments.md
               - Research plan: ml-experiments/themes/differentiable-physics-forecast-engine/plan.md
+          - Network:
+              - Summary: ml-experiments/themes/differentiable-physics-network/index.md
+              - Experiments: ml-experiments/themes/differentiable-physics-network/experiments.md
+              - Research plan: ml-experiments/themes/differentiable-physics-network/plan.md
       - Generator forecasting:
           - Summary: ml-experiments/themes/generator-forecasting/index.md
           - Experiments: ml-experiments/themes/generator-forecasting/experiments.md
