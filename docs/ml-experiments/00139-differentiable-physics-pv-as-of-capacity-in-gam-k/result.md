@@ -7,7 +7,8 @@ also_relevant_to:
   - solar-disaggregation
 status: planned
 size: >-
-  medium. Stored: private files under data/ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/
+  medium. Stored: private files under
+data/ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/
   only. Serving path: not touched. Degradation rule: not touched. Designs: one defensible design,
   because the convex model already subtracts a capacity times a unit solar shape and only the source
   of the capacity changes. Callers: this folder's scripts, which copy experiments 111, 129, and 136
@@ -53,7 +54,8 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 139: does an as-of solar capacity in GAM-K lower the forecast error on sunny half-hours?
+# Experiment 139: does an as-of solar capacity in GAM-K lower the forecast error on sunny
+half-hours?
 
 Plan only; the write-up follows the runs.
 
@@ -99,7 +101,8 @@ fewer than 12,000 training half-hours at the origin (experiment 129's rule) take
 and the write-up counts the rows that took it.
 
 **Wiring identity check.** Feed the adaptor experiment 45's own frozen weekly path and require arm
-1's scores to reproduce to the last digit. Log the ratio of the as-of capacity to the pin per Primary
+1's scores to reproduce to the last digit. Log the ratio of the as-of capacity to the pin per
+Primary
 and origin, to catch a unit mismatch.
 
 **Leakage check, first.** The as-of fit at an origin sees only rows before the origin. Experiment
@@ -108,7 +111,8 @@ the same season-year, and those fits used data to 2026-07-31, so the divisor is 
 origin. This experiment rebuilds the divisor from known-answer fits cut at each origin (the
 `cut` argument of `arms.fitted_capacity`), for the season-years 2023 and 2024 (experiment 129's
 known-answer table covers 2019 to 2024). If that rebuild is too slow, the fallback is a constant
-divisor from season-years before the origin, and the write-up discloses which was used. A sensitivity
+divisor from season-years before the origin, and the write-up discloses which was used. A
+sensitivity
 arm with the hindsight divisor shows how much the divisor matters. A Sonnet code reviewer checks the
 table for any use of data after the origin.
 
@@ -124,13 +128,15 @@ fault, so the write-up reports the ratio beside the same test on CAMS irradiance
 experiment 111's gate: the calibrated fake ensemble scores within 0.05 points of ERA5 and CAMS.
 
 **Stop rules.** Stop and report a wiring fault if the injection is not recovered within 0.75 to 1.25
-at 4 of the 5 Primaries. The run order is the replicate months first (origin 2024-07-01), then the scored year. After the replicate months, stop if arm 2 minus arm 1 has an interval lying
+at 4 of the 5 Primaries. The run order is the replicate months first (origin 2024-07-01), then the
+scored year. After the replicate months, stop if arm 2 minus arm 1 has an interval lying
 wholly above zero on the sunniest third, and diagnose it (an as-of capacity too low at the growing
 Primaries D10 and D16 is the likely cause) instead of running more arms.
 
 **Rows and slices.** `fold_a_daily_gap_v1` (the 292 daily ENS runs of experiment 87), with the
 replicate on the even months of 2024-07 to 2025-06 as in experiment 111. Slices: sunniest and
-darkest third of half-hours by irradiance from the Copernicus Atmosphere Monitoring Service (CAMS), season, lead band, D11 alone, and per Primary.
+darkest third of half-hours by irradiance from the Copernicus Atmosphere Monitoring Service (CAMS),
+season, lead band, D11 alone, and per Primary.
 Absolute skill per arm beside every contrast, and tail calibration at the 0.01, 0.05, 0.95, and 0.99
 quantiles, plus the 0.1 and 0.9 quantiles of the design note, using the nearest of experiment
 87's 11 quantiles where one is missing. Forecast rows stay before 2026-07-01.
