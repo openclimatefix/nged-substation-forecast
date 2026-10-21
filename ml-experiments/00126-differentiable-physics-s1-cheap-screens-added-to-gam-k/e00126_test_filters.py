@@ -105,9 +105,8 @@ def main() -> None:
         )
         tracked["G-skf"].append(float(np.mean(gap_levels[inside])))
     for name, values in tracked.items():
-        print(
-            f"{name}: mean extra level tracked over the 3 days {np.mean(values):.2f} of {STEP_POINTS}"
-        )
+        mean_tracked = np.mean(values)
+        print(f"{name}: mean extra level over the 3 days {mean_tracked:.2f} of {STEP_POINTS}")
     p_clean = np.concatenate([r.p_bad[0] for r in base_results])
     print(f"G-skf: mean shift-or-outlier probability on the clean stream {p_clean.mean():.3f}")
     p_bad = np.concatenate([r.p_bad[0] for r in results])

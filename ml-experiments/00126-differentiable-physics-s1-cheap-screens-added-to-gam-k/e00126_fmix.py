@@ -203,11 +203,12 @@ def fit_factors(
         prior = 0.5 * float(np.sum((log_factors / FACTOR_PRIOR_SPREAD) ** 2))
         return -trace.log_likelihood + prior
 
+    simplex = np.vstack([np.zeros(N_FACTORS), 0.5 * np.eye(N_FACTORS)])
     result = minimize(
         negative,
         np.zeros(N_FACTORS),
         method="Nelder-Mead",
-        options={"xatol": 0.02, "fatol": 0.05, "maxiter": 120},
+        options={"initial_simplex": simplex, "xatol": 0.02, "fatol": 0.05, "maxiter": 120},
     )
     return np.asarray(result.x)
 
