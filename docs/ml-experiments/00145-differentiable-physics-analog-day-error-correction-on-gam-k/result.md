@@ -55,7 +55,7 @@ ones whose forecast temperature was closest to the target day's, and averages th
 a nearest-neighbour ("analog") correction of the kind forecasters use for load on holidays and
 extreme weather, as in the analog ensemble of [Delle Monache et al.
 (2013)](https://doi.org/10.1175/MWR-D-12-00281.1), applied to the error of a forecast and not to
-the weather. A clean negative result is a fine outcome. Experiment 143 tests a different holiday
+the weather. A clean negative result is a fine outcome. Experiment 143 (in progress) tests a different holiday
 idea (keeping holiday readings out of the Kalman filter's update); the two do not overlap in
 mechanism.
 
@@ -82,6 +82,13 @@ mechanism.
   fallback to any earlier holiday-like day. The holiday arm's setting is therefore fixed before any
   fit and not tuned, and one earlier occurrence is one noisy sample. The holiday result rests on 16
   days at each of 5 substations.
+- **What the tuning rows cannot exercise.** A tuning target has at most 15 months of history, so
+  its pool holds recent same-class days and almost no days of the previous year; the scored year's
+  pool also holds last year's days. The tuned k and N are therefore tuned on a recency-dominated
+  pool, and the write-up reports the number of candidates and of previous-year candidates by period.
+  The plan does not predict the tuned N.
+- **Warm-up runs.** The history before 2024-07 comes from warm-up runs, whose Kalman errors may not
+  have converged; the write-up prints the usable-block count and the mean absolute error by month.
 - **Past weather at lag times.** The similarity uses the ENS ensemble-mean temperature that each
   past day's forecast run saw for that day, so it exists at forecast time. The target day's forecast
   temperature is from the run being corrected. No ERA5 enters.
@@ -96,7 +103,7 @@ mechanism.
   profile A.
 - **ANALOG-k.** K0 minus kappa times the mean error of the k most similar past days (below); where no
   analog set exists the arm falls back to A. A pure analog correction.
-- **ANALOG+R.** K0 minus kappa times A plus lambda times (the analog profile minus A). Lambda 0 is
+- **ANALOG+R.** K0 plus the shift -kappa x (A + lambda x (the analog profile minus A)). Lambda 0 is
   R, so R is nested. Lambda is the weight of the analog profile in the correction.
 - **ANALOG-holiday.** R on every non-holiday-like day; on a holiday-like target day, K0 minus 0.75
   times A plus 0.5 times (the same-holiday profile minus A). The weights are fixed, because the
@@ -115,8 +122,9 @@ block; the target's run has origin on T-1) when all of the following hold.
   temperature.
 - **Class.** For a non-holiday T, S is a non-holiday-like day of T's day type (Monday, Tuesday to
   Thursday, Friday, Saturday, Sunday). For a holiday-like T (an English bank holiday, Easter
-  Saturday or Sunday, 24 December, or 27 to 31 December), S has T's holiday identity, such as
-  Christmas Day. If T has no earlier occurrence, S is any holiday-like day, and if fewer than 2
+  Saturday or Sunday, 24 December, or 27 to 31 December), S has T's holiday identity: a bank holiday's
+  name (Good Friday, Easter Monday, Christmas Day, ...), `Easter Saturday`, `Easter Sunday`, or the
+  month and day for 24 and 27 to 31 December. If T has no earlier occurrence, S is any holiday-like day, and if fewer than 2
   of those exist the arm falls back to A.
 - **Season.** For a non-holiday T, S lies within N weeks either side of T's day of year (circular).
   A holiday T uses no season window, since its class is already narrow.
@@ -136,6 +144,11 @@ before O, or a forecast temperature from a run that started before O.
   pooled mean absolute error of the corrected median at D+1 on the tuning rows (the odd months of
   2024-07 to 2025-06), as in experiment 134. Each arm's spread is then refitted on the tuning rows
   and one factor per lead band is chosen, as for every arm of experiment 115.
+- **R's kappa is tuned on the same rows too.** The tuning screen prints R's mean absolute error at
+  kappa 0.5, 0.75, and 1.0, so a reader can see whether R at 0.75 was a handicap.
+- **Lead scope.** Every arm applies its shift at every lead, as R does, so that R is nested;
+  experiment 134 found such a shift loses beyond 48 hours, and the lead bands show it here too. The
+  verdict metric is D+1 either way.
 - **Tuning uses the median's absolute error, not the quantile score,** for the speed of a screen of
   about 150 settings; the contrasts are on the quantile score.
 
@@ -154,12 +167,23 @@ the gate can fail for a real reason.
   at most what R recovers plus 0.05.
 - **G2, a recurring holiday.** +3 points on the evening (17:00 to 21:00 local) of the Spring Bank
   Holiday of 27 May 2024, read at the Spring Bank Holiday of 26 May 2025 (a tuning row). Pass:
-  ANALOG-holiday recovers at least 0.15 of the shift (its maximum is 0.75 times 0.5, about 0.38), and R recovers
+  ANALOG-holiday recovers at least 0.15 of the shift (expected 0.75 x 0.5 x 0.83, about 0.31), and R recovers
   none, since the earlier occurrence is a year before R's 14 days.
 - **G3, a recurring weather state (informative).** +3 points on 17:00 to 21:00 local on every day of
   November 2024 to January 2025 whose forecast daily mean temperature is below 5 degrees C, read at
   the injected days from the sixth on. ANALOG+R should recover at least 0.05 more than
   ANALOG+R-notemp. This gate is reported and does not cap the verdict.
+- **G1b, the temperature ranking.** The G1 injection at k 3 and N 4, where the pool of Saturdays
+  holds more than 3 candidates, read at the same Saturdays; ANALOG-k with temperature and without
+  are reported side by side (informative).
+- **G0, no lookahead.** +3 points on the readings of the target day T and of T-1, the origin's own
+  day, at the injected Saturday runs: every arm's profile at T must be unchanged to the last digit.
+  Failing G0 invalidates the experiment.
+- **Expected values, so that a bug is distinguishable from a pass.** Removing each day's mean costs
+  a factor of 5/6 (8 injected half-hours of 48 raise the block mean by 0.5). At the G1 reference
+  the pool of Saturday n holds the 8 Saturdays T-7 to T-56, so k 8 takes all of them, n-1 injected,
+  and the mean share is 0.5625: ANALOG-k about 0.75 x 0.5625 x 0.83 = 0.35, R about 0.089,
+  ANALOG+R about 0.22 (the margin over twice R, 0.178, is 0.04), and the placebo about 0.
 - A failure of G1 or G2 caps every verdict at `inconclusive`. The gate runs before any replicate or
   scored forecast is read.
 
@@ -172,11 +196,13 @@ the gate can fail for a real reason.
 - **P4.** ANALOG+R-notemp minus ANALOG+R is 0.00 to +0.02 (temperature similarity adds little at D+1,
   because GAM-K already models temperature).
 - **P5.** On holiday-like days ANALOG-holiday minus R is -0.05 to -0.3 at D+1, with an interval that
-  includes zero; in the Christmas window the sign is the same.
-- **P6.** The gain is largest in winter evenings (16:00 to 20:00 from November to March) and absent
-  in non-winter.
+  includes zero, so the predicted outcome is "cannot tell"; in the Christmas window the sign is the same.
+- **P6.** The gain is largest in winter evenings (16:00 to 20:00 from November to March), and the
+  non-winter estimate lies within 0.005 of zero.
 - **P7.** Beyond 48 hours the analog arms lose against R, as experiment 134's profile did.
-- **P8.** The tuned k is 5 or more, the tuned N is 8 or more.
+- **P8.** The tuned k is 5 or more.
+- **Expected verdict.** P1's range straddles the 0.02 bar, so `small gain` or `not supported` is the
+  expected verdict, and `supported` would be a surprise.
 
 ### Contrasts and decision rule
 
@@ -189,12 +215,16 @@ the gate can fail for a real reason.
   +0.02; and the gate passes. **Small gain** if the scored interval lies wholly below zero but its
   upper end is above -0.02. **Not supported** if the interval includes zero. **Refuted** if the
   interval lies wholly above zero. A gate failure caps every verdict at `inconclusive`.
-- **Holiday verdict, separately.** The holiday arm is a `candidate` for holidays only when C4's
-  scored-year 95% interval is wholly below zero. The replicate months hold no holiday with an earlier
-  occurrence, so they are reported as a check of the fallback path and do not decide; otherwise the
-  write-up says the rows cannot tell.
+- **Holiday verdict, separately, descriptive.** Only about 13 holiday-like days fall on scored runs,
+  8 of them in December, so a month-block interval is very coarse. C4 is reported with its interval,
+  the count of scored holiday-like days, the split between the identity path and the fallback path
+  (and how often the fallback fires), and the number of substations that improve. The arm is a
+  `candidate` for holidays only when C4's estimate is negative at 4 of 5 substations, both inside
+  and outside the Christmas window, and its 95% interval lies wholly below zero. The replicate
+  months hold no holiday with an earlier occurrence, so they check the fallback path only.
 - **Threshold, with the reason.** 0.02 points (about 1% of the score), because the change adds a
-  history lookup keyed on day type, holiday identity, and forecast temperature to the serving path.
+  history lookup keyed on day type, holiday identity, and forecast temperature to the serving path,
+  and because experiment 134's day-type arm gained 0.022 over R without such a lookup.
 - **Intervals.** 99% intervals for the five planned contrasts and 95% for the rest, month blocks
   resampled, paired across arms (`studies.bootstrap.bootstrap_difference_at_level`).
 
@@ -202,7 +232,9 @@ the gate can fail for a real reason.
 
 Winter (November to March) and the winter evening peak (16:00 to 20:00); cold nights (daily mean
 under about 3 degrees C, 22:00 to 06:00) with q95 coverage; holidays and the days after them;
-Christmas window (15 December to 7 January); Easter; each weekday; non-winter; per substation (5 of
+Christmas window (15 December to 7 January); the days 1 to 3 after a holiday-like day (ordinary
+class members, reported as their own row); row and day counts for every cell; the mean absolute
+temperature gap between each cold day and its chosen analogs (match quality); Easter; each weekday; non-winter; per substation (5 of
 5 counts); leave-one-substation-out; tails (coverage and pinball loss at q01, q05, q95, q99); lead
 bands; and the "Checks" list the `ml-experiment` skill requires. The days after a holiday are the
 rows whose local date lies 1 to 3 days after a holiday-like day.
