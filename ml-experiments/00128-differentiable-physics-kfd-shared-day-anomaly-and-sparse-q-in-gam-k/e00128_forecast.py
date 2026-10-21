@@ -8,7 +8,8 @@ member, because the filter has no regressors. The 51 members are pooled by
 `studies.ens_members.mixture_quantiles`, as experiment 111 does.
 
 The arms are in `e00128_arms`. **KDS-shuf** replaces d in the forecast by the d of another day of
-the same calendar month, taken from that day's state at the same clock time (`shuffle_partners`).
+an earlier day of the same calendar month, taken from that day's state at the same clock time
+(`shuffle_partners`); the first day of a month gets a d of 0.
 **KDS-nod** leaves d out of the forecast and keeps KDS's levels and anomalies.
 """
 
@@ -54,25 +55,33 @@ class ArmFilter:
 
 
 def shuffle_partners(*, origins: list[datetime]) -> dict[datetime, datetime]:
-    """Return, for each origin, the origin of another day of the same calendar month.
+    """Return, for each origin, the origin of an earlier day of the same calendar month.
 
-    The partner comes from a fixed permutation (seed 128) of the month's origins, so the check
-    repeats exactly.
+    The partner is drawn from the month's origins whose calendar date is strictly before the
+    origin's, so it is never the origin itself, never the target day, and never a day whose cutoff
+    state holds readings after this origin's cutoff. The draw is seeded (seed 128, year, month,
+    ordinal of the origin's date), so the check repeats exactly. An origin on the first date of
+    its month has no earlier day and gets no partner.
 
     Args:
-        origins: Every run's `power_fcst_init_time`.
+        origins: Every run's `power_fcst_init_time`, one per calendar date, in UTC.
 
     Returns:
         A map from origin to the origin whose state supplies d.
     """
-    by_month: dict[tuple[int, int], list[datetime]] = {}
-    for origin in origins:
-        by_month.setdefault((origin.year, origin.month), []).append(origin)
     partners: dict[datetime, datetime] = {}
-    for (year, month), members in by_month.items():
-        order = np.random.default_rng([SHUFFLE_SEED, year, month]).permutation(len(members))
-        for position, member in enumerate(members):
-            partners[member] = members[int(order[position])]
+    for origin in origins:
+        earlier = [
+            other
+            for other in origins
+            if (other.year, other.month) == (origin.year, origin.month)
+            and other.date() < origin.date()
+        ]
+        if earlier:
+            generator = np.random.default_rng(
+                [SHUFFLE_SEED, origin.year, origin.month, origin.date().toordinal()]
+            )
+            partners[origin] = earlier[int(generator.integers(len(earlier)))]
     return partners
 
 
@@ -230,10 +239,12 @@ def corrected_members(
         if partners is None:
             msg = "the shuffled mode needs the partner map"
             raise ValueError(msg)
-        other = joint.state_at(
-            trace=filtered.trace, cutoff=cutoff_of(cache=cache, origin=partners[origin])
-        )
-        day_value = float(other.x[joint.D_INDEX]) if other.position >= 0 else 0.0
+        day_value = 0.0
+        if origin in partners:
+            other = joint.state_at(
+                trace=filtered.trace, cutoff=cutoff_of(cache=cache, origin=partners[origin])
+            )
+            day_value = float(other.x[joint.D_INDEX]) if other.position >= 0 else 0.0
     correction = joint.correction_from_state(
         state=state,
         params=filtered.trace.params,
