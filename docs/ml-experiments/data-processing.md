@@ -57,7 +57,12 @@ in MVA. Applies to experiments and production. Evidence: [experiment
 79](00079-pvdis-7-mw-at-mva-only-primaries/result.md) found no reverse flow at 7 of the 8 MVA-only
 Primaries from April to September, and [experiment
 56](00056-mva-only-primaries-skill-against-mw-primaries/result.md) could not tell the best guess's
-skill at the 8 MVA-only Primaries from its skill at the 8 MW Primaries (inconclusive).
+skill at the 8 MVA-only Primaries from its skill at the 8 MW Primaries (inconclusive). [Experiment
+110](00110-differentiable-physics-5-embedded-generation-and-capacity/result.md) fitted a power
+factor to only 2 of the 8 MVA-only Primaries (and recovered one of them, D12), because the other 6
+have almost no reverse flow in
+their training rows. It held the power factor at 0.97 at those 6, and modelling the meter as
+apparent power scored 0.13 points of capacity better than reading it as real power.
 
 **Read power through the cleaned table, and read the raw table only when the question is about
 availability.** The cleaned table holds only unflagged rows
@@ -109,10 +114,10 @@ the dropped months look less different from the kept months, which fits their me
 
 **An uncut start hurts a model without recent power far more than a model with it (high confidence
 for D18).** In [experiment 102](00102-simp1-simplifying-the-bg2-best-guess-before-production/result.md),
-D18's training rows began in December 2024 at zero output. A weekly-refitted XGBoost model without the
+D18's training rows began with a late start at zero output. A weekly-refitted XGBoost model without the
 three recent-power inputs forecast 20% of capacity in December 2025 against an actual of 75%, and its
-score at D18 was 5.7 points of capacity worse than the same model with the inputs. With the first 2.6
-months cut (training from 2025-03-01), the difference at D18 fell to -0.03 points. The cost of
+score at D18 was 5.7 points of capacity worse than the same model with the inputs. With the start
+cut (training from a later date), the difference at D18 fell to -0.03 points. The cost of
 removing the inputs across the 16 Primaries fell from 0.710 to 0.361 points. Applies to experiments,
 and to any comparison of a model with and without recent power. A comparison that cuts the start for
 one arm must cut it for every arm.
@@ -144,10 +149,8 @@ midday. Applies to experiments. Evidence: [experiment
 
 **Screen for embedded generation with the share of negative dark half-hours (high confidence).**
 Series with 26% to 82% of their dark half-hours negative carry embedded generation or an exporting
-grid connection. The screen cannot work on an MVA Primary. One Primary (D15) carries a flat export
-of about 2 MW through one transformer, and the export changes over 2025 and 2026. Applies to
-experiments. Evidence: [experiment 103](00103-differentiable-physics-1-data-look/result.md), figure
-9.
+grid connection. The screen cannot work on an MVA Primary. Applies to experiments. Evidence:
+[experiment 103](00103-differentiable-physics-1-data-look/result.md), figure 9.
 
 ## Fixed windows
 
@@ -299,8 +302,13 @@ that experiments 87 and 104 use for lagged power (3 hours plus the half-hour a r
 experiment has measured the delay of the live telemetry. Readings 0 hours old instead of 3.5
 lowered the score by 0.035 points (95% interval -0.060 to -0.016). Readings 9 hours old raised it by
 0.026 (0.000 to 0.046), and readings 24 hours old raised it by 0.099 (0.059 to 0.142), on five
-Primaries in the scored year. Applies to experiments and production. Provisional: the delay was not
-measured on live telemetry. Confidence: low for the delay, medium for the size of its effect.
+Primaries in the scored year. [Experiment
+115](00115-differentiable-physics-w1-diurnal-shape-state-on-ens/result.md) repeated the sweep on
+ensemble weather at day D+1 (scored year, five Primaries, difference of mean scores without an
+interval): readings 0 hours old lowered the score by 0.016 points, readings 24 hours old raised it by
+0.088, and readings 33 hours old raised it by 0.120. Applies to experiments and production.
+Provisional: the delay was not measured on live telemetry. Confidence: low for the delay, medium for
+the size of its effect.
 
 ## Weather products
 
@@ -573,9 +581,10 @@ threshold-weighted error rose 57% on half-hours outside logged switching ([exper
 of that experiment is an early version.
 
 **Count overlapping detected intervals once when summing the megawatts, and end each interval when
-the transfer ends.** Summing overlapping intervals made the detector's megawatts about 1.5 times the
-true value from the second day, and the detector kept reporting megawatts for days after a transfer
-ended ([experiment
+the transfer ends.** Of the cases where the detector marked a transfer, 21% held two or more overlapping
+intervals, whose megawatts were added together, and the detector kept reporting megawatts for a
+median of 48 hours (90th percentile 96 hours) after a transfer ended, because it alarmed the return
+step as a new transfer of opposite sign ([experiment
 88](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)).
 Applies to experiments and production.
 

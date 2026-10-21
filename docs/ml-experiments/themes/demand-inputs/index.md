@@ -105,8 +105,8 @@ exists, add the forecast unmetered solar output as a [base margin](../../glossar
 ([experiment 74](../../00074-an1-same-time-analogues-vs-explicit-solar-forecast-demand/result.md),
 using the offset of [experiment
 64](../../00064-pvdis-5-net-demand-as-demand-minus-forecast-solar/result.md); experiment 74 is
-`not-for-production`). In BG2 the offset lowered the Primary score by only 0.010 over the whole year,
-because only 5 Primaries carry one and the offset acts in daylight from April to September
+`not-for-production`). In BG2 the offset lowered the score by 0.114 on its daylight April-to-September
+rows at the 5 Primaries that carry one, and by 0.010 over the whole year at all 16 Primaries
 ([experiment 87](../../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)). The
 stage 0 mapping ([experiment
 14](../../00014-cams-trained-stage1-with-stage0-ens-correction-demand/result.md)) and the heating
