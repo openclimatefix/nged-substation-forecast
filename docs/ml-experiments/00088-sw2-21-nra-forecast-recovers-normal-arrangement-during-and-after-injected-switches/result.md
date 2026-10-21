@@ -203,18 +203,18 @@ is the fall in error from arm 1 divided by that gap.
   after the fact by the ratio of the detector's MW to the injected MW, the as-built RO-NC-trained
   NRA booster changed the error against plain by -0.73 points where the detector's MW was at most
   1.5 times the true MW (735 of 2,452 cases), +1.45 where it was more than 1.5 times (291 cases),
-  and -0.06 where the detector marked nothing (1,426 cases). The cases with a ratio above 1.5 are
-  those with two or more overlapping intervals (219 cases, among them early fire plus a later
-  re-alarm on the same series, and an alarm plus a partner interval one or two stamps apart);
-  single-interval cases already recover 59% of the gain the injected MW gives. The causal
+  and -0.06 where the detector marked nothing (1,426 cases). The as-built loss comes
+  entirely from cases with two or more overlapping intervals (219 cases, among them early fire
+  plus a later re-alarm on the same series, and an alarm plus a partner interval one or two
+  stamps apart); single-interval cases already recover 59% of the gain the injected MW gives. The causal
   detector's de-duplication matches only an identical onset, so it misses these.
 - **Is the MW the wrong scale?** No. Arm 4 was trained on hindsight labels that sum overlapping
   intervals in the same way, so training and scoring use the same MW definition. Dividing the MW by
   1.5 would cut the gain of the single-interval cases, whose median ratio is 1.00.
 - **Stability of the planned contrasts (point values).** C2 is robust: it ranges from -0.62 to
-  -0.92 when any one scored month is left out. C1 is fragile: without February 2026 it is +0.09,
-  and without the single event 89073 (a February event) it is -0.06. Both the as-built result and
-  the post hoc result rest on February 2026.
+  -0.92 when October 2025, February 2026, April 2026, or June 2026 is left out. C1 is fragile: without February 2026 it is +0.09,
+  and without the single event 89073 (a February event) it is -0.06. The as-built result rests on
+  February 2026; the largest-step contrast keeps its sign without it (-0.20).
 - **Known fault in the report script.** The report script still takes the detector's MW from the
   first pass for some arms and the second pass for others, so its printed MW ratios mix stale and
   fresh values. The MW ratios on this page come from an audit that

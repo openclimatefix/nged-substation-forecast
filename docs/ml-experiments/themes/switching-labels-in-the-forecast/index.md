@@ -134,8 +134,8 @@ does not support a detector or a label table in the forecast.
   lingering return step kept the correction on after a transfer ended ([experiment
   88](../../00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md);
   the loss comes from the 21% of marked cases with overlapping intervals, not from a scale error in
-  the MW). The 16% result rests on February 2026, and the 83% result is robust to leaving out any
-  one month.
+  the MW). The 16% result rests on February 2026, and the oracle contrast C2
+  keeps its size when any of the four months is left out.
 - **A detected transfer is known late.** At the newest usable lag the detector had marked 32% of the
   moved MW in the first 24 hours after onset, against 73% in days 1 to 3 (experiment 88), and its
   probability separated poorly in that first day (area under the curve 0.61 for the calibrated
