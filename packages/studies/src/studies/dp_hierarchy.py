@@ -152,11 +152,11 @@ class BspSeries:
             `NaN` where a reading is missing, which drops the row.
         temperature_c: The BSP area's mean temperature, shape (T,).
         pv_shape: The unmetered PV's per-unit output shape, shape (T,), `NaN` where unknown.
+        sigma_mw: The robust half-hourly residual scale of the BSP row, in MW. The caller must
+            compute it from rows before the fit's cut; nothing here can check that.
         loss: A loss series for the optional loss term, shape (T,), or `None`.
         generator_coefficient: The factor on the generators in the BSP row, 1 unless the caller has
             fitted it before the cut; a constant of the fit.
-        sigma_mw: The robust half-hourly residual scale of the BSP row, in MW. The caller must
-            compute it from rows before the fit's cut; nothing here can check that.
     """
 
     name: str
