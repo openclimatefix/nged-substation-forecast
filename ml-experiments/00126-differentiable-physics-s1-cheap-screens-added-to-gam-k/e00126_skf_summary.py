@@ -10,7 +10,7 @@ import polars as pl
 
 
 def main() -> None:
-    """Print false-alarm rates and per-cell recall, delay, and recovery for the plain filter and G-skf."""
+    """Print false-alarm rates, and per-cell recall, delay, and recovery, for both detectors."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuts", nargs="+", default=["2023-07-01"])
     arguments = parser.parse_args()
