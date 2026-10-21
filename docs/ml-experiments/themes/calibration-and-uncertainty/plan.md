@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [E160](#e160-band-width) | Does reading the spread table smoothly along the lead remove the q05-q95 width staircase of the stage 2 winner without hurting the quantile score? | 1 | Experiment 155 (merged) | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
@@ -14,13 +13,6 @@
 <!-- planned-table -->
 
 ## Proposals in detail
-
-### E160: band width
-
-**The spread table has four lead bands, so the band widens in steps.** Experiment 160 interpolates
-each hour band by quarter cell between the lead-band centres, forces the width to be non-decreasing
-in lead, or both, on the stage 2 winning arm, without refitting the mean. It passes when the upper
-95% bound of the quantile-score change is under +0.01 points and the staircase is gone.
 
 ### P14: coupling
 
