@@ -318,7 +318,7 @@ def run(*, cut_text: str) -> None:
         for site in common.DECISION_SITES
         for row in run_site(cache=cache, vintages=vintages, site=site, cut=cut)
     ]
-    pl.DataFrame(rows).write_parquet(common.WORK_DIR / f"skf_gate_{cut_text}.parquet")
+    pl.DataFrame(rows, infer_schema_length=None).write_parquet(common.WORK_DIR / f"skf_gate_{cut_text}.parquet")
 
 
 def main() -> None:
