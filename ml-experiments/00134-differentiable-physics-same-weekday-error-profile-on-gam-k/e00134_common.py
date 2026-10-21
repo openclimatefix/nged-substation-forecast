@@ -35,9 +35,7 @@ SRC_WORK_DIR: Final[Path] = (
 )
 """Experiment 111's work folder, which this experiment only reads."""
 SRC_115_WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00115-differentiable-physics-w1-diurnal-shape-state-on-ens"
-    / "work"
+    ML_EXPERIMENTS_DATA_DIR / "00115-differentiable-physics-w1-diurnal-shape-state-on-ens" / "work"
 )
 """Experiment 115's work folder, which this experiment only reads: its K0 correction, K0 spread,
 tuned recipe R, and cached member forecasts."""

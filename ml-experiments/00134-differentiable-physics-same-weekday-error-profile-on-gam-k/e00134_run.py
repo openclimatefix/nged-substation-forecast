@@ -1,4 +1,4 @@
-"""Tune, gate, and build the arms of experiment 134.
+r"""Tune, gate, and build the arms of experiment 134.
 
 Stages (each reads only what the earlier stages stored):
 
@@ -24,9 +24,7 @@ import e00134_common as common
 import e00134_profiles as profiles
 import e00134_site as site_module
 import numpy as np
-import polars as pl
 import torch
-from studies.dp_ens_weather import N_LEAD_BANDS
 
 SITES: Final[tuple[str, ...]] = common.SCORED_SITES
 FRAMES_DIR: Final[Path] = common.WORK_DIR / "frames"
@@ -37,6 +35,8 @@ KAPPAS: Final[tuple[float, ...]] = (0.5, 0.75, 1.0)
 WEIGHTS: Final[tuple[float, ...]] = (0.0, 0.25, 0.5, 0.75, 1.0)
 WEEKS: Final[tuple[int, ...]] = (2, 3, 4)
 R_KAPPA: Final[float] = 0.75
+REFERENCE: Final[profiles.ProfileSpec] = profiles.ProfileSpec(kappa=0.75, weeks=4, weight=0.5)
+"""The fixed setting at which the gate's pass conditions are read."""
 INJECTION_SHIFT: Final[float] = 3.0
 INJECTION_FIRST_SATURDAY: Final[datetime] = datetime(2024, 11, 2, tzinfo=UTC)
 INJECTION_WEEKS: Final[int] = 8
@@ -61,8 +61,8 @@ def load_k0(*, site: str) -> tuple[arms.Correction, np.ndarray]:
         )
     with np.load(common.SRC_115_WORK_DIR / "spread" / f"K0_{site}.npz") as stored:
         tables, factors = stored["tables"], stored["factors"]
-    from studies.dp_gam import ResidualSpread
     from studies.dp_ens import LeadHourSpread
+    from studies.dp_gam import ResidualSpread
 
     spread = LeadHourSpread(
         by_lead_band=tuple(ResidualSpread(table=t) for t in tables), factors=factors
@@ -96,11 +96,23 @@ def spec_table() -> dict[str, profiles.ProfileSpec]:
 
 def _tune_job(site: str) -> dict:
     data = get_site(site)
-    k0, q50 = load_k0(site=site)
+    _k0, q50 = load_k0(site=site)
     rows = data.period_rows(period="tuning") & data.scorable & data.d1_rows()
     blocks, targets = profiles.day_blocks(data=data, k0_q50=q50, actual=data.actual)
     out: dict[str, list[float]] = {}
     for name, spec in spec_table().items():
+        by_run = profiles.profile_shift_by_run(blocks=blocks, targets=targets, spec=spec)
+        shift = profiles.shift_at_rows(data=data, by_run=by_run)
+        error = np.abs(data.actual[rows] - (q50[rows] + shift[rows]))
+        out[name] = [float(error.sum()), int(rows.sum())]
+    extra = {
+        "RB-ref": REFERENCE,
+        "RB-ref-placebo": profiles.ProfileSpec(
+            kappa=REFERENCE.kappa, weeks=REFERENCE.weeks, weight=REFERENCE.weight, group="placebo"
+        ),
+        "R-exact": profiles.ProfileSpec(kappa=R_KAPPA, holiday_rule=False),
+    }
+    for name, spec in extra.items():
         by_run = profiles.profile_shift_by_run(blocks=blocks, targets=targets, spec=spec)
         shift = profiles.shift_at_rows(data=data, by_run=by_run)
         error = np.abs(data.actual[rows] - (q50[rows] + shift[rows]))
@@ -151,7 +163,7 @@ def saturdays() -> list[int]:
 
 def _gate_job(site: str) -> dict:
     data = get_site(site)
-    k0, q50 = load_k0(site=site)
+    _k0, q50 = load_k0(site=site)
     days = saturdays()
     injected = data.actual.copy()
     origin_days = data.run_origins.astype("datetime64[D]")
@@ -171,9 +183,13 @@ def _gate_job(site: str) -> dict:
         "RW": chosen_spec(family="RW"),
         "RBdt": chosen_spec(family="RBdt"),
     }
-    placebo = chosen_spec(family="RB")
+    specs["RB-ref"] = REFERENCE
+    specs["RB-ref-placebo"] = profiles.ProfileSpec(
+        kappa=REFERENCE.kappa, weeks=REFERENCE.weeks, weight=REFERENCE.weight, group="placebo"
+    )
+    tuned = chosen_spec(family="RB")
     specs["RB-placebo"] = profiles.ProfileSpec(
-        kappa=placebo.kappa, weeks=placebo.weeks, weight=placebo.weight, group="placebo"
+        kappa=tuned.kappa, weeks=tuned.weeks, weight=tuned.weight, group="placebo"
     )
     measured_runs = np.flatnonzero(np.isin(target_day, days[FIRST_SCORED_SATURDAY - 1 :]))
     for name, spec in specs.items():
@@ -189,7 +205,7 @@ def _gate_job(site: str) -> dict:
         )
         delta = (moved - base)[measured_runs][:, list(INJECTION_HALF_HOURS)]
         recovery[name] = float(delta.mean() / INJECTION_SHIFT)
-    return {"site": site, "recovery": recovery, "runs": int(len(measured_runs))}
+    return {"site": site, "recovery": recovery, "runs": len(measured_runs)}
 
 
 def stage_gate(*, pool: ProcessPoolExecutor) -> None:

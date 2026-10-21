@@ -29,13 +29,14 @@ FIRST_SOURCE_BACK: Final[int] = 2
 PLACEBO_OFFSET_DAYS: Final[int] = 3
 """The placebo reads the weekday that falls this many days after the target's."""
 DAY_TYPES: Final[tuple[int, ...]] = (0, 1, 1, 1, 2, 3, 4)
-"""The day type of Monday (0) to Sunday (6): Monday, Tuesday to Thursday, Friday, Saturday, Sunday."""
+"""The day type of Monday (0) to Sunday (6): Monday, Tuesday to Thursday, Friday, Saturday, or
+Sunday."""
 CHRISTMAS_RUN_DAYS: Final[tuple[int, ...]] = (24, 27, 28, 29, 30, 31)
 EPOCH: Final[np.datetime64] = np.datetime64("1970-01-01", "D")
 
 
 def holiday_like_days(*, first: date, last: date) -> set[date]:
-    """Return the English bank holidays, Easter Saturday and Sunday, and 24 and 27 to 31 December."""
+    """Return the English bank holidays, Easter Saturday and Sunday, and 24 and 27-31 December."""
     out = set(bank_holiday_names())
     for day, name in bank_holiday_names().items():
         if name == "Good Friday":
@@ -79,12 +80,13 @@ def day_blocks(
         actual: The reading at every row (`NaN` where there is none); may be an injected copy.
 
     Returns:
-        Blocks of shape (runs, 48) with `NaN` for an unusable run, and the UTC day number
-        (days since 1970-01-01) of each run's target day.
+        Blocks of shape (runs, 2, 48): the sum and the count of each local half-hour's centred
+        errors (a clock-change day holds one half-hour twice), zero for an unusable run, and the UTC
+        day number (days since 1970-01-01) of each run's target day.
     """
     d1 = data.d1_rows()
     error = k0_q50 - actual
-    blocks = np.full((len(data.runs), 48), np.nan)
+    blocks = np.zeros((len(data.runs), 2, 48))
     origin_days = data.run_origins.astype("datetime64[D]")
     for run in range(len(data.runs)):
         rows = np.arange(data.offsets[run], data.offsets[run + 1])
@@ -94,7 +96,10 @@ def day_blocks(
         block = error[rows]
         if int(np.isfinite(block).sum()) < MIN_DAY_READINGS:
             continue
-        blocks[run, data.row_half_hour[rows]] = block - np.nanmean(block)
+        centred = block - np.nanmean(block)
+        finite = np.isfinite(centred)
+        np.add.at(blocks[run, 0], data.row_half_hour[rows][finite], centred[finite])
+        np.add.at(blocks[run, 1], data.row_half_hour[rows][finite], 1.0)
     targets = (origin_days + np.timedelta64(1, "D") - EPOCH).astype(np.int64)
     return blocks, targets
 
@@ -135,7 +140,7 @@ def profile_shift_by_run(
             if index is None or day in banned:
                 return None
             block = blocks[index]
-            return block if np.isfinite(block).any() else None
+            return block if block[1].sum() > 0 else None
 
         all_days = [
             b
@@ -166,9 +171,8 @@ def profile_shift_by_run(
 
 
 def _mean_by_half_hour(*, blocks: list[np.ndarray]) -> np.ndarray:
-    stacked = np.stack(blocks)
-    count = np.isfinite(stacked).sum(axis=0)
-    total = np.where(np.isfinite(stacked), stacked, 0.0).sum(axis=0)
+    total = np.sum([b[0] for b in blocks], axis=0)
+    count = np.sum([b[1] for b in blocks], axis=0)
     return np.where(count > 0, total / np.maximum(count, 1), 0.0)
 
 
@@ -193,14 +197,3 @@ def profile_correction(
     return arms.Correction(
         level=k0.level, anomaly=k0.anomaly, shape=shift_at_rows(data=data, by_run=by_run)
     )
-
-
-def copy_7_days_ago(*, data: site_module.SiteData) -> np.ndarray:
-    """Return, per row, the reading at the same half-hour 7 days earlier (`NaN` if missing)."""
-    cache = data.cache
-    seven_days = 7 * 48
-    earlier = data.position - seven_days
-    return np.where(
-        earlier >= 0, np.where(data.features.present[earlier], data.features.y[earlier], np.nan), np.nan
-    )
-
