@@ -146,9 +146,10 @@ chose by next-day score.
   corrected design matrix and `zc` the corrected target, and `penalty` and `linear` exactly
   those of `fit_gam` at the same strength (scaled by the number of training rows), so TS and the
   joint arms carry the same regularisation.
-- **Spread.** Each arm has its own quantile spread, fitted on its own post-filter residuals from
-  replica fits (the same rule as TS: a replica joint fit at the replica cut), so the quantile
-  scores compare like with like. This roughly doubles the number of fits.
+- **Spread.** Each arm has its own quantile spread, fitted on its own corrected ensemble forecasts
+  of the tuning months with the same rule as experiment 111 (centred residual quantiles per lead
+  band, hour band, and quarter, and a factor per lead band from {0.9, 1.0, 1.15, 1.3}), so the
+  quantile scores compare like with like.
 
 ### Arms
 
@@ -185,19 +186,24 @@ J2 minus J1 is descriptive.
   the shapes at least as well as TS, so the joint fit is shown to be able to win when the
   assumptions hold. Failing P4 is reported, and a joint arm that cannot win here has its real
   result read with caution.
-- **Absorption control (blocking for `supported`).** The question is whether the fitted curves move
-  to explain a change that the filter should track. To each decision substation's real training
-  target, add (a) a level change of 2 points and (b) a PV-shaped change of 30% of the
-  substation's midday PV effect, each over the last 180 days before the cut (where the filter has
-  not yet caught up) and over a middle 180 days. Refit TS, J1, and J2 with and without the
-  addition, at three cuts (2025-01, 2025-07, 2026-01). A null refit, with the same fit on a
-  window shifted by 7 days, sets the noise floor of curve movement. The movement of a term is the
-  largest absolute change of its fitted curve in points over the training rows (PV, heating,
-  holiday, and weekly profile curves). The curves of a level change should not move by more than
-  twice the noise floor, because the filter absorbs a level; the PV-shaped change may move the PV
-  curve only in the PV-shaped direction. An arm fails when a curve that should not move moves by
-  more than the larger of 0.10 points and twice the noise floor. TS's movement is reported as
-  the reference, and the arms are judged against the injected truth and not against TS.
+- **Absorption control (blocking for `supported`).** The question is whether the fitted curves
+  move to explain a change that the filter should track. To each decision substation's real
+  training target, add (a) a level change of 2 points and (b) a PV-shaped change of 30% of the
+  substation's pinned solar output (as a fall in net power), each over the last 180 days before the
+  cut (where the filter has not yet caught up) and over a middle 180 days. Refit TS, J1, and the
+  J2 arm with ridge weight 1, with and without the addition, at three cuts (2025-01, 2025-07,
+  2026-01). A null refit with the cut moved back by 7 days sets each arm's noise floor of curve
+  movement. The movement of a term is the largest absolute change of its fitted curve in points
+  over the training rows, for the weekly profile, holiday, tent, harmonics, heating, and lighting
+  terms. PV is pinned in this design, so no fitted PV curve exists and the PV-shaped change can
+  only move the other terms. A joint arm fails when a term moves by more than the larger of 0.10
+  points and twice its own noise floor, and by more than twice the larger of TS's movement and TS's
+  noise floor in the same term, because a plain fit should move when the data really change. A term
+  whose own noise floor exceeds 1 point is reported as unidentified. A smoke test of the controls on
+  one cut of one substation, run before this page was finalised, found that J1's weekly-profile
+  curve has a noise floor near 90 points: a constant shift of the profile is absorbed by the
+  filter's level, so J1 cannot identify it, whereas J2's ridge removes the freedom (noise floor
+  below 0.3 points).
 - **Shape distance.** For every monthly cut, the root-mean-square difference between J1's (and
   J2's) fitted curves and TS's, per term, as a share of the root mean square of TS's curve of that
   term (the fitted curve in points over the training rows). Beside it, the condition number and
@@ -229,6 +235,7 @@ J2 minus J1 is descriptive.
 One GPU job at a time under 24 GB, and `systemd-run --user --scope -p MemoryMax=16G -p
 OOMPolicy=continue`. The corrected design matrix needs one filter pass per monthly cut and
 substation over about 250 columns, which is a few seconds on the GPU, so the GPU time is expected
-to be well under 1 hour. The first step times one cut and writes the number here. The replica fits
-for the spread roughly double the fits, and the ENS forecasts take about 35 s per arm and
+to be well under 1 hour. The first step times one cut and writes the number here. The joint fits of all five
+joint arms (J1 and the four J2 ridge weights) share one filter pass per cut and substation. A
+smoke test on one cut of one substation took about 8 seconds for three arms. The ENS forecasts take about 35 s per arm and
 substation, on the CPU in at most 6 processes.
