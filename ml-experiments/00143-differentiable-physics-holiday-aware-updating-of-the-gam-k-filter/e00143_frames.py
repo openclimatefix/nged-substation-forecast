@@ -4,7 +4,7 @@ The four arms share K0's spread tables and factors (see `e00143_arms`), so a fra
 arms only through the correction.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00143-*/e00143_frames.py [--workers 3]
+        env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 uv run --no-sync python ml-experiments/00143-*/e00143_frames.py [--workers 3]
 """
 
 import argparse
@@ -16,7 +16,6 @@ import e00143_common as common
 import e00143_site as site_module
 import numpy as np
 import polars as pl
-import torch
 
 REPRODUCTION_TOLERANCE: float = 1e-3
 """K0's quantiles must match experiment 115's stored frame to this many points (float32 storage)."""
@@ -25,7 +24,6 @@ REPRODUCTION_TOLERANCE: float = 1e-3
 @lru_cache(maxsize=2)
 def get_site(site: str) -> site_module.SiteData:
     """Load a site once per worker process."""
-    torch.set_num_threads(1)
     return site_module.load_site(site=site)
 
 
