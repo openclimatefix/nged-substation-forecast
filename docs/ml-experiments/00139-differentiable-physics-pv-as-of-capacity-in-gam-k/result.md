@@ -7,8 +7,7 @@ also_relevant_to:
   - solar-disaggregation
 status: planned
 size: >-
-  medium. Stored: private files under
-data/ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/
+  medium. Stored: private files under data/ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/
   only. Serving path: not touched. Degradation rule: not touched. Designs: one defensible design,
   because the convex model already subtracts a capacity times a unit solar shape and only the source
   of the capacity changes. Callers: this folder's scripts, which copy experiments 111, 129, and 136
@@ -54,8 +53,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 139: does an as-of solar capacity in GAM-K lower the forecast error on sunny
-half-hours?
+# Experiment 139: does an as-of solar capacity in GAM-K lower the forecast error on sunny half-hours?
 
 Plan only; the write-up follows the runs.
 
