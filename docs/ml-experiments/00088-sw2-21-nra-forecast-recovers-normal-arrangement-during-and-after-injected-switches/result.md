@@ -76,9 +76,11 @@ headline: >-
   (-1.159 to +0.095). Post hoc, with the largest of overlapping detector steps: arm 4 minus plain
   -0.406 (-1.223 to -0.083), closing 43% (17% to 71%).
 lessons: >-
-  Knowing the MW moved is what recovers the normal running arrangement. The detector's MW, as
-  built, is 1.5 times too large from the second day, because overlapping intervals are summed,
-  and it stays on for days after a transfer ends. Masking training targets adds nothing.
+  Knowing the MW moved is what recovers the normal running arrangement. The detector's MW is
+  close to the true MW for the transfers it marks (a weighted median of 1.07 times from day 2),
+  but 21% of marked cases hold two or more overlapping intervals that are summed, and the
+  return step is alarmed as a new transfer of opposite sign that stays on for about 48 hours.
+  Masking training targets adds nothing.
 advice:
   - >-
     Estimate the MW of a detected transfer once per half-hour, from the largest step of the
@@ -97,7 +99,7 @@ advice:
     Test any future detector-fed correction against the true MW first: with the injected MW the
     lag correction closes 51% of the gap, the RO-NC-trained booster 50%, and the oracle-trained
     booster 83%, so a detector must
-    supply MW within about 1.5 times of the truth to keep that gain (figure 3).
+    supply MW close to the truth, with each transfer counted once, to keep that gain (figure 3).
   - >-
     Score the real transfers with forecast origins every few hours, not once a day: no daily
     09:00 origin falls inside any of the 3 labelled real transfers of the validation year with
@@ -117,10 +119,12 @@ normal running arrangement (NRA) is the network as it is when no transfer is on.
 correcting the earlier half-hours of power that the forecast reads (the lags) closed about half of
 the extra error that a transfer causes, and an XGBoost model trained on NGED's logged transfers
 closed 83%. With the MW from the refit-offset neighbour-count detector (RO-NC), run only on data
-from before the forecast, the gain was 16% and could not be told from zero. The detector's MW was
-about 1.5 times the true MW from the second day after a transfer began, because the detector reports
-overlapping time intervals for one transfer and their MW is added together. The detector also kept
-reporting MW for days after a transfer had ended. Counting overlapping intervals once, a choice made
+from before the forecast, the gain was 16% and could not be told from zero. The MW of a single detected
+interval was close to the true MW (a weighted median of 1.07 times from day 2). The loss comes from
+the 21% of marked cases in which the detector reports two or more overlapping time intervals for
+one transfer, and their MW is added together. The detector also kept reporting MW for days after a
+transfer had ended, because it alarms the return step as a new transfer of opposite sign and holds
+it for about 48 hours. Counting overlapping intervals once, a choice made
 after seeing the results, closed 43% during a transfer but still raised the error after it ended.
 Dropping the transfer's half-hours from the training data added nothing. The verdict is
 **inconclusive**.
@@ -195,12 +199,28 @@ is the fall in error from arm 1 divided by that gap.
 - **What the detector reports.** At the newest lag the forecast may use (3.5 hours before the
   origin), it had marked 32%, 73%, and 70% of the
   moved MW (by time since onset), with the right sign in all but 2% of cases. The median ratio of
-  its MW to the injected median was 0.80, 1.43, and 1.50. Split after the fact by the ratio of the
-  detector's MW to the injected MW, the
-  as-built RO-NC-trained NRA booster changed the error against plain by -0.55 points where the
-  detector's MW was at most 1.5 times the true MW (583 of 2,452 cases), +0.27 where it was more
-  than 1.5 times (443 cases), and -0.06 where the detector marked nothing (1,426 cases). The
-  largest-step MW changed the error by -0.71 in the second group.
+  its MW to the injected median was 0.66, 1.07, and 1.09 (weighted median, right-sign cases). Split
+  after the fact by the ratio of the detector's MW to the injected MW, the as-built RO-NC-trained
+  NRA booster changed the error against plain by -0.73 points where the detector's MW was at most
+  1.5 times the true MW (735 of 2,452 cases), +1.45 where it was more than 1.5 times (291 cases),
+  and -0.06 where the detector marked nothing (1,426 cases). The cases with a ratio above 1.5 are
+  those with two or more overlapping intervals (219 cases, among them early fire plus a later
+  re-alarm on the same series, and an alarm plus a partner interval one or two stamps apart);
+  single-interval cases already recover 59% of the gain the injected MW gives. The causal
+  detector's de-duplication matches only an identical onset, so it misses these.
+- **Is the MW the wrong scale?** No. Arm 4 was trained on hindsight labels that sum overlapping
+  intervals in the same way, so training and scoring use the same MW definition. Dividing the MW by
+  1.5 would cut the gain of the single-interval cases, whose median ratio is 1.00.
+- **Stability of the planned contrasts (point values).** C2 is robust: it ranges from -0.62 to
+  -0.92 when any one scored month is left out. C1 is fragile: without February 2026 it is +0.09,
+  and without the single event 89073 (a February event) it is -0.06. Both the as-built result and
+  the post hoc result rest on February 2026.
+- **Known fault in the report script.** The report script still takes the detector's MW from the
+  first pass for some arms and the second pass for others, so its printed MW ratios mix stale and
+  fresh values. The MW ratios on this page come from an audit that
+  re-ran the causal detector on every case and reproduced every headline number (C1, C2, the
+  largest-step contrast, and the shares of the gap closed), because those numbers come from the
+  second-pass forecasts only. The script has not been changed.
 - **After a transfer ends (family B, descriptive).** Plain 4.93, 4.77, and 4.90 points at 0 to 24 h,
   1 to 3 d, and 3 to 7 d after the end. RO-NC-trained NRA with as-built MW is higher than plain by
   0.36
@@ -237,9 +257,11 @@ is the fall in error from arm 1 divided by that gap.
   one); the double-counting was fixed and the causal variants re-run before any number above was
   written. The
   largest-step variants are post hoc.
-- **What to try next.** Replace the detector's summed MW by one MW per half-hour, end a transfer
-  as soon as the step reverses, and let the MW decay in the days after the end, then repeat the
-  family A and B contrasts. Score real transfers with several forecast origins a day.
+- **What to try next.** De-duplicate overlapping same-sign intervals of one series, keeping the
+  largest step. Suppress an opposite-sign alarm inside an earlier interval or within 48 half-hours
+  after its end, and let the MW decay in the days after the end. Then repeat the family A and B
+  contrasts and report the result without February 2026 beside the full result.
+  Score real transfers with several forecast origins a day.
 
 ## Plan (written before any code ran)
 
