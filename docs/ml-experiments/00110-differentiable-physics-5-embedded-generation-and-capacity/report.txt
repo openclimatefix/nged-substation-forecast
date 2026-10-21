@@ -1,0 +1,402 @@
+== Absolute quantile score by arm, points of capacity (rows outside the masks) ==
+year,arm,filtered,decision-site QS,decision-site MAE of mean,all-site QS,D5,D11,D16,D10,D9,D14,D8,D22,D3,D4,D21,D19,D2,D12
+replicate,b,false,3.060,5.233,3.060,2.989,2.638,3.058,4.570,,2.109,,,,,,,,
+replicate,b_clip,false,2.974,5.082,2.974,2.774,2.607,2.872,4.569,,2.117,,,,,,,,
+replicate,b_d1,false,3.303,5.567,3.303,2.904,3.523,2.608,5.453,,2.093,,,,,,,,
+replicate,b_gen,false,4.871,7.843,4.871,4.142,5.544,2.949,9.540,,2.301,,,,,,,,
+replicate,b_node,false,4.839,7.818,4.839,3.985,5.544,2.949,9.540,,2.301,,,,,,,,
+replicate,g_dark,false,,,16.492,,,,,,,17.668,12.469,18.485,14.851,18.669,15.328,17.900,16.655
+replicate,k_base,false,2.917,5.013,2.917,2.936,2.658,2.687,4.335,,2.024,,,,,,,,
+replicate,k_i,false,3.742,6.495,3.742,3.705,2.956,3.576,5.577,,2.971,,,,,,,,
+replicate,k_ii,false,2.973,5.141,2.973,2.974,2.697,2.736,4.427,,2.083,,,,,,,,
+replicate,k_iii,false,3.019,5.158,3.019,2.972,3.011,2.902,4.334,,1.925,,,,,,,,
+replicate,k_iiiii,false,3.073,5.262,3.073,3.009,3.032,2.930,4.484,,1.961,,,,,,,,
+replicate,l0,false,,,4.352,,,,,,,9.725,4.703,1.834,2.270,1.905,3.037,1.681,9.585
+replicate,lq,false,,,4.276,,,,,,,9.723,4.649,1.829,2.270,1.903,3.036,1.679,9.049
+replicate,n,false,,,4.438,,,,,,,9.725,4.699,1.834,2.270,1.905,3.037,1.681,10.282
+replicate,x_mva,false,,,4.559,,,,,,,9.216,5.730,1.626,1.824,2.025,2.410,1.656,11.911
+replicate,b,true,2.288,3.981,2.288,2.548,2.282,1.900,2.932,,1.788,,,,,,,,
+replicate,b_clip,true,2.222,3.864,2.222,2.287,2.254,1.858,2.937,,1.789,,,,,,,,
+replicate,b_d1,true,2.286,3.976,2.286,2.545,2.270,1.905,2.939,,1.783,,,,,,,,
+replicate,b_gen,true,2.230,3.886,2.230,2.289,2.254,1.924,2.914,,1.784,,,,,,,,
+replicate,b_node,true,2.284,3.982,2.284,2.551,2.254,1.924,2.914,,1.784,,,,,,,,
+replicate,g_dark,true,,,6.092,,,,,,,10.207,6.071,4.908,4.264,5.554,4.768,4.976,7.967
+replicate,k_base,true,2.283,3.974,2.283,2.516,2.264,1.889,2.983,,1.775,,,,,,,,
+replicate,k_i,true,2.782,4.898,2.782,2.953,2.576,2.151,3.865,,2.387,,,,,,,,
+replicate,k_ii,true,2.361,4.123,2.361,2.577,2.302,1.930,3.192,,1.821,,,,,,,,
+replicate,k_iii,true,2.154,3.733,2.154,2.314,2.153,1.827,2.806,,1.680,,,,,,,,
+replicate,k_iiiii,true,2.230,3.879,2.230,2.397,2.180,1.868,2.994,,1.726,,,,,,,,
+replicate,l0,true,,,3.509,,,,,,,9.407,3.067,1.346,1.995,1.872,2.564,1.555,6.214
+replicate,lq,true,,,3.481,,,,,,,9.397,3.038,1.345,1.995,1.871,2.563,1.553,6.035
+replicate,n,true,,,3.635,,,,,,,9.407,3.065,1.346,1.995,1.872,2.564,1.555,7.227
+replicate,x_mva,true,,,3.495,,,,,,,8.925,3.433,1.220,1.852,1.792,2.467,1.537,6.683
+scored,b,false,3.046,5.225,2.923,3.448,2.334,3.702,3.439,2.334,2.384,,,,,,,,
+scored,b_clip,false,3.009,5.145,2.872,3.243,2.334,3.679,3.454,2.215,2.393,,,,,,,,
+scored,b_d1,false,2.895,4.980,2.793,2.935,2.254,2.650,4.469,2.305,2.157,,,,,,,,
+scored,b_gen,false,3.160,5.511,3.139,3.025,3.387,2.601,4.594,3.038,2.135,,,,,,,,
+scored,b_node,false,3.196,5.573,3.169,3.224,3.387,2.601,4.594,3.038,2.135,,,,,,,,
+scored,g_dark,false,,,15.576,,,,,,,12.117,13.740,18.059,15.613,17.890,14.884,18.736,13.577
+scored,k_base,false,3.072,5.236,2.917,3.499,2.351,3.690,3.560,2.174,2.337,,,,,,,,
+scored,k_i,false,4.052,6.921,3.807,4.122,2.772,4.595,5.184,2.634,3.625,,,,,,,,
+scored,k_ii,false,3.120,5.329,2.990,3.531,2.391,3.729,3.649,2.370,2.373,,,,,,,,
+scored,k_iii,false,2.932,5.071,2.773,3.432,2.653,3.022,3.326,2.011,2.285,,,,,,,,
+scored,k_iiiii,false,2.959,5.131,2.825,3.454,2.670,3.033,3.383,2.183,2.314,,,,,,,,
+scored,l0,false,,,4.441,,,,,,,11.243,4.753,2.059,2.490,2.444,3.165,1.999,7.346
+scored,lq,false,,,4.379,,,,,,,11.155,4.737,2.054,2.490,2.439,3.162,1.998,6.961
+scored,n,false,,,4.523,,,,,,,11.243,4.747,2.059,2.490,2.444,3.165,1.999,8.013
+scored,x_mva,false,,,4.662,,,,,,,10.658,6.377,1.721,2.382,2.329,3.039,1.986,8.790
+scored,b,true,2.282,3.987,2.227,2.792,2.125,2.131,2.536,1.967,1.876,,,,,,,,
+scored,b_clip,true,2.257,3.938,2.190,2.580,2.131,2.191,2.525,1.869,1.889,,,,,,,,
+scored,b_d1,true,2.280,3.985,2.225,2.792,2.122,2.118,2.542,1.966,1.876,,,,,,,,
+scored,b_gen,true,2.240,3.912,2.194,2.582,2.127,2.115,2.525,1.973,1.886,,,,,,,,
+scored,b_node,true,2.279,3.983,2.226,2.793,2.127,2.115,2.525,1.974,1.886,,,,,,,,
+scored,g_dark,true,,,5.964,,,,,,,9.221,5.571,5.027,4.487,5.482,4.968,5.147,7.801
+scored,k_base,true,2.304,4.026,2.230,2.787,2.125,2.291,2.526,1.871,1.847,,,,,,,,
+scored,k_i,true,2.702,4.749,2.617,3.059,2.377,2.475,3.302,2.210,2.326,,,,,,,,
+scored,k_ii,true,2.351,4.126,2.313,2.810,2.152,2.297,2.656,2.132,1.889,,,,,,,,
+scored,k_iii,true,2.225,3.874,2.151,2.652,2.127,2.154,2.492,1.793,1.745,,,,,,,,
+scored,k_iiiii,true,2.281,3.992,2.244,2.695,2.150,2.175,2.634,2.066,1.791,,,,,,,,
+scored,l0,true,,,3.469,,,,,,,8.919,2.942,1.360,2.061,2.033,2.718,1.610,6.076
+scored,lq,true,,,3.436,,,,,,,8.896,2.952,1.360,2.061,2.030,2.716,1.608,5.836
+scored,n,true,,,3.600,,,,,,,8.920,2.944,1.360,2.061,2.033,2.718,1.610,7.133
+scored,x_mva,true,,,3.485,,,,,,,8.491,3.461,1.242,2.089,2.036,2.785,1.542,6.209
+== Planned contrasts (99.00% intervals), negative = treatment better ==
+contrast,scored QS,scored MAE of mean,scored rows,scored sites better,scored all rows,scored unfiltered,replicate QS,replicate MAE of mean,replicate rows,replicate sites better,replicate all rows,replicate unfiltered,scored low,scored high,Nov-Mar,Apr-Oct,summer midday,without D16,sunlit rows,dark rows,missing
+C1 generation side harms MW forecast: B-gen - B-D1,-0.039,-0.072,83865,3,-0.043,0.265,-0.056,-0.090,85594,3,-0.055,1.568,-0.075,-0.003,0.013,-0.073,-0.307,-0.048,,,
+C2 the meter: L0 - N on |S|,-0.131,-0.253,138910,5,-0.130,-0.082,-0.126,-0.257,137619,5,-0.124,-0.086,-0.220,-0.056,-0.106,-0.149,-0.703,,-0.246,-0.006,
+C3 learned Q: LQ - L0 on |S|,-0.032,-0.066,138910,7,-0.033,-0.062,-0.028,-0.059,137619,8,-0.028,-0.075,-0.055,-0.010,-0.016,-0.044,-0.030,,-0.043,-0.021,
+C4 fitted against pinned capacity: k_base - B,,,,,,,,,,,,,,,,,,,,,not run: its arm is not identified
+C5 DP against lagless XGBoost: B - x_best (both unfiltered),-0.022,0.213,83865,3,0.001,-0.022,-0.413,-0.211,85594,4,-0.424,-0.413,-0.570,0.390,-0.695,0.413,0.066,-0.234,,,
+== Exploratory contrasts (95% intervals) ==
+contrast,scored QS,scored MAE of mean,scored rows,scored sites better,scored all rows,scored unfiltered,replicate QS,replicate MAE of mean,replicate rows,replicate sites better,replicate all rows,replicate unfiltered,scored low,scored high,Nov-Mar,Apr-Oct,summer midday,without D16,sunlit rows,dark rows
+C5 beside: B - X-best with the filter,-0.215,-0.148,83865,4,-0.216,-0.022,-0.144,-0.013,85594,4,-0.152,-0.413,-0.348,-0.074,-0.470,-0.050,-0.100,-0.192,,
+B-node - B-D1,-0.001,-0.002,83865,2,-0.006,0.301,-0.003,0.006,85594,2,-0.003,1.536,-0.010,0.008,0.011,-0.009,0.001,-0.000,,
+B-clip - B (all MW sites),-0.025,-0.049,83865,2,-0.025,-0.037,-0.066,-0.117,85594,3,-0.063,-0.085,-0.043,-0.007,-0.004,-0.038,-0.224,-0.046,,
+B-clip - B at D5,-0.212,-0.391,15211,1,-0.187,-0.205,-0.261,-0.464,17520,1,-0.261,-0.216,-0.322,-0.100,0.007,-0.324,-1.565,,,
+B-gen - B-node at D5,-0.212,-0.387,15211,1,-0.185,-0.199,-0.262,-0.468,17520,1,-0.262,0.156,-0.322,-0.098,0.010,-0.325,-1.569,,,
+K-base - B,0.023,0.039,83865,4,0.021,0.026,-0.005,-0.007,85594,4,0.000,-0.142,0.000,0.047,0.006,0.034,0.032,-0.011,,
+K-i - K-base,0.397,0.723,83865,0,0.397,0.980,0.499,0.924,85594,0,0.499,0.824,0.293,0.512,0.583,0.277,0.362,0.450,,
+K-ii - K-base,0.046,0.099,83865,0,0.044,0.048,0.078,0.149,85594,0,0.083,0.055,0.009,0.081,0.091,0.018,0.044,0.057,,
+K-iii - K-base,-0.079,-0.153,83865,4,-0.082,-0.140,-0.129,-0.241,85594,5,-0.128,0.102,-0.134,-0.025,-0.032,-0.110,0.010,-0.065,,
+K-ii+iii - K-base,-0.023,-0.034,83865,3,-0.030,-0.113,-0.053,-0.095,85594,4,-0.048,0.155,-0.103,0.046,0.068,-0.083,0.057,-0.001,,
+K-i - B,0.420,0.762,83865,0,0.417,1.006,0.494,0.917,85594,0,0.499,0.682,0.331,0.520,0.588,0.311,0.394,0.439,,
+K-ii - B,0.069,0.139,83865,0,0.065,0.074,0.073,0.142,85594,0,0.083,-0.087,0.028,0.111,0.096,0.052,0.075,0.045,,
+K-iii - B,-0.056,-0.113,83865,3,-0.062,-0.114,-0.135,-0.248,85594,5,-0.128,-0.041,-0.107,-0.007,-0.027,-0.076,0.042,-0.076,,
+L0 - G-dark (solar term on sunlit MVA rows),-2.496,-4.549,138910,8,-2.491,-11.135,-2.583,-4.698,137619,8,-2.589,-12.140,-2.774,-2.236,-2.312,-2.625,-2.744,,-4.202,-0.633
+N - G-dark,-2.365,-4.296,138910,8,-2.361,-11.053,-2.457,-4.441,137619,8,-2.465,-12.054,-2.655,-2.092,-2.206,-2.476,-2.041,,-3.956,-0.627
+B - climatology,-1.786,-3.330,83865,5,-1.940,-1.022,-1.622,-3.130,85594,5,-1.625,-0.851,-2.101,-1.478,-2.306,-1.450,-2.918,-1.717,,
+B - manual heuristic,-1.207,-2.227,83865,5,-1.347,-0.443,-1.550,-2.832,85594,5,-1.574,-0.779,-1.521,-0.907,-1.755,-0.852,-2.251,-1.255,,
+B-D1 - B (Part 4's A3 - A2),-0.002,-0.002,83865,3,-0.000,-0.150,-0.002,-0.005,85594,3,-0.002,0.244,-0.011,0.004,0.000,-0.003,0.005,0.001,,
+== Planned MW contrasts with each decision site left out (quantile score) ==
+contrast,year,all five,without D5,without D10,without D11,without D14,without D16
+C1 generation side harms MW forecast: B-gen - B-D1,scored,-0.039,-0.001,-0.045,-0.051,-0.052,-0.048
+C1 generation side harms MW forecast: B-gen - B-D1,replicate,-0.056,-0.005,-0.064,-0.067,-0.071,-0.075
+C4 fitted against pinned capacity: k_base - B,scored,0.023,0.029,0.031,0.029,0.036,-0.011
+C4 fitted against pinned capacity: k_base - B,replicate,-0.005,0.002,-0.019,-0.002,-0.003,-0.004
+C5 DP against lagless XGBoost: B - x_best (both unfiltered),scored,-0.022,-0.133,0.024,0.112,0.127,-0.234
+C5 DP against lagless XGBoost: B - x_best (both unfiltered),replicate,-0.413,-0.442,-0.414,-0.305,-0.369,-0.535
+== Calibration gate of the capacity intervals (weak evidence: 20 substations) ==
+arm,noise,80% covered,80% binomial 95%,80% calibrated,90% range covered,90% binomial 95%,90% calibrated,mean 90% width,mean bias
+k_base,iid,12/20,0.36 to 0.81,false,14/20,0.46 to 0.88,false,0.640,-0.014
+k_base,real,12/20,0.36 to 0.81,false,15/20,0.51 to 0.91,false,4.063,0.026
+k_i,iid,13/20,0.41 to 0.85,false,14/20,0.46 to 0.88,false,0.607,0.013
+k_i,real,6/20,0.12 to 0.54,false,7/20,0.15 to 0.59,false,7.295,4.449
+k_ii,iid,13/20,0.41 to 0.85,false,14/20,0.46 to 0.88,false,0.615,-0.046
+k_ii,real,13/20,0.41 to 0.85,false,16/20,0.56 to 0.94,true,4.361,0.335
+k_iii,iid,15/20,0.51 to 0.91,true,15/20,0.51 to 0.91,false,0.778,-0.017
+k_iii,real,14/20,0.46 to 0.88,true,15/20,0.51 to 0.91,false,2.762,-0.368
+== Reproduction of Part 4's A2 by B ==
+year,rows,B score,Part 4 A2 score,mean |forecast difference|
+scored,83865,2.2815,2.2752,0.0350
+replicate,85594,2.2884,2.2836,0.0384
+== Capacity by site, arm, and cut ==
+cut,arm,site,season_year,capacity,range_low,range_high,n_months,vintage_held,vintage_mean,vintage_source,width,precise,near,ratio_to_vintage
+tuning,k_base,D5,2022,59.30,55.06,62.50,27,false,62.89,early_vintage,7.43,false,true,0.94
+tuning,k_base,D10,2022,41.61,36.74,45.35,29,false,37.72,early_vintage,8.60,false,true,1.10
+tuning,k_base,D11,2022,30.01,25.19,32.48,32,false,26.11,early_vintage,7.29,false,true,1.15
+tuning,k_base,D14,2022,30.92,27.85,32.14,25,true,29.62,early_vintage,4.29,false,true,1.04
+tuning,k_base,D16,2022,25.81,24.43,27.18,25,false,27.27,early_vintage,2.75,true,true,0.95
+tuning,k_i,D5,2022,69.88,64.65,72.43,27,false,62.89,early_vintage,7.78,false,true,1.11
+tuning,k_i,D10,2022,53.98,48.68,60.33,29,false,37.72,early_vintage,11.64,false,false,1.43
+tuning,k_i,D11,2022,38.18,32.43,44.28,32,false,26.11,early_vintage,11.85,false,false,1.46
+tuning,k_i,D14,2022,39.45,37.04,43.30,25,true,29.62,early_vintage,6.25,false,false,1.33
+tuning,k_i,D16,2022,35.56,31.99,39.24,25,false,27.27,early_vintage,7.25,false,false,1.30
+tuning,k_ii,D5,2022,59.13,54.97,61.94,27,false,62.89,early_vintage,6.97,false,true,0.94
+tuning,k_ii,D10,2022,41.33,35.49,44.78,29,false,37.72,early_vintage,9.29,false,true,1.10
+tuning,k_ii,D11,2022,30.14,24.96,31.70,32,false,26.11,early_vintage,6.74,false,true,1.15
+tuning,k_ii,D14,2022,31.11,27.86,32.60,25,true,29.62,early_vintage,4.74,false,true,1.05
+tuning,k_ii,D16,2022,26.47,24.72,27.78,25,false,27.27,early_vintage,3.06,false,true,0.97
+tuning,k_iii,D5,2022,50.36,47.79,52.02,25,false,62.89,early_vintage,4.24,true,true,0.80
+tuning,k_iii,D10,2022,30.54,27.25,33.90,25,false,37.72,early_vintage,6.65,false,true,0.81
+tuning,k_iii,D11,2022,19.22,16.71,21.76,25,false,26.11,early_vintage,5.04,false,false,0.74
+tuning,k_iii,D14,2022,24.61,22.46,26.20,25,true,29.62,early_vintage,3.74,false,true,0.83
+tuning,k_iii,D16,2022,20.76,19.35,22.65,25,false,27.27,early_vintage,3.30,false,false,0.76
+tuning,k_iiiii,D5,2022,50.39,47.65,52.00,25,false,62.89,early_vintage,4.35,true,true,0.80
+tuning,k_iiiii,D10,2022,29.74,26.20,33.11,25,false,37.72,early_vintage,6.91,false,false,0.79
+tuning,k_iiiii,D11,2022,18.89,16.34,21.65,25,false,26.11,early_vintage,5.31,false,false,0.72
+tuning,k_iiiii,D14,2022,24.37,22.29,25.99,25,true,29.62,early_vintage,3.70,false,true,0.82
+tuning,k_iiiii,D16,2022,20.68,19.14,22.80,25,false,27.27,early_vintage,3.65,false,false,0.76
+replicate,k_base,D5,2023,58.92,57.34,60.92,39,false,66.03,vintage,3.58,true,true,0.89
+replicate,k_base,D10,2023,49.16,46.07,51.61,41,false,39.49,vintage,5.54,false,false,1.24
+replicate,k_base,D11,2023,31.26,29.30,33.25,44,false,28.61,vintage,3.95,false,true,1.09
+replicate,k_base,D14,2023,30.59,29.39,32.70,37,true,29.62,vintage,3.31,false,true,1.03
+replicate,k_base,D16,2023,25.50,24.97,26.52,37,false,32.88,vintage,1.55,true,false,0.78
+replicate,k_i,D5,2023,71.25,67.49,73.97,39,false,66.03,vintage,6.49,true,true,1.08
+replicate,k_i,D10,2023,62.61,57.85,69.40,41,false,39.49,vintage,11.55,false,false,1.59
+replicate,k_i,D11,2023,39.78,37.15,42.48,44,false,28.61,vintage,5.32,false,false,1.39
+replicate,k_i,D14,2023,41.68,39.21,44.25,37,true,29.62,vintage,5.04,false,false,1.41
+replicate,k_i,D16,2023,35.87,32.98,37.83,37,false,32.88,vintage,4.85,false,true,1.09
+replicate,k_ii,D5,2023,59.14,57.50,60.99,39,false,66.03,vintage,3.49,true,true,0.90
+replicate,k_ii,D10,2023,48.95,45.75,51.39,41,false,39.49,vintage,5.64,false,false,1.24
+replicate,k_ii,D11,2023,31.43,29.53,33.13,44,false,28.61,vintage,3.60,false,true,1.10
+replicate,k_ii,D14,2023,30.68,28.99,32.61,37,true,29.62,vintage,3.62,false,true,1.04
+replicate,k_ii,D16,2023,25.98,24.95,27.50,37,false,32.88,vintage,2.55,true,false,0.79
+replicate,k_iii,D5,2023,51.21,48.51,53.76,25,false,66.03,vintage,5.25,false,false,0.78
+replicate,k_iii,D10,2023,32.56,31.96,35.30,25,false,39.49,vintage,3.34,false,true,0.82
+replicate,k_iii,D11,2023,22.70,20.57,25.16,25,false,28.61,vintage,4.59,false,false,0.79
+replicate,k_iii,D14,2023,26.98,25.25,28.32,25,true,29.62,vintage,3.07,false,true,0.91
+replicate,k_iii,D16,2023,23.55,21.32,25.94,25,false,32.88,vintage,4.63,false,false,0.72
+replicate,k_iiiii,D5,2023,51.40,48.46,53.97,25,false,66.03,vintage,5.51,false,false,0.78
+replicate,k_iiiii,D10,2023,32.00,30.95,34.39,25,false,39.49,vintage,3.44,false,true,0.81
+replicate,k_iiiii,D11,2023,22.56,20.05,25.00,25,false,28.61,vintage,4.95,false,false,0.79
+replicate,k_iiiii,D14,2023,26.92,25.18,28.18,25,true,29.62,vintage,3.00,true,true,0.91
+replicate,k_iiiii,D16,2023,23.47,21.34,25.87,25,false,32.88,vintage,4.53,false,false,0.71
+scored,k_base,D5,2024,57.83,56.30,59.28,51,false,62.12,vintage,2.98,true,true,0.93
+scored,k_base,D10,2024,46.06,42.48,49.44,53,false,43.16,vintage,6.96,false,true,1.07
+scored,k_base,D11,2024,28.71,26.60,30.67,56,false,32.93,vintage,4.07,false,true,0.87
+scored,k_base,D14,2024,32.20,30.17,34.05,49,true,29.62,vintage,3.88,false,true,1.09
+scored,k_base,D16,2024,27.25,26.75,29.32,49,false,39.53,vintage,2.56,true,false,0.69
+scored,k_i,D5,2024,69.35,67.39,71.33,51,false,62.12,vintage,3.94,true,true,1.12
+scored,k_i,D10,2024,59.70,55.93,63.99,53,false,43.16,vintage,8.05,false,false,1.38
+scored,k_i,D11,2024,37.09,34.04,41.08,56,false,32.93,vintage,7.04,false,true,1.13
+scored,k_i,D14,2024,41.53,40.02,43.52,49,true,29.62,vintage,3.50,true,false,1.40
+scored,k_i,D16,2024,37.96,35.55,41.00,49,false,39.53,vintage,5.45,false,true,0.96
+scored,k_ii,D5,2024,58.29,56.45,59.68,51,false,62.12,vintage,3.23,true,true,0.94
+scored,k_ii,D10,2024,46.47,42.43,49.95,53,false,43.16,vintage,7.53,false,true,1.08
+scored,k_ii,D11,2024,29.26,26.81,31.19,56,false,32.93,vintage,4.38,false,true,0.89
+scored,k_ii,D14,2024,32.58,30.74,34.49,49,true,29.62,vintage,3.75,false,true,1.10
+scored,k_ii,D16,2024,27.97,27.47,30.68,49,false,39.53,vintage,3.21,false,false,0.71
+scored,k_iii,D5,2024,51.75,48.36,56.19,25,false,62.12,vintage,7.83,false,true,0.83
+scored,k_iii,D10,2024,36.89,34.47,40.10,25,false,43.16,vintage,5.63,false,true,0.85
+scored,k_iii,D11,2024,23.83,23.02,25.27,25,false,32.93,vintage,2.26,true,false,0.72
+scored,k_iii,D14,2024,27.95,26.74,28.70,25,true,29.62,vintage,1.96,true,true,0.94
+scored,k_iii,D16,2024,29.77,27.38,31.00,25,false,39.53,vintage,3.61,false,false,0.75
+scored,k_iiiii,D5,2024,51.90,48.35,56.05,25,false,62.12,vintage,7.71,false,true,0.84
+scored,k_iiiii,D10,2024,36.35,33.75,40.01,25,false,43.16,vintage,6.26,false,true,0.84
+scored,k_iiiii,D11,2024,23.63,23.06,25.42,25,false,32.93,vintage,2.36,true,false,0.72
+scored,k_iiiii,D14,2024,27.91,26.34,28.78,25,true,29.62,vintage,2.45,true,true,0.94
+scored,k_iiiii,D16,2024,29.59,26.99,31.16,25,false,39.53,vintage,4.17,false,false,0.75
+== Capacity labels ==
+arm,identified at replicate cut,identified at scored cut,gate tests 1 and 2,identified,robust,k_iii_consistent,fitted_capacity_may_go_to_part_6
+k_base,false,false,true,false,false,true,false
+k_i,false,false,true,false,false,true,false
+k_ii,false,false,true,false,false,true,false
+== K-iii over K-base ==
+cut,site,K-iii / K-base,range low,range high,"overlaps [0.65, 0.87]"
+replicate,D10,0.662,0.625,0.725,true
+replicate,D11,0.726,0.636,0.803,true
+replicate,D14,0.882,0.818,0.924,true
+replicate,D16,0.924,0.851,0.973,true
+replicate,D5,0.869,0.824,0.920,true
+scored,D10,0.801,0.749,0.837,true
+scored,D11,0.830,0.811,0.868,true
+scored,D14,0.868,0.846,0.896,true
+scored,D16,1.092,1.027,1.124,false
+scored,D5,0.895,0.845,0.960,true
+== Node: deepest outage by site, arm, and cut ==
+cut,arm,site,evidence points,path range points,under 1 point
+replicate,b_gen,D10,27.731,38.452,false
+replicate,b_gen,D11,34.935,39.295,false
+replicate,b_gen,D14,6.326,132.271,false
+replicate,b_gen,D16,12.602,41.953,false
+replicate,b_gen,D5,15.723,18.771,false
+scored,b_gen,D10,34.664,42.730,false
+scored,b_gen,D11,32.943,47.694,false
+scored,b_gen,D14,11.616,127.613,false
+scored,b_gen,D16,14.544,47.304,false
+scored,b_gen,D5,18.124,20.235,false
+scored,b_gen,D9,9.280,65.164,false
+replicate,b_node,D10,27.731,38.452,false
+replicate,b_node,D11,34.935,39.295,false
+replicate,b_node,D14,6.326,132.271,false
+replicate,b_node,D16,12.602,41.953,false
+replicate,b_node,D5,11.704,19.729,false
+scored,b_node,D10,34.664,42.730,false
+scored,b_node,D11,32.943,47.694,false
+scored,b_node,D14,11.616,127.613,false
+scored,b_node,D16,14.544,47.304,false
+scored,b_node,D5,17.653,21.149,false
+scored,b_node,D9,9.280,65.164,false
+== Clip: profiled multiplier and ceiling by site, arm, and cut ==
+cut,arm,site,multiplier,ceiling share,open
+replicate,b_clip,D10,1.000,1.000,true
+replicate,b_clip,D11,0.900,0.900,false
+replicate,b_clip,D14,0.950,1.000,true
+replicate,b_clip,D16,0.800,0.750,false
+replicate,b_clip,D5,1.100,0.600,false
+scored,b_clip,D10,0.950,1.000,true
+scored,b_clip,D11,0.850,1.000,true
+scored,b_clip,D14,0.950,1.000,true
+scored,b_clip,D16,0.750,0.800,false
+scored,b_clip,D5,1.100,0.650,false
+scored,b_clip,D9,0.750,1.000,true
+replicate,b_gen,D5,1.100,0.600,false
+scored,b_gen,D5,1.100,0.650,false
+== Meter: reactive pair by site, arm, and cut ==
+cut,arm,site,reactive,reverse-flow share,power factor,q0 points,converged,power_factor_low,power_factor_high,q0_low,q0_high,recovered
+replicate,l0,D12,zero,0.270,1.000,0.000,true,0.951,0.956,3.480,4.933,true
+replicate,l0,D19,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,l0,D2,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,l0,D21,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,l0,D22,zero,0.000,1.000,0.000,true,0.968,0.970,0.000,0.231,false
+replicate,l0,D3,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,l0,D4,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,l0,D8,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+scored,l0,D12,zero,0.254,1.000,0.000,true,0.950,0.955,3.319,4.816,true
+scored,l0,D19,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+scored,l0,D2,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+scored,l0,D21,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+scored,l0,D22,zero,0.000,1.000,0.000,true,0.966,0.970,0.000,0.456,false
+scored,l0,D3,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+scored,l0,D4,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+scored,l0,D8,zero,0.000,1.000,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,lq,D12,learned,0.270,0.954,4.059,true,0.951,0.956,3.480,4.933,true
+replicate,lq,D19,fixed,0.000,0.970,0.000,false,0.970,0.970,0.000,0.000,false
+replicate,lq,D2,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,lq,D21,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,lq,D22,learned,0.005,0.967,0.339,true,0.968,0.970,0.000,0.231,false
+replicate,lq,D3,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,lq,D4,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+replicate,lq,D8,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+scored,lq,D12,learned,0.254,0.953,3.873,true,0.950,0.955,3.319,4.816,true
+scored,lq,D19,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+scored,lq,D2,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+scored,lq,D21,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+scored,lq,D22,learned,0.007,0.967,0.381,true,0.966,0.970,0.000,0.456,false
+scored,lq,D3,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+scored,lq,D4,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+scored,lq,D8,fixed,0.000,0.970,0.000,true,0.970,0.970,0.000,0.000,false
+== Median forecast minus mean forecast, points ==
+year,arm,filtered,D10,D9,D16,D11,D14,D5,D3,D8,D2,D22,D12,D4,D21,D19
+scored,b,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_clip,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_clip,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_d1,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_d1,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_gen,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_gen,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_node,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,b_node,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,g_dark,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,g_dark,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,k_base,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_base,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_i,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_i,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_ii,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_ii,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_iii,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_iii,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_iiiii,true,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,k_iiiii,false,0.000,0.000,0.000,0.000,0.000,0.000,,,,,,,,
+scored,l0,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,l0,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,lq,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,lq,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,n,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,x_mva,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+scored,x_mva,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,b,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_clip,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_clip,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_d1,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_d1,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_gen,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_gen,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_node,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,b_node,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,g_dark,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,g_dark,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,k_base,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_base,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_i,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_i,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_ii,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_ii,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_iii,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_iii,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_iiiii,true,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,k_iiiii,false,0.000,,0.000,0.000,0.000,0.000,,,,,,,,
+replicate,l0,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,l0,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,lq,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,lq,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,n,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,x_mva,true,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+replicate,x_mva,false,,,,,,,0.000,0.000,0.000,0.000,0.000,0.000,0.000,0.000
+== Tail calibration ==
+year,arm,filtered,q01 coverage,q01 pinball,q05 coverage,q05 pinball,q95 coverage,q95 pinball,q99 coverage,q99 pinball
+scored,b,true,0.0153,0.1676,0.0553,0.5676,0.9405,0.5839,0.9830,0.1772
+scored,b,false,0.0187,0.1777,0.0539,0.6451,0.8378,0.9107,0.9307,0.3194
+scored,b_clip,true,0.0169,0.1675,0.0582,0.5626,0.9395,0.5719,0.9827,0.1744
+scored,b_clip,false,0.0209,0.1797,0.0586,0.6421,0.8409,0.8922,0.9322,0.3110
+scored,b_d1,true,0.0155,0.1675,0.0558,0.5673,0.9413,0.5822,0.9834,0.1760
+scored,b_d1,false,0.0494,0.2592,0.1129,0.7712,0.9389,0.7009,0.9813,0.1948
+scored,b_gen,true,0.0159,0.1667,0.0550,0.5582,0.9411,0.5787,0.9825,0.1756
+scored,b_gen,false,0.0435,0.2454,0.1031,0.7959,0.9072,0.8249,0.9646,0.2458
+scored,b_node,true,0.0156,0.1684,0.0546,0.5659,0.9416,0.5847,0.9832,0.1760
+scored,b_node,false,0.0456,0.2491,0.1091,0.8085,0.9115,0.8313,0.9653,0.2478
+scored,g_dark,true,0.0251,0.3504,0.0703,1.3478,0.9093,1.5554,0.9606,0.5229
+scored,g_dark,false,0.0152,0.4934,0.0482,2.1327,0.6777,9.1908,0.7378,7.2820
+scored,k_base,true,0.0171,0.1699,0.0581,0.5710,0.9385,0.5796,0.9828,0.1763
+scored,k_base,false,0.0256,0.1987,0.0637,0.6708,0.8430,0.8897,0.9339,0.3072
+scored,k_i,true,0.0157,0.1880,0.0573,0.6479,0.9444,0.6777,0.9846,0.1990
+scored,k_i,false,0.0411,0.2913,0.0937,0.9169,0.8494,1.1216,0.9290,0.3900
+scored,k_ii,true,0.0161,0.1738,0.0582,0.5898,0.9418,0.5911,0.9827,0.1795
+scored,k_ii,false,0.0257,0.2023,0.0634,0.6885,0.8469,0.9159,0.9316,0.3230
+scored,k_iii,true,0.0160,0.1631,0.0580,0.5523,0.9368,0.5704,0.9813,0.1761
+scored,k_iii,false,0.0111,0.1688,0.0357,0.6128,0.8350,0.8376,0.9347,0.2789
+scored,k_iiiii,true,0.0172,0.1722,0.0597,0.5797,0.9377,0.5797,0.9818,0.1752
+scored,k_iiiii,false,0.0108,0.1717,0.0357,0.6260,0.8388,0.8402,0.9351,0.2843
+scored,l0,true,0.0191,0.2407,0.0674,0.8648,0.9322,0.8941,0.9765,0.2781
+scored,l0,false,0.0462,0.3535,0.1204,1.1102,0.9182,1.0836,0.9706,0.3041
+scored,lq,true,0.0192,0.2418,0.0678,0.8614,0.9327,0.8873,0.9765,0.2758
+scored,lq,false,0.0462,0.3511,0.1200,1.0946,0.9195,1.0739,0.9710,0.3027
+scored,n,true,0.0206,0.2448,0.0690,0.8806,0.9328,0.9308,0.9760,0.2900
+scored,n,false,0.0471,0.3524,0.1242,1.1184,0.9215,1.1070,0.9710,0.3092
+scored,x_mva,true,0.0234,0.2827,0.1256,0.9305,0.8869,1.0192,0.9824,0.3732
+scored,x_mva,false,0.0397,0.3634,0.1654,1.4377,0.8538,1.3472,0.9814,0.3763
+replicate,b,true,0.0193,0.1905,0.0614,0.5983,0.9310,0.5944,0.9772,0.1877
+replicate,b,false,0.0511,0.2570,0.1135,0.8037,0.8575,0.8384,0.9388,0.2768
+replicate,b_clip,true,0.0186,0.1874,0.0598,0.5843,0.9329,0.5750,0.9785,0.1818
+replicate,b_clip,false,0.0523,0.2560,0.1165,0.7957,0.8663,0.8031,0.9434,0.2619
+replicate,b_d1,true,0.0187,0.1886,0.0610,0.5969,0.9305,0.5970,0.9769,0.1887
+replicate,b_d1,false,0.0087,0.1736,0.0300,0.6676,0.7824,1.1543,0.8981,0.4789
+replicate,b_gen,true,0.0171,0.1809,0.0583,0.5801,0.9327,0.5790,0.9782,0.1824
+replicate,b_gen,false,0.0200,0.2339,0.0505,0.8723,0.6961,2.0900,0.8183,1.1115
+replicate,b_node,true,0.0178,0.1847,0.0596,0.5914,0.9309,0.5937,0.9773,0.1869
+replicate,b_node,false,0.0249,0.2546,0.0565,0.9007,0.7084,2.0264,0.8273,1.0776
+replicate,g_dark,true,0.0207,0.3581,0.0611,1.3669,0.9104,1.5918,0.9609,0.5488
+replicate,g_dark,false,0.0246,0.5876,0.0565,2.2409,0.6783,9.8799,0.7343,7.8479
+replicate,k_base,true,0.0196,0.1903,0.0641,0.5986,0.9322,0.5902,0.9779,0.1851
+replicate,k_base,false,0.0481,0.2428,0.1046,0.7547,0.8701,0.7895,0.9457,0.2588
+replicate,k_i,true,0.0240,0.2214,0.0682,0.7085,0.9434,0.6992,0.9825,0.2032
+replicate,k_i,false,0.0480,0.2904,0.1060,0.9243,0.8751,1.0279,0.9444,0.3582
+replicate,k_ii,true,0.0199,0.1924,0.0657,0.6157,0.9327,0.6044,0.9781,0.1858
+replicate,k_ii,false,0.0417,0.2302,0.0985,0.7569,0.8685,0.8066,0.9485,0.2573
+replicate,k_iii,true,0.0177,0.1837,0.0566,0.5743,0.9333,0.5575,0.9795,0.1764
+replicate,k_iii,false,0.0266,0.1968,0.0732,0.7036,0.8158,0.9301,0.9152,0.3449
+replicate,k_iiiii,true,0.0184,0.1849,0.0598,0.5929,0.9348,0.5672,0.9798,0.1773
+replicate,k_iiiii,false,0.0263,0.1985,0.0729,0.7211,0.8193,0.9333,0.9193,0.3375
+replicate,l0,true,0.0178,0.2416,0.0619,0.8720,0.9340,0.8940,0.9768,0.2938
+replicate,l0,false,0.0470,0.4285,0.1136,1.1244,0.9412,1.0374,0.9823,0.2726
+replicate,lq,true,0.0179,0.2449,0.0616,0.8724,0.9349,0.8858,0.9770,0.2923
+replicate,lq,false,0.0469,0.4273,0.1135,1.1119,0.9428,1.0231,0.9823,0.2723
+replicate,n,true,0.0194,0.2455,0.0648,0.8852,0.9337,0.9205,0.9769,0.2968
+replicate,n,false,0.0489,0.4306,0.1180,1.1281,0.9414,1.0662,0.9825,0.2758
+replicate,x_mva,true,0.0203,0.3209,0.1165,0.9716,0.8761,1.0445,0.9789,0.3904
+replicate,x_mva,false,0.0389,0.3748,0.1551,1.5079,0.8632,1.4398,0.9783,0.4253
