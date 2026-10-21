@@ -38,7 +38,6 @@ from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens import proxy_residual_stream
 from studies.dp_ens_weather import Calibration, proxy_cache
 from studies.dp_features import FeatureCache, naive_utc
-from studies.dp_gam import GamFit
 
 ARM_NAMES: Final[tuple[str, ...]] = ("a0", "a1", "a2", "a3")
 PERIODS: Final[tuple[str, ...]] = ("tuning", "replicate", "scored")
@@ -112,9 +111,7 @@ def load_arm_fits(*, arm: str, site: str) -> list:
     return tall.load_fits(cadence=kind, site=site)
 
 
-def tall_residual_stream(
-    *, cache: FeatureCache, fits: list[tall.TallFit], site: str
-) -> np.ndarray:
+def tall_residual_stream(*, cache: FeatureCache, fits: list[tall.TallFit], site: str) -> np.ndarray:
     """Return observed minus the chained T-all fits' forecast on a cache, `NaN` where none.
 
     Fit `i` supplies the rows after its cut and up to the next cut, as `proxy_residual_stream`
@@ -160,13 +157,13 @@ class ArmForecaster:
         self.run = filters.filter_stream(
             residual=stream,
             band=context.cache.calendar.band,
-            settings=settings_of_hyper(
-                hyper=noise_hyper(noise=ARM_NOISE[arm], site=context.site)
-            ),
+            settings=settings_of_hyper(hyper=noise_hyper(noise=ARM_NOISE[arm], site=context.site)),
         )
         first = self.fits[0].cut + timedelta(hours=DEFAULT_DELAY_HOURS)
         self.tuning = [
-            i for i in context.setup.indices(periods={"tuning"}) if context.setup.origins[i] >= first
+            i
+            for i in context.setup.indices(periods={"tuning"})
+            if context.setup.origins[i] >= first
         ]
         self.spread = ens.fit_spread_from_frame(
             frame=self._frame(runs=self.tuning, spread=ens.ZERO_SPREAD)

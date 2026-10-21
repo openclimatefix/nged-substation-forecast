@@ -6,7 +6,6 @@ order for the maintainer to change.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| BG stage 1, GAM-K assembly on the ensemble mean (experiment 136) | Does GAM-K with T-all and one shared filter noise setting, driven by the ensemble mean, match BG2 and beat experiment 111's GAM-K? | 1 | Nothing | Planned |
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |

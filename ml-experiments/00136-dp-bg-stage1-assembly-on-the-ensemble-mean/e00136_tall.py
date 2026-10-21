@@ -19,10 +19,11 @@ from typing import Final
 import e00136_common as common
 import e00136_design as design
 import numpy as np
+import polars as pl
 import torch
 from studies.dp_features import FeatureCache
 from studies.dp_gam import GamFit, GamLayout, design_matrix, pinned_solar_points
-from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity, read_vintages
+from studies.dp_pinned_capacity import PinnedCapacity, read_vintages
 
 CADENCES: Final[tuple[str, ...]] = ("monthly", "weekly")
 WEEKLY_STEP: Final[timedelta] = timedelta(days=7)
@@ -52,7 +53,12 @@ class TallFit:
 
 
 def fit_tall(
-    *, cache: FeatureCache, vintages, site: str, cut: datetime, penalty_weight: float  # noqa: ANN001
+    *,
+    cache: FeatureCache,
+    vintages: pl.DataFrame,
+    site: str,
+    cut: datetime,
+    penalty_weight: float,
 ) -> TallFit:
     """Fit T-all at one site and cut."""
     base = design.build_base(cache=cache, vintages=vintages, site=site, cut=cut)
@@ -70,6 +76,14 @@ def fit_tall(
 
 def predict_tall(*, cache: FeatureCache, fit: TallFit, index: np.ndarray) -> np.ndarray:
     """Predict net power in points at the grid rows `index`: the design times the coefficients.
+
+    Args:
+        cache: The cache whose weather drives the prediction.
+        fit: The T-all fit.
+        index: Grid rows.
+
+    Returns:
+        The predictions, one per row.
 
     Raises:
         ValueError: If a row has a non-finite input.

@@ -22,10 +22,10 @@ from studies.dp_assimilation import (
 from studies.dp_ens import LeadHourSpread, choose_fit
 from studies.dp_ens_weather import (
     HORIZON_HALF_HOURS,
-    RunWindow,
     AnalysisProxy,
     Calibration,
     EnsSiteRun,
+    RunWindow,
     WeatherContext,
     ghi_climatology,
     lead_band_of_hours,
@@ -189,6 +189,12 @@ class MeanForecast:
 def mean_run(*, run: EnsSiteRun) -> EnsSiteRun:
     """Return the run with its usable members replaced by their mean, as a single member.
 
+    Args:
+        run: The run with its members.
+
+    Returns:
+        The run with one member, the mean of the usable members.
+
     Raises:
         ValueError: If the run's control member is incomplete (from `usable_members`).
     """
@@ -223,7 +229,7 @@ def forecast_mean_run(
     the newest reading that ended at least `DEFAULT_DELAY_HOURS` before the origin. The quantiles
     are the spread's around the corrected mean.
     """
-    fit = choose_fit(fits=fits, origin=origin)
+    fit = choose_fit(fits=fits, origin=origin)  # ty: ignore[invalid-argument-type]
     window = RunWindow.build(cache=cache, context=context, run=run)
     driven = window.driven_caches(context=context, run=mean_run(run=run), members=[0])[0]
     n_targets = window.window.stop - window.window.start
