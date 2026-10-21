@@ -354,8 +354,8 @@ def figures() -> None:
         figure_reading(
             reading="2",
             title=(
-                "With real residuals, KD and KDS fail the cross-talk reading in most draws, "
-                "GK and KS in fewer"
+                "With real residuals, KD fails the cross-talk reading in most draws, and KDS "
+                "passes in only 57% at S1x3"
             ),
             subtitle=(
                 "Share of draws in which neither the night level nor the day state moves by 25% "
