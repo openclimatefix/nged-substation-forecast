@@ -1,0 +1,546 @@
+Running as unit: run-p2402682-i61150398.scope; invocation ID: 6ac2e04dd33649b2a13124ab6714837f
+rows by site: [{'site': 'D10', 'len': 100483}, {'site': 'D11', 'len': 97046}, {'site': 'D14', 'len': 97856}, {'site': 'D16', 'len': 97908}, {'site': 'D5', 'len': 95939}, {'site': 'D9', 'len': 97000}]
+stack rows (every scored row with a reading): 586232
+shared with BG2: 581078
+in_logged rows: 27095 share 0.0462
+in_switching_filter rows: 23188 share 0.0396
+MASK_NEW: alarm active at the forecast origin on 86049 rows (0.147); 72 h post-end on 1216 rows (0.002)
+   active share by site: {'D10': 0.139, 'D11': 0.138, 'D14': 0.132, 'D16': 0.152, 'D5': 0.322, 'D9': 0.0}
+MASK_RONC: alarm active at the forecast origin on 59590 rows (0.102); 72 h post-end on 736 rows (0.001)
+   active share by site: {'D10': 0.177, 'D11': 0.031, 'D14': 0.017, 'D16': 0.128, 'D5': 0.081, 'D9': 0.173}
+MASK_UNION: alarm active at the forecast origin on 130059 rows (0.222); 72 h post-end on 1651 rows (0.003)
+   active share by site: {'D10': 0.286, 'D11': 0.159, 'D14': 0.145, 'D16': 0.211, 'D5': 0.357, 'D9': 0.173}
+MASK_GATED: alarm active at the forecast origin on 60394 rows (0.103); 72 h post-end on 707 rows (0.001)
+   active share by site: {'D10': 0.102, 'D11': 0.097, 'D14': 0.053, 'D16': 0.137, 'D5': 0.231, 'D9': 0.0}
+
+== OUTSIDE events: not within a logged transfer from onset to 72 h after its end ==
+rows 559137 (163's narrower rows, also outside hand-filtered switching: 556965 )
+outside all 559137 shared-row means: {'K0': 2.725, 'GAM_ONLY': 3.029, 'MASK_NEW': 2.758, 'MASK_RONC': 2.986, 'MASK_UNION': 2.826, 'MASK_GATED': 2.733, 'SOFT_F10': 2.724, 'SOFT_F100': 2.724, 'SOFT_F1000': 2.727, 'SOFT_F10000': 2.744, 'SOFT_F100000': 2.759, 'SOFT_F1000000': 2.757, 'BG2': 2.693, 'MANUAL': 3.39, 'CLIM': 3.652, 'ARM_C': 2.664}
+   MASK_UNION minus K0 +0.102 (-0.013 to +0.208)
+   MASK_NEW minus K0 +0.033 (-0.042 to +0.105)
+   MASK_RONC minus K0 +0.261 (+0.094 to +0.486)
+   GAM_ONLY minus K0 +0.304 (+0.191 to +0.429)
+   MASK_GATED minus K0 +0.009 (-0.068 to +0.081)
+   MASK_GATED minus MASK_UNION -0.093 (-0.176 to -0.023)
+   MASK_GATED minus BG2 +0.041 (-0.123 to +0.206)
+   SOFT_F10 minus K0 -0.000 (-0.000 to +0.000)
+   SOFT_F100 minus K0 -0.000 (-0.001 to +0.001)
+   SOFT_F1000 minus K0 +0.003 (-0.001 to +0.007)
+   SOFT_F10000 minus K0 +0.020 (+0.007 to +0.036)
+   SOFT_F100000 minus K0 +0.034 (+0.003 to +0.076)
+   SOFT_F1000000 minus K0 +0.033 (-0.036 to +0.099)
+   SOFT_F10 minus MASK_UNION -0.102 (-0.208 to +0.013)
+   SOFT_F100 minus MASK_UNION -0.102 (-0.208 to +0.013)
+   SOFT_F1000 minus MASK_UNION -0.099 (-0.205 to +0.017)
+   SOFT_F10000 minus MASK_UNION -0.082 (-0.188 to +0.038)
+   SOFT_F100000 minus MASK_UNION -0.067 (-0.160 to +0.027)
+   SOFT_F1000000 minus MASK_UNION -0.069 (-0.151 to -0.002)
+   SOFT_F10 minus MASK_GATED -0.009 (-0.081 to +0.068)
+   SOFT_F100 minus MASK_GATED -0.009 (-0.081 to +0.069)
+   SOFT_F1000 minus MASK_GATED -0.006 (-0.078 to +0.073)
+   SOFT_F10000 minus MASK_GATED +0.011 (-0.054 to +0.092)
+   SOFT_F100000 minus MASK_GATED +0.025 (-0.009 to +0.074)
+   SOFT_F1000000 minus MASK_GATED +0.024 (+0.006 to +0.049)
+   SOFT_F10 minus BG2 +0.032 (-0.114 to +0.187)
+   SOFT_F100 minus BG2 +0.032 (-0.114 to +0.187)
+   SOFT_F1000 minus BG2 +0.035 (-0.111 to +0.190)
+   SOFT_F10000 minus BG2 +0.052 (-0.093 to +0.205)
+   SOFT_F100000 minus BG2 +0.066 (-0.086 to +0.227)
+   SOFT_F1000000 minus BG2 +0.065 (-0.104 to +0.240)
+   K0 minus BG2 +0.032 (-0.114 to +0.187)
+   MASK_UNION minus BG2 +0.134 (-0.074 to +0.345)
+   MASK_NEW minus BG2 +0.065 (-0.108 to +0.244)
+   ARM_C minus BG2 -0.028 (-0.178 to +0.122)
+outside winter 223434 shared-row means: {'K0': 2.723, 'GAM_ONLY': 3.111, 'MASK_NEW': 2.733, 'MASK_RONC': 3.176, 'MASK_UNION': 2.735, 'MASK_GATED': 2.726, 'SOFT_F10': 2.723, 'SOFT_F100': 2.723, 'SOFT_F1000': 2.728, 'SOFT_F10000': 2.755, 'SOFT_F100000': 2.763, 'SOFT_F1000000': 2.737, 'BG2': 2.941, 'MANUAL': 3.899, 'CLIM': 4.285, 'ARM_C': 2.631}
+   MASK_UNION minus K0 +0.012 (-0.217 to +0.208)
+   MASK_NEW minus K0 +0.010 (-0.180 to +0.195)
+   MASK_RONC minus K0 +0.454 (+0.076 to +0.907)
+   GAM_ONLY minus K0 +0.388 (+0.156 to +0.622)
+   MASK_GATED minus K0 +0.003 (-0.191 to +0.188)
+   MASK_GATED minus MASK_UNION -0.009 (-0.040 to +0.028)
+   MASK_GATED minus BG2 -0.216 (-0.380 to -0.031)
+   SOFT_F10 minus K0 -0.000 (-0.000 to +0.000)
+   SOFT_F100 minus K0 +0.001 (-0.002 to +0.004)
+   SOFT_F1000 minus K0 +0.006 (-0.002 to +0.016)
+   SOFT_F10000 minus K0 +0.033 (+0.004 to +0.065)
+   SOFT_F100000 minus K0 +0.040 (-0.030 to +0.142)
+   SOFT_F1000000 minus K0 +0.015 (-0.159 to +0.188)
+   SOFT_F10 minus MASK_UNION -0.012 (-0.208 to +0.217)
+   SOFT_F100 minus MASK_UNION -0.012 (-0.207 to +0.220)
+   SOFT_F1000 minus MASK_UNION -0.006 (-0.201 to +0.230)
+   SOFT_F10000 minus MASK_UNION +0.020 (-0.158 to +0.261)
+   SOFT_F100000 minus MASK_UNION +0.028 (-0.072 to +0.185)
+   SOFT_F1000000 minus MASK_UNION +0.002 (-0.038 to +0.060)
+   SOFT_F10 minus MASK_GATED -0.003 (-0.188 to +0.192)
+   SOFT_F100 minus MASK_GATED -0.002 (-0.188 to +0.195)
+   SOFT_F1000 minus MASK_GATED +0.003 (-0.179 to +0.204)
+   SOFT_F10000 minus MASK_GATED +0.030 (-0.137 to +0.232)
+   SOFT_F100000 minus MASK_GATED +0.037 (-0.046 to +0.157)
+   SOFT_F1000000 minus MASK_GATED +0.012 (-0.001 to +0.034)
+   SOFT_F10 minus BG2 -0.219 (-0.248 to -0.178)
+   SOFT_F100 minus BG2 -0.218 (-0.249 to -0.175)
+   SOFT_F1000 minus BG2 -0.213 (-0.249 to -0.164)
+   SOFT_F10000 minus BG2 -0.186 (-0.242 to -0.119)
+   SOFT_F100000 minus BG2 -0.178 (-0.237 to -0.070)
+   SOFT_F1000000 minus BG2 -0.204 (-0.348 to -0.031)
+   K0 minus BG2 -0.219 (-0.247 to -0.179)
+   MASK_UNION minus BG2 -0.207 (-0.407 to -0.004)
+   MASK_NEW minus BG2 -0.209 (-0.369 to -0.024)
+   ARM_C minus BG2 -0.311 (-0.373 to -0.246)
+outside other 335703 shared-row means: {'K0': 2.726, 'GAM_ONLY': 2.974, 'MASK_NEW': 2.775, 'MASK_RONC': 2.859, 'MASK_UNION': 2.887, 'MASK_GATED': 2.739, 'SOFT_F10': 2.726, 'SOFT_F100': 2.725, 'SOFT_F1000': 2.726, 'SOFT_F10000': 2.737, 'SOFT_F100000': 2.756, 'SOFT_F1000000': 2.771, 'BG2': 2.527, 'MANUAL': 3.05, 'CLIM': 3.23, 'ARM_C': 2.687}
+   MASK_UNION minus K0 +0.161 (+0.063 to +0.272)
+   MASK_NEW minus K0 +0.049 (+0.018 to +0.089)
+   MASK_RONC minus K0 +0.133 (+0.033 to +0.245)
+   GAM_ONLY minus K0 +0.248 (+0.146 to +0.352)
+   MASK_GATED minus K0 +0.013 (+0.000 to +0.032)
+   MASK_GATED minus MASK_UNION -0.149 (-0.264 to -0.047)
+   MASK_GATED minus BG2 +0.212 (+0.065 to +0.365)
+   SOFT_F10 minus K0 -0.000 (-0.000 to -0.000)
+   SOFT_F100 minus K0 -0.001 (-0.002 to -0.000)
+   SOFT_F1000 minus K0 +0.001 (-0.002 to +0.004)
+   SOFT_F10000 minus K0 +0.011 (+0.003 to +0.022)
+   SOFT_F100000 minus K0 +0.030 (+0.011 to +0.051)
+   SOFT_F1000000 minus K0 +0.045 (+0.017 to +0.080)
+   SOFT_F10 minus MASK_UNION -0.162 (-0.272 to -0.064)
+   SOFT_F100 minus MASK_UNION -0.162 (-0.272 to -0.065)
+   SOFT_F1000 minus MASK_UNION -0.161 (-0.270 to -0.064)
+   SOFT_F10000 minus MASK_UNION -0.150 (-0.263 to -0.052)
+   SOFT_F100000 minus MASK_UNION -0.131 (-0.246 to -0.033)
+   SOFT_F1000000 minus MASK_UNION -0.117 (-0.232 to -0.023)
+   SOFT_F10 minus MASK_GATED -0.013 (-0.032 to -0.000)
+   SOFT_F100 minus MASK_GATED -0.014 (-0.032 to -0.001)
+   SOFT_F1000 minus MASK_GATED -0.012 (-0.029 to -0.001)
+   SOFT_F10000 minus MASK_GATED -0.002 (-0.012 to +0.008)
+   SOFT_F100000 minus MASK_GATED +0.017 (+0.004 to +0.038)
+   SOFT_F1000000 minus MASK_GATED +0.032 (+0.008 to +0.070)
+   SOFT_F10 minus BG2 +0.199 (+0.049 to +0.351)
+   SOFT_F100 minus BG2 +0.198 (+0.048 to +0.350)
+   SOFT_F1000 minus BG2 +0.199 (+0.051 to +0.351)
+   SOFT_F10000 minus BG2 +0.210 (+0.062 to +0.363)
+   SOFT_F100000 minus BG2 +0.229 (+0.075 to +0.388)
+   SOFT_F1000000 minus BG2 +0.244 (+0.082 to +0.414)
+   K0 minus BG2 +0.199 (+0.049 to +0.352)
+   MASK_UNION minus BG2 +0.360 (+0.168 to +0.562)
+   MASK_NEW minus BG2 +0.248 (+0.083 to +0.423)
+   ARM_C minus BG2 +0.160 (+0.056 to +0.278)
+outside_163rows all 556965 shared-row means: {'K0': 2.725, 'GAM_ONLY': 3.03, 'MASK_NEW': 2.759, 'MASK_RONC': 2.986, 'MASK_UNION': 2.827, 'MASK_GATED': 2.734, 'SOFT_F10': 2.725, 'SOFT_F100': 2.725, 'SOFT_F1000': 2.728, 'SOFT_F10000': 2.745, 'SOFT_F100000': 2.76, 'SOFT_F1000000': 2.758, 'BG2': 2.693, 'MANUAL': 3.391, 'CLIM': 3.654, 'ARM_C': 2.666}
+   MASK_UNION minus K0 +0.102 (-0.013 to +0.208)
+   MASK_NEW minus K0 +0.033 (-0.043 to +0.105)
+   MASK_RONC minus K0 +0.260 (+0.093 to +0.485)
+   GAM_ONLY minus K0 +0.304 (+0.192 to +0.429)
+   MASK_GATED minus K0 +0.009 (-0.068 to +0.081)
+   MASK_GATED minus MASK_UNION -0.093 (-0.177 to -0.023)
+   MASK_GATED minus BG2 +0.041 (-0.123 to +0.207)
+   SOFT_F10 minus K0 -0.000 (-0.000 to +0.000)
+   SOFT_F100 minus K0 -0.000 (-0.001 to +0.001)
+   SOFT_F1000 minus K0 +0.003 (-0.001 to +0.007)
+   SOFT_F10000 minus K0 +0.020 (+0.007 to +0.036)
+   SOFT_F100000 minus K0 +0.034 (+0.003 to +0.076)
+   SOFT_F1000000 minus K0 +0.033 (-0.036 to +0.100)
+   SOFT_F10 minus MASK_UNION -0.102 (-0.208 to +0.013)
+   SOFT_F100 minus MASK_UNION -0.102 (-0.209 to +0.013)
+   SOFT_F1000 minus MASK_UNION -0.099 (-0.206 to +0.017)
+   SOFT_F10000 minus MASK_UNION -0.082 (-0.189 to +0.038)
+   SOFT_F100000 minus MASK_UNION -0.067 (-0.160 to +0.027)
+   SOFT_F1000000 minus MASK_UNION -0.069 (-0.151 to -0.001)
+   SOFT_F10 minus MASK_GATED -0.009 (-0.081 to +0.068)
+   SOFT_F100 minus MASK_GATED -0.009 (-0.082 to +0.069)
+   SOFT_F1000 minus MASK_GATED -0.006 (-0.078 to +0.074)
+   SOFT_F10000 minus MASK_GATED +0.011 (-0.054 to +0.092)
+   SOFT_F100000 minus MASK_GATED +0.026 (-0.009 to +0.075)
+   SOFT_F1000000 minus MASK_GATED +0.024 (+0.007 to +0.049)
+   SOFT_F10 minus BG2 +0.032 (-0.114 to +0.188)
+   SOFT_F100 minus BG2 +0.032 (-0.114 to +0.188)
+   SOFT_F1000 minus BG2 +0.035 (-0.111 to +0.191)
+   SOFT_F10000 minus BG2 +0.052 (-0.093 to +0.206)
+   SOFT_F100000 minus BG2 +0.067 (-0.086 to +0.228)
+   SOFT_F1000000 minus BG2 +0.065 (-0.104 to +0.241)
+   K0 minus BG2 +0.033 (-0.114 to +0.188)
+   MASK_UNION minus BG2 +0.135 (-0.074 to +0.347)
+   MASK_NEW minus BG2 +0.066 (-0.108 to +0.245)
+   ARM_C minus BG2 -0.027 (-0.177 to +0.122)
+outside_163rows winter 221848 shared-row means: {'K0': 2.724, 'GAM_ONLY': 3.112, 'MASK_NEW': 2.734, 'MASK_RONC': 3.177, 'MASK_UNION': 2.736, 'MASK_GATED': 2.727, 'SOFT_F10': 2.724, 'SOFT_F100': 2.725, 'SOFT_F1000': 2.73, 'SOFT_F10000': 2.757, 'SOFT_F100000': 2.765, 'SOFT_F1000000': 2.739, 'BG2': 2.943, 'MANUAL': 3.904, 'CLIM': 4.292, 'ARM_C': 2.634}
+   MASK_UNION minus K0 +0.012 (-0.218 to +0.209)
+   MASK_NEW minus K0 +0.010 (-0.181 to +0.197)
+   MASK_RONC minus K0 +0.453 (+0.076 to +0.906)
+   GAM_ONLY minus K0 +0.387 (+0.155 to +0.623)
+   MASK_GATED minus K0 +0.003 (-0.192 to +0.190)
+   MASK_GATED minus MASK_UNION -0.009 (-0.039 to +0.028)
+   MASK_GATED minus BG2 -0.216 (-0.381 to -0.026)
+   SOFT_F10 minus K0 -0.000 (-0.000 to +0.000)
+   SOFT_F100 minus K0 +0.001 (-0.002 to +0.004)
+   SOFT_F1000 minus K0 +0.006 (-0.002 to +0.016)
+   SOFT_F10000 minus K0 +0.033 (+0.004 to +0.065)
+   SOFT_F100000 minus K0 +0.041 (-0.030 to +0.143)
+   SOFT_F1000000 minus K0 +0.015 (-0.159 to +0.190)
+   SOFT_F10 minus MASK_UNION -0.012 (-0.209 to +0.219)
+   SOFT_F100 minus MASK_UNION -0.011 (-0.209 to +0.222)
+   SOFT_F1000 minus MASK_UNION -0.006 (-0.202 to +0.231)
+   SOFT_F10000 minus MASK_UNION +0.021 (-0.159 to +0.262)
+   SOFT_F100000 minus MASK_UNION +0.029 (-0.072 to +0.186)
+   SOFT_F1000000 minus MASK_UNION +0.003 (-0.037 to +0.060)
+   SOFT_F10 minus MASK_GATED -0.003 (-0.190 to +0.192)
+   SOFT_F100 minus MASK_GATED -0.002 (-0.190 to +0.195)
+   SOFT_F1000 minus MASK_GATED +0.003 (-0.181 to +0.204)
+   SOFT_F10000 minus MASK_GATED +0.030 (-0.138 to +0.232)
+   SOFT_F100000 minus MASK_GATED +0.038 (-0.046 to +0.158)
+   SOFT_F1000000 minus MASK_GATED +0.012 (-0.001 to +0.034)
+   SOFT_F10 minus BG2 -0.218 (-0.249 to -0.177)
+   SOFT_F100 minus BG2 -0.218 (-0.250 to -0.174)
+   SOFT_F1000 minus BG2 -0.213 (-0.250 to -0.162)
+   SOFT_F10000 minus BG2 -0.186 (-0.243 to -0.118)
+   SOFT_F100000 minus BG2 -0.178 (-0.238 to -0.066)
+   SOFT_F1000000 minus BG2 -0.204 (-0.349 to -0.026)
+   K0 minus BG2 -0.218 (-0.249 to -0.178)
+   MASK_UNION minus BG2 -0.207 (-0.408 to +0.000)
+   MASK_NEW minus BG2 -0.208 (-0.370 to -0.019)
+   ARM_C minus BG2 -0.309 (-0.374 to -0.245)
+outside_163rows other 335117 shared-row means: {'K0': 2.726, 'GAM_ONLY': 2.975, 'MASK_NEW': 2.775, 'MASK_RONC': 2.859, 'MASK_UNION': 2.888, 'MASK_GATED': 2.739, 'SOFT_F10': 2.726, 'SOFT_F100': 2.725, 'SOFT_F1000': 2.727, 'SOFT_F10000': 2.737, 'SOFT_F100000': 2.757, 'SOFT_F1000000': 2.771, 'BG2': 2.527, 'MANUAL': 3.051, 'CLIM': 3.231, 'ARM_C': 2.687}
+   MASK_UNION minus K0 +0.162 (+0.064 to +0.272)
+   MASK_NEW minus K0 +0.049 (+0.018 to +0.089)
+   MASK_RONC minus K0 +0.133 (+0.033 to +0.245)
+   GAM_ONLY minus K0 +0.249 (+0.147 to +0.352)
+   MASK_GATED minus K0 +0.013 (+0.000 to +0.032)
+   MASK_GATED minus MASK_UNION -0.149 (-0.264 to -0.047)
+   MASK_GATED minus BG2 +0.212 (+0.064 to +0.365)
+   SOFT_F10 minus K0 -0.000 (-0.000 to -0.000)
+   SOFT_F100 minus K0 -0.001 (-0.002 to -0.000)
+   SOFT_F1000 minus K0 +0.001 (-0.002 to +0.004)
+   SOFT_F10000 minus K0 +0.011 (+0.003 to +0.022)
+   SOFT_F100000 minus K0 +0.030 (+0.011 to +0.051)
+   SOFT_F1000000 minus K0 +0.045 (+0.017 to +0.080)
+   SOFT_F10 minus MASK_UNION -0.162 (-0.272 to -0.064)
+   SOFT_F100 minus MASK_UNION -0.163 (-0.273 to -0.065)
+   SOFT_F1000 minus MASK_UNION -0.161 (-0.271 to -0.065)
+   SOFT_F10000 minus MASK_UNION -0.150 (-0.263 to -0.052)
+   SOFT_F100000 minus MASK_UNION -0.131 (-0.246 to -0.033)
+   SOFT_F1000000 minus MASK_UNION -0.117 (-0.233 to -0.023)
+   SOFT_F10 minus MASK_GATED -0.013 (-0.032 to -0.000)
+   SOFT_F100 minus MASK_GATED -0.014 (-0.033 to -0.001)
+   SOFT_F1000 minus MASK_GATED -0.012 (-0.029 to -0.001)
+   SOFT_F10000 minus MASK_GATED -0.002 (-0.012 to +0.008)
+   SOFT_F100000 minus MASK_GATED +0.018 (+0.004 to +0.038)
+   SOFT_F1000000 minus MASK_GATED +0.032 (+0.009 to +0.070)
+   SOFT_F10 minus BG2 +0.198 (+0.048 to +0.352)
+   SOFT_F100 minus BG2 +0.198 (+0.047 to +0.351)
+   SOFT_F1000 minus BG2 +0.199 (+0.050 to +0.352)
+   SOFT_F10000 minus BG2 +0.210 (+0.061 to +0.363)
+   SOFT_F100000 minus BG2 +0.229 (+0.074 to +0.388)
+   SOFT_F1000000 minus BG2 +0.244 (+0.081 to +0.414)
+   K0 minus BG2 +0.199 (+0.048 to +0.352)
+   MASK_UNION minus BG2 +0.360 (+0.168 to +0.562)
+   MASK_NEW minus BG2 +0.248 (+0.083 to +0.423)
+   ARM_C minus BG2 +0.160 (+0.056 to +0.279)
+
+== leave one substation out, OUTSIDE, MASK_UNION minus K0 and MASK_NEW minus K0 ==
+D5 left out: +0.129 (+0.017 to +0.243) +0.049 (-0.015 to +0.121) gated +0.023 (-0.037 to +0.095) soft ['-0.000 (-0.000 to +0.000)', '-0.000 (-0.001 to +0.001)', '+0.005 (-0.001 to +0.013)', '+0.030 (+0.006 to +0.063)', '+0.050 (+0.018 to +0.095)', '+0.049 (-0.008 to +0.115)']
+D10 left out: +0.070 (-0.050 to +0.187) -0.013 (-0.082 to +0.024) gated -0.024 (-0.091 to +0.012) soft ['-0.000 (-0.000 to +0.000)', '-0.000 (-0.001 to +0.001)', '+0.002 (-0.001 to +0.007)', '+0.011 (+0.003 to +0.024)', '+0.006 (-0.012 to +0.018)', '-0.010 (-0.072 to +0.023)']
+D11 left out: +0.114 (-0.021 to +0.235) +0.031 (-0.058 to +0.114) gated +0.007 (-0.084 to +0.089) soft ['-0.000 (-0.000 to +0.000)', '-0.000 (-0.002 to +0.001)', '+0.003 (-0.001 to +0.008)', '+0.022 (+0.007 to +0.041)', '+0.036 (-0.000 to +0.082)', '+0.031 (-0.049 to +0.108)']
+D14 left out: +0.118 (-0.019 to +0.246) +0.038 (-0.054 to +0.125) gated +0.010 (-0.083 to +0.097) soft ['-0.000 (-0.000 to +0.000)', '-0.000 (-0.001 to +0.001)', '+0.003 (-0.001 to +0.008)', '+0.022 (+0.006 to +0.042)', '+0.039 (+0.001 to +0.090)', '+0.037 (-0.046 to +0.118)']
+D16 left out: +0.111 (+0.011 to +0.224) +0.054 (-0.008 to +0.129) gated +0.025 (-0.030 to +0.098) soft ['-0.000 (-0.000 to -0.000)', '-0.001 (-0.002 to -0.000)', '+0.000 (-0.004 to +0.004)', '+0.009 (-0.016 to +0.032)', '+0.033 (-0.015 to +0.087)', '+0.050 (-0.009 to +0.121)']
+D9 left out: +0.068 (-0.050 to +0.173) +0.040 (-0.051 to +0.127) gated +0.011 (-0.083 to +0.098) soft ['-0.000 (-0.000 to +0.000)', '-0.000 (-0.002 to +0.001)', '+0.003 (-0.001 to +0.009)', '+0.024 (+0.008 to +0.044)', '+0.042 (+0.004 to +0.092)', '+0.040 (-0.044 to +0.121)']
+
+== per substation, OUTSIDE, mean score ==
+D5 {'K0': 3.477, 'MASK_NEW': 3.42, 'MASK_UNION': 3.425, 'MASK_GATED': 3.404, 'SOFT_F10': 3.477, 'SOFT_F100': 3.476, 'SOFT_F1000': 3.468, 'SOFT_F10000': 3.437, 'SOFT_F100000': 3.421, 'SOFT_F1000000': 3.42, 'GAM_ONLY': 4.006}
+D10 {'K0': 3.375, 'MASK_NEW': 3.631, 'MASK_UNION': 3.63, 'MASK_GATED': 3.541, 'SOFT_F10': 3.375, 'SOFT_F100': 3.374, 'SOFT_F1000': 3.38, 'SOFT_F10000': 3.435, 'SOFT_F100000': 3.545, 'SOFT_F1000000': 3.615, 'GAM_ONLY': 3.524}
+D11 {'K0': 2.386, 'MASK_NEW': 2.431, 'MASK_UNION': 2.43, 'MASK_GATED': 2.402, 'SOFT_F10': 2.386, 'SOFT_F100': 2.386, 'SOFT_F1000': 2.387, 'SOFT_F10000': 2.394, 'SOFT_F100000': 2.414, 'SOFT_F1000000': 2.428, 'GAM_ONLY': 2.698}
+D14 {'K0': 2.152, 'MASK_NEW': 2.164, 'MASK_UNION': 2.173, 'MASK_GATED': 2.156, 'SOFT_F10': 2.152, 'SOFT_F100': 2.151, 'SOFT_F1000': 2.155, 'SOFT_F10000': 2.162, 'SOFT_F100000': 2.164, 'SOFT_F1000000': 2.164, 'GAM_ONLY': 2.538}
+D16 {'K0': 2.628, 'MASK_NEW': 2.555, 'MASK_UNION': 2.68, 'MASK_GATED': 2.553, 'SOFT_F10': 2.628, 'SOFT_F100': 2.629, 'SOFT_F1000': 2.643, 'SOFT_F10000': 2.703, 'SOFT_F100000': 2.669, 'SOFT_F1000000': 2.571, 'GAM_ONLY': 2.963}
+D9 {'K0': 2.432, 'MASK_NEW': 2.432, 'MASK_UNION': 2.697, 'MASK_GATED': 2.432, 'SOFT_F10': 2.432, 'SOFT_F100': 2.432, 'SOFT_F1000': 2.432, 'SOFT_F10000': 2.432, 'SOFT_F100000': 2.432, 'SOFT_F1000000': 2.432, 'GAM_ONLY': 2.579}
+
+== rows by the alarm active at the forecast origin (descriptive) ==
+MASK_NEW active all rows                  rows  86049 {'MASK_NEW': 4.512, 'K0': 3.946, 'GAM_ONLY': 4.752, 'BG2': 3.914} minus K0 +0.594 (+0.168 to +1.223) minus BG2 +0.599 (+0.075 to +1.304)
+MASK_NEW post   all rows                  rows   1216 {'MASK_NEW': 2.568, 'K0': 2.484, 'GAM_ONLY': 3.115, 'BG2': 2.447} minus K0 +0.091 (+0.022 to +0.163) minus BG2 +0.122 (-0.182 to +0.387)
+MASK_NEW active outside logged transfers  rows  68539 {'MASK_NEW': 3.386, 'K0': 3.127, 'GAM_ONLY': 3.393, 'BG2': 3.042} minus K0 +0.258 (-0.339 to +0.896) minus BG2 +0.344 (-0.267 to +0.960)
+MASK_NEW post   outside logged transfers  rows   1178 {'MASK_NEW': 2.578, 'K0': 2.492, 'GAM_ONLY': 3.135, 'BG2': 2.449} minus K0 +0.085 (+0.014 to +0.152) minus BG2 +0.129 (-0.179 to +0.392)
+MASK_UNION active all rows                  rows 130059 {'MASK_UNION': 4.336, 'K0': 3.598, 'GAM_ONLY': 4.292, 'BG2': 3.563} minus K0 +0.718 (+0.315 to +1.202) minus BG2 +0.773 (+0.310 to +1.338)
+MASK_UNION post   all rows                  rows   1651 {'MASK_UNION': 2.556, 'K0': 2.725, 'GAM_ONLY': 3.362, 'BG2': 2.731} minus K0 -0.161 (-0.381 to +0.019) minus BG2 -0.175 (-0.545 to +0.136)
+MASK_UNION active outside logged transfers  rows 111159 {'MASK_UNION': 3.475, 'K0': 2.979, 'GAM_ONLY': 3.279, 'BG2': 2.892} minus K0 +0.496 (-0.066 to +1.090) minus BG2 +0.584 (+0.015 to +1.191)
+MASK_UNION post   outside logged transfers  rows   1613 {'MASK_UNION': 2.563, 'K0': 2.734, 'GAM_ONLY': 3.38, 'BG2': 2.737} minus K0 -0.171 (-0.395 to +0.011) minus BG2 -0.174 (-0.549 to +0.141)
+MASK_GATED active all rows                  rows  60394 {'MASK_GATED': 5.01, 'K0': 4.414, 'GAM_ONLY': 5.384, 'BG2': 4.401} minus K0 +0.599 (+0.095 to +1.417) minus BG2 +0.609 (-0.033 to +1.482)
+MASK_GATED post   all rows                  rows    707 {'MASK_GATED': 2.467, 'K0': 2.367, 'GAM_ONLY': 2.994, 'BG2': 2.427} minus K0 +0.106 (+0.041 to +0.233) minus BG2 +0.040 (-0.345 to +0.310)
+MASK_GATED active outside logged transfers  rows  44216 {'MASK_GATED': 3.389, 'K0': 3.274, 'GAM_ONLY': 3.441, 'BG2': 3.177} minus K0 +0.116 (-0.816 to +1.005) minus BG2 +0.212 (-0.655 to +1.000)
+MASK_GATED post   outside logged transfers  rows    693 {'MASK_GATED': 2.467, 'K0': 2.367, 'GAM_ONLY': 2.994, 'BG2': 2.427} minus K0 +0.100 (+0.033 to +0.221) minus BG2 +0.040 (-0.345 to +0.310)
+OUTSIDE and no MASK_NEW alarm active or post: MASK_NEW minus K0 +0.002 (-0.000 to +0.003) rows 489420
+OUTSIDE and no MASK_UNION alarm active or post: MASK_UNION minus K0 +0.004 (+0.001 to +0.010) rows 446365
+OUTSIDE and no MASK_GATED alarm active or post: MASK_GATED minus K0 -0.000 (-0.001 to +0.001) rows 514228
+
+== logged transfers: row sets and cards ==
+shape: (3, 4)
+┌────────┬───────┬───────┬────────┐
+│ set    ┆ rows  ┆ cards ┆ events │
+│ ---    ┆ ---   ┆ ---   ┆ ---    │
+│ str    ┆ u32   ┆ u32   ┆ u32    │
+╞════════╪═══════╪═══════╪════════╡
+│ INSIDE ┆ 12540 ┆ 5     ┆ 6      │
+│ BEFORE ┆ 2440  ┆ 2     ┆ 2      │
+│ AFTER  ┆ 5993  ┆ 11    ┆ 13     │
+└────────┴───────┴───────┴────────┘
+shared all BEFORE rows 11 cards 1 {'K0': 19.212, 'GAM_ONLY': 23.272, 'MASK_NEW': 19.212, 'MASK_RONC': 19.212, 'MASK_UNION': 19.212, 'MASK_GATED': 19.212, 'SOFT_F10': 19.212, 'SOFT_F100': 19.212, 'SOFT_F1000': 19.212, 'SOFT_F10000': 19.212, 'SOFT_F100000': 19.212, 'SOFT_F1000000': 19.212, 'BG2': 16.153, 'MANUAL': 14.13, 'CLIM': 23.999, 'ARM_C': 19.837, 'ORACLE': 19.212}
+shared other BEFORE rows 11 cards 1 {'K0': 19.212, 'GAM_ONLY': 23.272, 'MASK_NEW': 19.212, 'MASK_RONC': 19.212, 'MASK_UNION': 19.212, 'MASK_GATED': 19.212, 'SOFT_F10': 19.212, 'SOFT_F100': 19.212, 'SOFT_F1000': 19.212, 'SOFT_F10000': 19.212, 'SOFT_F100000': 19.212, 'SOFT_F1000000': 19.212, 'BG2': 16.153, 'MANUAL': 14.13, 'CLIM': 23.999, 'ARM_C': 19.837, 'ORACLE': 19.212}
+shared all INSIDE rows 12168 cards 3 {'K0': 5.942, 'GAM_ONLY': 12.326, 'MASK_NEW': 10.694, 'MASK_RONC': 11.513, 'MASK_UNION': 11.319, 'MASK_GATED': 10.694, 'SOFT_F10': 5.95, 'SOFT_F100': 6.024, 'SOFT_F1000': 6.572, 'SOFT_F10000': 8.148, 'SOFT_F100000': 9.94, 'SOFT_F1000000': 10.599, 'BG2': 7.378, 'MANUAL': 10.239, 'CLIM': 10.163, 'ARM_C': 6.212, 'ORACLE': 10.401}
+shared winter INSIDE rows 12153 cards 2 {'K0': 5.928, 'GAM_ONLY': 12.319, 'MASK_NEW': 10.686, 'MASK_RONC': 11.506, 'MASK_UNION': 11.312, 'MASK_GATED': 10.686, 'SOFT_F10': 5.936, 'SOFT_F100': 6.01, 'SOFT_F1000': 6.559, 'SOFT_F10000': 8.137, 'SOFT_F100000': 9.931, 'SOFT_F1000000': 10.591, 'BG2': 7.368, 'MANUAL': 10.229, 'CLIM': 10.151, 'ARM_C': 6.198, 'ORACLE': 10.393}
+shared other INSIDE rows 15 cards 1 {'K0': 17.184, 'GAM_ONLY': 17.699, 'MASK_NEW': 17.184, 'MASK_RONC': 17.184, 'MASK_UNION': 17.184, 'MASK_GATED': 17.184, 'SOFT_F10': 17.184, 'SOFT_F100': 17.184, 'SOFT_F1000': 17.184, 'SOFT_F10000': 17.184, 'SOFT_F100000': 17.184, 'SOFT_F1000000': 17.184, 'BG2': 15.602, 'MANUAL': 18.254, 'CLIM': 19.622, 'ARM_C': 17.729, 'ORACLE': 17.184}
+shared all AFTER rows 3675 cards 7 {'K0': 13.686, 'GAM_ONLY': 6.936, 'MASK_NEW': 6.321, 'MASK_RONC': 7.406, 'MASK_UNION': 6.307, 'MASK_GATED': 6.336, 'SOFT_F10': 13.684, 'SOFT_F100': 13.64, 'SOFT_F1000': 13.155, 'SOFT_F10000': 10.862, 'SOFT_F100000': 7.406, 'SOFT_F1000000': 6.406, 'BG2': 10.091, 'MANUAL': 7.649, 'CLIM': 7.494, 'ARM_C': 12.44, 'ORACLE': 6.354}
+shared winter AFTER rows 3255 cards 5 {'K0': 15.017, 'GAM_ONLY': 7.522, 'MASK_NEW': 6.765, 'MASK_RONC': 7.927, 'MASK_UNION': 6.749, 'MASK_GATED': 6.785, 'SOFT_F10': 15.017, 'SOFT_F100': 14.981, 'SOFT_F1000': 14.469, 'SOFT_F10000': 11.891, 'SOFT_F100000': 7.99, 'SOFT_F1000000': 6.862, 'BG2': 10.997, 'MANUAL': 8.115, 'CLIM': 8.149, 'ARM_C': 13.616, 'ORACLE': 6.824}
+shared other AFTER rows 420 cards 2 {'K0': 3.368, 'GAM_ONLY': 2.388, 'MASK_NEW': 2.876, 'MASK_RONC': 3.368, 'MASK_UNION': 2.876, 'MASK_GATED': 2.857, 'SOFT_F10': 3.353, 'SOFT_F100': 3.247, 'SOFT_F1000': 2.969, 'SOFT_F10000': 2.884, 'SOFT_F100000': 2.877, 'SOFT_F1000000': 2.876, 'BG2': 3.073, 'MANUAL': 4.035, 'CLIM': 2.417, 'ARM_C': 3.323, 'ORACLE': 2.71}
+stack_only all BEFORE rows 2440 cards 2 {'K0': 2.932, 'GAM_ONLY': 3.693, 'MASK_NEW': 2.932, 'MASK_RONC': 2.932, 'MASK_UNION': 2.932, 'MASK_GATED': 2.932, 'SOFT_F10': 2.932, 'SOFT_F100': 2.932, 'SOFT_F1000': 2.932, 'SOFT_F10000': 2.932, 'SOFT_F100000': 2.932, 'SOFT_F1000000': 2.932, 'BG2': 16.153, 'MANUAL': 14.13, 'CLIM': 23.999, 'ARM_C': 19.837, 'ORACLE': 4.364}
+stack_only other BEFORE rows 2440 cards 2 {'K0': 2.932, 'GAM_ONLY': 3.693, 'MASK_NEW': 2.932, 'MASK_RONC': 2.932, 'MASK_UNION': 2.932, 'MASK_GATED': 2.932, 'SOFT_F10': 2.932, 'SOFT_F100': 2.932, 'SOFT_F1000': 2.932, 'SOFT_F10000': 2.932, 'SOFT_F100000': 2.932, 'SOFT_F1000000': 2.932, 'BG2': 16.153, 'MANUAL': 14.13, 'CLIM': 23.999, 'ARM_C': 19.837, 'ORACLE': 4.364}
+stack_only all INSIDE rows 12540 cards 5 {'K0': 5.838, 'GAM_ONLY': 12.151, 'MASK_NEW': 10.494, 'MASK_RONC': 11.303, 'MASK_UNION': 11.156, 'MASK_GATED': 10.463, 'SOFT_F10': 5.847, 'SOFT_F100': 5.923, 'SOFT_F1000': 6.465, 'SOFT_F10000': 8.008, 'SOFT_F100000': 9.758, 'SOFT_F1000000': 10.401, 'BG2': 7.378, 'MANUAL': 10.239, 'CLIM': 10.163, 'ARM_C': 6.212, 'ORACLE': 10.238}
+stack_only winter INSIDE rows 12153 cards 2 {'K0': 5.928, 'GAM_ONLY': 12.319, 'MASK_NEW': 10.686, 'MASK_RONC': 11.506, 'MASK_UNION': 11.312, 'MASK_GATED': 10.686, 'SOFT_F10': 5.936, 'SOFT_F100': 6.01, 'SOFT_F1000': 6.559, 'SOFT_F10000': 8.137, 'SOFT_F100000': 9.931, 'SOFT_F1000000': 10.591, 'BG2': 7.368, 'MANUAL': 10.229, 'CLIM': 10.151, 'ARM_C': 6.198, 'ORACLE': 10.393}
+stack_only other INSIDE rows 387 cards 3 {'K0': 3.035, 'GAM_ONLY': 6.852, 'MASK_NEW': 4.46, 'MASK_RONC': 4.946, 'MASK_UNION': 6.264, 'MASK_GATED': 3.472, 'SOFT_F10': 3.056, 'SOFT_F100': 3.17, 'SOFT_F1000': 3.49, 'SOFT_F10000': 3.936, 'SOFT_F100000': 4.335, 'SOFT_F1000000': 4.445, 'BG2': 15.602, 'MANUAL': 18.254, 'CLIM': 19.622, 'ARM_C': 17.729, 'ORACLE': 5.358}
+stack_only all AFTER rows 5993 cards 11 {'K0': 10.129, 'GAM_ONLY': 5.218, 'MASK_NEW': 6.083, 'MASK_RONC': 5.734, 'MASK_UNION': 5.177, 'MASK_GATED': 5.752, 'SOFT_F10': 10.13, 'SOFT_F100': 10.11, 'SOFT_F1000': 9.858, 'SOFT_F10000': 8.612, 'SOFT_F100000': 6.679, 'SOFT_F1000000': 6.127, 'BG2': 10.091, 'MANUAL': 7.649, 'CLIM': 7.494, 'ARM_C': 12.44, 'ORACLE': 4.79}
+stack_only winter AFTER rows 3329 cards 6 {'K0': 14.717, 'GAM_ONLY': 7.424, 'MASK_NEW': 6.648, 'MASK_RONC': 7.784, 'MASK_UNION': 6.633, 'MASK_GATED': 6.668, 'SOFT_F10': 14.717, 'SOFT_F100': 14.682, 'SOFT_F1000': 14.181, 'SOFT_F10000': 11.661, 'SOFT_F100000': 7.846, 'SOFT_F1000000': 6.743, 'BG2': 10.997, 'MANUAL': 8.115, 'CLIM': 8.149, 'ARM_C': 13.616, 'ORACLE': 6.705}
+stack_only other AFTER rows 2664 cards 5 {'K0': 4.397, 'GAM_ONLY': 2.462, 'MASK_NEW': 5.376, 'MASK_RONC': 3.172, 'MASK_UNION': 3.358, 'MASK_GATED': 4.607, 'SOFT_F10': 4.399, 'SOFT_F100': 4.396, 'SOFT_F1000': 4.455, 'SOFT_F10000': 4.801, 'SOFT_F100000': 5.221, 'SOFT_F1000000': 5.357, 'BG2': 3.073, 'MANUAL': 4.035, 'CLIM': 2.417, 'ARM_C': 3.323, 'ORACLE': 2.397}
+
+== C2 to C5 contrasts by logged-transfer row set (resampling transfers) ==
+BEFORE stack_only MASK_UNION minus K0 +0.000 (+0.000 to +0.000) cards 2
+BEFORE stack_only MASK_NEW minus K0 +0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only GAM_ONLY minus K0 +0.761 (+0.746 to +4.060) cards 2
+BEFORE stack_only MASK_GATED minus K0 +0.000 (+0.000 to +0.000) cards 2
+BEFORE stack_only MASK_GATED minus MASK_UNION +0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F10 minus K0 +0.000 (+0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F100 minus K0 +0.000 (+0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F1000 minus K0 +0.000 (+0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F10000 minus K0 +0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F100000 minus K0 +0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F1000000 minus K0 +0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F10 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F100 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F1000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F10000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F100000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F1000000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F10 minus MASK_GATED -0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F100 minus MASK_GATED -0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F1000 minus MASK_GATED -0.000 (-0.000 to +0.000) cards 2
+BEFORE stack_only SOFT_F10000 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F100000 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only SOFT_F1000000 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 2
+BEFORE stack_only MASK_UNION minus ORACLE -1.432 (-1.438 to +0.000) cards 2
+BEFORE shared MASK_UNION minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared MASK_NEW minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared GAM_ONLY minus K0 +4.060 (+4.060 to +4.060) cards 1
+BEFORE shared MASK_GATED minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared MASK_GATED minus MASK_UNION +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared MASK_GATED minus BG2 +3.059 (+3.059 to +3.059) cards 1
+BEFORE shared SOFT_F10 minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared SOFT_F100 minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared SOFT_F1000 minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared SOFT_F10000 minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared SOFT_F100000 minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared SOFT_F1000000 minus K0 +0.000 (+0.000 to +0.000) cards 1
+BEFORE shared SOFT_F10 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F100 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F1000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F10000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F100000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F1000000 minus MASK_UNION -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F10 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F100 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F1000 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F10000 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F100000 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared SOFT_F1000000 minus MASK_GATED -0.000 (-0.000 to -0.000) cards 1
+BEFORE shared MASK_UNION minus BG2 +3.059 (+3.059 to +3.059) cards 1
+BEFORE shared MASK_NEW minus BG2 +3.059 (+3.059 to +3.059) cards 1
+BEFORE shared BG2 minus K0 -3.059 (-3.059 to -3.059) cards 1
+BEFORE shared MASK_UNION minus ORACLE +0.000 (+0.000 to +0.000) cards 1
+INSIDE stack_only MASK_UNION minus K0 +5.318 (+2.977 to +6.744) cards 5
+INSIDE stack_only MASK_NEW minus K0 +4.655 (+1.013 to +5.622) cards 5
+INSIDE stack_only GAM_ONLY minus K0 +6.312 (+2.688 to +8.535) cards 5
+INSIDE stack_only MASK_GATED minus K0 +4.625 (+0.282 to +5.620) cards 5
+INSIDE stack_only MASK_GATED minus MASK_UNION -0.693 (-3.118 to -0.069) cards 5
+INSIDE stack_only SOFT_F10 minus K0 +0.009 (+0.006 to +0.028) cards 5
+INSIDE stack_only SOFT_F100 minus K0 +0.084 (+0.071 to +0.179) cards 5
+INSIDE stack_only SOFT_F1000 minus K0 +0.626 (+0.290 to +0.708) cards 5
+INSIDE stack_only SOFT_F10000 minus K0 +2.169 (+0.589 to +2.264) cards 5
+INSIDE stack_only SOFT_F100000 minus K0 +3.919 (+0.899 to +4.429) cards 5
+INSIDE stack_only SOFT_F1000000 minus K0 +4.563 (+0.999 to +5.468) cards 5
+INSIDE stack_only SOFT_F10 minus MASK_UNION -5.309 (-6.738 to -2.948) cards 5
+INSIDE stack_only SOFT_F100 minus MASK_UNION -5.234 (-6.667 to -2.798) cards 5
+INSIDE stack_only SOFT_F1000 minus MASK_UNION -4.692 (-6.061 to -2.370) cards 5
+INSIDE stack_only SOFT_F10000 minus MASK_UNION -3.149 (-4.623 to -1.381) cards 5
+INSIDE stack_only SOFT_F100000 minus MASK_UNION -1.398 (-2.501 to -0.246) cards 5
+INSIDE stack_only SOFT_F1000000 minus MASK_UNION -0.755 (-2.401 to -0.059) cards 5
+INSIDE stack_only SOFT_F10 minus MASK_GATED -4.616 (-5.614 to -0.269) cards 5
+INSIDE stack_only SOFT_F100 minus MASK_GATED -4.541 (-5.543 to -0.196) cards 5
+INSIDE stack_only SOFT_F1000 minus MASK_GATED -3.999 (-4.934 to +0.029) cards 5
+INSIDE stack_only SOFT_F10000 minus MASK_GATED -2.456 (-3.478 to +0.609) cards 5
+INSIDE stack_only SOFT_F100000 minus MASK_GATED -0.705 (-1.189 to +1.085) cards 5
+INSIDE stack_only SOFT_F1000000 minus MASK_GATED -0.062 (-0.150 to +1.201) cards 5
+INSIDE stack_only MASK_UNION minus ORACLE +0.919 (+0.342 to +1.402) cards 5
+INSIDE shared MASK_UNION minus K0 +5.378 (+0.000 to +6.794) cards 3
+INSIDE shared MASK_NEW minus K0 +4.752 (+0.000 to +5.676) cards 3
+INSIDE shared GAM_ONLY minus K0 +6.384 (+0.516 to +8.568) cards 3
+INSIDE shared MASK_GATED minus K0 +4.752 (+0.000 to +5.676) cards 3
+INSIDE shared MASK_GATED minus MASK_UNION -0.625 (-1.117 to +0.000) cards 3
+INSIDE shared MASK_GATED minus BG2 +3.316 (+1.582 to +3.459) cards 3
+INSIDE shared SOFT_F10 minus K0 +0.008 (+0.000 to +0.011) cards 3
+INSIDE shared SOFT_F100 minus K0 +0.083 (+0.000 to +0.088) cards 3
+INSIDE shared SOFT_F1000 minus K0 +0.631 (+0.000 to +0.691) cards 3
+INSIDE shared SOFT_F10000 minus K0 +2.207 (+0.000 to +2.277) cards 3
+INSIDE shared SOFT_F100000 minus K0 +3.998 (+0.000 to +4.466) cards 3
+INSIDE shared SOFT_F1000000 minus K0 +4.657 (+0.000 to +5.520) cards 3
+INSIDE shared SOFT_F10 minus MASK_UNION -5.369 (-6.788 to -0.000) cards 3
+INSIDE shared SOFT_F100 minus MASK_UNION -5.295 (-6.715 to -0.000) cards 3
+INSIDE shared SOFT_F1000 minus MASK_UNION -4.747 (-6.103 to -0.000) cards 3
+INSIDE shared SOFT_F10000 minus MASK_UNION -3.171 (-4.641 to -0.000) cards 3
+INSIDE shared SOFT_F100000 minus MASK_UNION -1.380 (-2.327 to -0.000) cards 3
+INSIDE shared SOFT_F1000000 minus MASK_UNION -0.720 (-1.273 to -0.000) cards 3
+INSIDE shared SOFT_F10 minus MASK_GATED -4.744 (-5.670 to -0.000) cards 3
+INSIDE shared SOFT_F100 minus MASK_GATED -4.670 (-5.598 to -0.000) cards 3
+INSIDE shared SOFT_F1000 minus MASK_GATED -4.122 (-4.985 to -0.000) cards 3
+INSIDE shared SOFT_F10000 minus MASK_GATED -2.546 (-3.523 to -0.000) cards 3
+INSIDE shared SOFT_F100000 minus MASK_GATED -0.754 (-1.210 to -0.000) cards 3
+INSIDE shared SOFT_F1000000 minus MASK_GATED -0.095 (-0.156 to -0.000) cards 3
+INSIDE shared MASK_UNION minus BG2 +3.941 (+1.582 to +4.576) cards 3
+INSIDE shared MASK_NEW minus BG2 +3.316 (+1.582 to +3.459) cards 3
+INSIDE shared BG2 minus K0 +1.437 (-1.582 to +2.218) cards 3
+INSIDE shared MASK_UNION minus ORACLE +0.918 (+0.000 to +1.381) cards 3
+AFTER stack_only MASK_UNION minus K0 -4.952 (-8.405 to +0.027) cards 11
+AFTER stack_only MASK_NEW minus K0 -4.047 (-8.014 to +1.124) cards 11
+AFTER stack_only GAM_ONLY minus K0 -4.911 (-7.675 to -0.764) cards 11
+AFTER stack_only MASK_GATED minus K0 -4.377 (-8.104 to +0.298) cards 11
+AFTER stack_only MASK_GATED minus MASK_UNION +0.575 (-0.210 to +2.248) cards 11
+AFTER stack_only SOFT_F10 minus K0 +0.001 (-0.013 to +0.009) cards 11
+AFTER stack_only SOFT_F100 minus K0 -0.020 (-0.109 to +0.035) cards 11
+AFTER stack_only SOFT_F1000 minus K0 -0.272 (-0.621 to +0.116) cards 11
+AFTER stack_only SOFT_F10000 minus K0 -1.518 (-3.089 to +0.481) cards 11
+AFTER stack_only SOFT_F100000 minus K0 -3.450 (-6.740 to +0.939) cards 11
+AFTER stack_only SOFT_F1000000 minus K0 -4.003 (-7.916 to +1.100) cards 11
+AFTER stack_only SOFT_F10 minus MASK_UNION +4.953 (-0.029 to +8.407) cards 11
+AFTER stack_only SOFT_F100 minus MASK_UNION +4.933 (-0.060 to +8.399) cards 11
+AFTER stack_only SOFT_F1000 minus MASK_UNION +4.681 (-0.117 to +7.975) cards 11
+AFTER stack_only SOFT_F10000 minus MASK_UNION +3.435 (-0.057 to +5.875) cards 11
+AFTER stack_only SOFT_F100000 minus MASK_UNION +1.502 (-0.005 to +3.348) cards 11
+AFTER stack_only SOFT_F1000000 minus MASK_UNION +0.950 (+0.008 to +3.248) cards 11
+AFTER stack_only SOFT_F10 minus MASK_GATED +4.378 (-0.296 to +8.106) cards 11
+AFTER stack_only SOFT_F100 minus MASK_GATED +4.358 (-0.284 to +8.093) cards 11
+AFTER stack_only SOFT_F1000 minus MASK_GATED +4.106 (-0.188 to +7.655) cards 11
+AFTER stack_only SOFT_F10000 minus MASK_GATED +2.860 (+0.039 to +5.435) cards 11
+AFTER stack_only SOFT_F100000 minus MASK_GATED +0.927 (+0.136 to +1.548) cards 11
+AFTER stack_only SOFT_F1000000 minus MASK_GATED +0.375 (+0.020 to +1.013) cards 11
+AFTER stack_only MASK_UNION minus ORACLE +0.387 (-0.072 to +1.099) cards 11
+AFTER shared MASK_UNION minus K0 -7.379 (-9.832 to -0.042) cards 7
+AFTER shared MASK_NEW minus K0 -7.365 (-9.825 to -0.025) cards 7
+AFTER shared GAM_ONLY minus K0 -6.750 (-8.847 to +0.094) cards 7
+AFTER shared MASK_GATED minus K0 -7.349 (-9.822 to +0.007) cards 7
+AFTER shared MASK_GATED minus MASK_UNION +0.030 (-0.001 to +0.104) cards 7
+AFTER shared MASK_GATED minus BG2 -3.755 (-6.041 to +0.069) cards 7
+AFTER shared SOFT_F10 minus K0 -0.002 (-0.022 to +0.011) cards 7
+AFTER shared SOFT_F100 minus K0 -0.045 (-0.176 to +0.033) cards 7
+AFTER shared SOFT_F1000 minus K0 -0.531 (-0.910 to -0.047) cards 7
+AFTER shared SOFT_F10000 minus K0 -2.824 (-4.213 to -0.039) cards 7
+AFTER shared SOFT_F100000 minus K0 -6.280 (-8.257 to -0.027) cards 7
+AFTER shared SOFT_F1000000 minus K0 -7.280 (-9.698 to -0.025) cards 7
+AFTER shared SOFT_F10 minus MASK_UNION +7.377 (+0.037 to +9.836) cards 7
+AFTER shared SOFT_F100 minus MASK_UNION +7.334 (+0.013 to +9.823) cards 7
+AFTER shared SOFT_F1000 minus MASK_UNION +6.848 (-0.024 to +9.286) cards 7
+AFTER shared SOFT_F10000 minus MASK_UNION +4.555 (+0.003 to +6.661) cards 7
+AFTER shared SOFT_F100000 minus MASK_UNION +1.099 (+0.008 to +1.719) cards 7
+AFTER shared SOFT_F1000000 minus MASK_UNION +0.099 (+0.008 to +0.133) cards 7
+AFTER shared SOFT_F10 minus MASK_GATED +7.348 (-0.012 to +9.822) cards 7
+AFTER shared SOFT_F100 minus MASK_GATED +7.304 (-0.038 to +9.814) cards 7
+AFTER shared SOFT_F1000 minus MASK_GATED +6.819 (-0.083 to +9.280) cards 7
+AFTER shared SOFT_F10000 minus MASK_GATED +4.526 (-0.078 to +6.658) cards 7
+AFTER shared SOFT_F100000 minus MASK_GATED +1.069 (-0.079 to +1.714) cards 7
+AFTER shared SOFT_F1000000 minus MASK_GATED +0.070 (-0.082 to +0.127) cards 7
+AFTER shared MASK_UNION minus BG2 -3.785 (-6.045 to +0.001) cards 7
+AFTER shared MASK_NEW minus BG2 -3.771 (-6.041 to +0.016) cards 7
+AFTER shared BG2 minus K0 -3.594 (-5.728 to +0.116) cards 7
+AFTER shared MASK_UNION minus ORACLE -0.048 (-0.140 to +0.249) cards 7
+shape: (13, 16)
+┌───────────┬──────┬──────┬───────┬──────────┬───────────┬───────────┬──────────┬───────────┬───────────┬───────────┬───────────┬───────────┬──────────┬───────┬────────┐
+│ card      ┆ site ┆ rows ┆ K0    ┆ MASK_NEW ┆ MASK_UNI… ┆ MASK_GAT… ┆ SOFT_F10 ┆ SOFT_F10… ┆ SOFT_F10… ┆ SOFT_F10… ┆ SOFT_F10… ┆ SOFT_F10… ┆ GAM_ONLY ┆ BG2   ┆ ORACLE │
+│ ---       ┆ ---  ┆ ---  ┆ ---   ┆ ---      ┆ ---       ┆ ---       ┆ ---      ┆ ---       ┆ ---       ┆ ---       ┆ ---       ┆ ---       ┆ ---      ┆ ---   ┆ ---    │
+│ str       ┆ str  ┆ u32  ┆ f64   ┆ f64      ┆ f64       ┆ f64       ┆ f64      ┆ f64       ┆ f64       ┆ f64       ┆ f64       ┆ f64       ┆ f64      ┆ f64   ┆ f64    │
+╞═══════════╪══════╪══════╪═══════╪══════════╪═══════════╪═══════════╪══════════╪═══════════╪═══════════╪═══════════╪═══════════╪═══════════╪══════════╪═══════╪════════╡
+│ 1fd00231… ┆ D14  ┆ 128  ┆ 2.34  ┆ 2.41     ┆ 2.41      ┆ 2.34      ┆ 2.35     ┆ 2.35      ┆ 2.35      ┆ 2.39      ┆ 2.4       ┆ 2.41      ┆ 2.35     ┆ 1.34  ┆ 2.23   │
+│ 50086045… ┆ D16  ┆ 615  ┆ 7.71  ┆ 11.07    ┆ 2.33      ┆ 8.51      ┆ 7.72     ┆ 7.8       ┆ 8.19      ┆ 9.2       ┆ 10.52     ┆ 11.0      ┆ 1.89     ┆ null  ┆ 2.23   │
+│ 5954dbdf… ┆ D16  ┆ 74   ┆ 1.51  ┆ 1.51     ┆ 1.51      ┆ 1.51      ┆ 1.51     ┆ 1.51      ┆ 1.51      ┆ 1.51      ┆ 1.51      ┆ 1.51      ┆ 3.1      ┆ null  ┆ 1.44   │
+│ 6dc4dc91… ┆ D10  ┆ 102  ┆ 1.45  ┆ 1.45     ┆ 1.45      ┆ 1.45      ┆ 1.45     ┆ 1.45      ┆ 1.45      ┆ 1.45      ┆ 1.45      ┆ 1.45      ┆ 1.62     ┆ 3.11  ┆ 1.51   │
+│ a2d72ea3… ┆ D14  ┆ 621  ┆ 1.92  ┆ 2.53     ┆ 2.53      ┆ 1.77      ┆ 1.93     ┆ 1.88      ┆ 1.82      ┆ 2.1       ┆ 2.43      ┆ 2.52      ┆ 2.03     ┆ null  ┆ 1.79   │
+│ b2f7c058… ┆ D16  ┆ 857  ┆ 14.65 ┆ 2.06     ┆ 2.04      ┆ 2.06      ┆ 14.69    ┆ 14.86     ┆ 15.49     ┆ 14.64     ┆ 5.63      ┆ 2.31      ┆ 3.53     ┆ 5.66  ┆ 2.08   │
+│ b2f7c058… ┆ D5   ┆ 857  ┆ 18.15 ┆ 8.89     ┆ 8.91      ┆ 8.89      ┆ 18.14    ┆ 18.02     ┆ 16.4      ┆ 11.79     ┆ 9.34      ┆ 8.94      ┆ 10.46    ┆ 19.41 ┆ 9.19   │
+│ ce4b82f2… ┆ D5   ┆ 849  ┆ 22.45 ┆ 12.81    ┆ 12.77     ┆ 12.81     ┆ 22.42    ┆ 22.22     ┆ 21.24     ┆ 16.84     ┆ 13.45     ┆ 12.88     ┆ 12.47    ┆ 14.69 ┆ 12.92  │
+│ da56d516… ┆ D10  ┆ 1008 ┆ 4.33  ┆ 4.7      ┆ 4.7       ┆ 4.7       ┆ 4.33     ┆ 4.35      ┆ 4.42      ┆ 4.58      ┆ 4.68      ┆ 4.7       ┆ 3.11     ┆ null  ┆ 2.74   │
+│ e2fb25b4… ┆ D16  ┆ 172  ┆ 2.0   ┆ 2.21     ┆ 2.21      ┆ 2.21      ┆ 2.0      ┆ 2.01      ┆ 2.06      ┆ 2.16      ┆ 2.21      ┆ 2.21      ┆ 2.7      ┆ 2.07  ┆ 1.78   │
+│ e2fb25b4… ┆ D5   ┆ 172  ┆ 3.03  ┆ 3.47     ┆ 3.39      ┆ 3.47      ┆ 3.03     ┆ 3.04      ┆ 3.2       ┆ 3.41      ┆ 3.46      ┆ 3.47      ┆ 4.41     ┆ 3.01  ┆ 2.9    │
+│ e8920008… ┆ D14  ┆ 292  ┆ 3.82  ┆ 3.08     ┆ 3.08      ┆ 3.08      ┆ 3.79     ┆ 3.64      ┆ 3.24      ┆ 3.1       ┆ 3.08      ┆ 3.08      ┆ 2.4      ┆ 3.83  ┆ 2.92   │
+│ e94a3ad2… ┆ D14  ┆ 246  ┆ 2.85  ┆ 2.59     ┆ 2.59      ┆ 2.85      ┆ 2.85     ┆ 2.84      ┆ 2.77      ┆ 2.63      ┆ 2.59      ┆ 2.59      ┆ 2.15     ┆ 2.63  ┆ 2.55   │
+└───────────┴──────┴──────┴───────┴──────────┴───────────┴───────────┴──────────┴───────────┴───────────┴───────────┴───────────┴───────────┴──────────┴───────┴────────┘
+transfer-substation pairs with AFTER rows: 13
+leave one substation out, AFTER, MASK_UNION minus K0:
+  D5 left out: -3.307 (-7.716 to +0.287) pair alarm -1.996 (-7.097 to +1.565) gated -2.478 (-7.229 to +0.382) soft ['+0.008 (-0.004 to +0.018)', '+0.043 (-0.041 to +0.121)', '+0.209 (-0.116 to +0.510)', '+0.253 (-0.132 to +0.707)', '-1.353 (-5.079 to +1.305)', '-1.956 (-6.955 to +1.531)']
+  D10 left out: -6.155 (-9.122 to -0.261) pair alarm -5.044 (-8.838 to +1.379) gated -5.450 (-8.890 to +0.260) soft ['+0.000 (-0.016 to +0.010)', '-0.029 (-0.135 to +0.038)', '-0.352 (-0.721 to +0.124)', '-1.916 (-3.493 to +0.570)', '-4.308 (-7.447 to +1.151)', '-4.989 (-8.734 to +1.350)']
+  D11 left out: -4.952 (-8.405 to +0.027) pair alarm -4.047 (-8.014 to +1.124) gated -4.377 (-8.104 to +0.298) soft ['+0.001 (-0.013 to +0.009)', '-0.020 (-0.109 to +0.035)', '-0.272 (-0.621 to +0.116)', '-1.518 (-3.089 to +0.481)', '-3.450 (-6.740 to +0.939)', '-4.003 (-7.916 to +1.100)']
+  D14 left out: -6.329 (-9.749 to -0.562) pair alarm -5.175 (-9.498 to +1.614) gated -5.509 (-9.511 to +0.516) soft ['+0.002 (-0.016 to +0.012)', '-0.008 (-0.125 to +0.053)', '-0.292 (-0.745 to +0.253)', '-1.901 (-3.820 to +0.763)', '-4.404 (-8.057 to +1.371)', '-5.118 (-9.379 to +1.584)']
+  D16 left out: -3.648 (-7.363 to +0.306) pair alarm -3.639 (-7.352 to +0.311) gated -3.736 (-7.373 to +0.146) soft ['-0.006 (-0.018 to +0.002)', '-0.082 (-0.157 to -0.007)', '-0.620 (-1.203 to -0.002)', '-2.346 (-4.667 to +0.139)', '-3.440 (-6.941 to +0.275)', '-3.618 (-7.305 to +0.307)']
+  D9 left out: -4.952 (-8.405 to +0.027) pair alarm -4.047 (-8.014 to +1.124) gated -4.377 (-8.104 to +0.298) soft ['+0.001 (-0.013 to +0.009)', '-0.020 (-0.109 to +0.035)', '-0.272 (-0.621 to +0.116)', '-1.518 (-3.089 to +0.481)', '-3.450 (-6.740 to +0.939)', '-4.003 (-7.916 to +1.100)']
+
+== tails (coverage; pinball loss in points) on OUTSIDE rows and on AFTER shared rows ==
+outside K0         {'q01': (0.0146, 0.1954), 'q05': (0.0493, 0.687), 'q95': (0.9578, 0.7095), 'q99': (0.9882, 0.208)}
+outside GAM_ONLY   {'q01': (0.0059, 0.192), 'q05': (0.0253, 0.7337), 'q95': (0.8901, 0.7968), 'q99': (0.961, 0.2508)}
+outside MASK_NEW   {'q01': (0.0145, 0.1877), 'q05': (0.0515, 0.6848), 'q95': (0.9555, 0.7115), 'q99': (0.988, 0.2029)}
+outside MASK_RONC  {'q01': (0.0341, 0.2794), 'q05': (0.0796, 0.8526), 'q95': (0.961, 0.724), 'q99': (0.9898, 0.2031)}
+outside MASK_UNION {'q01': (0.0201, 0.2103), 'q05': (0.0612, 0.7281), 'q95': (0.9563, 0.7135), 'q99': (0.9884, 0.2019)}
+outside MASK_GATED {'q01': (0.0136, 0.1861), 'q05': (0.0485, 0.678), 'q95': (0.9554, 0.7088), 'q99': (0.9879, 0.2026)}
+outside SOFT_F10   {'q01': (0.0146, 0.1954), 'q05': (0.0493, 0.687), 'q95': (0.9579, 0.7095), 'q99': (0.9882, 0.208)}
+outside SOFT_F100  {'q01': (0.0146, 0.1957), 'q05': (0.0493, 0.6873), 'q95': (0.9579, 0.7093), 'q99': (0.9882, 0.2079)}
+outside SOFT_F1000 {'q01': (0.0147, 0.1972), 'q05': (0.0492, 0.6891), 'q95': (0.9576, 0.7089), 'q99': (0.9881, 0.2073)}
+outside SOFT_F10000 {'q01': (0.0156, 0.2019), 'q05': (0.0505, 0.6966), 'q95': (0.9571, 0.707), 'q99': (0.9882, 0.2042)}
+outside SOFT_F100000 {'q01': (0.016, 0.1935), 'q05': (0.0525, 0.6921), 'q95': (0.9559, 0.7094), 'q99': (0.9882, 0.2027)}
+outside SOFT_F1000000 {'q01': (0.0146, 0.1877), 'q05': (0.0516, 0.6844), 'q95': (0.9555, 0.7112), 'q99': (0.988, 0.2028)}
+outside BG2        {'q01': (0.0097, 0.208), 'q05': (0.0404, 0.6169), 'q95': (0.9445, 0.7384), 'q99': (0.9831, 0.2491)}
+outside MANUAL     {'q01': (0.0463, 0.2487), 'q05': (0.0666, 0.7438), 'q95': (0.9036, 0.8924), 'q99': (0.9315, 0.3503)}
+outside CLIM       {'q01': (0.0167, 0.2105), 'q05': (0.0386, 0.8125), 'q95': (0.9126, 0.9385), 'q99': (0.9594, 0.2848)}
+outside ARM_C      {'q01': (0.0222, 0.1957), 'q05': (0.0705, 0.677), 'q95': (0.9468, 0.7128), 'q99': (0.9829, 0.215)}
+AFTER K0         {'q01': (0.409, 5.3061), 'q05': (0.4533, 7.114), 'q95': (0.757, 3.7951), 'q99': (0.8316, 2.2438)}
+AFTER GAM_ONLY   {'q01': (0.175, 1.4151), 'q05': (0.2024, 2.5943), 'q95': (0.7176, 1.9634), 'q99': (0.8384, 0.9254)}
+AFTER MASK_NEW   {'q01': (0.1752, 1.505), 'q05': (0.2305, 2.5976), 'q95': (0.8346, 1.6406), 'q99': (0.898, 0.7724)}
+AFTER MASK_RONC  {'q01': (0.2122, 3.4567), 'q05': (0.2539, 4.6189), 'q95': (0.9205, 1.0023), 'q99': (0.9731, 0.2926)}
+AFTER MASK_UNION {'q01': (0.1717, 1.5025), 'q05': (0.218, 2.592), 'q95': (0.8321, 1.6377), 'q99': (0.8963, 0.7789)}
+AFTER MASK_GATED {'q01': (0.1755, 1.5045), 'q05': (0.2327, 2.6047), 'q95': (0.8354, 1.6425), 'q99': (0.898, 0.7729)}
+AFTER SOFT_F10   {'q01': (0.4082, 5.309), 'q05': (0.4536, 7.1148), 'q95': (0.7573, 3.7924), 'q99': (0.8316, 2.2391)}
+AFTER SOFT_F100  {'q01': (0.4079, 5.315), 'q05': (0.4522, 7.1101), 'q95': (0.7578, 3.755), 'q99': (0.8327, 2.1958)}
+AFTER SOFT_F1000 {'q01': (0.4084, 5.2482), 'q05': (0.4528, 7.0118), 'q95': (0.7663, 3.3821), 'q99': (0.8424, 1.898)}
+AFTER SOFT_F10000 {'q01': (0.3981, 4.168), 'q05': (0.4403, 5.8198), 'q95': (0.8041, 2.3849), 'q99': (0.8691, 1.1703)}
+AFTER SOFT_F100000 {'q01': (0.2506, 1.8755), 'q05': (0.351, 3.1962), 'q95': (0.828, 1.7945), 'q99': (0.8947, 0.8295)}
+AFTER SOFT_F1000000 {'q01': (0.1793, 1.5224), 'q05': (0.24, 2.6335), 'q95': (0.8337, 1.6588), 'q99': (0.8974, 0.7783)}
+AFTER BG2        {'q01': (0.0035, 0.3325), 'q05': (0.323, 3.1027), 'q95': (0.7445, 4.0734), 'q99': (0.8419, 1.3811)}
+AFTER MANUAL     {'q01': (0.1951, 1.9112), 'q05': (0.2237, 3.071), 'q95': (0.7627, 1.7557), 'q99': (0.797, 0.9135)}
+AFTER CLIM       {'q01': (0.1461, 0.7075), 'q05': (0.1951, 2.223), 'q95': (0.6672, 2.2204), 'q99': (0.7652, 0.8871)}
+AFTER ARM_C      {'q01': (0.3956, 4.2675), 'q05': (0.4411, 6.1819), 'q95': (0.7573, 3.811), 'q99': (0.8356, 2.1398)}
+
+== checks: median forecast minus mean forecast, and absolute error of the median forecast ==
+K0 {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+MASK_NEW {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+MASK_UNION {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+MASK_GATED {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+SOFT_F10 {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+SOFT_F100 {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+SOFT_F1000 {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+SOFT_F10000 {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+SOFT_F100000 {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+SOFT_F1000000 {'D10': -0.064, 'D11': -0.027, 'D14': 0.033, 'D16': 0.014, 'D5': -0.135, 'D9': -0.021}
+absolute error of the median forecast, outside shared rows: {'K0': 4.773, 'GAM_ONLY': 5.334, 'MASK_NEW': 4.853, 'MASK_UNION': 4.961, 'MASK_GATED': 4.809, 'SOFT_F10': 4.772, 'SOFT_F100': 4.772, 'SOFT_F1000': 4.778, 'SOFT_F10000': 4.812, 'SOFT_F100000': 4.848, 'SOFT_F1000000': 4.853, 'BG2': 4.734}
+absolute error of the median forecast, AFTER shared rows: {'K0': 18.232, 'GAM_ONLY': 10.726, 'MASK_NEW': 9.639, 'MASK_UNION': 9.616, 'MASK_GATED': 9.666, 'SOFT_F10': 18.23, 'SOFT_F100': 18.185, 'SOFT_F1000': 17.653, 'SOFT_F10000': 15.155, 'SOFT_F100000': 11.255, 'SOFT_F1000000': 9.773, 'BG2': 15.467}
+
+== DECISION RULE (pre-registered in result.md) ==
+transfer-substation pairs with AFTER rows: 13 of which with a gated alarm known: 6
+G1 MASK_GATED minus K0 outside +0.009 (-0.068 to +0.081): inside +/-0.03 -> False
+G2 AFTER gain K0 - GATED 7.350 vs 0.7 x hard gain 5.165 (hard 7.379) -> True
+PART 1: not supported
+SOFT_F10: S1 outside minus MASK_UNION -0.102 (<= -0.051) True; S2 AFTER gain 0.002 (>= 5.903) False; S3 INSIDE harm +0.008 (<= +6.452) True; outside minus K0 -0.000
+SOFT_F100: S1 outside minus MASK_UNION -0.102 (<= -0.051) True; S2 AFTER gain 0.046 (>= 5.903) False; S3 INSIDE harm +0.082 (<= +6.452) True; outside minus K0 -0.000
+SOFT_F1000: S1 outside minus MASK_UNION -0.099 (<= -0.051) True; S2 AFTER gain 0.531 (>= 5.903) False; S3 INSIDE harm +0.630 (<= +6.452) True; outside minus K0 +0.003
+best factor among those passing S2 and S3: None
+PART 2: not supported factors passing S1, S2, and S3: []
+VERDICT by the pre-registered rule: not supported
+
+== D8 multi-day drops of experiment 159: alarms within 24 hours of a drop start ==
+RONC: 5 of 29 drops with an alarm onset within 24 h of the start; 37 alarms on D8 in all
+NEW: 3 of 29 drops with an alarm onset within 24 h of the start; 46 alarms on D8 in all
+GATED: 0 of 29 drops with an alarm onset within 24 h of the start; 6 alarms on D8 in all
+UNION: 7 of 29 drops with an alarm onset within 24 h of the start; 79 alarms on D8 in all

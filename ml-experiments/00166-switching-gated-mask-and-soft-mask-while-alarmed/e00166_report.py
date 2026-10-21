@@ -23,7 +23,8 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D14", "D16", "D9")
 MASKS: Final[tuple[str, ...]] = ("MASK_NEW", "MASK_RONC", "MASK_UNION", "MASK_GATED")
-SOFT: Final[tuple[str, ...]] = ("SOFT_F10", "SOFT_F100", "SOFT_F1000")
+SOFT_PRE: Final[tuple[str, ...]] = ("SOFT_F10", "SOFT_F100", "SOFT_F1000")
+SOFT: Final[tuple[str, ...]] = (*SOFT_PRE, "SOFT_F10000", "SOFT_F100000", "SOFT_F1000000")
 STACK: Final[tuple[str, ...]] = ("K0", "GAM_ONLY", *MASKS, *SOFT)
 EXTERNAL: Final[tuple[str, ...]] = ("BG2", "MANUAL", "CLIM", "ARM_C")
 ARMS: Final[tuple[str, ...]] = (*STACK, *EXTERNAL)
@@ -213,7 +214,7 @@ def decide(*, report: dict, ev: pl.DataFrame, outside: pl.DataFrame, pairs: pl.D
     inside = report["means|shared|all|INSIDE"]
     hard_harm = inside["MASK_UNION"] - inside["K0"]
     best: tuple[float, str] | None = None
-    for arm in SOFT:
+    for arm in SOFT_PRE:
         s1 = report[f"outside|all|{arm} minus MASK_UNION"][0]
         s1_pass = s1 <= -0.051
         gain = after["K0"] - after[arm]
@@ -230,7 +231,7 @@ def decide(*, report: dict, ev: pl.DataFrame, outside: pl.DataFrame, pairs: pl.D
         report[f"decision|{arm}"] = [s1_pass, s2_pass, s3_pass]
         if s2_pass and s3_pass and (best is None or outside_change < best[0]):
             best = (outside_change, arm)
-    passing = [a for a in SOFT if all(report[f"decision|{a}"])]
+    passing = [a for a in SOFT_PRE if all(report[f"decision|{a}"])]
     print("best factor among those passing S2 and S3:", best)
     part2 = "supported" if passing else "not supported"
     print("PART 2:", part2, "factors passing S1, S2, and S3:", passing)

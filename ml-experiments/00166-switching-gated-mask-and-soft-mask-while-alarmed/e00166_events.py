@@ -36,6 +36,8 @@ BALANCE_FLOOR: Final[float] = 0.4
 """The smallest balance score the pair alarm can have (experiment 156 keeps ratios 0.4 to 2.5)."""
 SOFT_FACTORS: Final[tuple[float, ...]] = (10.0, 100.0, 1000.0)
 """Pre-registered observation-noise variance factors of the soft mask, at full reliability."""
+POST_HOC_SOFT_FACTORS: Final[tuple[float, ...]] = (1e4, 1e5, 1e6)
+"""Stronger inflation factors added after the pre-registered three did almost nothing (post hoc)."""
 SCORED_FIRST: Final = GRID_START.replace(year=2025, month=7, day=1)
 
 

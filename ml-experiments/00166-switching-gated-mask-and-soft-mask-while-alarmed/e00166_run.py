@@ -31,7 +31,9 @@ import polars as pl
 from e00166_common import WORK_DIR
 from e00166_g_arms import quantile_score
 
-SOFT_ARMS: Final[dict[str, float]] = {f"SOFT_F{int(f)}": f for f in ev.SOFT_FACTORS}
+SOFT_ARMS: Final[dict[str, float]] = {
+    f"SOFT_F{int(f)}": f for f in (*ev.SOFT_FACTORS, *ev.POST_HOC_SOFT_FACTORS)
+}
 """Soft-mask arms by name and observation-noise variance factor at full reliability."""
 ARMS: Final[tuple[str, ...]] = (
     "K0",

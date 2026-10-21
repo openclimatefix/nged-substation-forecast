@@ -1,10 +1,10 @@
 # ruff: noqa: E501, PERF401
-"""Draw experiment 165's figures as SVG from `event_rows.parquet`, `joined.parquet`, and `report.json`.
+"""Draw experiment 166's figures as SVG from `event_rows.parquet`, `balance.parquet`, and `report.json`.
 
 Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newline`.
 The series are Primary substations, not NGED generators.
 
-    OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00165-*/e00166_charts.py
+    OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00166-*/e00166_charts.py
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from e00166_common import WORK_DIR
-from e00166_report import boot
+from e00166_events import BALANCE_GATE
 
 HERE: Final[Path] = Path(__file__).resolve().parent
 OUT_DIR: Final[Path] = (
@@ -29,29 +29,27 @@ OUT_DIR: Final[Path] = (
 )
 WIDTH: Final[int] = 520
 LABELS: Final[dict[str, str]] = {
-    "K0": "Stack, no mask",
-    "GAM_ONLY": "Stack, weather model only",
-    "MASK_NEW": "Stack, mask from pair alarm",
-    "MASK_UNION": "Stack, mask from either alarm",
-    "MASK_RONC": "Stack, mask from RO-NC alarm",
-    "ORACLE": "Stack, mask from logged interval (ceiling)",
-    "BG2": "Best guess 2 (XGBoost)",
-    "ARM_C": "Experiment 155 arm C (stack with recipe R, no mask)",
-    "MANUAL": "Manual heuristic",
-    "CLIM": "Climatology",
+    "MASK_UNION": "Hard mask, either alarm (experiment 165)",
+    "MASK_NEW": "Hard mask, every pair alarm",
+    "MASK_GATED": "Hard mask, pair alarm with balance score 0.7 or more",
+    "SOFT_F1000": "Soft mask, noise x1000 (largest pre-registered)",
+    "SOFT_F1000000": "Soft mask, noise x1,000,000 (post hoc)",
 }
 COLOURS: Final[dict[str, str]] = {
-    LABELS["K0"]: ocf.BRAND_ORANGE,
-    LABELS["GAM_ONLY"]: ocf.DATA_PURPLE,
-    LABELS["MASK_NEW"]: ocf.DATA_GREEN,
-    LABELS["MASK_UNION"]: ocf.DATA_BLUE,
-    LABELS["MASK_RONC"]: ocf.DATA_SKY,
-    LABELS["ORACLE"]: "#444444",
-    LABELS["BG2"]: "#8A8A8A",
-    LABELS["ARM_C"]: "#F4A582",
-    LABELS["MANUAL"]: "#BBBBBB",
-    LABELS["CLIM"]: "#DDDDDD",
+    "MASK_UNION": ocf.DATA_BLUE,
+    "MASK_NEW": ocf.DATA_SKY,
+    "MASK_GATED": ocf.DATA_GREEN,
+    "SOFT_F1000": ocf.BRAND_ORANGE,
+    "SOFT_F1000000": ocf.DATA_PURPLE,
 }
+SOFT_SWEEP: Final[tuple[str, ...]] = (
+    "SOFT_F10",
+    "SOFT_F100",
+    "SOFT_F1000",
+    "SOFT_F10000",
+    "SOFT_F100000",
+    "SOFT_F1000000",
+)
 
 
 def _title(*, text: str, line: str) -> alt.TitleParams:
@@ -64,103 +62,231 @@ def _title(*, text: str, line: str) -> alt.TitleParams:
     )
 
 
-def _colour() -> alt.Color:
-    return alt.Color(
-        "label:N", legend=None, scale=alt.Scale(domain=list(COLOURS), range=list(COLOURS.values()))
-    )
-
-
-def _scale(arms: tuple[str, ...]) -> alt.Scale:
-    names = [LABELS[a] for a in arms]
-    return alt.Scale(domain=names, range=[COLOURS[n] for n in names])
-
-
 def _save(*, chart: alt.TopLevelMixin, name: str) -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     chart.save(OUT_DIR / f"{name}.svg")
 
 
-def _dots(*, data: pl.DataFrame, title: str, rule: float | None, height: int) -> alt.TopLevelMixin:
-    enc_y = alt.Y("label:N", title=None, sort=None, axis=alt.Axis(labelLimit=330))
-    layers = [
-        alt.Chart(data)
+def _scale(arms: tuple[str, ...]) -> alt.Scale:
+    return alt.Scale(domain=[LABELS[a] for a in arms], range=[COLOURS[a] for a in arms])
+
+
+def _intervals(
+    *,
+    data: pl.DataFrame,
+    y: str,
+    arms: tuple[str, ...],
+    x_title: str,
+    domain: list[float],
+    title: alt.TitleParams,
+    height: int,
+) -> alt.TopLevelMixin:
+    colour = alt.Color(
+        "label:N",
+        legend=alt.Legend(orient="top", title=None, labelLimit=400, columns=1),
+        scale=_scale(arms),
+    )
+    return alt.layer(
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeWidth=2)
-        .encode(x=alt.X("low:Q", title=title), x2="high:Q", y=enc_y, color=_colour()),  # ty: ignore[unresolved-attribute]
-        alt.Chart(data)
+        .encode(
+            x=alt.X("low:Q", title=x_title, scale=alt.Scale(domain=domain)),
+            x2="high:Q",
+            y=alt.Y(f"{y}:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
+            yOffset="label:N",
+            color=colour,
+        ),
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70)
-        .encode(x="mean:Q", y=enc_y, color=_colour()),  # ty: ignore[unresolved-attribute]
-    ]
-    if rule is not None:
-        layers.append(
-            alt.Chart(pl.DataFrame({"v": [rule]}))
-            .mark_rule(strokeDash=[4, 3], color="#888")
-            .encode(x="v:Q")  # ty: ignore[unresolved-attribute]
-        )
-    return alt.layer(*layers).properties(width=WIDTH, height=height)
+        .encode(
+            x="mean:Q",
+            y=alt.Y(f"{y}:N", sort=None),
+            yOffset="label:N",
+            color=alt.Color("label:N", legend=None, scale=_scale(arms)),
+        ),
+        alt.Chart(pl.DataFrame({"v": [0.0]}))
+        .mark_rule(strokeDash=[4, 3], color="#888")
+        .encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
+    ).properties(width=WIDTH, height=height, title=title)
 
 
 def main() -> None:
     """Draw the figures."""
     ev = pl.read_parquet(WORK_DIR / "event_rows.parquet")
     report = json.loads((WORK_DIR / "report.json").read_text())
-    # figure 1: AFTER, shared rows, mean score by arm with a 95% interval over logged transfers
-    after = ev.filter((pl.col("set") == "AFTER") & pl.col("shared"))
-    arms = [
-        "K0",
-        "GAM_ONLY",
-        "MASK_NEW",
-        "MASK_UNION",
-        "MASK_RONC",
-        "ORACLE",
-        "BG2",
-        "ARM_C",
-        "MANUAL",
-        "CLIM",
-    ]
+    arms = tuple(LABELS)
+    # figure 1: the headline, change against the unmasked stack in each row group
     rows = []
-    for arm in arms:
-        sub = after.filter(pl.col(arm).is_not_null())
-        m, lo, hi = boot(num=sub[arm].to_numpy(), den=None, groups=sub["card"].to_numpy())
-        rows.append({"label": LABELS[arm], "mean": m, "low": lo, "high": hi})
-    cards = after["card"].n_unique()
+    for name, key in (
+        ("During a logged transfer (INSIDE)", "INSIDE|shared|{arm} minus K0"),
+        ("72 hours after a transfer ends (AFTER)", "AFTER|shared|{arm} minus K0"),
+    ):
+        for arm in arms:
+            m, lo, hi = report[key.format(arm=arm)]
+            rows.append({"group": name, "label": LABELS[arm], "mean": m, "low": lo, "high": hi})
     _save(
-        chart=_dots(
+        chart=_intervals(
             data=pl.DataFrame(rows),
-            title="Mean quantile score, points of effective capacity (smaller is better)",
-            rule=None,
-            height=250,
-        ).properties(
+            y="group",
+            arms=arms,
+            x_title="Score minus the unmasked stack, points (negative is better)",
+            domain=[-11, 8],
+            height=200,
             title=_title(
-                text="After a logged transfer ends, the masked stack scores about half as high as the unmasked stack, but 7 transfers leave wide intervals",
-                line=f"Dot: mean score of every row in the 72 hours after the logged end, forecasts issued after the transfer began. Line: 95% interval from resampling the {cards} logged transfers. Winter dominates the rows. Six Primary substations, July 2025 to June 2026.",
-            )
+                text="The gated hard mask keeps the whole gain after a transfer; no soft mask keeps it without the extra error",
+                line="Mean quantile score of each mask minus the unmasked stack, points of effective capacity. Dot: mean difference. Line: 95% interval, resampling logged transfers (INSIDE: 3, AFTER: 7, rows shared with best guess 2). Six Primary substations, July 2025 to June 2026.",
+            ),
         ),
-        name="figure_2_after_scores",
+        name="figure_1_headline",
     )
-    # figure 2: per event, AFTER
+    # figure 2: the trade-off, AFTER change against OUTSIDE change
+    pts = []
+    for arm, label in (
+        ("MASK_UNION", "Hard mask, either alarm"),
+        ("MASK_NEW", "Hard mask, every pair alarm"),
+        ("MASK_GATED", "Hard mask, gated pair alarm"),
+        *[
+            (
+                a,
+                "Soft mask, "
+                + {
+                    "SOFT_F10": "x10",
+                    "SOFT_F100": "x100",
+                    "SOFT_F1000": "x1000",
+                    "SOFT_F10000": "x10,000 (post hoc)",
+                    "SOFT_F100000": "x100,000 (post hoc)",
+                    "SOFT_F1000000": "x1,000,000 (post hoc)",
+                }[a],
+            )
+            for a in SOFT_SWEEP
+        ],
+    ):
+        pts.append(
+            {
+                "label": label,
+                "outside": report[f"outside|all|{arm} minus K0"][0],
+                "after": report[f"AFTER|shared|{arm} minus K0"][0],
+                "kind": "Hard mask" if arm.startswith("MASK") else "Soft mask",
+            }
+        )
+    d2 = pl.DataFrame(pts)
+    offsets = {
+        "Soft mask, x10": (7, -10),
+        "Soft mask, x100": (7, 5),
+        "Soft mask, x1000": (7, 6),
+        "Hard mask, gated pair alarm": (7, 14),
+        "Hard mask, every pair alarm": (7, 26),
+        "Soft mask, x1,000,000 (post hoc)": (7, -9),
+    }
+    texts = []
+    for r in d2.iter_rows(named=True):
+        dx, dy = offsets.get(r["label"], (7, 0))
+        texts.append(
+            alt.Chart(pl.DataFrame([r]))  # ty: ignore[unresolved-attribute]
+            .mark_text(align="left" if dx > 0 else "right", dx=dx, dy=dy, fontSize=10)
+            .encode(x="outside:Q", y="after:Q", text="label:N")
+        )
+    chart2 = alt.layer(
+        alt.Chart(d2)
+        .mark_point(filled=True, size=90)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "outside:Q",
+                title="Extra error on ordinary days, points (smaller is better)",
+                scale=alt.Scale(domain=[-0.02, 0.16]),
+            ),
+            y=alt.Y(
+                "after:Q",
+                title="Change in the 72 hours after a transfer, points (more negative is better)",
+            ),
+            color=alt.Color(
+                "kind:N",
+                legend=alt.Legend(orient="top", title=None),
+                scale=alt.Scale(
+                    domain=["Hard mask", "Soft mask"], range=[ocf.DATA_GREEN, ocf.BRAND_ORANGE]
+                ),
+            ),
+        ),
+        *texts,
+    ).properties(
+        width=WIDTH,
+        height=300,
+        title=_title(
+            text="A soft mask gains only as much as it harms: the two move together",
+            line="Each dot is one arm. Horizontal: mean score minus the unmasked stack outside logged transfers. Vertical: the same on the 72 hours after a logged transfer ends (7 transfers shared with best guess 2). The unmasked stack is at the origin.",
+        ),
+    )
+    _save(chart=chart2, name="figure_2_trade_off")
+    # figure 3: outside logged transfers by season
+    rows3 = []
+    for season in ("winter", "other"):
+        for arm in ("MASK_UNION", "MASK_NEW", "MASK_GATED", "SOFT_F1000", "SOFT_F1000000"):
+            m, lo, hi = report[f"outside|{season}|{arm} minus K0"]
+            rows3.append(
+                {
+                    "season": "Winter (November to March)"
+                    if season == "winter"
+                    else "Other months",
+                    "label": LABELS[arm],
+                    "mean": m,
+                    "low": lo,
+                    "high": hi,
+                }
+            )
+    _save(
+        chart=_intervals(
+            data=pl.DataFrame(rows3),
+            y="season",
+            arms=arms,
+            x_title="Score minus the unmasked stack, points (negative is better)",
+            domain=[-0.3, 0.4],
+            height=180,
+            title=_title(
+                text="Outside winter the gated mask adds about 0.013 points; the mask from either alarm adds 0.161",
+                line="Outside logged transfers, 95% interval from resampling calendar months. Dot: mean difference. Dashed line: no difference.",
+            ),
+        ),
+        name="figure_3_outside_by_season",
+    )
+    # figure 4: per transfer, AFTER
+    after = ev.filter((pl.col("set") == "AFTER") & pl.col("shared"))
     per = (
-        after.group_by("card", "site")
+        ev.filter(pl.col("set") == "AFTER")
+        .group_by("card", "site")
         .agg(
             pl.len().alias("rows"),
             *[
                 pl.col(a).mean()
-                for a in ("K0", "MASK_NEW", "MASK_UNION", "GAM_ONLY", "BG2", "ORACLE")
+                for a in ("K0", "MASK_UNION", "MASK_GATED", "SOFT_F1000", "SOFT_F1000000")
             ],
-            pl.col("winter").first(),
+            pl.col("known_gated").first(),
+            pl.col("end").first(),
         )
         .sort("K0", descending=True)
         .with_row_index("n", offset=1)
     )
     long = []
     for r in per.iter_rows(named=True):
-        name = (
-            f"Transfer {r['n']} ({'winter' if r['winter'] else 'other months'}, {r['rows']} rows)"
-        )
-        for arm in ("K0", "MASK_NEW", "MASK_UNION", "GAM_ONLY", "BG2", "ORACLE"):
-            long.append({"event": name, "label": LABELS[arm], "score": r[arm]})
-    long_frame = pl.DataFrame(long)
-    chart2 = (
-        alt.Chart(long_frame)  # ty: ignore[unresolved-attribute]
+        gated = "gated alarm" if 0 <= r["known_gated"] < r["end"] else "no gated alarm"
+        name = f"Transfer {r['n']} ({gated}, {r['rows']} rows)"
+        for arm in ("K0", "MASK_UNION", "MASK_GATED", "SOFT_F1000", "SOFT_F1000000"):
+            long.append(
+                {
+                    "event": name,
+                    "label": "Stack, no mask" if arm == "K0" else LABELS[arm],
+                    "score": r[arm],
+                }
+            )
+    names = {
+        "Stack, no mask": ocf.BRAND_ORANGE,
+        **{
+            LABELS[a]: COLOURS[a]
+            for a in ("MASK_UNION", "MASK_GATED", "SOFT_F1000", "SOFT_F1000000")
+        },
+    }
+    names["Stack, no mask"] = "#444444"
+    chart4 = (
+        alt.Chart(pl.DataFrame(long))  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70)
         .encode(
             x=alt.X(
@@ -170,159 +296,45 @@ def main() -> None:
             y=alt.Y("event:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
             color=alt.Color(
                 "label:N",
-                legend=alt.Legend(orient="top", columns=2, title=None, labelLimit=400),
-                scale=_scale(("K0", "MASK_NEW", "MASK_UNION", "GAM_ONLY", "BG2", "ORACLE")),
+                legend=alt.Legend(orient="top", columns=1, title=None, labelLimit=400),
+                scale=alt.Scale(domain=list(names), range=list(names.values())),
             ),
         )
         .properties(
             width=WIDTH,
             height=26 * per.height + 30,
             title=_title(
-                text="The gain comes from a few long transfers; short transfers change little",
-                line="Each row is one logged transfer at one substation, scored on the 72 hours after it ends. Transfers are numbered from the largest unmasked score; substations are not named.",
+                text="The gain sits in transfers that have a gated alarm; the gate keeps those and drops the rest",
+                line=f"Each row is one logged transfer at one substation ({after['card'].n_unique()} transfers shared with best guess 2; all 13 pairs shown), scored on the 72 hours after it ends. Transfers are numbered from the largest unmasked score; substations are not named.",
             ),
         )
     )
-    _save(chart=chart2, name="figure_3_per_transfer")
-    # figure 3: three row sets
-    long3 = []
-    for name in ("INSIDE", "AFTER"):
-        sub = ev.filter((pl.col("set") == name) & pl.col("shared"))
-        for arm in ("K0", "GAM_ONLY", "MASK_NEW", "MASK_UNION", "BG2"):
-            long3.append(
-                {
-                    "set": f"{name} ({sub['card'].n_unique()} transfers, {sub.height} rows)",
-                    "label": LABELS[arm],
-                    "score": float(sub[arm].mean()),  # ty: ignore[invalid-argument-type]
-                }
-            )
-    chart3 = (
-        alt.Chart(pl.DataFrame(long3))  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=True, size=80)
+    _save(chart=chart4, name="figure_4_per_transfer")
+    # figure 5: balance scores of the pair alarms
+    balance = pl.read_parquet(WORK_DIR / "balance.parquet")
+    chart5 = alt.layer(
+        alt.Chart(balance.select("balance_score"))  # ty: ignore[unresolved-attribute]
+        .mark_bar(color=ocf.DATA_BLUE)
         .encode(
             x=alt.X(
-                "score:Q",
-                title="Mean quantile score against observed power, points (smaller is better)",
+                "balance_score:Q",
+                bin=alt.Bin(step=0.05),
+                title="Balance score (1 = the opposite steps cancel exactly)",
             ),
-            y=alt.Y("set:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
-            color=alt.Color(
-                "label:N",
-                legend=alt.Legend(orient="top", columns=2, title=None, labelLimit=400),
-                scale=_scale(("K0", "GAM_ONLY", "MASK_NEW", "MASK_UNION", "BG2")),
-            ),
-        )
-        .properties(
-            width=WIDTH,
-            height=100,
-            title=_title(
-                text="While a transfer runs, the observed power contains the transfer, so a mask scores worse",
-                line="INSIDE: targets from the first alarm until the logged end. AFTER: the 72 hours after the end, when observed power is the normal running arrangement. Only AFTER is a fair test of a mask.",
-            ),
-        )
-    )
-    _save(chart=chart3, name="figure_4_row_sets")
-    # figure 5: outside logged transfers, by season
-    rows4 = []
-    for season in ("winter", "other"):
-        for arm, label in (
-            ("MASK_NEW", "MASK_NEW minus K0"),
-            ("MASK_UNION", "MASK_UNION minus K0"),
-            ("MASK_RONC", "MASK_RONC minus K0"),
-            ("GAM_ONLY", "GAM_ONLY minus K0"),
-        ):
-            m, lo, hi = report[f"outside|{season}|{label}"]
-            rows4.append({"label": LABELS[arm], "season": season, "mean": m, "low": lo, "high": hi})
-    d4 = pl.DataFrame(rows4).with_columns(row=pl.col("label") + " (" + pl.col("season") + ")")
-    season_scale = alt.Scale(domain=["winter", "other"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE])
-    chart4 = alt.layer(
-        alt.Chart(d4)  # ty: ignore[unresolved-attribute]
-        .mark_rule(strokeWidth=2)
-        .encode(
-            x=alt.X("low:Q", title="Score minus the unmasked stack, points (negative is better)"),
-            x2="high:Q",
-            y=alt.Y("row:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
-            color=alt.Color(
-                "season:N", legend=alt.Legend(orient="top", title=None), scale=season_scale
-            ),
+            y=alt.Y("count():Q", title="Pair alarms"),
         ),
-        alt.Chart(d4)  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=True, size=70)
-        .encode(
-            x="mean:Q",
-            y=alt.Y("row:N", sort=None),
-            color=alt.Color("season:N", legend=None, scale=season_scale),
-        ),
-        alt.Chart(pl.DataFrame({"v": [0.0]}))
-        .mark_rule(strokeDash=[4, 3], color="#888")
+        alt.Chart(pl.DataFrame({"v": [BALANCE_GATE]}))
+        .mark_rule(strokeDash=[4, 3], color=ocf.BRAND_ORANGE, strokeWidth=2)
         .encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
     ).properties(
         width=WIDTH,
-        height=260,
+        height=200,
         title=_title(
-            text="On ordinary days the masks score no better than the unmasked stack, and worse outside winter",
-            line="All real rows outside logged transfers and their 72 hours after, July 2025 to June 2026, six Primary substations. Dot: mean difference. Line: 95% interval from resampling calendar months. Dashed line: no difference.",
+            text=f"{int((balance['balance_score'] >= BALANCE_GATE).sum())} of {balance.height} pair alarms pass the gate at a balance score of 0.7",
+            line="All 282 real pair alarms of experiment 156 (window 4 hours, 3.75 noise units), January 2022 to June 2026. Dashed line: the gate.",
         ),
     )
-    _save(chart=chart4, name="figure_5_outside_by_season")
-    # figure 1: the headline, mask minus unmasked stack by row group
-    groups = (
-        ("Outside transfers, no alarm", "outside_no_alarm|{arm} minus K0"),
-        (
-            "Outside transfers, alarm active",
-            "alarm|{arm}|active|outside logged transfers|minus K0",
-        ),
-        (
-            "Outside transfers, 72 h after alarm",
-            "alarm|{arm}|post|outside logged transfers|minus K0",
-        ),
-        ("During a logged transfer", "INSIDE|stack_only|{arm} minus K0"),
-        ("72 h after a logged transfer ends", "AFTER|stack_only|{arm} minus K0"),
-    )
-    rows1 = []
-    for name, key in groups:
-        for arm in ("MASK_NEW", "MASK_UNION"):
-            m, lo, hi = report[key.format(arm=arm)]
-            rows1.append({"group": name, "label": LABELS[arm], "mean": m, "low": lo, "high": hi})
-    d1 = pl.DataFrame(rows1)
-    arm_scale = _scale(("MASK_NEW", "MASK_UNION"))
-    chart1 = alt.layer(
-        alt.Chart(d1)  # ty: ignore[unresolved-attribute]
-        .mark_rule(strokeWidth=2)
-        .encode(
-            x=alt.X(
-                "low:Q",
-                title="Score minus the unmasked stack, points (negative is better)",
-                scale=alt.Scale(domain=[-10, 8]),
-            ),
-            x2="high:Q",
-            y=alt.Y("group:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
-            yOffset="label:N",
-            color=alt.Color(
-                "label:N",
-                legend=alt.Legend(orient="top", title=None, labelLimit=400, columns=2),
-                scale=arm_scale,
-            ),
-        ),
-        alt.Chart(d1)  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=True, size=70)
-        .encode(
-            x="mean:Q",
-            y=alt.Y("group:N", sort=None),
-            yOffset="label:N",
-            color=alt.Color("label:N", legend=None, scale=arm_scale),
-        ),
-        alt.Chart(pl.DataFrame({"v": [0.0]}))
-        .mark_rule(strokeDash=[4, 3], color="#888")
-        .encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
-    ).properties(
-        width=WIDTH,
-        height=260,
-        title=_title(
-            text="Masking helps in the 72 hours after a transfer ends, hurts while an alarm is active, and costs little otherwise",
-            line="Mask minus unmasked stack, mean quantile score in points of effective capacity. Dot: mean difference. Line: 95% interval, resampling logged transfers (INSIDE, AFTER) or calendar months (other rows). Six Primary substations, July 2025 to June 2026.",
-        ),
-    )
-    _save(chart=chart1, name="figure_1_headline")
+    _save(chart=chart5, name="figure_5_balance_scores")
 
 
 if __name__ == "__main__":
