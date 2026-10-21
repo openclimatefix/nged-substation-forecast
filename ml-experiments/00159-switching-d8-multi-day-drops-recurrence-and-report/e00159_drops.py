@@ -5,8 +5,8 @@ frozen convex model's expected power, and ERA5 temperature per series on experim
 the RO-NC alarms of experiment 130 arm B. Writes private tables under `WORK_DIR` and prints every
 number the write-up quotes into `printed_report.txt`.
 
-Run: OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
-    uv run --no-sync python ml-experiments/00159-*/e00159_drops.py
+Run it from the worktree root with `OMP_NUM_THREADS=1`, under `systemd-run --user --scope` with
+`MemoryMax=8G` and `OOMPolicy=continue`, as `uv run --no-sync python e00159_drops.py`.
 """
 
 from __future__ import annotations
@@ -531,7 +531,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             f"{int(row['start_hour']):02d}:{int(row['start_hour'] % 1 * 60):02d} "
             f"| {row['best_neighbour_step_mw']:+.1f} ({row['best_neighbour']}) | {n_closures} |"
         )
-    (Path(__file__).parent / "drops_table.md").write_text("\n".join(lines) + "\n")
+    (Path(__file__).parent / "drops_table.txt").write_text("\n".join(lines) + "\n")
 
     (WORK_DIR / "printed_report.txt").write_text("\n".join(REPORT) + "\n")
     (Path(__file__).parent / "printed_report.txt").write_text("\n".join(REPORT) + "\n")
