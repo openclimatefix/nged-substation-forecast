@@ -212,7 +212,8 @@ is the fall in error from arm 1 divided by that gap.
   intervals in the same way, so training and scoring use the same MW definition. Dividing the MW by
   1.5 would cut the gain of the single-interval cases, whose median ratio is 1.00.
 - **Stability of the planned contrasts (point values).** C2 is robust: it ranges from -0.62 to
-  -0.92 when October 2025, February 2026, April 2026, or June 2026 is left out. C1 is fragile: without February 2026 it is +0.09,
+  -0.92 when October 2025, February 2026, April 2026, or June 2026 is left out.
+  C1 is fragile: without February 2026 it is +0.09,
   and without the single event 89073 (a February event) it is -0.06. The as-built result rests on
   February 2026; the largest-step contrast keeps its sign without it (-0.20).
 - **Known fault in the report script.** The report script still takes the detector's MW from the
