@@ -18,15 +18,16 @@ on the GPU) gives the corrected design matrix, and its Gram matrix goes into the
 solver as the two-stage fit (`studies.dp_gam.solve_bounded_quadratic`) with the same penalties. No
 gradient descent is involved, and the noise settings are inputs, not parameters.
 
-**The cases are the day-ahead cases of the scoring.** Each training half-hour is the target of one
+**The cases follow the scoring's 12-to-36-hour band.** Each training half-hour is the target of one
 case: the forecast made at the 09:00 UTC initialisation whose window of valid times 12 to 36 hours
 ahead contains it, from the residuals that ended at least `DEFAULT_DELAY_HOURS` before that
 initialisation. The windows of consecutive days tile the time axis, so no half-hour is a target
-twice.
+twice. This is not `studies.dp_assimilation.day_ahead_initialisation`, whose window is 15.5 to 39
+hours.
 
 **An optional ridge ties the coefficients to an anchor fit** (normally the two-stage fit at the same
-cut), `lambda * (theta - anchor)' G (theta - anchor)` with `G` the plain Gram matrix of the same
-rows, so `lambda` is measured against the data's own weight and the shapes move only as far as the
+cut), `lambda * (theta - anchor)' G (theta - anchor)` with `G` the plain Gram matrix of the loss's
+cases, so `lambda` is measured against the data's own weight and the shapes move only as far as the
 corrected error needs.
 
 **The filter reads the training residuals, which are in-sample.** They are smaller than the
@@ -45,7 +46,7 @@ import torch
 
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS, usable_cutoff_positions
 from studies.dp_features import FeatureCache, naive_utc
-from studies.dp_filter_grid import correction_at_cutoffs, run_kalman_grid
+from studies.dp_filter_grid import correction_at_cutoffs, resolve_device, run_kalman_grid
 from studies.dp_gam import (
     DEFAULT_MAX_ITERATIONS,
     N_BANDS,
@@ -55,6 +56,7 @@ from studies.dp_gam import (
     GamSpec,
     TrainingWindow,
     accumulate_gram,
+    check_pinned_capacity,
     design_matrix,
     last_signal_season_year,
     penalty_matrix,
@@ -64,6 +66,9 @@ from studies.dp_gam import (
     solve_bounded_quadratic,
 )
 from studies.dp_pinned_capacity import PinnedCapacity
+
+HALF_HOUR: Final[np.timedelta64] = np.timedelta64(30, "m")
+"""The width of a grid row, to find the start of the first row."""
 
 BURN_IN_DAYS: Final[int] = 14
 """The first days of the window are left out of the loss, while the filter converges."""
@@ -142,12 +147,25 @@ def corrected_normal_equations(
         The normal equations.
 
     Raises:
-        ValueError: If a case's target is not a stream row, or the shapes disagree.
+        ValueError: If a case's target is not a stream row, the shapes disagree, a design value is
+            not finite, there is no stream row or case, or `hyper` has the wrong shape.
     """
     if columns.shape[0] != len(rows) or target.shape != rows.shape:
         msg = "columns, target, and rows must have one entry per stream row"
         raise ValueError(msg)
+    if len(rows) == 0 or len(case_target) == 0:
+        msg = "the joint loss needs at least one stream row and one case"
+        raise ValueError(msg)
+    if not (np.isfinite(columns).all() and np.isfinite(target).all()):
+        msg = "every design column and the target must be finite on every stream row"
+        raise ValueError(msg)
+    if np.asarray(hyper).shape not in {(4,), (N_BANDS, 4)}:
+        msg = f"hyper must have shape (4,) or ({N_BANDS}, 4), not {np.asarray(hyper).shape}"
+        raise ValueError(msg)
     first, last = int(rows[0]), int(rows[-1])
+    if case_target.min() < first or case_target.max() > last:
+        msg = "every case's target must be a stream row"
+        raise ValueError(msg)
     local = rows - first
     n_local = last - first + 1
     streams = np.full((columns.shape[1] + 1, n_local), np.nan)
@@ -189,7 +207,9 @@ def loss_cases(
     """Return the grid positions of the loss's targets and of the newest reading each may use.
 
     A training row is a target when it is a stream row, ends more than `BURN_IN_DAYS` days after the
-    first stream row, and has a usable reading before its initialisation's cutoff.
+    first stream row, and its cutoff lies at or after the first stream row. A case whose hour band
+    has no reading before its cutoff gets a correction of zero. The filter reads every stream row,
+    including rows that the loss does not train on (lockdown and switching rows).
 
     Args:
         cache: The cache.
@@ -239,108 +259,6 @@ def stream_rows(
     return np.flatnonzero(keep)
 
 
-def fit_joint_gam(
-    *,
-    cache: FeatureCache,
-    site: str,
-    spec: GamSpec,
-    cut: datetime,
-    window: TrainingWindow,
-    season_years: Sequence[int],
-    hyper: np.ndarray,
-    pinned: PinnedCapacity | None = None,
-    anchor: GamFit | None = None,
-    ridges: Sequence[float] = (0.0,),
-    device: str | None = None,
-) -> list[GamFit]:
-    """Fit the convex model of one substation through the Kalman filter.
-
-    Args:
-        cache: The cache.
-        site: The substation's label.
-        spec: The penalties and drift form.
-        cut: The cut; no row ends after it.
-        window: The window rule.
-        season_years: The season-years with a capacity increment.
-        hyper: The filter's unconstrained settings, shape `(4,)` or `(B, 4)`.
-        pinned: The pinned capacity built for `cut`; required exactly when the spec pins it.
-        anchor: The fit whose coefficients the ridge pulls towards, with the same layout.
-        ridges: The ridge weights `lambda` against the plain Gram matrix, one fit each; 0 for
-            none. Every weight shares one pass of the filter over the design columns.
-        device: Where the filter and the solve run.
-
-    Returns:
-        One fitted model per ridge weight, each with the same layout and fields as
-        `studies.dp_gam.fit_gam`'s.
-
-    Raises:
-        ValueError: If a ridge is asked for without an anchor, or the anchor's layout differs.
-    """
-    if any(ridge > 0.0 for ridge in ridges) and anchor is None:
-        msg = "a ridge needs an anchor fit"
-        raise ValueError(msg)
-    layout, index = prepare_fit(
-        cache=cache, site=site, spec=spec, cut=cut, window=window, season_years=season_years
-    )
-    if anchor is not None and anchor.layout.n_columns != layout.n_columns:
-        msg = "the anchor's layout differs from the joint fit's"
-        raise ValueError(msg)
-    features = cache.sites[site]
-    start = cache.end_times[index[0]] - np.timedelta64(30, "m")
-    rows = stream_rows(cache=cache, site=site, cut=cut, start=start)
-    columns, target = stream_design(cache=cache, site=site, layout=layout, rows=rows, pinned=pinned)
-    case_target, case_cutoff = loss_cases(cache=cache, index=index, rows=rows)
-    problem = corrected_normal_equations(
-        columns=columns,
-        target=target,
-        rows=rows,
-        band=cache.calendar.band,
-        case_target=case_target,
-        case_cutoff=case_cutoff,
-        hyper=hyper,
-        device=device,
-    )
-    matrix_np, cost_np = penalty_matrix(layout=layout, n_rows=len(index))
-    base = problem.gram + torch.as_tensor(matrix_np, dtype=torch.float64)
-    base_rhs = problem.rhs - 0.5 * torch.as_tensor(cost_np, dtype=torch.float64)
-    matrices, right_hand_sides = [], []
-    if anchor is not None:
-        plain, _ = accumulate_gram(
-            cache=cache, features=features, layout=layout, index=index, pinned=pinned
-        )
-        pull = plain[0] @ torch.as_tensor(anchor.theta[0], dtype=torch.float64)
-    for ridge in ridges:
-        if ridge > 0.0:
-            matrices.append(base + ridge * plain[0])
-            right_hand_sides.append(base_rhs + ridge * pull)
-        else:
-            matrices.append(base)
-            right_hand_sides.append(base_rhs)
-    where = device or "cpu"
-    theta, violation = solve_bounded_quadratic(
-        matrix=torch.stack(matrices).to(where),
-        rhs=torch.stack(right_hand_sides).to(where),
-        constrained=torch.as_tensor(layout.constrained),
-        max_iterations=NODE_MAX_ITERATIONS if spec.node is not None else DEFAULT_MAX_ITERATIONS,
-    )
-    last_season_year = last_signal_season_year(
-        cache=cache, site=site, index=index, cut=cut, pinned=pinned
-    )
-    return [
-        GamFit(
-            layout=layout,
-            theta=theta[member : member + 1].cpu().numpy(),
-            cut=cut,
-            n_rows=len(index),
-            site=site,
-            last_season_year=last_season_year,
-            violation=violation[member : member + 1].cpu().numpy(),
-            pinned=pinned,
-        )
-        for member in range(len(ridges))
-    ]
-
-
 def stream_design(
     *,
     cache: FeatureCache,
@@ -380,3 +298,126 @@ def stream_design(
             )
         targets.append(target)
     return np.concatenate(designs), np.concatenate(targets)
+
+
+def fit_joint_gam(
+    *,
+    cache: FeatureCache,
+    site: str,
+    spec: GamSpec,
+    cut: datetime,
+    window: TrainingWindow,
+    season_years: Sequence[int],
+    hyper: np.ndarray,
+    pinned: PinnedCapacity | None = None,
+    anchor: GamFit | None = None,
+    ridges: Sequence[float] = (0.0,),
+    device: str | None = None,
+) -> list[GamFit]:
+    """Fit the convex model of one substation through the Kalman filter.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        spec: The penalties and drift form.
+        cut: The cut; no row ends after it.
+        window: The window rule.
+        season_years: The season-years with a capacity increment.
+        hyper: The filter's unconstrained settings, shape `(4,)` or `(B, 4)`.
+        pinned: The pinned capacity built for `cut`; required exactly when the spec pins it.
+        anchor: The fit whose coefficients the ridge pulls towards, with the same layout.
+        ridges: The ridge weights `lambda` against the plain Gram matrix, one fit each; 0 for
+            none. Every weight shares one pass of the filter over the design columns.
+        device: A torch device name for the filter and the solve, or `None` for CUDA when
+            available, otherwise the CPU.
+
+    Returns:
+        One fitted model per ridge weight, each with the same layout and fields as
+        `studies.dp_gam.fit_gam`'s.
+
+    Raises:
+        ValueError: If a ridge is negative or asked for without an anchor, the anchor's layout
+            differs, the spec has an orthogonal penalty (not supported here), the pinned capacity is
+            missing or unexpected, or the fit has no loss case.
+    """
+    if any(ridge < 0.0 for ridge in ridges):
+        msg = "a ridge weight cannot be negative"
+        raise ValueError(msg)
+    if any(ridge > 0.0 for ridge in ridges) and anchor is None:
+        msg = "a ridge needs an anchor fit"
+        raise ValueError(msg)
+    if spec.orthogonal_penalty > 0.0:
+        msg = "the joint fit does not support an orthogonal penalty"
+        raise ValueError(msg)
+    check_pinned_capacity(
+        capacity=spec.capacity, pinned=pinned, site=site, features=cache.sites[site], cut=cut
+    )
+    layout, index = prepare_fit(
+        cache=cache, site=site, spec=spec, cut=cut, window=window, season_years=season_years
+    )
+    if anchor is not None and anchor.layout.n_columns != layout.n_columns:
+        msg = "the anchor's layout differs from the joint fit's"
+        raise ValueError(msg)
+    features = cache.sites[site]
+    start = cache.end_times[index[0]] - HALF_HOUR
+    rows = stream_rows(cache=cache, site=site, cut=cut, start=start)
+    columns, target = stream_design(cache=cache, site=site, layout=layout, rows=rows, pinned=pinned)
+    case_target, case_cutoff = loss_cases(cache=cache, index=index, rows=rows)
+    if len(case_target) == 0:
+        msg = f"{site} has no loss case before {cut}"
+        raise ValueError(msg)
+    problem = corrected_normal_equations(
+        columns=columns,
+        target=target,
+        rows=rows,
+        band=cache.calendar.band,
+        case_target=case_target,
+        case_cutoff=case_cutoff,
+        hyper=hyper,
+        device=device,
+    )
+    matrix_np, cost_np = penalty_matrix(layout=layout, n_rows=len(index))
+    base = problem.gram + torch.as_tensor(matrix_np, dtype=torch.float64)
+    base_rhs = problem.rhs - 0.5 * torch.as_tensor(cost_np, dtype=torch.float64)
+    matrices: list[torch.Tensor] = []
+    right_hand_sides: list[torch.Tensor] = []
+    if anchor is not None and any(ridge > 0.0 for ridge in ridges):
+        plain, _ = accumulate_gram(
+            cache=cache,
+            features=features,
+            layout=layout,
+            index=index,
+            weights=np.isin(index, case_target).astype(np.float64)[None],
+            pinned=pinned,
+        )
+        pull = plain[0] @ torch.as_tensor(anchor.theta[0], dtype=torch.float64)
+    for ridge in ridges:
+        if ridge > 0.0:
+            matrices.append(base + ridge * plain[0])
+            right_hand_sides.append(base_rhs + ridge * pull)
+        else:
+            matrices.append(base)
+            right_hand_sides.append(base_rhs)
+    where = resolve_device(device=device)
+    theta, violation = solve_bounded_quadratic(
+        matrix=torch.stack(matrices).to(where),
+        rhs=torch.stack(right_hand_sides).to(where),
+        constrained=torch.as_tensor(layout.constrained),
+        max_iterations=NODE_MAX_ITERATIONS if spec.node is not None else DEFAULT_MAX_ITERATIONS,
+    )
+    last_season_year = last_signal_season_year(
+        cache=cache, site=site, index=index, cut=cut, pinned=pinned
+    )
+    return [
+        GamFit(
+            layout=layout,
+            theta=theta[member : member + 1].cpu().numpy(),
+            cut=cut,
+            n_rows=len(index),
+            site=site,
+            last_season_year=last_season_year,
+            violation=violation[member : member + 1].cpu().numpy(),
+            pinned=pinned,
+        )
+        for member in range(len(ridges))
+    ]

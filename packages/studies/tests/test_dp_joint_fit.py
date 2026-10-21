@@ -26,13 +26,16 @@ from studies.dp_gam import (  # noqa: E402
     TrainingWindow,
     design_matrix,
     fit_gam,
+    penalty_matrix,
     prepare_fit,
 )
 from studies.dp_joint_fit import (  # noqa: E402
+    BURN_IN_DAYS,
     corrected_normal_equations,
     day_ahead_initialisations,
     fit_joint_gam,
     loss_cases,
+    stream_design,
     stream_rows,
 )
 
@@ -233,3 +236,156 @@ def test_the_gram_matches_a_column_by_column_dense_reference_with_gaps_and_a_bin
     zy = corrected(problem["target"])
     assert np.allclose(normal.gram.numpy(), z.T @ z, rtol=1e-8, atol=1e-8)
     assert np.allclose(normal.rhs.numpy(), z.T @ zy, rtol=1e-8, atol=1e-8)
+
+
+def test_windows_of_consecutive_days_tile_the_time_axis():
+    ends = np.arange(
+        np.datetime64("2025-03-01T00:30", "us"),
+        np.datetime64("2025-03-11T00:30", "us"),
+        np.timedelta64(30, "m"),
+    )
+    initialisation = day_ahead_initialisations(end_times=ends)
+    assert (np.diff(initialisation.astype(np.int64)) >= 0).all()
+    _, counts = np.unique(initialisation, return_counts=True)
+    assert (counts[1:-1] == 48).all()
+
+
+def test_a_non_finite_design_value_is_refused():
+    problem = _problem(seed=6)
+    problem["columns"][3, 1] = np.nan
+    with pytest.raises(ValueError, match="finite"):
+        corrected_normal_equations(**problem, hyper=HYPER, device="cpu")
+
+
+def test_streams_that_start_late_and_per_band_settings_match_the_dense_reference():
+    problem = _problem(seed=7)
+    keep = problem["rows"] > 60
+    for name in ("columns", "target", "rows"):
+        problem[name] = problem[name][keep]
+    inside = np.isin(problem["case_target"], problem["rows"])
+    problem["case_target"] = problem["case_target"][inside]
+    problem["case_cutoff"] = problem["case_cutoff"][inside]
+    per_band = np.stack([HYPER + 0.2 * band for band in range(N_BANDS)])
+    normal = corrected_normal_equations(**problem, hyper=per_band, device="cpu")
+    assert normal.n_cases == len(problem["case_target"])
+    stream = np.full(N_ROWS, np.nan)
+    theta = np.random.default_rng(8).normal(size=problem["columns"].shape[1])
+    stream[problem["rows"]] = problem["target"] - problem["columns"] @ theta
+    band_of_case = problem["band"][problem["case_target"]]
+    expected = np.zeros(len(band_of_case))
+    for band in range(N_BANDS):
+        trace = run_kalman(
+            residual=stream,
+            band=problem["band"],
+            hyper=FilterHyperparameters.from_array(values=per_band[band]),
+        )
+        total = correction_at(
+            trace=trace,
+            cutoff=problem["case_cutoff"],
+            target=problem["case_target"],
+            band=band_of_case,
+        ).total
+        expected = np.where(band_of_case == band, total, expected)
+    error = stream[problem["case_target"]] - expected
+    quadratic = (
+        theta @ normal.gram.numpy() @ theta
+        - 2.0 * normal.rhs.numpy() @ theta
+        + normal.target_sum_squares
+    )
+    assert quadratic == pytest.approx(float(error @ error), rel=1e-9)
+
+
+def test_loss_cases_respect_the_cut_the_delay_and_the_burn_in(dp_synthetic_cache: FeatureCache):
+    cache, spec = _truth_cache(cache=dp_synthetic_cache)
+    _layout, index = prepare_fit(
+        cache=cache,
+        site="S1",
+        spec=spec,
+        cut=CUT,
+        window=TrainingWindow(months=12),
+        season_years=SEASON_YEARS,
+    )
+    rows = stream_rows(
+        cache=cache, site="S1", cut=CUT, start=cache.end_times[index[0]] - np.timedelta64(30, "m")
+    )
+    targets, cutoffs = loss_cases(cache=cache, index=index, rows=rows)
+    ends = cache.end_times
+    initialisation = day_ahead_initialisations(end_times=ends[targets])
+    assert np.isin(targets, rows).all()
+    assert (cutoffs < targets).all()
+    assert (cutoffs >= rows[0]).all()
+    assert (ends[cutoffs] <= initialisation - np.timedelta64(3 * 3600 + 1800, "s")).all()
+    assert (ends[targets] > ends[rows[0]] + np.timedelta64(BURN_IN_DAYS, "D")).all()
+    assert (ends[targets] <= np.datetime64(CUT.replace(tzinfo=None), "us")).all()
+
+
+def test_an_orthogonal_penalty_and_a_negative_ridge_are_refused(dp_synthetic_cache: FeatureCache):
+    cache, spec = _truth_cache(cache=dp_synthetic_cache)
+    arguments = _fit_arguments(cache=cache, spec=spec)
+    with pytest.raises(ValueError, match="orthogonal"):
+        fit_joint_gam(
+            **_fit_arguments(cache=cache, spec=replace(spec, orthogonal_penalty=1.0)), hyper=HYPER
+        )
+    with pytest.raises(ValueError, match="negative"):
+        fit_joint_gam(**arguments, hyper=HYPER, ridges=(-1.0,))
+
+
+def test_the_joint_fit_has_no_larger_true_loss_than_the_two_stage_fit(
+    dp_synthetic_cache: FeatureCache,
+):
+    cache, spec = _truth_cache(cache=dp_synthetic_cache)
+    arguments = _fit_arguments(cache=cache, spec=spec)
+    [joint] = fit_joint_gam(**arguments, hyper=HYPER, device="cpu")
+    two_stage = fit_gam(
+        cache=cache,
+        site="S1",
+        specs=[spec],
+        cut=CUT,
+        window=TrainingWindow(months=12),
+        season_years=SEASON_YEARS,
+    )
+    _layout, index = prepare_fit(
+        cache=cache,
+        site="S1",
+        spec=spec,
+        cut=CUT,
+        window=TrainingWindow(months=12),
+        season_years=SEASON_YEARS,
+    )
+    rows = stream_rows(
+        cache=cache, site="S1", cut=CUT, start=cache.end_times[index[0]] - np.timedelta64(30, "m")
+    )
+    columns, target = stream_design(
+        cache=cache, site="S1", layout=joint.layout, rows=rows, pinned=None
+    )
+    targets, cutoffs = loss_cases(cache=cache, index=index, rows=rows)
+    matrix, cost = penalty_matrix(layout=joint.layout, n_rows=len(index))
+
+    def penalised_loss(theta: np.ndarray) -> float:
+        residual = np.full(len(cache.end_times), np.nan)
+        residual[rows] = target - columns @ theta
+        trace = run_kalman(
+            residual=residual,
+            band=cache.calendar.band,
+            hyper=FilterHyperparameters.from_array(values=HYPER),
+        )
+        correction = correction_at(
+            trace=trace, cutoff=cutoffs, target=targets, band=cache.calendar.band[targets]
+        ).total
+        error = residual[targets] - correction
+        return float(error @ error + theta @ matrix @ theta + cost @ theta)
+
+    assert penalised_loss(joint.theta[0]) < penalised_loss(two_stage.theta[0])
+    assert penalised_loss(joint.theta[0]) < penalised_loss(joint.theta[0] * 1.01)
+
+
+def test_more_ridge_keeps_the_fit_closer_to_the_anchor(dp_synthetic_cache: FeatureCache):
+    cache, spec = _truth_cache(cache=dp_synthetic_cache)
+    arguments = _fit_arguments(cache=cache, spec=spec)
+    [anchor] = fit_joint_gam(**arguments, hyper=NO_FILTER, device="cpu")
+    fits = fit_joint_gam(
+        **arguments, hyper=HYPER, anchor=anchor, ridges=(0.0, 0.3, 3.0, 30.0), device="cpu"
+    )
+    distance = [float(np.linalg.norm(fit.theta - anchor.theta)) for fit in fits]
+    assert distance == sorted(distance, reverse=True)
+    assert distance[0] > 10.0 * distance[-1] > 0.0
