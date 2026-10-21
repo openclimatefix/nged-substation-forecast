@@ -1,0 +1,114 @@
+== Line (b) per seed: slope on the heating contribution and heating RMSE
+shape: (10, 6)
+┌─────────────────┬────────┬───────────────────┬─────────────┬──────────────────┬────────────┐
+│ period          ┆ seed   ┆ Pooled fit (tuned ┆ Fair oracle ┆ Complete pooling ┆ No pooling │
+│ ---             ┆ ---    ┆ penalty)          ┆ ---         ┆ ---              ┆ ---        │
+│ str             ┆ str    ┆ ---               ┆ f64         ┆ f64              ┆ f64        │
+│                 ┆        ┆ f64               ┆             ┆                  ┆            │
+╞═════════════════╪════════╪═══════════════════╪═════════════╪══════════════════╪════════════╡
+│ 4 June weeks    ┆ seed 1 ┆ 2.012791          ┆ 2.767735    ┆ 2.071517         ┆ 9.442504   │
+│ 4 June weeks    ┆ seed 2 ┆ 2.161052          ┆ 2.549546    ┆ 2.26641          ┆ 6.892872   │
+│ 4 June weeks    ┆ seed 3 ┆ 2.12735           ┆ 2.35286     ┆ 2.225896         ┆ 6.369511   │
+│ 4 June weeks    ┆ seed 4 ┆ 2.320344          ┆ 3.28555     ┆ 2.335839         ┆ 7.164603   │
+│ 4 June weeks    ┆ seed 5 ┆ 2.379253          ┆ 3.44655     ┆ 2.428701         ┆ 12.039033  │
+│ 4 January weeks ┆ seed 1 ┆ 1.87462           ┆ 2.370238    ┆ 2.103846         ┆ 5.210371   │
+│ 4 January weeks ┆ seed 2 ┆ 1.988811          ┆ 2.301521    ┆ 2.28749          ┆ 4.334115   │
+│ 4 January weeks ┆ seed 3 ┆ 1.993972          ┆ 2.584486    ┆ 2.171069         ┆ 5.506199   │
+│ 4 January weeks ┆ seed 4 ┆ 2.262535          ┆ 4.058343    ┆ 2.197676         ┆ 8.40521    │
+│ 4 January weeks ┆ seed 5 ┆ 2.460585          ┆ 3.219024    ┆ 2.632043         ┆ 4.303106   │
+└─────────────────┴────────┴───────────────────┴─────────────┴──────────────────┴────────────┘
+shape: (10, 6)
+┌─────────────────┬────────┬───────────────────┬─────────────┬──────────────────┬────────────┐
+│ period          ┆ seed   ┆ Pooled fit (tuned ┆ Fair oracle ┆ Complete pooling ┆ No pooling │
+│ ---             ┆ ---    ┆ penalty)          ┆ ---         ┆ ---              ┆ ---        │
+│ str             ┆ str    ┆ ---               ┆ f64         ┆ f64              ┆ f64        │
+│                 ┆        ┆ f64               ┆             ┆                  ┆            │
+╞═════════════════╪════════╪═══════════════════╪═════════════╪══════════════════╪════════════╡
+│ 4 June weeks    ┆ seed 1 ┆ 0.059293          ┆ 0.352276    ┆ 0.000073         ┆ 0.896175   │
+│ 4 June weeks    ┆ seed 2 ┆ 0.074985          ┆ 0.427555    ┆ 0.000097         ┆ 1.125012   │
+│ 4 June weeks    ┆ seed 3 ┆ 0.03984           ┆ 0.4184      ┆ 0.000041         ┆ 1.012177   │
+│ 4 June weeks    ┆ seed 4 ┆ 0.02153           ┆ -0.097695   ┆ 0.000022         ┆ -0.527071  │
+│ 4 June weeks    ┆ seed 5 ┆ -0.015158         ┆ 0.081202    ┆ -0.000035        ┆ -0.052019  │
+│ 4 January weeks ┆ seed 1 ┆ 0.320697          ┆ 0.807861    ┆ 0.00058          ┆ 0.763139   │
+│ 4 January weeks ┆ seed 2 ┆ 0.323456          ┆ 0.909325    ┆ 0.00057          ┆ 1.049521   │
+│ 4 January weeks ┆ seed 3 ┆ 0.2003            ┆ 0.62908     ┆ 0.000352         ┆ 0.941823   │
+│ 4 January weeks ┆ seed 4 ┆ 0.498948          ┆ 1.061652    ┆ 0.000483         ┆ 1.390015   │
+│ 4 January weeks ┆ seed 5 ┆ 0.277573          ┆ 0.742222    ┆ 0.000621         ┆ 0.902794   │
+└─────────────────┴────────┴───────────────────┴─────────────┴──────────────────┴────────────┘
+== Decision rule
+{
+  "n_seeds": 5,
+  "pass_counts": {
+    "a": 4,
+    "b": 2,
+    "b_controls_fail": 3,
+    "c": 2,
+    "d": 5,
+    "e": 5,
+    "control_no_pooling_passes_b": 0,
+    "control_complete_pooling_passes_b": 2
+  },
+  "gate_passed": false,
+  "tuning_stable": true,
+  "verdict": "inconclusive",
+  "per_seed": {
+    "20261101": {
+      "a": false,
+      "b": false,
+      "b_controls_fail": true,
+      "c": false,
+      "d": true,
+      "e": true
+    },
+    "20261102": {
+      "a": true,
+      "b": false,
+      "b_controls_fail": true,
+      "c": true,
+      "d": true,
+      "e": true
+    },
+    "20261103": {
+      "a": true,
+      "b": false,
+      "b_controls_fail": true,
+      "c": false,
+      "d": true,
+      "e": true
+    },
+    "20261104": {
+      "a": true,
+      "b": true,
+      "b_controls_fail": false,
+      "c": false,
+      "d": true,
+      "e": true
+    },
+    "20261105": {
+      "a": true,
+      "b": true,
+      "b_controls_fail": false,
+      "c": true,
+      "d": true,
+      "e": true
+    }
+  }
+}
+== Lines (a), (c), (d), (e) per seed
+seed 20261101: (a) profile rms 0.518, max band error 0.054; (c) slope 0.836; (d) lambda* 1000, truth-best 1000, mae-tuned 1000; (e) within 25%: {'4w': 8, '3m': 8, 'g_4w': 0, 'g_3m': 6}
+seed 20261102: (a) profile rms 0.402, max band error 0.024; (c) slope 0.940; (d) lambda* 1000, truth-best 300, mae-tuned 300; (e) within 25%: {'4w': 8, '3m': 8, 'g_4w': 0, 'g_3m': 8}
+seed 20261103: (a) profile rms 0.461, max band error 0.055; (c) slope 0.820; (d) lambda* 1000, truth-best 1000, mae-tuned 300; (e) within 25%: {'4w': 8, '3m': 8, 'g_4w': 0, 'g_3m': 6}
+seed 20261104: (a) profile rms 0.474, max band error 0.050; (c) slope 0.825; (d) lambda* 300, truth-best 100, mae-tuned 300; (e) within 25%: {'4w': 8, '3m': 8, 'g_4w': 0, 'g_3m': 7}
+seed 20261105: (a) profile rms 0.363, max band error 0.028; (c) slope 0.910; (d) lambda* 1000, truth-best 1000, mae-tuned 1000; (e) within 25%: {'4w': 8, '3m': 8, 'g_4w': 0, 'g_3m': 5}
+== Fair oracle capacity ratios (fitted over true), June, per seed
+seed 20261101: 1.03 1.08 0.96 0.91 1.09 0.99 1.01 1.17
+seed 20261102: 1.03 1.03 1.19 1.05 1.02 1.00 1.02 1.20
+seed 20261103: 0.99 0.95 0.93 0.95 1.10 1.01 1.10 1.01
+seed 20261104: 0.97 1.06 1.11 1.05 1.13 1.02 0.92 1.09
+seed 20261105: 1.04 0.97 0.98 1.05 1.00 1.12 0.90 0.91
+== Winter (post hoc) line (b)
+seed 20261101: pooled slope 0.32 rmse 1.87; oracle slope 0.81 rmse 2.37; passes line (b): complete pooling False, no pooling False
+seed 20261102: pooled slope 0.32 rmse 1.99; oracle slope 0.91 rmse 2.30; passes line (b): complete pooling False, no pooling False
+seed 20261103: pooled slope 0.20 rmse 1.99; oracle slope 0.63 rmse 2.58; passes line (b): complete pooling False, no pooling False
+seed 20261104: pooled slope 0.50 rmse 2.26; oracle slope 1.06 rmse 4.06; passes line (b): complete pooling False, no pooling False
+seed 20261105: pooled slope 0.28 rmse 2.46; oracle slope 0.74 rmse 3.22; passes line (b): complete pooling False, no pooling False
