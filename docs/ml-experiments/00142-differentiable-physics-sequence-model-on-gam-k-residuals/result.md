@@ -57,77 +57,102 @@ the pinball loss is the standard training loss of quantile regression
 ## Design
 
 - **Substations.** The six substations whose member forecasts experiment 111 stored (D5, D10, D11,
-  D14, D16, and D9). The other DP series have no stored GAM-K member forecasts, and no demand model
-  is refitted. D9 is trained on but reported beside the five decision substations.
-- **One sample per (substation, run).** 821 runs per substation, about 4,900 samples. Target: the
+  D14, D16, and D9). Experiment 111's ensemble store holds seven series (those six and D18), so the
+  other DP series have no stored GAM-K member forecasts, and no demand model is refitted. D9 is trained on but reported beside the five decision substations.
+- **One sample per (substation, run).** 810 runs per substation, of which about 530 precede the scored year: about 3,200 training samples, and about 1,100 for the odd-months-only fit. Consecutive samples share 13 of 14 input days, so the independent information is about one year of days per substation. Target: the
   48 half-hours of day D+1 (leads 15.5 to 39 hours), as actual minus K0's median forecast.
-- **Input.** The 14 local days before the origin's day, plus a 15th partial day, as vectors of 48
+- **Clock.** Every day, the day type, the holiday flag, and the output index use the UTC day and the UTC half-hour (0 to 47), the day D+1 being a UTC day. No local clock enters.
+- **Input.** The 14 UTC days before the origin's day, plus a 15th partial day, as vectors of 48
   half-hour residuals from `SiteData.stream` (observed minus the chained GAM fit, driven by the
   analysis proxy, ending at the origin's latest usable reading, 3.5 hours before the 09:00 UTC
   origin) with a reading mask; each day carries its day type (five types, as in experiment 134) and
   a holiday-like flag. Missing readings are zero with mask zero. The target day enters through its
   day type, holiday-like flag, Christmas-window flag, and the calibrated ECMWF ensemble-mean
   temperature and irradiance at its 48 half-hours (published by the origin, so available at
-  forecast time). The target day's actuals are never an input.
+  forecast time; past days use the analysis proxy, as in experiment 111). The target day's actuals are never an input.
 - **Network.** A one-layer gated recurrent unit (32 hidden units) over the 15 day vectors, a
   substation embedding (4 dimensions), and a two-layer head (64 units) producing 144 numbers per
   sample: a median correction per half-hour, and a lower and an upper log-scale per half-hour that
   stretch K0's own quantile offsets (the distance of each K0 quantile from K0's median), so the 11
-  quantiles cannot cross. About 25,000 parameters. Adam, weight decay, dropout 0.1, early stopping
-  on a month-block validation fold.
-- **Arms.** K0; R; SEQ-median (median correction trained on absolute error; the spread is rebuilt
+  quantiles cannot cross. About 35,000 parameters. AdamW, weight decay, dropout 0.1. Early stopping uses
+  month-block validation folds, purged by 15 days either side of the held-out block; the
+  early-stopped model is the one used (no refit).
+- **Arms.** K0; R; SEQ-ridge (a ridge regression of the same median correction on the same inputs,
+  the linear reference; if the network does not beat it, a network is not needed); SEQ-blind (the
+  SEQ-quantile network with the residual input zeroed, so that any gain from the weather and
+  day-type scale heads alone can be told apart from reading the residuals); SEQ-median (median correction trained on absolute error; the spread is rebuilt
   by experiment 111's routine as for every other arm); SEQ-quantile (the correction and the two
   scales trained with the pinball loss at the 11 quantiles).
 - **Training sets.** Replicate comparison: train on the odd (tuning) months only and score the even
   months. Scored-year comparison: train on all runs whose valid times fall before 2025-07-01
-  (embargoing the last 2 days), early stopping on a month-block fold held out of those. Ten seeds,
-  averaged by quantile; seed is fixed per job, one GPU job at a time.
-- **Compute.** About 5,000 samples and 25,000 parameters: seconds per fit on the GPU. The whole
-  experiment is far inside the 2 GPU-hour cap. Worker threads are set to 1.
+  (embargoing the last 2 days), early stopping on a month-block fold held out of those. The final
+  forecast averages the fold models (3 folds for the replicate fit, 5 for the scored-year fit) and
+  2 seeds each; the seed is fixed per job.
+- **Compute.** About 3,000 samples and 35,000 parameters: seconds per fit, on the GPU if it is
+  free and on the CPU otherwise, far inside the 2 GPU-hour cap. Every script runs under
+  `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue` with one thread per worker.
+- **Other leads.** The network outputs day D+1 only. Every arm built on it equals K0 at other leads,
+  so the all-lead columns show R's lead-band behaviour against K0 and SEQ's equal to K0.
 - **Reuse.** Rows, periods, scoring, bootstrap, breakdowns, and charts are experiment 134's, copied
   into this folder with the prefix `e00142_`. No change to `src/` or `packages/`.
 
 ## Planned contrasts (99% month-resampled paired intervals; D-labels only)
 
+- **C0.** SEQ-quantile minus SEQ-blind (does reading the residuals help beyond the weather and day-type scale heads).
 - **C1.** SEQ-median minus R at D+1, scored year (decides the verdict), and replicate months.
 - **C2.** SEQ-quantile minus R at D+1, scored year, and replicate months.
 - **C3.** SEQ-quantile minus SEQ-median at D+1 (does the quantile loss help the tails).
-- **C4.** SEQ-median minus K0, and SEQ-quantile minus K0.
+- **C4.** SEQ-median minus K0, SEQ-quantile minus K0, and SEQ-median minus SEQ-ridge.
 - Beside them: all lead bands, winter, winter evening peaks (16:00 to 20:00), cold nights (daily
   mean under about 3 degrees C) with q95 coverage, holidays and the days after them, and
   Christmas; tail coverage and pinball at q01, q05, q95, q99; the training-versus-validation gap.
 
 ## Predictions
 
-- **P1.** SEQ-median minus R is between -0.03 and +0.05 points at D+1 in the scored year; the
-  most likely outcome is that R is as good (about 5,000 samples cannot teach a 14-day window more
-  than a shrunk mean).
-- **P2.** SEQ-quantile minus SEQ-median is between -0.05 and +0.02.
-- **P3.** Cold-night q95 coverage of SEQ-quantile is below 83% (K0: 73 to 78%).
-- **P4.** The pinball loss on the training rows is more than 20% below the validation rows'.
-- **P5.** No arm improves holidays or Christmas by more than 0.1 points (the networks see few).
+- **P1.** SEQ-median minus R is between -0.03 and +0.05 points at D+1 in the scored year, with a
+  99% interval about 0.03 wide; the most likely outcome is a null.
+- **P2.** SEQ-quantile minus SEQ-median is between -0.05 and +0.02, and SEQ-quantile minus R is
+  between -0.05 and +0.03.
+- **P3.** Cold-night q95 coverage of SEQ-quantile is between 74% and 82% (K0: 73 to 78%); it does not
+  reach 90%.
+- **P4.** SEQ-quantile minus SEQ-blind is between -0.03 and 0.00: most of any tail gain comes from
+  the weather and day-type heads, not from the residual history.
+- **P5.** SEQ-ridge scores within 0.02 points of SEQ-median.
+- **P6.** The validation pinball loss exceeds the training loss by 10% or more in the replicate fit
+  and by less than that in the scored-year fit.
+- **P7.** Holidays and Christmas have too few rows (about 400 and 100 per substation-year) for any
+  contrast to exclude zero.
 
 ## Decision rule
 
-**The threshold is 0.02 points at D+1.** A serving-path model is a new component that has to be
-trained, versioned, and monitored, so a gain smaller than 0.02 points would not pay for it. SEQ is
-`supported` if SEQ-median or SEQ-quantile beats R by at least 0.02 points with a 99% interval
-excluding zero in the scored year, the replicate months agree in sign, and the cold-night q95
-coverage is not worse than R's. It is `small gain` if the interval excludes zero but the gain is
-under 0.02. It is `not supported` otherwise, and a clean negative is a fine result. A training-
-versus-validation gap over 20% is reported but does not by itself change the verdict.
+**The threshold is 0.02 points at D+1, applied to the point estimate; the 99% interval must also
+exclude zero.** A serving-path model is a new component that has to be trained, versioned, and
+monitored, so a smaller gain would not pay for it. The primary arm for the verdict is SEQ-median
+against R (C1); SEQ-quantile against SEQ-median (C3) decides the tail claim only. SEQ-median is
+`supported` if C1 is at most -0.02 with the interval excluding zero in the scored year, the
+replicate months agree in sign, and SEQ-median beats SEQ-ridge. It is `small gain` if the interval
+excludes zero but the estimate is above -0.02. A tail gain is supported if C3 excludes zero below
+zero and cold-night q95 coverage moves at least 5 points towards 95% without SEQ-blind doing the
+same. Otherwise the verdict is `not supported`, and a clean negative is a fine result. A failed gate
+caps the verdict at `inconclusive`. The scored-year network trains on all pre-scored months while
+R's kappa was tuned on the odd months only; this asymmetry favours the network and is a caveat.
 
 ## Known-answer gate on real residuals (before any scored fit)
 
-**On the tuning months, a level step of +3 points and a Saturday-evening shift of +3 points for
-eight weeks are added to the real residual input and to the real targets.** Gate conditions: the
-trained network (trained on clean data, not on the injection) adapts within 3 days to the level step
-(recovers at least 50% of the step from the third day) and recovers at least 15% of the Saturday
-shape by the third injected Saturday, as experiment 134's gate required of RB. The **absorption
-test** follows experiment 135: the network is also retrained with the injection present in the
-training windows; it passes only if it does not recover more than the clean-trained network from
-days it has not seen, i.e. it must not memorise the injected pattern from the calendar. A failing
-gate stops the experiment before any replicate or scored forecast is read.
+**Two injections are added to the real tuning-month residual inputs and targets of the validation
+folds, and the network was trained on clean data.** (a) A level step of +3 points for eight weeks:
+the network must recover at least 30% of the step from the third day on and more than R does.
+(b) A +3-point shift on Saturdays 17:00 to 21:00 UTC for eight weeks: it must recover at least 15%
+of the shift from the third injected Saturday on, as experiment 134's gate required of RB. The
+networks are scored on the validation folds that they did not train on, and the gate tests the
+architecture's ability to adapt on real residuals, not its usefulness.
+
+**The absorption test.** A second network is trained with the injection present in the training
+weeks A (the first four of the eight), and is evaluated on the later held-out weeks B twice, with
+the injection present and absent. It passes if, on the clean held-out weeks, its correction at the
+injected half-hours is under 25% of the shift: it must adapt from the residual inputs and not
+memorise the calendar position. A failed gate stops the experiment before any replicate or scored
+forecast is read.
 
 ## What this experiment will not say
 
