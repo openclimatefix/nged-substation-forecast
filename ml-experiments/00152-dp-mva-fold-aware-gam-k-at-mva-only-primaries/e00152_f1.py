@@ -159,7 +159,7 @@ def main() -> None:  # noqa: PLR0915
         float(np.quantile(boot, 0.975)),
     ]
     out["n_months"] = len(unique)
-    sd_u, sd_s = out["unsigned"]["residual_sd_mw"], out["signed"]["residual_sd_mw"]
+    sd_u, sd_s = out["unsigned"]["residual_sd_mw"], out["signed"]["residual_sd_mw"]  # ty: ignore[not-subscriptable]
     out["residual_sd_drop_share"] = float(1.0 - sd_s / sd_u)
     # Summary of BSP size for scale.
     out["bsp_reading_mean_mw"] = float(np.mean(y))

@@ -100,14 +100,14 @@ def tail_calibration(*, frame: pl.DataFrame) -> list[dict]:
         for column in QUANTILES:
             below = column in ("q01", "q05")
             row[column] = float(
-                (
+                (  # ty: ignore[invalid-argument-type]
                     (group["actual"] < group[column])
                     if below
                     else (group["actual"] > group[column])
                 ).mean()
             )
-        row["mean_error"] = float((group["mean"] - group["actual"]).mean())
-        row["median_minus_mean"] = float((group["q50"] - group["mean"]).mean())
+        row["mean_error"] = float((group["mean"] - group["actual"]).mean())  # ty: ignore[invalid-argument-type]
+        row["median_minus_mean"] = float((group["q50"] - group["mean"]).mean())  # ty: ignore[invalid-argument-type]
         rows.append(row)
     return rows
 
@@ -149,7 +149,7 @@ def main() -> None:
                 for s in common.MVA_ONLY_PRIMARIES
             },
             "absolute_score": {
-                f"{site}|{arm}": float(g["score"].mean())
+                f"{site}|{arm}": float(g["score"].mean())  # ty: ignore[invalid-argument-type]
                 for (site, arm), g in frame.group_by(["site", "arm"])
             },
             "tail": tail_calibration(frame=frame),

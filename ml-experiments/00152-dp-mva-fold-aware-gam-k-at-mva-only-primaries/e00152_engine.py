@@ -282,7 +282,7 @@ def forecast_run(
         fit = kind_fits[chosen]
         assert_cut_not_after(
             fit=fit if isinstance(fit, GamFit) else fit.fit,
-            origin=origin,  # ty: ignore[invalid-argument-type]
+            origin=origin,
         )
         reading, flow = predict(cache=driven, fit=fit, index=np.arange(n_targets))
         correction = correction_at(

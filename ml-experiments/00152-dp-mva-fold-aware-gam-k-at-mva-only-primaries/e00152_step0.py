@@ -146,10 +146,10 @@ def main() -> None:
                     "pv_capacity_mw": capacity_points * eff / 100.0,
                     "n_sunny_midday_rows": sub.height,
                     "share_reverse": reverse.height / sub.height,
-                    "mean_p_reverse": float(sub["p_reverse"].mean()),
-                    "share_reverse_sure": float((sub["p_reverse"] > 0.9).mean()),
-                    "largest_reverse_mw": float(-sub["flow_mw"].min()) if reverse.height else 0.0,
-                    "p95_reverse_mw": float(-sub["flow_mw"].quantile(0.05))
+                    "mean_p_reverse": float(sub["p_reverse"].mean()),  # ty: ignore[invalid-argument-type]
+                    "share_reverse_sure": float((sub["p_reverse"] > 0.9).mean()),  # ty: ignore[invalid-argument-type]
+                    "largest_reverse_mw": float(-sub["flow_mw"].min()) if reverse.height else 0.0,  # ty: ignore[invalid-argument-type, unsupported-operator]
+                    "p95_reverse_mw": float(-sub["flow_mw"].quantile(0.05))  # ty: ignore[unsupported-operator]
                     if reverse.height
                     else 0.0,
                     "lowest_reading_mva": lowest["reading_mva"],
