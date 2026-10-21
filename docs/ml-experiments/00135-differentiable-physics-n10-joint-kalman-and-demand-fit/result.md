@@ -25,21 +25,26 @@ prediction: C1 (J1 minus TS, quantile score at 12 to 36 hours, scored year, five
   by more than TS's do (the absorption control fails for J1), and J2's do not. The fitted
   shapes of J1 differ from TS's by a root mean square of 5% to 15% of each term's own root mean
   square, and J2's by under 5%.
-decision_rule: 'Two planned contrasts (C1 J1 minus TS, C2 J2 minus TS), each read at the 97.5%
-  level of the month-resampled paired bootstrap (12 calendar months of the scored year, 20,000
-  resamples), which is the Bonferroni level for two contrasts. A joint arm is `supported` when
-  its contrast interval lies wholly below zero, at least 4 of the 5 decision substations
-  improve in both the scored year and the replicate months, the score over all leads 0.5 to 168
-  hours has an interval upper bound of at most +0.02, AND the arm passes the absorption control
-  and the shape-stability bound (below). It is `small gain` when the interval lies wholly below
-  zero but a further condition fails. It is `refuted` when the interval lies wholly above zero.
-  Otherwise it is `inconclusive`. A joint arm that lowers the score and fails the absorption
-  control is reported as an identification failure, not a gain, whatever its score. The
-  threshold is zero, because a joint fit replaces the fitting routine inside the training loop
-  and adds no model, data source, or serving step. The shape-stability bound is that the
-  root-mean-square change of each fitted term (PV, heating, holiday, weekly profile) from TS is
-  under 10% of the root mean square of the term itself. The verdict
-  is capped at `inconclusive` if the reproduction control P1 fails.'
+decision_rule: 'Two planned contrasts (C1 J1 minus TS, C2 J2 minus TS), each read as a two-sided
+  percentile interval of the month-resampled paired bootstrap (12 calendar months of the scored
+  year, 20,000 resamples) at the 1.25% and 98.75% percentiles, the Bonferroni level for two
+  contrasts at 5%. The verdicts apply in this order. (1) The verdict is capped at `inconclusive` if
+  a blocking control fails: P1 (reproduction), P2 (the linear filter equals the filter), or P3
+  (the solved loss equals the loss of the filter run on the fitted residuals). (2) A joint arm that
+  lowers the score and fails the absorption control is reported as an identification failure
+  (`not supported`), whatever its score. (3) A joint arm is `supported` when its contrast
+  interval lies wholly below zero, at least 4 of the 5 decision substations improve by at least
+  0.005 points in both the scored year and the replicate months, the score over all leads 0.5 to
+  168 hours has an interval upper bound of at most +0.02, and it passes the absorption control. (4)
+  It is `small gain` when the interval lies wholly below zero but a condition of (3) fails. (5) It
+  is `refuted` when the interval lies wholly above zero. (6) Otherwise it is `inconclusive`, which
+  is the expected outcome for a true effect of a few hundredths of a point, because 12 months
+  pooled over 5 substations give wide intervals, and is not evidence of no effect. The threshold
+  is zero, because a joint fit replaces the fitting routine inside the training loop and adds no
+  model, data source, or serving step. The shape distance is reported, not binding: it feeds the
+  substation cards and the discussion of whether to port. The experiment tests only whether the
+  coefficients should be fitted through a filter with fixed noise settings, so a null result does
+  not rule out learning the noise settings and the coefficients together.'
 benchmark: TS, the two-stage GAM-K with the learned-noise filter settings of experiment 133
   (its GRID arm); GAM-K with experiment 111's fixed settings (FIX) as reference; climatology and
   manual_heuristic as in experiment 111 for reference
@@ -119,10 +124,31 @@ chose by next-day score.
 - **Noise settings are held fixed at the learned values of experiment 133 (GRID) for each
   substation**, so the experiment changes only the coefficient fit. Learning the noise and the
   coefficients together is a further step, taken only if J1 or J2 shows a gain.
-- **The in-sample caveat.** In training, the filter reads in-sample residuals, which are smaller
-  than the out-of-sample residuals it reads at forecast time. The joint fit may therefore
-  under-weight the correction's noise. This is a stated risk of the design, and the replicate
-  months and the scored year, which are out of sample, decide the verdict.
+- **Three biases, stated in advance.** First, in training the filter reads in-sample residuals
+  from the training weather (ERA5 and CAMS), which are smaller and cleaner than the out-of-sample
+  residuals from the analysis proxy that it reads at forecast time, so the joint fit may
+  under-weight the correction's noise. A cross-fitted stream would remove this, but it makes the
+  loss nonlinear in the coefficients, so the experiment cannot rule the joint design out on this
+  point. Second, the noise settings were chosen on TS's own stitched out-of-sample residuals, which
+  favours TS: if a joint arm shows a gain, the follow-up is a retune of the settings on that arm's
+  own stream. Third, J2's ridge weight is a fourth selection, so J2 is a family, and the chosen
+  weight is reported per substation. The replicate months and the scored year, which are out of
+  sample for every arm, decide the verdict.
+- **The filter's rows and mask.** The filter reads one stream per design column and one for the
+  target, all on the same rows: those where the reading and every input are finite, from the
+  first training row to the cut (`stream_rows`). Rows the fit masks out of its loss (switching
+  events) stay in the filter's stream, as in TS. A training row is a loss case when it is a
+  stream row, ends more than 14 days after the first stream row, ends no later than the cut, and
+  has a usable reading before its initialisation's cutoff. The cases follow the scoring bands
+  (valid times 12 to 36 hours after the 09:00 UTC initialisation, one case per half-hour), not
+  `studies.dp_assimilation.day_ahead_initialisation`, whose window is 15.5 to 39 hours.
+- **Penalties.** The loss is `A = Zc' Zc + penalty` and `b = Zc' zc - 0.5 * linear`, with `Zc` the
+  corrected design matrix and `zc` the corrected target, and `penalty` and `linear` exactly
+  those of `fit_gam` at the same strength (scaled by the number of training rows), so TS and the
+  joint arms carry the same regularisation.
+- **Spread.** Each arm has its own quantile spread, fitted on its own post-filter residuals from
+  replica fits (the same rule as TS: a replica joint fit at the replica cut), so the quantile
+  scores compare like with like. This roughly doubles the number of fits.
 
 ### Arms
 
@@ -148,20 +174,36 @@ J2 minus J1 is descriptive.
   within 1e-4 points in the median forecast. Until experiment 133 has chosen its values, the same
   control runs against experiment 111's stored rows with FIX settings, and is run again once
   GRID's values are in.
-- **P2, the linear filter equals the filter.** On random streams, the corrected design matrix
-  built by filtering columns gives the same day-ahead corrections as `run_kalman` followed by
-  `correction_at` applied to the stream of residuals for a random coefficient vector, to 1e-9.
-  This tests the central idea of the design.
-- **Absorption control (blocking for `supported`).** To each decision substation's real
-  training-window target, add (a) a level change of 2 points on 180 days and (b) a PV-shaped
-  change of 30% of the substation's midday PV effect over 180 days. Refit TS, J1, and J2 with
-  and without the addition (at the 2025-07 cut), and report the change in each fitted term's
-  curve (PV, heating, holiday, weekly profile) in points. An arm fails when its PV, heating, or
-  holiday curve moves by more than 0.10 points at the peak AND by more than twice TS's movement;
-  a shape that moves is a failure whatever the score does.
+- **P2, the linear filter equals the filter (blocking, unit test).** On random streams with
+  missing readings, the corrected loss from `studies.dp_joint_fit` equals the loss of
+  `run_kalman` and `correction_at` on the residual stream for random coefficients, to a relative
+  1e-9 in float64.
+- **P3, the solved loss is the true loss (blocking).** For each fit, the loss of the filter run on
+  the fitted residuals equals the quadratic form of the solved normal equations to a relative
+  1e-8, and random feasible perturbations of the coefficients raise it.
+- **P4, known answer.** On a synthetic stream with known shapes and a random-walk level, J1 recovers
+  the shapes at least as well as TS, so the joint fit is shown to be able to win when the
+  assumptions hold. Failing P4 is reported, and a joint arm that cannot win here has its real
+  result read with caution.
+- **Absorption control (blocking for `supported`).** The question is whether the fitted curves move
+  to explain a change that the filter should track. To each decision substation's real training
+  target, add (a) a level change of 2 points and (b) a PV-shaped change of 30% of the
+  substation's midday PV effect, each over the last 180 days before the cut (where the filter has
+  not yet caught up) and over a middle 180 days. Refit TS, J1, and J2 with and without the
+  addition, at three cuts (2025-01, 2025-07, 2026-01). A null refit, with the same fit on a
+  window shifted by 7 days, sets the noise floor of curve movement. The movement of a term is the
+  largest absolute change of its fitted curve in points over the training rows (PV, heating,
+  holiday, and weekly profile curves). The curves of a level change should not move by more than
+  twice the noise floor, because the filter absorbs a level; the PV-shaped change may move the PV
+  curve only in the PV-shaped direction. An arm fails when a curve that should not move moves by
+  more than the larger of 0.10 points and twice the noise floor. TS's movement is reported as
+  the reference, and the arms are judged against the injected truth and not against TS.
 - **Shape distance.** For every monthly cut, the root-mean-square difference between J1's (and
-  J2's) fitted curves and TS's, per term, as a share of the term's own root mean square. These
-  numbers feed the substation cards, which need stable shapes.
+  J2's) fitted curves and TS's, per term, as a share of the root mean square of TS's curve of that
+  term (the fitted curve in points over the training rows). Beside it, the condition number and
+  effective degrees of freedom of the corrected Gram matrix against the plain one, because the
+  slow columns (profile, tent, harmonics) have corrected columns near zero, so their solution is
+  set by the ridge. These numbers feed the substation cards, which need stable shapes.
 - **Overfitting guard.** The tuning-month gain of each arm beside its replicate gain and its
   scored-year gain, per substation.
 
@@ -169,7 +211,8 @@ J2 minus J1 is descriptive.
 
 - **Headline figure:** quantile score at 12 to 36 hours by arm with 97.5% month-resampled
   intervals, then every lead band beside it, per decision substation.
-- **Non-inferiority:** the all-lead score (0.5 to 168 hours) of every contrast.
+- **Non-inferiority:** the all-lead score (0.5 to 168 hours) of every contrast, and the lead bands
+  of days 2 to 3 and days 4 to 7 separately, because the loss trains on day-ahead cases only.
 - **Breakouts, descriptive:** winter (November to March), winter nights, cold nights (hour bands 0
   and 3 with ERA5 temperature at or below 3 degrees C), and the Christmas and bank-holiday
   periods.
@@ -186,5 +229,6 @@ J2 minus J1 is descriptive.
 One GPU job at a time under 24 GB, and `systemd-run --user --scope -p MemoryMax=16G -p
 OOMPolicy=continue`. The corrected design matrix needs one filter pass per monthly cut and
 substation over about 250 columns, which is a few seconds on the GPU, so the GPU time is expected
-to be well under 1 hour. The ENS forecasts take about 35 s per arm and substation, on the CPU in
-at most 6 processes.
+to be well under 1 hour. The first step times one cut and writes the number here. The replica fits
+for the spread roughly double the fits, and the ENS forecasts take about 35 s per arm and
+substation, on the CPU in at most 6 processes.
