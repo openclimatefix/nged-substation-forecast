@@ -46,8 +46,14 @@ HISTORIES: Final[tuple[str, ...]] = ("full", "3m")
 def strength_of(*, config: str) -> PoolingStrength:
     """Return the deviation penalties an arm name stands for.
 
+    Args:
+        config: `k0`, `tied`, `ph<h>`, or `ps<h>_<o>`.
+
+    Returns:
+        The penalties; zero for `k0` and `tied`.
+
     Raises:
-        ValueError: If the name is not `k0`, `ph<h>`, or `ps<h>_<o>`.
+        ValueError: If the name is not one of those forms.
     """
     if config in {"k0", "tied"}:
         return PoolingStrength.uniform(value=0.0)
