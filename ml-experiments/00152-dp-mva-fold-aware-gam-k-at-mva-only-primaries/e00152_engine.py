@@ -501,30 +501,40 @@ def build_arm_frames(
     return pl.concat(parts)
 
 
-def run_site(
-    *,
-    site: str,
-    variant: str,
-    cache: FeatureCache,
-    kinds: tuple[str, ...],
-    arms: dict[str, str],
-    y: np.ndarray | None = None,
-    periods: tuple[str, ...] = ("replicate", "scored"),
-) -> dict[str, int]:
-    """Fit, filter, and forecast one site's variant and write each period's frame.
+@dataclass
+class Prepared:
+    """One site's fitted state for forecasting."""
 
-    Args:
-        site: The site's label.
-        variant: A name for the stored folder, such as `real` or `fold_l2_q0`.
-        cache: The full feature cache.
-        kinds: The fit kinds to run, `naive` and/or `meter`.
-        arms: Arm name to kind.
-        y: A replacement reading in points; the cache's if `None`.
-        periods: The periods to forecast.
+    work: FeatureCache
+    setup: inputs.SiteSetup
+    fits: dict[str, list[GamFit | MeterFit]]
+    traces: dict
+    sunny: np.ndarray
+    first_origin: datetime
 
-    Returns:
-        The number of rows written per period.
-    """
+    def usable(self, index: int) -> bool:
+        """Return True when a run's origin is at or after the first fitted cut plus the delay."""
+        return self.setup.origins[index] >= self.first_origin
+
+    def tuning(self) -> pl.DataFrame | None:
+        """Return the raw forecasts of the tuning runs, or `None` when no tuning run is usable."""
+        indices = [i for i in self.setup.indices(periods={"tuning"}) if self.usable(i)]
+        if not indices:
+            return None
+        return frames_for_runs(
+            cache=self.work,
+            setup=self.setup,
+            run_indices=indices,
+            fits=self.fits,
+            traces=self.traces,
+            sunny=self.sunny,
+        )
+
+
+def prepare_site(
+    *, site: str, variant: str, cache: FeatureCache, kinds: tuple[str, ...], y: np.ndarray | None
+) -> Prepared:
+    """Fit the monthly models and run the filters for one site."""
     work = masked_cache(cache=cache, site=site, y=y)
     setup = inputs.calibrated_setup(cache=work, site=site)
     cuts = common.monthly_cuts()
@@ -555,17 +565,54 @@ def run_site(
         hours=DEFAULT_DELAY_HOURS
     )
 
-    def usable(index: int) -> bool:
-        return setup.origins[index] >= first_origin
-
-    tuning = frames_for_runs(
-        cache=work,
-        setup=setup,
-        run_indices=[i for i in setup.indices(periods={"tuning"}) if usable(i)],
-        fits=fits,
-        traces=traces,
-        sunny=sunny,
+    return Prepared(
+        work=work, setup=setup, fits=fits, traces=traces, sunny=sunny, first_origin=first_origin
     )
+
+
+def run_site(
+    *,
+    site: str,
+    variant: str,
+    cache: FeatureCache,
+    kinds: tuple[str, ...],
+    arms: dict[str, str],
+    y: np.ndarray | None = None,
+    periods: tuple[str, ...] = ("replicate", "scored"),
+    donors: tuple[str, ...] = (),
+) -> dict[str, int]:
+    """Fit, filter, and forecast one site's variant and write each period's frame.
+
+    Args:
+        site: The site's label.
+        variant: A name for the stored folder, such as `real` or `fold_l2_q0`.
+        cache: The full feature cache.
+        kinds: The fit kinds to run, `naive` and/or `meter`.
+        arms: Arm name to kind.
+        y: A replacement reading in points; the cache's if `None`.
+        periods: The periods to forecast.
+        donors: Sites whose tuning-month forecasts supply the spread and residual pools when the
+            site has no usable tuning run of its own (D8, whose series starts in April 2025).
+
+    Returns:
+        The number of rows written per period.
+    """
+    prepared = prepare_site(site=site, variant=variant, cache=cache, kinds=kinds, y=y)
+    tuning = prepared.tuning()
+    if tuning is None:
+        donor_frames = [
+            frame
+            for donor in donors
+            if (
+                frame := prepare_site(
+                    site=donor, variant=variant, cache=cache, kinds=kinds, y=None
+                ).tuning()
+            )
+            is not None
+        ]
+        tuning = pl.concat(donor_frames)
+    work, setup, fits = prepared.work, prepared.setup, prepared.fits
+    usable, traces, sunny = prepared.usable, prepared.traces, prepared.sunny
     written: dict[str, int] = {}
     site_id = work.sites[site].table.time_series_id
     for period in periods:
