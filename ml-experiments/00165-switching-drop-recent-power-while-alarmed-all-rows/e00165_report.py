@@ -207,19 +207,21 @@ def main() -> None:  # noqa: PLR0915
     print("stack rows (every scored row with a reading):", wide.height)
     print("shared with BG2:", wide.filter(pl.col("shared")).height)
     for key in ("in_logged", "in_switching_filter"):
-        print(key, "rows:", int(wide[key].sum()), "share", round(float(wide[key].mean()), 4))
+        share = float(wide[key].mean())  # ty: ignore[invalid-argument-type]
+        print(key, "rows:", int(wide[key].sum()), "share", round(share, 4))
     for arm in ("MASK_NEW", "MASK_RONC", "MASK_UNION"):
         a, p = wide[f"active_{arm}"], wide[f"post_{arm}"]
+        a_share, p_share = float(a.mean()), float(p.mean())  # ty: ignore[invalid-argument-type]
         print(
             f"{arm}: alarm active at the forecast origin on {a.sum()} rows "
-            f"({float(a.mean()):.3f}); 72 h post-end on {p.sum()} rows ({float(p.mean()):.3f})"
+            f"({a_share:.3f}); 72 h post-end on {p.sum()} rows ({p_share:.3f})"
         )
         by_site = wide.group_by("site").agg(pl.col(f"active_{arm}").mean().round(3)).sort("site")
         print(
             "   active share by site:",
             {r["site"]: r[f"active_{arm}"] for r in by_site.iter_rows(named=True)},
         )
-        report[f"active_share|{arm}"] = float(a.mean())
+        report[f"active_share|{arm}"] = a_share
 
     outside = wide.filter(~pl.col("in_logged"))
     outside_163 = outside.filter(~pl.col("in_switching_filter"))
