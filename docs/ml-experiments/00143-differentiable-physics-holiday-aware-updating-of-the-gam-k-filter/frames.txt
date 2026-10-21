@@ -1,0 +1,36 @@
+K0 D5: 270,249 rows
+K0 D5 reproduces experiment 115: 270,249 of 270,249 rows, largest quantile difference 0.00e+00 points OK
+K-skip D5: 270,249 rows
+K-skip-core D5: 270,249 rows
+K-skip+1 D5: 270,249 rows
+K-zero D5: 270,249 rows
+K0 D10: 271,649 rows
+K0 D10 reproduces experiment 115: 271,649 of 271,649 rows, largest quantile difference 0.00e+00 points OK
+K-skip D10: 271,649 rows
+K-skip-core D10: 271,649 rows
+K-skip+1 D10: 271,649 rows
+K-zero D10: 271,649 rows
+K0 D11: 271,649 rows
+K0 D11 reproduces experiment 115: 271,649 of 271,649 rows, largest quantile difference 0.00e+00 points OK
+K-skip D11: 271,649 rows
+K-skip-core D11: 271,649 rows
+K-skip+1 D11: 271,649 rows
+K-zero D11: 271,649 rows
+K0 D14: 271,649 rows
+K0 D14 reproduces experiment 115: 271,649 of 271,649 rows, largest quantile difference 0.00e+00 points OK
+K-skip D14: 271,649 rows
+K-skip-core D14: 271,649 rows
+K-skip+1 D14: 271,649 rows
+K-zero D14: 271,649 rows
+K0 D16: 271,635 rows
+K0 D16 reproduces experiment 115: 271,635 of 271,635 rows, largest quantile difference 0.00e+00 points OK
+K-skip D16: 271,635 rows
+K-skip-core D16: 271,635 rows
+K-skip+1 D16: 271,635 rows
+K-zero D16: 271,635 rows
+K0 D9: 271,586 rows
+K0 D9 reproduces experiment 115: 271,586 of 271,586 rows, largest quantile difference 0.00e+00 points OK
+K-skip D9: 271,586 rows
+K-skip-core D9: 271,586 rows
+K-skip+1 D9: 271,586 rows
+K-zero D9: 271,586 rows
