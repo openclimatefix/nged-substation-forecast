@@ -155,8 +155,8 @@ in 3 of 5.
 **Arm 4 follows a sudden rise in capacity more slowly than arm 2 does.** Half of experiment 45's
 pinned capacity was injected as a step-up on 1 March 2024, in 2023/24. At the median Primary, arm 2
 recovers -0.07 and -0.06 in the two years before (no leakage) and 0.84 and 0.87 in the two years
-after. Arm 4 at penalty 0.1 recovers 0.04 before 2023/24 in 2022/23 and 0.77 and 0.85 after, and at
-penalty 1.0 recovers 0.19 and 0.26 before and 0.57 and 0.64 after.
+after. Arm 4 at penalty 0.1 recovers -0.04 and 0.04 in the two years before and 0.77 and 0.85 after,
+and at penalty 1.0 recovers 0.19 and 0.26 before and 0.57 and 0.64 after.
 
 ## Primary power beside the estimated solar power
 
@@ -187,8 +187,9 @@ shows the metered power of D5, D10, and D14 on a cloudy, a median, and a sunny d
 - **Holding the 1 July 2025 estimate forward undershoots the hindsight 2025/26 estimate by 0.00 to
   0.70 MW for arm 2.** The as-of fit at that origin sees season-years to 2024/25, and the held value
   is its 2024/25 capacity. The largest gaps are at D16 (0.70) and D10 (0.30), where capacity is
-  still growing. The as-of divisors come from known-answer fits that use data to 2026-06-30, which
-  is future information, with a small effect because recovery is stable at 0.80 to 0.82.
+  still growing. The as-of divisors come from known-answer fits that use data to 2026-07-01, which
+  is future information, with a small effect because recovery varies only from 0.78 to 0.86
+  across the Primaries.
 - **CAMS' own beam and diffuse irradiance changes the latest arm 2 estimate by 0.04 MW or less.**
   The beam and diffuse columns were already in the downloaded files, so no new download was needed.
   Recovery falls by 0.02 and the divided estimate rises by at most 0.04 MW, partly because the
@@ -204,7 +205,7 @@ shows the metered power of D5, D10, and D14 on a cloudy, a median, and a sunny d
   the cells that fail are the extreme scenarios. The test does not say how often the range holds on
   real panels.
 - **The point estimate sits near the top of its range.** The point divides by the Primary's own
-  median real-farm recovery (about 0.80), and the range divides by the pooled ratios (median about
+  median real-farm recovery (0.78 to 0.86), and the range divides by the pooled ratios (median about
   0.92).
 - **The divisor may overstate embedded capacity by roughly 5 to 10%.** A farm's recovery rises with
   the correlation of its irradiance with the Primary's (r = 0.79 over 25 farm and Primary pairs,
@@ -225,7 +226,8 @@ shows the metered power of D5, D10, and D14 on a cloudy, a median, and a sunny d
 - **The placebo limit of 0.20 is a post-pilot choice,** set after seeing arm 2 at 0.10 of the
   injection in the pilot. It changes no verdict among arms 2 and 4.
 - **The fits use mixed cuts.** The known-answer, coverage, semi-synthetic, and step fits stop at
-  2026-07-01, and the real, as-of, and beam fits stop at 2026-08-01. July 2026 may contain unmasked
+  2026-07-01, and the real, as-of, and beam fits stop at 2026-08-01. The four gates rest on the
+  first group, so they do not use the July 2026 rows. July 2026 may contain unmasked
   switching, because the switching labels may not cover April to July 2026.
 - **Four planned comparisons were not run.** They are the December-factor comparison, experiment
   45's semi-synthetic constant-path re-run, and the Embedded Capacity Register and the Renewable

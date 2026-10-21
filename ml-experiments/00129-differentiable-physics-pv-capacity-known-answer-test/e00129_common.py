@@ -77,8 +77,9 @@ COMPLETE_SEASON_YEARS: Final[range] = range(2019, 2025)
 """The season-years complete before `DATA_CUT`: 2019/20 to 2024/25."""
 THROUGH_JULY: Final[bool] = os.environ.get("E00129_THROUGH_JULY") == "1"
 """Set `E00129_THROUGH_JULY=1` to fit to 2026-08-01 on the rows `e00129_july.py` builds. This is the
-maintainer-approved hold-out exception: season-year 2025/26 ends in July because August's final
-ERA5 is not out. It moves the two `HOLDOUT_START` constants and `GRID_END` in this process only."""
+maintainer-approved hold-out exception: July 2026 is fitted at the 2025/26 level because August's
+final ERA5 is not out. It moves the two `HOLDOUT_START` constants and `GRID_END` in this process
+only."""
 DATA_CUT: Final[datetime] = (
     datetime(2026, 8, 1, tzinfo=UTC) if THROUGH_JULY else datetime(2026, 7, 1, tzinfo=UTC)
 )
