@@ -9,8 +9,7 @@ order for the maintainer to change.
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |
-| N8, ensemble members through the DP | Does running each ensemble member through the DP give better-calibrated spread than residual quantiles? | 4 | Part 6 merged, and a free GPU | Proposed |
-| Schaake shuffle against ECC | Do ensemble copula coupling and the Schaake shuffle give summed ensembles with the same calibration against the observed sum across substations? | 4 | N8's ensemble members | Queued, after N8 |
+| Schaake shuffle against ECC | Do ensemble copula coupling and the Schaake shuffle give summed ensembles with the same calibration against the observed sum across substations? | 4 | The ensemble members of N8 (experiment 125) | Queued |
 | N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly the moved power where both sides are metered? | 5 | Nothing; can run with the cheap screens or with the edge-flow experiment | Proposed |
 | Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals, with the prediction, its square, and the hour as covariates, calibrate the tails better than residual quantiles? | 6 | The stored residuals only; independent of CAL | Proposed |
 | Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles, for the curtailment tail? | 7 | The tail quantile regression above | Proposed |
@@ -27,14 +26,12 @@ and which re-spreading of the same mean forecast fixes the bands that are not. E
 substations in winter, the night hours, and one or two lead bands. Curtailment depends on the upper
 tail, so those cells matter more than the pooled figure.
 
-**The mean forecast stays fixed, and only the spread changes.** Five methods are candidates, each
+**The mean forecast stays fixed, and only the spread changes.** Four methods are candidates, each
 reusing the stored fits of experiment 111 so that no new model is fitted:
 
 - a rolling conformal offset per substation, lead band, and quantile;
 - the Kalman filter's own predictive variance, scaled by a table of standardised residuals;
 - the same variance widened by the spread across the ensemble members;
-- a model-error spread placed around each member, estimated from forecasts driven by the analysis
-  proxy so that the weather-forecast error is not counted twice;
 - separate lower and upper widening factors per lead band.
 
 **A cell counts as calibrated when its coverage lies within a binomial band set by the number of
@@ -57,15 +54,6 @@ scores](../../../roadmap/staged-probabilistic-forecast.md) for the production fo
 whether the convex model's spread, once calibrated, keeps the cross-substation dependence that
 those scores reward. It runs after the per-substation calibration, on the same rows.
 
-## N8: ensemble members through the DP
-
-**Running each of the 50 perturbed ensemble members through the DP lets weather uncertainty enter
-physically, through heating and solar output.** The comparison arms are member propagation,
-residual quantiles, and the two combined, plus the Kalman filter run on ensemble-driven residuals by
-lead. The fit is unchanged, so the work is feature preparation, which is CPU and disk bound, plus
-about one GPU hour. CAL's model-error arm is a cheaper version of the same question, so N8 waits for
-CAL's result if the maintainer restarts it.
-
 ## N7: paired residuals at switching events
 
 **Where both sides of a hand-filtered switching event are metered, the donor's and the receiver's
@@ -81,7 +69,7 @@ rest. The run takes minutes on the CPU.
 ensemble.** Ensemble copula coupling (ECC) orders each substation's calibrated quantiles by the
 ranks of the ensemble members. The Schaake shuffle orders them by a template taken from history.
 Both then give members whose sums across substations are scored against the observed sum, with the
-variogram score. It reuses the members of N8, takes about 1 CPU hour, and starts after N8. It is the
+variogram score. It reuses the members of N8 (experiment 125) and takes about 1 CPU hour. It is the
 comparison that CAL's coherence pass needs, so CAL can reuse its result.
 
 ## Tail quantile regression on filtered residuals
