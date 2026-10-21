@@ -17,22 +17,23 @@ hypothesis: >-
   exponentially smoothed temperatures (S-ewma) or smoothed daily extremes (S-mm), wind chill
   (C-wind) or apparent temperature (C-hw) inside the heating hinge, a school-term term (D-sch),
   lighting from solar elevation (E-sol), and a filter whose noise differs by regime (F-mix). A
-  second family of four wild screens: a switching Kalman filter with three hidden regimes
+  second family of four exploratory screens: a switching Kalman filter with three hidden regimes
   (G-skf), a learned periodic basis for the year cycle (W-basis), a soft cold/mild mixture of
   heating slopes (W-mix), and a cross-substation anomaly from weather-station residuals (W-stn).
-  One hypothesis per arm, in "Arms" and "Wild screens".
+  One hypothesis per arm, in "Arms" and "Four exploratory screens".
 prediction: >-
   Written before any fit, see "Predictions". Headline: most arms tie (within 0.02 points); E-sol is
   the likeliest gain, at -0.15 to -0.03 points on dark winter evenings; F-mix moves cold-snap q95
   and q99 coverage 1 to 3 points towards nominal.
 decision_rule: >-
   Each arm gets its own label and there is no aggregate verdict. gain: 99.44% interval (Bonferroni
-  over 9) on the primary rows wholly below zero, estimate at most -M (0.03 points on winter rows,
-  0.05 on event or cold-snap rows), replicate-year estimate below zero, at least 3 of 5 sites
-  improve in the scored year, and non-inferiority holds on the other rows. The threshold is
-  nonzero because a gain only justifies the later ENS confirmation if it exceeds the screening noise.
-  Gates (known-answer power, placebo, filter-fit control) can downgrade a label to not powered or
-  inconclusive. See "Decision rule".
+  over 9; 98.75% over 4 for X10 to X13) on the primary rows wholly below zero, estimate at most -M
+  (0.03 points on winter rows, 0.05 on event or cold-snap rows), replicate-year estimate below zero,
+  at least 3 of 5 sites improve in the scored year, and non-inferiority holds on the other rows. The
+  threshold is nonzero because a gain only justifies the later ENS confirmation if it exceeds the
+  screening noise. Gates (known-answer power, placebo, filter-fit control) can downgrade a label to
+  not powered or inconclusive; a failed G-skf gate caps its label at inconclusive. See "Decision
+  rule".
 benchmark: >-
   T-all-K, the decision form of experiment 114 (GAM-K), re-read from 114's stored predictions;
   B0-K and MH-K (experiment 121) as descriptive references
@@ -47,7 +48,7 @@ metric: >-
 production_status: not-for-production
 ---
 
-# Differentiable physics, S1: do six families of cheap additions to GAM-K lower the day-ahead score?
+# Differentiable physics, S1: do cheap additions to GAM-K lower the day-ahead score?
 
 **Status: planned.** No fit has run. This page holds the pre-registered plan; the write-up replaces
 it after the results. The full plan, with the Sonnet plan review and its triage, is the private
@@ -58,13 +59,15 @@ depend on.
 
 **Do cheap additions to the day-ahead GAM-K (a generalised additive model fitted by convex
 optimisation) lower its score once the Kalman filter has run, judged on November-to-March rows
-first?** Nine arms in six families each add one term to T-all-K, the decision form of
-[experiment 114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md).
-The ideas come from GAM load forecasting: smoothed temperatures and smoothed daily extremes
-([Obst et al. (2021)](https://arxiv.org/abs/2009.06527); [Fasiolo et al.
+first?** Nine arms in six families, and then four exploratory screens in a second family, each add
+one term to T-all-K, the decision form of [experiment 114](../00114-differentiable-
+physics-n3-n4-interactions-and-heating-threshold/result.md). The ideas come from GAM load
+forecasting: smoothed temperatures and smoothed daily extremes ([Obst et al.
+(2021)](https://arxiv.org/abs/2009.06527); [Fasiolo et al.
 (2021)](https://arxiv.org/abs/1707.03307)), wind chill and apparent temperature (North American
-wind-chill index; [Steadman (1984)](https://doi.org/10.1175/1520-0450(1984)023%3C1674:AUSOTA%3E2.0.CO;2)),
-and a Kalman filter on the model's residuals as in earlier experiments of this series.
+wind-chill index; [Steadman
+(1984)](https://doi.org/10.1175/1520-0450(1984)023%3C1674:AUSOTA%3E2.0.CO;2)), and a Kalman filter
+on the GAM-K residuals as in earlier experiments of this series.
 
 ## Arms
 
@@ -122,12 +125,13 @@ No night-time or Economy 7 arm (experiment 121 owns that), and no onboarding or 
 
 ## Planned contrasts
 
-Nine, Bonferroni (99.44% intervals), arm minus T-all-K, resampling whole calendar months, paired,
-three seeds, day D+1, after the filter: X1 A-mono and X2 A-free, X3 S-ewma and X4 S-mm, X5 C-wind
-and X6 C-hw (all on November to March); X7 D-sch (school-holiday weekdays); X8 E-sol (dark winter
-evenings); X9 F-mix (cold-snap days, with a tails table). Every arm is also run with T-all-K's
-stored filter hyperparameters (`-b0`); a label that differs between `-K` and `-b0` is
-`inconclusive`. Non-inferiority margin NI is the larger of 0.02 points and the pilot half-width.
+Nine in the first family, Bonferroni (99.44% intervals), arm minus T-all-K, resampling whole
+calendar months, paired, three seeds, day D+1, after the filter: X1 A-mono and X2 A-free, X3 S-ewma
+and X4 S-mm, X5 C-wind and X6 C-hw (all on November to March); X7 D-sch (school-holiday weekdays);
+X8 E-sol (dark winter evenings); X9 F-mix (cold-snap days, with a tails table). Every arm is also
+run with T-all-K's stored filter hyperparameters (`-b0`); a label that differs between `-K` and
+`-b0` is `inconclusive`. Non-inferiority margin NI is the larger of 0.02 points and the pilot half-
+width.
 
 ## Predictions
 
@@ -149,60 +153,125 @@ zero and half-width at most M), `undecidable` (half-width above M), plus the gat
 past weather, so every number is a ceiling for ENS. With nine contrasts, one `gain` is weaker
 evidence than one contrast with one `gain`.
 
-## Wild screens (second family, added before any fit)
+## Four exploratory screens (a second family, added before any fit)
 
-Four more screens, a family of their own: Bonferroni over these four (99.0% intervals), separate
-from the nine above, and a `gain` here has the same weight as one there. No night-time or
-onboarding arm. **No paper on switching Kalman filters is cited, because none has been read in full
-for this plan;** the citation is added after the plan review, from papers read in full.
+These four screens form a family of their own with Bonferroni over 4 (98.75% intervals), separate
+from the nine above. Thirteen contrasts exist in all, each family holds its own error rate, and a
+`gain` in either family carries the same caveat about multiple screens. No night-time or onboarding
+arm. **No paper on switching Kalman filters, expectation-maximisation, or the generalised
+pseudo-Bayesian (GPB) approximation is cited, because none has been read in full.** The run order
+below includes a reading step, and until it is done the page claims no novelty and cites none.
 
 | Arm | Hypothesis | Design (fixed now) |
 |---|---|---|
-| G-skf | A Kalman filter with three hidden regimes (normal; load transfer or level shift; bad meter or outlier) detects the hand-filtered events earlier, with fewer false alarms and a faster recovery than the plain filter, and so lowers the winter score. | One Kalman filter per regime on the frozen GAM residuals, mixed by regime probability with the first-order generalised pseudo-Bayesian (GPB1) collapse at each step. Diagonal noise. Normal: the plain filter's level and noise. Shift: the level step variance 100 times the normal one. Outlier: the observation variance 100 times the normal one and no level update. The 3 by 3 transition matrix and the regime variances' multipliers are fitted by expectation-maximisation on the tuning year's residual stream alone, without event labels. |
-| W-basis | A periodic basis learned from the data fits the year cycle better than fixed day-of-year harmonics. | Same column count as T-all's day-of-year harmonics. The columns are the leading left singular vectors of the smoothed day-of-year profile (sites by days of year, weather terms removed) from the training years before the cut, made continuous across 31 December. |
-| W-mix | Heating slopes that differ between cold and mild weather lower the winter score. | T-all's heating block multiplied by w(T) and by 1 - w(T), with w a logistic of the 24-hour smoothed temperature centred on 8 C with scale 3 C, two non-negative blocks. Overlaps A-free; the contrast against A-free is descriptive. |
-| W-stn | The previous day's gap between the nearest weather station's observed temperature and ERA5 carries information on the day-ahead demand. | One column per hour band: the previous day's mean of (MIDAS Open hourly station temperature minus ERA5 temperature at the site's cell), taken at the nearest station with hourly data, lagged at least 24 hours. The step-0 check confirms station coverage for each site in every year; a site without it drops from this arm and the page says so. |
+| G-skf | A Kalman filter with three hidden regimes (normal; load transfer or level shift; bad meter or outlier) detects the hand-filtered events earlier, recovers faster after a transfer ends, and lowers the winter score, with no more false alarms than the plain filter. | One Kalman filter per regime on the out-of-sample residuals of the frozen GAM-K, mixed by regime probability with the first-order GPB collapse (GPB1) at each step, diagonal noise. Normal: the plain filter's level and noise. Shift: level step variance 100 times the normal one. Outlier: observation variance 100 times the normal one and no level update. The two multipliers are fixed now. The 3 by 3 transition matrix and the normal regime's noise are fitted by expectation-maximisation (EM) as described below. |
+| W-basis | A periodic basis learned from the data fits the year cycle better than T-all's fixed day-of-year harmonics. | Read the harmonic count K from experiment 114's code at step 0. The basis is shared by all sites. Its columns are the leading K left singular vectors of the matrix of smoothed day-of-year demand profiles (365 days by site-years), after removing T-all's weather terms with a fit whose year-cycle columns are zero, from training rows before the cut only, made continuous across 31 December. If K exceeds the matrix rank, the remaining columns are T-all's own higher harmonics, and the count of each kind is printed. |
+| W-mix | Heating slopes that differ between cold and mild weather lower the winter score. | T-all's heating block multiplied by w(T) and by 1 - w(T), with w a logistic of the 24-hour smoothed temperature centred on 8 C with scale 3 C: two non-negative blocks. W-mix overlaps A-free, so the contrast against A-free is descriptive. |
+| W-stn | The weather station's observed temperature minus ERA5's, over the day before the forecast, carries information on the next day's demand. | One column per hour band: the mean over the 24 hours ending 06:00 UTC on day D of (MIDAS Open hourly air temperature at the nearest station with hourly data minus ERA5 at the site's cell), so the last hour used is 3 hours before the 09:00 UTC origin. |
 
-**G-skf known answer.** The harness of experiment 43 (`e00043_inject.py`, copied) injects conserved
-load transfers, and the harness of the H experiment adds metering errors (a stuck run of 24 hours,
-and scale errors of 30 and 90 days) at 10%, 25%, and 40% of the injected site's median demand, on
-the tuning year. Two placebos run beside them: zero-amplitude injections, and the plain cold-snap
-days with no injection (a legitimate demand rise that must not raise the shift or outlier regime).
-**Detection** is the shift or outlier probability above 0.5 for at least 3 consecutive half-hours
-within 48 hours of the start; the threshold is set on the tuning year at 1 false alarm per 100
-non-event days. The test set is the 66 hand-filtered switching events (35 lasting over a day, 31
-shorter) in the replicate and scored years; tuning-year events are in sample and descriptive.
-**Reported for G-skf, the plain filter, KEZ-DT, and edge-flow** (edge-flow read from the stored
-output of experiment 67 where it covers the events, otherwise printed as not comparable):
-detection rate on injected and real events, false alarms per 1,000 days (winter, Christmas week
-and the rest apart), hours to recovery after a transfer ends (the filtered residual back within 1.5
-normal standard deviations), and the day D+1 score in points. **Pass:** recall on injected
-transfers at least the plain filter's plus 0.10 at the same false-alarm rate, and zero-amplitude
-false alarms under 2 per 100 days. A failed pass labels G-skf `not detecting` and its score
-contrast is still printed. Its planned contrast (X10, day D+1 score against T-all-K on November to
-March) follows the labels above; the weights over time are drawn (see Figures).
+**W-stn's data limits.** MIDAS Open is a historical archive, released months late, and the copy on
+disk covers 2017 to 2025. The assumed latency for a live feed is 3 hours, and this plan names no
+live feed that delivers it, so any W-stn gain is a ceiling for production. The scored year runs to
+2026-06-30, so W-stn and T-all-K are compared on the rows to 2025-12-31 only, which holds two
+winter months of the scored year. W-stn therefore cannot be labelled `gain` and its best label is
+`small gain (partial scored year)`. Step 0 checks station coverage per site and year, and a site
+with a station more than 50 km away or with a gap over 10% of hours drops from this arm. The
+data are already on disk under the licence recorded in the download's `lineage.json`. A longer
+record would need a new download, which this plan does not request.
 
-**W-screens' gates.** Reproduction (block at zero equals T-all), the injected-effect gate sized at
-M, and the placebo gate are as for the nine arms. W-basis has a leakage check: the basis is built
-from rows before the cut only, asserted in a test of the script. W-stn's lag is asserted to be at
-least 24 hours before the 09:00 UTC origin.
+**G-skf, the EM and thresholds.** For each cut c in {2023-07-01, 2024-07-01, 2025-07-01}:
+
+- **Residuals:** EM and the detection threshold use the out-of-sample residuals of the replica GAM-K
+  fitted 12 months before c, over [c - 12 months, c); these are the residuals the plain filter
+  already tunes on. Rows inside the hand-filtered events (padded 24 hours) are masked, so EM sees
+  no event label and no injection.
+- **Held-out year:** injections go into the residuals of the GAM-K fitted at c over [c, c + 12
+  months), a year that neither EM nor the threshold has seen. At c = 2023-07-01 this is the tuning
+  year, so all of it runs before the merge. Recall on injected events is measured there only.
+- **Real events:** the 66 hand-filtered events (35 lasting over a day, 31 shorter) that fall in
+  the replicate and scored years are the test set, scored with the cuts 2024-07-01 and 2025-07-01.
+  Events in the tuning year are in sample for experiment 101 and descriptive here.
+- **Alarm rule common to all detectors:** the statistic exceeds k for 3 consecutive half-hours,
+  where k is set so the detector raises 1 alarm per 100 non-event days on [c - 12 months, c).
+  Statistics: the standardised innovation for the plain filter; the sum of the shift and outlier
+  probabilities for G-skf; edge-flow's own stored statistic from experiment 67 at its own
+  operating point (its coverage count of the 66 events is printed, and its comparison is
+  descriptive when it covers fewer than 20). KEZ-DT, the day-type variant of the Kalman filter on
+  effects from experiment 106, zeroes updates on holidays and is not a detector, so it is
+  compared on holiday and Christmas scores only.
+
+**G-skf injection harness.** The harness of experiment 43 (`e00043_inject.py`, copied) injects
+conserved load transfers, and its metering-error types (a stuck run of 24 hours, and scale
+errors of 30 and 90 days, as in experiment 124's plan) at 10%, 25%, and 40% of the injected
+site's median demand. Each cell has 100 seeds per site. Two placebos run beside them: the clean
+stream (zero amplitude), and the cold-snap days of the clean stream, which are a legitimate
+demand rise.
+
+**G-skf's failable rules (all measured on the held-out year at c = 2023-07-01 before the merge,
+again at later cuts after it).**
+
+| Claim | Pass rule | Prediction |
+|---|---|---|
+| Detection | recall on injected transfers at least the plain filter's plus 0.10 | +0.05 to +0.20 |
+| Delay | median hours from event start to alarm no longer than the plain filter's, for 25% and 40% transfers | 2 to 6 hours shorter |
+| Recovery | median hours until the filtered residual is back within 1.5 normal standard deviations after a transfer ends, at least 6 hours shorter than the plain filter's | 6 to 24 hours shorter |
+| Real events | recall on the real events at least the plain filter's plus 0.05, counts reported | 8 to 16 of the 35 long events, 0 to 3 of the 31 short |
+| False alarms | zero-amplitude and cold-snap placebos each under 2 per 100 non-event days; winter outside Christmas under 2 per 100 days; the Christmas fortnight under 3 alarm site-days per year | within these limits |
+| Power gate | on a synthetic stream with a known regime path drawn from the fitted model (100 draws), G-skf recovers the regime on at least 80% of half-hours and its score is below the plain filter's, 98.75% interval wholly below zero | passes |
+| Reproduction | with both multipliers at 1, G-skf reproduces the plain filter to 1e-6 | passes |
+| Leakage | a test asserts that EM, the threshold, and the transition matrix see no row at or after c | passes |
+
+**A failed row caps G-skf's X10 label at `inconclusive`.** The score contrast is still printed.
+
+**Other arms' gates.** W-basis and W-mix are linear in a fixed basis, so the injected-effect gate
+sized at M (pass: paired mean at most -M/2, because the oracle gain is M and a fit that recovers half
+of it still shows the screen can see the effect) and the parity placebo apply to them. The parity
+placebo suits D-sch and E-sol because a parity of half-hours or days has no daily or weekly
+structure for a calendar term to find. W-mix's reproduction test sets the two blocks' coefficients
+equal, which must reproduce T-all to 1e-5. W-basis has a leakage test covering the singular-value
+decomposition: no row at or after the cut enters the basis.
 
 **Planned contrasts X10 to X13:** G-skf-K, W-basis-K, W-mix-K, and W-stn-K minus T-all-K, all on
-November to March, with the same labels, margin M = 0.03 points, and replicate and site rules.
-Predictions: G-skf recall +0.05 to +0.20 over the plain filter and a winter score within +-0.03;
-W-basis, W-mix, and W-stn each within +-0.02 (a tie is likeliest), and W-stn the likeliest gain
-because it carries new information.
+November to March, with M = 0.03 points and the same replicate and site rules. G-skf also reports
+its score on the 48 hours after each of the 66 events ends, with non-inferiority 0.02 elsewhere.
+Before any of the four arms is read, the pilot half-width for November to March at 98.75% is
+printed beside M and written to `decisions.json`. **Power:** the nine arms' pilot half-width is
+about 0.03 points, equal to M, so a contrast whose half-width exceeds M is `undecidable` whatever it
+scores. The predictions are conditional on the printed half-width.
 
-## Figures added by the wild screens
+**Predictions for X10 to X13.** G-skf: a winter score within +-0.03 of T-all-K and a cold-snap
+score improvement of -0.05 to 0 points. W-basis and W-mix: within +-0.02, `tie` or `undecidable`.
+W-stn: -0.05 to 0 points on November to March, largest on cold-snap days.
 
-- **Weights over time (every filter arm: plain, F-mix, G-skf):** the filter's gain, or for G-skf
-  the regime probabilities, over the coldest week and over Christmas, per D-labelled site, with
-  holidays and cold-snap spells marked as bands.
-- **Detection curves** for G-skf, the plain filter, KEZ-DT, and edge-flow on injected and real
-  events, and a recovery-time chart.
+## Figures added by the exploratory screens
+
+- **Weights over time.** The nine arms and their `-b0` runs share the plain filter, so one plot
+  shows the plain filter's gain over the coldest week and the Christmas fortnight per D-labelled
+  site, with holidays and cold-snap spells shaded as bands and the filtered level's 80% interval
+  drawn. An arm gets its own plot only where its mean absolute gain differs from T-all-K's by more
+  than 10%. G-skf shows its regime probabilities and its effective gain.
+- **Detection curves** for G-skf, the plain filter, and edge-flow on injected and real events
+  (recall against false alarms per 100 days), and a recovery-time chart in hours.
+- **X10 to X13 join the headline chart, the absolute-score figure with Part 4's references, and the
+  whole-day (00:00 to 24:00 local) coldest-week figure,** where the W-stn and G-skf curves sit
+  beside the 01:00 step that no arm models.
+
+## Compute and run order for the exploratory screens
+
+- **CPU only:** the GPB1 filter (a mixture over regimes at every step, not a batched plain
+  filter), EM, the SVD, and the W-stn build. Plain-filter fits may use the GPU after the batched
+  filter of PR 1419 has merged. The injection grid is 3 error types and transfers, 3 amplitudes,
+  100 seeds, and 5 sites: 4,500 streams of 17,520 half-hours with 3 regimes. The loop runs over
+  time with the streams as one numpy axis, in chunks of 500 streams, so a chunk holds about 70
+  MB per array and each script stays under 8 GB. Estimated cost: 17,520 steps by 10 chunks by
+  3 regimes by 2 cuts, about 1 hour. EM adds 20 iterations over 5 sites and 3 cuts, about 10
+  minutes. **The total for the experiment becomes about 4 hours, budgeted at 5.**
+- **Reading step:** before the write-up, read in full at least one switching Kalman filter paper
+  and one GPB or interacting-multiple-model reference, and cite them from the read copies.
 
 ## Privacy and stage rule
 
-D-labels only; D15 and D18 never appear. Experiment 114 (PR 1397) is unmerged: until it merges,
-only code copying, known-answer test 1, tuning-year fits, and gates on the 2022-07-01 and
-2023-07-01 cuts run; no replicate-year or scored-year row is fitted or read.
+D-labels only; D15 and D18 never appear, no topology beyond interconnected pairs is shown (the edge-
+flow comparison shows counts only), temperatures are in degrees Celsius and delays in hours. Until
+experiment 114 has merged, only code copying, known-answer test 1, tuning-year fits, and gates on
+the 2022-07-01 and 2023-07-01 cuts run; no replicate-year or scored-year row is fitted or read.
