@@ -55,8 +55,10 @@ headline: >-
   neither interval rules out a loss larger than the margin.
 lessons: >-
   Weekly refitting and the blend carry the Primary gain: refitting weekly instead of monthly lowers
-  the score by 0.123 points and the blend by another 0.086. The solar offset lowers it by only 0.010
-  points over the whole year, far short of the -0.10 to -0.15 predicted. At the supply points,
+  the score by 0.123 points and the blend by another 0.086. The solar offset lowers it by 0.114
+  points (0.075 to 0.164) on the daylight April-to-September rows of the 5 Primaries that carry
+  one, inside the -0.10 to -0.15 predicted, and by 0.010 points over all rows of all 16 Primaries,
+  because only 8.5% of those rows can carry an offset. At the supply points,
   adding the 14-day correction raised the score by 0.305 points. The generator models cannot yet be
   ranked, and the wind power-curve margin lowered the wind score by 0.057 points.
 production_status: candidate
@@ -94,9 +96,10 @@ advice:
     Do not add the 14-day correction to the bulk and grid supply point model, because adding it
     back raises the score by 0.305 points (0.060 to 0.594) (ablation, supply points).
   - >-
-    Test the solar offset on the daylight rows from April to September at the 5 offset substations,
-    because over all rows of all 16 Primaries it lowers the score by only 0.010 points (-0.019 to
-    0.000) (S6 minus S5).
+    Keep the solar offset at the 5 Primaries that carry one, because on their daylight rows from
+    April to September it lowers the score by 0.114 points (0.075 to 0.164), and by 0.273 points at
+    leads up to 24 hours (S6 minus S5, rows gated as in experiment 64). The offset gate was chosen on
+    this validation year, so confirm the gain on a second year.
   - >-
     Add the power-curve margin to the ensemble-trained wind model, because it lowers the wind score
     by 0.057 points (0.024 to 0.098) against BG2 (add-one arm D2).
@@ -122,8 +125,11 @@ of capacity; one point is 1% of a series' capacity, and a lower score is better.
 substations BG2 scores 5.260, against 5.543 for the previous best, the stack: an XGBoost model
 trained once, with a correction from the last 14 days of errors. At the 4 supply points BG2 scores
 12.925, against 13.559 for the stack. The solar offset (the forecast output of the unmetered solar
-panels behind the substation, experiments 64 and 78) lowers the score by only 0.010 over the whole
-year, against a prediction of 0.10 to 0.15. For the solar and wind farms, training on the archived
+panels behind the substation, experiments 64 and 78) lowers the score by 0.114 points (0.075 to
+0.164) on the rows it can touch: daylight from April to September at the 5 Primaries that carry
+an offset, 8.5% of the Primary rows. That is inside the prediction of 0.10 to 0.15. Averaged over
+all rows of all 16 Primaries the gain dilutes to 0.010.
+For the solar and wind farms, training on the archived
 ECMWF ensemble forecasts scored 0.050 and 0.228 points worse than experiment 33's mixture trained
 on ERA5 weather. With 6 solar and 3 wind farms the experiment cannot tell whether the loss is under
 the 0.10 (solar) or 0.30 (wind) points we would accept. The verdict is `partly supported`.
@@ -180,7 +186,8 @@ resampling whole months. Negative differences mean BG2 scores lower, which is be
 - **Weekly refitting and the blend produce the Primary gain.** The staircase scores are: frozen
   6.927; the stack lowers the score by 1.384 (0.943 to 1.785); monthly refitting by 0.065 (-0.117
   to 0.244); weekly refitting by 0.123 (0.051 to 0.202); the blend by 0.086 (0.038 to 0.135); the
-  offset by 0.010 (0.000 to 0.019). The ablation that removes the blend from the final blend raises
+  offset by 0.010 (0.000 to 0.019), which is the all-row dilution of 0.114 (0.075 to 0.164) on the
+  rows the offset can touch. The ablation that removes the blend from the final blend raises
   the score by 0.091 (0.048 to 0.138), which differs from the staircase step because the two
   remove the blend from different forecasts.
 - **Other ablations.** At the supply points, adding the 14-day correction raises the score by 0.305
@@ -245,8 +252,13 @@ resampling whole months. Negative differences mean BG2 scores lower, which is be
   experiment 64's fit before the validation year, where the design says to refit them. The capacity
   per run comes from experiment 78's vintages, and the offset models start from the median of the
   training labels plus the offset. Ablation A6 holds the capacity at experiment 64's value, which
-  was estimated before July 2025. The offset lowers the score by only 0.010 over all rows. Whether
-  it helps more on daylight rows from April to September was not tested.
+  was estimated before July 2025. The offset lowers the score by 0.114 on its daylight
+  April-to-September rows at the 5 offset Primaries (0.010 over all rows of all 16 Primaries). An audit found no flaw that dilutes or
+  cancels the effect: the base margin, blend weights, gate, and member twins are consistent between
+  training and prediction. Using the held capacity at prediction instead of the vintage capacity
+  gives 0.105 (ablation A6), so the vintage capacity helps slightly. The spread factor is a fixed
+  1.15 around the median and the 14-day correction uses the stack member's own errors, so neither
+  carries a replica-year bias into the offset.
 - **The pooled member** refits monthly on the full history with 500 rounds, not under P-roll (the
   rolling-window schedule of experiment 49).
 - **References:** `climatology` and `manual_heuristic` are recomputed at 11 levels. The
