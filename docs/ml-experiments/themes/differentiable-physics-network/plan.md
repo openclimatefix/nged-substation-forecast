@@ -1,12 +1,14 @@
 # Differentiable physics: the network: research plan
 
-Experiment 116, the first experiment of the theme, ended `inconclusive` because the known-answer
-gate failed: every setting that finds injected transfers also finds flow between substations with no
-interconnection. Experiment 131 added a per-substation drift term. At equal recall the drift term
-roughly halves the flow on unconnected pairs, but no setting meets the recall targets and the
-placebo limit together, and the level penalty shrinks the flows it finds. The search narrows to a
-topology check on candidate flows, or a smaller level penalty combined with a check for unlabelled
-jumps in the placebo pairs. Neither is planned.
+**The proposed next steps are a topology check on candidate flows, or a smaller level penalty
+combined with a check for unlabelled jumps; neither option is planned.** [Experiment
+116](../../00116-differentiable-physics-nra-edge-flows-between-primaries/result.md) ended
+`inconclusive` because the known-answer gate failed: every setting that found injected transfers
+also found flow between substations with no interconnection. [Experiment
+131](../../00131-differentiable-physics-nra-edge-flows-drift-term/result.md) added a per-substation
+drift term. At equal or higher recall the drift term cuts the flow on unconnected pairs by half to
+three quarters, but no setting meets the recall targets and the placebo limit together, and the level
+penalty shrinks the flows the fit finds.
 
 ## Planned experiments
 

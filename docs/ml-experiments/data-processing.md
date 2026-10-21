@@ -154,10 +154,11 @@ grid connection. The screen cannot work on an MVA Primary. Applies to experiment
 
 ## Unlabelled jumps
 
-**Check the placebo pairs of a year for unlabelled jumps before reading a placebo failure as a
-property of a method (low confidence).** D10 has two jump windows that carry no label. In the
-replicate year, 1.58 of the 4.27 MW-days a year that the edge-flow fit put on the unconnected pair
-D16 and D10 lie inside those windows. Applies to experiments. Evidence: [experiment
+**Before reading flow on two substations with no interconnection (a placebo pair) as a fault of a
+method, check whether either substation has unlabelled jumps (low confidence).** In experiment 131's
+replicate year (2024-25), the edge-flow fit with a drift term put 4.27 MW-days a year on D16 and
+D10. Of those, 1.58 lie inside the two D10 windows described under "Expect D10 to carry unlabelled
+jumps" below. Applies to experiments. Evidence: [experiment
 131](00131-differentiable-physics-nra-edge-flows-drift-term/result.md).
 
 ## Fixed windows
