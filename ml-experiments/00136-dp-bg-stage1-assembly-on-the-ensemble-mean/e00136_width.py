@@ -6,11 +6,8 @@ above `24 (d - 1)` and at most `24 d` hours.
     uv run python ml-experiments/00136-*/e00136_width.py
 """
 
-import json
-
 import e00136_common as common
 import e00136_report as rep
-import numpy as np
 import polars as pl
 
 
