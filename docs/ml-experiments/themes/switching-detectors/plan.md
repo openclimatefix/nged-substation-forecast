@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals |
+| [166](../../00166-switching-gated-mask-and-soft-mask-while-alarmed/result.md) | Does a mask gated on the pair alarm's balance, or a soft mask that inflates the filter's observation noise, keep the gain after a transfer and remove the +0.102 harm outside transfers? | 1 | Nothing | Planned (2026-10-21) |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the
 interconnection edges between Primary substations and scores them on injected transfers; see the
