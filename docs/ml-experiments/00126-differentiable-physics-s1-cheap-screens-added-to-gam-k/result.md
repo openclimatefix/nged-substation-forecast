@@ -53,8 +53,9 @@ take_home_message: >-
   evenings, but its interval (-0.122 to +0.024) is too wide to call, because six of the thirteen
   screens had a half-width above their 0.03 to 0.05-point margin. Only W-basis (learned year cycle)
   was clearly worse, in every month, site, and year. F-mix and W-stn looked worse too, but each
-  rests on 2 to 3 calendar months. G-skf found injected load transfers 4 to 7 times as often at 25% and 40% transfers as the
-  plain filter, but failed its own power gate and recovered no faster.
+  rests on 2 to 3 calendar months. G-skf found injected load transfers 4 to 7 times as often at
+  25% and 40% transfers as the plain filter, but failed its own power gate and recovered no
+  faster.
 advice:
   - >-
     Test E-sol again on ENS weather and on all five winters with a wider row set, because it is the
