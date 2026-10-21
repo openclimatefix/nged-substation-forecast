@@ -78,8 +78,7 @@ def structure_checks(*, site: str) -> dict[str, float | int | bool]:
 
     Returns the number of holiday days with readings, the smallest and largest count of skipped
     readings on one holiday day (46 to 50 on daylight-saving days), whether K-skip equals K0
-    exactly on rows whose cutoff precedes the first skipped reading, and the share of grid days
-    that hold a category label.
+    exactly on rows whose cutoff precedes the first skipped reading.
     """
     data = frames.get_site(site)
     days = arms.grid_days(data=data)
@@ -90,15 +89,12 @@ def structure_checks(*, site: str) -> dict[str, float | int | bool]:
     early = cutoff < first
     k0 = arms.arm_correction(data=data, arm="K0").total
     skip = arms.arm_correction(data=data, arm="K-skip").total
-    labels = hol.categorise(local_day=np.unique(days), holiday=arms.holiday_numbers())
     return {
         "holiday_days_with_readings": len(counts),
         "fewest_skipped_on_a_day": int(counts.min()),
         "most_skipped_on_a_day": int(counts.max()),
         "early_rows": int(early.sum()),
         "early_rows_identical": bool(np.array_equal(k0[early], skip[early])),
-        "labelled_days": int((labels != "").sum()),
-        "grid_days": len(labels),
     }
 
 
