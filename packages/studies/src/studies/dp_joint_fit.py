@@ -288,9 +288,7 @@ def fit_joint_gam(
     features = cache.sites[site]
     start = cache.end_times[index[0]] - np.timedelta64(30, "m")
     rows = stream_rows(cache=cache, site=site, cut=cut, start=start)
-    columns, target = _stream_design(
-        cache=cache, site=site, layout=layout, rows=rows, pinned=pinned
-    )
+    columns, target = stream_design(cache=cache, site=site, layout=layout, rows=rows, pinned=pinned)
     case_target, case_cutoff = loss_cases(cache=cache, index=index, rows=rows)
     problem = corrected_normal_equations(
         columns=columns,
@@ -343,7 +341,7 @@ def fit_joint_gam(
     ]
 
 
-def _stream_design(
+def stream_design(
     *,
     cache: FeatureCache,
     site: str,
@@ -351,7 +349,19 @@ def _stream_design(
     rows: np.ndarray,
     pinned: PinnedCapacity | None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Return the design matrix and the target of the stream rows, as the fit builds them."""
+    """Return the design matrix and the target of the stream rows, as the fit builds them.
+
+    Args:
+        cache: The cache.
+        site: The substation's label.
+        layout: The columns.
+        rows: The stream rows (see `stream_rows`).
+        pinned: The pinned capacity, whose solar output is added to the target; required exactly
+            when the layout pins the capacity.
+
+    Returns:
+        The design matrix of shape `(len(rows), p)` and the target of shape `(len(rows),)`.
+    """
     features = cache.sites[site]
     designs, targets = [], []
     for chunk in row_chunks(index=rows):
