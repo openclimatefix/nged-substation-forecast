@@ -32,7 +32,7 @@ decision_rule: >-
   The verdict rests on C2 (all history plus drift minus 24 months plus drift), pooled over the
   substation-origin pairs that pass the history rule below, with a month-block bootstrap interval
   at 98.75% (a Bonferroni correction over the four planned contrasts). The threshold is zero,
-  because a training start costs nothing to port. `supported`: the interval lies wholly below zero,
+  because a training start takes no effort to port. `supported`: the interval lies wholly below zero,
   at least 9 of the 12 origins lie below zero outside the tie band (one week-block standard error),
   at most 1 origin lies above zero outside the tie band, and the sign survives leaving out each
   substation in turn. `partly supported`: the interval lies wholly below zero but the origin or
@@ -62,21 +62,20 @@ headline: >-
   +0.014, below zero at 7 of 12 origins and above zero at 4; the drift term lowers the score by
   0.38 points on 24 months and 0.50 on all history
 take_home_message: >-
-  Training the convex demand model on every year back to 2019 instead of the last 24 months lowered
-  its score by only 0.08 points (about 3%) once the drift term was in, and the interval just spans
-  zero, so full history is not shown to help. The drift term matters five times more, lowering the
-  score by 0.38 points on 24 months and 0.50 on all history, so the drift term, not the window, is
-  what to keep. Whether long history pays off may depend on adding explicit heating, switching, or
-  pooled terms, which this experiment did not test.
+  Training the demand model on every year back to 2019, instead of the last 24 months, lowered its
+  forecast error by only about 3% (0.08 points of substation capacity), and the difference could be
+  chance. Letting the model's level drift slowly over the years helped much more, lowering the
+  error by 0.38 points on 24 months and 0.50 points on all history. We did not test whether
+  explicit heating, switching, or pooled terms would make the longer history help.
 date: 2026-10-21
 pr: 1451
 advice:
   - >-
-    Keep the drift term D1 in the convex demand model whatever the training window: it lowered the
+    The evidence supports a drift term D1 in the convex demand model with either training window: it lowered the
     score by 0.381 points on 24 months (C4, 98.75% interval -0.638 to -0.136) and by 0.502 on all
     history (C3, -0.765 to -0.270), at 11 and 10 of 12 origins.
   - >-
-    Do not move the convex model to all-history training for the sake of the score alone: with
+    All-history training is not shown to lower the score: with
     drift, all history minus 24 months was -0.083 points (C2, 98.75% interval -0.192 to +0.014),
     and without drift +0.038 (C1, -0.125 to +0.178, sign varies by origin).
   - >-
@@ -92,12 +91,15 @@ code: ml-experiments/00149-differentiable-physics-full-history-gam-era5-cams/
 ---
 
 **Training the convex demand model on every year back to 2019, instead of the last 24 months, lowered
-its score by only 0.08 points, and the interval just spans zero.** The drift term, a slow level
-path that lets the model follow changes in a substation's demand, mattered five times more: it
-lowered the score by 0.38 points on 24 months and by 0.50 points on all history. The result narrows
-the search. The drift term is what to keep, and full history needs a further reason, such as
-explicit heating, switching, or pooled terms, before it is worth the longer fit. The verdict is
-`inconclusive`.
+its forecast error by only about 3% (0.08 points of substation capacity), and the difference could
+be chance. The verdict is `inconclusive`.** The demand model is a convex fit of substation power
+from weather and calendar terms, and its quantile score (defined below) is the error measure. The
+drift term, a term that lets the forecast level move slowly over the years, lowered the score by
+0.38 points on 24 months and by 0.50 points on all history, about 5 to 6 times as much as the
+window did. The interval for the window's effect (98.75%, from resampling months) runs from -0.19 to
++0.01. We scored five Primary substations at 12 quarterly refits, on past weather and not on weather
+forecasts. This experiment did not test whether explicit heating, switching, or pooled terms would
+make longer history help.
 
 We asked whether, with the solar term fixed, a longer training window helps the convex model of
 `studies.dp_gam`. The solar term is a pinned capacity times a unit solar shape in every arm. We
@@ -107,12 +109,14 @@ every year from the substation's first usable date (September 2019 to February 2
 without the drift term D1. Training and scoring use past weather only (ERA5 temperature and CAMS
 irradiance), so every score is a ceiling for a forecast made on weather forecasts. "Score" means the
 quantile score: twice the mean pinball loss over 11 quantiles, in percentage points of each
-substation's effective capacity, where lower is better. Contrasts are treatment minus reference.
+substation's effective capacity, where lower is better. Contrasts are treatment minus reference. C1 is all history minus 24 months with no drift term, C2
+(the verdict) is the same with the drift term in both, C3 is drift minus no drift on all history, and
+C4 is drift minus no drift on 24 months.
 
 ![C2 per origin: all history with drift is below zero at 7 of 12 origins and above zero at 4](figure_01_headline.svg)
 
 **Figure 1 shows C2 at 7 of 12 origins below zero and at 4 above, and C1 with no stable sign.** The
-largest C2 gains are at the January 2024 and January 2026 origins (-0.51 and -0.46). The four
+largest C2 differences are at the January 2024 and January 2026 origins (-0.51 and -0.46). The four
 origins above zero are July 2023, April 2024, January 2025, and October 2025.
 
 ![Each arm's score per origin and substation](figure_02_absolute.svg)
@@ -155,8 +159,8 @@ nominal 95% (94.6%).
 | Climatology | 4.010 [3.816, 4.213] | -1.201 |
 
 - **C2 (the verdict), all history minus 24 months, both with drift:** -0.083 [-0.192, +0.014]
-  (98.75% interval from resampling months), 7 origins below zero, 4 above, 1 tied. The mean-forecast
-  error contrast is -0.120 [-0.300, +0.047]. Winter-quarter origins give -0.114 [-0.263, +0.024]
+  (98.75% interval from resampling months), 7 origins below zero, 4 above, 1 tied. The mean absolute error of the mean forecast
+  contrast is -0.120 [-0.300, +0.047]. Winter-quarter origins give -0.114 [-0.263, +0.024]
   and summer-quarter origins -0.054 [-0.127, +0.009]. Leaving out each substation in turn gives
   -0.076 to -0.091, all below zero.
 - **C1, all history minus 24 months, no drift:** +0.038 [-0.125, +0.178], 4 below, 6 above, 2 tied.
@@ -189,7 +193,7 @@ nominal 95% (94.6%).
 - **C2 below zero at 8 or more of 12 origins:** failed (7).
 - **C2 larger in winter-quarter origins than summer:** held (-0.114 against -0.054).
 - **C1 sign varies by origin:** held (4 below, 6 above).
-- **C3 between -0.2 and -0.5 and C4 smaller than C3:** held at the edge (-0.502, and C4 -0.381).
+- **C3 between -0.2 and -0.5:** failed by 0.002 (-0.502). **C4 smaller than C3:** held (-0.381).
 - **C2 moves under 0.15 when one substation is left out:** held (at most 0.008).
 - **Verdict:** the interval spans zero, so `inconclusive` by the pre-registered rule.
 
@@ -199,41 +203,56 @@ nominal 95% (94.6%).
   centred spread has a zero median, so this check cannot expose a shifted forecast. The mean error
   in the absolute-score table does: A24 misses low by +0.899 and Aall+D1 is nearly unbiased
   (-0.064).
-- **Error of the mean forecast beside each score contrast:** C1 +0.019 [-0.227, +0.240], C2 -0.120
-  [-0.300, +0.047], C3 -0.720 [-1.083, -0.386], C4 -0.581 [-0.966, -0.210]. Each has the same sign
-  as its score contrast.
-- **Blocking checks, all passed** (`report.txt`): Aall and Aall+D1 reproduce experiment 107's G-all
+- **Mean absolute error of the mean forecast beside each score contrast:** C1 +0.019 [-0.227, +0.240], C2 -0.120
+  [-0.300, +0.047], C3 -0.720 [-1.083, -0.386], C4 -0.581 [-0.966, -0.210]. Each of the four contrasts has the same sign as its score contrast.
+- **Blocking checks, all passed** (the reproduction is in `report.txt`; the other two are enforced in
+  the scripts, which raise on a violation): Aall and Aall+D1 reproduce experiment 107's G-all
   and G-all+D1 means exactly over 350,428 rows each (maximum absolute difference 0.0), every fit's
   non-negativity violation is below 2e-15, every spread-pool row has a valid time at or before its
   origin, and the pairs scored per origin are 4 sites for the first 3 origins and 5 after.
-- **Audit triggers.** Triggers 2, 4, and 5 fired for the contrasts below, and the other four did not.
-  No Opus audit was run, because the verdict is `inconclusive` and rests on C2 alone, the
-  experiment's brief limits reviews to Sonnet, and the same machinery was audited in experiment 107.
-  The maintainer can ask for one.
-    1. **Trigger 2 (contradicts its prediction):** C2 was below zero at 7 origins, not 8 or more. No
-       explanation was tested; the origins above zero are July 2023, April 2024, January 2025, and
-       October 2025.
+- **Audit triggers.** Triggers 2, 4, and 5 fired. Triggers 1, 3, 6, and 7 did not: the reproduction
+  controls match exactly (1), every mean-absolute-error contrast has the sign of its score contrast
+  (3), C3's interval is 1.1 times as wide as experiment 107's matching contrast (6), and no other
+  experiment cites this one (7). **No audit has run: the `ml-experiment` skill requires an Opus audit
+  for a fired trigger, and the experiment's brief allows Sonnet only, so merging needs the
+  maintainer's decision to waive the audit or to lift the limit.** The verdict is `inconclusive`,
+  and an audit could only turn it into a finding if it found a method fault.
+    1. **Trigger 2 (contradicts its prediction):** C2 was below zero at 7 origins, not 8 or more, and
+       C3 missed its predicted range by 0.002. The origins above zero are July 2023, April 2024,
+       January 2025, and October 2025. The explanation tested post hoc is the history rule's weakness
+       below: the early origins hold little extra history.
     2. **Trigger 4 (leaving one site out flips a sign):** C1 flips to -0.021 without D10. C1 is not
-       the verdict contrast, and it already had no stable sign.
+       the verdict contrast, and C1 already had no stable sign.
     3. **Trigger 5 (a nested arm wins):** the 24-month arm scores 0.038 better than all history
        without drift, although the all-history window contains the 24 months. The difference is
-       inside its interval, and the seasonal split above (post hoc) is the only explanation tested.
+       inside its interval. The seasonal split of C1 (post hoc) is the explanation tested.
 
 ## Caveats
 
 - **Past weather** (ERA5 and CAMS) at forecast time is a ceiling, as in experiment 107.
-- **Five Primaries** with D16 entering at April 2024; the first three origins hold four substations.
-- **Quarterly refits and one drift step** (3,000, tuned on 2024-07 to 2025-06): experiment 85
-  found quarterly refits score worse than weekly ones, and the contrast could change with the
+- **Five Primaries** are scored, with D16 entering at April 2024, so the first three origins hold
+  four substations.
+- **The 36-month rule does not guarantee 12 extra months of training data.** The rule counts calendar
+  months from each substation's first usable date, but training skips the COVID-lockdown window and
+  the switching masks. At the July 2023 origin the all-history window holds only 1.7 extra months
+  at D5, 3.7 at D10, and 6.2 at D11, and none at D14, so C2 compares two identical fits there. Extra
+  history reaches 12 months from the April 2024 origin for D10, D11, D14, and D16, and from July
+  2024 for D5. **Post hoc, over the 8 origins from July 2024 on, C2 is -0.066 [-0.201, +0.052]
+  and C1 is +0.031 [-0.186, +0.228] (98.75%)**, so the conclusion does not change.
+- **Quarterly refits and one drift step** (3,000, tuned on 2024-07 to 2025-06) are used. Experiment
+  85 found quarterly refits score worse than weekly refits, so the contrast could change with the
   schedule.
-- **The pinned solar capacity** of experiment 45 carries a hindsight growth prior before its first
-  vintage (2023-08-07), which affects the first origin; the as-of capacity of experiment 139 is not
-  used.
-- **The 36-month rule is a choice** made before the fits; D16's early origins are left out by it.
+- **The pinned solar capacity** of experiment 45 uses a hindsight growth prior at the four burn-in
+  cuts, and the July 2023 cut uses a vintage dated 37 days after it. The burn-in residuals form the
+  spread pools of the first four scored origins. Both arms of every contrast get the same capacity,
+  so the leak is not differential. The as-of capacity of experiment 139 is not used.
+- **D10's two unlabelled jump windows stay in training, spread pools, and scoring**, as in the base
+  variant of experiment 107. Without D10, C2 is -0.076 [-0.173, +0.010].
+- **The 36-month rule is a choice** made before the fits; it leaves out D16's first three origins.
 
 ## What to try next
 
 - **Rerun C2 with weekly refits and ensemble weather forecasts** only if a use needs full history,
-  because the pooled gain is 3% and the interval spans zero.
-- **Test whether explicit heating, switching, or pooled terms make long history pay**, since the
-  window alone does not.
+  because the pooled improvement is 3% and the interval spans zero.
+- **Test whether explicit heating, switching, or pooled terms make long history lower the score.** The
+  window alone did not, at these five substations.
