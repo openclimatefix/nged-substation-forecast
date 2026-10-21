@@ -48,6 +48,7 @@ from studies.dp_edge_flow import (  # noqa: E402
     run_lengths,
     runs_to_trace,
     seed_month_bootstrap,
+    solve_drift,
     solve_path,
     undirected_edges,
 )
@@ -877,3 +878,106 @@ def test_a_constant_offset_is_ambiguous_without_a_level_penalty_and_unique_with_
     assert abs(free[0].flows["A-B"][0] - free[1].flows["A-B"][0]) > 1.0
     assert penalised[0].flows["A-B"] == pytest.approx(penalised[1].flows["A-B"], abs=1e-3)
     assert penalised[0].flows["A-B"][0] > 2.0
+
+
+def test_the_drift_with_squared_error_matches_the_closed_form_random_walk_smoother():
+    rng = np.random.default_rng(21)
+    n = 40
+    residual = np.cumsum(rng.normal(0, 0.3, n)) + rng.normal(0, 0.5, n)
+    residual[10:13] = np.nan
+    noise, step_variance = 0.5, 0.04
+
+    drift = solve_drift(
+        residual=residual, noise=noise, step_variance=step_variance, huber_sigmas=1e9
+    )
+
+    weight = np.where(np.isfinite(residual), 1.0 / noise**2, 0.0)
+    difference = np.diff(np.eye(n), axis=0)
+    normal = np.diag(weight) + difference.T @ difference / step_variance
+    expected = np.linalg.solve(normal, weight * np.nan_to_num(residual))
+    np.testing.assert_allclose(drift, expected, atol=1e-6)
+
+
+def test_the_drift_ignores_a_spike_through_the_huber_loss_and_bridges_a_gap():
+    n = 200
+    residual = np.full(n, 3.0)
+    residual[100] = 300.0
+    residual[50:60] = np.nan
+
+    drift = solve_drift(residual=residual, noise=0.5, step_variance=0.01)
+
+    assert drift[100] < 3.5
+    assert np.all(np.isfinite(drift))
+    assert drift[55] == pytest.approx(3.0, abs=0.3)
+
+
+def test_the_drift_rejects_a_non_positive_step_variance():
+    with pytest.raises(ValueError, match="step_variance"):
+        solve_drift(residual=np.zeros(5), noise=1.0, step_variance=0.0)
+    path = [PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=5.0, level_penalty=1.0)]
+    with pytest.raises(ValueError, match="drift_step_variance"):
+        fit_flows(
+            paths=path,
+            residuals={"A": np.zeros(5), "B": np.zeros(5)},
+            noise={"A": 1.0, "B": 1.0},
+            drift_step_variance=-1.0,
+        )
+
+
+def test_a_drift_term_takes_a_slow_one_sided_ramp_and_leaves_a_short_transfer_on_the_edge():
+    rng = np.random.default_rng(22)
+    n = 2000
+    ramp = np.linspace(0.0, 4.0, n)
+    transfer = np.where((np.arange(n) > 900) & (np.arange(n) < 1000), 4.0, 0.0)
+    residuals = {
+        "A": ramp + transfer + rng.normal(0, 0.3, n),
+        "B": -transfer + rng.normal(0, 0.3, n),
+    }
+    noise = {"A": 0.3, "B": 0.3}
+    paths = [PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=20.0, level_penalty=0.5)]
+
+    without = fit_flows(paths=paths, residuals=residuals, noise=noise)
+    with_drift = fit_flows(paths=paths, residuals=residuals, noise=noise, drift_step_variance=1e-4)
+
+    assert flow_mw_days(flow=with_drift.flows["A-B"]) < flow_mw_days(flow=without.flows["A-B"])
+    assert with_drift.flows["A-B"][920:980].mean() > 3.0
+    assert abs(with_drift.flows["A-B"][1200:].mean()) < 0.3
+    assert with_drift.drifts["A"][-1] > with_drift.drifts["A"][0] + 2.0
+
+
+def test_the_joint_objective_with_a_drift_is_lowest_at_the_fitted_drift():
+    rng = np.random.default_rng(23)
+    n = 300
+    residuals = {
+        "A": np.cumsum(rng.normal(0, 0.05, n)) + rng.normal(0, 0.3, n),
+        "B": rng.normal(0, 0.3, n),
+    }
+    noise = {"A": 0.3, "B": 0.3}
+    paths = [PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=20.0, level_penalty=1.0)]
+    variance = 0.003
+
+    fit = fit_flows(paths=paths, residuals=residuals, noise=noise, drift_step_variance=variance)
+    best = joint_objective(
+        paths=paths,
+        flows=fit.flows,
+        residuals=residuals,
+        noise=noise,
+        drifts=fit.drifts,
+        drift_step_variance=variance,
+    )
+    perturbed = {node: drift + rng.normal(0, 0.05, n) for node, drift in fit.drifts.items()}
+    worse = joint_objective(
+        paths=paths,
+        flows=fit.flows,
+        residuals=residuals,
+        noise=noise,
+        drifts=perturbed,
+        drift_step_variance=variance,
+    )
+
+    assert best == pytest.approx(fit.objective)
+    assert best < worse
+    with pytest.raises(ValueError, match="drift_step_variance"):
+        joint_objective(
+            paths=paths, flows=fit.flows, residuals=residuals, noise=noise, drifts=fit.drifts
+        )
