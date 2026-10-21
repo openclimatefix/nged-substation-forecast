@@ -1,0 +1,410 @@
+"""Score experiment 136's arms and print every number the write-up quotes.
+
+Reads `work/dp_preds/` and the stored predictions of experiment 111 (GAM-K) and experiment 87
+(BG2, climatology, manual heuristic), puts every arm on common rows (a reading, outside the
+hand-filtered switching events, lead of at most 168 hours), and writes `work/report/report.json`:
+each arm's quantile score by lead band and breakout, the six planned contrasts with 99%
+month-resampled intervals, the tail table, and the checks.
+
+    uv run python ml-experiments/00136-*/e00136_report.py
+"""
+
+import json
+from datetime import UTC, datetime
+from typing import Final
+
+import e00136_common as common
+import e00136_run as run
+import numpy as np
+import polars as pl
+from studies.bootstrap import bootstrap_difference_at_level
+from studies.dp_calendar import BAND_NAMES
+from studies.dp_gam import QUANTILE_COLUMNS
+from studies.experiment_store import losses_for_bootstrap
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
+
+LEVELS: Final[np.ndarray] = np.array(
+    [0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99]
+)
+LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("under 24 h", 0.0, 24.0),
+    ("24-72 h", 24.0, 72.0),
+    ("72-168 h", 72.0, 168.0),
+    ("12-36 h", 12.0, 36.0),
+    ("all", 0.0, 168.0),
+)
+OURS: Final[tuple[str, ...]] = ("a0", "a1", "a2", "a3")
+STORED_111: Final[dict[str, str]] = {"k111": "gamk"}
+STORED_87: Final[dict[str, str]] = {
+    "bg2": "p_s6_bg2",
+    "climatology": "ref_climatology",
+    "manual_heuristic": "ref_manual_heuristic",
+}
+E87_PREDICTIONS: Final = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00087-bg2-best-guess-assembled-with-drop-one-ablations"
+    / "predictions"
+)
+CONTRASTS: Final[dict[str, tuple[str, str]]] = {
+    "C1": ("a0", "k111"),
+    "C2": ("a1", "a0"),
+    "C3": ("a2", "a1"),
+    "C4": ("a3", "a2"),
+    "C5": ("a2", "bg2"),
+    "C6": ("a2", "k111"),
+}
+LEVEL_PERCENT: Final[float] = 99.0
+N_RESAMPLES: Final[int] = 20_000
+COLD_TEMPERATURE_C: Final[float] = 3.0
+WINTER_MONTHS: Final[frozenset[int]] = frozenset({11, 12, 1, 2, 3})
+NIGHT_BANDS: Final[tuple[int, ...]] = (BAND_NAMES.index("night"), 3)
+KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time"]
+TAIL_QUANTILES: Final[tuple[tuple[str, float], ...]] = (
+    ("q01", 0.01),
+    ("q05", 0.05),
+    ("q95", 0.95),
+    ("q99", 0.99),
+)
+BASE_COLUMNS: Final[list[str]] = [
+    "time_series_id",
+    "power_fcst_init_time",
+    "valid_time",
+    "lead_hours",
+    "seed",
+    *QUANTILE_COLUMNS,
+    "actual",
+    "mean",
+    "site",
+]
+
+
+def annotate(*, frame: pl.DataFrame, cache) -> pl.DataFrame:  # noqa: ANN001
+    """Keep scorable rows (a reading, not switching, lead of at most 168 hours); add breakouts."""
+    last = cache.end_times[-1].astype("datetime64[us]").astype(datetime).replace(tzinfo=UTC)
+    pieces = []
+    for site in common.SCORED_SITES:
+        part = frame.filter(pl.col("site") == site)
+        if part.is_empty():
+            continue
+        features = cache.sites[site]
+        target = np.searchsorted(
+            cache.end_times, part["valid_time"].dt.replace_time_zone(None).to_numpy()
+        )
+        part = part.with_columns(
+            masked=pl.Series(features.switching_mask[target]),
+            hour_band=pl.Series(cache.calendar.band[target].astype(np.int8)),
+            holiday=pl.Series(cache.calendar.holiday_period[target] >= 0),
+            cold=pl.Series(
+                np.nan_to_num(features.temperature_c[target], nan=99.0) <= COLD_TEMPERATURE_C
+            ),
+            valid_month=pl.col("valid_time").dt.month(),
+        )
+        pieces.append(part)
+    return pl.concat(pieces).filter(
+        ~pl.col("masked")
+        & pl.col("actual").is_finite()
+        & (pl.col("lead_hours") <= 168.0)
+        & (pl.col("valid_time") <= last)
+    )
+
+
+def in_period(*, frame: pl.DataFrame, period: str) -> pl.DataFrame:
+    """Keep the rows whose run (by `power_fcst_init_time`) belongs to the period."""
+    origins = [
+        common.origin_of(run=r) for r in common.run_dates() if common.period_of_run(run=r) == period
+    ]
+    return frame.filter(pl.col("power_fcst_init_time").is_in(origins))
+
+
+def load(*, arm: str, period: str) -> pl.DataFrame | None:
+    """Return an arm's scorable rows for a period, or `None` if the arm has none."""
+    cache = common.load_cache()
+    ids = {s: cache.sites[s].table.time_series_id for s in common.SCORED_SITES}
+    if arm in OURS or arm in STORED_111:
+        pieces = []
+        for site in common.SCORED_SITES:
+            path = (
+                run.out_path(arm=arm, period=period, site=site)
+                if arm in OURS
+                else common.SOURCE_WORK_DIR
+                / "dp_preds"
+                / f"{STORED_111[arm]}_{period}_{site}.parquet"
+            )
+            if path.exists():
+                pieces.append(pl.read_parquet(path).with_columns(site=pl.lit(site)))
+        if not pieces:
+            return None
+        frame = pl.concat(pieces).select(BASE_COLUMNS)
+    else:
+        if period != "scored":
+            return None
+        label_of = {series: site for site, series in ids.items()}
+        frame = pl.read_parquet(E87_PREDICTIONS / STORED_87[arm] / "predictions.parquet").filter(
+            pl.col("time_series_id").is_in(list(label_of))
+        )
+        levels = list(QUANTILE_COLUMNS)
+        frame = frame.with_columns(
+            site=pl.col("time_series_id").replace_strict(label_of, return_dtype=pl.String),
+            actual=100.0 * pl.col("actual"),
+            **{q: 100.0 * pl.col(q) for q in levels},
+        ).with_columns(mean=pl.col("q50"))
+        frame = frame.select(BASE_COLUMNS)
+        frame = in_period(frame=frame, period="scored")
+    return annotate(frame=in_period(frame=frame, period=period), cache=cache)
+
+
+def common_rows(*, frames: dict[str, pl.DataFrame]) -> dict[str, pl.DataFrame]:
+    """Restrict every frame to the rows all frames hold."""
+    shared = None
+    for frame in frames.values():
+        current = frame.select(KEYS).unique()
+        shared = current if shared is None else shared.join(current, on=KEYS, how="inner")
+    assert shared is not None
+    schema = {
+        "time_series_id": pl.Int32,
+        "lead_hours": pl.Float64,
+        "seed": pl.Int8,
+        "actual": pl.Float32,
+        "mean": pl.Float32,
+        **dict.fromkeys(QUANTILE_COLUMNS, pl.Float32),
+    }
+    return {
+        name: frame.join(shared, on=KEYS, how="inner")
+        .sort(KEYS)
+        .with_columns(pl.col(column).cast(dtype) for column, dtype in schema.items())
+        for name, frame in frames.items()
+    }
+
+
+def with_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add the quantile score, the mean and median absolute errors, and the coverage flags."""
+    actual = frame["actual"].to_numpy().astype(np.float64)[:, None]
+    quantiles = frame.select(list(QUANTILE_COLUMNS)).to_numpy().astype(np.float64)
+    error = actual - quantiles
+    score = 2.0 * np.mean(
+        np.maximum(LEVELS[None, :] * error, (LEVELS[None, :] - 1.0) * error), axis=1
+    )
+    extra = {
+        "qs": score,
+        "abs_mean": np.abs(frame["actual"].to_numpy() - frame["mean"].to_numpy()).astype(
+            np.float64
+        ),
+        "abs_median": np.abs(frame["actual"].to_numpy() - frame["q50"].to_numpy()).astype(
+            np.float64
+        ),
+    }
+    for name, level in TAIL_QUANTILES:
+        value = frame[name].to_numpy().astype(np.float64)
+        loss = np.maximum(
+            level * (frame["actual"].to_numpy() - value),
+            (level - 1.0) * (frame["actual"].to_numpy() - value),
+        )
+        extra[f"pin_{name}"] = loss
+        extra[f"cov_{name}"] = (frame["actual"].to_numpy() <= value).astype(np.float64)
+    return frame.with_columns([pl.Series(k, v) for k, v in extra.items()])
+
+
+def lead_filter(*, frame: pl.DataFrame, low: float, high: float) -> pl.DataFrame:
+    """Keep rows with a lead above `low` and at most `high` hours."""
+    return frame.filter((pl.col("lead_hours") > low) & (pl.col("lead_hours") <= high))
+
+
+def contrast(*, losses: pl.DataFrame, treatment: str, reference: str, metric: str = "qs") -> dict:
+    """Return a paired contrast with a 99% month-resampled interval and its site and month signs."""
+    t = losses.filter(pl.col("arm") == treatment)
+    r = losses.filter(pl.col("arm") == reference)
+    estimate = float(t[metric].to_numpy().mean() - r[metric].to_numpy().mean())
+    lower, upper = bootstrap_difference_at_level(
+        losses=losses,
+        treatment=treatment,
+        reference=reference,
+        metric=metric,
+        level=LEVEL_PERCENT,
+        n_resamples=N_RESAMPLES,
+    )
+    by_site = (
+        t.group_by("site")
+        .agg(t=pl.col(metric).mean())
+        .join(r.group_by("site").agg(r=pl.col(metric).mean()), on="site")
+    )
+    by_month = (
+        t.group_by("month")
+        .agg(t=pl.col(metric).mean())
+        .join(r.group_by("month").agg(r=pl.col(metric).mean()), on="month")
+    )
+    return {
+        "estimate": estimate,
+        "lower": float(lower),
+        "upper": float(upper),
+        "sites_better": int((by_site["t"] < by_site["r"]).sum()),
+        "n_sites": by_site.height,
+        "months_negative": int((by_month["t"] < by_month["r"]).sum()),
+        "n_months": by_month.height,
+    }
+
+
+def subset_filters() -> dict[str, pl.Expr]:
+    """Return the breakout subsets, each as a row filter."""
+    night = pl.col("hour_band").is_in(list(NIGHT_BANDS))
+    winter = pl.col("valid_month").is_in(list(WINTER_MONTHS))
+    return {
+        "winter": winter,
+        "winter nights": winter & night,
+        "cold nights": pl.col("cold") & night,
+        "holidays and Christmas": pl.col("holiday"),
+    }
+
+
+def arm_table(*, losses: pl.DataFrame, sites: tuple[str, ...]) -> dict:
+    """Return each arm's mean score by lead band, by site over all leads, and by breakout."""
+    out: dict = {"by_lead": {}, "by_site": {}, "breakouts": {}}
+    scope = losses.filter(pl.col("site").is_in(list(sites)))
+    for name, low, high in LEAD_BANDS:
+        part = lead_filter(frame=scope, low=low, high=high)
+        out["by_lead"][name] = part.group_by("arm").agg(pl.col("qs").mean()).sort("arm").to_dicts()
+    out["by_site"] = (
+        scope.group_by(["arm", "site"]).agg(pl.col("qs").mean()).sort(["arm", "site"]).to_dicts()
+    )
+    for label, expression in subset_filters().items():
+        part = scope.filter(expression)
+        out["breakouts"][label] = {
+            "rows": part.filter(pl.col("arm") == part["arm"][0]).height,
+            "scores": part.group_by("arm").agg(pl.col("qs").mean()).sort("arm").to_dicts(),
+        }
+    return out
+
+
+def tail_table(*, losses: pl.DataFrame, sites: tuple[str, ...]) -> dict:
+    """Return coverage and pinball loss at the four tail quantiles, and cold-night q95 coverage."""
+    scope = losses.filter(pl.col("site").is_in(list(sites)))
+    out: dict = {}
+    for label, part in (
+        ("12-36 h", lead_filter(frame=scope, low=12.0, high=36.0)),
+        ("all leads", scope),
+        ("cold nights all leads", scope.filter(subset_filters()["cold nights"])),
+    ):
+        aggregations = [pl.col(f"cov_{n}").mean() for n, _ in TAIL_QUANTILES]
+        aggregations += [pl.col(f"pin_{n}").mean() for n, _ in TAIL_QUANTILES]
+        out[label] = part.group_by("arm").agg(aggregations).sort("arm").to_dicts()
+    return out
+
+
+def checks(*, frames: dict[str, pl.DataFrame]) -> dict:
+    """Return the median minus mean forecast per site and arm, at 12 to 36 hours."""
+    out = []
+    for name, frame in frames.items():
+        part = lead_filter(frame=frame, low=12.0, high=36.0)
+        grouped = part.group_by("site").agg(
+            (pl.col("q50") - pl.col("mean")).mean().alias("median_minus_mean")
+        )
+        out.extend({"arm": name, **row} for row in grouped.sort("site").to_dicts())
+    return {"median_minus_mean": out}
+
+
+def stack(*, frames: dict[str, pl.DataFrame]) -> pl.DataFrame:
+    """Return the bootstrap loss frame of arms already on common rows, with D-labels as `site`."""
+    cache = common.load_cache()
+    labels = {cache.sites[s].table.time_series_id: s for s in common.SCORED_SITES}
+    keep = [*KEYS, "lead_hours", "seed", *QUANTILE_COLUMNS, "actual", "mean"]
+    extra = ["hour_band", "holiday", "cold", "valid_month"]
+    stacked = losses_for_bootstrap(
+        arm_losses={
+            name: with_losses(frame=f.select([*keep, *extra])) for name, f in frames.items()
+        }
+    )
+    return stacked.with_columns(site=pl.col("site").replace_strict(labels, return_dtype=pl.String))
+
+
+def site_gains(*, losses: pl.DataFrame, treatment: str, reference: str) -> dict[str, float]:
+    """Return each decision site's all-lead contrast, treatment minus reference."""
+    scope = losses.filter(pl.col("site").is_in(list(common.DECISION_SITES)))
+    out = {}
+    for site in common.DECISION_SITES:
+        part = scope.filter(pl.col("site") == site)
+        out[site] = float(
+            part.filter(pl.col("arm") == treatment)["qs"].to_numpy().mean()
+            - part.filter(pl.col("arm") == reference)["qs"].to_numpy().mean()
+        )
+    return out
+
+
+def leave_one_out(*, losses: pl.DataFrame, treatment: str, reference: str) -> dict[str, float]:
+    """Return the all-lead contrast with each decision site left out in turn."""
+    scope = losses.filter(pl.col("site").is_in(list(common.DECISION_SITES)))
+    out = {}
+    for site in common.DECISION_SITES:
+        part = scope.filter(pl.col("site") != site)
+        t = part.filter(pl.col("arm") == treatment)["qs"].to_numpy().mean()
+        r = part.filter(pl.col("arm") == reference)["qs"].to_numpy().mean()
+        out[site] = float(t - r)
+    return out
+
+
+def period_report(*, period: str) -> tuple[dict, dict[str, pl.DataFrame]]:
+    """Return the period's tables and contrasts, and the common-row frames."""
+    loaded = {
+        arm: frame
+        for arm in (*OURS, *STORED_111, *STORED_87)
+        if (frame := load(arm=arm, period=period)) is not None
+    }
+    frames = common_rows(frames=loaded)
+    losses = stack(frames=frames)
+    decision = losses.filter(pl.col("site").is_in(list(common.DECISION_SITES)))
+    report: dict = {
+        "arms": list(frames),
+        "rows": frames[next(iter(frames))].height,
+        "tables": arm_table(losses=losses, sites=common.DECISION_SITES),
+        "tail": tail_table(losses=losses, sites=common.DECISION_SITES),
+        "contrasts": {},
+        "site_gains": {},
+        "leave_one_out": {},
+    }
+    for label, (treatment, reference) in CONTRASTS.items():
+        if treatment not in frames or reference not in frames:
+            continue
+        report["site_gains"][label] = site_gains(
+            losses=losses, treatment=treatment, reference=reference
+        )
+        report["leave_one_out"][label] = leave_one_out(
+            losses=losses, treatment=treatment, reference=reference
+        )
+        entry: dict = {}
+        for scope_name, low, high in LEAD_BANDS:
+            part = lead_filter(frame=decision, low=low, high=high)
+            entry[scope_name] = {
+                "qs": contrast(losses=part, treatment=treatment, reference=reference),
+                "abs_mean": contrast(
+                    losses=part, treatment=treatment, reference=reference, metric="abs_mean"
+                ),
+            }
+        for sub_name, expression in subset_filters().items():
+            part = decision.filter(expression)
+            entry[sub_name] = {
+                "qs": contrast(losses=part, treatment=treatment, reference=reference)
+            }
+        cold = decision.filter(subset_filters()["cold nights"])
+        entry["cold_night_q95_coverage"] = contrast(
+            losses=cold, treatment=treatment, reference=reference, metric="cov_q95"
+        )
+        report["contrasts"][label] = entry
+    return report, frames
+
+
+def main() -> None:
+    """Score the three periods and write the report."""
+    report: dict = {}
+    for period in ("scored", "replicate", "tuning"):
+        period_data, frames = period_report(period=period)
+        report[period] = period_data
+        if period == "scored":
+            report["checks"] = checks(frames=frames)
+    gate = common.WORK_DIR / "gate" / "p2.json"
+    if gate.exists():
+        report["p2"] = json.loads(gate.read_text())
+    target = common.WORK_DIR / "report" / "report.json"
+    common.write_json_atomic(path=target, content=report)
+    print(json.dumps(report, indent=1, default=float))
+
+
+if __name__ == "__main__":
+    main()
