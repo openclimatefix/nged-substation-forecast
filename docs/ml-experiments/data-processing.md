@@ -152,6 +152,20 @@ Series with 26% to 82% of their dark half-hours negative carry embedded generati
 grid connection. The screen cannot work on an MVA Primary. Applies to experiments. Evidence:
 [experiment 103](00103-differentiable-physics-1-data-look/result.md), figure 9.
 
+**Count the half-hours that `substation_zero` flags before scoring a detector on a transfer.**
+(Provisional.) The rule flags a reading of exactly 0 at a Primary substation, and a transformer
+that was switched out read exactly 0 in the 5 transfers we checked. At the series P12 and P13, the
+two transformers of one Primary substation, the rule flagged 426 half-hours inside 5 of the 6
+labelled real transfers lasting more than 1 day, and the panel of residuals used to score
+detectors held no readings there. The cleaned power table keeps flagged rows with their original
+readings, and restoring those half-hours let the refit-offset neighbour-count detector (RO-NC)
+find 4 of the 6 transfers. This applies to
+experiments on switching. For production, the maintainer has to decide whether the rule should keep
+a zero reading when the other transformer of the same Primary substation carries the load of the
+switched-out transformer. Evidence: [experiment
+132](00132-ro-nc-rescored-with-p12-and-p13-residuals-in-2025/result.md). Confidence: medium, from 5
+transfers at one Primary substation.
+
 ## Unlabelled jumps
 
 **Before reading flow on two substations with no interconnection (a placebo pair) as a fault of a
@@ -248,6 +262,19 @@ and drift against no drift)
 ([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction).
 Applies to experiments and to production. Confidence: high, because the centred and uncentred sets
 differ only in this shift.
+
+**For the convex demand model, tie a joint fit through a level-tracking filter to the two-stage
+coefficients (provisional).** In a fit that minimises the error after a Kalman filter that tracks a
+level, the filter absorbs a constant shift of each slow term (the weekly profile, the tent, and the
+harmonics), so the loss leaves those terms to the penalty alone. The untied joint fit's weekly
+profile moved by a median of 19 points of capacity (up to 95) when the training cut-off moved back
+by 7 days, against 1 point for the two-stage fit, and its quantile score at 12 to 36 hours was 5.4
+points of capacity worse ([experiment
+135](00135-differentiable-physics-n10-joint-kalman-and-demand-fit/result.md)). A ridge tie to the
+two-stage coefficients cut the weekly-profile movement to 1 point and left the score within 0.013
+points of the two-stage fit. Applies to experiments. Evidence: five decision substations, the scored
+year, one model family. Confidence: medium, because the explanation was not tested by a variant of
+the loss.
 
 **Give a capacity increment only to a season-year with enough training rows (provisional).** A fit
 whose cut is 2024-07-01 includes the half-hour that ends exactly at the cut, which belongs to
