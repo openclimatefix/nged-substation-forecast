@@ -32,13 +32,13 @@ same 75% threshold. Per-line rates and Wilson 90% intervals are printed).
 7. Local optima: of 5 starts (one singular value decomposition, four random Dirichlet), at least 4
    reach a training sum of squares within 1% of the best.
 8. Module tests pass.
+9. Score power (20 other fleets): the library's energy is scaled until the oracle's held-out score
+   beats N's by 0.10 points; SH minus N on held-out rows must then be at most -0.05.
 10. Economy 7-like step (the sparse fleets): a step of 4 points of capacity from 01:00
     to 07:00, absent from every shape, is injected into 2 of the 5 substations. The library with
     K = K* + 1, told nothing, must recover its time (largest rise within 1 half-hour) and size
     (within 25%) at both substations, and a placebo (same truth, new noise) must show no step of
     25% of the size or more.
-9. Score power (20 other fleets): the library's energy is scaled until the oracle's held-out score
-   beats N's by 0.10 points; SH minus N on held-out rows must then be at most -0.05.
 
 The dense prior (Dirichlet 1) is reported with lines 1 and 2 as identification-limited and is not
 blocking. Lines 1 and 2 and 4 use the start with the lowest training objective among the 5 starts,
