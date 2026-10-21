@@ -213,6 +213,12 @@ comparison with BG2 carried no threshold.
   agreement of all arms before the alarm could not be tested (1 transfer). No harm on ordinary rows
   was predicted within 0.10: +0.033 for STACK-NEW.
 
+- **Mask against the weather model alone.** The mask does not clearly beat ignoring recent power:
+  STACK-NEW minus GAM-ONLY on AFTER is -0.62 (95% -1.28 to +0.40) and STACK-UNION minus GAM-ONLY is
+  -0.63 (-1.28 to +0.38). GAM-ONLY closes 92% of the gap to ORACLE with no alarm, so most of the
+  "gap closed" is the gain from not reading the contaminated power, and the alarm adds a little on
+  top. The mask's value is in the 5 of 7 pairs it found, and it cannot be told from GAM-ONLY here.
+
 ## Checks
 
 - **Median minus mean forecast** by substation, identical for every stack arm: D10 -0.064, D11
@@ -232,6 +238,13 @@ comparison with BG2 carried no threshold.
 
 ## Caveats
 
+- **Four substations, not six.** D9 and D11 hold no logged transfer in the scored year, so the
+  comparison with BG2 rests on D5, D10, D14, and D16. Leaving D5 out shrinks C1 from -3.77 to -1.85.
+- **Row sets include rows issued before the alarm was usable.** INSIDE and AFTER rows need only a
+  forecast origin at or after the logged onset, so for some rows the mask is not yet on while
+  ORACLE is, which dilutes the share of the gap closed. The 4 transfers of the replicate months
+  (even months of 2024-07 to 2025-06) appear only in stack-only numbers, which no verdict uses, and
+  BG2 has no rows there.
 - **Seven transfers.** The scored year holds 7 logged transfers at the decision Primaries, and
   BG2 exists only there; BG2 comparisons rest on those 7. The stack-only rows add 4 transfers from
   the replicate months and move no conclusion.

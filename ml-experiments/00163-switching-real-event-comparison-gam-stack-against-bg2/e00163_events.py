@@ -110,7 +110,7 @@ def first_known(*, table: pl.DataFrame, series: int, onset: int, end: int) -> in
         & (pl.col("onset") >= onset - MATCH_BEFORE)
         & (pl.col("onset") < end)
     )
-    return None if hits.is_empty() else int(hits["onset_known"].min())
+    return None if hits.is_empty() else int(hits["onset_known"].min())  # ty: ignore[invalid-argument-type]
 
 
 def site_events(*, site: str, tables: dict[str, pl.DataFrame], offset: int) -> pl.DataFrame:
@@ -121,8 +121,8 @@ def site_events(*, site: str, tables: dict[str, pl.DataFrame], offset: int) -> p
     """
     series = fed.SERIES_OF_SITE[site]
     rows = []
-    for row in logged_transfers().filter(pl.col("series").list.contains(series)).iter_rows(
-        named=True
+    for row in (
+        logged_transfers().filter(pl.col("series").list.contains(series)).iter_rows(named=True)
     ):
         known = {
             name: first_known(table=tables[name], series=series, onset=row["onset"], end=row["end"])
@@ -158,7 +158,7 @@ def site_events(*, site: str, tables: dict[str, pl.DataFrame], offset: int) -> p
 
 
 def oracle_spans(*, events: pl.DataFrame) -> list[nra.Span]:
-    """Spans for the oracle mask: the logged interval, known from its onset, its end known at once."""
+    """Spans for the oracle mask: the logged interval, known from its onset, end known at once."""
     return [
         nra.Span(r["onset"], r["end"], r["onset"], r["end"], 0.0)
         for r in events.iter_rows(named=True)
@@ -168,8 +168,9 @@ def oracle_spans(*, events: pl.DataFrame) -> list[nra.Span]:
 def row_sets(*, data: object, events: pl.DataFrame) -> dict[str, np.ndarray]:
     """Row indices of the BEFORE, INSIDE, and AFTER sets, one array per set and event.
 
-    Returns a dict keyed `"<set>|<card>"`. Rows need a reading, a run of the scored year or of the replicate months
-    (even months of 2024-07 to 2025-06), and a forecast origin at or after the logged onset. Target time decides the set.
+    Returns a dict keyed `"<set>|<card>"`. Rows need a reading, a run of the scored year or of the
+    replicate months, and a forecast origin at or after the logged onset. Target time decides the
+    set.
     """
     d = data  # type: ignore[assignment]
     origin_pos = np.searchsorted(d.cache.end_times, d.run_origins)[d.run_of_row]  # ty: ignore[unresolved-attribute]

@@ -1,10 +1,11 @@
-"""Score the stack's arms at one substation on the real scored year and the logged-transfer row sets.
+"""Score the stack's arms at one substation on the scored year and the logged-transfer row sets.
 
 Writes `rows_<site>.parquet` (one row per arm and scored row), `events_<site>.parquet`, and
 `rowsets_<site>.parquet` (which rows belong to which event and row set) under the experiment's
-private folder. Every arm is GAM-K's cached member forecasts plus a correction from the Kalman filter
-run on the real residual stream with readings set missing inside the known alarm intervals, with
-experiment 115's K0 spread, so a contrast between arms is a difference in location only.
+private folder. Every arm is GAM-K's cached member forecasts plus a correction from the Kalman
+filter run on the real residual stream with readings set missing inside the known alarm
+intervals, with experiment 115's K0 spread, so a contrast between arms is a difference in
+location only.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         env OMP_NUM_THREADS=1 uv run --no-sync python e00163_run.py D5
@@ -34,7 +35,7 @@ ARMS: Final[tuple[str, ...]] = (
 )
 
 
-def main(site: str) -> None:  # noqa: PLR0915
+def main(site: str) -> None:
     """Compute and store one substation's per-row scores."""
     started = time.time()
     data = fed.get_site(site)
@@ -51,7 +52,9 @@ def main(site: str) -> None:  # noqa: PLR0915
         lo, hi = r["onset"] + offset, r["end"] + offset
         blocked[max(lo, 0) : min(hi + nra.TAIL, n)] = True
     scored = data.period_rows(period="scored") & np.isfinite(data.actual)
-    quiet = np.flatnonzero(scored & ~blocked[data.position] & ~data.features.switching_mask[data.position])
+    quiet = np.flatnonzero(
+        scored & ~blocked[data.position] & ~data.features.switching_mask[data.position]
+    )
     rows = np.unique(np.concatenate([quiet, event_rows]))
     cutoffs = data.cutoffs(delay_hours=fed.DELAY_HOURS)[data.run_of_row]
     spans = {
@@ -60,9 +63,7 @@ def main(site: str) -> None:  # noqa: PLR0915
         "MASK_UNION": nra.detected_spans(data=data, site=site, intervals=tables["UNION"]),
     }
     corrections = {
-        "K0": fed.correction_for(
-            data=data, stream=data.stream, prior=np.zeros(n), multiplier=1.0
-        ),
+        "K0": fed.correction_for(data=data, stream=data.stream, prior=np.zeros(n), multiplier=1.0),
         "GAM_ONLY": np.zeros(len(data.run_of_row)),
     }
     for arm, arm_spans in spans.items():

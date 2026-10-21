@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0912, RET504
 """Join the stack's per-row scores to BG2 and the references, and print every number the page quotes.
 
 Reads the private `rows_*.parquet`, `events_*.parquet`, `rowsets_*.parquet` and `quiet_*.parquet`
@@ -16,7 +17,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 from e00163_common import WORK_DIR
-from e00163_g_arms import LEVELS, quantile_score
+from e00163_g_arms import quantile_score
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D14", "D16", "D9")
@@ -94,11 +95,18 @@ def load_joined() -> pl.DataFrame:
     long = pl.concat(
         [
             rows.select(
-                "arm", *KEYS, "row", "lead_hours", "actual", "qs", *[c for c in QCOLS if c in rows.columns], "mean_forecast"
+                "arm",
+                *KEYS,
+                "row",
+                "lead_hours",
+                "actual",
+                "qs",
+                *[c for c in QCOLS if c in rows.columns],
+                "mean_forecast",
             ),
-            ext.select("arm", *KEYS, "lead_hours", "actual", "qs", *QCOLS, "mean_forecast").with_columns(
-                row=pl.lit(None, dtype=pl.Int64)
-            ),
+            ext.select(
+                "arm", *KEYS, "lead_hours", "actual", "qs", *QCOLS, "mean_forecast"
+            ).with_columns(row=pl.lit(None, dtype=pl.Int64)),
         ],
         how="diagonal_relaxed",
     )
@@ -150,7 +158,14 @@ def build() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     )
     long = pl.concat(
         [
-            rows.select("arm", *KEYS, "actual", "qs", *[c for c in QCOLS if c in rows.columns], "mean_forecast"),
+            rows.select(
+                "arm",
+                *KEYS,
+                "actual",
+                "qs",
+                *[c for c in QCOLS if c in rows.columns],
+                "mean_forecast",
+            ),
             ext.select("arm", *KEYS, "actual", "qs", *QCOLS, "mean_forecast"),
         ],
         how="diagonal_relaxed",
@@ -167,18 +182,35 @@ def main() -> None:  # noqa: PLR0915
     pl.Config.set_tbl_width_chars(250)
     pl.Config.set_fmt_str_lengths(8)
     check = wide.select(*KEYS, "actual").join(
-        long.filter(pl.col("arm") == "BG2").select(*KEYS, pl.col("actual").alias("actual_bg2")), on=KEYS
+        long.filter(pl.col("arm") == "BG2").select(*KEYS, pl.col("actual").alias("actual_bg2")),
+        on=KEYS,
     )
-    print("rows in both:", check.height, "max |actual stack - actual BG2| (points):", float((check["actual"] - check["actual_bg2"]).abs().max()))
+    print(
+        "rows in both:",
+        check.height,
+        "max |actual stack - actual BG2| (points):",
+        float((check["actual"] - check["actual_bg2"]).abs().max()),  # ty: ignore[invalid-argument-type]
+    )
     ev = ev.with_columns(
         winter=pl.col("mo").is_in(list(WINTER)),
-        period=pl.when(pl.col("power_fcst_init_time") >= datetime(2025, 7, 1, tzinfo=UTC)).then(pl.lit("scored")).otherwise(pl.lit("replicate")),
+        period=pl.when(pl.col("power_fcst_init_time") >= datetime(2025, 7, 1, tzinfo=UTC))
+        .then(pl.lit("scored"))
+        .otherwise(pl.lit("replicate")),
     )
-    cards = ev.group_by("set").agg(pl.len().alias("rows"), pl.col("card").n_unique().alias("cards"), pl.struct("card", "site").n_unique().alias("events"))
+    cards = ev.group_by("set").agg(
+        pl.len().alias("rows"),
+        pl.col("card").n_unique().alias("cards"),
+        pl.struct("card", "site").n_unique().alias("events"),
+    )
     print(cards)
     per_event = (
         ev.group_by("set", "period", "card", "site")
-        .agg(pl.len().alias("rows"), *[pl.col(a).mean().round(2) for a in [*STACK, "BG2", "ORACLE"]], pl.col("known_new").first(), pl.col("known_ronc").first())
+        .agg(
+            pl.len().alias("rows"),
+            *[pl.col(a).mean().round(2) for a in [*STACK, "BG2", "ORACLE"]],
+            pl.col("known_new").first(),
+            pl.col("known_ronc").first(),
+        )
         .with_columns(found_new=pl.col("known_new") >= 0, found_ronc=pl.col("known_ronc") >= 0)
         .drop("known_new", "known_ronc")
         .sort("period", "card", "site", "set")
@@ -186,19 +218,28 @@ def main() -> None:  # noqa: PLR0915
     print(per_event)
     report["rows_by_set"] = cards.to_dicts()
 
-    def pooled(frame: pl.DataFrame, a: str, b: str | None = None, *, groups: str = "card") -> tuple[float, float, float]:
-        sub = frame.filter(pl.col(a).is_not_null() & (pl.col(b).is_not_null() if b else pl.lit(True)))
+    def pooled(
+        frame: pl.DataFrame, a: str, b: str | None = None, *, groups: str = "card"
+    ) -> tuple[float, float, float]:
+        sub = frame.filter(
+            pl.col(a).is_not_null() & (pl.col(b).is_not_null() if b else pl.lit(True))
+        )
         diff = sub[a] - (sub[b] if b else 0.0)
         return boot(num=diff.to_numpy(), den=None, groups=sub[groups].to_numpy())
 
     def gap_closed(frame: pl.DataFrame, arm: str) -> tuple[float, float, float]:
         sub = frame.filter(pl.col("ORACLE").is_not_null())
         sub = sub.join(
-            sub.group_by("card", "site").agg((pl.col("K0") - pl.col("ORACLE")).mean().alias("g")).filter(pl.col("g") > 0).select("card", "site"),
+            sub.group_by("card", "site")
+            .agg((pl.col("K0") - pl.col("ORACLE")).mean().alias("g"))
+            .filter(pl.col("g") > 0)
+            .select("card", "site"),
             on=["card", "site"],
         )
         return boot(
-            num=(sub["K0"] - sub[arm]).to_numpy(), den=(sub["K0"] - sub["ORACLE"]).to_numpy(), groups=sub["card"].to_numpy()
+            num=(sub["K0"] - sub[arm]).to_numpy(),
+            den=(sub["K0"] - sub["ORACLE"]).to_numpy(),
+            groups=sub["card"].to_numpy(),
         )
 
     print("\n== means by set, scope, and season (points of effective capacity) ==")
@@ -212,9 +253,19 @@ def main() -> None:  # noqa: PLR0915
                     f = f.filter(pl.col("winter") == (season == "winter"))
                 if f.is_empty():
                     continue
-                means = {a: round(float(f[a].mean()), 3) for a in [*ARMS, "ORACLE"] if f[a].null_count() < f.height}
-                print(f"{scope:10s} {season:6s} {name:6s} rows {f.height:6d} cards {f['card'].n_unique():2d}", means)
-                report[f"means|{scope}|{season}|{name}"] = {"rows": f.height, "cards": f["card"].n_unique()} | means
+                means = {
+                    a: round(float(f[a].mean()), 3)  # ty: ignore[invalid-argument-type]
+                    for a in [*ARMS, "ORACLE"]
+                    if f[a].null_count() < f.height
+                }
+                print(
+                    f"{scope:10s} {season:6s} {name:6s} rows {f.height:6d} cards {f['card'].n_unique():2d}",
+                    means,
+                )
+                report[f"means|{scope}|{season}|{name}"] = {
+                    "rows": f.height,
+                    "cards": f["card"].n_unique(),
+                } | means
     print("\n== planned contrasts on AFTER ==")
     after = ev.filter(pl.col("set") == "AFTER")
     sh = after.filter(pl.col("shared"))
@@ -223,13 +274,26 @@ def main() -> None:  # noqa: PLR0915
         ("C2 MASK_UNION minus BG2", "MASK_UNION", "BG2"),
         ("K0 minus BG2", "K0", "BG2"),
         ("GAM_ONLY minus BG2", "GAM_ONLY", "BG2"),
+        ("MASK_NEW minus GAM_ONLY", "MASK_NEW", "GAM_ONLY"),
+        ("MASK_UNION minus GAM_ONLY", "MASK_UNION", "GAM_ONLY"),
         ("ARM_C minus BG2", "ARM_C", "BG2"),
     ):
         report[label] = pooled(sh, a, b)
         print(label, "shared rows:", fmt(report[label]), "cards", sh["card"].n_unique())
-    for label, a, b in (("MASK_NEW minus K0", "MASK_NEW", "K0"), ("MASK_UNION minus K0", "MASK_UNION", "K0"), ("MASK_RONC minus K0", "MASK_RONC", "K0"), ("GAM_ONLY minus K0", "GAM_ONLY", "K0")):
+    for label, a, b in (
+        ("MASK_NEW minus K0", "MASK_NEW", "K0"),
+        ("MASK_UNION minus K0", "MASK_UNION", "K0"),
+        ("MASK_RONC minus K0", "MASK_RONC", "K0"),
+        ("GAM_ONLY minus K0", "GAM_ONLY", "K0"),
+    ):
         report[label + " (AFTER, stack only)"] = pooled(after, a, b)
-        print(label, "AFTER stack-only (incl. replicate months):", fmt(report[label + " (AFTER, stack only)"]), "cards", after["card"].n_unique())
+        print(
+            label,
+            "AFTER stack-only (incl. replicate months):",
+            fmt(report[label + " (AFTER, stack only)"]),
+            "cards",
+            after["card"].n_unique(),
+        )
     print("\n== C3: share of the K0-to-ORACLE gap closed on AFTER ==")
     for scope, f in (("shared", sh), ("stack_only", after)):
         for arm in ("MASK_NEW", "MASK_UNION", "MASK_RONC", "GAM_ONLY", "BG2", "ARM_C"):
@@ -237,19 +301,35 @@ def main() -> None:  # noqa: PLR0915
                 continue
             g = gap_closed(f.filter(pl.col(arm).is_not_null()), arm)
             report[f"C3|{scope}|{arm}"] = g
-            n_ev = f.filter(pl.col("ORACLE").is_not_null()).select(pl.struct("card", "site")).n_unique()
-            print(f"{scope:10s} {arm:10s} {g[0]:.3f} ({g[1]:.3f} to {g[2]:.3f})  events with oracle: {n_ev}")
-    print("\n== per-event share of the gap closed (AFTER; events with K0 minus ORACLE above 0.25 points) ==")
+            n_ev = (
+                f.filter(pl.col("ORACLE").is_not_null())
+                .select(pl.struct("card", "site"))
+                .n_unique()
+            )
+            print(
+                f"{scope:10s} {arm:10s} {g[0]:.3f} ({g[1]:.3f} to {g[2]:.3f})  events with oracle: {n_ev}"
+            )
+    print(
+        "\n== per-event share of the gap closed (AFTER; events with K0 minus ORACLE above 0.25 points) =="
+    )
     pe = (
         after.filter(pl.col("ORACLE").is_not_null())
-        .group_by("card", "site", "period")
-        .agg(pl.len().alias("rows"), *[pl.col(a).mean() for a in ("K0", "ORACLE", "MASK_NEW", "MASK_UNION", "MASK_RONC", "GAM_ONLY", "BG2")])
+        .group_by("card", "site")
+        .agg(
+            pl.len().alias("rows"),
+            *[
+                pl.col(a).mean()
+                for a in ("K0", "ORACLE", "MASK_NEW", "MASK_UNION", "MASK_RONC", "GAM_ONLY", "BG2")
+            ],
+        )
         .with_columns(gap=pl.col("K0") - pl.col("ORACLE"))
         .filter(pl.col("gap") > 0.25)
     )
     for arm in ("MASK_NEW", "MASK_UNION", "MASK_RONC", "GAM_ONLY", "BG2"):
         sh_ = ((pe["K0"] - pe[arm]) / pe["gap"]).drop_nulls()
-        print(f"{arm:10s} events {len(sh_):2d} median {sh_.median():+.2f} mean {sh_.mean():+.2f} min {sh_.min():+.2f} max {sh_.max():+.2f}")
+        print(
+            f"{arm:10s} events {len(sh_):2d} median {sh_.median():+.2f} mean {sh_.mean():+.2f} min {sh_.min():+.2f} max {sh_.max():+.2f}"
+        )
         report[f"per_event_share|{arm}"] = sh_.to_list()
     print(pe.with_columns(pl.col(pl.Float64).round(2)).sort("gap", descending=True))
     print("\n== BEFORE and INSIDE contrasts (descriptive; observed power contains the transfer) ==")
@@ -257,28 +337,51 @@ def main() -> None:  # noqa: PLR0915
         f = ev.filter((pl.col("set") == name) & pl.col("shared"))
         if f.is_empty():
             continue
-        for label, a, b in (("MASK_NEW minus K0", "MASK_NEW", "K0"), ("MASK_UNION minus K0", "MASK_UNION", "K0"), ("BG2 minus K0", "BG2", "K0"), ("GAM_ONLY minus K0", "GAM_ONLY", "K0")):
+        for label, a, b in (
+            ("MASK_NEW minus K0", "MASK_NEW", "K0"),
+            ("MASK_UNION minus K0", "MASK_UNION", "K0"),
+            ("BG2 minus K0", "BG2", "K0"),
+            ("GAM_ONLY minus K0", "GAM_ONLY", "K0"),
+        ):
             report[f"{name}|{label}"] = pooled(f, a, b)
-            print(name, label, fmt(report[f'{name}|{label}']), "cards", f["card"].n_unique())
+            print(name, label, fmt(report[f"{name}|{label}"]), "cards", f["card"].n_unique())
     print("\n== leave one substation out, AFTER shared ==")
     for site in SITES:
         f = sh.filter(pl.col("site") != site)
         if f.is_empty():
             continue
-        print(site, "left out:", "C1", fmt(pooled(f, "MASK_NEW", "BG2")), "C2", fmt(pooled(f, "MASK_UNION", "BG2")))
-    print("\n== no harm: quiet rows (outside logged transfers and 72 h after, outside hand-filtered switching) ==")
+        print(
+            site,
+            "left out:",
+            "C1",
+            fmt(pooled(f, "MASK_NEW", "BG2")),
+            "C2",
+            fmt(pooled(f, "MASK_UNION", "BG2")),
+        )
+    print(
+        "\n== no harm: quiet rows (outside logged transfers and 72 h after, outside hand-filtered switching) =="
+    )
     quiet = pl.concat([pl.read_parquet(WORK_DIR / f"quiet_{s}.parquet") for s in SITES])
     q = wide.join(quiet, on=["site", "row"], how="inner").filter(pl.col("shared"))
     q = q.with_columns(winter=pl.col("mo").is_in(list(WINTER)))
     report["quiet_rows"] = q.height
-    for season, f in (("all", q), ("winter", q.filter(pl.col("winter"))), ("other", q.filter(~pl.col("winter")))):
-        means = {a: round(float(f[a].mean()), 3) for a in ARMS}
+    for season, f in (
+        ("all", q),
+        ("winter", q.filter(pl.col("winter"))),
+        ("other", q.filter(~pl.col("winter"))),
+    ):
+        means = {a: round(float(f[a].mean()), 3) for a in ARMS}  # ty: ignore[invalid-argument-type]
         print(season, f.height, means)
         report[f"quiet_means|{season}"] = means
         for label, a, b in (
-            ("MASK_NEW minus K0", "MASK_NEW", "K0"), ("MASK_UNION minus K0", "MASK_UNION", "K0"), ("MASK_RONC minus K0", "MASK_RONC", "K0"),
-            ("GAM_ONLY minus K0", "GAM_ONLY", "K0"), ("K0 minus BG2", "K0", "BG2"), ("MASK_NEW minus BG2", "MASK_NEW", "BG2"),
-            ("MASK_UNION minus BG2", "MASK_UNION", "BG2"), ("ARM_C minus BG2", "ARM_C", "BG2"),
+            ("MASK_NEW minus K0", "MASK_NEW", "K0"),
+            ("MASK_UNION minus K0", "MASK_UNION", "K0"),
+            ("MASK_RONC minus K0", "MASK_RONC", "K0"),
+            ("GAM_ONLY minus K0", "GAM_ONLY", "K0"),
+            ("K0 minus BG2", "K0", "BG2"),
+            ("MASK_NEW minus BG2", "MASK_NEW", "BG2"),
+            ("MASK_UNION minus BG2", "MASK_UNION", "BG2"),
+            ("ARM_C minus BG2", "ARM_C", "BG2"),
         ):
             ci = pooled(f, a, b, groups="month")
             report[f"quiet|{season}|{label}"] = ci
@@ -293,19 +396,28 @@ def main() -> None:  # noqa: PLR0915
             for col, level in TAILS:
                 qv = sub[col].to_numpy()
                 err = act - qv
-                out[col] = (round(float(np.mean(act <= qv)), 4), round(float(np.mean(np.maximum(level * err, (level - 1) * err))), 4))
+                out[col] = (
+                    round(float(np.mean(act <= qv)), 4),
+                    round(float(np.mean(np.maximum(level * err, (level - 1) * err))), 4),
+                )
             print(name, f"{arm:10s}", out)
             report[f"tails|{name}|{arm}"] = out
-    print("\n== checks: median forecast minus mean forecast (stack arms), and error of the median forecast on AFTER ==")
+    print(
+        "\n== checks: median forecast minus mean forecast (stack arms), and error of the median forecast on AFTER =="
+    )
     for arm in ("K0", "MASK_NEW", "MASK_UNION"):
         sub = long.filter(pl.col("arm") == arm).join(q.select(KEYS), on=KEYS, how="inner")
-        d = (sub["q50"] - sub["mean_forecast"]).group_by(sub["site"]).mean() if False else sub.group_by("site").agg((pl.col("q50") - pl.col("mean_forecast")).mean().alias("d")).sort("site")
+        d = (
+            sub.group_by("site")
+            .agg((pl.col("q50") - pl.col("mean_forecast")).mean().alias("d"))
+            .sort("site")
+        )
         print(arm, {r["site"]: round(r["d"], 3) for r in d.iter_rows(named=True)})
         report[f"median_minus_mean|{arm}"] = {r["site"]: r["d"] for r in d.iter_rows(named=True)}
     mae = {}
     for arm in ("K0", "GAM_ONLY", "MASK_NEW", "MASK_UNION", "BG2"):
         sub = long.filter(pl.col("arm") == arm).join(sh.select(KEYS).unique(), on=KEYS, how="inner")
-        mae[arm] = round(float((sub["q50"] - sub["actual"]).abs().mean()), 3)
+        mae[arm] = round(float((sub["q50"] - sub["actual"]).abs().mean()), 3)  # ty: ignore[invalid-argument-type]
     print("absolute error of the median forecast on AFTER shared rows:", mae)
     report["mae_median_after"] = mae
     (WORK_DIR / "report.json").write_text(json.dumps(report, indent=2, default=float))

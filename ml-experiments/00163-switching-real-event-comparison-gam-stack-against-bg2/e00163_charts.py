@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, PERF401
 """Draw experiment 163's figures as SVG from `event_rows.parquet`, `joined.parquet`, and `report.json`.
 
 Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newline`.
@@ -22,7 +22,10 @@ from e00163_report import boot
 
 HERE: Final[Path] = Path(__file__).resolve().parent
 OUT_DIR: Final[Path] = (
-    HERE.parents[1] / "docs" / "ml-experiments" / "00163-switching-real-event-comparison-gam-stack-against-bg2"
+    HERE.parents[1]
+    / "docs"
+    / "ml-experiments"
+    / "00163-switching-real-event-comparison-gam-stack-against-bg2"
 )
 WIDTH: Final[int] = 520
 LABELS: Final[dict[str, str]] = {
@@ -80,23 +83,40 @@ def _save(*, chart: alt.TopLevelMixin, name: str) -> None:
 def _dots(*, data: pl.DataFrame, title: str, rule: float | None, height: int) -> alt.TopLevelMixin:
     enc_y = alt.Y("label:N", title=None, sort=None, axis=alt.Axis(labelLimit=330))
     layers = [
-        alt.Chart(data).mark_rule(strokeWidth=2).encode(x=alt.X("low:Q", title=title), x2="high:Q", y=enc_y, color=_colour()),  # ty: ignore[unresolved-attribute]
-        alt.Chart(data).mark_point(filled=True, size=70).encode(x="mean:Q", y=enc_y, color=_colour()),  # ty: ignore[unresolved-attribute]
+        alt.Chart(data)
+        .mark_rule(strokeWidth=2)
+        .encode(x=alt.X("low:Q", title=title), x2="high:Q", y=enc_y, color=_colour()),  # ty: ignore[unresolved-attribute]
+        alt.Chart(data)
+        .mark_point(filled=True, size=70)
+        .encode(x="mean:Q", y=enc_y, color=_colour()),  # ty: ignore[unresolved-attribute]
     ]
     if rule is not None:
         layers.append(
-            alt.Chart(pl.DataFrame({"v": [rule]})).mark_rule(strokeDash=[4, 3], color="#888").encode(x="v:Q")  # ty: ignore[unresolved-attribute]
+            alt.Chart(pl.DataFrame({"v": [rule]}))
+            .mark_rule(strokeDash=[4, 3], color="#888")
+            .encode(x="v:Q")  # ty: ignore[unresolved-attribute]
         )
     return alt.layer(*layers).properties(width=WIDTH, height=height)
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:
     """Draw the figures."""
     ev = pl.read_parquet(WORK_DIR / "event_rows.parquet")
     report = json.loads((WORK_DIR / "report.json").read_text())
     # figure 1: AFTER, shared rows, mean score by arm with a 95% interval over logged transfers
     after = ev.filter((pl.col("set") == "AFTER") & pl.col("shared"))
-    arms = ["K0", "GAM_ONLY", "MASK_NEW", "MASK_UNION", "MASK_RONC", "ORACLE", "BG2", "ARM_C", "MANUAL", "CLIM"]
+    arms = [
+        "K0",
+        "GAM_ONLY",
+        "MASK_NEW",
+        "MASK_UNION",
+        "MASK_RONC",
+        "ORACLE",
+        "BG2",
+        "ARM_C",
+        "MANUAL",
+        "CLIM",
+    ]
     rows = []
     for arm in arms:
         sub = after.filter(pl.col(arm).is_not_null())
@@ -120,23 +140,36 @@ def main() -> None:  # noqa: PLR0915
     # figure 2: per event, AFTER
     per = (
         after.group_by("card", "site")
-        .agg(pl.len().alias("rows"), *[pl.col(a).mean() for a in ("K0", "MASK_NEW", "GAM_ONLY", "BG2", "ORACLE")], pl.col("winter").first())
+        .agg(
+            pl.len().alias("rows"),
+            *[pl.col(a).mean() for a in ("K0", "MASK_NEW", "GAM_ONLY", "BG2", "ORACLE")],
+            pl.col("winter").first(),
+        )
         .sort("K0", descending=True)
         .with_row_index("n", offset=1)
     )
     long = []
     for r in per.iter_rows(named=True):
-        name = f"Transfer {r['n']} ({'winter' if r['winter'] else 'other months'}, {r['rows']} rows)"
+        name = (
+            f"Transfer {r['n']} ({'winter' if r['winter'] else 'other months'}, {r['rows']} rows)"
+        )
         for arm in ("K0", "MASK_NEW", "GAM_ONLY", "BG2", "ORACLE"):
             long.append({"event": name, "label": LABELS[arm], "score": r[arm]})
     long_frame = pl.DataFrame(long)
     chart2 = (
-        alt.Chart(long_frame)
+        alt.Chart(long_frame)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=70)
         .encode(
-            x=alt.X("score:Q", title="Mean quantile score, points of effective capacity (smaller is better)"),
+            x=alt.X(
+                "score:Q",
+                title="Mean quantile score, points of effective capacity (smaller is better)",
+            ),
             y=alt.Y("event:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
-            color=alt.Color("label:N", legend=alt.Legend(orient="top", columns=2, title=None, labelLimit=400), scale=_scale(("K0", "MASK_NEW", "GAM_ONLY", "BG2", "ORACLE"))),
+            color=alt.Color(
+                "label:N",
+                legend=alt.Legend(orient="top", columns=2, title=None, labelLimit=400),
+                scale=_scale(("K0", "MASK_NEW", "GAM_ONLY", "BG2", "ORACLE")),
+            ),
         )
         .properties(
             width=WIDTH,
@@ -153,14 +186,27 @@ def main() -> None:  # noqa: PLR0915
     for name in ("INSIDE", "AFTER"):
         sub = ev.filter((pl.col("set") == name) & pl.col("shared"))
         for arm in ("K0", "GAM_ONLY", "MASK_NEW", "BG2"):
-            long3.append({"set": f"{name} ({sub['card'].n_unique()} transfers, {sub.height} rows)", "label": LABELS[arm], "score": float(sub[arm].mean())})
+            long3.append(
+                {
+                    "set": f"{name} ({sub['card'].n_unique()} transfers, {sub.height} rows)",
+                    "label": LABELS[arm],
+                    "score": float(sub[arm].mean()),  # ty: ignore[invalid-argument-type]
+                }
+            )
     chart3 = (
-        alt.Chart(pl.DataFrame(long3))
+        alt.Chart(pl.DataFrame(long3))  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=80)
         .encode(
-            x=alt.X("score:Q", title="Mean quantile score against observed power, points (smaller is better)"),
+            x=alt.X(
+                "score:Q",
+                title="Mean quantile score against observed power, points (smaller is better)",
+            ),
             y=alt.Y("set:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
-            color=alt.Color("label:N", legend=alt.Legend(orient="top", columns=2, title=None, labelLimit=400), scale=_scale(("K0", "GAM_ONLY", "MASK_NEW", "BG2"))),
+            color=alt.Color(
+                "label:N",
+                legend=alt.Legend(orient="top", columns=2, title=None, labelLimit=400),
+                scale=_scale(("K0", "GAM_ONLY", "MASK_NEW", "BG2")),
+            ),
         )
         .properties(
             width=WIDTH,
@@ -175,28 +221,68 @@ def main() -> None:  # noqa: PLR0915
     # figure 4: no harm
     rows4 = []
     for season in ("winter", "other"):
-        for arm, label in (("MASK_NEW", "MASK_NEW minus K0"), ("MASK_UNION", "MASK_UNION minus K0"), ("MASK_RONC", "MASK_RONC minus K0"), ("GAM_ONLY", "GAM_ONLY minus K0")):
+        for arm, label in (
+            ("MASK_NEW", "MASK_NEW minus K0"),
+            ("MASK_UNION", "MASK_UNION minus K0"),
+            ("MASK_RONC", "MASK_RONC minus K0"),
+            ("GAM_ONLY", "GAM_ONLY minus K0"),
+        ):
             m, lo, hi = report[f"quiet|{season}|{label}"]
             rows4.append({"label": LABELS[arm], "season": season, "mean": m, "low": lo, "high": hi})
         for arm, label in (("K0", "K0 minus BG2"), ("MASK_NEW", "MASK_NEW minus BG2")):
             m, lo, hi = report[f"quiet|{season}|{label}"]
-            rows4.append({"label": LABELS[arm] + " minus BG2", "season": season, "mean": m, "low": lo, "high": hi})
+            rows4.append(
+                {
+                    "label": LABELS[arm] + " minus BG2",
+                    "season": season,
+                    "mean": m,
+                    "low": lo,
+                    "high": hi,
+                }
+            )
     d4 = pl.DataFrame(rows4)
     d4 = d4.with_columns(row=pl.col("label") + " (" + pl.col("season") + ")")
-    chart4 = (
-        alt.layer(
-            alt.Chart(d4).mark_rule(strokeWidth=2).encode(x=alt.X("low:Q", title="Score minus the unmasked stack (or minus best guess 2 where stated), points; negative is better"), x2="high:Q", y=alt.Y("row:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)), color=alt.Color("season:N", legend=alt.Legend(orient="top", title=None), scale=alt.Scale(domain=["winter", "other"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]))),  # ty: ignore[unresolved-attribute]
-            alt.Chart(d4).mark_point(filled=True, size=70).encode(x="mean:Q", y=alt.Y("row:N", sort=None), color=alt.Color("season:N", legend=None, scale=alt.Scale(domain=["winter", "other"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]))),  # ty: ignore[unresolved-attribute]
-            alt.Chart(pl.DataFrame({"v": [0.0]})).mark_rule(strokeDash=[4, 3], color="#888").encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
-        )
-        .properties(
-            width=WIDTH,
-            height=380,
-            title=_title(
-                text="Outside transfers the pair-alarm mask costs about 0.03 points; masks from RO-NC cost more",
-                line="Real rows outside logged transfers and their 72 hours after, July 2025 to June 2026, six Primary substations. Dot: mean difference. Line: 95% interval from resampling calendar months. Dashed line: no difference.",
+    chart4 = alt.layer(
+        alt.Chart(d4)  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeWidth=2)
+        .encode(
+            x=alt.X(
+                "low:Q",
+                title="Score minus the unmasked stack (or minus best guess 2 where stated), points; negative is better",
             ),
-        )
+            x2="high:Q",
+            y=alt.Y("row:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
+            color=alt.Color(
+                "season:N",
+                legend=alt.Legend(orient="top", title=None),
+                scale=alt.Scale(
+                    domain=["winter", "other"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]
+                ),
+            ),
+        ),
+        alt.Chart(d4)  # ty: ignore[unresolved-attribute]
+        .mark_point(filled=True, size=70)
+        .encode(
+            x="mean:Q",
+            y=alt.Y("row:N", sort=None),
+            color=alt.Color(
+                "season:N",
+                legend=None,
+                scale=alt.Scale(
+                    domain=["winter", "other"], range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]
+                ),
+            ),
+        ),
+        alt.Chart(pl.DataFrame({"v": [0.0]}))
+        .mark_rule(strokeDash=[4, 3], color="#888")
+        .encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
+    ).properties(
+        width=WIDTH,
+        height=380,
+        title=_title(
+            text="Outside transfers the pair-alarm mask costs about 0.03 points; masks from RO-NC cost more",
+            line="Real rows outside logged transfers and their 72 hours after, July 2025 to June 2026, six Primary substations. Dot: mean difference. Line: 95% interval from resampling calendar months. Dashed line: no difference.",
+        ),
     )
     _save(chart=chart4, name="figure_4_no_harm")
 

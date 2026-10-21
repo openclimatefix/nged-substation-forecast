@@ -7,7 +7,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals |
-| [E163](#sw-real-event-comparison) | Does the XGBoost-free stack with a switching mask forecast better than best guess 2 after logged real transfers? | 1 | Nothing | Planned: experiment 163 |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the
 interconnection edges between Primary substations and scores them on injected transfers; see the
@@ -77,12 +76,3 @@ confirm:
   whitening, experiment 00037's proposed F4, an autoregressive model of order 1 per series and hour
   of day fitted to the residual. The filtered detector found less of the moved MW (-0.097 at 24
   hours), because the filter shrinks a day-long step faster than the noise of the 24-hour step.
-
-### SW real-event comparison
-
-**Experiment 163 scores the XGBoost-free stack with a switching mask against best guess 2 (BG2) on
-the logged real transfers.** The stack is the frozen generalised additive model with a Kalman
-filter, masked from the pair alarm of
-[experiment 156](../../00156-switching-faster-onset-alarm-from-opposite-steps/result.md). The
-experiment is descriptive and defines a gap to a clean ceiling (the logged interval masked from its
-onset) so that a pre-registered threshold can be applied.
