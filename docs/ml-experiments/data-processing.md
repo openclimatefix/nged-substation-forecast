@@ -254,6 +254,16 @@ and drift against no drift)
 Applies to experiments and to production. Confidence: high, because the centred and uncentred sets
 differ only in this shift.
 
+**Tie a demand model to its two-stage fit before passing it through a level-tracking filter (high
+confidence).** In a fit that minimises the error after a Kalman filter that tracks a level, the
+filter absorbs a constant shift of each slow term, so the loss leaves the weekly profile, the tent,
+and the harmonics to the penalty alone. The untied joint fit's weekly profile moved by a median of
+19 points (up to 95) when the cut moved back by 7 days, against 1 point for the two-stage fit, and
+scored 5.4 points worse at 12 to 36 hours ([experiment
+135](00135-differentiable-physics-n10-joint-kalman-and-demand-fit/result.md)). A ridge tie to the
+two-stage coefficients removed the movement and the loss. Applies to experiments. Evidence: 5
+decision substations, the scored year.
+
 **Give a capacity increment only to a season-year with enough training rows (provisional).** A fit
 whose cut is 2024-07-01 includes the half-hour that ends exactly at the cut, which belongs to
 season-year 2024, so that season-year has only 2 rows at D5. A free capacity increment for those 2 rows
