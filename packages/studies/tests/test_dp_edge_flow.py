@@ -5,7 +5,7 @@ solver against the same reference. The block-coordinate fit is checked against a
 a three-node graph. The causal window is checked by changing every residual after the cutoff.
 """
 
-from typing import Any, Literal
+from typing import Any
 
 import numpy as np
 import pytest
@@ -20,6 +20,7 @@ from studies.dp_edge_flow import (  # noqa: E402
     LeadHoursSpread,
     PathProblem,
     PathSpec,
+    SolverMethodType,
     _compress,
     _signs,
     block_mean_residuals,
@@ -819,7 +820,7 @@ def test_a_large_huber_threshold_turns_the_data_term_into_squared_error():
     assert np.max(np.abs(solve_path(problem=squared).flow)) > 10.0
 
 
-def _one_row_flow(*, method: Literal["dp", "admm"] = "dp", **settings: Any) -> float:
+def _one_row_flow(*, method: SolverMethodType = "dynamic_programme", **settings: Any) -> float:
     """Return the flow of a one-row, one-ended path with a squared-error data term."""
     problem = PathProblem(
         residual_a=np.array([5.0]), huber_sigmas=1e6, level_penalty=0.5, **settings
@@ -827,24 +828,24 @@ def _one_row_flow(*, method: Literal["dp", "admm"] = "dp", **settings: Any) -> f
     return float(solve_path(problem=problem, method=method).flow[0])
 
 
-@pytest.mark.parametrize("method", ["dp", "admm"])
-def test_a_row_is_weighted_by_one_over_the_noise_variance(method: Literal["dp", "admm"]):
+@pytest.mark.parametrize("method", ["dynamic_programme", "admm"])
+def test_a_row_is_weighted_by_one_over_the_noise_variance(method: SolverMethodType):
     # Minimising 0.5 * w * (5 - f)**2 + 0.5 * |f| gives f = 5 - 0.5 / w, and w = 1 / noise**2.
     assert _one_row_flow(method=method, noise_a=2.0) == pytest.approx(3.0, abs=1e-3)
     assert _one_row_flow(method=method, noise_a=0.5) == pytest.approx(4.875, abs=1e-3)
 
 
-@pytest.mark.parametrize("method", ["dp", "admm"])
-def test_a_reliability_weight_scales_the_row_weight(method: Literal["dp", "admm"]):
+@pytest.mark.parametrize("method", ["dynamic_programme", "admm"])
+def test_a_reliability_weight_scales_the_row_weight(method: SolverMethodType):
     # w = 0.5 / 4 = 0.125, so f = 5 - 0.5 / 0.125 = 1.
     flow = _one_row_flow(method=method, noise_a=2.0, reliability_a=np.array([0.5]))
 
     assert flow == pytest.approx(1.0, abs=1e-3)
 
 
-@pytest.mark.parametrize("method", ["dp", "admm"])
+@pytest.mark.parametrize("method", ["dynamic_programme", "admm"])
 def test_a_gain_other_than_zero_or_one_scales_the_flow_into_the_residual(
-    method: Literal["dp", "admm"],
+    method: SolverMethodType,
 ):
     # Minimising 0.5 * (5 - 2 f)**2 + 0.5 * |f| gives f = (5 - 0.5 / 2) / 2 = 2.375.
     flow = _one_row_flow(method=method, noise_a=1.0, gain_a=np.array([2.0]))
