@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00151_fed as fed
 import e00151_nra as nra
@@ -32,7 +32,7 @@ AFTER: Final[int] = 336
 """One week of target time after the logged end (part A)."""
 
 
-def stamp(when) -> int:
+def stamp(when: Any) -> int:
     """The detector stamp of a UTC time."""
     return int((when - GRID_START).total_seconds() // 1800)
 
@@ -71,7 +71,7 @@ def month_difference(*, months: np.ndarray, diff: np.ndarray) -> tuple[float, fl
     return float(diff.mean()), float(np.percentile(draws, 2.5)), float(np.percentile(draws, 97.5))
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915
     """Print part A per transfer, and part B pooled."""
     transfers = logged_transfers()
     intervals = pl.read_parquet(INTERVALS)
@@ -85,9 +85,19 @@ def main() -> None:
         stream = data.stream
         spread = fed.k0_spread(site)
 
-        def corrections(rows: np.ndarray, *, stream=stream, data=data, spans=spans, cutoffs=cutoffs, n=n):
+        def corrections(
+            rows: np.ndarray,
+            *,
+            stream: Any = stream,
+            data: Any = data,
+            spans: Any = spans,
+            cutoffs: Any = cutoffs,
+            n: Any = n,
+        ) -> Any:
             return {
-                "K0": fed.correction_for(data=data, stream=stream, prior=np.zeros(n), multiplier=1.0),
+                "K0": fed.correction_for(
+                    data=data, stream=stream, prior=np.zeros(n), multiplier=1.0
+                ),
                 "SUB_DET": nra.subtraction_correction(
                     data=data, stream=stream, spans=spans, cutoffs=cutoffs, rows=rows
                 ),
@@ -97,7 +107,7 @@ def main() -> None:
                 "GAM_ONLY": np.zeros(len(data.run_of_row)),
             }
 
-        def score(rows: np.ndarray, corr: dict, *, data=data, spread=spread) -> dict:
+        def score(rows: np.ndarray, corr: dict, *, data: Any = data, spread: Any = spread) -> dict:
             out = {}
             for arm, c in corr.items():
                 q = fed.quantiles_at(data=data, correction=c, spread=spread, rows=rows)
@@ -133,19 +143,18 @@ def main() -> None:
             run = data.runs[data.run_of_row[rows]]
             b_frames.append(
                 pl.DataFrame(
-                    {"site": site, "run": run, "lead_hours": data.lead_hours[rows]}
-                    | {arm: v for arm, v in scored.items()}
+                    {"site": site, "run": run, "lead_hours": data.lead_hours[rows]} | dict(scored)
                 )
             )
     pl.Config.set_tbl_rows(40)
     a = pl.DataFrame(a_rows, infer_schema_length=None)
-    print("== part A: forecasts issued inside a logged real transfer, targets in the week after its end ==")
+    print("== part A: forecasts issued inside a logged real transfer, targets after its end ==")
     print(a)
     if a.height:
         w = a["rows"]
         print(
             "row-weighted mean quantile score:",
-            {arm: round(float((a[arm] * w).sum() / w.sum()), 3) for arm in ARMS},
+            {arm: round(float((a[arm] * w).sum() / w.sum()), 3) for arm in ARMS},  # ty: ignore[unsupported-operator]
         )
     b = pl.concat(b_frames)
     b = b.with_columns(

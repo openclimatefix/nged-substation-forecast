@@ -17,7 +17,7 @@ Every score is against the true NRA series, `data.actual`, without the injected 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 import e00151_fed as fed
 import e00151_g_arms as arms134
@@ -25,7 +25,7 @@ import numpy as np
 import polars as pl
 
 ONSET_LAG: Final[int] = fed.ONSET_LAG
-"""Half-hours from a step to the stamp its alarm is known (the 24-hour statistic and a peak test)."""
+"""Half-hours from a step to the stamp its alarm is known (24-hour statistic, peak test)."""
 END_LAG: Final[int] = 60
 """Half-hours from the end of a transfer to the stamp its end is known: the call lag of the
 6-hour lookahead rule of experiment 148 (median 60, 90th percentile 96)."""
@@ -58,7 +58,7 @@ class Span:
 
 
 def detected_spans(
-    *, data, site: str, intervals: pl.DataFrame, end_lag: int = END_LAG
+    *, data: Any, site: str, intervals: pl.DataFrame, end_lag: int = END_LAG
 ) -> list[Span]:
     """Detected spans of a site from the offline-end intervals, known as the 6-hour rule knows them.
 
@@ -82,9 +82,7 @@ def detected_spans(
     return spans
 
 
-def true_spans(
-    *, events: list[tuple[int, int]], delta_points: np.ndarray, data
-) -> list[Span]:
+def true_spans(*, events: list[tuple[int, int]], delta_points: np.ndarray, data: Any) -> list[Span]:
     """True spans from the injected events, known after the same delays as a detection.
 
     `events` are (onset, end) in detector stamps; `delta_points` is over grid positions.
@@ -151,7 +149,7 @@ def cleaned_stream(
 
 def subtraction_correction(
     *,
-    data,
+    data: Any,
     stream: np.ndarray,
     spans: list[Span],
     cutoffs: np.ndarray,
@@ -180,7 +178,7 @@ def subtraction_correction(
 
 
 def score_nra(
-    *, data, site: str, corrections: dict[str, np.ndarray], rows: np.ndarray
+    *, data: Any, site: str, corrections: dict[str, np.ndarray], rows: np.ndarray
 ) -> pl.DataFrame:
     """Score every arm on `rows` against the true NRA series: quantile score and errors."""
     actual = data.actual[rows]

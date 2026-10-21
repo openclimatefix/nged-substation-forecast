@@ -12,7 +12,7 @@ import json
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import e00151_fed as fed
 import e00151_nra as nra
@@ -70,7 +70,7 @@ def site_events(*, delta: np.ndarray, events: np.ndarray) -> list[tuple[int, int
 
 
 def window_tags(
-    *, data, events: list[tuple[int, int]], spans: list[nra.Span], n: int
+    *, data: Any, events: list[tuple[int, int]], spans: list[nra.Span], n: int
 ) -> dict[str, np.ndarray]:
     """Per-position tags: the event index, the window kind, and when the alarm is known.
 
@@ -167,9 +167,7 @@ def injected_job(args: tuple[str, int]) -> str:
         rng = np.random.default_rng(seed + 31 * sorted(fed.SERIES_OF_SITE).index(site))
         weeks = int(rng.choice(PLACEBO_WEEKS))
         corrections = {
-            "K0": fed.correction_for(
-                data=data, stream=stream, prior=np.zeros(n), multiplier=1.0
-            ),
+            "K0": fed.correction_for(data=data, stream=stream, prior=np.zeros(n), multiplier=1.0),
             "CLEAN": fed.correction_for(
                 data=data, stream=data.stream, prior=np.zeros(n), multiplier=1.0
             ),

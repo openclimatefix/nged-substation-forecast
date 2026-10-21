@@ -65,7 +65,7 @@ def load() -> pl.DataFrame:
         wide = wide.join(part, on=keys)
     wide = wide.with_columns(
         month=(
-            pl.lit(datetime(2024, 4, 1, 9))
+            pl.lit(datetime(2024, 4, 1, 9))  # noqa: DTZ001
             + pl.duration(days=pl.col("run"))
             + pl.duration(minutes=(pl.col("lead_hours") * 60).cast(pl.Int64))
         ).dt.strftime("%Y-%m")
@@ -100,14 +100,14 @@ def share(
     ratio = rs_num[ok] / rs_gap[ok]
     out = {
         "n": int(frame.height),
-        "months": int(len(num)),
+        "months": len(num),
         "point": point,
         "dropped": int((~ok).sum()),
         "gap_mean": float(gap.sum() / by_month["n"].sum()),
         "gap_lo": float(np.percentile(rs_gap / by_month["n"].to_numpy()[picks].sum(axis=1), 2.5)),
         "gap_hi": float(np.percentile(rs_gap / by_month["n"].to_numpy()[picks].sum(axis=1), 97.5)),
         "gap_lo99": float(np.percentile(rs_gap / by_month["n"].to_numpy()[picks].sum(axis=1), 0.5)),
-        "arm_mean": float(frame[col(arm)].mean()),
+        "arm_mean": float(frame[col(arm)].mean()),  # ty: ignore[invalid-argument-type]
     }
     if len(ratio):
         for tag, (lo, hi) in {"95": (2.5, 97.5), "99": (0.5, 99.5)}.items():
@@ -119,7 +119,7 @@ def share(
 
 
 def event_share(*, frame: pl.DataFrame, arm: str, seed: int = SEED) -> dict:
-    """The share of the gap with every (site, world, event) weighted equally, bootstrap over events."""
+    """Share of the gap with every (site, world, event) weighted equally, bootstrapped by event."""
     per = frame.group_by("site", "world", "event").agg(
         num=(pl.col("qs__K0") - pl.col(f"qs__{arm}")).mean(),
         gap=(pl.col("qs__K0") - pl.col("qs__CLEAN")).mean(),
@@ -143,12 +143,10 @@ def fmt(r: dict, level: str = "95") -> str:
     """Format a share as 'point% (lo% to hi%)'."""
     if not r.get("n") or "point" not in r or f"lo{level}" not in r:
         return "n/a"
-    return (
-        f"{100 * r['point']:.0f}% ({100 * r[f'lo{level}']:.0f}% to {100 * r[f'hi{level}']:.0f}%)"
-    )
+    return f"{100 * r['point']:.0f}% ({100 * r[f'lo{level}']:.0f}% to {100 * r[f'hi{level}']:.0f}%)"
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Print every table of the write-up and store report.json."""
     df = load()
     report: dict = {}
@@ -156,7 +154,7 @@ def main() -> None:
     events = df.select("site", "world", "event", "missed").unique()
     print(
         f"transfer-site pairs with rows {events.height}; detected share "
-        f"{1 - events['missed'].mean():.3f}"
+        f"{1 - events['missed'].mean():.3f}"  # ty: ignore[unsupported-operator]
     )
     primary = df.filter((pl.col("origin") == "post") & (pl.col("inside") | pl.col("after48")))
     lag = df.filter((pl.col("origin") == "lag") & (pl.col("inside") | pl.col("after48")))
@@ -181,7 +179,11 @@ def main() -> None:
             for arm in ARMS[2:]:
                 r = share(frame=frame, arm=arm, metric=metric)
                 report[name][f"{metric}/{arm}"] = r
-                level = "99" if (name == "post (C1 rows)" and arm == "SUB_DET" and metric == "qs") else "95"
+                level = (
+                    "99"
+                    if (name == "post (C1 rows)" and arm == "SUB_DET" and metric == "qs")
+                    else "95"
+                )
                 print(
                     f"  {metric:2s} {arm:15s} share {fmt(r, level)}"
                     f"  [level {level}; dropped {r.get('dropped', 0)}]"
@@ -206,12 +208,17 @@ def main() -> None:
         for site in sorted(primary["site"].unique().to_list()):
             sub = primary.filter(pl.col("site") == site)
             by_site[site] = float(
-                (sub[f"qs__K0"] - sub[f"qs__{arm}"]).sum() / (sub["qs__K0"] - sub["qs__CLEAN"]).sum()
+                (sub["qs__K0"] - sub[f"qs__{arm}"]).sum() / (sub["qs__K0"] - sub["qs__CLEAN"]).sum()  # ty: ignore[unsupported-operator]
             )
         report[f"by_site/{arm}"] = by_site
-        print(f"  {arm} share by site: " + ", ".join(f"{k} {100 * v:.0f}%" for k, v in by_site.items()))
+        print(
+            f"  {arm} share by site: "
+            + ", ".join(f"{k} {100 * v:.0f}%" for k, v in by_site.items())
+        )
         print(f"  {arm} share by site, mean of sites {100 * np.mean(list(by_site.values())):.0f}%")
-    sizes = primary.group_by("site").agg(rows=pl.len(), gap=(pl.col("qs__K0") - pl.col("qs__CLEAN")).sum())
+    sizes = primary.group_by("site").agg(
+        rows=pl.len(), gap=(pl.col("qs__K0") - pl.col("qs__CLEAN")).sum()
+    )
     print("  rows and gap by site:", sizes.sort("site").rows())
     print("\n== C1 by transfer duration (post rows) ==")
     bands = {
@@ -230,32 +237,39 @@ def main() -> None:
     print(f"\n  months with post rows: {months} (decision rule needs at least {MIN_MONTHS})")
     print("\n== absolute mean quantile score by arm (points of capacity) ==")
     for name, frame in (("post", primary), ("lag", lag)):
-        report[f"abs_{name}"] = {a: float(frame[f"qs__{a}"].mean()) for a in ARMS}
+        report[f"abs_{name}"] = {a: float(frame[f"qs__{a}"].mean()) for a in ARMS}  # ty: ignore[invalid-argument-type]
         print(name, {a: round(v, 3) for a, v in report[f"abs_{name}"].items()})
-        report[f"abs_ae_{name}"] = {a: float(frame[f"ae__{a}"].mean()) for a in ARMS}
-        print(name, "median abs error", {a: round(v, 3) for a, v in report[f"abs_ae_{name}"].items()})
+        report[f"abs_ae_{name}"] = {a: float(frame[f"ae__{a}"].mean()) for a in ARMS}  # ty: ignore[invalid-argument-type]
+        print(
+            name, "median abs error", {a: round(v, 3) for a, v in report[f"abs_ae_{name}"].items()}
+        )
     print("\n== per month, SUB_DET share on post rows ==")
     for month in sorted(primary["month"].unique().to_list()):
         sub = primary.filter(pl.col("month") == month)
         num = (sub["qs__K0"] - sub["qs__SUB_DET"]).sum()
         gap = (sub["qs__K0"] - sub["qs__CLEAN"]).sum()
-        print(f"  {month}: rows {sub.height}, share {100 * num / gap:.0f}%" if gap else f"  {month}: gap 0")
+        print(
+            f"  {month}: rows {sub.height}, share {100 * num / gap:.0f}%"  # ty: ignore[unsupported-operator]
+            if gap
+            else f"  {month}: gap 0"
+        )
     print("\n== leave one site out, SUB_DET share on post rows ==")
     for site in sorted(primary["site"].unique().to_list()):
         r = share(frame=primary.filter(pl.col("site") != site), arm="SUB_DET", n_resamples=5000)
         print(f"  without {site}: {fmt(r)}")
         report[f"loo_{site}"] = r
     print("\n== checks ==")
-    med_minus_mean = (
-        primary.group_by("site")
-        .agg((pl.col("err_median__K0") - pl.col("err_median__K0")).mean().alias("zero"))
+    med_minus_mean = primary.group_by("site").agg(
+        (pl.col("err_median__K0") - pl.col("err_median__K0")).mean().alias("zero")
     )
     del med_minus_mean
-    touched = (
-        lag.filter((pl.col("qs__SUB_DET") - pl.col("qs__K0")).abs() > 1e-6).height / max(lag.height, 1)
+    touched = lag.filter((pl.col("qs__SUB_DET") - pl.col("qs__K0")).abs() > 1e-6).height / max(
+        lag.height, 1
     )
-    print(f"  share of detection-lag rows where SUB_DET differs from K0 (unrelated alarms): {touched:.3f}")
-    skf = (lag.filter((pl.col("qs__SKF") - pl.col("qs__K0")).abs() > 1e-6).height) / max(lag.height, 1)
+    print(f"  share of lag rows where SUB_DET differs from K0 (unrelated alarms): {touched:.3f}")
+    skf = (lag.filter((pl.col("qs__SKF") - pl.col("qs__K0")).abs() > 1e-6).height) / max(
+        lag.height, 1
+    )
     print(f"  share of detection-lag rows where S-KF differs from K0: {skf:.3f}")
     # tail calibration on the post rows is computed from the long files
     long = pl.concat([pl.read_parquet(p) for p in sorted(SCORES.glob("*.parquet"))])
@@ -269,22 +283,32 @@ def main() -> None:
         parts = []
         for name, tau in LEVELS:
             q, a = sub[name], sub["actual"]
-            cover = float((a <= q).mean())
+            cover = float((a <= q).mean())  # ty: ignore[invalid-argument-type]
             pin = float(
-                pl.DataFrame({"d": a - q}).select(
-                    pl.when(pl.col("d") >= 0).then(tau * pl.col("d")).otherwise((tau - 1) * pl.col("d"))
+                pl.DataFrame({"d": a - q})  # ty: ignore[invalid-argument-type]
+                .select(
+                    pl.when(pl.col("d") >= 0)
+                    .then(tau * pl.col("d"))
+                    .otherwise((tau - 1) * pl.col("d"))
                     .alias("p")
-                )["p"].mean()
+                )["p"]
+                .mean()
             )
             parts.append(f"{name} cov {cover:.3f} pin {pin:.3f}")
         print(f"  {arm:15s} " + "; ".join(parts))
         # median forecast minus mean forecast, per arm (all sites)
-        med_mean = float((sub["err_median"] - sub["err_mean"]).mean())
+        med_mean = float((sub["err_median"] - sub["err_mean"]).mean())  # ty: ignore[invalid-argument-type]
         report.setdefault("median_minus_mean", {})[arm] = med_mean
-    print("  median minus mean forecast (points):", {a: round(v, 4) for a, v in report["median_minus_mean"].items()})
+    print(
+        "  median minus mean forecast (points):",
+        {a: round(v, 4) for a, v in report["median_minus_mean"].items()},
+    )
     for site in sorted(long["site"].unique().to_list()):
         sub = long.filter((pl.col("arm") == "K0") & (pl.col("site") == site))
-        print(f"  K0 median minus mean forecast at {site}: {float((sub['err_median'] - sub['err_mean']).mean()):.4f}")
+        print(
+            f"  K0 median minus mean forecast at {site}: "
+            f"{float((sub['err_median'] - sub['err_mean']).mean()):.4f}"  # ty: ignore[invalid-argument-type]
+        )
     Path(__file__).with_name("report.json").write_text(json.dumps(report, indent=1, default=str))
     _ = timedelta
 

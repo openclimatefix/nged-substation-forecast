@@ -13,7 +13,9 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00151-nra-forecast-rescored-against-the-true-nra-series"
+WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00151-nra-forecast-rescored-against-the-true-nra-series"
+)
 """Private tables; never committed."""
 GAM_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00130-ro-nc-detector-on-the-gam-k-residual" / "gam"

@@ -1,9 +1,9 @@
 """Checks for experiment 151: how well the detected intervals match the injected transfers.
 
 For every injected transfer at a scored site, find the detected interval whose onset is within
-`ONSET_TOLERANCE` stamps and compare its MW and end with the truth, by transfer size (mean moved MW in points of the site's capacity). Also
-compares the stored `known_from` of the R0_M48 intervals with the 60-half-hour call lag of the
-6-hour lookahead rule of experiment 148.
+`ONSET_TOLERANCE` stamps and compare its MW and end with the truth, by transfer size (mean moved
+MW in points of the site's capacity). Also compares the stored `known_from` of the R0_M48
+intervals with the 60-half-hour call lag of the 6-hour lookahead rule of experiment 148.
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ def main() -> None:
     t = t.with_columns(
         pl.col("ratio").fill_nan(None),
         pl.col("end_error").fill_nan(None),
-        size=pl.col("true_mean").abs().cut([1, 3, 6], labels=["<1", "1-3", "3-6", ">6"]),
+        size=pl.col("true_mean").abs().cut([1, 3, 6], labels=["<1", "1-3", "3-6", ">6"]),  # ty: ignore[deprecated]
     )
     print(
         t.group_by("size")
