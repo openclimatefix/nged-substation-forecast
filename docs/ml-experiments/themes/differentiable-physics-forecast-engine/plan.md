@@ -13,7 +13,6 @@ order for the maintainer to change.
 | N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly the moved power where both sides are metered? | 5 | Nothing; can run with the cheap screens or with the edge-flow experiment | Proposed |
 | Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals, with the prediction, its square, and the hour as covariates, calibrate the tails better than residual quantiles? | 6 | The stored residuals only; independent of CAL | Proposed |
 | Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles, for the curtailment tail? | 7 | The tail quantile regression above | Proposed |
-| Learned process noise and observation variance | On the batched filter grid, do a learned diagonal process noise and an online observation variance beat fixed values? | 8 | The batched-filter module (pull request 1419) merged; about 1 GPU hour | Queued |
 | ERA5-only winter-by-winter backtest, earlier winters | Does the release candidate rank above XGBoost on past weather in the winters of 2019-20 to 2022-23, and does that ranking agree with the ensemble-weather result? | Low | Nothing | Queued, not started |
 | CAL, tail calibration and coherence | Can the convex model's tails on ensemble weather be calibrated per lead band, and do its summed ensembles match the observed sum across substations? | Postponed | The maintainer's decision to restart (postponed on 2026-10-20) | Postponed |
 
@@ -93,17 +92,6 @@ beyond those probabilities. A conditional Pareto tail cut the upward reserve req
 package `mgcv`, so a Python version needs a small custom maximum-likelihood fit, which takes CPU
 minutes per substation. The proposal serves the curtailment goal, which depends on the extreme upper
 quantiles.
-
-## Learned process noise and observation variance
-
-**The proposal lets the Kalman filter learn a diagonal process noise and track its own observation
-variance online, instead of using fixed values, on the batched filter grid.** [de Vilmarest and
-Wintenberger (2021)](https://arxiv.org/abs/2104.10777) call the variance-tracking method VIKING. In
-[de Vilmarest and Goude (2022)](https://arxiv.org/abs/2110.00334), it matched a hand-set large
-process noise on a linear model (mean absolute error 11.5 MW against 11.2 MW) and beat a dynamic
-model with fixed noise (14.9 MW), so the main benefit is less tuning. It would give the filter a
-variance that adapts to noisy periods, which also feeds the filter-variance arm of CAL. The run
-takes about 1 GPU hour.
 
 ## ERA5-only winter-by-winter backtest, earlier winters
 
