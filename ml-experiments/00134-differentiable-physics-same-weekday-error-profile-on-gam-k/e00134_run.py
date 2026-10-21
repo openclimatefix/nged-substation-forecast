@@ -4,7 +4,6 @@ Stages (each reads only what the earlier stages stored):
 
     tune     score every profile setting on the tuning rows' D+1 median error and choose
     gate     inject a Saturday-evening shift into real residuals and measure its recovery
-    frames   build each arm's correction, spread, and frame for every site
 
     systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \\
         uv run --no-sync python ml-experiments/00134-*/e00134_run.py <stage> [--workers 4]
@@ -27,7 +26,6 @@ import numpy as np
 import torch
 
 SITES: Final[tuple[str, ...]] = common.SCORED_SITES
-FRAMES_DIR: Final[Path] = common.WORK_DIR / "frames"
 TUNED_PATH: Final[Path] = common.WORK_DIR / "tuned.json"
 GATE_PATH: Final[Path] = common.WORK_DIR / "gate.json"
 SRC_FRAMES_DIR: Final[Path] = common.SRC_115_WORK_DIR / "frames"
@@ -225,7 +223,7 @@ def stage_gate(*, pool: ProcessPoolExecutor) -> None:
 def main() -> None:
     """Run one stage."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["tune", "gate", "frames"])
+    parser.add_argument("stage", choices=["tune", "gate"])
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
     started = time.monotonic()

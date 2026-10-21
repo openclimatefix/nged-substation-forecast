@@ -21,7 +21,7 @@ prediction: >-
 decision_rule: see "Decision rule"
 benchmark: >-
   Recipe R of experiment 115 (kappa 0.75 on the 14-day mean D+1 error profile, 2.436 points at D+1
-  in the scored year at the five decision substations), K0 (GAM-K as stored, 2.525), a naive
+  in the scored year at the five decision substations), K0 (GAM-K as stored, 2.524), a naive
   copy-7-days-ago forecast, and L1 (last week's same-weekday error)
 row_set_id: >-
   experiment 115's rows: tuning on the odd months and replicate on the even months of 2024-07 to
@@ -33,7 +33,7 @@ metric: >-
   39 hours from the 09:00 UTC power_fcst_init_time); every lead band beside it
 verdict: not supported
 best_arm: >-
-  RB-day-types (exploratory), 2.414 points at D+1 in the scored year against 2.436 for R and 2.525
+  RB-day-types (exploratory), 2.414 points at D+1 in the scored year against 2.436 for R and 2.524
   for K0; the pre-registered lead arm RB scored 2.424
 headline: >-
   The weekday-aware profile (RB) lowered the day-ahead score by 0.011 points against recipe R in
@@ -49,8 +49,8 @@ lessons:
   - >-
     Grouping days into day types (Monday, Tuesday to Thursday, Friday, Saturday, Sunday) did better
     than seven separate weekdays (-0.011 against the seven-weekday
-    profile RB, 99% interval -0.019 to -0.001), as more
-    samples per profile mean less noise.
+    profile RB, 99% interval -0.019 to -0.001), probably because each profile then averages more
+    samples; this reason was not tested.
   - >-
     The profile is built for the target's weekday at day D+1 and is applied at every lead, so it
     makes the score worse beyond 48 hours (+0.011).
@@ -74,9 +74,6 @@ advice:
   - >-
     Do not copy the value from 7 days ago as a forecast: its score was 7.07 points against 2.52 for
     GAM-K (COPY7 subset).
-  - >-
-    Keep the correction on holiday targets: with the holiday rule (no correction on those days), RB
-    scored 0.073 points worse than R in the Christmas window (C1 in the Christmas window).
 code: ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/
 ---
 
@@ -119,16 +116,15 @@ replicate months, and the scored year is 2 July 2025 to 29 June 2026 (292 runs).
 
 ## Results
 
-- **Arms.** K0 (GAM-K); R (recipe R, agreeing with experiment 115's stored correction to 9e-16
-  points); Rh (R with the holiday rule, kappa 0.75); L1 (last week's same-weekday error, kappa 0.5);
-  RW (mean same-weekday error of the last 3 weeks, kappa 0.5); RB (kappa, the correction weight,
-  0.75; lambda, the weekday share, 0.25; n, the number of weeks, 3); RB-day-types (kappa 0.75,
-  lambda 0.5, n 4 weeks). Settings are fleet-wide and were chosen by the tuning rows' D+1 mean
-  absolute error of the median. No demand model was refitted (experiment 111's monthly refits are
-  reused).
+- **Arms.** K0 (GAM-K); R (recipe R; its scores match experiment 115's); Rh (R with the holiday
+  rule, kappa 0.75); L1 (last week's same-weekday error, kappa 0.5); RW (mean same-weekday error of
+  the last 3 weeks, kappa 0.5); RB (kappa, the correction weight, 0.75; lambda, the weekday share,
+  0.25; n, the number of weeks, 3); RB-day-types (kappa 0.75, lambda 0.5, n 4 weeks). Settings are
+  fleet-wide and were chosen by the tuning rows' D+1 mean absolute error of the median. No demand
+  model was refitted (experiment 111's monthly refits are reused).
 - **Rows and compute.** 66,844 D+1 rows in the scored year and 41,126 in the replicate months at
   the five decision substations (D5, D10, D11, D14, D16), with D9 beside them. Fits take seconds;
-  the tuning, gate, and frame builds took about 20 minutes on 3 cores.
+  the tuning, gate, and frame builds took a few minutes on 3 cores.
 - **Absolute scores, scored year, D+1 (all leads).** K0 2.524 (2.812), R 2.436 (2.744), Rh 2.440
   (2.745), L1 2.535 (2.879), RW 2.452 (2.803), RB 2.424 (2.750), RB-day-types 2.414 (2.756). D9
   beside them: K0 2.194, R 2.123, RB 2.127.
@@ -147,9 +143,10 @@ replicate months, and the scored year is 2 July 2025 to 29 June 2026 (292 runs).
   -0.0279 (-0.0414 to -0.0161) replicate.
 - **C6 RB minus Rh (diagnostic, 95%).** -0.0153 (-0.0225 to -0.0086), 5 of 5 substations: with the
   holiday rule held fixed, RB scores 0.015 points better than Rh. Rh minus R is +0.0041 (-0.0001 to
-  +0.0116): the holiday rule alone raises the score by 0.004 points, mostly in the Christmas
-  window (C1 there:
-  +0.0726, +0.0285 to +0.0842, 0 of 4 substations).
+  +0.0116): the holiday rule alone raises the score by 0.004 points, with an interval that
+  includes zero. C1 in the Christmas window is +0.0726 (+0.0285 to +0.0842, 0 of 4 substations),
+  and C1 on Easter is -0.0835 (one set of 720 rows); C1 mixes the weekday term and the holiday rule,
+  and the holiday rule's own effect in those windows was not printed.
 - **Weekdays (scored year, C1).** Monday -0.0375 (-0.0575 to -0.0165), 4 of 5; Friday -0.0525
   (-0.0819 to -0.0218), 5 of 5; Tuesday +0.0044, Wednesday +0.0069, Thursday -0.0043, Saturday
   -0.0113, Sunday -0.0014, all with intervals that include zero. The replicate months show the same
@@ -171,12 +168,15 @@ replicate months, and the scored year is 2 July 2025 to 29 June 2026 (292 runs).
 
 **The known-answer gate passed, and it was run on the tuning months before any replicate or scored
 forecast was read.** A +3-point shift on Saturdays 17:00 to 21:00 for 8 weeks (2 November to 21
-December 2024) was recovered at the third to eighth Saturday as follows (median of five
-substations, share of the shift): R 0.089, Rh 0.089, RB at the reference setting 0.318 (at least
-0.15 and more than twice R), RB tuned 0.215, RW 0.394, and the placebo (weekday labels shifted by 3
-days) 0.045 at the reference and 0.067 tuned (at most R plus 0.05). On the tuning rows, the
-placebo's mean absolute error at D+1 (4.217) is above Rh's (4.130) and RB's at the reference
-(4.098), so the placebo's error does not improve: the benefit needs the correct weekday.
+December 2024) was recovered at the third to eighth Saturday as follows (median of five substations,
+share of the shift): R 0.089, Rh 0.089, RB at the reference setting 0.318 (at least 0.15 and more
+than twice R), RB tuned 0.215, RW 0.394, and the placebo (weekday labels shifted by 3 days) 0.045 at
+the reference and 0.067 tuned. The placebo condition on recovery (at most R plus 0.05) is nearly
+arithmetic, because a profile from the wrong weekday carries only the shrunk share of any shift, so
+the second check is the informative one. The share cannot reach 1: removing each day's mean, as the
+profile does, lowers the largest recoverable share to about 0.83. On the tuning rows, the placebo's
+mean absolute error at D+1 (4.217) is above Rh's (4.130) and RB's at the reference (4.098), so the
+placebo's error does not improve: the benefit needs the correct weekday.
 
 ## Checks
 
@@ -189,10 +189,11 @@ placebo's mean absolute error at D+1 (4.217) is above Rh's (4.130) and RB's at t
   The quantile score and both errors point the same way.
 - **Triggers.** None fired. The gate passed; the results agree with the predictions except C5's
   size; the quantile score and the errors agree; leaving out one substation never flips C1's sign
-  (-0.0053 to -0.0161 scored; the interval includes zero in four of five leave-one-outs, as in the
-  full set); no nested arm beats its container (RB beats Rh and RW, which it contains); the
-  closest sister interval, experiment 115's KW minus R, is a different contrast; no later
-  experiment depends on this result. No audit was run.
+  (-0.0053 to -0.0161 scored; the scored-year interval includes zero in four of five leave-one-outs,
+  as in the full set, and D11's upper end is +0.0000); no nested arm beats the arm containing it (RB
+  contains Rh and RW as special cases and beats both, which is the expected order); the closest
+  sister interval, experiment 115's KW minus R, is a different contrast; no later experiment depends
+  on this result. No audit was run.
 
 ## Caveats
 
@@ -256,15 +257,16 @@ scored separately.
 ### Settings and how they are chosen
 
 - **Grids.** kappa from 0.5, 0.75, 1.0; lambda from 0, 0.25, 0.5, 0.75, 1; n from 2, 3, 4.
-- **Rule.** Fleet-wide settings (one set for all five decision substations), because each
-  substation has about 3,000 tuning-month D+1 rows and the weekday profiles use 2 to 4 samples; a
+- **Rule.** Fleet-wide settings (one set for all five decision substations), because each substation
+  has about 3,000 tuning-month D+1 rows and the weekday profiles use 2 to 4 samples; a
   per-substation choice would mostly fit noise. The setting with the lowest mean absolute error of
   the corrected median at D+1 on the tuning rows, in points of effective capacity, pooled with equal
   weight per row over the five decision substations, wins. Holiday-like targets stay in the tuning
   rows (they carry zero correction in every arm). Weeks `n` is chosen separately for RW and RB, and
-  the full kappa-by-lambda-by-n grid is reported.
-  Each arm's spread is then refitted on the tuning rows and its factors chosen per lead band, as
-  for every arm of experiment 115.
+  the tuning-row scores of the kappa 0.75 slice of the RB grid are printed. Lambda takes 0.25, 0.5,
+  and 0.75 in RB, because lambda 0 is Rh and lambda 1 is RW, which are tuned separately. Each arm's
+  spread is then refitted on the tuning rows and its factors chosen per lead band, as for every arm
+  of experiment 115.
 - **Sensible limits.** If lambda = 0 wins, RB equals Rh and the verdict says so.
 
 ### Known-answer gate (reported before any score)
