@@ -35,6 +35,8 @@ D8_SERIES: Final[int] = 26
 NEIGHBOUR_SERIES: Final[tuple[int, ...]] = (3, 16, 17)
 """D8's connected metered neighbours in experiment 130's adjacency."""
 NEIGHBOUR_LABELS: Final[dict[int, str]] = {3: "D3", 16: "D14", 17: "D5"}
+PLACEBO_FROM_STAMP: Final[int] = 546 * 48
+"""2023-07-01, the month before which D8 has one drop; placebo times and windows start here."""
 LONG_CLOSURE_JOB: Final[str] = "21D5583"
 """The logged job on D8 and D14 that overlaps 12 of the drops of 2025."""
 HALF_HOURS_PER_DAY: Final[int] = 48
@@ -137,7 +139,7 @@ def closures_near(*, first: int, last: int) -> list[str]:
     return [f"{row['sheet']} {row['switch']}" for row in hits.iter_rows(named=True)]
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Build the drop table and every figure's input."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     arrays = pickle.loads((FALSE_ALARM_DIR / "arrays.pkl").read_bytes())
@@ -341,7 +343,12 @@ def main() -> None:  # noqa: PLR0915
         in_drop[max(first - 2 * HALF_HOURS_PER_DAY, 0) : last + 2 * HALF_HOURS_PER_DAY] = True
     eligible = np.flatnonzero(~in_drop)
     eligible = eligible[(eligible > NEIGHBOUR_WINDOW) & (eligible < n_stamps - NEIGHBOUR_WINDOW)]
-    placebo_at = rng.choice(eligible, size=N_PLACEBO, replace=False)
+    eligible = eligible[eligible >= PLACEBO_FROM_STAMP]
+    # Each placebo time has the time of day of a randomly drawn drop start.
+    by_time_of_day = {h: eligible[eligible % 48 == h] for h in range(48)}
+    placebo_at = np.array(
+        [rng.choice(by_time_of_day[int(firsts[rng.integers(n)] % 48)]) for _ in range(N_PLACEBO)]
+    )
     placebo_steps = np.array(
         [
             np.nanmax([step_up(power=arrays[s]["power"], at=int(a)) for s in NEIGHBOUR_SERIES])
@@ -353,11 +360,13 @@ def main() -> None:  # noqa: PLR0915
         hit = int((steps_best >= fraction * depth).sum())
         # Placebo: each placebo time takes a drop depth drawn at random.
         depths = rng.choice(depth, size=N_PLACEBO)
-        placebo_rate = float(np.nanmean(placebo_steps >= fraction * depths))
+        finite = np.isfinite(placebo_steps)
+        placebo_rate = float(np.mean(placebo_steps[finite] >= (fraction * depths)[finite]))
         placebo_rates[fraction] = placebo_rate
         say(
             f"Share of drops with a neighbour step-up of at least {fraction:.2f} x depth: "
-            f"{share(k=hit, n=n)}; placebo (random times without a drop) {placebo_rate:.3f}"
+            f"{share(k=hit, n=n)}; placebo (random times from July 2023, away from any drop, "
+            f"same time of day) {placebo_rate:.3f}"
         )
     pl.DataFrame(
         {"fraction": list(placebo_rates), "share": list(placebo_rates.values())}
@@ -380,10 +389,14 @@ def main() -> None:  # noqa: PLR0915
     placebo_hits = []
     for _ in range(2000):
         length = int(rng.choice(durations))
-        first = int(rng.choice(eligible[eligible < n_stamps - length]))
+        while True:
+            first = int(rng.choice(eligible[eligible < n_stamps - length]))
+            if not in_drop[first : first + length].any():
+                break
         placebo_hits.append(bool(closures_near(first=first, last=first + length)))
     say(
-        f"Placebo: windows of random drop lengths placed at random times away from any drop that "
+        f"Placebo: windows of random drop lengths placed at random times from July 2023 "
+        f"that overlap no drop and "
         f"have a logged closure of D8 within 24 hours: {float(np.mean(placebo_hits)):.3f}"
     )
     other_closure = sum(
@@ -469,9 +482,36 @@ def main() -> None:  # noqa: PLR0915
     )
     all_jump = jump_steps.sum()
     say(
-        f"Half-hour steps of over 3 MW on D8 in all history: {all_jump} of "
+        f"Half-hour jumps of that size on D8 in all history: {all_jump} of "
         f"{np.isfinite(np.diff(power)).sum()}"
     )
+    window = 2 * HALF_HOURS_PER_DAY
+    csum = np.r_[0, np.cumsum(jump_steps)]
+    lo = np.clip(np.arange(n_stamps) - window, 0, n_stamps)
+    hi = np.clip(np.arange(n_stamps) + window + 1, 0, n_stamps)
+    chance_jump = float(np.mean(csum[hi] - csum[lo] > 0))
+    say(f"Share of all half-hours with such a jump within 24 hours either side: {chance_jump:.3f}")
+    near_edge = np.zeros(n_stamps, dtype=bool)
+    for edge in np.r_[firsts, lasts]:
+        near_edge[max(edge - ALARM_NEAR, 0) : edge + ALARM_NEAR + 1] = True
+    say(
+        f"Share of all half-hours within 6 hours of a drop's start or end: {near_edge.mean():.3f}; "
+        f"expected alarms among 52: {52 * near_edge.mean():.1f}; "
+        f"among 28: {28 * near_edge.mean():.1f}"
+    )
+    when = [GRID_START + timedelta(minutes=30 * int(s)) for s in alarm_stamps]
+    say(f"Unexplained alarms from {min(when):%Y-%m-%d} to {max(when):%Y-%m-%d}")
+    in_window = sum(
+        datetime(2023, 8, 1, tzinfo=UTC) <= w < datetime(2024, 10, 1, tzinfo=UTC) for w in when
+    )
+    say(f"Unexplained alarms between 2023-08-01 and 2024-09-30: {in_window} of {len(when)}")
+    say(f"Drops starting in 2025 or later: {int((table['start_date'] >= date(2025, 1, 1)).sum())}")
+    long_2025 = sum(
+        LONG_CLOSURE_JOB in c and d.year == 2025
+        for c, d in zip(table["closures"].to_list(), table["start_date"].to_list(), strict=True)
+    )
+    say(f"Drops starting in 2025 with the long-running job {LONG_CLOSURE_JOB} near: {long_2025}")
+    say(f"Median power of D5 (series 17): {np.nanmedian(arrays[17]['power']):.2f} MW")
     sign = np.sign(unexplained["step_mw"].to_numpy())
     say(f"Alarm sign: {int((sign < 0).sum())} downward and {int((sign > 0).sum())} upward")
 

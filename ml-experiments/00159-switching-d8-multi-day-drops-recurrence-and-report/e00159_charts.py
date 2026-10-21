@@ -260,9 +260,9 @@ def figure_recurrence(*, drops: pl.DataFrame) -> alt.TopLevelMixin:
     )
     return alt.vconcat(bars, hour_bars, gap_bars, spacing=18).properties(
         title=_title(
-            text="The drops start on no particular weekday, hour, or interval",
+            text="No weekday, hour, or interval pattern is detectable in the 29 drops",
             line="The 29 drops. No test of the weekday and hour-of-day counts against a flat "
-            "pattern reaches p = 0.05.",
+            "pattern reaches p = 0.05, but 29 drops give the tests little power.",
         )
     )
 
@@ -350,10 +350,11 @@ def figure_neighbours(*, drops: pl.DataFrame, placebo: dict[float, float]) -> al
         width=WIDTH,
         height=200,
         title=_title(
-            text="No connected neighbour steps up at a drop more often than by chance",
+            text="A neighbour's step-up at a drop is not clearly above its rate at random times",
             line="Best step-up of D3, D14, and D5 (6-hour median after the drop's start minus "
             "6-hour median before). Whiskers: 95% Wilson interval. The comparison is 5,000 "
-            "random times at least 2 days from any drop.",
+            "random times from July 2023 at the time of day of a drop start, at least 2 days "
+            "from any drop.",
         ),
     )
 
@@ -405,9 +406,9 @@ def figure_alarms(*, drops: pl.DataFrame, alarms: pl.DataFrame) -> alt.TopLevelM
         width=WIDTH,
         height=170,
         title=_title(
-            text="Only 2 of the 28 unexplained alarms fall within 6 hours of a drop's start or end",
+            text="2 of the 28 unexplained alarms fall within 6 hours of a drop's start or end",
             line="Each dot is an alarm that RO-NC raised on D8 and that matches no logged "
-            "closure. Shaded: the 29 drops.",
+            "closure. Shaded: the 29 drops. About 0.5 of 28 would fall there by chance.",
         ),
     )
 

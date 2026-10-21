@@ -27,14 +27,14 @@ Mean temperature during a drop minus the month's mean: -0.55 C (95% interval -1.
 
 Neighbour check: best step-up among D3, D14, and D5 in the 6 hours after the start
 Best neighbour step (MW): median +0.12, range -1.42 to +4.04; drop depth median 2.71
-Share of drops with a neighbour step-up of at least 0.25 x depth: 11 of 29 (0.38; 0.23 to 0.56); placebo (random times without a drop) 0.509
-Share of drops with a neighbour step-up of at least 0.50 x depth: 8 of 29 (0.28; 0.15 to 0.46); placebo (random times without a drop) 0.346
-Share of drops with a neighbour step-up of at least 0.75 x depth: 5 of 29 (0.17; 0.08 to 0.35); placebo (random times without a drop) 0.214
+Share of drops with a neighbour step-up of at least 0.25 x depth: 11 of 29 (0.38; 0.23 to 0.56); placebo (random times from July 2023, away from any drop, same time of day) 0.344
+Share of drops with a neighbour step-up of at least 0.50 x depth: 8 of 29 (0.28; 0.15 to 0.46); placebo (random times from July 2023, away from any drop, same time of day) 0.214
+Share of drops with a neighbour step-up of at least 0.75 x depth: 5 of 29 (0.17; 0.08 to 0.35); placebo (random times from July 2023, away from any drop, same time of day) 0.124
 Drops with no readable neighbour step: 0
 Share of drops with a neighbour step down of at least 0.5 x depth at the end: 13 of 29 (0.45; 0.28 to 0.62)
 
 Drops with a logged closure of D8 within 24 hours: 23 of 29 (0.79; 0.62 to 0.90)
-Placebo: windows of random drop lengths placed at random times away from any drop that have a logged closure of D8 within 24 hours: 0.399
+Placebo: windows of random drop lengths placed at random times from July 2023 that overlap no drop and have a logged closure of D8 within 24 hours: 0.449
 Drops with a logged closure other than the long-running job 21D5583: 14 of 29 (0.48; 0.31 to 0.66)
 Logged closures touching D8 in total: 78
 
@@ -46,5 +46,12 @@ Drops with any RO-NC alarm within 6 hours of the start: 4 of 29
 Drops with an alarm of any kind within 6 hours of their start: 4 of 29
 Share of the grid inside a drop or within 2 days of one: 0.149
 Alarms with a metered half-hour jump of at least 0.3 x capacity (3.11 MW) within 24 hours either side: 27 of 28 (0.96; 0.82 to 0.99)
-Half-hour steps of over 3 MW on D8 in all history: 2642 of 78736
+Half-hour jumps of that size on D8 in all history: 2642 of 78736
+Share of all half-hours with such a jump within 24 hours either side: 0.644
+Share of all half-hours within 6 hours of a drop's start or end: 0.018; expected alarms among 52: 1.0; among 28: 0.5
+Unexplained alarms from 2022-09-18 to 2026-06-24
+Unexplained alarms between 2023-08-01 and 2024-09-30: 26 of 28
+Drops starting in 2025 or later: 18
+Drops starting in 2025 with the long-running job 21D5583 near: 12
+Median power of D5 (series 17): 2.96 MW
 Alarm sign: 16 downward and 12 upward

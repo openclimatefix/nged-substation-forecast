@@ -48,32 +48,35 @@ best_arm: >-
   Not applicable (descriptive). 29 drops of 2 days or longer, median depth 2.7 MW (range 1.2 to
   5.4) and median duration 3.6 days (range 2.0 to 19.2), 28 of them since July 2023.
 headline: >-
-  29 drops. A connected neighbour steps up by half the depth at 8 of 29 (0.28; 0.15 to 0.46)
-  against 0.35 at random times. 23 of 29 have a logged closure within 24 hours, against 0.40 for
-  random windows. 2 of the 28 unexplained RO-NC alarms fall within 6 hours of a drop's start or
-  end.
+  29 drops. A connected neighbour steps up by half the depth at 8 of 29 (0.28; 0.15 to 0.46) against
+  0.21 at random times of the same time of day. 23 of 29 have a logged closure within 24 hours,
+  against 0.45 for random windows. 10 of the 52 RO-NC alarms on D8 (2 of the 28 unexplained) fall
+  within 6 hours of a drop's start or end, against 1.0 expected by chance.
 lessons: >-
-  The drops do not look like transfers to D3, D14, or D5, they follow no weekday, hour, bank
-  holiday, or season, and the unexplained RO-NC alarms on D8 are a different event from the drops.
+  The drops do not clearly look like transfers to D3, D14, or D5, and show no detectable weekday,
+  hour, bank-holiday, or seasonal pattern. Most RO-NC alarms on D8 are away from the drops, but the
+  10 of 52 near a drop's edge are above chance.
 take_home_message: >-
-  D8's multi-day drops are 29 episodes since 2022, nearly all since mid-2023, in which D8 runs about
-  2.7 MW below the demand model for 2 to 19 days. No connected metered neighbour steps up with them
-  more often than at random times, so they do not look like load moved onto D3, D14, or D5, and
-  they follow no weekday, hour, bank holiday, or season. The RO-NC alarms on D8 are a different
-  event, because only 10 of the 52 alarms fall within 6 hours of a drop's start or end. The next
-  step is to ask NGED what moved, starting with the 6 drops that have no logged closure.
+  D8's multi-day drops are 29 episodes since 2022, nearly all since mid-2023, in which D8's power
+  runs about 2.7 megawatts below the demand regression model's expectation for 2 to 19 days. The
+  three connected metered neighbours step up with the drops at a rate not clearly above their rate
+  at random times, so the drops do not clearly look like load moved onto them, and they show no
+  detectable weekday, hour, bank-holiday, or seasonal pattern. Most of the switching detector's
+  alarms on D8 are away from the drops (10 of 52 are within 6 hours of an edge), so the detector
+  does not find the drops. The next step is to ask NGED which load moved or which switching took
+  place, starting with the six drops that have no logged closure.
 advice:
   - >-
-    Treat D8's multi-day drops as their own event type, separate from the 28 unexplained RO-NC
-    alarms, because only 2 of those 28 fall within 6 hours of a drop's start or end (alarms and
-    drops).
+    Treat D8's multi-day drops as their own event type and do not expect RO-NC to find them, because
+    42 of its 52 alarms on D8 are away from a drop's start or end and only 4 of the 29 drops have an
+    alarm within 6 hours of their start (alarms and drops).
   - >-
     Do not read a drop on D8 as a transfer to D3, D14, or D5 unless a neighbour's own step shows
-    it: the best neighbour step-up is at or below the chance rate at all three thresholds (neighbour
-    check).
+    it: the neighbour step-up rate at the drops is not clearly above the rate at random times at
+    all three thresholds (neighbour check).
   - >-
     Ask NGED what D8's switching and load changes are before choosing a mask for the drops, because
-    23 of 29 drops have a logged closure within 24 hours against 0.40 at random times, and 14 of 29
+    23 of 29 drops have a logged closure within 24 hours against 0.45 at random times, and 14 of 29
     still do once the long-running job 21D5583 is set aside (closures).
 production_status: not-for-production
 adopted_in: none
@@ -81,20 +84,32 @@ adopted_in: none
 
 # Experiment 159: what are D8's multi-day drops, do they recur, and do they look like transfers?
 
-**D8's multi-day drops are 29 episodes in which its power runs about 2.7 MW below the demand model
-for 2 to 19 days. No connected neighbour steps up with them more than it does at random times.** D8
-is a Primary substation. The false-alarm analysis of the refit-offset neighbour-count detector
-(RO-NC) found that D8's power falls for days at a time while the forecast does
-not follow. We listed every such drop in the convex demand model's residual of [experiment
-130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md), described when the drops happen, and
-checked whether one of the three connected metered neighbours (D3, D14, and D5) steps up by a
-similar amount at the same time, which would make a drop a load transfer. A neighbour does not step
-up more often than at random times (8 of 29 drops against 0.35 of random times), so the drops look
-like a customer load change, an outage, or a move to an unmetered substation. The drops follow no
-weekday, hour of day, bank holiday, or season. 23 of the 29 have a logged closure of D8 within 24
-hours, against 0.40 for random windows of the same lengths, so switching is probably involved. The
-written prediction was half right, so the verdict is `partly supported`. This page is descriptive,
-and all series are labelled D8 and its neighbours.
+**D8's multi-day drops are 29 episodes in which its power runs about 2.7 megawatts (MW) below what a
+demand regression model expects, for 2 to 19 days. Its three connected neighbours step up with the
+drops at a rate not clearly above their rate at times chosen at random.** D8 is a Primary
+substation, and D3, D14, and D5 are its connected neighbours with metered power. An earlier analysis
+found that the refit-offset neighbour-count detector (RO-NC), which flags a possible switching event
+(an operator moving load between substations) when the regression model's errors shift together,
+raised alarms on D8 that match no logged switching. That analysis also found that D8's power falls
+for days at a time while the demand forecast does not follow. We listed every such drop in the
+residual (metered power minus the power the regression model expects) of [experiment
+130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md). We then described when the drops
+happen. Finally, we checked whether a neighbour steps up by a similar amount at the same time, which
+would make a drop a load transfer (an operator moving some of D8's customers onto a neighbouring
+substation).
+
+A neighbour steps up by half the depth at 8 of the 29 drops (0.28; 95% Wilson interval 0.15 to
+0.46), against 0.21 at random times of the same time of day. Among the explanations we did not test,
+the drops could be a change in what D8's own customers draw, an outage, or a move of load to an
+unmetered substation. The drops show no detectable weekday, hour of day, bank-holiday, or seasonal
+pattern. Of the 29 drops, 23 have a logged closure of D8 within 24 hours, against 0.45 for random
+windows of the same lengths. Switching may therefore be involved, although closures within 24 hours
+are common (see Caveats). The alarms of RO-NC are mostly elsewhere: 10 of its 52 alarms on D8 fall
+within 6 hours of a drop's start or end, which is about 10 times the 1.0 expected by chance but
+leaves 42 of 52 away from the drops. We wrote predictions before looking at the data. Two held (the
+count of drops and the lack of a detectable weekday or hour pattern), one narrowly missed (the
+neighbour rate), and one failed (the alarms), so the verdict is `partly supported`. The page is
+descriptive, and the substations are labelled D3, D5, D8, and D14.
 
 ![D8 power with every drop shaded](figure_1_history.svg)
 
@@ -112,46 +127,58 @@ and all series are labelled D8 and its neighbours.
 
 ## Results
 
-- **Drops:** 29 runs of 2 days or longer in which the 24-hour median of the residual (metered power
-  minus the convex model's expected power) is below -1.5 MW, with gaps under 12 hours merged. 148 of
-  the 1,642 days (0.090) lie inside a drop. 28 of the 29 start on or after 2023-07-01, by year 1, 3,
-  7, 15, and 3 from 2022 to 2026. The sensitivity to the threshold is large: -1.0 MW gives 48 drops,
-  -2.0 MW gives 24, and -2.5 MW gives 15.
-- **Depth and duration:** median depth 2.71 MW (range 1.19 to 5.36), and median duration 3.6 days
-  (range 2.0 to 19.2). Inside drops the median metered power is 3.43 MW against an expected 6.20 MW,
-  and 0.435 of half-hours are below 3 MW, against 0.158 outside drops after the first. The depth is
-  not constant: its Spearman correlation with the start time is -0.40 (p = 0.032), because the four
-  drops of October 2023 to January 2024 are the deepest (4.9 to 5.4 MW).
+- **Drops:** 29 runs of 2 days or longer in which the 24-hour median of the residual is below -1.5
+  MW. Gaps under 12 hours are merged. The drops cover 148 of the 1,642 days of history (a share of
+  0.090). Of the 29 drops, 28 start on or after 2023-07-01. By start year, 1 drop starts in 2022, 3
+  in 2023, 7 in 2024, 15 in 2025, and 3 in 2026. The number of drops depends strongly on the
+  threshold: -1.0 MW gives 48 drops, -2.0 MW gives 24, and -2.5 MW gives 15.
+- **Depth and duration:** median depth 2.71 MW (range 1.19 to 5.36) and median duration 3.6 days
+  (range 2.0 to 19.2). Inside drops the median metered power is 3.43 MW against an expected 6.20 MW.
+  Of the half-hours inside drops, 0.435 are below 3 MW, against 0.158 of the half-hours outside
+  drops after the first drop. The Spearman correlation of depth with start time is -0.40 (p =
+  0.032). The correlation arises because the four drops from October 2023 to January 2024 are the
+  deepest (4.9 to 5.4 MW).
 - **What the power does inside a drop:** the metered power alternates between the expected level and
-  0 to 3 MW within each day, as in drop 20, which lasts 19 days. A drop is a run in which those low
-  periods dominate, not a steady 3 MW shift.
-- **Recurrence:** no weekday, hour, or interval pattern. Starts by weekday Monday to Sunday are 3,
-  5, 7, 3, 1, 5, 5 (chi-squared p = 0.48), and by 6-hour block of the day 11, 3, 5, 10 (p = 0.10).
-  The spacing between starts has a median of 16.4 days (quartiles 10.3 and 42.3). 1 of 29 starts
-  falls within 1 day of a bank holiday (0.03; 0.01 to 0.17), against 0.069 of all days. By calendar
-  month Jan to Dec the starts are 5, 0, 0, 0, 3, 6, 2, 4, 2, 3, 1, 3 (p = 0.12), and the mean
-  temperature during a drop is 0.55 C below the month's mean (95% interval -1.61 to +0.49).
-- **Neighbour check:** the best step-up among D3, D14, and D5 in the 6 hours after a drop's start is
-  at least 0.25, 0.50, and 0.75 times the depth for 11 (0.38; 0.23 to 0.56), 8 (0.28; 0.15 to 0.46),
-  and 5 (0.17; 0.08 to 0.35) of the 29 drops. At 5,000 random times away from any drop the rates are
-  0.51, 0.35, and 0.21. A neighbour steps down by at least half the depth at the end of 13 of 29
-  drops (0.45; 0.28 to 0.62). The rate at which a neighbour steps down at the end is the only sign
-  of a shared cause, and no placebo for it was run.
-- **Logged closures:** 23 of 29 drops (0.79; 0.62 to 0.90) have a logged closure of D8 within 24
-  hours, against 0.399 for 2,000 random windows of the same lengths away from any drop. 14 of 29
-  (0.48; 0.31 to 0.66) still have one when the long-running job 21D5583 (a closure between D8 and
-  D14 that overlaps 12 of the drops of 2025) is set aside. 6 drops have no logged closure.
+  0 to 3 MW within each day, as in drop 20, which lasts 19 days. A drop is a run in which the
+  periods at 0 to 3 MW dominate, not a steady 3 MW shift.
+- **Recurrence:** the 29 drops show no detectable weekday, hour, or interval pattern. Drop starts
+  per weekday, Monday to Sunday, are 3, 5, 7, 3, 1, 5, and 5 (chi-squared p = 0.48). Drop starts per
+  6-hour block of the day (00:00 to 06:00, 06:00 to 12:00, 12:00 to 18:00, and 18:00 to 24:00) are
+  11, 3, 5, and 10 (p = 0.10). The spacing between starts has a median of 16.4 days (quartiles 10.3
+  and 42.3). Of the 29 starts, 1 falls within 1 day of a bank holiday (0.03; 0.01 to 0.17), against
+  a share of 0.069 of all days. Drop starts per calendar month, January to December, are 5, 0, 0, 0,
+  3, 6, 2, 4, 2, 3, 1, and 3 (p = 0.12). The mean temperature during a drop is 0.55 degrees Celsius
+  below the month's mean (95% interval -1.61 to +0.49).
+- **Neighbour check:** the largest step-up in any one of D3, D14, and D5, in the 6 hours after a
+  drop's start, is at least 0.25, 0.50, and 0.75 times the depth for 11 of the 29 drops (0.38; 0.23
+  to 0.56), 8 (0.28; 0.15 to 0.46), and 5 (0.17; 0.08 to 0.35). At 5,000 randomly chosen times from
+  July 2023, away from any drop and at the time of day of a drawn drop start, the rates are 0.34,
+  0.21, and 0.12. Every interval of the drops contains the rate at random times, but the drops'
+  rates are above it at all three thresholds. A neighbour steps down by at least half the depth at
+  the end of 13 of the 29 drops (0.45; 0.28 to 0.62). That step-down is the one sign of a shared
+  cause in these checks. No comparison with random times was run for the step-down.
+- **Logged closures:** of the 29 drops, 23 (0.79; 0.62 to 0.90) have a logged closure of D8 within
+  24 hours, against 0.449 for 2,000 random windows of the same lengths that start in July 2023 or
+  later and overlap no drop. A closure is a switching outage in NGED's switching log. Of the 29
+  drops, 14 (0.48; 0.31 to 0.66) still have a closure when one long-running switching job (reference
+  21D5583, a closure between D8 and D14 that overlaps 12 of the 18 drops that start in 2025 or
+  later) is set aside. Six drops have no closure in the log.
 - **What the alarms did:** RO-NC raised 52 alarms on D8, of which 28 match no logged closure. Of
   those 28, 27 (0.96; 0.82 to 0.99) have a half-hour jump of at least 0.3 times the capacity (3.11
-  MW) within 24 hours, and 16 step down and 12 step up. 5 of the 28 (0.18; 0.08 to 0.36) fall inside
-  a drop, 0 within 6 hours of a drop's start, and 2 within 6 hours of its end. Of all 52 alarms, 10
-  fall within 6 hours of a drop's start or end, and 4 of the 29 drops have an alarm within 6 hours
-  of their start. The alarms respond to D8's within-day jumps, of which there are 2,642 of 78,736
-  half-hours in all history, and not to the drops.
+  MW) within 24 hours, against 0.644 of all half-hours, and 16 step down while 12 step up. Of the
+  28, 5 (0.18; 0.08 to 0.36) fall inside a drop, 0 within 6 hours of a drop's start, and 2 within 6
+  hours of its end. Of all 52 alarms, 10 fall within 6 hours of a drop's start or end, against 1.0
+  expected by chance (0.018 of half-hours lie that close to an edge), and 4 of the 29 drops have an
+  alarm within 6 hours of their start. The alarms track D8's within-day jumps more than chance and
+  are mostly away from the drops, although the 10 near an edge are above chance. Within-day jumps
+  occur in 2,642 of the 78,736 half-hours in the history. Of the 28 alarms, 26 fall between August
+  2023 and September 2024, while 18 of the 29 drops start in 2025 or later.
 - **Prediction:** the count (20 to 40 drops, nearly all after mid-2023) and the lack of a weekday or
-  hour pattern were right. The neighbour rate (below 0.25 for half the depth) was missed narrowly,
-  at 0.28, and the comparison with chance is what matters. The alarm prediction (at least 20 of 28
-  within 6 hours) was wrong, at 2 of 28.
+  hour pattern held. The neighbour prediction (a step-up of half the depth at fewer than a quarter
+  of the drops) narrowly missed, at 0.28, and the comparison with random times matters more. The
+  alarm prediction (at least 20 of 28 within 6 hours) failed, at 2 of 28. The neighbour prediction
+  said a step-up within 2 hours of the start, and the check uses 6-hour medians around the start, so
+  the two are not the same test.
 
 ## Checks
 
@@ -159,38 +186,45 @@ and all series are labelled D8 and its neighbours.
   closures touching D8 reproduce the false-alarm analysis.
 - **Forecast checks:** no forecast is scored, so the checks on the median and mean forecast, the
   tail coverage, and the curtailment cost do not apply.
-- **Audit triggers:** one of the seven fires. The result contradicts the written prediction for the
-  alarms (2 of 28 against at least 20). The page tests an explanation: the alarms sit in 2023 and
-  2024 while 22 of 29 drops start in 2025 or later (figure 7), and the alarms match D8's within-day
-  jumps (27 of 28). The other six triggers do not apply, because the page has no control, no nested
-  arm, no planned contrast, and no sister experiment.
+- **Audit triggers:** one of the seven audit triggers in the `ml-experiment` skill fires, because
+  the result contradicts the written prediction for the alarms (2 of 28 against at least 20). The
+  page tests an explanation. 26 of the 28 alarms fall between August 2023 and September 2024, while
+  18 of the 29 drops start in 2025 or later (figure 7), and 27 of the 28 alarms have a jump (0.644
+  of all half-hours do). The other six triggers do not apply, because the page has no control, no
+  nested arm, no planned contrast, and no earlier experiment on the same rows to compare an interval
+  with.
 
 ## Caveats
 
 - **The definition of a drop is ours.** The count changes from 15 to 48 as the threshold moves from
-  -2.5 to -1.0 MW, and a drop's start and end can be off by up to 12 hours, because of the 24-hour
+  -2.5 to -1.0 MW. A drop's start and end can be off by up to 12 hours, because of the 24-hour
   smoothing.
-- **The residual is the lab residual.** It comes from the frozen convex model of experiment 130,
-  refitted on the 1st and 16th of each month, with ERA5 weather and the real transfers masked from
-  training. A drop that the model partly follows is under-counted.
-- **The neighbour rate is a crude test.** It compares 6-hour medians, so it cannot see a transfer
-  that is spread over a day, and the placebo includes the daily rise of the neighbours' demand,
-  which is why it is high. D5 carries about 3 MW, so it can absorb only part of a 5 MW drop.
-- **Closures match more than transfers.** The logged closures touching D8 number 78 in 4.5 years,
-  and the random-window rate of 0.399 shows that a closure within 24 hours is common. The match does
-  not show that a closure caused a drop.
-- **Not done:** NGED has not confirmed any drop, and no cause was tested beyond the neighbours, the
-  closures, and the calendar.
+- **The residual is the lab residual.** The residual comes from the frozen convex regression model
+  of experiment 130, as the false-alarm analysis stored it, with estimates of past weather from ERA5
+  and the real transfers left out of training. A drop that the regression model partly follows is
+  under-counted.
+- **The neighbour check is crude.** The check compares 6-hour medians, so a transfer spread over a
+  day would not show. The random-time comparison matches the time of day of the drop starts, which
+  controls for the daily rise of the neighbours' demand. D5 has a median power of 2.96 MW, so D5 can
+  absorb only part of a 5 MW drop.
+- **A logged closure within 24 hours does not show that the closure caused a drop.** NGED's log
+  holds 78 closures touching D8 in 4.5 years, and the random-window rate of 0.449 shows that a
+  closure within 24 hours is common.
+- **The random-time comparisons are limited.** The window and time-of-day matching use July 2023
+  onwards only, with 29 drops, so an interval contains several rates. The calendar tests have little
+  power at 29 drops, and the month test uses expected counts below 5.
+- **Not done:** National Grid Electricity Distribution (NGED) has not confirmed any drop, and no
+  cause was tested beyond the neighbours, the closures, and the calendar.
 
 ## What to try next
 
-Ask NGED what D8 switches and which customers it serves, listing the 6 drops with no logged closure
-first. Whether a drop should be masked from training, or shown to NGED's operators as an event,
-follows from the answer.
+**Ask NGED which load D8 moves and which customers it serves.** Start with the six drops that have
+no logged closure. The answer from NGED decides whether a drop should be left out of the regression
+model's training data, or shown to NGED's operators as an event.
 
 ## Every drop
 
-| Drop | Start | End | Depth (MW) | Duration (days) | Start weekday and hour | Best neighbour step (MW) | Logged closures within 24 hours |
+| Drop | Start | End | Depth (MW) | Duration (days) | Start weekday and hour | Largest neighbour step-up (MW) | Logged closures within 24 hours |
 |---|---|---|---|---|---|---|---|
 | 1 | 2022-08-09 | 2022-08-23 | 2.0 | 14.2 | Tue 16:00 | +2.2 (D5) | 1 |
 | 2 | 2023-10-21 | 2023-10-25 | 4.9 | 4.3 | Sat 11:30 | +1.4 (D3) | 0 |
