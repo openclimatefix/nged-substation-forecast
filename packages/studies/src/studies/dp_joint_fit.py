@@ -250,9 +250,9 @@ def fit_joint_gam(
     hyper: np.ndarray,
     pinned: PinnedCapacity | None = None,
     anchor: GamFit | None = None,
-    ridge: float = 0.0,
+    ridges: Sequence[float] = (0.0,),
     device: str | None = None,
-) -> GamFit:
+) -> list[GamFit]:
     """Fit the convex model of one substation through the Kalman filter.
 
     Args:
@@ -265,16 +265,18 @@ def fit_joint_gam(
         hyper: The filter's unconstrained settings, shape `(4,)` or `(B, 4)`.
         pinned: The pinned capacity built for `cut`; required exactly when the spec pins it.
         anchor: The fit whose coefficients the ridge pulls towards, with the same layout.
-        ridge: The ridge weight `lambda` against the plain Gram matrix; 0 for none.
+        ridges: The ridge weights `lambda` against the plain Gram matrix, one fit each; 0 for
+            none. Every weight shares one pass of the filter over the design columns.
         device: Where the filter and the solve run.
 
     Returns:
-        The fitted model, with the same layout and fields as `studies.dp_gam.fit_gam`'s.
+        One fitted model per ridge weight, each with the same layout and fields as
+        `studies.dp_gam.fit_gam`'s.
 
     Raises:
         ValueError: If a ridge is asked for without an anchor, or the anchor's layout differs.
     """
-    if ridge > 0.0 and anchor is None:
+    if any(ridge > 0.0 for ridge in ridges) and anchor is None:
         msg = "a ridge needs an anchor fit"
         raise ValueError(msg)
     layout, index = prepare_fit(
@@ -301,32 +303,44 @@ def fit_joint_gam(
         device=device,
     )
     matrix_np, cost_np = penalty_matrix(layout=layout, n_rows=len(index))
-    matrix = problem.gram + torch.as_tensor(matrix_np, dtype=torch.float64)
-    rhs = problem.rhs - 0.5 * torch.as_tensor(cost_np, dtype=torch.float64)
-    if ridge > 0.0 and anchor is not None:
+    base = problem.gram + torch.as_tensor(matrix_np, dtype=torch.float64)
+    base_rhs = problem.rhs - 0.5 * torch.as_tensor(cost_np, dtype=torch.float64)
+    matrices, right_hand_sides = [], []
+    if anchor is not None:
         plain, _ = accumulate_gram(
             cache=cache, features=features, layout=layout, index=index, pinned=pinned
         )
-        matrix = matrix + ridge * plain[0]
-        rhs = rhs + ridge * plain[0] @ torch.as_tensor(anchor.theta[0], dtype=torch.float64)
+        pull = plain[0] @ torch.as_tensor(anchor.theta[0], dtype=torch.float64)
+    for ridge in ridges:
+        if ridge > 0.0:
+            matrices.append(base + ridge * plain[0])
+            right_hand_sides.append(base_rhs + ridge * pull)
+        else:
+            matrices.append(base)
+            right_hand_sides.append(base_rhs)
+    where = device or "cpu"
     theta, violation = solve_bounded_quadratic(
-        matrix=matrix[None].to(device or "cpu"),
-        rhs=rhs[None].to(device or "cpu"),
+        matrix=torch.stack(matrices).to(where),
+        rhs=torch.stack(right_hand_sides).to(where),
         constrained=torch.as_tensor(layout.constrained),
         max_iterations=NODE_MAX_ITERATIONS if spec.node is not None else DEFAULT_MAX_ITERATIONS,
     )
-    return GamFit(
-        layout=layout,
-        theta=theta.cpu().numpy(),
-        cut=cut,
-        n_rows=len(index),
-        site=site,
-        last_season_year=last_signal_season_year(
-            cache=cache, site=site, index=index, cut=cut, pinned=pinned
-        ),
-        violation=violation.cpu().numpy(),
-        pinned=pinned,
+    last_season_year = last_signal_season_year(
+        cache=cache, site=site, index=index, cut=cut, pinned=pinned
     )
+    return [
+        GamFit(
+            layout=layout,
+            theta=theta[member : member + 1].cpu().numpy(),
+            cut=cut,
+            n_rows=len(index),
+            site=site,
+            last_season_year=last_season_year,
+            violation=violation[member : member + 1].cpu().numpy(),
+            pinned=pinned,
+        )
+        for member in range(len(ridges))
+    ]
 
 
 def _stream_design(

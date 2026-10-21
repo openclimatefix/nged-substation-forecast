@@ -179,7 +179,7 @@ def test_a_filter_that_corrects_nothing_gives_the_two_stage_fit(dp_synthetic_cac
         season_years=SEASON_YEARS,
         weights=weights,
     )
-    joint = fit_joint_gam(**arguments, hyper=NO_FILTER, device="cpu")
+    [joint] = fit_joint_gam(**arguments, hyper=NO_FILTER, device="cpu")
     fitted = np.abs(two_stage.theta[0]) > 1e-3
     assert np.abs(joint.theta[0] - two_stage.theta[0])[fitted].max() < 1e-6
 
@@ -187,9 +187,10 @@ def test_a_filter_that_corrects_nothing_gives_the_two_stage_fit(dp_synthetic_cac
 def test_a_heavy_ridge_to_an_anchor_returns_the_anchor(dp_synthetic_cache: FeatureCache):
     cache, spec = _truth_cache(cache=dp_synthetic_cache)
     arguments = _fit_arguments(cache=cache, spec=spec)
-    anchor = fit_joint_gam(**arguments, hyper=NO_FILTER, device="cpu")
-    pulled = fit_joint_gam(**arguments, hyper=HYPER, anchor=anchor, ridge=1e6, device="cpu")
-    free = fit_joint_gam(**arguments, hyper=HYPER, device="cpu")
+    [anchor] = fit_joint_gam(**arguments, hyper=NO_FILTER, device="cpu")
+    [pulled, free] = fit_joint_gam(
+        **arguments, hyper=HYPER, anchor=anchor, ridges=(1e6, 0.0), device="cpu"
+    )
     assert np.abs(pulled.theta - anchor.theta).max() < np.abs(free.theta - anchor.theta).max()
     assert np.abs(pulled.theta - anchor.theta).max() < 1e-2
 
@@ -197,4 +198,4 @@ def test_a_heavy_ridge_to_an_anchor_returns_the_anchor(dp_synthetic_cache: Featu
 def test_a_ridge_without_an_anchor_is_refused(dp_synthetic_cache: FeatureCache):
     cache, spec = _truth_cache(cache=dp_synthetic_cache)
     with pytest.raises(ValueError, match="anchor"):
-        fit_joint_gam(**_fit_arguments(cache=cache, spec=spec), hyper=HYPER, ridge=1.0)
+        fit_joint_gam(**_fit_arguments(cache=cache, spec=spec), hyper=HYPER, ridges=(1.0,))
