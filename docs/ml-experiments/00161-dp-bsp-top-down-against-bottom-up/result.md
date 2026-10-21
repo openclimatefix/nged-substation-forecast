@@ -85,9 +85,10 @@ forecast for it. Those children stay inside the remainder. The covered children 
 that report real power and have a long history and an arm D forecast: D9, D10, and D11 under D13
 (23.3 of 55.3 MW of effective capacity), and D5, D14, and D16 under D17 (26.5 of 47.6 MW). D15 and
 D18 under D17 (the two transformers of one Primary substation) report real power but have under 5
-months of readings before the scored year, so they stay in D17's remainder too. The scope is therefore a partial bottom-up, and the write-up says so in
-its first paragraph. A bottom-up arm that also forecasts the MVA children (demand terms only, on
-dark rows, as experiment 124's joint fit does) is the obvious follow-up and is not tested here.
+months of readings before the scored year, so they stay in D17's remainder too. The scope is
+therefore a partial bottom-up, and the write-up says so in its first paragraph. A bottom-up arm that
+also forecasts the MVA children (demand terms only, on dark rows, as experiment 124's joint fit
+does) is the obvious follow-up and is not tested here.
 
 **Arms.** All arms use arm D's recipe: the ensemble-mean weather, T-all, the shared filter noise
 (POOL), monthly refits, the winter night offset, recipe R, and arm A's spread table.
