@@ -1,7 +1,9 @@
 ---
 id: "00156"
 slug: switching-faster-onset-alarm-from-opposite-steps
-title: "A faster onset alarm from simultaneous opposite steps at a metered neighbour, feeding a mask forecast"
+title: >-
+  A faster onset alarm from simultaneous opposite steps at a metered neighbour, feeding a mask
+  forecast
 theme: switching-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
@@ -108,8 +110,9 @@ code: ml-experiments/00156-switching-faster-onset-alarm-from-opposite-steps/
   D9 reported separately, and the share of unexplained alarms that have a balanced opposite
   neighbour (experiment `sw_false_alarms`).
 - **Weighting.** Each transfer weighted equally as well as pooled by rows, and with and without D11.
-- **Compute.** CPU only, 4 cores, thread caps 1, under `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue`.
-  Retraining: none, since the GAM-K forecasts of experiment 141 are cached.
+- **Compute.** CPU only, 4 cores, thread caps 1, under `systemd-run --user --scope -p
+  MemoryMax=16G -p OOMPolicy=continue`. Retraining: none, since the
+  GAM-K forecasts of experiment 141 are cached.
 
 ## Checks and caveats (to fill in after the run)
 

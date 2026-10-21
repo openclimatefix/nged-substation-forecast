@@ -21,7 +21,10 @@ interconnection edges between Primary substations and scores them on injected tr
 
 ### SW-OA: faster onset alarm
 
-**Experiment 156 tests an onset alarm built from opposite-signed steps at a metered neighbour.** RO-NC learns of a transfer about 48 hours late, and the mask forecast of experiment 151 gained nothing before the alarm. The alarm uses windows of 2, 4, and 6 hours and feeds the mask forecast of experiment 151. See the [plan](../../00156-switching-faster-onset-alarm-from-opposite-steps/result.md).
+**Experiment 156 tests an onset alarm built from opposite-signed steps at a metered neighbour.**
+RO-NC learns of a transfer about 48 hours late, and the mask forecast of experiment 151 gained
+nothing before the alarm. The alarm uses windows of 2, 4, and 6 hours and feeds the mask forecast of
+experiment 151. See the [plan](../../00156-switching-faster-onset-alarm-from-opposite-steps/result.md).
 
 ### SW2: switching-event detection
 
