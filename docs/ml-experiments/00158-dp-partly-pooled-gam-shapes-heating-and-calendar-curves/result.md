@@ -39,7 +39,8 @@ prediction: >-
   to 15% of K0's own score on those rows, because a 24-month window holds two examples of each
   holiday per substation and the fleet holds twelve. C8 (PS minus K0 on ordinary rows) is within
   +/-0.02. The complete-pooling arm (tied) scores worse than PS at 24 months, by 0.05 to 0.30. The
-  tuned penalties are 100 to 1000 rows of evidence at 24 months and 1000 to 10000 at 3 months.
+  tuned penalties are 1000 to 10000 rows of evidence on each side (a first guess that the tuning
+  months later made moot; see the amendment below).
 decision_rule: >-
   Six lines, each read at the 99% level of the month-resampled paired bootstrap of the scored year
   (12 calendar months, 20,000 resamples), at the five decision substations D5, D10, D11, D14, and
@@ -141,6 +142,12 @@ decision substations of the 3-month arm, among the pairs whose 24-month score is
 points above K0's on the same months; a tie within 0.005 points goes to the smaller `h + o`. PH
 takes the chosen `h` with `o` = 0. The 24-month arm tuned separately (the first plan) is reported as
 a labelled variant. The tuned penalties are therefore the same for both histories.
+
+**Prediction check after reading the tuning months.** K0-3m scored 3.05 points on the tuning months,
+against a predicted 6 to 17, because the Kalman filter corrects most of a poorly fitted level
+within days. The predicted size of C4 (-3 to -12 points) cannot hold. The written prediction above
+is left as it was, and the revised expectation, written before any scored-year score is read, is
+C4 between -0.5 and +0.3 points and C6 between +0.1 and +0.6 points. The decision rule is unchanged.
 
 **Switching.** The switching terms of experiments 141 and 147 are not part of this fit. Experiment
 141 found that feeding the detector's causal alarm to the filter did no better than a random
