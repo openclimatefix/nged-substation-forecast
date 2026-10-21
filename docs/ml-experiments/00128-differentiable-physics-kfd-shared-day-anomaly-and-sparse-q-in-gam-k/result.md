@@ -266,11 +266,11 @@ A tracked quantity at `k*` is the mean of its end-of-day values over the 7 days 
 **Draws and fits.** Each draw refits every arm's hyperparameters on the synthetic stream, GK
 included: GK's four values are refitted by the experiment 111 fit, which is KD's fit with `sigma_d`
 pinned to 0 so that GK nests in KD, so no arm is advantaged by a fit made on the real stream. Each
-refit starts from the real fit and uses the real fit's priors, as experiment 118 did. The real form holds 12 noise
-draws per substation (60 per cell), each run as S0, S1, and S1x3 (180 streams). The AR(1) form holds
-6 noise draws per substation (30 per cell), each run as S0, S1, and S1x3 (90 streams; the S1x3 streams give the reference rate
-at the amplitude that may decide the gate). A cell reports the
-share of draws that pass, with a 95% binomial half-width.
+refit starts from the real fit and uses the real fit's priors, as experiment 118 did. The real form
+holds 12 noise draws per substation (60 per cell), each run as S0, S1, and S1x3 (180 streams). The
+AR(1) form holds 6 noise draws per substation (30 per cell), each run as S0, S1, and S1x3 (90
+streams; the S1x3 streams give the reference rate at the amplitude that may decide the gate). A cell
+reports the share of draws that pass, with a 95% binomial half-width.
 
 **Readings:**
 
@@ -418,9 +418,10 @@ contrast and its mean-forecast error disagree, audit trigger 3 fires.
 
 **Pre-run clarification (written before any gate or scored draw).** The P-shift criterion that caps
 the verdict is the one the code applies, and the other wordings in this plan ("at its floor", "above
-its floor") are shorthand for it: the median over the 20 shifts of the shifted-band `sigma_d` is below 0.1 points at 4 or more of the 5 decision substations, and the unshifted fit returns `sigma_d` above 0.1 points. The code uses 0.1 points and not the floor of 0.02 points
-because a refit on shifted streams can settle slightly above the floor without carrying a real
-cross-band signal.
+its floor") are shorthand for it: the median over the 20 shifts of the shifted-band `sigma_d` is
+below 0.1 points at 4 or more of the 5 decision substations, and the unshifted fit returns `sigma_d`
+above 0.1 points. The code uses 0.1 points and not the floor of 0.02 points because a refit on
+shifted streams can settle slightly above the floor without carrying a real cross-band signal.
 
 **The smallest gain worth porting is 0.03 points at D+1, about 1.2% of GAM-K's 2.521.** The change
 adds one state and two fitted hyperparameters per substation to the recent-level filter that sits
@@ -510,35 +511,33 @@ the day-ahead likelihood on KD's continuous hyperparameters.
 
 ## Compute, storage, and size
 
-- **What gets stored.** Private files under `data/ml-experiments/00128-.../`: fitted hyperparameters,
-  gate draws, filter states, and predictions (written with `experiment_store.write_predictions`).
-  Figures and the write-up go under `docs/ml-experiments/00128-.../`. No Delta table or contract
-  changes.
-- **Serving path.** Not touched. The joint filter lives in the experiment folder
-  (`e00128_filter.py`), and `packages/studies/` is not changed. A port would touch the recent-level
-  filter of the serving path and would be its own issue.
-- **Degradation rule.** Not touched. The joint filter skips a missing reading, and d decays across
-  the gap, so a port keeps the always-output path.
-- **More than one design is defensible.** Yes: the day could be local or UTC, d could couple only
-  some bands, the sparse search could refit the held values, and the placebo could shuffle the feed
-  instead of the forecast term. The plan fixes one of each.
-- **Callers.** The experiment's own scripts only. They import `studies.dp_assimilation` (for
-  `FilterHyperparameters` and the 111 filter) and copy experiment 118's stream, gate, and scoring
-  helpers into `e00128_*.py` files, because a script may import only its own folder.
-- **Resources.** CPU only, at most 6 cores, each command under `systemd-run --user --scope -p
-  MemoryMax=16G -p OOMPolicy=continue`, `free -g` first (25 GB available or wait), 6 worker
-  processes with 1 thread each. Estimates, to be replaced by one timed filter pass before any other
-  step runs: one joint-filter likelihood evaluation over the tuning stream takes 0.3 to 0.9 s (new nine-state
-  code in plain NumPy; the low end is optimistic), so
+- **What gets stored.** Private files under `data/ml-experiments/00128-.../`: fitted
+  hyperparameters, gate draws, filter states, and predictions (written with
+  `experiment_store.write_predictions`). Figures and the write-up go under
+  `docs/ml-experiments/00128-.../`. No Delta table or contract changes. - **Serving path.** Not
+  touched. The joint filter lives in the experiment folder (`e00128_filter.py`), and
+  `packages/studies/` is not changed. A port would touch the recent-level filter of the serving path
+  and would be its own issue. - **Degradation rule.** Not touched. The joint filter skips a missing
+  reading, and d decays across the gap, so a port keeps the always-output path. - **More than one
+  design is defensible.** Yes: the day could be local or UTC, d could couple only some bands, the
+  sparse search could refit the held values, and the placebo could shuffle the feed instead of the
+  forecast term. The plan fixes one of each. - **Callers.** The experiment's own scripts only. They
+  import `studies.dp_assimilation` (for `FilterHyperparameters` and the 111 filter) and copy
+  experiment 118's stream, gate, and scoring helpers into `e00128_*.py` files, because a script may
+  import only its own folder. - **Resources.** CPU only, at most 6 cores, each command under
+  `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue`, `free -g` first (25 GB
+  available or wait), 6 worker processes with 1 thread each. Estimates, to be replaced by one timed
+  filter pass before any other step runs: one joint-filter likelihood evaluation over the tuning
+  stream takes 0.3 to 0.9 s (new nine-state code in plain NumPy; the low end is optimistic), so
   fitting KD at six substations takes 5 to 10 minutes of wall time; KS and KDS take 10 to 20 minutes
   each; the power check and controls take 20 to 40 minutes; the gate (270 synthetic streams, each
   refitting GK, KD, KS, and KDS) took 3 minutes for one timed stream at D10 on one core (while
-  another process shared the machine), so about 2.3 hours of wall time on 6 cores, against 3.4
-  hours for experiment 118's 1,600 draws; tuning the spreads and forecasting the replicate months and scored
-  year take 15 to 30 minutes, since experiment 118's tune and forecast steps each took under 3
-  minutes per substation group; scoring, figures, and the substation cards take 20 minutes. If one
-  gate refit takes more than 4 minutes once timed, the noise draws fall to 8 per substation in the real
-  form and 4 in the AR(1) form, and the write-up says so.
+  another process shared the machine), so about 2.3 hours of wall time on 6 cores, against 3.4 hours
+  for experiment 118's 1,600 draws; tuning the spreads and forecasting the replicate months and
+  scored year take 15 to 30 minutes, since experiment 118's tune and forecast steps each took under
+  3 minutes per substation group; scoring, figures, and the substation cards take 20 minutes. If one
+  gate refit takes more than 4 minutes once timed, the noise draws fall to 8 per substation in the
+  real form and 4 in the AR(1) form, and the write-up says so.
 
 ## Order of work
 

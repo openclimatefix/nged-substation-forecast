@@ -29,7 +29,8 @@
   decision substations, where the unshifted fit returns it above. A failure gives `inconclusive`
   and triggers an audit; it does not stop the experiment.
 - **p_sparse:** on AR(1) streams with true `q_b = 0`, a band keeps a nonzero `q_b` at 2 nats in at
-  most 10% of draws; on streams with a true `q_b` of 0.05, a band is kept in at least 80% of draws; and every band left out has `q` exactly 0.
+  most 10% of draws; on streams with a true `q_b` of 0.05, a band is kept in at least 80% of
+  draws; and every band left out has `q` exactly 0.
 
 Each control writes `work/control_<name>.json`, which holds `passed` and, for the controls with a
 stop rule, `stop`. The script exits with status 1 after printing `STOP` when a stop rule fires.
