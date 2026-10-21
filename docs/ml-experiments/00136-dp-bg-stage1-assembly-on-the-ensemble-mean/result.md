@@ -8,7 +8,8 @@ also_relevant_to:
 - calibration-and-uncertainty
 status: done
 size: >-
-  medium. Stored: private files under data/ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/
+  medium. Stored: private files under
+  data/ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is
   defensible (how the ensemble mean drives the model, whether the spread is refitted per arm), and
   the plan pre-registers one of each. Callers: this folder's scripts, which copy experiments 111,
@@ -40,9 +41,12 @@ decision_rule: >-
   both the same and at least 4 of 5 decision substations at or below zero on C6. It is `partly
   supported` when C6 is wholly below zero and C5's upper bound is above +0.05, or when C5 passes and
   C6 includes zero. It is `refuted` when C6's interval lies wholly above zero. It is `inconclusive`
-  otherwise. The threshold on C6 is zero: every added piece is already built and tested in an earlier
-  experiment, so combining them adds no pipeline step beyond the day-type split in the design matrix.
-  The non-inferiority margin 0.05 is about a third of the BG2 minus GAM-K spread across lead bands in
+  otherwise. The threshold on C6 is zero: every added piece is already built and tested in an
+  earlier
+  experiment, so combining them adds no pipeline step beyond the day-type split in the design
+  matrix.
+  The non-inferiority margin 0.05 is about a third of the BG2 minus GAM-K spread across lead bands
+  in
   experiment 111, and a smaller difference is not worth a second forecast engine. The verdict is
   capped at `inconclusive` if the reproduction control P1 fails (A0 within +/-0.03 of experiment
   111's GAM-K is a prediction, but the FIX arm of experiment 133 reproducing 111 within 1e-4 on
@@ -56,8 +60,8 @@ metric: >-
   Quantile score (twice the mean pinball loss over the 11 quantiles of experiment 87) in points of
   effective capacity, on rows outside the hand-filtered switching events, at the five decision
   substations D5, D10, D11, D14, and D16 (D9 beside them), over leads 0.5 to 168 hours, then under
-  24 hours, 24 to 72 hours, 72 to 168 hours, winter (November to March), cold nights, Christmas and
-  bank holidays; coverage and pinball loss of the 0.01, 0.05, 0.95, and 0.99 quantiles
+  24 hours, 24 to 72 hours, 72 to 168 hours, winter (November to March), cold nights, and Christmas
+  and bank holidays; coverage and pinball loss of the 0.01, 0.05, 0.95, and 0.99 quantiles
 code: ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/
 verdict: inconclusive
 production_status: not-for-production
@@ -66,43 +70,50 @@ best_arm: >-
   A2 (A0 + T-all + POOL noise, monthly refits), 2.791 points over leads 0.5 to 168 hours in the
   scored year, against 2.780 for BG2 and 2.800 for experiment 111's GAM-K
 headline: >-
-  The assembled arm A2 scored 2.791 points, level with BG2 (A2 minus BG2 +0.010, 99% interval
+  The assembled arm A2 (GAM-K with T-all and POOL on the ensemble mean) scored 2.791 points, the
+  same as BG2 within the interval (A2 minus BG2 +0.010, 99% interval
   -0.164 to +0.174) and with experiment 111's GAM-K (-0.009, -0.058 to +0.054), so the experiment
-  cannot rank the three. Driving GAM-K from the ensemble mean cost +0.039 (+0.018 to +0.060),
-  T-all took back -0.021 (-0.039 to -0.004), and the shared filter noise a further -0.027
+  cannot rank the three. Driving GAM-K from the ensemble mean raised the score by 0.039 (+0.018 to
+  +0.060), T-all lowered it by 0.021 (-0.039 to -0.004), and the shared filter noise by a further
+  0.027
   (-0.069 to +0.017, inside the noise).
 lessons:
   - >-
-    Replacing the 51-member mixture with one forecast on the ensemble mean costs 0.039 points,
+    Replacing the 51-member mixture with one forecast on the ensemble mean worsens the score by
+    0.039 points,
     all of it in the lower half of the distribution (pinball at the 0.01 to 0.25 quantiles), and
     the mean forecast's error is almost unchanged (+0.007).
   - >-
     T-all's gain carried over from past weather to ensemble weather at about half its size
     (-0.021 against -0.039) and at 5 of 5 substations.
   - >-
-    The shared filter noise lowered the score in winter and on winter nights and raised the
-    pinball loss at the 0.95 and 0.99 quantiles on cold nights (0.747 and 0.302 against 0.669 and
+    The shared filter noise improved the quantile score in winter and on winter nights and worsened
+    the pinball loss at the 0.95 and 0.99 quantiles on cold nights (0.747 and 0.302 against 0.669
+    and
     0.244 for A1).
   - >-
     Weekly refits changed nothing measurable (+0.004, -0.012 to +0.021), so monthly refits are
     enough for this model.
 take_home_message: >-
   Putting everything that has helped so far into the convex demand model and driving it from the
-  ensemble mean gives a forecast level with the production recipe (BG2) and with the earlier
-  version of the model, and the experiment cannot tell any of the three apart. The ensemble mean
-  itself costs about 0.04 points against using all 51 members, and the heating split and the shared
-  filter noise win about 0.05 back, so the assembly did not add up to the hoped-for gain.
+  ensemble mean gives a forecast that scores the same as the production recipe (BG2) and as
+  experiment 111's GAM-K, and the experiment cannot tell any of the three apart. Using the ensemble
+  mean makes the score about 0.04 points worse than using all 51 members, and the heating split and
+  the shared filter noise improve it by about 0.05, so the assembly did not add up to the hoped-for
+  gain.
 advice:
   - >-
     Keep the 51-member mixture for GAM-K's quantiles until a spread built around the ensemble mean
-    matches its lower tail, because the single-mean arm lost 0.039 points, all below the median
-    (C1, post hoc pinball by level).
+    matches its lower tail, because the single-mean arm worsened the score by 0.039 points, all
+    below the median
+    (C1, and the post hoc pinball loss at each quantile level in the Results).
   - >-
-    Keep T-all in the best-guess model and expect about -0.02 points on ensemble weather, 5 of 5
+    Keep T-all in the convex demand model (GAM-K) and expect about -0.02 points on ensemble weather,
+    5 of 5
     substations (C2).
   - >-
     Do not adopt the shared filter noise (POOL) without checking cold-night tails, where it raised
-    the 0.95 and 0.99 pinball loss (cold-night tail table).
+    the 0.95 and 0.99 pinball loss (the Tail calibration table).
   - >-
     Refit monthly, not weekly, for GAM-K contrasts, because weekly refits moved the score by
     +0.004 (C4).
@@ -114,11 +125,13 @@ advice:
 # Experiment 136: does GAM-K with everything that has helped, on the ensemble mean, match BG2?
 
 **Putting every earlier gain into the convex demand model and driving it from the ensemble mean
-gave a forecast level with BG2 and with experiment 111's GAM-K, and the experiment cannot rank the
+gave a forecast that scores the same as BG2 and as experiment 111's GAM-K, and the experiment cannot
+rank the
 three.** The assembled arm scored 2.791 points against 2.780 for BG2 and 2.800 for experiment 111's
 GAM-K, and the 99% intervals are 0.11 to 0.34 points wide. Using the ensemble mean instead of the 51
-members cost 0.039 points. The heating split (T-all) and one shared filter noise setting won about
-0.05 of that back. The verdict is `inconclusive`. The experiment narrows the next step to the
+members made the quantile score 0.039 points worse (higher is worse). The heating split (T-all) and
+one shared filter noise setting together lowered it by 0.048 points, which is not distinguishable
+from the loss. The verdict is `inconclusive`. The experiment narrows the next step to the
 spread: a single table of residual quantiles around the mean forecast is too narrow in the lower
 tail, and a spread that restores the mixture's lower tail could turn the assembly into a gain.
 
@@ -131,9 +144,10 @@ filter noise setting shared by every substation (POOL, [experiment
 forecasts demand at the five decision Primary substations 0.5 to 168 hours ahead as well as the
 production recipe (BG2, [experiment
 87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)). The convex model was
-driven by the ensemble mean of the ECMWF ensemble (ENS) instead of its 51 members. We added the
-pieces one at a time and scored each arm on the same rows. All pieces were already built; this
-experiment only combines them.
+driven by the ensemble mean of the ensemble of the European Centre for Medium-Range Weather
+Forecasts (ECMWF ENS) instead of its 51 members. We added three changes one at a time (the ensemble
+mean as input, T-all, and POOL) and scored each arm on the same half-hourly rows. All three were
+already built and tested in earlier experiments.
 
 ![Planned contrasts](figure_1_headline.svg)
 
@@ -145,8 +159,8 @@ experiment only combines them.
 
 - **Arms and schedule.** A0 is experiment 111's GAM-K on the ensemble mean. A1 is A0 plus T-all.
   A2 is A1 plus POOL. A3 is A2 refitted weekly instead of monthly. A0 to A2 refit monthly on a
-  24-month window, as experiment 111's fits do. The brief's "monthly refits" arm would have equalled
-  A2, so A3 tests weekly refits. The quantiles are the corrected mean plus a residual table fitted
+  24-month window, as experiment 111's fits do. A3 tests weekly refits, because a monthly-refit arm
+  would equal A2. The quantiles are the corrected mean plus a residual table fitted
   on the tuning months, with every spread factor at 1.
 - **Rows.** `fold_a_daily_gap_v1`, 561,172 half-hourly rows in the scored year at the five decision
   substations, outside the hand-filtered switching events; BG2 exists only for the scored year.
@@ -155,15 +169,16 @@ experiment only combines them.
   A1 2.818, A2 2.791, A3 2.795, experiment 111's GAM-K 2.800, BG2 2.780, manual heuristic 3.497,
   climatology 3.804. A2 is 20% below the manual heuristic and 27% below climatology.
 - **By lead band (A2, BG2, experiment 111's GAM-K).** Under 24 hours: 2.363, 2.434, 2.373. From 24
-  to 72 hours: 2.630, 2.646, 2.653. From 72 to 168 hours: 2.980, 2.936, 2.983. A2 leads BG2 at the
-  short leads and trails it at the long leads, as experiment 111's GAM-K did.
+  to 72 hours: 2.630, 2.646, 2.653. From 72 to 168 hours: 2.980, 2.936, 2.983. A2 scores better than
+  BG2 below 24 hours and worse from 72 to 168 hours, as experiment 111's GAM-K did.
 - **C1, A0 minus experiment 111's GAM-K.** +0.039 (99% interval +0.018 to +0.060), 0 of 5
   substations better, 2 of 12 months negative; replicate +0.029 (+0.011 to +0.052). The prediction
-  was within 0.03, so the ensemble mean costs more than predicted.
+  was within 0.03, so the ensemble mean worsens the score by more than predicted.
 - **C2, A1 minus A0 (T-all).** -0.021 (-0.039 to -0.004), 5 of 5 substations better, 10 of 12
   months negative; replicate -0.037 (-0.082 to -0.008). The prediction of -0.02 to -0.04 held.
 - **C3, A2 minus A1 (POOL).** -0.027 (-0.069 to +0.017), 4 of 5 substations better; replicate
-  -0.017 (-0.082 to +0.032). The prediction of -0.01 to -0.03 held in size, and the interval includes
+  -0.017 (-0.082 to +0.032). The prediction of -0.01 to -0.03 held in size, and the interval
+  includes
   zero.
 - **C4, A3 minus A2 (weekly refits).** +0.004 (-0.012 to +0.021); replicate 0.000 (-0.018 to
   +0.019). The prediction of within 0.02 held.
@@ -177,7 +192,8 @@ experiment only combines them.
   nights -0.055, cold nights -0.070, and holidays and Christmas +0.063 (18,913 rows, interval
   -0.058 to +0.094). The gain sits in winter and on cold nights, which are the hours NGED cares
   about, and the holiday rows lose.
-- **Why the ensemble mean costs 0.039 (C1, tested after the result, post hoc).** A0's pinball loss
+- **Why the ensemble mean worsens the score by 0.039 (C1, tested after the result, post hoc).** A0's
+  pinball loss
   is worse than experiment 111's GAM-K at the 0.01, 0.05, 0.10, and 0.25 quantiles (0.2252 against
   0.2082, 0.7471 against 0.7084, 1.1992 against 1.1487, 2.0333 against 1.9842) and equal from the
   0.40 quantile upward. A0's coverage at the 0.05 quantile is 6.3% against 5.8%, and at the 0.10
@@ -197,28 +213,35 @@ experiment only combines them.
 
 - **The 0.01 and 0.05 quantiles are too high in every ensemble-mean arm.** The observed shares
   below them are 2.2% and 6.3% to 6.6%, against 1.8% and 5.8% for experiment 111's GAM-K.
-- **POOL hurts cold-night tails.** On cold nights (3 C or below, night hours, all leads) the pinball
+- **POOL hurts cold-night tails.** On cold nights (3 °C or below, night hours, all leads) the
+  pinball
   loss at the 0.95 and 0.99 quantiles is 0.747 and 0.302 for A2 against 0.669 and 0.244 for A1.
 - **The cold-night q95 coverage is 88% to 90% in the ensemble-mean arms**, above the 73% to 78%
-  that experiment 125 found; the two experiments define the cold-night rows differently.
-- **Curtailment cost against the manual heuristic was not computed**, because no node metric exists
-  for these five substations yet.
+  that [experiment
+  125](../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md)
+  found; the two experiments define the cold-night rows differently.
+- **Curtailment cost against the manual heuristic was not computed**, because the repository has no
+  node metric for these five substations yet.
 
 ## Checks
 
 - **Median minus mean forecast, per site (A2, scored year, 12 to 36 hours):** 0.000 at every site,
-  because the spread table is centred. Experiment 111's GAM-K: -0.005, -0.021, +0.018, -0.009,
+  because the residual quantile table is built so that its median is zero. Experiment 111's GAM-K:
+  -0.005, -0.021, +0.018, -0.009,
   -0.097 and -0.052 at D10, D11, D14, D16, D5, and D9.
 - **Error of the mean forecast beside the score contrasts (mean absolute error, points):** C1
   +0.007, C2 -0.049, C3 -0.073, C4 -0.001, C5 -0.061, C6 -0.115. The mean forecast is better in
   every step except C1, which is slightly worse.
-- **Triggers that fired, none triaged by an audit.** Trigger 2: C1 (+0.039) contradicts its
+- **Audit triggers that fired, none triaged by an audit.** Trigger 2 (a result contradicts its
+  prediction): C1 (+0.039) contradicts its
   prediction of within 0.03; the explanation above was tested and recorded. Trigger 3: C5's quantile
   score contrast is +0.010 while its mean-error contrast is -0.061; A2's mean forecast is better
   than BG2's and its spread is worse. Trigger 4: leaving D10 out turns C6 from -0.009 to +0.002,
   and leaving D16 out turns C5 from +0.010 to -0.033. Neither flip changes the verdict, because
   both C5 and C6 are `inconclusive` already, so we did not run the Opus audit; the manager can ask
   for one.
+- **P1 control passed** in experiment 133 (its FIX arm reproduces experiment 111's GAM-K within 1e-4
+  points).
 - **P2 control passed.** T-all with a huge penalty matches experiment 111's stored fits to within
   2.6e-6 points, looser than the plan's 1e-6 because the ridge is divided between the pieces.
 - **Prediction miss on cold-night coverage.** Predicted 73% to 85%, observed 88% to 90%.
@@ -226,10 +249,11 @@ experiment only combines them.
 ## Caveats
 
 - **Caveat on POOL.** POOL was chosen on experiment 111's fits, not on T-all's.
-- **Caveat on the interval.** Five substations and 12 months give C5 and C6 intervals of 0.11 to
-  0.34 points, so only effects of about 0.05 or larger are resolved in C1 to C4.
-- **Past weather at lag times.** The filter's residuals use the analysis proxy built from earlier
-  ENS runs, which exists at forecast time.
+- **Caveat on the interval.** C5 and C6 have 99% intervals 0.11 to 0.34 points wide, so effects
+  smaller than that cannot be resolved against BG2 or experiment 111's GAM-K. C1 to C4 have
+  intervals 0.04 to 0.09 wide.
+- **The filter uses no future weather.** Its residuals use an analysis proxy built from earlier ENS
+  runs, and the proxy is available at forecast time.
 
 ## What to try next
 
@@ -243,7 +267,8 @@ experiment only combines them.
 
 **Question.** Does the convex model with the Kalman filter (GAM-K, [experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)), given the pieces
-that helped in later experiments and driven by the ensemble mean, forecast Primary demand at least as
+that helped in later experiments and driven by the ensemble mean, forecast Primary demand at least
+as
 well as BG2 ([experiment 87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md)),
 and better than experiment 111's GAM-K? No new modelling: every piece exists.
 
@@ -272,8 +297,10 @@ arm's own forecast (`e00133_ens.fit_spread_from_frame`), as K0-w does in [experi
 The mean of a model with a hinge on temperature differs from the model at the mean temperature, so
 C1 is not zero by construction.
 
-**T-all.** [Experiment 114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md)
-fitted T-all at yearly cuts with its own design code. This experiment copies that design code and fits
+**T-all.** [Experiment
+114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md)
+fitted T-all at yearly cuts with its own design code. This experiment copies that design code and
+fits
 it at every monthly (and weekly) cut, and predicts on the ensemble-mean-driven cache.
 
 **Filter.** The filter runs on the proxy-driven residual stream of each arm's own fits, with FIX for
@@ -288,14 +315,16 @@ are the odd months and the replicate months the even months of 2024-07 to 2025-0
 **Breakouts.** Lead bands (under 24, 24 to 72, 72 to 168 hours), winter, cold nights, holidays and
 Christmas, and tail calibration at the 0.01, 0.05, 0.95, and 0.99 quantiles, with the q95 coverage
 on cold nights. Absolute skill is reported for BG2, climatology, and manual_heuristic beside the
-contrasts. The curtailment cost saving against the manual heuristic follows once a node metric exists
+contrasts. The curtailment cost saving against the manual heuristic follows once a node metric
+exists
 for these substations; if not run, the write-up says so.
 
 **Spread factors.** Every spread factor is fixed at 1, because [experiment
 125](../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md)
 found that factors tuned on alternate months scored worse out of period.
 
-**Controls.** P1: the FIX arm of experiment 133 reproduced experiment 111's GAM-K within 1e-4 (passed
+**Controls.** P1: the FIX arm of experiment 133 reproduced experiment 111's GAM-K within 1e-4
+(passed
 in experiment 133). P2: the T-all code, run with a difference penalty so large that the arm becomes
 B0, must reproduce experiment 111's stored `gamk` forecasts at the same cut to within 1e-6 points;
 this checks the copy of experiment 114's design code. P3: A0's forecast frames, scored on the
@@ -303,7 +332,8 @@ rows of experiment 111's stored GAM-K, differ from it only through the weather i
 against a within-method difference of 0 +/- 0.03.
 
 **Five triggers.** Stored: private files only. Serving path: not touched. Degradation rule: not
-touched. More than one design defensible: yes (mean input, spread refit), pre-registered above. Callers
+touched. More than one design defensible: yes (mean input, spread refit), pre-registered above.
+Callers
 not nameable without searching: no, the scripts copy experiments 111, 114, and 133.
 
 **Resources.** Central processing unit (CPU) only, at most 8 cores with one thread per worker, each
