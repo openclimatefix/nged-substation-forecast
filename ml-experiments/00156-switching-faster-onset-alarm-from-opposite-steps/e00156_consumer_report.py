@@ -1,7 +1,9 @@
 # ruff: noqa: E501
 """Stage 2 report: the mask forecast driven by each alarm, scored on the injected worlds.
 
+```bash
 uv run --no-sync python e00156_consumer_report.py | tee <private folder>/printed_consumer.txt
+```
 """
 
 from __future__ import annotations

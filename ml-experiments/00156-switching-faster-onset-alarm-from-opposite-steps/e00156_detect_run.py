@@ -1,7 +1,9 @@
 """Stage 1: tune k on the real stream, then run the pair alarm on every injected world.
 
+```bash
 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        env OMP_NUM_THREADS=1 uv run --no-sync python e00156_detect_run.py tune|worlds|real
+    env OMP_NUM_THREADS=1 uv run --no-sync python e00156_detect_run.py tune|worlds|real
+```
 """
 
 from __future__ import annotations

@@ -1,7 +1,9 @@
 # ruff: noqa: E501, PLR0915
 """Stage 1 report: detection contrasts C1 to C3, coverage, false alarms, and the real transfers.
 
-uv run --no-sync python e00156_detect_report.py | tee ../../data/ml-experiments/<id>/printed_detect.txt
+```bash
+uv run --no-sync python e00156_detect_report.py | tee <private folder>/printed_detect.txt
+```
 """
 
 from __future__ import annotations
