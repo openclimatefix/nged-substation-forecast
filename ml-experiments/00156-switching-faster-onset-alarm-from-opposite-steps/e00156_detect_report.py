@@ -145,6 +145,11 @@ def main() -> None:
         print("  C1 lag NEW minus RO-NC (h):", fmt(boot(table=t, stat=lag_gap)))
         print("  C2 recall NEW minus RO-NC:", fmt(boot(table=t, stat=recall_gap)))
         print("  C3 recall UNION minus RO-NC:", fmt(boot(table=u, stat=recall_gap)))
+        overlap = t.filter(pl.col("found_n"))
+        print(
+            f"  of the {overlap.height} transfers NEW finds, RO-NC also finds "
+            f"{int(overlap['found_r'].sum())}; RO-NC finds {int(t['found_r'].sum())} in all"
+        )
         print(f"  UNION median lag (h): {u.filter(pl.col('found_n'))['lag_n'].median():.2f}")
     # false alarms by series at each window's matched k
     ro = pl.read_parquet(FALSE_ALARMS).filter(pl.col("unexplained"))

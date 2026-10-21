@@ -110,7 +110,10 @@ def intervals_of(
     """Offline-end intervals with the 24-hour merge (`R0_M48`) for a pair-alarm table.
 
     The end rule and the merge are those of RO-NC's intervals, so the onset alarm is the only
-    difference. `onset_known` is the stamp from which the onset is known to a forecast.
+    difference. `onset_known` is the stamp from which the onset is known to a forecast. A partner
+    node gets a copy of its alarm's interval (the partner's step was seen with the alarm), because
+    the tracker's own test of the partner's next 24 hours is not available when the alarm is
+    known.
     """
     schema = {
         "world": pl.Int64,
@@ -126,7 +129,7 @@ def intervals_of(
     }
     if table.is_empty():
         return pl.DataFrame(schema=schema)
-    base = table.select("series", "stamp", "step_mw", "z", "partners")
+    base = table.select("series", "stamp", "step_mw", "z").with_columns(partners=pl.lit(""))
     tracked = build_intervals(alarm_table=base, relative=relative, window=48, detector="D0")
     live = live_end_intervals(intervals=tracked, inputs=fast24, rule="R0", cap_days=CAP_DAYS)
     merged = filter_alarms(table=base, live=live, tolerance=MERGE)
@@ -136,20 +139,27 @@ def intervals_of(
     rows = []
     for iv in final:
         alarm = steps.get((iv.alarm_series, iv.onset))
-        rows.append(
-            {
-                "world": world,
-                "setting": "R0_M48",
-                "series": iv.series,
-                "role": iv.role,
-                "alarm_series": iv.alarm_series,
-                "onset": iv.onset,
-                "end": iv.end,
-                "known_from": iv.known_from,
-                "step_mw": float("nan") if alarm is None else alarm["step_mw"],
-                "onset_known": iv.onset if alarm is None else alarm["known"],
-            }
-        )
+        known = iv.onset if alarm is None else alarm["known"]
+        step = float("nan") if alarm is None else alarm["step_mw"]
+        series_hit = [(iv.series, "alarm")]
+        if alarm is not None and iv.role == "alarm":
+            partners = [int(p.split(":")[0]) for p in alarm["partners"].split(";") if p]
+            series_hit += [(p, "partner") for p in partners if p in relative]
+        for series, role in series_hit:
+            rows.append(
+                {
+                    "world": world,
+                    "setting": "R0_M48",
+                    "series": series,
+                    "role": role,
+                    "alarm_series": iv.alarm_series,
+                    "onset": iv.onset,
+                    "end": iv.end,
+                    "known_from": iv.known_from,
+                    "step_mw": step,
+                    "onset_known": known,
+                }
+            )
     return pl.DataFrame(rows, schema=schema)
 
 

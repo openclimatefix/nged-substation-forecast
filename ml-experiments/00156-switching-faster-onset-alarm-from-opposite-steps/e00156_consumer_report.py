@@ -88,6 +88,9 @@ def contrasts(table: pl.DataFrame, *, name: str) -> None:
     for a, b in (
         ("MASK_UNION", "MASK_RONC"),
         ("MASK_NEW", "MASK_RONC"),
+        ("MASK_NEW", "GAM_ONLY"),
+        ("MASK_UNION", "GAM_ONLY"),
+        ("MASK_RONC", "GAM_ONLY"),
         ("MASK_UNION", "K0"),
         ("MASK_RONC", "K0"),
         ("MASK_NEW", "K0"),
@@ -134,7 +137,12 @@ def posthoc(table: pl.DataFrame) -> None:
     keys = ["site", "world", "period", "row"]
     both = table.join(
         extra.pivot(on="arm", index=keys, values="qs").select(
-            *keys, "MASK_UNION2", "MASK_UNION2_MATCHED", "MASK_NEW_W4", "MASK_NEW_W12"
+            *keys,
+            "MASK_NEW_ALARM",
+            "MASK_UNION2",
+            "MASK_UNION2_MATCHED",
+            "MASK_NEW_W4",
+            "MASK_NEW_W12",
         ),
         on=keys,
     )
@@ -144,11 +152,23 @@ def posthoc(table: pl.DataFrame) -> None:
         "  mean quantile score:",
         {
             a: round(float(both[a].mean()), 3)  # ty: ignore[invalid-argument-type]
-            for a in ("MASK_UNION2", "MASK_UNION2_MATCHED", "MASK_NEW_W4", "MASK_NEW_W12")
+            for a in (
+                "MASK_NEW_ALARM",
+                "MASK_UNION2",
+                "MASK_UNION2_MATCHED",
+                "MASK_NEW_W4",
+                "MASK_NEW_W12",
+            )
         },
     )
     gap = (both["K0"] - both["CLEAN"]).to_numpy()
-    for a in ("MASK_UNION2", "MASK_UNION2_MATCHED", "MASK_NEW_W4", "MASK_NEW_W12"):
+    for a in (
+        "MASK_NEW_ALARM",
+        "MASK_UNION2",
+        "MASK_UNION2_MATCHED",
+        "MASK_NEW_W4",
+        "MASK_NEW_W12",
+    ):
         show(
             f"{a} minus MASK_RONC",
             interval(months=months, num=(both[a] - both["MASK_RONC"]).to_numpy(), den=None),
@@ -196,6 +216,18 @@ def main() -> None:
         print(
             f"  {site}: rows {sub.height}; MASK_UNION minus MASK_RONC {float((sub['MASK_UNION'] - sub['MASK_RONC']).mean()):+.3f}"  # ty: ignore[invalid-argument-type]
         )
+    print("\n== leave one site out: MASK_UNION or MASK_NEW minus MASK_RONC, all rows ==")
+    for site in sorted(table["site"].unique()):
+        sub = table.filter(pl.col("site") != site)
+        m = sub["month"].to_numpy()
+        for a in ("MASK_UNION", "MASK_NEW"):
+            show(
+                f"without {site}: {a} minus MASK_RONC",
+                interval(months=m, num=(sub[a] - sub["MASK_RONC"]).to_numpy(), den=None),
+            )
+    neither = table.filter(pl.col("known_ronc").is_infinite() & pl.col("known_new").is_infinite())
+    print(f"\nrows of transfers that neither alarm matches: {neither.height} of {table.height}")
+    print("  mean quantile score:", {a: round(float(neither[a].mean()), 3) for a in ARMS})  # ty: ignore[invalid-argument-type]
     transfers = per_transfer(table)
     print(f"\n== each transfer weighted equally: {transfers.height} transfers ==")
     contrasts(transfers, name="per-transfer means")

@@ -135,6 +135,7 @@ def injected_job(args: tuple[str, int, bool]) -> str:
     }
     if posthoc:
         intervals = {
+            "NEW_ALARM": intervals["NEW"].filter(pl.col("role") == "alarm"),
             "UNION2": prefer_new(ronc=ronc, new=intervals["NEW"]),
             "UNION2_MATCHED": prefer_new(
                 ronc=ronc.filter(
@@ -179,6 +180,7 @@ def injected_job(args: tuple[str, int, bool]) -> str:
         }
         families = (
             (
+                ("MASK_NEW_ALARM", "NEW_ALARM"),
                 ("MASK_UNION2", "UNION2"),
                 ("MASK_UNION2_MATCHED", "UNION2_MATCHED"),
                 *((f"MASK_NEW_W{w}", f"NEW_W{w}") for w in POSTHOC_WINDOWS),

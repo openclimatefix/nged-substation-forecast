@@ -119,6 +119,7 @@ def main() -> None:
     )
     months = table["month"].to_numpy()
     rows = []
+    means = {arm: float(table[arm].mean()) for arm in LABELS}  # ty: ignore[invalid-argument-type]
     for arm, label in LABELS.items():
         p, lo, hi, _, _ = rep.interval(months=months, num=table[arm].to_numpy(), den=None)
         rows.append({"arm": label, "score": p, "low": lo, "high": hi})
@@ -131,17 +132,21 @@ def main() -> None:
         title="Mean quantile score, points of capacity (smaller is better)",
     ).properties(
         title=_title(
-            text="A mask driven by the pair alarm scores 2.96, against 3.34 for RO-NC and 3.55 with no correction",
+            text=(
+                f"Masking readings after either alarm scores {means['MASK_UNION']:.2f} and after"
+                f" RO-NC {means['MASK_RONC']:.2f}, but ignoring recent power scores"
+                f" {means['GAM_ONLY']:.2f}"
+            ),
             line="Dot: mean over all forecasts issued after a simulated load transfer began, 277,056 forecast rows, scored against the true series. Line: 95% interval from resampling whole months of target time.",
         )
     )
     _save(chart=chart, name="figure_1_headline")
 
     sets = {
-        "Before the RO-NC alarm is known": table.filter(pl.col("known_ronc") > 0),
-        "After the RO-NC alarm is known": table.filter(pl.col("known_ronc") <= 0),
-        "Targets inside the transfer": table.filter(pl.col("inside")),
-        "Targets in the 72 h after the transfer": table.filter(~pl.col("inside")),
+        "Transfers the pair alarm finds": table.filter(pl.col("known_new").is_finite()),
+        "Transfers the pair alarm misses": table.filter(pl.col("known_new").is_infinite()),
+        "Forecast origin before the RO-NC alarm is known": table.filter(pl.col("known_ronc") > 0),
+        "Forecast origin after the RO-NC alarm is known": table.filter(pl.col("known_ronc") <= 0),
     }
     rows = []
     for set_name, part in sets.items():
@@ -174,7 +179,7 @@ def main() -> None:
     ]
     chart = alt.vconcat(*panels).properties(  # ty: ignore[invalid-argument-type]
         title=_title(
-            text="The pair alarm helps before RO-NC has spoken and loses to it after",
+            text="The mask helps most on transfers the pair alarm finds; once RO-NC has alarmed, its mask is better",
             line="Share of the gap between no correction and the true series that each mask closes. Dot: estimate. Line: 95% interval from resampling whole months. Dashed rule: same as no correction.",
         )
     )

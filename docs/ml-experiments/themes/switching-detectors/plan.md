@@ -7,7 +7,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals |
-| [SW-OA](#sw-oa-faster-onset-alarm) | Does an alarm from simultaneous opposite steps at a metered neighbour learn of a transfer within hours, and does a mask forecast driven by it beat the one driven by RO-NC? | 1 | Nothing | Planned as experiment 156 |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the
 interconnection edges between Primary substations and scores them on injected transfers; see the
@@ -18,13 +17,6 @@ interconnection edges between Primary substations and scores them on injected tr
 <!-- planned-table -->
 
 ## Proposals in detail
-
-### SW-OA: faster onset alarm
-
-**Experiment 156 tests an onset alarm built from opposite-signed steps at a metered neighbour.**
-RO-NC learns of a transfer about 48 hours late, and the mask forecast of experiment 151 gained
-nothing before the alarm. The alarm uses windows of 2, 4, and 6 hours and feeds the mask forecast of
-experiment 151. See the [plan](../../00156-switching-faster-onset-alarm-from-opposite-steps/result.md).
 
 ### SW2: switching-event detection
 
