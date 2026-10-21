@@ -13,17 +13,19 @@ size: >-
   experiment's scripts only; the gate code is copied from experiment 150 and the pooled fit it
   calls lives in packages/studies/ and is not changed.
 hypothesis: >-
-  When the partly pooled convex model of experiment 109 holds only 4 winter weeks of one
-  substation, its fitted heating curve is closer to the injected truth than the curve of no pooling
-  and of complete pooling, as close to the truth as a fair oracle's curve (within 10%), and it
-  recovers the sign of the substation's own heating offset from the fleet's curve; the fleet's
-  shared curve is recovered as well as an average of per-site fits recovers it.
+  When the partly pooled convex regression model of experiment 109 is fitted to only 4 winter weeks
+  of one substation, its fitted heating curve is closer to the injected truth than the curves of
+  the no-pooling and complete-pooling fits. The curve is as close to the truth as a fair oracle's
+  curve (within 10%). The model recovers the sign of the substation's own heating offset relative to
+  the fleet's curve. The fleet's shared curve is recovered as well as an average of per-site fits
+  recovers it.
 prediction: >-
-  The pooled fit's heating error is below both controls' on 4 or 5 of 5 seeds (experiment 150's
-  post hoc January rerun had it below complete pooling on 4 of 5 and below no pooling on 5 of 5),
-  and within 10% of the fair oracle's on 5 of 5 seeds (the oracle's January error was the larger
-  one). The sign of the substation's own offset is right at 6 or more of 8 substations on 3 or 4 of
-  5 seeds: offsets are small relative to the noise at 4 weeks, so the sign line has little power.
+  The pooled fit's heating error is below both controls' on 4 or 5 of 5 seeds. Experiment 150's
+  post hoc January rerun had the pooled fit's error below complete pooling on 4 of 5 seeds and
+  below no pooling on 5 of 5. The error is within 10% of the fair oracle's on 5 of 5 seeds, because
+  in experiment 150's January rerun the oracle's error was larger than the pooled fit's. The sign
+  of the substation's own offset is right at 6 or more of 8 substations on 3 or 4 of 5 seeds:
+  offsets are small relative to the noise at 4 weeks, so the sign line has little power.
 decision_rule: >-
   Four lines W1 to W3 below, each counted over 5 seeds, and a line holds when it passes on at least
   4 of 5 seeds. Verdict `supported` if all four lines hold; `partly supported` if exactly three
@@ -44,67 +46,73 @@ metric: >-
   rows, in points of effective capacity, pooled over the 8 substations' turns, per seed
 verdict: partly supported
 best_arm: >-
-  Pooled fit at the penalty experiment 150 tuned (300 to 1,000 rows); heating error 2.84 to 3.61
-  points of effective capacity over 5 seeds, against 3.38 to 4.63 for complete pooling and 4.13 to
-  11.52 for no pooling
+  The pooled fit, at the penalty experiment 150 tuned (300 to 1,000 rows), had a heating error of
+  2.84 to 3.61 points of effective capacity over five seeds, against 3.38 to 4.63 for complete
+  pooling and 4.13 to 11.52 for no pooling
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-21
 take_home_message: >-
-  A partly pooled demand model fitted to 4 winter weeks of one substation found that substation's
-  heating response better than fitting the substation alone (heating error 2.8 to 3.6 against 4.1 to
-  11.5 points of capacity) and better than giving it the fleet's curve (3.4 to 4.6), and it found
-  the fleet's shared curve as well as separate fits. None of the estimators, a fair reference
-  included, reliably found the sign of the substation's own heating offset from 4 weeks (the
-  pooled fit did on 2 of 5 seeds), so a partly pooled model can share the heating curve but cannot
-  yet learn a new substation's own deviation from 4 weeks.
+  On synthetic substations with a known answer, a partly pooled demand model fitted to 4 winter
+  weeks of one substation estimated that substation's heating response with a smaller error than
+  fitting the substation alone (2.8 to 3.6 against 4.1 to 11.5 points of capacity) and than copying
+  the fleet's curve (3.4 to 4.6), on every seed. It recovered the fleet's shared curve about as well
+  as separate fits did. Neither the pooled fit nor the fair oracle recovered the sign of the
+  substation's own heating offset reliably (the pooled fit got the sign right at 6 or more of 8
+  substations on only 2 of 5 seeds), so on these synthetic fleets and one January, a partly pooled
+  model can share the heating curve but cannot learn a substation's own offset from 4 weeks.
 advice:
   - >-
-    Share the heating curve across substations in a partly pooled model, and keep the own offset of
-    a substation with 4 weeks of history heavily shrunk towards the fleet's curve (W2b, W3).
+    In a partly pooled model, share the heating curve across substations and keep the own offset of
+    a substation with 4 weeks of history heavily shrunk towards the fleet's curve (W2b: error below
+    both controls; W3: offset sign found on 2 of 5 seeds).
   - >-
     Score the heating error against the injected truth on winter weeks, not against an oracle
-    fitted to noisy rows (W2, figure 1).
+    fitted to noisy rows (W2, close to the fair oracle on 4 of 5 seeds; figure 1).
   - >-
     Do not read a substation's own heating offset from 4 winter weeks, because the sign was right at
-    3 to 8 of 8 substations for the fair oracle and 3 to 6 for the pooled fit (W3).
+    3 to 8 of 8 substations for the fair oracle and 3 to 6 for the pooled fit (W3: offset sign).
 code: ml-experiments/00154-differentiable-physics-n0-gate-2-heating-error-against-truth/
 ---
 
 # Differentiable physics, N0 gate 2: the partly pooled convex model's heating error against the injected truth
 
-**On made-up data with a known right answer, a partly pooled demand model found a new substation's
-winter heating response from 4 weeks of data better than either extreme could, but no method found
-the sign of that substation's own deviation from the fleet reliably.** The fleet's shared heating
-curve was recovered as well as the average of separate per-substation fits recovers the curve. A
-partly pooled model can therefore share the heating curve, and a substation with 4 weeks of history
-should keep its own offset heavily shrunk towards the fleet's curve. The next experiment on partly
-pooled shapes should not rely on offsets learned from 4 weeks. The verdict is `partly supported`:
-three of the four pre-registered lines hold.
+**On synthetic substations with a known heating curve, a partly pooled regression model estimated
+the heating response of a substation with only 4 winter weeks of data better than fitting that
+substation alone or copying the fleet's curve, but no method recovered the sign of the substation's
+own deviation from the fleet's curve on most seeds.** The fleet's shared heating curve was recovered
+as well as the average of separate per-substation fits recovers it. In this synthetic test, sharing
+the heating curve across substations therefore worked, and a substation's own offset from that
+curve was not learnable from 4 weeks. The next experiment, which fits a partly pooled generalised
+additive model (GAM, a demand model built from smooth curves), should not rely on offsets learned
+from 4 weeks. The verdict is `partly supported`: three of the four pass-or-fail lines written down
+before the run hold (listed under "Pre-registered lines").
 
-**We tested a forecasting method on 8 synthetic substations whose right answer we know.** The
-method is the convex demand model of [experiment
-109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md), which gives each
-substation the fleet's shared coefficients plus a penalised deviation of its own ("partial
-pooling"; the model is convex, so its fit has one optimum). The synthetic substations use the real
-calendar and weather of real substations, with injected heating coefficients: one curve shared by
-the fleet plus a known offset for each substation. [Experiment
+**The method is the convex regression model of [experiment
+109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md).** The model gives
+each substation the fleet's shared coefficients plus a penalised deviation of its own ("partial
+pooling"; the model is convex, so its fit has one optimum). [Experiment
 150](../00150-differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds/result.md) could not tell
 whether the method shrinks a substation's own coefficients correctly, because in 4 weeks of June
-the heating signal is weak. Here each synthetic substation in turn keeps only the 4 weeks before
-2025-02-01 (the other 7 keep 2 years), when heating dominates demand. The experiment repeats this
-on 5 random draws of the injected coefficients ("seeds"). The fleet and the noise are experiment
-150's.
+the heating signal is weak.
 
-**Terms used below.** The "heating error" is the root mean square, over the November to March rows
-of the substation's 2 years of calendar and weather, of the fitted minus the injected heating
-contribution to demand, in points of effective capacity (percentage points of the substation's
-capacity). The "offset" is the substation's mean heating contribution minus the fleet curve's. The
-"fair oracle" is a reference estimator told the fleet mean, the true spread of each coefficient
-and the noise variance, which estimates every coefficient from the same 4 weeks. The two "controls"
-are the same fit with no pooling (penalty 0 rows of evidence) and with complete pooling (penalty
+**Each synthetic substation has a known heating curve: one shared by the fleet plus its own
+offset.** The eight synthetic substations use the real calendar and weather of real substations.
+Each synthetic substation in turn keeps only the 4 weeks before 2025-02-01, when heating dominates
+demand, and the other seven keep 2 years. The experiment repeats this procedure on five random
+draws of the injected coefficients ("seeds"). The injected fleet coefficients and the noise level
+are the same as in experiment 150.
+
+**Terms used below.** The "fleet" is the eight synthetic substations. The "heating error" is the
+root mean square of the fitted heating contribution to demand minus the injected one. It is taken
+over the November to March rows of the substation's 2 years of calendar and weather, and is stated
+in points of effective capacity (percentage points of the substation's capacity). The "offset" is
+the substation's mean heating contribution minus the fleet curve's. The "fair oracle" is a
+reference estimator that is told the fleet mean, the true spread of each coefficient, and the noise
+variance, and then estimates every coefficient from the same 4 weeks. The two "controls" are the
+pooled fit run with no pooling (penalty 0 rows of evidence) and with complete pooling (penalty
 1,000,000 rows). The "pooled fit" uses the penalty experiment 150 tuned on each seed (300 to 1,000
-rows). The lines W1 to W3 are defined under "Pre-registered lines" below.
+rows).
 
 ![The pooled fit has a smaller heating error than both controls on all 5 seeds](figure_01_heating_error.svg)
 
@@ -114,9 +122,9 @@ rows). The lines W1 to W3 are defined under "Pre-registered lines" below.
 
 ## Pre-registered lines
 
-- **W1, the shared curve.** The fitted fleet curve's error against the injected fleet mean,
-  averaged over the 8 turns, is at most 1.1 times the error of the average of the per-site fits
-  (the penalty-0 fit of the same turn).
+- **W1, the shared curve.** W1 holds on a seed when the fleet curve's error is at most 1.1 times
+  the per-site average's error. The fleet curve's error is measured against the injected fleet mean
+  and averaged over the eight turns. The per-site average is the average of the penalty-0 fits.
 - **W2, close to the fair oracle.** The pooled fit's heating error is at most 1.1 times the fair
   oracle's.
 - **W2b, better than both controls.** The pooled fit's heating error is below no pooling's and
@@ -136,23 +144,25 @@ capacity.
 |---|---|---|
 | W1, shared curve within 10% of per-site fits | 5 of 5 | Fleet-curve error 0.52 to 1.31, against 0.62 to 1.28 for the per-site average. |
 | W2, pooled error within 10% of the fair oracle | 4 of 5 | Seed 2 missed: 3.61 against the oracle's 2.80. |
-| W2b, pooled error below both controls | 5 of 5 | Complete pooling was closest, by 0.10 on seed 3. |
+| W2b, pooled error below both controls | 5 of 5 | Complete pooling came closest, 0.10 behind the pooled fit on seed 3. |
 | W3, own offset has the injected sign | 2 of 5 | Signs right at 4, 6, 3, 6, and 4 of 8 substations. |
 
-- **Heating error per arm and seed.** Pooled fit: 2.84, 3.61, 3.28, 3.08, and 3.39.
-  complete pooling: 3.72, 4.63, 3.38, 3.57, and 3.93. no pooling: 8.34, 5.89, 8.36, 11.52, and 4.13.
-  fair oracle: 3.37, 2.80, 3.91, 4.07, and 4.00.
-- **Verdict rule as pre-registered.** W2b holds, and three of four lines hold, so `partly supported`.
-- **The pooled fit's edge over complete pooling is small on some seeds.** The edge is 0.10 on seed
-  3 and 0.48 to 1.02 on the others, so most of the gain over no pooling comes from sharing the
-  curve, and little from the substation's own offset.
-- **The oracle found the offset's sign more often, and still reached 6 of 8 on only 2 seeds
-  (comparison added after the run).** The fair oracle got the sign right at 3, 8, 5, 7, and 5 of 8
+- **The pooled fit's heating error is below complete pooling's and no pooling's on every seed.**
+  Pooled fit: 2.84, 3.61, 3.28, 3.08, and 3.39.
+  Complete pooling: 3.72, 4.63, 3.38, 3.57, and 3.93. No pooling: 8.34, 5.89, 8.36, 11.52, and 4.13.
+  Fair oracle: 3.37, 2.80, 3.91, 4.07, and 4.00.
+- **Three of the four lines hold, including W2b, so the verdict is `partly supported`.**
+- **Most of the pooled fit's gain over no pooling comes from sharing the curve, not from the
+  substation's own offset.** The pooled fit's margin over complete pooling is 0.10 points on seed 3
+  and 0.48 to 1.02 points on the other four seeds.
+- **Even the fair oracle reached 6 of 8 correct offset signs on only two seeds.** This comparison
+  was added after the run. The fair oracle got the sign right at 3, 8, 5, 7, and 5 of 8
   substations, the pooled fit at 4, 6, 3, 6, and 4, and no pooling at 4, 3, 4, 3, and 3. The oracle
   reached 6 or more on seeds 2 and 4, the same two seeds as the pooled fit. The pooled offsets'
   slope on the injected offsets was 0.50, 0.53, -0.06, 0.67, and 0.27, against the oracle's 0.35,
   1.00, 0.26, 1.47, and 0.66.
-- **The coefficient-space error is lowest for the pooled fit on 4 of 5 seeds.** The pooled fit's
+- **The error of the fitted coefficients themselves (root mean square of fitted minus injected
+  coefficient) is lowest for the pooled fit on 4 of 5 seeds.** The pooled fit's
   1.87 to 2.46 beat the oracle's 2.30 to 4.06 on every seed and complete pooling's 2.10 to 2.63 on
   every seed except seed 4, where complete pooling's 2.20 is just below the pooled fit's 2.26.
 
@@ -174,13 +184,13 @@ capacity.
 - **Audit triggers that fired.** Trigger 1 (a known-answer line, W3, fails) and trigger 7 (a later
   experiment's design, the partly pooled GAM, depends on this gate). Trigger 2 (a result
   contradicts its prediction) fires only for W3's sign count. Triggers 3 to 6 do not apply. One
-  Sonnet reviewer re-derived the numbers from the stored runs and read the code; no Opus audit ran,
-  and the next experiment should treat the offset result as unreplicated beyond one January and 5
+  Sonnet reviewer re-derived the numbers from the stored runs and read the code. No Opus audit ran.
+  The next experiment should treat the offset result as unreplicated beyond one January and five
   seeds.
 
 ## Caveats
 
-- **The fleets share the real calendar, weather and noise weeks**, and differ only in the injected
+- **The fleets share the real calendar, weather, and noise weeks**, and differ only in the injected
   coefficients, so the 5 seeds are not independent replicates of the noise. The held weeks are
   one January.
 - **The oracle's offset is measured against the true fleet mean, and the pooled fit's against its
@@ -192,12 +202,12 @@ capacity.
   the six real Primaries' fitted curve with injected spread.
 - **The pooled fit is given the true capacity of the seven full-history substations** (inherited
   from experiments 109 and 150).
-- **Schedule.** One refit per fit at the 2025-02-01 cut, so the contrasts do not depend on a
-  retraining schedule.
+- **Each model is fitted once, at the 2025-02-01 cut, so the contrasts do not depend on a
+  retraining schedule.**
 
 ## What to try next
 
 **Plan the partly pooled GAM shapes experiment so that the shared curve is pooled and the
 substation's offset comes from its full history, not from 4 weeks.** Use at least a winter's rows
 for any substation whose own offset is scored, because the sign of the offset was not found from 4
-weeks by any method tried. The partly pooled GAM itself is not planned or started here.
+weeks by any method tried.
