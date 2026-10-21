@@ -91,12 +91,21 @@ four planned contrasts. CAL's arm KE (ENS spread as a width input) is a rival wa
 spread and stays CAL's. N8 does not depend on CAL, and CAL's step of tuning a passing MP further
 depends on N8.
 
-**Builds on** experiments [111][e111] (GAM-K, tuned factors, ENS store), 114 (T-all-K), and 115
-(W1), whose pages are not published yet. N8 changes only the spread; the median-defining mean, the
-filter, and the fits are experiment 111's.
+**Builds on** experiments [111][e111] (GAM-K, tuned factors, ENS store), 114 (T-all-K), and
+[115][e115] (W1). N8 changes only the spread; the median-defining mean, the filter, and the fits are
+experiment 111's. The Kalman filter is the level-and-anomaly filter as it stands on main, which
+[experiment 118][e118] kept over its 14-weight filter. N8 does not redesign the filter, and the
+Kalman-on-ensemble-residuals arm uses it unchanged.
+
+**Experiment 119 asks for a plain recalibration of GAM-K's quantiles.** Arm K0-w (the stored table
+re-tuned on the wider factor grid) is that recalibration, so N8 also answers 119's next step.
 
 [e111]:
 https://openclimatefix.github.io/nged-substation-forecast/ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result/
+[e115]:
+https://openclimatefix.github.io/nged-substation-forecast/ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/result/
+[e118]:
+https://openclimatefix.github.io/nged-substation-forecast/ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/result/
 
 ## Data on local disk, and the periods
 
