@@ -102,27 +102,27 @@ adopted_in: none
 # Experiment 133: do learned noise settings beat the fixed ones in GAM-K's filter?
 
 **Choosing the filter's noise settings for each substation by next-day score did not improve the
-forecast on later months, so the noise of the filter is not where the next-day error comes from.**
+forecast on later months.**
 The gain was 0.044 points on the months that chose the settings and 0.009 points (99% interval
 -0.044 to +0.030) on the scored year. A single setting shared by every substation did as well, and
 letting the observation variance follow recent errors did not widen the 0.95 quantile where it
-fell short, on cold nights. The verdict is `inconclusive`, and what it narrows is this: neither
-per-substation tuning nor an online variance is worth building into the filter.
+fell short, on cold nights. The verdict is `inconclusive`. The scored-year gain is too small to
+justify building either change, and the grid did not find a minimum, so this experiment cannot say
+whether a wider search would.
 
 We asked whether the Kalman filter of the convex demand model with the filter (GAM-K, [experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)) forecasts the
 next day better when its noise settings are chosen by next-day score instead of by likelihood. The
-filter tracks, in each of four hour bands, a slowly moving level and a quickly decaying transient
-of the convex model's error. [Experiment
+filter tracks, in each of 4 bands of hours of the day, a slowly moving level and a quickly decaying
+transient of the convex model's error. [Experiment
 118](../00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/result.md) and
-experiment 128 found that the likelihood of such settings scatters about 10 times between fits,
-so we ran the filter on a grid of 1,323 settings per substation on the GPU, ranked the cells by
-next-day error on the odd months of 2024-07 to 2025-06, re-scored the best 20 with the full
-ensemble forecast, and judged the winner on the even months and on the scored year. We also tried
-the scalar variant of VIKING ([de Vilmarest and Wintenberger
-(2022)](https://arxiv.org/abs/2104.10777)), which tracks the observation variance online, and used
-it to scale the spread of the forecast. The design is in [experiment
-133's plan](#pre-registered-design) below, and the plan review changed it before any fit.
+experiment 128 found that the likelihood of such settings scatters about 10 times between fits, so
+we ran the filter on a grid of 1,323 settings per substation on a graphics processing unit (GPU),
+ranked the cells by next-day error on the odd months of 2024-07 to 2025-06, re-scored the best 20
+with the full ensemble forecast, and judged the winner on the even months and on the scored year. We
+also tried the scalar variant of VIKING (variance-inferring Kalman filter; [de Vilmarest and
+Wintenberger (2022)](https://arxiv.org/abs/2104.10777)), which tracks the observation variance
+online, and used it to scale the spread of the forecast. The design is in [Plan](#plan) below.
 
 ![Planned contrasts in the three periods](figure_1_headline.svg)
 
@@ -163,10 +163,11 @@ it to scale the spread of the forecast. The design is in [experiment
   must be). The interval is wider than the +/-0.03 equivalence band, so the contrast is undecided,
   with the sign favouring POOL out of sample.
 - **C3a, VK0 minus GRID.** Scored year -0.013 (-0.045 to +0.005), replicate +0.005 (-0.003 to
-  +0.012); not under the -0.03 bar. **C3b, VK1 minus GRID.** Scored year -0.004 (-0.052 to
-  +0.027), replicate +0.012 (-0.014 to +0.037). Over all leads, C3a is -0.032 (-0.104 to -0.004)
-  in the scored year and -0.007 (-0.014 to +0.000) in the replicate, a descriptive result that the
-  settings were not tuned for, and C3b is +0.001 (-0.101 to +0.051) and +0.029 (+0.012 to +0.044).
+  +0.012); not under the -0.03 bar. **C3b, VK1 minus GRID.** Scored year -0.004 (-0.052 to +0.027),
+  replicate +0.012 (-0.014 to +0.037). Over all leads, C3a is -0.032 (-0.104 to -0.004) in the
+  scored year and -0.007 (-0.014 to +0.000) in the replicate, a descriptive result, because the
+  settings were not tuned for all-lead score. C3b over all leads is +0.001 (-0.101 to +0.051) and
+  +0.029 (+0.012 to +0.044).
 - **Cold-night coverage of the 0.95 quantile, 12 to 36 hours, scored year:** FIX 0.879, GRID 0.864,
   POOL 0.877, VK0 0.868, VK1 0.865, TRAIL 0.867, against 0.95 and against all rows at 0.940 to
   0.944. The change against GRID is +0.003 (-0.003 to +0.011) for VK0 and +0.000 (-0.013 to
@@ -196,7 +197,7 @@ it to scale the spread of the forecast. The design is in [experiment
   their ensemble quantile-score ranking was 0.70 to 0.94 across substations, so the cheap ranking
   does track the target score. The online variance's random-walk variance went to the edge of its
   grid (e^-5 per half-hour), with mean tuning scores of 2.2939, 2.2928, and 2.2928 for the three
-  values, so it barely mattered.
+  values, so the random-walk variance barely mattered.
 
 ## Checks
 
@@ -205,26 +206,28 @@ it to scale the spread of the forecast. The design is in [experiment
   forecast by more than 0.12 points.
 - **Error of the mean forecast beside each contrast, 12 to 36 hours, scored year** (99% intervals):
   C1 -0.013 (-0.070 to +0.053), C2 -0.049 (-0.136 to +0.021), C3a -0.019 (-0.051 to +0.002), C3b
-  -0.019 (-0.051 to +0.002). Each has the sign of its quantile-score contrast, so trigger 3 did not
-  fire.
-- **Controls.** P1 passed: FIX's scored median forecast matches experiment 111's stored GAM-K rows
-  with a maximum absolute difference of 0 at every substation. P2 passed: on simulated streams
-  the cell chosen on odd-month cases scored 1.0031 times the true setting's error on even-month
-  cases for the filter's own model, and 0.9997 times for a model with a seasonal wobble added.
+  -0.019 (-0.051 to +0.002). Each has the sign of its quantile-score contrast, so the audit trigger
+  for a disagreement between mean and quantile scores did not fire.
+- **Controls.** The reproduction control passed: FIX's scored median forecast matches experiment
+  111's stored GAM-K rows with a maximum absolute difference of 0 at every substation. The selection
+  control passed: on simulated streams the cell chosen on odd-month cases scored 1.0031 times the
+  true setting's error on even-month cases for the filter's own model, and 0.9997 times for a model
+  with a seasonal wobble added.
 - **Tracking gate (not informative).** The pre-registered pass rate is 100% for every arm on real
-  residuals and on AR(1) noise at three injected sizes (half, 0.2, and 0.1 of the residual
-  standard deviation as the peak; the last two are post hoc), because the filter is linear and
-  the shifted and unshifted streams share one noise realisation, so every draw gives the same
-  answer. The tracking ratio (filtered midday gain over the injected midday shift) is 0.97 for
-  FIX, 1.13 for GRID, 1.06 for POOL, and 1.21 for VK0 on real residuals (AR(1): 0.98, 1.14, 1.07,
-  1.24), so none of the chosen settings loses a slow change. The figures of 0.22 (real) and 0.80
-  (AR(1)) from experiment 128 are for a refitted filter and are not comparable. This experiment
-  makes no claim about identifying any weight.
-- **Audit triggers.** Trigger 2 (a result against its own prediction) fired for C1, and the
-  explanation, that choosing among the 20 best of 1,323 cells on a flat surface overfits the
-  chosen months, is recorded but not tested here. Trigger 4 fired: leaving D5 out turns C1 from
-  -0.009 to +0.024, because D5's scored gain is -0.160. Trigger 7 may apply, because experiment
-  135 takes GRID's values as a baseline. The manager decides whether an Opus audit runs; none has.
+  residuals and on AR(1) noise at three injected sizes (half, 0.2, and 0.1 of the residual standard
+  deviation as the peak; the last two are post hoc), because the filter is linear and the shifted
+  and unshifted streams share one noise realisation, so every draw gives the same answer. The
+  tracking ratio (filtered midday gain over the injected midday shift) is 0.97 for FIX, 1.13 for
+  GRID, 1.06 for POOL, and 1.21 for VK0 on real residuals (first-order autoregressive noise, AR(1):
+  0.98, 1.14, 1.07, 1.24), so none of the chosen settings loses a slow change. The figures of 0.22
+  (real) and 0.80 (AR(1)) from experiment 128 are for a refitted filter and are not comparable. This
+  experiment makes no claim about identifying any weight.
+- **Audit triggers.** Audit trigger 2 (a result against its own prediction) fired for C1, and the
+  explanation, that choosing among the 20 best of 1,323 cells on a flat surface overfits the chosen
+  months, is recorded but not tested here. Audit trigger 4 (one substation drives the contrast)
+  fired: leaving D5 out turns C1 from -0.009 to +0.024, because D5's scored gain is -0.160. Audit
+  trigger 7 (a later experiment builds on the result) may apply, because experiment 135 takes GRID's
+  values as a baseline. No second-model audit has been run.
 - **Not run.** The curtailment-cost saving against the manual heuristic, because it needs a node's
   forecast and its generators' forecasts.
 
@@ -238,7 +241,7 @@ it to scale the spread of the forecast. The design is in [experiment
 - A spread that responds to cold weather directly (the temperature itself), because the size of
   recent errors did not predict cold-night error.
 
-## Pre-registered design
+## Plan
 
 The plan, as committed before any fit and triaged after one plan review, is in the git history
 of this file (the commit "Experiment 133 plan"). The changes made after the review were: `sigma_eps`
