@@ -44,7 +44,7 @@ LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("all leads", 0.0, 168.0),
 )
 CONTRAST_LEVEL: Final[float] = 97.5
-"""Coverage in percent of a two-sided percentile interval: the Bonferroni level for two contrasts."""
+"""Coverage in percent of the two-sided interval: the Bonferroni level for two contrasts."""
 FRAME_COLUMNS: Final[tuple[str, ...]] = (
     "site",
     "time_series_id",
