@@ -19,9 +19,9 @@ hypothesis: >-
   trained with the pinball loss at the 11 quantiles.
 prediction: >-
   Written before any fit, see "Predictions" below. Headline: SEQ-median minus R is -0.03 to +0.05
-  points at D+1 (most likely a null); SEQ-quantile minus R is -0.05 to +0.05; the cold-night q95
-  coverage of SEQ-quantile rises by at most 5 points from K0's 73 to 78%; the training-versus-
-  validation pinball gap is over 20%.
+  points at D+1 (most likely a null); SEQ-quantile minus R is -0.05 to +0.03; cold-night q95
+  coverage of SEQ-quantile is 74% to 82%; the validation pinball loss exceeds the training loss by
+  10% or more. Only P6 was tested, because the gate failed.
 decision_rule: see "Decision rule"
 benchmark: >-
   Recipe R (2.436 points at D+1 in the scored year at the five decision substations), K0 (GAM-K as
@@ -40,7 +40,7 @@ best_arm: >-
 headline: >-
   On real residuals, the network recovered -10% of an injected level step (R 0%) and 0% of an
   injected Saturday-evening shift (R -9%), against gates of 30% and 15%; it lowered the day-ahead
-  mean absolute error on the tuning months' held-out blocks by only 1% to 3% against K0.
+  mean absolute error on the tuning months' held-out blocks by 0% to 3% against K0.
 lessons:
   - >-
     With about 1,100 training samples (one winter of days per substation), a gated recurrent unit
@@ -55,12 +55,13 @@ date: 2026-10-21
 take_home_message: >-
   A small neural network that reads the last 14 days of GAM-K's errors did not learn to adapt to
   changes in them: when we added a known step or a Saturday-evening shift to real errors, it
-  corrected for none of it, so we did not score it on the scored year. With about one year of days
-  per substation to learn from, the hand-built Kalman filter with recipe R remains the better tool.
+  recovered none of it, so we did not score it on the scored year. Nothing was scored, so this
+  result does not compare it with the hand-built Kalman filter and recipe R.
 advice:
   - >-
-    Do not train a sequence network on one substation-year of GAM-K residuals (about 1,100 to 3,200
-    samples); it learns no response to changes in the residuals (known-answer gate).
+    A sequence network trained on about 1,100 samples of GAM-K residuals showed no response to
+    injected changes in the residuals, in two architectures (known-answer gate); try longer history
+    before another architecture.
   - >-
     If a learned residual corrector is tried again, pretrain it on simulated or longer history, such
     as the 2021 to 2024 ensemble backfill, before using the stored GAM-K residuals (known-answer
@@ -68,12 +69,15 @@ advice:
 code: ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/
 ---
 
-**Take-home: a small neural network trained on one year of GAM-K's errors did not learn to adapt
-when those errors change, so it was not scored.** We added a known shift to real errors and asked
-whether the network, trained on clean errors, corrected for it. It corrected for none of it, in two
-architectures. The experiment therefore stops at the known-answer gate, and the verdict is
-`inconclusive`: the day-ahead score was not measured. The search narrows to a network with more
-history to learn from, not a different architecture on the same year.
+**Take-home: a small neural network trained on one year of GAM-K's forecast errors did not learn to
+adapt when those errors change, so we did not score it.** GAM-K is our demand model with a Kalman
+filter (a method that updates a forecast from its recent errors). We added a known change to real
+errors, either a +3-point step for 8 weeks or a +3-point shift on Saturday evenings, and checked
+whether the network, trained on unchanged errors, corrected for the change. It recovered none of
+it, in two architectures, and the sign was wrong for the step. The experiment therefore stops at
+this check, and the verdict is `inconclusive`: the day-ahead forecast score was not measured, and
+the comparison with the Kalman filter and recipe R (subtract 0.75 times the last 14 days' mean
+error) was not made. Whether more history would help is untested.
 
 ## Question
 
@@ -93,6 +97,10 @@ the pinball loss is the standard training loss of quantile regression
 ([Koenker and Bassett, 1978](https://doi.org/10.2307/1913643)).
 
 ## Design
+
+This section is the plan as pre-registered; the gate failed, so only the samples, the gate fits, and
+the tuning-month fits ran (see Results).
+
 
 - **Substations.** The six substations whose member forecasts experiment 111 stored (D5, D10, D11,
   D14, D16, and D9). Experiment 111's ensemble store holds seven series (those six and D18), so the
@@ -118,12 +126,14 @@ the pinball loss is the standard training loss of quantile regression
   substation embedding (4 dimensions), and a two-layer head (64 units) producing 144 numbers per
   sample: a median correction per half-hour, and a lower and an upper log-scale per half-hour that
   stretch K0's own quantile offsets (the distance of each K0 quantile from K0's median), so the 11
-  quantiles cannot cross. About 35,000 parameters. AdamW, weight decay, dropout 0.1. Early stopping
+  quantiles cannot cross. About 35,000 parameters (about 42,000 with the linear skip layer added
+  after the first gate run). AdamW, weight decay, dropout 0.1. Early stopping
   uses
   month-block validation folds, purged by 15 days either side of the held-out block; the
   early-stopped model is the one used (no refit).
 - **Arms.** K0; R; SEQ-ridge (a ridge regression of the same median correction on the same inputs,
-  the linear reference; if the network does not beat it, a network is not needed); SEQ-blind (the
+  the linear reference; if the neural network does not beat it, a neural network is not needed);
+  SEQ-blind (the
   SEQ-quantile network with the residual input zeroed, so that any gain from the weather and
   day-type scale heads alone can be told apart from reading the residuals); SEQ-median (median
   correction trained on absolute error; the spread is rebuilt
@@ -175,7 +185,7 @@ the pinball loss is the standard training loss of quantile regression
 
 **The threshold is 0.02 points at D+1, applied to the point estimate; the 99% interval must also
 exclude zero.** A serving-path model is a new component that has to be trained, versioned, and
-monitored, so a smaller gain would not pay for it. The primary arm for the verdict is SEQ-median
+monitored, so a smaller gain does not justify it. The primary arm for the verdict is SEQ-median
 against R (C1); SEQ-quantile against SEQ-median (C3) decides the tail claim only. SEQ-median is
 `supported` if C1 is at most -0.02 with the interval excluding zero in the scored year, the
 replicate months agree in sign, and SEQ-median beats SEQ-ridge. It is `small gain` if the interval
@@ -187,7 +197,8 @@ R's kappa was tuned on the odd months only; this asymmetry favours the network a
 
 ## Known-answer gate on real residuals (before any scored fit)
 
-**Two injections are added to the real tuning-month residual inputs and targets of the validation
+**Two injections are added to the real residual inputs of April to June 2024 (before every tuning
+month) and targets of the validation
 folds, and the network was trained on clean data.** (a) A level step of +3 points for eight weeks:
 the network must recover at least 30% of the step from the third day on and more than R does.
 (b) A +3-point shift on Saturdays 17:00 to 21:00 UTC for eight weeks: it must recover at least 15%
@@ -200,11 +211,14 @@ weeks A (the first four of the eight), and is evaluated on the later held-out we
 the injection present and absent. It passes if, on the clean held-out weeks, its correction at the
 injected half-hours is under 25% of the shift: it must adapt from the residual inputs and not
 memorise the calendar position. A failed gate stops the experiment before any replicate or scored
-forecast is read.
+forecast is read. The gate ran twice, and the absorption test was redefined after the first run (see
+Results).
+
 
 ## What this experiment will not say
 
-Five to six substations and one independent winter; the network is trained on GAM-K's residuals on
+Six substations, five of them decision substations, and one independent winter; the network is
+trained on GAM-K's residuals on
 ensemble-driven weather, not on the production XGBoost blend; the result bears on a research
 engine, not on a model release.
 
@@ -213,20 +227,22 @@ engine, not on a model release.
 - **Gate, first architecture (gated recurrent unit alone).** Level step of +3 points for eight weeks
   (April to June 2024, before every tuning month): the network recovered -5% of it from the third
   day (gate: at least 30% and more than R); R recovered 0%, because recipe R removes each day's
-  mean. Saturday-evening shift of +3 points: the network recovered 0.04% (gate: 15%). The
-  absorption test was ill-defined as first written (it compared against zero and not against the
-  clean-trained network), so the run's absorption number is not used.
+  mean. Saturday-evening shift of +3 points: the network recovered 0.04% (gate: 15%). The absorption
+  test was ill-defined as first written (it compared against zero and not against the clean-trained
+  network, and returned -54%), so that number is not used.
 - **Gate, second architecture (post hoc revision before any replicate or scored read).** A linear
   skip from the 14-day mean residual by half-hour, the previous day, and the partial current day was
-  added, which can represent recipe R exactly. The network recovered -10% of the level step and
+  added, which can represent recipe R exactly. The neural network recovered -10% of the level step
+  and
   -0.1% of the Saturday shift; R recovered 0% and -9%. The absorption test (training with the
   shift in four of the eight weeks, evaluating the other four on clean inputs, correction minus the
   clean-trained network's) gave 2.2% on clean weeks, below the 25% limit and 2.6% on injected weeks,
   so the network did not memorise the calendar, but it did not adapt either.
 - **Fit quality on the tuning months.** Day-ahead mean absolute error of the median on three
-  held-out month blocks (purged by 15 days): network 3.97, 4.04, 4.43 against K0 4.02, 4.06, 4.57
-  points, a 1% to 3% reduction; the training error is lower than the validation error by 3% to 26%,
-  the largest gap on the block with the fewest training days.
+  held-out month blocks (purged by 15 days): network 3.97, 4.07, 4.43 against K0 4.02, 4.06, 4.57
+  points, a reduction of 0% to 3% (the mean of two seeds per block; the second block's reduction is
+  about 0%). Over the two seeds, the validation error exceeds the training error by -0.2%, 12%, and
+  31% on the three blocks; the three blocks have about 700 training samples each.
 - **Arms and rows not run.** SEQ-median, SEQ-quantile, SEQ-ridge, and SEQ-blind were not scored in
   the replicate months or the scored year, as the plan requires after a failed gate. The code for
   the fits and frames is in the folder but was not run.
