@@ -257,4 +257,8 @@ def predict(
         batch = _batch(pooled=pooled, index=index, device=device)
         c, lo, up = net(history=batch["history"], target=batch["target"], site=batch["site"])
         outs.append([c.cpu().numpy(), lo.cpu().numpy(), up.cpu().numpy()])
-    return tuple(np.mean([o[i] for o in outs], axis=0) for i in range(3))  # ty: ignore[invalid-return-type]
+    return (
+        np.mean([o[0] for o in outs], axis=0),
+        np.mean([o[1] for o in outs], axis=0),
+        np.mean([o[2] for o in outs], axis=0),
+    )
