@@ -60,46 +60,53 @@ best_arm: >-
 headline: >-
   All history minus 24 months, both with drift (C2), is -0.083 points, 98.75% interval -0.192 to
   +0.014, below zero at 7 of 12 origins and above zero at 4; the drift term lowers the score by
-  0.38 points on 24 months and 0.50 on all history
+  0.38 points on 24 months and 0.50 on all history, and an audit found a recent-level correction does
+  as well
 take_home_message: >-
   Training the demand model on every year back to 2019, instead of the last 24 months, lowered its
   forecast error by only about 3% (0.08 points of substation capacity), and the difference could be
-  chance. Letting the model's level drift slowly over the years helped much more, lowering the
-  error by 0.38 points on 24 months and 0.50 points on all history. We did not test whether
-  explicit heating, switching, or pooled terms would make the longer history help.
+  chance. The drift term helped much more, lowering the error by 0.38 points on 24 months and 0.50
+  points on all history, but a post hoc audit found that a plain correction by the mean error of the
+  last 28 training days recovers 86% to 94% of that gain, so the gain is a recent-level correction
+  and the drift form is not shown to beat the simpler fix. We did not test whether explicit
+  heating, switching, or pooled terms would make the longer history help.
 date: 2026-10-21
 pr: 1451
 advice:
   - >-
-    The evidence supports a drift term D1 in the convex demand model with either training window: it
-    lowered the score by 0.381 points on 24 months (C4, 98.75% interval -0.638 to -0.136) and by
-    0.502 on all history (C3, -0.765 to -0.270), at 11 and 10 of 12 origins.
+    Treat the drift term's gain as a recent-level correction: a no-drift fit plus the mean residual
+    of its last 28 training days recovered 94% of C3 and 86% of C4, and drift minus that fix was
+    -0.031 [-0.145, +0.089] on all history (post hoc, audit). Compare any new level correction with
+    that fix, not only with no correction.
   - >-
-    All-history training is not shown to lower the score: with
-    drift, all history minus 24 months was -0.083 points (C2, 98.75% interval -0.192 to +0.014),
-    and without drift +0.038 (C1, -0.125 to +0.178, sign varies by origin).
+    All-history training is not shown to lower the score: with drift, all history minus 24 months
+    was -0.083 points (C2, 98.75% interval -0.192 to +0.014, and -0.240 to +0.052 resampling whole
+    origins), and without drift +0.038 (C1, -0.125 to +0.178, sign varies by origin).
   - >-
-    Check D14 before trusting the drift term at a new Primary: the drift term raised D14's score by
-    0.085 points on all history and 0.202 on 24 months, while it lowered the other four substations'
-    (C3 and C4 by substation alone).
+    Do not read the window contrasts one origin at a time: C2's 7 below and 4 above are consistent
+    with chance (origin-level sign test p = 0.55, audit), and C2 does not grow with the extra months
+    of history (Spearman correlation 0.02).
   - >-
-    Read any history-window contrast by season: all history without drift scored 0.163 points better
-    on November to March rows and 0.171 worse on April to October rows (C1 by row season).
-code: ml-experiments/00149-differentiable-physics-full-history-gam-era5-cams/
+    Expect a level correction to hurt where the level reverts: the drift term raised D14's score by
+    0.085 points on all history and 0.202 on 24 months, and raised D10's by 0.52 from the 2024-10
+    origin on (C3 and C4 by substation, audit), while it lowered 36 of the 57 substation-origin
+    pairs' scores.
+  - >-
+    Read any history-window contrast by season, and de-level it first: all history without drift
+    scored 0.163 points better on November to March rows and 0.171 worse on April to October rows
+    (C1 by row season), and C1 is about zero once each pair's level is removed (audit).
 ---
-
----
-
-**Training the convex demand model on every year back to 2019, instead of the last 24 months,
+ **Training the convex demand model on every year back to 2019, instead of the last 24 months,
 lowered its forecast error by only about 3% (0.08 points of substation capacity), and the difference
 could be chance. The verdict is `inconclusive`.** The demand model is a convex fit of substation
 power from weather and calendar terms, and its quantile score (defined below) is the error measure.
 The drift term, a term that lets the forecast level move slowly over the years, lowered the score by
 0.38 points on 24 months and by 0.50 points on all history, about 5 to 6 times as much as the window
-did. The interval for the window's effect (98.75%, from resampling months) runs from -0.19 to +0.01.
-We scored five Primary substations at 12 quarterly refits, on past weather and not on weather
-forecasts. This experiment did not test whether explicit heating, switching, or pooled terms would
-make longer history help.
+did. A post hoc audit found that a plain correction by the mean error of the last 28 training days
+recovers 86% to 94% of that gain. The interval for the window's effect (98.75%, from resampling
+months) runs from -0.19 to +0.01. We scored five Primary substations at 12 quarterly refits, on past
+weather and not on weather forecasts. This experiment did not test whether explicit heating,
+switching, or pooled terms would make longer history help.
 
 We asked whether, with the solar term fixed, a longer training window helps the convex model of
 `studies.dp_gam`. The solar term is a pinned capacity times a unit solar shape in every arm. We
@@ -159,17 +166,19 @@ nominal 95% (94.6%).
 | Climatology | 4.010 [3.816, 4.213] | -1.201 |
 
 - **C2 (the verdict), all history minus 24 months, both with drift:** -0.083 [-0.192, +0.014]
-  (98.75% interval from resampling months), 7 origins below zero, 4 above, 1 tied. The mean absolute
-  error of the mean forecast contrast is -0.120 [-0.300, +0.047]. Winter-quarter origins give -0.114
-  [-0.263, +0.024] and summer-quarter origins -0.054 [-0.127, +0.009]. Leaving out each substation
-  in turn gives -0.076 to -0.091, all below zero.
+  (98.75% interval from resampling months; resampling whole origins gives [-0.240, +0.052]), 7
+  origins below zero, 4 above, 1 tied. The mean absolute error of the mean forecast contrast is
+  -0.120 [-0.300, +0.047]. Winter-quarter origins give -0.114 [-0.263, +0.024] and summer-quarter
+  origins -0.054 [-0.127, +0.009]. Leaving out each substation in turn gives -0.076 to -0.091, all
+  below zero.
 - **C1, all history minus 24 months, no drift:** +0.038 [-0.125, +0.178], 4 below, 6 above, 2 tied.
   Leaving out D10 gives -0.021. Rows from November to March give -0.163 [-0.365, +0.021] and rows
   from April to October +0.171 [+0.041, +0.290].
 - **C3, drift minus no drift on all history:** -0.502 [-0.765, -0.270], 10 origins below zero, none
   above. Experiment 107 found -0.451 for the same contrast on its own rows, which include D16 at all
   12 origins; the sign and size agree.
-- **C4, drift minus no drift on 24 months:** -0.381 [-0.638, -0.136], 11 below, 1 above. The drift
+- **C4, drift minus no drift on 24 months:** -0.381 [-0.638, -0.136], 11 below, 1 above (resampling
+  whole substation-origin pairs gives [-0.796, +0.002], so the claim is weaker than C3's). The drift
   term raised D14's score on both windows (+0.085 on all history, +0.202 on 24 months) and lowered
   the other four substations' by 0.23 to 1.22 (all history).
 - **Tail calibration** (percentage of outcomes at or below the quantile; nominal 1, 5, 95, and 99;
@@ -201,8 +210,10 @@ nominal 95% (94.6%).
 
 - **Median forecast minus mean forecast, per site:** exactly 0.000 for every arm, because the
   centred spread has a zero median, so this check cannot expose a shifted forecast. The mean error
-  in the absolute-score table does: A24 misses low by +0.899 and Aall+D1 is nearly unbiased
-  (-0.064).
+  in the absolute-score table does: the pooled values are A24 +0.899 and Aall+D1 -0.064, but they
+  hide large biases that cancel. The audit's mean absolute bias per substation-origin pair is 3.66
+  for A24, 3.43 for Aall, 2.67 for A24+D1, and 2.46 for Aall+D1 points, and Aall+D1 reaches +8.3 at
+  D10 for the 2025-10 origin.
 - **Mean absolute error of the mean forecast beside each score contrast:** C1 +0.019 [-0.227,
   +0.240], C2 -0.120 [-0.300, +0.047], C3 -0.720 [-1.083, -0.386], C4 -0.581 [-0.966, -0.210]. Each
   of the four contrasts has the same sign as its score contrast.
@@ -227,6 +238,39 @@ nominal 95% (94.6%).
     3. **Trigger 5 (a nested arm wins):** the 24-month arm scores 0.038 better than all history
        without drift, although the all-history window contains the 24 months. The difference is
        inside its interval. The seasonal split of C1 (post hoc) is the explanation tested.
+
+## Audit (Opus, post hoc, approved by the maintainer)
+
+- **Verdict stands.** The audit refitted all 4 arms at 5 substations and 16 cuts from scratch. The
+  means match to 4e-11 points, and C1 to C4 reproduce. Nothing leaks: the last drift knot uses
+  training rows at or before the cut, and the forecast holds it flat.
+- **The drift term is a recent-level correction.** A no-drift fit plus the mean residual of its last
+  28 training days, per hour band, recovers 94% of C3 and 86% of C4. Drift minus that fix is -0.031
+  [-0.145, +0.089] on all history and -0.055 [-0.239, +0.103] on 24 months, so the drift form is not
+  shown to beat the simpler fix. A drift fit trained to 28 days before the cut keeps about 90% of
+  its gain, and the gain fades only mildly with lead (C3 -0.62 in week 0 and -0.42 in week 12).
+- **Every contrast is a level contrast.** With each substation-origin-band's mean error removed, all
+  four arms score a mean absolute error of 4.089 to 4.095 (a diagnostic that uses the scored
+  window's own mean).
+- **The correction fails where the level reverts.** Drift lowered the score at only 36 of 57
+  substation-origin pairs, and raised D10's by +0.52 [+0.11, +0.94] (95%) from the 2024-10 origin
+  on.
+- **C2's sign pattern is consistent with chance.** The origin-level sign test gives p = 0.55, C2 is
+  below zero at 28 of 57 pairs, and C2 does not grow with extra history (Spearman 0.02; -0.054
+  [-0.193, +0.063] with at least 12 extra months). With levels removed, all history is better by
+  0.046 on November to March rows and worse by 0.027 on April to October rows. D16 has only 8.4
+  extra months at the April 2024 origin.
+- **The earlier sign flips look like level effects.** Without drift, C1 per pair correlates 0.82
+  with the difference in held-level bias, and C1 is about zero once levels are removed. So whether
+  more years help depends on where each substation's next level sits relative to the window average.
+  This experiment does not test the annual frozen fits of experiments 104 and 106 (up to 12 months
+  of stale level, against 3 here), the best form of level correction, weather forecasts, or a
+  replication of experiment 106's design.
+- **The month-block interval is narrow for this design,** because the 3 months of an origin share
+  one fit's level error. The page's intervals use months, as experiment 107 did; the origin-block
+  and pair-block intervals are given above for C2 and C4.
+- **Triage:** all findings accepted. The full report is in the private `briefs/` folder
+  (`e149_audit_report.md`).
 
 ## Caveats
 
@@ -253,6 +297,9 @@ nominal 95% (94.6%).
 
 ## What to try next
 
+- **Settle the level-correction question:** score a de-levelled error as the primary metric, apply a
+  common causal level correction (the 28-day mean residual) to both window arms, and run both the
+  quarterly and the annual-refit designs over two or more years.
 - **Rerun C2 with weekly refits and ensemble weather forecasts** only if a use needs full history,
   because the pooled improvement is 3% and the interval spans zero.
 - **Test whether explicit heating, switching, or pooled terms make long history lower the score.**
