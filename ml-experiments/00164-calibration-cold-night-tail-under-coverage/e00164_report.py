@@ -257,7 +257,7 @@ def contrast(*, losses: pl.DataFrame, treatment: str, reference: str, metric: st
 
 
 def width_by_lead_day(*, losses: pl.DataFrame) -> list[dict]:
-    """Return, per arm, the decision substations' median q05 to q95 width and q95 coverage by day."""
+    """Return, per arm, the decision substations' median q05 to q95 width and coverage by day."""
     scope = losses.filter(pl.col("site").is_in(list(common.DECISION_SITES)))
     return (
         scope.group_by(["arm", "lead_day"])
@@ -505,10 +505,12 @@ def diagnosis(*, losses: pl.DataFrame, arm: str) -> dict:
     The residual is the actual minus the mean forecast. Rows of the decision substations, by the
     ensemble-mean temperature bin and by hour band, and the ERA5-defined cold nights by hour band.
     """
-    scope = losses.filter(pl.col("site").is_in(list(common.DECISION_SITES)) & (pl.col("arm") == arm))
+    scope = losses.filter(
+        pl.col("site").is_in(list(common.DECISION_SITES)) & (pl.col("arm") == arm)
+    )
     scope = scope.with_columns(
         residual=pl.col("actual") - pl.col("mean"),
-        temperature_bin=pl.col("ens_mean_c").cut(list(TEMPERATURE_BIN_EDGES_C)).cast(pl.String),
+        temperature_bin=pl.col("ens_mean_c").cut(list(TEMPERATURE_BIN_EDGES_C)).cast(pl.String),  # ty: ignore[deprecated]
         half_width_95=pl.col("q95") - pl.col("mean"),
     )
     aggregations = [
@@ -528,7 +530,9 @@ def diagnosis(*, losses: pl.DataFrame, arm: str) -> dict:
         .agg(aggregations)
         .sort("hour_band")
         .to_dicts(),
-        "not_cold_by_hour_band": scope.filter(~pl.col("cold2") & pl.col("valid_month").is_in(list(WINTER_MONTHS)))
+        "not_cold_by_hour_band": scope.filter(
+            ~pl.col("cold2") & pl.col("valid_month").is_in(list(WINTER_MONTHS))
+        )
         .group_by("hour_band")
         .agg(aggregations)
         .sort("hour_band")

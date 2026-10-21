@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 164 | Is the cold-night q95 under-coverage of the smooth-table forecast a width problem, and does a temperature-gated widening fix it? | 1 | Experiment 160 (merged) | Planned; runs on CPU, 6 cores |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments

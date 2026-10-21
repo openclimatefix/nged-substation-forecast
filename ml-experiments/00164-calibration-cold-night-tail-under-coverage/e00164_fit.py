@@ -192,11 +192,10 @@ def main() -> None:
         scale_t = np.ones((n_rows, len(common.QUANTILES)))
         scale_o = np.ones((n_rows, len(common.QUANTILES)))
         for position, level in enumerate(common.LEVELS.tolist()):
-            if level not in T_LEVELS:
-                continue
-            scale_t[:, position] = np.array([t_fit[c][level] for c in range(4)])[cls]
             if level in o_fit:
                 scale_o[:, position] = np.where(is_cold, o_fit[level], 1.0)
+            if level in T_LEVELS:
+                scale_t[:, position] = np.array([t_fit[c][level] for c in range(4)])[cls]
         scale_s = np.where(is_cold, 1.0 + beta * std_c, 1.0)[:, None] * np.ones(
             (1, len(common.QUANTILES))
         )
