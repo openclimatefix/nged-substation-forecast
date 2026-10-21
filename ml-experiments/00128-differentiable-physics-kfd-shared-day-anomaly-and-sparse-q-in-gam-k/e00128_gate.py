@@ -2,14 +2,15 @@
 
 Each stream is built on the real PV regressor and the real tuning-year residuals of one decision
 substation (2024-07-01 to 2025-06-30). The script injects a known change shaped like a rise in
-solar-panel capacity, adds noise, refits GK, KD, KS, and KDS on the synthetic stream (starting from the
-real fit and with the real fit's prior), runs GK, KD, KS, and KDS over it, and stores the arms'
+solar-panel capacity, adds noise, refits GK, KD, KS, and KDS on the synthetic stream (starting from
+the real fit and with the real fit's prior), runs GK, KD, KS, and KDS over it, and stores the arms'
 end-of-day midday level, night level, and d, and their day-ahead absolute error.
 
 **Scenarios.** S0 injects nothing. S1 raises the PV weight from 1 to 1.30 over 180 days from
 2024-07-01, so the stream gains `0.30 * clip(days / 180) * pv_regressor` at each half-hour. S1x3 is
 three times that. **Noise forms.** `real`: a circular month-block resample of the substation's real
-tuning-year residuals (12 draws per substation), which keeps the cross-band structure. `ar1`: the
+tuning-year residuals (12 draws per substation) from months with the same clock signature, which
+keeps the cross-band structure. `ar1`: the
 filter's own model without a day-level state (an AR(1) anomaly per hour band at GAM-K's `phi`,
 `sigma_z`, and `sigma_eps`; 6 draws per substation, run as S0, S1, and S1x3 so that the reference
 rate exists at whichever amplitude decides). **Each S1 and S1x3 stream is paired with an S0
@@ -36,10 +37,11 @@ import json
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Final
+from zoneinfo import ZoneInfo
 
 import e00128_common as common
 import e00128_filter as joint
@@ -174,19 +176,41 @@ def ar1_noise(*, inputs: GateInputs, generator: np.random.Generator) -> np.ndarr
     )
 
 
+def clock_signature(*, label: np.datetime64) -> tuple[int, int]:
+    """Return the UTC offset, in hours, of Europe/London at the start and at the end of a month.
+
+    (1, 1) is a British Summer Time month, (0, 0) a Greenwich Mean Time month, and (0, 1) and
+    (1, 0) are the months of the two clock changes.
+    """
+    zone = ZoneInfo("Europe/London")
+
+    def offset_hours(day: date) -> int:
+        noon = datetime(day.year, day.month, day.day, 12, tzinfo=zone)
+        return round((noon.utcoffset() or timedelta(0)).total_seconds() / 3600)
+
+    first = label.astype("datetime64[D]").astype(date)
+    last = (label + 1).astype("datetime64[D]").astype(date) - timedelta(days=1)
+    return offset_hours(first), offset_hours(last)
+
+
 def block_noise(*, inputs: GateInputs, generator: np.random.Generator) -> np.ndarray:
     """Resample the real residuals by whole calendar months, with replacement, keeping the position.
 
     The residual at a position in a month comes from the same position (day and half-hour) of
-    another month of the stream, wrapped round if that month is shorter. A missing real residual
-    stays missing.
+    another month of the stream, wrapped round if that month is shorter. The source month is drawn
+    from the months with the same clock signature (`clock_signature`) as the target month, so no
+    residual moves by one local hour between British Summer Time and Greenwich Mean Time. A month
+    of a clock change has no other month with its signature and is its own source. A missing real
+    residual stays missing.
     """
     labels = np.unique(inputs.month)
     members = {label: np.flatnonzero(inputs.month == label) for label in labels}
+    signature = {label: clock_signature(label=label) for label in labels}
     out = np.full(len(inputs.rows), np.nan)
     for label in labels:
         target = members[label]
-        source = members[labels[generator.integers(len(labels))]]
+        pool = [other for other in labels if signature[other] == signature[label]]
+        source = members[pool[generator.integers(len(pool))]]
         out[target] = inputs.real_residual[source[np.arange(len(target)) % len(source)]]
     return out
 
