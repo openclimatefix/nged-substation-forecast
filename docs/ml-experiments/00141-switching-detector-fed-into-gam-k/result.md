@@ -73,63 +73,104 @@ ready before the real-year scoring, the same arms are re-run on it, labelled pos
   `(series, half-hour, score, signed step)`, so the causal live end rule of experiment 140 can be
   swapped in later without changing the arms.
 
+**Causal score.** RO-NC's step statistic compares the mean of the residual after a stamp with the
+mean before it, so a score stamped at the onset has seen up to 24 hours of the future. The
+deployable score is therefore re-indexed: the score at stamp `s` uses only residuals ending no
+later than `s` minus 3.5 hours (the telemetry delay), the alarm is stamped when the "after" window
+is full and not at the onset, and the peak, partner, and veto tests use the same cut. A unit test
+truncates the residual stream at `s` minus 3.5 hours and requires the score at `s` to be unchanged.
+Only S-HE and S-ORACLE may read onset-stamped scores.
+
+**New filter core (a deliverable).** Experiment 134's filter is single-regime, so S-KF needs a
+two-regime core in this folder: a per-stamp prior input, a level-variance multiplier for regime S,
+a posterior update from the two regimes' likelihoods, and moment-matched mixing of state and
+covariance. Gate: S-KF with the prior fixed at 0 reproduces K0 to numerical tolerance. The
+regime-S multiplier grid is 4, 16, 64, and 256 times `q`, chosen on the tuning months.
+
 **Known answer first (injected world).** Draw transfers of known size and timing in the real
-residual stream using experiment 130's injection harness (headline band: moved load 25% or more
-of the receiving load, lasting over 1 day; plus the other bands descriptively). The residual of
-the frozen GAM-K forecast plus the moved megawatts is the fast path of experiment 130, valid
-because the weather model is not refitted. The filter, the arms, and the scoring run on the
-injected world, and the actuals are the injected power. Checks: (a) S-KF's posterior probability of
-S passes 0.5 within 24 hours of the onset for at least 60% of detected headline-band events;
-(b) the false-alarm bound below.
+residual stream using experiment 130's injection harness (headline band: moved load 25% or more of
+the receiving load, lasting over 1 day; other bands descriptively), with injection seeds disjoint
+from the tuning months. The frozen GAM-K forecast is not refitted, so adding the moved megawatts to
+the stream (experiment 130's fast path) is valid for the filters. Scoring uses actuals plus the
+signed moved megawatts at the donor and each receiver, never the original actuals, normalised by
+the same effective capacity as the score. The spread is shared across arms (K0's), so every
+contrast is a location-only difference. The `scorable` mask is recomputed on the injected world:
+injected rows stay in, and logged events overlapping an injection window are dropped. Two gates:
+an injected event of size zero reproduces K0 exactly, and check (a): S-KF's posterior probability of
+S passes 0.5 within 24 hours of the causal alarm for at least 60% of detected headline-band events.
 
-**False-alarm bound.** On quiet rows (no injected or logged event within 7 days), S-KF minus K0 is
-at most +0.005 points over all rows of the real scored year, and at most +0.02 points on rows within
-48 hours of a false alarm.
+**Controls.**
 
-**Real year.** The same arms on the real scored year, with the logged switching events used only
-descriptively (rows inside logged events are scored separately; rows outside are the headline, as
-in experiment 134). Compare with experiments 44 and 88.
+- **Placebo.** S-KF with the causal score shifted by a random whole number of weeks within each
+  series, which keeps the alarm rate, durations, and hour-of-day structure. Predicted gain: about
+  zero.
+- **Variance-inflation control.** K0 with regime S's multiplier applied at the same fraction of
+  stamps but unrelated to events (the placebo prior, with no likelihood update), to separate
+  knowing when from simply adapting faster.
+- **False alarms.** Report the alarm rate per series per year, the detection-delay distribution,
+  and alarms on Economy 7 winter mornings and evenings.
+- **S-F** is fitted on the injected tuning world (disjoint seeds), because the real tuning months
+  hold few events; the number of events is stated.
+
+**Real year.** The same arms on the real scored year. The real year can support only "no harm"
+(C3) and a descriptive gain near events (C5), because experiment 44 bounds the whole-year gain at
+about 0.42%. Logged events are used only descriptively. The expected whole-year change is
+computed from the injected-world gain and experiment 44's event frequency and compared with C3's
+interval width before the verdict.
 
 **Rows and scoring.** `fold_a_daily_gap_v1`; the five decision substations of experiment 134 plus
-D9 beside them; leads 0.5 to 168 h with D+1 (15.5 to 39 h) beside; winter (November to March) and
-cold nights (daily mean under about 3 C) separately; tail calibration with q95 coverage on cold
-nights (73% to 78% in experiment 125); intervals resample whole calendar months; absolute scores
-for K0, climatology, the manual heuristic, and (when ready) the best guess are shown beside every
-contrast. Labels for the sites follow experiment 134; no metered-generator series is used.
+D9 beside them; leads 0.5 to 168 h with D+1 (15.5 to 39 h) beside, and the gain by lead band;
+winter (November to March) and cold nights (daily mean under about 3 C) separately; tail
+calibration, with q95 and q99 coverage and pinball loss on cold nights reported separately (q95
+coverage was 73% to 78% in experiment 125); intervals resample whole calendar months; absolute
+scores for K0, climatology, the manual heuristic, and (when ready) the best guess shown beside every
+contrast. "Within 48 hours of an onset" means the target valid time. A pooled figure weights the six
+sites equally. Labels for the sites follow experiment 134; no metered-generator series is used.
 
-**Contrasts (Bonferroni across the four).**
+**Contrasts (family-wise level 5%, Bonferroni across C1, C2, C3, and C5).**
 
-- C1: S-KF minus K0, injected world, rows within 48 hours of a headline-band onset.
+- C1: S-KF minus K0, injected world, target rows within 48 hours of a causal alarm on a
+  headline-band transfer.
 - C2: S-F minus K0, same rows.
-- C3: S-KF minus K0, real scored year, all rows outside logged events (the non-inferiority bound).
-- C4: share of the K0-to-S-ORACLE gap closed by S-KF, injected world (descriptive, no verdict).
+- C3: S-KF minus K0, real scored year, all rows outside logged events (non-inferiority).
+- C4: share of the K0-to-S-ORACLE gap closed by S-KF, injected world (descriptive).
+- C5: S-KF minus K0, real scored year, rows within 48 hours of a causal alarm or of a logged event.
+- Placebo minus K0 and variance-inflation control minus K0 are descriptive, and S-KF must beat both
+  on C1 for `supported`.
 
-**Decision rule.** The threshold is set by the cost of porting: a two-regime filter plus a
-detector pipeline step is a new component, so it must beat what a perfect detector could give on
-the real year.
+**Decision rule.** The threshold is set by the cost of porting: a two-regime filter plus a detector
+pipeline step is a new component. Before the verdict, the plan fixes the minimum detectable effect
+as the half-width of C3's month-resampled interval.
 
-- `supported`: C1's 99% interval is wholly below zero and C3's upper end is at most +0.005 points.
-- `small gain`: as `supported`, but C1's point estimate is under -0.05 points.
-- `not supported`: C1's interval includes zero or lies above it.
-- `refuted`: C3's lower end is above +0.005 points (the filter harms the real year).
-- `inconclusive` otherwise. S-F, S-HE, and the real-event rows carry no verdict.
+- `supported`: C1's interval is wholly below zero, S-KF beats the placebo and the variance-inflation
+  control on C1, C3's upper end is at most +0.005 points, and the q95 and q99 coverage on cold
+  nights is within 2 points of K0's.
+- `not supported`: C1's interval includes zero or lies above it, or S-KF fails to beat the placebo.
+- `inconclusive`: otherwise, including a C3 interval wider than +0.005 points.
 
-**Stop rule.** If the injected-world check (a) fails and C1's point estimate is above zero after the
-tuning months, stop before scoring the real year, record `refuted` or `inconclusive`, and write up
-what the failure rules out. Compute cap: 6 cores at one thread each, 16 GB per job.
+C1 is an easy test by construction (large injected steps). A `supported` verdict therefore means
+the mechanism works in the lab, and the write-up says plainly that the real-year benefit is
+bounded by experiment 44 and judged by C3 and C5.
 
-**Compute.** CPU only (the corrections are small filters on cached forecasts; the GPU is not
-needed). `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue`, 6 workers,
+**Stop rule.** If check (a) fails, or C1's point estimate is above zero on the tuning months, stop
+before scoring the real year, record `not supported` or `inconclusive`, and write up what the
+failure rules out. Compute cap: 6 cores at one thread each, 16 GB per job.
+
+**Compute.** CPU only (the corrections are small filters on cached forecasts).
+`systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue`, 6 workers,
 `OMP_NUM_THREADS=1`.
 
-**Lab shortcuts, named.** ERA5-driven residuals in the detector (as in experiment 130); hindsight
-end in S-HE; true megawatts in S-ORACLE; fast-path injection.
+**Lab shortcuts, named.** ERA5-driven residuals in the detector (as in experiment 130), which are
+cleaner than live ENS-driven residuals and so inflate C1; hindsight end in S-HE; true megawatts in
+S-ORACLE; fast-path injection.
 
 **Data processing.** Reads `cleaned_power_time_series` with the `substation_zero` flags treated as
 kept, as experiment 132 did.
 
 ## Reviews planned
 
-Sonnet reviews the plan, then the code for leakage (the detector score at a half-hour may use
+A Sonnet review of the plan is triaged above (leakage of the score, the new filter core, scoring
+of injected actuals, the vacuous verdict rule, and the missing controls were accepted). Sonnet then
+reviews the code for leakage (the detector score at a half-hour may use
 residuals ending no later than that half-hour minus the 3.5-hour telemetry delay), then the
 write-up. One Opus review only with the maintainer's approval.
