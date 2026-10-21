@@ -199,3 +199,37 @@ def test_a_ridge_without_an_anchor_is_refused(dp_synthetic_cache: FeatureCache):
     cache, spec = _truth_cache(cache=dp_synthetic_cache)
     with pytest.raises(ValueError, match="anchor"):
         fit_joint_gam(**_fit_arguments(cache=cache, spec=spec), hyper=HYPER, ridges=(1.0,))
+
+
+def test_the_gram_matches_a_column_by_column_dense_reference_with_gaps_and_a_binding_floor():
+    problem = _problem(seed=5)
+    # Long gaps (a stretch with no stream row) and a tiny observation noise make the covariance
+    # collapse to the variance floor, the case where the gains are least like a textbook filter.
+    keep = ~((problem["rows"] > 350) & (problem["rows"] < 450))
+    for name in ("columns", "target", "rows"):
+        problem[name] = problem[name][keep]
+    inside = np.isin(problem["case_target"], problem["rows"])
+    problem["case_target"] = problem["case_target"][inside]
+    problem["case_cutoff"] = problem["case_cutoff"][inside]
+    hyper = np.array([-6.0, 1.0, -3.0, -8.0])
+    normal = corrected_normal_equations(**problem, hyper=hyper, device="cpu")
+    settings = FilterHyperparameters.from_array(values=hyper)
+    band_of_case = problem["band"][problem["case_target"]]
+    position = {int(row): index for index, row in enumerate(problem["rows"])}
+    case_rows = np.array([position[int(t)] for t in problem["case_target"]])
+
+    def corrected(values: np.ndarray) -> np.ndarray:
+        stream = np.full(N_ROWS, np.nan)
+        stream[problem["rows"]] = values
+        correction = correction_at(
+            trace=run_kalman(residual=stream, band=problem["band"], hyper=settings),
+            cutoff=problem["case_cutoff"],
+            target=problem["case_target"],
+            band=band_of_case,
+        ).total
+        return values[case_rows] - correction
+
+    z = np.column_stack([corrected(problem["columns"][:, j]) for j in range(5)])
+    zy = corrected(problem["target"])
+    assert np.allclose(normal.gram.numpy(), z.T @ z, rtol=1e-8, atol=1e-8)
+    assert np.allclose(normal.rhs.numpy(), z.T @ zy, rtol=1e-8, atol=1e-8)
