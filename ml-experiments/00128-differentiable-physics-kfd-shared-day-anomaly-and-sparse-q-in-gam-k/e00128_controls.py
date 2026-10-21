@@ -16,7 +16,9 @@
 - **p_day:** every band's half-hours fall on one local date; the local-day index matches the
   Europe/London dates across the clock changes of 2024-10-27 and 2025-03-30 (days of 25 and 23
   hours); and the joint filter equals an independent dense reference filter that counts midnights
-  from the local dates, on the fortnight around each clock change, to 1e-9. **Stop** on failure.
+  from the local dates, on the fortnight around each clock change, to 1e-9; and the forecast
+  corrections (`correction_from_state` and `day_ahead_corrections`) equal the dense reference's
+  state propagated to the targets, with `sigma_d` above 0. **Stop** on failure.
 - **p_ident:** on streams simulated from KD with a known `sigma_d` and `phi_d`, the refitted
   `sigma_d` lies within a factor of 2 of the truth in at least 80% of the draws; a permanent common
   level step of 3 points held for 60 days ends mostly in the levels for KD (d below 25% of the step
@@ -27,7 +29,7 @@
   decision substations, where the unshifted fit returns it above. A failure gives `inconclusive`
   and triggers an audit; it does not stop the experiment.
 - **p_sparse:** on AR(1) streams with true `q_b = 0`, a band keeps a nonzero `q_b` at 2 nats in at
-  most 10% of draws; on streams with a true `q_b` of 0.05, a band is kept in at least 80% of draws.
+  most 10% of draws; on streams with a true `q_b` of 0.05, a band is kept in at least 80% of draws; and every band left out has `q` exactly 0.
 
 Each control writes `work/control_<name>.json`, which holds `passed` and, for the controls with a
 stop rule, `stop`. The script exits with status 1 after printing `STOP` when a stop rule fires.
