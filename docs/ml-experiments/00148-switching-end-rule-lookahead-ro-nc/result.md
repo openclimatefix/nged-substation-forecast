@@ -69,8 +69,9 @@ take_home_message: >-
   the end of a switching interval, with no loss of recall against the offline rule. The call then
   comes a median 30 hours after the true end, and 24 of those hours are the step statistic's own
   window, so a longer lookahead of 24 or 48 hours only delays the call to 48 or 72 hours without
-  finding more. The 35 real transfers give the same 18 found at every lookahead from 1 hour up. A lookahead of 0 hours is
-  wrong in six transfers in ten, because the end is called about 8 hours early.
+  finding more. The 35 real transfers give the same 18 found at every lookahead from 1 hour up. A
+  lookahead of 0 hours is wrong in six transfers in ten, because the end is called about 8 hours
+  early.
 advice:
   - >-
     Fix the end of an RO-NC interval at the largest opposite step that no later step beats within
@@ -92,7 +93,7 @@ adopted_in: none
 the end of a switching interval of the refit-offset neighbour-count detector (RO-NC), with no loss
 of recall against the offline rule R0.** We scored the end rule at lookaheads of 0, 6, 24, and 48
 hours on 1,806 injected transfers pooled over shapes S2 to S4. The offline rule R0 is the end rule
-of experiments 61 and 130, and L<h> below is the lookahead rule with h hours. The share of moved MW
+of experiments 61 and 130, and `L<h>` below is the lookahead rule with h hours. The share of moved MW
 found is 0.795 at 6 hours, 0.794 at 24 hours, and 0.798 at 48 hours, against 0.794 for the offline
 rule R0, and no lookahead of 6 hours or more loses recall. The call lag is the lookahead plus 24
 hours, because the step statistic needs 24 hours of data after each stamp, so 6 hours calls the end
