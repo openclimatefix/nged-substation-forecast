@@ -212,7 +212,7 @@ def figure_per_site(*, wide: pl.DataFrame) -> alt.TopLevelMixin:
         width=WIDTH - 80,
         height=260,
         title=_title(
-            text="Drift helps at every substation but D14, and D10 gains most",
+            text="Drift helps at four of the five substations, and D10 gains most",
             subtitle=(
                 "Dot: contrast at one substation over the 12 refits. Line: 98.33% interval from "
                 "resampling whole calendar months. Dashed rule: no difference."
