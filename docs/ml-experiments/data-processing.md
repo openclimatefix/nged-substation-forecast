@@ -157,8 +157,9 @@ grid connection. The screen cannot work on an MVA Primary. Applies to experiment
 that was switched out read exactly 0 in the 5 transfers we checked. At the series P12 and P13, the
 two transformers of one Primary substation, the rule flagged 426 half-hours inside 5 of the 6
 labelled real transfers lasting more than 1 day, and the panel of residuals used to score
-detectors held no readings there. Re-reading those half-hours from the raw power table let the
-refit-offset neighbour-count detector (RO-NC) find 4 of the 6 transfers. This applies to
+detectors held no readings there. The cleaned power table keeps flagged rows with their original
+readings, and restoring those half-hours let the refit-offset neighbour-count detector (RO-NC)
+find 4 of the 6 transfers. This applies to
 experiments on switching. For production, the maintainer has to decide whether the rule should keep
 a zero reading when the other transformer of the same Primary substation carries the load of the
 switched-out transformer. Evidence: [experiment

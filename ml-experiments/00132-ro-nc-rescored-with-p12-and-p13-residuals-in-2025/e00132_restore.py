@@ -1,10 +1,11 @@
 r"""Re-read the zero readings that `substation_zero` flags inside the six transfers at P12 and P13.
 
 For each of the six labelled transfers over 1 day at P12 and P13, every half-hour within
-`RESTORE_PAD` of the labelled window that the raw `power_time_series` table holds and the
-`cleaned_power_time_series` table flags is written, unchanged, to the private `restored.parquet`.
-No value is interpolated. The raw store and the cleaned table are only read. The script also prints,
-per window and series, the half-hours present in the raw table, flagged by cleaning, null in
+`RESTORE_PAD` of the labelled window that the `cleaned_power_time_series` table flags is written,
+unchanged, to the private `restored.parquet`. The cleaned table keeps every row of the original
+telemetry and adds a `drop_reason`, so a flagged row still holds its original reading. No value is
+interpolated, and the cleaned table is only read. The script also prints, per window and series,
+the half-hours present in the table, flagged by cleaning, null in
 experiment 6's `features.parquet`, and restored.
 
     systemd-run --user --scope -p MemoryMax=4G -p OOMPolicy=continue \
@@ -33,11 +34,6 @@ E00101_EVENTS: Final[Path] = (
 
 def main() -> None:
     """Write `restored.parquet` and print the per-window counts."""
-    raw = (
-        pl.scan_delta(str(NGED_DIR / "power_time_series.delta"))
-        .filter(pl.col("time_series_id").is_in(BLOCKED_SERIES))
-        .collect()
-    )
     cleaned = (
         pl.scan_delta(str(NGED_DIR / "cleaned_power_time_series.delta"))
         .filter(pl.col("time_series_id").is_in(BLOCKED_SERIES))
@@ -65,7 +61,7 @@ def main() -> None:
         transfer_end = GRID_START + timedelta(minutes=30 * finish)
         for series in BLOCKED_SERIES:
             in_window = (pl.col("time") >= start) & (pl.col("time") < end)
-            raw_rows = raw.filter(pl.col("time_series_id") == series).filter(in_window)
+            raw_rows = cleaned.filter(pl.col("time_series_id") == series).filter(in_window)
             flagged_rows = flagged.filter(pl.col("time_series_id") == series).filter(in_window)
             null_target = features.filter(
                 pl.col("time_series_id") == series,

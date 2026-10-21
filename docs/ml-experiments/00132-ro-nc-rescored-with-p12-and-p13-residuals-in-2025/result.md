@@ -44,7 +44,7 @@ best_arm: >-
 take_home_message: >-
   The detector missed the 6 real transfers at P12 and P13 mainly because the cleaning rule had
   flagged as faults, and removed, the zero readings that a switched-out transformer reports. With
-  those readings restored from the raw power table, the detector finds 4 of the 6, and 17 of all 35
+  those readings restored from the cleaned power table, the detector finds 4 of the 6, and 17 of all 35
   transfers lasting more than 1 day, up from 12. The cleaning rule removes real periods when a
   transformer is switched out. The thresholds were not re-tuned, and the unexplained alarms on
   odd-numbered months rose from 80 to 95 (PF14) and from 80 to 87 (RO-NC), so the recall comes with
@@ -54,7 +54,7 @@ lessons: >-
   In 4 of the 6 transfers one of the two transformers reads exactly 0 MW for nearly the whole
   transfer, and in a fifth (E44) for 10 half-hours. The `substation_zero` cleaning rule flagged
   those half-hours. Two changes let RO-NC find the 4 transfers whose steps exceed 10 noise units:
-  restoring 426 half-hours from the raw power table, and building residuals for 2025 with held-out
+  restoring 426 half-hours from the cleaned power table, and building residuals for 2025 with held-out
   blocks. The 2 transfers that RO-NC misses have steps under 1 noise unit. The restoration also
   raised the unexplained alarms at the stored thresholds by 7 to 15 on odd months.
 advice:
@@ -88,7 +88,7 @@ from one substation or transformer to another. P12 and P13 are the two transform
 substation, and the 6 transfers last more than 1 day. In 4 of the 6, one transformer reads exactly 0
 MW for nearly the whole transfer, and in a fifth (E44) for 10 half-hours. The cleaning rule
 `substation_zero` flags a reading of exactly 0 at a Primary substation as a telemetry fault. We
-re-read the 426 flagged half-hours from the raw power table. We also fitted an XGBoost forecasting
+re-read the 426 flagged half-hours from the cleaned power table. We also fitted an XGBoost forecasting
 model to each series and took its errors (the residual, observed minus predicted power, in MW)
 over 2025, each error from a model that never saw the block of time it scores. Experiment 17's
 residuals start only in 2026, because its XGBoost model needs a year of history. We then rescored
@@ -108,7 +108,7 @@ are at P12 and P13.
   0.30 to 0.90). The steps of those 4 transfers are 10.4 to 17.1 noise units. A noise unit is the
   usual size of the detector's 24-hour step on odd-numbered months, and a step is the largest
   24-hour change in the residual within 2 hours of the labelled start. The 2 transfers not found
-  are E44, where only 10 of the 99 half-hours read 0, and E59, where P12 has no raw readings inside
+  are E44, where only 10 of the 99 half-hours read 0, and E59, where P12 has no readings inside
   the transfer. Their steps are 0.6 and 0.9 noise units.
 - **Elsewhere:** 13 of the other 29 transfers are found (0.45; 0.28 to 0.62), against 12 before the
   restoration. The extra transfer found is E55 at P13 and P14, whose step rises from 1.9 to 11.4
@@ -121,7 +121,7 @@ are at P12 and P13.
   are found 0.196 of the time, MW-weighted 0.767 (0.645 to 0.869), over 56 transfers and 3 shapes.
 - **Restored half-hours:** 426, all exactly 0 MW, none invented: E44 10 at each series, E49 102 at
   P12, E50 103 at P13, E52 1 at P12 and 100 at P13, and E54 100 at P13. E50 at P13 has 43
-  half-hours absent from the raw power table, and none are restored.
+  half-hours absent from the cleaned power table, and none are restored.
 - **The guess:** the pre-registered guess of 3 to 5 found was right on the count, and the step
   sizes were not the guessed ones: 4 transfers have steps over 10 noise units and 2 under 1.
 - **Variants:** blocked fits with equal sample weights, and fits with the 6 transfer windows masked

@@ -113,7 +113,7 @@ def figure_found(*, table: pl.DataFrame) -> alt.TopLevelMixin:
 def figure_readings(*, table: pl.DataFrame) -> alt.TopLevelMixin:
     """Raw readings of P12 and P13 around each of the six transfers, restored half-hours marked."""
     raw = (
-        pl.scan_delta(str(NGED_DIR / "power_time_series.delta"))
+        pl.scan_delta(str(NGED_DIR / "cleaned_power_time_series.delta"))
         .filter(pl.col("time_series_id").is_in(BLOCKED_SERIES))
         .collect()
     )
@@ -177,7 +177,7 @@ def figure_readings(*, table: pl.DataFrame) -> alt.TopLevelMixin:
                     "Raw half-hourly readings of the two transformers of one Primary substation, "
                     "2 days either side of each labelled transfer (shaded between its start and "
                     "end). Crosses: zero readings that `substation_zero` flagged and this "
-                    "experiment re-read from the raw power table. E59 has no raw readings at P12 "
+                    "experiment re-read from the cleaned power table. E59 has no readings at P12 "
                     "inside the transfer."
                 )
             ],
