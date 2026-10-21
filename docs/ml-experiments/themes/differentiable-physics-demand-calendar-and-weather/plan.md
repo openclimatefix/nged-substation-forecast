@@ -10,7 +10,6 @@ experiment, so this page lists the input screens only.
 | N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Running | Nothing | Running (experiment 114) |
 | Bundled cheap screens | One experiment of six screens, each with the one-line hypothesis in the section below | 2 | A check for overlap with the multi-hinge heating experiment before planning; its final contrast uses experiment 114 | Queued, planner next |
 | Weather encoder retest | Does a small learned encoder over a patch of weather cells lower the error on hard cases (convective and frontal days, wind and solar sites) once the base forecast is recalibrated? | 3 | The audit of the encoder experiment | Queued, after the audit |
-| Experiment 121 (MH): multi-hinge heating curve and night-step terms | Do five heating hinges, or a night-time step, lower the convex model's error after the filter? | Running | Nothing | Running (experiment 121) |
 
 Later parts are listed in their own themes.
 
