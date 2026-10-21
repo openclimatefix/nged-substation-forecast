@@ -256,9 +256,9 @@ resampling whole months. Negative differences mean BG2 scores lower, which is be
   April-to-September rows at the 5 offset Primaries (0.010 over all rows of all 16 Primaries).
   Nothing dilutes or cancels the effect: the base margin, blend weights, gate, and member twins
   are the same in training and prediction. Using the held capacity at prediction instead of the
-  vintage capacity gives 0.105 (ablation A6), so the vintage capacity helps slightly. The spread factor is a fixed
-  1.15 around the median and the 14-day correction uses the stack member's own errors, so neither
-  carries a replica-year bias into the offset.
+  vintage capacity gives 0.105 (ablation A6), so the vintage capacity helps slightly. The spread
+  factor is a fixed 1.15 around the median and the 14-day correction uses the stack member's own
+  errors, so neither carries a replica-year bias into the offset.
 - **The pooled member** refits monthly on the full history with 500 rounds, not under P-roll (the
   rolling-window schedule of experiment 49).
 - **References:** `climatology` and `manual_heuristic` are recomputed at 11 levels. The
