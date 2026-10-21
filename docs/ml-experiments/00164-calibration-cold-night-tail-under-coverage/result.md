@@ -122,6 +122,7 @@ advice:
   - >-
     Judge cold-night coverage over at least two winters: a single year holds 10 cold days (Caveats).
 date: 2026-10-21
+pr: 1470
 ---
 
 # Experiment 164: a one-sided widening lifts cold-night q95 coverage to 0.896, short of 0.90
