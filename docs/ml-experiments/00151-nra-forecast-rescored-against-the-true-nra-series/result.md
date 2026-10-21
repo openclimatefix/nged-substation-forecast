@@ -146,8 +146,9 @@ arm:
 
 Shares for the two target windows are also reported separately, because the pooled share can
 hide a gain inside the transfer and a loss after it ends (the failure of experiment 141's
-true-interval arm). The post-alarm row set of C1 is the rows whose origin is after the alarm and whose target is inside
-the transfer or in the 48 hours after the true end. The detection-lag rows are reported separately.
+true-interval arm). The post-alarm row set of C1 is the rows whose origin is after the alarm and
+whose target is inside the transfer or in the 48 hours after the true end. The detection-lag rows
+are reported separately.
 Transfers the detector missed contribute their rows to the detection-lag set only.
 
 ## Descriptive check on real transfers
