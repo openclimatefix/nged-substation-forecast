@@ -85,6 +85,9 @@ def load_base(*, site: str) -> pl.DataFrame:
 def ens_mean_temperature(*, site: str) -> tuple[np.ndarray, np.ndarray]:
     """Return the run origins (`datetime64[us]`) and the ENS-member mean temperature per run.
 
+    Args:
+        site: The substation's label.
+
     Returns:
         The origins, shape (n_runs,), and the temperature in degrees Celsius, shape (n_runs,
         n_targets); target `k` of a run ends `k + 1` half-hours after its origin.
