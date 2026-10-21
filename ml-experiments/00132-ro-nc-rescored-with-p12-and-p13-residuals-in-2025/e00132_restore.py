@@ -71,6 +71,7 @@ def main() -> None:
                 flagged_rows.select("time_series_id", "time"), on=["time_series_id", "time"]
             ).with_columns(event=pl.lit(event))
             pieces.append(restored)
+            largest = float(restored["power"].abs().to_numpy().max(initial=0.0))
             rows.append(
                 {
                     "event": event,
@@ -80,7 +81,7 @@ def main() -> None:
                     "flagged_zero": flagged_rows.height,
                     "null_in_features": null_target,
                     "restored": restored.height,
-                    "restored_max_abs_mw": float(restored["power"].abs().max() or 0.0),
+                    "restored_max_abs_mw": largest,
                 }
             )
     out = (

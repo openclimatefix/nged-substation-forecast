@@ -83,15 +83,15 @@ def figure_found(*, table: pl.DataFrame) -> alt.TopLevelMixin:
         yOffset=alt.YOffset("panel:N", sort=[OLD, NEW]),
         color=colour,
     )
-    bars = base.mark_bar().encode(
+    bars = base.mark_bar().encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "share:Q",
             title="Share of the transfers found (95% Wilson interval; larger is better)",
             scale=alt.Scale(domain=[0, 1]),
         )
     )
-    rules = base.mark_rule(color="black").encode(x="low:Q", x2="high:Q")
-    labels = base.mark_text(align="left", dx=4, fontSize=11, color="black").encode(
+    rules = base.mark_rule(color="black").encode(x="low:Q", x2="high:Q")  # ty: ignore[unresolved-attribute]
+    labels = base.mark_text(align="left", dx=4, fontSize=11, color="black").encode(  # ty: ignore[unresolved-attribute]
         x="high:Q", text="text:N"
     )
     return (bars + rules + labels).properties(
@@ -140,7 +140,7 @@ def figure_readings(*, table: pl.DataFrame) -> alt.TopLevelMixin:
         legend=alt.Legend(title=None, orient="top", direction="horizontal"),
     )
     line = (
-        alt.Chart()
+        alt.Chart()  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=1.2, clip=True)
         .encode(
             x=alt.X("hour:Q", title="Hours since the labelled start of the transfer"),
@@ -149,7 +149,7 @@ def figure_readings(*, table: pl.DataFrame) -> alt.TopLevelMixin:
         )
     )
     points = (
-        alt.Chart()
+        alt.Chart()  # ty: ignore[unresolved-attribute]
         .mark_point(shape="cross", size=22, filled=False, strokeWidth=1.2)
         .encode(x="hour:Q", y="power:Q", color=colour)
     )
@@ -158,7 +158,7 @@ def figure_readings(*, table: pl.DataFrame) -> alt.TopLevelMixin:
         part = data.filter(pl.col("event") == event)
         end_hour = float(part["end_hour"][0])
         shade = (
-            alt.Chart(pl.DataFrame({"start": [0.0], "end": [end_hour]}))
+            alt.Chart(pl.DataFrame({"start": [0.0], "end": [end_hour]}))  # ty: ignore[unresolved-attribute]
             .mark_rect(opacity=0.12, color="grey")
             .encode(x="start:Q", x2="end:Q")
         )
@@ -209,7 +209,7 @@ def figure_noise() -> alt.TopLevelMixin:
     data = pl.DataFrame(rows)
     median = float(np.median([r["share"] for r in rows if r["group"] == "Other Primaries"]))
     bars = (
-        alt.Chart(data)
+        alt.Chart(data)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             y=alt.Y("series:N", sort=None, title=None),
@@ -228,7 +228,7 @@ def figure_noise() -> alt.TopLevelMixin:
         )
     )
     rule = (
-        alt.Chart(pl.DataFrame({"x": [median]}))
+        alt.Chart(pl.DataFrame({"x": [median]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color="black", strokeDash=[4, 3])
         .encode(x="x:Q")
     )

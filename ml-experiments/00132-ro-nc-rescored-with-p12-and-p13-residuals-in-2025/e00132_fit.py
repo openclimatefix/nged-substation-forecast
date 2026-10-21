@@ -211,6 +211,8 @@ def fit_series(*, time_series_id: int, name: str, variant: str) -> str:
         return f"{variant} {name} {path.name}: exists"
     frame = series_frame(time_series_id=time_series_id)
     first = frame.filter(pl.col("target").is_not_null())["valid_time"].min()
+    if not isinstance(first, datetime):
+        raise TypeError(f"series {time_series_id} has no observed half-hours")
     starts = block_starts(first=first, last=panel_start[time_series_id], day=day)
     starts[0] = first
     ends = [*starts[1:], panel_start[time_series_id]]
