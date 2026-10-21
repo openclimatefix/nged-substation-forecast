@@ -92,7 +92,8 @@ review as `implement-issue` does.
   `experiment_store.write_predictions`. The folder is private and never committed.
 
 **`result.md` is the plan first and the write-up second.** Commit it with status `planned` before
-the code runs, so the commit order proves the hypothesis came first. Its front matter holds the
+the code runs, so the commit order proves the hypothesis came first. Push that commit to the
+experiment's own branch, and do not open a pull request for it. Its front matter holds the
 `id`, `slug`, `theme`, `also_relevant_to`, `status`, `size`, `hypothesis`, `prediction`,
 `decision_rule`, `benchmark`, `row_set_id`, and `metric`, and, when finished, the `verdict`
 (`supported`, `partly supported`, `small gain`, `not supported`, `refuted`, `inconclusive`,
@@ -188,16 +189,20 @@ time would have taken under an hour.
 ## Keep the theme's Research plan page current
 
 **Update the owning theme's Research plan page (`docs/ml-experiments/themes/<theme>/plan.md`) in the
-PR that commits the `planned` `result.md`, and again in the PR that adds the finished write-up.** The
-first PR updates the experiment's row in the priority table at the top of the page with its id, the
-question in one line, the priority, what it waits for, and the state, and commits the `result.md`
-with `status: planned`, which the page's generated planned-experiments table then lists. The finished
-PR deletes that row and the experiment's proposal section from the page, sets the final `status`,
-`verdict`, and `production_status` in the front matter, and writes `take_home_message`. Nothing else
-is edited: the Experiments table of the theme, and the candidates table on the overview, are
-generated from the front matter. An idea the maintainer has agreed to run but that has no folder yet
-goes in the priority table marked "Proposed". An experiment that ends `invalid` or `failed` keeps its
-`result.md`, and its `take_home_message` says why.
+first commit that adds the `planned` `result.md`, and again in the pull request that adds the
+finished write-up.** An experiment opens one pull request, when its result is ready, and the plan
+commit is the first commit in that pull request's history. No pull request is opened at plan time. A
+change to `packages/studies/` that the experiment needs is the exception: open its pull request as
+soon as the module is ready for review, because the module needs its own review. The planning commit
+updates the experiment's row in the priority table at the top of the page with its id, the question
+in one line, the priority, what it waits for, and the state, and commits the `result.md` with
+`status: planned`, which the page's generated planned-experiments table then lists. The finished
+commit deletes that row and the experiment's proposal section from the page, sets the final
+`status`, `verdict`, and `production_status` in the front matter, and writes `take_home_message`.
+Nothing else is edited: the Experiments table of the theme, and the candidates table on the
+overview, are generated from the front matter. An idea the maintainer has agreed to run but that has
+no folder yet goes in the priority table marked "Proposed". An experiment that ends `invalid` or
+`failed` keeps its `result.md`, and its `take_home_message` says why.
 
 **Name every experiment in a series with the same topic words in its slug, so a reader can find the
 series by eye.** Write the slug as a few words naming the topic and the part, such as
@@ -312,6 +317,15 @@ checked how much of it a fitting method could find again. The method found about
 At 2 of the 8 substations, other checks suggested the answer could not be trusted." The verdict word
 and its numbers follow in the next paragraph, with each term defined where it first appears.
 
+**Cite the work an experiment builds on, generously, in the plan and in `result.md`.** Whenever an
+arm, a method, a metric, or a design choice comes from someone else's paper, software, or
+published result, name the authors and link the work where it is first used, following the
+citation rule in `CLAUDE.md`. Credit colleagues inside the project the same way: link the earlier
+experiment, study, or docs page whose idea the experiment takes forward. An experiment that
+re-implements a published method, such as a Kalman filter on the coefficients of a fitted additive
+model, says so in its opening sentences, so a reader never mistakes the idea for ours. When in
+doubt, cite.
+
 **Keep the rest of `result.md` to about a screen:** the verdict in one sentence, the winner with its
 interval, each arm's absolute score, 2 to 4 figures (load the `dataviz` skill), the failures, and
 the lessons for later experiments, which also become `advice`. **A published page never names a
@@ -406,16 +420,23 @@ requires. The experiment either waits for that PR or records the unchecked prope
 
 ## Merging
 
-**An experiment's PR may be merged without waiting for the maintainer when all four hold:** the
-diff touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews
-its size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
+**An experiment's PR may be merged without waiting for the maintainer when all four hold:** the diff
+touches only `ml-experiments/` and `docs/ml-experiments/`; the experiment has had the reviews its
+size calls for, with the findings triaged, and its front matter passes `experiment_tables.py
 --check`; any audit a trigger in "Audit before merge" calls for has run, with its findings triaged
 in the PR; and the checks pass (`ci` green, no closing keyword in the PR body or commit messages, no
-`data/` or `.env` file, the branch contains `main`, a merge commit and not a squash). **Before any
-merge, a fresh Sonnet agent reviews the prose of `result.md` and its `take_home_message`.** The
-agent receives the files and no account of the reasoning behind them, loads the `prose-review`
-skill, and reads the opening paragraph first. It reports every term, abbreviation, and number in the
-opening that a reader who has not seen the experiment could not parse, and then checks the rest of
-the page against the prose rules in `CLAUDE.md`. The experiment's session triages the findings,
-applies the valid ones, and records each rejected one with its reason. A change to
-`packages/studies/` stops at a reviewed PR, as `implement-issue` does.
+`data/` or `.env` file, the branch contains `main` or everything that landed on `main` since the
+branch was cut sits under `docs/` or `ml-experiments/` and touches no file the PR changes, a merge
+commit and not a squash).
+
+**Run every CI step locally before each push,** including the `pre-commit` hooks on every changed
+file (the SVG end-of-file hook needs `svgo --final-newline`), `ty check`, `pydoclint`, and
+`experiment_tables.py --check`. A failure found by CI costs a ten-minute rerun.
+
+**Before any merge, a fresh Sonnet agent reviews the prose of `result.md` and its
+`take_home_message`.** The agent receives the files and no account of the reasoning behind them,
+loads the `prose-review` skill, and reads the opening paragraph first. It reports every term,
+abbreviation, and number in the opening that a reader who has not seen the experiment could not
+parse, and then checks the rest of the page against the prose rules in `CLAUDE.md`. The experiment's
+session triages the findings, applies the valid ones, and records each rejected one with its reason.
+A change to `packages/studies/` stops at a reviewed PR, as `implement-issue` does.

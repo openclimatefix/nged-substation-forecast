@@ -171,6 +171,25 @@ date after the experiment's window, not rechecked there), and D5 shows a flat mi
 2023-07) and D11 (2020-04). Applies to experiments. Evidence: [experiment
 103](00103-differentiable-physics-1-data-look/result.md) for the step list and D8.
 
+**Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
+coefficients exactly at each step) to a window of three months or shorter.** An exact
+least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
+weeks or 3 months of data extrapolates those terms badly: the per-site fits scored 70.6 and 48.4
+points at the five decision substations, against 15.1 and 5.5 for the gradient fits that stop
+before convergence. No window between 3 months and 2 years was tested. The pooled model with its
+interaction network failed the same way on four days of the scored year, where an exact fit with
+weak penalties forecast up to 280 points too high ([experiment
+112](00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result.md); medium
+confidence; provisional). Applies to experiments.
+
+**Treat a heating threshold above a substation's highest temperature, and any per-site threshold
+of a pooled model, as unidentified.** Above the highest temperature the heating hinge is always on,
+and the deviation absorbs a shift, so only the prior sets the threshold; at real noise (standard
+deviation 5 points) a synthetic fleet with a 14 degree threshold was recovered to 2.7 to 5.7 degrees
+with the interaction network off or on ([experiment
+112](00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/result.md); medium
+confidence; provisional). Applies to experiments.
+
 ## Drift in demand over the years
 
 **Do not assume that one level shift removes drift, because drift differs by series and by hour
@@ -220,6 +239,15 @@ and drift against no drift)
 ([experiment 104](00104-differentiable-physics-2-simple-structural-model/result.md), Correction).
 Applies to experiments and to production. Confidence: high, because the centred and uncentred sets
 differ only in this shift.
+
+**Give a capacity increment only to a season-year with enough training rows (provisional).** A fit
+whose cut is 2024-07-01 includes the half-hour that ends exactly at the cut, which belongs to
+season-year 2024, so that season-year has only 2 rows at D5. A free capacity increment for those 2 rows
+reached -56 points in an unconstrained fit. The N5 scripts drop any season-year with fewer than 1,000
+training rows from the capacity columns, so the rows count towards the previous season-year's
+capacity ([experiment 113](00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result.md)).
+Applies to experiments that fit the convex model's capacity. Evidence: D5 at the 2024-07-01 cut.
+Confidence: high.
 
 ## Timestamps and availability
 
@@ -274,8 +302,13 @@ that experiments 87 and 104 use for lagged power (3 hours plus the half-hour a r
 experiment has measured the delay of the live telemetry. Readings 0 hours old instead of 3.5
 lowered the score by 0.035 points (95% interval -0.060 to -0.016). Readings 9 hours old raised it by
 0.026 (0.000 to 0.046), and readings 24 hours old raised it by 0.099 (0.059 to 0.142), on five
-Primaries in the scored year. Applies to experiments and production. Provisional: the delay was not
-measured on live telemetry. Confidence: low for the delay, medium for the size of its effect.
+Primaries in the scored year. [Experiment
+115](00115-differentiable-physics-w1-diurnal-shape-state-on-ens/result.md) repeated the sweep on
+ensemble weather at day D+1 (scored year, five Primaries, difference of mean scores without an
+interval): readings 0 hours old lowered the score by 0.016 points, readings 24 hours old raised it by
+0.088, and readings 33 hours old raised it by 0.120. Applies to experiments and production.
+Provisional: the delay was not measured on live telemetry. Confidence: low for the delay, medium for
+the size of its effect.
 
 ## Weather products
 
@@ -285,6 +318,24 @@ serve the live UKV.** UKV is the Met Office's UK Variable-resolution forecast, o
 CEDA archive and the live product are statistically different, and the archive is licensed for
 non-commercial use ([experiment 53](00053-ukv-vs-ens-solar-anomaly/result.md)). Applies to
 experiments and production.
+
+**Calibrate the ECMWF ensemble's temperature and irradiance before it drives a model trained on ERA5
+and CAMS, and expect shifts of up to about 2 K in temperature and 20% in irradiance (medium
+confidence).** Per substation, season, lead band, and hour
+band, the ensemble-mean temperature needed a shift of -1.15 to +2.05 K (mean +0.20) and the
+daylight irradiance a ratio of 0.80 to 1.11 (mean 0.95) at five Primary substations, fitted on the
+odd months of 2024-07 to 2025-06. Shrinking the forecast solar anomaly towards CAMS's
+month-by-half-hour climatology did not help in any lead band
+([experiment 111](00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)).
+Applies to experiments, and to production if a model trained on past weather serves ensemble
+forecasts.
+
+**Drop an ensemble member that has a missing weather value from its run at that substation, and
+refuse a run whose control member is incomplete (medium confidence).** Member 36 of the run of
+2025-06-04 has 12 missing shortwave values at two Primaries, which would fail every half-hour of
+the run at those substations; the ensemble mixture then pools the remaining 50 members' forecasts
+([experiment 111](00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)).
+Applies to experiments and production.
 
 ## Embedded solar capacity
 
@@ -530,9 +581,10 @@ threshold-weighted error rose 57% on half-hours outside logged switching ([exper
 of that experiment is an early version.
 
 **Count overlapping detected intervals once when summing the megawatts, and end each interval when
-the transfer ends.** Summing overlapping intervals made the detector's megawatts about 1.5 times the
-true value from the second day, and the detector kept reporting megawatts for days after a transfer
-ended ([experiment
+the transfer ends.** Of the cases where the detector marked a transfer, 21% held two or more overlapping
+intervals, whose megawatts were added together, and the detector kept reporting megawatts for a
+median of 48 hours (90th percentile 96 hours) after a transfer ended, because it alarmed the return
+step as a new transfer of opposite sign ([experiment
 88](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)).
 Applies to experiments and production.
 
