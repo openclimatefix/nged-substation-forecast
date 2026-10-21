@@ -1,0 +1,57 @@
+D8 grid: 78816 half-hours, 78772 with power
+Sensitivity: threshold -1.0 MW gives 48 drops of 2 days or longer
+Sensitivity: threshold -2.0 MW gives 24 drops of 2 days or longer
+Sensitivity: threshold -2.5 MW gives 15 drops of 2 days or longer
+Drops (smoothed residual below -1.5 MW, >= 2 days): 29
+
+Depth (median expected minus metered, MW): median 2.71, range 1.19 to 5.36, mean 2.89, sd 1.09
+Duration (days): median 3.6, range 2.0 to 19.2
+Total days inside drops: 148.2 of 1642 (0.090)
+First drop: 2022-08-09; last: 2026-01-27
+Drops per start year: {2022: 1, 2023: 3, 2024: 7, 2025: 15, 2026: 3}
+Drops starting on or after 2023-07-01: 28 of 29
+Half-hours inside drops: below 1 MW 0.063, below 3 MW 0.435, median power 3.43 MW, median expected 6.20 MW
+Half-hours outside drops, after the first: below 1 MW 0.015, below 3 MW 0.158, median power 6.00 MW, median expected 6.38 MW
+start weekday counts Mon..Sun [3, 5, 7, 3, 1, 5, 5], chi-squared p = 0.479
+end weekday counts Mon..Sun [3, 3, 3, 4, 5, 8, 3], chi-squared p = 0.539
+start hour counts by 6-hour block (0-6, 6-12, 12-18, 18-24) [11, 3, 5, 10], chi-squared p = 0.104
+end hour counts by 6-hour block (0-6, 6-12, 12-18, 18-24) [6, 4, 6, 13], chi-squared p = 0.092
+Spacing between starts (days): median 16.4, quartiles 10.3 and 42.3, range 3.1 to 438
+Spacing since 2023-07-01 (days): median 15.2, quartiles 10.2 and 38.9
+Depth coefficient of variation 0.38; depth against start time Spearman rho -0.40 (p = 0.032)
+Drop starts within 1 day of a bank holiday: 1 of 29 (0.03; 0.01 to 0.17); share of all days within 1 day of one 0.069; binomial p = 0.720
+Drop ends within 1 day of a bank holiday: 1 of 29 (0.03; 0.01 to 0.17)
+Drop starts by calendar month Jan..Dec [5, 0, 0, 0, 3, 6, 2, 4, 2, 3, 1, 3]; chi-squared p = 0.116
+Drop starts by season: {'winter (Dec-Feb)': 8, 'spring (Mar-May)': 3, 'summer (Jun-Aug)': 12, 'autumn (Sep-Nov)': 6}
+Mean temperature during a drop minus the month's mean: -0.55 C (95% interval -1.61 to +0.49)
+
+Neighbour check: best step-up among D3, D14, and D5 in the 6 hours after the start
+Best neighbour step (MW): median +0.12, range -1.42 to +4.04; drop depth median 2.71
+Share of drops with a neighbour step-up of at least 0.25 x depth: 11 of 29 (0.38; 0.23 to 0.56); placebo (random times from July 2023, away from any drop, same time of day) 0.344
+Share of drops with a neighbour step-up of at least 0.50 x depth: 8 of 29 (0.28; 0.15 to 0.46); placebo (random times from July 2023, away from any drop, same time of day) 0.214
+Share of drops with a neighbour step-up of at least 0.75 x depth: 5 of 29 (0.17; 0.08 to 0.35); placebo (random times from July 2023, away from any drop, same time of day) 0.124
+Drops with no readable neighbour step: 0
+Share of drops with a neighbour step down of at least 0.5 x depth at the end: 13 of 29 (0.45; 0.28 to 0.62)
+
+Drops with a logged closure of D8 within 24 hours: 23 of 29 (0.79; 0.62 to 0.90)
+Placebo: windows of random drop lengths placed at random times from July 2023 that overlap no drop and have a logged closure of D8 within 24 hours: 0.449
+Drops with a logged closure other than the long-running job 21D5583: 14 of 29 (0.48; 0.31 to 0.66)
+Logged closures touching D8 in total: 78
+
+RO-NC alarms on D8: 52; unexplained: 28
+Unexplained alarms inside a drop: 5 of 28 (0.18; 0.08 to 0.36)
+Within 6 hours of a drop's start: 0 of 28 (0.00; 0.00 to 0.12); of its end: 2 of 28 (0.07; 0.02 to 0.23); of either: 2 of 28 (0.07; 0.02 to 0.23)
+All 52 RO-NC alarms on D8 within 6 hours of a drop's start or end: 10
+Drops with any RO-NC alarm within 6 hours of the start: 4 of 29
+Drops with an alarm of any kind within 6 hours of their start: 4 of 29
+Share of the grid inside a drop or within 2 days of one: 0.149
+Alarms with a metered half-hour jump of at least 0.3 x capacity (3.11 MW) within 24 hours either side: 27 of 28 (0.96; 0.82 to 0.99)
+Half-hour jumps of that size on D8 in all history: 2642 of 78736
+Share of all half-hours with such a jump within 24 hours either side: 0.644
+Share of all half-hours within 6 hours of a drop's start or end: 0.018; expected alarms among 52: 1.0; among 28: 0.5
+Unexplained alarms from 2022-09-18 to 2026-06-24
+Unexplained alarms between 2023-08-01 and 2024-09-30: 26 of 28
+Drops starting in 2025 or later: 18
+Drops starting in 2025 with the long-running job 21D5583 near: 12
+Median power of D5 (series 17): 2.96 MW
+Alarm sign: 16 downward and 12 upward
