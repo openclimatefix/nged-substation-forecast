@@ -77,9 +77,9 @@ advice:
     75% to 83% of the plain-to-ceiling gap, and with the detector's MW
     32% to 53% (figure 2).
   - >-
-    If synthetic transfers are tried again, train with a MW that carries the detector's errors (1.5
-    times too large, ending days late) and not the exact MW, because exact MW makes the injected rows
-    look ordinary (lessons).
+    If synthetic transfers are tried again, train with a MW that carries the detector's errors
+    (overlapping intervals summed, a return step held for a median of 48 hours) and not the exact
+    MW, because exact MW makes the injected rows look ordinary (lessons).
   - >-
     Score the tails of any widening idea at q01 and q99 with the 11-level boosters: the lower tail
     was under-covered (1.3% to 1.6% of actuals below q01 against 1% nominal) and the upper tail
@@ -180,9 +180,9 @@ overlapping detector step.
   not). Findings on the unused `power` argument and on memory were not acted on.
   A numbers review and a prose review followed; their valid findings (four rounding slips, one
   mislabelled range, and an opening that used undefined terms) were applied.
-- **What to try next.** Train the booster with a MW that carries the detector's errors (about 1.5
-  times too large, ending late) in the synthetic transfers, and score it with the detector's MW. A
-  better MW estimate at forecast time is the other route.
+- **What to try next.** Train the booster with a MW that carries the detector's errors (overlapping
+  intervals summed, a return step held for a median of 48 hours) in the synthetic transfers, and
+  score it with the detector's MW. A better MW estimate at forecast time is the other route.
 
 ## Plan (written before any code ran)
 
