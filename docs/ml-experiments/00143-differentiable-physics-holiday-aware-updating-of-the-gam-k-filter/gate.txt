@@ -1,0 +1,88 @@
+== injected day 2025-01-01 (share of the +3 step, median of 5 decision sites) ==
+  K0: day+1 +0.059, day+2 +0.231, day+3 +0.174, day+4 +0.123, day+5 +0.081
+  K-skip: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-skip-core: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-skip+1: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-zero: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  largest |share| in K-skip, K-skip+1, K-zero over all 6 sites: {'K-skip': 0.0, 'K-skip+1': 0.0, 'K-zero': 0.0}
+== injected day 2025-05-05 (share of the +3 step, median of 5 decision sites) ==
+  K0: day+1 +0.082, day+2 +0.225, day+3 +0.170, day+4 +0.120, day+5 +0.081
+  K-skip: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-skip-core: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-skip+1: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-zero: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  largest |share| in K-skip, K-skip+1, K-zero over all 6 sites: {'K-skip': 0.0, 'K-skip+1': 0.0, 'K-zero': 0.0}
+== injected day 2025-05-26 (share of the +3 step, median of 5 decision sites) ==
+  K0: day+1 +0.082, day+2 +0.225, day+3 +0.170, day+4 +0.120, day+5 +0.081
+  K-skip: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-skip-core: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-skip+1: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-zero: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  largest |share| in K-skip, K-skip+1, K-zero over all 6 sites: {'K-skip': 0.0, 'K-skip+1': 0.0, 'K-zero': 0.0}
+== injected day 2025-01-15 (share of the +3 step, median of 5 decision sites) ==
+  K0: day+1 +0.059, day+2 +0.231, day+3 +0.174, day+4 +0.123, day+5 +0.081
+  K-skip: day+1 +0.059, day+2 +0.231, day+3 +0.174, day+4 +0.124, day+5 +0.083
+  K-skip-core: day+1 +0.059, day+2 +0.231, day+3 +0.174, day+4 +0.123, day+5 +0.082
+  K-skip+1: day+1 +0.059, day+2 +0.231, day+3 +0.174, day+4 +0.124, day+5 +0.084
+  K-zero: day+1 +0.059, day+2 +0.231, day+3 +0.174, day+4 +0.124, day+5 +0.083
+  largest |share| in K-skip, K-skip+1, K-zero over all 6 sites: {'K-skip': 0.4676272102777599, 'K-skip+1': 0.4676272222461362, 'K-zero': 0.4676272102777599}
+== injected day 2025-01-03 (share of the +3 step, median of 5 decision sites) ==
+  K0: day+1 +0.059, day+2 +0.231, day+3 +0.174, day+4 +0.123, day+5 +0.081
+  K-skip: day+1 +0.129, day+2 +0.480, day+3 +0.303, day+4 +0.184, day+5 +0.126
+  K-skip-core: day+1 +0.065, day+2 +0.254, day+3 +0.188, day+4 +0.132, day+5 +0.089
+  K-skip+1: day+1 +0.000, day+2 +0.000, day+3 +0.000, day+4 +0.000, day+5 +0.000
+  K-zero: day+1 +0.129, day+2 +0.480, day+3 +0.303, day+4 +0.184, day+5 +0.126
+  largest |share| in K-skip, K-skip+1, K-zero over all 6 sites: {'K-skip': 0.7522212632646254, 'K-skip+1': 0.0, 'K-zero': 0.7522212632646254}
+K-zero largest change on holiday targets: 0.00e+00
+{
+ "D5": {
+  "holiday_days_with_readings": 32,
+  "fewest_skipped_on_a_day": 48,
+  "most_skipped_on_a_day": 48,
+  "early_rows": 8736,
+  "early_rows_identical": true
+ },
+ "D10": {
+  "holiday_days_with_readings": 32,
+  "fewest_skipped_on_a_day": 48,
+  "most_skipped_on_a_day": 48,
+  "early_rows": 8736,
+  "early_rows_identical": true
+ },
+ "D11": {
+  "holiday_days_with_readings": 32,
+  "fewest_skipped_on_a_day": 48,
+  "most_skipped_on_a_day": 48,
+  "early_rows": 8736,
+  "early_rows_identical": true
+ },
+ "D14": {
+  "holiday_days_with_readings": 32,
+  "fewest_skipped_on_a_day": 48,
+  "most_skipped_on_a_day": 48,
+  "early_rows": 8736,
+  "early_rows_identical": true
+ },
+ "D16": {
+  "holiday_days_with_readings": 32,
+  "fewest_skipped_on_a_day": 48,
+  "most_skipped_on_a_day": 48,
+  "early_rows": 8736,
+  "early_rows_identical": true
+ },
+ "D9": {
+  "holiday_days_with_readings": 32,
+  "fewest_skipped_on_a_day": 48,
+  "most_skipped_on_a_day": 48,
+  "early_rows": 8736,
+  "early_rows_identical": true
+ }
+}
+{
+ "K0 carries on every injected holiday (day+2)": true,
+ "skip arms carry nothing from a holiday": true,
+ "K-skip matches K0 on the control day": true,
+ "K-zero is unchanged on holiday targets": true,
+ "a step the day after the cluster is carried by K-skip but not K-skip+1": true,
+ "skipped readings per holiday day are 46 to 50 and early rows are identical": true
+}
