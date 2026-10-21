@@ -295,7 +295,7 @@ def start_times(
 JUMP_FIRST_SLOT: Final[int] = 3
 """The jump search starts at the transition into the half-hour starting 23:30."""
 JUMP_LAST_SLOT: Final[int] = 14
-"""... and ends at the transition into the half-hour starting 03:00."""
+"""... and ends at the transition into the half-hour starting 05:00."""
 
 
 def local_profile(*, lookup: dict, evening: common.date, scale: float) -> list[float] | None:

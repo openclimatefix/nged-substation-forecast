@@ -31,7 +31,8 @@ metric: >-
   with a 90% interval; pooled values; gate: interval coverage over repeated draws
 verdict: inconclusive
 labels: >-
-  gate: per-series and pooled coverage within bands, pooled-interval row over-covers (100%);
+  gate: per-series and pooled coverage within bands, but the pooled-interval row cannot under-cover
+  by construction (100%) and the one misspecified cell under-covers (79% pooled);
   clock: UTC-fixed (post hoc); tariff edges: not visible at Primary level (control failed)
 best_arm: >-
   none (estimation): pooled step at a daily mean of 3 C over the six decision series 9.9 points
@@ -39,13 +40,14 @@ best_arm: >-
 headline: >-
   Pooled over the six decision series the night step at a daily mean of 3 C is 9.9 points (6.2 to
   13.5), 13.2 over the eight further Primaries (6.8 to 19.6); the slope is positive at all 14
-  series; the step follows UTC on British Summer Time nights at 12 of 14; winter 2025-26, read
-  afterwards (first run), gives 10.8 (6.3 to 15.4) pooled over the six.
+  series; the step follows UTC on British Summer Time nights at 13 of 14 (post hoc); winter 2025-26,
+  read afterwards (first run), gives 10.8 (6.3 to 15.4) pooled over the six.
 lessons: >-
   The night step is not special to the three substations that prompted the study, and its full
   size depends on summer nights having no step; the cold-dependent part alone is 1.1 to 4.7 points
   at the decision series. The baseline forecast of experiment 114 runs below actual demand from
-  about 01:00 on cold nights at D5 and D16, and at D10 once winter 2025-26 is included. Tariff
+  about 01:00 on cold nights at D5 and D16, and at D10 in winter 2024-25 alone (in winter 2023-24 D10's
+  cold nights sit about 11 points lower and the baseline is 9 to 17 points too high all night). Tariff
   edges on the local clock cannot be separated from the load shape at Primary level with this
   design.
 production_status: not-for-production
@@ -54,25 +56,26 @@ take_home_message: >-
   substation's near-peak demand, and it starts around 01:00 and looks fixed to UTC rather than the
   local clock (a check chosen after seeing the data). The rise on cold winter nights is the feature
   an operator would see: the day-ahead forecast runs 6 to 10 points below actual demand from about
-  01:00 at D5 and D16 on the two pre-registered winters, and at D10 only once the selection winter
-  2025-26 (a first run) is included. The step appears at 13 of the 14 substations, and its full size
-  rests on summer nights having no step; the verdict is inconclusive because the gate's pooled
-  interval over-covered, and an independent audit is pending.
+  01:00 at D5 and D16 on the two pre-registered winters, and at D10 in winter 2024-25 alone (7.6
+  points at 01:00); at D10 in winter 2023-24 the baseline is instead 9 to 17 points too high all
+  night. The step appears at 13 of the 14 substations, and its full size rests on summer nights
+  having no step, which the gate cannot test. The verdict is inconclusive because the gate is
+  weaker than it looks: it holds one real test of the interval, and that test under-covers.
 advice:
   - >-
     Try a night term fixed to UTC, not the local clock, in demand models of Primary substations;
     the UTC reading is post hoc and unconfirmed (timing readouts, figure 7 and the by-year table).
   - >-
     Judge forecasts on cold winter nights from 01:00: the day-ahead forecast runs 6 to 10 points
-    below actual demand at D5 and D16 on two winters, and at D10 only when winter 2025-26 is
-    included (cold-night figure 9).
+    below actual demand at D5 and D16 on two winters, and at D10 in winter 2024-25 alone; at D10 in
+    winter 2023-24 the baseline is too high all night (cold-night figure 9).
   - >-
     Check an effect that prompted a study on substations that were not chosen for it before
     treating the effect as special (E7-X pooled step, figure 5).
   - >-
-    Test a pooled random-effects interval with a known-answer gate on its own row before quoting
-    it: the Hartung-Knapp interval over six series covered 100% of draws (gate, pooled-interval
-    row).
+    Build a known-answer gate so that each row can fail before relying on it: here the pooled-interval
+    row cannot under-cover by construction, so its 100% says nothing about the real pooled interval
+    (gate paragraph).
   - >-
     Read local-clock tariff edges at Primary level only against a placebo limit, because the
     ordinary load shape makes every half-hour look like an edge (about 1.2 points; tariff edges
@@ -118,11 +121,12 @@ The part that grows with cold needs no such assumption, and that part is smaller
 at the six decision substations (the slope times 12.5 degrees, the gap between 15.5 C and a 3 C
 night). The rise looks fixed to UTC on British Summer Time nights (a post hoc check). On cold winter
 nights the day-ahead forecast of experiment 114 runs below actual demand from about 01:00, at D5 and
-D16 on the two pre-registered winters and at D10 only once the selection winter is included. The
-verdict word under the plan's decision rule is `inconclusive`. The rule names a failing per-series
-gate row, and the failing row here is the pooled-interval row (it over-covered), so the page applies
-the rule by extension, because that pooled interval is the headline's interval. The estimates above
-stand. An independent audit is pending.
+D16 on the two pre-registered winters and at D10 in winter 2024-25 alone. The verdict word is
+`inconclusive`. By the literal decision rule it would be `supported`, because every per-series gate
+row passes and both pooled intervals lie above 0. We keep `inconclusive` because the audit found the
+gate weaker than `supported` needs: its four gated shapes are one test, its pooled-interval row
+cannot fail, and its one misspecified cell under-covers (the gate paragraph below). The estimates
+above stand. The independent audit has run, and its findings are applied.
 
 ![Step per series and pooled](figure_1_headline.svg)
 
@@ -141,29 +145,40 @@ stand. An independent audit is pending.
   interval -0.7 to 1.7).
 - **Does the step have a fixed clock time?** The step starts in the half-hour starting 00:30 (ending
   at 01:00) at all 14 series (at D4 the interval reaches one half-hour earlier). On cold British
-  Summer Time nights the largest jump falls one hour later by the clock at 12 of 14 series, which
+  Summer Time nights the largest jump falls one hour later by the clock at 13 of 14 series, which
   fits timers set to Coordinated Universal Time (UTC) (a post hoc check, chosen after seeing the
-  data).
+  data; D14 shows a shift of 4 half-hours).
 - **How much of the step do experiment 114's day-ahead forecasts already remove?** R, the step left
   in the errors of its baseline model divided by the full step, is 0.53 to 0.78 at D5, D10, and D16
   (stored predictions for winters 2023-24 and 2024-25 only).
 - **Where does the baseline forecast miss on cold nights?** At D5 and D16 actual demand runs 5.6 and
-  9.4 points above the forecast in the half-hour starting 01:00; at D10 it runs 12.2 points below
-  the forecast in the half-hour starting 23:30 (figure 9).
+  9.4 points above the forecast in the half-hour starting 01:00 on the two pre-registered winters;
+  at D10 it runs 12.2 points below the forecast in the half-hour starting 23:30, because in winter
+  2023-24 D10's cold nights sit about 11 points lower and the baseline is 9 to 17 points too high all
+  night (figure 9).
 - **What do the data and methods support?** An estimate of the size and shape of the night step in
   four winters of one weather product. They do not support a cause: daylight, lighting, and
   switching schedules also change at night, and NGED has not confirmed storage heating.
 
-**Known-answer gate: per-series and pooled coverage pass; the pooled-interval row fails.** We added
-a known step to the real nights, resampled in 14-day blocks, and asked whether the 90% interval holds
-the true step. Coverage is 87.0 to 87.5% pooled over series for the four gated shapes (target 85 to
-95%) and 82 to 93% for each series (target 80 to 98%). The mean estimate is within 0.20 points of the
-truth everywhere (target 0.5). The Hartung-Knapp interval for the pooled mean covered the true mean
-in 100% of the 200 draws (target 85 to 95%), so the pooled intervals are conservative, not too
-narrow. If the true step follows the 18:00 to 08:00 mean temperature instead of the daily mean,
-coverage falls to 79% pooled at 7 points and to 43% at the worst series (descriptive, no target),
-so the daily-mean proxy matters. The gate tests only the shapes this plan chose, with noise that is
-independent between 14-day blocks.
+**Known-answer gate: the gate holds one real test of the interval, and that test under-covers.** We
+added a known step to the real nights, resampled in 14-day blocks, and asked whether the 90%
+interval holds the true step. The four gated shapes (matched, ramp-plateau, flat, and placebo) are
+one test, not four: the estimator is linear, and all four injected shapes lie in its column space,
+so each moves the estimate by exactly its truth. Within every draw the point error is identical
+across the four cells, and their coverages differ only through the random numbers of the inner
+bootstrap. They show coverage of 87.0 to 87.5% pooled over series (target 85 to 95%) and 82 to 93%
+for each series (target 80 to 98%), and the mean estimate is within 0.20 points of the truth
+everywhere (target 0.5). That checks the bootstrap on resampled residual noise once. The
+Hartung-Knapp interval for the pooled mean covered the true mean in 100% of the 200 draws (target 85
+to 95%), but that row cannot under-cover. The gate defines the true mean as the mean of a fixed set
+of steps (0, 0, 4, 4, 7, and 7), each series recovers its step within about 0.3 points, so the
+pooled estimate misses that mean by at most 0.52 points while the interval half-width is at least
+2.13. The 100% therefore says nothing about whether the real pooled interval is conservative. The
+one misspecified cell is the night-temperature cell. If the true step follows the 18:00 to 08:00
+mean temperature instead of the daily mean, coverage falls to 79% pooled at 7 points and to 43% at
+the worst series (descriptive, no target), so the daily-mean proxy matters. The gate also centres
+the summer nights on 0, so it cannot test the assumption that summer nights have no step. It tests
+only the shapes this plan chose, with noise that is independent between 14-day blocks.
 
 ![Gate coverage](figure_4_gate.svg)
 
@@ -177,10 +192,11 @@ all 14 series (the plan allowed up to 2 points).
 
 ![Raw nights](figure_2_raw.svg)
 
-**The step has the same sign in every winter at the six decision substations, and falls over the four
-winters at D10.** At D10 it falls from 17.0 points in 2021-22 to 14.2 in 2024-25, and it falls
-steadily at four E7-X substations (D19, D2, D3, and D22). At D5, D11, and D16 the four winters stay
-within 3.4 points of each other, and at D14 the step is 1.3 to 4.2.
+**The step has the same sign in every winter at the six decision substations, and falls over the
+four winters at D10.** At D10 it falls from 17.0 points in 2021-22 to 14.2 in 2024-25, and it also
+falls at two E7-X substations (D19 and D22). At D3 it falls and then levels (8.2, 6.8, 5.5, and 6.0
+points), and at D2 it is level over the last two winters (13.7 in both). At D5, D11, and D16 the
+four winters stay within 3.4 points of each other, and at D14 the step is 1.3 to 4.2.
 
 ![Step per winter](figure_3_winters.svg)
 
@@ -205,12 +221,17 @@ filter 0.52, 0.42, and 0.31.
 
 **On cold British Summer Time nights the jump arrives one hour later on the clock.** The
 pre-registered rule (the sign of the difference between the local-clock and UTC-clock windows) printed
-`UTC` at all 14 series, but the rule did not separate the two clocks: by the arithmetic of the
-windows, a step fixed to either clock makes that difference negative (reasoning after the fact, not
-computed). The post hoc check in the figure compares the half-hour of the largest mean rise on cold
-summer-time nights with the same half-hour on cold winter nights, and finds a shift of 2 half-hours
-at 12 of 14 series (D14 shows 4; D9 shows 9, on 18 nights). The counts of cold summer-time nights in
-the cards and the figure are the same (18 at D9 and 68 to 90 at the others).
+`UTC` at all 14 series. For a pure step the rule does separate the two clocks: a step fixed to the
+local clock gives a positive difference (+0.25 of the step) and a step fixed to UTC a negative one
+(-0.4 of the step). The confound is the ordinary load shape, which makes the difference negative with
+no step at all, on summer nights (-0.2 to -6.0 points) and on mild British Summer Time nights. Against
+that summer placebo, cold British Summer Time nights are more negative at 13 of 14 series (D4 is
+level), which supports UTC. The post hoc check in the figure compares the half-hour of the largest
+mean rise on cold summer-time nights with the same half-hour on cold winter nights. The search runs
+from the transition into the half-hour starting 23:30 to the one starting 05:00, and finds a shift of
+2 half-hours at 12 of 14 series (D14 shows 4; D9 shows 9, a jump at 05:00 on 18 nights). Inside 23:30
+to 03:00, D9 also shifts by 2, which makes 13 of 14. The counts of cold summer-time nights in the
+cards and the figure are the same (18 at D9 and 68 to 90 at the others).
 
 ![Timing](figure_7_timing.svg)
 
@@ -284,14 +305,16 @@ shape: (14, 7)
 | R against the full step 30 to 60% at D5, D10, D16 | 0.78, 0.63, 0.53 | Partly: D16 only |
 | Raw cold-night mean within 2 points of the line | gap at most 0.4 at all 14 series | Yes |
 | Timing `cannot tell` at most series, or `local` if a label is printed | 68 to 90 cold summer-time nights at 13 series (18 at D9); `UTC` printed at all 14 | No |
-| Gate coverage within the bands | the four gated shapes pass; the pooled-interval row fails (100%) | Partly |
+| Gate coverage within the bands | the four gated shapes (one test) pass; the pooled-interval row cannot under-cover (100%); the night-temperature cell under-covers (79%) | Partly |
 | Run time under 1.5 hours | not recorded | Not checked |
 
 ## Checks
 
-- **Median forecast minus mean forecast, and the quantile-score contrast beside the error of the
-  mean
-  or median forecast:** not applicable, because the experiment forecasts nothing.
+- **Median forecast minus mean forecast:** R and figure 9 use the median forecast of experiment 114's
+  baseline model. On cold nights its median minus its mean is 0.0 at D5, D10, and D16. R and figure 9
+  include the hand-filtered switching half-hours; excluding them moves D5's miss at 01:00 from +6.1
+  to +6.8 points and moves the other substations by at most 0.1 points. The step fits themselves
+  exclude those half-hours in the switching control only.
 - **Hand-filtered switching list:** refitting the six decision series without experiment 103's
   switching events changes no step by more than 0.3 points (11.0, 9.8, 15.4, 7.0, 3.0, and 13.5 for
   D5, D9, D10, D11, D14, and D16, against 10.8, 9.5, 15.4, 7.0, 3.0, and 13.4).
@@ -299,16 +322,19 @@ shape: (14, 7)
   placebo cells is 88%, 86%, and 84%, and the mean interval width 1.7, 1.9, and 2.1 points. The
   28-day coverage is just below the 85% edge of the pooled band.
 - **Audit triggers** (conditions in the plan under which a result needs an independent audit).
-  Trigger 1 (a control fails: test 1, the rank check, or the placebo coverage) does not fire; the
-  placebo coverage is inside its band, but the gate's pooled-interval row failed separately (100%
-  against 85 to 95%), which is why the verdict is `inconclusive`. Trigger 2 fires: the E7-X pooled
-  step (13.2) is above the decision substations' (9.9). Trigger 3 does not fire: no substation has a
-  step and a raw contrast of opposite sign. Trigger 4 does not fire: leaving each decision
-  substation out moves the pooled mean to between 8.8 and 11.2, inside 6.2 to 13.5. Trigger 5 does
-  not fire: bounding the slope at 0 changes no slope. Trigger 6 does not fire: the widest
-  decision-substation interval is 1.8 points (D9). Trigger 7 (a later design depends on the
-  result) fires, because the cards and experiment 121's night arms use these numbers. The audit has
-  not run yet; the code and write-up reviews are triaged in the pull request.
+  Trigger 1 (a control fails: test 1, the rank check, or the placebo coverage) fires: the gate's
+  pooled-interval row, a known-answer test, gave 100% against 85 to 95%, and the tariff-edge
+  placebo failed. Trigger 2 fires: the E7-X pooled step (13.2) is above the decision substations'
+  (9.9), and 8 of the 10 predictions missed, some by 2 to 7 times. Two post hoc explanations are
+  available. The predictions were anchored on experiment 121's residual steps, while the step here is
+  the full step: dividing 121's 7.1 points at D10 by R = 0.63 gives about 11. And the flat part
+  inherits the summer decline through the night (summer reference -0.7 to -13.4 points). Trigger 3
+  does not fire: no substation has a step and a raw contrast of opposite sign. Trigger 4 does not
+  fire: leaving each decision substation out moves the pooled mean to between 8.8 and 11.2, inside
+  6.2 to 13.5. Trigger 5 does not fire: bounding the slope at 0 changes no slope. Trigger 6 does not
+  fire: the widest decision-substation interval is 1.8 points (D9). Trigger 7 (a later design depends
+  on the result) fires, because the cards and experiment 121's night arms use these numbers. The audit
+  has run: every headline number reproduced, and its findings are applied on this page.
 
 ## Substation cards
 
@@ -355,9 +381,9 @@ Start of the step, timing, and share left by the baseline model (R):
 ## Cold nights: actual demand against the baseline forecast
 
 **On cold nights actual demand runs above the baseline forecast of experiment 114 from about 01:00
-at D5 and D16 on the two pre-registered winters (by 5.6 and 9.4 points), and at D10 only once the
-selection winter is included (6.7 points over three winters; -12.2 at 23:30 on the two
-pre-registered winters).** The figure shows the median and the 25th to 75th percentile, across the
+at D5 and D16 on the two pre-registered winters (by 5.6 and 9.4 points), and at D10 in winter
+2024-25 alone (+7.6 at 01:00); at D10 the two-winter median is dominated by a level error in winter
+2023-24.** The figure shows the median and the 25th to 75th percentile, across the
 104 cold winter nights per substation of winters 2023-24 to 2025-26 (the coldest 10% of days, the
 plan's cold-snap rule), of actual demand and of the day-ahead median forecast, in points. The
 largest median misses (actual minus forecast) are D5 +6.1 in the half-hour starting 01:00, D9 +2.9
@@ -366,8 +392,12 @@ starting 01:30, D10 +6.7 starting 01:00, D11 +3.6 starting 03:00, D14 +4.0 start
 actual and forecast at D5 (07:00 against 06:00), D9 (06:00 against 07:00), D11 (06:30 against
 06:00), and D16 (07:00 against 06:30), and matches at D10 and D14. The two earlier winters alone (72
 nights, before the selection winter was read) gave the same pattern at D5 and D16 (+5.6 and +9.4 at
-01:00) but a different largest miss at D10 (-12.2 in the half-hour starting 23:30); `report.txt`
-prints both.
+01:00) but a different largest miss at D10 (-12.2 in the half-hour starting 23:30). The cause is winter
+2023-24: D10's cold nights sit about 11 points lower than in the other winters (about 42 points
+against 52 to 54), and the baseline forecast is 9 to 17 points too high through the whole night. That
+level drop is not in the switching mask, and it also lowers D10's 2023-24 step. Winter 2024-25 alone
+shows +7.6 at 01:00 and +7.0 at 00:30, the same pattern as D5 and D16, and adding winter 2025-26
+dilutes the 2023-24 error rather than creating the rise. `report.txt` prints both.
 
 ![Actual demand against the baseline forecast, decision series](figure_9_cold_nights.svg)
 
@@ -528,8 +558,8 @@ neighbouring years.
   that difference. The slope does not.
 - **Four headline winters of one weather product, from one set of substations.** The winters are
   separate years, and neighbouring cells share one ERA5 product.
-- **The pooled intervals were wider than needed in the gate, and may be too narrow in practice.**
-  The gate showed coverage of 100% against a target of 85 to 95%. The substations share one weather
+- **The gate says nothing about the pooled intervals, which may be too narrow in practice.** The
+  gate's 100% pooled coverage is built in (the gate paragraph). The substations share one weather
   product, so their errors are not independent, which would make the intervals too narrow.
 - **Cold-snap means rest on few winters.** The raw cold-snap means per winter (November to March
   beside November to February) are in `report.txt`, with 32 to 38 nights per winter. They cover four
@@ -624,9 +654,9 @@ load, and the pooling is the random-effects meta-analysis of [DerSimonian and La
 [111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md),
 [113](../00113-differentiable-physics-n5-convex-identification-at-realistic-noise/result.md),
 [114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md),
-120 (PR 1410),
+[120](../00120-differentiable-physics-sh-convex-daily-shape-library/result.md),
 121 (PR 1413), and
-122 (PR 1415). One targeted search
+[122](../00122-differentiable-physics-three-winter-backtest-gam-k/result.md). One targeted search
 for a DOI on Economy 7 or storage-heating load found none on temperature dependence. The nearest
 sources are [Elexon
 CP1058A](https://assets.elexon.co.uk/wp-content/uploads/sites/11/2012/02/28171857/cp1058a.pdf),
