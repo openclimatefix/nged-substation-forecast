@@ -267,7 +267,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         .sort("gap", descending=True)
     )
     top3 = per_event_gap.filter(pl.col("site") == "D11").head(3)["gap"].sum()
-    print(f"  three largest D11 transfers hold {top3 / per_event_gap['gap'].sum():.1%} of the gap")
+    print(
+        f"  three largest D11 transfers hold {float(top3) / float(per_event_gap['gap'].sum()):.1%} of the gap"
+    )
     print("\n== checks ==")
     med_minus_mean = primary.group_by("site").agg(
         (pl.col("err_median__K0") - pl.col("err_median__K0")).mean().alias("zero")

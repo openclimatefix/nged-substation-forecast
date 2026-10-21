@@ -26,7 +26,7 @@ from typing import Final
 import e00151_g_common as common
 import e00151_g_ens as ens
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens import member_means
 from studies.dp_ens_weather import Calibration
