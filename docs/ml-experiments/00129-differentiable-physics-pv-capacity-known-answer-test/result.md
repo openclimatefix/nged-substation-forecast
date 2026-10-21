@@ -88,3 +88,39 @@ The write-up compares the hindsight capacity per Primary with the Embedded Capac
 Renewable Energy Planning Database and Feed-in Tariff figures that experiment 45 processed. The
 registers are lower bounds, so the check is that our range lies above the register total of sites
 below 1 MW (sensitivity at 5 MW).
+
+## Stage B findings and rules fixed before stage C
+
+Stage B ran on D10 and D16, on the feature cache that stops at 2026-06-30. The numbers are the pilot's
+and are not results.
+
+- **Fits cost about 0.5 s, and the GPU and CPU give identical capacities,** so the whole experiment
+  takes minutes.
+- **The ridge does not matter.** Ridge 0.01, 0.1 and 1.0 move the recovery by 0.01 or less, so the
+  ridge pilot is dropped and 0.1 (experiment 104's value) is kept.
+- **A real farm's output is recovered at 0.76 to 0.84 without load,** as experiments 39 and 63 found.
+  A day-long cloud-driven load of 10% of capacity adds about 0.21 to arm 2's recovery and 0.20 to arm
+  3's.
+- **Arm 3 recovers 0.02 to 0.03 more than arm 2 and does not cut the cloud-load bias.** Its placebo
+  difference of fits (0.17 to 0.18 of the injection) is larger than arm 2's (0.10).
+- **On the semi-synthetic target (true capacity zero), the capacity found from noise is 1 to 4% of the
+  injected capacity.** The recovery's drift on a constant farm is +0.18 per 5 years at D10 (standard
+  deviation 0.16 over 10 draws) and +0.045 at D16, against a limit of 0.05.
+
+**Rules for stage C, written before it runs.**
+
+- **Arm 3 is descriptive.** It cannot win the verdict if it only matches arm 2. Its purpose is the
+  stated claim that sun-blind demand does or does not cut the cloud-load bias, at five Primaries.
+- **Arm 4 runs,** because arm 2's drift exceeds 0.05 per 5 years at D10. Its increment penalty is
+  tuned on D9, which is not a decision Primary, from the semi-synthetic drift alone.
+- **Post-pilot choice:** the placebo gate is "placebo difference of fits at most 20% of the real-sky
+  recovery of the same arm and Primary". The 20% is a round number chosen after seeing arm 2 at 0.10 of
+  the injection, so the gate is not independent of the pilot.
+- **Grid:** the five decision Primaries; 20, 50 and 100% of the pinned capacity; the five real farms,
+  the east-west plant, and the south-west plant; with and without the cloud-driven load.
+- **Divisor:** recovery is divided by the median recovery of the other four farms (matched plants, no
+  load, 100%) at the same Primary and arm; the two synthetic plants use the median of all five.
+- **Coverage cells:** 30 cells, one per Primary, plant class (matched with a rotating farm,
+  east-west, south-west), and load, each at 100%. The interval is the stratified month-block
+  bootstrap of the last complete season-year, divided by recovery ratios from the other Primaries and
+  other farms.
