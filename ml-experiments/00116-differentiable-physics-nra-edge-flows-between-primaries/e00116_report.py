@@ -11,7 +11,6 @@ import json
 from typing import Any
 
 import e00116_common as common
-import e00116_decide as decide
 import e00116_tune as tune
 
 
@@ -57,7 +56,7 @@ def main() -> None:  # noqa: PLR0912 - a flat sequence of prints, one block per 
     first = json.loads((work / "gate_tuning_only_first_run.json").read_text())
     show(label="first run, reading 5 (outside-path bug)", value=first["5_nra_gap_closed"]["value"])
     print("== C1")
-    c1 = decide.c1_summary()
+    c1 = json.loads((work / "verdict.json").read_text())["c1"]
     show(
         label="reconstruction share",
         value=f"{c1['estimate']:.3f} ({c1['lower']:.3f} to {c1['upper']:.3f})",

@@ -46,8 +46,12 @@ take_home_message: >-
   settings we fixed in advance it found under a quarter of the load we added artificially, and it
   changed no forecast. Looser settings found more, but they also found load moving between
   substations that are not connected, probably the slow drifts of demand that our model does not
-  describe. Adding a drift term to the model, or accepting a flow only where the two substations are
-  connected, is the next thing to test.
+  describe. The gate failed for a structural reason: at the settings we fixed in advance, the fit
+  cannot find any transfer shorter than 7 to 9 days, and the longest test transfer lasts under 5
+  days, so the failure is a limit of the method as specified, not a bug in the solver. The
+  zero flow we first saw on the unconnected pairs was also an artefact of the order the fit visits
+  its paths, so those pairs were never clean. Adding a drift term to the model, or accepting a flow
+  only where the two substations are connected, is the next thing to test.
 production_status: not-for-production
 code: ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/
 date: 2026-10-20
@@ -65,6 +69,19 @@ MW-days on the two pairs. The placebo pairs probably soak up the opposite-signed
 demand model with no drift term leaves in its residuals. Flows fitted this way therefore cannot be
 read as switching without a drift term or a topology check; this page proposes both as next steps
 and does not commit the project to either.
+
+**The failure is a limit of the registered objective, and the zero placebo is an ordering artefact.**
+The Huber loss caps each row's pull on the flow, so a step in the flow appears only if the block of
+rows is long enough to outweigh the step penalty. At the chosen step constant of 300 that is 174
+hours on the D10–D11 edge and 207 hours on the D5–D16 edge, against a longest gate transfer of 113
+hours. In 5 re-fitted gate transfers the fitted step at onset was exactly 0 each time, so the recall
+of 0.22 comes from a flat offset across the whole window, not from detecting the transfer. A
+level constant of 0 also makes the minimiser non-unique, because a constant flow costs nothing: the
+constant lands on whichever path the fit visits first. The tuning placebo path was visited last, so
+its flow read about 0 for every configuration with level constant 0. With the placebo path visited
+first, the chosen configuration puts about 23 and 46 MW-days a year on the two tuning placebo pairs
+(measured on 4 tuning tiles of 72 days in total, then scaled to a year), against a limit of 0.05. This
+does not change the verdict.
 
 We asked whether load that the network operator moves between two neighbouring Primary substations
 can be found from the half-hourly power readings alone. The method fits a flow for each
@@ -104,22 +121,25 @@ year. All readings failed:
   (needs 0.8 to 1.25);
 
 - release, the share of found transfers whose causal flow is under 20% of the moved MW at the
-  deadline: 0 (needs 0.5);
+  deadline: 0 (needs 0.5), on one transfer, because only 1 of the 201 large gate transfers reached
+  a recall of 0.5 and so entered the test;
 
 - recall: 0.22 over 1 day (needs 0.77), 0.10 for 6 to 24 hours (needs 0.5), and 0.46 over 1 day on
   the realistic set (needs 0.5);
 
 - placebo in the replicate year: 0.0 MW-days on replicate placebo pair 1 and 2.9 on pair 2 (needs
-  under 0.05 each);
+  under 0.05 each; the 0.0 on pair 1 is probably the same path-order artefact);
 
 - normal-running gap: the forecast with the causal flows removed has a mean absolute error of 7.07
   points against 5.82 for the plain filter and 3.76 for the oracle (the share of the gap closed is
   -0.60, needs 0.5). The first run of this reading, 7.28 points and -0.71, removed each substation's
   outside path as well as its edge flows by mistake; it was corrected in the experiment's script
   `e00116_causal.py` (not in the module), and only arm A5 was re-run, on module commit 6a57d0944;
-  both runs are on file.
+  both runs are on file. The negative gap closure probably comes from the same free constant: a
+  constant offset in each 30-day window, carried forward by the warm start, may sit on the edge and
+  then be removed from the filter's level (plausible, not measured).
 
-**C1, the hindsight reconstruction.** The edge flows rebuild 0.25 (98.33% interval 0.175 to 0.265)
+**C1, the hindsight reconstruction.** The edge flows rebuild 0.25 (98.33% interval 0.179 to 0.264)
 of the injected megawatts on 400 realistic transfers, against a requirement of at least 0.5 with the
 lower end above 0.25. Models trained on the injected history forecast the clean scored year with
 mean absolute errors of 5.82 (as trained), 5.79 (flows removed), and 5.78 points (oracle mask):
@@ -139,8 +159,10 @@ with causal flows) minus A4 is -0.002 (-0.026 to +0.017) in the scored year and 
 4.02 points better than A4 in the scored year (-4.02, -4.69 to -3.12) and 4.46 points in the
 replicate year, so a correct flow would matter a great deal: scaled by the 4.5% of rows that lie
 inside hand-filtered events, the oracle gain is 0.18 points on all rows. A5 closes 0.0004 of the
-gap. A5 minus A4 on real rows outside events is -0.0003 (scored) and +0.017 (replicate); the limit
-is +0.03.
+gap. The absolute scores are row means (A4 6.522, A5 6.512 points, a difference of -0.010), while
+the contrast is the mean over the 13 seeds of each seed's difference (-0.002), so the two do not
+reconcile by subtraction. A5 minus A4 on real rows outside events is -0.0003 (scored) and +0.017
+(replicate); the limit is +0.03.
 
 **Post hoc variants (exploratory, chosen after the gate failed; the verdict does not use them).** On
 100 gate transfers of 25% and 40% of the receiving load: registered penalties with a Huber threshold
@@ -213,11 +235,16 @@ injected transfers give no winter result at G-c.
   371-hour event is recovered at 1.19 of 1.5 MW although the injected recall is 0.22, and C1 and the
   gate recall are far below the predicted 0.55 to 0.85 and 0.8 to 0.95. Trigger 3 fired weakly for
   C3 in the replicate year (quantile score -0.007, mean error +0.000, both inside their intervals).
-  Triggers 4 (leave one out), 5 (nested arms, including A5 with S = 1, not run) and 6 (interval
-  widths against experiments 106 and 111) were not run: the contrasts are within noise and the
-  exploratory arms were skipped after the gate failed. Trigger 7 did not apply, because there is no
-  positive verdict. An Opus audit is needed before the merge.
-- **Deviations from the plan.** C2 and C3 were run although the plan says a failed gate stops them,
+  Trigger 6 fired and is explained: the 98.33% intervals of C2 are 0.025 (scored) and 0.020
+  (replicate) points wide, under half the 0.29 to 0.40 of experiment 111's 98.75% intervals, as
+  expected when two arms differ only by nearly empty flows. Triggers 4 (leave one out) and 5 (nested
+  arms, including A5 with S = 1) were not run: the exploratory arms were skipped after the gate
+  failed. Trigger 7 did not apply, because there is no
+  positive verdict. An Opus audit of this page and the module has been done, and its fixes are applied.
+- **Deviations from the plan.** The block-coordinate sweeps stop at a tolerance of 1e-3 or 12
+  sweeps, not the 1e-6 the plan states; all whole-year fits and all re-run local fits stopped at
+  12 sweeps unconverged, and a re-run with 400 sweeps at 1e-9 left recall and the moved-MW ratio
+  unchanged on 5 transfers. C2 and C3 were run although the plan says a failed gate stops them,
   to report them descriptively; C3 ran on a 100-transfer sample per year (seeds 0 to 12) instead of
   400, because the registered flows are nearly empty and the gate had failed. Injected transfers are
   fitted as neighbourhoods (the paths at the two ends, on a window of 3 days either side) instead of
@@ -229,8 +256,9 @@ injected transfers give no winter result at G-c.
 
 - **Module.** Tuning, the gate's first run, and the 400 tuning-year transfer runs used
   `studies.dp_edge_flow` at commit 6a57d0944; C1, C2, the replicate- and scored-year flows, the
-  replicas, and C3 used commit abaac6097 (the Sonnet review's fixes). The Opus reviews of the module
-  had not run when this page was written.
+  replicas, and C3 used commit abaac6097 (the Sonnet review's fixes). The Opus reviews
+  of the module (causal window, then solver and audit) found no solver bug and no leak, and the
+  tests that killed three surviving mutants were added before the merge.
 
 - **What to try next (proposal only).** Add a slow drift term per substation to the convex model
   before fitting flows, and compare flows on connected and unconnected pairs again; or accept a
