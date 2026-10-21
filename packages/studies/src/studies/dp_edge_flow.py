@@ -880,14 +880,14 @@ def joint_objective(
     reliability: Mapping[str, np.ndarray] | None = None,
     huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
     drifts: Mapping[str, np.ndarray] | None = None,
-    drift_step_variance: float | None = None,
+    drift_step_variance: Mapping[str, float] | None = None,
 ) -> float:
     """Return the objective of the whole graph at a set of flows.
 
     The data term is summed over nodes, and the penalties over paths. Step penalties apply over
     the rows where the path's nodes have a reading, as the path solver applies them. When `drifts`
     is given, each node's drift is subtracted in the data term and costs the squared change between
-    consecutive rows divided by twice `drift_step_variance`.
+    consecutive rows divided by twice that node's `drift_step_variance`.
 
     Args:
         paths: The graph's paths.
@@ -897,14 +897,17 @@ def joint_objective(
         reliability: Optional per-row weight in 0 to 1 for each node.
         huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
         drifts: Optional drift offset of each node on the grid, in megawatts.
-        drift_step_variance: The variance of the drift's change per row, in megawatts squared;
-            required when `drifts` is given.
+        drift_step_variance: Each node's variance of the drift's change per row, in megawatts
+            squared; required when `drifts` is given.
 
     Returns:
         The joint objective.
     """
-    if drifts is not None and (drift_step_variance is None or drift_step_variance <= 0.0):
-        msg = "drift_step_variance must be positive when drifts are given"
+    if drifts is not None and (
+        drift_step_variance is None
+        or any(drift_step_variance.get(node, 0.0) <= 0.0 for node in residuals)
+    ):
+        msg = "drift_step_variance must be positive for every node when drifts are given"
         raise ValueError(msg)
     total = 0.0
     for node, residual in residuals.items():
@@ -913,7 +916,7 @@ def joint_objective(
         )
         if drifts is not None and drift_step_variance is not None:
             modelled = modelled + drifts[node]
-            total += float(np.sum(np.diff(drifts[node]) ** 2)) / (2.0 * drift_step_variance)
+            total += float(np.sum(np.diff(drifts[node]) ** 2)) / (2.0 * drift_step_variance[node])
         weight = _row_weight(
             residual=residual,
             noise=noise[node],
@@ -940,6 +943,9 @@ def joint_objective(
 DRIFT_IRLS_ITERATIONS: Final[int] = 50
 """The most reweighting iterations of one drift solve."""
 
+DRIFT_RESIDUAL_FLOOR: Final[float] = 1e-12
+"""The reweighting divides by the larger of a residual's magnitude and this, in megawatts."""
+
 
 def solve_drift(
     *,
@@ -955,13 +961,15 @@ def solve_drift(
 
     The drift `d` minimises `sum w_t * huber(r_t - d_t) + sum (d_t - d_(t-1))**2 / (2 q)`, where
     `q` is the step variance. The drift has no level penalty, so a constant offset costs nothing.
-    A row with no reading has weight 0, and the walk bridges it. Iteratively reweighted least
+    A row with no reading has weight 0, and the walk bridges it; a residual with no reading at all
+    has a drift of zero. Iteratively reweighted least
     squares solves the problem: each iteration solves a tridiagonal system.
 
     Args:
         residual: The residual to fit in megawatts, `NaN` where there is no reading.
         noise: The residual's robust standard deviation in megawatts.
-        step_variance: The variance of the drift's change per row, in megawatts squared.
+        step_variance: The variance of the drift's change per row, in megawatts squared. A value
+            near zero, or a long gap with a very large value, makes the system near-singular.
         reliability: Optional per-row weight in 0 to 1.
         huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
         start: Optional starting drift, used to set the first reweighting.
@@ -982,10 +990,14 @@ def solve_drift(
     value = np.nan_to_num(residual)
     threshold = huber_sigmas * noise
     smoothness = 1.0 / step_variance
+    if not np.any(base_weight > 0.0):
+        return np.zeros(length)
     drift = np.zeros(length) if start is None else start.copy()
     for _ in range(DRIFT_IRLS_ITERATIONS):
         magnitude = np.abs(value - drift)
-        reweight = np.where(magnitude <= threshold, 1.0, threshold / np.maximum(magnitude, 1e-12))
+        reweight = np.where(
+            magnitude <= threshold, 1.0, threshold / np.maximum(magnitude, DRIFT_RESIDUAL_FLOOR)
+        )
         weight = base_weight * reweight
         banded = np.zeros((2, length))
         banded[0, 1:] = -smoothness
@@ -1011,7 +1023,7 @@ def fit_flows(
     tolerance: float = DEFAULT_TOLERANCE,
     sweep_tolerance: float = SWEEP_TOLERANCE,
     huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
-    drift_step_variance: float | None = None,
+    drift_step_variance: Mapping[str, float] | None = None,
 ) -> FlowFit:
     """Fit every path's flow by block-coordinate descent.
 
@@ -1038,7 +1050,7 @@ def fit_flows(
             the largest path change in megawatts.
         huber_sigmas: The Huber loss is quadratic within this many noise scales of zero; a large
             value makes the data term squared error.
-        drift_step_variance: The variance of each node's drift per row, in megawatts squared, or
+        drift_step_variance: Each node's variance of its drift per row, in megawatts squared, or
             `None` for a fit with no drift term.
 
     Returns:
@@ -1048,8 +1060,10 @@ def fit_flows(
         ValueError: If a path names a node with no residual, or `drift_step_variance` is not
             positive.
     """
-    if drift_step_variance is not None and drift_step_variance <= 0.0:
-        msg = f"drift_step_variance must be positive, not {drift_step_variance}"
+    if drift_step_variance is not None and any(
+        drift_step_variance.get(node, 0.0) <= 0.0 for node in residuals
+    ):
+        msg = "drift_step_variance must be positive for every node"
         raise ValueError(msg)
     length = len(next(iter(residuals.values())))
     for path in paths:
@@ -1075,15 +1089,16 @@ def fit_flows(
         sweeps = sweep
         largest_change = 0.0
         all_converged = True
+        flow_residuals = (
+            {node: residuals[node] - drifts[node] for node in residuals} if drifts else residuals
+        )
         for path in paths:
             solution = solve_path(
                 problem=_partial_problem(
                     path=path,
                     paths=paths,
                     flows=flows,
-                    residuals={node: residuals[node] - drifts[node] for node in residuals}
-                    if drifts
-                    else residuals,
+                    residuals=flow_residuals,
                     noise=noise,
                     reliability=reliability,
                     length=length,
@@ -1105,7 +1120,7 @@ def fit_flows(
                         paths=paths, flows=flows, node=node, skip="", length=length
                     ),
                     noise=noise[node],
-                    step_variance=drift_step_variance,
+                    step_variance=drift_step_variance[node],
                     reliability=reliability.get(node),
                     huber_sigmas=huber_sigmas,
                     start=drifts[node],
@@ -1592,6 +1607,7 @@ def causal_window_fit(
     max_sweeps: int = DEFAULT_MAX_SWEEPS,
     sweep_tolerance: float = SWEEP_TOLERANCE,
     huber_sigmas: float = HUBER_THRESHOLD_IN_SIGMAS,
+    drift_step_variance: Mapping[str, float] | None = None,
 ) -> tuple[FlowFit, int]:
     """Fit the flows on the trailing window of residuals that a forecast may see.
 
@@ -1613,6 +1629,7 @@ def causal_window_fit(
         max_sweeps: The sweep limit of the block-coordinate fit.
         sweep_tolerance: The sweeps' stopping tolerance.
         huber_sigmas: The Huber loss is quadratic within this many noise scales of zero.
+        drift_step_variance: Each node's drift variance per row, or `None` for no drift term.
 
     Returns:
         The fit, whose flows have `window_length` rows (fewer near the start of the stream), and
@@ -1646,6 +1663,7 @@ def causal_window_fit(
         max_sweeps=max_sweeps,
         sweep_tolerance=sweep_tolerance,
         huber_sigmas=huber_sigmas,
+        drift_step_variance=drift_step_variance,
     )
     return fit, first
 
