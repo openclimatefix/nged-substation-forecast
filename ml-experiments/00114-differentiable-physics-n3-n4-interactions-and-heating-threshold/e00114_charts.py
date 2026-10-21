@@ -309,7 +309,7 @@ def figure_4_profiles() -> alt.TopLevelMixin:
             facet=alt.Facet("site:N", sort=order, title=None),
             columns=3,
             title=_title(
-                text="Four of five substations prefer a threshold below 15.5; two sit at 12 C",
+                text="Loss minimum below 15.5 C at 4 of 5 substations; only D10 passes the rule",
                 subtitle=(
                     "Scored cut. Loss in effective nats (loss difference over 2 times the noise "
                     "variance times 21.4, gate 3's median variance inflation); gap of 2 or less "

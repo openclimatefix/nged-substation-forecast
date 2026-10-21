@@ -199,6 +199,11 @@ def summary() -> dict[str, Any]:
         "c_pass": far_recovery >= MIN_FAR_RECOVERY,
         "placebo_recovery": placebo_recovery,
         "placebo_pass": placebo_recovery >= MIN_PLACEBO_RECOVERY,
+        "edge_argmin_draws": int(
+            (
+                (main["argmin_c"] <= common.MIN_HINGE_C) | (main["argmin_c"] >= common.MAX_HINGE_C)
+            ).sum()
+        ),
         "tau_median": common.as_float(main["tau"].median()),
         "tau_by_site": {
             site: common.as_float(main.filter(pl.col("site") == site)["tau"].median())

@@ -1,16 +1,47 @@
 # Differentiable physics (demand, calendar, and weather): research plan
 
-**The next step is a drift term that re-estimates its level after the end of the training data.**
-Experiment 104 found that all years of history without drift scored worse than 12 months, and that a
-drift held constant recovered that and helped in every scored month, leaving all years with drift
-level with 12 months.
+**The cheap screens of inputs to the convex model are bundled into one experiment.** Experiment 104
+found that all years of history without drift scored worse than 12 months, and that a drift held
+constant recovered that. The recent-level drift and the day-type filter are covered by the KFE
+experiment, so this page lists the input screens only.
 
-| Priority | Proposal | Waits for |
-|---|---|---|
-| 1 | Test a drift that re-estimates its level from recent demand | Part 3, which pools the model across substations |
-| 2 | Experiment 121 (MH): multi-hinge heating curve and night-step terms in the convex model | Experiment 114 merge for the scored-year fits |
+| Experiment | Question | Priority | Waits for | State |
+|---|---|---|---|---|
+| N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Running | Nothing | Running (experiment 114) |
+| Bundled cheap screens | One experiment of six screens, each with the one-line hypothesis in the section below | 2 | A check for overlap with the multi-hinge heating experiment before planning; its final contrast uses experiment 114 | Queued, planner next |
+| Weather encoder retest | Does a small learned encoder over a patch of weather cells lower the error on hard cases (convective and frontal days, wind and solar sites) once the base forecast is recalibrated? | 3 | The audit of the encoder experiment | Queued, after the audit |
+| Experiment 121 (MH): multi-hinge heating curve and night-step terms | Do five heating hinges, or a night-time step, lower the convex model's error after the filter? | Running | Nothing | Running (experiment 121) |
 
 Later parts are listed in their own themes.
+
+## Bundled cheap screens
+
+**The six screens share one experiment and run on 6 CPU cores in about 2 hours.** Each has one
+hypothesis:
+
+- **Free temperature spline.** A free spline of temperature fits better than the fixed 15.5 °C
+  hinge.
+- **Smoothed temperatures.** Temperature smoothed at two decay rates, plus smoothed daily minimum and
+  maximum, adds skill to the convex model's means of 6 hours to 1 week. The GAM papers on regional
+  load use these terms: [Obst et al. (2021)](https://arxiv.org/abs/2009.06527) for French load, and
+  [Fasiolo et al. (2021)](https://arxiv.org/abs/1707.03307) for the winning GEFCom2014 entry. No paper
+  isolates the gain from the smoothing alone.
+- **Humidity and wind chill.** Feeding humidity and wind chill into the heating hinge lowers the
+  winter error.
+- **School-term calendar.** A school-term term lowers the error in term-time weeks, once data
+  availability is checked.
+- **Lighting from solar elevation.** Lighting modelled from solar elevation beats a fixed clock curve
+  on dark winter evenings.
+- **Filter-noise mixture.** A filter noise that depends on the regime (cold snap, mild, holiday)
+  beats one fixed noise.
+
+## Weather encoder retest
+
+**The retest repeats the weather-encoder comparison on the hard cases, with a recalibrated base
+forecast.** The encoder replaces single-cell inputs with a learned view of a patch of cells, and the
+aim is a lower error on convective and frontal days, when a single cell misses the neighbouring
+weather. It waits for the audit of the first encoder experiment, and runs on the GPU. The [encoders
+technique page](../../../techniques/encoders.md) is the first thing to read.
 
 ## Planned experiments
 

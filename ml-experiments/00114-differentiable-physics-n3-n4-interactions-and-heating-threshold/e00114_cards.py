@@ -193,8 +193,8 @@ def card(*, site: str) -> alt.TopLevelMixin:
     )
     nats = pl.DataFrame({"threshold": common.HINGE_GRID_C, "nats": scored["nats"]})
     printed = (
-        f"Threshold {scored['argmin_c']:g} C (80% interval {scored['interval_low_c']:g} to "
-        f"{scored['interval_high_c']:g}; at the edge of the 12 to 19 C grid)"
+        f"Threshold {scored['argmin_c']:g} C or lower (80% interval {scored['interval_low_c']:g} "
+        f"to {scored['interval_high_c']:g}; the grid starts at 12 C)"
         if scored["printable"]
         else "Threshold not identified at this substation"
     )

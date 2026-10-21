@@ -39,9 +39,10 @@ from studies.dp_gam import (
 )
 from studies.dp_pinned_capacity import PinnedCapacity, pinned_capacity
 
-FactorType = Literal["daytype", "subband"]
-"""How rows are split into two groups: weekday against other days, or the first against the second
-half of the hour band."""
+FactorType = Literal["daytype", "subband", "parity_halfhour", "parity_day"]
+"""How rows are split into two groups: weekday against other days, the first against the second
+half of the hour band, or (as placebos with no time-of-day or weekly structure) even against odd
+local half-hours of the day, or even against odd days of the year."""
 
 SUBBAND_SECOND_HALF_START: Final[tuple[int, ...]] = (6, 17, 27, 40)
 """The local half-hour of day (0 to 47) at which each hour band's second half starts: 03:00 for
@@ -75,6 +76,10 @@ B0: Final[ArmSpec] = ArmSpec(name="b0")
 def interaction_arm(*, name: str, penalty_weight: float) -> ArmSpec:
     """Return one of the interaction arms `t1`, `t2`, `t3`, or `t_all`, at a penalty weight.
 
+    The placebo arms `p_halfhour` and `p_day` split each heating column into two pieces by an
+    arbitrary parity, so they carry T2's number of columns and penalty without its time-of-day
+    structure.
+
     Args:
         name: `t1` (heating by day type), `t2` (heating by half-band), `t3` (lighting by day
             type), or `t_all` (all three together).
@@ -91,6 +96,8 @@ def interaction_arm(*, name: str, penalty_weight: float) -> ArmSpec:
         "t2": ("subband",),
         "t3": (),
         "t_all": ("daytype", "subband"),
+        "p_halfhour": ("parity_halfhour",),
+        "p_day": ("parity_day",),
     }
     lighting: tuple[FactorType, ...] = ("daytype",) if name in ("t3", "t_all") else ()
     if name not in heating:
@@ -206,8 +213,9 @@ def factor_group(*, cache: FeatureCache, index: np.ndarray, factor: FactorType) 
     Args:
         cache: The feature cache.
         index: Grid rows.
-        factor: `daytype` (0 weekday, 1 Saturday, Sunday, or bank holiday) or `subband` (0 first
-            half of the row's hour band, 1 second half).
+        factor: `daytype` (0 weekday, 1 Saturday, Sunday, or bank holiday), `subband` (0 first
+            half of the row's hour band, 1 second half), `parity_halfhour` (the local half-hour of
+            day modulo 2), or `parity_day` (the local day of the year modulo 2).
 
     Returns:
         An int array of 0 and 1.
@@ -215,6 +223,10 @@ def factor_group(*, cache: FeatureCache, index: np.ndarray, factor: FactorType) 
     calendar = cache.calendar
     if factor == "daytype":
         return (calendar.day_type[index] != 0).astype(np.int64)
+    if factor == "parity_halfhour":
+        return (calendar.half_hour[index] % 2).astype(np.int64)
+    if factor == "parity_day":
+        return (calendar.day_of_year[index] % 2).astype(np.int64)
     split = np.array(SUBBAND_SECOND_HALF_START)[calendar.band[index].astype(np.int64)]
     return (calendar.half_hour[index] >= split).astype(np.int64)
 
