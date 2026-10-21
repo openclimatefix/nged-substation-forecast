@@ -1,0 +1,198 @@
+---
+id: '00158'
+slug: dp-partly-pooled-gam-shapes-heating-and-calendar-curves
+theme: differentiable-physics-pooling-across-substations
+also_relevant_to:
+- differentiable-physics-forecast-engine
+- hierarchy-and-pooling
+status: planned
+size: >-
+  medium. Stored: private files under
+  data/ml-experiments/00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/ only. Serving
+  path: not touched. Degradation rule: not touched. Designs: more than one is defensible (which
+  families are pooled, the penalty's value, the short history's length), and this plan pre-registers
+  one of each and runs the alternatives as labelled arms. Callers: this folder's scripts, which copy
+  the forecast engine of experiment 136 and call the reviewed `studies.dp_gam_pooled` fit without
+  changing it. No new modelling.
+hypothesis: >-
+  A GAM-K forecast (the convex demand model with a Kalman filter on recent errors, experiment 111)
+  fitted jointly across six Primary substations, so that each substation's heating curve, lighting
+  curve, daily profile, holiday effects, and Christmas shape are a fleet mean plus a penalised
+  deviation of its own, forecasts better than the same model fitted to each substation alone, now
+  that the solar capacity is pinned and the filter handles recent switching. The mechanism is that
+  a substation sees only two winters and two Christmases in a 24-month window, so its own curves
+  are noisy, and five other substations carry information about the shapes that physically are
+  shared. Capacity, level, and the band means stay per substation. The gain is largest for a
+  substation with 3 months of history and on Christmas rows, and no pooled arm is worse than the
+  per-site fit by more than 0.02 points on ordinary rows.
+prediction: >-
+  Written before any score is read. The per-site GAM-K on the ensemble mean (K0) scores 2.839 points
+  over leads 0.5 to 168 hours at the five decision substations in the scored year (experiment 136's
+  A0). C1 (heating curve pooled, PH minus K0, 24 months) is -0.03 to +0.02 points, because
+  experiment 109 found pooling cost 0.002 to 0.015 points at full history on past weather. C2 (all
+  shared families pooled, PS minus K0) is -0.04 to +0.03. C3 (PS minus PH) is -0.02 to +0.02. C4
+  (PS-3m minus K0-3m, a 3-month history for the target) is -3 to -12 points: experiment 109 found
+  pooling cut the error of a 3-month substation to 22% of the per-site fit's, and K0-3m is expected
+  to score 6 to 17 and PS-3m 3.5 to 5. C5 (PH-3m minus K0-3m) is within 1 point of C4. C6 (PS-3m
+  minus K0 at 24 months) is +0.1 to +1.0, because 3 months of the target's own rows still miss one
+  heating season. C7 (PS minus K0 on holiday and Christmas rows) is -0.2 to -1.5 points, about 5%
+  to 15% of K0's own score on those rows, because a 24-month window holds two examples of each
+  holiday per substation and the fleet holds twelve. C8 (PS minus K0 on ordinary rows) is within
+  +/-0.02. The complete-pooling arm (tied) scores worse than PS at 24 months, by 0.05 to 0.30. The
+  tuned penalties are 100 to 1000 rows of evidence at 24 months and 1000 to 10000 at 3 months.
+decision_rule: >-
+  Six lines, each read at the 99% level of the month-resampled paired bootstrap of the scored year
+  (12 calendar months, 20,000 resamples), at the five decision substations D5, D10, D11, D14, and
+  D16 (D9 beside them in the tables, in no contrast), over leads 0.5 to 168 hours and rows outside
+  the hand-filtered switching events. L1 (heating pooled gains at full history): C1's interval lies
+  wholly below -0.02 points. L2 (non-inferior): C2's upper bound is at most +0.02 points and C8's
+  upper bound is at most +0.02 points. L3 (short history): C4's interval lies wholly below -0.02
+  points. L4 (events): C7's interval lies wholly below zero, the sign of C7 is negative at 4 or more
+  of 5 decision substations in each of the two Christmases (the replicate Christmas of 2024 and the
+  scored Christmas of 2025), and L2's C8 holds. The verdict is `supported` when L1 (or C2's interval
+  wholly below -0.02), L3, and L4 hold and the controls pass; `partly supported` when L2 and L3 hold
+  but not all of L1 and L4; `not supported` when L3 fails or C2's interval lies wholly above +0.02
+  points; `inconclusive` otherwise. The verdict is capped at `inconclusive` if the reproduction
+  control or the leakage control fails. The threshold of -0.02 points is set by cost. A pooled
+  fit couples every substation's forecast to the other five substations' data and to one monthly
+  joint refit, so a gain under 0.02 points (under 1% of the score) at full history does not pay for
+  that coupling. For a substation with 3 months of history the coupling is the only route to a
+  heating curve, so L3 asks only for a gain larger than 0.02. The two-sided check on ordinary rows
+  follows the maintainer's rule for calendar-event arms: judge on the event rows, and require
+  non-inferiority elsewhere.
+benchmark: >-
+  K0, the per-site GAM-K on the ensemble mean, refitted monthly on 24 months (experiment 136's A0,
+  rebuilt here); K0-3m, the per-site fit on 3 months with experiment 109's ridge of 10; complete
+  pooling (tied) as the other bookend; absolute skill beside them from experiment 136's A2 (the
+  per-site T-all arm, 2.791), BG2 (experiment 87, 2.780), climatology, and manual_heuristic as
+  stored
+row_set_id: fold_a_daily_gap_v1
+metric: >-
+  Quantile score (twice the mean pinball loss over the 11 quantiles of experiment 87) in points of
+  effective capacity, over leads 0.5 to 168 hours, then under 24 hours, 24 to 72 hours, 72 to 168
+  hours, day D+1, winter (November to March), cold nights, holiday rows, and Christmas rows; coverage
+  and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles
+code: ml-experiments/00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/
+production_status: not-for-production
+adopted_in: none
+---
+
+# Experiment 158: do partly pooled GAM shapes beat per-site GAM fits?
+
+Plan only; the write-up follows the runs.
+
+## Plan
+
+**Question.** Experiments 105, 109, and 112 pooled raw demand, so the shared shape had to absorb each
+substation's solar output and switching. Solar capacity is now a pinned term, the filter of
+GAM-K handles recent level shifts, and
+[experiment 154](../00154-differentiable-physics-n0-gate-2-heating-error-against-truth/result.md)
+showed, on synthetic fleets with a known answer, that sharing the heating curve across substations
+recovers it better than fitting each substation alone, and that a substation's own heating offset
+is not learnable from 4 weeks. This experiment asks whether the same sharing helps the real
+forecast, at 24 months of history, at 3 months, and on holidays.
+
+**Method.** The partly pooled convex fit of
+[experiment 109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md)
+(`studies.dp_gam_pooled.fit_pooled`) gives each substation the fleet's coefficients plus a
+ridge-penalised deviation of its own. The fit is GAM-K's design with a pinned capacity and no
+drift. With a penalty of 0 the fit is the per-site fit, and the folder's reproduction control
+checks that it matches experiment 111's stored fits to 1e-10. The forecast engine (ensemble mean
+input, per-substation Kalman filter, residual table fitted on the tuning months) is copied from
+[experiment 136](../00136-dp-bg-stage1-assembly-on-the-ensemble-mean/result.md), so the arms differ
+only in their monthly fits. The partly pooled fit is the idea of
+[Gelman and Hill](https://doi.org/10.1017/CBO9780511790942) (multilevel models) applied to the
+coefficients of a generalised additive model.
+
+**Fleet.** D5, D9, D10, D11, D14, and D16. D18 is left out because its capacity is a late vintage.
+D9's pinned capacity is a late vintage (`growth_prior`) at the cuts before 2025-04, and the pooled
+fit refuses such a capacity, so D9 is fitted alone in every arm at those cuts and joins the fleet
+from 2025-04.
+
+**Arms.** All arms refit monthly from 2024-04.
+
+| Arm | Pooled families | History of the target |
+|---|---|---|
+| K0 | none (penalty 0) | 24 months |
+| PH | heating curve | 24 months |
+| PS | heating, lighting, daily profile, holiday periods, Christmas tent, harmonics | 24 months |
+| tied | the families of PS, completely pooled (reference) | 24 months |
+| K0-3m, PH-3m, PS-3m | as K0, PH, and PS | 3 months for the target, 24 for the other five |
+
+The 3-month arms take each substation in turn as the target, so the other five keep 24 months.
+Capacity, level (the band means of the profile), and the filter stay per substation in every arm.
+`studies.dp_gam_pooled` pools the holiday periods and the Christmas tent with the other non-heating
+families under one penalty, so PS cannot pool the heating curve and the profile at different
+strengths from the calendar families. Splitting them would change the reviewed module and is left
+for a follow-up if PS gains.
+
+**The penalty.** The deviation penalty is in rows of evidence (a substation with far more training
+rows keeps its own curve). PH tunes the heating penalty over 100, 300, 1000, 3000, and 10000 on the
+odd tuning months of 2024-07 to 2025-06 by the all-lead score at the decision substations, and PS
+then tunes the other families' penalty over 100, 300, 1000, and 3000 with the heating penalty at
+PH's value. The 24-month and 3-month arms are tuned separately. A tie within 0.005 points goes to
+the smaller penalty (less pooling).
+
+**Switching.** The switching terms of experiments 141 and 147 are not part of this fit. Experiment
+141 found that feeding the detector's causal alarm to the filter did no better than a random
+placebo, because the alarm arrives about 48 hours after the step, and experiment 147 found a
+live end rule inconclusive. The fit therefore does not take the hand-filtered switching events as
+ground truth, and the rows inside those events are excluded from scoring, as in every experiment on
+`fold_a_daily_gap_v1`.
+
+**Per-site baseline.** The brief names the best-guess GAM-K components of experiment 155 as the
+per-site baseline. Experiment 155 has not run, so K0 is experiment 136's A0 (GAM-K on the ensemble
+mean, pinned capacity, per-substation filter), and experiment 136's A2 (per-site T-all and shared
+filter noise) is an absolute reference. The pooled design shares B0's columns, not T-all's split
+columns, because `studies.dp_gam_pooled` pools B0's design. Pooling T-all is a follow-up.
+
+**Rows and periods.** `fold_a_daily_gap_v1`, 09:00 UTC `power_fcst_init_time`, leads 0.5 to 168
+hours. The tuning months are the odd months and the replicate months are the even months of 2024-07
+to 2025-06, and the scored year is 2025-07-02 to 2026-06-29 (292 runs), as in experiment 136.
+D-labels only. The replicate months hold the Christmas of 2024 and the scored year the Christmas of
+2025. The weather is the calibrated ensemble mean of experiment 136 and the filter uses its
+analysis proxy built from earlier runs, so every input exists at forecast time. Each monthly fit
+trains on rows that end before its cut.
+
+**Rows for events.** Holiday rows are those on a bank holiday or in the Christmas run
+(`holiday_period >= 0`), and Christmas rows are those within the Christmas tent's window of
+Christmas Day. Ordinary rows are all others.
+
+**Planned contrasts.** C1 PH minus K0. C2 PS minus K0. C3 PS minus PH. C4 PS-3m minus K0-3m. C5
+PH-3m minus K0-3m. C6 PS-3m minus K0. C7 PS minus K0 on holiday and Christmas rows. C8 PS minus K0
+on ordinary rows. C9 PS minus K0 on Christmas rows alone (reported, no verdict). Each is read at the
+99% level. The replicate months give the sign. Contrasts are also reported by lead band, by season,
+and by substation, and tail calibration at the 0.01, 0.05, 0.95, and 0.99 quantiles is reported
+overall and on cold nights.
+
+**Controls.**
+
+- **Reproduction.** K0's monthly fits match experiment 111's stored `gamk` fits to a maximum
+  coefficient difference of 1e-8 at every cut and substation, and K0's scored-year score matches
+  experiment 136's A0 within 0.001.
+- **Leakage.** The fit asserts that no training row ends after the cut. The leave-one-out check
+  re-fits PS with each substation held out of the fleet in turn, and the headline contrast keeps
+  its sign.
+- **Known answer.** [Experiment 154](../00154-differentiable-physics-n0-gate-2-heating-error-against-truth/result.md)
+  is the known-answer gate of the same fit, on synthetic fleets. It is not repeated here.
+- **Bookends.** K0 (no pooling) and tied (complete pooling) bracket PH and PS. A pooled arm that
+  scores worse than tied at 24 months on all rows fails the check that shrinkage is working.
+
+**Five triggers (size).** Stored: private files only. Serving path: not touched. Degradation rule:
+not touched. More than one design defensible: yes, pre-registered above. Callers not nameable
+without searching: no, the scripts copy experiment 136's and call one reviewed fit.
+
+**Audit triggers to watch.** Trigger 1 (the bookend check), trigger 2 (a result against its
+prediction, likely at full history), and trigger 5 (a nested arm beating the arm that contains it:
+PS against PH).
+
+**Resources.** CPU only, at most 8 cores with one thread per worker, each job under `systemd-run
+--user --scope -p MemoryMax=16G -p OOMPolicy=continue`. No GPU. A joint fit across 27 monthly cuts
+takes under a minute and one substation's forecast takes seconds.
+
+**Advice followed and departures.** From experiment 154: share the heating curve, keep every offset
+and level per substation, and do not claim a substation's own heating offset is learned from short
+windows (the 3-month arms are scored on forecast skill, not on the offset). From experiment 150:
+treat the penalty as tuned on the tuning months, not carried over. From experiment 149: no
+drift term is used. Departure: K0 is experiment 136's A0 and not experiment 155's arm, because
+experiment 155 has not run.
