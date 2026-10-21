@@ -399,6 +399,67 @@ def reference_filter(
     return out
 
 
+def reference_forecast_error(
+    *,
+    trace: joint.JointTrace,
+    reference_state: np.ndarray,
+    window: np.ndarray,
+    data: streams.SiteStreams,
+    dates: np.ndarray,
+    params: joint.JointParams,
+) -> float:
+    """Return the largest gap between the code's corrections and the dense reference's.
+
+    For five cutoffs spread over the window, the reference propagates its own dense state to each of
+    the next 100 grid rows with an explicit transition matrix, counting midnights from the local
+    dates, and sums the level, anomaly, and day-level entries of the band. Both
+    `correction_from_state` and `day_ahead_corrections` must give the same totals.
+
+    Args:
+        trace: The filter's trace on the window.
+        reference_state: The dense reference's state after each reading of the window.
+        window: The grid row of each reading.
+        data: The site's streams.
+        dates: The local date of every grid row, `datetime64[D]`.
+        params: The filter's constants.
+
+    Returns:
+        The largest absolute gap, in points.
+    """
+    worst = 0.0
+    for k in np.linspace(len(window) // 10, len(window) - 1, num=5).astype(int):
+        targets = np.arange(window[k] + 1, min(window[k] + 101, len(dates)))
+        band = data.band[targets]
+        expected = np.empty(len(targets))
+        for i, row in enumerate(targets):
+            gap = int(row - window[k])
+            midnights = int((dates[row] - dates[window[k]]).astype(int))
+            propagated = reference_state[k].copy()
+            propagated[4:8] *= params.phi**gap
+            propagated[8] *= params.phi_d**midnights
+            expected[i] = propagated[band[i]] + propagated[4 + band[i]] + propagated[8]
+        from_state = joint.correction_from_state(
+            state=joint.state_at(trace=trace, cutoff=int(window[k])),
+            params=params,
+            band=band,
+            target=targets,
+            target_day=data.day[targets],
+        )
+        day_ahead = joint.day_ahead_corrections(
+            trace=trace,
+            rows=targets,
+            cutoffs=np.full(len(targets), window[k]),
+            band=data.band,
+            day=data.day,
+        )
+        worst = max(
+            worst,
+            float(np.abs(from_state.total - expected).max()),
+            float(np.abs(day_ahead.total - expected).max()),
+        )
+    return worst
+
+
 def p_day() -> dict:
     """Check the bands, the local days, and the midnight counts across the clock changes."""
     cache = common.load_cache()
@@ -435,6 +496,7 @@ def p_day() -> dict:
     data = streams.load_site_streams(site=site)
     residual = data.fit_residual(cache=cache)
     worst = 0.0
+    worst_forecast = 0.0
     for first, last in CLOCK_CHANGE_WINDOWS:
         window = np.flatnonzero(
             (calendar.local_date >= np.datetime64(first))
@@ -457,8 +519,21 @@ def p_day() -> dict:
             params=TEST_PARAMS,
         )
         worst = max(worst, float(np.abs(trace.state - expected).max()))
+        worst_forecast = max(
+            worst_forecast,
+            reference_forecast_error(
+                trace=trace,
+                reference_state=expected,
+                window=window,
+                data=data,
+                dates=calendar.local_date,
+                params=TEST_PARAMS,
+            ),
+        )
     outcome["joint_filter_vs_dense_reference"] = worst
     outcome["reference_agrees"] = bool(worst < P_DAY_TOLERANCE)
+    outcome["forecast_vs_dense_reference"] = worst_forecast
+    outcome["forecast_agrees"] = bool(worst_forecast < P_DAY_TOLERANCE)
     outcome["passed"] = all(value for key, value in outcome.items() if isinstance(value, bool))
     outcome["stop"] = not outcome["passed"]
     print(outcome)
@@ -636,7 +711,13 @@ def sparse_draw(job: tuple[str, int, float]) -> dict:
         base=truth,
         threshold=fit.THRESHOLD_NATS,
     )
-    return {"site": site, "draw": draw, "true_q": true_q, "active": result.active.tolist()}
+    return {
+        "site": site,
+        "draw": draw,
+        "true_q": true_q,
+        "active": result.active.tolist(),
+        "q_of_left_out_bands": result.q[~result.active].tolist(),
+    }
 
 
 def p_sparse(*, draws: int, workers: int) -> dict:
@@ -650,6 +731,8 @@ def p_sparse(*, draws: int, workers: int) -> dict:
     with ProcessPoolExecutor(max_workers=workers) as pool:
         outputs = list(pool.map(sparse_draw, jobs))
     result: dict = {"draws_per_site": draws}
+    left_out = [q for output in outputs for q in output["q_of_left_out_bands"]]
+    result["left_out_bands_have_q_exactly_zero"] = all(q == 0.0 for q in left_out)
     for true_q in (0.0, SPARSE_TRUE_Q):
         active = np.array([o["active"] for o in outputs if o["true_q"] == true_q])
         result[f"true_q_{true_q}"] = {
@@ -658,7 +741,11 @@ def p_sparse(*, draws: int, workers: int) -> dict:
         }
     false_rate = max(result["true_q_0.0"]["share_kept_by_band"])
     true_rate = min(result[f"true_q_{SPARSE_TRUE_Q}"]["share_kept_by_band"])
-    result["passed"] = bool(false_rate <= SPARSE_FALSE_MAX and true_rate >= SPARSE_TRUE_MIN)
+    result["passed"] = bool(
+        false_rate <= SPARSE_FALSE_MAX
+        and true_rate >= SPARSE_TRUE_MIN
+        and result["left_out_bands_have_q_exactly_zero"]
+    )
     result["stop"] = False
     return result
 
