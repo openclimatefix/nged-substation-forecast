@@ -25,7 +25,7 @@ import e00161_filters as filters
 import e00161_tall as tall
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00161_ens import SiteSetup
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens_weather import Calibration, proxy_cache
