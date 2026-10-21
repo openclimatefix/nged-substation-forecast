@@ -252,6 +252,27 @@ already built and tested in earlier experiments.
   2.6e-6 points, looser than the plan's 1e-6 because the ridge is divided between the pieces.
 - **Prediction miss on cold-night coverage.** Predicted 73% to 85%, observed 88% to 90%.
 
+## Width of the bands by lead day (arm A2, scored year, descriptive)
+
+**The median 5% to 95% band width is a staircase in lead, not a smooth widening.** The spread table
+has four lead bands (up to 24, 48, 144, and 168 hours), each fitted separately by hour band and
+calendar quarter, so the width is constant across lead days 3 to 6 and steps at days 1, 2, and 7.
+Over a whole year the medians never fall, but in a single week the width can fall between bands,
+because each band's table for a given hour band and quarter is estimated on its own.
+
+| Site | Median width, lead days 1 to 7 (points) | q95 coverage, lead days 1 to 7 |
+|---|---|---|
+| D5 | 19.7, 21.5, 25.0, 25.0, 25.0, 25.0, 28.0 | 0.912, 0.923, 0.932, 0.923, 0.919, 0.912, 0.912 |
+| D10 | 22.2, 25.1, 32.6, 32.6, 32.6, 32.6, 36.1 | 0.960, 0.971, 0.978, 0.976, 0.971, 0.970, 0.960 |
+| D11 | 14.9, 15.9, 17.7, 17.7, 17.7, 17.7, 18.2 | 0.946, 0.945, 0.959, 0.952, 0.949, 0.944, 0.951 |
+| D14 | 16.2, 16.5, 16.7, 16.7, 16.7, 16.7, 17.5 | 0.931, 0.946, 0.968, 0.965, 0.960, 0.953, 0.943 |
+| D16 | 12.9, 13.3, 14.1, 14.1, 14.1, 14.1, 15.3 | 0.927, 0.939, 0.940, 0.933, 0.934, 0.923, 0.926 |
+| D9 | 14.6, 15.0, 14.8, 14.8, 14.8, 14.8, 15.8 | 0.954, 0.956, 0.953, 0.950, 0.945, 0.943, 0.942 |
+
+- **A fix needs no refit.** Interpolating each hour-band and quarter cell between the lead bands'
+  centres, or forcing each cell to be non-decreasing in lead, would give bands that widen with lead.
+  Neither has been scored (`e00136_width.py` prints the table).
+
 ## Caveats
 
 - **Caveat on POOL.** POOL was chosen on experiment 111's fits, not on T-all's.
