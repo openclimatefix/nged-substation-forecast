@@ -19,7 +19,7 @@ from e00162_h_shaped import terms
 from e00162_s_d_common import WORK_DIR
 from e00162_s_d_inject import stamp_of_month
 
-ARMS: Final[tuple[str, ...]] = ("SHARE", "CONST", "DEMAND", "SOLAR", "MIX")
+ARMS: Final[tuple[str, ...]] = ("SHARE", "CONST", "DEMAND", "SOLAR", "MIX", "PVOUT")
 DRAWS: Final[int] = 20_000
 LEVEL: Final[float] = 0.05 / 9
 """Bonferroni level of the nine planned contrasts."""
@@ -162,6 +162,34 @@ def daylight_flags() -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+def donor_found(arm: str, family: str, *, anchored: bool) -> pl.DataFrame:
+    """Per event: whether an interval on the donor starts near the onset (or near first light for solar-shaped arms)."""
+    rows = []
+    for path in sorted((WORK_DIR / "worlds" / arm).glob("world_*.npz")):
+        world = int(path.stem.split("_")[1])
+        with np.load(path) as stored:
+            events = stored["events"]
+        if family == "RONC":
+            iv = pl.read_parquet(WORK_DIR / "worlds" / arm / f"world_{world}.parquet").filter(
+                pl.col("setting") == "R0_M48"
+            )
+        else:
+            iv = pl.read_parquet(WORK_DIR / "detect" / arm / f"world_{world}_W8_pair.parquet")
+        onsets = {}
+        for r in iv.iter_rows(named=True):
+            onsets.setdefault(r["series"], []).append(r["onset"])
+        for event_id, donor, onset, end, _ in events:
+            anchor = int(onset)
+            t = terms(series=int(donor))
+            if anchored and arm in ("SOLAR", "PVOUT") and t is not None:
+                sun = t["solar"][int(onset) : int(end)]
+                if np.isfinite(sun).any() and np.nanmax(sun) > 0:
+                    anchor = int(onset) + int(np.argmax(np.nan_to_num(sun) > 0.1 * np.nanmax(sun)))
+            found = any(abs(o - anchor) <= ONSET_TOLERANCE for o in onsets.get(int(donor), []))
+            rows.append({"world": world, "event_id": int(event_id), "found": found})
+    return pl.DataFrame(rows)
+
+
 def paired(*, frame: pl.DataFrame, family: str, arm: str, base: str = "CONST") -> pl.DataFrame:
     """Events of two arms side by side (arm 'a', base 'b')."""
     sel = frame.filter(pl.col("family") == family)
@@ -197,7 +225,7 @@ def main() -> None:
     print("events using the net-power fallback shape (donor without terms):", fb)
     mm = events.filter(pl.col("family") == "RONC").group_by("arm").agg(pl.col("moved_mw").mean())
     print(
-        "mean moved MW per event by arm:",
+        "mean moved MW per event by arm (positive deltas summed over series; not comparable for PVOUT, whose positive delta is at the donor; the donor mean is matched by construction):",
         dict(zip(mm["arm"], [round(x, 4) for x in mm["moved_mw"]], strict=True)),
     )
     print(
@@ -224,7 +252,7 @@ def main() -> None:
         },
     )
     contrasts = {}
-    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX"):
+    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX", "PVOUT"):
         print(f"\n-- {arm} minus CONST --")
         for family, name in (
             ("NEW8", "P4 pair-alarm recall"),
@@ -241,6 +269,51 @@ def main() -> None:
         r = boot_groups(table=t, key="ym", stat=lambda x: float((x["lag_a"] - x["lag_b"]).median()))  # ty: ignore[invalid-argument-type]
         print(f"  P6 pair-alarm lag (h), {t.height} events both find: {fmt(*r)}")
         contrasts[f"{arm}_P6"] = r
+    print(
+        "\n== post hoc: recall by matching an interval on the donor only, a solar-shaped transfer scored from first light =="
+    )
+    key = even.filter((pl.col("arm") == "CONST") & (pl.col("family") == "RONC")).select(
+        "world", "event_id", "ym", "moved_mw", "covered"
+    )
+    base_arm = {}
+    for family, label in (("NEW8", "pair alarm"), ("RONC", "RO-NC")):
+        base_arm[family] = donor_found("CONST", family, anchored=False).join(
+            key, on=["world", "event_id"]
+        )
+        w = base_arm[family]["moved_mw"].to_numpy()
+        print(
+            f"  {label}: CONST (donor match, drawn onset) {float((base_arm[family]['found'].cast(pl.Float64).to_numpy() * w).sum() / w.sum()):.3f}; on events with a metered receiver {float((base_arm[family].filter(pl.col('covered'))['found'].cast(pl.Float64) * base_arm[family].filter(pl.col('covered'))['moved_mw']).sum() / base_arm[family].filter(pl.col('covered'))['moved_mw'].sum()):.3f}"  # ty: ignore[unsupported-operator]
+        )
+        for arm in ("SOLAR", "PVOUT", "MIX", "DEMAND", "SHARE"):
+            for anchored in (False, True):
+                if anchored and arm not in ("SOLAR", "PVOUT"):
+                    continue
+                t = (
+                    donor_found(arm, family, anchored=anchored)
+                    .join(key, on=["world", "event_id"])
+                    .join(
+                        base_arm[family].select("world", "event_id", found_b="found"),
+                        on=["world", "event_id"],
+                    )
+                )
+                r = boot_groups(
+                    table=t,
+                    key="ym",
+                    stat=lambda x: float(
+                        (  # ty: ignore[unsupported-operator]
+                            (x["found"].cast(pl.Float64) - x["found_b"].cast(pl.Float64))
+                            * x["moved_mw"]
+                        ).sum()
+                        / x["moved_mw"].sum()
+                    ),
+                )
+                absolute = float(
+                    (t["found"].cast(pl.Float64) * t["moved_mw"]).sum() / t["moved_mw"].sum()  # ty: ignore[unsupported-operator]
+                )
+                print(
+                    f"    {arm} {'from first light' if anchored else 'drawn onset'}: recall {absolute:.3f}; minus CONST {fmt(*r)}"
+                )
+                contrasts[f"{arm}_{family}_donor_{'first_light' if anchored else 'onset'}"] = r
     print("\n== causal live end rule (R2_M48) on the donor, even-month events with an alarm ==")
     ends = pl.concat([end_coverage(a) for a in ARMS])
     key = events.filter(pl.col("family") == "RONC").select(
@@ -260,7 +333,7 @@ def main() -> None:
         )
     flags = daylight_flags()
     ends = ends.join(flags, on=["world", "event_id"])
-    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX"):
+    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX", "PVOUT"):
         a = ends.filter(pl.col("arm") == arm).select(
             "world", "event_id", "ym", "daylight", cov_a="cov0"
         )
@@ -279,7 +352,7 @@ def main() -> None:
     )
     print("\n== sensitivity: detection contrasts on daylight events only ==")
     flagged = even.join(flags, on=["world", "event_id"]).filter(pl.col("daylight"))
-    for arm in ("DEMAND", "SOLAR", "MIX"):
+    for arm in ("DEMAND", "SOLAR", "MIX", "PVOUT"):
         for family, name in (
             ("NEW8", "pair-alarm recall"),
             ("RONC", "RO-NC recall"),
@@ -320,7 +393,7 @@ def main() -> None:
         )
     keys = ["site", "world", "period", "row"]
     base = scores["CONST"]
-    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX"):
+    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX", "PVOUT"):
         t = scores[arm].join(base.select(*keys, **{f"{a}_c": a for a in MASK_ARMS}), on=keys)
         print(f"  {arm} vs CONST: rows {t.height} of {scores[arm].height} / {base.height}")
         months = t["month"].to_numpy()
@@ -346,7 +419,7 @@ def main() -> None:
         "\n== checks: error of the mean and median forecast, MASK_UNION, arm minus CONST (points of capacity) =="
     )
     raw = {}
-    for arm in ("CONST", "SHARE", "DEMAND", "SOLAR", "MIX"):
+    for arm in ("CONST", "SHARE", "DEMAND", "SOLAR", "MIX", "PVOUT"):
         f = pl.concat(
             [pl.read_parquet(p) for p in sorted((WORK_DIR / "scores" / arm).glob("*.parquet"))]
         ).filter(pl.col("arm") == "MASK_UNION")
@@ -357,7 +430,7 @@ def main() -> None:
                 + pl.duration(minutes=(pl.col("lead_hours") * 60).cast(pl.Int64))
             ).dt.strftime("%Y-%m")
         )
-    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX"):
+    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX", "PVOUT"):
         t = raw[arm].join(
             raw["CONST"].select(*keys, mean_c="err_mean", med_c="err_median"), on=keys
         )

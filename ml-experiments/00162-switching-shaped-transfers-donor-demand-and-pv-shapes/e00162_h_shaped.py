@@ -8,7 +8,10 @@ shape of the moved power:
 - `SHARE`: a drifting share of the donor's net power (experiment 58, as in experiments 141 and 156).
 - `CONST`: a constant.
 - `DEMAND`: proportional to the donor's demand term of the convex model.
-- `SOLAR`: proportional to the donor's solar output (zero at night).
+- `SOLAR`: proportional to the donor's solar output (zero at night), taken away from the donor's
+  net power: a daytime load leaves the donor.
+- `PVOUT`: the same shape with the opposite sign, so the donor's net power rises at midday: solar
+  output leaves the donor, as when a transfer moves rooftop panels.
 - `MIX`: half the mean MW demand-shaped and half solar-shaped.
 
 A donor without convex-model terms (series 12 and 13) falls back to its own net power as the shape
@@ -23,7 +26,7 @@ import numpy as np
 from e00162_h_common import GRID_LENGTH, WORK_DIR
 from e00162_h_inject import Event, Injection, _share, inject_power
 
-ARMS: Final[tuple[str, ...]] = ("SHARE", "CONST", "DEMAND", "SOLAR", "MIX")
+ARMS: Final[tuple[str, ...]] = ("SHARE", "CONST", "DEMAND", "SOLAR", "MIX", "PVOUT")
 TERMS_DIR: Final = WORK_DIR / "terms"
 _TERMS: dict[int, dict[str, np.ndarray]] = {}
 
@@ -61,7 +64,7 @@ def shape_of(
     fallback = _unit(values=net) if arm != "SHARE" else None
     if arm == "DEMAND":
         out = demand
-    elif arm == "SOLAR":
+    elif arm in ("SOLAR", "PVOUT"):
         out = solar
     else:
         out = 0.5 * (demand + solar) if demand is not None and solar is not None else None
@@ -86,7 +89,7 @@ def inject_arm(
         target = float((share * donor_power).mean())
         unit, used_fallback = shape_of(arm=arm, donor=event.donor, stamps=stamps, net=donor_power)
         fallbacks += int(used_fallback)
-        moved = target * unit
+        moved = (-target if arm == "PVOUT" else target) * unit
         out[event.donor][stamps] -= moved
         delta[event.donor][stamps] -= moved
         for receiver, weight in zip(event.receivers, event.weights, strict=True):

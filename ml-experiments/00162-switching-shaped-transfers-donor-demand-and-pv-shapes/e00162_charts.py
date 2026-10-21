@@ -9,6 +9,7 @@ The series are Primary substations, not NGED generators.
 
 from __future__ import annotations
 
+import json
 import textwrap
 from pathlib import Path
 from typing import Final
@@ -223,67 +224,63 @@ def figure_identification() -> None:
 ARM_LABELS: Final[dict[str, str]] = {
     "SHARE": "Share of net power (experiments 141, 156)",
     "DEMAND": "Demand-shaped",
-    "SOLAR": "Solar-shaped",
-    "MIX": "Half demand, half solar",
+    "SOLAR": "Daytime load leaves the donor (solar shape)",
+    "PVOUT": "Solar output leaves the donor",
+    "MIX": "Half demand, half daytime load",
     "CONST": "Constant MW",
 }
+ARM_ORDER: Final[tuple[str, ...]] = ("SHARE", "DEMAND", "MIX", "SOLAR", "PVOUT")
 ARM_COLOURS: Final[list[str]] = [
     ocf.DATA_SKY,
     ocf.DATA_BLUE,
-    ocf.BRAND_ORANGE,
     ocf.DATA_PURPLE,
-    "#444444",
+    ocf.BRAND_ORANGE,
+    ocf.DATA_GREEN,
 ]
 
 
 def _forest(
     *, rows: list[dict], title: alt.TitleParams, x_title: str, height: int
-) -> alt.TopLevelMixin:
+) -> alt.LayerChart:
     data = pl.DataFrame(rows)
     order = list(dict.fromkeys(data["label"]))
+    labels = [ARM_LABELS[a] for a in ARM_ORDER]
     base = alt.Chart(data)
     y = alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=340))
+    offset = alt.YOffset("arm:N", sort=labels)
     colour = alt.Color(
         "arm:N",
-        legend=alt.Legend(orient="top", title=None, columns=2, labelLimit=400),
-        scale=alt.Scale(
-            domain=[ARM_LABELS[a] for a in ("SHARE", "DEMAND", "SOLAR", "MIX")],
-            range=ARM_COLOURS[:4],
-        ),
+        legend=alt.Legend(orient="top", title=None, columns=1, labelLimit=400),
+        scale=alt.Scale(domain=labels, range=ARM_COLOURS),
     )
     return (
         base.mark_rule(strokeWidth=3).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("low:Q", title=x_title),
-            x2="high:Q",
-            y=y,
-            yOffset=alt.YOffset("arm:N", sort=list(ARM_LABELS.values())),
-            color=colour,
+            x=alt.X("low:Q", title=x_title), x2="high:Q", y=y, yOffset=offset, color=colour
         )
-        + base.mark_point(filled=True, size=80, opacity=1).encode(  # ty: ignore[unresolved-attribute]
-            x="point:Q",
-            y=y,
-            yOffset=alt.YOffset("arm:N", sort=list(ARM_LABELS.values())),
-            color=colour,
+        + base.mark_point(filled=True, size=70, opacity=1).encode(  # ty: ignore[unresolved-attribute]
+            x="point:Q", y=y, yOffset=offset, color=colour
         )
-        + alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
+        + alt.Chart(pl.DataFrame({"x": [0.0]}))
         .mark_rule(color="#444444", strokeDash=[4, 3])
-        .encode(x="x:Q")
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     ).properties(width=WIDTH, height=height, title=title)
 
 
 def figure_contrasts() -> None:
     """Contrasts of each shaped arm against the constant-MW arm."""
-    import json
-
     summary = json.loads((WORK_DIR / "part2_summary.json").read_text())
     share_rows, score_rows = [], []
-    for arm in ("SHARE", "DEMAND", "SOLAR", "MIX"):
-        for key, label in (
-            ("P4 pair-alarm recall", "Pair alarm: share of moved MW found"),
-            ("P5 RO-NC recall", "RO-NC: share of moved MW found"),
-            ("P7", "End rule: share of the true interval covered"),
+    for arm in ARM_ORDER:
+        solar = arm in ("SOLAR", "PVOUT")
+        light = "first_light" if solar else "onset"
+        for name, label in (
+            (f"{arm}_P4 pair-alarm recall", "Pair alarm: onset as drawn"),
+            (f"{arm}_NEW8_donor_{light}", "Pair alarm: solar shapes scored from first light"),
+            (f"{arm}_P5 RO-NC recall", "RO-NC: onset as drawn"),
+            (f"{arm}_RONC_donor_{light}", "RO-NC: solar shapes scored from first light"),
+            (f"{arm}_P7", "End rule: share of the true interval covered"),
         ):
-            point, _, _, lo, hi = summary[f"{arm}_{key}"]
+            point, _, _, lo, hi = summary[name]
             share_rows.append(
                 {"label": label, "arm": ARM_LABELS[arm], "point": point, "low": lo, "high": hi}
             )
@@ -300,25 +297,25 @@ def figure_contrasts() -> None:
     top = _forest(
         rows=share_rows,
         x_title="Difference from constant MW (share; larger is better)",
-        height=260,
+        height=420,
         title=_title(
-            text="A solar-shaped transfer is much harder for the detectors to find than a constant one",
-            line="Each dot: the mean difference from a transfer of the same mean MW moved at a constant rate, on the 611 simulated transfers that start in even months. Line: interval from resampling whole months at a level corrected for nine contrasts. Dashed line: no difference.",
+            text="A solar-shaped transfer is hard for RO-NC and the end rule to follow, but the pair alarm finds it from first light",
+            line="Each dot: mean difference from a transfer of the same mean MW at a constant rate, on the 611 simulated transfers that start in even months. Line: interval from resampling whole months, corrected for nine contrasts. Dashed line: no difference. Rows marked first light score a solar-shaped transfer from sunrise instead of the drawn onset.",
         ),
     )
     bottom = _forest(
         rows=score_rows,
         x_title="Difference from constant MW (points of capacity; smaller is better)",
-        height=90,
+        height=110,
         title=alt.TitleParams(text=""),
     )
-    _save(chart=alt.vconcat(top, bottom).resolve_scale(color="shared"), name="figure_4_contrasts")  # ty: ignore[invalid-argument-type]
+    _save(chart=alt.vconcat(top, bottom).resolve_scale(color="shared"), name="figure_4_contrasts")
 
 
 def figure_scores() -> None:
     """Mean quantile score of each forecast on each injection arm."""
     rows = []
-    for arm in ("SHARE", "CONST", "DEMAND", "SOLAR", "MIX"):
+    for arm in ("CONST", *ARM_ORDER):
         frame = pl.concat(
             [pl.read_parquet(p) for p in sorted((WORK_DIR / "scores" / arm).glob("*.parquet"))]
         )
@@ -338,9 +335,9 @@ def figure_scores() -> None:
             )
     data = pl.DataFrame(rows)
     chart = (
-        alt.Chart(data)  # ty: ignore[unresolved-attribute]
+        alt.Chart(data)
         .mark_point(filled=True, size=90, opacity=1)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "score:Q",
                 title="Mean quantile score (points of capacity; smaller is better)",
@@ -349,7 +346,7 @@ def figure_scores() -> None:
             y=alt.Y(
                 "arm:N",
                 title=None,
-                sort=[ARM_LABELS[a] for a in ("CONST", "SHARE", "DEMAND", "MIX", "SOLAR")],
+                sort=[ARM_LABELS[a] for a in ("CONST", *ARM_ORDER)],
                 axis=alt.Axis(labelLimit=330),
             ),
             color=alt.Color(
@@ -376,7 +373,7 @@ def figure_scores() -> None:
         )
         .properties(
             width=WIDTH,
-            height=200,
+            height=220,
             title=_title(
                 text="The mask forecast gains least on solar-shaped transfers",
                 line="Mean quantile score of each forecast on forecast origins after a simulated transfer began, by how the transfer's power was shaped over the day. Scores are against the true series without the transfer.",
