@@ -7,7 +7,7 @@ also_relevant_to:
 - production-reference-and-best-guess
 - calibration-and-uncertainty
 - lagged-power-and-error-correction
-status: planned
+status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00155-dp-bg-stage2-assembly-night-offset-and-error-correction/ only. Serving
@@ -84,13 +84,228 @@ metric: >-
   0.99 quantiles; the quantile score by lead hour up to 24 hours, to check that errors do not grow
   from 3.5 to 9.5 hours of lead
 code: ml-experiments/00155-dp-bg-stage2-assembly-night-offset-and-error-correction/
-production_status: not-for-production
+verdict: inconclusive
+best_arm: >-
+  C (arm A plus recipe R at every lead), 2.754 points over leads 0.5 to 168 hours in the scored year,
+  against 2.791 for A, 2.756 for the arm with both corrections, 2.780 for BG2, and 2.800 for
+  experiment 111's GAM-K
+headline: >-
+  Recipe R lowered the score by 0.037 points against the stage 1 assembly (99% interval -0.062 to
+  -0.016; 5 of 5 substations) and the winter night offset by 0.017 (-0.033 to -0.002), but the
+  offset added nothing on top of R (+0.002, -0.004 to +0.009). The verdict is capped at
+  `inconclusive` because the pre-registered placebo gained as much as the real offset.
+lessons:
+  - >-
+    Recipe R carries the whole gain: it lowers the score at 12 of 12 months and 5 of 5 substations,
+    and the offset's gain is mostly the same winter-night error, so R fitted on the offset's errors
+    removes about 58% of the offset (audit, finding 2).
+  - >-
+    The offset's gain comes from splitting the year into a winter half and a summer half: random
+    five-month sets gained -0.003 on average, and only Nov-Mar, Apr-Aug, and May-Sep splits gained
+    -0.017 (audit, finding 1), so the placebo that moved the indicator six months could not tell.
+  - >-
+    BG2 scores 0.9 points better than the GAM-K arms on Christmas rows (2.31 against 3.23), but those
+    rows come from one Christmas, 12 runs, and 4 substations (audit, finding 3).
+take_home_message: >-
+  Adding recipe R, which subtracts 0.75 times the mean error of the last 14 days by half-hour,
+  lowers the stage 1 assembly's score by about 0.04 points (1.3%), and the winter night offset
+  adds nothing once R is in. The assembly with R scores 2.754 against BG2's 2.780, which is better
+  by 0.026 points with an interval too wide to rank the two. The pre-registered placebo control
+  failed, so the formal verdict is inconclusive, but the choice of winning arm (R alone) does not
+  depend on it.
+advice:
+  - >-
+    Start the calibration experiments from arm C (stage 1 plus recipe R at every lead): it scored
+    2.754 and no other arm was lower by more than 0.005 points (figure 1, C2).
+  - >-
+    Apply recipe R at every lead, not only the first 48 hours: limiting it cost 0.023 points
+    (0.007 to 0.041) over all leads (C8).
+  - >-
+    Do not add the winter night offset to recipe R: it added +0.002 (-0.004 to +0.009) and is worse
+    than R alone in daytime half-hours by 0.005 (audit, finding 2; C4).
+  - >-
+    Do not use the analog correction at every lead: it gained 0.039 points at day D+1 but nothing
+    over all leads, and scored 0.12 points worse on bank holidays other than Christmas (C7).
+  - >-
+    Build a placebo for a seasonal term from random month sets of the same length, not from the
+    indicator moved by six months, which spans the same space as the real indicator (audit, finding
+    1).
+  - >-
+    Report Christmas as one event with a per-day table, and draw no ranking from it: BG2's 0.9-point
+    lead rests on 12 runs from one Christmas (audit, finding 3).
+date: 2026-10-21
+pr: 1456
+production_status: candidate
 adopted_in: none
 ---
 
 # Experiment 155: does GAM-K with a winter night offset and recipe R beat the stage 1 assembly?
 
-Plan only; the write-up follows the runs.
+**Subtracting recipe R's 14-day error profile from the stage 1 forecast lowers its score by about
+0.04 points, and the winter night offset adds nothing once R is in.** The stage 1 assembly (arm A)
+scored 2.791 points over leads 0.5 to 168 hours in the scored year. Adding R gave 2.754 (C2 -0.037,
+99% interval -0.062 to -0.016), adding the offset alone gave 2.774 (C1 -0.017, -0.033 to -0.002),
+and adding both gave 2.756 (C3 -0.035, -0.061 to -0.014; C4, both against R alone, +0.002). The best
+arm is therefore R alone, which sits 0.026 points below BG2 (2.780) with an interval too wide to
+rank the two. The verdict is `inconclusive` because the pre-registered placebo gained as much as the
+real offset, and the rule caps the verdict there. Without the cap, C3's upper bound (-0.014) is
+above the -0.02 threshold, so the verdict would be `partly supported`. The next experiments start
+from arm C.
+
+We asked whether two corrections that earlier experiments found, a winter night offset
+([experiment 137](../00137-differentiable-physics-e7-economy-7-night-step-term-in-the-forecast/result.md)'s
+audit) and recipe R ([experiment 115](../00115-differentiable-physics-w1-diurnal-shape-state-on-ens/result.md),
+the 0.75-weighted mean error of the last 14 days by half-hour), improve the stage 1 forecast of
+[experiment 136](../00136-dp-bg-stage1-assembly-on-the-ensemble-mean/result.md), the convex
+demand model with a Kalman filter on recent errors driven by the ensemble-mean weather. We
+added each correction to experiment 136's stored forecasts, alone and together, refitted each arm's
+spread, and scored every arm on the same half-hourly rows at five Primary substations. Nothing is
+newly modelled: the analog correction of [experiment
+145](../00145-differentiable-physics-analog-day-error-correction-on-gam-k/result.md) is an extra
+arm.
+
+![Planned contrasts](figure_1_headline.svg)
+
+![Quantile score by lead band](figure_2_by_lead.svg)
+
+![Score minus arm A by breakout](figure_3_breakouts.svg)
+
+![Winter nights by half-hour](figure_4_half_hour.svg)
+
+## Results
+
+- **Arms and schedule.** A is experiment 136's A2 as stored. B adds the winter night offset. C adds
+  R at every lead. D adds R to B (R on B's own past errors). C48 and D48 limit R to leads of 48 hours
+  or less. E adds experiment 145's tuned analog correction to B. B0 is the offset without the winter
+  indicator (ablation). The fits are experiment 136's monthly refits on a 24-month window, so every
+  contrast is within that schedule.
+- **Rows.** `fold_a_daily_gap_v1`, scored year 2025-07-02 to 2026-06-29, five decision substations
+  (D5, D10, D11, D14, D16; D9 beside them), outside the hand-filtered switching events. The headline
+  rows are those that every arm and BG2, climatology, and the manual heuristic share. The store
+  holds 291 scored runs per substation, not the 292 the plan names. Five outage rows at D16 (actual
+  0) leave the headline because BG2 has no actual there.
+- **Absolute skill, all leads (points of effective capacity).** A 2.791, B 2.774, C 2.754, D 2.756,
+  C48 2.777, D48 2.766, E 2.757, B0 2.788, experiment 111's GAM-K 2.800, BG2 2.780, manual
+  heuristic 3.497, climatology 3.804. Day D+1: A 2.489, B 2.462, C 2.436, D 2.432, E 2.393, BG2
+  2.535, GAM-K 2.521. Replicate months (even months of 2024-07 to 2025-06), all leads: A 2.710, B
+  2.719, C 2.664, D 2.688, E 2.711.
+- **C1, B minus A (offset).** -0.017 (-0.033 to -0.002), 5 of 5 substations, 11 of 12 months;
+  replicate +0.009 (-0.022 to +0.048). Cold nights (daily mean below 2 °C, 5,395 rows) -0.058.
+- **C2, C minus A (R).** -0.037 (-0.062 to -0.016), 5 of 5 substations, 12 of 12 months; D+1 -0.053
+  (-0.087 to -0.022); replicate -0.047 (-0.106 to -0.001). Leaving out any one substation gives
+  -0.029 to -0.042.
+- **C3, D minus A.** -0.035 (-0.061 to -0.014); replicate -0.022 (-0.079 to +0.030). It lies 0.019
+  from the sum of C1 and C2, inside the predicted 0.02.
+- **C4, D minus C.** +0.002 (-0.004 to +0.009); replicate +0.024 (0.000 to +0.067). **C5, D minus
+  B.** -0.018 (-0.034 to -0.004).
+- **C6, D minus BG2.** -0.024 (-0.220 to +0.153), D+1 -0.103 (-0.306 to +0.093). **C13, A minus
+  BG2** +0.010, as experiment 136 found. The intervals are 0.3 to 0.4 points wide, so no arm can be
+  ranked against BG2.
+- **C7, E minus D.** +0.001 (-0.010 to +0.014) over all leads, -0.039 (-0.056 to -0.010) at D+1;
+  E scores 0.12 worse than D on bank holidays other than Christmas.
+- **C8 and C9, limiting R to 48 hours.** C48 minus C +0.023 (+0.007 to +0.041); D48 minus D +0.010
+  (-0.001 to +0.021). R helps beyond 48 hours as well.
+- **Spread refit (post hoc).** Using arm A's spread table for the corrected means scores 0.003 to 0.004
+  better than each arm's own refit (B 2.771, C 2.750, D 2.751), so refitting the spread on
+  tuning months that start with little history costs a little.
+- **Predictions against outcome.** C1 -0.017 against -0.02 to -0.04 (a little short; cold nights
+  -0.058 against -0.10 to -0.30, a miss). C2 -0.037 inside -0.03 to -0.08; at D+1 -0.053 against
+  -0.07 to -0.12 (a miss). C3 inside 0.02 of the sum. C48 and D48 worse by 0.023 and 0.010 (inside
+  0.00 to 0.03). E minus D at D+1 -0.039 (inside), all leads +0.001 (inside). The best arm scored
+  2.754 against 2.67 to 2.75, and minus BG2 -0.026 (just outside -0.03 to -0.11). The cold-night q95
+  coverage rose by 1.1 points at most (predicted 2 to 6).
+- **Verdict by the pre-registered rule.** The placebo control failed, so the verdict is capped at
+  `inconclusive`. The winning arm is C: its all-lead score is the lowest, D (2.756) and E (2.757)
+  are within 0.005 points, and C comes first in the tie order.
+
+## Tail calibration and breakouts (scored year, five decision substations)
+
+| Subset | Arm | q01 cov | q05 cov | q95 cov | q99 cov | Pinball q95 | Pinball q99 |
+|---|---|---|---|---|---|---|---|
+| All leads | A | 0.022 | 0.066 | 0.945 | 0.982 | 0.736 | 0.229 |
+| All leads | C | 0.023 | 0.069 | 0.946 | 0.982 | 0.748 | 0.233 |
+| All leads | D | 0.024 | 0.070 | 0.947 | 0.983 | 0.749 | 0.232 |
+| Cold nights | A | 0.043 | 0.073 | 0.827 | 0.941 | 0.927 | 0.307 |
+| Cold nights | B | 0.043 | 0.078 | 0.838 | 0.942 | 0.902 | 0.290 |
+| Cold nights | C | 0.043 | 0.092 | 0.827 | 0.939 | 0.944 | 0.329 |
+| Cold nights | D | 0.042 | 0.092 | 0.837 | 0.942 | 0.937 | 0.324 |
+| Cold nights | BG2 | 0.020 | 0.035 | 0.756 | 0.861 | 1.390 | 0.809 |
+
+- **Cold nights stay under-covered.** The q95 covers 82.7% to 84.3% of cold-night rows in every
+  arm (BG2 75.6%), against 94.5% over all rows. R leaves the cold-night upper tail unchanged and
+  worsens its q05 coverage (9.2% against 7.3%), and only the offset improves the pinball loss at
+  q95 and q99 there.
+- **Breakouts, quantile score minus arm A.** Winter nights: B -0.062, C -0.093, D -0.092. Winter:
+  B -0.037, C -0.067, D -0.064. Christmas rows only (7,775 rows): B -0.035, C -0.054, D -0.054, BG2
+  -0.921. Bank holidays without Christmas (11,138 rows): B +0.041, C +0.015, D +0.037, E +0.119,
+  BG2 +0.653.
+- **Christmas is one event.** The 7,775 Christmas rows come from 12 runs at 4 substations in one
+  month. A over-forecasts on 29 to 31 December by 6.7 to 7.9 points, and BG2 does not. BG2 is worse
+  than A on other bank holidays and on non-holiday December rows (audit, finding 3).
+- **The offset on the 22:00 to 23:00 half-hours.** B's score on winter nights at half-hours ending
+  22:00 and 22:30 UTC is 2.137 and 2.105, against 2.105 and 2.111 for A, so the offset does not
+  repeat the loss at 22:00 that experiment 137's term had, except by 0.03 at 22:00.
+- **Lead check.** The score of A falls from 0.5 to 3.5 hours to 3.5 to 9.5 hours by 0.476 points,
+  because the bands cover different hours of the day. Against A, B's difference is +0.003 (+0.001
+  to +0.005, passes the +0.02 bound) and the R arms' is -0.048 (-0.139 to +0.032, fails the bound
+  by its upper end and shows no growth in the point estimate). The production cadence is not tested.
+- **Curtailment cost against the manual heuristic was not computed**, because the repository has no
+  node metric for these substations yet.
+
+## Checks
+
+- **Median minus mean forecast, per substation:** 0.000 for arms A, B, and D at all six
+  substations, because the residual table is centred, so this check exposes nothing here.
+- **Mean forecast's error beside each contrast (mean absolute error):** C1 -0.035, C2 -0.090, C3
+  -0.087, C4 +0.003, C7 +0.009. Every contrast moves in the direction of its quantile score.
+- **Leave-one-out:** removing any one substation leaves C1 at -0.015 to -0.019, C2 at -0.029 to
+  -0.042, and C3 at -0.028 to -0.041, so trigger 4 did not fire.
+- **Controls.** Reproduction: arm A rescored on experiment 136's rows gives 2.791 (passed). Spread
+  refit with a zero shift reproduces A's quantiles to 1.5e-5 (passed). Leakage: corrupting `actual`
+  by 100 points from each cut (offset) and from the origin's own day (R) changed no applied shift
+  (maximum change 0.0, passed). Injected known answer: the winter-night step of 6 points is
+  recovered as 5.60 points at every substation (93%), and R's shift on an injected daily shape of
+  3 points is +2.06 (0.75 times the day-mean-corrected 2.75), inside 25% of +2.25 (passed).
+  **Placebo: failed.** The offset with the winter indicator moved six months scored 2.774, the same
+  as B (difference +0.00002), against a pass rule of at most half of C1.
+- **Zero-shift runs.** R's shift is zero for 4 of 184 tuning runs and none of the replicate or
+  scored runs at each substation.
+- **Triggers fired.** Trigger 1 (the placebo) and trigger 2 (predictions missed on cold nights and
+  at D+1). Trigger 5 did not fire, because C4's interval includes zero, although arm C scores 0.002
+  below arm D. Triggers 3, 4, and 6 did not fire. The Opus audit is in the private briefs folder
+  (`e155_audit_report.md`) and is triaged below.
+
+## Audit and triage
+
+- **Finding 1, placebo (accepted).** The placebo was degenerate: with per-slot constants, a May to
+  September indicator spans nearly the same space as a November to March indicator. A scan of 55 month
+  sets found that a five-month window gains about -0.017 only when it splits the year into winter and
+  summer halves, and 40 random five-month sets gained -0.003 on average (none as much as the real
+  flag). The gain therefore needs a seasonal split, and the real flag is the best one. The cap stays
+  because the rule was pre-registered, and the scan is reported as a labelled post hoc control.
+- **Finding 2, the two corrections overlap (accepted).** R fitted on B's errors removes about 58% of
+  the offset at night, and R's day-mean removal moves the offset's level onto daytime half-hours, so
+  D is worse than C by +0.005 (+0.002 to +0.008) in daytime. No order of the two beats C. The offset
+  is dropped from the winning arm.
+- **Finding 3, Christmas (accepted).** Rows and units match; the lead is real for one event. It is
+  reported as one event, with no ranking.
+- **Findings 4 and 5, no leakage and row-set details (accepted).** The row-set details are stated in
+  the Results.
+
+## Caveats
+
+- **One scored year.** The offset is fitted on one earlier winter, and the replicate months show
+  the offset's sign reversed (+0.009), so the offset's evidence is thin. The selection of arm C uses
+  the scored year, and the replicate months agree on R (-0.047).
+- **The intervals against BG2 are 0.3 to 0.4 points wide**, so the ranking of the corrected arms
+  against BG2 is open.
+- **Analog source days.** Arm E has fewer source days than experiment 145 had, because the stored
+  forecasts omit the every-fifth-day stride runs and the runs before 2024-07.
+
+## What to try next
+
+- **Calibrate the tails of arm C on cold nights**, where the q95 covers 82.7% of rows.
+- **Test the offset again at a second winter** with a placebo made of random month sets.
 
 ## Plan
 
