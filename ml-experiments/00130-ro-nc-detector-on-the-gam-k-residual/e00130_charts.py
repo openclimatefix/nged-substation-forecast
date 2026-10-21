@@ -110,13 +110,13 @@ def figure_contrasts(*, data: pl.DataFrame) -> alt.TopLevelMixin:
             y=y, x=alt.X("low:Q", title="Difference in share of moved MW found"), x2="high:Q"
         )
         + alt.Chart(frame)
-        .mark_point(filled=True, size=70, color=ocf.DATA_BLUE)  # ty: ignore[unresolved-attribute]
-        .encode(y=y, x="point:Q")
+        .mark_point(filled=True, size=70, color=ocf.DATA_BLUE)
+        .encode(y=y, x="point:Q")  # ty: ignore[unresolved-attribute]
     )
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0, 0.03], "label": ["no change", "threshold +0.03"]}))
-        .mark_rule(strokeDash=[4, 3], color="gray")  # ty: ignore[unresolved-attribute]
-        .encode(x="x:Q")
+        .mark_rule(strokeDash=[4, 3], color="gray")
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
     chart = (marks + zero).properties(width=WIDTH, height=130)
     return chart.properties(
@@ -165,8 +165,8 @@ def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
     frame = pl.DataFrame(rows)
     chart = (
         alt.Chart(frame)
-        .mark_bar()  # ty: ignore[unresolved-attribute]
-        .encode(
+        .mark_bar()
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "step:N",
                 sort=["0 to 2", "2 to 4", "4 to 6", "6 to 10", "10 or more"],
@@ -229,8 +229,8 @@ def figure_diagnostic() -> alt.TopLevelMixin:
     kinds = ["B noise / A noise", "C noise / A noise", "Share of a 3-day step kept by C"]
     chart = (
         alt.Chart(pl.DataFrame(rows))
-        .mark_circle(size=60)  # ty: ignore[unresolved-attribute]
-        .encode(
+        .mark_circle(size=60)
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("value:Q", title="Ratio (a step statistic in MW)"),
             y=alt.Y("series:N", title=None),
             color=alt.Color(

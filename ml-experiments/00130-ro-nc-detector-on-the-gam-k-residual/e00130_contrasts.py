@@ -264,7 +264,7 @@ def sanity_a16() -> None:
             frames.append(one)
         value = np.mean(
             [
-                float((f["weight"] * f["found"].cast(pl.Float64)).sum() / f["weight"].sum())
+                float((f["weight"] * f["found"].cast(pl.Float64)).sum()) / float(f["weight"].sum())
                 for f in frames
             ]
         )
