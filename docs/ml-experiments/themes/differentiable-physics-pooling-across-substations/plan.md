@@ -6,7 +6,6 @@ substation and was worse at full history.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| Partly pooled GAM shapes (proposed) | Do partly pooled GAM shapes (shared heating curve, per-substation offset from full history) beat per-site GAM fits now that PV and switching are explicit terms? | 1 | The explicit PV work, the full-history arm, and the switching terms; experiment 154 supports sharing the heating curve but not offsets learned from 4 weeks | Proposed |
 | Onboarding design (proposed) | Does a pooled model for onboarding and a per-site model for mature substations beat either alone? | 2 | Experiment 105: pooled onboarding scored 4.04 against 14.38 for a per-site model on 4 weeks, and was worse at full history | Proposed |
 | Part 4 (proposed) | Does a drift term (a slowly changing demand level), trained from 2019-09, beat the same model on its best window? | 3 | Experiment 112 (finished: an exact variable-projection fit did not improve the pooled model, and its known-answer test failed at realistic noise) | Proposed |
 | Part 5 (proposed) | Does the MVA observation layer (a model of how a meter that reads apparent power relates to real power) help the MW sites and recover MW at MVA sites? | 4 | Experiment 105 and a better capacity fit | Proposed |
@@ -27,6 +26,11 @@ the heating error against the injected truth on 4 winter weeks: the pooled fit b
 complete pooling on 5 of 5 seeds and recovered the fleet's shared curve as well as separate fits,
 but the sign of a substation's own offset was found on only 2 of 5 seeds, by the fair oracle no
 more reliably.
+
+**[Experiment 158](../../00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/result.md)
+fitted GAM-K's shared curves jointly across six substations.** A substation with 3 months of history
+scored 3.01 points instead of 3.64 (-0.629, 99% interval -1.639 to -0.091), and a substation with 24
+months scored the same as without pooling (+0.004, -0.006 to +0.014).
 
 ## Planned experiments
 
