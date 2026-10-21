@@ -152,6 +152,14 @@ Series with 26% to 82% of their dark half-hours negative carry embedded generati
 grid connection. The screen cannot work on an MVA Primary. Applies to experiments. Evidence:
 [experiment 103](00103-differentiable-physics-1-data-look/result.md), figure 9.
 
+## Unlabelled jumps
+
+**Check the placebo pairs of a year for unlabelled jumps before reading a placebo failure as a
+property of a method (low confidence).** D10 has two jump windows that carry no label. In the
+replicate year, 1.58 of the 4.27 MW-days a year that the edge-flow fit put on the unconnected pair
+D16 and D10 lie inside those windows. Applies to experiments. Evidence: [experiment
+131](00131-differentiable-physics-nra-edge-flows-drift-term/result.md).
+
 ## Fixed windows
 
 **Use the fixed lockdown window, 2020-03-23 to 2021-07-19, and do not detect the window from the
