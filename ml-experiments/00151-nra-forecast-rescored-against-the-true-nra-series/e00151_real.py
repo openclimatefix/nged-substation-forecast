@@ -14,6 +14,7 @@ because it covers these transfers.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Final
 
@@ -159,7 +160,7 @@ def main() -> None:  # noqa: PLR0915
     b = pl.concat(b_frames)
     b = b.with_columns(
         month=(
-            pl.lit(__import__("datetime").datetime(2024, 4, 1, 9))
+            pl.lit(datetime(2024, 4, 1, 9))  # noqa: DTZ001
             + pl.duration(days=pl.col("run"))
             + pl.duration(minutes=(pl.col("lead_hours") * 60).cast(pl.Int64))
         ).dt.strftime("%Y-%m")
