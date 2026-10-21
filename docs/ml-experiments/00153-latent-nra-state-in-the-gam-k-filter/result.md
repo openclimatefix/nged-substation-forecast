@@ -102,13 +102,42 @@ intervals, as experiment 151 does for subtraction.
 - **NEW-ORACLE:** the new filter fed the true transfer intervals with no delay (the ceiling).
 - **CLEAN:** GAM-K's filter on the stream without the injected transfers (reported beside, not the
   denominator of C1).
-- **Placebo (no injected transfer):** NEW-DET with the detected intervals shifted by a whole number
-  of weeks and applied to the stream without any injected transfer, and scored against the observed
-  series. K0 and NEW-DET should be equal there.
+- **GAM-ONLY, MASK, NEW-DETNOCAP, NEW-DET96, NEW-TRUEEND:** see the design changes below.
+- **Placebo:** see the design changes below (real alarms on the recorded power).
 
 The ratio of x's process noise to n's is set on the tuning months (the odd months) from {10, 100,
 1000, 10000}, scored by quantile score on NEW-DET's pre-registered post-alarm rows against the true
 NRA, as 141 tuned its multiplier; the scored months are not used to choose it.
+
+## Design changes made before any score was read
+
+The manager's strategy review and the switching-events discussion session asked for the changes
+below. No arm had been scored when they were made; the first run was stopped and discarded.
+
+- **Two denominators.** Every share is reported against NEW-ORACLE (the pre-registered C1) and
+  against CLEAN, so the verdict is comparable with experiment 151's.
+- **Two floors.** GAM-ONLY ignores power (the GAM-K member forecasts with no correction). MASK is
+  K0 with the readings inside every known interval missing, re-run from the onset. If NEW-DET is
+  about as good as MASK, masking is the far smaller production change.
+- **End rule.** The detected arms use the detected end plus 60 half-hours (the 6-hour lookahead
+  rule's median call lag). A sensitivity arm (NEW-DET96) uses 96 half-hours, the 90th percentile.
+  NEW-TRUEEND keeps the detected alarm but ends the offset at the true end, so the post-end loss
+  from a late end is visible. The offset decays by a factor of 0.5 per reading after its end
+  (one reading per hour band per day), a time constant of 1.4 days, and it is not carried into the
+  forecast.
+- **Interval cap.** An interval still open 14 days after its onset has its offset folded into the
+  NRA level, because a step with no return would otherwise hold the level frozen. NEW-DETNOCAP
+  shows the effect of the cap.
+- **Row sets are not pooled in a headline.** Scores are reported separately inside the transfer,
+  in the 48 hours after the true end, and in the remaining rows (detection lag, after the detected
+  end), and by transfer duration (1 to 3 days, 3 to 7 days, over 7 days). C1 stays the pooled
+  post-alarm rows for the decision rule only.
+- **Placebo uses real alarms.** The placebo is experiment 148's real causal alarms (6-hour
+  lookahead) on the recorded power, with the new filter, MASK, and K0 scored against the recorded
+  series outside the logged switching periods. Intervals shifted by whole weeks are not used.
+- **No circular real check.** The labelled MW is the detector's own step, so observed power plus
+  labelled MW is not used as the NRA. The real-transfer check is descriptive: forecasts issued
+  inside logged transfers with targets after the logged end, scored against observed power.
 
 ## Rows and windows
 
