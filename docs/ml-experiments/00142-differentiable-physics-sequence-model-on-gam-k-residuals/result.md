@@ -101,7 +101,6 @@ the pinball loss is the standard training loss of quantile regression
 This section is the plan as pre-registered; the gate failed, so only the samples, the gate fits, and
 the tuning-month fits ran (see Results).
 
-
 - **Substations.** The six substations whose member forecasts experiment 111 stored (D5, D10, D11,
   D14, D16, and D9). Experiment 111's ensemble store holds seven series (those six and D18), so the
   other DP series have no stored GAM-K member forecasts, and no demand model is refitted. D9 is
@@ -213,7 +212,6 @@ injected half-hours is under 25% of the shift: it must adapt from the residual i
 memorise the calendar position. A failed gate stops the experiment before any replicate or scored
 forecast is read. The gate ran twice, and the absorption test was redefined after the first run (see
 Results).
-
 
 ## What this experiment will not say
 
