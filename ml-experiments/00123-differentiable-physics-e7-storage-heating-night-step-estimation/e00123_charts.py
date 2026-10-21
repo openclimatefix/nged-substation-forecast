@@ -622,7 +622,8 @@ def figure_9_cold_nights(*, cold: dict[str, Any]) -> alt.TopLevelMixin:
     ]
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="On cold nights demand at D5, D10, and D16 runs above the baseline forecast from 01:00",
+            text="On cold nights demand at D5, D10, and D16 runs above the baseline forecast "
+            "from 01:00",
             subtitle="Line: median over the cold winter nights of winters 2023-24 to 2025-26; "
             "band: "
             "25th to 75th percentile. Cold nights are the coldest 10% of days by daily mean "
