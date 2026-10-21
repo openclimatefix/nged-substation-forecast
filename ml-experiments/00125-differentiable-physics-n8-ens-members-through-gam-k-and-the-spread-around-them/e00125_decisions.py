@@ -56,13 +56,13 @@ def main() -> None:
     if path.exists():
         msg = f"{path} exists; the rule is fixed once"
         raise FileExistsError(msg)
-    content = {site: site_decisions(site=site) for site in common.SCORED_SITES}
+    content: dict[str, object] = {site: site_decisions(site=site) for site in common.SCORED_SITES}
     text = json.dumps(content, indent=2, sort_keys=True)
     content["sha256"] = hashlib.sha256(text.encode()).hexdigest()
     content["written"] = datetime.now(tz=UTC).date().isoformat()
     common.write_json_atomic(path=path, content=content)
     for site in common.SCORED_SITES:
-        item = content[site]
+        item = site_decisions(site=site)
         print(
             site, round(item["threshold_c"], 2), len(item["episodes_after_rule_window"]), "episodes"
         )

@@ -8,7 +8,7 @@ rows resample days in blocks of 7 within months.
     uv run python ml-experiments/00125-*/e00125_results.py
 """
 
-from typing import Final
+from typing import Final, cast
 
 import e00125_common as common
 import e00125_post as post
@@ -110,7 +110,7 @@ def calibration_cells(*, frame: pl.DataFrame) -> dict:
         n_eff = chosen.select(pl.struct("site", "local_date").n_unique()).item()
         row = []
         for column, level in zip(TAIL_COLUMNS, TAIL_LEVELS, strict=True):
-            coverage = float((chosen["actual"] <= chosen[column]).mean())
+            coverage = cast("float", (chosen["actual"] <= chosen[column]).mean())
             half = 2.5 * np.sqrt(level * (1 - level) / n_eff)
             ok = bool(abs(coverage - level) <= half)
             in_band += int(ok)
@@ -126,24 +126,28 @@ def summarise(*, frame: pl.DataFrame) -> dict:
     values = per_row(frame=frame)
     out = {
         "n_rows": frame.height,
-        "quantile_score": float(values["score"].mean()),
-        "tail_pinball": float(values["tail"].mean()),
-        "mae_median": float(values["mae_median"].mean()),
+        "quantile_score": cast("float", values["score"].mean()),
+        "tail_pinball": cast("float", values["tail"].mean()),
+        "mae_median": cast("float", values["mae_median"].mean()),
         "calibration": calibration_cells(frame=frame),
     }
     out["by_band"] = {
         str(band): {
-            "quantile_score": float(values["score"][frame["lead_band"].to_numpy() == band].mean()),
-            "tail_pinball": float(values["tail"][frame["lead_band"].to_numpy() == band].mean()),
+            "quantile_score": cast(
+                "float", values["score"][frame["lead_band"].to_numpy() == band].mean()
+            ),
+            "tail_pinball": cast(
+                "float", values["tail"][frame["lead_band"].to_numpy() == band].mean()
+            ),
         }
         for band in range(N_LEAD_BANDS)
     }
     out["coverage_80_90"] = {
-        "central_80": float(
-            ((frame["actual"] >= frame["q10"]) & (frame["actual"] <= frame["q90"])).mean()
+        "central_80": cast(
+            "float", ((frame["actual"] >= frame["q10"]) & (frame["actual"] <= frame["q90"])).mean()
         ),
-        "central_90": float(
-            ((frame["actual"] >= frame["q05"]) & (frame["actual"] <= frame["q95"])).mean()
+        "central_90": cast(
+            "float", ((frame["actual"] >= frame["q05"]) & (frame["actual"] <= frame["q95"])).mean()
         ),
     }
     return out
@@ -157,7 +161,7 @@ def contrast(*, treatment: pl.DataFrame, reference: pl.DataFrame, winter: bool =
     for name, level in (("score", 95.0), ("tail", BONFERRONI_LEVEL)):
         difference = a[name] - b[name]
         lower, upper = bootstrap(values=difference, blocks=blocks, level=level)
-        out[name] = {"difference": float(difference.mean()), "lower": lower, "upper": upper}
+        out[name] = {"difference": cast("float", difference.mean()), "lower": lower, "upper": upper}
     out["n_blocks"] = len(np.unique(blocks))
     return out
 

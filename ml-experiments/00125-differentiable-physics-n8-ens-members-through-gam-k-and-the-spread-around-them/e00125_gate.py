@@ -30,7 +30,7 @@ import sys
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import replace
 from statistics import NormalDist
-from typing import Final
+from typing import Any, Final
 
 import e00125_arms as arms
 import e00125_cache as cache_module
@@ -342,10 +342,10 @@ def reproduction(*, sites: tuple[str, ...]) -> dict:
     }
 
 
-def causality(*, site: str, indices: tuple[int, ...]) -> dict:
+def causality(*, site: str, indices: tuple[int, ...]) -> dict[str, Any]:
     """Run gate test 4: later actuals and later ENS runs must not move a run's forecast."""
     base = cache_module.prepare_site(site=site)
-    results = {}
+    results: dict[str, Any] = {}
     cache = base.cache
     features = cache.sites[site]
     runs_all = base.setup.indices(periods={"tuning"})
@@ -381,6 +381,7 @@ def causality(*, site: str, indices: tuple[int, ...]) -> dict:
             site=site, cache=cache, setup=replace(base.setup, runs=runs, context=context)
         )
         reference = cache_module.build_run(inputs=base, index=index)
+        assert reference is not None
         changed = [
             cache_module.build_run(inputs=later, index=index),
             cache_module.build_run(inputs=future_runs, index=index),
@@ -393,6 +394,7 @@ def causality(*, site: str, indices: tuple[int, ...]) -> dict:
             ),
             index=index,
         )
+        changed = [run for run in changed if run is not None]
         results[str(index)] = {
             kind: bool(
                 np.array_equal(reference.corrected, other.corrected)
@@ -401,6 +403,7 @@ def causality(*, site: str, indices: tuple[int, ...]) -> dict:
             )
             for kind, other in zip(("later_actuals", "later_ens_runs"), changed, strict=True)
         }
+        assert control is not None
         results[str(index)]["control_sees_a_change_before_the_cutoff"] = bool(
             not np.array_equal(reference.level, control.level)
         )
@@ -428,7 +431,7 @@ def mean_and_order(*, sites: tuple[str, ...]) -> dict:
                 worst_mean = max(
                     worst_mean, float(np.abs(moved.mean(axis=0) - run.corrected.mean(axis=0)).max())
                 )
-        for name, kwargs in {
+        arms_to_check: dict[str, dict[str, Any]] = {
             "k0": {"spread": tables["k0"], "centre": "members"},
             "mp": {"spread": tables["mp"], "centre": "members"},
             "mp_s": {"spread": tables["mp"], "centre": "members", "s": [2.0] * N_LEAD_BANDS},
@@ -438,10 +441,10 @@ def mean_and_order(*, sites: tuple[str, ...]) -> dict:
                 "spread": tables["mp"].with_factors(factors=[0.7, 1.5, 1.0, 1.3]),
                 "centre": "members",
             },
-        }.items():
+        }
+        for kwargs in arms_to_check.values():
             rows = post.build_rows(runs=runs, **kwargs)
             worst_order = min(worst_order, float(np.diff(rows.quantiles, axis=1).min()))
-            del name
     return {
         "max_mean_difference": worst_mean,
         "min_quantile_step": worst_order,

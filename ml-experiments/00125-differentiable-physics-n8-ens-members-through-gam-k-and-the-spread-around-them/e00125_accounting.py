@@ -10,7 +10,7 @@ tail-weighted CRPS reads the 11-atom mixtures of K0-w and MP.
 """
 
 import json
-from typing import Final
+from typing import Final, cast
 
 import e00125_cache as cache_module
 import e00125_common as common
@@ -130,9 +130,9 @@ def cold_night_coverage() -> dict:
         out[arm] = {
             "n_rows": frame.height,
             "n_site_days": frame.select(pl.struct("site", "local_date").n_unique()).item(),
-            "q05": float((frame["actual"] <= frame["q05"]).mean()),
-            "q95": float((frame["actual"] <= frame["q95"]).mean()),
-            "q99": float((frame["actual"] <= frame["q99"]).mean()),
+            "q05": cast("float", (frame["actual"] <= frame["q05"]).mean()),
+            "q95": cast("float", (frame["actual"] <= frame["q95"]).mean()),
+            "q99": cast("float", (frame["actual"] <= frame["q99"]).mean()),
         }
     return out
 

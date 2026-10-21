@@ -11,7 +11,7 @@ write-up's folder, PNGs to a scratch folder for the render check.
 import json
 import textwrap
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import altair as alt
 import e00125_common as common
@@ -147,7 +147,7 @@ def _reliability_frame() -> pl.DataFrame:
                         "arm": ARM_NAMES[arm],
                         "band": BANDS[band],
                         "level": level,
-                        "gap": float((chosen["actual"] <= chosen[column]).mean()) - level,
+                        "gap": cast("float", (chosen["actual"] <= chosen[column]).mean()) - level,
                     }
                 )
     return pl.DataFrame(rows)
@@ -206,7 +206,7 @@ def figure_variance(*, accounting: dict) -> alt.TopLevelMixin:
         ):
             rows.append({"band": BANDS[band], "quantity": name, "value": float(value)})
     table = pl.DataFrame(rows)
-    names = [r["quantity"] for r in rows[:4]]
+    names = [str(r["quantity"]) for r in rows[:4]]
     chart = (
         alt.Chart(table)  # ty: ignore[unresolved-attribute]
         .mark_bar()

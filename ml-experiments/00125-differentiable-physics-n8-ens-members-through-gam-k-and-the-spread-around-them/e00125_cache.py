@@ -139,6 +139,9 @@ def prepare_site(
         fits=fits,
         hyper=np.array(tuned["filter_hyper"]["gamk"][site]),
     )
+    if trace is None:
+        msg = f"No correction trace for {site}"
+        raise ValueError(msg)
     return SiteInputs(
         site=site,
         cache=cache,
