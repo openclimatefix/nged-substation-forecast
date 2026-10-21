@@ -54,7 +54,8 @@ decision_rule: >-
   printed arm D score by more than 0.001 points.
 benchmark: >-
   The reference (arm D with arm A's spread; experiment 155 scored arm A at 2.791 and arm D, with its
-  own refitted spread, at 2.756 points, and arm A's spread scored 0.002 to 0.005 better than D's own); BG2, climatology, and manual_heuristic as stored
+  own refitted spread, at 2.756 points, and arm A's spread scored 0.002 to 0.005 better than D's
+  own); BG2, climatology, and manual_heuristic as stored
   by experiment 87, for absolute skill
 row_set_id: fold_a_daily_gap_v1
 metric: >-
@@ -69,7 +70,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 160: does reading the spread table smoothly along the lead remove the width staircase?
+# Experiment 160: does a smooth spread table remove the width staircase?
 
 Plan only; the write-up follows the runs.
 
