@@ -6,7 +6,7 @@ theme: differentiable-physics-forecast-engine
 also_relevant_to:
   - differentiable-physics-demand-calendar-and-weather
   - lagged-power-and-error-correction
-status: planned
+status: done
 size: >-
   simple to medium. Stored: private files under data/ml-experiments/00143-<slug>/ only. Serving
   path: not touched. Degradation rule: not touched. Designs: more than one is defensible (which
@@ -21,8 +21,8 @@ hypothesis: >-
 prediction: >-
   Written before any fit, see "Predictions" below. Headline: K-skip minus K0 on the days 1 to 5
   after a holiday cluster is -0.05 to -0.30 points at D+1 in the scored year, with the largest
-  gain on 27 to 30 December (K-skip-core); on holiday days it is -0.05 to +0.10; on all other days it is
-  within 0.01.
+  gain on 27 to 30 December (K-skip-core); on holiday days it is -0.05 to +0.10; on all other days
+  it is within 0.01.
 decision_rule: see "Decision rule"
 benchmark: >-
   K0, GAM-K as experiment 111 stored it and experiment 115 rebuilt it (2.524 points at D+1 in the
@@ -36,18 +36,209 @@ metric: >-
   Quantile score (twice the mean pinball loss over experiment 87's 11 quantiles) in points of
   effective capacity, on rows outside the hand-filtered switching events, at day D+1 (leads 15.5 to
   39 hours from the 09:00 UTC power_fcst_init_time); every lead band beside it
+verdict: not supported
+production_status: not-for-production
+adopted_in: none
+best_arm: >-
+  K0, GAM-K's filter as it stands (2.524 points at day D+1 in the scored year); K-skip scored 2.519
+  and is not distinguishable from it
+headline: >-
+  Leaving holiday readings out of the filter lowered the score by 0.089 points on the 5 days after
+  each holiday in the scored year (99% interval -0.309 to +0.036, 5 holiday clusters), and raised it
+  by 0.063 in 2024-25 (+0.022 to +0.160). The two Christmases disagree: -0.456 after Christmas 2025
+  and +0.194 after Christmas 2024.
+lessons:
+  - >-
+    The holiday readings are mostly not a wrong level: in 10 of 12 holiday clusters the filter's
+    residual on holiday days has the same sign as on the 5 days after, so carrying it forward is
+    usually right.
+  - >-
+    The gain after Christmas 2025 comes from ignoring 27 December to 2 January as well as
+    Christmas Day; ignoring only 24 to 26 December made the days after worse (+0.229).
+  - >-
+    Zeroing the correction on holiday targets (K-zero) is the harmful action, +0.619 points on
+    holiday days against K-skip in the scored year and +0.305 in 2024-25.
+date: 2026-10-21
+take_home_message: >-
+  Leaving holiday readings out of the day-ahead filter's update does not reliably help the days
+  after a holiday: the effect had the opposite sign after Christmas 2024 and Christmas 2025, and
+  its 99% interval in the scored year (-0.309 to +0.036 points) includes zero. Holiday readings
+  mostly carry the same level error as the days after them, so the filter is right to learn from
+  them. Setting the correction to zero on holiday days, as experiment 118 did, is the action that
+  hurts (+0.62 points on holiday days). The forecast for this Christmas should keep the filter as
+  it is.
+advice:
+  - >-
+    Do not mask holiday readings in the GAM-K filter's update: the effect on the 5 days after a
+    holiday was -0.089 in the scored year (interval includes zero) and +0.063 in 2024-25 (C1).
+  - >-
+    Never set GAM-K's correction to zero on holiday targets: it cost +0.619 points on holiday days
+    in the scored year and +0.305 in 2024-25 (C5).
+  - >-
+    Do not skip the day after a holiday in the update: it scored +0.061 and +0.091 worse than
+    skipping only the holiday (C4).
+  - >-
+    To test Christmas-specific contamination, compare Christmases over more years than two, because
+    the sign flipped between 2024 and 2025 and only two Christmases are in the data (C7).
+code: ml-experiments/00143-differentiable-physics-holiday-aware-updating-of-the-gam-k-filter/
 ---
 
-**This experiment asks whether the recent-error filter in the day-ahead forecast should ignore
-readings taken on holidays.** The filter (a Kalman filter that tracks a slowly moving level error
-and a quickly decaying error in the physics-based demand model's forecast) reads each new half-hour
-of demand and moves its level towards the error it sees. A holiday's demand differs from the model's
-forecast for reasons that do not repeat the next day, so the filter may learn a level error that
-is wrong on the days after the holiday. This forecast is judged over this Christmas, so the days
-after Christmas matter most. We keep the demand model, its filter settings, and its spread fixed,
-and change only which readings the filter updates on. The plan below is committed before any fit.
+**Take-home: leaving holiday readings out of the filter's update did not reliably help, so the
+filter should keep learning from them.** After Christmas 2025 the score improved by 0.456 points,
+and after Christmas 2024 it worsened by 0.194, so the two Christmases disagree. Averaged over the 5
+holiday clusters in the scored year the score fell by 0.089 points (99% interval -0.309 to +0.036),
+and in the 5 clusters of 2024-25 it rose by 0.063 (+0.022 to +0.160). Holiday readings mostly carry
+the same level error as the days after them (10 of 12 clusters), so they are information more often
+than contamination. The harmful action is zeroing the correction on holiday days (+0.62 points
+there), which experiment 118 combined with the skipping. The verdict is `not supported`.
 
-## Background and credit
+## What was asked, and the answer in plain terms
+
+**The question was whether Christmas Day and other holidays teach the filter a wrong level that
+spoils the days after them.** The filter is the recent-error filter of the physics-based demand
+model with ensemble weather (GAM-K, arm K0; see "Background and credit" below). We changed only which
+readings the filter learns from and left the demand model, the filter settings, and the spread
+alone. K-skip ignores every reading on a bank holiday and on 24 December to 2 January. K-skip-core
+ignores bank holidays and 24 to 26 December only. K-skip+1 also ignores the day after a holiday.
+K-zero ignores holiday readings and sets the correction to zero on holiday days. Scores are quantile
+scores in points of effective capacity (1 point is 1% of a substation's capacity; lower is better)
+at day D+1 (leads 15.5 to 39 hours) over five Primary substations, outside the hand-filtered
+switching events.
+
+**Answer.** On the 25 days after the 5 holiday clusters of the scored year (2 July 2025 to 29 June
+2026), K-skip scored 0.089 points better than K0, but the interval includes zero and the effect
+reverses in 2024-25. K-skip does no harm elsewhere (+0.002 on the other 324 days; -0.005 over all
+rows, interval -0.017 to +0.005). The decision rule needed a gain whose interval lies wholly below
+zero, so the verdict is `not supported`.
+
+## Figures
+
+![Planned contrasts at day D+1, 2024-25 and the scored year](figure_01_headline.svg)
+
+![Daily score of each arm around Christmas 2024 and Christmas 2025](figure_02_christmas.svg)
+
+![K-skip minus K0 for each holiday cluster](figure_03_clusters.svg)
+
+## Results
+
+- **Arms and rows.** K0, K-skip, K-skip-core, K-skip+1, K-zero; all share K0's filter settings and
+  spread. K0 reproduces experiment 115's frame exactly (largest quantile difference 0 points, 6
+  substations). No demand model was refitted and nothing was tuned. "2024-25" pools the tuning and
+  replicate months of July 2024 to June 2025 (each alone holds 1 to 3 holiday clusters, so the
+  pooling is post hoc); the scored year has 292 runs, 66,844 D+1 rows. Day categories hold 5
+  holiday dates (bank holidays outside Christmas), 10 Christmas-window dates, 25 leakage dates, and
+  324 other dates in the scored year.
+- **Absolute D+1 scores.** Scored year: K0 2.524, K-skip 2.519, K-skip-core 2.525, K-skip+1
+  2.522, K-zero 2.541. 2024-25: K0 2.425, K-skip 2.429, K-skip-core 2.429, K-skip+1 2.437,
+  K-zero 2.442.
+- **C1 K-skip minus K0, days 1 to 5 after a holiday.** Scored -0.0887 (-0.3090 to +0.0355, 5
+  clusters, 3 of 5 substations better); 2024-25 +0.0626 (+0.0222 to +0.1604, 5 clusters, 1 of 5);
+  replicate months alone +0.0376 (2 clusters). Leaving out one substation never changes the scored
+  sign (-0.044 to -0.117).
+- **C2 holiday days (non-inferiority, margin +0.10).** Scored -0.0301 (-0.0625 to +0.0003); 2024-25
+  +0.0004 (-0.0041 to +0.0103). Passed.
+- **C3 other days (margin +0.01).** Scored +0.0022 (-0.0009 to +0.0080); 2024-25 -0.0001 (-0.0011
+  to +0.0005). Passed.
+- **C6 all rows.** Scored -0.0049 (-0.0166 to +0.0050); 2024-25 +0.0044 (-0.0016 to +0.0142).
+- **C4 K-skip+1 minus K-skip, days after.** Scored +0.0607 (-0.0537 to +0.1486); 2024-25 +0.0911
+  (+0.0090 to +0.2635). Skipping the day after a holiday does not help.
+- **C5 K-zero minus K-skip, holiday days.** Scored +0.6190 (+0.0637 to +1.8134); 2024-25 +0.3045
+  (+0.1258 to +0.8079). K-zero's bank-holiday days cost +0.847 against K0 in the scored year.
+- **Christmas.** K-skip minus K0 on the Christmas window: 2025 -0.033, 2024 -0.002; on the 5 days
+  after: 2025 -0.456 (2 of the 3 substations with rows on those days better), 2024 +0.194 (1 of 5).
+  On 27 to 30 December, K-skip-core minus K0: 2025 -0.082, 2024 +0.132; K-skip-core minus
+  K-skip: +0.240 in 2025 and +0.127 in 2024, so ignoring Christmas Day alone is not what helped in 2025, and
+  ignoring 27 December to 2 January as well helped. Each Christmas is one cluster, so no interval
+  is meaningful.
+- **Other holidays (scored year).** Easter 2026 -0.099 on the holiday days and +0.043 after;
+  Late Summer 2025 +0.025 after; early and late May 2026 -0.077 and -0.125 after. In 2024-25 every
+  cluster's days after were worse with K-skip (+0.019 to +0.194).
+- **Winter (scored year, K-skip minus K0).** November to March -0.0099 (-0.0258 to -0.0000);
+  winter evenings 16:00 to 20:00 -0.0233 (-0.0754 to -0.0000); cold-snap nights -0.0696 (-0.2011
+  to -0.0000; 19 dates). The upper ends round to zero because 4 to 5 month blocks resample poorly. In
+  2024-25 the same breakdowns were +0.006, +0.005, and +0.029.
+- **Cold-snap nights, q95 coverage (scored year, 895 rows; nominal 0.95).** K0 0.840, K-skip 0.869,
+  K-skip-core 0.828, K-skip+1 0.878, K-zero 0.850; 2024-25 K0 0.888, K-skip 0.892. All arms
+  under-cover on cold nights.
+- **Tails, D+1, scored year (coverage gap in points, pinball loss).** K0: q01 +1.31 (0.1912), q05
+  +1.75 (0.6362), q95 -1.57 (0.6613), q99 -1.21 (0.2090). K-skip: +1.28 (0.1909), +1.73 (0.6355),
+  -1.51 (0.6600), -1.23 (0.2086). K-zero is worse at q95 (-2.08) and q99 (-1.61).
+- **Lead bands.** K-skip minus K0 on days after a holiday is negative at every lead band in the scored
+  year (-0.025 to -0.100), all with intervals that include zero.
+- **Predictions.** P1 failed (the replicate and 2024-25 sign is positive); P2 failed (-0.082 and
+  +0.132, not at most -0.10 in both); P3 held (-0.030, +0.000); P4 held (upper +0.008, +0.0005);
+  P5 failed (+0.061 and +0.091, outside 0.03); P6 held (+0.619, +0.305).
+
+## Gate
+
+**The known-answer gate passed before any scored fit.** A +3-point step added to every reading of
+one day was carried by K0 into the following days (share of the step at days 1 to 5 after 1 January
+2025: 0.06, 0.23, 0.17, 0.12, 0.08, the median of 5 substations; 5 May and 26 May 2025 give 0.08,
+0.23, 0.17, 0.12, 0.08), and carried by K-skip, K-skip+1, and K-zero not at all (largest absolute share
+0, 6 substations). On the control day, 15 January 2025, K-skip matched K0 to within 0.002. A step on
+3 January 2025 was carried by K-skip (at least 0.10 on the second day) and not by K-skip+1. Each holiday
+day with readings had 48 readings skipped, and K-skip equalled K0 exactly before the first skipped
+reading. Most of these conditions are true by construction of the mask; the informative result is
+that K0 carries a step at all. The gate does not test the dates' correctness beyond the check that
+the calendar uses each half-hour's local start date.
+
+## Why the effect differs between Christmases (explanation tested)
+
+**The holiday readings' residual usually has the same sign as the residual on the days after, so
+the filter's carried level is usually right.** The filter's residual (observed minus the fitted
+forecast) averaged +0.7 points on Christmas 2024's holiday days and +5.6 on the 5 days after, and
++4.3 and +7.7 in 2025. The sign differs in 2 of the 12 clusters (early May 2024 and Late Summer
+2025). This
+rules out "holidays teach a wrong level" as the general case. It does not explain why ignoring
+27 December to 2 January helped in 2025: that remains unexplained, with one Christmas for each
+sign.
+
+## Checks
+
+- **Median forecast minus mean forecast per site (scored year, D+1, points).** K0 and K-skip:
+  D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097. The arms share K0's spread, so the
+  values are the same to 3 places.
+- **Error of the median and of the mean forecast beside each contrast (scored year, D+1).** C1
+  -0.141 and -0.142 (quantile score -0.089); C2 -0.040 and -0.037; C3 +0.004 and +0.004; C6
+  -0.007 and -0.007. All point the same way as the quantile score.
+- **Triggers.** Trigger 2 (a result contradicts its own prediction) applies to P1, P2, and P5;
+  the explanation tested above is recorded and does not settle P2. Triggers 1, 3, 4, 5, 6, and 7
+  did not fire: the gate passed; the quantile score and the errors agree; leaving out one
+  substation never flips C1's scored sign; no nested arm beats the arm that contains it; no
+  sister experiment on these rows; no later experiment depends on this result. No audit was run,
+  and no Opus review, as the brief asked.
+
+## Caveats
+
+- **Two Christmases and about 5 holiday clusters per period.** Intervals from resampling 5 clusters
+  are wide and unstable, and the Christmas contrasts are single clusters.
+- **The spread is K0's.** It slightly favours K0 on days where K-skip's residuals differ.
+- **The substations' holiday days are not independent**; the per-substation counts (3 of 5)
+  reflect the same weather.
+- **The early winters of experiment 122 were not added**: that experiment stored quantile
+  predictions only, not residual streams.
+- **Gate thresholds were set before the gate was run, and the plan was amended once after its
+  review (K-skip-core, cluster bootstrap, extra gate checks), before any score was read.**
+
+## What to try next
+
+- **Keep K0 for this Christmas.** The filter's holiday behaviour is not shown to be a defect.
+- **If a holiday term is revisited, test it over more than two Christmases**, for example by running
+  GAM-K's filter on past weather for 2019 to 2024, which needs residual streams that no stored
+  experiment holds.
+- **Test ignoring only 27 December to 2 January's readings** (not 24 to 26 December) as a
+  Christmas-specific rule, since K-skip-core and K-skip separate there.
+
+Every number above is printed by `ml-experiments/00143-*/e00143_report.py` and `e00143_gate.py`;
+the report's output is [`report.txt`](report.txt).
+
+## Plan, committed before any fit
+
+**The plan below was committed before any fit and amended once, after its review and before any
+score was read: K-skip-core, the cluster bootstrap, C6 in the decision rule, and extra gate checks
+were added.** Section headings are one level lower than in the plan's commit.
+
+### Background and credit
 
 **GAM-K is the physics-based demand model (a generalised additive model) with the Kalman filter on
 its recent errors, as built in [experiment
@@ -66,7 +257,7 @@ holiday rule on the recent-error profile raised the score by 0.004 points (an in
 zero), and that its Christmas-window contrast was +0.07; the holiday rule's own effect in those
 windows was not printed.
 
-## Arms
+### Arms
 
 All four arms are K0's member forecasts plus a correction, with K0's filter hyperparameters, spread
 tables, and spread factors (experiment 115's stored values), so the arms differ only in the
@@ -101,7 +292,7 @@ January, by which time K-skip has ignored 10 days of readings; a null C1 there c
 stale level rather than no contamination, and the K-skip-core contrast on 27 to 30 December is the
 cleaner test of Christmas Day's contamination.
 
-## Settings
+### Settings
 
 **No setting is fitted.** The filter hyperparameters, spread tables, and spread factors are those
 of K0 as experiment 111 and 115 tuned them. The odd months of 2024-07 to 2025-06 (tuning months) are
@@ -113,7 +304,7 @@ winters of [experiment
 that experiment stored quantile predictions only, not residual streams, so rerunning the filter on
 earlier Christmases would need new past-weather fits and is left to a later experiment.
 
-## Planned contrasts
+### Planned contrasts
 
 All at day D+1, quantile score in points of effective capacity, K-arm minus K0 unless stated
 (negative favours the first-named arm), pooled over the five decision substations, with 99%
@@ -139,10 +330,11 @@ each arm.
 A block is one holiday cluster with its holiday days and its 5 following days, over all decision
 substations. Clusters are resampled with replacement within the period, 5,000 resamples, a fixed
 seed, percentile interval; for C3 and C6 the blocks are calendar months. The write-up states how
-many clusters and dates each period holds, and a conclusion resting on few clusters says so. Christmas occurs once a year, so the Christmas findings rest on two Christmases
-(2024 and 2025) and are not generalised.
+many clusters and dates each period holds, and a conclusion resting on few clusters says so.
+Christmas occurs once a year, so the Christmas findings rest on two Christmases (2024 and 2025) and
+are not generalised.
 
-## Predictions
+### Predictions
 
 - **P1.** C1 is between -0.05 and -0.30 in the scored year, and negative in the replicate months.
 - **P2.** On 27 to 30 December, K-skip-core minus K0 is at most -0.10 in each of the two Christmases
@@ -154,7 +346,7 @@ many clusters and dates each period holds, and a conclusion resting on few clust
 - **P6.** C5 is above +0.30 (zeroing the correction on holiday targets hurts), the direction of
   experiment 118.
 
-## Decision rule
+### Decision rule
 
 **The verdict follows C1, C2, and C3 in the scored year, and the replicate months must agree in the
 sign of C1.** Skipping holiday readings costs nothing in production, because it is a mask on the
@@ -168,7 +360,7 @@ update, so the threshold for a gain is zero.
 - **not supported:** C1's interval includes zero or lies above it.
 - A failed known-answer gate caps the verdict at `inconclusive`.
 
-## Known-answer gate (before any scored fit)
+### Known-answer gate (before any scored fit)
 
 **On real tuning-month residuals, add +3 points to every reading of one holiday day, run each arm's
 filter on the changed stream, and measure how much of the step reaches the correction on the
@@ -192,12 +384,12 @@ target is 1 to 5 days after the injected day, as a share of 3 points.
   stored K0 frame to 1e-3 points at every site.
 - A failed condition is reported and capped as stated in the decision rule.
 
-## Known limits
+### Known limits
 
 The spread tables and factors are K0's, tuned for K0's residuals, so they slightly favour K0 on
 leakage days where K-skip's residuals are smaller. The effect is conservative for K-skip.
 
-## Compute and process
+### Compute and process
 
 CPU only, at most 4 cores. Each filter run over a site's grid takes about 1 second, and a frame
 build for four arms and six substations takes a few minutes. Every script runs under
