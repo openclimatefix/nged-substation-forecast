@@ -195,7 +195,8 @@ def figure_recovery(*, table: pl.DataFrame) -> alt.TopLevelMixin:
                 "Dot: median over five real farms injected at 50% of the Primary's pinned"
                 " capacity. Line: range over the farms. Green band: pre-registered gate"
                 " (0.95 to 1.05). Dashed line: 0.88, the best two-stage figure. Black tick:"
-                " the share of the farm that one scale of the fixed solar shape fits (shape ceiling)."
+                " the share of the farm that one scale of the fixed solar shape fits"
+                " (shape ceiling)."
                 " Fits use rows before 2025-07-01."
             ),
         ),

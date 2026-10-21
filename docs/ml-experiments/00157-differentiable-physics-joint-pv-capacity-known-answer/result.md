@@ -147,7 +147,7 @@ the 99th percentile of alternating-current output over daylight half-hours, in M
   reach for most farms under one scale per season-year. The cause
   of the farm's shape differing from the fleet shape (tilt, azimuth, inverter clipping, or
   irradiance error) was not tested.
-- **Winter months are barely identified.** The monthly recovery is 0.85 to 0.96 from April to
+- **Winter months are barely identified.** The monthly recovery is 0.84 to 0.96 from April to
   August and 0.2 to 0.35 in December (figure 2). A likely cause is that the demand terms absorb the small winter
   signal. We did not test this.
 
