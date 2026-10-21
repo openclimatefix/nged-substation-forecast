@@ -598,6 +598,9 @@ include = [
     "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_diagnose.py",
     "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_gam_panel.py",
     "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_variants.py",
+    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_members.py",
+    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_run.py",
+    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_tune.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
 ]
