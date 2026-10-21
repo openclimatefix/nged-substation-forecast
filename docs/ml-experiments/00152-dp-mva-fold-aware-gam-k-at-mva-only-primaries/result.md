@@ -28,22 +28,22 @@ prediction: >-
   Coverage below q05 on D12's sunny-midday rows is 9 to 11% for N, 6 to 8% for A, and within 3
   points of 5% for F. F minus BG2 at D12 is -0.1 to +0.2 points.
 decision_rule: >-
-  Four planned contrasts at the 98.75% level (Bonferroni over four) of the month-block bootstrap on
-  paired differences, 10,000 draws, as experiments 56 and 111, each read in the scored year
+  Four planned contrasts at the 98.75% level (Bonferroni over four) of the month-block bootstrap
+  on paired differences, 10,000 draws, as experiments 56 and 111, each read in the scored year
   (2025-07-01 to 2026-06-30) and required to keep its sign in the replicate (even months of
   2024-07 to 2025-06). R1, the fold-aware engine: F minus N on |S| at D12, all rows; passes at
   -0.30 points or lower with the interval wholly below zero. R2, the latent filter and folded
   quantiles: F minus A at D12 on sunny-midday rows; passes at -0.10 or lower with the interval
-  wholly below zero. R3, harmless elsewhere: F minus N pooled over D2, D3, D4, D19, D21, D22, and D8
-  after its cut; passes at +0.03 or lower. R4, against production: F minus BG2 at D12, labelled and
-  never in the verdict. R2's all-rows value is reported beside it, and R3 also needs its
+  wholly below zero. R3, harmless elsewhere: F minus N pooled over D2, D3, D4, D19, D21, D22, and
+  D8 after its cut; passes at +0.03 or lower. R4, against production: F minus BG2 at D12, labelled
+  and never in the verdict. R2's all-rows value is reported beside it, and R3 also needs its
   replicate point estimate at +0.03 or lower. `supported` needs the known-answer test and R1, R2,
-  R3. `partly supported` needs the known-answer test, R1 and R3, with R2 failing. `refuted` when R1's interval lies wholly
-  above zero or R3's point estimate exceeds +0.10. `inconclusive` otherwise. A failed
-  known-answer test caps the verdict at `inconclusive`, except that `refuted` takes precedence when
-  its own condition holds. The thresholds are those of the private design, which set them above the
-  cost of porting: R1 would add a meter fit and a new filter to the serving path, and R2 would be a
-  second port on top of R1.
+  R3. `partly supported` needs the known-answer test, R1 and R3, with R2 failing. `refuted` when
+  R1's interval lies wholly above zero or R3's point estimate exceeds +0.10. `inconclusive`
+  otherwise. A failed known-answer test caps the verdict at `inconclusive`, except that `refuted`
+  takes precedence when its own condition holds. The thresholds are those of the private design,
+  which set them above the cost of porting: R1 would add a meter fit and a new filter to the
+  serving path, and R2 would be a second port on top of R1.
 benchmark: >-
   Arm N (GAM-K on |S| read as signed power), arm A (experiment 110's L0 with the additive filter),
   BG2 as stored by experiment 87, climatology, and manual_heuristic, on the same rows
@@ -53,9 +53,9 @@ row_set_id: >-
 metric: >-
   Quantile score (twice the mean pinball loss over the 11 quantiles of experiment 87) on the MVA
   reading |S| in points of effective capacity, rows outside the hand-filtered switching events,
-  leads 0.5 to 168 hours from the 09:00 UTC power_fcst_init_time; sliced by sunny midday (by CAMS irradiance, not observed power),
-  near-zero readings, the morning and afternoon crossing bands, season, lead band, and site; tail
-  calibration at q01, q05, q95, and q99
+  leads 0.5 to 168 hours from the 09:00 UTC power_fcst_init_time; sliced by sunny midday (by CAMS
+  irradiance, not observed power), near-zero readings, the morning and afternoon crossing bands,
+  season, lead band, and site; tail calibration at q01, q05, q95, and q99
 code: ml-experiments/00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/
 production_status: not-for-production
 adopted_in: none
