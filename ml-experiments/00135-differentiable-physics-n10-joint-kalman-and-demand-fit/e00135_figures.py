@@ -53,10 +53,10 @@ def _interval_chart(
         y=alt.Y("lead:N", sort=LEAD_BANDS, title=None),
         yOffset=alt.YOffset("period:N", sort=list(PERIOD_LABELS.values())),
     )
-    rule = base.mark_rule(strokeWidth=2, color=colour).encode(
+    rule = base.mark_rule(strokeWidth=2, color=colour).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lower:Q", title=x_title), x2="upper:Q"
     )
-    dot = base.mark_point(filled=True, size=70, color=colour).encode(
+    dot = base.mark_point(filled=True, size=70, color=colour).encode(  # ty: ignore[unresolved-attribute]
         x="estimate:Q",
         opacity=alt.Opacity(
             "period:N",
@@ -67,7 +67,7 @@ def _interval_chart(
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}))
         .mark_rule(strokeDash=[4, 3], color="#444")
-        .encode(x="x:Q")
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
     return (zero + rule + dot).properties(width=CONTENT_WIDTH_PX - 150, height=170, title=title)
 
@@ -115,9 +115,9 @@ def per_site(*, results: dict) -> alt.Chart:
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}))
         .mark_rule(strokeDash=[4, 3], color="#444")
-        .encode(x="x:Q")
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
-    dots = base.mark_point(filled=True, size=80).encode(
+    dots = base.mark_point(filled=True, size=80).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "difference:Q",
             title="Quantile score, J2 minus TS (points of capacity; more negative is better)",
@@ -153,7 +153,7 @@ def shapes(*, controls: dict, arm: str) -> alt.Chart:
     return (
         alt.Chart(frame)
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y(
                 "term:N",
                 title=None,

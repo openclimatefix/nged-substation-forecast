@@ -254,15 +254,18 @@ and drift against no drift)
 Applies to experiments and to production. Confidence: high, because the centred and uncentred sets
 differ only in this shift.
 
-**Tie a demand model to its two-stage fit before passing it through a level-tracking filter (high
-confidence).** In a fit that minimises the error after a Kalman filter that tracks a level, the
-filter absorbs a constant shift of each slow term, so the loss leaves the weekly profile, the tent,
-and the harmonics to the penalty alone. The untied joint fit's weekly profile moved by a median of
-19 points (up to 95) when the cut moved back by 7 days, against 1 point for the two-stage fit, and
-scored 5.4 points worse at 12 to 36 hours ([experiment
+**For the convex demand model, tie a joint fit through a level-tracking filter to the two-stage
+coefficients (provisional).** In a fit that minimises the error after a Kalman filter that tracks a
+level, the filter absorbs a constant shift of each slow term (the weekly profile, the tent, and the
+harmonics), so the loss leaves those terms to the penalty alone. The untied joint fit's weekly
+profile moved by a median of 19 points of capacity (up to 95) when the training cut-off moved back
+by 7 days, against 1 point for the two-stage fit, and its quantile score at 12 to 36 hours was 5.4
+points of capacity worse ([experiment
 135](00135-differentiable-physics-n10-joint-kalman-and-demand-fit/result.md)). A ridge tie to the
-two-stage coefficients removed the movement and the loss. Applies to experiments. Evidence: 5
-decision substations, the scored year.
+two-stage coefficients cut the weekly-profile movement to 1 point and left the score within 0.013
+points of the two-stage fit. Applies to experiments. Evidence: five decision substations, the scored
+year, one model family. Confidence: medium, because the explanation was not tested by a variant of
+the loss.
 
 **Give a capacity increment only to a season-year with enough training rows (provisional).** A fit
 whose cut is 2024-07-01 includes the half-hour that ends exactly at the cut, which belongs to
