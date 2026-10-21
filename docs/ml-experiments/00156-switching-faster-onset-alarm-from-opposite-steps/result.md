@@ -28,8 +28,7 @@ hypothesis: >-
   scores better than the same mask driven by RO-NC, because the mask starts days sooner.
 prediction: >-
   Written before any result. At the same false-alarm rate as RO-NC (at most 80 unexplained alarms
-  in odd months), the median onset-known lag of the new alarm is 3 to 8 hours (the window plus
-  scheduling), against about 48 hours for RO-NC. The share of injected transfers with a metered
+  in odd months), the median onset-known lag of the new alarm is 3 to 8 hours (1.5 windows), against about 48 hours for RO-NC. The share of injected transfers with a metered
   partner (coverage) is 0.6 to 0.85. The MW-weighted recall of the new alarm on all injected
   transfers is lower than RO-NC's (0.15 to 0.35 against RO-NC's 0.36 to 0.45) because the rule
   needs a metered partner and a short window has a worse signal-to-noise ratio, and the union of
@@ -89,15 +88,17 @@ code: ml-experiments/00156-switching-faster-onset-alarm-from-opposite-steps/
 - **Statistic.** For each window W, `level_shift` with gap 0: the mean of the W half-hours from `t`
   minus the mean of the W half-hours before `t`. Its noise unit is 1.4826 times the median absolute
   deviation over odd months of each node's own statistic at that window, so each window length
-  has its own units. The alarm at `t` is known at `t + W`, when the after-window is complete, and
-  uses no later data (causal).
-- **Alarm rule.** At `t`, node i alarms when `|step_i| >= k` noise units and some connected
-  metered node j steps the opposite way by at least `k/2` noise units (its own unit) at `t-1`, `t`,
+  has its own units.
+- **Alarm rule.** Node i alarms at `t` when `|step_i|` is at least k noise units and is the largest
+  within W/2 half-hours either side (a causal peak test with a lookahead of W/2), and some connected
+  metered node j steps the opposite way by at least k/2 noise units (its own unit) at `t-1`, `t`,
   or `t+1`, and the partner's megawatt step lies within 0.4 to 2.5 times node i's (the balance range
   of experiment 43, so that `r_i + r_j` shows no step). The alarm is rejected when two or more
-  connected metered nodes (or the only neighbour) step the same way by `k/2` units. The first
-  stamp at which the rule holds, with no alarm on the series in the previous W half-hours, is the
-  onset.
+  connected metered nodes (or the only neighbour) step the same way by k/2 units. The alarm is
+  known at `t + W/2 + W`: the peak test needs W/2 more half-hours and the after-window needs W.
+  This is 3, 6, and 9 hours for the three windows, against 48 hours (`2 x 24`) for RO-NC. The peak
+  test is added to the first plan text before any run, because a first-crossing rule dates the onset
+  up to W earlier than the step and would fail the 2-hour onset tolerance at the longer windows.
 - **Intervals.** Each alarm becomes an interval on the alarm series and each partner series. The
   end and the stamp from which it is known come from the same machinery as RO-NC's intervals
   (experiments 147 and 148, merged on one Primary substation within 48 half-hours), so the
