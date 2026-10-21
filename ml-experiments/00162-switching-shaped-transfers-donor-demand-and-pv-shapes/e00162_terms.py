@@ -22,7 +22,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00162_common import GRID_LENGTH, SERIES_IDS, WORK_DIR
 from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
 from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
