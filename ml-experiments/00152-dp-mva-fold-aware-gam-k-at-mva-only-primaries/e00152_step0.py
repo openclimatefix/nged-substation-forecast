@@ -25,12 +25,11 @@ from e00152_common import (
     MVA_ONLY_PRIMARIES,
     SUNNY_MONTHS,
     WORK_DIR,
+    load_cache,
 )
 from studies.baselines import haurwitz_w_m2
 from studies.dp_features import default_input_paths
 from studies.solar import zenith
-
-import e00110_common as c110  # isort: skip
 
 NGED_FLAG_BY_SITE: dict[str, str] = {}
 
@@ -58,7 +57,7 @@ def nged_reverse_flow_flags() -> dict[str, str]:
 def main() -> None:
     """Build the Step 0 table and the per-row frame."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
-    cache = c110.load_cache()
+    cache = load_cache()
     details = json.loads((EXPERIMENT_110_DIR / "work" / "fit_details.json").read_text())
     flags = nged_reverse_flow_flags()
     row_parts = []

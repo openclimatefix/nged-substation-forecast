@@ -22,7 +22,7 @@ import json
 
 import numpy as np
 import polars as pl
-from e00152_common import EXPERIMENT_110_DIR, WORK_DIR
+from e00152_common import EXPERIMENT_110_DIR, WORK_DIR, load_cache, quantile_score
 from e00152_latent_filter import correction_at as latent_correction
 from e00152_latent_filter import folded_quantiles, run_latent
 from studies.dp_assimilation import (
@@ -34,8 +34,6 @@ from studies.dp_assimilation import (
     usable_cutoff_positions,
 )
 from studies.dp_gam import QUANTILE_LEVELS
-
-import e00110_common as c110  # isort: skip
 
 SITE = "D12"
 N_BOOTSTRAP = 10_000
@@ -109,7 +107,7 @@ def replay(*, cache, year: dict[str, np.ndarray], hyper: FilterHyperparameters) 
 
 def score(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
     """Return the quantile score of each row, in points."""
-    return c110.quantile_score(actual=actual, quantiles=quantiles)
+    return quantile_score(actual=actual, quantiles=quantiles)
 
 
 def month_block_interval(*, diff: np.ndarray, months: np.ndarray) -> tuple[float, float, float]:
@@ -126,7 +124,7 @@ def month_block_interval(*, diff: np.ndarray, months: np.ndarray) -> tuple[float
 def main() -> None:  # noqa: PLR0915
     """Run F2 and write `work/f2.json`."""
     WORK_DIR.mkdir(parents=True, exist_ok=True)
-    cache = c110.load_cache()
+    cache = load_cache()
     tuned = json.loads((EXPERIMENT_110_DIR / "work" / "tuned.json").read_text())
     hyper = FilterHyperparameters.from_array(values=np.array(tuned["filter_hyper"]["l0"][SITE]))
     years = {cut: load_year(cut=cut, cache=cache) for cut in ("replicate", "scored")}
