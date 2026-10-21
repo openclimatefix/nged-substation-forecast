@@ -45,7 +45,7 @@ decision_rule: >-
   year, and `inconclusive` otherwise (including a fix that reaches 0.90 but whose all-row upper
   bound is at or above +0.01). The winning fix is the passing fix with the lowest all-row
   quantile score, with the earlier of C1, C2, and C3 winning ties within 0.002 points. The
-  threshold is set by cost: T and O add 11 fitted multipliers per temperature class, and S adds one,
+  threshold is set by cost: T adds 6 fitted multipliers per temperature class, O adds 4, and S adds one,
   stored beside the spread table, so each is worth porting at any all-row change whose upper bound
   stays under 0.01 points (under 0.5% of the score). Every multiplier and the ensemble-spread
   coefficient are fitted on the tuning months and nothing is fitted on the replicate months or the
@@ -85,7 +85,7 @@ replicate months the even months of the year before the scored year, as in exper
 - **Diagnosis.** Residual mean, residual standard deviation, and q05 and q95 coverage by ensemble
   temperature bin (below 0, 0 to 2, 2 to 5, 5 to 8, 8 to 12, and above 12 °C) and by hour band,
   with the same breakdown for the ERA5-defined cold nights that the score uses.
-- **T: temperature-class factor.** One multiplier on the quantile offsets per quantile level and per
+- **T: temperature-class factor.** One multiplier on the quantile offsets at the six outer levels (0.01, 0.05, 0.1, 0.9, 0.95, and 0.99) per
   ensemble-temperature class (below 2, 2 to 6, 6 to 10, and 10 °C or more), pooled over the six
   substations. Each multiplier is the empirical quantile of residual over offset that makes the
   tuning coverage nominal, and is kept at 1 where a class has fewer than 500 tuning rows.
