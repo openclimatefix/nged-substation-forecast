@@ -113,7 +113,6 @@ advice:
   - >-
     Leave a substation out of the fleet at any cut where its pinned capacity is a late vintage,
     because the pooled fit refuses such a capacity (D9 before 2025-04).
-
 ---
 
 # Experiment 158: do partly pooled GAM shapes beat per-site GAM fits?
