@@ -81,7 +81,7 @@ lessons:
   - >-
     Replacing the 51-member mixture with one forecast on the ensemble mean worsens the score by
     0.039 points,
-    all of it in the lower half of the distribution (pinball at the 0.01 to 0.25 quantiles), and
+    most of it in the lower half of the distribution (pinball at the 0.01 to 0.25 quantiles), and
     the mean forecast's error is almost unchanged (+0.007).
   - >-
     T-all's gain carried over from past weather to ensemble weather at about half its size
@@ -162,15 +162,17 @@ already built and tested in earlier experiments.
   24-month window, as experiment 111's fits do. A3 tests weekly refits, because a monthly-refit arm
   would equal A2. The quantiles are the corrected mean plus a residual table fitted
   on the tuning months, with every spread factor at 1.
-- **Rows.** `fold_a_daily_gap_v1`, 561,172 half-hourly rows in the scored year at the five decision
-  substations, outside the hand-filtered switching events; BG2 exists only for the scored year.
-  D9 is scored beside them and is not in any contrast.
+- **Rows.** `fold_a_daily_gap_v1`, 561,172 half-hourly rows in the scored year (464,228 at the five
+  decision substations and 96,944 at D9), outside the hand-filtered switching events; BG2 exists
+  only for the scored year.
+  D9 is in the table of arms and in no contrast.
 - **Absolute skill, scored year, leads 0.5 to 168 hours (points of effective capacity).** A0 2.839,
   A1 2.818, A2 2.791, A3 2.795, experiment 111's GAM-K 2.800, BG2 2.780, manual heuristic 3.497,
   climatology 3.804. A2 is 20% below the manual heuristic and 27% below climatology.
 - **By lead band (A2, BG2, experiment 111's GAM-K).** Under 24 hours: 2.363, 2.434, 2.373. From 24
   to 72 hours: 2.630, 2.646, 2.653. From 72 to 168 hours: 2.980, 2.936, 2.983. A2 scores better than
-  BG2 below 24 hours and worse from 72 to 168 hours, as experiment 111's GAM-K did.
+  BG2 below 72 hours and worse from 72 to 168 hours; experiment 111's GAM-K trails BG2 at 24 to 72
+  hours as well.
 - **C1, A0 minus experiment 111's GAM-K.** +0.039 (99% interval +0.018 to +0.060), 0 of 5
   substations better, 2 of 12 months negative; replicate +0.029 (+0.011 to +0.052). The prediction
   was within 0.03, so the ensemble mean worsens the score by more than predicted.
@@ -190,16 +192,18 @@ already built and tested in earlier experiments.
   is above +0.05, so the hypothesis is `inconclusive`.
 - **Breakouts, A2 minus experiment 111's GAM-K (scored year, all leads).** Winter -0.028, winter
   nights -0.055, cold nights -0.070, and holidays and Christmas +0.063 (18,913 rows, interval
-  -0.058 to +0.094). The gain sits in winter and on cold nights, which are the hours NGED cares
-  about, and the holiday rows lose.
+  -0.058 to +0.094). The point estimates are lower in winter and on cold nights, which are the hours
+  NGED cares about, and higher on holidays; every one of these intervals includes zero.
 - **Why the ensemble mean worsens the score by 0.039 (C1, tested after the result, post hoc).** A0's
   pinball loss
   is worse than experiment 111's GAM-K at the 0.01, 0.05, 0.10, and 0.25 quantiles (0.2252 against
-  0.2082, 0.7471 against 0.7084, 1.1992 against 1.1487, 2.0333 against 1.9842) and equal from the
-  0.40 quantile upward. A0's coverage at the 0.05 quantile is 6.3% against 5.8%, and at the 0.10
+  0.2082, 0.7471 against 0.7084, 1.1992 against 1.1487, 2.0333 against 1.9842) and also worse, by
+  smaller amounts, at the 0.40 to 0.99 quantiles (for example 0.7433 against 0.7300 at the 0.95
+  quantile). A0's coverage at the 0.05 quantile is 6.3% against 5.8%, and at the 0.10
   quantile 11.4% against 10.1%. The mean forecast's error rose by only 0.007, so the loss is in the
-  spread: the mixture of 51 members puts more mass in the lower tail than one residual table around
-  the mean does (`e00136_levels.py`).
+  spread. The mixture of 51 members putting more mass in the lower tail than one residual table
+  around the mean does is consistent with these figures, and was not tested further
+  (`e00136_levels.py`).
 
 ## Tail calibration (scored year, five decision substations)
 
@@ -213,12 +217,13 @@ already built and tested in earlier experiments.
 
 - **The 0.01 and 0.05 quantiles are too high in every ensemble-mean arm.** The observed shares
   below them are 2.2% and 6.3% to 6.6%, against 1.8% and 5.8% for experiment 111's GAM-K.
-- **POOL hurts cold-night tails.** On cold nights (3 °C or below, night hours, all leads) the
+- **POOL hurts cold-night tails.** On cold nights (observed temperature of 3 °C or below, night and
+  evening hours, all leads) the
   pinball
   loss at the 0.95 and 0.99 quantiles is 0.747 and 0.302 for A2 against 0.669 and 0.244 for A1.
 - **The cold-night q95 coverage is 88% to 90% in the ensemble-mean arms**, above the 73% to 78%
   that [experiment
-  125](../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md)
+125](../00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/result.md)
   found; the two experiments define the cold-night rows differently.
 - **Curtailment cost against the manual heuristic was not computed**, because the repository has no
   node metric for these five substations yet.
@@ -236,7 +241,8 @@ already built and tested in earlier experiments.
   prediction): C1 (+0.039) contradicts its
   prediction of within 0.03; the explanation above was tested and recorded. Trigger 3: C5's quantile
   score contrast is +0.010 while its mean-error contrast is -0.061; A2's mean forecast is better
-  than BG2's and its spread is worse. Trigger 4: leaving D10 out turns C6 from -0.009 to +0.002,
+  than BG2's median (BG2 has no separate mean) and its spread is worse. Trigger 4: leaving D10 out
+  turns C6 from -0.009 to +0.002,
   and leaving D16 out turns C5 from +0.010 to -0.033. Neither flip changes the verdict, because
   both C5 and C6 are `inconclusive` already, so we did not run the Opus audit; the manager can ask
   for one.
