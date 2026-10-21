@@ -677,6 +677,12 @@ def main() -> None:  # noqa: PLR0915
         Contrast("B0-K - lagless XGBoost with the filter", "b0_k", "p4:x_best_k"),
     ]
     c1 = mh_contrasts[0]
+    reproduction = estimate(
+        year="scored", contrast=Contrast("B0-K vs 114 B0-K", "b0_k", "e114:b0_k")
+    )
+    print(
+        f"B0-K minus experiment 114 B0-K, scored year (must be within 1e-4): {reproduction[0]:.2e}"
+    )
     rows = [contrast_row(contrast=c1, level=MH_LEVEL, where=None)]
     rows += [
         contrast_row(contrast=c, level=EXPLORATORY_LEVEL, where=None) for c in mh_contrasts[1:]
