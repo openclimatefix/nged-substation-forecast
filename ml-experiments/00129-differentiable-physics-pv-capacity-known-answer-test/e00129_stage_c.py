@@ -118,14 +118,17 @@ def known_answer_rows(
     return rows
 
 
-def calibration_ratios(*, table: pl.DataFrame, site: str, source: str, arm_name: str) -> np.ndarray:
-    """Return the recovery ratios at 100% in the last complete year, at other Primaries and farms.
+def calibration_ratios(
+    *, table: pl.DataFrame, site: str, source: str, arm_name: str, season_year: int = LAST_YEAR
+) -> np.ndarray:
+    """Return the recovery ratios at 100% in a season-year, at other Primaries and farms.
 
     Args:
         table: The known-answer table of every Primary and arm.
         site: The Primary whose range is built; its own injections are left out.
         source: The source being tested; a real farm's own injections are left out.
         arm_name: The arm.
+        season_year: The season-year whose recoveries are returned.
 
     Returns:
         The recovery of every remaining injection, with and without load, over plants.
@@ -133,7 +136,7 @@ def calibration_ratios(*, table: pl.DataFrame, site: str, source: str, arm_name:
     held = table.filter(
         pl.col("arm") == arm_name,
         pl.col("fraction") == 1.0,
-        pl.col("season_year") == LAST_YEAR,
+        pl.col("season_year") == season_year,
         pl.col("site") != site,
     )
     if plant_class(source=source) == "matched":
