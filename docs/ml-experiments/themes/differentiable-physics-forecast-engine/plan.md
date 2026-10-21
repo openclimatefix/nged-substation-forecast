@@ -6,7 +6,6 @@ order for the maintainer to change.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| KFD, shared day-level error and sparse noise in GAM-K's filter (experiment 128) | Does one day-level error state shared by the four hour bands, with the level noise estimated sparsely from zero, track an injected solar-panel-shaped change in real residuals better than GAM-K, and lower the day-ahead score? | 1 | One Sonnet plan review, then one Opus review of the code before the first run | Planned |
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |
@@ -18,17 +17,6 @@ order for the maintainer to change.
 | Learned process noise and observation variance | On the batched filter grid, do a learned diagonal process noise and an online observation variance beat fixed values? | 8 | The batched-filter module (pull request 1419) merged; about 1 GPU hour | Queued |
 | ERA5-only winter-by-winter backtest, earlier winters | Does the release candidate rank above XGBoost on past weather in the winters of 2019-20 to 2022-23, and does that ranking agree with the ensemble-weather result? | Low | Nothing | Queued, not started |
 | CAL, tail calibration and coherence | Can the convex model's tails on ensemble weather be calibrated per lead band, and do its summed ensembles match the observed sum across substations? | Postponed | The maintainer's decision to restart (postponed on 2026-10-20) | Postponed |
-
-## KFD: a shared day-level error state and a sparse process noise in GAM-K's filter
-
-**The proposal adds one day-level error, shared by the four hour bands, to the level-and-anomaly
-filter of GAM-K, and estimates the level noise sparsely from zero.** Experiment 118 found that real
-residuals carry a day-level error shared across the hour bands (correlation of the daily means 0.58,
-against 0.00 in the filter's own model), and that the 14-weight filter absorbed that error into its
-weights. The plan, in [experiment
-128](../../00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/result.md),
-pre-registers a known-answer gate on real residuals and a day-ahead score against GAM-K on the rows
-of experiment 118. The run is CPU only, and the gate dominates its 6 to 10 hours.
 
 ## CAL: tail calibration and a coherence pass
 
