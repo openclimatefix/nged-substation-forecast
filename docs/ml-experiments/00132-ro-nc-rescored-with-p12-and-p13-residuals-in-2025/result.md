@@ -44,8 +44,8 @@ best_arm: >-
 take_home_message: >-
   The detector missed the 6 real transfers at P12 and P13 mainly because the cleaning rule had
   flagged as faults, and removed, the zero readings that a switched-out transformer reports. With
-  those readings restored from the cleaned power table, the detector finds 4 of the 6, and 17 of all 35
-  transfers lasting more than 1 day, up from 12. The cleaning rule removes real periods when a
+  those readings restored from the cleaned power table, the detector finds 4 of the 6, and 17 of
+  all 35 transfers lasting more than 1 day, up from 12. The cleaning rule removes real periods when a
   transformer is switched out. The thresholds were not re-tuned, and the unexplained alarms on
   odd-numbered months rose from 80 to 95 (PF14) and from 80 to 87 (RO-NC), so the recall comes with
   a higher false-alarm count. The next step is to re-tune the alarm thresholds on the new residuals
