@@ -21,7 +21,7 @@ hypothesis: >-
 prediction: >-
   Written before any fit, see "Predictions" below. Headline: K-skip minus K0 on the days 1 to 5
   after a holiday cluster is -0.05 to -0.30 points at D+1 in the scored year, with the largest
-  gain on the Christmas window; on holiday days it is -0.05 to +0.10; on all other days it is
+  gain on 27 to 30 December (K-skip-core); on holiday days it is -0.05 to +0.10; on all other days it is
   within 0.01.
 decision_rule: see "Decision rule"
 benchmark: >-
@@ -75,6 +75,10 @@ correction.
 - **K0 (control).** GAM-K's filter reads every reading, as in experiment 111.
 - **K-skip.** A reading on a holiday day is treated as missing for the update only. A holiday
   target still gets the carried level and transient.
+- **K-skip-core.** K-skip, but only bank holidays and 24 to 26 December are skipped. K-skip
+  also skips 27 December to 2 January, so its 27 to 30 December targets differ from K0 for two
+  reasons (Christmas Day not learned, and four more days not learned). K-skip-core separates them:
+  on 27 to 30 December it ignores Christmas Day but reads the readings of the 27th onwards.
 - **K-skip+1.** K-skip, and also the first non-holiday day after each holiday day is skipped, to
   test slow recovery.
 - **K-zero (reference only).** K-skip's filter, and the level and transient are set to zero on
@@ -89,8 +93,13 @@ of its half-hour's start.
 January); *bank holiday* (a bank holiday outside that window); *after Christmas* and *after bank
 holiday* (days 1 to 5 after the last day of a holiday cluster, where a cluster joins holiday days at
 most 3 days apart, so Good Friday and Easter Monday are one cluster); *other* (everything else).
-"Leakage days" are the two "after" categories. 27 to 30 December lie inside the Christmas window and
-are also scored on their own.
+"Leakage days" are the two "after" categories. A day that follows two clusters takes the later
+cluster's label, and 1 and 2 January belong to the Christmas window even where New Year's Day is
+also a bank holiday. 27 to 30 December lie inside the Christmas window and are also scored on their
+own, as K-skip-core against K-skip and against K0. After Christmas the leakage days are 3 to 7
+January, by which time K-skip has ignored 10 days of readings; a null C1 there could therefore be a
+stale level rather than no contamination, and the K-skip-core contrast on 27 to 30 December is the
+cleaner test of Christmas Day's contamination.
 
 ## Settings
 
@@ -115,7 +124,9 @@ intervals from a day-block bootstrap (below).
 - **C3 (non-inferiority).** K-skip minus K0 on the other days.
 - **C4.** K-skip+1 minus K-skip on the leakage days.
 - **C5 (reference).** K-zero minus K-skip on holiday days.
-- **C6.** K-skip minus K0 over all D+1 rows (month-block bootstrap, `studies.bootstrap`).
+- **C6 (non-inferiority).** K-skip minus K0 over all D+1 rows (month-block bootstrap,
+  `studies.bootstrap`).
+- **C7.** K-skip-core minus K0 on 27 to 30 December, and K-skip-core minus K-skip on the same days.
 
 **Required breakdowns for C1 to C3** (K-skip against K0, and K-skip+1 against K0): winter
 (November to March); winter evening 16:00 to 20:00; cold nights (days with a daily mean under 3 C,
@@ -124,16 +135,19 @@ Christmas (20 December to 5 January, daily mean D+1 score per arm); 27 to 30 Dec
 band beside D+1. Tail calibration (coverage and pinball loss at q01, q05, q95, q99) is reported for
 each arm.
 
-**Day-block bootstrap.** A block is one local date, with all decision substations' rows on that date
-(substations move together on a day). Dates are resampled with replacement within the category and
-period, 5,000 resamples, a fixed seed, percentile interval. The write-up states how many dates each
-category holds. Christmas occurs once a year, so the Christmas findings rest on two Christmases
+**Cluster bootstrap.** Days of one holiday cluster share filter state, so they are not independent.
+A block is one holiday cluster with its holiday days and its 5 following days, over all decision
+substations. Clusters are resampled with replacement within the period, 5,000 resamples, a fixed
+seed, percentile interval; for C3 and C6 the blocks are calendar months. The write-up states how
+many clusters and dates each period holds, and a conclusion resting on few clusters says so. Christmas occurs once a year, so the Christmas findings rest on two Christmases
 (2024 and 2025) and are not generalised.
 
 ## Predictions
 
 - **P1.** C1 is between -0.05 and -0.30 in the scored year, and negative in the replicate months.
-- **P2.** On 27 to 30 December, K-skip minus K0 is at most -0.10 in each of the two Christmases.
+- **P2.** On 27 to 30 December, K-skip-core minus K0 is at most -0.10 in each of the two Christmases
+  (point estimates; two Christmases give no interval worth a rule). Where the largest gain sits is
+  read from this contrast, not from C1.
 - **P3.** C2 is between -0.05 and +0.10.
 - **P4.** C3 is within ±0.01, and its upper interval end is at most +0.01.
 - **P5.** C4 is within ±0.03 (skipping the day after a holiday adds nothing measurable).
@@ -148,7 +162,8 @@ update, so the threshold for a gain is zero.
 
 - **supported:** C1's interval lies wholly below zero; C2's upper end is at most +0.10 (about 4% of
   the score; holiday days are about 5% of the year); C3's upper end is at most +0.01; and C1 is
-  negative in the replicate months.
+  negative in the replicate months; and C6's upper end is at most 0.00 (the net annual effect does
+  not lose).
 - **partly supported:** C1's interval lies wholly below zero but C2 or C3 fails its margin.
 - **not supported:** C1's interval includes zero or lies above it.
 - A failed known-answer gate caps the verdict at `inconclusive`.
@@ -167,9 +182,20 @@ target is 1 to 5 days after the injected day, as a share of 3 points.
   K-skip+1 carry 0.00 (to 1e-9). On the control day, K-skip's share is within 0.02 of K0's, so that
   skipping holidays does not damage the filter elsewhere. K-zero's change on the holiday targets
   themselves is exactly zero.
+- **Further checks, all run before any scored fit.** Every holiday day with readings has 46 to 50
+  readings skipped; K-skip equals K0 exactly on every row whose cutoff precedes the first skipped
+  reading; a step injected on 3 January is carried by K-skip (share at least 0.10 on the second
+  day) and not by K-skip+1. Most of these checks are true by construction of the mask. The gate's
+  informative parts are that K0 carries a step (the bar is 0.10) and that the masks hit the dates
+  intended (the local date of the half-hour's start, as `studies.dp_calendar` defines it).
 - **K0 reproduces experiment 115.** The K0 frame's q01, q05, q50, q95, and q99 match experiment 115's
   stored K0 frame to 1e-3 points at every site.
 - A failed condition is reported and capped as stated in the decision rule.
+
+## Known limits
+
+The spread tables and factors are K0's, tuned for K0's residuals, so they slightly favour K0 on
+leakage days where K-skip's residuals are smaller. The effect is conservative for K-skip.
 
 ## Compute and process
 
