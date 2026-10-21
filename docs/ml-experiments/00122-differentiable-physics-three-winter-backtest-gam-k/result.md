@@ -79,8 +79,9 @@ filter that corrects it from recent errors; [experiment
 differentiable-physics series' candidate. The comparison models are the same model without the
 filter (the plain model) and lagless XGBoost, an XGBoost model given no recent power. A Primary
 substation steps the voltage down for the local distribution network. A point of effective capacity
-is 1% of a substation's capacity. We rescored the stored day-ahead forecasts of experiment 114 (pull
-request 1397, not yet merged) (the plain model and GAM-K) and [experiment
+is 1% of a substation's capacity. We rescored the stored day-ahead forecasts of [experiment
+114](../00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/result.md) (the plain
+model and GAM-K) and [experiment
 109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md) (lagless XGBoost)
 for November to March of 2023-24, 2024-25, and 2025-26, at five Primary substations. Nothing was
 refitted. Each mean absolute error is a mean over the winter's days, in points of effective
