@@ -463,6 +463,7 @@ include = [
     "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_cards.py",
     "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_fit.py",
     "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_tune.py",
+    "ml-experiments/00150-differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds/e00150_tune.py",
     "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_extra.py",
     "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_grid.py",
     "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_refit.py",

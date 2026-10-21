@@ -166,6 +166,15 @@ switched-out transformer. Evidence: [experiment
 132](00132-ro-nc-rescored-with-p12-and-p13-residuals-in-2025/result.md). Confidence: medium, from 5
 transfers at one Primary substation.
 
+## Unlabelled jumps
+
+**Before reading flow on two substations with no interconnection (a placebo pair) as a fault of a
+method, check whether either substation has unlabelled jumps (low confidence).** In experiment 131's
+replicate year (2024-25), the edge-flow fit with a drift term put 4.27 MW-days a year on D16 and
+D10. Of those, 1.58 lie inside the two D10 windows described under "Expect D10 to carry unlabelled
+jumps" below. Applies to experiments. Evidence: [experiment
+131](00131-differentiable-physics-nra-edge-flows-drift-term/result.md).
+
 ## Fixed windows
 
 **Use the fixed lockdown window, 2020-03-23 to 2021-07-19, and do not detect the window from the
