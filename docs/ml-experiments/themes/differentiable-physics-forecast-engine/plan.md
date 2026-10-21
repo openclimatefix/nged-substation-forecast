@@ -6,7 +6,7 @@ order for the maintainer to change.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| Analog-day error correction (experiment 145) | Does averaging GAM-K's past day-ahead errors over the most similar past days (day type, holiday identity, forecast temperature, season) beat recipe R and the weekday profile, especially on holidays and Christmas? | 3 | Nothing; CPU only, 4 cores | Planned |
+| Holiday-aware filter updating (experiment 143) | Does leaving holiday readings out of the GAM-K filter's update lower the score on the days after a holiday, without hurting holiday days? | 1 (the forecast is judged over this Christmas) | Nothing; CPU, about 1 hour | Planned |
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |

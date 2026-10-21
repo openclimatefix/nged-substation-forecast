@@ -1,0 +1,378 @@
+== Gate conditions: {"K-skip matches K0 on the control day": true, "K-zero is unchanged on holiday targets": true, "K0 carries on every injected holiday (day+2)": true, "a step the day after the cluster is carried by K-skip but not K-skip+1": true, "skip arms carry nothing from a holiday": true, "skipped readings per holiday day are 46 to 50 and early rows are identical": true}
+
+== tuning: D+1, 41,684 rows, 5 decision substations, 99% intervals ==
+tuning | category sizes: [{'category': 'after_bank_holiday', 'dates': 10, 'rows': 2400, 'clusters': 2}, {'category': 'after_christmas', 'dates': 5, 'rows': 1200, 'clusters': 1}, {'category': 'bank_holiday', 'dates': 2, 'rows': 480, 'clusters': 2}, {'category': 'christmas_window', 'dates': 1, 'rows': 235, 'clusters': 1}, {'category': 'other', 'dates': 166, 'rows': 37369, 'clusters': 1}]
+tuning | C1 K-skip - K0, leakage days | +0.0793 [+0.0194, +0.1945] blocks 3, dates 15, rows 3,600, sites better 1/5; MAE median +0.1029, MAE mean +0.1046
+tuning | C2 K-skip - K0, holiday days | +0.0727 [-0.0058, +0.2287] blocks 3, dates 3, rows 715, sites better 2/5; MAE median +0.0758, MAE mean +0.0755
+tuning | C3 K-skip - K0, other days | -0.0007 [-0.0028, +0.0001] blocks 12, dates 166, rows 37,369, sites better 3/5; MAE median -0.0007, MAE mean -0.0010
+tuning | C4 K-skip+1 - K-skip, leakage days | +0.1219 [-0.0125, +0.3191] blocks 3, dates 15, rows 3,600, sites better 2/5; MAE median +0.1569, MAE mean +0.1576
+tuning | C5 K-zero - K-skip, holiday days | +0.7144 [-0.0068, +1.0928] blocks 3, dates 3, rows 715, sites better 1/5; MAE median +1.0902, MAE mean +1.0715
+tuning | C6 K-skip - K0, all rows | +0.0075 [-0.0000, +0.0286] blocks 12, dates 184, rows 41,684, sites better 2/5; MAE median +0.0096, MAE mean +0.0095
+tuning | C7 K-skip-core - K0, 27-30 December | no rows
+tuning | C7 K-skip-core - K-skip, 27-30 December | no rows
+tuning | C7 K-skip - K0, 27-30 December | no rows
+tuning | K-skip - K0, Christmas window | +0.2287 [+0.2287, +0.2287] blocks 1, dates 1, rows 235, sites better 2/5
+tuning | K-skip - K0, bank holidays outside it | -0.0036 [-0.0058, -0.0015] blocks 2, dates 2, rows 480, sites better 2/5
+tuning | K-skip - K0, after Christmas | +0.1945 [+0.1945, +0.1945] blocks 1, dates 5, rows 1,200, sites better 1/5
+tuning | K-skip - K0, after other bank holidays | +0.0217 [+0.0194, +0.0240] blocks 2, dates 10, rows 2,400, sites better 1/5
+tuning | K-skip+1 - K0, Christmas window | +0.2287 [+0.2287, +0.2287] blocks 1, dates 1, rows 235, sites better 2/5
+tuning | K-skip+1 - K0, bank holidays outside it | -0.0075 [-0.0141, -0.0010] blocks 2, dates 2, rows 480, sites better 3/5
+tuning | K-skip+1 - K0, after Christmas | +0.5135 [+0.5135, +0.5135] blocks 1, dates 5, rows 1,200, sites better 2/5
+tuning | K-skip+1 - K0, after other bank holidays | +0.0450 [+0.0070, +0.0831] blocks 2, dates 10, rows 2,400, sites better 1/5
+tuning | K-zero - K0, Christmas window | +1.2932 [+1.2932, +1.2932] blocks 1, dates 1, rows 235, sites better 2/5
+tuning | K-zero - K0, bank holidays outside it | +0.5393 [-0.0126, +1.0913] blocks 2, dates 2, rows 480, sites better 2/5
+tuning | K-zero - K0, after Christmas | +0.1952 [+0.1952, +0.1952] blocks 1, dates 5, rows 1,200, sites better 1/5
+tuning | K-zero - K0, after other bank holidays | +0.0274 [+0.0210, +0.0339] blocks 2, dates 10, rows 2,400, sites better 1/5
+tuning | K-skip-core - K0, Christmas window | -0.0186 [-0.0186, -0.0186] blocks 1, dates 1, rows 235, sites better 3/5
+tuning | K-skip-core - K0, bank holidays outside it | -0.0036 [-0.0058, -0.0015] blocks 2, dates 2, rows 480, sites better 2/5
+tuning | K-skip-core - K0, after Christmas | +0.0405 [+0.0405, +0.0405] blocks 1, dates 5, rows 1,200, sites better 1/5
+tuning | K-skip-core - K0, after other bank holidays | +0.0217 [+0.0194, +0.0240] blocks 2, dates 10, rows 2,400, sites better 1/5
+tuning | K-skip - K0, winter | +0.0128 [-0.0000, +0.0383] blocks 5, dates 91, rows 20,683, sites better 3/5
+tuning | K-skip - K0, winter evening 16-20 | +0.0298 [-0.0000, +0.0887] blocks 3, dates 89, rows 3,448, sites better 2/5
+tuning | K-skip - K0, cold-snap days | +0.0720 [-0.0000, +0.1069] blocks 2, dates 19, rows 4,411, sites better 3/5
+tuning | K-skip - K0, cold-snap nights | +0.0368 [+0.0000, +0.0548] blocks 2, dates 19, rows 1,651, sites better 1/5
+tuning | K-skip - K0, non-winter | +0.0022 [-0.0000, +0.0129] blocks 7, dates 93, rows 21,001, sites better 2/5
+tuning | K-skip+1 - K0, winter | +0.0290 [-0.0000, +0.0865] blocks 5, dates 91, rows 20,683, sites better 3/5
+tuning | K-skip+1 - K0, winter evening 16-20 | +0.0249 [-0.0000, +0.0741] blocks 3, dates 89, rows 3,448, sites better 3/5
+tuning | K-skip+1 - K0, cold-snap days | +0.0937 [-0.0000, +0.1391] blocks 2, dates 19, rows 4,411, sites better 3/5
+tuning | K-skip+1 - K0, cold-snap nights | +0.1335 [+0.0000, +0.1984] blocks 2, dates 19, rows 1,651, sites better 2/5
+tuning | K-skip+1 - K0, non-winter | +0.0053 [+0.0000, +0.0173] blocks 7, dates 93, rows 21,001, sites better 2/5
+tuning | cold-snap nights q95 coverage K0: 0.8589 (1,651 rows)
+tuning | cold-snap nights q95 coverage K-skip: 0.8643 (1,651 rows)
+tuning | cold-snap nights q95 coverage K-skip-core: 0.8589 (1,651 rows)
+tuning | cold-snap nights q95 coverage K-skip+1: 0.8595 (1,651 rows)
+tuning | cold-snap nights q95 coverage K-zero: 0.8583 (1,651 rows)
+tuning | K-skip - K0 | lead D+1 | leakage days | +0.0793 [+0.0194, +0.1945] blocks 3, dates 15, rows 3,600, sites better 1/5
+tuning | K-skip - K0 | lead D+1 | holiday days | +0.0727 [-0.0058, +0.2287] blocks 3, dates 3, rows 715, sites better 2/5
+tuning | K-skip - K0 | lead D+1 | other days | -0.0007 [-0.0028, +0.0001] blocks 12, dates 166, rows 37,369, sites better 3/5
+tuning | K-skip - K0 | lead 0-24 h | leakage days | +0.0525 [+0.0179, +0.0732] blocks 3, dates 15, rows 3,600, sites better 1/5
+tuning | K-skip - K0 | lead 0-24 h | holiday days | +0.1068 [-0.0028, +0.2360] blocks 3, dates 4, rows 865, sites better 1/5
+tuning | K-skip - K0 | lead 0-24 h | other days | -0.0008 [-0.0032, +0.0000] blocks 12, dates 171, rows 38,119, sites better 2/5
+tuning | K-skip - K0 | lead 24-48 h | leakage days | +0.1172 [-0.0058, +0.3138] blocks 3, dates 15, rows 3,600, sites better 1/5
+tuning | K-skip - K0 | lead 24-48 h | holiday days | +0.0858 [-0.0058, +0.3821] blocks 3, dates 3, rows 625, sites better 2/5
+tuning | K-skip - K0 | lead 24-48 h | other days | -0.0006 [-0.0024, +0.0002] blocks 12, dates 166, rows 36,919, sites better 3/5
+tuning | K-skip - K0 | lead 48-144 h | leakage days | +0.0994 [-0.0092, +0.4163] blocks 3, dates 15, rows 12,475, sites better 2/5
+tuning | K-skip - K0 | lead 48-144 h | holiday days | -0.0018 [-0.0033, +0.0005] blocks 2, dates 2, rows 1,575, sites better 3/5
+tuning | K-skip - K0 | lead 48-144 h | other days | +0.0007 [-0.0012, +0.0042] blocks 12, dates 161, rows 136,126, sites better 2/5
+tuning | K-skip - K0 | lead 144-168 h | leakage days | +0.0074 [-0.0018, +0.1253] blocks 3, dates 10, rows 2,200, sites better 4/5
+tuning | K-skip - K0 | lead 144-168 h | holiday days | -0.0052 [-0.0052, -0.0052] blocks 1, dates 1, rows 240, sites better 4/5
+tuning | K-skip - K0 | lead 144-168 h | other days | +0.0066 [-0.0001, +0.0249] blocks 12, dates 143, rows 31,504, sites better 2/5
+tuning | K-skip - K0 | lead 12-36 h | leakage days | +0.0698 [+0.0166, +0.1614] blocks 3, dates 15, rows 3,600, sites better 1/5
+tuning | K-skip - K0 | lead 12-36 h | holiday days | +0.0764 [-0.0055, +0.2211] blocks 3, dates 4, rows 745, sites better 2/5
+tuning | K-skip - K0 | lead 12-36 h | other days | -0.0007 [-0.0030, +0.0001] blocks 12, dates 171, rows 37,519, sites better 3/5
+tuning | K-skip - K0 | lead 0.5-168 h | leakage days | +0.0853 [+0.0035, +0.3119] blocks 3, dates 15, rows 21,875, sites better 2/5
+tuning | K-skip - K0 | lead 0.5-168 h | holiday days | +0.0429 [-0.0016, +0.2760] blocks 3, dates 4, rows 3,305, sites better 2/5
+tuning | K-skip - K0 | lead 0.5-168 h | other days | +0.0010 [-0.0003, +0.0050] blocks 12, dates 171, rows 242,668, sites better 2/5
+tuning | cluster from 2024-12-24 (10 holiday days, 6 scored dates): mean D+1 score K0 2.949, K-skip 3.149, K-skip-core 2.980, K-skip+1 3.416, K-zero 3.324; K-skip-K0 holiday +0.229, after +0.194
+tuning | cluster from 2025-05-05 (1 holiday days, 6 scored dates): mean D+1 score K0 2.607, K-skip 2.626, K-skip-core 2.626, K-skip+1 2.674, K-zero 2.622; K-skip-K0 holiday -0.006, after +0.024
+tuning | cluster from 2025-05-26 (1 holiday days, 6 scored dates): mean D+1 score K0 2.476, K-skip 2.492, K-skip-core 2.492, K-skip+1 2.482, K-zero 2.686; K-skip-K0 holiday -0.002, after +0.019
+tuning | absolute D+1 score (all rows): K0 2.4245, K-skip 2.4320, K-skip-core 2.4266, K-skip+1 2.4416, K-zero 2.4446
+tuning | absolute D+1 score by category:
+    christmas_window (235 rows): K0 2.605, K-skip 2.834, K-skip-core 2.587, K-skip+1 2.834, K-zero 3.898
+    bank_holiday (480 rows): K0 2.694, K-skip 2.690, K-skip-core 2.690, K-skip+1 2.686, K-zero 3.233
+    after_christmas (1,200 rows): K0 3.016, K-skip 3.211, K-skip-core 3.057, K-skip+1 3.530, K-zero 3.212
+    after_bank_holiday (2,400 rows): K0 2.511, K-skip 2.533, K-skip-core 2.533, K-skip+1 2.556, K-zero 2.538
+    other (37,369 rows): K0 2.395, K-skip 2.395, K-skip-core 2.395, K-skip+1 2.394, K-zero 2.395
+tuning | tails K0: q01 +0.37 0.1546, q05 +0.74 0.5957, q95 -1.25 0.6129, q99 -0.75 0.1636
+tuning | tails K-skip: q01 +0.41 0.1548, q05 +0.83 0.5957, q95 -1.19 0.6199, q99 -0.83 0.1690
+tuning | tails K-skip-core: q01 +0.38 0.1549, q05 +0.72 0.5960, q95 -1.29 0.6140, q99 -0.77 0.1641
+tuning | tails K-skip+1: q01 +0.39 0.1554, q05 +0.77 0.5962, q95 -1.34 0.6277, q99 -0.94 0.1728
+tuning | tails K-zero: q01 +0.40 0.1553, q05 +0.82 0.5972, q95 -1.41 0.6272, q99 -0.96 0.1718
+tuning | median minus mean K0: D10 -0.005, D11 -0.021, D14 +0.009, D16 -0.025, D5 -0.098
+tuning | median minus mean K-skip: D10 -0.005, D11 -0.021, D14 +0.009, D16 -0.025, D5 -0.098
+tuning | median minus mean K-skip-core: D10 -0.005, D11 -0.021, D14 +0.009, D16 -0.025, D5 -0.098
+tuning | median minus mean K-skip+1: D10 -0.005, D11 -0.021, D14 +0.009, D16 -0.025, D5 -0.098
+tuning | median minus mean K-zero: D10 -0.005, D11 -0.021, D14 +0.009, D16 -0.025, D5 -0.098
+tuning | C1 without D5 | +0.0922 [+0.0121, +0.2377] blocks 3, dates 15, rows 2,880, sites better 1/4
+tuning | C1 without D10 | +0.0919 [+0.0139, +0.2390] blocks 3, dates 15, rows 2,880, sites better 1/4
+tuning | C1 without D11 | +0.0343 [+0.0192, +0.0591] blocks 3, dates 15, rows 2,880, sites better 1/4
+tuning | C1 without D14 | +0.1045 [+0.0115, +0.2886] blocks 3, dates 15, rows 2,880, sites better 0/4
+tuning | C1 without D16 | +0.0736 [+0.0241, +0.1479] blocks 3, dates 15, rows 2,880, sites better 1/4
+tuning | mean |K-skip mean forecast - K0 mean forecast|: leakage days 0.911, holiday days 0.916, other days 0.043 points
+
+== replicate: D+1, 41,126 rows, 5 decision substations, 99% intervals ==
+replicate | category sizes: [{'category': 'after_bank_holiday', 'dates': 10, 'rows': 2400, 'clusters': 2}, {'category': 'bank_holiday', 'dates': 3, 'rows': 720, 'clusters': 2}, {'category': 'christmas_window', 'dates': 9, 'rows': 1925, 'clusters': 1}, {'category': 'other', 'dates': 159, 'rows': 36081, 'clusters': 2}]
+replicate | C1 K-skip - K0, leakage days | +0.0376 [+0.0309, +0.0444] blocks 2, dates 10, rows 2,400, sites better 0/5; MAE median +0.0956, MAE mean +0.0984
+replicate | C2 K-skip - K0, holiday days | -0.0191 [-0.0297, +0.0137] blocks 3, dates 12, rows 2,645, sites better 3/5; MAE median -0.0781, MAE mean -0.0743
+replicate | C3 K-skip - K0, other days | +0.0004 [-0.0000, +0.0009] blocks 11, dates 159, rows 36,081, sites better 1/5; MAE median +0.0007, MAE mean +0.0007
+replicate | C4 K-skip+1 - K-skip, leakage days | +0.0449 [+0.0411, +0.0486] blocks 2, dates 10, rows 2,400, sites better 1/5; MAE median +0.0881, MAE mean +0.0886
+replicate | C5 K-zero - K-skip, holiday days | +0.1937 [+0.0775, +0.5942] blocks 3, dates 12, rows 2,645, sites better 2/5; MAE median +0.2244, MAE mean +0.2164
+replicate | C6 K-skip - K0, all rows | +0.0013 [-0.0055, +0.0074] blocks 12, dates 181, rows 41,126, sites better 3/5; MAE median +0.0012, MAE mean +0.0016
+replicate | C7 K-skip-core - K0, 27-30 December | +0.1324 [+0.1324, +0.1324] blocks 1, dates 4, rows 960, sites better 1/5
+replicate | C7 K-skip-core - K-skip, 27-30 December | +0.1272 [+0.1272, +0.1272] blocks 1, dates 4, rows 960, sites better 3/5
+replicate | C7 K-skip - K0, 27-30 December | +0.0052 [+0.0052, +0.0052] blocks 1, dates 4, rows 960, sites better 3/5
+replicate | K-skip - K0, Christmas window | -0.0297 [-0.0297, -0.0297] blocks 1, dates 9, rows 1,925, sites better 3/5
+replicate | K-skip - K0, bank holidays outside it | +0.0091 [-0.0000, +0.0137] blocks 2, dates 3, rows 720, sites better 2/5
+replicate | K-skip - K0, after Christmas | no rows
+replicate | K-skip - K0, after other bank holidays | +0.0376 [+0.0309, +0.0444] blocks 2, dates 10, rows 2,400, sites better 0/5
+replicate | K-skip+1 - K0, Christmas window | -0.0297 [-0.0297, -0.0297] blocks 1, dates 9, rows 1,925, sites better 3/5
+replicate | K-skip+1 - K0, bank holidays outside it | +0.0403 [-0.0000, +0.0605] blocks 2, dates 3, rows 720, sites better 2/5
+replicate | K-skip+1 - K0, after Christmas | no rows
+replicate | K-skip+1 - K0, after other bank holidays | +0.0825 [+0.0720, +0.0930] blocks 2, dates 10, rows 2,400, sites better 1/5
+replicate | K-zero - K0, Christmas window | +0.0478 [+0.0478, +0.0478] blocks 1, dates 9, rows 1,925, sites better 3/5
+replicate | K-zero - K0, bank holidays outside it | +0.5135 [+0.3247, +0.6079] blocks 2, dates 3, rows 720, sites better 1/5
+replicate | K-zero - K0, after Christmas | no rows
+replicate | K-zero - K0, after other bank holidays | +0.0413 [+0.0379, +0.0446] blocks 2, dates 10, rows 2,400, sites better 0/5
+replicate | K-skip-core - K0, Christmas window | +0.0846 [+0.0846, +0.0846] blocks 1, dates 9, rows 1,925, sites better 2/5
+replicate | K-skip-core - K0, bank holidays outside it | +0.0091 [-0.0000, +0.0137] blocks 2, dates 3, rows 720, sites better 2/5
+replicate | K-skip-core - K0, after Christmas | no rows
+replicate | K-skip-core - K0, after other bank holidays | +0.0376 [+0.0309, +0.0444] blocks 2, dates 10, rows 2,400, sites better 0/5
+replicate | K-skip - K0, winter | -0.0039 [-0.0084, +0.3653] blocks 5, dates 60, rows 13,685, sites better 3/5
+replicate | K-skip - K0, winter evening 16-20 | -0.0323 [-0.0616, +0.0003] blocks 2, dates 57, rows 2,280, sites better 3/5
+replicate | K-skip - K0, cold-snap days | +0.0007 [+0.0007, +0.0007] blocks 1, dates 6, rows 1,248, sites better 1/5
+replicate | K-skip - K0, cold-snap nights | +0.0003 [+0.0003, +0.0003] blocks 1, dates 6, rows 468, sites better 1/5
+replicate | K-skip - K0, non-winter | +0.0040 [+0.0000, +0.0074] blocks 7, dates 121, rows 27,441, sites better 0/5
+replicate | K-skip+1 - K0, winter | -0.0038 [-0.0084, +0.3653] blocks 5, dates 60, rows 13,685, sites better 3/5
+replicate | K-skip+1 - K0, winter evening 16-20 | -0.0322 [-0.0616, +0.0004] blocks 2, dates 57, rows 2,280, sites better 3/5
+replicate | K-skip+1 - K0, cold-snap days | +0.0009 [+0.0009, +0.0009] blocks 1, dates 6, rows 1,248, sites better 0/5
+replicate | K-skip+1 - K0, cold-snap nights | +0.0003 [+0.0003, +0.0003] blocks 1, dates 6, rows 468, sites better 1/5
+replicate | K-skip+1 - K0, non-winter | +0.0125 [+0.0000, +0.0301] blocks 7, dates 121, rows 27,441, sites better 0/5
+replicate | cold-snap nights q95 coverage K0: 0.9915 (468 rows)
+replicate | cold-snap nights q95 coverage K-skip: 0.9915 (468 rows)
+replicate | cold-snap nights q95 coverage K-skip-core: 0.9915 (468 rows)
+replicate | cold-snap nights q95 coverage K-skip+1: 0.9915 (468 rows)
+replicate | cold-snap nights q95 coverage K-zero: 0.9915 (468 rows)
+replicate | K-skip - K0 | lead D+1 | leakage days | +0.0376 [+0.0309, +0.0444] blocks 2, dates 10, rows 2,400, sites better 0/5
+replicate | K-skip - K0 | lead D+1 | holiday days | -0.0191 [-0.0297, +0.0137] blocks 3, dates 12, rows 2,645, sites better 3/5
+replicate | K-skip - K0 | lead D+1 | other days | +0.0004 [-0.0000, +0.0009] blocks 11, dates 159, rows 36,081, sites better 1/5
+replicate | K-skip - K0 | lead 0-24 h | leakage days | +0.0470 [+0.0315, +0.0624] blocks 2, dates 10, rows 2,400, sites better 0/5
+replicate | K-skip - K0 | lead 0-24 h | holiday days | +0.0963 [+0.0128, +0.1253] blocks 3, dates 12, rows 2,645, sites better 3/5
+replicate | K-skip - K0 | lead 0-24 h | other days | +0.0008 [+0.0000, +0.0019] blocks 11, dates 165, rows 36,921, sites better 1/5
+replicate | K-skip - K0 | lead 24-48 h | leakage days | +0.0337 [+0.0327, +0.0347] blocks 2, dates 10, rows 2,400, sites better 0/5
+replicate | K-skip - K0 | lead 24-48 h | holiday days | -0.0844 [-0.1222, +0.0253] blocks 3, dates 12, rows 2,645, sites better 3/5
+replicate | K-skip - K0 | lead 24-48 h | other days | +0.0005 [-0.0000, +0.0013] blocks 11, dates 159, rows 35,577, sites better 1/5
+replicate | K-skip - K0 | lead 48-144 h | leakage days | +0.0134 [-0.0030, +0.0298] blocks 2, dates 10, rows 9,600, sites better 1/5
+replicate | K-skip - K0 | lead 48-144 h | holiday days | -0.0553 [-0.0801, +0.0163] blocks 3, dates 12, rows 10,580, sites better 2/5
+replicate | K-skip - K0 | lead 48-144 h | other days | +0.0004 [-0.0006, +0.0016] blocks 11, dates 153, rows 128,748, sites better 2/5
+replicate | K-skip - K0 | lead 144-168 h | leakage days | +0.0098 [+0.0000, +0.0197] blocks 2, dates 10, rows 2,400, sites better 1/5
+replicate | K-skip - K0 | lead 144-168 h | holiday days | +0.0092 [-0.0000, +0.0127] blocks 3, dates 12, rows 2,645, sites better 1/5
+replicate | K-skip - K0 | lead 144-168 h | other days | +0.0013 [-0.0000, +0.0035] blocks 11, dates 129, rows 28,725, sites better 2/5
+replicate | K-skip - K0 | lead 12-36 h | leakage days | +0.0413 [+0.0338, +0.0488] blocks 2, dates 10, rows 2,400, sites better 0/5
+replicate | K-skip - K0 | lead 12-36 h | holiday days | +0.0124 [-0.0000, +0.0140] blocks 3, dates 12, rows 2,645, sites better 3/5
+replicate | K-skip - K0 | lead 12-36 h | other days | +0.0005 [-0.0000, +0.0010] blocks 11, dates 165, rows 36,249, sites better 1/5
+replicate | K-skip - K0 | lead 0.5-168 h | leakage days | +0.0206 [+0.0118, +0.0293] blocks 2, dates 10, rows 16,800, sites better 0/5
+replicate | K-skip - K0 | lead 0.5-168 h | holiday days | -0.0286 [-0.0435, +0.0161] blocks 3, dates 12, rows 18,515, sites better 2/5
+replicate | K-skip - K0 | lead 0.5-168 h | other days | +0.0006 [-0.0000, +0.0015] blocks 11, dates 165, rows 229,971, sites better 1/5
+replicate | cluster from 2024-08-26 (1 holiday days, 6 scored dates): mean D+1 score K0 2.277, K-skip 2.314, K-skip-core 2.314, K-skip+1 2.354, K-zero 2.368; K-skip-K0 holiday -0.000, after +0.044
+replicate | cluster from 2024-12-24 (10 holiday days, 9 scored dates): mean D+1 score K0 3.201, K-skip 3.171, K-skip-core 3.286, K-skip+1 3.171, K-zero 3.249; K-skip-K0 holiday -0.030, after +nan
+replicate | cluster from 2025-04-18 (4 holiday days, 9 scored dates): mean D+1 score K0 2.318, K-skip 2.347, K-skip-core 2.347, K-skip+1 2.415, K-zero 2.484; K-skip-K0 holiday +0.014, after +0.031
+replicate | absolute D+1 score (all rows): K0 2.4255, K-skip 2.4268, K-skip-core 2.4321, K-skip+1 2.4326, K-zero 2.4396
+replicate | absolute D+1 score by category:
+    christmas_window (1,925 rows): K0 3.201, K-skip 3.171, K-skip-core 3.286, K-skip+1 3.171, K-zero 3.249
+    bank_holiday (720 rows): K0 2.312, K-skip 2.321, K-skip-core 2.321, K-skip+1 2.352, K-zero 2.825
+    after_bank_holiday (2,400 rows): K0 2.231, K-skip 2.269, K-skip-core 2.269, K-skip+1 2.314, K-zero 2.272
+    other (36,081 rows): K0 2.399, K-skip 2.400, K-skip-core 2.400, K-skip+1 2.403, K-zero 2.400
+replicate | tails K0: q01 +1.38 0.2149, q05 +1.55 0.6587, q95 -0.89 0.5995, q99 -0.61 0.1653
+replicate | tails K-skip: q01 +1.37 0.2157, q05 +1.49 0.6582, q95 -0.92 0.6005, q99 -0.62 0.1649
+replicate | tails K-skip-core: q01 +1.40 0.2162, q05 +1.56 0.6610, q95 -0.91 0.6009, q99 -0.61 0.1644
+replicate | tails K-skip+1: q01 +1.34 0.2156, q05 +1.50 0.6587, q95 -0.99 0.6027, q99 -0.66 0.1655
+replicate | tails K-zero: q01 +1.38 0.2162, q05 +1.41 0.6611, q95 -1.21 0.6094, q99 -0.81 0.1703
+replicate | median minus mean K0: D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+replicate | median minus mean K-skip: D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+replicate | median minus mean K-skip-core: D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+replicate | median minus mean K-skip+1: D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+replicate | median minus mean K-zero: D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+replicate | C1 without D5 | +0.0284 [+0.0073, +0.0495] blocks 2, dates 10, rows 1,920, sites better 0/4
+replicate | C1 without D10 | +0.0388 [+0.0266, +0.0510] blocks 2, dates 10, rows 1,920, sites better 0/4
+replicate | C1 without D11 | +0.0426 [+0.0374, +0.0478] blocks 2, dates 10, rows 1,920, sites better 0/4
+replicate | C1 without D14 | +0.0463 [+0.0325, +0.0600] blocks 2, dates 10, rows 1,920, sites better 0/4
+replicate | C1 without D16 | +0.0320 [+0.0135, +0.0506] blocks 2, dates 10, rows 1,920, sites better 0/4
+replicate | mean |K-skip mean forecast - K0 mean forecast|: leakage days 0.452, holiday days 1.553, other days 0.014 points
+
+== development: D+1, 82,810 rows, 5 decision substations, 99% intervals ==
+development | category sizes: [{'category': 'after_bank_holiday', 'dates': 20, 'rows': 4800, 'clusters': 4}, {'category': 'after_christmas', 'dates': 5, 'rows': 1200, 'clusters': 1}, {'category': 'bank_holiday', 'dates': 5, 'rows': 1200, 'clusters': 4}, {'category': 'christmas_window', 'dates': 10, 'rows': 2160, 'clusters': 1}, {'category': 'other', 'dates': 325, 'rows': 73450, 'clusters': 2}]
+development | C1 K-skip - K0, leakage days | +0.0626 [+0.0222, +0.1604] blocks 5, dates 25, rows 6,000, sites better 1/5; MAE median +0.1000, MAE mean +0.1021
+development | C2 K-skip - K0, holiday days | +0.0004 [-0.0041, +0.0103] blocks 5, dates 15, rows 3,360, sites better 2/5; MAE median -0.0453, MAE mean -0.0424
+development | C3 K-skip - K0, other days | -0.0001 [-0.0011, +0.0005] blocks 13, dates 325, rows 73,450, sites better 2/5; MAE median -0.0000, MAE mean -0.0001
+development | C4 K-skip+1 - K-skip, leakage days | +0.0911 [+0.0090, +0.2635] blocks 5, dates 25, rows 6,000, sites better 0/5; MAE median +0.1294, MAE mean +0.1300
+development | C5 K-zero - K-skip, holiday days | +0.3045 [+0.1258, +0.8079] blocks 5, dates 15, rows 3,360, sites better 2/5; MAE median +0.4087, MAE mean +0.3983
+development | C6 K-skip - K0, all rows | +0.0044 [-0.0016, +0.0142] blocks 13, dates 365, rows 82,810, sites better 3/5; MAE median +0.0054, MAE mean +0.0056
+development | C7 K-skip-core - K0, 27-30 December | +0.1324 [+0.1324, +0.1324] blocks 1, dates 4, rows 960, sites better 1/5
+development | C7 K-skip-core - K-skip, 27-30 December | +0.1272 [+0.1272, +0.1272] blocks 1, dates 4, rows 960, sites better 3/5
+development | C7 K-skip - K0, 27-30 December | +0.0052 [+0.0052, +0.0052] blocks 1, dates 4, rows 960, sites better 3/5
+development | K-skip - K0, Christmas window | -0.0016 [-0.0016, -0.0016] blocks 1, dates 10, rows 2,160, sites better 3/5
+development | K-skip - K0, bank holidays outside it | +0.0040 [-0.0047, +0.0117] blocks 4, dates 5, rows 1,200, sites better 2/5
+development | K-skip - K0, after Christmas | +0.1945 [+0.1945, +0.1945] blocks 1, dates 5, rows 1,200, sites better 1/5
+development | K-skip - K0, after other bank holidays | +0.0297 [+0.0206, +0.0410] blocks 4, dates 20, rows 4,800, sites better 0/5
+development | K-skip+1 - K0, Christmas window | -0.0016 [-0.0016, -0.0016] blocks 1, dates 10, rows 2,160, sites better 3/5
+development | K-skip+1 - K0, bank holidays outside it | +0.0212 [-0.0108, +0.0518] blocks 4, dates 5, rows 1,200, sites better 2/5
+development | K-skip+1 - K0, after Christmas | +0.5135 [+0.5135, +0.5135] blocks 1, dates 5, rows 1,200, sites better 2/5
+development | K-skip+1 - K0, after other bank holidays | +0.0638 [+0.0232, +0.0905] blocks 4, dates 20, rows 4,800, sites better 1/5
+development | K-zero - K0, Christmas window | +0.1833 [+0.1833, +0.1833] blocks 1, dates 10, rows 2,160, sites better 3/5
+development | K-zero - K0, bank holidays outside it | +0.5238 [+0.0717, +0.8996] blocks 4, dates 5, rows 1,200, sites better 1/5
+development | K-zero - K0, after Christmas | +0.1952 [+0.1952, +0.1952] blocks 1, dates 5, rows 1,200, sites better 1/5
+development | K-zero - K0, after other bank holidays | +0.0343 [+0.0242, +0.0430] blocks 4, dates 20, rows 4,800, sites better 0/5
+development | K-skip-core - K0, Christmas window | +0.0733 [+0.0733, +0.0733] blocks 1, dates 10, rows 2,160, sites better 2/5
+development | K-skip-core - K0, bank holidays outside it | +0.0040 [-0.0047, +0.0117] blocks 4, dates 5, rows 1,200, sites better 2/5
+development | K-skip-core - K0, after Christmas | +0.0405 [+0.0405, +0.0405] blocks 1, dates 5, rows 1,200, sites better 1/5
+development | K-skip-core - K0, after other bank holidays | +0.0297 [+0.0206, +0.0410] blocks 4, dates 20, rows 4,800, sites better 0/5
+development | K-skip - K0, winter | +0.0062 [-0.0051, +0.0290] blocks 5, dates 151, rows 34,368, sites better 3/5
+development | K-skip - K0, winter evening 16-20 | +0.0051 [-0.0384, +0.0578] blocks 5, dates 146, rows 5,728, sites better 4/5
+development | K-skip - K0, cold-snap days | +0.0563 [-0.0000, +0.1069] blocks 3, dates 25, rows 5,659, sites better 3/5
+development | K-skip - K0, cold-snap nights | +0.0288 [+0.0000, +0.0548] blocks 3, dates 25, rows 2,119, sites better 1/5
+development | K-skip - K0, non-winter | +0.0032 [+0.0001, +0.0064] blocks 8, dates 214, rows 48,442, sites better 0/5
+development | K-skip+1 - K0, winter | +0.0160 [-0.0051, +0.0673] blocks 5, dates 151, rows 34,368, sites better 3/5
+development | K-skip+1 - K0, winter evening 16-20 | +0.0022 [-0.0383, +0.0462] blocks 5, dates 146, rows 5,728, sites better 4/5
+development | K-skip+1 - K0, cold-snap days | +0.0732 [-0.0000, +0.1391] blocks 3, dates 25, rows 5,659, sites better 3/5
+development | K-skip+1 - K0, cold-snap nights | +0.1041 [+0.0000, +0.1984] blocks 3, dates 25, rows 2,119, sites better 2/5
+development | K-skip+1 - K0, non-winter | +0.0094 [+0.0013, +0.0202] blocks 8, dates 214, rows 48,442, sites better 1/5
+development | cold-snap nights q95 coverage K0: 0.8882 (2,119 rows)
+development | cold-snap nights q95 coverage K-skip: 0.8924 (2,119 rows)
+development | cold-snap nights q95 coverage K-skip-core: 0.8882 (2,119 rows)
+development | cold-snap nights q95 coverage K-skip+1: 0.8886 (2,119 rows)
+development | cold-snap nights q95 coverage K-zero: 0.8877 (2,119 rows)
+development | K-skip - K0 | lead D+1 | leakage days | +0.0626 [+0.0222, +0.1604] blocks 5, dates 25, rows 6,000, sites better 1/5
+development | K-skip - K0 | lead D+1 | holiday days | +0.0004 [-0.0041, +0.0103] blocks 5, dates 15, rows 3,360, sites better 2/5
+development | K-skip - K0 | lead D+1 | other days | -0.0001 [-0.0011, +0.0005] blocks 13, dates 325, rows 73,450, sites better 2/5
+development | K-skip - K0 | lead 0-24 h | leakage days | +0.0503 [+0.0260, +0.0697] blocks 5, dates 25, rows 6,000, sites better 1/5
+development | K-skip - K0 | lead 0-24 h | holiday days | +0.0989 [+0.0019, +0.1377] blocks 5, dates 15, rows 3,510, sites better 3/5
+development | K-skip - K0 | lead 0-24 h | other days | -0.0000 [-0.0013, +0.0009] blocks 13, dates 326, rows 75,040, sites better 2/5
+development | K-skip - K0 | lead 24-48 h | leakage days | +0.0838 [+0.0096, +0.2499] blocks 5, dates 25, rows 6,000, sites better 1/5
+development | K-skip - K0 | lead 24-48 h | holiday days | -0.0519 [-0.0811, +0.0189] blocks 5, dates 15, rows 3,270, sites better 2/5
+development | K-skip - K0 | lead 24-48 h | other days | -0.0000 [-0.0010, +0.0006] blocks 13, dates 325, rows 72,496, sites better 2/5
+development | K-skip - K0 | lead 48-144 h | leakage days | +0.0620 [-0.0067, +0.2960] blocks 5, dates 25, rows 22,075, sites better 2/5
+development | K-skip - K0 | lead 48-144 h | holiday days | -0.0484 [-0.0761, +0.0136] blocks 5, dates 14, rows 12,155, sites better 2/5
+development | K-skip - K0 | lead 48-144 h | other days | +0.0005 [-0.0005, +0.0022] blocks 13, dates 314, rows 264,874, sites better 2/5
+development | K-skip - K0 | lead 144-168 h | leakage days | +0.0087 [-0.0011, +0.0408] blocks 5, dates 20, rows 4,600, sites better 3/5
+development | K-skip - K0 | lead 144-168 h | holiday days | +0.0080 [-0.0039, +0.0122] blocks 4, dates 13, rows 2,885, sites better 1/5
+development | K-skip - K0 | lead 144-168 h | other days | +0.0041 [+0.0000, +0.0129] blocks 13, dates 272, rows 60,229, sites better 2/5
+development | K-skip - K0 | lead 12-36 h | leakage days | +0.0584 [+0.0230, +0.1354] blocks 5, dates 25, rows 6,000, sites better 1/5
+development | K-skip - K0 | lead 12-36 h | holiday days | +0.0265 [-0.0039, +0.0377] blocks 5, dates 15, rows 3,390, sites better 3/5
+development | K-skip - K0 | lead 12-36 h | other days | -0.0001 [-0.0012, +0.0005] blocks 13, dates 326, rows 73,768, sites better 2/5
+development | K-skip - K0 | lead 0.5-168 h | leakage days | +0.0572 [+0.0069, +0.2298] blocks 5, dates 25, rows 38,675, sites better 1/5
+development | K-skip - K0 | lead 0.5-168 h | holiday days | -0.0178 [-0.0300, +0.0129] blocks 5, dates 15, rows 21,820, sites better 2/5
+development | K-skip - K0 | lead 0.5-168 h | other days | +0.0008 [-0.0001, +0.0026] blocks 13, dates 326, rows 472,639, sites better 2/5
+development | cluster from 2024-08-26 (1 holiday days, 6 scored dates): mean D+1 score K0 2.277, K-skip 2.314, K-skip-core 2.314, K-skip+1 2.354, K-zero 2.368; K-skip-K0 holiday -0.000, after +0.044
+development | cluster from 2024-12-24 (10 holiday days, 15 scored dates): mean D+1 score K0 3.093, K-skip 3.162, K-skip-core 3.155, K-skip+1 3.276, K-zero 3.281; K-skip-K0 holiday -0.002, after +0.194
+development | cluster from 2025-04-18 (4 holiday days, 9 scored dates): mean D+1 score K0 2.318, K-skip 2.347, K-skip-core 2.347, K-skip+1 2.415, K-zero 2.484; K-skip-K0 holiday +0.014, after +0.031
+development | cluster from 2025-05-05 (1 holiday days, 6 scored dates): mean D+1 score K0 2.607, K-skip 2.626, K-skip-core 2.626, K-skip+1 2.674, K-zero 2.622; K-skip-K0 holiday -0.006, after +0.024
+development | cluster from 2025-05-26 (1 holiday days, 6 scored dates): mean D+1 score K0 2.476, K-skip 2.492, K-skip-core 2.492, K-skip+1 2.482, K-zero 2.686; K-skip-K0 holiday -0.002, after +0.019
+development | absolute D+1 score (all rows): K0 2.4250, K-skip 2.4294, K-skip-core 2.4293, K-skip+1 2.4371, K-zero 2.4421
+development | absolute D+1 score by category:
+    christmas_window (2,160 rows): K0 3.136, K-skip 3.135, K-skip-core 3.210, K-skip+1 3.135, K-zero 3.320
+    bank_holiday (1,200 rows): K0 2.465, K-skip 2.469, K-skip-core 2.469, K-skip+1 2.486, K-zero 2.989
+    after_christmas (1,200 rows): K0 3.016, K-skip 3.211, K-skip-core 3.057, K-skip+1 3.530, K-zero 3.212
+    after_bank_holiday (4,800 rows): K0 2.371, K-skip 2.401, K-skip-core 2.401, K-skip+1 2.435, K-zero 2.405
+    other (73,450 rows): K0 2.397, K-skip 2.397, K-skip-core 2.397, K-skip+1 2.398, K-zero 2.397
+development | tails K0: q01 +nan nan, q05 +nan nan, q95 +nan nan, q99 +nan nan
+development | tails K-skip: q01 +nan nan, q05 +nan nan, q95 +nan nan, q99 +nan nan
+development | tails K-skip-core: q01 +nan nan, q05 +nan nan, q95 +nan nan, q99 +nan nan
+development | tails K-skip+1: q01 +nan nan, q05 +nan nan, q95 +nan nan, q99 +nan nan
+development | tails K-zero: q01 +nan nan, q05 +nan nan, q95 +nan nan, q99 +nan nan
+development | median minus mean K0: D10 -0.001, D11 -0.022, D14 +0.007, D16 -0.018, D5 -0.090
+development | median minus mean K-skip: D10 -0.001, D11 -0.022, D14 +0.007, D16 -0.018, D5 -0.090
+development | median minus mean K-skip-core: D10 -0.001, D11 -0.022, D14 +0.007, D16 -0.018, D5 -0.090
+development | median minus mean K-skip+1: D10 -0.001, D11 -0.022, D14 +0.007, D16 -0.018, D5 -0.090
+development | median minus mean K-zero: D10 -0.001, D11 -0.022, D14 +0.007, D16 -0.018, D5 -0.090
+development | C1 without D5 | +0.0667 [+0.0092, +0.1916] blocks 5, dates 25, rows 4,800, sites better 1/4
+development | C1 without D10 | +0.0706 [+0.0182, +0.1940] blocks 5, dates 25, rows 4,800, sites better 1/4
+development | C1 without D11 | +0.0376 [+0.0225, +0.0546] blocks 5, dates 25, rows 4,800, sites better 1/4
+development | C1 without D14 | +0.0812 [+0.0127, +0.2332] blocks 5, dates 25, rows 4,800, sites better 0/4
+development | C1 without D16 | +0.0570 [+0.0199, +0.1232] blocks 5, dates 25, rows 4,800, sites better 1/4
+development | mean |K-skip mean forecast - K0 mean forecast|: leakage days 0.727, holiday days 1.418, other days 0.029 points
+
+== scored: D+1, 66,844 rows, 5 decision substations, 99% intervals ==
+scored | category sizes: [{'category': 'after_bank_holiday', 'dates': 20, 'rows': 3840, 'clusters': 4}, {'category': 'after_christmas', 'dates': 5, 'rows': 576, 'clusters': 1}, {'category': 'bank_holiday', 'dates': 5, 'rows': 960, 'clusters': 4}, {'category': 'christmas_window', 'dates': 10, 'rows': 1345, 'clusters': 1}, {'category': 'other', 'dates': 324, 'rows': 60123, 'clusters': 2}]
+scored | C1 K-skip - K0, leakage days | -0.0887 [-0.3090, +0.0355] blocks 5, dates 25, rows 4,416, sites better 3/5; MAE median -0.1407, MAE mean -0.1421
+scored | C2 K-skip - K0, holiday days | -0.0301 [-0.0625, +0.0003] blocks 5, dates 15, rows 2,305, sites better 4/5; MAE median -0.0401, MAE mean -0.0371
+scored | C3 K-skip - K0, other days | +0.0022 [-0.0009, +0.0080] blocks 13, dates 324, rows 60,123, sites better 2/5; MAE median +0.0040, MAE mean +0.0039
+scored | C4 K-skip+1 - K-skip, leakage days | +0.0607 [-0.0537, +0.1486] blocks 5, dates 25, rows 4,416, sites better 1/5; MAE median +0.1289, MAE mean +0.1246
+scored | C5 K-zero - K-skip, holiday days | +0.6190 [+0.0637, +1.8134] blocks 5, dates 15, rows 2,305, sites better 1/5; MAE median +0.9274, MAE mean +0.9139
+scored | C6 K-skip - K0, all rows | -0.0049 [-0.0166, +0.0050] blocks 13, dates 364, rows 66,844, sites better 5/5; MAE median -0.0070, MAE mean -0.0072
+scored | C7 K-skip-core - K0, 27-30 December | -0.0817 [-0.0817, -0.0817] blocks 1, dates 4, rows 529, sites better 2/4
+scored | C7 K-skip-core - K-skip, 27-30 December | +0.2400 [+0.2400, +0.2400] blocks 1, dates 4, rows 529, sites better 1/4
+scored | C7 K-skip - K0, 27-30 December | -0.3217 [-0.3217, -0.3217] blocks 1, dates 4, rows 529, sites better 3/4
+scored | K-skip - K0, Christmas window | -0.0327 [-0.0327, -0.0327] blocks 1, dates 10, rows 1,345, sites better 3/4
+scored | K-skip - K0, bank holidays outside it | -0.0263 [-0.0766, +0.0004] blocks 4, dates 5, rows 960, sites better 5/5
+scored | K-skip - K0, after Christmas | -0.4556 [-0.4556, -0.4556] blocks 1, dates 5, rows 576, sites better 2/3
+scored | K-skip - K0, after other bank holidays | -0.0336 [-0.1131, +0.0383] blocks 4, dates 20, rows 3,840, sites better 4/5
+scored | K-skip+1 - K0, Christmas window | -0.0327 [-0.0327, -0.0327] blocks 1, dates 10, rows 1,345, sites better 3/4
+scored | K-skip+1 - K0, bank holidays outside it | -0.0912 [-0.2623, -0.0005] blocks 4, dates 5, rows 960, sites better 4/5
+scored | K-skip+1 - K0, after Christmas | -0.5476 [-0.5476, -0.5476] blocks 1, dates 5, rows 576, sites better 2/3
+scored | K-skip+1 - K0, after other bank holidays | +0.0500 [-0.1190, +0.1991] blocks 4, dates 20, rows 3,840, sites better 1/5
+scored | K-zero - K0, Christmas window | +0.4049 [+0.4049, +0.4049] blocks 1, dates 10, rows 1,345, sites better 1/4
+scored | K-zero - K0, bank holidays outside it | +0.8466 [-0.0430, +2.0108] blocks 4, dates 5, rows 960, sites better 1/5
+scored | K-zero - K0, after Christmas | -0.4575 [-0.4575, -0.4575] blocks 1, dates 5, rows 576, sites better 2/3
+scored | K-zero - K0, after other bank holidays | -0.0297 [-0.1004, +0.0356] blocks 4, dates 20, rows 3,840, sites better 3/5
+scored | K-skip-core - K0, Christmas window | -0.0197 [-0.0197, -0.0197] blocks 1, dates 10, rows 1,345, sites better 2/4
+scored | K-skip-core - K0, bank holidays outside it | -0.0263 [-0.0766, +0.0004] blocks 4, dates 5, rows 960, sites better 5/5
+scored | K-skip-core - K0, after Christmas | +0.2288 [+0.2288, +0.2288] blocks 1, dates 5, rows 576, sites better 0/3
+scored | K-skip-core - K0, after other bank holidays | -0.0336 [-0.1131, +0.0383] blocks 4, dates 20, rows 3,840, sites better 4/5
+scored | K-skip - K0, winter | -0.0099 [-0.0258, -0.0000] blocks 5, dates 151, rows 26,422, sites better 5/5
+scored | K-skip - K0, winter evening 16-20 | -0.0233 [-0.0754, -0.0000] blocks 5, dates 121, rows 4,416, sites better 5/5
+scored | K-skip - K0, cold-snap days | -0.0573 [-0.1075, +0.0001] blocks 4, dates 19, rows 2,395, sites better 3/5
+scored | K-skip - K0, cold-snap nights | -0.0696 [-0.2011, -0.0000] blocks 4, dates 19, rows 895, sites better 3/5
+scored | K-skip - K0, non-winter | -0.0017 [-0.0174, +0.0107] blocks 8, dates 213, rows 40,422, sites better 3/5
+scored | K-skip+1 - K0, winter | -0.0133 [-0.0368, +0.0000] blocks 5, dates 151, rows 26,422, sites better 5/5
+scored | K-skip+1 - K0, winter evening 16-20 | -0.0267 [-0.0888, -0.0000] blocks 5, dates 121, rows 4,416, sites better 5/5
+scored | K-skip+1 - K0, cold-snap days | -0.0691 [-0.1234, +0.0001] blocks 4, dates 19, rows 2,395, sites better 2/5
+scored | K-skip+1 - K0, cold-snap nights | -0.1436 [-0.2598, -0.0001] blocks 4, dates 19, rows 895, sites better 4/5
+scored | K-skip+1 - K0, non-winter | +0.0055 [-0.0096, +0.0253] blocks 8, dates 213, rows 40,422, sites better 1/5
+scored | cold-snap nights q95 coverage K0: 0.8402 (895 rows)
+scored | cold-snap nights q95 coverage K-skip: 0.8693 (895 rows)
+scored | cold-snap nights q95 coverage K-skip-core: 0.8279 (895 rows)
+scored | cold-snap nights q95 coverage K-skip+1: 0.8782 (895 rows)
+scored | cold-snap nights q95 coverage K-zero: 0.8503 (895 rows)
+scored | K-skip - K0 | lead D+1 | leakage days | -0.0887 [-0.3090, +0.0355] blocks 5, dates 25, rows 4,416, sites better 3/5
+scored | K-skip - K0 | lead D+1 | holiday days | -0.0301 [-0.0625, +0.0003] blocks 5, dates 15, rows 2,305, sites better 4/5
+scored | K-skip - K0 | lead D+1 | other days | +0.0022 [-0.0009, +0.0080] blocks 13, dates 324, rows 60,123, sites better 2/5
+scored | K-skip - K0 | lead 0-24 h | leakage days | -0.0731 [-0.3386, +0.0395] blocks 5, dates 25, rows 4,416, sites better 2/5
+scored | K-skip - K0 | lead 0-24 h | holiday days | +0.0614 [+0.0024, +0.0961] blocks 5, dates 15, rows 2,304, sites better 0/5
+scored | K-skip - K0 | lead 0-24 h | other days | +0.0018 [-0.0009, +0.0079] blocks 12, dates 324, rows 60,098, sites better 1/5
+scored | K-skip - K0 | lead 24-48 h | leakage days | -0.0997 [-0.3624, +0.0403] blocks 5, dates 25, rows 4,414, sites better 3/5
+scored | K-skip - K0 | lead 24-48 h | holiday days | -0.0697 [-0.0992, +0.0003] blocks 5, dates 15, rows 2,306, sites better 5/5
+scored | K-skip - K0 | lead 24-48 h | other days | +0.0022 [-0.0010, +0.0077] blocks 13, dates 324, rows 60,065, sites better 1/5
+scored | K-skip - K0 | lead 48-144 h | leakage days | -0.0774 [-0.2696, +0.0052] blocks 5, dates 25, rows 17,658, sites better 4/5
+scored | K-skip - K0 | lead 48-144 h | holiday days | -0.0875 [-0.1311, +0.0021] blocks 5, dates 15, rows 9,222, sites better 4/5
+scored | K-skip - K0 | lead 48-144 h | other days | +0.0024 [-0.0018, +0.0122] blocks 13, dates 323, rows 238,055, sites better 2/5
+scored | K-skip - K0 | lead 144-168 h | leakage days | -0.0252 [-0.0952, +0.0008] blocks 5, dates 25, rows 4,414, sites better 3/5
+scored | K-skip - K0 | lead 144-168 h | holiday days | -0.0363 [-0.0598, +0.0056] blocks 5, dates 15, rows 2,306, sites better 1/5
+scored | K-skip - K0 | lead 144-168 h | other days | +0.0058 [-0.0022, +0.0256] blocks 13, dates 319, rows 59,105, sites better 0/5
+scored | K-skip - K0 | lead 12-36 h | leakage days | -0.0932 [-0.3308, +0.0349] blocks 5, dates 25, rows 4,416, sites better 3/5
+scored | K-skip - K0 | lead 12-36 h | holiday days | -0.0180 [-0.0648, +0.0002] blocks 5, dates 15, rows 2,304, sites better 4/5
+scored | K-skip - K0 | lead 12-36 h | other days | +0.0023 [-0.0010, +0.0090] blocks 12, dates 324, rows 60,118, sites better 1/5
+scored | K-skip - K0 | lead 0.5-168 h | leakage days | -0.0725 [-0.2693, +0.0081] blocks 5, dates 25, rows 30,902, sites better 4/5
+scored | K-skip - K0 | lead 0.5-168 h | holiday days | -0.0564 [-0.0845, +0.0032] blocks 5, dates 15, rows 16,138, sites better 4/5
+scored | K-skip - K0 | lead 0.5-168 h | other days | +0.0027 [-0.0011, +0.0117] blocks 13, dates 325, rows 417,323, sites better 1/5
+scored | cluster from 2025-08-25 (1 holiday days, 6 scored dates): mean D+1 score K0 2.184, K-skip 2.204, K-skip-core 2.204, K-skip+1 2.283, K-zero 2.244; K-skip-K0 holiday -0.000, after +0.025
+scored | cluster from 2025-12-24 (10 holiday days, 15 scored dates): mean D+1 score K0 3.376, K-skip 3.217, K-skip-core 3.431, K-skip+1 3.189, K-zero 3.522; K-skip-K0 holiday -0.033, after -0.456
+scored | cluster from 2026-04-03 (4 holiday days, 9 scored dates): mean D+1 score K0 2.658, K-skip 2.727, K-skip-core 2.727, K-skip+1 2.807, K-zero 2.721; K-skip-K0 holiday -0.099, after +0.043
+scored | cluster from 2026-05-04 (1 holiday days, 6 scored dates): mean D+1 score K0 2.818, K-skip 2.756, K-skip-core 2.756, K-skip+1 2.830, K-zero 2.963; K-skip-K0 holiday -0.001, after -0.077
+scored | cluster from 2026-05-25 (1 holiday days, 6 scored dates): mean D+1 score K0 2.782, K-skip 2.682, K-skip-core 2.682, K-skip+1 2.651, K-zero 3.155; K-skip-K0 holiday +0.001, after -0.125
+scored | absolute D+1 score (all rows): K0 2.5242, K-skip 2.5193, K-skip-core 2.5248, K-skip+1 2.5223, K-zero 2.5409
+scored | absolute D+1 score by category:
+    christmas_window (1,345 rows): K0 3.243, K-skip 3.210, K-skip-core 3.223, K-skip+1 3.210, K-zero 3.648
+    bank_holiday (960 rows): K0 2.685, K-skip 2.659, K-skip-core 2.659, K-skip+1 2.594, K-zero 3.531
+    after_christmas (576 rows): K0 3.687, K-skip 3.232, K-skip-core 3.916, K-skip+1 3.140, K-zero 3.230
+    after_bank_holiday (3,840 rows): K0 2.600, K-skip 2.567, K-skip-core 2.567, K-skip+1 2.650, K-zero 2.570
+    other (60,123 rows): K0 2.490, K-skip 2.492, K-skip-core 2.491, K-skip+1 2.492, K-zero 2.492
+scored | tails K0: q01 +1.31 0.1912, q05 +1.75 0.6362, q95 -1.57 0.6613, q99 -1.21 0.2090
+scored | tails K-skip: q01 +1.28 0.1909, q05 +1.73 0.6355, q95 -1.51 0.6600, q99 -1.23 0.2086
+scored | tails K-skip-core: q01 +1.28 0.1909, q05 +1.71 0.6360, q95 -1.62 0.6624, q99 -1.26 0.2097
+scored | tails K-skip+1: q01 +1.31 0.1912, q05 +1.81 0.6369, q95 -1.44 0.6589, q99 -1.20 0.2076
+scored | tails K-zero: q01 +1.21 0.1887, q05 +1.60 0.6332, q95 -2.08 0.6771, q99 -1.61 0.2190
+scored | median minus mean K0: D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+scored | median minus mean K-skip: D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+scored | median minus mean K-skip-core: D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+scored | median minus mean K-skip+1: D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+scored | median minus mean K-zero: D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+scored | C1 without D5 | -0.1110 [-0.3287, +0.0450] blocks 5, dates 25, rows 3,648, sites better 3/4
+scored | C1 without D10 | -0.0659 [-0.3041, +0.0238] blocks 5, dates 25, rows 3,456, sites better 2/4
+scored | C1 without D11 | -0.0440 [-0.1483, +0.0644] blocks 5, dates 25, rows 3,456, sites better 2/4
+scored | C1 without D14 | -0.1173 [-0.4783, +0.0140] blocks 5, dates 25, rows 3,456, sites better 3/4
+scored | C1 without D16 | -0.1032 [-0.3335, +0.0305] blocks 5, dates 25, rows 3,648, sites better 2/4
+scored | mean |K-skip mean forecast - K0 mean forecast|: leakage days 0.694, holiday days 1.257, other days 0.025 points
+
+== Residual diagnostic (does the holiday residual predict the days after?) ==
+residual | cluster from 2024-05-06: mean residual on holiday days -2.82, on the 5 days after +0.59 points
+residual | cluster from 2024-05-27: mean residual on holiday days +2.96, on the 5 days after +0.82 points
+residual | cluster from 2024-08-26: mean residual on holiday days +0.94, on the 5 days after +1.08 points
+residual | cluster from 2024-12-24: mean residual on holiday days +0.73, on the 5 days after +5.59 points
+residual | cluster from 2025-04-18: mean residual on holiday days +1.27, on the 5 days after +0.27 points
+residual | cluster from 2025-05-05: mean residual on holiday days +0.18, on the 5 days after +0.10 points
+residual | cluster from 2025-05-26: mean residual on holiday days +4.92, on the 5 days after +5.61 points
+residual | cluster from 2025-08-25: mean residual on holiday days +1.55, on the 5 days after -1.10 points
+residual | cluster from 2025-12-24: mean residual on holiday days +4.31, on the 5 days after +7.67 points
+residual | cluster from 2026-04-03: mean residual on holiday days +3.47, on the 5 days after +1.56 points
+residual | cluster from 2026-05-04: mean residual on holiday days +5.89, on the 5 days after +0.82 points
+residual | cluster from 2026-05-25: mean residual on holiday days +5.62, on the 5 days after +6.11 points
