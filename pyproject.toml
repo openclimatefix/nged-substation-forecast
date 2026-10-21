@@ -616,6 +616,9 @@ include = [
     "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_members.py",
     "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_run.py",
     "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_tune.py",
+    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_design.py",
+    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_run.py",
+    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_tall.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
 ]
