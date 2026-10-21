@@ -1,4 +1,4 @@
-"""Check that experiment 158's per-site fits (`k0`, 24 months) reproduce experiment 111's `gamk` fits.
+"""Check that experiment 158's per-site fits (`k0`) reproduce experiment 111's `gamk` fits.
 
 Prints the largest absolute coefficient difference over every cut and substation, and the number of
 cuts and substations compared.
@@ -27,7 +27,8 @@ def main() -> None:
             worst = max(worst, float(np.abs(np.asarray(a.theta) - np.asarray(b.theta)).max()))
             compared += 1
     print(
-        f"{compared} fits ({len(common.FLEET)} substations); largest coefficient difference {worst:.2e}"
+        f"{compared} fits ({len(common.FLEET)} substations); "
+        f"largest coefficient difference {worst:.2e}"
     )
 
 

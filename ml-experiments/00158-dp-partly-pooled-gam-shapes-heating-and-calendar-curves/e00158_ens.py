@@ -227,7 +227,7 @@ def forecast_mean_run(
     the newest reading that ended at least `DEFAULT_DELAY_HOURS` before the origin. The quantiles
     are the spread's around the corrected mean.
     """
-    fit = choose_fit(fits=fits, origin=origin)  # ty: ignore[invalid-argument-type]
+    fit = choose_fit(fits=fits, origin=origin)
     window = RunWindow.build(cache=cache, context=context, run=run)
     driven = window.driven_caches(context=context, run=mean_run(run=run), members=[0])[0]
     n_targets = window.window.stop - window.window.start
