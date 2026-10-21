@@ -6,7 +6,8 @@ also_relevant_to:
   - solar-disaggregation
 status: finished
 size: >-
-  simple. Stored: private files under data/ml-experiments/00157-differentiable-physics-joint-pv-capacity-known-answer/
+  simple. Stored: private files under
+  data/ml-experiments/00157-differentiable-physics-joint-pv-capacity-known-answer/
   only. Serving path: not touched. Degradation rule: not touched. Designs: one defensible design,
   because the maintainer fixed the arms and the stop rule. Callers: this folder's scripts, which
   copy experiments 110 and 129 and call the reviewed `studies.dp_*` modules without editing them.
@@ -76,11 +77,10 @@ advice:
   - >-
     Test a different solar shape, such as a fitted tilt and azimuth per Primary, before planning
     forecast arms on a better capacity (shape ceiling bullet).
-code: ml-experiments/00157-differentiable-physics-joint-pv-capacity-known-answer/
-
 ---
 
-# Experiment 157: does fitting the solar capacity jointly with the demand terms recover an injected farm?
+# Experiment 157: does fitting the solar capacity jointly with the demand terms recover an injected
+farm?
 
 **Take-home message: in this test, letting the solar capacity change month by month did not find
 more of an injected solar farm than a capacity that changes once a year, so the forecast stage is
@@ -100,7 +100,8 @@ supported`.
 **Net power is linear in solar capacity, so the capacity can be fitted inside the demand model of
 `studies.dp_gam` instead of in a second stage.** The joint arm gives the
 capacity a non-negative level for each calendar month and penalises its change from month to month.
-The two-stage arm and the joint arm both trained on the same rows before 2025-07-01. The Kalman filter is not involved, because
+The two-stage arm and the joint arm both trained on the same rows before 2025-07-01. The Kalman
+filter is not involved, because
 this stage fits capacity and never forecasts. The idea of a joint fit comes from the PV design
 session; the convex demand model and the injection come from experiments
 [110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md) and
@@ -121,7 +122,8 @@ the 99th percentile of alternating-current output over daylight half-hours, in M
 ## Results
 
 - **Verdict by the pre-registered rule: stop.** Over the five farms, the median recovery of the
-  joint fit (its fitted path averaged over season-year 2024) is 0.754 (D5), 0.696 (D10), 0.685 (D11), 0.776 (D14), 0.730 (D16), and 0.668
+  joint fit (its fitted path averaged over season-year 2024) is 0.754 (D5), 0.696 (D10), 0.685
+  (D11), 0.776 (D14), 0.730 (D16), and 0.668
   (D9). None lies in 0.95 to 1.05, and none exceeds 0.88. The joint fit recovered less than the
   predicted 0.78 to 0.92 at every Primary.
 - **Two-stage benchmark, same rows:** 0.840 (D5), 0.825 (D10), 0.785 (D11), 0.865 (D14), 0.823
@@ -148,13 +150,15 @@ the 99th percentile of alternating-current output over daylight half-hours, in M
   of the farm's shape differing from the fleet shape (tilt, azimuth, inverter clipping, or
   irradiance error) was not tested.
 - **Winter months are barely identified.** The monthly recovery is 0.84 to 0.96 from April to
-  August and 0.2 to 0.35 in December (figure 2). A likely cause is that the demand terms absorb the small winter
+  August and 0.2 to 0.35 in December (figure 2). A likely cause is that the demand terms absorb the
+  small winter
   signal. We did not test this.
 
 ## Checks
 
 - **Wiring check passed.** With no injection, the two-stage fit built from the month design's Gram
-  matrix reproduces `fit_gam` at D10 to 1e-6 (46.062283 against 46.062283 points of effective capacity). The check covers the two-stage arm
+  matrix reproduces `fit_gam` at D10 to 1e-6 (46.062283 against 46.062283 points of effective
+  capacity). The check covers the two-stage arm
   with no injection only, so the joint arm has no independent check.
 - **Triggers of the `ml-experiment` skill's "Audit before merge":** none fired. The wiring check
   passed. The result agrees with the prediction that fewer than 4 of 5 Primaries reach the gate, and
@@ -177,19 +181,23 @@ the 99th percentile of alternating-current output over daylight half-hours, in M
 
 ## What to try next
 
-- **A fixed-shape capacity probably cannot reach 1.0, so test a different shape first.** A fitted tilt and
+- **A fixed-shape capacity probably cannot reach 1.0, so test a different shape first.** A fitted
+  tilt and
   azimuth per Primary, or a fitted peak-to-capacity ratio, would raise the ceiling. A joint
   capacity fit is worth planning only once the ceiling is above the 0.95 gate.
 - **No forecast arms are run, because the pre-registered decision rule says to stop.**
 
 ## Plan (written before any fit)
 
-**Question.** [Experiment 129](../00129-differentiable-physics-pv-capacity-known-answer-test/result.md)
+**Question.** [Experiment
+129](../00129-differentiable-physics-pv-capacity-known-answer-test/result.md)
 found a capacity per season-year from each Primary's own power and recovered an injected real
-farm's output at 0.78 to 0.88. [Experiment 139](../00139-differentiable-physics-pv-as-of-capacity-in-gam-k/result.md)
+farm's output at 0.78 to 0.88. [Experiment
+139](../00139-differentiable-physics-pv-as-of-capacity-in-gam-k/result.md)
 found the as-of capacity no better than the pin, and the hindsight capacity equal to it. Net power
 is linear in capacity, so the capacity can instead be fitted inside the GAM-K fit as a monthly path.
-Does fitting the capacity as a monthly path recover the injection near 1.0? This experiment runs only the known-answer stage, as the
+Does fitting the capacity as a monthly path recover the injection near 1.0? This experiment runs
+only the known-answer stage, as the
 maintainer asked, because the expected forecast gain is under 0.05 points of the quantile score.
 
 **Arms, all on the same rows.** Every arm trains on rows before the origin 2025-07-01 and has the
@@ -197,15 +205,20 @@ same demand terms, so that only the capacity differs.
 
 | Arm | Capacity | Role |
 |---|---|---|
-| 1. Pin | Experiment 45's `frozen` vintage, held | Reference. It does not refit, so it recovers none of the injection |
-| 2. Two-stage as-of | Experiment 129's arm 2: non-negative increments per season-year, ridge 0.1 on the cumulative capacity | Benchmark |
-| 3. Joint | A non-negative level for each calendar month (the derated unit shape times the level), a penalty on the squared change of the level from month to month, and a near-zero ridge on the level | The arm under test |
+| 1. Pin | Experiment 45's `frozen` vintage, held | Reference. It does not refit, so it recovers
+none of the injection |
+| 2. Two-stage as-of | Experiment 129's arm 2: non-negative increments per season-year, ridge 0.1 on
+the cumulative capacity | Benchmark |
+| 3. Joint | A non-negative level for each calendar month (the derated unit shape times the level),
+a penalty on the squared change of the level from month to month, and a near-zero ridge on the level
+| The arm under test |
 
 **The joint fit's growth penalty is fixed in advance.** It is 0.1 times the mean diagonal of the
 Gram matrix over the capacity columns, the share experiment 129's arm 4 used. Two values, 0.01 and
 1.0, run as labelled sensitivity checks that cannot change the verdict. The shape parameters (tilt
 35 degrees, south-facing, ratio of direct-current to alternating-current rating 1.15, inverter
-clip at the alternating-current capacity, and 0.4% per kelvin de-rating) stay as in `studies.dp_gam`. The Kalman filter acts on residuals only in the forecast
+clip at the alternating-current capacity, and 0.4% per kelvin de-rating) stay as in
+`studies.dp_gam`. The Kalman filter acts on residuals only in the forecast
 stage, so it is not involved here: this stage fits capacity and never forecasts.
 
 **Injection.** Each of the five real farms of experiment 129 (labels A, B, C, D, F; anonymised) is
