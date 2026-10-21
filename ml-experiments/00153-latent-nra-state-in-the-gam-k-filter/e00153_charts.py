@@ -1,3 +1,4 @@
+# type: ignore
 # ruff: noqa: E501
 """Charts of experiment 153: each arm's quantile score minus K0's, with 95% intervals."""
 
