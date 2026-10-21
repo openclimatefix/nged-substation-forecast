@@ -5,7 +5,7 @@ theme: differentiable-physics-pooling-across-substations
 also_relevant_to:
 - differentiable-physics-forecast-engine
 - hierarchy-and-pooling
-status: planned
+status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/ only. Serving
@@ -74,13 +74,165 @@ metric: >-
   hours, day D+1, winter (November to March), cold nights, holiday rows, and Christmas rows; coverage
   and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles
 code: ml-experiments/00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/
-production_status: not-for-production
+production_status: candidate
 adopted_in: none
+verdict: partly supported
+best_arm: >-
+  PS-3m (all shared families pooled, penalty 300 rows on the heating curve and 3000 on the other
+  families, a 3-month history for the target): 3.009 points against 3.638 for the per-site fit on
+  the same history (difference -0.629, 99% interval -1.639 to -0.091)
+headline: >-
+  C4, PS-3m minus K0-3m, is -0.629 points (-1.639 to -0.091) and C2, PS minus K0 at 24 months, is
+  +0.004 (-0.006 to +0.014)
+lessons: >-
+  Partial pooling of every shared shape lets a substation with 3 months of history forecast almost
+  as well as one with 24 months, and costs nothing at 24 months, but it gains nothing there, not
+  even on Christmas rows. Pooling only the heating curve is not enough.
+take_home_message: >-
+  Fitting the demand model's shared curves (heating, lighting, daily profile, holidays) across six
+  substations lets a substation with only 3 months of history score 3.01 points instead of 3.64,
+  within 0.17 points of the same substation with 24 months of its own history, and the gain is
+  largest in winter and on Christmas rows. For substations with 24 months of history, pooling
+  changes the score by less than 0.02 points, so it is safe but not worth adding. Pooling only the
+  heating curve did not help a 3-month substation.
+advice:
+  - >-
+    Use a partly pooled fit across substations for a substation with about 3 months of history, and
+    pool every shared family (heating, lighting, daily profile, holiday periods, Christmas tent,
+    harmonics), not the heating curve alone (C4, C5).
+  - >-
+    Do not pool a substation that already has 24 months of history: the score is unchanged within
+    0.02 points, and a stronger penalty makes Christmas rows worse (C2, C7, post hoc table).
+  - >-
+    Score a pooled arm against a per-site fit that has the same ridge and the same Kalman filter,
+    because the filter corrects most of a poorly fitted level and shrinks the contrast (K0-3m scored
+    3.64, not the 6 to 17 predicted).
+  - >-
+    Leave a substation out of the fleet at any cut where its pinned capacity is a late vintage,
+    because a hindsight level would move every other substation's forecast (D9 before 2025-04).
+
 ---
 
 # Experiment 158: do partly pooled GAM shapes beat per-site GAM fits?
 
-Plan only; the write-up follows the runs.
+**Fitting a demand model's shared curves jointly across six substations lets a substation with only
+3 months of history forecast almost as well as one with 24 months, but it does not help a substation
+that already has 24 months.** A substation with 3 months scored 3.01 points with the shared curves
+and 3.64 points fitted alone (lower is better; difference -0.629, 99% interval -1.639 to -0.091),
+against 2.84 for a 24-month substation. The gain was at all 5 decision substations and in all 12
+months of the scored year, and it was largest in winter and on Christmas rows. At 24 months, pooling
+changed the score by +0.004 points (-0.006 to +0.014), which is safe but not worth the coupling
+between substations. Pooling only the heating curve made a 3-month substation worse, so the other
+shared shapes carry the gain. The verdict is `partly supported`.
+
+**We asked** whether a demand forecast improves when each substation's heating curve, lighting
+curve, daily profile, holiday effects, and Christmas shape are a fleet average plus a penalised
+deviation of its own. The forecast is GAM-K of [experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md), a
+convex generalised additive demand model with a Kalman filter on recent errors, driven by the
+ensemble-mean weather forecast as in [experiment
+136](../00136-dp-bg-stage1-assembly-on-the-ensemble-mean/result.md). The partly pooled fit is the
+convex model of [experiment
+109](../00109-differentiable-physics-n0-partially-pooled-convex-model/result.md), which applies the
+multilevel-model idea of [Gelman and Hill](https://doi.org/10.1017/CBO9780511790942) to the
+coefficients. [Experiment
+154](../00154-differentiable-physics-n0-gate-2-heating-error-against-truth/result.md) had found on
+synthetic data that sharing the heating curve works and that a substation's own offset cannot be read
+from 4 weeks. We kept every level, capacity, and offset per substation. We scored monthly refits
+over the scored year (2025-07 to 2026-06) at the five decision substations, with the even months of
+2024-07 to 2025-06 as a replicate.
+
+![With 3 months of history, pooling every shared shape cuts the error](figure_1_short_history.svg)
+
+![With 24 months of history, pooling changes the score by less than 0.02 points](figure_2_full_history.svg)
+
+![Pooling matters on Christmas and holidays when history is short](figure_3_breakouts.svg)
+
+![The 3-month gain sits in winter](figure_4_seasons.svg)
+
+## Results
+
+Every number is in [`report.json`](report.json), which `e00158_report.py` writes. Scores are
+quantile scores in points of capacity, lower is better.
+
+- **Arms and settings.** K0 (no pooling), PH (heating curve pooled, 300 rows of evidence), PS (all
+  shared families pooled, 300 rows on the heating curve and 3000 on the others), and complete
+  pooling as a reference, each for a target with 24 months and with 3 months of history (the other
+  five substations keep 24). The penalty pair was chosen on the odd tuning months from 3 values per
+  family, the same for both histories. Monthly refits, no weekly refits.
+- **Absolute scores, scored year, all leads.** K0 2.839, PH 2.839, PS 2.843, complete pooling 3.133,
+  K0-3m 3.638, PS-3m 3.009, PH-3m 4.145. References: experiment 136's A2 (per-site T-all) 2.791, BG2
+  2.780, manual heuristic 3.497, climatology 3.804.
+- **L1 fails: C1, PH minus K0, is -0.000 (-0.002 to +0.001).** The threshold was a gain below -0.02.
+- **L2 holds: C2, PS minus K0, is +0.004 (-0.006 to +0.014) and C8 (ordinary rows) is +0.006
+  (-0.002 to +0.015).** Both upper bounds are below +0.02. The replicate months agree (+0.007 and
+  +0.006).
+- **L3 holds: C4, PS-3m minus K0-3m, is -0.629 (-1.639 to -0.091), at 5 of 5 substations and 12 of
+  12 months.** The replicate months give -1.051 (-3.236 to -0.117). The gain is the same at every
+  lead band (-0.61 to -0.66). Leaving each decision substation out in turn leaves it between -0.59
+  and -0.69.
+- **C5, PH-3m minus K0-3m, is +0.507 (-0.073 to +1.024).** Heating alone was worse in both periods
+  (replicate +0.601, 0.339 to 0.852), but the arms differ in ridge (see the caveats).
+- **C6, PS-3m minus K0, is +0.169 (+0.053 to +0.327).** A 3-month substation with pooling is
+  within 0.17 points of a 24-month substation fitted alone, and still worse.
+- **L4 fails: C7, PS minus K0 on holiday and Christmas rows at 24 months, is -0.024 (-0.049 to
+  +0.028).** The sign is negative at 3 of the 4 decision substations with Christmas rows in the
+  scored Christmas, and at 1 of 5 in the replicate Christmas (+0.019 over Christmas rows alone).
+- **At 3 months, pooling helps most on rare days.** Christmas rows scored 4.32 against 9.39 for the
+  per-site fit, holiday rows 3.98 against 9.58, winter 3.41 against 4.91, and cold nights 3.43
+  against 4.49 (scored year).
+- **Tail calibration, scored year, all leads (coverage of q01, q05, q95, q99; pinball loss at q01
+  and q99).** K0: 2.2%, 6.3%, 94.7%, 98.3%; 0.225 and 0.231. PS: 2.1%, 6.4%, 94.5%, 98.3%; 0.223 and
+  0.229. K0-3m: 3.4%, 8.2%, 93.6%, 97.3%; 0.326 and 0.542. PS-3m: 2.6%, 7.1%, 94.4%, 98.1%; 0.245 and
+  0.246.
+
+## Predictions against outcome and checks
+
+- **C1 to C3 and C8 predicted within about +/-0.03; observed within +0.006.** C7 predicted -0.2 to
+  -1.5; observed -0.024. C4 predicted -3 to -12 and revised to -0.5 to +0.3 after the tuning months
+  showed K0-3m scoring 3.05; observed -0.629, just outside the revised range. Complete pooling
+  scored worse than PS at 24 months by 0.29, as predicted (0.05 to 0.30).
+- **Controls.** The per-site fits at penalty 0 reproduce experiment 111's stored fits to within
+  6.5e-11 at all 27 cuts and 6 substations, and K0's score (2.839) equals experiment 136's A0. The
+  fit refuses any training row after the cut. Complete pooling scoring worse than PS passes the
+  shrinkage check at both histories. Experiment 154 is the known-answer gate; it was not repeated.
+- **Median forecast minus mean forecast, per site.** 0.000 at every site for K0, PS, and PS-3m, at
+  12 to 36 hours.
+- **Mean-forecast error beside each contrast.** Same sign as the quantile score for C1 to C9
+  (for example C2 +0.010, C4 -0.833, C7 -0.033 on mean absolute error).
+- **Audit triggers.** Trigger 2 fired for C7 and C4. The explanations were tested: a post hoc pair
+  of arms with a penalty of 30000 rows on the non-heating families scored worse than K0 at 24
+  months on Christmas rows (3.052 and 3.050 against 3.012 in the scored year, 3.603 and 3.586 against
+  3.376 in the replicate), so at 24 months the shared Christmas shape is worse than a substation's
+  own two Christmases; and K0-3m scored 3.64 because the filter corrects most of a poorly fitted
+  level. Trigger 5 (a nested arm beating the arm containing it) does not apply: PH-3m is not nested
+  in K0-3m, because the arms differ in ridge. Trigger 7 holds in principle (a later onboarding
+  design could rest on C4), and C4 is replicated in the even months. No Opus audit ran.
+
+## Caveats
+
+- **PH-3m and K0-3m differ in ridge.** K0-3m uses experiment 109's ridge of 10 on every coefficient,
+  and the pooled arms use 0.1, because a ridge of 10 would also pull a pooled heating curve to zero.
+  C5 therefore mixes pooling with ridge.
+- **Six substations, 3 months, one scored year.** D9 is fitted alone before 2025-04 because its
+  pinned capacity is a late vintage, and D18 is out of the fleet. D5 has no scored Christmas rows
+  after the switching mask.
+- **K0 is experiment 136's A0, not experiment 155's arm,** because experiment 155 has not run, and
+  the pooled design shares B0's columns, not T-all's.
+- **The switching terms of experiments 141 and 147 are not in the fit.** The detector's alarm
+  arrives about 48 hours after a step.
+- **The penalty pair was tuned on the odd months of one year,** and the plan was amended once after
+  the first tuning scores were read (see "Plan"). The 3-month history is a window of 3 months, not a
+  new substation's first 3 months.
+- **No curtailment-cost metric was scored.** The question is the fit, not a headline model.
+
+## What to try next
+
+**Pool T-all's split columns and let the heating curve and the calendar families take separate
+penalties, then test the pooled fit on a real substation that joins with 3 months of history.**
+Separate penalties need a change to the reviewed module `studies.dp_gam_pooled`, in its own pull
+request. Christmas shapes at 24 months did not improve, so a better Christmas shape needs more years
+of history, not more substations.
 
 ## Plan
 
