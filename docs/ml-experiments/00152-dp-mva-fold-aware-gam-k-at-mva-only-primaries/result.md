@@ -63,7 +63,7 @@ best_arm: >-
   hours in the scored year, against 7.29 for A and 7.56 for N
 headline: >-
   Folding the quantiles lowered D12's quantile score by 0.39 points against reading the apparent
-  power as signed power (99% interval -0.95 to +0.16, so R1 failed in the scored year; replicate
+  power as signed power (98.75% interval -0.95 to +0.16, so R1 failed in the scored year; replicate
   -0.53, -0.86 to -0.27) and by 0.40 against the meter fit alone on sunny middays (-0.65 to -0.07,
   R2 passed), with no harm at the other seven sites (-0.02, -0.11 to +0.06, R3 passed). The
   known-answer test failed on K1 at injection level 1.0 and on K5, so the verdict is inconclusive.
@@ -79,7 +79,7 @@ lessons:
   - >-
     Folded quantiles recover the sign of the flow when the injected farm is as large as twice the
     Primary's midday median reading (balanced accuracy 0.81 to 0.87 at all five sites), but not at
-    the natural size of 1.0 times (0.51 to 0.81), where the sign of the flow is often a coin toss.
+    1.0 times the midday median reading (0.51 to 0.81), where the sign of the flow is close to chance.
   - >-
     At sunny middays all three arms forecast D12's reading too low (mean forecast minus reading is
     -12.6 points for F and A and -22.9 for N, scored year), a bias that the fold does not remove.
@@ -94,15 +94,15 @@ take_home_message: >-
 advice:
   - >-
     Do not port the fold to the serving path on this evidence: R1's interval includes zero in the
-    scored year (R1), the known-answer test failed on K1 and K5, and one Primary decides the test
+    scored year (R1), the known-answer test failed on K1 and K5, and all the contrast comes from one Primary
     (Step 0).
   - >-
     If a later experiment revisits the fold, add a second site with reverse flow first, because D12
     alone decides R1 and R2 and the other seven have none (Step 0).
   - >-
     Keep the meter fit with symmetric quantiles (arm A) as the fall-back for MVA Primaries with a
-    visible reverse flow, because it beat reading the apparent power as signed power at D12 in both
-    years (A minus N in the Results).
+    visible reverse flow, because it beat reading the apparent power as signed power at D12 in the
+    replicate year, with the scored-year interval including zero (A minus N in the Results).
   - >-
     Do not rely on the tails of the folded quantiles on sunny middays until the upper-tail
     undercoverage (15% above q95 at D12 in the scored year) is fixed (Tail calibration).
@@ -115,7 +115,7 @@ adopted_in: none
 **At Stickney (D12), the one MVA-only Primary with clear reverse flow, folding the forecast
 quantiles at zero lowered the score on sunny middays, did no harm at the other seven Primaries, and
 did not clear the pre-registered bar for the whole year.** Against the same meter fit with symmetric
-quantiles, arm F scored 0.40 points better on D12's sunny middays (99% interval -0.65 to -0.07;
+quantiles, arm F scored 0.40 points better on D12's sunny middays (98.75% interval -0.65 to -0.07;
 replicate year -0.26, -0.51 to -0.02), which passes R2. Against reading the apparent power as signed
 power (arm N), arm F scored 0.39 points better over all of D12's rows in the scored year, but the
 interval (-0.95 to +0.16) includes zero, so R1 failed there. In the replicate year the gain was 0.53
@@ -123,21 +123,26 @@ points (-0.86 to -0.27). Pooled over the other seven Primaries, F minus N was -0
 so R3 passed. The known-answer test on five Primaries with a hidden solar farm passed on the sign of
 the flow at the larger injection (balanced accuracy 0.81 to 0.87) and failed at the smaller one
 (0.51 to 0.81) and on the upper-tail coverage (11.5% of readings above q95 at the larger
-injection). The verdict is `inconclusive`: one substation decides the test, and the sign of its
+injection). The verdict is `inconclusive`: all of R1 and R2 rests on one substation, and the sign of its
 flow could be checked only indirectly.
+
+In this page, arm N reads the apparent power as signed power. Arm A fits the demand model through
+the meter and uses symmetric quantiles. Arm F is arm A with quantiles folded at zero. R1 to R3 are
+the pre-registered contrasts in the front matter, and the Terms paragraph below defines the other
+abbreviations.
 
 ## Step 0: only D12 has clear reverse flow
 
 ![Predicted reverse flow at sunny middays, by Primary](figure_0_step0.svg)
 
-**Only D12 has predicted reverse flow on most sunny middays, so one substation decides R1 and R2.**
+**Only D12 has predicted reverse flow on most sunny middays, so all of R1 and R2 rests on one substation.**
 The table uses experiment 110's fit through the meter (past weather, the scored year; the replicate
 year agrees within 0.2 MW and 3 percentage points). Sunny middays are April to September
 half-hours starting 10:00 to 13:30 UTC with CAMS irradiance at least 70% of the Haurwitz clear-sky
 value, outside switching masks. "Sure" is the share of those half-hours with a fitted
 reverse-flow probability above 0.9 under a normal residual.
 
-| Site | NGED reverse flow? | PV capacity (MW) | Sunny-midday half-hours with reverse flow | Sure | Largest reverse flow (MW) | Lowest reading (MVA) |
+| Site | NGED reverse flow? | PV capacity (MW) | Sunny-midday half-hours with reverse flow | Sure (probability above 0.9) | Largest reverse flow (MW) | Lowest reading (MVA) |
 |---|---|---|---|---|---|---|
 | D12 | Maybe | 5.9 | 100% | 100% | 5.3 | 0.87 |
 | D22 | Maybe | 1.6 | 3.7% (replicate 0.7%) | 0% | 0.14 | 0.21 |
@@ -174,7 +179,7 @@ meter, filters the signed flow, and folds its quantiles. A bulk supply point (BS
 substation above a group of Primaries.
 
 **Eight of the 16 trial Primaries report only the magnitude of apparent power (MVA), and the reading
-bounces off zero when embedded solar pushes the net flow below zero.** This experiment asks whether
+rises again once embedded solar pushes the net flow below zero, because it is the absolute value of the flow.** This experiment asks whether
 a forecast that models that bounce explicitly beats one that treats the reading as signed power.
 [Experiment 110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md)
 already fitted the bounce for day-ahead forecasts on past weather and found it helps at Stickney
@@ -201,8 +206,7 @@ ahead, with a filter and quantiles that also know about the fold.
 - **R4, F minus BG2 at D12.** Not computed: experiment 87 stored BG2 only for the MW Primaries,
   and none exists for D12. The reference arms climatology and the manual heuristic are likewise not
   available for the MVA series.
-- **A minus N at D12.** Fitting through the meter without folding the quantiles already helps:
-  absolute quantile score at D12 is 7.56 (N), 7.29 (A), and 7.17 (F) in the scored year, and 7.33,
+- **A minus N at D12.** Fitting through the meter without folding the quantiles already helps in the replicate year (-0.48, -0.77 to -0.25) and not clearly in the scored year (-0.27, -0.88 to +0.33): absolute quantile score at D12 is 7.56 (N), 7.29 (A), and 7.17 (F) in the scored year, and 7.33,
   6.85, and 6.80 in the replicate year.
 - **By site, F minus N, scored year.** D2 +0.011, D3 +0.015, D4 -0.009, D8 -0.189, D12 -0.391,
   D19 -0.009, D21 +0.017, D22 +0.042. Only D3 and D21 have an interval wholly above zero (D3
@@ -212,14 +216,14 @@ ahead, with a filter and quantiles that also know about the fold.
 
 Five MW Primaries (D5, D10, D11, D14, D16) had a metered solar farm's output subtracted from the
 signed power at 1.0 and 2.0 times the Primary's midday median absolute reading in the year before
-the scored year. Each farm differs per Primary. The series was then folded to |P| (zero reactive
+the scored year. Each Primary receives a different metered farm. The series was then folded to |P| (zero reactive
 power) or to `sqrt(P² + (0.2506 D)²)` (power factor 0.97, with the pre-injection reading as the
 demand D, which is simpler than the plan's as-of-capacity demand estimate). The scored year only.
 
 | Check | Rule | Result | Passed? |
 |---|---|---|---|
 | K1, sign balanced accuracy, level 2.0 | at least 0.80 at 4 of 5 sites | 0.81 to 0.87 at 5 of 5, both reactive-power settings | yes |
-| K1, sign balanced accuracy, level 1.0 | at least 0.80 at 4 of 5 sites | zero reactive power 0.70 to 0.81 (1 of 5), power factor 0.97 0.51 to 0.79 (0 of 5) | no |
+| K1, sign balanced accuracy, level 1.0 | at least 0.80 at 4 of 5 sites | with zero reactive power 0.70 to 0.81, at 1 of 5 sites; with power factor 0.97 0.51 to 0.79, at 0 of 5 sites | no |
 | K2, F minus N, level 2.0 | at most -0.10, interval wholly below zero | -0.71 (-1.02 to -0.44) zero reactive power, -0.56 (-0.84 to -0.31) power factor 0.97 | yes |
 | K2, F minus N, natural level | at most +0.03 | -0.016 (-0.041 to +0.010) | yes |
 | K3, mean absolute error of the signed median on reverse-flow rows, level 2.0 | F at most 1.5 times S, N at least 2 times S | F 1.04 times S, N 2.99 times S | yes |
@@ -227,7 +231,7 @@ demand D, which is simpler than the plan's as-of-capacity demand estimate). The 
 | K5, coverage on sunny middays, level 2.0 | within 3 points of 5% below q05 and above q95 | 2.5% below q05, 11.5% above q95 | no |
 
 The signed ceiling S scored 5.4 to 6.8 points at level 2.0, against 2.2 to 4.0 at the natural
-level, so the injection adds real forecast difficulty. Stop rule S1 (balanced accuracy under 0.80
+level, so the injected farm makes the signed series harder to forecast. Stop rule S1 (balanced accuracy under 0.80
 at 3 or more sites at level 2.0) did not fire.
 
 ## Checks
@@ -237,19 +241,31 @@ at 3 or more sites at level 2.0) did not fire.
   middays by 1.8 points, which is the mechanism of the gain.
 - **Mean-forecast error beside the contrasts, D12.** F and A share one fit and filter, so their mean
   forecasts are identical (all rows -0.09, sunny middays -12.6 points). N's is +0.04 over all rows
-  and -22.9 on sunny middays. Every quantile gain of F over A is therefore from the quantiles, and
-  A's gain over N on sunny middays comes with a mean error that is 10 points smaller.
+  and -22.9 on sunny middays. Every quantile gain of F over A therefore comes from the quantiles.
+  A's gain over N on sunny middays comes with a mean forecast error that is 10 points smaller.
 - **Tail calibration at D12, scored year.** Share of readings below q01, q05, above q95, above q99,
   all rows: F 3.7%, 7.9%, 7.5%, 3.0%; A 3.5%, 8.8%, 6.5%, 2.1%; N 4.2%, 9.9%, 5.6%, 1.9%.
   On sunny middays: F 0.9%, 2.7%, 15.1%, 6.9%; A 0.6%, 1.9%, 15.8%, 7.3%; N 0.0%, 0.2%, 18.1%,
   7.6%. All three arms leave 15% to 18% of readings above q95 on sunny middays, because the forecast
   reading is too low there.
 - **Audit triggers that fired.** R1 failed in the scored year while the replicate year passed, so
-  the headline contrast is not stable across the two years. The known-answer test failed K1 at
+  R1's point estimate agrees across the two years, and the scored-year interval is too wide to exclude zero. The known-answer test failed K1 at
   level 1.0 and K5. One site decides R1 and R2. The pre-registered verdict is `inconclusive`, and
   no audit was run, because the brief allows no Opus review and none of the findings would change
   the verdict.
-- **Not computed.** BG2, climatology and manual heuristic at the MVA Primaries (no stored
+- **Predictions against outcomes.** F minus N at D12 was predicted at -0.5 to -1.0 and came out at
+  -0.39 (scored) and -0.53 (replicate). F minus A on sunny middays was predicted at -0.05 to -0.25
+  and came out at -0.40 and -0.26, larger than predicted. F minus N pooled over the other seven
+  was predicted within +-0.02 and came out at -0.02 and -0.03. Coverage below q05 on D12's
+  sunny-midday rows was predicted at 9 to 11% for N, 6 to 8% for A, and near 5% for F, and came out
+  at 0.2%, 1.9%, and 2.7%. The sunny-midday forecast is too low in all arms, which leaves almost no
+  readings below q05 and explains the miss for N and A.
+- **Folding helps more in Stage 2 than the Stage 0 replay predicted.** The replay of folded
+  quantiles on experiment 110's day-ahead predictions with past weather moved D12's sunny-midday
+  score by +0.03 and +0.04 points. Stage 2 uses ensemble-driven forecasts at leads 0.5 to 168
+  hours. One possible reason is the longer leads, but the experiment did not test the difference
+  separately.
+- **Not computed.** BG2, climatology, and manual heuristic at the MVA Primaries (no stored
   predictions), the curtailment-style cost (the folded series has no signed export), and a learned
   reactive-power arm.
 
@@ -264,7 +280,7 @@ at 3 or more sites at level 2.0) did not fire.
 - **Stage 1 uses the scored year only**, one farm per Primary, and the sign check's floor is 5% of
   the Primary's 99th-percentile reading.
 
-## Changes to the Opus design (maintainer, 2026-10-21)
+## Decisions made at the start of the run
 
 - **Run now.** Experiment 139 is not awaited: no as-of capacity can be built at an MVA Primary, so
   the capacity is fitted through the meter in every monthly refit.
@@ -343,7 +359,7 @@ reports the sign at D12 as unestablished.
 filters on experiment 110's stored D12 predictions (day-ahead, past weather), the gated
 signed-flow filter minus the additive filter was +0.02 points (95% interval -0.24 to +0.30) on
 scored-year sunny-midday rows, under the 0.05-point threshold, and -0.37 (-0.91 to -0.03) in the
-replicate year, so the sign is not stable. On all rows it was worse in both years (+1.57 and +0.80
+replicate year, so the sign differs between the years. On all rows it was worse in both years (+1.57 and +0.80
 points). Folded quantiles on the additive filter's corrected reading moved the sunny-midday score
 by +0.03 and +0.04 points. Following S0, arm F becomes arm A plus folded quantiles, and R2 compares
 those two. The replay reproduced experiment 110's stored filtered mean. The replicate-year
