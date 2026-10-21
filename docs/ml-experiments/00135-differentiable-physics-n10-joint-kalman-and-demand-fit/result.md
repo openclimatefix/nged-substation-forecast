@@ -234,8 +234,7 @@ J2 minus J1 is descriptive.
 
 One GPU job at a time under 24 GB, and `systemd-run --user --scope -p MemoryMax=16G -p
 OOMPolicy=continue`. The corrected design matrix needs one filter pass per monthly cut and
-substation over about 250 columns, which is a few seconds on the GPU, so the GPU time is expected
-to be well under 1 hour. The first step times one cut and writes the number here. The joint fits of all five
-joint arms (J1 and the four J2 ridge weights) share one filter pass per cut and substation. A
-smoke test on one cut of one substation took about 8 seconds for three arms. The ENS forecasts take about 35 s per arm and
-substation, on the CPU in at most 6 processes.
+substation over about 290 columns. The joint fits of all five joint arms (J1 and the four J2 ridge
+weights) share that pass. A smoke test on one cut of one substation took about 8 seconds for three
+arms, so the GPU time is expected to be well under 1 hour. The ENS forecasts take about 35 s per
+arm and substation, on the CPU in at most 6 processes.
