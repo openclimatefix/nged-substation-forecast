@@ -4,7 +4,8 @@ The four arms share K0's spread tables and factors (see `e00143_arms`), so a fra
 arms only through the correction.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 uv run --no-sync python ml-experiments/00143-*/e00143_frames.py [--workers 3]
+        env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 uv run --no-sync python \\
+        ml-experiments/00143-*/e00143_frames.py [--workers 3]
 """
 
 import argparse
