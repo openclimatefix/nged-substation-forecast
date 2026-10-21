@@ -62,11 +62,13 @@ best_arm: >-
   median call lag of 29.0 hours after the true end.
 headline: >-
   R2 minus R0 -0.000 (-0.001 to +0.000), false ends 0.050, median lag 29.0 hours. R1 and R3 differ
-  from R0 by -0.496 (-0.606 to -0.406) and -0.496 (-0.608 to -0.406), with false-end shares of 0.613 and 0.604.
+  from R0 by -0.496 (-0.606 to -0.406) and -0.496 (-0.608 to -0.406), with false-end shares of
+  0.613 and 0.604.
   Merging cuts the share of transfers with 2 or more intervals from 0.574 to 0.033.
 lessons: >-
   A threshold-first end rule ends the transfer about 8 hours early, because the 24-hour step ramps
-  up before the true end. Waiting for the running peak to fall delays the call by a median 29 hours and does not lower the share found. Merging
+  up before the true end. Waiting for the running peak to fall delays the call by a median 29 hours
+  and does not lower the share found. Merging
   same-Primary alarms removes about 94% of the transfers that were reported as 2 or more intervals.
 take_home_message: >-
   The end of a switching interval can be called from data available at the time, with no loss of
