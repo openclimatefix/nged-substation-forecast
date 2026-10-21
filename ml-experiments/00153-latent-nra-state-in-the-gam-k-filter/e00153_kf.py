@@ -174,6 +174,14 @@ def _band_latent(
     while `open_interval` is true at the reading, and otherwise decays by `X_DECAY_PER_READING`
     with no process noise.
 
+    Args:
+        positions: The grid positions of the band's readings, ascending.
+        values: The residual at each position, in points.
+        open_interval: True at each reading inside an alarm interval whose offset is switched on.
+        reabsorb: True at each reading where the offset is first folded into the level.
+        hyper: The site's hyperparameters.
+        ratio: The offset's process variance as a multiple of the fitted `q`.
+
     Returns:
         The NRA level n and the anomaly z after each reading (x is not returned: the forecast
         leaves it out).
