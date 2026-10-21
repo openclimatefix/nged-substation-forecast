@@ -27,7 +27,8 @@ prediction: >-
   C1 (the per-substation term minus the base, quantile score on the E7 window rows of cold winter
   nights at leads 12 to 36 hours, scored year, six decision substations) is -0.5 to -2.0 points.
   The term recovers at least half of the oracle's gain (the oracle is the same term fitted on the
-  scored year itself; the ratio is read only if the oracle's C1 interval lies wholly below zero). The mean forecast's error on the same rows (actual minus mean) shrinks by
+  scored year itself; the ratio is read only if the oracle's C1 interval lies wholly below zero).
+  The mean forecast's error on the same rows (actual minus mean) shrinks by
   at least a third. The all-rows quantile score (C4) changes by -0.03 to +0.01 points.
 decision_rule: >-
   Five planned contrasts, each read at the 99% level of the month-resampled paired bootstrap (the
@@ -78,7 +79,8 @@ forecast's own past errors, closes the miss.
   a 09:00 UTC run always covers in full for the night it forecasts, and
   `weekend` flags Saturday and Sunday evenings. Coefficients are a ridge regression of the base
   forecast's error (actual minus the mean forecast) on those 72 columns, fitted per substation
-  (`T_SITE`) or shared across the six substations (`T_POOL`), on all rows whose run origin and valid time are both
+  (`T_SITE`) or shared across the six substations (`T_POOL`), on all rows whose run origin and
+  valid time are both
   before the first of the month being forecast (an expanding window, refitted monthly, starting
   from 2024-07). The ridge penalty is chosen on the odd tuning months from a fixed grid. The
   spread around the shifted median is unchanged.
