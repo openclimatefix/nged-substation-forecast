@@ -6,8 +6,8 @@ fleet is experiment 150's, rebuilt from the same five seeds: eight synthetic sub
 calendar and weather of the MW Primaries, a known fleet-mean heating response, known per-substation
 heating offsets, and noise taken as whole weeks of residuals from a different real substation. The
 gate contains no generator data. The deviation penalty of each seed is the one experiment 150 tuned
-(read from its stored gate file), so this script needs no tuning and no torch. One invocation runs
-one seed:
+(read from its stored gate file), so this script needs no tuning. `studies.dp_gam` imports torch,
+so a fresh worktree needs `uv sync --all-packages --group gpu`. One invocation runs one seed:
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00154-*/e00154_gate.py --seed 20261101
