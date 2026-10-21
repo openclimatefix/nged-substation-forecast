@@ -33,7 +33,7 @@ from studies.dp_ens_weather import Calibration
 from studies.dp_gam import GamFit
 
 PERIODS: Final[frozenset[str]] = frozenset({"tuning", "replicate", "scored", "stride", "warm_up"})
-MEMBERS_DIR: Final[Path] = common.WORK_DIR / "members"
+MEMBERS_DIR: Final[Path] = common.SRC_115_WORK_DIR / "members"
 GAMK_FITS_DIR: Final[Path] = common.FITS_DIR / "gamk"
 
 

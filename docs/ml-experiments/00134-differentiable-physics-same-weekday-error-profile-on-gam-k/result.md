@@ -54,7 +54,8 @@ of repeating the value seven days ago is the usual seasonal-naive forecast
 - **Rh.** R with the holiday rule below, kappa re-chosen on the tuning months. It separates the
   effect of the holiday rule from the effect of the weekday.
 - **COPY7.** The actual power at the same half-hour 7 days earlier as a point forecast (all 11
-  quantiles equal), reported beside the arms and never corrected.
+  quantiles equal), reported beside the arms and never corrected, on its own subset: the rows where
+  that reading exists, with K0 and RB rescored on the same subset.
 - **L1.** K0 minus kappa times last week's same-weekday D+1 error profile (one sample).
 - **RW.** K0 minus kappa times the mean same-weekday error over the last n weeks; n from 2, 3, 4.
 - **RB (lead arm).** Profile = A + lambda (W - A), where A is Rh's 14-day all-days profile, W is
@@ -77,20 +78,35 @@ scored separately.
 - **Rule.** Fleet-wide settings (one set for all five decision substations), because each
   substation has about 3,000 tuning-month D+1 rows and the weekday profiles use 2 to 4 samples; a
   per-substation choice would mostly fit noise. The setting with the lowest mean absolute error of
-  the corrected median at D+1 on the tuning rows, pooled over the five decision substations, wins.
+  the corrected median at D+1 on the tuning rows, in points of effective capacity, pooled with equal
+  weight per row over the five decision substations, wins. Holiday-like targets stay in the tuning
+  rows (they carry zero correction in every arm). Weeks `n` is chosen separately for RW and RB, and
+  the full kappa-by-lambda-by-n grid is reported.
   Each arm's spread is then refitted on the tuning rows and its factors chosen per lead band, as
   for every arm of experiment 115.
 - **Sensible limits.** If lambda = 0 wins, RB equals Rh and the verdict says so.
 
 ## Known-answer gate (reported before any score)
 
-**On real tuning-month residuals, inject a +3-point shift into the readings of Saturdays
-17:00 to 21:00 local for 8 consecutive weeks and measure the share of it each arm's correction
-recovers at the later Saturdays of the window.** Pass conditions: RB recovers at least twice what
-R recovers and at least 0.3 of the shift; the placebo (the weekday labels of the profile shifted by
-3 days, same settings) recovers no more than R plus 0.05; and on the tuning months the placebo
-RB's gain over Rh is under half the real RB's gain. A failed condition caps the verdict at
-`inconclusive`.
+**On real tuning-month residuals, add +3 points to the readings of Saturdays 17:00 to 21:00 local
+for 8 consecutive Saturdays (2 November to 21 December 2024), run every arm's full profile code on
+the changed readings, and measure the share of the shift each correction recovers at the third to
+eighth Saturday.** The Saturday is the UTC day of the valid time, and the half-hours are local. The
+injection goes through the same 40-of-48 reading filter, holiday rule, and fallback as the real
+scoring, so the gate can fail for a real reason. The share is linear in the weights: with kappa 0.75,
+R recovers about 0.75 x 2/14 = 0.11, and RB at lambda 0.5 and n 4 recovers about 0.19.
+
+- **Settings.** The gate runs at the tuned settings and at a fixed reference (kappa 0.75, lambda 0.5,
+  n 4), so the result does not depend on where tuning lands.
+- **Pass conditions, at the reference.** RB recovers at least 0.15 of the shift and at least twice
+  what R recovers; the placebo (the profile reads the weekday that falls 3 days after the target's;
+  same settings, not re-tuned, because the placebo only has to show the gain needs the right
+  weekday) recovers at most what R recovers plus 0.05; and on the tuning months the placebo's mean
+  absolute error at D+1 lies less than halfway from Rh's to RB's.
+- **Tuned settings.** Reported beside the reference. If tuning picks lambda 0, RB equals Rh and the
+  verdict says so.
+- A failed condition caps the verdict at `inconclusive`. The gate runs before any replicate or
+  scored forecast is read.
 
 ## Predictions
 
@@ -102,18 +118,26 @@ RB's gain over Rh is under half the real RB's gain. A failed condition caps the 
 
 - **C1** RB minus R (decides the verdict), **C2** RW minus R, **C3** RB minus K0, **C4** RB minus L1,
   **C5** RB-day-types minus RB. **C6** (diagnostic) RB minus Rh.
-- **Supported** if C1's scored-year estimate is at most -0.02 points and its interval lies wholly
-  below zero; the replicate year has the same sign and at least half the size; at least 3 of 5
-  substations improve in both periods; the winter breakdown (November to March, and winter evening)
-  shows no loss; and the gate passes. **Small gain** if the interval lies below zero but the
-  estimate is smaller than 0.02 points. **Not supported** if the scored interval includes zero or
-  lies above it. A gate failure caps the verdict at `inconclusive`.
+- **Supported** if C1's scored-year interval has its upper end at most -0.02 points; the replicate
+  year has the same sign and an estimate at least half the scored estimate; at least 3 of 5
+  substations improve in both periods; the winter C1 estimate is at most 0 with its upper end under
+  +0.02; and the gate passes. **Small gain** if the scored interval lies wholly below zero but its
+  upper end is above -0.02. **Not supported** if the interval includes zero. **Refuted** if the
+  interval lies wholly above zero. A gate failure caps every verdict at `inconclusive`.
+- **C1 and the holiday rule.** C1 is RB minus R as the brief states, so it includes the holiday rule.
+  The write-up reports C1 on non-holiday rows and C6 (RB minus Rh) beside it, and says so when the
+  weekday effect and the holiday rule point in different directions.
 - **Threshold, with the reason.** 0.02 points (about 1% of the score), because the change adds one
   profile of the same size as recipe R to the serving path.
 - **Intervals.** 99% intervals, month blocks resampled, paired across arms
   (`studies.bootstrap.bootstrap_difference_at_level`).
 
 ## Breakdowns and checks
+
+The winter evening peak is 16:00 to 20:00 local from November to March. "Last n weeks" counts the
+last n same-weekday dates, and a date left out by the holiday rule or by the reading filter is not
+replaced. Charts and tables use D-labels only. `result.md` opens with the take-home message, then one
+headline chart with intervals, then the weekday-by-weekday chart.
 
 Each weekday separately; winter (November to March) and the winter evening peak; cold nights (daily
 mean under about 3 C, as in experiment 122) with q95 coverage; holidays, Christmas windows, and
