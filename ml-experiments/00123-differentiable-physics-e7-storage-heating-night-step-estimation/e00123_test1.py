@@ -6,7 +6,7 @@ reproduce its tuning-year quantile score at four decimal places. It reads no est
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import cast
 
 import e00123_common as common
@@ -46,7 +46,7 @@ def print_convention() -> None:
     print(
         "Window rows (start): 00:30, 01:00, 01:30, 02:00, 02:30; baseline (start): 22:00 to 23:30."
     )
-    slots = common.slot_table(clock="utc", evenings=[__import__("datetime").date(2022, 1, 12)])
+    slots = common.slot_table(clock="utc", evenings=[date(2022, 1, 12)])
     print(slots.sort("role", "slot"))
 
 
