@@ -42,16 +42,17 @@ decision_rule: >-
   BSP's effective capacity, over leads 0.5 to 168 hours in the scored year, on the shared rows. Each
   is read at the 97.5% level of the month-resampled paired bootstrap (12 calendar months, 20,000
   resamples; the level is Bonferroni-corrected for the two BSPs because `partly supported` needs
-  only one). The threshold is a gain of 2% of the top-down score, computed from the point estimate of
-  the top-down score at that BSP, because bottom-up adds a remainder chain per BSP and a weight table, and needs the children's
-  forecasts at serving time. The hypothesis is `supported` when both BSPs' intervals lie wholly below
-  minus the threshold, `partly supported` when exactly one does and the other interval does not lie wholly above zero,
-  `mixed` when one does and the other lies wholly above zero, `small gain` when both lie wholly
-  below zero and the `supported` condition fails, `refuted` when both lie wholly above zero, and
-  `inconclusive` otherwise (for example one interval wholly below zero but not below the
-  threshold, and the other straddling zero). The verdict is capped at `inconclusive` if the reproduction control or
-  the oracle control fails. Contrasts C2 to C9 carry no verdict. The prediction range overlaps the threshold, so a gain of
-  about 2% is close to a coin flip on the verdict.
+  only one). The threshold is a gain of 2% of the top-down score, computed from the point estimate
+  of the top-down score at that BSP, because bottom-up adds a remainder chain per BSP and a weight
+  table, and needs the children's forecasts at serving time. The hypothesis is `supported` when both
+  BSPs' intervals lie wholly below minus the threshold, `partly supported` when exactly one does and
+  the other interval does not lie wholly above zero, `mixed` when one does and the other lies wholly
+  above zero, `small gain` when both lie wholly below zero and the `supported` condition fails,
+  `refuted` when both lie wholly above zero, and `inconclusive` otherwise (for example one interval
+  wholly below zero but not below the threshold, and the other straddling zero). The verdict is
+  capped at `inconclusive` if the reproduction control or the oracle control fails. Contrasts C2 to
+  C9 carry no verdict. The prediction range overlaps the threshold, so a gain of about 2% is close
+  to a coin flip on the verdict.
 benchmark: >-
   Top-down (arm D's chain on the BSP alone) as the reference arm; the fixed-sum bottom-up; the
   oracle; ClimatologyForecaster and manual_heuristic for absolute skill
@@ -79,20 +80,20 @@ not a hard sum. This experiment asks the question again with the best-guess GAM-
 D) on both sides: is the BSP forecast better when it is built from its children's forecasts plus a
 learned remainder than when the BSP is forecast as a stand-alone series?
 
-**Scope: two BSPs (seven and nine children), and the children that report real power.** NGED's hierarchy file places 16
-Primaries under two BSPs, D13 (seven children) and D17 (nine children). Four of D13's children (D2, D4,
-D19, D21) and four of D17's (D3, D8, D12, D22) report apparent power in megavolt-amperes, which
-hides the sign of the flow in daylight (see
-[the data-processing page](../data-processing.md), "Use a Primary metered in MVA for demand only on
-dark rows"). No observed net-power remainder can be formed from such a child, and arm D has no
-forecast for it. The MVA children stay inside the remainder. The covered children are the Primaries
-that report real power and have a long history and an arm D forecast: D9, D10, and D11 under D13
-(23.3 of 55.3 MW of effective capacity), and D5, D14, and D16 under D17 (26.5 of 47.6 MW). D15 and
-D18 under D17 (the two transformers of one Primary substation) report real power but have under 5
-months of readings before the scored year, so they stay in D17's remainder too. The scope is
-therefore a partial bottom-up, and the write-up says so in its first paragraph. A bottom-up arm that
-also forecasts the MVA children (demand terms only, on dark rows, as experiment 124's joint fit
-does) is the obvious follow-up and is not tested here.
+**Scope: two BSPs (seven and nine children), and the children that report real power.** NGED's
+hierarchy file places 16 Primaries under two BSPs, D13 (seven children) and D17 (nine children).
+Four of D13's children (D2, D4, D19, D21) and four of D17's (D3, D8, D12, D22) report apparent power
+in megavolt-amperes, which hides the sign of the flow in daylight (see [the data-processing
+page](../data-processing.md), "Use a Primary metered in MVA for demand only on dark rows"). No
+observed net-power remainder can be formed from such a child, and arm D has no forecast for it. The
+MVA children stay inside the remainder. The covered children are the Primaries that report real
+power and have a long history and an arm D forecast: D9, D10, and D11 under D13 (23.3 of 55.3 MW of
+effective capacity), and D5, D14, and D16 under D17 (26.5 of 47.6 MW). D15 and D18 under D17 (the
+two transformers of one Primary substation) report real power but have under 5 months of readings
+before the scored year, so they stay in D17's remainder too. The scope is therefore a partial
+bottom-up, and the write-up says so in its first paragraph. A bottom-up arm that also forecasts the
+MVA children (demand terms only, on dark rows, as experiment 124's joint fit does) is the obvious
+follow-up and is not tested here.
 
 **Arms.** All arms use arm D's recipe: the ensemble-mean weather, T-all, the shared filter noise
 (POOL), monthly refits, the winter night offset, recipe R, and arm A's spread table.
@@ -106,11 +107,11 @@ does) is the obvious follow-up and is not tested here.
 
 **The remainder series.** For each BSP the remainder is `r(t) = BSP(t) - sum_i w_i * y_i(t)`, where
 `y_i` is the covered child's observed reading in MW. The chain forecasts `r` as it forecasts any
-series, with the BSP's location for the weather and calibration, a PV capacity fitted and not
-pinned (no capacity vintage exists for a BSP, and the remainder holds the unmetered and the MVA
-children's embedded solar), the same filter, and arm D's two corrections applied to the remainder's
-own errors. The BU forecast of the BSP is `sum_i w_i * mean_i + mean_r`, because the decomposition is
-exact in the observed readings. BU1 runs its own remainder chain on `BSP - sum_i y_i`.
+series, with the BSP's location for the weather and calibration, a PV capacity fitted and not pinned
+(no capacity vintage exists for a BSP, and the remainder holds the unmetered and the MVA children's
+embedded solar), the same filter, and arm D's two corrections applied to the remainder's own errors.
+The BU forecast of the BSP is `sum_i w_i * mean_i + mean_r`, because the decomposition is exact in
+the observed readings. BU1 runs its own remainder chain on `BSP - sum_i y_i`.
 
 **A confound the design names.** The covered children's arm D forecasts use the pinned PV capacity
 of [experiment 139](../00139-differentiable-physics-pv-as-of-capacity-in-gam-k/result.md). No
@@ -136,11 +137,12 @@ sees the same error stream, and every score uses the runs the arms share.
 with no intercept, on the half-hours in 2023-10-01 to 2024-03-31 where the BSP and the children are
 present, unflagged, and outside the hand-filtered switching events. The window ends on the day
 before the first run (2024-04-01) and starts at the first usable day of the youngest child (D9,
-2023-10-01 at D13). The weights are fixed for the whole experiment, so no weight uses a reading after
-any cut. The weights are 15 to 27 months old in the scored year, and the remainder series before
-2024-04 is in-sample for the weights; no scored row is affected. Variant BU-w2 refits the weights
-on data to 2025-06-30 and is scored on the scored year only. The window is winter only at D13, so the weights say little about summer; the write-up shows
-the fitted weights beside experiment 124's multipliers.
+2023-10-01 at D13). The weights are fixed for the whole experiment, so no weight uses a reading
+after any cut. The weights are 15 to 27 months old in the scored year, and the remainder series
+before 2024-04 is in-sample for the weights; no scored row is affected. Variant BU-w2 refits the
+weights on data to 2025-06-30 and is scored on the scored year only. The window is winter only at
+D13, so the weights say little about summer; the write-up shows the fitted weights beside experiment
+124's multipliers.
 
 **Spread.** Each arm's quantiles are its mean plus a residual table (hour band by calendar quarter
 by lead band) fitted on that arm's own tuning-month forecasts (the odd months of 2024-07 to
@@ -149,10 +151,10 @@ BU uses a table fitted on the sum's residuals. A variant gives BU TD's table (BU
 isolates the mean.
 
 **Rows and periods.** `fold_a_daily_gap_v1`, 09:00 UTC `power_fcst_init_time`, the 292 runs of the
-scored year (2025-07-02 to 2026-06-29), leads 0.5 to 168 hours. A row is scored when the BSP and
-its three covered children have a reading and sit outside the hand-filtered switching events, so
-every arm is scored on the same rows. Tuning months and replicate months are experiment 136's. Series
-are D-labels. No generator series enters.
+scored year (2025-07-02 to 2026-06-29), leads 0.5 to 168 hours. A row is scored when the BSP and its
+three covered children have a reading and sit outside the hand-filtered switching events, so every
+arm is scored on the same rows. Tuning months and replicate months are experiment 136's. Series are
+D-labels. No generator series enters.
 
 **Weather and what exists at forecast time.** The weather is the calibrated ensemble mean of
 experiment 136 for the BSP's grid cell, and the filter's analysis proxy is built from earlier runs.
@@ -166,46 +168,46 @@ of `studies.node_curtailment` at the scaled limit (f = 0.9, with 0.75 and 0.5), 
 generators-beneath inputs it needs exist for these two BSPs. Where it cannot be scored, the write-up
 says so.
 
-**Planned contrasts.** C1 BU minus TD (headline, at D13 and at D17), with TD also reported on all
-of its own rows beside the shared rows. C2 BU1 minus TD. C3 BU minus
-BU1 (do learned weights help). C4 C1 by lead band. C5 BU-spreadTD minus TD (the mean alone). C6 BU
-minus TD at the tail quantiles. C7 BU-oracle minus TD (diagnostic). C8 BU-fc minus BU. C9 BU-w2 minus BU. Each is read through
+**Planned contrasts.** C1 BU minus TD (headline, at D13 and at D17), with TD also reported on all of
+its own rows beside the shared rows. C2 BU1 minus TD. C3 BU minus BU1 (do learned weights help). C4
+C1 by lead band. C5 BU-spreadTD minus TD (the mean alone). C6 BU minus TD at the tail quantiles. C7
+BU-oracle minus TD (diagnostic). C8 BU-fc minus BU. C9 BU-w2 minus BU. Each is read through
 `studies.bootstrap`.
 
 **Controls, run before any contrast is read.**
 
-- **Reproduction.** Arm D rescored from experiment 155's stored forecasts at the covered children
-  on the common rows matches experiment 155's stored per-site scores within 0.001.
-- **Oracle (positive control).** BU-oracle scores below TD at both BSPs by at least half the share
-  of effective capacity that the covered children make up (42% at D13, 56% at D17) times TD's
-  score. The decomposition is exact in observed readings, so a smaller gain means a plumbing fault
-  in the remainder, the weights, or the join. Experiment 36's oracle gained 3.4 to
-  5.6 points.
-- **Leakage.** The weight window ends before the first run, and an assertion checks that no remainder
-  fit trains on a reading after its cut (the chain's `assert_no_lookahead`).
-- **Closure check.** Print the in-sample residual of the weight fit in MW and its share of the BSP's
-  variance, to compare with experiment 124's audit (1.2 to 1.8 MW at the BSP that closes, 11 points
-  at the other).
+- **Reproduction.** Arm D rescored from experiment 155's stored forecasts at the covered children on
+  the common rows matches experiment 155's stored per-site scores within 0.001. - **Oracle (positive
+  control).** BU-oracle scores below TD at both BSPs by at least half the share of effective
+  capacity that the covered children make up (42% at D13, 56% at D17) times TD's score. The
+  decomposition is exact in observed readings, so a smaller gain means a plumbing fault in the
+  remainder, the weights, or the join. Experiment 36's oracle gained 3.4 to 5.6 points. -
+  **Leakage.** The weight window ends before the first run, and an assertion checks that no
+  remainder fit trains on a reading after its cut (the chain's `assert_no_lookahead`). - **Closure
+  check.** Print the in-sample residual of the weight fit in MW and its share of the BSP's variance,
+  to compare with experiment 124's audit (1.2 to 1.8 MW at the BSP that closes, 11 points at the
+  other).
 
 **Five triggers (size).** Stored: private files only. Serving path: not touched. Degradation rule:
 not touched. More than one design defensible: yes, three, each pre-registered above. Callers not
 nameable without searching: no, the scripts copy experiments 111, 136, and 155.
 
-**Audit triggers to watch.** Trigger 1 (a control fails: the oracle), trigger 2 (the result contradicts
-experiment 36's null, or this plan's prediction), and trigger 6 (an interval more than twice as wide
-as experiment 155's per-site intervals) are the likely ones. The write-up lists which fired and
-tells the manager if any did.
+**Audit triggers to watch.** Trigger 1 (a control fails: the oracle), trigger 2 (the result
+contradicts experiment 36's null, or this plan's prediction), and trigger 6 (an interval more than
+twice as wide as experiment 155's per-site intervals) are the likely ones. The write-up lists which
+fired and tells the manager if any did.
 
 **Resources.** CPU only, at most 6 cores with one thread per worker, each job under `systemd-run
---user --scope -p MemoryMax=16G -p OOMPolicy=continue`. No GPU. New work: the ensemble frames for the
-two BSP locations for the 456 early runs (the scored year's frames already hold both), the weather
-calibration, and six chains (TD, the BU remainder, and the fixed-sum remainder at each BSP).
+--user --scope -p MemoryMax=16G -p OOMPolicy=continue`. No GPU. New work: the ensemble frames for
+the two BSP locations for the 456 early runs (the scored year's frames already hold both), the
+weather calibration, and six chains (TD, the BU remainder, and the fixed-sum remainder at each BSP).
 
 **Outputs.** Predictions for every arm in the `dp_preds` layout under
 `data/ml-experiments/00161-dp-bsp-top-down-against-bottom-up/work/dp_preds/`.
 
-**Advice followed and departures.** From experiment 36: do not expect the children's median forecasts
-to help an XGBoost BSP model, and do not read the oracle's gain as headroom; this experiment uses a
-different model and reports the oracle only as a control. From experiment 124: the BSP reading is not
-an exact sum, so the weights and the remainder are estimated. From experiment 155: use arm D (the
-instruction for this experiment), apply recipe R at every lead, and read the tails.
+**Advice followed and departures.** From experiment 36: do not expect the children's median
+forecasts to help an XGBoost BSP model, and do not read the oracle's gain as headroom; this
+experiment uses a different model and reports the oracle only as a control. From experiment 124: the
+BSP reading is not an exact sum, so the weights and the remainder are estimated. From experiment
+155: use arm D (the instruction for this experiment), apply recipe R at every lead, and read the
+tails.
