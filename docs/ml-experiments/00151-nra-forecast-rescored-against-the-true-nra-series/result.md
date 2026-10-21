@@ -62,8 +62,6 @@ metric: >-
 code: ml-experiments/00151-nra-forecast-rescored-against-the-true-nra-series/
 ---
 
-# Experiment 151: the NRA forecast scored against the true NRA series
-
 **This page is the plan. The result sections are filled in after the run.**
 
 ## Question
