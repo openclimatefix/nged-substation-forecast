@@ -139,7 +139,10 @@ def end_coverage(arm: str) -> pl.DataFrame:
 
 
 def daylight_flags() -> pl.DataFrame:
-    """Per event: whether the donor has convex-model terms and the event holds daylight (solar mean of at least 0.05 MW)."""
+    """Flag each event whose donor has convex-model terms and whose interval holds daylight.
+
+    Daylight means a solar mean of at least 0.05 MW.
+    """
     rows = []
     for path in sorted((WORK_DIR / "worlds" / "CONST").glob("world_*.npz")):
         world = int(path.stem.split("_")[1])
@@ -163,7 +166,10 @@ def daylight_flags() -> pl.DataFrame:
 
 
 def donor_found(arm: str, family: str, *, anchored: bool) -> pl.DataFrame:
-    """Per event: whether an interval on the donor starts near the onset (or near first light for solar-shaped arms)."""
+    """Flag each event whose donor has an interval starting near the onset.
+
+    Solar-shaped arms are matched near first light instead of the drawn onset.
+    """
     rows = []
     for path in sorted((WORK_DIR / "worlds" / arm).glob("world_*.npz")):
         world = int(path.stem.split("_")[1])
