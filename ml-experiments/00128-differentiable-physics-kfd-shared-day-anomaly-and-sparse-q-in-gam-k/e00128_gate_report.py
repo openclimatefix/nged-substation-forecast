@@ -87,15 +87,14 @@ def paired(*, treated: dict, base: dict, arm: str, name: str) -> np.ndarray:
 def tracks(*, tracked: np.ndarray, truth: np.ndarray, k_star: int) -> bool:
     """Return whether a paired series passes reading 1 against a truth path."""
     recent = tracked[k_star - gate.READ_AVERAGE_DAYS + 1 : k_star + 1]
+    days = slice(1, gate.READ_WINDOW[1] + 1)
     if not np.isfinite(recent).any():
         return False
     recovery = np.nanmean(recent) / truth[k_star]
-    both = np.isfinite(tracked[: gate.READ_WINDOW[1]]) & np.isfinite(truth[: gate.READ_WINDOW[1]])
+    both = np.isfinite(tracked[days]) & np.isfinite(truth[days])
     if both.sum() < 3:
         return False
-    correlation = np.corrcoef(
-        tracked[: gate.READ_WINDOW[1]][both], truth[: gate.READ_WINDOW[1]][both]
-    )[0, 1]
+    correlation = np.corrcoef(tracked[days][both], truth[days][both])[0, 1]
     return bool(recovery >= RECOVERY and correlation >= CORRELATION)
 
 
@@ -191,11 +190,31 @@ def false_movement(*, records: dict[Key, dict], scenario: str) -> dict:
     return out
 
 
-def paired_interval(*, difference: np.ndarray) -> tuple[float, float]:
-    """Return the 95% interval of the mean of per-draw differences, resampling draws."""
+def paired_interval(*, difference: np.ndarray, n_sites: int) -> tuple[float, float]:
+    """Return the 95% interval of the mean of per-draw differences.
+
+    Each resample first draws substations with replacement, then draws the draws within each drawn
+    substation with replacement, because the draws of one substation share its real stream.
+
+    Args:
+        difference: The per-draw differences, ordered by substation and then draw.
+        n_sites: The number of substations, each with the same number of draws.
+
+    Returns:
+        The 2.5th and 97.5th percentiles of the resampled means.
+
+    Raises:
+        ValueError: If the differences do not split evenly over the substations.
+    """
+    if len(difference) % n_sites:
+        msg = f"{len(difference)} differences do not split over {n_sites} substations"
+        raise ValueError(msg)
+    by_site = difference.reshape(n_sites, -1)
+    n_draws = by_site.shape[1]
     generator = np.random.default_rng(BOOTSTRAP_SEED)
-    picks = generator.integers(len(difference), size=(N_RESAMPLES, len(difference)))
-    means = difference[picks].mean(axis=1)
+    sites = generator.integers(n_sites, size=(N_RESAMPLES, n_sites))
+    draws = generator.integers(n_draws, size=(N_RESAMPLES, n_sites, n_sites))
+    means = by_site[sites[:, :, None], draws].mean(axis=(1, 2))
     return float(np.percentile(means, 2.5)), float(np.percentile(means, 97.5))
 
 
@@ -203,7 +222,7 @@ def tracking_difference(*, outcomes: dict[tuple, list[bool]], form: str, scenari
     """Return KDS minus GAM-K in the tracking pass rate, with a paired interval over draws."""
     kds = np.array(outcomes[("1", "KDS", form, scenario)], dtype=np.float64)
     gk = np.array(outcomes[("1", "GK", form, scenario)], dtype=np.float64)
-    low, high = paired_interval(difference=kds - gk)
+    low, high = paired_interval(difference=kds - gk, n_sites=len(gate.SITES))
     return {"difference": float(np.mean(kds - gk)), "lower": low, "upper": high}
 
 
