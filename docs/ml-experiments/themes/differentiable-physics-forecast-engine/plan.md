@@ -1,20 +1,19 @@
 # Differentiable physics: the forecast engine: research plan
 
-**Part 6 of the series was the first experiment of this theme, and two follow-ups are in flight:
-experiment 125 (N8) and experiment 128.** The other rows below are proposals, not agreed work, and
-the priorities are a suggested order for the maintainer to change.
+**Part 6 of the series was the first experiment of this theme, and its follow-ups wait on the
+maintainer.** The rows below are proposals, not agreed work, and the priorities are a suggested
+order for the maintainer to change.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |
 | Filter on BG2 residuals (research only) | Does a Kalman filter on the recent residuals of the production XGBoost blend (BG2) lower its day-ahead score as it does for the convex model? | Low | Nothing; run midweek, and only as research | Proposed |
-| N8, ensemble members through the DP (experiment 125) | Does running each ensemble member through the DP give better-calibrated spread than residual quantiles? | 4 | Part 6 merged, and a free GPU | In flight (draft pull request 1422) |
+| N8, ensemble members through the DP | Does running each ensemble member through the DP give better-calibrated spread than residual quantiles? | 4 | Part 6 merged, and a free GPU | Proposed |
 | Schaake shuffle against ECC | Do ensemble copula coupling and the Schaake shuffle give summed ensembles with the same calibration against the observed sum across substations? | 4 | N8's ensemble members | Queued, after N8 |
 | N7, paired residuals at switching events | Do the donor's and the receiver's residuals sum to roughly the moved power where both sides are metered? | 5 | Nothing; can run with the cheap screens or with the edge-flow experiment | Proposed |
 | Tail quantile regression on filtered residuals | Does a quantile regression on the Kalman residuals, with the prediction, its square, and the hour as covariates, calibrate the tails better than residual quantiles? | 6 | The stored residuals only; independent of CAL | Proposed |
 | Conditional Pareto tails | Does a Pareto distribution with covariate-dependent scale calibrate the 1% and 99% quantiles, for the curtailment tail? | 7 | The tail quantile regression above | Proposed |
-| Shared day-level anomaly and sparse process noise (experiment 128) | Does one day-level anomaly state shared across the hour bands, with the process noise estimated sparsely from zero, fix the weights that the known-answer gate could not recover on real residuals in GAM-K's filter? | Proposed | Nothing | In flight (planned, code review before the first scored run) |
 | Learned process noise and observation variance | On the batched filter grid, do a learned diagonal process noise and an online observation variance beat fixed values? | 8 | The batched-filter module (pull request 1419) merged; about 1 GPU hour | Queued |
 | ERA5-only winter-by-winter backtest, earlier winters | Does the release candidate rank above XGBoost on past weather in the winters of 2019-20 to 2022-23, and does that ranking agree with the ensemble-weather result? | Low | Nothing | Queued, not started |
 | CAL, tail calibration and coherence | Can the convex model's tails on ensemble weather be calibrated per lead band, and do its summed ensembles match the observed sum across substations? | Postponed | The maintainer's decision to restart (postponed on 2026-10-20) | Postponed |
