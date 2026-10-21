@@ -51,7 +51,7 @@ metric: >-
 code: ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/
 verdict: refuted
 date: 2026-10-21
-pr: 1441
+pr: 1455
 headline: >-
   The as-of capacity scored 0.110 points worse than the pin on the sunniest third of daylight
   half-hours (98.75% interval 0.038 to 0.181) in the scored year, and 0.042 points better on the
