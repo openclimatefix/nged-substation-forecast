@@ -65,31 +65,32 @@ best_arm: POOL, one shared filter setting, scored 2.462 points at leads 12 to 36
   scored year against 2.498 for FIX (experiment 111's values), a post hoc contrast of -0.036
   (99% interval -0.076 to -0.0003). The planned headline, GRID minus FIX, is -0.009 (-0.044
   to +0.030).
-headline: Choosing each substation's filter noise by next-day score gained 0.044 points on the
-  months that chose it (99% interval -0.062 to -0.019) and -0.009 (-0.044 to +0.030) on the
-  scored year, so the gain did not carry over. The online observation variance changed neither
+headline: Choosing each substation's filter noise by next-day score changed the quantile score
+  by -0.044 points on the months that chose it (99% interval -0.062 to -0.019) and by -0.009
+  (-0.044 to +0.030) on the scored year, so the gain did not carry over. The online observation variance changed neither
   the score (C3a -0.013, -0.045 to +0.005) nor the coverage of the 0.95 quantile on cold nights
   (+0.003, -0.003 to +0.011).
-lessons: Filter noise chosen by next-day score fits the months it was chosen on and not the
-  following months, so the noise of GAM-K's filter is not where the next-day error comes from.
-  One setting shared by every substation scored as well as per-substation settings, so per-substation
-  tuning is not needed. A recent-error scale on the spread does not predict cold-night error.
+lessons: Filter noise chosen by next-day score improved the months it was chosen on and not the
+  following months, and the explanation (overfitting a flat surface) was not tested. One setting
+  shared by every substation scored at least as well as per-substation settings in the scored
+  year. A recent-error scale on the spread did not predict cold-night error in this experiment.
 take_home_message: 'Choosing the filter''s noise settings for each substation by how well they
   forecast the next day did not improve the forecast on later months: the gain of 0.044 points
   on the months used to choose shrank to 0.009 on the scored year, inside the noise. A single
-  setting shared by every substation did as well as the per-substation settings, so the filter''s
-  noise is not worth tuning per substation. Letting the observation variance follow recent errors
+  setting shared by every substation did at least as well as the per-substation settings, so
+  tuning the filter''s noise per substation looks unnecessary, although the grid did not find a
+  minimum. Letting the observation variance follow recent errors
   did not widen the forecast where it matters, on cold nights, where the 0.95 quantile still
   covered only 86% to 88% of readings.'
 advice:
-- 'Do not tune GAM-K''s filter noise per substation by next-day score: the gain of 0.044 on
-  the choosing months fell to -0.009 (-0.044 to +0.030) in the scored year (C1, figure 2).'
-- 'Try one noise setting shared by all substations before any per-substation fit: the shared
-  setting scored 0.036 below FIX in the scored year (99% interval -0.076 to -0.0003, post hoc
-  PH1) and had the lowest score in both periods.'
-- 'Do not scale the spread by a recent-error statistic to fix cold-night coverage: the statistic''s
+- 'Do not tune GAM-K''s filter noise per substation by next-day score on this grid: the change of
+  -0.044 on the choosing months became -0.009 (-0.044 to +0.030) in the scored year (C1, figure 2).'
+- 'Test one noise setting shared by all substations as a planned contrast before any per-substation
+  fit: the shared setting scored 0.036 below FIX in the scored year (99% interval -0.076 to
+  -0.0003, post hoc PH1), though it was no better than FIX on the tuning months.'
+- 'Do not expect a recent-error scale on the spread to fix cold-night coverage: the statistic''s
   log correlation with the next day''s error was -0.03 (online variance) and 0.06 (trailing
-  innovations) on cold nights (mechanism bullet, C3b).'
+  innovations) on cold nights, and the coverage did not rise (mechanism bullet, C3b).'
 - 'Widen the grid before trusting a grid-chosen setting: every GRID cell touched an edge of
   the grid, so the surface was not searched to its minimum (figure 5).'
 - 'Do not use a fixed-setting tracking test with the same noise added to the shifted and unshifted
@@ -157,11 +158,12 @@ online, and used it to scale the spread of the forecast. The design is in [Plan]
   +0.073). Odd months -0.044 (-0.062 to -0.019; 5 of 5 substations better). The prediction was
   -0.02 to -0.08 with a replicate gain of at most 60% of the odd-month gain, so the prediction
   failed on the replicate. Verdict by the decision rule: `inconclusive`, because the gain lives on
-  the months that chose the cells.
+  the months that chose the cells; only 1 of 5 substations improves in the replicate, and leaving
+  out D5 turns the scored-year contrast positive (see Checks).
 - **C2, POOL minus GRID.** Scored year -0.026 (-0.078 to +0.013), replicate -0.046 (-0.096 to
   +0.016), odd months +0.053 (+0.0004 to +0.144; POOL is worse on the months that chose GRID, as it
-  must be). The interval is wider than the +/-0.03 equivalence band, so the contrast is undecided,
-  with the sign favouring POOL out of sample.
+  must be). The interval is wider than the +/-0.03 equivalence band,
+  so by the rule the sign decides, and it favours POOL out of sample.
 - **C3a, VK0 minus GRID.** Scored year -0.013 (-0.045 to +0.005), replicate +0.005 (-0.003 to
   +0.012); not under the -0.03 bar. **C3b, VK1 minus GRID.** Scored year -0.004 (-0.052 to +0.027),
   replicate +0.012 (-0.014 to +0.037). Over all leads, C3a is -0.032 (-0.104 to -0.004) in the
@@ -170,8 +172,9 @@ online, and used it to scale the spread of the forecast. The design is in [Plan]
   +0.029 (+0.012 to +0.044).
 - **Cold-night coverage of the 0.95 quantile, 12 to 36 hours, scored year:** FIX 0.879, GRID 0.864,
   POOL 0.877, VK0 0.868, VK1 0.865, TRAIL 0.867, against 0.95 and against all rows at 0.940 to
-  0.944. The change against GRID is +0.003 (-0.003 to +0.011) for VK0 and +0.000 (-0.013 to
-  +0.015) for VK1, so the predicted rise of 3 to 8 points is excluded.
+  0.944. The change against GRID is +0.003 (-0.003 to +0.011) for VK0 and +0.000 (-0.013 to +0.015)
+  for VK1, so the predicted rise of 3 to 8 points is excluded (against FIX the two arms are lower,
+  0.868 and 0.865 against 0.879).
 - **Mechanism.** The log correlation of the tail statistic at the cutoff with the next day's
   absolute error is 0.29 (online variance) and 0.30 (trailing innovations) over all rows, and -0.03
   and +0.06 on cold nights. Recent residual size predicts error on average and not on the nights
@@ -182,17 +185,19 @@ online, and used it to scale the spread of the forecast. The design is in [Plan]
   0.05 quantile (0.620) and ties TRAIL at the 0.01 quantile (0.178).
 - **Breakouts, descriptive, 12 to 36 hours, scored year** (mean quantile score for FIX, GRID, POOL):
   winter 2.550, 2.539, 2.497; winter nights 2.112, 2.055, 2.025; cold nights 2.351, 2.304, 2.279;
-  holidays and Christmas 2.889, 2.846, 2.778. POOL has the lowest score in each.
+  holidays and Christmas 2.889, 2.846, 2.778. POOL has the lowest score in each, though it was no
+  better than FIX on the tuning months (PH1 +0.009).
 - **Post hoc PH1, POOL minus FIX** (added after the scored year was read; no verdict). 12 to 36
   hours: scored year -0.036 (99% interval -0.076 to -0.0003; 4 of 5 substations better, 9 of 12
   months negative); replicate -0.041 (-0.104 to +0.017; 5 of 5 substations better). All leads,
   scored year: -0.030 (-0.070 to +0.010).
-- **Fitted values.** Every GRID cell touches an edge of the grid (figure 5): five of six sit at
-  the lowest transient standard deviation of the grid (0.61 times the observation standard
-  deviation), five at the highest decay factor (0.98 per half-hour), and D10 at the lowest (0.73).
-  POOL is one cell at both edges (level variance 0.37 times the observation variance per day,
-  transient standard deviation 0.61, decay factor 0.98). FIX's values are 1.3 to 44 and 2.8 to
-  9.0 for the same two ratios. The grid did not find a minimum, so a wider grid could change C1.
+- **Fitted values.** Every GRID cell touches an edge of the grid (figure 5): five of six sit at the
+  lowest transient standard deviation of the grid (0.61 times the observation standard deviation),
+  four at the highest decay factor (0.98 per half-hour), D10 at the lowest (0.73), and D16 inside
+  the range (0.95). POOL is one cell at both edges (level variance 0.37 times the observation
+  variance per day, transient standard deviation 0.61, decay factor 0.98). FIX's values are 1.3 to
+  44 and 2.8 to 9.0 for the same two ratios. The grid did not find a minimum, so a wider grid could
+  change C1.
 - **Selection.** The Spearman correlation between the proxy-error ranking of the 20 best cells and
   their ensemble quantile-score ranking was 0.70 to 0.94 across substations, so the cheap ranking
   does track the target score. The online variance's random-walk variance went to the edge of its
@@ -202,8 +207,8 @@ online, and used it to scale the spread of the forecast. The design is in [Plan]
 ## Checks
 
 - **Median minus mean forecast, GRID, 12 to 36 hours (points of capacity):** D5 -0.117, D9 -0.041,
-  D11 -0.018, D14 +0.011, D16 +0.008, D10 -0.007. FIX's D5 is -0.097; no arm's spread shifts the
-  forecast by more than 0.12 points.
+  D11 -0.018, D14 +0.011, D16 +0.008, D10 -0.007. FIX's D5 is -0.097; no GRID or VK0 spread shifts
+  the forecast by more than 0.12 points, but TRAIL and VK1 do at D5 (-0.162 and -0.137).
 - **Error of the mean forecast beside each contrast, 12 to 36 hours, scored year** (99% intervals):
   C1 -0.013 (-0.070 to +0.053), C2 -0.049 (-0.136 to +0.021), C3a -0.019 (-0.051 to +0.002), C3b
   -0.019 (-0.051 to +0.002). Each has the sign of its quantile-score contrast, so the audit trigger
@@ -243,11 +248,13 @@ online, and used it to scale the spread of the forecast. The design is in [Plan]
 
 ## Plan
 
-The plan, as committed before any fit and triaged after one plan review, is in the git history
-of this file (the commit "Experiment 133 plan"). The changes made after the review were: `sigma_eps`
-held at 1 for the grid arms because the correction depends only on ratios; a two-step choice of
-cell; VK0 and VK1 as separate arms; a trailing-innovation arm (TRAIL); decision rules for every
-contrast; and the gate made larger. Pre-run clarifications made before the first fit: POOL is one
-shared cell in ratio units (the filter is scale-free, so "scaled per substation" adds nothing) and
-is chosen on the step-1 error alone; the gate's injected shift peaks at half of each substation's
-residual standard deviation, because the stored fits do not expose the PV effect in points.
+The plan, as committed before any fit and triaged after one plan review, is in the git history of
+this file (the commit "Experiment 133 plan"). The changes made after the review were: a grid of
+1,323 settings (log q -4 to 6, not the 4,032-setting grid planned); an online-variance random-walk
+grid of e^-9, e^-7, and e^-5; D18 left out for lack of tuning readings; `sigma_eps` held at 1 for
+the grid arms because the correction depends only on ratios; a two-step choice of cell; VK0 and VK1
+as separate arms; a trailing-innovation arm (TRAIL); decision rules for every contrast; and the gate
+made larger. Pre-run clarifications made before the first fit: POOL is one shared cell in ratio
+units (the filter is scale-free, so "scaled per substation" adds nothing) and is chosen on the
+step-1 error alone; the gate's injected shift peaks at half of each substation's residual standard
+deviation, because the stored fits do not expose the PV effect in points.
