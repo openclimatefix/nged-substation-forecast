@@ -70,7 +70,7 @@ take_home_message: >-
   are a day-level state for each time of day with a shared part, an explicit solar-panel term, and a
   test with an injected change large enough to detect; the verdict is inconclusive.
 date: 2026-10-21
-pr: <pr>
+pr: 1433
 advice:
   - >-
     Do not add one day-level error state shared by all four hour bands to the level-and-anomaly
