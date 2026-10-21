@@ -568,6 +568,7 @@ include = [
     "packages/studies/tests/test_dp_meter.py",
     "packages/studies/tests/test_dp_gam_pooled.py",
     "packages/studies/tests/test_dp_shape_library.py",
+    "packages/studies/tests/test_dp_shape_library.py",
     "packages/studies/tests/test_dp_gam_graph.py",
     "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_common.py",
     "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_design.py",
