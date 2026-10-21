@@ -1,7 +1,6 @@
 ---
 id: '00136'
 slug: dp-bg-stage1-assembly-on-the-ensemble-mean
-title: 'Differentiable physics, best guess stage 1: GAM-K with everything that has helped, driven by the ensemble mean'
 part: BG-1
 theme: differentiable-physics-forecast-engine
 also_relevant_to:
@@ -120,9 +119,10 @@ on cold nights. Absolute skill is reported for BG2, climatology, and manual_heur
 contrasts. The curtailment cost saving against the manual heuristic follows once a node metric exists
 for these substations; if not run, the write-up says so.
 
-**Controls.** P1: the FIX arm of experiment 133 reproduces experiment 111's GAM-K (already passed in
-experiment 133). P2: A3 with a zero-width window of one month should reproduce A2 within noise (a
-placebo that a change of cadence alone moves nothing is not claimed; C4 tests it).
+**Controls.** P1: the FIX arm of experiment 133 reproduces experiment 111's GAM-K within 1e-4
+(passed in experiment 133). P2: the T-all fit on the monthly cut of 2025-07-01 is compared with
+experiment 114's yearly T-all fit of the same cut, whose coefficients must agree to numerical
+precision.
 
 **Five triggers.** Stored: private files only. Serving path: not touched. Degradation rule: not
 touched. More than one design defensible: yes (mean input, spread refit), pre-registered above. Callers
