@@ -85,7 +85,8 @@ code: ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-a
 **Adding night-time levels fixed to the UTC clock removes most of the 01:00 jump in demand that the
 current forecast misses on cold winter nights, and a five-hinge heating curve adds almost nothing.**
 We asked two questions of GAM-K, the fitted model of primary substation demand (a primary substation
-is a 33 kV to 11 kV substation of the distribution network) that the differentiable-physics series
+is a substation of the electricity distribution network that supplies local feeders) that the
+differentiable-physics series
 of experiments uses. First, does letting its heating response bend at five temperatures instead of
 one lower the forecast error? Second, does a night-time step term, such as the load that Economy 7
 meters and storage heaters switch on at about 01:00, lower the error on winter nights? (Economy 7 is
