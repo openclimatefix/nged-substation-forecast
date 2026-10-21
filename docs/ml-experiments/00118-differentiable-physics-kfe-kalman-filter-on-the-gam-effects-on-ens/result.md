@@ -65,8 +65,8 @@ lessons:
     -0.010, 95%, exploratory), though not in the replicate months (-0.013, -0.060 to +0.042).
   - >-
     The heating and profile-scale weights each earn a little when the others are present (dropping
-    them costs 0.032 and 0.060 points at D+1), but moving them does not beat moving the level alone
-    (C4 -0.006, interval -0.035 to +0.023).
+    them worsens the score by 0.032 and 0.060 points at D+1), but moving them does not beat moving
+    the level alone (C4 -0.006, interval -0.035 to +0.023).
   - >-
     Holding the level and anomaly corrections at zero on holiday days is much worse (KEZ-DT minus KEZ
     +1.24 points on 17 holiday days, interval +0.62 to +1.83), so the carried level is needed on
@@ -82,7 +82,8 @@ take_home_message: >-
   interval -0.013 to +0.048), and did no better in winter or on cold days. Switching the correction
   off on holidays is much worse (+1.24 points) and halving it is not better, so the filter still
   helps on holidays. The weights cannot be read as measurements, because the known-answer gate
-  failed on real residuals and the noise-fit control failed its strict bar, so the verdict is
+  failed on real residuals, although two of its bars were mis-set. Keep experiment 111's filter, and
+  the next step is a filter that fixes the PV weight and moves the others; the verdict is
   inconclusive.
 date: 2026-10-20
 pr: 1409
@@ -122,9 +123,10 @@ followed its own model, but not when the noise was resampled from real residuals
 heating weights are not interpretable, and P4 adds that the PV and holiday variances are not
 recovered (a holiday variance simulated at 0 was fitted between 9e-7 and 3e-2 per day in the first
 run). The verdict is `inconclusive`. The evidence supports keeping GAM-K's filter, and fitting a new
-filter's noise by a day-ahead likelihood with a wide bound on log q, which together improved KEZ by
-0.127 points here. The scored-year interval excludes any gain over GAM-K above about 0.05, so the
-data answer "not worth porting"; `inconclusive` refers to what the weights mean.
+filter's noise by a day-ahead likelihood with a wide bound on log q (the combined change improved
+KEZ by 0.127 points here; the two changes were made together). The scored-year interval excludes any
+gain over GAM-K above about 0.05, so the data answer "not worth porting"; `inconclusive` refers to
+what the weights mean.
 
 **This experiment re-implements the method of [de Vilmarest et al.
 (2024)](https://doi.org/10.1109/TPWRS.2023.3310280) on our convex model and our data.** They froze
@@ -182,17 +184,16 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   below). The planned contrast C1 shows no gain either way: +0.015 in the scored year and +0.021 in
   the replicate months.
 - **GAM-K is reproduced:** 2.800 points over leads 0.5 to 168 hours in the scored year, as in
-  experiment 111, and GK minus GAM-0 is -0.152 (-0.264 to -0.039) there, against -0.151 in
+  experiment 111, and GK minus GAM-0 is -0.152 points (-0.264 to -0.039) there, against -0.151 in
   experiment 111. Controls P0 to P3 pass (see Controls).
 - **Planned contrasts at D+1** (99% intervals from resampling whole calendar months, paired; "k of
   5" counts decision substations where the first-named arm scores better):
 
-| Contrast | Scored year | Replicate months |
-|---|---|---|
-| C1, KEZ minus GK | +0.015 (-0.013 to +0.048), 1 of 5 | +0.021 (-0.068 to +0.115), 1 of 5 |
-| C2, KE minus GK | +0.180 (+0.046 to +0.305), 0 of 5 | +0.166 (+0.041 to +0.318), 2 of 5 |
-| C3, KEZ minus KE | -0.164 (-0.267 to -0.048), 5 of 5 | -0.145 (-0.226 to -0.049), 4 of 5 |
-| C4, KEZ minus KEZ-Q0 (descriptive) | -0.006 (-0.035 to +0.023), 3 of 5 | -0.045 (-0.124 to +0.052), 3 of 5 |
+| Contrast | Scored year | Replicate months | |---|---|---| | C1, KEZ minus GK | +0.015 (-0.013 to
++0.048), 1 of 5 | +0.021 (-0.068 to +0.115), 1 of 5 | | C2, KE minus GK | +0.180 (+0.046 to +0.305),
+0 of 5 | +0.166 (+0.041 to +0.318), 2 of 5 | | C3, KEZ minus KE | -0.164 (-0.267 to -0.048), 5 of 5
+| -0.145 (-0.226 to -0.049), 4 of 5 | | C4, KEZ minus KEZ-Q0 (descriptive) | -0.006 (-0.035 to
++0.023), 3 of 5 | -0.045 (-0.124 to +0.052), 3 of 5 |
 | C5, KEZ minus KEZ-QI | -0.010 (-0.066 to +0.032), 3 of 5 | -0.026 (-0.192 to +0.072), 3 of 5 |
 
 - **Absolute scores, scored year, D+1 and over leads 0.5 to 168 hours** (five decision substations,
@@ -213,13 +214,12 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   is -0.013 (-0.027 to +0.002) in the scored year and +0.008 (-0.070 to +0.073) in the replicate
   months.
 - **The likelihood and bound change together were worth 0.127 points** (KEZ-1s minus KEZ, scored
-  year, +0.084 to +0.171;
-  replicate months +0.083, +0.031 to +0.139). The first run fitted the noise by the one-step
-  likelihood and the narrower bound on log q (a pre-fit clarification, below), and KEZ-1s is that run.
-  The two changes were made together, so this experiment cannot say which one caused the gain. KEZ-Q0
-  (level only, day-ahead-fitted noise) scored worse than GK, whose hyperparameters come from the
-  one-step likelihood, by +0.022 (scored year) and +0.066 (replicate months), which points the other
-  way.
+  year, +0.084 to +0.171; replicate months +0.083, +0.031 to +0.139). The first run fitted the noise
+  by the one-step likelihood and the narrower bound on log q (a pre-fit clarification, below), and
+  KEZ-1s is that run. The two changes were made together, so this experiment cannot say which one
+  caused the gain. KEZ-Q0 (level only, day-ahead-fitted noise) scored worse than GK, whose
+  hyperparameters come from the one-step likelihood, by +0.022 (scored year) and +0.066 (replicate
+  months), which points the other way.
 
 ## Controls
 
@@ -325,19 +325,23 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   run), PV tracking passed in 0.98 to 1.00 of draws and heating tracking in 0.99 to 1.00 in the
   filter's own noise model, and in only 0.39 to 0.42 (PV) and 0.55 to 0.62 (heating) with resampled
   real residuals, still under the bar of 0.80.
-- **The manager ruled that the replicate and scored forecasts run after the failed gate** and that
-  the contrasts are published as descriptive, with the verdict capped at `inconclusive`. The
-  first-run gate fits are kept. Not run (reported, not blocking): the level step, the holiday step,
-  the gate with the shared-step noise matrix, the 10% and 20% amplitude rows, and the
-  doubled-amplitude S3x2 scenario.
+- **The maintainer's process rule was that the replicate and scored forecasts run after the failed
+  gate** and that the contrasts are published as descriptive, with the verdict capped at
+  `inconclusive`. The first-run gate fits are kept. Not run (reported, not blocking): the level
+  step, the holiday step, the gate with the shared-step noise matrix, the 10% and 20% amplitude
+  rows, and the doubled-amplitude S3x2 scenario.
 
 ## Checks
 
+- **A Sonnet audit ran** (re-derived C1 to C5 from the stored predictions; leakage, spread, held
+  values, and the gate failure checked). It found no bug in the forecasts, scoring, or likelihood.
+  Its findings on the write-up are applied above.
 - **Bar calibration.** Two gate readings failed on bars the filter cannot meet even when correct:
   the P4 zero-variance bar of 1e-7 is below the optimiser's grid (a true zero fits at 8e-7, a
-  `GREEDY_GRID` value), and the S0 no-false-movement bar of 0.10 is tighter than the filter's own
-  posterior spread for the heating weights (0.09 to 0.33). The failures that stand are PV and heating
-  tracking on resampled real residuals, and the holiday variances (fitted 1e-3 to 3e-2).
+  `GREEDY_GRID` value, the optimiser's grid of candidate variances), and the S0 no-false-movement
+  bar of 0.10 is tighter than the filter's own posterior spread for the heating weights (0.09 to
+  0.33). The failures that stand are PV and heating tracking on resampled real residuals, and the
+  holiday variances (fitted 1e-3 to 3e-2).
 - **Median forecast minus mean forecast, per substation** (all leads, scored year, points; GK /
   KEZ): D5 -0.117
   / -0.088, D10 -0.037 / -0.041, D11 -0.043 / -0.008, D14 +0.015 / +0.019, D16 +0.002 / -0.010, D9
@@ -374,12 +378,10 @@ fitted on the odd months of 2024-07 to 2025-06 only.
   last training rows, and the spread fitted on the tuning months are inherited from experiment 111;
   the gain reported by de Vilmarest et al. is on regional load. The forecasts ran on module commit
   `2e356581b` of PR 1407; if its review changes the module, what the change affects re-runs and
-  these first-run results stay on this page. **This page cannot merge before PR 1407 does**, because
-  the scripts import the module, and until then this pull request's diff carries the module's code,
-  its tests, and three lines of `pyproject.toml`.
-- **What to try next:** KEZ without the PV weight is the only arm that scored below GK in the scored
-  year, and it did not in the replicate months, so a filter that moves the profile and heating
-  weights while fixing PV is a cheap follow-up. A day-ahead likelihood fit for GK's own
+  these first-run results stay on this page. The scripts import the module from `packages/studies`.
+- **What to try next:** KEZ without the PV weight is the only one of the nine arms that scored below
+  GK in the scored year, and it did not in the replicate months, so a filter that moves the profile
+  and heating weights while fixing PV is a cheap follow-up. A day-ahead likelihood fit for GK's own
   level-and-anomaly filter is the fairer comparison for KEZ-Q0 (KEZ-Q0 minus GK is +0.022, +0.006 to
   +0.035).
 
