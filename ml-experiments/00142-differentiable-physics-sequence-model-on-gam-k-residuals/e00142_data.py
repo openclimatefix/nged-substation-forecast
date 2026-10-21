@@ -86,13 +86,14 @@ def _christmas(*, day_numbers: np.ndarray) -> np.ndarray:
     return np.array(flags)
 
 
-def build_samples(
+def build_samples(  # noqa: PLR0915
     *,
     data: site_module.SiteData,
     k0_q50: np.ndarray,
     k0_quantiles: np.ndarray,
     setup_runs: list,
     actual: np.ndarray | None = None,
+    stream: np.ndarray | None = None,
 ) -> Samples:
     """Build a substation's samples.
 
@@ -102,6 +103,7 @@ def build_samples(
         k0_quantiles: K0's 11 quantiles at every row, shape (n_rows, 11).
         setup_runs: The ensemble runs of the site (`SiteSetup.runs`), indexed by run index.
         actual: Readings to learn from, `data.actual` by default; an injected copy for the gate.
+        stream: The residual stream, `data.stream` by default; an injected copy for the gate.
 
     Returns:
         The samples of every run with a full day D+1 and a K0 forecast.
@@ -109,17 +111,14 @@ def build_samples(
     actual = data.actual if actual is None else actual
     ends = data.cache.end_times
     assert (np.diff(ends) == np.timedelta64(30, "m")).all(), "the grid must be regular"
-    stream = data.stream
+    stream = data.stream if stream is None else stream
     cutoff = data.cutoffs(delay_hours=DELAY_HOURS)
     d1 = data.d1_rows()
     first_day = (ends[0] - np.timedelta64(30, "m")).astype("datetime64[D]")
-    day_start_pos = lambda day: int(  # noqa: E731
-        ((day - first_day).astype(np.int64)) * N_BINS
-    )
     origin_days = data.run_origins.astype("datetime64[D]")
-    all_days = np.array([(origin_days.min() - EPOCH).astype(int) - HISTORY_DAYS - 2])
     first = date(1970, 1, 1)
-    low, high = int(all_days[0]) - 30, int((origin_days.max() - EPOCH).astype(int)) + 40
+    low = int((origin_days.min() - EPOCH).astype(int)) - HISTORY_DAYS - 30
+    high = int((origin_days.max() - EPOCH).astype(int)) + 40
     banned = {
         (d - first).days
         for d in profiles.holiday_like_days(
@@ -136,7 +135,10 @@ def build_samples(
         day_numbers = (origin_day - EPOCH).astype(int) + np.arange(-HISTORY_DAYS, 1)
         history = np.zeros((N_DAYS, N_DAY_FEATURES))
         for slot, day_number in enumerate(day_numbers):
-            start = day_start_pos(EPOCH + np.timedelta64(int(day_number), "D"))
+            start = (
+                int((EPOCH + np.timedelta64(int(day_number), "D") - first_day).astype(np.int64))
+                * N_BINS
+            )
             if start < 0 or start + N_BINS > len(stream):
                 continue
             positions = start + np.arange(N_BINS)
