@@ -152,6 +152,20 @@ Series with 26% to 82% of their dark half-hours negative carry embedded generati
 grid connection. The screen cannot work on an MVA Primary. Applies to experiments. Evidence:
 [experiment 103](00103-differentiable-physics-1-data-look/result.md), figure 9.
 
+**Count the half-hours that `substation_zero` flags before scoring a detector on a transfer.**
+(Provisional.) The rule flags a reading of exactly 0 at a Primary substation, and a transformer
+that was switched out read exactly 0 in the 5 transfers we checked. At the series P12 and P13, the
+two transformers of one Primary substation, the rule flagged 426 half-hours inside 5 of the 6
+labelled real transfers lasting more than 1 day, and the panel of residuals used to score
+detectors held no readings there. The cleaned power table keeps flagged rows with their original
+readings, and restoring those half-hours let the refit-offset neighbour-count detector (RO-NC)
+find 4 of the 6 transfers. This applies to
+experiments on switching. For production, the maintainer has to decide whether the rule should keep
+a zero reading when the other transformer of the same Primary substation carries the load of the
+switched-out transformer. Evidence: [experiment
+132](00132-ro-nc-rescored-with-p12-and-p13-residuals-in-2025/result.md). Confidence: medium, from 5
+transfers at one Primary substation.
+
 ## Fixed windows
 
 **Use the fixed lockdown window, 2020-03-23 to 2021-07-19, and do not detect the window from the
