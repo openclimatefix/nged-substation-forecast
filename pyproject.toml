@@ -628,8 +628,6 @@ include = [
     "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_fits.py",
     "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_kat.py",
     "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_run.py",
-    "ml-experiments/00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/e00158_fits.py",
-    "ml-experiments/00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/e00158_run.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
 ]

@@ -34,7 +34,7 @@ from typing import Final
 
 import e00158_common as common
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache
 from studies.dp_gam import GamFit, TrainingWindow
 from studies.dp_gam_pooled import PooledSite, PoolingStrength, fit_pooled
