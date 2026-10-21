@@ -22,7 +22,9 @@ from e00166_g_arms import quantile_score
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D14", "D16", "D9")
-STACK: Final[tuple[str, ...]] = ("K0", "GAM_ONLY", "MASK_NEW", "MASK_RONC", "MASK_UNION")
+MASKS: Final[tuple[str, ...]] = ("MASK_NEW", "MASK_RONC", "MASK_UNION", "MASK_GATED")
+SOFT: Final[tuple[str, ...]] = ("SOFT_F10", "SOFT_F100", "SOFT_F1000")
+STACK: Final[tuple[str, ...]] = ("K0", "GAM_ONLY", *MASKS, *SOFT)
 EXTERNAL: Final[tuple[str, ...]] = ("BG2", "MANUAL", "CLIM", "ARM_C")
 ARMS: Final[tuple[str, ...]] = (*STACK, *EXTERNAL)
 E87: Final = ML_EXPERIMENTS_DATA_DIR / "00087-bg2-best-guess-assembled-with-drop-one-ablations"
@@ -117,7 +119,7 @@ def load_joined() -> pl.DataFrame:
 
 
 def boot(
-    *, num: np.ndarray, den: np.ndarray | None, groups: np.ndarray, seed: int = 165
+    *, num: np.ndarray, den: np.ndarray | None, groups: np.ndarray, seed: int = 166
 ) -> tuple[float, float, float]:
     """Ratio of sums (a mean when `den` is None) with a 95% interval from resampling groups."""
     den = np.ones(len(num)) if den is None else den
@@ -157,7 +159,8 @@ def build() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
     sets = pl.concat([pl.read_parquet(WORK_DIR / f"rowsets_{s}.parquet") for s in SITES])
     events = pl.concat([pl.read_parquet(WORK_DIR / f"events_{s}.parquet") for s in SITES])
     ev = sets.join(wide, on=["site", "row"], how="inner").join(
-        events.select("card", "site", "known_new", "known_ronc"), on=["card", "site"]
+        events.select("card", "site", "known_new", "known_ronc", "known_gated", "end"),
+        on=["card", "site"],
     )
     long = pl.concat(
         [
@@ -174,6 +177,72 @@ def build() -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
         how="diagonal_relaxed",
     )
     return wide, ev, long
+
+
+def decide(*, report: dict, ev: pl.DataFrame, outside: pl.DataFrame, pairs: pl.DataFrame) -> None:
+    """Apply the decision rule of the plan to the numbers in `report` and print each test."""
+    print("\n== DECISION RULE (pre-registered in result.md) ==")
+    gated_pairs = (
+        ev.filter(pl.col("set") == "AFTER").select("card", "site", "known_gated", "end").unique()
+    )
+    with_alarm = gated_pairs.filter(
+        (pl.col("known_gated") >= 0) & (pl.col("known_gated") < pl.col("end"))
+    ).height
+    print(
+        "transfer-substation pairs with AFTER rows:",
+        gated_pairs.height,
+        "of which with a gated alarm known:",
+        with_alarm,
+    )
+    enough = with_alarm >= 5
+    g1 = report["outside|all|MASK_GATED minus K0"]
+    after = report["means|shared|all|AFTER"]
+    hard_gain = after["K0"] - after["MASK_UNION"]
+    gated_gain = after["K0"] - after["MASK_GATED"]
+    g1_pass = g1[1] >= -0.03 and g1[2] <= 0.03
+    g2_pass = gated_gain >= 0.7 * hard_gain
+    print(f"G1 MASK_GATED minus K0 outside {fmt(g1)}: inside +/-0.03 -> {g1_pass}")
+    print(
+        f"G2 AFTER gain K0 - GATED {gated_gain:.3f} vs 0.7 x hard gain {0.7 * hard_gain:.3f} "
+        f"(hard {hard_gain:.3f}) -> {g2_pass}"
+    )
+    part1 = (
+        "inconclusive" if not enough else ("supported" if g1_pass and g2_pass else "not supported")
+    )
+    print("PART 1:", part1)
+    inside = report["means|shared|all|INSIDE"]
+    hard_harm = inside["MASK_UNION"] - inside["K0"]
+    best: tuple[float, str] | None = None
+    for arm in SOFT:
+        s1 = report[f"outside|all|{arm} minus MASK_UNION"][0]
+        s1_pass = s1 <= -0.051
+        gain = after["K0"] - after[arm]
+        s2_pass = gain >= 0.8 * hard_gain
+        harm = inside[arm] - inside["K0"]
+        s3_pass = harm <= 1.2 * hard_harm
+        outside_change = report[f"outside|all|{arm} minus K0"][0]
+        print(
+            f"{arm}: S1 outside minus MASK_UNION {s1:+.3f} (<= -0.051) {s1_pass}; "
+            f"S2 AFTER gain {gain:.3f} (>= {0.8 * hard_gain:.3f}) {s2_pass}; "
+            f"S3 INSIDE harm {harm:+.3f} (<= {1.2 * hard_harm:+.3f}) {s3_pass}; "
+            f"outside minus K0 {outside_change:+.3f}"
+        )
+        report[f"decision|{arm}"] = [s1_pass, s2_pass, s3_pass]
+        if s2_pass and s3_pass and (best is None or outside_change < best[0]):
+            best = (outside_change, arm)
+    passing = [a for a in SOFT if all(report[f"decision|{a}"])]
+    print("best factor among those passing S2 and S3:", best)
+    part2 = "supported" if passing else "not supported"
+    print("PART 2:", part2, "factors passing S1, S2, and S3:", passing)
+    n_supported = (part1 == "supported") + (part2 == "supported")
+    if n_supported == 2:
+        verdict = "supported"
+    elif n_supported == 1:
+        verdict = "partly supported"
+    else:
+        verdict = "inconclusive" if part1 == "inconclusive" else "not supported"
+    print("VERDICT by the pre-registered rule:", verdict)
+    report["decision"] = {"part1": part1, "part2": part2, "verdict": verdict, "best": best}
 
 
 def main() -> None:  # noqa: PLR0915
@@ -210,7 +279,7 @@ def main() -> None:  # noqa: PLR0915
     for key in ("in_logged", "in_switching_filter"):
         share = float(wide[key].mean())  # ty: ignore[invalid-argument-type]
         print(key, "rows:", int(wide[key].sum()), "share", round(share, 4))
-    for arm in ("MASK_NEW", "MASK_RONC", "MASK_UNION"):
+    for arm in ("MASK_NEW", "MASK_RONC", "MASK_UNION", "MASK_GATED"):
         a, p = wide[f"active_{arm}"], wide[f"post_{arm}"]
         a_share, p_share = float(a.mean()), float(p.mean())  # ty: ignore[invalid-argument-type]
         print(
@@ -241,6 +310,13 @@ def main() -> None:  # noqa: PLR0915
         ("MASK_NEW minus K0", "MASK_NEW", "K0"),
         ("MASK_RONC minus K0", "MASK_RONC", "K0"),
         ("GAM_ONLY minus K0", "GAM_ONLY", "K0"),
+        ("MASK_GATED minus K0", "MASK_GATED", "K0"),
+        ("MASK_GATED minus MASK_UNION", "MASK_GATED", "MASK_UNION"),
+        ("MASK_GATED minus BG2", "MASK_GATED", "BG2"),
+        *[(f"{a} minus K0", a, "K0") for a in SOFT],
+        *[(f"{a} minus MASK_UNION", a, "MASK_UNION") for a in SOFT],
+        *[(f"{a} minus MASK_GATED", a, "MASK_GATED") for a in SOFT],
+        *[(f"{a} minus BG2", a, "BG2") for a in SOFT],
         ("K0 minus BG2", "K0", "BG2"),
         ("MASK_UNION minus BG2", "MASK_UNION", "BG2"),
         ("MASK_NEW minus BG2", "MASK_NEW", "BG2"),
@@ -269,14 +345,18 @@ def main() -> None:  # noqa: PLR0915
             "left out:",
             fmt(pooled(f, "MASK_UNION", "K0", groups="month")),
             fmt(pooled(f, "MASK_NEW", "K0", groups="month")),
+            "gated",
+            fmt(pooled(f, "MASK_GATED", "K0", groups="month")),
+            "soft",
+            [fmt(pooled(f, a, "K0", groups="month")) for a in SOFT],
         )
     print("\n== per substation, OUTSIDE, mean score ==")
     for site in SITES:
         f = outside.filter(pl.col("site") == site)
-        print(site, means(f, ["K0", "MASK_NEW", "MASK_UNION", "GAM_ONLY"]))
+        print(site, means(f, ["K0", "MASK_NEW", "MASK_UNION", "MASK_GATED", *SOFT, "GAM_ONLY"]))
 
     print("\n== rows by the alarm active at the forecast origin (descriptive) ==")
-    for arm in ("MASK_NEW", "MASK_UNION"):
+    for arm in ("MASK_NEW", "MASK_UNION", "MASK_GATED"):
         for scope, base in (("all rows", wide), ("outside logged transfers", outside)):
             for kind in ("active", "post"):
                 f = base.filter(pl.col(f"{kind}_{arm}"))
@@ -295,7 +375,7 @@ def main() -> None:  # noqa: PLR0915
                 )
                 report[f"alarm|{arm}|{kind}|{scope}|minus K0"] = ci
                 report[f"alarm|{arm}|{kind}|{scope}|minus BG2"] = ci_bg
-    for arm in ("MASK_NEW", "MASK_UNION"):
+    for arm in ("MASK_NEW", "MASK_UNION", "MASK_GATED"):
         quiet_alarm = outside.filter(~pl.col(f"active_{arm}") & ~pl.col(f"post_{arm}"))
         ci = pooled(quiet_alarm, arm, "K0", groups="month")
         print(
@@ -343,6 +423,12 @@ def main() -> None:  # noqa: PLR0915
                 ("MASK_UNION minus K0", "MASK_UNION", "K0"),
                 ("MASK_NEW minus K0", "MASK_NEW", "K0"),
                 ("GAM_ONLY minus K0", "GAM_ONLY", "K0"),
+                ("MASK_GATED minus K0", "MASK_GATED", "K0"),
+                ("MASK_GATED minus MASK_UNION", "MASK_GATED", "MASK_UNION"),
+                ("MASK_GATED minus BG2", "MASK_GATED", "BG2"),
+                *[(f"{a} minus K0", a, "K0") for a in SOFT],
+                *[(f"{a} minus MASK_UNION", a, "MASK_UNION") for a in SOFT],
+                *[(f"{a} minus MASK_GATED", a, "MASK_GATED") for a in SOFT],
                 ("MASK_UNION minus BG2", "MASK_UNION", "BG2"),
                 ("MASK_NEW minus BG2", "MASK_NEW", "BG2"),
                 ("BG2 minus K0", "BG2", "K0"),
@@ -367,7 +453,16 @@ def main() -> None:  # noqa: PLR0915
             pl.len().alias("rows"),
             *[
                 pl.col(a).mean()
-                for a in ("K0", "MASK_NEW", "MASK_UNION", "GAM_ONLY", "BG2", "ORACLE")
+                for a in (
+                    "K0",
+                    "MASK_NEW",
+                    "MASK_UNION",
+                    "MASK_GATED",
+                    *SOFT,
+                    "GAM_ONLY",
+                    "BG2",
+                    "ORACLE",
+                )
             ],
         )
         .sort("card", "site")
@@ -388,6 +483,10 @@ def main() -> None:  # noqa: PLR0915
             fmt(pooled(f, "MASK_UNION", "K0")),
             "pair alarm",
             fmt(pooled(f, "MASK_NEW", "K0")),
+            "gated",
+            fmt(pooled(f, "MASK_GATED", "K0")),
+            "soft",
+            [fmt(pooled(f, a, "K0")) for a in SOFT],
         )
 
     print(
@@ -414,7 +513,7 @@ def main() -> None:  # noqa: PLR0915
     print(
         "\n== checks: median forecast minus mean forecast, and absolute error of the median forecast =="
     )
-    for arm in ("K0", "MASK_NEW", "MASK_UNION"):
+    for arm in ("K0", "MASK_NEW", "MASK_UNION", "MASK_GATED", *SOFT):
         sub = long.filter(pl.col("arm") == arm).join(outside.select(KEYS), on=KEYS, how="inner")
         d = (
             sub.group_by("site")
@@ -425,12 +524,13 @@ def main() -> None:  # noqa: PLR0915
         report[f"median_minus_mean|{arm}"] = {r["site"]: r["d"] for r in d.iter_rows(named=True)}
     for name, keys in (("outside", key_sets["outside"]), ("AFTER", key_sets["AFTER"])):
         mae = {}
-        for arm in ("K0", "GAM_ONLY", "MASK_NEW", "MASK_UNION", "BG2"):
+        for arm in ("K0", "GAM_ONLY", "MASK_NEW", "MASK_UNION", "MASK_GATED", *SOFT, "BG2"):
             sub = long.filter(pl.col("arm") == arm).join(keys, on=KEYS, how="inner")
             mae[arm] = round(float((sub["q50"] - sub["actual"]).abs().mean()), 3)  # ty: ignore[invalid-argument-type]
         print("absolute error of the median forecast,", name, "shared rows:", mae)
         report[f"mae_median|{name}"] = mae
 
+    decide(report=report, ev=ev, outside=outside, pairs=pairs)
     print("\n== D8 multi-day drops of experiment 159: alarms within 24 hours of a drop start ==")
     tables = ev_module.alarm_tables()
     drops = pl.read_parquet(D159 / "drops.parquet")

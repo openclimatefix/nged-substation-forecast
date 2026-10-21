@@ -70,9 +70,16 @@ decision_rule: >-
   its selection from three factors is noted in the write-up. Part 2 is `supported` when a factor
   passes S1, S2, and S3, and `not supported` otherwise. The experiment's verdict is `supported`
   when both parts are supported, `partly supported` when one is, `not supported` when neither is,
-  and `inconclusive` when part 1 is inconclusive and part 2 is not supported. The threshold on G1
+  and `inconclusive` when part 1 is inconclusive and part 2 is not supported; part 1
+  inconclusive with part 2 supported is `partly supported`. Clarifications added before any
+  forecast score was read: G2 recomputes 0.7 x (K0 minus MASK_UNION) on the AFTER rows shared
+  with BG2, the same rows the gated arm is scored on (165's 13.69 and 6.31 are only a guide); a
+  pair counts as having a gated alarm when `0 <= known_gated < end`, among the 13
+  transfer-substation pairs of 165's all-stack AFTER set; G1 fails when the interval is wider
+  than +/-0.03 (a wide interval cannot show no harm); S1 uses a point estimate where G1 uses an
+  interval, because S1 asks for a size of improvement and G1 for absence of harm. The threshold on G1
   is +/-0.03 because the mask adds alarm tables to the serving path, which is worth doing only if
-  ordinary days do not get worse. The "inside-transfer gain" of the brief (6.32 against 13.69
+  ordinary days do not get worse. The "inside-transfer gain" of the brief (6.31 against 13.69
   unmasked) is the AFTER set of 165; the INSIDE set, where observed power contains the moved
   load, is where 165 found the hard mask 5.32 points worse. Post hoc and labelled: gates of 0.6 and
   0.8, the same checks in winter and outside winter, and leave-one-substation-out.
