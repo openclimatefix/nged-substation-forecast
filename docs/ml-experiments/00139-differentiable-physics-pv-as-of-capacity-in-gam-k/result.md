@@ -67,7 +67,7 @@ sunny half-hours without raising it on dark ones? No new model: only the capacit
 **Arms.** Every arm is GAM-K of [experiment
 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md) driven by the ENS
 ensemble mean, as in the best-guess assembly of [experiment
-136](../00136-dp-bg-stage1-assembly-on-the-ensemble-mean/result.md), with monthly refits on a
+136](https://github.com/openclimatefix/nged-substation-forecast/pull/1437), with monthly refits on a
 24-month window and the shared filter noise setting. Only the capacity differs.
 
 | Arm | Capacity | Role |
