@@ -124,6 +124,7 @@ def release_test(*, cache: Any, config: Any, data: Any, paths: Any, transfer: di
         window_length=causal.WINDOW_HALF_HOURS,
         max_sweeps=data_module.MAX_SWEEPS,
         sweep_tolerance=data_module.SWEEP_TOLERANCE,
+        huber_sigmas=config.huber_sigmas,
     )
     moved = float(np.mean(np.abs(added[transfer["receiver"]][transfer["onset"] : transfer["end"]])))
     name = edge_name(node_a=transfer["node_a"], node_b=transfer["node_b"])

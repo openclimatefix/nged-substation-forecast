@@ -3,8 +3,8 @@
 - **P1, P1b, P2** (the path solver against a quadratic programme, block-coordinate descent against
   a joint program, and recovery of a noise-free transfer) are tests of `studies.dp_edge_flow`; this
   script runs them.
-- **P3a causality:** changing every residual after the newest usable row leaves A5's corrections
-  unchanged.
+- **P3a causality:** at each of three origins, changing every residual after that origin's newest
+  usable row leaves A5's corrections at that origin unchanged.
 - **P3b zero flows:** with every flow forced to zero, A5 equals the plain filter exactly.
 - **P3c labels:** emptying the switching-event labels leaves arm A0's stored fit unchanged.
 - **P3d cut:** changing the power after a fit's cut leaves its forecasts unchanged.
@@ -71,26 +71,28 @@ def _transfer_and_context(*, cache: Any) -> tuple[dict, causal.Context, dict, di
 
 
 def causality(*, cache: Any) -> bool:
-    """P3a: nothing after the newest usable row changes A5's corrections."""
+    """P3a: nothing after an origin's newest usable row changes A5's corrections at that origin."""
     transfer, context, streams, _, cutoffs = _transfer_and_context(cache=cache)
     nodes = (transfer["node_a"], transfer["node_b"])
     before = causal.causal_forecasts(
         context=context, streams_mw=streams, nodes=nodes, cutoffs=cutoffs
     )
     rng = np.random.default_rng(0)
-    changed = {}
-    for node, stream in streams.items():
-        copy = stream.copy()
-        copy[cutoffs[-1] + 1 :] += rng.normal(0.0, 5.0, len(copy) - cutoffs[-1] - 1)
-        changed[node] = copy
-    after = causal.causal_forecasts(
-        context=context, streams_mw=changed, nodes=nodes, cutoffs=cutoffs
-    )
-    return all(
-        np.array_equal(b.correction, a.correction)
-        for node in nodes
-        for b, a in zip(before[node], after[node], strict=True)
-    )
+    same = []
+    for step, cutoff in enumerate(cutoffs):
+        changed = {}
+        for node, stream in streams.items():
+            copy = stream.copy()
+            copy[cutoff + 1 :] += rng.normal(0.0, 5.0, len(copy) - cutoff - 1)
+            changed[node] = copy
+        after = causal.causal_forecasts(
+            context=context, streams_mw=changed, nodes=nodes, cutoffs=cutoffs
+        )
+        same.extend(
+            np.array_equal(before[node][step].correction, after[node][step].correction)
+            for node in nodes
+        )
+    return all(same)
 
 
 def zero_flows(*, cache: Any) -> float:

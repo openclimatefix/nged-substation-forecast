@@ -122,6 +122,7 @@ class Context:
         survival: The run-length survival curve.
         mean_points: Each node's frozen-fit mean in points, on the whole grid (`NaN` elsewhere).
         scale: Each node's megawatts per point.
+        huber_sigmas: The Huber threshold of the flow fit, in noise scales.
     """
 
     cache: FeatureCache
@@ -132,6 +133,7 @@ class Context:
     survival: SurvivalCurve
     mean_points: dict[str, np.ndarray]
     scale: dict[str, float]
+    huber_sigmas: float
 
     def local_paths(self, *, nodes: tuple[str, ...]) -> tuple[PathSpec, ...]:
         """Return the paths that touch any of the nodes."""
@@ -347,6 +349,7 @@ def causal_forecasts(
             start=_warm_start(previous=previous, shift=cutoff - previous_cutoff),
             max_sweeps=data_module.MAX_SWEEPS,
             sweep_tolerance=data_module.SWEEP_TOLERANCE,
+            huber_sigmas=context.huber_sigmas,
         )
         previous, previous_cutoff = fit.flows, cutoff
         for node in nodes:
@@ -411,7 +414,12 @@ def build_context(
 
     Returns:
         The context.
+
+    Raises:
+        ValueError: If `config.block` is not 1, because the causal path fits half-hourly rows.
     """
+    if config.block != 1:
+        raise ValueError(f"The causal path fits half-hourly rows, not blocks of {config.block}.")
     data = data_module.load_year(cache=cache, cut_name=cut_name, arm=arm)
     edges = data_module.decision_graph(data=data)
     paths = data_module.build_graph_paths(data=data, edges=edges, config=config)
@@ -430,6 +438,7 @@ def build_context(
         survival=survival,
         mean_points=mean_points,
         scale={s: data.capacity_mw[s] / data_module.POINTS_PER_CAPACITY for s in data.sites},
+        huber_sigmas=config.huber_sigmas,
     )
 
 
