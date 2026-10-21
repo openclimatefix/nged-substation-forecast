@@ -107,7 +107,8 @@ def build_pool(*, cache: FeatureCache) -> ResidualPool:
         base = design.build_base(
             cache=cache, vintages=vintages, site=site, cut=common.REPLICATE_CUT
         )
-        fit = design.fit_arm(cache=cache, base=base, arm=design.B0)
+        context = design.ArmContext(aux=design.site_aux(cache=cache, site=site))
+        fit = design.fit_arm(cache=cache, base=base, arm=design.B0, context=context)
         stream = np.full(len(cache.end_times), np.nan)
         stream[base.index] = base.target - base.x0 @ fit.theta
         residuals[site] = stream
