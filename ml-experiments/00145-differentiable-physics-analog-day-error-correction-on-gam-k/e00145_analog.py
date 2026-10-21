@@ -80,6 +80,8 @@ class AnalogSpec:
         weight: The weight of the analog profile against `A` (1 for the pure analog arm).
         temperature: True to rank candidates by forecast temperature, False to take the most recent.
         holiday_only: True to use the analog profile on holiday-like targets only and `A` elsewhere.
+        max_age_days: Longest gap in days between a source day and the target, or `None` for no
+            limit (the post hoc recent-only arm uses 300, which leaves out the previous year).
         placebo_shift: Days added to the target's date before reading its day type (the gate's
             placebo uses 3, so a Saturday target reads Tuesday-to-Thursday days).
     """
@@ -90,6 +92,7 @@ class AnalogSpec:
     weight: float = 1.0
     temperature: bool = True
     holiday_only: bool = False
+    max_age_days: int | None = None
     placebo_shift: int = 0
 
 
@@ -232,8 +235,8 @@ def build_days(
     )
 
 
-def analog_profile(*, days: AnalogDays, run: int, spec: AnalogSpec) -> np.ndarray | None:
-    """Return the mean block of the analog days of one run's target, or `None` if there is no set.
+def analog_days(*, days: AnalogDays, run: int, spec: AnalogSpec) -> np.ndarray | None:
+    """Return the indices of the analog days of one run's target, or `None` if there is no set.
 
     Args:
         days: The site's source days.
@@ -241,7 +244,7 @@ def analog_profile(*, days: AnalogDays, run: int, spec: AnalogSpec) -> np.ndarra
         spec: The setting; `weight` and `kappa` are not used here.
 
     Returns:
-        The mean centred error by local half-hour of the `spec.k` closest candidates, or `None`.
+        The indices of the up to `spec.k` closest candidate days, nearest first, or `None`.
     """
     target = int(days.targets[run])
     newest = int(np.searchsorted(days.targets, target - FIRST_SOURCE_BACK, side="right"))
@@ -250,6 +253,8 @@ def analog_profile(*, days: AnalogDays, run: int, spec: AnalogSpec) -> np.ndarra
     if spec.holiday_only and not identity:
         return None
     candidate = days.usable[past]
+    if spec.max_age_days is not None:
+        candidate = candidate & (target - days.targets[past] <= spec.max_age_days)
     if spec.temperature:
         candidate = candidate & np.isfinite(days.temperature_c[past])
         if not np.isfinite(days.temperature_c[run]):
@@ -280,8 +285,13 @@ def analog_profile(*, days: AnalogDays, run: int, spec: AnalogSpec) -> np.ndarra
         if spec.temperature
         else np.zeros(len(chosen))
     )
-    nearest = chosen[np.lexsort((-days.targets[chosen], distance))[: spec.k]]
-    return _mean_by_half_hour(blocks=days.blocks[nearest])
+    return chosen[np.lexsort((-days.targets[chosen], distance))[: spec.k]]
+
+
+def analog_profile(*, days: AnalogDays, run: int, spec: AnalogSpec) -> np.ndarray | None:
+    """Return the mean block of one run's analog days, or `None` if there is no set."""
+    nearest = analog_days(days=days, run=run, spec=spec)
+    return None if nearest is None else _mean_by_half_hour(blocks=days.blocks[nearest])
 
 
 def analog_shift_by_run(*, days: AnalogDays, spec: AnalogSpec) -> np.ndarray:

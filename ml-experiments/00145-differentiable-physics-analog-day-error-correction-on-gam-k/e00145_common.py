@@ -44,7 +44,7 @@ SRC_134_WORK_DIR: Final[Path] = (
     / "00134-differentiable-physics-same-weekday-error-profile-on-gam-k"
     / "work"
 )
-"""Experiment 134's work folder, which this experiment only reads: its RB and RB-day-types frames."""
+"""Experiment 134's work folder, which this experiment only reads: its RB frames."""
 STORE_DIR: Final[Path] = SRC_WORK_DIR / "ens_store"
 FITS_DIR: Final[Path] = SRC_WORK_DIR / "fits"
 CACHE_DIR: Final[Path] = (

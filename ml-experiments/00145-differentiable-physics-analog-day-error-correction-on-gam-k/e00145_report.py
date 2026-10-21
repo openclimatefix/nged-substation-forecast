@@ -1,40 +1,54 @@
-"""Score experiment 134 and print every number its write-up quotes.
+"""Score experiment 145 and print every number its write-up quotes.
 
 Writes `work/results.json` and prints the same numbers as text, which is committed beside the
 write-up as `report.txt`. Intervals resample whole calendar months, paired across arms. The five
 planned contrasts use 99% intervals (Bonferroni across five at an overall 5%); every other
 contrast uses 95%.
 
-    uv run --no-sync python ml-experiments/00134-*/e00145_report.py \
-        > docs/ml-experiments/00134-*/report.txt
+    uv run --no-sync python ml-experiments/00145-*/e00145_report.py \
+        > docs/ml-experiments/00145-*/report.txt
 """
 
 import json
 from datetime import date, timedelta
 from typing import Final
 
+import e00145_analog as analog
 import e00145_common as common
-import e00145_profiles as profiles
+import e00145_run as run
 import e00145_score as score
 import numpy as np
 import polars as pl
 from studies.tail_calibration import tail_calibration_table
 
 PERIODS: Final[tuple[str, ...]] = ("replicate", "scored")
-ARMS: Final[tuple[str, ...]] = ("K0", "R", "Rh", "L1", "RW", "RB", "RB-day-types")
+ARMS: Final[tuple[str, ...]] = (
+    "K0",
+    "R",
+    "RB",
+    "RB-day-types",
+    "ANALOG-k",
+    "ANALOG+R",
+    "ANALOG-holiday",
+    "ANALOG+R-notemp",
+    "ANALOG+R-recent",
+)
 PLANNED: Final[dict[str, tuple[str, str]]] = {
-    "C1 RB - R": ("RB", "R"),
-    "C2 RW - R": ("RW", "R"),
-    "C3 RB - K0": ("RB", "K0"),
-    "C4 RB - L1": ("RB", "L1"),
-    "C5 RB-day-types - RB": ("RB-day-types", "RB"),
+    "C1 ANALOG+R - R": ("ANALOG+R", "R"),
+    "C2 ANALOG-k - R": ("ANALOG-k", "R"),
+    "C3 ANALOG+R - RB-day-types": ("ANALOG+R", "RB-day-types"),
+    "C4 ANALOG-holiday - R": ("ANALOG-holiday", "R"),
+    "C5 ANALOG+R - K0": ("ANALOG+R", "K0"),
 }
 EXTRA: Final[dict[str, tuple[str, str]]] = {
-    "C6 RB - Rh (diagnostic)": ("RB", "Rh"),
-    "Rh - R": ("Rh", "R"),
+    "ANALOG+R-notemp - ANALOG+R (diagnostic)": ("ANALOG+R-notemp", "ANALOG+R"),
+    "ANALOG+R-recent - ANALOG+R (post hoc)": ("ANALOG+R-recent", "ANALOG+R"),
+    "ANALOG+R-recent - R (post hoc)": ("ANALOG+R-recent", "R"),
+    "ANALOG+R - RB": ("ANALOG+R", "RB"),
+    "ANALOG-k - ANALOG+R": ("ANALOG-k", "ANALOG+R"),
     "R - K0": ("R", "K0"),
-    "RB-day-types - R": ("RB-day-types", "R"),
 }
+SHOWN: Final[tuple[str, ...]] = ("K0", "R", "ANALOG+R", "ANALOG-holiday")
 PLANNED_LEVEL: Final[float] = 99.0
 WINTER: Final[frozenset[int]] = frozenset({11, 12, 1, 2, 3})
 WEEKDAYS: Final[tuple[str, ...]] = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
@@ -62,12 +76,13 @@ def holiday_flags(*, frame: pl.DataFrame) -> pl.DataFrame:
     first, last = dates.min(), dates.max()
     assert isinstance(first, date)
     assert isinstance(last, date)
-    holiday = profiles.holiday_like_days(first=first, last=last)
+    holiday = set(analog.holiday_identities(first=first, last=last))
     from studies.dp_calendar import bank_holiday_names
 
     names = bank_holiday_names()
     good_fridays = [d for d, n in names.items() if n == "Good Friday"]
     easter = {g + timedelta(days=k) for g in good_fridays for k in range(4)}
+    after = {h + timedelta(days=k) for h in holiday for k in (1, 2, 3)} - holiday
     christmas = {
         d
         for d in (first + timedelta(days=i) for i in range((last - first).days + 1))
@@ -77,6 +92,7 @@ def holiday_flags(*, frame: pl.DataFrame) -> pl.DataFrame:
         holiday_like=dates.is_in(list(holiday)),
         christmas_window=dates.is_in(list(christmas)),
         easter=dates.is_in(list(easter)),
+        after_holiday=dates.is_in(list(after)),
     )
 
 
@@ -123,6 +139,7 @@ def run_contrast(
             losses=losses, treatment=pair[0], reference=pair[1], metric="abs_median", level=level
         ),
         "absolute": {a: score.mean_of(score.quantile_score(frame=subset[a])) for a in pair},
+        "days": int(subset[pair[0]].select(pl.struct("site", "local_date")).n_unique()),
     }
     if "abs_mean" in losses.columns:
         out["mae_mean"] = score.contrast(
@@ -157,6 +174,7 @@ def breakdowns(*, frames: dict[str, pl.DataFrame], pair: tuple[str, str], level:
     pick("holiday-like days", pl.col("holiday_like"))
     pick("Christmas window", pl.col("christmas_window"))
     pick("Easter", pl.col("easter"))
+    pick("1 to 3 days after a holiday-like day", pl.col("after_holiday"))
     for index, name in enumerate(WEEKDAYS):
         pick(f"weekday {name}", (pl.col("weekday") == index) & ~pl.col("holiday_like"))
     winter = pl.col("month").is_in(list(WINTER))
@@ -202,38 +220,9 @@ def lead_bands_and_leave_out(
     return out
 
 
-def copy7_frames(*, period: str, sites: tuple[str, ...]) -> dict[str, pl.DataFrame]:
-    """Return COPY7 beside K0 and RB on the rows where the reading 7 days earlier exists."""
-    frames = load_frames(period=period, sites=sites)
-    cache = common.load_cache()
-    values = {}
-    for site in sites:
-        features = cache.sites[site]
-        present = features.present
-        y = features.y
-        valid = frames["K0"].filter(pl.col("site") == site)["valid_time"]
-        position = np.searchsorted(cache.end_times, valid.dt.replace_time_zone(None).to_numpy())
-        earlier = position - 7 * 48
-        ok = (earlier >= 0) & present[np.maximum(earlier, 0)]
-        values[site] = np.where(ok, y[np.maximum(earlier, 0)], np.nan)
-    pieces = []
-    base = frames["K0"]
-    for site in sites:
-        part = base.filter(pl.col("site") == site)
-        value = values[site].astype(np.float32)
-        pieces.append(
-            part.with_columns(
-                **{q: pl.Series(value) for q in score.LEVEL_COLUMNS},
-                mean=pl.Series(value),
-            )
-        )
-    copy = pl.concat(pieces).filter(pl.col("q50").is_finite())
-    return {"COPY7": copy, "K0": frames["K0"], "RB": frames["RB"], "R": frames["R"]}
-
-
 def tails(*, frames: dict[str, pl.DataFrame]) -> dict:
     """Return coverage and pinball loss at the tail levels per arm at D+1."""
-    shared = score.common_rows(arms_by_name={a: frames[a] for a in ("K0", "R", "Rh", "RB")})
+    shared = score.common_rows(arms_by_name={a: frames[a] for a in SHOWN})
     return {
         arm: tail_calibration_table(
             frame=score.lead_filter(frame=f, band=D1), levels=TAIL_LEVELS
@@ -244,7 +233,7 @@ def tails(*, frames: dict[str, pl.DataFrame]) -> dict:
 
 def mean_qs(*, frame: pl.DataFrame, band: tuple[str, float, float]) -> float:
     """Return the mean quantile score of a frame's rows in a lead band."""
-    return mean_qs(frame=frame, band=band)
+    return score.mean_of(score.quantile_score(frame=score.lead_filter(frame=frame, band=band)))
 
 
 def interval(entry: dict | None) -> str:
@@ -254,12 +243,100 @@ def interval(entry: dict | None) -> str:
     q = entry["qs"]
     text = (
         f"{q['estimate']:+.4f} [{q['lower']:+.4f}, {q['upper']:+.4f}] "
-        f"{q['sites_better']}/{q['n_sites']} sites, rows {q['rows']:,}; MAE median "
-        f"{entry['mae_median']['estimate']:+.4f}"
+        f"{q['sites_better']}/{q['n_sites']} sites, rows {q['rows']:,}, "
+        f"site-days {entry['days']:,}; MAE median {entry['mae_median']['estimate']:+.4f}"
     )
     if "mae_mean" in entry:
         text += f", MAE mean {entry['mae_mean']['estimate']:+.4f}"
     return text
+
+
+def print_cold_night_coverage(*, frames: dict[str, pl.DataFrame]) -> None:
+    """Print the share of readings at or below q95 and q99 on cold-snap nights at D+1."""
+    print("cold-snap nights (22:00 to 06:00, daily mean under 3 C) at D+1: coverage of q95, q99")
+    for arm in SHOWN:
+        d1 = score.lead_filter(frame=frames[arm], band=D1)
+        night = d1.filter(pl.col("local_hour").is_in([22, 23, 0, 1, 2, 3, 4, 5, 6]))
+        flags = np.zeros(night.height, dtype=bool)
+        for site in common.SCORED_SITES:
+            where = (night["site"] == site).to_numpy()
+            if where.any():
+                flags[where] = cold_mask(frame=night.filter(pl.col("site") == site), site=site)
+        rows = night.filter(pl.Series(flags))
+        if rows.height == 0:
+            continue
+        print(
+            f"    {arm}: rows {rows.height:,}, q95 {(rows['actual'] <= rows['q95']).mean():.3f}, "
+            f"q99 {(rows['actual'] <= rows['q99']).mean():.3f}"
+        )
+
+
+def print_history_counts() -> None:  # noqa: PLR0912
+    """Print candidate counts, the holiday paths, and the cold-day match quality at site D10."""
+    site = "D10"
+    days = run.site_days(site=site)
+    spec = run.chosen_spec(family="ANALOG+R")
+    dates = [analog.EPOCH_DATE + timedelta(days=int(t)) for t in days.targets]
+    first_scored = date(2025, 7, 3)
+    for label, low, high in (
+        ("tuning and replicate", date(2024, 7, 1), date(2025, 6, 30)),
+        ("scored", first_scored, date(2026, 6, 30)),
+    ):
+        counts, prior = [], []
+        for index, day in enumerate(dates):
+            if not (low <= day <= high) or days.identity[index]:
+                continue
+            chosen = analog.analog_days(days=days, run=index, spec=spec)
+            pool = analog.analog_days(
+                days=days,
+                run=index,
+                spec=analog.AnalogSpec(kappa=1.0, k=10_000, weeks=spec.weeks),
+            )
+            if pool is not None:
+                counts.append(len(pool))
+                prior.append(int((days.targets[index] - days.targets[pool] > 300).sum()))
+            del chosen
+        print(
+            f"{site} {label}: non-holiday targets with an analog pool {len(counts)}, mean pool "
+            f"{np.mean(counts):.1f}, mean prior-year candidates {np.mean(prior):.1f}"
+        )
+    holiday_spec = run.HOLIDAY_SPEC
+    scored = [
+        i for i, d in enumerate(dates) if d >= first_scored and days.identity[i] and days.usable[i]
+    ]
+    identity_path = fallback_path = none = 0
+    for index in scored:
+        found = analog.analog_days(days=days, run=index, spec=holiday_spec)
+        if found is None:
+            none += 1
+            continue
+        if all(days.identity[j] == days.identity[index] for j in found):
+            identity_path += 1
+        else:
+            fallback_path += 1
+    print(
+        f"{site} scored holiday-like targets {len(scored)} (the scored runs hold fewer): identity "
+        f"path {identity_path}, fallback path {fallback_path}, no set {none}"
+    )
+    gaps = []
+    for index, day in enumerate(dates):
+        if day < first_scored or days.identity[index] or days.temperature_c[index] >= COLD_SNAP_C:
+            continue
+        found = analog.analog_days(days=days, run=index, spec=spec)
+        if found is not None:
+            gaps.append(float(np.abs(days.temperature_c[found] - days.temperature_c[index]).mean()))
+    print(
+        f"{site} cold scored days {len(gaps)}: mean absolute temperature gap to the chosen "
+        f"analogs {np.mean(gaps):.2f} C (all-days gap on non-cold days for comparison below)"
+    )
+    warm = []
+    for index, day in enumerate(dates):
+        if day < first_scored or days.identity[index] or days.temperature_c[index] < COLD_SNAP_C:
+            continue
+        found = analog.analog_days(days=days, run=index, spec=spec)
+        if found is not None:
+            warm.append(float(np.abs(days.temperature_c[found] - days.temperature_c[index]).mean()))
+    print(f"{site} other scored days {len(warm)}: mean gap {np.mean(warm):.2f} C")
 
 
 def main() -> None:  # noqa: PLR0912
@@ -270,18 +347,24 @@ def main() -> None:  # noqa: PLR0912
     print(f"chosen: {tuned['chosen']}")
     for family, name in tuned["chosen"].items():
         print(f"  {family}: {name} {tuned['pooled_mae'][name]:.4f}")
-    for key in ("K0", "R-exact", "RB-ref", "RB-ref-placebo"):
+    for key in (
+        "K0",
+        "R-exact",
+        "R-kappa0.5",
+        "R-kappa1",
+        "R-kappa1.25",
+        "ANALOG-holiday",
+        "ANALOG-k-ref",
+        "ANALOG+R-ref",
+    ):
         print(f"  {key}: {tuned['pooled_mae'][key]:.4f}")
-    print(
-        "  RB grid (kappa 0.75): "
-        + ", ".join(
-            f"{k}={v:.4f}"
-            for k, v in sorted(tuned["pooled_mae"].items())
-            if k.startswith("RB_") and k.endswith("k0.75")
-        )
-    )
-    print("== Gate: median share of the injected shift recovered ==")
+    print("== Gate: median share of the injected shift recovered, and the lookahead check ==")
     print(json.dumps(gate["median_recovery"], indent=1))
+    print(
+        "G0 largest profile change when the target day and the origin's day are injected: "
+        f"{max(max(r['g0_max_change'].values()) for r in gate['sites'])}"
+    )
+    print_history_counts()
     results: dict = {}
     for period in PERIODS:
         frames = load_frames(period=period, sites=common.DECISION_SITES)
@@ -336,22 +419,13 @@ def main() -> None:  # noqa: PLR0912
                 )
             )
         print(f"{period} | median minus mean forecast at D+1, per site:")
-        for arm in ("K0", "R", "Rh", "RB"):
+        for arm in SHOWN:
             d1 = score.lead_filter(frame=frames[arm], band=D1)
             grouped = (
                 d1.group_by("site").agg(gap=(pl.col("q50") - pl.col("mean")).mean()).sort("site")
             )
             print(f"    {arm}: " + ", ".join(f"{s} {g:+.3f}" for s, g in grouped.iter_rows()))
-        copy = copy7_frames(period=period, sites=common.DECISION_SITES)
-        copy = score.common_rows(arms_by_name=copy)
-        print(
-            f"{period} | COPY7 subset (rows with a reading 7 days earlier): "
-            + ", ".join(
-                f"{a} D+1 {mean_qs(frame=f, band=D1):.3f} "
-                f"all leads {mean_qs(frame=f, band=ALL_LEADS):.3f}"
-                for a, f in copy.items()
-            )
-        )
+        print_cold_night_coverage(frames=frames)
     common.write_json_atomic(path=common.WORK_DIR / "results.json", content=results)
 
 

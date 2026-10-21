@@ -23,6 +23,7 @@ from studies.ens_members import mixture_quantiles
 
 FACTOR_GRID: Final[tuple[float, ...]] = (0.8, 0.85, 0.9, 1.0, 1.15, 1.3)
 WORK_DIR: Final[Path] = common.WORK_DIR
+FRAMES_DIR: Final[Path] = WORK_DIR / "frames"
 LEVELS: Final[np.ndarray] = np.array(
     [0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99]
 )
@@ -297,3 +298,8 @@ def replace_period_masks(*, frame: pl.DataFrame, data: site_module.SiteData) -> 
         ),
     )
     return frame.with_columns(row_period=pl.Series(row_period))
+
+
+def frame_path(*, arm: str, site: str) -> Path:
+    """Return the file that holds an arm's frame at a site."""
+    return FRAMES_DIR / f"{arm}_{site}.parquet"

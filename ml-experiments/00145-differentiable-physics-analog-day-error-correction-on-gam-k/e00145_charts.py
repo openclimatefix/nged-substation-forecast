@@ -1,6 +1,6 @@
-"""Draw experiment 134's figures from `work/results.json` (written by `e00145_report.py`).
+"""Draw experiment 145's figures from `work/results.json` (written by `e00145_report.py`).
 
-uv run --no-sync python ml-experiments/00134-*/e00145_charts.py
+uv run --no-sync python ml-experiments/00145-*/e00145_charts.py
 """
 
 import json
@@ -14,7 +14,7 @@ import polars as pl
 
 DOCS_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
-    / "docs/ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k"
+    / "docs/ml-experiments/00145-differentiable-physics-analog-day-error-correction-on-gam-k"
 )
 WIDTH: Final[int] = 640
 PERIOD_COLOURS: Final[dict[str, str]] = {
@@ -94,6 +94,42 @@ def save(*, chart: alt.Chart, name: str) -> None:
     chart.save(DOCS_DIR / f"{name}.svg")
 
 
+def collect(*, results: dict, label: str, keys: list[str], group: str = "planned") -> pl.DataFrame:
+    """Collect one contrast's estimate and interval for several breakdowns and both periods."""
+    out = []
+    for period, name in PERIOD_KEYS.items():
+        for key in keys:
+            entry = results[period][group][label].get(key)
+            if entry is None:
+                continue
+            q = entry["qs"]
+            out.append(
+                {
+                    "contrast": key,
+                    "period": name,
+                    "estimate": q["estimate"],
+                    "lower": q["lower"],
+                    "upper": q["upper"],
+                }
+            )
+    return pl.DataFrame(out)
+
+
+BREAKDOWNS: Final[tuple[str, ...]] = (
+    "all D+1",
+    "non-holiday rows",
+    "holiday-like days",
+    "Christmas window",
+    "1 to 3 days after a holiday-like day",
+    "winter",
+    "winter evening 16-20",
+    "non-winter",
+    "cold-snap days",
+    "cold-snap nights",
+    *(f"weekday {d}" for d in WEEKDAYS),
+)
+
+
 def main() -> None:
     """Draw every figure."""
     results = json.loads((common.WORK_DIR / "results.json").read_text())
@@ -101,7 +137,7 @@ def main() -> None:
     save(
         chart=forest(
             frame=rows(results=results, labels=planned, key="all D+1"),
-            title="Same-weekday profile: planned contrasts at day D+1",
+            title="Analog-day correction: planned contrasts at day D+1",
             subtitle=[
                 *SUBTITLE,
                 "Five decision substations. Each contrast is the first arm minus the second.",
@@ -111,58 +147,39 @@ def main() -> None:
         ),
         name="figure_01_headline",
     )
-    c1 = "C1 RB - R"
-    weekday = []
-    for period, name in PERIOD_KEYS.items():
-        for day in WEEKDAYS:
-            entry = results[period]["planned"][c1].get(f"weekday {day}")
-            if entry is None:
-                continue
-            q = entry["qs"]
-            weekday.append(
-                {
-                    "contrast": day,
-                    "period": name,
-                    "estimate": q["estimate"],
-                    "lower": q["lower"],
-                    "upper": q["upper"],
-                }
-            )
+    c1 = "C1 ANALOG+R - R"
     save(
         chart=forest(
-            frame=pl.DataFrame(weekday),
-            title="Gain of the weekday profile over the all-days profile, by weekday",
-            subtitle=[
-                *SUBTITLE,
-                "RB minus R at day D+1; the target's weekday; holiday-like days left out.",
-            ],
-            order=list(WEEKDAYS),
-            height=320,
+            frame=collect(results=results, label=c1, keys=list(BREAKDOWNS)),
+            title="Where the analog-day correction gains: C1 by breakdown",
+            subtitle=[*SUBTITLE, "ANALOG+R minus R at day D+1; the 16 holiday-like days lose."],
+            order=list(BREAKDOWNS),
+            height=560,
         ),
-        name="figure_02_by_weekday",
+        name="figure_02_breakdowns",
     )
     bands = []
     for period, name in PERIOD_KEYS.items():
-        for label in (c1, "C5 RB-day-types - RB"):
+        for label in (c1, "C2 ANALOG-k - R"):
             for band, entry in results[period]["planned"][label]["lead_bands"]["bands"].items():
                 if entry is None or band not in BAND_ORDER:
                     continue
                 q = entry["qs"]
                 bands.append(
                     {
-                        "contrast": f"{label}, {band}",
+                        "contrast": f"{label[:2]}, {band}",
                         "period": name,
                         "estimate": q["estimate"],
                         "lower": q["lower"],
                         "upper": q["upper"],
                     }
                 )
-    order = [f"{label}, {b}" for label in (c1, "C5 RB-day-types - RB") for b in BAND_ORDER]
+    order = [f"{label[:2]}, {b}" for label in (c1, "C2 ANALOG-k - R") for b in BAND_ORDER]
     save(
         chart=forest(
             frame=pl.DataFrame(bands),
-            title="The gain is at day D+1 and fades at longer leads",
-            subtitle=[*SUBTITLE, "Lead bands count from the 09:00 UTC forecast origin."],
+            title="The gain is at day D+1 and reverses beyond 48 hours",
+            subtitle=[*SUBTITLE, "C1 is ANALOG+R minus R; C2 is ANALOG-k minus R."],
             order=order,
             height=420,
         ),
@@ -170,14 +187,18 @@ def main() -> None:
     )
     gate = json.loads((common.WORK_DIR / "gate.json").read_text())["median_recovery"]
     shown = {
-        "R": "R",
-        "Rh": "Rh",
-        "RB-ref": "RB (reference setting)",
-        "RB-ref-placebo": "RB placebo (reference)",
-        "RB": "RB (tuned)",
-        "RW": "RW (tuned)",
+        ("g1", "R"): "G1 Saturdays: R",
+        ("g1", "ANALOG-k-ref"): "G1: ANALOG-k",
+        ("g1", "ANALOG+R-ref"): "G1: ANALOG+R",
+        ("g1", "ANALOG+R-ref-placebo"): "G1: ANALOG+R placebo",
+        ("g2", "R"): "G2 holiday: R",
+        ("g2", "ANALOG-holiday"): "G2: ANALOG-holiday",
+        ("g3", "ANALOG+R-ref"): "G3 cold days: ANALOG+R",
+        ("g3", "ANALOG+R-ref-notemp"): "G3: without temperature",
     }
-    frame = pl.DataFrame({"arm": list(shown.values()), "share": [gate[k] for k in shown]})
+    frame = pl.DataFrame(
+        {"arm": list(shown.values()), "share": [gate[g][k] for g, k in shown]}
+    )
     chart = (
         alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_bar(color=ocf.DATA_BLUE, aria=False)
@@ -190,12 +211,10 @@ def main() -> None:
         )
         .properties(
             width=WIDTH - 260,
-            height=200,
+            height=260,
             title=alt.TitleParams(
-                "Known-answer gate: only the correct weekday recovers the injected shift",
-                subtitle=[
-                    "Median over five substations, at the third to eighth injected Saturday."
-                ],
+                "Known-answer gate: injected shifts on real residuals",
+                subtitle=["Median over five substations."],
             ),
         )
         .configure_view(stroke=None)

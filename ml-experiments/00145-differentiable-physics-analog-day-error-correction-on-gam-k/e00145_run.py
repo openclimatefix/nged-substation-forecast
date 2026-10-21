@@ -15,6 +15,7 @@ import argparse
 import json
 import time
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import replace
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -32,11 +33,14 @@ SITES: Final[tuple[str, ...]] = common.SCORED_SITES
 TUNED_PATH: Final[Path] = common.WORK_DIR / "tuned.json"
 GATE_PATH: Final[Path] = common.WORK_DIR / "gate.json"
 SRC_FRAMES_DIR: Final[Path] = common.SRC_115_WORK_DIR / "frames"
-KAPPAS: Final[tuple[float, ...]] = (0.5, 0.75, 1.0)
-NEIGHBOURS: Final[tuple[int, ...]] = (3, 5, 8, 12)
+KAPPAS: Final[tuple[float, ...]] = (0.5, 0.75, 1.0, 1.25)
+NEIGHBOURS: Final[tuple[int, ...]] = (3, 5, 8, 12, 20)
 SEASON_WEEKS: Final[tuple[int, ...]] = (4, 8, 13)
 WEIGHTS: Final[tuple[float, ...]] = (0.25, 0.5, 0.75)
 R_KAPPA: Final[float] = 0.75
+RECENT_DAYS: Final[int] = 300
+"""The post hoc recent-only arm leaves out source days older than this, so no day of the previous
+year enters."""
 R_SPEC: Final[analog.AnalogSpec] = analog.AnalogSpec(kappa=R_KAPPA, k=1, weeks=1, weight=0.0)
 """Recipe R: weight 0 returns the 14-day profile alone."""
 HOLIDAY_SPEC: Final[analog.AnalogSpec] = analog.AnalogSpec(
@@ -206,6 +210,7 @@ def stage_tune(*, pool: ProcessPoolExecutor) -> None:
         "R-exact",
         "R-kappa0.5",
         "R-kappa1",
+        "R-kappa1.25",
         "ANALOG-holiday",
         "ANALOG-k-ref",
         "ANALOG+R-ref",
@@ -219,6 +224,8 @@ def chosen_spec(*, family: str) -> analog.AnalogSpec:
         return HOLIDAY_SPEC
     if family == "R":
         return R_SPEC
+    if family == "ANALOG+R-recent":
+        return replace(chosen_spec(family="ANALOG+R"), max_age_days=RECENT_DAYS)
     name = json.loads(TUNED_PATH.read_text())["chosen"][family]
     return spec_table()[name][1]
 

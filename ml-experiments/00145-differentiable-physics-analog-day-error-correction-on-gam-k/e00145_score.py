@@ -13,8 +13,8 @@ paired across arms (`studies.bootstrap`).
 from pathlib import Path
 from typing import Final
 
+import e00145_arms as arms
 import e00145_common as common
-import e00145_tune as tune
 import numpy as np
 import polars as pl
 from studies.bootstrap import bootstrap_difference_at_level
@@ -79,7 +79,7 @@ def load_arm(
     """
     pieces = []
     for site in sites:
-        path = tune.frame_path(arm=arm, site=site)
+        path = arms.frame_path(arm=arm, site=site)
         frame = pl.read_parquet(path).filter(
             (pl.col("row_period") == period)
             & ~pl.col("switching_mask")
