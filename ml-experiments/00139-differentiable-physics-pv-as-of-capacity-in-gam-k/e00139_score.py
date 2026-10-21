@@ -209,6 +209,13 @@ def main() -> None:
         for scope in ("sunniest third", "darkest daylight third"):
             result = contrast(losses=part.filter(scopes[scope]), treatment="asof", reference="pin")
             print(site, scope, {k: round(v, 4) for k, v in result.items()})
+    # One Primary alone, asof - pin.
+    print("== one Primary alone, asof - pin, quantile score ==")
+    for site in five:
+        part = stacked.filter(pl.col("label") == site)
+        for scope in ("sunniest third", "darkest daylight third"):
+            result = contrast(losses=part.filter(scopes[scope]), treatment="asof", reference="pin")
+            print(site, scope, {k: round(v, 4) for k, v in result.items()})
     # D9: pin and no-PV only.
     d9 = {arm: frames[arm].filter(pl.col("label") == "D9").drop("arm") for arm in ("pin", "nopv")}
     both = losses_for_bootstrap(arm_losses=d9)

@@ -30,6 +30,8 @@ WEEKS: np.ndarray = np.arange(WEEKS_START, WEEKS_END, np.timedelta64(7, "D"))
 """Week-start Mondays that every path covers."""
 
 
+# A Monday up to six days before 1 July labels its July days with the previous season-year, which
+# affects at most one week per season-year.
 def season_year_of_weeks(*, weeks: np.ndarray) -> np.ndarray:
     """Return the season-year (July to June, labelled by the July's year) of each Monday."""
     months = weeks.astype("datetime64[M]")

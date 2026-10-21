@@ -5,14 +5,13 @@ the injected output is `c * shape`, with `c` half the as-of capacity held at the
 effective capacity). The scored year's actual power falls by that output, and no fit sees it: the
 fits and the filter use the real power, so the demand terms cannot absorb the injection.
 
-1. With the capacity unchanged the forecast is the as-of forecast, so its error shifts by the
-   injection (identity, checked numerically).
-2. With the capacity raised by `c` (the path and the held value), the forecast falls by `c` times
-   the ensemble-driven unit PV shape. The recovery is the mean fall of the forecast divided by the
-   mean injected output over the sunniest third of the scored half-hours.
+Nothing is injected into any fit, filter, or actual. The test computes the forecast under the as-of
+capacity and under that capacity raised by `c` (the path and the held value), and divides the mean
+fall of the forecast by the mean injected output `c * shape` over the sunniest third of the scored
+half-hours. It therefore tests how well the ensemble-driven unit solar shape matches each source's
+shape, and not whether a fit absorbs an injection.
 
-The band is 0.75 to 1.25, as in experiment 129. A second ratio raises the capacity by `c` times the
-Primary's recovery divisor instead, which puts the raise in the model's own units.
+The band is 0.75 to 1.25, as in experiment 129.
 
     uv run --no-sync python ml-experiments/00139-*/e00139_kat.py [--workers 5]
 """
@@ -133,8 +132,6 @@ def kat_site(site: str) -> pl.DataFrame:
                 "source": source,
                 "plant": "matched" if source in common.FARMS else source,
                 "recovery": ratio,
-                "recovery_in_model_units": ratio / divisor,
-                "divisor_2024": divisor,
                 "sunny_half_hours": int(usable.sum()),
                 "mean_injected_points": float(output[usable].mean()),
                 "mean_fall_points": float(fall[usable].mean()),
@@ -157,11 +154,9 @@ def main() -> None:
         table.group_by("site", "plant")
         .agg(
             pl.col("recovery").median().alias("recovery"),
-            pl.col("recovery_in_model_units").median().alias("recovery_model_units"),
         )
         .with_columns(
             passes=pl.col("recovery").is_between(*BAND),
-            passes_model_units=pl.col("recovery_model_units").is_between(*BAND),
         )
         .sort("plant", "site")
     )
@@ -170,7 +165,6 @@ def main() -> None:
         print(
             summary.group_by("plant").agg(
                 pl.col("passes").sum().alias("primaries_passing"),
-                pl.col("passes_model_units").sum().alias("primaries_passing_model_units"),
             )
         )
 
