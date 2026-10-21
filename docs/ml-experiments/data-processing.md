@@ -475,6 +475,14 @@ level is hindsight: D9 at 2024-07-01 looks 9.5 months ahead, D15 at 2025-07-01 3
 every cut up to the whole scored year, and every Primary at the tuning year's replica (2022-07-01)
 13 months. D14's vintage stops at 2023-04-17 at every origin, so its capacity is held from then.
 
+**Leave a substation out of a joint (pooled) fit at any cut where its pinned capacity is a late
+vintage (provisional).** A hindsight capacity in one substation's target would move the fleet mean
+and so every other substation's forecast. In [experiment
+158](00158-dp-partly-pooled-gam-shapes-heating-and-calendar-curves/result.md), D9's capacity is a
+late vintage at every cut before 2025-04, so D9 was fitted alone at those cuts and joined the fleet
+from 2025-04. Applies to experiments and production. Confidence: medium; the rule follows
+`studies.dp_gam_pooled`'s refusal, and no experiment measured the size of the effect.
+
 **With the capacity pinned, a drift term absorbs an injected solar farm in the hours the farm
 produces.** The morning, midday, and evening bands move, and the night band does not (0.004 to 0.011
 points in experiment 106's test). Applies to experiments.
