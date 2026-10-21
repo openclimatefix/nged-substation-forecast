@@ -102,8 +102,6 @@ class Signals:
         causal: The prior from causal alarms (active from onset-known to end-known).
         hindsight: The prior from the hindsight end rule, active from the true onset.
         oracle: The prior from the injected truth (zeros in the real year).
-        step_points: The signed step of the active causal alarm, in points (0 when none).
-        age_days: Days since the active causal alarm was known (0 when none).
         alarm_window: True within 48 hours after an alarm on an injected transfer is known (the
             C1 rows' target window). Alarms from the real stream alone are left out.
         event_window: True within an injected transfer and 72 hours after it.
@@ -115,8 +113,6 @@ class Signals:
     causal: np.ndarray
     hindsight: np.ndarray
     oracle: np.ndarray
-    step_points: np.ndarray
-    age_days: np.ndarray
     alarm_window: np.ndarray
     event_window: np.ndarray
     transfer: np.ndarray
@@ -150,7 +146,6 @@ def build_signals(
     offset = stamp_offset(data)
     series = SERIES_OF_SITE[site]
     causal, hindsight, oracle = np.zeros(n), np.zeros(n), np.zeros(n)
-    step, age = np.zeros(n), np.zeros(n)
     alarm_window, event_window = np.zeros(n, dtype=bool), np.zeros(n, dtype=bool)
     causal_end, oracle_end = np.zeros(n), np.zeros(n)
     moving = np.zeros(n, dtype=bool)
@@ -170,9 +165,6 @@ def build_signals(
             if lo < hi:
                 causal[lo:hi] = p_on
                 causal_end[lo : min(hi + END_STAMPS, n)] = p_on
-                points = 100.0 * row["step_mw"] / CAPACITY_MW[site]
-                step[lo:hi] = points if np.isfinite(points) else 0.0
-                age[lo:hi] = (np.arange(lo, hi) - start) / 48.0
             wlo, whi = max(start, 0), min(start + AFTER_STAMPS, n)
             if 0 <= onset < n and near_transfer[onset]:
                 alarm_window[wlo:whi] = True
@@ -191,8 +183,6 @@ def build_signals(
         causal,
         hindsight,
         oracle,
-        step,
-        age,
         alarm_window,
         event_window,
         moving,

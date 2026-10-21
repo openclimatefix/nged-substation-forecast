@@ -51,24 +51,22 @@ headline: >-
   -0.075)
   and loses in the 72 hours after it ends (+0.310, +0.195 to +0.695).
 lessons: >-
-  Knowing a transfer's true start would help the filter inside the transfer, but the gain is lost
-  after the transfer ends, because the filter holds its level flat over every lead. The causal alarm
+  Knowing when a transfer starts and ends helps the filter inside the transfer, but the gain is
+  lost after it ends, because the filter holds its level flat over every lead. The causal alarm
   arrives 48 hours after the step, and with that delay it does no better than a random placebo.
 take_home_message: >-
-  Telling the forecast's filter about a load transfer helped only when the filter knew the true
-  start
-  of the transfer, and then only inside the transfer. After the transfer ended, the same filter did
-  worse than the plain filter, because it held the transfer's step over the whole 7-day forecast.
-  The
-  detector's real alarm arrives about 2 days after the step and did no better than a random placebo.
-  The next test is a filter that expects a transfer to end, using the typical duration of transfers.
+  Telling the forecast's filter when a load transfer started and ended helped inside the transfer
+  and hurt in the 72 hours after it, because the filter holds the transfer's step over the whole
+  7-day forecast. The switching detector's alarm arrives 48 hours after the step and did no better
+  than a random placebo. The next test is a correction that decays over the typical transfer
+  duration.
 advice:
   - >-
     Do not feed the switching detector's causal alarm into GAM-K's filter as a regime probability:
     with the alarm 48 hours late it matched a random placebo (C1, placebo rows).
   - >-
     When testing a detector in a forecast, score rows inside the transfer and after it separately;
-    a gain inside the transfer can be cancelled after it ends (S-ORACLE panels).
+    a gain inside the transfer can be cancelled after it ends (the three row panels in the figure).
   - >-
     Make the correction for a transfer decay toward zero over the typical transfer duration instead
     of holding it flat at every lead, which is the loss after the transfer ends (untested here).
@@ -76,35 +74,39 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**Take-home message.** Telling GAM-K's Kalman filter about a load transfer helped only when the
-filter knew the transfer's true start, and then only inside the transfer. GAM-K is the
-weather-driven demand forecast of earlier experiments, and its Kalman filter corrects each forecast
-with the most recent errors. A load transfer moves a block of demand from one substation to another,
-for example when a switch is thrown. We simulated transfers and gave the filter either the
-switching detector's alarm or the true interval. The alarm arrives about 2 days after the step,
-and the arm that used it scored the same as a placebo that used random times. The arm given the true
-interval scored 0.126 points better than the filter alone inside a transfer (95% interval 0.075 to
-0.219), and 0.310 points worse in the 72 hours after the transfer ended (0.195 to 0.695), because
-the filter holds the step flat over the whole 7-day forecast. On the pre-registered measure (the 48
-hours after an alarm) the deployable arm scored +0.059 points (-0.004 to +0.378; positive is worse).
+**Take-home message.** Telling GAM-K's filter when a load transfer started and ended helped
+inside the transfer and hurt in the 72 hours after it. GAM-K is the weather-driven demand forecast
+of earlier experiments, and its Kalman filter corrects each forecast with the most recent errors.
+A load transfer moves a block of demand from one substation to another, for example when a switch
+is thrown, and it shows as a step in the forecast error. We simulated transfers and gave the filter
+either the switching detector's alarm or the true start and end. Scores are quantile scores in
+points of effective capacity, and a positive difference from the filter alone (K0) is worse.
 
-## What we asked, and the answer
+**The answer in numbers.** The arm given the true interval (S-ORACLE) scored 0.126 points better
+than K0 inside a transfer (95% interval 0.075 to 0.219), and 0.310 points worse in the 72 hours
+after the transfer ended (0.195 to 0.695), because the filter holds the step flat over the whole
+7-day forecast. The detector's alarm arrives 48 hours after the step, and the arm that used it
+scored the same as a placebo that used random times. On the pre-registered measure, C1 (the 48
+hours after an alarm), the deployable arm scored +0.059 points (-0.004 to +0.378).
+
+## What we asked
 
 We asked whether the refit-offset neighbour-count detector (RO-NC, the detector of
-[experiment 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md), which looks for steps in
-the forecast error that appear at a substation and are matched by opposite steps at its neighbours)
-lowers the forecast's error when its output is fed into GAM-K's Kalman filter. We added transfers of
-25% or more of the receiving load that last over a day (the headline-band transfers drawn in
-[experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md)) to the real forecast errors, in
-44 simulated versions of the data that touch six Primary substations. We ran the detector with the
-causal end rule of experiment 147, and gave the filter a second "switched" regime whose level
-variance is a multiple of the fitted one. The method follows
+[experiment 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md)) lowers the forecast's
+error when its output is fed into GAM-K's Kalman filter. RO-NC looks for steps in the forecast
+error that appear at one substation and are matched by opposite steps at neighbouring substations.
+We added transfers of 25% or more of the receiving load that last over a day to the real forecast
+errors, in 44 simulated versions of the data that touch six Primary substations. The transfers are
+the headline-band draw of [experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md).
+We ran the detector with the causal end rule of experiment 147. We then gave the filter a second
+"switched" regime whose level variance is a multiple of the fitted one. The method follows
 [experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)'s
-Kalman filter and a two-model mixture filter in the style of the interacting multiple model filter.
-Every setting scored worse than the filter alone on the tuning months, so the stop rule (stop before
-the real year if the tuning months show no gain) ended the experiment before the real year was
-scored. An Opus audit then found that the first version of this page mislabelled its rows: the
-numbers below are from the re-run that fixes them.
+Kalman filter, combined with a two-regime mixture in the style of the interacting multiple model
+filter used in target tracking.
+
+Every setting scored worse than the filter alone on the tuning months. The stop rule (stop before
+the real year if the tuning months show no gain) therefore ended the experiment before the real
+year was scored.
 
 ![Each arm's quantile score minus K0's, with 95% intervals](arms_vs_k0.svg)
 
@@ -124,7 +126,8 @@ numbers below are from the re-run that fixes them.
   0.5 to 168 h, rows outside the hand-filtered switching events. Three row sets, by target time:
   inside a simulated transfer (279,332 rows, 11 months), the 48 hours after a causal alarm on a
   simulated transfer (127,468 rows, 10 months; this is C1), and the 72 hours after a simulated
-  transfer ends (281,864 rows, 12 months). Alarms from the real stream alone are not scored.
+  transfer ends (281,864 rows, 12 months). Alarms from the real forecast-error series alone are not
+  scored.
   Intervals resample calendar months of target time.
 - **C1, S-KF minus K0, 48 hours after a causal alarm:** +0.059 points (-0.004 to +0.378); K0's own
   score on these rows is 5.46 points (4.24 to 6.94). Mean-forecast absolute error: +0.064 (-0.008
@@ -148,9 +151,10 @@ numbers below are from the re-run that fixes them.
   is known only 48 hours after the step, by which time K0 has adapted too. The inside-transfer
   gains of S-KF, the placebo, and variance inflation are the same (about -0.027), so the detector's
   timing adds nothing to them.
-- **The filter does not adapt within a day.** On D9's real residuals with an 8-point step lasting
-  4 days, the Opus audit found that K0 still misses 5.4 of 8 points after 24 to 36 hours and 3.3
-  after three days. `e00141_synthetic.py` uses illustrative settings and a single hour band, so it
+- **K0 adapts slowly at the one substation tested.** On D9's real residuals with an 8-point step
+  lasting 4 days, the Opus audit found that K0 still misses 5.4 of 8 points after 24 to 36 hours
+  and 3.3 after 3 days. `e00141_synthetic.py` uses illustrative settings and a single hour band, so
+  it
   does not represent the fitted filter.
 - **Tail calibration** (48 hours after a causal alarm; K0 and S-KF alike): q95 coverage 88.2%
   against a nominal 95%, and q05 coverage (the share of actuals above q05) 85.0% against 95%. On
@@ -161,7 +165,7 @@ numbers below are from the re-run that fixes them.
   D11 +0.008, D5 -0.001. By period: replicate months +0.002, scored year +0.031. Dropping D10 leaves
   +0.020, and dropping any other site leaves +0.063 to +0.071.
 
-## Checks
+## Checks and audit
 
 - **Median minus mean forecast per site** (rows after an alarm; K0 and S-KF share the same value):
   D10 -0.12, D14 +0.02, D11 -0.05, D16 +0.00, D9 -0.07, D5 -0.48 points of effective capacity. D5's
@@ -176,7 +180,8 @@ numbers below are from the re-run that fixes them.
   Its findings and their triage:
     - **Accepted:** the rows labelled "inside a transfer" included the 72 hours after it. The page
       now scores the two separately.
-    - **Accepted:** 88% of the alarm intervals in the first version were alarms from the real stream
+    - **Accepted:** 88% of the alarm intervals in the first scoring were alarms from the real
+      forecast-error series
       repeated in every simulated version. Only alarms on a simulated transfer are scored now.
     - **Accepted:** "the filter adapts within about a day" was false for the fitted settings, and
       S-ORACLE is not an upper bound because its prior is off at the reverse step. Both claims are
@@ -186,8 +191,29 @@ numbers below are from the re-run that fixes them.
       so the stop rule still fires).
     - **Not applied:** the audit's suggestion to re-tune on rows inside the transfer only, which
       would tune the deployable arm on rows that it can only see 48 hours late.
-    - **Noted, no change:** the detector's stamps sit one half-hour later than the site's grid
-      positions. The stream and the scored actual shift together, so no number moves.
+    - **Noted, no change:** the detector's timestamps sit one half-hour later than the site's grid
+      timestamps. The forecast-error series and the scored actual shift together, so no number
+      moves.
+
+- **Leakage review (one Sonnet reviewer, code only).** It found no way for a deployable arm to see
+  data later than its forecast time. The filter runs forward, the 96-half-hour onset lag matches
+  the alarm statistic's window, `known_from` is the stamp at which the end statistic is
+  computable, and tuning reads only the tuning months. Its other findings and their triage:
+    - **Accepted, as a limit on the controls (not re-run):** the placebo prior is shifted by whole
+      weeks, so it seldom falls on the scored rows, which sit around events. "Matches the placebo"
+      therefore shows that a late alarm has no measurable gain over an unrelated prior, and the
+      page's claim stays at that. The variance-inflation control also differs from S-KF in both
+      alarm times and the likelihood update, so it does not isolate the update alone.
+    - **Accepted, as a limit on the rows (not re-run):** the "after a causal alarm" rows count any
+      alarm within 2 hours of a transfer, including repeat and return-step alarms, so they describe
+      cases where the detector fired near a real transfer. They exclude the cost of false alarms.
+    - **Accepted, code only:** the unused `step_points` and `age_days` arrays are removed. They fed
+      no arm, so no number moves.
+    - **Noted:** the scored-score files are reused if they exist, so a re-tune needs them deleted
+      first; the chosen settings (prior 0.5, multiplier 4) were the ones used for the scored files.
+      The multiplier 4 sits at the lower edge of the grid (4 to 256), so a smaller multiplier was
+      not tried.
+    - **Not checked by the reviewer:** where experiment 138's classifier and threshold were fitted.
 
 ## Departures from the plan
 
@@ -197,7 +223,8 @@ numbers below are from the re-run that fixes them.
   variance-inflation controls were run on the simulated data only.
 - **The causal alarm is known from 96 half-hours (48 hours) after the step starts**, a conservative
   stand-in for the statistic's 24-hour window plus the 24-hour peak test. The planned unit test
-  (truncating the residual stream and checking the score is unchanged) was **not written**, so the
+  (truncating the forecast-error series and checking the score is unchanged) was **not written**, so
+  the
   claim that the alarm time is causal rests on this lag and on the end rule's own `known_from`.
   A leak would favour the detector, which makes the negative result stronger, not weaker.
 - **Intervals are 95%, not the planned family-wise level**, because only one contrast carries a
@@ -209,11 +236,11 @@ numbers below are from the re-run that fixes them.
 
 ## What the next experiment should answer
 
-A filter that holds the transfer's step flat at every lead is wrong once the transfer ends, and the
-true interval does not help for forecasts made inside it. An experiment can test a correction for a
+A filter that holds the transfer's step flat at every lead is wrong once the transfer ends. An
+experiment could test a correction for a
 detected transfer that decays toward zero over the typical transfer duration (from the logged
 operations), on the same simulated data, with the true-interval arm as its ceiling and the causal
-alarm as the deployable arm. It should also test the alarm at the shorter lag that a 24-hour step
+alarm as the deployable arm. It could also test the alarm at the shorter lag that a 24-hour step
 statistic allows if the peak test is dropped.
 
 ## Plan (written before any fit)
