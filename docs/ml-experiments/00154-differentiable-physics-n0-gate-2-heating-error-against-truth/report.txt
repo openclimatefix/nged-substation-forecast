@@ -1,0 +1,127 @@
+== Decision rule
+{
+  "n_seeds": 5,
+  "pass_counts": {
+    "W1_shared_curve": 5,
+    "W2_close_to_fair_oracle": 4,
+    "W2b_beats_both_controls": 5,
+    "W3_offset_sign": 2
+  },
+  "verdict": "partly supported",
+  "per_seed": [
+    {
+      "seed": 20261101,
+      "errors": {
+        "pooled": 2.8448754574456245,
+        "no_pooling": 8.342624068989247,
+        "complete_pooling": 3.7176530525388816,
+        "oracle": 3.3727911532973667
+      },
+      "fleet_curve_rmse": 0.5207373682883977,
+      "per_site_mean_curve_rmse": 0.9882655332689357,
+      "sites_with_right_offset_sign": 4,
+      "offset_slope": 0.4971675745030259,
+      "W1_shared_curve": true,
+      "W2_close_to_fair_oracle": true,
+      "W2b_beats_both_controls": true,
+      "W3_offset_sign": false,
+      "control_beats_pooled": []
+    },
+    {
+      "seed": 20261102,
+      "errors": {
+        "pooled": 3.6050158120195577,
+        "no_pooling": 5.891215262030696,
+        "complete_pooling": 4.629821858801246,
+        "oracle": 2.802581549391389
+      },
+      "fleet_curve_rmse": 0.5410980886685299,
+      "per_site_mean_curve_rmse": 0.8122598673301972,
+      "sites_with_right_offset_sign": 6,
+      "offset_slope": 0.5299135756171323,
+      "W1_shared_curve": true,
+      "W2_close_to_fair_oracle": false,
+      "W2b_beats_both_controls": true,
+      "W3_offset_sign": true,
+      "control_beats_pooled": []
+    },
+    {
+      "seed": 20261103,
+      "errors": {
+        "pooled": 3.275526300028456,
+        "no_pooling": 8.35834485812222,
+        "complete_pooling": 3.379542404987649,
+        "oracle": 3.914105843206484
+      },
+      "fleet_curve_rmse": 0.5929028543844737,
+      "per_site_mean_curve_rmse": 0.796296990729369,
+      "sites_with_right_offset_sign": 3,
+      "offset_slope": -0.0616482785646142,
+      "W1_shared_curve": true,
+      "W2_close_to_fair_oracle": true,
+      "W2b_beats_both_controls": true,
+      "W3_offset_sign": false,
+      "control_beats_pooled": []
+    },
+    {
+      "seed": 20261104,
+      "errors": {
+        "pooled": 3.0813928595561695,
+        "no_pooling": 11.522233911636112,
+        "complete_pooling": 3.565011715085662,
+        "oracle": 4.0733155009694455
+      },
+      "fleet_curve_rmse": 1.3149433399188393,
+      "per_site_mean_curve_rmse": 1.2812692783687702,
+      "sites_with_right_offset_sign": 6,
+      "offset_slope": 0.6716367082077541,
+      "W1_shared_curve": true,
+      "W2_close_to_fair_oracle": true,
+      "W2b_beats_both_controls": true,
+      "W3_offset_sign": true,
+      "control_beats_pooled": []
+    },
+    {
+      "seed": 20261105,
+      "errors": {
+        "pooled": 3.385389513511528,
+        "no_pooling": 4.132149484042927,
+        "complete_pooling": 3.9285850245907485,
+        "oracle": 3.9974678928073843
+      },
+      "fleet_curve_rmse": 0.6188661145087989,
+      "per_site_mean_curve_rmse": 0.6235776770915895,
+      "sites_with_right_offset_sign": 4,
+      "offset_slope": 0.271414970331408,
+      "W1_shared_curve": true,
+      "W2_close_to_fair_oracle": true,
+      "W2b_beats_both_controls": true,
+      "W3_offset_sign": false,
+      "control_beats_pooled": []
+    }
+  ]
+}
+== Heating error per seed (points of effective capacity)
+seed 20261101: penalty 1000; {'pooled': 2.84, 'no_pooling': 8.34, 'complete_pooling': 3.72, 'oracle': 3.37}
+seed 20261102: penalty 1000; {'pooled': 3.61, 'no_pooling': 5.89, 'complete_pooling': 4.63, 'oracle': 2.8}
+seed 20261103: penalty 1000; {'pooled': 3.28, 'no_pooling': 8.36, 'complete_pooling': 3.38, 'oracle': 3.91}
+seed 20261104: penalty 300; {'pooled': 3.08, 'no_pooling': 11.52, 'complete_pooling': 3.57, 'oracle': 4.07}
+seed 20261105: penalty 1000; {'pooled': 3.39, 'no_pooling': 4.13, 'complete_pooling': 3.93, 'oracle': 4.0}
+== Coefficient-space error (root mean square over the 8 turns)
+seed 20261101: {'pooled': 1.87, 'oracle': 2.37, 'complete_pooling': 2.1, 'no_pooling': 5.21}
+seed 20261102: {'pooled': 1.99, 'oracle': 2.3, 'complete_pooling': 2.29, 'no_pooling': 4.33}
+seed 20261103: {'pooled': 1.99, 'oracle': 2.58, 'complete_pooling': 2.17, 'no_pooling': 5.51}
+seed 20261104: {'pooled': 2.26, 'oracle': 4.06, 'complete_pooling': 2.2, 'no_pooling': 8.41}
+seed 20261105: {'pooled': 2.46, 'oracle': 3.22, 'complete_pooling': 2.63, 'no_pooling': 4.3}
+== Offset sign: substations of 8 with the injected sign, per estimator (post hoc: all)
+seed 20261101: sign {'pooled': 4, 'oracle': 3, 'no_pooling': 4}; slope {'pooled': 0.5, 'oracle': 0.35, 'no_pooling': -0.17}; |injected offsets| [0.9, 0.02, 0.25, 1.58, 3.63, 0.79, 1.11, 1.71]
+seed 20261102: sign {'pooled': 6, 'oracle': 8, 'no_pooling': 3}; slope {'pooled': 0.53, 'oracle': 1.0, 'no_pooling': 0.42}; |injected offsets| [0.62, 0.61, 3.85, 1.83, 1.45, 2.29, 2.33, 0.71]
+seed 20261103: sign {'pooled': 3, 'oracle': 5, 'no_pooling': 4}; slope {'pooled': -0.06, 'oracle': 0.26, 'no_pooling': 1.26}; |injected offsets| [1.8, 1.04, 0.73, 0.98, 0.95, 0.69, 2.68, 1.2]
+seed 20261104: sign {'pooled': 6, 'oracle': 7, 'no_pooling': 3}; slope {'pooled': 0.67, 'oracle': 1.47, 'no_pooling': 1.57}; |injected offsets| [0.97, 0.74, 2.91, 0.41, 1.04, 0.69, 1.07, 1.35]
+seed 20261105: sign {'pooled': 4, 'oracle': 5, 'no_pooling': 3}; slope {'pooled': 0.27, 'oracle': 0.66, 'no_pooling': 0.94}; |injected offsets| [0.33, 1.6, 2.56, 3.72, 1.05, 2.47, 0.85, 2.12]
+== Fair oracle capacity ratio (fitted over true) per turn
+seed 20261101: 1.03 0.98 1.05 0.99 0.84 1.03 1.00 1.38
+seed 20261102: 1.03 1.02 1.09 0.99 0.98 1.08 0.87 0.79
+seed 20261103: 1.13 0.81 1.23 0.99 0.82 1.01 1.05 0.94
+seed 20261104: 1.16 1.06 1.05 1.50 1.23 1.21 1.05 1.18
+seed 20261105: 1.02 1.08 0.85 0.92 0.83 1.08 1.10 1.05
