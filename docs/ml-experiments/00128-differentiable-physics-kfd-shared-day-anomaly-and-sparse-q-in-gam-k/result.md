@@ -120,6 +120,7 @@ through the other months.
 | KDS-1n, KDS-4n | GK plus d | sparse, thresholds of 1 and 4 nats | sensitivity, exploratory |
 | KDS-floor | GK plus d | sparse, with every `q_b` at least 1e-4 points squared per day | exploratory: keeps the levels able to move |
 | KDS-da | GK plus d | sparse, with KD's continuous hyperparameters fitted by the day-ahead likelihood | exploratory |
+| KDS-dow | KDS | KDS's, plus a shrunken same-weekday correction | pre-run addition, own verdict line, outside the main verdict |
 
 The monthly weight reset, the 14-weight state, noise pooling across substations, and any PV or
 effect weight are not in the experiment. Experiment 127 stays parked.
@@ -446,6 +447,63 @@ The 0.03 matches the half-width of a paired scored-year interval at five substat
 - If KDS tracks worse than GK by more than 0.10 in the AR(1) form, the added state damages tracking
   under the filter's own error model. Stop and report before any scored forecast.
 - No arm is added after a replicate or scored result is read, except one labelled post hoc.
+
+## Pre-run addition: a different set of hour bands per weekday (KDS-dow)
+
+**This arm was added before any replicate or scored forecast was read, at the maintainer's
+request. It has its own verdict line and no effect on the verdict rule above.** The reason is that
+copying what happened 7 days ago is a strong baseline for half-hourly demand, and KDS gives every
+weekday the same four hour bands.
+
+**The arm.** KDS-dow adds to each KDS forecast a correction for the target's weekday and hour band.
+The correction is the exponentially weighted mean of the KDS filter's one-step innovations (observed
+residual minus the filter's prediction just before the reading) at the same weekday and hour band of
+earlier weeks, shrunk towards zero by `n / (n + kappa)`, where `n` is the sum of the weights. With
+`kappa` large, every weekday uses the same set of bands, as KDS does; a weekday differs only where
+earlier weeks at that weekday and band agree. The forecast reads only readings at or before its
+cutoff, so a target at D+1 uses the same weekday of the week before, which is 6 days before the
+origin's day. Two constants per substation, the weekly forgetting factor (0, 0.3, 0.5, 0.7, or 0.8;
+0 keeps only last week) and `kappa` (0.3 to 100), are chosen on the tuning months by the sum of
+squared one-step innovations that remain after the correction. Zero correction is a candidate and
+is chosen if no pair lowers that sum. The arm needs no new filter run, no new gate draw, and no
+change to the controls, because it reads the stored KDS trace. The code is `e00128_dow.py`.
+
+**Reference, not an arm.** Beside KDS-dow the page reports a forecast that is the actual value 7
+days before each target, where that value was read at or before the cutoff, with a spread fitted on
+the tuning months by the same procedure. It is scored on the rows where last week's value exists,
+beside KDS and KDS-dow on those same rows. It is labelled a reference and has no verdict.
+
+**Contrast.** KDS-dow minus KDS at D+1, over the same rows and with the same 99% month-block
+interval as C1 to C5, with the replicate-months sign and the leave-one-substation-out values. It
+is a sixth contrast outside the Bonferroni family of five, so the other five keep their intervals.
+
+**Prediction, written before any fit.** KDS-dow minus KDS is -0.01 points (range -0.04 to +0.01),
+better at 3 or more of the 5 decision substations. The gain is predicted to be small because the
+convex model already carries weekday terms, so a weekly pattern is left in the innovations only
+where the pattern changes over the year. At least 2 of the 5 substations are predicted to fit an
+off correction. The last-week reference is predicted to score worse than KDS by at least 0.5
+points, because it carries no weather information.
+
+**What works means.** `KDS-dow: supported` if the scored-year 99% interval lies wholly below zero,
+the estimate is at least 0.02 points below zero, and at least 4 of 5 decision substations are better
+in both the scored year and the replicate months. `KDS-dow: not supported` if the lower limit of the
+interval is above -0.02 points. `KDS-dow: inconclusive` for every other result. A KDS-dow that is
+supported does not change the verdict of the experiment; it is a candidate for its own experiment.
+
+**Compute.** Fitting the constants takes seconds per substation. Forecasting the tuning months,
+replicate months, and scored year for one more arm takes the 15 to 30 minutes already estimated for
+the other arms, divided across them, so under 10 minutes extra. No gate rerun is needed.
+
+**Wiring, to be done after the gate.** In `e00128_arms.py`, add `ArmSpec("KDS-dow", "KDS", "own")`.
+In `e00128_forecast.py`, after `corrected_members` for this arm, add the weekday term to the
+members' means (`dataclasses.replace(corrected, means=corrected.means + term[None, :])`) with
+`term = e00128_dow.weekday_term(trace=filtered.trace, band=data.band, constants=constants,
+cutoff=cutoff_of(cache=cache, origin=origin), target_day=data.day[target],
+target_band=data.band[target])`. The constants come once per substation from
+`e00128_dow.fit_weekday_constants(trace=filters["KDS"].trace, band=data.band,
+tuning_mask=data.tuning_mask)`. The last-week reference uses `e00128_dow.last_week_means` on
+`features.y` with the same cutoff, and drops the rows where it is `NaN`. The report adds the
+contrast and the verdict line.
 
 ## Controls
 
