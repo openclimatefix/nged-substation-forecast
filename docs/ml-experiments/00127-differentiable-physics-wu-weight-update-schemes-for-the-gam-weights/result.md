@@ -1,7 +1,6 @@
 ---
 id: "00127"
 slug: differentiable-physics-wu-weight-update-schemes-for-the-gam-weights
-title: "Differentiable physics, WU: which way of updating the convex model's weights forecasts best"
 part: "WU"
 theme: differentiable-physics-forecast-engine
 also_relevant_to: [differentiable-physics-long-history-and-drift, lagged-power-and-error-correction]
