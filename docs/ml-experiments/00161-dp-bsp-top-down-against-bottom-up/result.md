@@ -7,7 +7,7 @@ also_relevant_to:
 - hierarchy-and-pooling
 - production-reference-and-best-guess
 - calibration-and-uncertainty
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00161-dp-bsp-top-down-against-bottom-up/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is
@@ -64,13 +64,209 @@ metric: >-
   and 72 to 168 hours; coverage and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles; the
   mean absolute error of the mean forecast
 code: ml-experiments/00161-dp-bsp-top-down-against-bottom-up/
+verdict: inconclusive
+best_arm: >-
+  Top-down (arm D's chain on the BSP alone), 4.361 points at D13 and 7.672 at D17 over leads 0.5 to
+  168 hours in the scored year, against 4.387 and 7.706 for the bottom-up arm with learned weights
+headline: >-
+  Bottom-up scored 0.026 points worse than top-down at D13 (97.5% interval -0.033 to +0.102) and
+  0.035 points worse at D17 (-0.012 to +0.094), so neither BSP gained. The verdict is
+  `inconclusive`: both intervals include zero, and the oracle control (observed children in place of
+  forecast children) gained 0.52 and 0.56 points, less than the 0.92 and 2.14 the plan required.
+lessons:
+  - >-
+    The BSP's forecast error sits mostly in the load the covered children do not meter: the
+    remainder's error has a standard deviation of 9.4 points at D13 and 16.6 at D17, against 2.3
+    and 3.5 for the covered children's summed error (figure 3).
+  - >-
+    Even with the children's readings known exactly, the oracle gained only 12% (D13) and 7% (D17) of
+    the top-down score, so a better forecast of the covered children cannot lift the BSP's score
+    much (C7).
+  - >-
+    Least-squares weights on three covered children are not stable: the bounded fit sits on its
+    upper bound of 1.2 for all six children, and the unbounded fit gives weights of 0.23 to 5.0
+    because the children stand in for unmetered siblings.
+take_home_message: >-
+  Forecasting a BSP from its children's forecasts plus a remainder did not beat forecasting the BSP
+  as a stand-alone series at either BSP, by 0.6% of the score at D13 and 0.5% at D17, both within
+  the noise. The reason is plain: the children this test could use (three real-power Primaries per
+  BSP) cover 42% and 56% of the BSP's capacity, and the BSP's error lives in the rest. The oracle
+  control missed its pre-registered threshold, which was set too high, so the formal verdict is
+  capped at `inconclusive`; the direction does not depend on it.
+advice:
+  - >-
+    Keep forecasting a BSP as a stand-alone series with the best-guess chain: the bottom-up arm
+    scored 0.5% to 0.6% worse and needs the children's forecasts at serving time (C1).
+  - >-
+    Do not expect a bottom-up arm to help until the children cover most of the BSP's load: the oracle
+    with exact children gained 7% to 12%, so the unmetered load and the MVA-metered children (4 of 7
+    at D13 and 4 of 9 at D17) need their own demand forecasts first (C7, figure 3).
+  - >-
+    Bound or fix the weights: the unbounded fit moved three weights to 3.3, 4.3, and 5.0, which are
+    the children standing in for uncovered siblings, and scored no better than the fixed-sum arm
+    (free minus learned +0.001 and +0.022).
+date: 2026-10-21
+pr: 1464
+production_status: not-for-production
+adopted_in: none
 ---
 
-# Experiment 161: is a bulk supply point forecast better from its children than on its own?
+# Experiment 161: a bulk supply point is forecast no better from its children than on its own
 
-Plan only; the write-up follows the runs.
+**Take-home: building a bulk supply point (BSP) forecast from its children's forecasts did not
+beat forecasting the BSP as a stand-alone series, at either BSP.** In the scored year, the
+bottom-up arm scored 4.387 points at D13 against 4.361 for top-down (+0.026, 97.5% interval -0.033
+to +0.102), and 7.706 at D17 against 7.672 (+0.035, -0.012 to +0.094). The bottom-up arm is 0.6%
+and 0.5% worse, within the noise. The reason is the share of the BSP the sum can reach. Only 3
+children per BSP report real power and have a long history, so they cover 42% (D13) and 56% (D17)
+of the BSP's effective capacity, and most of the BSP's forecast error is in the load they do not
+cover (figure 3). With the children's readings known exactly (the oracle), the score improves by
+only 12% and 7%. The verdict is `inconclusive`, because both intervals include zero and the
+oracle control missed its pre-registered threshold (the threshold was set too high; see
+Checks).
+
+This experiment compares two ways of forecasting a BSP, which sits above several Primary
+substations in the electricity network. The top-down arm gives the BSP's own half-hourly reading to
+the best-guess GAM-K chain ([experiment
+155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md)'s arm D). The
+bottom-up arm forecasts each covered child Primary with the same chain, weights the forecasts by
+learned weights, and adds the chain's forecast of the remainder, the BSP's reading minus the
+weighted children's readings. Quantile scores are in points: percentages of the BSP's effective
+capacity, lower is better. Scored rows are the 292 daily runs of 2025-07-02 to 2026-06-29, leads 0.5
+to 168 hours, outside switching events.
+
+**Scope.** Two BSPs have child Primaries with usable data: D13 (seven children) and D17 (nine
+children). Only the children that report real power and have a long history enter the sum (D9, D10,
+and D11 under D13; D5, D14, and D16 under D17). The other children report apparent power (4 of 7 and
+4 of 9), or have under 5 months of readings (D15 and D18), so they stay in the remainder. The test
+is therefore a partial bottom-up. NGED will say in January 2027 which BSP each unmetered Primary
+sits under, and no other BSP is in scope until then.
+
+## Results
+
+![Bottom-up minus top-down quantile score, with 97.5% intervals, at both BSPs, in the scored year](figure_1_headline.svg)
+
+**Bottom-up scored the same as top-down, within the noise.** Figure 1 shows the three bottom-up
+variants against zero, and the oracle far below it. The fixed-sum variant (every weight 1) scored
+the same as the learned weights (C3: -0.003 at D13, +0.003 at D17, both intervals including zero).
+Giving the bottom-up arm the top-down arm's spread table moved the score by -0.016 at D13 and
++0.002 at D17 (C5), so the bottom-up mean is as good as the top-down mean and its own spread table
+is slightly worse at D13.
+
+![Quantile score by lead band for top-down, bottom-up, and the oracle](figure_2_by_lead.svg)
+
+**No lead band favoured bottom-up with confidence.** The prediction said the gain would be largest
+below 24 hours (C4). At D13 the difference is -0.031 (-0.065 to +0.007) below 24 hours, +0.006
+between 24 and 72 hours, and +0.050 (-0.015 to +0.140) beyond 72 hours, which has the predicted
+order and includes zero in every band. At D17 it is +0.040, +0.010, and +0.046, with the wrong sign
+in every band.
+
+![Standard deviation of forecast error for top-down, bottom-up, and the two parts of bottom-up](figure_3_decomposition.svg)
+
+**Most of the BSP's error is in the remainder.** At D13 the remainder's error has a standard
+deviation of 9.4 points and the weighted children's summed error 2.3 points; at D17 the figures are
+16.6 and 3.5. The top-down error (10.9 and 18.2) is the two parts added, so correcting the children
+cannot remove the remainder's error. The two parts' errors correlate positively (0.56 at D13, 0.39
+at D17), so they add up to nearly the top-down error. Even the oracle, which removes the children's
+error, only gets from 4.361 to 3.838 points at D13 and from 7.672 to 7.108 at D17.
+
+| Arm (scored year) | D13 score | D17 score |
+|---|---|---|
+| Top-down | 4.361 | 7.672 |
+| Bottom-up, learned weights | 4.387 | 7.706 |
+| Bottom-up, weights fixed at 1 | 4.389 | 7.703 |
+| Bottom-up, unbounded weights | 4.388 | 7.728 |
+| Bottom-up, learned weights, top-down spread table | 4.345 | 7.674 |
+| Oracle (observed children) | 3.838 | 7.108 |
+| Manual heuristic | 5.466 | 8.424 |
+| Climatology | 5.905 | 8.953 |
+
+Rows are the shared rows: 96,324 at D13 and 82,137 at D17. Top-down on all of its own rows scores
+4.355 (97,046 rows) at D13 and 7.751 at D17. The replicate months (even months of 2024-07 to
+2025-06) agree: C1 is -0.014 (-0.067 to +0.031) at D13 and +0.036 (-0.010 to +0.084) at D17.
+
+**The weights are not identified.** The bounded fit (0.8 to 1.2) puts all six weights on the upper
+bound, 1.2. The unbounded fit gives D13 weights of 3.3, 4.3, and 1.4 (D9, D10, D11) and D17 weights
+of 5.0, 0.2, and 1.1 (D5, D14, D16). Both fits use the winter window 2023-10 to 2024-03. The
+children stand in for their unmetered siblings, so the weight on a child is not that child's
+transformer ratio. The sum does not close: the in-sample residual has a standard deviation of 6.3 MW
+(47% of the BSP's variance) at D13 and 8.8 MW (70%) at D17.
+
+## Tail calibration and subset scores (scored year)
+
+| BSP, arm | Coverage at 0.01 | 0.05 | 0.95 | 0.99 |
+|---|---|---|---|---|
+| D13 top-down | 0.018 | 0.067 | 0.921 | 0.969 |
+| D13 bottom-up | 0.025 | 0.080 | 0.915 | 0.961 |
+| D17 top-down | 0.020 | 0.077 | 0.906 | 0.964 |
+| D17 bottom-up | 0.022 | 0.086 | 0.906 | 0.963 |
+
+**Both arms are too narrow in the tails, and bottom-up is slightly more so.** The nominal values are
+0.01, 0.05, 0.95, and 0.99. Bottom-up's pinball loss at the four tail quantiles is higher than
+top-down's at both BSPs (C6: +0.012 to +0.042 at D13, +0.012 to +0.040 at D17), with every interval
+including zero except the 0.05 quantile in the replicate months at D17. The top-down spread table
+brings bottom-up's coverage back to top-down's (D13 0.017, 0.066, 0.921, 0.969).
+
+## Checks
+
+- **Median minus mean forecast, per BSP:** 0.000 for every arm at both BSPs, because the residual
+  table is centred, so this check exposes nothing here.
+- **Mean forecast's error beside each contrast (mean absolute error):** C1 -0.030 at D13 and +0.002
+  at D17; C2 -0.026 and -0.003; C5 -0.030 and +0.002; C7 -0.975 and -1.037. At D13 the mean of the
+  bottom-up forecast is slightly better than top-down's while its quantile score is slightly worse,
+  so the spread table, not the mean, costs the score there (C5 confirms).
+- **Controls.** Reproduction: the copied chain rescored at D10 reproduces experiments 136's and
+  155's stored scores exactly (passed). Leakage: the weight window ends on 2024-03-31, before the
+  first run, and the chain's `assert_no_lookahead` holds (passed). Weather frames built for the
+  BSP cells match the stored frame of 2025-07-02 bit for bit (passed). The decomposition
+  `BSP = remainder + weighted children` holds exactly in the observed readings (passed).
+  **Oracle: failed.** The oracle gained 0.523 points at D13 and 0.563 at D17, against thresholds of
+  0.918 and 2.140 (half of the covered capacity share times the top-down score). The
+  threshold assumed the BSP's error falls in proportion to the covered load. The error decomposition
+  shows it does not, so the failure reflects the mis-specified threshold and not a plumbing fault,
+  which the exact decomposition would have exposed.
+- **Triggers fired.** Trigger 1 (the oracle control failed). Trigger 2 (the prediction missed:
+  C1 predicted -2% to -8% and found +0.6% and +0.5%; the oracle predicted -15% to -40% and found
+  -12% and -7%; the explanation in the error decomposition is stated above and was tested by it).
+  Trigger 3 (C1 and C2 point in different directions on the mean absolute error and the quantile
+  score at D13; C5 explains it as spread). Triggers 4 to 7 did not fire: no site-level ablation
+  applies to two BSPs, no nested arm beat its container, no sister experiment on BSPs exists for
+  trigger 6, and no later experiment depends on the headline. The independent audit (Opus) is in the
+  private briefs folder and is triaged below.
+
+## Audit and triage
+
+Pending.
+
+## Caveats
+
+- **Two BSPs, three covered children each.** The sum reaches 42% and 56% of the BSP's capacity, so
+  the result says little about a BSP whose children are all metered in real power.
+- **The weights come from one winter** (2023-10 to 2024-03), and the unbounded weights are not
+  stable. A fit on all year or a hierarchical estimate may behave differently.
+- **Pinned against fitted capacity.** The covered children use the pinned PV capacity and the BSP
+  and remainder fit theirs. The planned variant that fits the children's capacity (C8) was not run:
+  with no bottom-up gain to split, the question did not arise.
+- **The weight-refit variant (C9) was replaced by the unbounded-weights variant,** which tests the
+  same question (does the weight estimate matter) with the weights that failed.
+- **The curtailment metric was not scored,** because this experiment did not build the generator inputs
+  it needs for these BSPs.
+- **Weather is past-weather ensemble means calibrated as in experiment 136,** the same as every
+  arm uses, so the comparison is fair and the absolute scores are not production scores.
+
+## What to try next
+
+- **Forecast the apparent-power children's demand** (dark rows only, as experiment 124 does) and
+  put them into the sum, so the covered share rises from about half toward all of the BSP.
+- **Estimate the weights jointly with the remainder** on a full year, with a ridge or the 1.2 bound,
+  so the weights stop standing in for unmetered siblings.
+- **Wait for NGED's January 2027 answer on the hierarchy** before adding BSPs beyond D13 and D17.
 
 ## Plan
+
+**Departures from this plan.** The weights are bounded (0.8 to 1.2), because the first unbounded fit
+was unstable, and the unbounded fit is the `free` variant, which replaces BU-w2 (C9). BU-fc (C8) was
+not run. The oracle threshold and the prediction missed, as the Checks list says.
 
 **Question.** Experiment 36 summed the Primaries' forecasts and fed the sum to a BSP's XGBoost
 model, and the sum added nothing. Experiment 124 showed that a BSP reading does not close exactly

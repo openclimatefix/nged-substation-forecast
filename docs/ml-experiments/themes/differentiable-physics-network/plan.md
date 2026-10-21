@@ -10,12 +10,6 @@ drift term. At equal or higher recall the drift term cuts the flow on unconnecte
 three quarters, but no setting meets the recall targets and the placebo limit together, and the level
 penalty shrinks the flows the fit finds.
 
-## Priority table
-
-| Experiment | Question | Priority | Waits for | State |
-|---|---|---|---|---|
-| BSP top-down against bottom-up (experiment 161) | Is a bulk supply point forecast better from its metered-MW child Primaries' forecasts plus a learned remainder than as a stand-alone series, with the best-guess GAM-K chain on both sides? | 2 | Nothing; CPU, a few hours | Planned |
-
 ## Planned experiments
 
 <!-- planned-table -->
