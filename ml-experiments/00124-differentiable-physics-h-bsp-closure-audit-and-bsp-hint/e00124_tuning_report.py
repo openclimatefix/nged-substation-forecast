@@ -32,7 +32,7 @@ def section(*, suffix: str, title: str) -> list[str]:
     lines = [f"## {title}", ""]
     lines.append(f"- weights tried: {', '.join(f'{w:g}' for w in weights)}")
     lines.append(f"- chosen weight W*: {tuning['w_star']:g} ({tuning['n_injections']} injections)")
-    total = sum(by_kind.values())
+    total = np.sum(list(by_kind.values()), axis=0)
     lines.append(
         "- summed damage over all injections by weight: "
         + ", ".join(f"{v:.1f}" for v in total)

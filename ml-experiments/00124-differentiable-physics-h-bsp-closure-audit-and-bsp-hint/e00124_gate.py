@@ -21,7 +21,7 @@ the BSP row.
 
 import json
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final
 
 import numpy as np
@@ -32,6 +32,7 @@ from e00124_pilot import SEASON_YEARS, Pilot, build_pilot
 from studies.dp_features import FeatureCache
 from studies.dp_gam import design_matrix
 from studies.dp_hierarchy import (
+    BspSeries,
     JointAssembly,
     JointFit,
     RemainderLayout,
@@ -168,14 +169,12 @@ def simulate(
     return power, reading + ar1(n=n, sd=truth.bsp_sd, rho=truth.bsp_rho, rng=rng)
 
 
-def level(*, cache: FeatureCache, fit: JointFit, pilot: Pilot, index: np.ndarray) -> list[float]:
+def level(*, cache: FeatureCache, fit: JointFit, bsp: BspSeries, index: np.ndarray) -> list[float]:
     """Return the mean fitted remainder over `index` for each weight."""
     return [
         float(
             np.mean(
-                remainder_prediction(
-                    cache=cache, fit=fit, bsp=pilot.bsp, index=index, weight_index=k
-                )
+                remainder_prediction(cache=cache, fit=fit, bsp=bsp, index=index, weight_index=k)
             )
         )
         for k in range(len(fit.weights))
@@ -203,29 +202,34 @@ def main() -> None:
     weights = [0.0, w_star, MAX_WEIGHT]
     cache = load_cache()
     pilot = build_pilot(cache=cache, bsps=load_bsps(cache=cache), cut=TUNING_CUT)
-    common = {
-        "cache": cache,
-        "remainder_spec": RemainderSpec(),
-        "sigma_points": pilot.sigma_points,
-        "cut": TUNING_CUT,
-        "season_years": SEASON_YEARS,
-        "device": DEVICE,
-    }
-    assembly = assemble_joint(specs=pilot.specs, bsps=[pilot.bsp], window=pilot.windows, **common)
+
+    def assemble(
+        *, specs: dict, bsp: BspSeries, window: dict, sigma_points: dict[str, float]
+    ) -> JointAssembly:
+        return assemble_joint(
+            specs=specs,
+            bsps=[bsp],
+            window=window,
+            cache=cache,
+            remainder_spec=RemainderSpec(),
+            sigma_points=sigma_points,
+            cut=TUNING_CUT,
+            season_years=SEASON_YEARS,
+            device=DEVICE,
+        )
+
+    assembly = assemble(
+        specs=pilot.specs, bsp=pilot.bsp, window=pilot.windows, sigma_points=pilot.sigma_points
+    )
     truth = build_truth(cache=cache, pilot=pilot, assembly=assembly)
     first_mw, second_mw, *_ = pilot.mw_sites
-    smaller = type(pilot.bsp)(
-        **{
-            **pilot.bsp.__dict__,
-            "members": tuple(m for m in pilot.bsp.members if m.site != second_mw),
-        }
-    )
+    smaller = replace(pilot.bsp, members=tuple(m for m in pilot.bsp.members if m.site != second_mw))
     kept = [m.site for m in smaller.members]
-    sabotaged = assemble_joint(
+    sabotaged = assemble(
         specs={s: pilot.specs[s] for s in kept},
-        bsps=[smaller],
+        bsp=smaller,
         window={s: pilot.windows[s] for s in kept},
-        **{**common, "sigma_points": {s: pilot.sigma_points[s] for s in kept}},
+        sigma_points={s: pilot.sigma_points[s] for s in kept},
     )
     probe = solve_joint(assembly=assembly, weights=weights)
     scores = {
@@ -282,9 +286,9 @@ def main() -> None:
                     for s in pilot.mw_sites
                     if s != first_mw
                 },
-                "level": level(cache=cache, fit=clean, pilot=pilot, index=index),
+                "level": level(cache=cache, fit=clean, bsp=pilot.bsp, index=index),
                 "level_truth": float(np.mean(truth.r_truth[index])),
-                "level_sabotaged": level(cache=cache, fit=broken, pilot=smaller, index=index),
+                "level_sabotaged": level(cache=cache, fit=broken, bsp=smaller, index=index),
                 "capacity_bias": {
                     s: capacity_bias(fit=clean, truth=truth, site=s) for s in pilot.mw_sites
                 },

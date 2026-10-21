@@ -13,7 +13,7 @@ the plan's decision rule.
 import json
 import sys
 from datetime import datetime
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import torch
@@ -232,7 +232,7 @@ def tune() -> None:
     )
     winter = np.array([int(m[5:7]) in WINTER_MONTHS for m in months])
     rng = np.random.default_rng(3)
-    result = {"weights": weights, "months": months, "passing": []}
+    result: dict[str, Any] = {"weights": weights, "months": months, "passing": []}
     for k, w in enumerate(weights):
         if w == 0.0:
             continue

@@ -258,6 +258,11 @@ def fmt(value: float | None, digits: int = 2) -> str:
     return "cannot tell" if value is None or not np.isfinite(value) else f"{value:.{digits}f}"
 
 
+def percent(share: float | None) -> str:
+    """Format a share as a percentage with one decimal, or 'cannot tell'."""
+    return fmt(None if share is None else 100 * share, 1)
+
+
 def residual_on_grid(
     *,
     cache: FeatureCache,
@@ -504,7 +509,8 @@ def injection_audit(
     position = {g: i for i, g in enumerate(index)}
     results: dict[str, float] = {}
     for label, length, kind, size in cells:
-        if thresholds[length] is None:
+        threshold = thresholds[length]
+        if threshold is None:
             lines.append(f"- injected {label}: cannot tell (too few blocks for its threshold)")
             continue
         hits = {"refit": [0, 0], "in-sample clean fit": [0, 0], "pre-injection fit": [0, 0]}
@@ -542,7 +548,7 @@ def injection_audit(
                         design=design,
                         penalty=penalty,
                         n=len(y),
-                        threshold=thresholds[length],
+                        threshold=threshold,
                     )
                     for name, hit in detected.items():
                         hits[name][sign_number] += hit
@@ -556,8 +562,8 @@ def injection_audit(
             lines.append(f"- injected {label}: cannot tell (no window with enough complete rows)")
             continue
         results.update({f"{label} {k}": v for k, v in rates.items()})
-        in_sample = fmt(None if placebo[length] is None else 100 * placebo[length], 1)
-        out_sample = fmt(None if placebo_out[length] is None else 100 * placebo_out[length], 1)
+        in_sample = percent(placebo[length])
+        out_sample = percent(placebo_out[length])
         lines.append(
             f"- injected {label}: detected "
             + ", ".join(f"{100 * v:.0f}% with the {k}" for k, v in rates.items())

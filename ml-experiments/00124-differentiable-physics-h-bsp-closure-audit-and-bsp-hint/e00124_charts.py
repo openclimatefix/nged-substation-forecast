@@ -281,16 +281,14 @@ def figure_coefficients() -> None:
     panels = []
     for bsp in sorted(frame["bsp"].unique().to_list()):
         part = frame.filter(pl.col("bsp") == bsp)
-        base = alt.Chart(part).encode(  # ty: ignore[unresolved-attribute]
-            y=alt.Y("cut:N", sort=None, title=None)
-        )
-        rule = base.mark_rule(strokeWidth=2).encode(
+        base = alt.Chart(part).encode(y=alt.Y("cut:N", sort=None, title=None))
+        rule = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("low:Q", scale=alt.Scale(domain=[0, 1.6]), title="Fitted coefficient"),
             x2="high:Q",
             color=colour,
             yOffset="coefficient:N",
         )
-        dots = base.mark_point(filled=True, size=60).encode(
+        dots = base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
             x="value:Q", color=colour, yOffset="coefficient:N"
         )
         one = (
