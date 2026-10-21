@@ -230,15 +230,20 @@ not lie wholly above +0.02.
   construction.
 - **Mean absolute error of the median beside C1:** MP is 0.003 points better (4.904 against 4.907)
   while its quantile score is 0.0077 worse.
-- **Triggers fired:** trigger 2 (the variance-ratio and C1 predictions failed; the variance accounting
-  above is the tested explanation), trigger 3 (the error of the median and the quantile score point
-  in different directions, by 0.0025 points, and MP's median at D5 sits 0.04 points below K0-w's,
-  above the plan's 0.01 threshold), trigger
-  4 (leaving out D5 or D16 flips the sign of C1's replicate quantile-score estimate, which is within
-  0.001 of zero and has an interval spanning zero; the scored-year sign and the verdict do not
-  change), and trigger 6 (C1's 95% score interval has a half-width of 0.0064, under half of experiment
-  111's sister contrast at 0.016, because the two arms differ only in the width of the table).
-  The audit has not been run; the maintainer decides whether it is needed.
+- **Triggers fired:** triggers 2, 3, 4, and 6. Every explanation below is post hoc, written after
+  the scores were read, and none was tested by a further run except where stated.
+  - Trigger 2: the variance-ratio and C1 predictions failed. The variance accounting above is the
+    post hoc explanation, and it is a calculation on the stored predictions, not a new test.
+  - Trigger 3: the error of the median and the quantile score point in different directions, by
+    0.0025 points, and MP's median at D5 sits 0.04 points below K0-w's, above the plan's 0.01
+    threshold. No explanation was tested.
+  - Trigger 4: leaving out D5 or D16 flips the sign of C1's replicate quantile-score estimate,
+    which is within 0.001 of zero and has an interval spanning zero. The scored-year sign and the
+    verdict do not change.
+  - Trigger 6: C1's 95% score interval has a half-width of 0.0064, under half of experiment 111's
+    sister contrast at 0.016. The post hoc explanation is that the two arms differ only in the
+    width of the table.
+  - No Opus audit was run, because the verdict is inconclusive and two Sonnet reviews were applied.
 
 **Caveats.**
 
@@ -251,6 +256,8 @@ not lie wholly above +0.02.
 - The substation cards of the plan were not produced.
 - The rank histogram is of demand among the members. The plan's rank histogram of ERA5 temperature
   was not drawn, because the cache holds demand forecasts and not member weather.
+- The cold-night coverage finding (73% to 78% at the 95% quantile) is descriptive, not a tested
+  contrast. It rests on 36 substation-days at 5 substations in one winter.
 - The cold-snap rule was written after the predictions were stored and before any score was read.
 - The known-answer gate has limits. On the twin, K0 also reaches 16 of 16 calibration cells, so
   that check alone cannot tell the double count from its absence. The variance-ratio check (2b)
