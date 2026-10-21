@@ -61,18 +61,18 @@ best_arm: >-
   0.713 to 0.848), 0.006 below the offline rule R0 (0.794), with a false-end share of 0.052 and a
   median call lag of 29.0 hours after the true end.
 headline: >-
-  R2 minus R0 -0.000 (-0.001 to +0.000), false ends 0.050, median lag 29.0 hours. R1 and R3 lose
-  0.496 (-0.606 to -0.406) and -0.496 (-0.608 to -0.406), with false-end shares of 0.613 and 0.604.
+  R2 minus R0 -0.000 (-0.001 to +0.000), false ends 0.050, median lag 29.0 hours. R1 and R3 differ
+  from R0 by -0.496 (-0.606 to -0.406) and -0.496 (-0.608 to -0.406), with false-end shares of 0.613 and 0.604.
   Merging cuts the share of transfers with 2 or more intervals from 0.574 to 0.033.
 lessons: >-
   A threshold-first end rule ends the transfer about 8 hours early, because the 24-hour step ramps
-  up before the true end. Waiting for the running peak to fall costs a median 29 hours and loses
-  no recall. Merging same-Primary alarms removes about 94% of the duplicate intervals.
+  up before the true end. Waiting for the running peak to fall delays the call by a median 29 hours and does not lower the share found. Merging
+  same-Primary alarms removes about 94% of the transfers that were reported as 2 or more intervals.
 take_home_message: >-
   The end of a switching interval can be called from data available at the time, with no loss of
   recall against the offline rule, by waiting until the step statistic falls to 0.8 of its running
   peak. The call comes a median 29 hours after the true end. Ending the interval at the first sign
-  of a return step is wrong in about 6 of 10 transfers, because it fires about 8 hours early.
+  of a return step is wrong in about six transfers in ten, because it fires about 8 hours early.
   Merging overlapping alarms on one Primary substation cuts the share of transfers reported as 2 or
   more intervals from 0.57 to 0.03.
 advice:
@@ -86,27 +86,28 @@ advice:
     Plan for a 29-hour median lag (32.5-hour 90th percentile) between the true end and the call,
     and treat the interval as open until then (results, lag).
   - >-
-    Do not fuse intervals across more than 48 half-hours without a new test: M192 costs 0.019 of
-    the share found, a post hoc result (merge contrasts).
+    Do not fuse intervals across more than 48 half-hours without a new test: M192 lowers the share
+    found by 0.019, a post hoc result (merge contrasts).
 production_status: candidate
 adopted_in: none
 ---
 
 # Experiment 147: can the end of a switching interval be called without looking ahead?
 
-**A live service can call the end of a switching interval with no lookahead, and loses no recall
-against the offline rule, by waiting until the step statistic falls to 0.8 of its running peak.**
-The offline end rule of [experiment 130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md),
-used by the refit-offset neighbour-count detector (RO-NC), needs up to 24 hours of data after the
-return step, so it cannot be applied live. We tested three rules that use only data available when
-the end is called. The running-peak rule R2 gives the same MW-weighted share found as the offline
-rule: -0.000 (99% interval -0.001 to +0.000) on 1,806 injected transfers per shape, with a false-end
-share of 0.050 and a median call lag of 29.0 hours after the true end. The two rules that end the
-interval as soon as the return step crosses the threshold, R1 (first return step) and R3 (step held
-for 6 hours), lose 0.496 of the share found, because they end the transfer a median 6.5 to 8 hours
-too early and so miss it. Merging overlapping alarms on one Primary substation cuts the share of
-transfers reported as 2 or more intervals from 0.574 to 0.033 at a cost of 0.006 in share found.
-The verdict is `supported`.
+**A live service can call the end of a switching interval with no lookahead, and shows no measurable
+loss in MW-weighted share found against the offline rule, by waiting until the step statistic falls
+to 0.8 of its running peak.** The offline end rule of [experiment
+130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md), used by the refit-offset
+neighbour-count detector (RO-NC), needs up to 48 hours of data after the first return step, so the
+rule cannot be applied live. We tested three rules that use only data available when the end is
+called. The running-peak rule R2 gives the same MW-weighted share found as the offline rule: -0.000
+(99% interval -0.001 to +0.000) on 1,806 injected transfers pooled over shapes S2 to S4 (602 per
+shape), with a false-end share of 0.050 and a median call lag of 29.0 hours after the true end. The
+two rules that end the interval as soon as the return step crosses the threshold, R1 (first return
+step) and R3 (step held for 6 hours), lose 0.496 of the share found, because they end the transfer a
+median 8 hours too early and so miss the transfer. Merging overlapping alarms on one Primary
+substation cuts the share of transfers reported as 2 or more intervals from 0.574 to 0.033 and
+lowers the share found by 0.006. The verdict is `supported`.
 
 ![MW-weighted share found by end rule](share_found.svg)
 
@@ -123,7 +124,7 @@ The verdict is `supported`.
   threshold (half the onset step, at least 1.5 noise units), called 24 hours later.
 - **R2, running peak:** after the first return step, the end is the stamp of the largest opposite
   step so far. It is called once the step falls below 0.8 of that peak, or 24 hours after the first
-  return step if it has not.
+  return step if the step has not fallen.
 - **R3, hold:** the end is the first stamp from which the opposite step stays above the threshold
   for 12 half-hours (6 hours), called when the 12th stamp's step can be computed.
 - **Merging:** an alarm on a Primary substation is dropped when an earlier alarm on the same Primary
@@ -132,8 +133,8 @@ The verdict is `supported`.
   24 hours before. Both tests use only alarms and calls made before the dropped alarm. M12 and M48
   are pre-registered. M96 and M192 are post hoc.
 
-A noise unit is the usual size of the detector's 24-hour step in odd-numbered months, when no
-transfer is injected. The detector is arm B of [experiment
+**A noise unit is the usual size of the detector's 24-hour step in odd-numbered months, when no
+transfer is injected.** The detector is arm B of [experiment
 138](../00138-weaker-onset-detector-on-the-ro-nc-convex-residual/result.md), which is the arm of
 experiment 130, scored without refitting on experiment 138's fresh draw of injected transfers.
 
@@ -152,23 +153,22 @@ experiment 130, scored without refitting on experiment 138's fresh draw of injec
   to +0.00); R1 -8.50 (-16.50 to -1.50); R3 -8.00 (-16.50 to -1.50). A negative value means the call
   named an end before the true end.
 - **Merging, applied to R2 (95% interval for the share found):** the share of transfers with 2 or
-  more intervals falls from 0.574 (no merge) to 0.033 (M12 and M48), 0.027 (M96), and 0.017
-  (M192). The share found changes by -0.006 (-0.017 to
-  +0.000) for M12 and M48, -0.007 (-0.018 to -0.001) for M96, and -0.019 (-0.042 to -0.002) for M192.
-  M12, M48, and M96 are `supported`. M192 is `not supported`, because its lower interval end is
-  below -0.02.
+  more intervals falls from 0.574 (no merge) to 0.033 (M12 and M48), 0.027 (M96), and 0.017 (M192).
+  The share found changes by -0.006 (-0.017 to +0.000) for M12 and M48, -0.007 (-0.018 to -0.001)
+  for M96, and -0.019 (-0.042 to -0.002) for M192. M12, M48, and M96 are `supported`. M192 is `not
+  supported`, because its lower interval end is below -0.02.
 - **Precision of intervals:** across all injected batches, the share of intervals that match an
-  injected transfer rises from 0.050 (no merge, 137,283 intervals) to 0.064 (M12 and M48, about
-  104,000 intervals).
+  injected transfer rises from 0.050 (no merge, 137,283 intervals) to 0.063 (R2 with M12 or M48,
+  104,091 intervals).
 - **Real transfers over 1 day (35, descriptive):** R0 and R2 find 18 of 35, as in [experiment
   146](../00146-ro-nc-arm-b-on-the-35-real-transfers-over-1-day/result.md). R1 finds 7 and R3
   finds 6, with 13 and 14 false ends. With merging, the number of transfers with 2 or more
   intervals falls from 17 to 1.
-- **Predictions:** R1's predicted loss of 0.02 to 0.08 was wrong (it lost 0.496). R3 was predicted
-  to halve R1's false ends and lose 0.01 to 0.04, but its false-end share is 0.604 against 0.613.
-  R2 was predicted to give the offline ends on at least 0.9 of transfers with a median lag of 48
-  hours, and it gives the same share found with a median lag of 29.0 hours. Merging was predicted to
-  lower the share of transfers with 2 or more intervals from about 0.2 to under 0.1. The no-merge
+- **Predictions:** R1's predicted loss of 0.02 to 0.08 was wrong (R1 lost 0.496). R3 was predicted
+  to halve R1's false ends and lose 0.01 to 0.04, but the false-end share of R3 is 0.604 against
+  0.613. R2 was predicted to give the offline ends on at least 0.9 of transfers with a median lag of
+  48 hours, and R2 gives the same share found with a median lag of 29.0 hours. Merging was predicted
+  to lower the share of transfers with 2 or more intervals from about 0.2 to under 0.1. The no-merge
   share was 0.574, not 0.2, and the merged share is 0.017 to 0.033.
 
 ## End-time accuracy check (descriptive)
@@ -177,10 +177,10 @@ experiment 130, scored without refitting on experiment 138's fresh draw of injec
   (receiving) series, 773 of the 1,269 under R2, the partner's step reverses within 3 hours of the
   stated end, with a size between 0.5 and 2 times its onset step, for 0.915 of them. The share is
   0.935 of 750 where R2's end is within the tolerance of the true end, and 0.261 of 23 where it is
-  outside, so the check separates good ends from bad ones.
-- **R1 and R3:** 0.918 and 0.920 of those with a partner pass the same check, although their ends
-  are a median of 8 hours early. The check does not flag an early end, because the partner's step
-  ramps early too.
+  outside, so the check separates good ends from bad ends.
+- **R1 and R3:** 0.918 and 0.920 of the transfers with a partner pass the same check, although their
+  ends are a median of 8 hours early. The check does not flag an early end, because the partner's
+  step ramps early too.
 - **Real transfers:** 8 of the 9 transfers with a partner series reverse at R0's and R2's end, 7 at
   R1's, and 6 at R3's.
 - **Causal and hindsight tables:** the interval tables for every series are written in the layout of
@@ -207,16 +207,19 @@ experiment 130, scored without refitting on experiment 138's fresh draw of injec
   lag, and "lag" above counts only the time from the true end to the end call.
 - **Best-interval selection uses the truth.** When several intervals match an injected transfer,
   the scored one is the closest to the truth, which favours all rules alike.
-- **M96 and M192 are post hoc,** so their intervals are not corrected for the planned contrasts.
+- **M96 and M192 are post hoc,** so their confidence intervals are not corrected for the planned
+  contrasts.
 - **Series 12 is blank by design, and series 14 never alarmed,** so neither appears in the interval
   tables.
 - **Long transfers (up to 14 days) were scored descriptively:** no rule differs from R0 by more
-  than 0.01 in share found, apart from R3 (+0.009, 0.000 to +0.021).
+  than 0.01 in share found (largest: -0.010 for R1 and R2 with M12, M48, or M96; R3 is +0.009,
+  0.000 to +0.021).
 
 ## What to try next
 
-Study the delay of the onset alarm itself, since a live service learns of the start about 48 hours
-after it, and test the running-peak rule on the next detector arm that replaces RO-NC.
+**The next experiment should study the delay of the onset alarm itself.** A live service learns of
+a start about 48 hours after the start. A further experiment can test the running-peak rule on the
+next detector arm that replaces RO-NC.
 
 Code: `ml-experiments/00147-causal-live-end-rule-for-ro-nc/`; every number above is printed by
 `e00147_contrasts.py` (saved at
