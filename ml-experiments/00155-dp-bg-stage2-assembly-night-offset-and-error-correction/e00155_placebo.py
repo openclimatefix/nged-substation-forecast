@@ -34,7 +34,9 @@ def main() -> None:
         ]
         other = report.annotate(frame=pl.concat(frames).select(report.BASE_COLUMNS), cache=cache)
         shared = report.common_rows(frames={"placebo": placebo, name: other})
-        scores = {k: float(report.with_losses(frame=v)["qs"].mean()) for k, v in shared.items()}
+        scores = {
+            k: float(report.with_losses(frame=v)["qs"].to_numpy().mean()) for k, v in shared.items()
+        }
         out[name] = {**scores, "placebo_minus": scores["placebo"] - scores[name]}
     common.write_json_atomic(path=common.WORK_DIR / "placebo.json", content=out)
     print(out)
