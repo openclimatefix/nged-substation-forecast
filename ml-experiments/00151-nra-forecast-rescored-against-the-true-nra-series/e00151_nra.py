@@ -1,0 +1,187 @@
+"""The arms of experiment 151: filters that forecast the normal running arrangement (NRA).
+
+Every arm is GAM-K's cached member forecasts plus a correction from a Kalman filter run on a
+stream. The arms differ in the stream and in the regime prior the filter sees:
+
+- K0: the stream with the injected transfers in it, no correction.
+- CLEAN: the stream without the injected megawatts (MW), the ceiling.
+- S-KF, S-ORACLE: experiment 141's two-regime filter, fed detected or true intervals.
+- SUB-DET: the stream with the detected MW subtracted over each interval known at the forecast
+  origin. The filter is re-run once for each distinct set of known intervals.
+- SUB-TRUE-LAG: the same with the true MW and interval, known after the detector's delays.
+- SUB-PLACEBO: SUB-DET with the intervals shifted by whole weeks.
+
+Every score is against the true NRA series, `data.actual`, without the injected MW.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Final
+
+import e00151_fed as fed
+import e00151_g_arms as arms134
+import numpy as np
+import polars as pl
+
+ONSET_LAG: Final[int] = fed.ONSET_LAG
+"""Half-hours from a step to the stamp its alarm is known (the 24-hour statistic and a peak test)."""
+END_LAG: Final[int] = 60
+"""Half-hours from the end of a transfer to the stamp its end is known: the call lag of the
+6-hour lookahead rule of experiment 148 (median 60, 90th percentile 96)."""
+TAIL: Final[int] = 96
+"""48 hours of target time after the end of a transfer."""
+WEEK: Final[int] = 336
+ONSET_TOLERANCE: Final[int] = fed.ONSET_TOLERANCE
+
+
+@dataclass(frozen=True)
+class Span:
+    """One interval whose MW is subtracted from the stream, in grid positions.
+
+    Attributes:
+        onset: First position the MW applies to.
+        end: First position it no longer applies to (used once the end is known).
+        start: First cutoff at which the interval is known.
+        known: First cutoff at which the end is known.
+        amount: The points to subtract: a constant, or an array over the whole grid.
+    """
+
+    onset: int
+    end: int
+    start: int
+    known: int
+    amount: float | np.ndarray
+
+
+def detected_spans(*, data, site: str, intervals: pl.DataFrame) -> list[Span]:
+    """Detected spans of a site from the offline-end intervals, known as the 6-hour rule knows them.
+
+    The onset is known `ONSET_LAG` after the step. The end is known at the later of the interval's
+    stored `known_from` and `END_LAG` after the end. The megawatts are the stored `step_mw` of the
+    detector on the site's series, a constant per interval.
+    """
+    offset = fed.stamp_offset(data)
+    series = fed.SERIES_OF_SITE[site]
+    spans = []
+    for row in intervals.filter(
+        (pl.col("setting") == "R0_M48") & (pl.col("series") == series)
+    ).iter_rows(named=True):
+        points = 100.0 * row["step_mw"] / fed.CAPACITY_MW[site]
+        if not np.isfinite(points):
+            continue
+        onset, end = row["onset"] + offset, row["end"] + offset
+        start = onset + ONSET_LAG
+        known = max(row["known_from"] + offset, end + END_LAG, start + 1)
+        spans.append(Span(onset, end, start, known, points))
+    return spans
+
+
+def true_spans(
+    *, events: list[tuple[int, int]], delta_points: np.ndarray, data
+) -> list[Span]:
+    """True spans from the injected events, known after the same delays as a detection.
+
+    `events` are (onset, end) in detector stamps; `delta_points` is over grid positions.
+    """
+    offset = fed.stamp_offset(data)
+    spans = []
+    for on, en in events:
+        onset, end = on + offset, en + offset
+        masked = np.zeros_like(delta_points)
+        masked[onset:end] = delta_points[onset:end]
+        spans.append(Span(onset, end, onset + ONSET_LAG, end + END_LAG, masked))
+    return spans
+
+
+def constant_true_spans(*, spans: list[Span], delta_points: np.ndarray) -> list[Span]:
+    """True spans with the MW held at the event's mean instead of its daily shape."""
+    out = []
+    for s in spans:
+        mean = float(np.nanmean(delta_points[s.onset : s.end]))
+        out.append(Span(s.onset, s.end, s.start, s.known, mean))
+    return out
+
+
+def shifted(*, spans: list[Span], weeks: int, n: int) -> list[Span]:
+    """Shift every span by whole weeks (a control), dropping those that leave the grid."""
+    out = []
+    for s in spans:
+        d = weeks * WEEK
+        if s.onset + d < 0 or s.end + d >= n or s.known + d >= n:
+            continue
+        out.append(Span(s.onset + d, s.end + d, s.start + d, s.known + d, s.amount))
+    return out
+
+
+def cleaned_stream(*, stream: np.ndarray, spans: list[Span], cutoff: int | None) -> np.ndarray:
+    """The stream with every span known at `cutoff` subtracted, using the end where it is known."""
+    out = stream.copy()
+    if cutoff is None:
+        return out
+    for s in spans:
+        if s.start > cutoff:
+            continue
+        stop = s.end if s.known <= cutoff else len(out)
+        if isinstance(s.amount, np.ndarray):
+            out[s.onset : stop] -= s.amount[s.onset : stop]
+        else:
+            out[s.onset : stop] -= s.amount
+    return out
+
+
+def subtraction_correction(
+    *, data, stream: np.ndarray, spans: list[Span], cutoffs: np.ndarray, rows: np.ndarray
+) -> np.ndarray:
+    """The total filter correction at `rows`, each from the stream cleaned as known at its cutoff.
+
+    Rows share a filter run when no span changes status between their cutoffs, so the filter runs
+    once per distinct status of the spans among the rows. The result is NaN elsewhere.
+    """
+    out = np.full(len(data.run_of_row), np.nan)
+    breaks = np.sort(np.array([v for s in spans for v in (s.start, s.known)] or [0]))
+    state = np.searchsorted(breaks, cutoffs[rows], side="right")
+    for s in np.unique(state):
+        chosen = rows[state == s]
+        cutoff = int(breaks[s - 1]) if s > 0 else None
+        correction = fed.correction_for(
+            data=data,
+            stream=cleaned_stream(stream=stream, spans=spans, cutoff=cutoff),
+            prior=np.zeros(len(stream)),
+            multiplier=1.0,
+        )
+        out[chosen] = correction[chosen]
+    return out
+
+
+def score_nra(
+    *, data, site: str, corrections: dict[str, np.ndarray], rows: np.ndarray
+) -> pl.DataFrame:
+    """Score every arm on `rows` against the true NRA series: quantile score and errors."""
+    actual = data.actual[rows]
+    spread = fed.k0_spread(site)
+    frames = []
+    for arm, correction in corrections.items():
+        q = fed.quantiles_at(data=data, correction=correction, spread=spread, rows=rows)
+        mean_forecast = data.member_mean[rows] + correction[rows]
+        frames.append(
+            pl.DataFrame(
+                {
+                    "arm": arm,
+                    "site": site,
+                    "row": rows,
+                    "position": data.position[rows],
+                    "run": data.runs[data.run_of_row[rows]],
+                    "lead_hours": data.lead_hours[rows],
+                    "qs": arms134.quantile_score(actual=actual, quantiles=q),
+                    "err_median": q[:, 5] - actual,
+                    "err_mean": mean_forecast - actual,
+                    "q01": q[:, 0],
+                    "q05": q[:, 1],
+                    "q95": q[:, 9],
+                    "q99": q[:, 10],
+                    "actual": actual,
+                }
+            )
+        )
+    return pl.concat(frames)

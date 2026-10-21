@@ -27,25 +27,35 @@ prediction: >-
   Written before any fit. On forecast origins after the alarm is raised, with targets inside the
   transfer or in the 48 hours after its true end, the subtraction arm driven by detected intervals
   (SUB-DET) closes 30% to 60% of the gap in quantile score between the filter without correction
-  (K0) and the filter fed the true NRA series (CLEAN). The two-regime filter fed the detected
-  intervals (S-KF) closes 0% to 15%, and the two-regime filter fed the true intervals (S-ORACLE)
-  closes under 15%, because both still follow the observed level. Subtraction of the true MW
-  after the detector's own delay (SUB-TRUE-LAG) closes 55% to 85%. On forecast origins between the
-  onset and the alarm (the detection lag) no deployable arm closes more than 10%. A subtraction
-  arm fed intervals shifted by whole weeks (SUB-PLACEBO) closes a negative share.
+  (K0) and the filter fed the true NRA series (CLEAN). The reason for that range: experiment 88
+  closed 43% (17% to 71%) with the detector's largest-step MW (post hoc) and 51% (9% to 74%) with
+  the injected MW for a lag correction, and the intervals of experiments 147 and 148 fix the
+  overlap and return-step faults that held experiment 88's pre-registered figure to 16%. The range
+  is wide because the detected MW is a constant while the injected MW follows a daily shape. The
+  two-regime filters (S-KF fed detected intervals, S-ORACLE fed true intervals) are controls that
+  follow the observed level: their shares are at most 15% and may be negative. Subtraction of the
+  true MW (SUB-TRUE-LAG, the daily shape; SUB-TRUE-CONST, a constant at the event mean), known
+  after the same delays as a detection, closes 55% to 90% and 45% to 80%. A subtraction arm fed
+  intervals shifted by whole weeks (SUB-PLACEBO) closes a negative share.
 decision_rule: >-
   One decisive contrast, C1: the share of the gap closed by SUB-DET, (K0 - SUB-DET) / (K0 -
-  CLEAN), in mean quantile score over the post-alarm row set (below), read with a 99% interval
-  from 20,000 resamples of whole calendar months of target time, the same months for the
-  numerator and the denominator. `supported` when the lower end of C1 is at least 40%. `not
-  supported` when C1's point value is under 20%, which means the intervals are not good enough
-  for aim 2. `partly supported` otherwise. The threshold is set by the cost of porting: the arm
-  needs the detector, its MW estimate, and a second pass of the filter on the serving path of the
-  forecast. The point value under 20% is the maintainer's line for "not good enough". All other
-  contrasts (C2 S-KF, C3 S-ORACLE, C4 SUB-TRUE-LAG, C5 SUB-PLACEBO, the same shares on the
-  pre-alarm rows, on the 48 hours after the detected end, on the two periods separately, and the
-  same shares for the error of the median forecast) are read at 95% and decide nothing. A
-  share is not reported when the gap's own interval includes zero.
+  CLEAN), in mean quantile score over the post-alarm row set (below). The numerator and the gap are
+  resampled together from 20,000 resamples of whole calendar months of target time (the months, not
+  the 44 worlds, are the independent units), and a resample whose gap is zero or negative is
+  dropped and counted. The interval is read at 99%. `supported` when the lower end of C1 is at
+  least 40%. `not supported` when C1's point value is under 20%, which the maintainer takes to
+  mean the intervals are not good enough for aim 2. `partly supported` when the point value is at
+  least 20% and the lower end is under 40%. `inconclusive` when the gap's own 99% interval
+  includes zero or fewer than 8 calendar months have post-alarm rows. The 40% and 20% lines are
+  the maintainer's, not derived from the cost of porting; the prediction (30% to 60%) straddles
+  the 40% line, so a verdict of `supported` is not the expected one. All other contrasts (C2
+  S-KF, C3 S-ORACLE, C4 SUB-TRUE-LAG, C5 SUB-TRUE-CONST, C6 SUB-PLACEBO, the shares inside the
+  transfer and in the 48 hours after its end taken separately, the shares on the detection-lag
+  rows, on the 48 hours after the detected end, and on the two periods and each month separately,
+  and the same shares for the error of the median forecast) are read at 95% and decide nothing.
+  C1 conditions on the transfer being detected, so the share of injected transfers that the
+  detector found, and the K0-to-CLEAN gap on all rows after the onset including missed transfers,
+  are reported beside it.
 benchmark: >-
   K0 (GAM-K's Kalman filter run on the stream with the transfers in it, no correction) and CLEAN
   (the same filter run on the stream without the injected transfers, the true-MW arm). Absolute
@@ -91,13 +101,20 @@ real residual stream plus the MW that the injected transfers add.
 - **S-KF:** experiment 141's two-regime filter, with the prior and variance multiplier that 141
   chose on its tuning months, fed the detected intervals.
 - **S-ORACLE:** the same filter fed the true transfer intervals (not deployable).
-- **SUB-DET:** at each forecast origin, the stream the filter reads has the detected step MW
-  subtracted over every detected interval known at that origin. An interval is known from 96
-  half-hours after its onset (the 24-hour statistic plus a peak test, as in 141). Its end is known
-  30 hours after the end (the call lag of the 6-hour lookahead rule). Until the end is known the
-  interval counts as still open. The filter is re-run once per distinct set of known intervals.
-- **SUB-TRUE-LAG:** the same, with the true MW and the true interval, known from the same stamps as
-  SUB-DET's (isolates the detector's MW and interval errors from its delay; not deployable).
+- **SUB-DET:** at each forecast origin, the stream the filter reads has the detected step MW (the
+  stored `step_mw`, a constant per interval) subtracted from the detected onset, over every
+  detected interval known at that origin, including the false alarms and partner intervals of the
+  real stream that a deployed arm would also act on. An interval is known from 96 half-hours after
+  its onset (the 24-hour statistic plus a peak test, as in 141). Its end is known at the later of
+  the stored `known_from` and 60 half-hours after the end (the median call lag of the 6-hour
+  lookahead rule). Until the end is known the interval counts as still open. The filter is re-run
+  once per distinct set of known intervals among the scored rows. A knowledge stamp is compared
+  with the forecast's cutoff (the origin minus the 3.5-hour telemetry delay), the stamp of the
+  last reading the filter may use.
+- **SUB-TRUE-LAG:** the same with the true shaped MW and the true interval, known 96 half-hours
+  after the true onset and 60 after the true end (isolates the detector's MW and interval errors
+  from its delay; not deployable). **SUB-TRUE-CONST** is the same with a constant at the event's
+  mean MW, which separates the cost of the detector's constant-MW shape from its other errors.
 - **SUB-PLACEBO:** SUB-DET with the detected intervals shifted by a whole number of weeks, as 141's
   placebo (a control: it should close a negative share).
 
@@ -107,7 +124,8 @@ cheap, and the filter family already answers the question for the forecast that 
 ## Intervals
 
 The 6-hour lookahead rule of experiment 148 is not stored for the injected worlds, so each world's
-offline-end intervals (`R0_M48`) are used with the end known 30 hours after the end. Experiment 148
+offline-end intervals (`R0_M48`) are used, with the end known at the later of their stored
+`known_from` and 60 half-hours after the end. Experiment 148
 found that L6 and R0 have the same onset on all 292 intervals of its base draw, the same end on
 most (the median difference is 0 stamps; the mean is -1.3 stamps), and that L6 knows the end 60
 half-hours after the end (median; 90th percentile 96). The check is printed in the report.
@@ -126,22 +144,28 @@ arm:
   alarm is known;
 - the period (replicate months or scored year).
 
-The post-alarm row set of C1 is the rows whose origin is after the alarm and whose target is inside
+Shares for the two target windows are also reported separately, because the pooled share can
+hide a gain inside the transfer and a loss after it ends (the failure of experiment 141's
+true-interval arm). The post-alarm row set of C1 is the rows whose origin is after the alarm and whose target is inside
 the transfer or in the 48 hours after the true end. The detection-lag rows are reported separately.
 Transfers the detector missed contribute their rows to the detection-lag set only.
 
 ## Descriptive check on real transfers
 
 The labelled real transfers (the 35 over 1 day of experiment 146 and the shorter labelled ones)
-whose donor is one of the six substations are scored on the real stream. The NRA series is the
+whose donor is one of the six substations are scored on the real stream, with K0 and SUB-DET (the
+real-stream intervals of experiment 147, with the same knowledge stamps). The NRA series is the
 observed power plus the labelled `moved_mw_p50` over the labelled interval, because a donor's power
-drops by that amount. The arms are K0, SUB-DET, and SUB-LABEL (the labelled MW and interval,
-known from the labelled onset plus the 96-stamp delay). The count of transfers scored is stated; no
-interval or verdict is drawn from it.
+drops by that amount. The count of transfers scored is stated; no interval or verdict is drawn from
+it, and it stays out of the headline.
 
 ## Checks and risks
 
-- **Ceiling check:** CLEAN minus K0 outside every window is exactly zero.
+- **Ceiling check:** CLEAN's correction equals K0's, to 1e-9, for every row whose cutoff precedes
+  the first injected stamp at the site; the run script raises if not.
+- **Identity check:** on the detection-lag rows S-KF and SUB-DET equal K0 except where an
+  unrelated real-stream alarm is known; the report prints how many scored rows a false interval
+  touches.
 - **Leakage:** a forecast at origin `c` uses only intervals whose knowledge stamp is at most `c`,
   and a stream value is read only up to the cutoff `c` minus the 3.5-hour telemetry delay, as in
   141. A unit test-style assertion in the run script checks the knowledge stamps against the
