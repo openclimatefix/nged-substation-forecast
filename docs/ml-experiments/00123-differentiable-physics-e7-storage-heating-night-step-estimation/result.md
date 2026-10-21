@@ -35,9 +35,10 @@ take_home_message: <written after the results>
 advice: <written after the results>
 ---
 
-**Status: results for winters 2021-22 to 2024-25.** Winter 2025-26, the winter in which D5, D10, and
-D16 were picked, has not been read yet, because it waits for the merge of experiment 114's pull
-request (PR 1397). The plan, committed before any code ran, follows the results.
+**Status: results for winters 2021-22 to 2024-25 (the headline winters), with winter 2025-26 (the
+selection winter) read afterwards and reported in its own section.** The selection winter is the
+winter in which D5, D10, and D16 were picked. It was read only after PR 1397 (experiment 114)
+merged. The plan, committed before any code ran, follows the results.
 
 We examined 14 Primary substations, labelled D2 to D22 to keep them anonymous. Six of them (D5,
 D9, D10, D11, D14, and D16) were set before any fit as the substations the conclusion rests on; we
@@ -68,7 +69,7 @@ that summer nights have no step. The part that grows with cold needs no such ass
 part is smaller: 1.1 to 4.7 points at the six decision substations (the slope times 12.5 degrees,
 the gap between 15.5 C and a 3 C night). The verdict word under the plan's decision rule is
 `inconclusive`, because the gate's pooled-interval row failed (it over-covered); the estimates
-above stand, and the verdict waits for the independent audit and for winter 2025-26.
+above stand, and the verdict waits for the independent audit; winter 2025-26 did not change the estimates.
 
 ![Step per series and pooled](figure_1_headline.svg)
 
@@ -166,6 +167,53 @@ rise. The profile of cold-winter-night demand minus summer-night demand, relativ
 
 ![Night profile](figure_8_profile.svg)
 
+## Selection winter 2025-26
+
+**Winter 2025-26 gives a similar step to the headline winters at every substation except D12, and
+the three substations picked on that winter are about 2 points higher in it.** The step fitted to
+winter 2025-26 alone has a 90% interval above 0 at all 14 substations (D8, which has no step in the
+headline winters, reaches 2.4 points, interval 0.5 to 4.0). Pooled over the six decision substations
+it is 10.9 points (Hartung-Knapp 6.3 to 15.4), against 9.9 (6.2 to 13.5) in the headline winters;
+over all five winters, 10.1 (6.2 to 13.9). The mean of D5, D10, and D16 is 15.2 points in winter
+2025-26 against 13.2 in the headline winters, a rise of 1.0, 2.3, and 2.6 points at the three. D9,
+D11, and D14 average 6.5 in both. The E7-X substations average 13.8 (7.6 to 19.9) against 13.2, and
+D12 rose by 9.6 points. The three substations picked on winter 2025-26 are therefore higher in it by
+about 2 points, a modest selection effect on an estimate of 13 to 15 points.
+
+- **Experiment 114's scored winter.** With the scored-year residuals, the share of the full step
+  left in the baseline model's errors over winters 2023-24 to 2025-26 is 0.76, 0.63, and 0.52 at D5,
+  D10, and D16 (0.64 at D11 and 1.97 at D14).
+- **Replicate-winter rule.** The plan's rule that the step is positive in the replicate winter
+  2024-25 alone holds at all six decision substations (figure 3, which now includes 2025-26).
+- **Cold nights.** The cold-night figure above uses winters 2023-24 to 2025-26.
+
+Winter 2025-26 alone, per substation (points):
+
+```text
+== winter 2025-26 alone, per series (points) ==
+shape: (14, 7)
+┌──────┬───────────┬───────┬───────┬───────────────────────┬────────────┬───────────────────┐
+│ site ┆ step_2025 ┆ low   ┆ high  ┆ headline_winters_mean ┆ difference ┆ positive_interval │
+│ ---  ┆ ---       ┆ ---   ┆ ---   ┆ ---                   ┆ ---        ┆ ---               │
+│ str  ┆ f64       ┆ f64   ┆ f64   ┆ f64                   ┆ f64        ┆ bool              │
+╞══════╪═══════════╪═══════╪═══════╪═══════════════════════╪════════════╪═══════════════════╡
+│ D5   ┆ 11.86     ┆ 10.13 ┆ 14.15 ┆ 10.82                 ┆ 1.05       ┆ true              │
+│ D9   ┆ 8.89      ┆ 7.56  ┆ 9.75  ┆ 9.51                  ┆ -0.62      ┆ true              │
+│ D10  ┆ 17.72     ┆ 17.15 ┆ 18.29 ┆ 15.38                 ┆ 2.34       ┆ true              │
+│ D11  ┆ 7.69      ┆ 7.06  ┆ 8.21  ┆ 6.99                  ┆ 0.71       ┆ true              │
+│ D14  ┆ 3.00      ┆ 2.35  ┆ 3.73  ┆ 2.94                  ┆ 0.06       ┆ true              │
+│ D16  ┆ 15.99     ┆ 14.38 ┆ 17.24 ┆ 13.44                 ┆ 2.55       ┆ true              │
+│ D2   ┆ 13.40     ┆ 12.21 ┆ 14.18 ┆ 14.68                 ┆ -1.28      ┆ true              │
+│ D3   ┆ 6.15      ┆ 5.89  ┆ 6.37  ┆ 6.62                  ┆ -0.46      ┆ true              │
+│ D4   ┆ 12.97     ┆ 11.20 ┆ 14.27 ┆ 13.42                 ┆ -0.45      ┆ true              │
+│ D8   ┆ 2.35      ┆ 0.52  ┆ 4.00  ┆ 0.58                  ┆ 1.77       ┆ true              │
+│ D12  ┆ 24.66     ┆ 20.68 ┆ 27.65 ┆ 15.05                 ┆ 9.61       ┆ true              │
+│ D19  ┆ 30.59     ┆ 28.14 ┆ 32.32 ┆ 33.62                 ┆ -3.04      ┆ true              │
+│ D21  ┆ 9.68      ┆ 8.48  ┆ 10.50 ┆ 9.66                  ┆ 0.02       ┆ true              │
+│ D22  ┆ 11.84     ┆ 10.55 ┆ 12.96 ┆ 12.68                 ┆ -0.84      ┆ true              │
+└──────┴───────────┴───────┴───────┴───────────────────────┴────────────┴───────────────────┘
+```
+
 ## Predictions against outcome
 
 | Prediction (winters 2021-22 to 2024-25) | Outcome | Met |
@@ -183,7 +231,8 @@ rise. The profile of cold-winter-night demand minus summer-night demand, relativ
 
 ## Checks
 
-- **Median forecast minus mean forecast, and the quantile-score contrast beside the error of the mean
+- **Median forecast minus mean forecast, and the quantile-score contrast beside the error of the
+  mean
   or median forecast:** not applicable, because the experiment forecasts nothing.
 - **Hand-filtered switching list:** refitting the six decision series without experiment 103's
   switching events changes no step by more than 0.3 points (11.0, 9.8, 15.4, 7.0, 3.0, and 13.5 for
@@ -247,16 +296,18 @@ Start of the step, timing, and share left by the baseline model (R):
 
 ## Cold nights: actual demand against the baseline forecast
 
-**On cold nights the baseline forecast of experiment 114 runs below actual demand from 01:00 at D5
-and D16, and above it before midnight at D10 (-12.2 points in the half-hour starting 23:30).** The
-figure shows the median and the 25th to 75th percentile, across the 72 cold winter nights per
-substation (the coldest 10% of days, the plan's cold-snap rule), of actual demand and of the day-
-ahead median forecast, in points. The largest median misses, from the same nights: D5 +5.6 points in
-the half-hour starting 01:00, D10 -12.2 starting 23:30, D11 -3.6 starting 23:00, D14 +2.8 starting
-02:00, and D16 +9.4 starting 01:00 (actual minus forecast). The half-hour of the largest rise
-between 05:00 and 08:00 differs between actual and forecast at D5 (07:00 against 06:00) and at D16
-(06:00 against 06:30), and matches at D10, D11, and D14. D9 has no stored forecast for these
-winters.
+**On cold nights actual demand runs above the baseline forecast of experiment 114 from about 01:00
+at D5, D10, and D16, by 6.1, 6.7, and 9.6 points in the half-hour starting 01:00.** The figure shows
+the median and the 25th to 75th percentile, across the 104 cold winter nights per substation of
+winters 2023-24 to 2025-26 (the coldest 10% of days, the plan's cold-snap rule), of actual demand
+and of the day-ahead median forecast, in points. The largest median misses (actual minus forecast)
+are D5 +6.1 in the half-hour starting 01:00, D9 +2.9 starting 01:30, D10 +6.7 starting 01:00, D11
++3.6 starting 03:00, D14 +4.0 starting 02:00, and D16 +9.6 starting 01:00. The half-hour of the
+largest rise between 05:00 and 08:00 differs between actual and forecast at D5 (07:00 against
+06:00), D9 (06:00 against 07:00), D11 (06:30 against 06:00), and D16 (07:00 against 06:30), and
+matches at D10 and D14. The two earlier winters alone (72 nights, before the selection winter was
+read) gave the same pattern at D5 and D16 (+5.6 and +9.4 at 01:00) but a different largest miss at
+D10 (-12.2 in the half-hour starting 23:30); `report.txt` prints both.
 
 ![Actual demand against the baseline forecast, decision series](figure_9_cold_nights.svg)
 
@@ -423,7 +474,8 @@ neighbouring years.
 - **The daily mean temperature is a proxy** for the temperature that sets heater charging. In the
   gate, a step that follows the 18:00 to 08:00 mean temperature was covered by the interval in 79%
   of draws pooled at 7 points, and in 43% at the worst substation.
-- **Winter 2025-26 has not been analysed yet.**
+- **Winter 2025-26 was read once, after the headline winters.** The page's headline numbers use the
+  headline winters, and the selection winter appears beside them.
 
 ## The plan, as committed before any fit
 

@@ -278,7 +278,8 @@ def figure_3_winters(*, numbers: dict[str, Any]) -> alt.TopLevelMixin:
             subtitle="Dot: step at a daily mean of 3 C, in points, fitted to that winter alone. "
             "Line: "
             "90% interval from resampling 14-day blocks of nights. The six decision substations "
-            "were set before any fit as the ones the conclusion rests on.",
+            "were set before any fit as the ones the conclusion rests on. Winter 2025-26 "
+            "(orange) is the selection winter, read after the headline winters.",
         ),
     )
 
@@ -621,9 +622,8 @@ def figure_9_cold_nights(*, cold: dict[str, Any]) -> alt.TopLevelMixin:
     ]
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="On cold nights demand at D5 and D16 runs above the baseline forecast from 01:00, "
-            "and D10 runs below it before midnight",
-            subtitle="Line: median over the cold winter nights of winters 2023-24 and 2024-25; "
+            text="On cold nights demand at D5, D10, and D16 runs above the baseline forecast from 01:00",
+            subtitle="Line: median over the cold winter nights of winters 2023-24 to 2025-26; "
             "band: "
             "25th to 75th percentile. Cold nights are the coldest 10% of days by daily mean "
             "temperature. The baseline forecast is experiment 114's day-ahead forecast; D9 has no "
@@ -649,30 +649,37 @@ def figure_10_cold_nights_e7x(*, cold: dict[str, Any]) -> alt.TopLevelMixin:
         title=_title(
             text="Seven of the eight further substations (E7-X) show a rise around 01:00 on cold "
             "nights; D8 shows none",
-            subtitle="Line: median demand over the cold winter nights of winters 2023-24 and "
-            "2024-25; band: 25th to 75th percentile (orange). No baseline forecast is stored "
+            subtitle="Line: median demand over the cold winter nights of winters 2023-24 to "
+            "2025-26; band: 25th to 75th percentile (orange). No baseline forecast is stored "
             "for these substations.",
         )
     )
 
 
 def main() -> None:
-    """Draw the figures of a stage."""
+    """Draw the figures of a stage, or only the named figures."""
     parser = argparse.ArgumentParser()
     parser.add_argument("stage", choices=["headline", "all"])
-    stage = parser.parse_args().stage
+    parser.add_argument("only", nargs="*", help="figure names to draw (default: all of them)")
+    arguments = parser.parse_args()
+    stage = arguments.stage
     numbers = json.loads((common.WORK_DIR / f"numbers_{stage}.json").read_text())
-    _save(figure_1_headline(numbers=numbers), name="figure_1_headline")
-    _save(figure_2_raw(numbers=numbers), name="figure_2_raw")
-    _save(figure_3_winters(numbers=numbers), name="figure_3_winters")
-    _save(figure_4_gate(), name="figure_4_gate")
-    _save(figure_5_pooled(numbers=numbers), name="figure_5_pooled")
-    _save(figure_6_absorbed(numbers=numbers), name="figure_6_absorbed")
-    _save(figure_7_timing(numbers=numbers), name="figure_7_timing")
-    _save(figure_8_profile(numbers=numbers), name="figure_8_profile")
     cold = json.loads((common.WORK_DIR / f"cold_nights_{stage}.json").read_text())
-    _save(figure_9_cold_nights(cold=cold), name="figure_9_cold_nights")
-    _save(figure_10_cold_nights_e7x(cold=cold), name="figure_10_cold_nights_e7x")
+    figures = {
+        "figure_1_headline": lambda: figure_1_headline(numbers=numbers),
+        "figure_2_raw": lambda: figure_2_raw(numbers=numbers),
+        "figure_3_winters": lambda: figure_3_winters(numbers=numbers),
+        "figure_4_gate": figure_4_gate,
+        "figure_5_pooled": lambda: figure_5_pooled(numbers=numbers),
+        "figure_6_absorbed": lambda: figure_6_absorbed(numbers=numbers),
+        "figure_7_timing": lambda: figure_7_timing(numbers=numbers),
+        "figure_8_profile": lambda: figure_8_profile(numbers=numbers),
+        "figure_9_cold_nights": lambda: figure_9_cold_nights(cold=cold),
+        "figure_10_cold_nights_e7x": lambda: figure_10_cold_nights_e7x(cold=cold),
+    }
+    for name, draw in figures.items():
+        if not arguments.only or name in arguments.only:
+            _save(draw(), name=name)
 
 
 if __name__ == "__main__":

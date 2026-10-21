@@ -86,7 +86,13 @@ def residual_cross_checks(
             except FileNotFoundError, pl.exceptions.ComputeError, ValueError:
                 continue
             usable = tuple(
-                w for w in common.DESIGN_WINTERS if w in fit._winters_of(table=table, site=site)
+                w
+                for w in (
+                    (*common.DESIGN_WINTERS, common.SELECTION_WINTER)
+                    if "scored" in tags
+                    else common.DESIGN_WINTERS
+                )
+                if w in fit._winters_of(table=table, site=site)
             )
             if not usable:
                 continue
