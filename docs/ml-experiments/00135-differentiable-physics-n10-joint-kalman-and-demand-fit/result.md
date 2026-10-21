@@ -38,7 +38,7 @@ decision_rule: 'Two planned contrasts (C1 J1 minus TS, C2 J2 minus TS), each rea
   threshold is zero, because a joint fit replaces the fitting routine inside the training loop
   and adds no model, data source, or serving step. The shape-stability bound is that the
   root-mean-square change of each fitted term (PV, heating, holiday, weekly profile) from TS is
-  under 10% of the term's root mean square. The verdict
+  under 10% of the root mean square of the term itself. The verdict
   is capped at `inconclusive` if the reproduction control P1 fails.'
 benchmark: TS, the two-stage GAM-K with the learned-noise filter settings of experiment 133
   (its GRID arm); GAM-K with experiment 111's fixed settings (FIX) as reference; climatology and
