@@ -253,7 +253,8 @@ resampling whole months. Negative differences mean BG2 scores lower, which is be
   per run comes from experiment 78's vintages, and the offset models start from the median of the
   training labels plus the offset. Ablation A6 holds the capacity at experiment 64's value, which
   was estimated before July 2025. The offset lowers the score by 0.114 on its daylight
-  April-to-September rows at the 5 offset Primaries (0.010 over all rows of all 16 Primaries). An audit found no flaw that dilutes or
+  April-to-September rows at the 5 offset Primaries (0.010 over all rows of all 16 Primaries).
+  An audit found no flaw that dilutes or
   cancels the effect: the base margin, blend weights, gate, and member twins are consistent between
   training and prediction. Using the held capacity at prediction instead of the vintage capacity
   gives 0.105 (ablation A6), so the vintage capacity helps slightly. The spread factor is a fixed
