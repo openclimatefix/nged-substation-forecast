@@ -117,8 +117,7 @@ def figure_short_history(*, data: dict) -> alt.TopLevelMixin:
         names=names,
         axis_values=[-3.0, -2.0, -1.0, 0.0, 1.0],
         title=_title(
-            text="With 3 months of history, pooling every shared shape cuts the error; pooling "
-            "only the heating curve does not",
+            text="With 3 months of history, pooling every shared shape cuts the error",
             subtitle=(
                 "Dot: difference in mean quantile score over leads 0.5 to 168 hours, five decision "
                 "substations, outside switching events. Line: 99% interval from resampling whole "
@@ -224,7 +223,7 @@ def figure_seasons(*, data: dict) -> alt.TopLevelMixin:
             width=WIDTH - 260,
             height=60,
             title=_title(
-                text="The 3-month gain sits in winter, where the heating curve matters",
+                text="The 3-month gain sits in winter",
                 subtitle=(
                     "Scored year, all leads, five decision substations, outside switching events."
                 ),
