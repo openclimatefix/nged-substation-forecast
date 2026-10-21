@@ -81,18 +81,17 @@ headline: >-
   to be non-decreasing alone leaves the staircase.
 lessons:
   - >-
-    The staircase was a property of how the spread table was read, not of the fitted widths, so a
-    smooth reading costs at most 0.006 points and no refit.
+    The staircase came from how the spread table is read, not from the fitted widths, so a smooth
+    reading needs no refit and changed the score by +0.0022 points (upper bound +0.0061).
   - >-
     The 90% band holds 88.3% of actuals over all leads (nominal 90%), and its q05 is crossed on 6.5%
     of rows (nominal 5%), so the lower tail is the thin one; no variant moves either figure.
   - >-
-    The cold-night q95 coverage stays near 85% in every variant, so the smooth spread is not the
-    fix for cold nights; the mean on those nights is the problem.
+    The cold-night q95 coverage stays near 85% in every variant, so a smoother spread is not the fix
+    for cold nights.
   - >-
     The non-decreasing table (M) lowers the q01 and q99 pinball loss (-0.0025 and -0.0039) and the
-    cold-night score (-0.028), because it widens the tails at the substations whose fitted widths
-    fall with lead.
+    cold-night score (-0.028) but raises the winter-night score (+0.0035); we did not test why.
 take_home_message: >-
   The q05 to q95 band of the stage 2 winner was flat from lead day 2 to day 5 because the stored
   spread table has four lead bands. Reading the table by linear interpolation between the band
@@ -107,8 +106,8 @@ advice:
     Do not force the width to be non-decreasing in lead as the only fix: the flat days 2 to 5 stay
     (staircase test, M).
   - >-
-    Look to the mean, not the width, for the cold-night upper tail: all three variants leave the
-    cold-night q95 coverage at 85% (cold-night bullet).
+    Do not expect a spread change to fix the cold-night upper tail: all three variants leave the
+    q95 coverage on cold nights at 85% (cold-night bullet).
   - >-
     Test a non-decreasing table (M) on tail scores in a later experiment: it lowered the q01 and q99
     pinball loss and the cold-night score without changing the all-lead score (C2).
@@ -157,31 +156,32 @@ points of it and I comes first in the pre-registered order.
   value) and nothing is fitted on the scored year. No weather product or model is run: the weather
   source is whatever experiment 155 used, so nothing here depends on forecast-time availability.
 - **Rows.** `fold_a_daily_gap_v1`, scored year (561,172 rows at the 6 substations, 464,228 at the 5
-  decision substations in the common set with BG2, climatology, and the manual heuristic), outside the
-  hand-filtered switching events. The replicate months (even months of 2024-07 to 2025-06) give the
-  second period. Schedule: experiment 155's monthly refits, so no contrast here depends on retraining
-  cadence; the fix acts after the forecast.
-- **Staircase measured on the reference.** The year-median q05 to q95 width is identical on lead days
-  2, 3, 4, and 5 at every decision substation (3 equal pairs of adjacent days at each), for example
-  25.0 points at D5 and 14.1 at D16, with steps at 24, 48, and 144 hours. I leaves 0 equal pairs at
-  every substation, IM leaves 1 at D11, and M leaves 3 at every substation. The largest one-day step,
-  as a share of the substation's median width, falls from 0.105 (median over substations) to 0.056
-  (I) and 0.063 (IM), and rises to 0.142 for M.
+  decision substations in the common set with BG2, climatology, and the manual heuristic), outside
+  the hand-filtered switching events. The replicate months (even months of 2024-07 to 2025-06) give
+  the second period. Schedule: experiment 155's monthly refits, so no contrast here depends on
+  retraining cadence; the fix acts after the forecast.
+- **Staircase measured on the reference.** The year-median q05 to q95 width is identical on lead
+  days 2, 3, 4, and 5 at every decision substation (3 equal pairs of adjacent days at each), for
+  example 25.0 points at D5 and 14.1 at D16, with steps at 24, 48, and 144 hours. I leaves 0 equal
+  pairs at every substation, IM leaves 1 at D11, and M leaves 3 at every substation. The largest
+  one-day step, as a share of the substation's median width, falls from 0.105 (median over
+  substations) to 0.056 (I) and 0.063 (IM), and rises to 0.142 for M.
 - **Coverage by lead day (reference, mean over substations).** The share of actuals inside the 90%
-  band is 0.88 over all leads (0.80 to 0.95 across substations and lead days), against 0.90
-  nominal. The q95 covers 0.948 of rows, and the q05 is crossed by 0.065 (nominal 0.05). Variants
-  I, M, and IM keep every one of these within 0.01 of the reference.
-- **Absolute skill, all leads (points).** Reference 2.7507, I 2.7529, M 2.7498, IM 2.7523, BG2 2.7804,
-  manual heuristic 3.4968, climatology 3.8038. At 12 to 36 hours: reference 2.4028, I 2.4047, M 2.3982,
-  IM 2.4027, BG2 2.5178.
+  band is 0.88 over all leads (0.80 to 0.95 across substations and lead days), against 0.90 nominal.
+  The q95 covers 0.948 of rows, and the q05 is crossed by 0.065 (nominal 0.05). The pooled q05 and
+  q95 figures of I, M, and IM stay within 0.01 of the reference; per substation and lead day the
+  inside-band share differs by up to 0.017 (M) and 0.031 (IM).
+- **Absolute skill, all leads (points).** Reference 2.7507, I 2.7529, M 2.7498, IM 2.7523, BG2
+  2.7804, manual heuristic 3.4968, climatology 3.8038. At 12 to 36 hours: reference 2.4028, I
+  2.4047, M 2.3982, IM 2.4027, BG2 2.5178.
 - **Score by lead band, I minus reference.** Under 24 hours +0.0024 (+0.0008 to +0.0043, worse),
   24 to 72 hours -0.0071 (-0.0123 to -0.0021, better), 72 to 168 hours +0.0069 (+0.0008 to +0.0141,
   worse). Interpolation narrows the early part of each stepped band and widens the late part, so it
   helps at 24 to 72 hours and hurts at the shortest and longest leads.
 - **Substations.** I minus reference by substation: D10 +0.0088, D5 +0.0037, D16 +0.0008, D11
   -0.0001, D14 -0.0018. D10 is the only substation that loses by more than 0.004 (IM +0.0113 there,
-  above the 0.01 limit, which the pre-registered rule applies to the pooled score only). Without D10,
-  C1 is about +0.0007. Months: C1 is negative in 5 of 12, C2 in 7 of 12, and C3 in 6 of 12.
+  above the 0.01 limit, which the pre-registered rule applies to the pooled score only). Without
+  D10, C1 is about +0.0007. Months: C1 is negative in 5 of 12, C2 in 7 of 12, and C3 in 6 of 12.
 - **Tail calibration, scored year, all rows (coverage; pinball loss).** Reference q01 0.022; 0.214,
   q05 0.065; 0.711, q95 0.948; 0.748, q99 0.982; 0.231. I: 0.022; 0.216, 0.065; 0.713, 0.947;
   0.746, 0.981; 0.232. IM: 0.020; 0.213, 0.061; 0.713, 0.949; 0.747, 0.983; 0.228. M: 0.020; 0.212,
@@ -192,7 +192,8 @@ points of it and I comes first in the pre-registered order.
   0.848 for the reference, 0.846 for I (-0.002, -0.005 to +0.001), and 0.852 for M and IM
   (+0.004, +0.001 to +0.011). The q99 coverage is 0.940 (reference), 0.933 (I), 0.954 (M), and 0.953
   (IM). The score on those rows moves by +0.021 for I (+0.002 to +0.053, worse), -0.028 for M
-  (-0.068 to -0.001), and -0.015 for IM (-0.045 to -0.001). BG2 covers 0.756 at the q95.
+  (-0.068 to -0.001), and -0.015 for IM (-0.045 to -0.001). On all winter nights M is worse by
+  +0.0035 (+0.0006 to +0.0074) and IM by +0.0079 (+0.0010 to +0.0166). BG2 covers 0.756 at the q95.
 - **Width smoothness.** The mean absolute change in median width between adjacent lead days is
   within 0.15 points of the reference at every substation for I, and larger for IM at D14 and
   D16 (0.59 and 0.50 against 0.21 and 0.39) because the monotone table widens those substations'
@@ -200,12 +201,13 @@ points of it and I comes first in the pre-registered order.
 - **Curtailment-cost proxy.** The node-only rule of `studies.node_curtailment` run on each
   substation's own demand, with the limit set at 0.9 times its maximum before the scored year, at
   GBP 2,000 per MWh over leads 12 to 36 hours. Avoidable cost against the perfect forecast, in GBP
-  per MW of capacity per day over the 292 daily runs (42.7 MW in total): reference 106.3, I 105.9,
-  M 106.5, IM 106.2, BG2 150.8, manual heuristic 267.1. The reference saves 160.8 GBP per MW per
-  day against the stored manual-heuristic forecast. The intervals are wide (the reference's
-  avoidable cost is 0.11 to 3.3 million GBP in total for the 5 substations) and the five variants
-  differ by under 0.5 GBP per MW per day, so the proxy cannot rank them. The limit at 0.75 and 0.5
-  of the maximum gives the same ordering of the arms within 8 GBP per MW per day. A Primary
+  per MW of capacity per day over the 292 daily runs (42.7 MW in total): reference 106.3, I 105.9, M
+  106.5, IM 106.2, BG2 150.8, manual heuristic 267.1. The reference saves 160.8 GBP per MW per day
+  against the stored manual-heuristic forecast. The intervals are wide (the reference's avoidable
+  cost is 0.11 to 3.3 million GBP in total for the 5 substations) and the variants differ from the
+  reference by under 0.5 GBP per MW per day at the limit of 0.9, so the proxy cannot rank them. With
+  the limit at 0.5 of the maximum the order of the four variants reverses (M lowest, I highest) and
+  M differs from the reference by about 19 GBP per MW per day, so the order is not stable. A Primary
   substation has no published export limit here, and a demand series is treated as the flow that can
   breach, so the figures show the arithmetic and are not a curtailment forecast.
 - **Caveats.** The staircase test uses lead-day medians pooled over a year and over the hour bands,
@@ -216,8 +218,9 @@ points of it and I comes first in the pre-registered order.
   not tested here. Arm C (recipe R alone) was experiment 155's pre-registered winner; the fix acts
   on the spread, so the result is expected, but not shown, to carry over to arm C.
 - **What this rules out and what to try next.** A smooth reading of the table is a free change
-  (no fitted term and no stored state); the cold-night upper tail is a problem of the mean and not
-  of the band width, so the next calibration experiment should target the cold-night level error. A
+  (no fitted term and no stored state); a smoother spread does not move the cold-night upper tail
+  (q95 coverage 0.85 in every variant), so the next calibration experiment should look at that
+  tail directly, for example at the mean forecast on those nights. A
   refit of the spread on 12-hour lead bands and a test of M's table on tail scores are the two
   follow-ups.
 
@@ -231,8 +234,11 @@ points of it and I comes first in the pre-registered order.
   directions.
 - **Reproduction control.** The reference rescored from experiment 155's stored forecasts scores
   2.7507, the score of experiment 155's `d_spread_a` (the plan wrote "arm D"; arm D with its own
-  refitted spread scores 2.756, so the comparison that applies is against `d_spread_a`, which is
-  the reference). The reproduction gap of the recovered table is under 2e-5 points.
-- **Audit triggers.** None fired. The predictions held (score changes within +-0.005, at most 1
-  equal pair for I and IM). D10 loses 0.009 under I, which a leave-one-out check shows does not flip
-  C1's sign or the verdict. No audit ran.
+  refitted spread scores 2.756, so the comparison that applies is against `d_spread_a`, which is the
+  reference). The run script prints the reproduction gap of the recovered table (under 2e-5 points).
+- **Audit triggers.** None fired. The score changes (within +-0.005) and the equal-pair counts (at
+  most 1 for I and IM) matched the predictions. The prediction that the cold-night q95 coverage
+  stays near 83% missed in level: it was 0.846 to 0.852 (the 83% came from experiment 155's arms on
+  a slightly different definition of cold nights). D10 loses 0.009 under I. The unweighted mean of
+  the other four substations' differences is +0.0007, so C1's sign is unchanged without D10 (not
+  recomputed from rows), and the verdict does not depend on it. No audit ran.
