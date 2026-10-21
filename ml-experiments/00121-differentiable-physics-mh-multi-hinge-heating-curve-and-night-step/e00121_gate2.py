@@ -157,7 +157,9 @@ class SiteSetup:
         truth_matrix: The five-hinge truth's design (MH-5's columns) on `rows`.
         grams: Each arm's Gram matrix on the two training sets.
         penalties: Each arm's penalty on the two training sets.
-        mh_months: The main training set's per-month Gram matrices for MH, with quarter labels.
+        mh_months: The main training set's per-month Gram matrices for MH.
+        mh_quarters: The quarter label of each month in `mh_months`.
+        mh_month_of_row: The month, as an index into `mh_months`, of each training row.
         hyper: B0-K's filter hyperparameters at the site.
     """
 
