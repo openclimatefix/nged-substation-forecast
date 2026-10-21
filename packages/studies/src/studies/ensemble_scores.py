@@ -1,18 +1,18 @@
 """Scores for a forecast given as a set of weighted values: a rank histogram and two CRPS variants.
 
-An ensemble forecast, or a mixture of quantile atoms, is a finite set of values `x_1 … x_m` with
+An ensemble forecast, or a mixture of quantiles, is a finite set of values `x_1 … x_m` with
 weights that sum to 1. Three scores read such a set directly:
 
 - `rank_histogram` counts where the measured value falls among the sorted values. A flat histogram
   means the measured value is exchangeable with the members; a U shape means the spread is too
   small.
 - `fair_crps` is the continuous ranked probability score of an equally weighted ensemble, corrected
-  so that its expectation does not depend on the number of members
+  so that its expected value does not change with the number of members
   ([Ferro (2014)](https://doi.org/10.1002/qj.2270)).
 - `tail_weighted_crps` is the threshold-weighted CRPS of
   [Gneiting and Ranjan (2011)](https://doi.org/10.1198/jbes.2010.08110) with an indicator weight on
-  one tail. It is the CRPS of the values after clamping them at a threshold, so a forecast is
-  scored only on the tail it was asked about.
+  one tail. The threshold-weighted CRPS equals the CRPS of the values after clamping them at a
+  threshold, so a forecast is scored only on the tail it was asked about.
 
 All three take one row per case, so a `(n_cases, m)` array of values scored against `n_cases`
 measured values. A score is lower when it is better, and every score here is proper
@@ -45,7 +45,12 @@ def rank_histogram(
 
     Returns:
         Integer array of length `m + 1`; entry `r` counts the cases with rank `r`.
+
+    Raises:
+        ValueError: If `members` or `actual` holds a NaN.
     """
+    if np.isnan(members).any() or np.isnan(actual).any():
+        raise ValueError("rank_histogram does not accept NaN; drop those cases first")
     below = (members < actual[:, None]).sum(axis=1)
     equal = (members == actual[:, None]).sum(axis=1)
     rank = below + np.floor(rng.random(size=len(actual)) * (equal + 1)).astype(np.int64)
@@ -131,7 +136,12 @@ def tail_weighted_crps(
 
     Returns:
         Array of shape `(n_cases,)`, the score of each case in the unit of `values`.
+
+    Raises:
+        ValueError: If `tail` is neither `upper` nor `lower`.
     """
+    if tail not in ("upper", "lower"):
+        raise ValueError(f"tail must be 'upper' or 'lower', not {tail!r}")
     t = np.asarray(threshold, dtype=float)
     t_col = t[:, None] if t.ndim == 1 else t
     clamp = np.maximum if tail == "upper" else np.minimum

@@ -60,9 +60,17 @@ def test_fair_crps_needs_two_members() -> None:
 def test_tail_weighted_crps_ignores_values_on_the_other_side() -> None:
     values = np.array([[-10.0, -5.0, 3.0, 4.0]])
     weights = np.full(4, 0.25)
-    kwargs = {"weights": weights, "actual": np.array([-7.0]), "threshold": 0.0, "tail": "upper"}
-    base = tail_weighted_crps(values=values, **kwargs)
-    moved = tail_weighted_crps(values=np.array([[-99.0, -1.0, 3.0, 4.0]]), **kwargs)
+    actual = np.array([-7.0])
+    base = tail_weighted_crps(
+        values=values, weights=weights, actual=actual, threshold=0.0, tail="upper"
+    )
+    moved = tail_weighted_crps(
+        values=np.array([[-99.0, -1.0, 3.0, 4.0]]),
+        weights=weights,
+        actual=actual,
+        threshold=0.0,
+        tail="upper",
+    )
     assert base[0] == pytest.approx(moved[0])
 
 
@@ -116,3 +124,42 @@ def test_rank_histogram_splits_ties_across_ranks() -> None:
     rng = np.random.default_rng(5)
     counts = rank_histogram(members=np.zeros((20000, 3)), actual=np.zeros(20000), rng=rng)
     assert counts.min() > 0.9 * 5000
+
+
+def test_rank_histogram_puts_a_high_actual_in_the_top_rank() -> None:
+    rng = np.random.default_rng(6)
+    counts = rank_histogram(
+        members=rng.normal(size=(1000, 4)), actual=np.full(1000, 100.0), rng=rng
+    )
+    assert counts[4] == 1000
+    low = rank_histogram(members=rng.normal(size=(1000, 4)), actual=np.full(1000, -100.0), rng=rng)
+    assert low[0] == 1000
+
+
+def test_rank_histogram_rejects_nan() -> None:
+    with pytest.raises(ValueError, match="NaN"):
+        rank_histogram(
+            members=np.zeros((1, 2)), actual=np.array([np.nan]), rng=np.random.default_rng(0)
+        )
+
+
+def test_weighted_crps_rejects_negative_weights() -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        weighted_crps(values=np.zeros((1, 2)), weights=np.array([-0.5, 1.5]), actual=np.zeros(1))
+
+
+def test_fair_crps_three_members_known_value() -> None:
+    # members 0, 1, 3 and y = 1: mean|x-y| = 1; Σ_iΣ_j|x_i-x_j| = 2(1+3+2) = 12; 12/(2*3*2) = 1.
+    got = fair_crps(members=np.array([[0.0, 1.0, 3.0]]), actual=np.array([1.0]))
+    assert got[0] == pytest.approx(0.0)
+
+
+def test_tail_weighted_crps_rejects_an_unknown_tail() -> None:
+    with pytest.raises(ValueError, match="tail"):
+        tail_weighted_crps(
+            values=np.zeros((1, 1)),
+            weights=np.ones(1),
+            actual=np.zeros(1),
+            threshold=0.0,
+            tail="Upper",  # ty: ignore[invalid-argument-type]
+        )
