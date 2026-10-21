@@ -115,7 +115,7 @@ def release_test(
 
 def transfer_job(job: tuple[dict, str, str]) -> dict[str, Any]:
     """Fit one transfer's neighbourhood and return its hindsight reading and release test."""
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
     transfer, year_name, group = job
@@ -151,7 +151,7 @@ def transfer_job(job: tuple[dict, str, str]) -> dict[str, Any]:
 
 def placebo_job(job: tuple[str, str, tuple[str, str], bool]) -> dict[str, Any]:
     """Return the placebo flow of one pair, group, year, and path order over the whole year."""
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
     year_name, group, pair, first = job

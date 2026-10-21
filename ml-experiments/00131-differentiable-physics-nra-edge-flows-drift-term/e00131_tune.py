@@ -153,7 +153,7 @@ def _write(*, target: Path, payload: dict[str, Any]) -> None:
 
 def _screen_worker(config: data_module.FlowConfig) -> str:
     """Score one configuration at stage 1 and write its result."""
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
     target = TUNE_DIR / f"{config.label()}.json"
@@ -172,7 +172,7 @@ def _screen_worker(config: data_module.FlowConfig) -> str:
 
 def _full_worker(config: data_module.FlowConfig) -> str:
     """Re-read one finalist's placebo flow on every tile of the year."""
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
     target = FINAL_DIR / f"{config.label()}.json"
@@ -185,7 +185,7 @@ def _full_worker(config: data_module.FlowConfig) -> str:
 
 def _huber_worker(config: data_module.FlowConfig) -> str:
     """Score a Huber variant of the winner on transfers and the whole year of placebo tiles."""
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(1)
     target = HUBER_DIR / f"{config.label()}.json"
