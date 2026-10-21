@@ -62,20 +62,20 @@ slot, the holder's session id, the GPU share, the cores, and the start date.
 - **A CPU-only experiment needing 2 cores can use the reserved share** when every slot is held and the
   maintainer agrees.
 - **Run every job in its own memory-capped systemd scope, so that one runaway Python process cannot
-  kill the Claude sessions.** On 2026-10-21 a single `python3` process grew to 56 GB inside the
-  same `tmux` scope as the Claude sessions. The kernel killed that process, and systemd's default
+  kill the Claude sessions.** On 2026-10-21 a single `python3` process grew to 56 GB inside the same
+  `tmux` scope as the Claude sessions. The kernel killed that process, and systemd's default
   `OOMPolicy=stop` then stopped the whole scope, which ended the manager and all 20 sessions at
-  once. The fix is one scope per job, with a memory cap and `OOMPolicy=continue`:
-  `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue <command>`. A job that exceeds
-  its cap is the only process the kernel kills. Put the command in `briefs/common.md` and tell every
-  session to run `free -g` first and to wait or ask the manager when less than 25 GB is available.
-  Every Python command a session runs goes through `systemd-run`, including test runs and `python -c`
-  probes, because the sessions' own `tmux` scope has no cap. Adding `-p MemorySwapMax=0` stops a
-  capped job swapping and slowing the whole machine before it is killed. While a job runs,
-  `systemctl --user show <scope> -p MemoryMax -p OOMPolicy` confirms the settings. A capped job that
-  dies shows exit status 137 or "Killed", and the session's transcript says nothing else, so report
-  every such kill to the maintainer with the script name. Setting `DefaultOOMPolicy=continue` in the user manager is a system configuration change, so ask
-  the maintainer before making it.
+  once. The fix is one scope per job, with a memory cap and `OOMPolicy=continue`: `systemd-run
+  --user --scope -p MemoryMax=16G -p OOMPolicy=continue <command>`. A job that exceeds its cap is
+  the only process the kernel kills. Put the command in `briefs/common.md` and tell every session to
+  run `free -g` first and to wait or ask the manager when less than 25 GB is available. Every Python
+  command a session runs goes through `systemd-run`, including test runs and `python -c` probes,
+  because the sessions' own `tmux` scope has no cap. Adding `-p MemorySwapMax=0` stops a capped job
+  swapping and slowing the whole machine before it is killed. While a job runs, `systemctl --user
+  show <scope> -p MemoryMax -p OOMPolicy` confirms the settings. A capped job that dies shows exit
+  status 137 or "Killed", and the session's transcript says nothing else, so report every such kill
+  to the maintainer with the script name. Setting `DefaultOOMPolicy=continue` in the user manager is
+  a system configuration change, so ask the maintainer before making it.
 - **Cap the threads of every worker.** Set `OMP_NUM_THREADS=1`, `MKL_NUM_THREADS=1`, and
   `OPENBLAS_NUM_THREADS=1` before the pool starts. Workers left on default BLAS threads each ran about
   100 threads, and three sessions starting at once pushed the load average on 32 cores to 76. Put
@@ -83,7 +83,8 @@ slot, the holder's session id, the GPU share, the cores, and the start date.
 - **Read the load before raising a quota or starting a session, and remember that it lags.** The
   one-minute load average falls several minutes after the cause is fixed. `ps` sorted by CPU, with
   the thread-count column `nlwp`, names the offending processes and their thread counts, so message
-  the owning session instead of guessing. Raise a quota only below a load of about 24 on 32 cores, because 28 to 33 means the machine is full.
+  the owning session instead of guessing. Raise a quota only below a load of about 24 on 32 cores,
+  because 28 to 33 means the machine is full.
 - **Check that a quota can change without losing work.** A multiprocessing pool has its size fixed
   when it starts, so raising a quota means a restart. Ask the session whether its results are
   skip-if-exists before telling it to restart, and whether the sweep is parallel at all: a solver in
@@ -120,12 +121,12 @@ merge rules, and the local CI checks.
   build. The maintainer may lift the limit for a named task.
 - **Let a session finish.** Ask the session to keep working until its PR is merged. A session that
   opens a plan PR and goes idle holds its slot and delays the series.
-- **Say in the brief what the session may not decide.** Without that statement in the brief, a session launched
-  an Opus audit on its own. State the Opus rule, the memory cap, the three thread variables, and that
-  shared code stays inside the experiment folder.
+- **Say in the brief what the session may not decide.** Without that statement in the brief, a
+  session launched an Opus audit on its own. State the Opus rule, the memory cap, the three thread
+  variables, and that shared code stays inside the experiment folder.
 - **Tell the session to take the next free experiment id when it opens its plan PR.** An experiment
-  id counts as taken once its plan PR is open, so two briefs that name the same expected id collide. Check
-  `origin/main`, the open PRs, and `data/ml-experiments/`.
+  id counts as taken once its plan PR is open, so two briefs that name the same expected id collide.
+  Check `origin/main`, the open PRs, and `data/ml-experiments/`.
 - **Name sessions after their role.** A title beginning "Design:" or "Discuss:" marks an interactive
   session; every other session the manager creates is a worker.
 
