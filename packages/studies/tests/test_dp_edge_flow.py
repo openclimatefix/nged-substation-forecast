@@ -5,6 +5,8 @@ solver against the same reference. The block-coordinate fit is checked against a
 a three-node graph. The causal window is checked by changing every residual after the cutoff.
 """
 
+from typing import Any, Literal
+
 import numpy as np
 import pytest
 from scipy.optimize import minimize
@@ -14,6 +16,7 @@ torch = pytest.importorskip("torch", reason="studies.dp_gam needs torch: uv sync
 from studies.dp_assimilation import FilterHyperparameters, run_kalman  # noqa: E402
 from studies.dp_edge_flow import (  # noqa: E402
     BandFilterRun,
+    FlowFit,
     LeadHoursSpread,
     PathProblem,
     PathSpec,
@@ -814,3 +817,62 @@ def test_a_large_huber_threshold_turns_the_data_term_into_squared_error():
 
     assert np.max(np.abs(solve_path(problem=robust).flow)) < 2.0
     assert np.max(np.abs(solve_path(problem=squared).flow)) > 10.0
+
+
+def _one_row_flow(*, method: Literal["dp", "admm"] = "dp", **settings: Any) -> float:
+    """Return the flow of a one-row, one-ended path with a squared-error data term."""
+    problem = PathProblem(
+        residual_a=np.array([5.0]), huber_sigmas=1e6, level_penalty=0.5, **settings
+    )
+    return float(solve_path(problem=problem, method=method).flow[0])
+
+
+@pytest.mark.parametrize("method", ["dp", "admm"])
+def test_a_row_is_weighted_by_one_over_the_noise_variance(method: Literal["dp", "admm"]):
+    # Minimising 0.5 * w * (5 - f)**2 + 0.5 * |f| gives f = 5 - 0.5 / w, and w = 1 / noise**2.
+    assert _one_row_flow(method=method, noise_a=2.0) == pytest.approx(3.0, abs=1e-3)
+    assert _one_row_flow(method=method, noise_a=0.5) == pytest.approx(4.875, abs=1e-3)
+
+
+@pytest.mark.parametrize("method", ["dp", "admm"])
+def test_a_reliability_weight_scales_the_row_weight(method: Literal["dp", "admm"]):
+    # w = 0.5 / 4 = 0.125, so f = 5 - 0.5 / 0.125 = 1.
+    flow = _one_row_flow(method=method, noise_a=2.0, reliability_a=np.array([0.5]))
+
+    assert flow == pytest.approx(1.0, abs=1e-3)
+
+
+@pytest.mark.parametrize("method", ["dp", "admm"])
+def test_a_gain_other_than_zero_or_one_scales_the_flow_into_the_residual(
+    method: Literal["dp", "admm"],
+):
+    # Minimising 0.5 * (5 - 2 f)**2 + 0.5 * |f| gives f = (5 - 0.5 / 2) / 2 = 2.375.
+    flow = _one_row_flow(method=method, noise_a=1.0, gain_a=np.array([2.0]))
+
+    assert flow == pytest.approx(2.375, abs=1e-3)
+
+
+def _constant_offset_fit(*, order: list[int], level: float) -> FlowFit:
+    """Fit one edge and two outside paths to a constant offset that either could carry."""
+    residuals = {"A": np.full(30, 3.0), "B": np.full(30, -3.0)}
+    paths = [
+        PathSpec(name="A-B", node_a="A", node_b="B", step_penalty=50.0, level_penalty=level),
+        PathSpec(name="outside:A", node_a="A", step_penalty=50.0, level_penalty=2.0 * level),
+        PathSpec(name="outside:B", node_a="B", step_penalty=50.0, level_penalty=2.0 * level),
+    ]
+    return fit_flows(
+        paths=[paths[i] for i in order],
+        residuals=residuals,
+        noise={"A": 1.0, "B": 1.0},
+        max_sweeps=50,
+    )
+
+
+def test_a_constant_offset_is_ambiguous_without_a_level_penalty_and_unique_with_one():
+    free = [_constant_offset_fit(order=order, level=0.0) for order in ([0, 1, 2], [1, 2, 0])]
+    penalised = [_constant_offset_fit(order=order, level=0.3) for order in ([0, 1, 2], [1, 2, 0])]
+
+    assert free[0].objective == pytest.approx(free[1].objective, abs=1e-6)
+    assert abs(free[0].flows["A-B"][0] - free[1].flows["A-B"][0]) > 1.0
+    assert penalised[0].flows["A-B"] == pytest.approx(penalised[1].flows["A-B"], abs=1e-3)
+    assert penalised[0].flows["A-B"][0] > 2.0
