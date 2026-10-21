@@ -6,21 +6,28 @@ part: H
 also_relevant_to: [hierarchy-and-pooling, switching-detectors]
 status: done
 size: >-
-  complex for the new module studies.dp_hierarchy (own PR, two code reviews); medium for the
-  scripts. Private files only; serving path and degradation rules untouched; several defensible
-  designs, one pre-registered each; callers are this experiment's scripts only.
+  Complex for the new module studies.dp_hierarchy (own PR, two code reviews), medium for the
+  scripts. Stores only private files. Serving path untouched. Degradation rules untouched. Several
+  defensible designs, one pre-registered each. Callers are this experiment's scripts only.
 hypothesis: >-
   A bulk supply point (BSP) reading, fitted jointly with the Primaries beneath it as the sum of
   their demand terms plus the metered generators plus a penalised remainder, with a tuned weight,
   limits the damage that a metering error at one Primary does to that Primary's forecast, without
   raising the Primaries' forecast error when no error is present.
-prediction: see "Predictions" below, written before any fit
-decision_rule: see "Decision rule" below and "Decision rule for step 0"
+prediction: >-
+  The tuned weight would be 0.3 to 3, the extra clean-forecast error at that weight would be within
+  0.02 points, and the largest weight tried (30) would be 0.05 to 0.15 points worse than the tuned
+  weight.
+decision_rule: >-
+  The tuning rule picks a weight only if the rise in clean-forecast error is at most 0.023 points,
+  the limit on extra clean error fixed before any fit, and otherwise picks weight 0. The hint is
+  supported only if the damage cut passes (at least 0.30) in the scored and replicate years, and a
+  pilot on one BSP is capped at partly supported.
 benchmark: >-
   W0, W*, W-max, OR, a direct GAM on the BSP, climatology, manual_heuristic; experiment 111's GAM-K
   and BG2 as reference rows
 row_set_id: >-
-  dp_mw_v1 and dp_mva_dark_v1 (experiment 103); the Primaries in the study; tuning 2023-24, replicate 2024-25, scored 2025-26
+  dp_mw_v1 and dp_mva_dark_v1 (experiment 103); tuning 2023-24, replicate 2024-25, scored 2025-26
 metric: >-
   Day-D+1 quantile score in points (C1); damage in points and ratio of summed damages (C2); BSP
   quantile score (C3)
@@ -28,17 +35,18 @@ verdict: not supported
 production_status: not-for-production
 take_home_message: >-
   The bulk supply point reading halved the damage from injected scale errors, but it made forecasts
-  on clean data worse at every weight above zero, by at least 0.385 points of capacity, about 17
-  times the 0.023-point limit. A synthetic system that closes exactly loses clean accuracy the
-  same way, which suggests the loss comes from adding the reading to the Primaries' fit and not
-  mainly from a wrong multiplier (untested). As a detector of metering errors the reading is weak:
-  a 25% scale error lasting 30 days is found in 0% of cases by a fit that includes it and in 50%
-  by a fit trained only on earlier rows, which then false-alarms on 61% of later windows.
+  on clean data worse at every weight above zero: by at least 0.385 points of capacity in the
+  corrected re-run, about 17 times the 0.023-point limit (2.355 points or more in the first run). A
+  synthetic system that closes exactly loses clean accuracy the same way, so the loss does not
+  come mainly from a wrong multiplier. The cause is untested. As a detector of metering errors the
+  reading is weak: a 25% scale error lasting 30 days is found in 0% of cases by a fit that includes
+  it and in 50% by a fit trained only on earlier rows, which then false-alarms on 61% of later
+  windows.
 advice:
   - >-
     Do not add a bulk supply point term to the Primaries' loss: even an exactly specified synthetic
-    system lost clean accuracy at every weight from 0.0003 up, probably because the reading carries
-    the Primaries' own autocorrelated noise, which we did not test (Figure 3).
+    system lost clean accuracy at every weight from 0.0003 up, possibly because the reading carries
+    the Primaries' own autocorrelated noise (cause untested, Figure 3).
   - >-
     Set the scale of a bulk supply point row from its residual against the Primaries' fitted values
     and not their readings, which was 2.9 MW and not 1.2 MW here (arm B).
@@ -46,63 +54,97 @@ advice:
     Check the rise in clean-forecast error from a hint at the smallest weight before tuning
     anything else; a weight of 0.1 raised it by 1.1 to 2.4 points here (Figure 1).
   - >-
-    Do not read a bulk supply point residual with a fixed 3-standard-deviation threshold in
-    service, because a frozen fit drifts and the threshold false-alarmed on 44% to 83% of 30-day
-    and 90-day windows, and on 14% to 18% of 24-hour windows, in the year after the cut (closure
-    audit).
-  - >-
-    Report metering-error detection for a fit that is refitted with the injected series included,
-    because a running service would make that fit; at the tuning cut a fit that cannot see the
-    series detected a 30-day 25% scale error in 50% of injections against 0% for the refit (closure
-    audit).
+    Judge a bulk supply point residual as a metering-error monitor only with a fit refitted with the
+    injected series included, and do not use a fixed 3-standard-deviation threshold in service: at
+    the tuning cut a 30-day 25% scale error was found in 0% of injections by the refit and 50% by a
+    fit trained only on earlier rows, which false-alarmed on 44% to 83% of 30-day and 90-day
+    windows in the year after the cut (closure audit).
 date: 2026-10-20
 pr: 1417
 ---
 
 # Differentiable physics, H: does a bulk supply point reading limit the damage from a Primary's metering error?
 
-**We asked whether the power reading of a bulk supply point (BSP) can protect the forecasts of the
-Primary substations beneath it from a metering error at one of them.** A BSP is where the
-distribution network takes power from the transmission network. Its reading is roughly the sum of
-the Primaries' power minus the power of the metered generators. We fitted each Primary's forecast
-together with the BSP reading, with a weight on how closely the fit must match that reading (weight
-0 means separate fits). We then injected metering errors into one Primary's history: gaps, stuck
-values, and scale errors. We measured the damage, meaning the rise in that Primary's forecast error,
-with and without the BSP reading. Errors are in points, where 1 point is 1% of the Primary's
-effective capacity. **The BSP reading halved the damage from scale errors, but it made forecasts on
-clean data worse at every weight above zero: by at least 0.385 points at the smallest weight of the
-corrected re-run (0.003), about 17 times the 0.023-point limit, and by at least 2.3 points in the
-first run.** The tuning rule written into the plan before any fit therefore chooses weight 0. The
-verdict is `not supported`, for this joint fit with the multipliers on the Primaries' and generation
-sums in the BSP equation fixed at 1.
+**Adding the bulk supply point reading to the Primary substations' fit halved the damage from a
+scale error in one Primary's history, but it made forecasts on clean data worse at every weight
+above zero, so the reading should not go into the Primaries' loss.** The smallest clean-data loss
+was 0.385 points, about 17 times the 0.023-point limit. An exactly specified synthetic system lost
+clean accuracy the same way, so the loss does not come mainly from a wrong multiplier. The cause is
+untested. The next thing to try is the bulk supply point reading as a separate monitor, outside the
+Primaries' fit. The verdict is `not supported`, for this joint fit with the multipliers on the
+Primaries' and generation sums fixed at 1.
 
-![Damage from injected errors and the rise in clean-forecast error, against the weight on the BSP reading](figure_1_tradeoff.svg)
+**Why `not supported` and not `inconclusive`.** The pre-registered tuning rule allows a
+clean-forecast rise of at most 0.023 points, the limit on extra clean error fixed before any fit.
+That rule failed at every weight tried, so the result stands on its own. Arm B was an extra arm that
+stopped at its plumbing check, and it does not change the verdict.
 
-**Figure 1 shows two runs of the same tuning, and the page labels which is which.** (The *tuning
-cut* is 2023-07-01: the fit reads only earlier data, and the *tuning year* is the 12 months after it.) The *first run*
-used a BSP-row scale of 1.2 MW, taken from the closure regression on the Primaries' readings. Arm B's
-plumbing check (below) showed that the joint fit's BSP row carries the Primaries' fitted variation,
-2.9 MW, so the *re-run* used 2.9 MW and a grid that reaches lower weights. The corrected scale makes
-a given weight act about 6 times weaker (the scale ratio, 2.9 over 1.2, squared). Both runs use the same 200 injected errors. The corrected
-re-run was done after seeing the first run (post hoc). The re-run changes the numbers and not the
-verdict.
-No arm B tuning run exists, because arm B stopped at its plumbing check.
+A **Primary substation** is a substation that takes power from a bulk supply point. A **bulk supply
+point (BSP)** is where the distribution network takes power from the transmission network. The BSP
+reading is roughly the sum of the Primaries' power minus the power of the metered generators beneath
+it. We fitted each Primary's forecast together with the BSP reading. The **weight** says how closely
+the fit must match that reading, and weight 0 means separate fits. We then injected metering errors
+into one Primary's history (gaps, stuck values, and scale errors) and measured the **damage**, which
+is the rise in that Primary's forecast error, with and without the BSP reading. A **point** is 1% of
+a Primary's effective capacity, and every error below is a mean absolute error in points. The data
+come from [experiment 103](../00103-differentiable-physics-1-data-look/result.md), and [experiment
+36](../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) had found that summing the Primary
+forecasts added little at the BSPs. The plan was committed before any fit, and the commit order
+proves it.
 
-**Summary.** Numbers are in `tuning_report.md` (both runs), `audit_report.md`, and
-`armb_plumbing.json`; no interval was computed.
+![Damage and clean-error rise against weight](figure_1_tradeoff.svg)
 
-- **The BSP reading halves the damage from scale errors.** Over 200 injected errors at two
-  Primaries (60 gaps, 60 stuck runs, 80 scale errors) in the tuning year, the summed extra error
-  from scale errors fell from 33.0 points at weight 0 to 16.3 at weight 30 in the first run and to
-  16.8 in the re-run, about half (51% and 49%), about 0.2 points per injection. Pooling all 200
-  injections gives a 41% cut in the first run (32.8 to 19.4) and 40% in the re-run.
+**Figure 1 shows two runs of the same tuning.** The *tuning cut* is 2023-07-01: the fit reads only
+earlier data, and the *tuning year* is the 12 months after it. The *first run* set the BSP row's
+scale to 1.2 MW, from a regression on the Primaries' readings. Arm B's plumbing check showed that
+the joint fit's BSP row carries the Primaries' fitted variation, 2.9 MW, so the *re-run* used 2.9 MW
+and a grid reaching lower weights. A given weight then acts about 6 times weaker (2.9 over 1.2,
+squared). Both runs use the same 200 injected errors. The re-run came after seeing the first run, so
+it is post hoc, and it changes the numbers and not the verdict.
+
+![Closure multipliers per BSP and cut](figure_2_coefficients.svg)
+
+**Figure 2 shows the closure audit's multipliers.** The audit fits, per BSP, how much of each
+Primary's reading and of the generation enters the BSP reading.
+
+![Clean-error rise of synthetic systems against weight](figure_3_plumbing.svg)
+
+**Figure 3 shows arm B's plumbing check.** Synthetic systems built exactly as the fit assumes still
+lose clean accuracy at every weight.
+
+## Arms and rows
+
+- **Hint fit (the pilot).** One BSP, the one that closes in the audit, with a joint fit of its
+  Primaries and one remainder step penalty. Each Primary's demand has a smooth drift, and the fit is
+  made once before each scored year with no Kalman filter re-learning the level. The plan caps
+  a pilot at `partly supported`.
+- **Arm B (plumbing check only).** It asked whether the hint stops hurting clean forecasts once its
+  multipliers are fixed at the closure audit's fit. The check used 20 synthetic systems built
+  exactly as the fit assumes, plus a control with the multipliers 15% wrong. The stop rule was that
+  a failed check ends the arm, and the check failed twice (see the findings below), so arm B's
+  tuning grid was never run.
+- **Row set.** `dp_mw_v1` and `dp_mva_dark_v1` from experiment 103. Tuning year 2023-24, replicate
+  year 2024-25, scored year 2025-26. Only the clean-error grid was fitted at the replicate and
+  scored cuts.
+- **Injections.** 200 errors at two Primaries (60 gaps, 60 stuck runs, 80 scale errors of 20%), 10
+  seeds per cell and Primary.
+- **Not produced.** The score is the mean absolute error of a point forecast, so there are no
+  quantile scores, tail rows, climatology or `manual_heuristic` rows, BSP-forecast arms, or
+  intervals. The known-answer gate was not run, because the tuning rule chose weight 0.
+
+## Headline numbers
+
+- **The BSP reading halves the damage from scale errors.** The summed extra error from scale errors
+  fell from 33.0 points at weight 0 to 16.3 at weight 30 in the first run and to 16.8 in the re-run
+  (51% and 49% of the damage left), about 0.2 points per injection. Pooling all 200 injections
+  gives a 41% cut in the first run (32.8 to 19.4 points) and 40% in the re-run.
 - **The BSP reading does nothing for gaps and stuck runs.** Neither did measurable damage at
   weight 0 (summed -0.1 points each), and weight 30 added 1.2 to 1.8 points in both runs.
-- **The BSP reading makes clean forecasts worse.** The clean-year mean absolute error rose, against
-  separate fits, as follows (tuning year; the replicate and scored years are in
-  `tuning_report.md`):
+- **The BSP reading makes clean forecasts worse.** The tuning-year clean mean absolute error rose
+  against separate fits as follows, with a limit of 0.023 points (the replicate and scored years
+  are in `tuning_report.txt`):
 
-  | Weight | First run (1.2 MW) | Re-run (2.9 MW) |
+  | Weight | First run (1.2 MW), points | Re-run (2.9 MW), points |
   |---|---|---|
   | 0.003 | not tried | 0.385 |
   | 0.03 | not tried | 0.765 |
@@ -110,564 +152,62 @@ No arm B tuning run exists, because arm B stopped at its plumbing check.
   | 1 | 4.222 | 2.989 |
   | 30 | 4.652 | 4.564 |
 
-  The limit was 0.023 points. The tuning rule then chooses weight 0 in both runs. The gate and the
-  injection runs of the replicate and scored years were not run, because with the chosen weight at 0
-  gate reading 6 (a damage cut of at least 0.30) cannot pass. Only the clean-error grid was fitted
-  at the replicate and scored cuts, in both runs. The plan's verdict list says `not supported`
-  only when the gate passes, so the verdict word is our reading of the tuning rule's "C2 cannot
-  pass" together with the rise at weight 30 (the arm W-max), and the pilot cap of `partly
-  supported` bounds it anyway.
-- **A hypothesis about the cause.** The hypothesis written into the first plan was that the closure
-  multipliers, fixed at 1, are wrong: the audit fits 0.85 to 1.16 (Figure 2). The arm B check argues
-  against the multipliers as the main cause. A synthetic system built exactly from the model's form, with the
-  audit's multipliers and the Primaries' own autocorrelated noise in the BSP reading, loses clean
-  accuracy at every weight (Figure 3). We hypothesise that the reading carries the sum of the
-  Primaries' noise and the fit bends to explain it. We did not run a control without that noise,
-  and a coding fault is not excluded, because the known-answer gate was not run.
+- **The tuning rule chooses weight 0 in both runs,** so the damage-reduction gate (a cut of at least
+  0.30) cannot pass. No interval was computed.
 - **The BSP reading is a weak monitor.** At the tuning cut a 30-day 25% scale error is found in 0%
-  of injections when the fit includes the injected series and in 50% when the fit is trained only
-  on earlier rows (2% and 29% at the replicate cut). The fit trained only on earlier rows raises a
-  false alarm on 1.2% of windows in the data it was fitted to and on 61% of windows in the year
-  after the cut.
+  of injections when the fit includes the injected series, and in 50% when the fit is trained only
+  on earlier rows (2% and 29% at the replicate cut). The earlier-rows fit raises a false alarm on
+  1.2% of windows in the data it was fitted to and on 61% of windows in the year after the cut.
 
-**The pilot omitted several parts of the plan.** Each is a labelled simplification:
+## Closure-audit findings
 
-- one BSP (the one that closes), with its MW and MVA Primaries, and one remainder step penalty;
-- a smooth drift in each Primary's demand, without sudden steps, and a fitted solar capacity that
-  scoring holds at its last value;
-- a fit made once before each scored year, with no Kalman filter re-learning the level (the
-  filter-on reading, the production-relevant one, was therefore not produced, and the plan caps a
-  pilot at `partly supported`);
-- a score that is the mean absolute error of a point forecast, with no quantile score, tails,
-  climatology or `manual_heuristic` rows, BSP-forecast arms, or intervals;
-- tuning on 10 seeds per cell and Primary (200 injections) and not 30 per kind, with scale errors of
-  20% and not the audit's 10%, 25%, and 40%;
-- generation series enter only if they hold readings in 90% of the BSP's rows.
+- **One BSP closes in the training years, and the other does not.** At the pilot BSP the in-sample
+  residual is 2.2 to 3.2 points (1.2 to 1.8 MW) at the three cuts, over six winters with a median
+  residual within 1 MW.
+- **The fitted multipliers are 1.01 to 1.16 on the Primaries and 0.85 to 0.90 on the generation.**
+- **Out of sample, the frozen fit drifts.** The residual scale is 5.5 points with a +3.7 MW median
+  offset. The other BSP has an in-sample residual of 11 points.
+- The full numbers are in `audit_report.txt` (first run: `audit_report_first_run.txt`).
 
-## What the closure audit found
-
-![Closure multipliers of the audit, per bulk supply point and cut](figure_2_coefficients.svg)
-
-**One BSP closes in the training years, and the other does not.** At the pilot BSP the in-sample
-residual is 2.2 to 3.2 points (1.2 to 1.8 MW) at the three cuts, over six winters with a median
-residual within 1 MW. Its fitted multipliers are 1.01 to 1.16 on the Primaries, 0.85 to 0.90 on
-the generation, and 1.03 to 1.10 on the Primaries that report in megavolt-amperes. Out of sample,
-the frozen fit leaves a residual scale of 5.5 points and a +3.7 MW median offset. The other BSP has
-too little generator history, so its power sits in the remainder: 11 points in-sample. The full
-numbers are in `audit_report.md`.
-
-## Follow-on arm B (stopped at its plumbing check): the audit-calibrated hint
-
-**This section is the plan for a second arm of the same experiment, written before any fit of
-arm B.** The first joint fit above stays as written and keeps its first-run numbers. Arm B asks
-whether the same hint stops hurting clean forecasts once its multipliers are fixed at the closure
-audit's fit. A Sonnet review of this plan found 14 issues; all are applied except where noted in
-"Review triage" below. Because the decision rule gains a minimum damage reduction that the first
-fit's rule did not have, that addition is labelled post hoc.
-
-**Hypothesis.** A BSP hint whose multipliers on the MW Primaries, the MVA Primaries, and the
-generation are fixed at the closure audit's fit raises the clean forecast error of the MW Primaries
-by no more than 0.023 points at some weight above 0, and at that weight it removes at least 30% of
-the summed damage from injected errors.
-
-**Prediction (can fail).** We put the chance that some weight meets both conditions at about 10%.
-The module's test `test_fixed_closure_coefficients_are_recovered_and_change_the_fit` finds that a
-constant multiplier error is mostly absorbed by the remainder's level, so the multipliers are
-probably not the main cause.
-
-**Design, with the leakage rules.**
-
-- **Which BSP and cut.** The pilot BSP (the one the audit closes, with a generation multiplier of
-  0.85 at the tuning cut), at the tuning cut 2023-07-01 and its tuning year. The first BSP has too
-  little complete history there ("cannot tell") and is not used.
-- **Which values are fixed.** Only the three multipliers of the audit's fit at the tuning cut: the
-  Primaries' (1.01), the MVA Primaries' (1.03), and the generation's (0.85). The unmetered solar
-  capacity, the heating slope, the level, and the steps stay free parameters of the joint fit's
-  remainder. The audit's regression uses the observed series and the joint fit's remainder has the
-  same terms, so the multipliers carry over; the audit's L1 step penalty differs in form and is not
-  carried over.
-- **Frozen file.** The multipliers are written to one file before arm B runs and read from it, so
-  no later run can change them. They come from rows before the cut only: the audit's step penalty
-  is chosen by its own 4-fold block cross-validation on those rows, the fit sees the observed
-  Primary series and never an injected one (the tuning-year injections lie after the cut and enter
-  only the joint fit's Primary readings), and none of the audit's after-the-cut diagnostics sets
-  anything.
-- **Weights.** {0.0003, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1}, because the first grid's 0.1
-  already cost 2.4 points and a cost linear in the weight would still be about 0.07 at 0.003.
-- **Injections and score.** The same 200 injections (10 seeds per cell and Primary, same seeds), the
-  same frozen-fit mean absolute error in points of effective capacity, and the same 0.023-point
-  limit as the first joint fit. Units are points of effective capacity throughout, and the BSP row
-  converts them to MW once, through each Primary's effective capacity.
-
-**Plumbing check first, blocking.** Twenty synthetic systems at the tuning cut are built as the
-known-answer gate builds them: the Primaries' truth is their separate fits plus autocorrelated
-noise, the remainder's truth is the real joint fit's remainder, and the BSP is built exactly from
-these with the audit's multipliers. At weight 0.1 the clean error rise must be under 0.023 points,
-which excludes a coding fault of the kind the first fit's missing gate left open. A paired negative
-control uses the same systems with the fit's multipliers deliberately 15% wrong: it must cost more
-than the exact fit, otherwise the check cannot show that it detects a fault, and arm B's conclusion
-carries that caveat. If the exact check fails, arm B stops as `inconclusive` until the fault is
-found; the first run is kept and the fix is labelled post hoc.
-
-**Decision rule, fixed now.** A weight passes if all of these hold: the clean error rise at the
-weight has a 95% month-resampled interval whose upper end is at most 0.023 points (the clean score
-is deterministic, so its noise is the month-to-month swing); the clean rise in the winter months
-(November to March), judged with the audit's cold-snap threshold, is also at most 0.023 points, so a
-winter loss holds the arm back even if the annual mean passes; and the summed damage over the 200
-injections is at least 30% below weight 0's, with a 95% bootstrap interval over injections whose
-lower end is above 0. The chosen weight is the passing weight with the largest damage reduction.
-
-- **If a weight passes,** the replicate and scored years and the gate run for it under the first
-  plan's rules. A failed gate reading caps the verdict at `inconclusive`; every change after seeing
-  the module or a result is labelled post hoc; and a gate reading must be able to fail.
-- **If no weight passes,** arm B stops at `not supported`, including when the clean error rise at
-  0.0003 is still above 0.023 points: we then conclude that a BSP term added to the Primaries'
-  loss costs clean accuracy at every weight tried, fixed multipliers or not. The BSP reading is
-  recorded as a weak monitor (the first run's 50% detection and 61% false alarms in the year after
-  the cut), not as a recommendation.
-
-**Reports.** Figure A plots the damage reduction (percent of weight 0's summed damage, with its
-bootstrap interval over injections) against the clean error rise (points, with its month-resampled
-interval), one point per weight, on a logarithmic weight axis, with the 30% and 0.023 limits as
-reference lines. A table gives the winter breakdown (November to March, with the number of winters
-and cold-snap days; fewer than three cold-snap days is "cannot tell"). Figure B repeats the audit's
-multipliers with their 80% intervals from resampling whole calendar months, per BSP by position,
-and no count of a BSP's series is shown.
-
-**Compute.** One GPU job at a time, under 8 GB of host memory (the first run used 1.7 GB) and about
-6 GB of GPU memory. The tuning grid is 200 injections at about 17 seconds for a batch of 8 weights
-(the first run took 35 minutes for 200 injections with 7 weights), so about an hour; the plumbing
-check is 20 systems with 3 solves each, about 20 minutes. If a weight passes, each of the two later
-cuts is 200 injections with 3 weights and an oracle fit, about 40 minutes each, and the gate is 100
-systems with 3 solves at about 15 seconds, about 80 minutes: about 3 hours more.
-
-**Result: arm B stopped at its blocking plumbing check, and its tuning was not run.** The check
-failed twice, and both runs are committed (`armb_plumbing_first_run.json`, `armb_plumbing.json`).
+## Arm B plumbing check
 
 - **First run (before the BSP-row scale correction).** The exact synthetic systems rose by 13.0
-  points at weight 0.1, and the control with multipliers 15% wrong rose by 12.0, so the check failed
-  and could not tell the two apart. The check exposed a fault in the first fit's setup: the BSP row's scale
-  was 1.2 MW, from the closure regression on the Primaries' readings, when the joint fit's BSP row
-  carries the Primaries' fitted variation, 2.9 MW. The correction is post hoc.
-- **Second run (after the correction).** The exact systems still rose by 6.0 points at weight 0.1,
-  and by 0.05 points at the smallest weight, 0.0003, which is above the 0.023 limit (Figure 3). The
-  control rose by about the same, so the check cannot detect a wrong multiplier. The 20 synthetic systems are built from the pilot's fitted Primaries, and the numbers are medians.
-- **What the plan says to do.** The rule fixed before arm B says a failed check stops the arm as
-  `inconclusive` until the fault is found. The fault was found and the check still failed at every
-  weight the grid reaches, so the decision rule could not pass a weight. We therefore did not run
-  arm B's tuning grid. The corrected-scale re-run of the first fit's tuning (Figure 1, dashed)
-  was run instead, as a labelled post hoc check, and it also finds no weight within the limit.
-
-![Clean-error rise of exactly specified synthetic systems against the weight (second run, after the scale correction; median of 20 synthetic systems)](figure_3_plumbing.svg)
-
-**Review triage.** Applied: all 14 findings of the Sonnet plan review. Finding 12 (a probability) is
-stated as about 10%. Finding 7's per-BSP count rule also changes the page's audit paragraph, which no
-longer says how much of the other BSP's generation is missing. No finding was rejected.
+  points at weight 0.1, and the control with multipliers 15% wrong rose by 12.0, so the check could
+  not tell them apart. The check exposed the 1.2 MW scale fault described under Figure 1.
+- **Second run (after the correction).** The exact systems still rose by 6.0 points at weight 0.1
+  and by 0.05 points at the smallest weight, 0.0003, above the 0.023 limit. The control rose by
+  about the same, so the check cannot detect a wrong multiplier. Numbers are medians of the 20
+  systems (`armb_plumbing_first_run.json`, `armb_plumbing.json`).
+- **Cause of the loss (untested).** We hypothesise that the BSP reading carries the sum of the
+  Primaries' own autocorrelated noise, and the fit bends to explain it. We did not run a control
+  without that noise.
 
 ## Checks
 
 - **Mean and median forecasts, and quantile scores, do not apply,** because the pilot scores a
   point forecast by its mean absolute error.
 - **Trigger 1 (a control fails) fired:** arm B's plumbing check failed twice.
-- **Trigger 2 (a contradiction) fired.** The result contradicts the plan's prediction that clean
-  error would change by no more than 0.02 points, and the finding of
-  [experiment 36](../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) that bottom-up children
-  add 0.04 to 0.19 points at the BSPs, and the cause was not tested.
-- **Trigger 7 (dependence) also applies,** because a possible follow-on experiment depends on
-  this result. An Opus audit is requested from the manager before the merge.
+- **Trigger 2 (a contradiction) fired.** The result contradicts the prediction that clean error
+  would change by no more than 0.02 points, and it contradicts the finding of
+  [experiment 36](../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) that bottom-up children add
+  0.04 to 0.19 points at the BSPs. The cause was not tested.
+- **Trigger 7 (dependence) also applies,** because a possible follow-on experiment depends on this
+  result.
 - **Triggers 3 to 6 do not apply or were not run:** the score is a mean absolute error (trigger 3),
   no leave-one-out was run (4), no arm is nested in another (5), and no interval was computed (6).
-- **Predictions that failed:** the chosen weight was predicted at 0.3 to 3 and came out at 0, and
-  the extra clean error at weight 30 was predicted within ±0.02 points and came out above 4.
+- **Predictions that failed:** the chosen weight W* was predicted at 0.3 to 3 and came out at 0, and
+  the extra clean error at W* was predicted within +/-0.02 points. The extra clean error at weight
+  30 was predicted 0.05 to 0.15 points worse than at W*, and it came out at 4.564 points.
 
-## Lessons
+## Caveats
 
-- **The hint as built was far over the limit, and so was an exactly specified synthetic system.**
-  The hypothesis that the closure multipliers are the main cause is weakened and untested.
-- **One possible next experiment.** Keep the BSP reading out of the Primaries' loss and use its
-  residual against the Primaries' fitted values as a monitoring signal, scored for detection and
-  false alarms in the year after the cut. Whether to run it is the maintainer's decision.
+- A coding fault is not excluded, because the known-answer gate was not run.
+- The filter-on reading, the production-relevant one, was not produced.
+- Only one BSP was fitted, so the finding may not carry to a BSP with different Primaries.
 
-## The plan as committed, with its clarifications
+## What to try next
 
-**Everything below was written before the results and is kept as committed.** The pilot's
-simplifications are the clarifications near the end.
-
-### What this experiment asks, and what the maintainer will accept
-
-**The question is robustness, not mean-forecast skill.** The maintainer is content if the hierarchy
-gives only explainability and robustness to metering errors, so C2 is the headline and C1 a
-non-inferiority check with a gain bonus. Experiment 36 found bottom-up children add 0.04 to 0.19
-points at the two BSPs, so no large clean-data gain is predicted.
-
-**The hint is soft:** the BSP rows carry a tunable weight w, and a remainder term absorbs whatever
-the Primaries and metered generators do not explain. At w = 0 the fit equals the separate fits (P1).
-
-**There is no GSP fit:** the GSP relation cannot be closed (most of the power at each grid supply point is unmetered).
-The crude BSP fit had a daily-mean residual standard deviation of 1.8 to 2.7 MW, above the median
-switching transfer (1.0 MW); step 0 tests whether a better fit shrinks it.
-
-**Open assumptions, recorded on the page and not asked of NGED (deferred to January):** nine
-unmetered partner Primaries sit under unknown BSPs, and some 11 kV generation may remain inside a
-Primary's series. Step 0 measures their footprint through the remainder's weather term, the
-dropped-sum sensitivity, and a_G.
-
-### Step 0 (H0): the BSP closure audit
-
-**Fit, per BSP b, on rows before each cut (three cuts), by the same convex solver:**
-
-BSP_b(t) = a_P · Σ_{metered MW Primaries under b} y_i(t) − a_G · Σ_{metered generators at b} g_k(t)
-+ c · Σ_{MVA Primaries under b} y_m(t) + q_b · pv_shape(t) + level_b + drift_b(t) + h_b · heat(t)
-+ shape_b(hour) [+ κ · loss(t)]
-
-- The Primaries enter as their observed readings (a diagnostic, not the joint model); the two series of one
-  Primary enter summed; generators enter as the observed sum, and only the sum and its coefficient are
-  ever published.
-- BSPs and Primaries are import-positive, generators export-positive. a_P, a_G, c are free in
-  [0, 1.5]; q_b ≥ 0 is an unmetered PV capacity on the pinned solar shape; drift_b has monthly hat
-  functions with an L1 step penalty tuned on the tuning year by cross-validated residual variance.
-- **The unmetered Primaries carry weather-driven demand,** so the remainder has one heating slope h_b
-  (on the BSP's area-mean temperature below 15 °C) and one daily shape (48 half-hour effects, ridge
-  penalised). A coefficient a_P near 1 is therefore not read as evidence of closure. The audit
-  reports the fit with and without these two terms; the loss term stays only if it lowers the
-  tuning-year residual variance by 5% or more.
-- A sensitivity fit drops that summed Primary, because some generation may remain inside its series.
-
-**Reports, per BSP, in MW and as a share of the BSP's median load:**
-
-1. The coefficients a_P, a_G, c, q_b, h_b with month-block bootstrap intervals.
-2. The residual's robust half-hourly scale and its block-mean standard deviation over 6, 24, 72
-   hours, 30 days, and 90 days.
-3. The residual by hour band and calendar month (does the -9.3 MW midday trough survive?).
-4. **Injected visibility, at C2's own window lengths:** the injection harness of experiment 43 adds
-   metering errors (a stuck run of 24 hours, and scale errors of 30 and 90 days) and conserved
-   cross-BSP transfers to the Primaries' side, at 10%, 25%, and 40% of the injected Primary's median
-   load, 100 seeds per cell in each of the tuning and replicate years. A window is **detected** if
-   the matched-filter shift of the residual's window mean exceeds 3 times the block-mean standard
-   deviation for that window length, with a false-alarm rate (from 1,000 placebo windows outside
-   injections) of at most 5%. Gaps need no detection and are not scored here.
-5. Detection is also reported with a fit trained on pre-injection rows only; the lower counts.
-
-#### Decision rule for step 0, fixed before any residual is read
-
-Let `recall30` be the detection rate for a 30-day scale error of 25% of the injected Primary's median
-load, in the tuning year, and `recall1d` the rate for a 24-hour stuck run of the same size. Per BSP:
-
-- **informative** if `recall30` ≥ 0.5 and the false-alarm rate ≤ 0.05;
-- **weak** if `recall30` is 0.2 to 0.5, or the false-alarm rate exceeds 0.05;
-- **uninformative** if `recall30` < 0.2.
-
-`recall1d` and the a_P band are reported, not decisive. Then step 1 runs as follows:
-
-- **at least one BSP informative:** H1 runs on every informative BSP's Primaries, full design;
-- **none informative:** H1 runs anyway as a **pilot** on the BSP with the highest `recall30`; the
-  verdict cannot exceed `partly supported`, and C2 must hold in both years;
-- **`not supported` is kept for a pilot whose C2 also fails;** the take-home then says that hierarchy
-  gives explainability (the fitted shares, the residual by band) but no robustness.
-
-### Step 1 (H1): the joint fit and the weight
-
-**Model, per BSP b chosen by step 0, with metered Primaries i ∈ I_b:**
-
-- Primary row: y_i(t) = d_i(t; θ_i) + ε, with d_i the convex GAM of the series (experiment 106's
-  all-years form: drift with monthly knots, pinned capacity; experiment 111's hand-filtered masks,
-  applied identically to every arm).
-- BSP row: BSP_b(t) = Σ_{i∈I_b} d_i(t; θ_i) + (MVA Primaries' dark-row demand terms) − Σ_k g_k(t) +
-  r_b(t; ρ_b) + ε_b. The **penalised remainder** r_b is the audit's: level, drift with an L1 step
-  penalty, unmetered PV capacity q_b ≥ 0, one heating slope, one daily shape, and the loss term if
-  step 0 kept it (the sum in it is the observed sum in fitting and the forecast sum in forecasting).
-- **MVA Primaries enter the BSP row with demand terms only** (dark-row fits; |S| hides the sign in
-  daylight); their embedded PV joins q_b. That Primary's two series enter as one summed term.
-- **Joint objective:** Σ_i ‖y_i − d_i‖² / σ_i² + w · Σ_b ‖BSP_b − (…)‖² / σ_b² + the GAM and
-  remainder penalties, with σ the robust half-hourly residual scale on pre-cut rows. This is a
-  bounded least-squares problem in the stacked coefficients, so it uses `dp_gam`'s Gram accumulation
-  and `solve_bounded_quadratic`; the new module stacks the designs and adds the cross-block entries.
-- Generators enter as known inputs, sign -1; a missing generator reading drops that BSP row.
-
-**Weight grid:** w in {0, 0.1, 0.3, 1, 3, 10, 30}, relative to a Primary row of equal noise.
-
-**Tuning rule, on the tuning year only, pre-registered:**
-- **W\*** is the w with the largest summed damage reduction on the tuning-year injections T (30
-  seeds per kind and Primary, disjoint from the C2 seeds), subject to a clean-score cost of at most
-  0.023 points against W0 (the Part 4 C4 noise reference, ±0.023 at 97.5% for the mean score). A
-  clean-cost limit alone would drift to w = 30.
-- **W-max** is w = 30, kept as a sensitivity showing the clean-score cost of a heavy hint.
-- If every w > 0 breaks the clean-cost limit, W\* = W0 and C2 cannot pass.
-
-**Years.** Tuning 2023-07-01 to 2024-06-30 (w, injections T, gate systems); replicate 2024-07-01 to
-2025-06-30 (C1 and C2 must hold here too); scored 2025-07-01 to 2026-06-30 (the verdict).
-
-Each cut trains on rows before it only, from each site's start (experiment 103's start cuts). **One
-frozen fit per cut and arm, with experiment 111's Kalman filter (hyperparameters fitted on the tuning
-year); the contrasts are screening-tier and could depend on a monthly refit, which the page says.**
-Weather is ERA5 and CAMS (lab conditions); no ENS arm.
-
-**Caveats the page carries:** hindsight capacity vintage (the 2023-07-01 cut reads one about 5 weeks
-later); shared hand-filtered masks; filter hyperparameters in-sample for the replicate year; ERA5
-is 5 days late, so every number is a ceiling.
-
-### Arms
-| Arm | Joint fit | Weight | Filter |
-|---|---|---|---|
-| W0 | joint code, BSP rows present | 0 | plain Kalman |
-| W\* | as above | tuned | plain Kalman |
-| W-max | as above | 30 | plain Kalman |
-| OR | W\*, with the injected windows masked out of the injected Primary's rows (oracle) | tuned | plain Kalman |
-| BD | direct GAM on the BSP (convex, drift, pinned PV) | none | none |
-| BU0 | BSP forecast: sum of W0's Primary forecasts + remainder | 0 | none |
-
-**BD and BU0 score C3;** climatology and `manual_heuristic` are scored at both levels. C2 is also
-scored with the filter off (W0, W\*, W-max, OR) so that the filter's level re-learning is not
-credited to the hint.
-
-### Plumbing controls and the blocking known-answer gate
-
-**Plumbing controls run first; an unfixable failure makes the verdict `inconclusive`:**
-
-- P1: the stacked design reproduces `dp_gam`'s single-site Gram matrix block by block (relative error
-  under 1e-9), and the joint solution at w = 0 equals the separate fits (coefficients to 1e-6);
-- P2: with a noise-free BSP built exactly as Σ d_i − Σ g + remainder, the joint fit at w = 1
-  recovers every d_i's sum to 1e-4 relative;
-- P3: no fit reads a row after its cut; every σ and L1 scale uses pre-cut rows; emptying the label
-  file changes no arm except the hand-filtered mask arms;
-- P4: the audit's a_G estimate lies in 0.5 to 1.5 on the real BSP (-0.8 to -1.2 expected), else step 1
-  stops on that BSP.
-
-**Known-answer gate on synthetic systems (blocking: a failed reading stops C1 and C2 and caps the
-verdict at `inconclusive`; readings are frozen, and a redefined rerun is forbidden, as experiment
-109's post hoc reruns showed it must be).** 100 synthetic systems with the real Primaries' calendars
-and weather, truths fitted to each Primary (experiment 113's builder), a BSP built from the fitted
-demand terms plus a known generator sum and remainder, and noise as large and autocorrelated as the
-real step-0 residual. **Half the systems close exactly; the other half have a_P = 0.9 and a
-remainder shape the model lacks (a winter-evening hump),** because a truth in the model's own form
-flatters the hint (experiment 113's caveat). Readings, at W\* and at W0:
-
-1. **Identification:** the 80% month-block bootstrap intervals (experiment 113's I1, widened by
-   sqrt(m/(m-1))) cover the true heating slopes and latest capacity 70 to 90% of the time. Experiment
-   113's verdict was `refuted`: coverage was 84% each at realistic noise, but capacity coverage was
-   52% with independent noise, from a bias of about 0.24 points at the drift step of 3,000. The gate
-   uses the real-noise cell at the tuned step and reports the independent-noise cell beside it.
-   **Fallback:** coverage under 70% still lets C2 run, and the cards carry no intervals.
-2. **No harm:** W\*'s median heating-slope interval width is at most W0's, and its median capacity
-   bias at most 1.5 times W0's. Remainder: q_b within 30%, level within 0.5 MW of truth.
-4. **Error leak control:** with a 25% scale error at one synthetic Primary for 30 days, the siblings'
-   median damage at W\* is at most 1.2 times W0's.
-5. **Sabotage (the gate can fail):** with one in-sum Primary dropped from the BSP row, the
-   remainder's level moves beyond 3 clean-system standard deviations in at least 80% of 100 systems.
-6. **Positive control for the claim (also C2's power check):** with a 25% scale error for 30 days at
-   one synthetic Primary, W\* cuts that Primary's damage by at least 0.30 at the median system, in both
-   halves of the systems. This reading fails if the weight is effectively zero. **Clarified after
-   the module was written, before any fit (see "Clarifications"): the damage is scored on the clean
-   scored year, outside the corrupted window, with the pilot's one remainder step penalty.**
-7. **Power for C1:** the paired half-width (99.17% interval) of W\* minus W0 on the clean synthetic
-   systems, at the **real site count** under the chosen BSPs (2 to 3 sites, not 5), is measured and
-   printed before any real fit. If it exceeds 0.03 points, the verdict is capped at
-   `partly supported`. With 100 systems the 98.3% half-width on a coverage near 0.8 is about ±0.10,
-   so the 70 to 90% band separates 80% from 60%.
-
-### Planned contrasts
-
-**Three contrasts, Bonferroni-corrected, each with site counts, absolute scores, mean-forecast error,
-and the replicate year's estimate.** Screening tier: one frozen fit per cut. C1 and C3 resample whole
-calendar months (`studies.bootstrap`, 3 seeds, paired across arms).
-
-- **C1, the hint costs nothing on clean data:** W\* minus W0 on the Primaries' day-D+1 quantile score,
-  outside hand-filtered events, at the Primaries beneath the chosen BSPs (D9 beside them).
-  Non-inferiority at margin 0.05 points (about 2% of GAM-K's score; twice the 0.023 noise
-  reference): passes if the interval's upper end is at most +0.05 in the scored and replicate years
-  and gate reading 7 holds. **Gain bonus** if the interval lies wholly below zero with an estimate
-  at most -0.03. W-max minus W0 is reported beside it.
-- **C2, robustness to a metering error (the headline):** inject one error at one Primary's readings
-  in training history only. **Gap:** 6, 24, or 72 hours missing (the BSP row stays). **Stuck:** the
-  last good value repeats for 1, 3, or 7 days, shorter than the cleaning rule's flag threshold (read
-  from `nged_data.cleaning` and committed before any score). **Scale:** readings times 0.8 or 1.2 for
-  30 or 90 days. Each injection lies in the 12 months before the cut, 7 days apart at least, 10 seeds
-  per cell and Primary, drawn independent of residuals. **Damage** = injected minus clean score for
-  that Primary's day-D+1 forecast on the clean scored year, in points. **Reduction** = 1 − (summed
-  damage at W\*) / (summed damage at W0), a ratio of sums, **read only for a kind and Primary whose
-  W0 damage has an interval wholly above zero**; damage is printed beside every reduction, filter on
-  and off. **Interval:** two-level bootstrap (Primaries, then injections within each); the Primary
-  count (probably 2 to 3) is printed beside it. Passes if, for at least 2 of the 3 kinds, the
-  reduction's lower end exceeds 0.10 and its estimate is at least 0.30, **the sign agrees in every
-  Primary,** and the siblings' mean damage at W\* is at most 1.2 times that at W0.
-- **C3, the BSP forecast by-product:** BU0 and the W\* bottom-up forecast against BD on the BSP's day-D+1
-  quantile score; descriptive, with a non-inferiority reading at 0.10 points of the BSP's median
-  load. `studies.node_curtailment` is not used: it needs a generator forecast per node, which no arm
-  here produces. C3 is reported, never decisive.
-
-**Tails, every arm:** coverage and pinball at q01, q05, q95, q99, on all rows and the 48 hours after
-each injection. **Comparators:** every arm, climatology, `manual_heuristic`, and experiment 111's
-GAM-K (2.800) and BG2 (2.780) as reference rows (not like for like).
-
-### Predictions
-
-Written before any fit; each line can fail, and none overrides the decision rule.
-
-- **Step 0:** a_P 0.85 to 1.15, a_G -0.9 to -1.2; `recall30` above 0.5 at one BSP, 0.2 to 0.5 at the
-  other.
-- **Gate:** coverage 70 to 90%; width at W\* 5 to 25% below W0; reading 6 reduction 0.3 to 0.6;
-  reading 7 half-width 0.02 to 0.05.
-- **W\*:** 0.3 to 3. **C1:** within ±0.02, no gain bonus; W-max worse by 0.05 to 0.15.
-- **C2:** gap reduction 0.3 to 0.7; stuck 0.4 to 0.8; scale 0.2 to 0.5; sibling ratio 1.0 to 1.3;
-  filter-on damage under 0.05 points for 30-day errors, so the filter-off reading carries most of it.
-- **C3:** BU0 and W\* within ±0.05 of BD.
-
-### Decision rule
-
-**Step 0 first, then the gate, then C1, C2, C3; C1 and C2 must hold in the replicate year too.**
-
-- **`supported`:** at least one BSP informative; the gate passes with reading 7 at most 0.03; C1 and
-  C2 both pass in the scored and replicate years.
-- **`partly supported`:** the gate and C1 pass, and C2 passes in only one year or one kind; or the
-  verdict is capped (pilot on an uninformative BSP, or reading 7 above 0.03) and the rest holds.
-- **`small gain`:** the gate and C1 pass, and C2's reduction interval lies wholly above zero but
-  misses the 0.30 estimate or the 0.10 lower-end condition.
-- **`not supported`:** the gate passes and C2's interval lies within ±0.10 of zero (including a
-  failed pilot), or C1's upper end exceeds +0.05 in both years.
-- **`refuted`:** the gate passes and C2's interval lies wholly below zero (the hint spreads the
-  error across the Primaries).
-- **`inconclusive`:** a failed plumbing control or gate reading (the take-home names the reading and
-  what it rules out), or anything else.
-
-**The verdict rests on injected errors and the scored year's clean scores; real labelled events are
-descriptive only.**
-
-### Substation cards and privacy
-
-**Each decision site's card gets a provisional "network" panel with the line "Provisional: fitted to
-past weather on a screening run; weakly identified at real noise levels (experiment 113: a heating
-slope's 80% month-block interval is about 38% of the slope wide)".** It shows the Primary's own
-example forecasts for W0 and W\* on 4 fixed weeks chosen by rule before scoring (the week starting
-on the first Monday on or after the 15th of July 2025, October 2025, January 2026, and April 2026),
-median with 80% and 90% bands against observed; day counts, no dates, own-capacity units,
-`aria=False`. Generator-linked series appear only as G-c in normalised units, with no dates.
-
-**BSP results never sit on a Primary's card.** The BSP coefficients, residuals, and C3 appear in one
-table that says "two bulk supply points" and carries no D-label, so no card reveals which Primary
-sits under which BSP (two cards sharing a remainder would give away the grouping).
-
-**Privacy.** The page uses D-labels only. Metered generators appear only as one sum labelled "G-c", never beside a D-label, name, or identifier, and with no dates. The sum appears as a coefficient and as a ratio to a BSP's median load (a_G, the generator share of a BSP's load), never as a series. The page may name interconnected D-label pairs (D5-D16, D10-D11) but no substation names and no other topology: no supply-point membership, no unmetered partners, no edge counts, no statement of which Primaries sit under which BSP. No generator's public name appears with its series. A BSP residual that would reveal G-c by subtraction is shown as a ratio.
-
-### Audit before merge: the seven triggers
-
-1. **A control fails:** any plumbing control, gate reading, or P4.
-2. **A contradiction:** C2's reduction beyond the oracle's; W\* worse than W0 on clean data with the
-   gate passing; C2 passing on a BSP step 0 found uninformative.
-3. **Quantile score against mean error:** C1 or C2 with opposite signs in the two.
-4. **Leave one out:** dropping a site, injected Primary, or kind flips C1 or C2.
-5. **Nested arms:** W\* beating OR on injected windows, or W0 beating W\* on C2.
-6. **Interval width:** C1's width over twice or under half experiments 106's or 111's, scaled by the
-   square root of the site-count ratio (they use 5 sites).
-7. **Dependence:** Flexpectation v2's hierarchy design rests on this, so any positive verdict audits.
-
-"Checks" bullets: median minus mean forecast per site and arm, mean error beside each contrast.
-
-### Module and compute
-
-**Module `studies.dp_hierarchy` (own PR off `main`, two code reviews, green tests, no new dependencies):** stacks per-site `GamLayout`s with a BSP block and wraps `solve_bounded_quadratic` with the weight, remainder, generators, and MVA dark-row mask; tests P1 to P3 under 5 minutes each. No replicate-year or scored-year fit runs before that PR has merged.
-
-**Compute, CPU only, at most 6 cores: about 8 to 18 hours of wall clock at 8 cores, to be re-read at 6.** Single-site Gram accumulation is 12 minutes per site and cut, cached. A joint solve takes 1 to 3 minutes. Counts: tuning grid 42 solves; tuning injections about 300; gate about 400; C2 450 injections x 3 arms plus OR x 2 cuts, about 3,600 solves, each also run through the filter. **Thinning, on the total:** if C2's projected wall clock exceeds 14 hours after 200 solves, C2 drops to 5 seeds per cell and the weight grid to {0, 0.3, 1, 3, 30}.
-
-### Clarifications made after the module was written and before any fit
-
-**These five changes follow a Sonnet code review of the module. They were made before any tuning,
-gate, replicate-year, or scored-year fit ran, and are labelled so a reader can tell them from the
-original plan.**
-
-- **The remainder's penalties scale with the BSP term.** The BSP term is `(w / sigma_b^2) * (loss +
-  penalties)`, so the weight `w` changes how much the BSP reading matters and not how freely the
-  remainder can absorb an offset. The original plan added the penalties unscaled.
-- **Gate reading 6 is scored out of the corrupted window.** The module's own test showed a BSP
-  weight pulls a corrupted Primary back inside the corrupted window (error 11.3 to about 3.3
-  points) while the remainder's free level absorbs the constant offset elsewhere. The damage that
-  matters in C2 arrives on the clean scored year, so reading 6 scores that year, and also reports
-  the in-window error and the BSP residual (the module's own test does this; the gate reports the clean-year damage only, since the pilot has one remainder step penalty).
-- **The BSP rows start where the Primaries' training window starts,** so the hint does not
-  constrain a Primary's coefficients at times its own block ignores.
-- **The remainder's last step knot (at the cut) is dropped,** because its indicator is true for the
-  final training row only and cannot be identified.
-- **The generator sign is tested with a time-varying series.** A constant would be absorbed by the
-  remainder's level.
-
-### Clarification: the closure audit runs first, on its own
-
-**Step 0 runs before the gate and before the joint fits, as a descriptive audit of whether the
-Primaries, the metered generators, a level, and unmetered solar close the BSP readings.** The
-design session asked for this on 2026-10-20, so it is a labelled clarification made before any
-audit result exists.
-
-- **What it reports, by BSP:** the closure residual in points of effective capacity and in MW, the
-  residual by hour band and calendar month, and a winter breakdown (November to March, with the
-  cold-snap rule fixed before the residual is read).
-- **"Cannot tell":** a BSP or winter whose history is too short to give a block-mean standard
-  deviation at a window length is reported as "cannot tell", never as a number.
-- **Cost:** descriptive only, on CPU, about 2 to 3 hours and under 8 GB.
-- **Privacy:** the page names no substation and no topology beyond interconnected D-label pairs,
-  and shows the metered generators only as the sum "G-c", without dates.
-- **Decisions:** the pre-registered step 0 decision rule is unchanged, and step 1 and the gate
-  follow it.
-
-### Step 0 result (first run)
-
-**The closure audit ran before the gate; its numbers are in `audit_report.md`, printed by
-`ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_audit.py`.**
-The first-run numbers stay as printed.
-
-- **A coverage rule was added after seeing the history coverage and before any residual was read
-  (post hoc).** A series enters a fit only if it holds readings in at least 90% of the rows where
-  the BSP does. A series that fails the rule stays inside the remainder, and the report counts it.
-- **One BSP closes in the training years and does not hold out of sample.** In-sample residuals are
-  2.2 to 3.2 points of effective capacity, with a_P 1.01 to 1.16 and a_G 0.85 to 0.90, and over six
-  winters the median residual stays within 1 MW. In the scored year the frozen fit has a 5.5-point
-  residual with a +3.7 MW median offset, because its frozen steps do not hold.
-- **The other BSP cannot be closed with the generator history available.** About half of its
-  generation series have too little history, so their power sits in the remainder: in-sample 11
-  points and a_G 0.24. Whether its generators close it is "cannot tell".
-- **A fit that may refit hides metering errors from the BSP.** With a refit that includes the
-  injected series, a 30-day scale error of 25% is detected in 0% to 3% of injections, and the 24 h
-  stuck run in 0% to 1%. A fit trained only on pre-injection rows detects the same 30-day error in
-  8% to 50%.
-- **By the pre-registered rule neither BSP is informative (`recall30` under 0.2),** so step 1 runs
-  as the capped pilot on the BSP with the highest `recall30`, and the verdict cannot exceed
-  `partly supported`.
-
-### Clarifications made after a Sonnet code review of the scripts, before the tuning, gate, and scored fits
-
-**The audit was re-run after the review with the fixes below; its first-run report is kept as
-`audit_report_first_run.md`, and the first-run numbers in "Step 0 result (first run)" stay as
-printed.**
-
-- **The step 0 rule reads the refit variant of detection.** The rule's `recall30` is the detection
-  rate when the fit includes the injected series, because that is the fit a running service would
-  make. The report also gives the clean fit trained on all pre-cut rows (in-sample, so it flatters
-  detection) and a fit trained only on the rows before the injected window's month. In the re-run
-  at the tuning cut, the pilot BSP detects a 30-day 25% scale error in 0% (refit), 50% (in-sample
-  clean fit), and 50% (pre-injection fit) of injections. The pre-injection fit's false-alarm rate is
-  1.2% in-sample but 61% in the year after the cut, because a frozen fit drifts, so a 3-standard-
-  deviation detector would not hold up in service. The pilot decision stands.
-- **The audit's injected scale error is a share of the Primary's median load, with both signs,**
-  and the lower rate of the two signs is reported (before: a share of the instantaneous reading).
-  A 90-day threshold with fewer than 8 blocks is reported as "cannot tell".
-- **The cold-snap rule is a temperature threshold,** the 5% quantile of winter-day means before the
-  tuning cut, applied to every winter (before: a fixed list of past days).
-- **The published audit report drops the counts of Primaries and generation series per BSP,**
-  which would narrow down which Primaries sit under which BSP.
-- **Tuning uses 10 seeds per cell and Primary (plan: 30 per kind),** and the gate adds the missing
-  sabotage reading, builds the BSP from the Primaries' noisy series, gives the first MW Primary the
-  same winter-evening hump in half the systems, and freezes its thresholds in
-  `e00124_gate_readings.py` before the gate runs.
-- **The pilot uses the smooth-drift form without L1 steps, fitted capacity, a frozen fit, and the
-  mean absolute error as its score,** with no Kalman filter. The filter-on reading, which the
-  manager's ruling makes the production-relevant one, is therefore not produced, and the verdict is
-  capped at `partly supported`.
-
-### Rulings made before the run
-
-- **A pilot is capped.** A pilot on the better BSP caps the verdict at `partly supported`.
-- **Filter-on carries the verdict.** If filter-on damages are under 0.05 points there is no room for the hint to help: the page says so, reports filter-off as mechanism evidence only, and caps the verdict at `partly supported`.
-- **W\* is shared across the two bulk supply points,** because per-BSP tuning would overfit.
-- **The data owner is not asked about unmetered partners or 11 kV generation** until January.
-
-### Plan review
-
-One Sonnet plan review found 12 issues; 11 were applied as asked and one in part. The part not applied is the saving against `manual_heuristic`: a BSP forecast has no generator forecast here, so `studies.node_curtailment` cannot be computed, as C3 states.
+- **Keep the BSP reading out of the Primaries' loss,** and use its residual against the Primaries'
+  fitted values as a monitoring signal, scored for detection and false alarms in the year after the
+  cut. Whether to run it is the maintainer's decision.
+- **Test the cause directly:** a synthetic control with no autocorrelated noise in the BSP reading.

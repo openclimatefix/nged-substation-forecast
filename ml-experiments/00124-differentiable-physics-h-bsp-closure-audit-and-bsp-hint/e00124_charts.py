@@ -239,7 +239,7 @@ def figure_plumbing() -> None:
 
 def _parse_audit() -> pl.DataFrame:
     """Read the closure coefficients and their 80% intervals from the audit report."""
-    text = (DOCS_DIR / "audit_report.md").read_text()
+    text = (DOCS_DIR / "audit_report.txt").read_text()
     rows = []
     bsp = cut = ""
     for line in text.splitlines():

@@ -35,17 +35,15 @@ supports it, and otherwise from per-site fits with the shared meter layer. It ne
 ## Hierarchy: Primaries, BSPs, and GSPs
 
 **[Experiment 124](../../00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/result.md)
-ran the closure audit and a pilot joint fit.** A BSP reading should equal the sum of its Primaries
-minus the metered generators connected there, plus losses and an unmetered remainder. The audit found
-that the Primaries and generators close one of the two BSPs up to factors of 0.85 to 1.16, and the
-other BSP not at all with the generator history available. The joint fit, with the factors fixed at
-1, cut the damage from injected metering errors by 41% but made clean forecasts worse by 2.4 or more
-points of capacity. A follow-on arm that fixes the factors at the audit fit stopped at its synthetic
-check, where an exactly specified synthetic system also lost clean accuracy at every weight. The loss
-therefore comes from adding a BSP term to the Primaries' fit, and not mainly from the factors.
+found that adding the BSP reading to the Primaries' fit raised clean-forecast error at every weight
+tried.** The raise was 0.4 to 4.6 points of capacity, although the reading cut the damage from
+injected metering errors by about 41%. The closure audit found that the Primaries and generators
+close one of the two BSPs up to factors of 0.85 to 1.16, and an exactly specified synthetic system
+lost clean accuracy the same way, so the cause is untested.
 [Experiment 36](../../00036-hierarchy-aware-bsp-gsp-forecasts/result.md) had found that the sum of
 Primary forecasts added nothing at the two BSPs.
-Three facts shape the design:
+
+**Three facts shape the design:**
 
 - **The remainder is large.** In the data checked, the BSP residual has a daily-mean standard
   deviation larger than the typical switched load, so the audit has to say what the remainder
@@ -58,7 +56,7 @@ Three facts shape the design:
   Primaries is therefore small, and the proposals below aim at the BSP and GSP levels.
 
 **The BSP as a Kalman observation tests whether the closure relation, with its unmetered remainder as
-state noise, helps the Primaries' filters.** It runs on the CPU in about 2 hours. Experiment 124 has finished the closure audit.
+state noise, helps the Primaries' filters.** It runs on the CPU in about 2 hours.
 
 **Top-down against bottom-up at the BSP and GSP levels asks which direction gives the better
 forecast at each level.** The arms are a direct forecast of the BSP, the sum of the Primary

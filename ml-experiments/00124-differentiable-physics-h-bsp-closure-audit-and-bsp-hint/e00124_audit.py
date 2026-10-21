@@ -805,7 +805,7 @@ def main() -> None:
     lines = ["# Experiment 124, step 0: the BSP closure audit", ""]
     for bsp in bsps:
         report_bsp(cache=cache, bsp=bsp, lines=lines)
-    (WORK_DIR / "audit_report.md").write_text(
+    (WORK_DIR / "audit_report.txt").write_text(
         "\n".join(line.removeprefix(PRIVATE) for line in lines) + "\n"
     )
     text = "\n".join(line for line in lines if not line.startswith(PRIVATE)) + "\n"
@@ -814,7 +814,7 @@ def main() -> None:
         / "docs"
         / "ml-experiments"
         / Path(__file__).parent.name
-        / "audit_report.md"
+        / "audit_report.txt"
     ).write_text(text)
     sys.stdout.write(text)
 

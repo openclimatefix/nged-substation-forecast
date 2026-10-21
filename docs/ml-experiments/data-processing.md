@@ -630,5 +630,7 @@ experiments.* A bulk supply point (BSP) reading is import-positive, the generato
 export-positive, and the Primaries' apparent-power series are positive. At the one BSP that closes,
 the reading equals 1.01 to 1.16 times the MW Primaries plus 1.03 to 1.10 times the MVA Primaries
 minus 0.85 to 0.90 times the metered generation, plus unmetered solar and a level (the closure
-audit of [experiment 124](00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/result.md)). The scope is two BSPs, of which one closed; the
-confidence is moderate, and the entry is provisional until the experiment has had its reviews.
+audit of
+[experiment 124](00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/result.md)). The
+scope is two BSPs, of which one closed; the confidence is moderate, and the entry is provisional
+until the experiment has had its reviews.

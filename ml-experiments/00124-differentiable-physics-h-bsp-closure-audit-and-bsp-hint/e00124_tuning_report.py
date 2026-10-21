@@ -1,4 +1,4 @@
-"""Print the tuning results of experiment 124 into `tuning_report.md`, by kind of injection.
+"""Print the tuning results of experiment 124 into `tuning_report.txt`, by kind of injection.
 
     uv run python ml-experiments/00124-*/e00124_tuning_report.py
 
@@ -8,6 +8,7 @@ of effective capacity, summed over the injections of a kind.
 """
 
 import json
+import textwrap
 from collections import defaultdict
 from pathlib import Path
 
@@ -71,14 +72,20 @@ def main() -> None:
         suffix="_corrected",
         title="Re-run after the plumbing check (BSP-row scale 2.9 MW, from the fitted Primaries)",
     )
-    text = "\n".join(lines) + "\n"
-    (WORK_DIR / "tuning_report.md").write_text(text)
+    text = (
+        "\n".join(
+            textwrap.fill(line, width=100, subsequent_indent="  ", break_long_words=False)
+            for line in lines
+        )
+        + "\n"
+    )
+    (WORK_DIR / "tuning_report.txt").write_text(text)
     (
         Path(__file__).parents[2]
         / "docs"
         / "ml-experiments"
         / Path(__file__).parent.name
-        / "tuning_report.md"
+        / "tuning_report.txt"
     ).write_text(text)
     print(text)
 
