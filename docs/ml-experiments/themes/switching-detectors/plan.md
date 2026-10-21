@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [159](../../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md) | What are D8's multi-day power drops, do they recur, and does a connected neighbour step up when they happen? | Running | Nothing | Planned 2026-10-21; descriptive, CPU only |
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the

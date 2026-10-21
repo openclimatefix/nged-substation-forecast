@@ -636,6 +636,16 @@ about 5% of the moved megawatts, all in the 13% of headline-band transfers that 
 headline band is the injected transfers that move 25% to 40% of the receiving load for over 1 day.
 Applies to experiments and production.
 
+**Treat D8's multi-day drops as events, and do not read them as transfers to its metered neighbours
+or as RO-NC alarms.** D8 has 29 runs of 2 days or longer in which its power sits about 2.7 MW
+(range 1.2 to 5.4) below the convex demand model, 28 of them since July 2023. A metered neighbour
+steps up with them no more often than at random times (8 of 29 against 0.35), and only 2 of the 28
+unexplained RO-NC alarms on D8 fall within 6 hours of a drop's start or end ([experiment
+159](00159-switching-d8-multi-day-drops-recurrence-and-report/result.md)). Applies to experiments
+and to production, for D8. The scope is one series and one residual model, the cause is unknown,
+the count depends on the threshold (15 to 48 for -2.5 to -1.0 MW), and the entry is provisional
+until NGED has said what moved.
+
 ## Forecast tails and curtailment cost
 
 **Count the half-hours beyond a limit before ranking forecasts on curtailment cost.** Two bulk
