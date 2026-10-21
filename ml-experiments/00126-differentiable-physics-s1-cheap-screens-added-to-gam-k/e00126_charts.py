@@ -43,6 +43,8 @@ ARM_LABELS: Final[dict[str, str]] = {
 LABEL_COLOURS: Final[dict[str, str]] = {
     "worse": ocf.BRAND_ORANGE,
     "undecidable": "#8A8A8A",
+    "undecidable (too few month blocks)": "#8A8A8A",
+    "not powered": "#8A8A8A",
     "tie": ocf.DATA_BLUE,
     "small gain": ocf.DATA_GREEN,
     "gain": ocf.DATA_GREEN,
@@ -65,7 +67,7 @@ def headline() -> alt.LayerChart | alt.FacetChart:
                 "estimate": r["scored"],
                 "low": r["low"],
                 "high": r["high"],
-                "label": r["label before gates"],
+                "label": r["label"],
             }
             for r in rows
         ]

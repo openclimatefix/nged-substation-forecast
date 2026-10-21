@@ -37,6 +37,8 @@ NI_FLOOR: Final[float] = 0.02
 MIN_SITES_IMPROVING: Final[int] = 3
 TAIL_LEVELS: Final[dict[str, float]] = {"q01": 0.01, "q05": 0.05, "q95": 0.95, "q99": 0.99}
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time", "seed"]
+MIN_MONTH_BLOCKS: Final[int] = 7
+"""A `worse` label needs this many whole calendar months to resample, unless no site improves."""
 STN_END: Final[str] = "2025-12-31"
 """W-stn is compared on scored-year rows to this date only."""
 
@@ -232,6 +234,18 @@ def contrast_row(*, contrast: Contrast) -> dict[str, Any]:
         diff, _, _ = estimate(contrast=contrast, treatment=kb0_name)
         kb0_low, kb0_high = interval(contrast=contrast, treatment=kb0_name)
         kb0 = {"estimate": diff, "low": kb0_low, "high": kb0_high}
+    months = int(
+        paired(
+            year="scored",
+            treatment=contrast.treatment,
+            reference="t_all_k",
+            sites=DECISION,
+            subset=contrast.subset,
+            stn_only=contrast.arm == "w_stn",
+        )["valid_time"]
+        .dt.truncate("1mo")
+        .n_unique()
+    )
     label = label_of(
         contrast=contrast,
         low=low,
@@ -260,6 +274,7 @@ def contrast_row(*, contrast: Contrast) -> dict[str, Any]:
         "MAE of the mean": scored_ae,
         "with T-all's filter (-b0)": kb0,
         "label before gates": label,
+        "month blocks": months,
     }
 
 
@@ -320,6 +335,16 @@ def main() -> None:
     for row in rows:
         entry = gate3.get(row["arm"])
         row["gate 3 powered"] = None if entry is None else entry.get("powered")
+        label = row["label before gates"]
+        if label == "tie" and row["gate 3 powered"] is False:
+            label = "not powered"
+        if (
+            label in ("worse", "worse on other rows")
+            and row["month blocks"] < MIN_MONTH_BLOCKS
+            and row["sites improving (of 5)"] > 0
+        ):
+            label = "undecidable (too few month blocks)"
+        row["label"] = label
     print(json.dumps(rows, indent=2))
     (common.WORK_DIR / "numbers.json").write_text(json.dumps(rows, indent=2) + "\n")
     print("\n== absolute scores (decision sites, all rows outside switching masks) ==")

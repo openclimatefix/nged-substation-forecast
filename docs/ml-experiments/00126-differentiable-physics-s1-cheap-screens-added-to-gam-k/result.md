@@ -51,16 +51,18 @@ take_home_message: >-
   None of the thirteen cheap additions to the day-ahead GAM-K lowered the winter score by a margin
   we can trust. E-sol (lighting from solar elevation) came closest, at -0.036 points on dark winter
   evenings, but its interval (-0.122 to +0.024) is too wide to call, because six of the thirteen
-  screens had a half-width above their 0.03 to 0.05-point margin. Three additions made the score
-  worse (F-mix on cold-snap days, W-basis, and W-stn), and G-skf found injected load transfers
-  3 to 7 times as often as the plain filter, but failed its own power gate and recovered no faster.
+  screens had a half-width above their 0.03 to 0.05-point margin. Only W-basis (learned year cycle)
+  was clearly worse, in every month, site, and year. F-mix and W-stn looked worse too, but each
+  rests on 2 to 3 calendar months. G-skf found injected load transfers 3 to 7 times as often as the
+  plain filter, but failed its own power gate and recovered no faster.
 advice:
   - >-
     Test E-sol again on ENS weather and on all five winters with a wider row set, because it is the
     one screen whose estimate, replicate year, and five of five sites all point the same way.
   - >-
-    Drop W-basis (learned year cycle) and F-mix (regime noise) from the shortlist: both worsened the
-    score and the mean-forecast error in the scored year.
+    Drop W-basis (learned year cycle) from the shortlist: it was worse in every month block, at all
+    five sites, in the replicate year, and with T-all's filter settings. F-mix (regime noise) and
+    W-stn (station gap) were worse on 2 to 3 months only, so they are open, not ruled out.
   - >-
     Use G-skf only as a detector of load transfers (recall 0.34 against 0.05 at 25% transfers), not
     as a forecast filter, and re-tune its regime multipliers on injected events before any new test.
@@ -69,12 +71,12 @@ advice:
 # Differentiable physics, S1: do cheap additions to GAM-K lower the day-ahead score?
 
 **Take-home: no cheap addition showed a gain we can trust.** Of thirteen screens (nine in the first
-family, four exploratory), none earned the label `gain`. Five were `undecidable` because the
-interval was wider than the margin, four were `tie`, three were `worse` (F-mix, W-basis, W-stn),
-and G-skf is `inconclusive`. Every powered screen except W-stn had an estimate in the predicted
-direction, so the result narrows the search to E-sol on a larger row set and rules out learned year
-cycles and regime noise as forecast terms. Past weather was used throughout, so every number is
-a ceiling for ENS weather. **Verdict: inconclusive.**
+family, four exploratory), none earned the label `gain`. Seven were `undecidable` (the interval was
+wider than the margin, or too few calendar months were available to resample), two were `tie`
+(A-free and D-sch), two were `not powered` (S-ewma and S-mm, whose gate failed), one was `worse`
+(W-basis), and G-skf is `inconclusive`. The result narrows the search to E-sol on a larger row set
+and rules out a learned year cycle as a forecast term. Past weather was used throughout, so every
+number is a ceiling for ENS weather. **Verdict: inconclusive.**
 
 The question was whether adding one cheap term to T-all-K (experiment 114's day-ahead model with the
 Kalman filter) lowers the quantile score on November-to-March rows. The scored year is 2025-07 to
@@ -95,10 +97,31 @@ the filter re-tuned per arm on the tuning year.
   regime on 98% of half-hours but its state error was 0.38 above the plain filter's, interval
   -1.9 to +6.1), and W-basis's injected-effect gate moved the wrong way. Trigger 2: F-mix predicted
   tails moving towards nominal and the cold-snap score within noise, and got +0.078 points. An Opus
-  audit is therefore due before merge. Triggers 3 to 7 did not fire (no leave-one-out run was
-  needed, because no contrast is a gain).
+  audit ran (a fresh Opus agent, findings below). Triggers 3 to 7 did not fire (no leave-one-out run
+  was needed, because no contrast is a gain).
 - **Reproduction:** B0 equals `fit_gam` to 3e-13, T-all equals experiment 114's stored scored-year
   forecast to 1e-4 points, and every appending arm with zeroed columns equals T-all to 1e-11 points.
+
+## Audit findings and triage
+
+- **Intervals resample only 3 to 6 calendar months,** so at 99.44% the bounds are close to the
+  smallest and largest month means. Accepted: X9 (F-mix) and X13 (W-stn) are relabelled
+  `undecidable (too few month blocks)`, and F-mix's +0.078 rests on January 2026 and on D11 (+0.29;
+  the other four sites range from -0.06 to +0.09).
+- **X3 and X4 were labelled `tie` though gate 3 said not powered.** Accepted: both are now
+  `not powered`, and the report applies the gate downgrade.
+- **W-basis's gate-3 failure is a fault in the gate.** The truth blends T-all and W-basis with a
+  weight `s` of 0.30 to 0.92, but W-basis replaces T-all's harmonics, so it can fit that truth only
+  at `s` = 1. C-hw (and C-wind) replace columns too, so C-hw's "not powered" label is suspect.
+  Accepted as a caveat, not re-run.
+- **G-skf has no coding error.** On its own model it beat the plain filter in 98 of 100 draws
+  (median -1.85); two blow-up draws (+186, +33) fail the mean-based gate, and the fitted matrix reads
+  level shifts as outliers, which freezes the state. The cap at `inconclusive` stands.
+- **Confirmed:** X2, X8, X9, and X11 re-derived from the stored predictions match to 4 decimals; the
+  spread is median-centred with no previous-year bias; F-mix and G-skf feed the filter the same
+  replica residuals; no leakage found.
+- **Minor:** W-basis's basis cache is keyed by cut, so within a gate-3 worker the 2022-07 basis
+  comes from its first synthetic draw. Left as is.
 
 ## Contrasts (scored year, arm-K minus T-all-K, points; negative is better)
 
@@ -106,23 +129,24 @@ the filter re-tuned per arm on the tuning year.
 |---|---|---|---|---|---|---|---|
 | X1 A-mono | Nov-Mar | -0.007 | -0.062 to 0.032 | +0.025 | 4 | undecidable | not powered |
 | X2 A-free | Nov-Mar | -0.012 | -0.034 to 0.006 | -0.010 | 5 | tie | powered |
-| X3 S-ewma | Nov-Mar | -0.002 | -0.007 to 0.002 | 0.000 | 4 | tie | not powered |
-| X4 S-mm | Nov-Mar | -0.006 | -0.015 to 0.002 | +0.013 | 4 | tie | not powered |
+| X3 S-ewma | Nov-Mar | -0.002 | -0.007 to 0.002 | 0.000 | 4 | not powered | not powered |
+| X4 S-mm | Nov-Mar | -0.006 | -0.015 to 0.002 | +0.013 | 4 | not powered | not powered |
 | X5 C-wind | Nov-Mar | -0.026 | -0.056 to 0.018 | -0.012 | 5 | undecidable | powered |
 | X6 C-hw | Nov-Mar | -0.006 | -0.040 to 0.059 | -0.007 | 3 | undecidable | not powered |
 | X7 D-sch | school-holiday weekdays | -0.019 | -0.052 to 0.028 | -0.020 | 5 | tie | powered |
 | X8 E-sol | dark winter evenings | -0.036 | -0.122 to 0.024 | -0.017 | 5 | undecidable | powered |
-| X9 F-mix | cold-snap days | +0.078 | 0.002 to 0.140 | +0.011 | 1 | worse | n/a |
+| X9 F-mix | cold-snap days | +0.078 | 0.002 to 0.140 | +0.011 | 1 | undecidable (3 months) | n/a |
 | X10 G-skf | Nov-Mar | -0.006 | -0.086 to 0.031 | +0.004 | 2 | inconclusive (power gate failed) | n/a |
 | X11 W-basis | Nov-Mar | +0.091 | 0.025 to 0.149 | +0.021 | 0 | worse | not powered |
 | X12 W-mix | Nov-Mar | -0.020 | -0.058 to 0.021 | +0.005 | 4 | undecidable | powered |
-| X13 W-stn | Nov-Dec 2025 | +0.013 | 0.001 to 0.120 | -0.005 | 2 | worse (partial year) | powered |
+| X13 W-stn | Nov-Dec 2025 | +0.013 | 0.001 to 0.120 | -0.005 | 2 | undecidable (2 months) | powered |
 
 - **Intervals:** 99.44% for X1 to X9, 98.75% for X10 to X13, resampling whole calendar months. The
   pilot half-width for the primary rows (Nov-Mar) was 0.028 points, so a screen cannot be called
   below about 0.03 points.
-- **Labels:** a screen whose gate-3 label is "not powered" cannot be called a tie. Labels follow
-  the pre-registered rule; no screen reached `gain` or `small gain`, so the parity placebo gate did
+- **Labels:** a screen whose gate-3 label is "not powered" cannot be called a tie, and a `worse`
+  label needs at least 7 calendar months unless no site improves. Otherwise labels follow the
+  pre-registered rule; no screen reached `gain` or `small gain`, so the parity placebo gate did
   not run.
 - **`-b0` control:** every arm run with T-all's filter settings gave an estimate within 0.002 of its
   `-K` estimate, except W-basis (+0.100 against +0.091), so no label depends on the filter fit.
