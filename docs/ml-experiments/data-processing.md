@@ -574,9 +574,9 @@ of that experiment is an early version.
 
 **Count overlapping detected intervals once when summing the megawatts, and end each interval when
 the transfer ends.** Of the cases where the detector marked a transfer, 21% held two or more overlapping
-intervals, whose megawatts were added together, and the detector kept reporting megawatts for about
-48 hours after a transfer ended, because it alarmed the return step as a new transfer of opposite
-sign ([experiment
+intervals, whose megawatts were added together, and the detector kept reporting megawatts for a
+median of 48 hours (90th percentile 96 hours) after a transfer ended, because it alarmed the return
+step as a new transfer of opposite sign ([experiment
 88](00088-sw2-21-nra-forecast-recovers-normal-arrangement-during-and-after-injected-switches/result.md)).
 Applies to experiments and production.
 
