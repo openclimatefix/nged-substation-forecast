@@ -23,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import multiprocessing
+import os
 import pickle
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor
@@ -70,8 +71,11 @@ from e00130_long import draw_long_events
 from e00130_profile import SHAPES, Shape, fit_profile_shares, inject_shaped, shares_json
 from e00130_score import by_series, match_event
 from e00130_variants import (
+    BLANK_SERIES,
+    SOURCE,
     Variant,
     check_variants,
+    innovations_of_injection,
     load_both,
     scales_for,
     tracked_relative,
@@ -85,7 +89,7 @@ EXPERIMENT_70_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00070-sw2-19-same-si
 EXPERIMENT_71_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00071-sw2-18-refit-offset-and-gap-bridging"
 )
-N_WORKERS: Final[int] = 4
+N_WORKERS: Final[int] = int(os.environ.get("E130_WORKERS", "8"))
 WINDOW: Final[int] = 48
 CAP_DAYS: Final[int] = 14
 TARGET: Final[int] = 80
@@ -146,8 +150,18 @@ def build_detectors(
     scales: dict,
     thresholds: dict,
     models: dict,
+    tracker: dict | None = None,
+    tracker_offset: dict | None = None,
 ) -> dict:
-    """Alarm tables and first-return intervals of every arm on one residual panel."""
+    """Alarm tables and first-return intervals of every arm on one residual panel.
+
+    The end rule's level tracker reads `tracker` and `tracker_offset` when given, else the panels'
+    `tracker` residual (source `C`), else the detection residual itself.
+    """
+    tracker = panel.get("tracker", residual) if tracker is None else tracker
+    tracker_offset = (
+        offset_panel.get("tracker", offset) if tracker_offset is None else tracker_offset
+    )
     out = {}
     for arm, variant in BASIS.items():
         inputs = variant_inputs(
@@ -157,8 +171,8 @@ def build_detectors(
             variant=variant,
             panel=panel,
             offset_panel=offset_panel,
-            residual=residual,
-            offset=offset,
+            residual=tracker,
+            offset=tracker_offset,
         )
         if arm in SCORED:
             cand = candidates(inputs=inputs)
@@ -190,11 +204,21 @@ def build_detectors(
 
 
 def injected(*, seed: int, batch: list[Event], shape: Shape) -> tuple[Injection, dict, dict]:
-    """The injection of one batch and shape, and the injected residuals of both models."""
+    """The injection of one batch and shape, and the injected residuals of both models.
+
+    For sources `A16`, `A15`, and `B` the model is frozen, so the residual is the stored residual
+    plus the injected delta. For `C` the filter is re-run on every injected series.
+    """
     panel, offset_panel = _STATE["panel"], _STATE["offset_panel"]
     injection = inject_shaped(
         power=panel["power"], events=batch, seed=seed, shape=shape, shares=_STATE["shares"]
     )
+    if SOURCE == "C":
+        return (
+            injection,
+            innovations_of_injection(injection=injection, panel=panel),
+            innovations_of_injection(injection=injection, panel=offset_panel),
+        )
     return (
         injection,
         injection.fast_residual(panel["residual"]),
@@ -202,10 +226,21 @@ def injected(*, seed: int, batch: list[Event], shape: Shape) -> tuple[Injection,
     )
 
 
+def injected_trackers(*, injection: Injection) -> tuple[dict | None, dict | None]:
+    """The frozen injected residuals that the end rule's tracker reads for source `C`."""
+    if SOURCE != "C":
+        return None, None
+    return (
+        injection.fast_residual(_STATE["panel"]["tracker"]),
+        injection.fast_residual(_STATE["offset_panel"]["tracker"]),
+    )
+
+
 def is_training_event(*, event: Event, months: np.ndarray) -> bool:
     """A headline-band transfer that starts in an odd month, outside the holiday set."""
     return (
-        event.event_id < HOLIDAY_FIRST_ID
+        (SOURCE == "A16" or event.donor != BLANK_SERIES)
+        and event.event_id < HOLIDAY_FIRST_ID
         and (event.size_band, event.duration_band) == HEADLINE_BAND
         and int(months[event.onset]) in TUNING_MONTHS
     )
@@ -236,7 +271,10 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
     """Inject one batch with one shape, detect with every arm, return one row per event and arm."""
     seed, batch, shape = args
     injection, residual, offset = injected(seed=seed, batch=batch, shape=shape)
+    tracker, tracker_offset = injected_trackers(injection=injection)
     results = build_detectors(
+        tracker=tracker,
+        tracker_offset=tracker_offset,
         panel=_STATE["panel"],
         offset_panel=_STATE["offset_panel"],
         residual=residual,
@@ -250,6 +288,8 @@ def score_batch(args: tuple[int, list[Event], Shape]) -> list[dict]:
     for arm, (_, intervals) in results.items():
         grouped = by_series(intervals=intervals)
         for event in batch:
+            if SOURCE != "A16" and event.donor == BLANK_SERIES:
+                continue
             match = match_event(
                 series=event.series, onset=event.onset, end=event.end, intervals=grouped
             )
@@ -284,7 +324,7 @@ def make_state(*, out: Path, trained: bool = True) -> dict:
         "panel": panel,
         "offset_panel": offset_panel,
         "scales": all_scales(panel=panel, offset_panel=offset_panel),
-        "shares": fit_profile_shares(panel=panel),
+        "shares": fit_profile_shares(panel=load_both(source="A16")[0]),
         "thresholds": read_json(out=out, name="thresholds.json") if trained else {},
         "models": pickle.loads((out / "models.pkl").read_bytes()) if trained else {},
     }
@@ -332,7 +372,7 @@ def tune(*, out: Path) -> None:
         threshold, curve = tune_d2(inputs=inputs, veto_z=NO_VETO, logged=logged, target=TARGET)
         print(f"{variant}: threshold {threshold}, count {dict(curve)[round(threshold, 2)]}")
         thresholds[variant] = threshold
-    if thresholds["PF14"] != 4.0:
+    if SOURCE == "A16" and thresholds["PF14"] != 4.0:
         raise SystemExit(f"STOP: PF14 matched {thresholds['PF14']}, not 4.0")
     (out / "thresholds.json").write_text(json.dumps(thresholds))
 
@@ -483,7 +523,7 @@ def main() -> None:
     parser.add_argument(
         "stages", nargs="+", choices=("tune", "train", "harness-check", "score", "real")
     )
-    parser.add_argument("--out", type=Path, default=WORK_DIR)
+    parser.add_argument("--out", type=Path, default=WORK_DIR / SOURCE)
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     stages = {

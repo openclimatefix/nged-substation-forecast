@@ -26,16 +26,14 @@ import argparse
 import json
 import pickle
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import replace
 from datetime import UTC, datetime
-from math import log, pi
 from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
 import torch
-from e00130_common import GRID_LENGTH, GRID_START, SERIES_IDS, TUNING_MONTHS, WORK_DIR, stamp_months
+from e00130_common import GRID_LENGTH, SERIES_IDS, TUNING_MONTHS, WORK_DIR, stamp_months
 from studies.dp_assimilation import (
     INITIAL_LEVEL_VARIANCE,
     MIN_PRIOR_SPREAD,
@@ -45,7 +43,7 @@ from studies.dp_assimilation import (
 )
 from studies.dp_calendar import HALF_HOURS_PER_DAY
 from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
-from studies.dp_gam import GamFit, GamSpec, TrainingWindow, fit_gam, predict_gam
+from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 PART_4_DIR: Final[Path] = (
@@ -53,8 +51,7 @@ PART_4_DIR: Final[Path] = (
 )
 """Experiment 106's folder: the shared feature cache and the tuned penalties and filter prior."""
 SERIES_PATH: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR.parent
-    / "studies/per_study/stage1_pilot/demand/inputs/series.parquet"
+    ML_EXPERIMENTS_DATA_DIR.parent / "studies/per_study/stage1_pilot/demand/inputs/series.parquet"
 )
 GAM_DIR: Final[Path] = WORK_DIR / "gam"
 RIDGE: Final[float] = 0.1
@@ -99,7 +96,7 @@ def cuts_for(*, offset_day: int) -> list[datetime]:
 
 
 def base_spec() -> GamSpec:
-    """The convex model without drift, with the fitted PV capacity and experiment 106's penalties."""
+    """The convex model without drift, fitted PV capacity, and experiment 106's penalties."""
     tuned = json.loads((PART_4_DIR / "work" / "tuned.json").read_text())
     return GamSpec(
         ridge=RIDGE,
@@ -151,7 +148,7 @@ def fit_job(job: tuple[int, int]) -> str:
         except ValueError:
             points = np.full(len(rows), np.nan)
             lost += len(rows)
-        stamps = ((end[rows] - np.datetime64("2022-01-01T00:00", "us")) // np.timedelta64(30, "m"))
+        stamps = (end[rows] - np.datetime64("2022-01-01T00:00", "us")) // np.timedelta64(30, "m")
         keep = (stamps >= 0) & (stamps < GRID_LENGTH)
         forecast[stamps[keep].astype(int)] = points[keep] * _capacity(series=series) / 100.0
     GAM_DIR.mkdir(parents=True, exist_ok=True)
@@ -186,7 +183,7 @@ def observed(*, series: int) -> np.ndarray:
 
 
 def frozen_panel(*, offset_day: int) -> dict[str, dict[int, np.ndarray]]:
-    """`expected`, `residual`, and `power` in MW per series for the model refitted on `offset_day`."""
+    """`expected`, `residual`, and `power` in MW per series for the model refitted on one day."""
     out: dict[str, dict[int, np.ndarray]] = {"power": {}, "expected": {}, "residual": {}}
     for series in SERIES_IDS:
         expected = np.load(GAM_DIR / f"forecast_{series}_{offset_day}.npy")

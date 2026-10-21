@@ -1,48 +1,40 @@
-"""Draw experiment 101's figures as SVG.
+"""Draw experiment 130's figures as SVG.
 
 Afterwards optimise each with `npx svgo@4 --multipass --precision=1 --final-newline`.
 
 The series are Primary substations, not NGED generators.
 
-    uv run python ml-experiments/00101-*/e00130_charts.py
+    OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00130-*/e00130_charts.py
 """
 
 from __future__ import annotations
 
+import itertools
 import textwrap
 from pathlib import Path
 from typing import Final
 
 import altair as alt
-import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
-from e00130_common import WORK_DIR
-from e00130_report import (
-    ARMS,
-    DURATION_BANDS,
-    INJECTED_RECALL,
-    SHARE_BANDS,
-    bootstrap_weighted,
-    event_table,
-    wilson,
-)
+from e00130_contrasts import STEP_EDGES, contrast, pooled, populations
+from e00130_diagnose import table
 
 OUT_DIR: Final[Path] = (
     Path(__file__).resolve().parents[2]
     / "docs"
     / "ml-experiments"
-    / "00101-ro-nc-detector-on-real-hand-filtered-switching-events"
+    / "00130-ro-nc-detector-on-the-gam-k-residual"
 )
-WIDTH: Final[int] = 600
-WRAP: Final[int] = 95
-COLOURS: Final[dict[str, str]] = {
-    "D0": ocf.DATA_SKY,
-    "PF14": ocf.DATA_BLUE,
-    "X": ocf.DATA_PURPLE,
-    "LOGIT_SAME": ocf.DATA_GREEN,
-    "RO-NC": ocf.BRAND_ORANGE,
+WIDTH: Final[int] = 520
+WRAP: Final[int] = 80
+ARM_LABELS: Final[dict[str, str]] = {
+    "A15_XL": "A: lagless XGBoost residual",
+    "B_XL": "B: frozen convex-model residual (headline)",
+    "C_XL": "C: filter innovations of the convex model",
+    "B_LOGIT_SAME": "D: arm B with one model, no refit offset",
 }
+COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_PURPLE, ocf.DATA_GREEN]
 
 
 def _title(*, text: str, lines: list[str]) -> alt.TitleParams:
@@ -58,307 +50,223 @@ def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     print("wrote", name)
 
 
-def _colour(*, title: str | None = None, arms: tuple[str, ...] = ARMS) -> alt.Color:
-    return alt.Color(
-        "arm:N",
-        scale=alt.Scale(domain=list(arms), range=[COLOURS[a] for a in arms]),
-        legend=alt.Legend(title=title, orient="top", direction="horizontal"),
-    )
-
-
-def figure_recall(*, table: pl.DataFrame) -> alt.TopLevelMixin:
-    """MW-weighted recall of each arm on three populations, with the injected figure marked."""
-    populations = {
-        "All 66 labelled real events": table,
-        "35 events lasting over 1 day": table.filter(pl.col("hours") > 24),
-        "14 events of 25% or more of the receiving load, over 1 day": table.filter(
-            (pl.col("hours") > 24) & (pl.col("share") >= 0.25)
-        ),
-    }
+def figure_recall(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """MW-weighted recall of RO-NC on each residual, with 95% intervals."""
+    frames = pooled(data=data, population="base", parity="even")
     rows = []
-    for name, frame in populations.items():
-        for arm in ARMS:
-            point, lo, hi = bootstrap_weighted(
-                found=frame[f"found|{arm}"].to_numpy().astype(float),
-                weight=frame["moved_mw_p50"].to_numpy(),
-            )
-            rows.append({"population": name, "arm": arm, "recall": point, "lo": lo, "hi": hi})
-    data = pl.DataFrame(rows).with_columns(
-        inj_point=pl.lit(INJECTED_RECALL[0]),
-        inj_lo=pl.lit(INJECTED_RECALL[1]),
-        inj_hi=pl.lit(INJECTED_RECALL[2]),
-    )
-    x = alt.X(
-        "recall:Q",
-        scale=alt.Scale(domain=[0, 1]),
-        axis=alt.Axis(
-            values=[0, 0.25, 0.5, 0.75, 1],
-            format=".2f",
-            title="Share of moved MW found (higher is better)",
+    for arm, name in ARM_LABELS.items():
+        point, low, high = contrast(frames=frames, arm=arm)
+        rows.append({"arm": name, "point": point, "low": low, "high": high})
+    base = alt.Chart(pl.DataFrame(rows)).encode(
+        y=alt.Y("arm:N", sort=list(ARM_LABELS.values()), title=None, axis=alt.Axis(labelLimit=320)),
+        color=alt.Color(
+            "arm:N", legend=None, scale=alt.Scale(domain=list(ARM_LABELS.values()), range=COLOURS)
         ),
     )
-    y = alt.Y("arm:N", sort=list(ARMS), title=None)
-    band = (
-        alt.Chart()  # ty: ignore[unresolved-attribute]
-        .mark_rect(opacity=0.04, color=ocf.BRAND_ORANGE)
-        .encode(x="inj_lo:Q", x2="inj_hi:Q")
-    )
-    rule = alt.Chart().mark_rule(color=ocf.BRAND_ORANGE, strokeDash=[4, 3]).encode(x="inj_point:Q")  # ty: ignore[unresolved-attribute]
-    points = alt.Chart().mark_point(filled=True, size=70).encode(x=x, y=y, color=_colour())  # ty: ignore[unresolved-attribute]
-    bars = alt.Chart().mark_rule(strokeWidth=2).encode(x="lo:Q", x2="hi:Q", y=y, color=_colour())  # ty: ignore[unresolved-attribute]
-    return (
-        alt.layer(band, rule, bars, points, data=data)
-        .properties(width=WIDTH - 150, height=110)
-        .facet(
-            row=alt.Row(
-                "population:N",
-                sort=list(populations),
-                title=None,
-                header=alt.Header(
-                    labelAngle=0, labelAlign="left", labelLimit=400, labelFontSize=11
-                ),
-            )
+    chart = (
+        base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("low:Q", title="Share of moved MW found", scale=alt.Scale(domain=[0, 1])),
+            x2="high:Q",
         )
-        .properties(
-            title=_title(
-                text="Real labelled transfers: share of moved MW found, by detector",
-                lines=[
-                    (
-                        "Dot: share of the moved MW (megawatts) whose event the detector found. "
-                        "Line: "
-                        "95% interval from resampling whole events; 14, 35 and 66 events are few. "
-                        "Orange dashed line and band: RO-NC on injected transfers of the same kind "
-                        "(0.770; 0.665 to 0.857)."
-                    ),
-                ],
-            )
+        + base.mark_point(filled=True, size=70).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
+    ).properties(width=WIDTH, height=110)
+    return chart.properties(
+        title=_title(
+            text="Arm B finds a little more of the moved power; arm C finds much less",
+            lines=[
+                (
+                    "Share of the megawatts (MW) moved by injected transfers that RO-NC finds, on "
+                    "each "
+                    "residual (larger is better). Transfers over 1 day starting in even months, 15 "
+                    "Primary substations, three injection shapes pooled. Dot: estimate. Line: 95% "
+                    "interval from resampling whole calendar months."
+                )
+            ],
         )
     )
 
 
-def figure_bands(*, table: pl.DataFrame) -> alt.TopLevelMixin:
-    """Share of events found by PF14 and RO-NC, by share band and by duration band."""
-    rows = []
-    groups: list[tuple[str, str, pl.DataFrame]] = [
-        ("Share of the receiving load", band, table.filter(pl.col("share_band") == band))
-        for band in SHARE_BANDS
-    ] + [
-        (
-            "Duration",
-            name,
-            table.filter((pl.col("hours") > lo) & (pl.col("hours") <= hi)),
-        )
-        for name, lo, hi in DURATION_BANDS
+def figure_contrasts(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """The planned contrast and the descriptive contrasts, with intervals."""
+    base = pooled(data=data, population="base", parity="even")
+    long = pooled(data=data, population="long", parity="even")
+    specs = [
+        ("C1 (planned): B minus A", base, "B_XL", "A15_XL"),
+        ("C2: C minus A", base, "C_XL", "A15_XL"),
+        ("D minus B: one model, no refit offset", base, "B_LOGIT_SAME", "B_XL"),
+        ("B minus A on transfers of 15.6 to 60 days", long, "B_XL", "A15_XL"),
     ]
-    for facet, band, frame in groups:
-        for arm in ("PF14", "RO-NC"):
-            k, n = int(frame[f"found|{arm}"].sum()), frame.height
-            lo, hi = wilson(k=k, n=n)
-            rows.append(
-                {
-                    "facet": facet,
-                    "band": f"{band} (n={n})",
-                    "arm": arm,
-                    "share": k / n if n else 0.0,
-                    "lo": lo,
-                    "hi": hi,
-                }
-            )
-    data = pl.DataFrame(rows)
-    charts = []
-    for facet in ("Share of the receiving load", "Duration"):
-        sub = data.filter(pl.col("facet") == facet)
-        order = list(dict.fromkeys(sub["band"]))
-        y = alt.Y("band:N", sort=order, title=None)
-        base = alt.Chart(sub)
-        dots = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X(
-                "share:Q",
-                scale=alt.Scale(domain=[0, 1]),
-                axis=alt.Axis(
-                    values=[0, 0.25, 0.5, 0.75, 1], format=".2f", title="Share of events found"
-                ),
-            ),
-            y=y,
-            yOffset=alt.YOffset("arm:N"),
-            color=_colour(arms=("PF14", "RO-NC")),
-        )
-        lines = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
-            x="lo:Q",
-            x2="hi:Q",
-            y=y,
-            yOffset=alt.YOffset("arm:N"),
-            color=_colour(arms=("PF14", "RO-NC")),
-        )
-        charts.append((lines + dots).properties(width=WIDTH - 200, height=100, title=facet))
-    return alt.vconcat(*charts).properties(
-        title=_title(
-            text="Real events found, by size and by duration",
-            lines=[
-                (
-                    "Dot: share of the labelled real events found (higher is better). Line: 95% "
-                    "Wilson "
-                    "interval. All 66 labelled events. PF14 is the benchmark single-series "
-                    "detector; "
-                    "RO-NC is the refit-offset neighbour-count detector."
-                ),
-            ],
-        )
-    )
-
-
-def figure_strips(*, table: pl.DataFrame) -> alt.TopLevelMixin:
-    """One strip per event over 1 day: the event, and where PF14 and RO-NC flagged it."""
-    long = table.filter(pl.col("hours") > 24).sort("hours")
-    order = [f"{e} ({h / 24:.1f} d)" for e, h in zip(long["event"], long["hours"], strict=True)]
-    label = dict(zip(long["card_id"], order, strict=True))
-    span = pl.DataFrame(
-        {
-            "event": [label[c] for c in long["card_id"]],
-            "start": [0.0] * long.height,
-            "end": (long["hours"] / 24).to_list(),
-        }
-    )
-    flagged = (
-        pl.read_parquet(WORK_DIR / "event_intervals.parquet")
-        .filter(
-            pl.col("card_id").is_in(long["card_id"].implode()),
-            pl.col("arm").is_in(["PF14", "RO-NC"]),
-        )
-        .with_columns(
-            event=pl.col("card_id").replace_strict(label),
-            start=(pl.col("start_h").clip(lower_bound=-24) / 24),
-            end=(pl.col("end_h") / 24),
-        )
-    )
-    y = alt.Y("event:N", sort=order, title=None, axis=alt.Axis(labelFontSize=9))
-    x = alt.X(
-        "start:Q",
-        scale=alt.Scale(type="sqrt", domain=[-1, 32], nice=False),
-        axis=alt.Axis(
-            values=[0, 1, 2, 4, 8, 16, 32],
-            title="Days since the labelled start (square-root scale)",
-        ),
-    )
-    background = (
-        alt.Chart(span).mark_bar(color="#DDDDDD", size=11, clip=True).encode(x=x, x2="end:Q", y=y)  # ty: ignore[unresolved-attribute]
-    )
+    rows = []
+    for label, frames, arm, ref in specs:
+        point, low, high = contrast(frames=frames, arm=arm, base=ref)
+        rows.append({"contrast": label, "point": point, "low": low, "high": high})
+    frame = pl.DataFrame(rows)
+    order = [r[0] for r in specs]
+    y = alt.Y("contrast:N", sort=order, title=None, axis=alt.Axis(labelLimit=320))
     marks = (
-        alt.Chart(flagged)  # ty: ignore[unresolved-attribute]
-        .mark_bar(size=3.5, clip=True)
-        .encode(
-            x=x,
-            x2="end:Q",
-            y=y,
-            yOffset=alt.YOffset("arm:N", sort=["PF14", "RO-NC"]),
-            color=_colour(arms=("PF14", "RO-NC")),
+        alt.Chart(frame)
+        .mark_rule(color=ocf.DATA_BLUE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=y, x=alt.X("low:Q", title="Difference in share of moved MW found"), x2="high:Q"
         )
+        + alt.Chart(frame)
+        .mark_point(filled=True, size=70, color=ocf.DATA_BLUE)  # ty: ignore[unresolved-attribute]
+        .encode(y=y, x="point:Q")
     )
-    return (background + marks).properties(
-        width=WIDTH - 130,
-        height=14 * long.height,
-        title=_title(
-            text="Where the detectors flagged the 35 labelled events lasting over 1 day",
-            lines=[
-                (
-                    "Grey bar: the event as labelled. Blue bar: interval PF14 flagged. Orange bar: "
-                    "interval RO-NC flagged. Events are sorted by length; labels give the "
-                    "anonymised "
-                    "event number and its length in days. Every alarm needs 24 hours after the "
-                    "step."
-                ),
-            ],
-        ),
-    )
-
-
-def figure_steps(*, table: pl.DataFrame) -> alt.TopLevelMixin:
-    """Peak step against share of receiving load for the 35 events over 1 day."""
-    long = table.filter(pl.col("hours") > 24).with_columns(
-        outcome=pl.when(pl.col("found|RO-NC"))
-        .then(pl.lit("Found by RO-NC"))
-        .otherwise(pl.lit("Missed by RO-NC")),
-        power_present=pl.col("power_present_share") >= 0.5,
-        share_plot=pl.col("share").fill_null(-0.1),
-        peak_plot=pl.col("peak_step_z").fill_nan(None).fill_null(-1.0),
-    )
-    domain = ["Found by RO-NC", "Missed by RO-NC"]
-    colour = alt.Color(
-        "outcome:N",
-        scale=alt.Scale(domain=domain, range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]),
-        legend=alt.Legend(title=None, orient="top"),
-    )
-    shape = alt.Shape(
-        "units:N",
-        scale=alt.Scale(
-            domain=["MW only", "MVA only", "mixed"], range=["circle", "square", "triangle-up"]
-        ),
-        legend=alt.Legend(title="Series type", orient="top"),
-    )
-    points = (
-        alt.Chart(long)  # ty: ignore[unresolved-attribute]
-        .mark_point(filled=True, size=90, opacity=0.85)
-        .encode(
-            x=alt.X(
-                "share_plot:Q",
-                scale=alt.Scale(domain=[-0.15, 1.4]),
-                axis=alt.Axis(
-                    values=[0, 0.25, 0.5, 0.75, 1.0, 1.25],
-                    title=(
-                        "Moved MW as a share of the receiving load "
-                        "(events with no metered receiver sit left of 0)"
-                    ),
-                ),
-            ),
-            y=alt.Y(
-                "peak_plot:Q",
-                scale=alt.Scale(domain=[-2, 10]),
-                axis=alt.Axis(
-                    values=[0, 2, 4, 6, 8, 10],
-                    title="24-hour step in noise units (series without data sit below 0)",
-                ),
-            ),
-            color=colour,
-            shape=shape,
-        )
-    )
-    threshold = (
-        alt.Chart(pl.DataFrame({"y": [4.0]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(strokeDash=[4, 3], color="#888888")
-        .encode(y="y:Q")
-    )
-    quarter = (
-        alt.Chart(pl.DataFrame({"x": [0.25]}))  # ty: ignore[unresolved-attribute]
-        .mark_rule(strokeDash=[4, 3], color="#888888")
+    zero = (
+        alt.Chart(pl.DataFrame({"x": [0.0, 0.03], "label": ["no change", "threshold +0.03"]}))
+        .mark_rule(strokeDash=[4, 3], color="gray")  # ty: ignore[unresolved-attribute]
         .encode(x="x:Q")
     )
-    return (points + threshold + quarter).properties(
-        width=WIDTH - 60,
-        height=260,
+    chart = (marks + zero).properties(width=WIDTH, height=130)
+    return chart.properties(
         title=_title(
-            text="Why events are missed: a small step, no metered receiver, or no data",
+            text="The headline gain of arm B is small and its interval touches zero",
             lines=[
                 (
-                    "Each mark is one of the 35 labelled events lasting over 1 day. Dashed "
-                    "lines: the "
-                    "4.0 noise-unit alarm threshold of the benchmark detector and the 25% share "
-                    "used "
-                    "for the injected transfers. Noise unit: the usual size of the 24-hour step on "
-                    "odd-numbered months."
-                ),
+                    "Paired difference in the share of moved MW found by RO-NC (larger is better), "
+                    "transfers over 1 day unless stated, even months. Dot: estimate. Line: 95% "
+                    "interval from resampling whole calendar months. Grey rules: no change, and "
+                    "the "
+                    "+0.03 that the plan set for a supported verdict."
+                )
             ],
-        ),
+        )
+    )
+
+
+def figure_by_step(*, data: pl.DataFrame) -> alt.TopLevelMixin:
+    """Share of transfers found, by donor step size, for arms A, B, and C."""
+    rows = []
+    for metered, mlabel in ((True, "A metered receiver exists"), (False, "No metered receiver")):
+        for low, high in itertools.pairwise(STEP_EDGES):
+            n, found = 0, dict.fromkeys(ARM_LABELS, 0)
+            for frame in pooled(data=data, population="base", parity="even"):
+                part = frame.filter(
+                    (pl.col("metered_receivers") > 0) == metered,
+                    pl.col("donor_step_z").abs().is_between(low, high, "left"),
+                )
+                n += part.height
+                for arm in ("A15_XL", "B_XL", "C_XL"):
+                    found[arm] += int(part[arm].sum())
+            if n < 30:
+                continue
+            label = f"{low:g} to {high:g}" if high != float("inf") else f"{low:g} or more"
+            rows.extend(
+                {
+                    "panel": mlabel,
+                    "step": label,
+                    "order": low,
+                    "arm": ARM_LABELS[arm],
+                    "share": found[arm] / n,
+                }
+                for arm in ("A15_XL", "B_XL", "C_XL")
+            )
+    frame = pl.DataFrame(rows)
+    chart = (
+        alt.Chart(frame)
+        .mark_bar()  # ty: ignore[unresolved-attribute]
+        .encode(
+            x=alt.X(
+                "step:N",
+                sort=["0 to 2", "2 to 4", "4 to 6", "6 to 10", "10 or more"],
+                title="Donor step (noise units)",
+                axis=alt.Axis(labelAngle=0),
+            ),
+            xOffset=alt.XOffset("arm:N", sort=list(ARM_LABELS.values())),
+            y=alt.Y("share:Q", title="Share of transfers found", scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color(
+                "arm:N",
+                sort=list(ARM_LABELS.values()),
+                scale=alt.Scale(domain=list(ARM_LABELS.values())[:3], range=COLOURS[:3]),
+                legend=alt.Legend(orient="top", title=None, columns=1, labelLimit=400),
+            ),
+        )
+        .properties(width=WIDTH, height=120)
+        .facet(row=alt.Row("panel:N", title=None))
+    )
+    return chart.properties(
+        title=_title(
+            text="Arm B finds more of the transfers whose step is 2 to 4 noise units",
+            lines=[
+                (
+                    "Share of injected transfers that RO-NC finds, by the size of the donor's step "
+                    "in that arm's noise units (larger is better), transfers over 1 day starting "
+                    "in "
+                    "even months, three injection shapes summed. Bins with under 30 transfers are "
+                    "left out."
+                )
+            ],
+        )
+    )
+
+
+def figure_diagnostic() -> alt.TopLevelMixin:
+    """Per series: noise of B and C relative to A, and the share of a step that the filter keeps."""
+    rows = []
+    for row in table():
+        rows.append(
+            {
+                "series": f"Primary {int(row['series'])}",
+                "kind": "B noise / A noise",
+                "value": row["scale_b"] / row["scale_a"],
+            }
+        )
+        rows.append(
+            {
+                "series": f"Primary {int(row['series'])}",
+                "kind": "C noise / A noise",
+                "value": row["scale_c"] / row["scale_a"],
+            }
+        )
+        rows.append(
+            {
+                "series": f"Primary {int(row['series'])}",
+                "kind": "Share of a 3-day step kept by C",
+                "value": row["retained_share"],
+            }
+        )
+    kinds = ["B noise / A noise", "C noise / A noise", "Share of a 3-day step kept by C"]
+    chart = (
+        alt.Chart(pl.DataFrame(rows))
+        .mark_circle(size=60)  # ty: ignore[unresolved-attribute]
+        .encode(
+            x=alt.X("value:Q", title="Ratio (a step statistic in MW)"),
+            y=alt.Y("series:N", title=None),
+            color=alt.Color(
+                "kind:N",
+                sort=kinds,
+                scale=alt.Scale(
+                    domain=kinds, range=[ocf.BRAND_ORANGE, ocf.DATA_PURPLE, ocf.DATA_GREEN]
+                ),
+                legend=alt.Legend(orient="top", title=None, columns=1, labelLimit=400),
+            ),
+        )
+        .properties(width=WIDTH, height=260)
+    )
+    return chart.properties(
+        title=_title(
+            text="The filter shrinks the noise to 0.2 of arm A's but keeps only 0.2 of a step",
+            lines=[
+                (
+                    "For each Primary: the odd-month noise of the 24-hour step statistic of arm B "
+                    "and arm C divided by arm A's, and the share of a constant 3-day step added to "
+                    "the residual that arm C's statistic still shows (median over 30 starts in "
+                    "even "
+                    "months)."
+                )
+            ],
+        )
     )
 
 
 def main() -> None:
     """Draw every figure."""
-    table = event_table()
-    _save(figure_recall(table=table), name="figure_1_recall_by_detector.svg")
-    _save(figure_bands(table=table), name="figure_2_recall_by_band.svg")
-    _save(figure_strips(table=table), name="figure_3_event_strips.svg")
-    _save(figure_steps(table=table), name="figure_4_step_and_share.svg")
-    print(np.__name__)
+    data = populations()
+    _save(figure_recall(data=data), name="figure_1_recall_by_arm.svg")
+    _save(figure_contrasts(data=data), name="figure_2_contrasts.svg")
+    _save(figure_by_step(data=data), name="figure_3_share_found_by_step.svg")
+    _save(figure_diagnostic(), name="figure_4_noise_and_retained_step.svg")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,8 @@ return step is blocked. Nothing here reads a switching log.
 
 from __future__ import annotations
 
+import os
+import pickle
 from pathlib import Path
 from typing import Final, Literal
 
@@ -20,6 +22,7 @@ from e00130_detectors import (
     refit_stamps,
     robust_scale,
 )
+from e00130_inject import Injection
 from e00130_intervals import relative_residual
 
 FEATURES_PATH: Final[Path] = (
@@ -159,10 +162,82 @@ def tracked_relative(
     return out
 
 
-def load_both() -> tuple[dict, dict]:
-    """Return the stored panel and the offset panel."""
+SOURCE: Final[str] = os.environ.get("E130_SOURCE", "A16")
+"""Which residual the detectors read: `A16` (experiment 82's lagless XGBoost, all 16 series, the
+sanity arm), `A15` (the same without series 12), `B` (frozen convex model), or `C` (filter
+innovations of the frozen residual)."""
+BLANK_SERIES: Final[int] = 12
+"""The generator case with no convex-model fit; blanked in every arm but `A16`."""
+SOURCES: Final[tuple[str, ...]] = ("A16", "A15", "B", "C")
+
+
+def _blank(*, arrays: dict[int, np.ndarray]) -> dict[int, np.ndarray]:
+    return {s: np.full(GRID_LENGTH, np.nan) if s == BLANK_SERIES else a for s, a in arrays.items()}
+
+
+def _gam_arrays() -> tuple[dict, dict]:
+    """The stored frozen and innovation panels of the 1st-of-month and 16th-of-month models."""
+    from e00130_gam_panel import GAM_DIR
+
+    first = pickle.loads((GAM_DIR / "panel_1.pkl").read_bytes())
+    second = pickle.loads((GAM_DIR / "panel_16.pkl").read_bytes())
+    return first, second
+
+
+def load_both(*, source: str | None = None) -> tuple[dict, dict]:
+    """Return the panel and the offset panel that the chosen source's detectors read.
+
+    `power` is always experiment 82's, so that events are drawn and injected identically in every
+    source. For `C` the panels also hold `tracker`, the frozen residual that the end rule's level
+    tracker reads.
+    """
+    source = SOURCE if source is None else source
     panel = load_panel()
-    return panel, load_offset_panel(panel=panel)
+    offset_panel = load_offset_panel(panel=panel)
+    if source == "A16":
+        return panel, offset_panel
+    if source == "A15":
+        for part in (panel, offset_panel):
+            part["residual"] = _blank(arrays=part["residual"])
+        return panel, offset_panel
+    first, second = _gam_arrays()
+    out = []
+    for stored in (first, second):
+        frozen = stored["frozen"]
+        expected = _blank(arrays=frozen["expected"])
+        residual = _blank(arrays=frozen["residual"])
+        part: dict = {"power": panel["power"], "expected": expected, "residual": residual}
+        if source == "C":
+            innovation = {
+                s: stored["innovation"].get(s, np.full(GRID_LENGTH, np.nan)) for s in residual
+            }
+            part = {**part, "residual": _blank(arrays=innovation), "tracker": residual}
+        out.append(part)
+    return out[0], out[1]
+
+
+def innovations_of_injection(*, injection: Injection, panel: dict) -> dict[int, np.ndarray]:
+    """Innovations of the injected frozen residual: the filter is re-run on each touched series.
+
+    A series with no injected power keeps its stored innovations.
+    """
+    from e00130_gam_panel import hour_band, innovations, load_hyper, site_of_series
+
+    band, hyper = hour_band(), load_hyper()
+    out: dict[int, np.ndarray] = {}
+    for series, stored in panel["residual"].items():
+        delta = injection.delta[series]
+        if series not in hyper or not np.any(delta):
+            out[series] = stored
+            continue
+        capacity = site_of_series()[series][1]
+        frozen = panel["tracker"][series] + delta
+        out[series] = (
+            innovations(residual=frozen / capacity * 100.0, band=band, hyper=hyper[series])
+            * capacity
+            / 100.0
+        )
+    return out
 
 
 def check_variants() -> None:

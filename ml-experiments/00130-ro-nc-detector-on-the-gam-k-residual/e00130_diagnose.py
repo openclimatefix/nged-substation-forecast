@@ -16,6 +16,7 @@ import numpy as np
 from e00130_common import GRID_LENGTH, SERIES_IDS, load_panel, stamp_months
 from e00130_detectors import level_shift, robust_scale
 from e00130_gam_panel import GAM_DIR, hour_band, innovations, load_hyper, site_of_series
+from studies.dp_assimilation import FilterHyperparameters
 
 WINDOW = 48
 STEP_DAYS = 3
@@ -23,7 +24,9 @@ ONSETS_PER_SERIES = 30
 SEED = 130
 
 
-def retained_share(*, series: int, frozen: dict, hyper, band: np.ndarray, unit_mw: float) -> float:
+def retained_share(
+    *, series: int, frozen: dict, hyper: FilterHyperparameters, band: np.ndarray, unit_mw: float
+) -> float:
     """Median over onsets of the peak statistic of arm C divided by the injected step."""
     capacity = site_of_series()[series][1]
     residual = frozen["residual"][series]
@@ -40,7 +43,11 @@ def retained_share(*, series: int, frozen: dict, hyper, band: np.ndarray, unit_m
         stream = np.full(GRID_LENGTH, np.nan)
         stream[lo:hi] = residual[lo:hi]
         stream[onset:end] += step
-        innov = innovations(residual=stream / capacity * 100.0, band=band, hyper=hyper) * capacity / 100.0
+        innov = (
+            innovations(residual=stream / capacity * 100.0, band=band, hyper=hyper)
+            * capacity
+            / 100.0
+        )
         shift = level_shift(values=innov, window=WINDOW)
         near = slice(onset - 4, onset + 4)
         shares.append(float(np.nanmax(shift[near])) / step)
@@ -48,14 +55,14 @@ def retained_share(*, series: int, frozen: dict, hyper, band: np.ndarray, unit_m
     return float(np.median(shares))
 
 
-def main() -> None:
-    """Print the table."""
+def table() -> list[dict[str, float]]:
+    """One row per series: odd-month step scales of the three residuals and C's retained share."""
     a_panel = load_panel()
     band = hour_band()
     hyper = load_hyper()
     with (GAM_DIR / "panel_1.pkl").open("rb") as handle:
-        stored = pickle.load(handle)  # noqa: S301
-    print("series site  scaleA scaleB scaleC  B/A  C/A  C-retained-share-of-step")
+        stored = pickle.load(handle)
+    rows = []
     for series in SERIES_IDS:
         if series not in hyper:
             continue
@@ -67,9 +74,21 @@ def main() -> None:
         share = retained_share(
             series=series, frozen=stored["frozen"], hyper=hyper[series], band=band, unit_mw=a
         )
+        rows.append(
+            {"series": series, "scale_a": a, "scale_b": b, "scale_c": c, "retained_share": share}
+        )
+    return rows
+
+
+def main() -> None:
+    """Print the table."""
+    print("series site  scaleA scaleB scaleC  B/A  C/A  C-retained-share-of-step")
+    for row in table():
+        series = int(row["series"])
+        a, b, c = row["scale_a"], row["scale_b"], row["scale_c"]
         print(
             f"{series:3d} {site_of_series()[series][0]:4s} {a:.3f} {b:.3f} {c:.3f} "
-            f"{b / a:.2f} {c / a:.2f} {share:.2f}",
+            f"{b / a:.2f} {c / a:.2f} {row['retained_share']:.2f}",
             flush=True,
         )
 

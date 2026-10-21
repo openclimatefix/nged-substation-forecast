@@ -4,7 +4,7 @@ slug: ro-nc-detector-on-the-gam-k-residual
 theme: switching-detectors
 also_relevant_to:
   - differentiable-physics-forecast-engine
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/
   only (monthly fits of the convex model, three residual panels, alarm and outcome tables), no
@@ -60,105 +60,155 @@ metric: >-
   labelled real transfers over 1 day found, and the share of misses with a donor step of 2 to 4
   noise units.
 code: ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/
+verdict: inconclusive
+best_arm: >-
+  Arm B, RO-NC on the frozen convex-model residual, finds 0.794 of the moved MW (95% interval 0.719
+  to 0.855), against 0.772 (0.688 to 0.840) for arm A, RO-NC on the lagless XGBoost residual.
+headline: >-
+  C1, arm B minus arm A, is +0.023 (-0.001 to +0.046) in the share of moved MW found, under the
+  +0.03 bar. C2, arm C minus arm A, is -0.283 (-0.331 to -0.216).
+lessons: >-
+  A better demand forecast lifts the share of moved power found only slightly (+0.023), because
+  most of the misses are transfers with a donor step of 2 to 4 noise units and no metered
+  receiver, which stay hard on either residual. The Kalman filter's innovations lose much of the
+  step, and arm C finds 0.283 less.
+take_home_message: >-
+  Building the load-transfer detector on a demand forecast from the convex model, with no recent
+  power, found about 2 more percentage points of the moved power than building it on the lagless
+  XGBoost forecast (+0.023, interval -0.001 to +0.046, under the +0.03 bar), and found 18 of the 35
+  real transfers over 1 day against 12. The Kalman filter's one-step errors found much less (0.488
+  of the moved power against 0.772): the filter keeps only about a fifth of a 3-day step, so the
+  filter most likely absorbs the transfer, which we did not test further. The detector's
+  remaining misses are mostly small steps with no metered receiver, so a stronger signal for those,
+  not a better forecast, is the next thing to try.
+advice:
+  - >-
+    Do not expect a better demand forecast alone to lift the transfer detector much: a frozen
+    convex-model residual found +0.023 (-0.001 to +0.046) more of the moved MW than lagless
+    XGBoost, under the +0.03 bar (C1).
+  - >-
+    Do not feed the Kalman filter's one-step innovations to the transfer detector: they find 0.283
+    (0.216 to 0.331) less of the moved MW than lagless XGBoost (C2).
+  - >-
+    Do not judge a residual for step detection by its noise alone: arm C's step statistic had 0.2
+    of arm A's noise and found 0.488 of the moved MW against 0.772 (C2, noise and step figure).
+  - >-
+    Look for the remaining misses among sharp steps of 2 to 4 noise units with no metered receiver,
+    where arm B still finds only 181 of 550 transfers (recall by donor step).
+  - >-
+    Read the count of real transfers found (18 of 35 for arm B, 12 for arm A) with the caveat that
+    the convex model trained with the hand-filtered switching rows masked, so it favours arms B and
+    C (real transfers).
 production_status: not-for-production
 adopted_in: none
 ---
 
 # Experiment 130: does the detector find more load transfers on the GAM-K residual?
 
-**Plan only.** This page holds the pre-registered plan. The write-up replaces it after the fits.
+**A better demand forecast lifts the share of moved power that the detector finds only a little,
+and the Kalman filter's one-step errors make the detector much worse.** The convex-model forecast
+with no recent power (arm B) finds 0.794 of the moved megawatts (MW) against 0.772 for the lagless
+XGBoost forecast (arm A). The gain of +0.023 (95% interval -0.001 to +0.046) is under the +0.03 bar,
+so the verdict is `inconclusive`. Arm B finds 18 of the 35 real transfers over 1 day against 12 for
+arm A, a descriptive count that the convex model's training rows flatter. The remaining misses are
+mostly steps of 2 to 4 noise units with no metered receiver, so a stronger signal for those
+transfers is the next thing to try, not a better forecast.
 
-We ask whether a detector of load transfers finds more of the power moved when it is built on a
+We asked whether a detector of load transfers finds more of the power moved when it is built on a
 better demand forecast. A load transfer is a switching operation that moves part of one Primary
 substation's demand onto neighbouring Primary substations for hours or days. The detector,
 [experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)'s
 refit-offset neighbour-count detector (RO-NC), subtracts a forecast from the measured power and
-raises an alarm when the 24-hour average of the difference steps by 4.0 noise units or more. It
-found 0.770 of the megawatts (MW) moved by transfers that we added to the real power history of 16
-Primaries, where the forecast was a lagless XGBoost model. We swap that forecast for the convex
-demand model of [experiment 122](../00122-differentiable-physics-three-winter-backtest-gam-k/result.md),
-with and without its Kalman filter (GAM-K), and count the share of the moved MW found again.
+raises an alarm when the 24-hour average of the difference steps by 4.0 noise units or more. We
+added synthetic transfers to the real power history of 15 Primaries, swapped the forecast
+(lagless XGBoost in experiment 82) for the convex demand model of [experiment
+122](../00122-differentiable-physics-three-winter-backtest-gam-k/result.md) with and without its
+Kalman filter (GAM-K), and counted the share of the moved MW found again.
 
-## Design
+![Share of moved MW found, by residual](figure_1_recall_by_arm.svg)
 
-One variable changes: the residual. The injected-transfer draw (same seeds, shapes S2, S3, and S4,
-even-month starts), the 35 labelled real transfers over 1 day, the 80 unexplained odd-month
-alarms, the first-return end rule, and the resampling by whole calendar months are experiment 82's.
+![Planned and descriptive contrasts](figure_2_contrasts.svg)
 
-- **Arm A:** RO-NC on the lagless XGBoost residual, as in experiment 82.
-- **Arm B (headline):** RO-NC on the frozen convex model's residual (observed power minus the
-  convex model's forecast, no filter). The convex model is fitted on a 24-month window on the 1st
-  and on the 16th of each month, without drift and with a fitted PV capacity, and the two fits give
-  the two-model refit offset.
-- **Arm C:** RO-NC on the one-step innovations of the Kalman filter on the frozen residual, with the
-  same two fits. The filter is re-run on each injected power series. The end rule's level tracker
-  reads the frozen residual, because the innovations return to zero after a step.
-- **Arm D:** arm B with one model and no refit offset. Descriptive.
+![Share of transfers found by donor step](figure_3_share_found_by_step.svg)
 
-## Pre-run deviations and diagnostics
+![Noise and retained step of each residual](figure_4_noise_and_retained_step.svg)
 
-These were found before any detector was scored. The diagnostic reads only residual noise and step
+## Results
+
+- **Arms.** A: lagless XGBoost residual (experiment 82). B (the headline): residual of the convex
+  model, frozen between fits, with the model fitted on the 1st and on the 16th of each month for
+  the refit offset. C: one-step innovations of the Kalman filter on that residual, filter re-run on
+  each injected power series. D: arm B with one model and no refit offset. Every arm is RO-NC with
+  its own noise unit, its own logistic score, and 80 unexplained odd-month alarms.
+- **Row set.** The 602 fresh headline-band transfers per injection shape that start in even months
+  and do not start at the excluded series (shapes S2, S3, and S4 pooled), and 214 long transfers
+  (15.6 to 60 days). The draw is experiment 82's.
+- **Sanity.** On all 16 series the lagless arm reproduces experiment 82: RO-NC 0.770, PF14 0.656.
+  The harness check reproduces the stored flags of experiments 70 and 71 exactly.
+- **MW-weighted recall (95% interval).** A 0.772 (0.688 to 0.840); B 0.794 (0.719 to 0.855); C
+  0.488 (0.407 to 0.588); D 0.724 (0.644 to 0.770).
+- **Planned contrast C1, B minus A:** +0.023 (-0.001 to +0.046); the lower end is not above zero,
+  so the rule gives `inconclusive`. By shape, +0.020 (S2), +0.022 (S3), +0.027 (S4).
+- **Descriptive contrasts:** C2, C minus A, -0.283 (-0.331 to -0.216); D minus B -0.071 (-0.120 to
+  -0.040); B minus A on long transfers +0.034 (-0.043 to +0.086).
+- **Donor step 2 to 4 noise units.** With no metered receiver, A finds 147 of 550 and B 181 (C 42).
+  With a metered receiver, A finds 109 of 151, B 126, and C 66. Such misses are 0.637 of arm A's
+  missed transfers (445 of 699) and 0.623 of arm B's (394 of 632).
+- **Real transfers over 1 day (35, descriptive).** RO-NC found 12 (A), 18 (B), and 11 (C). The
+  convex model trained with the hand-filtered switching rows masked, and those rows include these
+  transfers, so the count favours arms B and C.
+- **Why arm C loses.** Its step statistic has 0.11 to 0.29 of arm A's noise, but a constant 3-day
+  step keeps only 0.13 to 0.29 of its size (median 0.22), because the filter's level and transient
+  follow the step within hours. We predicted arm C within -0.03 to +0.03 of arm A and it landed far
+  below. The tail of arm C's statistic is not much heavier than arm A's (99.9th percentile of the
+  absolute statistic over its scale: median 6.0 against 5.4), so tails do not explain the gap. The
+  most likely reason is that the filter absorbs the transfer, and we did not test that further.
+
+## Pre-run deviations
+
+These were found before any detector was scored. The diagnostic read only residual noise and step
 retention, not recall.
 
-- **Headline moved from arm C to arm B.** The first draft of this plan named arm C. A plan review
-  asked for a positive control on the filter. The control adds a constant 4-noise-unit, 3-day step
-  to the frozen residual, re-runs the filter, and reads the peak 24-hour statistic. The filter keeps
-  0.13 to 0.29 of the step (median 0.22 over the 15 series), because the transient's half-life is
-  2 to 4 hours and the level tracks within hours. The statistic's noise falls to 0.11 to 0.29 of arm
-  A's, so arm C's steps in noise units are about as large as arm A's. Arm B's noise is 0.6 to 1.2
-  times arm A's (median 0.8). Arm B is therefore the arm that should gain, and arm C stays as a
-  descriptive arm.
-- **Fifteen series, not 16.** Series 12 (D15) is a generator case with no usable history for the
-  convex model, so it has no residual. Arm A is re-scored with series 12 blanked and with transfers
-  that start at series 12 left out, so that every arm sees the same 15 series. Experiment 82's
-  16-series 0.770 is reproduced once as a sanity check.
-- **Fitted PV capacity, not pinned.** The real-time capacity vintages that experiment 111 pinned
-  exist for 8 of the 16 series, so every arm uses the fitted capacity. Experiments 111 and 122 used
-  the pinned capacity at the sites they scored.
-- **Own filter settings.** Experiment 111's filter settings exist for 6 series and were fitted on a
-  year that overlaps this experiment's odd months. The four filter settings of each series are fitted
-  here on its odd-month frozen residual with experiment 106's prior.
-- **Hindsight in the convex model's training rows.** The convex model leaves out the hand-filtered
-  switching rows when it trains. These include the 35 labelled real transfers, so the real-transfer
-  count favours arms B and C, and arm A's XGBoost trained on all rows. The injected-transfer
-  contrast is unaffected, because the injection is added after the fit.
-- **Time axis and units.** The convex model's cache holds end-of-half-hour times and points of
-  effective capacity. Converted to MW at the series' effective capacity, the observed power equals
-  experiment 82's panel to the last digit.
+- **Headline moved from arm C to arm B.** A plan review asked for a positive control on the filter.
+  The control adds a constant 4-noise-unit, 3-day step to the frozen residual and re-runs the
+  filter. The filter kept a median 0.22 of the step, and arm B's noise was 0.6 to 1.2 times arm A's
+  (median 0.8). Arm B was therefore expected to gain, and arm C stayed as a descriptive arm.
+- **Fifteen series, not 16.** The generator case (series 12) has no usable history for the convex
+  model, so every arm is scored on the other 15 series.
+- **Fitted PV capacity, not pinned.** The real-time capacity vintages exist for only 8 of the 16
+  series, so the convex model fits its PV capacity from the training window.
+- **Own filter settings.** The four filter settings of each series are fitted on its odd-month
+  frozen residual, with experiment 106's prior, because experiment 111's settings cover 6 series.
 
-## Checks that guard the comparison
+## Checks
 
-- **No injected rows in the training window.** Each fit sees uninjected power only, and the
-  injection is added after the fit, as for arm A. A unit check asserts that arm B's residual of an
-  injected series equals its uninjected residual plus the injected delta.
-- **Noise units per arm.** Each arm's noise unit is the robust scale of its own odd-month 24-hour
-  step statistic, and its threshold gives 80 unexplained odd-month alarms.
-- **Weather.** The convex model uses past weather (ERA5) at fit and forecast times, as experiments
-  82 and 122 do. ERA5 arrives about 5 days late, so a live service could not build these residuals.
-  [Experiment 101](../00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md) made
-  the same choice. The convex model is `not-for-production` (experiment 122).
+- **Median forecast minus mean forecast, and error beside the quantile score.** Not applicable: the
+  experiment scores detector alarms against injected transfers and makes no probabilistic forecast.
+- **Trigger 2 (a result contradicts its prediction), fired for arm C.** The positive control and
+  the tail check are the tests above. The cause stays an untested hypothesis. Arm C is descriptive
+  and carries no verdict, so the audit was not run.
+- **Trigger 4 (leaving one site out changes the verdict), fired weakly for C1.** Without donor 3,
+  8, or 9 the lower end rises above zero (+0.002, +0.007, and +0.003), which would read as `small
+  gain`. Without donor 18 C1 falls to +0.013 (-0.003 to +0.032). The sign never flips, and the
+  point value stays between +0.013 and +0.030. The audit was not run, because the verdict is
+  `inconclusive` either way.
+- **Triggers 1, 3, 5, 6, and 7 did not fire.** The sanity arm reproduces experiment 82, and arm D
+  is below arm B as expected. C1's interval is about 0.05 wide at 95%, in line with experiment 82's
+  C1 interval of 0.108 at 98.33%.
 
-## Compute
+## Caveats
 
-CPU only, 6 to 10 cores and 8 GB under `systemd-run --user --scope -p MemoryMax=8G -p
-OOMPolicy=continue`. The 1,800 convex-model fits take about 3 minutes. The detector scoring over
-the injected draw dominates the run time.
+- **Lab conditions.** The convex model uses past weather (ERA5), which arrives about 5 days late, so
+  a live service could not build these residuals. The convex model is `not-for-production`
+  (experiment 122).
+- **Hindsight in training.** The convex model leaves out the hand-filtered switching rows when it
+  trains. The injected-transfer contrast is unaffected, because the injection is added after the
+  fit.
+- **Code location.** The residual builder and detector scripts live in this experiment's folder.
+  Moving them into `packages/` needs a review.
 
-## Sizing
+## What the next experiment should answer
 
-- **Stored data:** private tables only; nothing enters a Delta table or a prediction set.
-- **Production serving path:** not touched.
-- **Degradation rule:** not touched.
-- **Defensible designs:** two residuals (arms B and C), resolved by the positive control above.
-- **Callers:** the experiment's own scripts, which import only their folder, `studies.*`, and
-  reviewed packages. Moving the detector code or the residual builder into `packages/` needs a
-  review and is not part of this experiment.
-
-## Earlier advice followed and departed from
-
-- **Followed:** experiment 82's advice to look for the remaining misses among sharp steps of 2 to 4
-  noise units with no metered receiver (the descriptive donor-step table).
-- **Followed:** experiment 101's advice to quote recall on real transfers as a count out of 35.
-- **Followed:** experiment 122's caveat that GAM-K's gain over frozen models is mostly level
-  tracking, which is why arm A's twice-monthly refits and arm B's frozen residual are compared and
-  the filter's gain is not assumed.
+**Can a signal other than a better forecast find steps of 2 to 4 noise units with no metered
+receiver?** Arm B still finds only 181 of 550 such transfers. A signal from neighbouring
+Primaries' sum or from the topology above them is the nearest untried route.
