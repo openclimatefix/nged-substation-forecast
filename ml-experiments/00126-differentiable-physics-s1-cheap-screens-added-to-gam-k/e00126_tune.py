@@ -1,27 +1,28 @@
-"""Tune experiment 126's penalty weights and filter hyperparameters on the tuning year.
+"""Tune experiment 126's filter hyperparameters on the tuning year.
 
 Every fit uses data before 2023-07-01 (the tuning cut), and the replica of the tuning year is the
 fit at 2022-07-01. The scored rows are 2023-07-01 to 2024-06-30 at the five decision sites. D9 has
 no history at that cut.
 
-1. **The penalty weight lambda** of each interaction arm (T1, T2, T3, and T-all) is chosen from
-   `common.LAMBDA_GRID`, one value for all sites, by the day-ahead quantile score after the filter
-   on rows outside the switching masks. Each candidate has its own filter hyperparameters.
+1. **The penalty weight** is T-all's, 1.0, chosen by experiment 114 on the same tuning year; it is
+   read from 114's hashed `decisions.json` and not re-tuned, so every arm differs from T-all by its
+   added columns only.
 2. **Each arm's filter hyperparameters** are fitted by marginal likelihood on that arm's
    out-of-sample tuning-year residuals, under a prior shared across the five sites. D9 takes the
-   mean of the five sites' unconstrained values.
+   mean of the five sites' unconstrained values. The `-b0` runs use T-all's hyperparameters.
 
 The choices are written to `work/decisions.json` with a SHA-256 hash in `work/decisions.sha256`,
 before any replicate-year or scored-year row is read. The new columns' effective degrees of freedom
-at each lambda are written to `work/tuning.json`.
+are written to `work/tuning.json`.
 
-    uv run python ml-experiments/00114-*/e00126_tune.py [--workers 6]
+    uv run --no-sync python ml-experiments/00126-*/e00126_tune.py [--workers 6]
 """
 
 import argparse
 import hashlib
 import json
 from concurrent.futures import ProcessPoolExecutor
+from pathlib import Path
 from typing import Any, Final
 
 import e00126_common as common
@@ -36,16 +37,31 @@ from studies.dp_pinned_capacity import read_vintages
 
 TUNING_LABELS: Final[tuple[str, ...]] = ("replica_tuning", "tuning")
 ArmKey = tuple[str, float]
-"""An arm's name and penalty weight (0 for B0 and the threshold arm)."""
+"""An arm's name and penalty weight."""
+T_ALL_DECISIONS: Final[Path] = (
+    common.ML_EXPERIMENTS_DATA_DIR
+    / "00114-differentiable-physics-n3-n4-interactions-and-heating-threshold"
+    / "work"
+    / "decisions.json"
+)
 
 _STATE: dict[str, Any] = {}
 
 
+def t_all_weight() -> float:
+    """Return T-all's penalty weight from experiment 114's decisions, after checking its hash."""
+    text = T_ALL_DECISIONS.read_text()
+    recorded = T_ALL_DECISIONS.with_name("decisions.sha256").read_text().strip()
+    if hashlib.sha256(text.encode()).hexdigest() != recorded:
+        msg = "experiment 114's decisions.json no longer matches its recorded hash"
+        raise ValueError(msg)
+    return float(json.loads(text)["lambda"]["t_all"])
+
+
 def arm_keys() -> list[ArmKey]:
-    """Return every candidate arm: B0, the threshold arm, and each interaction arm and lambda."""
-    keys: list[ArmKey] = [("b0", 0.0), ("h_site", 0.0)]
-    keys += [(name, lam) for name in pipeline.INTERACTION_ARMS for lam in common.LAMBDA_GRID]
-    return keys
+    """Return every arm: T-all and the eleven arms that change its columns, at T-all's weight."""
+    weight = t_all_weight()
+    return [(name, weight) for name in pipeline.ARM_NAMES]
 
 
 def key_text(*, key: ArmKey) -> str:
@@ -101,29 +117,49 @@ def _hyper_job(
 
 
 def _edf_job(site: str) -> dict[str, float]:
-    """Return the new columns' effective degrees of freedom of each interaction arm at one site.
+    """Return each arm's effective degrees of freedom above T-all's at one site.
 
-    The count is `trace((G + P)^-1 G)` of the arm minus B0's, at the tuning cut, ignoring the sign
-    bounds.
+    The count is `trace((G + P)^-1 G)` of the arm minus T-all's, at the tuning cut, ignoring the
+    sign bounds.
     """
     cache: FeatureCache = _STATE["cache"]
-    base = design.build_base(
-        cache=cache, vintages=_STATE["vintages"], site=site, cut=common.TUNING_CUT
+    vintages = _STATE["vintages"]
+    base = design.build_base(cache=cache, vintages=vintages, site=site, cut=common.TUNING_CUT)
+    weight = t_all_weight()
+    reference = _edf(
+        cache=cache,
+        base=base,
+        arm=pipeline.arm_spec(arm_name="t_all", penalty_weight=weight),
+        vintages=vintages,
     )
     out: dict[str, float] = {}
-    reference = _edf(cache=cache, base=base, arm=design.B0)
-    for name in pipeline.INTERACTION_ARMS:
-        for lam in common.LAMBDA_GRID:
-            arm = design.interaction_arm(name=name, penalty_weight=lam)
-            out[f"{name}@{lam:g}"] = _edf(cache=cache, base=base, arm=arm) - reference
+    for name in pipeline.ARM_NAMES:
+        arm = pipeline.arm_spec(arm_name=name, penalty_weight=weight)
+        out[name] = _edf(cache=cache, base=base, arm=arm, vintages=vintages) - reference
     return out
 
 
-def _edf(*, cache: FeatureCache, base: design.BaseFit, arm: design.ArmSpec) -> float:
+def _edf(
+    *,
+    cache: FeatureCache,
+    base: design.BaseFit,
+    arm: design.ArmSpec,
+    vintages: pl.DataFrame,
+) -> float:
     """Return an arm's effective degrees of freedom at the base fit."""
-    x = design.arm_matrix(
-        cache=cache, layout=base.layout, site=base.site, index=base.index, x0=base.x0, arm=arm
+    context = pipeline.arm_context(
+        cache=cache, vintages=vintages, site=base.site, cut=common.TUNING_CUT, arm_name=arm.name
     )
+    x = design.arm_matrix(
+        cache=cache,
+        layout=base.layout,
+        site=base.site,
+        index=base.index,
+        x0=base.x0,
+        arm=arm,
+        context=context,
+    )
+    x = x[np.isfinite(x).all(axis=1)]
     xt = torch.as_tensor(x)
     penalty = design.arm_penalty(layout=base.layout, arm=arm, n_rows=base.n)
     return design.effective_degrees_of_freedom(gram=xt.T @ xt, penalty=penalty)
@@ -189,14 +225,10 @@ def main() -> None:
             scores[key][site] = (plain, filtered)
     mean_plain = {k: float(np.mean([s[0] for s in v.values()])) for k, v in scores.items()}
     mean_filtered = {k: float(np.mean([s[1] for s in v.values()])) for k, v in scores.items()}
-    chosen_lambda: dict[str, float] = {}
-    for name in pipeline.INTERACTION_ARMS:
-        candidates = [(name, lam) for lam in common.LAMBDA_GRID]
-        chosen_lambda[name] = min(candidates, key=lambda k: mean_filtered[k])[1]
-    chosen_keys = [("b0", 0.0), ("h_site", 0.0)] + [(n, chosen_lambda[n]) for n in chosen_lambda]
+    weight = t_all_weight()
     decisions = {
-        "lambda": chosen_lambda,
-        "filter_hyper": {key[0]: hypers[key] for key in chosen_keys},
+        "lambda": {"t_all": weight},
+        "filter_hyper": {key[0]: hypers[key] for key in keys},
         "sites": list(sites),
     }
     text = json.dumps(decisions, indent=2, sort_keys=True) + "\n"
@@ -219,7 +251,7 @@ def main() -> None:
         edf_values = [edf[s][text_key] for s in sites if text_key in edf[s]]
         edf_text = f"{float(np.median(edf_values)):.1f}" if edf_values else "-"
         print(f"{text_key:>10} {mean_plain[key]:11.4f} {mean_filtered[key]:9.4f} {edf_text:>28}")
-    print(f"\nchosen lambda: {chosen_lambda}")
+    print(f"\nT-all penalty weight: {weight}")
     print(f"decisions.json sha256: {digest}")
     frame = pl.DataFrame(
         [

@@ -396,7 +396,7 @@ def cold_weight(*, temperature_c: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp((temperature_c - MIX_CENTRE_C) / MIX_SCALE_C))
 
 
-def extra_block(
+def extra_block(  # noqa: PLR0911 (one branch per arm)
     *, cache: FeatureCache, site: str, index: np.ndarray, arm: ArmSpec, context: ArmContext
 ) -> np.ndarray | None:
     """Return the columns an arm appends after T-all's, or `None` for an arm that appends none."""
@@ -701,7 +701,12 @@ class ArmFit:
 
 
 def fit_arm(
-    *, cache: FeatureCache, base: BaseFit, arm: ArmSpec, context: ArmContext, target: np.ndarray | None = None
+    *,
+    cache: FeatureCache,
+    base: BaseFit,
+    arm: ArmSpec,
+    context: ArmContext,
+    target: np.ndarray | None = None,
 ) -> ArmFit:
     """Fit an arm on the full training sample of a base fit.
 

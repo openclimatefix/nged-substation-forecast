@@ -121,7 +121,9 @@ def ewma_temperatures(*, temperature_c: np.ndarray) -> np.ndarray:
     columns = []
     for days in EWMA_TIME_CONSTANTS_DAYS:
         weight = 1.0 - np.exp(-HALF_HOUR_HOURS / (24.0 * days))
-        columns.append(lfilter([weight], [1.0, -(1.0 - weight)], filled, zi=[(1 - weight) * filled[0]])[0])
+        columns.append(
+            lfilter([weight], [1.0, -(1.0 - weight)], filled, zi=[(1 - weight) * filled[0]])[0]
+        )
     return np.stack(columns, axis=1)
 
 
@@ -139,7 +141,7 @@ def temperature_extremes(*, temperature_c: np.ndarray) -> np.ndarray:
     lowest = series.rolling_min(window_size=daily)
     highest = series.rolling_max(window_size=daily)
     week = 7 * daily
-    out = np.stack(
+    return np.stack(
         [
             lowest.to_numpy(),
             highest.to_numpy(),
@@ -148,7 +150,6 @@ def temperature_extremes(*, temperature_c: np.ndarray) -> np.ndarray:
         ],
         axis=1,
     )
-    return out
 
 
 def wind_chill_adjustment(*, temperature_c: np.ndarray, wind_m_s: np.ndarray) -> np.ndarray:
@@ -220,8 +221,10 @@ def _haversine_km(*, lat: float, lon: float, lats: np.ndarray, lons: np.ndarray)
 @memoise
 def _station_coordinates() -> pl.DataFrame:
     """Return the MIDAS hourly-weather stations' coordinates (columns `src_id`, `lat`, `lon`)."""
-    path = STATION_DIR / "_station_metadata" / (
-        "midas-open_uk-hourly-weather-obs_dv-202607_station-metadata.csv"
+    path = (
+        STATION_DIR
+        / "_station_metadata"
+        / ("midas-open_uk-hourly-weather-obs_dv-202607_station-metadata.csv")
     )
     lines = path.read_text().splitlines()
     start = lines.index("data") + 1
@@ -264,10 +267,10 @@ def station_gap_by_day(
     coordinates = _station_coordinates()
     start, stop = hourly["time"].min(), hourly["time"].max()
     hours = (stop - start).total_seconds() / 3600.0 + 1.0
-    coverage = hourly.group_by("src_id").agg(
-        share=pl.col("air_c").is_not_null().sum() / hours
+    coverage = hourly.group_by("src_id").agg(share=pl.col("air_c").is_not_null().sum() / hours)
+    stations = coordinates.join(coverage, on="src_id").filter(
+        pl.col("share") >= 1.0 - MAX_STATION_GAP_SHARE
     )
-    stations = coordinates.join(coverage, on="src_id").filter(pl.col("share") >= 1.0 - MAX_STATION_GAP_SHARE)
     distance = _haversine_km(
         lat=table.latitude,
         lon=table.longitude,
@@ -281,7 +284,9 @@ def station_gap_by_day(
         return gap, record
     chosen = stations["src_id"][nearest]
     observed = hourly.filter(pl.col("src_id") == chosen).select("time", "air_c")
-    model = era5.select(time=pl.col("valid_time"), model_c=pl.col("temperature_2m").cast(pl.Float64))
+    model = era5.select(
+        time=pl.col("valid_time"), model_c=pl.col("temperature_2m").cast(pl.Float64)
+    )
     joined = observed.join(model, on="time", how="inner").with_columns(
         gap=pl.col("air_c") - pl.col("model_c")
     )
@@ -350,4 +355,3 @@ def build_site_aux(*, cache: FeatureCache, site: str) -> SiteAux:
 def origin_day_positions(*, cache: FeatureCache) -> np.ndarray:
     """Return each grid row's origin date (`datetime64[D]`) for a day-ahead forecast."""
     return day_ahead_initialisation(end_times=cache.end_times, days_ahead=1).astype("datetime64[D]")
-

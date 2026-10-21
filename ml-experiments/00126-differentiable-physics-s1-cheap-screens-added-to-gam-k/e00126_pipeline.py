@@ -164,9 +164,12 @@ def fit_year(
     if base.n < MIN_TRAINING_ROWS:
         return None
     arm = arm_spec(arm_name=arm_name, penalty_weight=penalty_weight)
-    fit = design.fit_arm(cache=cache, base=base, arm=arm, context=arm_context(
-        cache=cache, vintages=vintages, site=site, cut=cut, arm_name=arm_name
-    ))
+    fit = design.fit_arm(
+        cache=cache,
+        base=base,
+        arm=arm,
+        context=arm_context(cache=cache, vintages=vintages, site=site, cut=cut, arm_name=arm_name),
+    )
     index = common.scoring_index(
         cache=cache, site=site, after=cut, through=common.year_end(cut=cut)
     )
