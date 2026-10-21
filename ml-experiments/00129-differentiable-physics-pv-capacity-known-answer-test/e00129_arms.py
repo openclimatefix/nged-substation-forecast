@@ -7,6 +7,7 @@ increments are.
 """
 
 from dataclasses import replace
+from datetime import datetime
 from typing import Final, Literal
 
 import e00129_common as common
@@ -42,12 +43,14 @@ def arm_spec(*, arm: ArmType, ridge: float = common.RIDGE) -> GamSpec:
     return fitted
 
 
-def training_index(*, cache: FeatureCache, site: str) -> np.ndarray:
-    """Return the grid rows every fit of the substation trains on."""
+def training_index(
+    *, cache: FeatureCache, site: str, cut: datetime = common.DATA_CUT
+) -> np.ndarray:
+    """Return the grid rows every fit of the substation trains on, before `cut`."""
     return training_rows(
         features=cache.sites[site],
         cache=cache,
-        cut=common.DATA_CUT,
+        cut=cut,
         window=common.TRAINING_WINDOW,
     )
 
@@ -93,6 +96,7 @@ def fit_arm(
     device: str,
     increment_share: float = 0.0,
     weights: np.ndarray | None = None,
+    cut: datetime = common.DATA_CUT,
 ) -> GamFit:
     """Fit an arm at `DATA_CUT` on every usable row, once or under row weightings.
 
@@ -104,6 +108,7 @@ def fit_arm(
         increment_share: For arm 4, the increment penalty as a share of the mean diagonal of the
             Gram matrix over the capacity columns; ignored by the other arms.
         weights: Optional row weights of shape (batch, n_training_rows), for the bootstrap.
+        cut: The fit uses rows before this instant.
 
     Returns:
         The fitted batch.
@@ -114,7 +119,7 @@ def fit_arm(
             cache=cache,
             site=site,
             specs=[spec],
-            cut=common.DATA_CUT,
+            cut=cut,
             window=common.TRAINING_WINDOW,
             season_years=common.SEASON_YEARS,
             weights=weights,
@@ -128,6 +133,7 @@ def fit_arm(
         increment_share=increment_share,
         weights=weights,
         device=device,
+        cut=cut,
     )
 
 
@@ -139,13 +145,14 @@ def _fit_with_increment_penalty(
     increment_share: float,
     weights: np.ndarray | None,
     device: str,
+    cut: datetime,
 ) -> GamFit:
     """Fit the convex model with a ridge on the capacity increments instead of the capacities."""
     layout, index = prepare_fit(
         cache=cache,
         site=site,
         spec=spec,
-        cut=common.DATA_CUT,
+        cut=cut,
         window=common.TRAINING_WINDOW,
         season_years=common.SEASON_YEARS,
     )
@@ -179,11 +186,11 @@ def _fit_with_increment_penalty(
     return GamFit(
         layout=layout,
         theta=theta.cpu().numpy(),
-        cut=common.DATA_CUT,
+        cut=cut,
         n_rows=len(index),
         site=site,
         last_season_year=last_signal_season_year(
-            cache=cache, site=site, index=index, cut=common.DATA_CUT, pinned=None
+            cache=cache, site=site, index=index, cut=cut, pinned=None
         ),
         violation=violation.cpu().numpy(),
         pinned=None,
@@ -202,8 +209,9 @@ def fitted_capacity(
     site: str,
     device: str,
     increment_share: float = 0.0,
+    cut: datetime = common.DATA_CUT,
 ) -> dict[int, float]:
     """Return an arm's fitted capacity of each season-year, in points of effective capacity."""
     return fit_arm(
-        arm=arm, cache=cache, site=site, device=device, increment_share=increment_share
+        arm=arm, cache=cache, site=site, device=device, increment_share=increment_share, cut=cut
     ).capacity_points()
