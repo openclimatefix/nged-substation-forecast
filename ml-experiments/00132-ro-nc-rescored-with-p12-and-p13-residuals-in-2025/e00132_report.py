@@ -17,7 +17,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 from e00132_common import GRID_START, WORK_DIR, fits_folder, load_panel
-from e00132_fit import FITS, SERIES, VARIANTS
+from e00132_fit import FITS, PURGE, SERIES, VARIANTS
 from e00132_real import SUFFIX
 from e00132_run import all_scales
 from e00132_variants import load_offset_panel
@@ -125,7 +125,7 @@ def section_real(*, table: pl.DataFrame) -> None:
             column = f"{arm}|{name}"
             print(
                 f"  {arm:10s} all {count_text(k=int(long[column].sum()), n=long.height)}; "
-                f"at P12/P13 {int(at_pair[column].sum())} of {at_pair.height}; "
+                f"at P12/P13 {count_text(k=int(at_pair[column].sum()), n=at_pair.height)}; "
                 f"other {count_text(k=int(elsewhere[column].sum()), n=elsewhere.height)}"
             )
         found = long[f"RO-NC|{name}"].to_numpy().astype(float)
@@ -212,9 +212,29 @@ def section_noise() -> None:
     print(f"  residual half-hours added to the panel: {added}")
 
 
+def section_reproduction_injected() -> None:
+    """The old panel's injected rows must equal experiment 82's stored rows."""
+    stored = pl.read_parquet(
+        ML_EXPERIMENTS_DATA_DIR
+        / "00082-sw2-18-19-combined-refit-offset-and-same-sign-count"
+        / "event_results.parquet"
+    ).sort("event_id", "setting", "shape")
+    rerun = pl.read_parquet(WORK_DIR / "score_old" / "event_results.parquet").sort(
+        "event_id", "setting", "shape"
+    )
+    joined = stored.join(rerun, on=["event_id", "setting", "shape"], suffix="_rerun")
+    print(
+        f"\nold-panel injected rows: {rerun.height} rerun, {stored.height} stored, "
+        f"{joined.filter(pl.col('found') != pl.col('found_rerun')).height} differ in `found`, "
+        f"{joined.filter(pl.col('onset_found') != pl.col('onset_found_rerun')).height} in "
+        f"`onset_found`, largest moved-MW difference "
+        f"{(joined['moved_mw'] - joined['moved_mw_rerun']).abs().max()}"
+    )
+
+
 def section_leak() -> None:
     """Training rows inside a held-out block or its purge, and the block of each transfer."""
-    print("\n== leakage check: training rows inside a held-out block or its purge")
+    print(f"\n== leakage check: training rows inside a held-out block or its {PURGE} purge")
     for variant in VARIANTS:
         for name in FITS:
             for series in SERIES:
@@ -340,6 +360,7 @@ def main() -> None:
     section_alarms()
     section_noise()
     section_leak()
+    section_reproduction_injected()
     section_injected(table=table)
 
 

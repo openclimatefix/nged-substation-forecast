@@ -171,13 +171,14 @@ def figure_readings(*, table: pl.DataFrame) -> alt.TopLevelMixin:
         )
     return alt.vconcat(*panels).properties(
         title=_title(
-            text="In 5 of the 6 transfers one transformer reads 0 MW, which cleaning flagged",
+            text="In 4 of the 6 transfers one transformer reads 0 MW, which cleaning flagged",
             lines=[
                 (
                     "Raw half-hourly readings of the two transformers of one Primary substation, "
                     "2 days either side of each labelled transfer (shaded between its start and "
                     "end). Crosses: zero readings that `substation_zero` flagged and this "
-                    "experiment re-read from the raw store. E59 has no raw readings at P12."
+                    "experiment re-read from the raw power table. E59 has no raw readings at P12 "
+                    "inside the transfer."
                 )
             ],
         )

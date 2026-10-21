@@ -54,9 +54,15 @@ def main() -> None:
     )
     flagged = cleaned.filter(pl.col("drop_reason") == "substation_zero")
     pieces, rows = [], []
-    for event, (start, end) in zip(
-        events.sort("onset")["event"], sorted(transfer_windows()), strict=True
+    for event, (start, end), onset, finish in zip(
+        events.sort("onset")["event"],
+        sorted(transfer_windows()),
+        events.sort("onset")["onset"],
+        events.sort("onset")["end"],
+        strict=True,
     ):
+        transfer_start = GRID_START + timedelta(minutes=30 * onset)
+        transfer_end = GRID_START + timedelta(minutes=30 * finish)
         for series in BLOCKED_SERIES:
             in_window = (pl.col("time") >= start) & (pl.col("time") < end)
             raw_rows = raw.filter(pl.col("time_series_id") == series).filter(in_window)
@@ -67,6 +73,7 @@ def main() -> None:
                 pl.col("valid_time") < end,
                 pl.col("target").is_null(),
             ).height
+            inside = (pl.col("time") >= transfer_start) & (pl.col("time") < transfer_end)
             restored = raw_rows.join(
                 flagged_rows.select("time_series_id", "time"), on=["time_series_id", "time"]
             ).with_columns(event=pl.lit(event))
@@ -78,6 +85,8 @@ def main() -> None:
                     "series": series,
                     "window_half_hours": int((end - start) / timedelta(minutes=30)),
                     "in_raw": raw_rows.height,
+                    "transfer_half_hours": finish - onset,
+                    "in_raw_inside_transfer": raw_rows.filter(inside).height,
                     "flagged_zero": flagged_rows.height,
                     "null_in_features": null_target,
                     "restored": restored.height,

@@ -152,16 +152,18 @@ Series with 26% to 82% of their dark half-hours negative carry embedded generati
 grid connection. The screen cannot work on an MVA Primary. Applies to experiments. Evidence:
 [experiment 103](00103-differentiable-physics-1-data-look/result.md), figure 9.
 
-**Count the half-hours that `substation_zero` flags before scoring a detector on a transfer
-(provisional).** The rule flags a reading of exactly 0 at a Primary substation, and a transformer
-that is switched out reads exactly 0. At P12 and P13, the two transformers of one Primary, the rule
-flagged 426 half-hours inside 5 of the 6 labelled transfers over 1 day, and the residual panel held
-no readings there. Re-reading those half-hours from the raw power table let the refit-offset
-neighbour-count detector find 4 of the 6 transfers. Applies to experiments on switching; for
-production, it is a question for the maintainer whether the rule should keep a zero when the
-other transformers of the same Primary carry its load. Evidence: [experiment
+**Count the half-hours that `substation_zero` flags before scoring a detector on a transfer.**
+(Provisional.) The rule flags a reading of exactly 0 at a Primary substation, and a transformer
+that was switched out read exactly 0 in the 5 transfers we checked. At the series P12 and P13, the
+two transformers of one Primary substation, the rule flagged 426 half-hours inside 5 of the 6
+labelled real transfers lasting more than 1 day, and the panel of residuals used to score
+detectors held no readings there. Re-reading those half-hours from the raw power table let the
+refit-offset neighbour-count detector (RO-NC) find 4 of the 6 transfers. This applies to
+experiments on switching. For production, the maintainer has to decide whether the rule should keep
+a zero reading when the other transformer of the same Primary substation carries the load of the
+switched-out transformer. Evidence: [experiment
 132](00132-ro-nc-rescored-with-p12-and-p13-residuals-in-2025/result.md). Confidence: medium, from 5
-transfers at one Primary.
+transfers at one Primary substation.
 
 ## Fixed windows
 
