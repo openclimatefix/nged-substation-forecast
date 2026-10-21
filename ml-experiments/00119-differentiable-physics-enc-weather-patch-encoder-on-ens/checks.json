@@ -1,0 +1,17 @@
+{
+  "causality_max_abs_change": {
+    "ENC-c": 0.0,
+    "ENC-c0": 0.0,
+    "ENC-cps": 0.0,
+    "ENC-r": 0.0
+  },
+  "k0_unsorted_rows": 0,
+  "purge_violations": {
+    "F1": 0,
+    "F2": 0
+  },
+  "reproduction_max_abs_difference": {
+    "ENC-c": 0.0,
+    "ENC-r": 0.0
+  }
+}

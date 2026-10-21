@@ -1,48 +1,48 @@
 # Differentiable physics (demand, calendar, and weather): research plan
 
-**The next step is a drift term that re-estimates its level after the end of the training data.**
-Experiment 104 found that all years of history without drift scored worse than 12 months, and that a
-drift held constant recovered that and helped in every scored month, leaving all years with drift
-level with 12 months.
+**The cheap screens of inputs to the convex model are bundled into one experiment.** Experiment 104
+found that all years of history without drift scored worse than 12 months, and that a drift held
+constant recovered that. The recent-level drift and the day-type filter are covered by the KFE
+experiment, so this page lists the input screens only.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| Drift from recent demand (proposed) | Does a drift that re-estimates its level from recent demand beat a drift held constant? | 1 | Part 3, which pools the model across substations | Proposed |
-| N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Running | Nothing | Running (experiment 114) |
-| Smoothed temperatures at two time constants | Do exponentially smoothed temperatures with two decay rates, plus smoothed daily minimum and maximum, lower the convex model's error? | 2 | Experiment 114, which changes the same temperature terms | Proposed |
-| UTC-indexed night term | Does a small level per hour band in UTC hours, from 22:00 to 08:00 UTC, remove error that the local-time daily profile leaves around the clock changes? | 3 | A descriptive check of residuals against UTC hour | Waiting on a descriptive check |
-| N11, weather encoder | Does a small learned encoder over a 5 by 5 patch of weather cells around each substation lower the error on convective and frontal days? | 4 | GPU hours (4 to 8 for the run) | Proposed |
+| N3 and N4, interaction terms and heating threshold | Do interaction terms in the convex model, and a heating threshold chosen per substation, lower its error? | Done, partly supported | None | Interaction terms (N3) gained, mostly at one substation, and the per-site heating threshold (N4) tied (experiment 114) |
+| S1, cheap screens added to GAM-K (experiment 126) | Do cheap additions to the day-ahead GAM-K lower the score, winter first? | Done, inconclusive | None | None of 13 screens showed a trusted gain; E-sol (-0.036 on dark winter evenings) is the lead for a retest on ENS weather; W-basis worse in every month, site and year; F-mix, W-stn undecided on 2 to 3 months |
+| Weather encoder retest | Does a small learned encoder over a patch of weather cells lower the error on hard cases (convective and frontal days, wind and solar sites) once the base forecast is recalibrated? | 3 | A plain recalibration of GAM-K's quantiles, which experiment 119 found accounts for most of the encoder's gain | Queued, after the recalibration |
 
 Later parts are listed in their own themes.
 
-## Smoothed temperatures at two time constants
+## Bundled cheap screens
 
-**The proposal adds two exponentially decayed temperature columns and smoothed daily extremes to the
-convex model.** The GAM papers on regional load use temperature smoothed at two decay rates per
-half-hourly step, 0.95 and 0.99, plus smoothed daily minimum and maximum temperatures.
-[Obst et al. (2021)](https://arxiv.org/abs/2009.06527) use these terms for French load, and [Fasiolo
-et al. (2021)](https://arxiv.org/abs/1707.03307) report the same smoothing for the winning
-GEFCom2014 entry. No paper isolates the gain from the smoothing alone. At half-hourly steps the two
-rates correspond to roughly 10 hours and 50 hours. The convex model already uses means of 6 hours to
-1 week, which are the same idea, so the experiment tests whether the two decay rates and the daily
-extremes add anything to those means. It runs in minutes on the CPU.
+**The six screens share one experiment and run on 6 CPU cores in about 2 hours.** Each has one
+hypothesis:
 
-## UTC-indexed night term
+- **Free temperature spline.** A free spline of temperature fits better than the fixed 15.5 °C
+  hinge.
+- **Smoothed temperatures.** Temperature smoothed at two decay rates, plus smoothed daily minimum and
+  maximum, adds skill to the convex model's means of 6 hours to 1 week. The GAM papers on regional
+  load use these terms: [Obst et al. (2021)](https://arxiv.org/abs/2009.06527) for French load, and
+  [Fasiolo et al. (2021)](https://arxiv.org/abs/1707.03307) for the winning GEFCom2014 entry. No paper
+  isolates the gain from the smoothing alone.
+- **Humidity and wind chill.** Feeding humidity and wind chill into the heating hinge lowers the
+  winter error.
+- **School-term calendar.** A school-term term lowers the error in term-time weeks, once data
+  availability is checked.
+- **Lighting from solar elevation.** Lighting modelled from solar elevation beats a fixed clock curve
+  on dark winter evenings.
+- **Filter-noise mixture.** A filter noise that depends on the regime (cold snap, mild, holiday)
+  beats one fixed noise.
 
-**Economy 7 and storage-heater timers run on Greenwich Mean Time all year, so their load switches on
-at fixed UTC hours, while the convex model's daily profile follows local clock time.** The proposal
-adds one small level per hour band in UTC hours from 22:00 to 08:00 UTC, on top of the local-time
-profile. Around the two clock changes, the local profile places the timer-driven load an hour away
-from where it falls. The first step is a descriptive check: plot the model's residuals at night
-against UTC hour, separately for the weeks either side of each clock change. The term is only worth
-fitting if those residuals shift with the clock change.
+## Weather encoder retest
 
-## N11: weather encoder
-
-**The proposal replaces the single-cell ERA5 and CAMS inputs with a small learned encoder over a 5
-by 5 patch of cells around each substation.** The aim is a lower error on convective and frontal days,
-when a single cell misses the neighbouring weather. The run needs 4 to 8 GPU hours, so it waits for the
-GPU budget. The [encoders technique page](../../../techniques/encoders.md) is the first thing to read.
+**The retest repeats the weather-encoder comparison on the hard cases, with a recalibrated base
+forecast.** The encoder replaces single-cell inputs with a learned view of a patch of cells, and the
+aim is a lower error on convective and frontal days, when a single cell misses the neighbouring
+weather. Experiment 119, the first encoder experiment, ended inconclusive, and about two-thirds of
+its gain survived when the network read the wrong date's weather. The retest therefore waits for a
+plain recalibration of GAM-K's quantiles, and runs on the GPU. The [encoders
+technique page](../../../techniques/encoders.md) is the first thing to read.
 
 ## Planned experiments
 
