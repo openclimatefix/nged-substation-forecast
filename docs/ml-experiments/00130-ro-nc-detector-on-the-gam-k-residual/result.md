@@ -86,6 +86,9 @@ take_home_message: >-
   against 0.772), most likely because the filter follows a transfer's step within hours and so
   absorbs it, which we did not test. Most of the detector's remaining misses are small steps with
   no metered receiving substation, so a stronger signal for those transfers is the next idea to try.
+  The maintainer has chosen to treat the gain as an improvement and to build later detector work
+  on the frozen convex residual; that decision lies outside the pre-registered rule, so the
+  verdict stays inconclusive.
 advice:
   - >-
     Do not expect a better demand forecast alone to lift the load-transfer detector much: a frozen
