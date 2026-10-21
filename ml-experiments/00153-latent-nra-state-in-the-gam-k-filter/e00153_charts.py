@@ -1,5 +1,5 @@
 # type: ignore
-# ruff: noqa: E501
+# ruff: noqa: PGH003, E501
 """Charts of experiment 153: each arm's quantile score minus K0's, with 95% intervals."""
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 # type: ignore
-# ruff: noqa: DTZ001, PLR0912, PLR0915, E501
+# ruff: noqa: PGH003, DTZ001, PLR0912, PLR0915, E501
 """Report experiment 153: shares of the oracle gap closed by the latent-NRA filter, with intervals.
 
 Usage: uv run --no-sync python e00153_report.py   (prints every number the write-up quotes)
