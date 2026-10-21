@@ -548,6 +548,7 @@ include = [
     "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_asof.py",
     "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_beam.py",
     "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_charts.py",
+    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_charts.py",
     "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_common.py",
     "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_july.py",
     "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_pilot.py",
