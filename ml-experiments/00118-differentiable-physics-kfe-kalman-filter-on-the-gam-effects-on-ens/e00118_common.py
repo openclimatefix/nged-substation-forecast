@@ -149,9 +149,7 @@ class SiteSetup:
     def indices(self, *, periods: set[str]) -> list[int]:
         """Return the runs that belong to the named periods."""
         return [
-            index
-            for index, run in enumerate(self.run_dates)
-            if period_of_run(run=run) in periods
+            index for index, run in enumerate(self.run_dates) if period_of_run(run=run) in periods
         ]
 
 
@@ -197,7 +195,9 @@ def load_setup(*, cache: FeatureCache, site: str) -> SiteSetup:
     context = WeatherContext(
         site=site,
         calibration=load_calibration(site=site),
-        climatology=ghi_climatology(cache=cache, site=site, before=datetime(2024, 7, 1, tzinfo=UTC)),
+        climatology=ghi_climatology(
+            cache=cache, site=site, before=datetime(2024, 7, 1, tzinfo=UTC)
+        ),
         proxy=AnalysisProxy.build(runs=runs, n_rows=len(cache.end_times)),
     )
     return SiteSetup(site=site, run_dates=dates, origins=origins, runs=runs, context=context)
