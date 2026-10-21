@@ -573,6 +573,11 @@ include = [
     "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_report.py",
     "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_budget.py",
     "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gate_diagnostics.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_charts.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_checks.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_diagnose.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_gam_panel.py",
+    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_variants.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
 ]
