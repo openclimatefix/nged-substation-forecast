@@ -552,6 +552,13 @@ capacity fitted from its own rows before the cut instead (D9 at the 2024-07-01 c
 109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md); provisional: not
 measured, and the experiment's gate did not pass under its pre-registered definition).
 
+**Do not rely on the farm series behind a disaggregated Primary's reading.** For D8 (Marsh Lane),
+the metadata table names two farms whose output was added back, and the raw power table holds 1
+reading for one farm and 4,643 for the other (441 above zero, none after 2026-01-26). The notes in
+the `information` field are a July 2026 snapshot, so the files carry no history of when an analogue
+failed ([experiment
+182](00182-switching-d8-disaggregated-farms-and-drops/result.md)).
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers
