@@ -291,7 +291,7 @@ def figure_distance(*, pairs: pl.DataFrame) -> alt.TopLevelMixin:
     points = (
         alt.Chart(pairs.select("site", "pair_km", "rise"))
         .mark_point(filled=True, size=50, color=ocf.DATA_BLUE, opacity=0.8, aria=False)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "pair_km:Q",
                 title="Distance between the injected farm and the reference farm (km)",
