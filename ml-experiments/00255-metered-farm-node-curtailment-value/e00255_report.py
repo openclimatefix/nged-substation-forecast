@@ -326,7 +326,7 @@ def main() -> None:
             "",
         ]
         valid_times = arms.node_frames[H5]["valid_time"].unique()
-        night = arms.farm_frames_mw[H5].filter(pl.col("q50") == 0.0).unique(["site", "valid_time"])
+        night = arms.farm_frames_mw[H5].filter(pl.col("night")).unique(["site", "valid_time"])
         all_rows = arms.farm_frames_mw[H5].unique(["site", "valid_time"])
         day_mwh = float(all_rows["actual"].drop_nulls().to_numpy().sum()) * 0.5
         night_mwh = float(night["actual"].drop_nulls().to_numpy().sum()) * 0.5

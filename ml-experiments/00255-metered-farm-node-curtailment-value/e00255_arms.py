@@ -139,6 +139,7 @@ def _farm_rows(
         .with_columns(
             pl.col("output_mw").alias("actual"),
             *(pl.lit(0.0).alias(q) for q in inputs.QUANTILES),
+            night=pl.lit(True),
         )
     )
     day = (
@@ -154,6 +155,7 @@ def _farm_rows(
                 (pl.col(q) * pl.col("capacity_mw")).clip(lower_bound=0.0).alias(q)
                 for q in inputs.QUANTILES
             ),
+            night=pl.lit(False),
         )
     )
     columns = [
@@ -164,6 +166,7 @@ def _farm_rows(
         "seed",
         "capacity_mw",
         "actual",
+        "night",
     ]
     return pl.concat(
         [night.select(*columns, *inputs.QUANTILES), day.select(*columns, *inputs.QUANTILES)]
