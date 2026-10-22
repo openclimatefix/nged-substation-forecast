@@ -4,7 +4,7 @@ slug: pv-capacity-calibrated-interval
 theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - solar-disaggregation
-status: planned
+status: finished
 size: >-
   simple. Stored: private files under data/ml-experiments/00241-<slug>/ only (a table of
   corrected estimates). Serving path: not touched. Degradation rule: not touched. Designs: more
@@ -40,17 +40,135 @@ metric: >-
   of alternating-current output over daylight half-hours, in MW). Error: corrected estimate divided
   by the injected capacity, minus 1. Coverage: the share of held-out injections whose injected
   capacity lies inside the 80% interval
+verdict: partly supported
+production_status: not-for-production
+adopted_in: none
+date: 2026-10-22
+pr: 1546
+headline: >-
+  Dividing the capacity found by the median recovery of the other four farms put the estimate
+  within 10% of the injected capacity at 5 of 5 decision Primaries (median absolute error 0.056,
+  against 0.193 uncorrected), but the 80% interval covered 58.7% of held-out injections with
+  same-year calibration (78.7% with all-years calibration, which met the 10% condition at 3 of 5
+  Primaries) and 1% to 2% with a cloud-driven load added.
+best_arm: same-year calibration for accuracy; all-years calibration for coverage
+take_home_message: >-
+  Dividing the solar capacity found by the typical recovery of other real farms removes most of the
+  bias: the estimate lands within 10% of the truth at all five Primaries, against a typical error
+  of 19% without the correction. The 80% interval built the same way covers the truth 59% to 79%
+  of the time, which is too uncertain to label as an 80% interval, and it fails completely when
+  the demand follows cloud (1% to 2%). Keep showing the range as a spread over scenarios, with the
+  correction applied.
+lessons:
+  - >-
+    The recoveries of farms at the same Primary agree closely enough (a spread of about 0.14 of the
+    capacity) that the median corrects the bias, but with 4 farms the 10th to 90th percentile
+    interval is too narrow to cover 80% of new farms.
+  - >-
+    A cloud-driven load makes every corrected estimate 25% to 27% too high, so the calibration
+    holds only where demand does not follow cloud.
+advice:
+  - >-
+    Apply the leave-one-farm-out correction (divide by the Primary's median recovery) to estimates
+    of unmetered solar capacity, because it reduces the median error from 19% to 6% (figure 1).
+  - >-
+    Do not label the interval from four farms' recoveries as an 80% interval on the substation
+    cards: its coverage is 59% to 79% and falls to 1% to 2% with a cloud-driven load (figure 2).
 code: ml-experiments/00241-pv-capacity-calibrated-interval/
 ---
 
 # PV capacity: how well does a calibrated interval cover?
 
-**Planned, not yet run.** The experiment fits nothing. It reads the recoveries in experiment 129's
-known-answer table (arm 2, farms A to F are metered generators and are never named). For each
-Primary substation and each held-out farm, it divides the capacity found by the median recovery
-over the other four farms at the same Primary, and builds an 80% interval from the 10th and 90th
-percentiles of those recoveries. The maintainer's labelled exception (data to 2026-07-31) is not
-used, because the stored fits stop at 2026-07-01.
+**Take-home message: dividing the capacity found by the median recovery of other real farms removes
+most of the bias, and the interval built from the same recoveries is too narrow to call an 80%
+interval.** The corrected estimate is within 10% of the injected capacity at all five decision
+Primaries when the calibration uses the same season-year. The interval covers 58.7% of held-out
+injections with that calibration and 78.7% with the all-years calibration. It covers 1% to 2% when a
+cloud-driven load is added to the Primary's demand.
+
+**What was done.** The experiment fits nothing. It reads the recoveries that experiment 129 measured
+when it added the recorded output of a real solar farm (farms A to F are metered generators and are
+never named) to a Primary substation's power at 20%, 50%, and 100% of the Primary's pinned capacity,
+for season-years 2019 to 2024. For each held-out farm at a Primary, the capacity found is divided by
+the median recovery of the other four farms at the same Primary, and the 80% interval runs from the
+capacity found divided by the 90th percentile of those recoveries to the capacity found divided by
+the 10th percentile. The calibration set is either the other farms in the same season-year (12
+recoveries) or the other farms in every season-year (up to 72 recoveries). D5, D10, D11, D14, and
+D16 are the five decision Primaries (the substations whose capacity is judged). The recovery is the
+capacity found with the farm added, minus the capacity found without it, divided by the injected
+capacity, in the capacity unit of experiment 129 (the 99th percentile of alternating-current output
+over daylight half-hours, in MW). The stored fits stop at 2026-07-01, so the maintainer's labelled
+exception for capacity experiments (data to 2026-07-31) is not used, and no forecast is scored.
+
+![Corrected estimate of the held-out farm](figure_01_error.svg)
+
+**Figure 1. The corrected estimate is within 10% of the injected capacity for 21 of 25 held-out
+farms at the five decision Primaries (same-year calibration, season-year 2024).**
+
+![Coverage of the 80% interval](figure_02_coverage.svg)
+
+**Figure 2. The 80% interval covers 59% to 79% of held-out injections, and 1% to 2% when a
+cloud-driven load is added.**
+
+## Findings
+
+- **The accuracy condition is met with same-year calibration.** The median absolute error of the
+  corrected estimate is 0.032 to 0.094 of the injected capacity at the five Primaries (0.056 over
+  all 75 held-out injections at season-year 2024), against 0.145 to 0.220 uncorrected (0.193
+  pooled). The corrected estimate is within 10% for 84% of those injections.
+- **The accuracy condition fails at 2 of 5 Primaries with all-years calibration.** The median
+  absolute error is 0.104 at D5 and 0.103 at D16, and 0.031 to 0.056 at the other three. The
+  corrected estimate is within 10% for 73% of the injections.
+- **The coverage depends on the calibration set.** At season-year 2024 the interval covers 58.7% of
+  the 75 held-out injections with same-year calibration and 78.7% with all-years calibration. Over
+  all six season-years the coverage is 60.8% and 71.8% (390 injections). The target is 70% to 90%.
+- **The two conditions are met by different calibration sets, so neither set meets both.**
+  Same-year calibration meets the accuracy condition and misses the coverage range. All-years
+  calibration is in the coverage range and meets the accuracy condition at 3 of 5 Primaries. The
+  plan did not say which calibration set decides, and the decision rule is not met by either.
+- **A cloud-driven load breaks the calibration.** With experiment 129's cloud-driven load added to
+  the held-out injection, every corrected estimate is 25% to 27% too high (median ratio of 1.26 to
+  1.27 at season-year 2024) and the interval covers 0% to 1.3% of injections (2.3% over all
+  seasons with all-years calibration).
+- **The sample is smaller than it looks.** The 3 injected fractions at each farm give nearly the
+  same recovery, so the 75 injections at season-year 2024 are about 25 distinct farm and Primary
+  pairs, and the Primaries share the same weather. With about 25 pairs, a coverage of 79% has a
+  standard error of about 0.08.
+
+## Checks
+
+- **Row counts:** every Primary holds 15 injections without load and 15 with load per season-year,
+  except D14 and D16, which start at season-year 2021.
+- **Reproduction:** the stored recovery equals the capacity found with the farm minus the capacity
+  found without it, divided by the injected capacity, to within 1e-9, as the script checks.
+- **Median forecast minus mean forecast, and the mean-forecast error:** not applicable, because the
+  experiment scores no forecast.
+- **Audit triggers** (the seven triggers in the `ml-experiment` skill's "Audit before merge"):
+  none of triggers 1 to 6 applies, because the experiment has no control, no sister experiment, and
+  no nested arm. Trigger 7 may apply, because a later design may depend on the finding that the
+  interval is not an 80% interval. The maintainer's decision on an audit is pending.
+- **Review:** one Sonnet review of the code and the page.
+
+## Limits
+
+- **The injections zero the farm's output when the sun is under 15 degrees above the horizon.**
+  Experiment 239 found that keeping that output raises the recovery by 0.033, so the recoveries
+  here understate a farm that produces in winter. Dividing a real farm's estimate by them would
+  overstate its capacity by about 4%.
+- **The calibration uses 4 farms,** so the 10th and 90th percentiles sit close to the smallest and
+  largest recovery, and a fifth farm falls outside that range about 2 times in 5.
+- **The farms sit tens of kilometres from the Primaries,** so a real unmetered farm near the
+  Primary may differ in orientation and size from the five farms.
+
+## What the next experiment should answer
+
+- **Does a wider interval cover 80% of new farms?** Widening the interval to the full range of
+  the 4 recoveries, or taking the 90% interval from the all-years calibration, would test the
+  coverage without changing the correction. The prediction that could fail is a coverage of 70% to
+  90% at 4 of 5 Primaries.
+- **How large is the shift from a cloud-driven load in real demand?** The correction is
+  26% too low in that case. A measured demand response to cloud would show whether the shift is
+  realistic.
 
 ## Plan: design
 

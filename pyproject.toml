@@ -412,6 +412,7 @@ extra-paths = [
 # scripts that go with those.
 include = [
     "packages/studies/src/studies/battery_recurrence.py",
+    "ml-experiments/00241-pv-capacity-calibrated-interval/e00241_calibrate.py",
     "packages/studies/src/studies/battery_state_space.py",
     "packages/studies/src/studies/capacity_physics_torch.py",
     "packages/studies/src/studies/dp_edge_flow.py",
