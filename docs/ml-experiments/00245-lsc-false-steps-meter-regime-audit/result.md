@@ -160,7 +160,10 @@ nothing about cause. No verdict on experiment 207 is given.
 - **Alarms:** RO-NC from experiment 130 arm B, the pair alarm and the logistic learned score from
   experiment 195 (any of its three folds, so the learned score covers more alarms than one fold).
 - **Matched windows:** 241 windows over the 8 events with controls (10 to 62 per event, none for
-  D14), within 30% of the false step's own residual step.
+  D14, so both D14 events drop out of the ratios). The size match is on the Primary's own largest
+  residual step in MW, within 30% of the false step's, not on the size of the capacity step. Windows
+  come from 2022 to 2025 (16, 10, 85, and 130 windows), and the alarm tables cover every year to
+  mid-2026.
 - **Caveats:** 7 events at the two failing Primaries cannot show a small effect; the interval on the
   ratio is wide. A month-resolution capacity step cannot show cause. The lab shortcuts are ERA5
   weather in the residual model of experiment 130 and hindsight alarm tables.
