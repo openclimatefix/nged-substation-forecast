@@ -15,7 +15,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00189_common import (
     ADJACENCY,
     D8_DROPS,
@@ -31,7 +31,7 @@ from e00189_common import (
 )
 from e00189_injector import InjectorFit
 from e00189_worlds import Calendar, sample_placed
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 N_CHANNELS: Final[int] = 13
 REGION: Final[tuple[int, int]] = (48, 240)

@@ -16,7 +16,7 @@ import time
 from typing import Final
 
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00189_common import WORK_DIR, load_panel, noise_units, pair_folds
 from e00189_injector import fit_injector
 from e00189_net import (
@@ -28,7 +28,7 @@ from e00189_net import (
     make_batch,
     n_parameters,
 )
-from torch.nn import functional
+from torch.nn import functional  # ty: ignore[unresolved-import]
 
 N_TRAIN: Final[int] = 80_000
 N_VALID: Final[int] = 6_000

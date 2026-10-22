@@ -15,7 +15,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00189_common import GRID_LENGTH, SERIES_IDS, TUNING_MONTHS, WINDOW, WORK_DIR, stamp_months
 from e00189_net import REGION, Context, WindowNet, window_inputs
 

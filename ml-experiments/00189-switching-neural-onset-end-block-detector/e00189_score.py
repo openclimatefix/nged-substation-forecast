@@ -203,7 +203,7 @@ def score_fold(
 
 def main(*, seed: int) -> None:
     """Score all three folds, pool the held-out results, and write the tables."""
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     panel = load_panel()
