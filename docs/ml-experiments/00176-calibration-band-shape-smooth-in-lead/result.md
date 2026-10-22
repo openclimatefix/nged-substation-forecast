@@ -112,6 +112,7 @@ advice:
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-22
+pr: 1484
 ---
 
 # Experiment 176: does the band width need to be smoother in lead?
