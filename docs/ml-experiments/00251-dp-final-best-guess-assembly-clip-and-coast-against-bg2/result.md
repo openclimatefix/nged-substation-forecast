@@ -61,7 +61,6 @@ adopted_in: none
 date: 2026-10-22
 ---
 
-# Does the full best-guess demand stack beat BG2 and the manual heuristic, with the D5 clip and the gap rule added?
 
 **Plan, written before any score is read.** The experiment assembles stored forecasts and fits
 nothing. Its question is whether the stack of [experiment
