@@ -20,7 +20,7 @@ import e00243_common as common
 import e00243_models as models
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 import xgboost as xgb
 from studies.tail_calibration import level_column
 
