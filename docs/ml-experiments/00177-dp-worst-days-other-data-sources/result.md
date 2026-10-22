@@ -174,6 +174,8 @@ cover at least as many days as the 37 worst days do.
   later flags only its opening day.
 - **The price threshold** is the 95th percentile of all settlement periods in 2025-07-03 to
   2026-06-30, 143.5 pounds per megawatt-hour.
+- **Power readings** come from `studies.power.scan_power`, which drops flagged readings. A first run on
+  the raw table gave the same counts for every indicator.
 - **Unreported sensitivities.** The top 0.5% price indicator covers 1 of 37 days (ordinary 2.7). The
   union of P1 and P2 covers 24 (ordinary 21.6, p = 0.18).
 

@@ -15,6 +15,7 @@ from typing import Final
 import numpy as np
 import openpyxl  # ty: ignore[unresolved-import]
 import polars as pl
+from studies.power import scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR
 
 SEED: Final[int] = 177
@@ -110,8 +111,8 @@ def s1_flags(*, days: pl.DataFrame, ids: dict[str, int], nbr: dict[str, set[str]
 
 
 def power(series: list[int]) -> pl.DataFrame:
-    """Return raw power for the series, with local half-hour start date and index."""
-    lf = pl.scan_delta(str(NGED / "power_time_series.delta")).filter(
+    """Return cleaned power for the series, with the local half-hour start date."""
+    lf = scan_power().filter(
         pl.col("time_series_id").is_in(series),
         pl.col("time") >= datetime(2025, 5, 1, tzinfo=UTC),
         pl.col("time") < datetime(2026, 8, 1, tzinfo=UTC),
