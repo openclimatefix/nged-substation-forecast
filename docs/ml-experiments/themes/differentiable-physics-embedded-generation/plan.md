@@ -2,7 +2,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 231, PV capacity audit | Where does the roughly 0.2 of an injected solar farm's capacity that the estimator misses go: plant shape, irradiance input, demand absorption, winter rows, or the capacity definition? | High | None | Planned |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |

@@ -17,7 +17,7 @@ from typing import Final
 import e00231_common as common
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (
     DEFAULT_MAX_ITERATIONS,
@@ -37,7 +37,6 @@ from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 SOLVE_BATCH: Final[int] = 25
 """Bounded solves per call, which keeps the batch of Gram matrices within memory."""
 WIRING_TOLERANCE: Final[float] = 1e-8
-RECOVERY_TOLERANCE: Final[float] = 0.005
 
 
 @dataclass(frozen=True)
@@ -171,9 +170,19 @@ def weighted_sums(*, stats: MonthlyStats, weights: np.ndarray) -> tuple[torch.Te
 
 
 def full_fit(
-    *, stats: MonthlyStats, layout: GamLayout, weights: np.ndarray, spec_cost: tuple
+    *,
+    stats: MonthlyStats,
+    layout: GamLayout,
+    weights: np.ndarray,
+    spec_cost: tuple[np.ndarray, np.ndarray],
 ) -> tuple[np.ndarray, np.ndarray, torch.Tensor, torch.Tensor]:
     """Fit the base and the injected series under each weighting.
+
+    Args:
+        stats: The monthly sums.
+        layout: The columns.
+        weights: Month weights, shape (B, M).
+        spec_cost: The penalty matrix and the linear cost vector.
 
     Returns:
         `(theta_base, theta_injected, gram, rhs)`: coefficients of shape (B, p), and the weighted
@@ -198,9 +207,16 @@ def frozen_fit(
     gram: torch.Tensor,
     rhs: torch.Tensor,
     theta_base: np.ndarray,
-    spec_cost: tuple,
+    spec_cost: tuple[np.ndarray, np.ndarray],
 ) -> np.ndarray:
     """Fit the injected series' capacity increments, every other column held at the base fit.
+
+    Args:
+        layout: The columns.
+        gram: The weighted Gram matrices, shape (B, p, p).
+        rhs: The weighted right-hand sides, shape (B, 2, p).
+        theta_base: The base fit's coefficients, shape (B, p).
+        spec_cost: The penalty matrix and the linear cost vector.
 
     Returns:
         The increments, shape (B, number of season-years).

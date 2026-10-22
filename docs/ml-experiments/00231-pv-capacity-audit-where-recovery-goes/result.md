@@ -4,7 +4,7 @@ slug: pv-capacity-audit-where-recovery-goes
 theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - solar-disaggregation
-status: planned
+status: finished
 size: >-
   simple to medium. Stored: private files under data/ml-experiments/00231-<slug>/ only. Serving
   path: not touched. Degradation rule: not touched. Designs: more than one is defensible, but the
@@ -42,20 +42,141 @@ metric: >-
   season-year 2024 (July 2024 to June 2025, the last complete season-year in experiment 129's
   known-answer table). Capacity unit: the 99th percentile of alternating-current output over
   daylight half-hours, in MW. Shares are fractions of the shortfall 1 minus rung 4
+verdict: partly supported
+production_status: not-for-production
+adopted_in: none
+date: 2026-10-22
+pr: 1537
+headline: >-
+  Of the 0.173 of an injected farm's capacity that the full fit misses (pooled median over five
+  Primaries), 58% is demand absorption (80% interval 54% to 63%) and 47% is the plant shape and
+  flat top (43% to 54%); the irradiance input contributes -6% (-12% to -2%).
+best_arm: none; a diagnostic ladder with no arm to rank
+take_home_message: >-
+  The capacity estimator misses 0.17 of an injected solar farm mainly for two reasons: the demand
+  terms of the fit absorb part of the solar signal (58% of the miss), and the fixed solar shape
+  does not reach the farm's flat top (47%). Better sunshine data does not help, because fitting
+  the farm alone on clear half-hours finds no more than fitting it on all daylight. The next
+  experiments should target demand absorption and the shape's seasonal flat top, not the
+  irradiance input.
+lessons:
+  - >-
+    Fitting the farm alone against the fleet solar shape already finds only 0.93 of it, so no
+    capacity fit of this shape can exceed 0.93 before demand is added.
+  - >-
+    Demand absorption takes 0.10 of the injected capacity (0.09 to 0.11) at the five Primaries,
+    and the estimator noise with demand frozen is 0.00.
+advice:
+  - >-
+    Do not spend an experiment on a better irradiance input for the capacity fit: clear half-hours
+    find 0.929 against 0.931 for all daylight half-hours, so the irradiance share of the miss is
+    below zero (figure 2).
+  - >-
+    Target demand absorption first, for example with matched sunny-minus-cloudy day pairs, because
+    freezing the demand terms recovers 0.93 against 0.83 with them free (figure 1).
+  - >-
+    Test a monthly or seasonal efficiency factor on the solar shape, because the recovered flat top
+    is 0.74 to 0.80 of the farm's in spring and summer and 0.90 to 0.96 in winter (figure 4).
+  - >-
+    Report the capacity fit's recovery from rows in April to August only as an alternative, because
+    dropping the winter rows raises the pooled recovery from 0.827 to 0.864 (figure 3).
 code: ml-experiments/00231-pv-capacity-audit-where-recovery-goes/
 ---
 
 # PV capacity audit: where does the recovery shortfall go?
 
-**Planned, not yet run.** The experiment adds the recorded output of a real solar farm to a Primary
-substation's power, asks the capacity estimator of experiment 129 how much of the farm it finds
-again, and then repeats the question under six simpler or narrower conditions to see which change
-closes the gap to 1. The Primaries are D5, D10, D11, D14, and D16, with D9 beside them, and the
-farms are A, B, C, D, and F, injected one at a time at 50% of the Primary's pinned capacity. Farm
-labels A to F stand for metered generators and are never named. The fits stop at 2026-07-01, so the
-maintainer's labelled exception (data to 2026-07-31) is not used. No forecast is scored.
+**Take-home message: the capacity estimator misses about 0.17 of an injected solar farm mainly
+because the demand terms of the fit soak up part of the solar signal, and because the fixed solar
+shape does not match the farm's flat top. The sunshine input is not the limit.** The experiment
+added the recorded output of a real solar farm (farms A to F stand for metered generators) to a
+Primary substation's power at 50% of the Primary's pinned capacity and asked experiment 129's
+capacity fit how much of the farm it finds again. The full fit finds 0.827 of it (pooled median over
+the five decision Primaries, 80% interval 0.814 to 0.842). Four simpler fits then show where the
+rest goes: fitting the farm alone finds 0.931, which is the limit for this solar shape, and
+freezing the demand terms finds 0.928. The verdict is `partly supported`: demand absorption took
+the predicted share, and the other three predicted shares were wrong. No forecast is scored, and
+the fits stop at 2026-07-01, so the maintainer's labelled exception (data to 2026-07-31) is not
+used.
 
-## The ladder of fits
+**Terms used below.** D5, D10, D11, D14, and D16 are the five decision Primaries of experiment
+103's data set, and D9 is shown beside them. A season-year runs from July to June and is labelled by
+the year of the July; the recovery is read at season-year 2024. The capacity unit is the 99th
+percentile of alternating-current output over daylight half-hours, in MW. The shortfall is 1 minus
+the recovery of the full fit. CAMS is the Copernicus Atmosphere Monitoring Service's satellite
+irradiance.
+
+![Recovery at each rung of the ladder](figure_01_rungs.svg)
+
+![Where the missing share goes](figure_02_causes.svg)
+
+![Recovery by rows used](figure_03_rows.svg)
+
+![Flat top of the recovered output](figure_04_divisor.svg)
+
+## Findings
+
+- **Prediction scorecard (pooled median over the five decision Primaries):** demand absorption
+  57.7% of the shortfall (80% interval 54.1% to 62.7%), predicted at least 40%, met at 5 of 5
+  Primaries. Irradiance input -5.8% (-11.8% to -2.4%), predicted at least 25%, met at 0 of 5. Season
+  share (summer rows only against all rows) 19.3% (13.1% to 28.2%), predicted under 15%, met at 1 of
+  5. Divisor share 27.3%, predicted under 15%, met at 0 of 5.
+- **Rungs, pooled (80% intervals):** farm only 0.931 (0.920 to 0.943); farm only on clear
+  half-hours 0.929 (0.910 to 0.930); demand frozen 0.928 (0.924 to 0.941); full fit 0.827 (0.814 to
+  0.842); full fit on April to August rows 0.864 (0.847 to 0.880); full fit on November to February
+  rows 0.475 (0.450 to 0.522).
+- **Plant shape and flat top, 47.1% (43.0% to 53.5%) of the shortfall:** the fleet shape with one
+  fitted scale reaches 0.929 on clear half-hours, so about 0.07 of a farm is out of its reach.
+- **Demand absorption, 57.7% (54.1% to 62.7%):** the injected solar lowers the demand that the
+  fit's profile, heating, lighting, and harmonic terms explain, and 0.098 (0.089 to 0.110) of the
+  injected capacity is lost that way. The estimator noise with demand frozen is 0.003 (-0.007 to
+  0.004).
+- **Irradiance input, -5.8%:** clear half-hours at the Primary's CAMS point fit the farm no better
+  than all daylight half-hours (0.929 and 0.931). Experiment 218's figures of 0.973 and 0.953 are a
+  fraction of squared output explained, which measures scatter, and this page measures the fitted
+  scale, which the scatter does not lower.
+- **Season, 19.3% (13.1% to 28.2%):** April to August rows alone raise the recovery from 0.827 to
+  0.864 at all 5 decision Primaries (D9 is unchanged), and November to February rows alone find 0.475
+  (0.450 to 0.522).
+- **Divisor:** the whole-year 99th-percentile ratio of the recovered output to the farm's is 0.75
+  to 0.82 (range over farms 0.71 to 0.83), 0.039 to 0.050 below the recovery of the full fit, so
+  reading the capacity at the 99th percentile makes the shortfall larger, not smaller. The ratio is
+  0.74 to 0.80 in spring and summer and 0.90 to 0.96 in winter.
+- **Reading of the flat top (a hypothesis, not tested here):** the fitted shape derates for heat
+  loss, and experiments 183 and 218 found no heat or clip term that explains the farms' flat top.
+  A flat top that falls more in the fit than in the farm from spring to summer is what a heat
+  derating that is too strong would produce.
+- **Reproduction:** the injected-fit capacity equals experiment 129's `kat_arm2` capacity to within
+  1e-6 relative at every Primary and farm. With experiment 129's base (fitted on all rows) the
+  recovery matches exactly; with this experiment's base (fitted on the rows where the farm has a
+  reading) it differs by 0.007 to 0.019 at most.
+
+## Checks
+
+- **Median forecast minus mean forecast, and the mean-forecast error:** not applicable; the
+  experiment scores no forecast.
+- **Triggers fired:** trigger 2 (the result contradicts three of four pre-registered shares and
+  appears to contradict experiment 218's 0.973). The explanation was tested by reading experiment
+  218's definition of "fraction of output fitted" (above). Trigger 7 (the designs of experiments
+  B to F depend on this result and it has not been replicated) fired, and an Opus audit is the
+  ML MANAGER's decision; the PR stays open until that is settled. Triggers 1, 3, 4, 5, and 6 did
+  not fire: the summer-only fit beating the full fit is the measured contrast and not a nested-arm
+  anomaly.
+- **Review:** one Sonnet code review found no finding that changes a result.
+
+## What the next experiment should answer
+
+- **Matched sunny-minus-cloudy day pairs (experiment B) targets the largest cause that can be
+  fixed, demand absorption.**
+- **A shared seasonal efficiency curve (experiment E) targets the flat-top gap and the season
+  share,** and should run after B.
+- **The clear-sky fit (experiment C) and the nearest-farm sunshine reference (experiment D) both
+  target the irradiance input, which contributes nothing here,** so their predicted gains are
+  unlikely to hold.
+- **Neural components:** a learned smooth response of the solar term to temperature and irradiance
+  could replace the fixed derating if the seasonal curve helps. The prediction that could fail is a
+  flat-top ratio of 0.9 or more in every season.
+
+## Plan: the ladder of fits
 
 Every rung reports the recovery at season-year 2024, as a median over the five farms, with a
 month-block 80% interval (a stratified bootstrap of the training months, 200 resamples, the same
@@ -85,7 +206,7 @@ shortfall. The season share is `R5_summer - R4` and the divisor share is `|R4_p9
 `R4_p99` is the whole-season-year 99th-percentile ratio of rung 6; both are alternatives to the
 ladder and not terms of the sum.
 
-## Plan checks
+## Plan: checks
 
 - **Read-out year (changed before the real run):** the first draft of this plan read the recovery at
   season-year 2025. A one-farm pilot at D10 (10 resamples, not a result) then showed that
