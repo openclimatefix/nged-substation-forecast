@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 248 | Do UKV irradiance and cloud inputs improve the two best neural heads on the plant? | 1 | Nothing | Running |
 
 ## Planned experiments
 
