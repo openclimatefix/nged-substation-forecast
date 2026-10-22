@@ -1,9 +1,10 @@
 """Read the UKV-CEDA variables at each farm's nearest cell and build the per-row UKV tables.
 
 Step 1 reads every complete 00 UTC UKV run that a farm row needs, for the 22 variables of
-`e00229_common.UKV_VARIABLES`, at the six farms' nearest 2 km cells. Step 2 interpolates each variable
-to the midpoint of each half-hour row, with shortwave scaled by the cosine of the solar zenith so that
-the sun's movement between steps is not read as cloud. Wind direction is interpolated as a vector.
+`e00229_common.UKV_VARIABLES`, at the six farms' nearest 2 km cells. Step 2 interpolates each
+variable to the midpoint of each half-hour row, with shortwave scaled by the cosine of the solar
+zenith so that the sun's movement between steps is not read as cloud. Wind direction is
+interpolated as a vector.
 
     systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00229-*/e00229_ukv.py
@@ -67,7 +68,9 @@ def needed_runs() -> list[datetime]:
     runs: set[datetime] = set()
     for site in common.FARMS:
         for band in common.BANDS:
-            table = pl.read_parquet(common.members_table(site=site, band=band), columns=["init_time"])
+            table = pl.read_parquet(
+                common.members_table(site=site, band=band), columns=["init_time"]
+            )
             runs.update(table["init_time"].unique().to_list())
     return sorted(runs)
 
@@ -96,24 +99,18 @@ def read_raw() -> None:
             print("read", i, "of", len(runs), flush=True)
     common.UKV_DIR.mkdir(parents=True, exist_ok=True)
     stamps = np.array([r.timestamp() for r in runs])
-    np.savez(RAW_PATH, runs=stamps, complete=complete, **values)
+    arrays: dict[str, np.ndarray] = {"runs": stamps, "complete": complete, **values}
+    np.savez(RAW_PATH, **arrays)  # ty: ignore[invalid-argument-type]
     print("complete runs", int(complete.sum()), "of", len(runs))
 
 
 def zenith_cosine(*, site: str, instants: pd.DatetimeIndex) -> np.ndarray:
     """Return the cosine of the apparent solar zenith at a farm for the given instants."""
     row = pv_sites().filter(pl.col("site") == site).row(0, named=True)
-    position = pvlib.location.Location(row["latitude"], row["longitude"]).get_solarposition(instants)
+    position = pvlib.location.Location(row["latitude"], row["longitude"]).get_solarposition(
+        instants
+    )
     return np.cos(np.radians(position["apparent_zenith"].to_numpy()))
-
-
-def interpolate_run(
-    *, series: np.ndarray, steps: np.ndarray, midpoint_hours: np.ndarray
-) -> np.ndarray:
-    """Linearly interpolate a (steps,) series, with NaN at a native step giving NaN."""
-    native = np.array(common.NATIVE_STEPS)
-    values = series[native]
-    return np.interp(midpoint_hours, native, values, left=np.nan, right=np.nan) if np.isfinite(values).all() else np.full(len(midpoint_hours), np.nan)
 
 
 def build_tables(*, only: str | None = None) -> None:
@@ -132,11 +129,9 @@ def build_tables(*, only: str | None = None) -> None:
             )
             run_index = np.searchsorted(run_stamps, table["init_time"].dt.epoch("s").to_numpy())
             midpoint = (
-                (table["time"] - timedelta(minutes=15) - table["init_time"]).dt.total_minutes().to_numpy()
-                / 60.0
-            )
+                table["time"] - timedelta(minutes=15) - table["init_time"]
+            ).dt.total_minutes().to_numpy() / 60.0
             usable = complete[run_index] & (midpoint >= 0) & (midpoint <= native[-1])
-            starts = table["init_time"].to_numpy()
             # Cosine of the zenith at the midpoint and at every native step of the row's run.
             midpoint_times = pd.DatetimeIndex(
                 (table["time"] - timedelta(minutes=15)).to_numpy(), tz="UTC"
@@ -148,7 +143,11 @@ def build_tables(*, only: str | None = None) -> None:
                     zenith_cosine(
                         site=site,
                         instants=pd.DatetimeIndex(
-                            [pd.Timestamp(run_stamps[r], unit="s", tz="UTC") + pd.Timedelta(hours=int(h)) for h in native]
+                            [
+                                pd.Timestamp(run_stamps[r], unit="s", tz="UTC")
+                                + pd.Timedelta(hours=int(h))
+                                for h in native
+                            ]
                         ),
                     ),
                     0.0,
@@ -165,8 +164,6 @@ def build_tables(*, only: str | None = None) -> None:
                         continue
                     series = arrays[name][r, :, farm_index]
                     base = np.interp(midpoint[rows], native, series[native])
-                    if name in ("shortwave_down", "longwave_down"):
-                        pass
                     out[rows] = base
                 columns[name] = out
             # Shortwave rescaled by the cosine of the zenith (the sun moves between hourly steps).
@@ -176,7 +173,11 @@ def build_tables(*, only: str | None = None) -> None:
                 if len(rows) == 0:
                     continue
                 series = arrays["shortwave_down"][r, :, farm_index]
-                kt = np.where(cos_steps[int(r)] > MIN_COSINE, series[native] / np.maximum(cos_steps[int(r)], MIN_COSINE), np.nan)
+                kt = np.where(
+                    cos_steps[int(r)] > MIN_COSINE,
+                    series[native] / np.maximum(cos_steps[int(r)], MIN_COSINE),
+                    np.nan,
+                )
                 # Clear-sky-index-like ratio, filled across the night by the nearest daytime ratio.
                 good = np.isfinite(kt)
                 if good.sum() < 2:
@@ -190,7 +191,9 @@ def build_tables(*, only: str | None = None) -> None:
             columns["wind_u"] = -speed * np.sin(direction)
             columns["wind_v"] = -speed * np.cos(direction)
             del columns["wind_direction_10m"]
-            frame = pl.DataFrame({"time": table["time"], "init_time": table["init_time"]}).with_columns(
+            frame = pl.DataFrame(
+                {"time": table["time"], "init_time": table["init_time"]}
+            ).with_columns(
                 site=pl.lit(site),
                 band=pl.lit(band),
                 ukv_usable=pl.Series(usable),

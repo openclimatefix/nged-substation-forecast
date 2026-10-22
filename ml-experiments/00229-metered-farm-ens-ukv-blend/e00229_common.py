@@ -26,7 +26,8 @@ UKV_STORES: Final[tuple[str, ...]] = ("UKV-CEDA", "UKV-CEDA-part2", "UKV-CEDA-pa
 FARMS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "E", "F")
 N_MEMBERS: Final[int] = 51
 BANDS: Final[tuple[int, ...]] = (0, 1)
-"""Band 0 holds valid times 12 to 36 hours after the ensemble run's 00 UTC start, band 1 holds 36 to 54."""
+"""Band 0 holds valid times 12 to 36 hours after the ensemble run's 00 UTC start, band 1 holds
+36 to 54."""
 BAND_LEAD_RANGE: Final[dict[int, tuple[float, float]]] = {0: (12.0, 36.0), 1: (36.0, 54.0)}
 FOLDS: Final[dict[str, tuple[datetime, datetime]]] = {
     "scored": (datetime(2025, 9, 1, tzinfo=UTC), datetime(2026, 1, 1, tzinfo=UTC)),

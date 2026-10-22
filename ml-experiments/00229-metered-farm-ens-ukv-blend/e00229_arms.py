@@ -2,15 +2,17 @@
 
 All arms predict power over capacity from the fleet-shape plant of experiments 218 and 224.
 
-| Arm | Weather | Centre | Spread |
-|---|---|---|---|
-| `a1_ens_two_number` | ensemble | mean of the 51 plant responses | 51 Gaussian points of the responses' standard deviation, times the offsets |
-| `a1x_tree_ens` | ensemble | XGBoost on ensemble columns | 11 quantile outputs |
-| `a2_ukv_alone` | UKV | plant on UKV shortwave and temperature | binned residual quantiles |
-| `a3_blend` | both | convex blend of the two plant forecasts, weights by UKV cloud band | the ensemble's spread, as arm `a1` |
-| `a4_tree_all_ukv` | both | XGBoost on ensemble columns and all 22 UKV variables | 11 quantile outputs |
-| `a5_tree_ukv_sky` | both | the same tree with UKV shortwave and cloud only | 11 quantile outputs |
-| `p3_blend_shuffle`, `p4_tree_shuffle` | both | arms 3 and 4 with UKV taken from a donor row of the same month, hour band, and cloud band | |
+Arms, with the weather each uses and how each builds its centre and spread:
+
+- `a1_ens_two_number`: ensemble weather. Centre: mean of 51 plant responses. Spread: 51 Gaussian
+  points of their standard deviation, times the offsets.
+- `a1x_tree_ens`: ensemble weather. XGBoost on ensemble columns, 11 quantile outputs.
+- `a2_ukv_alone`: UKV weather. Plant on UKV shortwave and temperature, binned residual quantiles.
+- `a3_blend`: both. Convex blend of the two plant forecasts by UKV cloud band, ensemble spread.
+- `a4_tree_all_ukv`: both. XGBoost on ensemble columns and 22 UKV variables.
+- `a5_tree_ukv_sky`: both. The same tree with UKV shortwave and cloud only.
+- `p3_blend_shuffle`, `p4_tree_shuffle`: arms 3 and 4 with UKV from a donor row (same month, hour
+  band, and cloud band).
 
 The tree predicts output over clear-sky irradiance (divided by 1000), then multiplies back.
 
@@ -101,10 +103,14 @@ ARM_NAMES: Final[tuple[str, ...]] = (
 
 
 def unit_response(
-    *, ghi: np.ndarray, temperature_c: np.ndarray, zenith: np.ndarray, azimuth: np.ndarray,
+    *,
+    ghi: np.ndarray,
+    temperature_c: np.ndarray,
+    zenith: np.ndarray,
+    azimuth: np.ndarray,
     doy: np.ndarray,
 ) -> np.ndarray:
-    """Return the fleet-shape unit response (power over capacity per unit scale) for (rows,) arrays."""
+    """Return the fleet-shape unit response (power over capacity per unit scale) per row."""
     split = pvlib.irradiance.erbs(ghi=ghi, zenith=zenith, datetime_or_doy=doy)
     sky = SunAndSky(
         half_hour_end_time=np.zeros(ghi.size),
@@ -158,7 +164,9 @@ def _bin_offsets(
     table = np.empty((N_BINS, len(LEVELS)))
     for index in range(N_BINS):
         rows = tuning & (bins == index)
-        table[index] = np.quantile(residual[rows], LEVELS) if rows.sum() >= MIN_BIN_ROWS else overall
+        table[index] = (
+            np.quantile(residual[rows], LEVELS) if rows.sum() >= MIN_BIN_ROWS else overall
+        )
     return bins, table[bins]
 
 
@@ -200,12 +208,19 @@ def build_farm_band(*, site: str, band: int, fold: str) -> FarmBand | None:
     start, end = common.FOLDS[fold]
     table = load_table(site=site, band=band)
     # Keep the ensemble member responses aligned with the surviving rows.
-    full = pl.read_parquet(common.members_table(site=site, band=band), columns=["time", "init_time"])
+    full = pl.read_parquet(
+        common.members_table(site=site, band=band), columns=["time", "init_time"]
+    )
     unit_all = np.load(common.members_unit(site=site, band=band)).astype(np.float64)
-    keep = full.with_row_index("i").join(
-        table.select("time", "init_time"), on=["time", "init_time"], how="inner"
-    )["i"].to_numpy()
+    keep = (
+        full.with_row_index("i")
+        .join(table.select("time", "init_time"), on=["time", "init_time"], how="inner")["i"]
+        .to_numpy()
+    )
     unit = unit_all[keep]
+    if not (full["time"].to_numpy()[keep] == table["time"].to_numpy()).all():
+        msg = "ensemble member responses are not aligned with the joined table"
+        raise ValueError(msg)
     time = table["time"]
     tuning = (time < start).to_numpy()
     scored = ((time >= start) & (time < end)).to_numpy()
@@ -225,12 +240,28 @@ def build_farm_band(*, site: str, band: int, fold: str) -> FarmBand | None:
     cloud_band = np.digitize(np.nan_to_num(cloud, nan=50.0), CLOUD_EDGES)
     bin_ens, offsets_ens = _bin_offsets(forecast=mu_ens, residual=output - mu_ens, tuning=tuning)
     bin_ukv, offsets_ukv = _bin_offsets(forecast=mu_ukv, residual=output - mu_ukv, tuning=tuning)
-    table = table.with_columns(mu_ens=pl.Series(mu_ens), sigma_ens=pl.Series(sigma), ukv_mu=pl.Series(mu_ukv))
+    table = table.with_columns(
+        mu_ens=pl.Series(mu_ens), sigma_ens=pl.Series(sigma), ukv_mu=pl.Series(mu_ukv)
+    )
     return FarmBand(
-        site=site, band=band, table=table, tuning=tuning, scored=scored, output=output,
-        cloud_band=cloud_band, mu_ens=mu_ens, sigma=sigma, response=response, mu_ukv=mu_ukv,
-        offsets_ens=offsets_ens, offsets_ukv=offsets_ukv, bin_ens=bin_ens, bin_ukv=bin_ukv,
-        ceiling=ceiling, scale_ens=scale_ens, scale_ukv=scale_ukv,
+        site=site,
+        band=band,
+        table=table,
+        tuning=tuning,
+        scored=scored,
+        output=output,
+        cloud_band=cloud_band,
+        mu_ens=mu_ens,
+        sigma=sigma,
+        response=response,
+        mu_ukv=mu_ukv,
+        offsets_ens=offsets_ens,
+        offsets_ukv=offsets_ukv,
+        bin_ens=bin_ens,
+        bin_ukv=bin_ukv,
+        ceiling=ceiling,
+        scale_ens=scale_ens,
+        scale_ukv=scale_ukv,
     )
 
 
@@ -256,7 +287,9 @@ def centres_two_number(*, mu: np.ndarray, sigma: np.ndarray, s: float) -> np.nda
     return mu[:, None] + s * sigma[:, None] * Z_POINTS[None, :]
 
 
-def fit_factors(*, pool: dict[str, np.ndarray], mu_key: str, offsets_key: str) -> tuple[float, float]:
+def fit_factors(
+    *, pool: dict[str, np.ndarray], mu_key: str, offsets_key: str
+) -> tuple[float, float]:
     """Return `(f, s)` minimising the pinball loss on the pooled tuning rows."""
 
     def loss(f: float, s: float) -> float:
@@ -275,7 +308,7 @@ def blend_weights(*, farms: list[FarmBand]) -> np.ndarray:
     """Return the ensemble's weight for each UKV cloud band, fitted on the farms' tuning rows.
 
     The two plant forecasts are combined convexly, so `w` runs from 0 (UKV alone) to 1 (ensemble
-    alone); each weight minimises the squared error of the blended forecast over a cloud band's rows.
+    alone); each weight minimises the blended forecast's squared error over a cloud band's rows.
     """
     weights = np.full(len(CLOUD_EDGES) + 1, 0.5)
     for cloud in range(len(weights)):
@@ -292,7 +325,9 @@ def blend_weights(*, farms: list[FarmBand]) -> np.ndarray:
     return weights
 
 
-def make_pool(*, farms: list[FarmBand], seed: int, mu_attr: str, offsets_attr: str) -> dict[str, np.ndarray]:
+def make_pool(
+    *, farms: list[FarmBand], seed: int, mu_attr: str, offsets_attr: str
+) -> dict[str, np.ndarray]:
     """Return up to `FIT_ROWS` tuning daylight rows pooled over the given farms."""
     rng = np.random.default_rng(seed)
     pieces = [
@@ -314,7 +349,7 @@ def make_pool(*, farms: list[FarmBand], seed: int, mu_attr: str, offsets_attr: s
 
 
 def donors(*, farm: FarmBand, seed: int) -> np.ndarray:
-    """Return a donor row per scored row: a random row of the same month, hour band, and cloud band."""
+    """Return a donor row per scored row: a random row of its month, hour band, and cloud band."""
     table = farm.table
     key = (
         table["time"].dt.month().cast(pl.String)
@@ -355,7 +390,9 @@ def frame_of(*, farm: FarmBand, fold: str, quantiles: np.ndarray, arm: str) -> p
     )
 
 
-def heuristic_and_climatology(*, farm: FarmBand, fold: str, full: pl.DataFrame) -> dict[str, np.ndarray]:
+def heuristic_and_climatology(
+    *, farm: FarmBand, fold: str, full: pl.DataFrame
+) -> dict[str, np.ndarray]:
     """Return the two floors' 11 quantiles for every row (NaN where the floor has no member)."""
     start, _ = common.FOLDS[fold]
     times = farm.table.select("time")
@@ -369,8 +406,10 @@ def heuristic_and_climatology(*, farm: FarmBand, fold: str, full: pl.DataFrame) 
     heuristic = np.full((len(times), len(LEVELS)), np.nan)
     valid = count > 0
     heuristic[valid] = np.nanquantile(stack[valid], LEVELS, axis=1).T
-    samples = history.filter(pl.col("time") < start).select("time", "output").with_columns(
-        local=pl.col("time").dt.convert_time_zone("Europe/London")
+    samples = (
+        history.filter(pl.col("time") < start)
+        .select("time", "output")
+        .with_columns(local=pl.col("time").dt.convert_time_zone("Europe/London"))
     )
     keyed = (
         samples.select(
@@ -420,12 +459,14 @@ def full_output() -> pl.DataFrame:
 
 
 def task(job: tuple[str, int, str]) -> list[pl.DataFrame]:
-    """Fit the shared factors and blend weights leave-one-farm-out and build one farm-band's arms."""
+    """Fit shared factors and blend weights leave-one-farm-out; build one farm-band's arms."""
     fold, band, site = job
     farms = farms_of(fold, band)
     farm = farms[site]
     others = [f for name, f in farms.items() if name != site]
-    pool_ens = make_pool(farms=others, seed=SEED + band, mu_attr="mu_ens", offsets_attr="offsets_ens")
+    pool_ens = make_pool(
+        farms=others, seed=SEED + band, mu_attr="mu_ens", offsets_attr="offsets_ens"
+    )
     f1, s1 = fit_factors(pool=pool_ens, mu_key="mu", offsets_key="offsets")
     weights = blend_weights(farms=others)
 
@@ -434,18 +475,25 @@ def task(job: tuple[str, int, str]) -> list[pl.DataFrame]:
         return w * farm.mu_ens + (1.0 - w) * mu_ukv
 
     mu_blend = blended(mu_ukv=farm.mu_ukv, cloud_band=farm.cloud_band)
-    bin_b, offsets_b = _bin_offsets(forecast=mu_blend, residual=farm.output - mu_blend, tuning=farm.tuning)
+    _, offsets_b = _bin_offsets(
+        forecast=mu_blend, residual=farm.output - mu_blend, tuning=farm.tuning
+    )
     # Offsets for the blend come from the blended forecast's own tuning residuals.
-    blend_tuning = farm.table.with_columns(mu_blend=pl.Series(mu_blend))
-    farm_blend = FarmBand(**{**farm.__dict__, "table": blend_tuning, "offsets_ens": offsets_b})
-    farm_blend.__dict__["mu_blend"] = mu_blend
     pool_b = {
-        "actual": np.concatenate([f.output[f.tuning & (f.mu_ens > MIN_FORECAST_POWER)] for f in others]),
-        "mu": np.concatenate([
-            (weights[f.cloud_band] * f.mu_ens + (1 - weights[f.cloud_band]) * f.mu_ukv)[f.tuning & (f.mu_ens > MIN_FORECAST_POWER)]
-            for f in others
-        ]),
-        "sigma": np.concatenate([f.sigma[f.tuning & (f.mu_ens > MIN_FORECAST_POWER)] for f in others]),
+        "actual": np.concatenate(
+            [f.output[f.tuning & (f.mu_ens > MIN_FORECAST_POWER)] for f in others]
+        ),
+        "mu": np.concatenate(
+            [
+                (weights[f.cloud_band] * f.mu_ens + (1 - weights[f.cloud_band]) * f.mu_ukv)[
+                    f.tuning & (f.mu_ens > MIN_FORECAST_POWER)
+                ]
+                for f in others
+            ]
+        ),
+        "sigma": np.concatenate(
+            [f.sigma[f.tuning & (f.mu_ens > MIN_FORECAST_POWER)] for f in others]
+        ),
     }
     offsets_pool = []
     for f in others:
@@ -458,7 +506,9 @@ def task(job: tuple[str, int, str]) -> list[pl.DataFrame]:
         pick = np.sort(rng.choice(len(pool_b["actual"]), size=FIT_ROWS, replace=False))
         pool_b = {k: v[pick] for k, v in pool_b.items()}
     f3, s3 = fit_factors(pool=pool_b, mu_key="mu", offsets_key="offsets")
-    print("factors", fold, band, site, "ens", f1, s1, "blend", f3, s3, "weights", weights, flush=True)
+    print(
+        "factors", fold, band, site, "ens", f1, s1, "blend", f3, s3, "weights", weights, flush=True
+    )
     quantiles: dict[str, np.ndarray] = {}
     two = centres_two_number(mu=farm.mu_ens, sigma=farm.sigma, s=s1)
     quantiles["a1_ens_two_number"] = mixture(centres=two, offsets=farm.offsets_ens, f=f1)
@@ -476,7 +526,9 @@ def task(job: tuple[str, int, str]) -> list[pl.DataFrame]:
     ]
 
 
-def tree_matrix(*, farm: FarmBand, columns: tuple[str, ...], source: np.ndarray | None = None) -> np.ndarray:
+def tree_matrix(
+    *, farm: FarmBand, columns: tuple[str, ...], source: np.ndarray | None = None
+) -> np.ndarray:
     """Return the tree's feature matrix; `source` swaps in the donor rows' UKV columns."""
     table = farm.table
     ens_names = [c for c in columns if not c.startswith("ukv_")]
@@ -535,7 +587,12 @@ def xgboost_task(job: tuple[str, str]) -> list[pl.DataFrame]:
                     model.predict(tree_matrix(farm=b, columns=columns, source=source))
                 ).reshape(b.table.height, len(LEVELS))
                 out.append(
-                    frame_of(farm=b, fold=fold, quantiles=shuffled * divisor[:, None], arm="p4_tree_shuffle")
+                    frame_of(
+                        farm=b,
+                        fold=fold,
+                        quantiles=shuffled * divisor[:, None],
+                        arm="p4_tree_shuffle",
+                    )
                 )
     return out
 
