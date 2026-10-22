@@ -584,7 +584,7 @@ failed ([experiment
 
 **Clip the solar term at D5 at 60% of the held capacity (medium confidence, provisional).** D5 is
 the one substation with the export-clip flag in the series table, and its sunny-daylight forecast
-error against BG2 falls from +0.202 MW to +0.069 MW when the solar output the model subtracts from
+error against BG2 falls from +0.202 MW to +0.069 MW when the solar output the GAM subtracts from
 demand is capped at 60% of the capacity held after the cut. The same clip at D10 and D16, which show
 no plateau in clear-sky net power, leaves their sunny error unchanged and raises their error over
 all half-hours by 0.005 to 0.006 MW, so apply it only where the limit exists. A ceiling of 100%
