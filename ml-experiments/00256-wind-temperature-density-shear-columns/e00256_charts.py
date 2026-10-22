@@ -89,7 +89,7 @@ def figure_1(*, score: dict) -> alt.TopLevelMixin:
                 "kind": "Planned (98.75%)" if label in DECISIVE else "Descriptive (95%)",
             }
         )
-    base = alt.Chart(pl.DataFrame(rows)).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(pl.DataFrame(rows)).encode(
         y=alt.Y(
             "contrast:N",
             sort=list(CONTRAST_LABELS.values()),
@@ -141,7 +141,7 @@ def figure_2(*, score: dict) -> alt.TopLevelMixin:
                     "upper": entry[2],
                 }
             )
-    base = alt.Chart().encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart().encode(
         y=alt.Y("split:N", sort=[s for _, s in SPLITS], title=None),
         color=alt.Color(
             "contrast:N",

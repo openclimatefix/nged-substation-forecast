@@ -132,7 +132,7 @@ def pressure_check(*, era5: pl.DataFrame, members: pl.DataFrame, sites: pl.DataF
         .agg(((pl.col("ens") - pl.col("era5_pa")).mean() / 100).alias("difference_hpa"))
         .sort("site", "month")
     )
-    worst = float(ens["difference_hpa"].abs().max())
+    worst = float(ens["difference_hpa"].abs().max())  # ty: ignore[invalid-argument-type]
     report = {
         "worst_abs_monthly_difference_hpa": worst,
         "monthly": ens.to_dicts(),
