@@ -1,7 +1,8 @@
 # ruff: noqa: E501
 """Helpers copied from experiment 193 (two-number arms); `e00202_replay.py` calls them.
 
-Original docstring: build the two-number arms and their placebos from experiment 184's stored member responses.
+Original docstring: build the two-number arms and their placebos from experiment 184's stored
+member responses.
 
 Each daylight row of arm A has 51 member responses (`delta_m`, the change in the mean forecast when
 one member's unit PV shape replaces the ensemble mean's). This script summarises them and rebuilds
