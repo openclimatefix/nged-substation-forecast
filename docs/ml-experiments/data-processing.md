@@ -62,7 +62,11 @@ skill at the 8 MVA-only Primaries from its skill at the 8 MW Primaries (inconclu
 factor to only 2 of the 8 MVA-only Primaries (and recovered one of them, D12), because the other 6
 have almost no reverse flow in
 their training rows. It held the power factor at 0.97 at those 6, and modelling the meter as
-apparent power scored 0.13 points of capacity better than reading it as real power.
+apparent power scored 0.13 points of capacity better than reading it as real power. [Experiment
+204](00204-dp-bsp-full-bottom-up-with-signed-mva-children/result.md) summed the apparent-power children
+of two bulk supply points into the bulk supply point's reading: reading the magnitude as signed power
+or converting it with a fitted sign scored within 0.03 points at one bulk supply point and 0.02 to
+0.03 points better with the sign at the other, where Stickney (D12) has reverse flow. Provisional.
 
 **Read power through the cleaned table, and read the raw table only when the question is about
 availability.** The cleaned table holds only unflagged rows
@@ -185,6 +189,12 @@ fold. A window found from the data picks up drift and solar growth as well ([exp
 drift-removed fit finds April 2020 more than 5 points low only at D11 (-26 points) and D10 (-7
 points), and August 2020 to September 2021 sits 5 to 17 points above the fit at D5, D10, D11, and
 D14. Applies to experiments and production.
+
+**A dataset of dated events that ends before 2021-07-20 cannot be compared with the demand-model
+fit's training rows, because the lockdown window removes every earlier row from training.** The
+feed-in tariff register, a list of small solar installations, ends on 2021-03-24, so none of its
+dates falls in a month on which the fit trains ([experiment
+215](00215-dp-pv-step-scan-real-series-register-match/result.md)). Applies to experiments.
 
 **Check how many days of training rows a demand-model fit kept after the lockdown window is removed,
 and flag a fit with fewer than 180 days (provisional; medium confidence).** Leaving the lockdown
@@ -421,6 +431,21 @@ physical clear-sky index, all at elevations of 14 to 16 degrees
 ([experiment 184](00184-dp-ens-daylight-calibration/result.md)). The scored contrast did not
 change when rows under 17 degrees were dropped. The confidence is moderate, and the entry is
 provisional until the experiment has had its reviews.
+
+## Wind farms
+
+**Drop the rows in `mask.parquet` of experiment 210 before training or scoring on the three metered
+wind farms, and do not expect ERA5 wind speed alone to find idle rows (provisional, medium
+confidence).** *Applies to: experiments.* The idle floor is a set of near-zero readings with
+repeated values (W1 and W3 in MVA) or small negative readings (W2 in MW, down to -0.071 MW). At
+ERA5 100 m wind of 5 to 8 m/s, 11% to 50% of half-hours are in the idle band, and a wind-speed
+threshold that keeps false drops under 5% misses 51% to 69% of idle-band half-hours out of sample.
+The mask adds runs of at least 12 hours in the idle band at high ERA5 wind (suspected outages),
+which total 160 hours at W1, 428 at W2, and 2,742 at W3. W3's idle share at wind above 10 m/s is
+6.2% over all years and 1.5% from 2021, so its first 2 years differ from the later ones. Evidence:
+[experiment 210](00210-wind-idle-noise-mva-artefact/result.md), three farms, 2019-09 to 2026-09.
+The mask is built on ERA5, which arrives about 5 days late, so it is for training and evaluation
+rows and not for live use.
 
 ## Embedded solar capacity
 
