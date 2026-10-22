@@ -16,7 +16,7 @@ from studies.dp_gam import TrainingWindow, fit_gam
 def main() -> None:
     """Fit D14 at one cut both ways and print the differences."""
     torch_threads = 4
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(torch_threads)
     cache = common.load_cache()

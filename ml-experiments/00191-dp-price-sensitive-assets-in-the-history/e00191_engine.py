@@ -30,7 +30,7 @@ import e00191_common as common
 import e00191_inputs as inputs
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import (
     DEFAULT_DELAY_HOURS,
     FilterHyperparameters,
