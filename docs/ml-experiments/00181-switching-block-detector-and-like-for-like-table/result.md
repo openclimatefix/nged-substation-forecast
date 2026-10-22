@@ -50,11 +50,12 @@ best_arm: >-
   budget of 80 unexplained odd-month alarms (threshold 4.37 noise units). The post hoc variant with a
   noise unit taken from the previous 7 days (S2) finds 5 of 17 (4 of the 5 days in even months).
 headline: >-
-  The block detector finds 0 of 17 block days at 80 alarms (prediction: at least 12). The best-fitting block of the 17
-  days has a median score of 2.3 noise units and a median length of 12 hours. Injected blocks 5
-  noise units tall are found 57% to 65% of the time, and blocks 6 noise units tall about 90%. On the 35 real
-  transfers, RO-NC on the convex-model residual finds 18 against 12 on the XGBoost residual, but
-  only 14 against 12 on the 29 transfers that both residuals can see.
+  The block detector finds 0 of 17 block days at 80 alarms (prediction: at least 12). The
+  best-fitting block of the 17 days has a median score of 2.3 noise units and a median length of 12
+  hours. Injected blocks 5 noise units tall are found 57% to 65% of the time, and blocks 6 noise
+  units tall about 90%. On the 35 real transfers, RO-NC on the convex-model residual finds 18
+  against 12 on the XGBoost residual, but only 14 against 12 on the 29 transfers that both
+  residuals can see.
 lessons: >-
   The 17 missed days are mostly short blocks of 1 to 4 noise units on the residual that RO-NC reads,
   so neither a longer or shorter averaging window nor a block-shaped statistic separates them from
