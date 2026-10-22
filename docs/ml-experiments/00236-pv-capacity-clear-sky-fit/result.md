@@ -126,6 +126,9 @@ output over daylight half-hours, in MW.
   limit. The coverage test of experiment 129 (23 of 30 cells) was not re-run; the interval-width
   condition stood in for it. The intervals are month-block bootstrap intervals only; the plan's
   range over the five farms is not reported.
+- **No Opus audit was run.** The ML manager decided that quota did not allow an Opus review of
+  any of this series' experiments, so every audit trigger listed above stays unaudited and a
+  Sonnet reviewer read the code and the page instead.
 
 ## What the next experiment should answer
 
