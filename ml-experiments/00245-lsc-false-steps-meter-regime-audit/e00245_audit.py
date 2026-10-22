@@ -4,8 +4,8 @@ Reads (private, stored) the monthly capacity paths of experiment 207, the arm B 
 that the false-alarm check of experiment 130 put on one half-hourly grid, and the alarm tables of
 experiments 130 and 195. Writes the event table and the matched controls to the private folder.
 
-Run: OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
-    uv run --no-sync python ml-experiments/00245-lsc-false-steps-meter-regime-audit/e00245_audit.py
+Run with `uv run --no-sync python e00245_audit.py` from this folder, under `systemd-run --user
+--scope -p MemoryMax=8G -p OOMPolicy=continue`.
 """
 
 import pickle
