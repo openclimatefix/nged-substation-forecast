@@ -8,6 +8,7 @@
 |---|---|---|---|---|
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals |
 | 186 | Are D8's multi-day drops an embedded gas peaker running (spark spread, triads, flat blocks)? | High (NGED answer relayed 2026-10-22) | Nothing | Planned |
+| 195 | Does a learned score on the existing detectors' features (or combined with RO-NC) find more real transfers at the same false-alarm rate? | High (maintainer, 2026-10-22) | Experiment 189 (PR 1494) | Planned |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the
 interconnection edges between Primary substations and scores them on injected transfers; see the
