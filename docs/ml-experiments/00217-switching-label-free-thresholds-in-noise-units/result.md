@@ -6,7 +6,7 @@ title: >-
   switching labels?
 theme: switching-detectors
 also_relevant_to: []
-status: planned
+status: done
 size: >-
   simple. Stored: private tables under data/ml-experiments/00217-switching-label-free-thresholds-in-noise-units/
   only. Serving path: not touched. Degradation rule: not touched. Designs: one (descriptive, plus one
@@ -34,34 +34,165 @@ benchmark: >-
   The cross-Primary median alarm rate of each detector at its stored threshold.
 row_set_id: none (alarm counts, not forecasts)
 metric: Alarms per Primary-year, in winter (December to February) and in the rest of the year.
+verdict: partly supported
+best_arm: >-
+  RO-NC at 4.35 noise units: 9 of 13 Primaries within a factor 2 of the median of 4.7 alarms per
+  Primary-year (69%; pre-registered bar 80%)
+headline: >-
+  A fixed 4.35-noise-unit threshold gives RO-NC between 0.9 and 19 alarms per Primary-year across 15
+  Primaries. At 2.5 noise units (post hoc), 13 of 13 other Primaries are within a factor 2.
+lessons: >-
+  A threshold in noise units gives similar alarm rates only at low thresholds, where alarms come
+  from the bulk of the noise. At high thresholds the rate follows each Primary's heavy tail, which
+  the share of days the model is badly off predicts (correlation 0.81 across Primaries).
+take_home_message: >-
+  A single threshold in noise units gives similar alarm rates across Primaries only when it is low:
+  at 2.5 noise units all 13 ordinary Primaries are within a factor of 2 of the median, at 4.35 only
+  9 of 13 are. D8 and D9 are not the outliers at a fixed threshold; D9 stands out only under the
+  label-tuned detector. Version 2 needs an automatic per-Primary tail rule, and the share of days
+  the model is badly off is the best candidate statistic.
+advice:
+  - >-
+    Do not expect one threshold above about 4 noise units to give the same alarm rate on every
+    Primary; set the threshold per Primary from a target alarm rate or a tail statistic (C1,
+    figure 3).
+  - >-
+    Use the share of days on which the day's mean residual exceeds 3 noise units as the first
+    candidate for a label-free per-Primary tail statistic, and test it on a held-out period (C2,
+    figure 2).
+  - >-
+    Do not replace the odd-month MAD noise estimate with the MAD of all months; the two agree
+    within 8% and change no alarm rate (C3).
+production_status: not-for-production
+adopted_in: none
 ---
 
-# Does one threshold in noise units give predictable alarm rates across Primaries, with no labels?
+**Take-home: a threshold in noise units gives similar alarm rates across Primaries only when it is
+low. Version 2 therefore needs an automatic per-Primary rule for any threshold above about 3 noise
+units.** At 4.35 noise units, the refit-offset neighbour-count detector (RO-NC) raises between 0.9
+and 19 alarms per Primary-year across 15 Primary substations, and 9 of the 13 Primaries other than D8
+and D9 fall within a factor of 2 of the median of 4.7. The pre-registered bar was 11 of 13, so that
+part fails. Post hoc, the same detector at 2.5 noise units puts 13 of 13 within a factor of 2 (median
+27 alarms per Primary-year), and the match worsens steadily as the threshold rises. D8 and D9 are not
+the outliers at a fixed threshold. Of the statistics we measured on the residual, the share of days on
+which the model is badly off predicts the alarm rate best.
 
-**Plan only; no result yet.** Version 2 of the service will have no NGED switching labels, so a
-detector's threshold has to come from the residual alone.
+**We asked whether a detector's alarm rate on a new Primary can be predicted from that Primary's
+residual alone, so that version 2, which will have no switching labels, needs no per-Primary tuning.**
+We ran RO-NC and the pair alarm at the thresholds in noise units that [experiment
+130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md) and [experiment
+156](../00156-switching-faster-onset-alarm-from-opposite-steps/result.md) stored, over the whole
+history of the frozen convex-model residual of every Primary with 12 or more months of it. We counted
+all alarms and read no label, logged closure, or labelled transfer. We also read the stored alarms of
+the learned score of [experiment 195](../00195-switching-neural-plus-detector-features/result.md),
+which is trained on labels. The noise unit is the scale of the 24-hour step statistic, estimated from
+odd months. The result narrows the search for version 2 to a per-Primary rule that sets a threshold
+from the residual's tail, not only from its noise scale.
 
-## Design
+## Figures
 
-- **Detectors.** RO-NC on the arm B residual of [experiment
-  130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md) (variant X, 24-hour window, 4.35
-  noise units); the pair alarm of [experiment
-  156](../00156-switching-faster-onset-alarm-from-opposite-steps/result.md) (4-hour window, 3.75
-  noise units); the learned score of [experiment
-  195](../00195-switching-neural-plus-detector-features/result.md) (stored alarms of the re-ranker,
-  at its operating point). The learned score is trained on labels, so its rates are descriptive only.
-- **Alarms.** All causal peak alarms over the whole residual history of every Primary with at least
-  12 months of residual. No label, logged closure, or labelled transfer is read.
-- **Residual statistics per Primary.** The current noise estimate (MAD of the step statistic in odd
-  months), the MAD of the step statistic over all months at 2, 4, 6, and 24 hours, the kurtosis of
-  the step statistic, the share of days where the model is off by more than 3 noise units for 24
-  hours or more, and the same share on holidays and Easter.
-- **Candidate noise estimates (fixed before any rate is seen).** R1: MAD over all months at the
-  detector's window. R2: the 95th percentile of the absolute step statistic divided by 1.96, so
-  heavy tails raise the scale. Thresholds are recomputed with each and the spread of alarm rates is
-  compared.
-- **Predictor.** Log alarm rate regressed on one statistic at a time, leave-one-Primary-out.
+![Alarm rate per Primary-year by detector](figure_1_alarm_rate_by_primary.svg)
 
-## Out of scope
+![RO-NC alarm rate against threshold](figure_3_rate_against_threshold.svg)
 
-The 35 logged transfers are not read.
+![Predicted against observed alarm rate](figure_2_predicted_against_observed.svg)
+
+![D8 and D9 against the median](figure_4_d8_and_d9.svg)
+
+## Headline numbers
+
+- **Prediction, part 1 fails.** RO-NC at 4.35 noise units: 9 of 13 other Primaries are within a
+  factor of 2 of the median (69%; 11 were needed). The pair alarm at 3.75 noise units: 5 of 13. No
+  single Primary changes this: dropping each in turn leaves 8 or 9 of 12 or 13.
+- **Prediction, part 2 holds, but was never at risk.** D8 is 2.14 times and D9 is 0.51 times the
+  median under the current noise estimate, so both were inside a factor of 3 before any change. The
+  two robust estimates keep them inside (figure 4).
+- **The two robust estimates do not narrow the spread.** R1, the median absolute deviation (MAD) of
+  all months, equals the current odd-month MAD within 8%, so it changes no rate (9 of 13; standard
+  deviation of the base-2 logarithm of the rate 1.00 against 1.17). R2, the 95th percentile divided
+  by 1.96, halves the median rate to 2.0 and leaves 9 of 13 (1.30).
+- **The label-tuned detectors are no more uniform.** RO-NC XL (stored alarms, threshold tuned to 80
+  unexplained odd-month alarms) has 9 of 13, and D9 at 3.2 times the median is outside a factor of
+  3. The learned re-ranker has 10 of 13, the learned logistic score 7 of 13.
+- **Rate against threshold (post hoc).** Other Primaries within a factor 2 of the median: 13 of 13 at
+  2.5 noise units, 12 at 3.0, 11 at 3.5, 9 at 4.35, 8 at 5.0, 6 at 6.0, and 4 at 8.0 (figure 3).
+- **Best predictor.** The share of days on which the day's mean residual exceeds 3 noise units
+  predicts log alarm rate leave-one-Primary-out with a mean absolute error of 0.58 (base 2) against
+  1.14 for the median of the other Primaries, and 13 of 15 predictions fall within a factor of 2
+  (correlation 0.81, figure 2). Without D18, which has 1 year of residual and the largest share (0.42),
+  the correlation is 0.72 and the error 0.62 against 1.19. The tail ratio (95th percentile over MAD)
+  comes next (error 0.93). The noise scale at any window gives 1.03 to 1.04, barely better than
+  the baseline. For the pair alarm the best statistic, the tail ratio, gives 1.46 against 1.80. No
+  statistic beats the baseline of 1.34 for RO-NC XL.
+- **Winter against the rest.** Pooled over Primaries, RO-NC raises 5.4 alarms per Primary-year in
+  December to February and 4.7 in the other months; the pair alarm 4.0 and 4.7. The per-Primary split
+  is in the table.
+- **What makes D8 and D9 different.** D8 has the largest noise (a 24-hour step scale of 0.62 MW
+  against a median of 0.16) and the heaviest upper tail (95th percentile 0.94 MW), but at a fixed
+  threshold in noise units its rate is 2.1 times the median, not an outlier. D9 is ordinary on every
+  statistic (misfit share 0.14, equal to the median; kurtosis 2.7), and raises 6 RO-NC alarms in 2.5
+  years at 4.35 noise units. Its 34 alarms under RO-NC XL come from the label-trained score at
+  lower z; these data do not say which of that score's inputs causes them.
+- **Tail calibration and curtailment.** Not applicable: no forecast is scored.
+
+## Residual statistics and alarm rates per Primary
+
+Sorted by the share of misfit days. "Noise, 24 h" is the current estimate (MAD of the 24-hour step
+statistic in odd months, MW); the MAD columns use all months at 2, 4, 6, and 24 hours. Misfit days:
+share of days on which the day's mean residual exceeds 3 noise units. Rates are alarms per
+Primary-year at 4.35 noise units (RO-NC) and 3.75 noise units (pair alarm). D18 has 1 year of
+residual and D9 2.5 years; the rest 4.5.
+
+| Primary | Years of residual | Noise, 24 h (MW) | MAD 2 h | MAD 4 h | MAD 6 h | MAD 24 h | 95th pct 24 h | Kurtosis 24 h | Misfit days | Holiday misfit | RO-NC all | winter | rest | Pair all | winter | rest |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| D18 | 1.0 | 0.078 | 0.139 | 0.142 | 0.138 | 0.083 | 0.272 | 29.4 | 0.42 | 0.60 | 19.2 | 16.2 | 20.2 | 21.2 | 16.2 | 22.9 |
+| D10 | 4.5 | 0.133 | 0.192 | 0.199 | 0.187 | 0.132 | 0.200 | 5.9 | 0.32 | 0.23 | 10.5 | 11.3 | 10.2 | 7.8 | 8.7 | 7.5 |
+| D22 | 4.5 | 0.094 | 0.118 | 0.132 | 0.140 | 0.097 | 0.126 | 7.2 | 0.24 | 0.32 | 5.6 | 8.7 | 4.5 | 9.6 | 10.5 | 9.3 |
+| D3 | 4.5 | 0.142 | 0.279 | 0.286 | 0.237 | 0.146 | 0.177 | 12.8 | 0.17 | 0.34 | 5.3 | 5.2 | 5.4 | 2.2 | 3.5 | 1.8 |
+| D16 | 4.5 | 0.184 | 0.243 | 0.251 | 0.249 | 0.185 | 0.212 | 5.1 | 0.16 | 0.13 | 2.7 | 1.7 | 3.0 | 2.7 | 3.5 | 2.4 |
+| D4 | 4.5 | 0.276 | 0.285 | 0.368 | 0.404 | 0.278 | 0.397 | 2.5 | 0.16 | 0.23 | 6.7 | 6.1 | 6.9 | 1.1 | 0.9 | 1.2 |
+| D19 | 4.5 | 0.159 | 0.214 | 0.214 | 0.204 | 0.160 | 0.206 | 2.7 | 0.15 | 0.09 | 5.8 | 6.1 | 5.7 | 0.7 | 0.9 | 0.6 |
+| D21 | 4.5 | 0.113 | 0.174 | 0.191 | 0.183 | 0.115 | 0.131 | 18.8 | 0.14 | 0.15 | 4.7 | 4.4 | 4.8 | 1.6 | 0.0 | 2.1 |
+| D2 | 4.5 | 0.308 | 0.464 | 0.471 | 0.449 | 0.303 | 0.340 | 10.0 | 0.14 | 0.23 | 1.3 | 0.9 | 1.5 | 0.4 | 0.0 | 0.6 |
+| D8 | 4.5 | 0.620 | 0.565 | 0.782 | 0.862 | 0.618 | 0.940 | 2.0 | 0.14 | 0.08 | 10.0 | 8.7 | 10.5 | 4.9 | 9.6 | 3.3 |
+| D9 | 2.5 | 0.164 | 0.189 | 0.216 | 0.215 | 0.157 | 0.181 | 2.7 | 0.14 | 0.26 | 2.4 | 1.5 | 2.7 | 0.0 | 0.0 | 0.0 |
+| D11 | 4.5 | 0.317 | 0.305 | 0.348 | 0.363 | 0.315 | 0.347 | 3.2 | 0.13 | 0.11 | 2.7 | 6.1 | 1.5 | 1.3 | 0.9 | 1.5 |
+| D14 | 4.5 | 0.245 | 0.298 | 0.349 | 0.353 | 0.247 | 0.297 | 3.6 | 0.11 | 0.09 | 2.7 | 4.4 | 2.1 | 4.5 | 3.5 | 4.8 |
+| D5 | 4.5 | 0.139 | 0.224 | 0.232 | 0.217 | 0.139 | 0.156 | 5.7 | 0.10 | 0.09 | 2.9 | 4.4 | 2.4 | 10.1 | 7.8 | 10.8 |
+| D12 | 4.5 | 0.355 | 0.414 | 0.511 | 0.570 | 0.334 | 0.390 | 0.9 | 0.06 | 0.08 | 0.9 | 2.6 | 0.3 | 11.1 | 2.6 | 14.1 |
+
+## Checks
+
+- **Median minus mean forecast, and mean-forecast error beside each contrast:** not applicable; the
+  experiment scores alarm counts, not forecasts.
+- **Audit triggers:** none fired. There is no control. The result differs from the false-alarm
+  finding that D8 and D9 raise 61 of 148 unexplained alarms; the cause tested here is the detector,
+  because at a fixed threshold in noise units D8 and D9 are not outliers, and only the label-tuned
+  RO-NC XL puts D9 outside a factor of 3 (figure 4). Dropping any one Primary never reaches 80%
+  (8 or 9 of 12 or 13). No nested arms, sister experiment, or later design depends on this result yet.
+
+## Caveats
+
+- **Residual and alarms share the same data.** The misfit share and the tail ratio are measured on
+  the residual that the alarms read, so their link to the alarm rate is partly built in. The
+  leave-one-Primary-out test shows the link holds across Primaries, not that the statistic is
+  independent of the alarms.
+- **Only 15 Primaries, 6 of them a single year apart in exposure.** D18 has 1 year and D9 2.5 years
+  of residual; the intervals in figure 1 are wide, and alarms in the same week are not independent.
+- **Lab shortcuts.** The residual uses ERA5 weather, which arrives about 5 days late, and a convex
+  model refitted on the 1st and the 16th of each month, as in experiment 130. A live service would
+  have ensemble forecast weather instead. The learned-score alarms are the stored cross-fitted
+  alarms of experiment 195, averaged over its three folds, and their thresholds use labels.
+- **Post hoc.** The threshold sweep (figure 3), the robustness checks, and the choice of the noise
+  estimates R1 and R2 are labelled as such; R1 and R2 were named in the plan before any rate was seen,
+  the sweep was not.
+- **The 35 logged transfers were not read.**
+
+## What the next experiment should answer
+
+- **Does a per-Primary alarm budget give uniform rates with no labels?** Set each Primary's threshold
+  so that its alarms equal a target number per Primary-year, estimated from its own history, and
+  check that the rate holds on a later year. The prediction that could fail: the rate in the held-out
+  year stays within a factor of 2 of the target for at least 80% of Primaries.
+- **Does the misfit-day share carry over to a held-out period?** Compute it on one year and predict
+  the next year's alarm rate.
