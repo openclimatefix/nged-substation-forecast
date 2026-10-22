@@ -81,3 +81,46 @@ This page is rewritten as the write-up when the run finishes.
 - **Gate input.** The networks have no temperature input; a +4 C error on 2% of the scored year's
   cold-night rows is injected through arm D's forecast-level input, shifted by 4 C times the
   substation's cold-night slope of the forecast level on ensemble-mean temperature.
+
+## Plan-review amendments (made before any score or spread was read)
+
+- **Early stopping and purge.** The `full` and `cfx` sets stop on 2025-04-28 to 2025-06-24; `cfy`
+  stops on 2024-10-01 to 2024-11-10, because its held-out half contains the usual block. All
+  early-stopping blocks come from the training half. A 15-day purge sits on both sides of each
+  held-out half and each early-stopping block. The cross-fit networks see 3 to 5 months of ensemble
+  weather rows, fewer than the full set's 12, so the replicate-year numbers are not like-for-like
+  with the scored year.
+- **Normalisation and knots.** The spread `z` is divided by the median spread of the tuning months
+  of the same head set, and the knots are the 50th and 90th percentiles of the tuning months. The
+  scored year is divided by the full set's own tuning-month median. The tuning-month spread
+  distributions of the cross-fit and the full sets are plotted side by side.
+- **Months.** E3 is fitted on all rows of the odd months (tuning) of 2024-07 to 2025-06, never on
+  cold nights alone. The replicate-year test of prediction 1 uses the even months; the odd months
+  are reported beside it. Cold-night row and day counts of each period are printed; if the tuning
+  months hold fewer than 300 cold-night rows, the cold-night result is read from the scored year
+  and the replicate even months alone.
+- **Intervals.** Spearman correlations and coverages carry 95% intervals resampled by valid day.
+  Prediction 1 passes when the point estimate is at least 0.2 and the interval's lower bound is
+  above 0.1. E3 passes prediction 2 on a point estimate of 0.90 or more, and the write-up states
+  whether the lift over E0 exceeds its interval.
+- **Placebo.** Primary P shuffles `z` among rows of the same substation, valid month, and hour band,
+  20 times (seeds 0 to 19); the reported lift is the mean over shuffles. A second placebo shuffles
+  among all substations (descriptive). P is read as a difference from E3 in cold-night q95 coverage
+  over resampled days. E3 must lift coverage by at least 0.005 for the "P's lift under half of E3's"
+  clause to apply.
+- **Gate.** The forecast level (`mean`, divided by 100) is one of the network's inputs, so the
+  injection reaches the networks. The cold-night slope of the forecast level on ensemble-mean
+  temperature is fitted on the training months (2020 to 2025-06) of each substation. The rows are
+  picked with seed 244, the spread is computed twice on the same rows (clean and injected), and
+  the number of injected rows and days is printed. The gate reads spread only, no coverage or score.
+- **Prediction 3.** The seed-to-seed spread is the standard deviation, across the 20 seeds, of each
+  single network's scored-year all-row quantile-score gain over arm D, using the network's own
+  bands (arm D offsets), in points of effective capacity.
+- **Extra arms and reports.** E1's own score (ensemble-mean centre, arm D offsets) is reported so the
+  change of centre is separate from the band scaling; E3's centre is E0's mean. E3 fits the levels
+  0.01, 0.05, 0.10, 0.25, 0.75, 0.90, 0.95, and 0.99 as experiment 169 did; the middle three levels
+  (0.40, 0.50, 0.60) keep E0's offsets. The spread of the log scales is reported as a second
+  covariate (Spearman only). E3 on the bagged spread (E2) is fitted too and reported as descriptive.
+  The coverage by spread decile is the first figure, and the 20 seed gains and the placebo follow.
+  Experiment 201's three stored corrections are not used. Experiments 160, 164, 169, 192, 200, 201,
+  209, and 211 are cited in the write-up.
