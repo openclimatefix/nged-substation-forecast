@@ -156,6 +156,9 @@ cloud-driven load is added.**
   no nested arm. Trigger 7 may apply, because a later design may depend on the finding that the
   interval is not an 80% interval. The maintainer's decision on an audit is pending.
 - **Review:** one Sonnet review of the code and the page.
+- **No Opus audit was run.** The ML manager decided that quota did not allow an Opus review of
+  any of this series' experiments, so every audit trigger listed above stays unaudited and a
+  Sonnet reviewer read the code and the page instead.
 
 ## Limits
 
