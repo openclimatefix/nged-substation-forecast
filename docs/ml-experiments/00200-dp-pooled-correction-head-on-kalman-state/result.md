@@ -73,18 +73,19 @@ advice:
 code: ml-experiments/00200-dp-pooled-correction-head-on-kalman-state/
 ---
 
-**Take-home: a small neural network lowers arm D's day-ahead score by 0.07 to 0.12 points at five
-substations, but a copy of it that cannot see any recent error gets four fifths of that.** Arm D is
-our convex demand model with a Kalman filter (a method that updates a forecast from its recent
-errors), the night offset, and recipe R (subtract 0.75 times the mean error of the last 14 days). We
-trained one network, shared by 6 substations, to correct arm D's median and rescale its spread. Most
-of the gain therefore comes from the calendar, the lead time, and the substation, which fix a bias in
-arm D without reading errors. Reading the errors and the filter's state adds -0.025 points (99%
-interval -0.106 to +0.029) when the network trains on 2020 onward, which is not distinguishable from
-zero. This is a weaker test than the brief planned: 6 substations, not 16 Primaries, because the
-other Primaries lack the inputs arm D needs, and no weather input. The verdict is `partly supported`:
-the headline contrast passes its rule, but the known-answer gate marginally fails (29% against 30%)
-and the mechanism, reading recent errors, is not supported.
+**Take-home: most of the network's gain does not come from reading recent errors, and a plain table
+recalibration of arm D reproduces only about a quarter of it.** Arm D is our convex demand model
+with a Kalman filter (a method that updates a forecast from its recent errors), the night offset,
+and recipe R (subtract 0.75 times the mean error of the last 14 days). We trained one network,
+shared by 6 substations, to correct arm D's median and rescale its spread. Trained on 2020 onward it
+lowers the day-ahead score by 0.125 points (99% interval 0.060 to 0.209). A copy that cannot see any
+error or Kalman state gets 0.100, so reading errors adds only 0.025 (interval -0.029 to +0.106,
+including zero). A ridge table on the same calendar, lead, substation, and forecast-level inputs,
+with no network, gets 0.030 (0.007 to 0.053) when fitted to the ensemble year, and is worse than arm
+D when fitted to all years. The blind network's extra gain over the table is unexplained, which is
+why an audit was run. This is a weaker test than the brief planned: 6 substations, not 16 Primaries,
+and no weather input. The verdict is `partly supported`: the headline contrast passes its rule, the
+known-answer gate marginally fails (29% against 30%), and reading recent errors is not what helps.
 
 ## Figures
 
@@ -123,6 +124,14 @@ and the mechanism, reading recent errors, is not supported.
   to +0.039). Stage 3: head 2.307, blind head 2.332 (C1 -0.125, -0.209 to -0.060; C2 -0.100, -0.140
   to -0.064; C3 -0.025, -0.106 to +0.029). Experiment 169's calibrated-spread arm D scores 2.430 on
   the same rows, so spread calibration is not the source.
+- **Plain recalibration arm (no network, stage 3 rows).** A ridge regression on one-hot site by
+  half-hour, site by day of week, site by lead band, site by forecast-level bin, and half-hour by
+  day of week, plus an ensemble-era flag, shifts arm D's median; a per-cell factor, chosen by
+  pinball loss, scales the quantile offsets. Fitted to all training rows it scores 0.049 points
+  worse than arm D (interval -0.001 to +0.096), because 80% of the rows are past-weather forecasts
+  with smaller errors. Fitted to the ensemble year only it scores -0.030 against arm D (interval
+  -0.053 to -0.007; 2.402 points), +0.070 worse than the blind network (+0.042 to +0.097) and 0.095
+  worse than the head (0.038 to 0.181).
 - **Per substation, stage 3 head minus arm D:** D5 -0.179, D10 -0.075, D11 -0.008, D14 -0.133, D16
   -0.243, D9 -0.104. Stage 2: D5 -0.081, D10 -0.066, D11 +0.040, D14 -0.112, D16 -0.142, D9 +0.014.
 - **Tails (decision substations, stage 3 head against arm D).** Pinball at q99: 0.391 against 0.411.
@@ -149,6 +158,6 @@ and the mechanism, reading recent errors, is not supported.
 
 ## What to try next
 
-- Replace the network with a calendar, lead, and substation recalibration of arm D's median and see
-  whether it matches the blind head.
+- Find out why the blind network beats the ridge table by 0.07 points: test the forecast-level
+  interaction, the spread head, and a gradient-boosted table (audit question 3).
 - Add the ensemble-mean temperature and shortwave inputs, which the stored forecasts lack.
