@@ -1,0 +1,130 @@
+R2_M48 onsets for D10 over the whole stored history: 16
+R2_M48 onsets for D11 over the whole stored history: 15
+R2_M48 onsets for D14 over the whole stored history: 2
+R2_M48 onsets for D16 over the whole stored history: 26
+R2_M48 onsets for D5 over the whole stored history: 16
+R0_M48 onsets for D10 over the whole stored history: 16
+R0_M48 onsets for D11 over the whole stored history: 15
+R0_M48 onsets for D14 over the whole stored history: 2
+R0_M48 onsets for D16 over the whole stored history: 26
+R0_M48 onsets for D5 over the whole stored history: 16
+pair_alarm_W8 onsets for D10 over the whole stored history: 37
+pair_alarm_W8 onsets for D11 over the whole stored history: 6
+pair_alarm_W8 onsets for D14 over the whole stored history: 20
+pair_alarm_W8 onsets for D16 over the whole stored history: 13
+pair_alarm_W8 onsets for D5 over the whole stored history: 45
+shape: (37, 19)
+┌──────┬────────────┬────────────┬──────────┬─────────┬─────────┬────────────┬───────────┬───────────┬───────────┬─────────┬───────────┬───────────┬───────────┬───────────┬───────────┬───────────┬───────────┬───────────┐
+│ site ┆ local_date ┆ shape      ┆ spread   ┆ n_valid ┆ n_edges ┆ midday_par ┆ edge_posi ┆ edge_shif ┆ edge_stre ┆ returns ┆ persists_ ┆ n_neighbo ┆ n_metered ┆ neighbour ┆ neighbour ┆ fired_R2_ ┆ fired_R0_ ┆ fired_pai │
+│ ---  ┆ ---        ┆ ---        ┆ ---      ┆ ---     ┆ ---     ┆ t          ┆ tion      ┆ t         ┆ ngth      ┆ ---     ┆ 7d        ┆ urs       ┆ _neighbou ┆ _step     ┆ s_with_st ┆ M48       ┆ M48       ┆ r_alarm_W │
+│ str  ┆ date       ┆ str        ┆ f64      ┆ i64     ┆ i64     ┆ ---        ┆ ---       ┆ ---       ┆ ---       ┆ bool    ┆ ---       ┆ ---       ┆ rs        ┆ ---       ┆ ep        ┆ ---       ┆ ---       ┆ 8         │
+│      ┆            ┆            ┆          ┆         ┆         ┆ f64        ┆ i64       ┆ f64       ┆ f64       ┆         ┆ bool      ┆ i64       ┆ ---       ┆ bool      ┆ ---       ┆ bool      ┆ bool      ┆ ---       │
+│      ┆            ┆            ┆          ┆         ┆         ┆            ┆           ┆           ┆           ┆         ┆           ┆           ┆ i64       ┆           ┆ str       ┆           ┆           ┆ bool      │
+╞══════╪════════════╪════════════╪══════════╪═════════╪═════════╪════════════╪═══════════╪═══════════╪═══════════╪═════════╪═══════════╪═══════════╪═══════════╪═══════════╪═══════════╪═══════════╪═══════════╪═══════════╡
+│ D10  ┆ 2025-07-03 ┆ a_block    ┆ 1.874095 ┆ 47      ┆ 1       ┆ 0.373922   ┆ 1546      ┆ -6.155684 ┆ 3.284617  ┆ false   ┆ null      ┆ 6         ┆ 6         ┆ true      ┆ D12       ┆ false     ┆ false     ┆ false     │
+│ D10  ┆ 2025-10-08 ┆ a_block    ┆ 2.282988 ┆ 48      ┆ 2       ┆ 0.984859   ┆ 6222      ┆ -32.61091 ┆ 14.284317 ┆ false   ┆ false     ┆ 6         ┆ 6         ┆ true      ┆ D11,D12,D ┆ false     ┆ false     ┆ false     │
+│      ┆            ┆            ┆          ┆         ┆         ┆            ┆           ┆ 9         ┆           ┆         ┆           ┆           ┆           ┆           ┆ 15,D21    ┆           ┆           ┆           │
+│ D10  ┆ 2025-10-17 ┆ a_block    ┆ 2.712697 ┆ 48      ┆ 2       ┆ 0.980121   ┆ 6652      ┆ -26.29438 ┆ 9.693078  ┆ false   ┆ false     ┆ 6         ┆ 6         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+│      ┆            ┆            ┆          ┆         ┆         ┆            ┆           ┆ 4         ┆           ┆         ┆           ┆           ┆           ┆           ┆           ┆           ┆           ┆           │
+│ D10  ┆ 2025-11-01 ┆ a_block    ┆ 2.393695 ┆ 48      ┆ 2       ┆ 0.722251   ┆ 7364      ┆ 16.125063 ┆ 6.736475  ┆ true    ┆ false     ┆ 6         ┆ 6         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+│ D10  ┆ 2025-11-26 ┆ b_offset   ┆ 7.648038 ┆ 48      ┆ 0       ┆ 0.43681    ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D10  ┆ 2025-12-02 ┆ b_offset   ┆ 4.605322 ┆ 48      ┆ 0       ┆ 0.281861   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D10  ┆ 2026-05-26 ┆ a_block    ┆ 4.63274  ┆ 48      ┆ 2       ┆ 0.484395   ┆ 17230     ┆ 16.36772  ┆ 3.533053  ┆ true    ┆ false     ┆ 6         ┆ 6         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+│ D10  ┆ 2026-06-20 ┆ a_block    ┆ 2.809501 ┆ 48      ┆ 1       ┆ 0.782727   ┆ 18459     ┆ -13.77194 ┆ 4.901917  ┆ false   ┆ false     ┆ 6         ┆ 6         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+│      ┆            ┆            ┆          ┆         ┆         ┆            ┆           ┆ 1         ┆           ┆         ┆           ┆           ┆           ┆           ┆           ┆           ┆           ┆           │
+│ D11  ┆ 2025-09-04 ┆ b_offset   ┆ 3.413582 ┆ 48      ┆ 0       ┆ 0.525663   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D11  ┆ 2025-09-24 ┆ b_offset   ┆ 5.43211  ┆ 48      ┆ 0       ┆ 0.489364   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D11  ┆ 2025-10-02 ┆ c_ramp_or_ ┆ 7.252345 ┆ 48      ┆ 0       ┆ 0.557915   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│      ┆            ┆ midday     ┆          ┆         ┆         ┆            ┆           ┆           ┆           ┆         ┆           ┆           ┆           ┆           ┆           ┆           ┆           ┆           │
+│ D11  ┆ 2025-11-05 ┆ b_offset   ┆ 3.615568 ┆ 48      ┆ 0       ┆ 0.506472   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D11  ┆ 2025-11-13 ┆ c_ramp_or_ ┆ 5.418268 ┆ 47      ┆ 0       ┆ 0.795864   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│      ┆            ┆ midday     ┆          ┆         ┆         ┆            ┆           ┆           ┆           ┆         ┆           ┆           ┆           ┆           ┆           ┆           ┆           ┆           │
+│ D11  ┆ 2025-11-28 ┆ b_offset   ┆ 3.565549 ┆ 47      ┆ 0       ┆ 0.175571   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D11  ┆ 2025-12-10 ┆ b_offset   ┆ 2.522746 ┆ 48      ┆ 0       ┆ 0.447212   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D11  ┆ 2026-03-23 ┆ b_offset   ┆ 2.090432 ┆ 47      ┆ 0       ┆ 0.374846   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D11  ┆ 2026-06-08 ┆ b_offset   ┆ 4.199315 ┆ 47      ┆ 0       ┆ 0.539207   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D11  ┆ 2026-06-21 ┆ b_offset   ┆ 4.073522 ┆ 48      ┆ 0       ┆ 0.683513   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D14  ┆ 2025-08-22 ┆ a_block    ┆ 1.990951 ┆ 47      ┆ 1       ┆ 0.242044   ┆ 3960      ┆ -6.5235   ┆ 3.276574  ┆ false   ┆ false     ┆ 5         ┆ 5         ┆ true      ┆ D12,D15,D ┆ false     ┆ false     ┆ false     │
+│      ┆            ┆            ┆          ┆         ┆         ┆            ┆           ┆           ┆           ┆         ┆           ┆           ┆           ┆           ┆ 18        ┆           ┆           ┆           │
+│ D14  ┆ 2025-09-12 ┆ a_block    ┆ 1.989829 ┆ 48      ┆ 1       ┆ 0.168874   ┆ 4972      ┆ -11.58966 ┆ 5.824455  ┆ false   ┆ false     ┆ 5         ┆ 5         ┆ true      ┆ D18,D3    ┆ false     ┆ false     ┆ false     │
+│      ┆            ┆            ┆          ┆         ┆         ┆            ┆           ┆ 8         ┆           ┆         ┆           ┆           ┆           ┆           ┆           ┆           ┆           ┆           │
+│ D14  ┆ 2025-11-28 ┆ a_block    ┆ 1.836159 ┆ 47      ┆ 1       ┆ 0.520974   ┆ 8683      ┆ 9.225594  ┆ 5.024399  ┆ false   ┆ false     ┆ 5         ┆ 5         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+│ D14  ┆ 2026-03-06 ┆ mixed      ┆ 5.489032 ┆ 48      ┆ 0       ┆ 0.386074   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D14  ┆ 2026-03-20 ┆ a_block    ┆ 2.016608 ┆ 45      ┆ 3       ┆ 0.09466    ┆ 14060     ┆ 11.528387 ┆ 5.716721  ┆ false   ┆ false     ┆ 5         ┆ 5         ┆ true      ┆ D12,D18   ┆ false     ┆ false     ┆ false     │
+│ D14  ┆ 2026-04-02 ┆ b_offset   ┆ 4.167955 ┆ 48      ┆ 0       ┆ 0.297854   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D14  ┆ 2026-05-07 ┆ a_block    ┆ 2.854499 ┆ 48      ┆ 2       ┆ 0.949445   ┆ 16350     ┆ 20.618887 ┆ 7.223295  ┆ false   ┆ false     ┆ 5         ┆ 5         ┆ true      ┆ D12,D8    ┆ false     ┆ false     ┆ false     │
+│ D14  ┆ 2026-05-19 ┆ a_block    ┆ 2.262569 ┆ 47      ┆ 2       ┆ 0.343716   ┆ 16917     ┆ -8.782999 ┆ 3.88187   ┆ true    ┆ false     ┆ 5         ┆ 5         ┆ true      ┆ D15,D3    ┆ false     ┆ false     ┆ false     │
+│ D14  ┆ 2026-05-20 ┆ c_ramp_or_ ┆ 5.937153 ┆ 48      ┆ 0       ┆ 0.843397   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│      ┆            ┆ midday     ┆          ┆         ┆         ┆            ┆           ┆           ┆           ┆         ┆           ┆           ┆           ┆           ┆           ┆           ┆           ┆           │
+│ D14  ┆ 2026-06-20 ┆ b_offset   ┆ 2.962007 ┆ 48      ┆ 0       ┆ 0.655749   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D14  ┆ 2026-06-29 ┆ b_offset   ┆ 2.52106  ┆ 48      ┆ 0       ┆ 0.567373   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D16  ┆ 2026-01-17 ┆ b_offset   ┆ 10.06612 ┆ 47      ┆ 0       ┆ 0.367431   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D16  ┆ 2026-01-19 ┆ b_offset   ┆ 3.485759 ┆ 48      ┆ 0       ┆ 0.269135   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│ D16  ┆ 2026-01-20 ┆ a_block    ┆ 2.249645 ┆ 48      ┆ 1       ┆ 0.541797   ┆ 11209     ┆ 8.686947  ┆ 3.861475  ┆ false   ┆ true      ┆ 2         ┆ 2         ┆ true      ┆ D22       ┆ false     ┆ false     ┆ false     │
+│ D16  ┆ 2026-01-24 ┆ a_block    ┆ 1.708161 ┆ 48      ┆ 2       ┆ 0.580432   ┆ 11398     ┆ -7.756075 ┆ 4.5406    ┆ true    ┆ false     ┆ 2         ┆ 2         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+│ D5   ┆ 2026-04-02 ┆ c_ramp_or_ ┆ 7.6322   ┆ 48      ┆ 0       ┆ 0.579368   ┆ null      ┆ null      ┆ null      ┆ null    ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      ┆ null      │
+│      ┆            ┆ midday     ┆          ┆         ┆         ┆            ┆           ┆           ┆           ┆         ┆           ┆           ┆           ┆           ┆           ┆           ┆           ┆           │
+│ D5   ┆ 2026-04-22 ┆ a_block    ┆ 2.660693 ┆ 48      ┆ 2       ┆ 0.955475   ┆ 15630     ┆ -32.95491 ┆ 12.385837 ┆ false   ┆ false     ┆ 3         ┆ 3         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+│ D5   ┆ 2026-05-07 ┆ a_block    ┆ 3.305148 ┆ 48      ┆ 3       ┆ 0.916983   ┆ 16349     ┆ 30.042196 ┆ 9.089516  ┆ false   ┆ null      ┆ 3         ┆ 3         ┆ true      ┆ D8        ┆ false     ┆ false     ┆ false     │
+│ D5   ┆ 2026-05-20 ┆ a_block    ┆ 5.959968 ┆ 48      ┆ 1       ┆ 0.865469   ┆ 16961     ┆ 27.208428 ┆ 4.565197  ┆ false   ┆ false     ┆ 3         ┆ 3         ┆ false     ┆           ┆ false     ┆ false     ┆ false     │
+└──────┴────────────┴────────────┴──────────┴─────────┴─────────┴────────────┴───────────┴───────────┴───────────┴─────────┴───────────┴───────────┴───────────┴───────────┴───────────┴───────────┴───────────┴───────────┘
+
+Unlabelled worst days: 37 days
+  a_block: 17 (0.459, 95% Wilson 0.310 to 0.616)
+  b_offset: 15 (0.405, 95% Wilson 0.263 to 0.565)
+  c_ramp_or_midday: 4 (0.108, 95% Wilson 0.043 to 0.247)
+  mixed: 1 (0.027, 95% Wilson 0.005 to 0.138)
+
+By site:
+shape: (5, 5)
+┌──────┬─────────┬──────────┬───────┬──────────────────┐
+│ site ┆ a_block ┆ b_offset ┆ mixed ┆ c_ramp_or_midday │
+│ ---  ┆ ---     ┆ ---      ┆ ---   ┆ ---              │
+│ str  ┆ u32     ┆ u32      ┆ u32   ┆ u32              │
+╞══════╪═════════╪══════════╪═══════╪══════════════════╡
+│ D10  ┆ 6       ┆ 2        ┆ 0     ┆ 0                │
+│ D11  ┆ 0       ┆ 8        ┆ 0     ┆ 2                │
+│ D14  ┆ 6       ┆ 3        ┆ 1     ┆ 1                │
+│ D16  ┆ 2       ┆ 2        ┆ 0     ┆ 0                │
+│ D5   ┆ 3       ┆ 0        ┆ 0     ┆ 1                │
+└──────┴─────────┴──────────┴───────┴──────────────────┘
+Class (c) days with at least half the squared residual 10:00-16:00: 4 of 4
+
+Unlabelled: class (a) days 17; with a metered neighbour 17; opposite-signed neighbour step on 9 (0.529, Wilson 0.310 to 0.738)
+  fired_R2_M48: 0 of 17
+  fired_R0_M48: 0 of 17
+  fired_pair_alarm_W8: 0 of 17
+  returns within the day: 4 of 17
+  persists over the next 7 days: 1; reverts: 14; unknown: 2
+Rule: class (a) at least 19 of 37
+
+Chance rate of an opposite-signed neighbour step (each neighbour rolled by whole days, 1000 draws, 17 days): mean 0.709, 95% range 0.529 to 0.882
+
+Ordinary days (middle half by excess loss): 200 days
+  a_block: 55 (0.275, 95% Wilson 0.218 to 0.341)
+  b_offset: 32 (0.160, 95% Wilson 0.116 to 0.217)
+  c_ramp_or_midday: 62 (0.310, 95% Wilson 0.250 to 0.377)
+  mixed: 51 (0.255, 95% Wilson 0.200 to 0.320)
+
+Ordinary: class (a) days 55; with a metered neighbour 55; opposite-signed neighbour step on 27 (0.491, Wilson 0.364 to 0.619)
+  fired_R2_M48: 0 of 55
+  fired_R0_M48: 0 of 55
+  fired_pair_alarm_W8: 1 of 55
+  returns within the day: 14 of 55
+  persists over the next 7 days: 1; reverts: 50; unknown: 4
+
+Known-answer control (shape injected into ordinary days):
+shape: (4, 3)
+┌──────────────────┬─────┬────────────────────────┐
+│ injected         ┆ n   ┆ classified_as_intended │
+│ ---              ┆ --- ┆ ---                    │
+│ str              ┆ i64 ┆ i64                    │
+╞══════════════════╪═════╪════════════════════════╡
+│ a_block          ┆ 40  ┆ 24                     │
+│ b_offset         ┆ 40  ┆ 24                     │
+│ c_ramp_or_midday ┆ 40  ┆ 1                      │
+│ d_spike          ┆ 40  ┆ 3                      │
+└──────────────────┴─────┴────────────────────────┘
+
+Observed neighbour rate on unlabelled class (a) days: 0.529
+Experiment 172's known-answer control recovered 89.2% of injected days (bar 90%).

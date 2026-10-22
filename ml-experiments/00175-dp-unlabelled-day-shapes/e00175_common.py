@@ -22,6 +22,7 @@ E174_WORK_DIR: Final[Path] = (
     / "00174-dp-unlabelled-worst-days-weather-shared-or-single-site"
     / "work"
 )
+E172_WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00172-dp-error-budget-worst-days" / "work"
 E147_INTERVALS: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00147-causal-live-end-rule-for-ro-nc" / "run" / "intervals.parquet"
 )
@@ -131,14 +132,18 @@ def arm_d_masked_times(*, site: str) -> pl.Series:
 
 
 def bg2_residuals() -> dict[str, np.ndarray]:
-    """Return BG2's residual (actual minus median forecast `q50`) per D-label on the grid."""
+    """Return BG2's residual per D-label on the grid, in points of effective capacity.
+
+    BG2 stores output as a fraction of capacity, so the residual (actual minus median forecast
+    `q50`) is multiplied by 100 to match arm D's units.
+    """
     rows = pl.read_parquet(BG2_PREDICTIONS).filter(
         pl.col("actual").is_finite(),
         pl.col("lead_hours") >= D1_LEAD_HOURS[0],
         pl.col("lead_hours") < D1_LEAD_HOURS[1],
     )
     return {
-        site: _on_grid(valid_time=part["valid_time"], value=part["actual"] - part["q50"])
+        site: _on_grid(valid_time=part["valid_time"], value=100.0 * (part["actual"] - part["q50"]))
         for (site,), part in rows.group_by("site")
     }
 
@@ -182,4 +187,12 @@ def unlabelled_days() -> pl.DataFrame:
         .filter(~pl.col("labelled"))
         .select("site", "local_date", "excess_ens")
         .sort(["site", "local_date"])
+    )
+
+
+def day_excess(*, site: str) -> pl.DataFrame:
+    """Return each scored local day of a site with its excess loss, from experiment 172's days."""
+    days = pl.read_parquet(E172_WORK_DIR / "days.parquet")
+    return days.filter(pl.col("site") == site, pl.col("n_rows") >= MIN_ROWS_PER_DAY).select(
+        "site", "local_date", "excess"
     )

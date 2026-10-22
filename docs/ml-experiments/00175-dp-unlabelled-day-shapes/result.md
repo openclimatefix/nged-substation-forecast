@@ -9,7 +9,7 @@ theme: differentiable-physics-forecast-engine
 also_relevant_to:
 - switching-detectors
 - switching-labels-in-the-forecast
-status: planned
+status: done
 size: >-
   medium. Stored: private tables under data/ml-experiments/00175-dp-unlabelled-day-shapes/ only.
   Serving path: not touched. Degradation rule: not touched. Designs: more than one is defensible
@@ -65,98 +65,146 @@ metric: >-
   2025-07-03 to 2026-06-30, as in experiments 172 and 174
 code: ml-experiments/00175-dp-unlabelled-day-shapes/
 date: 2026-10-22
+verdict: refuted
+best_arm: >-
+  Not applicable (descriptive). 17 of the 37 unlabelled worst days (45.9%, 95% interval 31.0% to
+  61.6%) are sharp-edged blocks, against the 19 needed. 15 are smooth offsets (40.5%). On the 17 block
+  days, an interconnected Primary steps the opposite way within 2 hours on 52.9%, below the 70.9%
+  that rolling the neighbours by whole days gives.
+headline: >-
+  Sharp-edged blocks make up 17 of 37 unlabelled worst days (45.9%, 31.0% to 61.6%), under the 19
+  needed, and smooth offsets make up 15 (40.5%). Ordinary days reach block shape on 27.5% of days
+  and offset shape on 16.0%. An interconnected Primary steps the opposite way within 2 hours on 52.9%
+  of the block days, below the 70.9% (52.9% to 88.2%) that rolling the neighbours' residuals by
+  whole days gives. The detectors fired within 3 hours on none of the 17 block days.
+lessons:
+  - >-
+    The unlabelled worst days are two shapes about equally: sharp-edged blocks (46%) and smooth
+    same-sign offsets (41%), with offsets 2.5 times as common as on ordinary days (16%).
+  - >-
+    Interconnected neighbours show an opposite step no more often than by chance, so the
+    interconnection table does not explain these blocks.
+  - >-
+    The shape rules recover only about 60% of injected blocks and offsets and almost no injected
+    ramps or spikes, so every count is approximate.
+take_home_message: >-
+  The forecast's worst unlabelled days are roughly half sharp-edged blocks (a switching-like change
+  in the power a substation draws) and 40% smooth offsets (a change in level or behaviour that lasts
+  the day). Interconnected neighbours do not show the opposite step more often than chance would
+  give, and the existing switching detectors fired on none of the block days. A fix therefore needs
+  both a faster level adaptation for the offsets and a way to see blocks that the interconnection
+  table does not explain.
+advice:
+  - >-
+    Do not expect the interconnection table to explain unlabelled block days: an opposite-signed
+    neighbour step is no commoner than the 70.9% that rolled neighbours give (figure 2).
+  - >-
+    Treat the Kalman filter's level adaptation and a block-aware detector as separate fixes: the
+    unlabelled worst days split 17 blocks to 15 offsets (figure 1).
+  - >-
+    Read any day-shape count from rules with a known-answer control: this experiment's rules recover
+    about 60% of injected blocks and offsets and almost no ramps or spikes (known-answer control).
+production_status: not-for-production
+adopted_in: none
+pr: 1480
 ---
 
-**Planned; the write-up replaces this page when the run finishes.**
-[Experiment 174](../00174-dp-unlabelled-worst-days-weather-shared-or-single-site/result.md) left
-37 worst substation-days whose loss is mostly not weather error and not shared with other Primaries.
-This experiment asks what the forecast's error looks like on each of those days, so that the next
-experiment can target the right lever. It is descriptive: it fits no new model.
+**The forecast's worst unlabelled days are about half sharp-edged blocks and 40% smooth offsets, and
+interconnected neighbours do not explain the blocks.**
+[Experiment 174](../00174-dp-unlabelled-worst-days-weather-shared-or-single-site/result.md) left 37
+worst substation-days (five Primary substations, one year) whose forecast loss is not weather error
+and not shared with other Primaries. We took the forecast's error on each day, observed minus
+forecast power in half-hours, and sorted each day into a shape with rules fixed before any day was
+looked at: a sharp-edged block (the error jumps and stays shifted for hours, as a switching event
+would), a smooth offset (the same sign most of the day), a ramp or midday-only error, or a spike of
+1 to 3 readings. For each block day we asked whether an interconnected Primary shows a step of
+opposite sign within 2 hours (a load transfer), and whether the switching detectors fired.
 
-## Rules fixed before any day is looked at
+**The pre-registered verdict is `refuted`.** Class (a), the sharp-edged block, holds 17 of the 37
+days against the 19 needed, and a neighbour's opposite step on the block days (52.9%) is below what
+rolling the neighbours' residuals by whole days gives (70.9%), so the second half failed the
+excess-over-chance rule. Two cautions apply. The shape rules recover only about 60% of injected
+blocks, so 17 against 19 does not exclude a majority of blocks. The block count is also well above
+ordinary days (27.5%), so switching-like days are over-represented among the worst days.
+[Experiment 172](../00172-dp-error-budget-worst-days/result.md)'s own known-answer control
+recovered 89.2% of injected days against a 90% bar, so every share here is approximate. This
+experiment fits no new forecast model.
 
-The residual of a day is arm D's observed minus forecast value at each half-hour of the D+1 band
-(lead 15 to 39 hours). Arm D is experiment 155's convex demand model with a Kalman filter, driven
-by the ensemble-mean weather forecast. The residual series is continuous across midnight, so a
-window can cross a day boundary, and a window counts clock positions (half-hours), so a window
-holds fewer valid readings where rows are missing. Missing half-hours (the hand-filtered switching
-rows) are skipped, not filled. The **day-before spread** `s` is 1.4826 times the median absolute
-deviation of the previous local day's residual (at least 24 valid readings), floored at the 10th
-percentile of that substation's daily spreads over the scored year; when the previous day has fewer
-than 24 valid readings, the nearest earlier day within 7 days that has enough is used, then the
-floor. A day is classified by the first rule that holds, in the order a, d, b, c; a day matching
-none is "mixed".
+![Share of days in each error shape, unlabelled worst days against ordinary days](fig1_classes.svg)
 
-- **Edge test.** At half-hour `t`, the jump is the median of the 2 readings from `t` minus the
-  median of the 2 readings before `t` (at least 1 valid reading each side), and the shift is the
-  same difference for 8 readings each side (at least 4 valid each side). An edge needs `|jump| > 3
-  s`, `|shift| > 3 s`, the same sign for both, and `|jump| >= |shift| / 2` (the step is sharp, not
-  a ramp). Consecutive qualifying half-hours within 1 hour merge into the one with the largest
-  `|shift|`. The day's primary edge is the merged edge with the largest `|shift| / s`.
-- **(a) Sharp-edged block.** The day has at least one edge. The block "returns" when a later edge in
-  the same local day has the opposite sign and `|shift|` at least half the primary edge's;
-  otherwise it "stays shifted". A block that starts before the day's first half-hour is not found,
-  and a block that straddles midnight is counted as returning only if the return falls in the same
-  local day as the primary edge.
-- **(d) Spike.** Not (a), and the number of readings in the whole day lying more than 4 s from the
-  day's median residual is between 1 and 3, and those readings account for at least half of the
-  day's summed absolute deviation from that median.
-- **(b) Smooth same-sign offset.** Not (a) or (d), the day's median residual exceeds 1 s in
-  magnitude, and at least 75% of the day's valid readings share its sign.
-- **(c) Ramp or midday-only error.** Not (a), (d), or (b), and either the readings from 10:00 to
-  16:00 local time account for at least half of the day's summed squared residual, or the day's
-  residual after a 6-reading rolling median never moves against its overall direction by more than
-  0.5 s between neighbouring readings and its range exceeds 2 s. The two parts are reported
-  separately within class (c).
-- **Neighbour check, class (a) days only.** The neighbours are the Primaries joined to the
-  substation's Primary by NGED's interconnection table that have a forecast from BG2 (the
-  production-style XGBoost blend of experiment 87), using its median forecast. A neighbour's
-  residual is observed minus that median, with the neighbour's own day-before spread `s_n`. A
-  neighbour shows an opposite-signed step when its 8-reading shift, at any half-hour within 2 hours
-  of any edge of the substation's day, exceeds 2 `s_n` with the sign opposite to that edge's shift.
-  A class (a) day with no neighbour that has a BG2 forecast is left out of the second half's
-  denominator. The chance rate rolls each neighbour's residual and spread series by a random whole
-  number of days from 1 to 90 (circular, separately per neighbour), 1,000 draws, and compares the
-  observed rate with the mean over draws. The same rate is also computed on ordinary days that
-  have an edge, as a second null.
-- **Detectors.** The detector "fired" on a class (a) day when a stored onset for that series lies
-  within 3 hours either side of the primary edge. Three tables are read: the refit-offset
-  neighbour-count detector (RO-NC, called XL in experiment 82; the detector of experiments 141
-  and 147) with the causal-live end rule R2 and 48-hour merging, the same detector with the
-  hindsight end rule R0 and 48-hour merging (both from experiment 147), and the pair alarm of
-  experiment 156 (4-hour window). The share of ordinary days with an onset within 3 hours of
-  any half-hour is reported as the base rate.
-- **Persistence.** The step "persists" when the median of the daily median residuals over the 7
-  local days after the primary edge's day, minus the same median over the 7 days before it, has the
-  sign of the step and at least half its size. The days need at least 24 valid readings each, and
-  at least 3 of the 7 on each side must qualify, otherwise the result is "unknown". The residual
-  comes from a forecast whose Kalman filter adapts to a level shift, so persistence of the real
-  step is understated.
-- **Ordinary days.** For each of the five substations, 40 days drawn at random (seed 175) from the
-  days whose excess loss is between the 25th and 75th percentile of its scored days, with at least
-  24 valid readings.
-- **Known-answer control.** A synthetic error is added to the arm D residual of 40 ordinary days
-  per class: a block of 3 `s` lasting 6 hours with a sharp edge (class a), a constant offset of 2
-  `s` over the day (b), a linear ramp from 0 to 4 `s` over the day (c), and a spike of 3 readings
-  of 6 `s` (d). The control reports the share of injected days classified as intended; the plan
-  does not set a bar, and the write-up reads the real counts as approximate by the recovery rate.
+![Share of block days with an opposite-signed neighbour step, against rolling the neighbours by days](fig2_neighbour.svg)
 
-## Outputs
+Figures 3 to 6 show every one of the 37 days, one panel each, grouped by substation:
 
-- Class counts with Wilson intervals, the same split by substation, and the same split for
-  ordinary days.
-- The neighbour-step share next to the shifted-neighbour chance rate and the ordinary-day rate.
-- Detector, pair-alarm, return, and persistence tallies for the class (a) days.
-- A compact multi-panel SVG set, one panel per day for all 37 days (residual, hand-filtered
-  readings, detector intervals, and the neighbours' residual), using D-labels only.
-- Experiment 172's control recovery (89.2%), quoted so that all shares read as approximate.
+![The 8 days at D10](fig3_days_d10.svg)
 
-## Audit and sizing
+![The 10 days at D11](fig4_days_d11.svg)
 
-- **Audit triggers:** the known-answer control above can fail. Trigger 2 (a result contradicting
-  its own prediction or an earlier experiment, without an explanation tested in the write-up)
-  fires if class (a) holds fewer than 19 days, because experiments 141 and 147 expected switching
-  to be common; the session records an explanation tested in the write-up, and asks for an audit
-  only if the shifted-neighbour rate contradicts the observed rate.
-- **Reviews:** one Sonnet plan review (done), one Sonnet code review, one Sonnet review of the
-  write-up against the printed report, one Sonnet prose review. No Opus.
+![The 11 days at D14](fig5_days_d14.svg)
+
+![The 8 days at D16 and D5](fig6_days_d16_d5.svg)
+
+## Results
+
+- **Shape counts (37 days):** sharp-edged block 17 (45.9%, 95% Wilson interval 31.0% to 61.6%),
+  smooth offset 15 (40.5%, 26.3% to 56.5%), ramp or midday-only 4 (10.8%), none of the four 1,
+  spike 0. All 4 ramp days put at least half their squared residual in 10:00 to 16:00.
+- **By substation:** D10 6 blocks and 2 offsets; D11 0 blocks, 8 offsets, and 2 ramps; D14 6 blocks,
+  3 offsets, 1 ramp, 1 none; D16 2 blocks and 2 offsets; D5 3 blocks and 1 ramp.
+- **Ordinary days (200 days, 40 per substation from the middle half by excess loss):** block 27.5%
+  (21.8% to 34.1%), offset 16.0%, ramp or midday-only 31.0%, none of the four 25.5%.
+- **Neighbour step on the block days:** all 17 block days have at least one neighbour with a BG2
+  forecast. 9 show an opposite-signed step within 2 hours (52.9%, 31.0% to 73.8%). Rolling each
+  neighbour's residuals by 1 to 90 whole days (1,000 draws) gives a mean of 70.9% (95% range 52.9%
+  to 88.2%). The 55 ordinary-day blocks give 49.1% (36.4% to 61.9%). The neighbour test is lenient
+  (2 spreads, 8 candidate times, a noisy neighbour forecast), so chance is high.
+- **Detectors on the 17 block days:** the refit-offset neighbour-count detector (RO-NC, called XL in
+  experiment 82; experiments 141 and 147) fired within 3 hours of the edge on 0 with either the
+  causal-live end rule (R2) or the hindsight end rule (R0), and the pair alarm of experiment 156
+  on 0. The five substations have 2 to 26 RO-NC onsets over the whole stored history, and the
+  ordinary-day base rate is 0 of 55 for RO-NC and 1 of 55 for the pair alarm.
+- **Return and persistence:** 4 of the 17 blocks return within the local day. The step persists over
+  the following 7 days on 1 of 17 and reverts on 14 (2 unknown), but the Kalman filter inside arm D
+  adapts to a level shift, so persistence of the real step is understated. Ordinary-day blocks
+  persist on 1 of 55.
+- **Known-answer control** (a shape added to 40 ordinary days each): intended class recovered on
+  24 of 40 injected blocks, 24 of 40 offsets, 1 of 40 ramps, and 3 of 40 spikes. Blocks and offsets
+  are found about 60% of the time, and ramps and spikes are almost always classed otherwise, so
+  the ramp and spike counts are lower bounds and every count is approximate.
+
+## Checks
+
+- **Median forecast minus mean forecast, per site:** 0.0 points at every substation, as in
+  experiments 172 and 174 (the arm D quantile forecast has its median equal to its mean).
+- **Mean-forecast error beside the quantile score:** not applicable; no score is contrasted here.
+- **Audit triggers:** trigger 2 (a result contradicting its own prediction) fired, because class (a)
+  holds 17 days against the predicted 19 to 28. The explanations tested are the ordinary-day rate
+  (27.5%, so blocks are over-represented) and the known-answer control (about 60% recovery, so the
+  shortfall of 2 days is inside the classifier's miss rate). Neither contradicts the neighbour
+  result, which points the same way, so no audit was requested.
+
+## Method and caveats
+
+- **Row set:** `fold_a_daily_gap_v1`, experiment 155's arm D (a convex demand model with a Kalman
+  filter, driven by the ensemble-mean weather forecast), D+1 band (lead 15 to 39 hours),
+  hand-filtered switching rows left out, 2025-07-03 to 2026-06-30. Weather at forecast time is the
+  ensemble forecast, so nothing here uses weather that arrives late.
+- **Rules:** fixed in the plan commit of this pull request before any day was looked at, and
+  coded in `e00175_classify.py`. A day is a block when its residual has a jump of more than 3
+  day-before spreads within 1 hour that lasts 4 hours. The classes are tested in the order block,
+  spike, offset, ramp or midday-only.
+- **Neighbours:** Primaries joined to the substation's Primary by NGED's interconnection table that
+  have a BG2 forecast (experiment 87, 16 series). BG2's residual is observed minus its median
+  forecast, in the same points of effective capacity as arm D, and it has no switching mask.
+- **Block edge at the day boundary:** a block that starts before the day's first half-hour is not
+  found, and the 8-reading windows need at least 4 valid readings on each side.
+- **One year, five substations:** the denominators are small (17 block days), so the 95% intervals
+  are wide (about 30 points).
+
+## What to try next
+
+- Read the 17 block days against NGED's switching logs (`Switching Logs.xlsx` in the hierarchy
+  folder), to see which blocks are logged switching that the detectors missed and which are
+  unlogged.
+- Test a faster level adaptation in the Kalman filter on the 15 offset days, which are 2.5 times as
+  common as on ordinary days and concentrated at D11 (8 of 10 days).

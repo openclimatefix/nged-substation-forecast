@@ -165,6 +165,13 @@ def _is_offset(*, day: np.ndarray, scale: float) -> bool:
     return bool(abs(median) > OFFSET_FACTOR * scale and same_sign >= OFFSET_SIGN_SHARE)
 
 
+def midday_share(*, day: np.ndarray, hours: np.ndarray) -> float:
+    """Return the share of the day's summed squared residual from 10:00 to 16:00 local time."""
+    squared = np.where(np.isfinite(day), day, 0.0) ** 2
+    midday = (hours >= MIDDAY_HOURS[0]) & (hours < MIDDAY_HOURS[1])
+    return float(squared[midday].sum() / squared.sum()) if squared.sum() > 0 else 0.0
+
+
 def _is_ramp_or_midday(*, day: np.ndarray, hours: np.ndarray, scale: float) -> bool:
     valid = np.isfinite(day)
     if valid.sum() < 2:
