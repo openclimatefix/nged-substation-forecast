@@ -1,8 +1,9 @@
 # Market and other data
 
-**Experiments hold public price, demand, solar, and carbon data, and none of it has yet improved a
-forecast of NGED's series by a margin that survived its control.** This page lists each source, what
-it is for, when its values become known, and where it sits on disk. The price series are described in
+**Experiments hold public price, demand, solar, and carbon data, and no experiment has yet found a
+source that improved a forecast of NGED's series by more than the experiment's decision
+threshold.** This page lists each source, what it is for, when its values become known, and where it
+sits on disk. The price series are described in
 full on the [GB price data page](../../background/gb-price-data-and-ancillary-markets.md) and in the
 [data sources page](../../roadmap/data-sources.md#electricity-price-data).
 
@@ -18,11 +19,11 @@ full on the [GB price data page](../../background/gb-price-data-and-ancillary-ma
 | Frequency | `elexon_frequency` | 15-second values and a half-hourly summary | Not checked |
 | Bid, offer, and notification data | `elexon_bod`, `elexon_boalf`, `elexon_pn`, `elexon_mels` | Per Balancing Mechanism Unit | Within minutes, for gate-closed periods |
 | Carbon intensity | `carbon_intensity` | National forecast and actual, grams per kWh | Forecast up to 2 days ahead |
-| PV_Live | `pv_live`, `pv_live_gsp` | Sheffield Solar's estimate of solar generation | Not checked |
-| Octopus Agile | `octopus_agile_east_midlands` | Half-hourly import tariff, East Midlands | Not checked |
+| PV_Live | `pv_live`, `pv_live_gsp` | Sheffield Solar's estimate of solar generation | Revised after first publication; `updated_at` gives the last revision |
+| Octopus Agile | `octopus_agile_east_midlands` | Half-hourly import tariff, East Midlands | The afternoon before the delivery day |
 
 The "known when" column digests the [publication table](../../roadmap/data-sources.md#when-each-series-is-published)
-and the folders' READMEs (docs, disk).
+and the folders' READMEs (docs, disk). Nothing we hold says when the frequency series is published.
 
 ## Timestamps and coverage
 
@@ -40,24 +41,27 @@ and the folders' READMEs (docs, disk).
   archive ends on 2026-03-27 and is stored as `dfs_service_requirement.csv` under
   `data/ml-experiments/00177-*/public/` (exp 185; 1,231 days with a record; disk).
 - **Each licence's attribution wording applies wherever the data is shown** (docs).
-- **Elexon's indicated demand and generation reach at most 42 hours ahead, and no table maps their
-  regions to NGED's licence areas**, so neither is a ready input
+- **Elexon's indicated demand and generation reach at most 42 hours ahead, and the study found no
+  table that maps their regions to NGED's licence areas**, so neither is a ready input
   ([study](../../studies/indgen-inddem-and-gsp-take.md); docs).
 
 ## Price features tried
 
-- **A price at the target half-hour lowered the pooled Primary score by 0.52 points of capacity in the
+- **A price at the target half-hour lowered the pooled error by 0.52 points of capacity in the
   selection year and 0.18 in the confirmation year (interval included zero), and a price from
-  another week matched about 0.45 of the 0.52** (exp 15; Primaries, two years; provisional).
-- **Lagged prices did no better** (exp 10; Primaries and one battery site, two years; provisional).
-- **Price changes added to the price level lowered the score by 0.037 and 0.050 points of capacity,
-  against 0.039 and 0.047 for changes from another week.** The experiment's verdict was `small
-  gain`, and the demand-inputs theme does not adopt it (exp 25; Primaries, two years; provisional).
-  See the [demand inputs theme](../themes/demand-inputs/index.md).
+  another week matched about 0.45 of the 0.52** (exp 15; pooled series, two years; provisional).
+- **Lagged prices gave no gain that survived the confirmation year.** A shuffled price from another
+  week reproduced most of the selection-year gain at the one battery-affected substation (exp 10; 2
+  listed substations, two years; provisional).
+- **Adding price changes to the price level lowered the error by 0.037 and 0.050 points of
+  capacity, and by 0.039 and 0.047 against changes taken from another week.** The verdict was
+  `small gain`, under the 0.1-point threshold, and the demand-inputs theme does not adopt it (exp
+  25; Primaries, two years; provisional). See the [demand inputs
+  theme](../themes/demand-inputs/index.md).
 - **National system price, DFS events, national demand, wind, solar, and interconnector flow each
   explain under 1% of the day-to-day variation in the best-guess forecast's loss.** Giving the
-  Kalman filter the signal in hindsight made the score slightly worse (exp 185; the 37 worst days, one
-  year; provisional).
+  Kalman filter the signal in hindsight made the score slightly worse (exp 185; 5 substations, 1,683
+  substation-days of one scored year; provisional).
 - **Modelling a price-following asset in the history did not improve the forecast at D8 or D14.** The
   ceiling with the true price gained 0.6% at D8 (exp 191; 2 Primaries; provisional).
 - **PV_Live lags at the two grid supply points gave no resolved gain** (-0.03 points of capacity;
@@ -67,4 +71,4 @@ and the folders' READMEs (docs, disk).
 - **Add a placebo twin to every price input**, a copy with the right level and the wrong timing
   (exp 10, 15; Primaries; provisional).
 
-Last checked against experiment 183.
+Last checked against experiment 218.
