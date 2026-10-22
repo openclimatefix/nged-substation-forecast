@@ -434,6 +434,14 @@ provisional until the experiment has had its reviews.
 
 ## Wind farms
 
+**Do not compute air density from the ECMWF ensemble's surface pressure for a model trained on ERA5
+surface pressure (provisional, medium confidence).** *Applies to: experiments and production.* The
+ensemble's surface pressure at the three metered wind farms is 0.7 to 7.0 hPa above ERA5's in the
+monthly mean (about +2.7 hPa on average, because the two products use different terrain heights),
+and a density column built from the ensemble pressure scored 0.049 points worse than temperature
+alone (95% interval 0.015 to 0.091). Evidence: [experiment
+256](00256-wind-temperature-density-shear-columns/result.md), three farms, July 2025 to June 2026.
+
 **Drop the rows in `mask.parquet` of experiment 210 before training or scoring on the three metered
 wind farms, and do not expect ERA5 wind speed alone to find idle rows (provisional, medium
 confidence).** *Applies to: experiments.* The idle floor is a set of near-zero readings with
