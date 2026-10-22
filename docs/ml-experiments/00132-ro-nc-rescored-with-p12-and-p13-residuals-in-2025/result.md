@@ -1,7 +1,7 @@
 ---
 id: "00132"
 slug: ro-nc-rescored-with-p12-and-p13-residuals-in-2025
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

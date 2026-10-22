@@ -86,7 +86,7 @@ adopted_in: none
 boosters: data/ml-experiments/00089-sw2-22-longest-history-nra-forecast-with-ara-lags-masked/work/boosters/
 ---
 
-# Experiment 89: does the longest history, with switching masked, improve the NRA forecast?
+# Experiment 89: does the longest history, with load shifts masked, improve the NRA forecast?
 
 **Take-home message: hiding the past power readings (lags) that were measured while the electricity
 network was switched away from its normal arrangement made the demand forecast for Primary

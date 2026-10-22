@@ -30,7 +30,7 @@ started. A folder holds `result.md` and its figures.
   to refit the XGBoost models, and how much training history to give them.
 - **[Solar disaggregation](themes/solar-disaggregation/index.md):** Separating embedded solar from
   substation demand.
-- **[Switching detectors](themes/switching-detectors/index.md):** Detecting load transfers between
+- **[Switching detectors](themes/lsc-detectors/index.md):** Detecting load transfers between
   substations, called switching events, from power data alone.
 - **[Switching labels in the forecast](themes/switching-labels-in-the-forecast/index.md):** Using
   switching labels to forecast the demand under the normal running arrangement.

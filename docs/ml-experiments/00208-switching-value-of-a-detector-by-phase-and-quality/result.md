@@ -4,7 +4,7 @@ slug: switching-value-of-a-detector-by-phase-and-quality
 title: >-
   When does the forecast benefit from knowing about switching transfers, and what is a better or
   worse detector worth?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

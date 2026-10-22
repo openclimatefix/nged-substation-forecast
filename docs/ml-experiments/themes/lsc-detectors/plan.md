@@ -1,4 +1,4 @@
-# Switching detectors: research plan
+# LSC detectors: research plan
 
 **A lower number in the "Priority" column runs sooner.**
 
