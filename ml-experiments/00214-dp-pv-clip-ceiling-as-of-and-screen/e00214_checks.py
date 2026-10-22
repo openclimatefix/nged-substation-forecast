@@ -21,9 +21,13 @@ def main() -> None:
     same_rows = new.shape == old.shape
     print("reproduction: same shape", same_rows)
     for column in ("q50", "q99"):
-        print(f"  max |new - old| in {column}:", float((new[column] - old[column]).abs().max()))
+        print(
+            f"  max |new - old| in {column}:",
+            float((new[column] - old[column]).abs().to_numpy().max()),
+        )
     print(
-        "stage-2 mean equals q50 (max |mean - q50|):", float((new["mean"] - new["q50"]).abs().max())
+        "stage-2 mean equals q50 (max |mean - q50|):",
+        float((new["mean"] - new["q50"]).abs().to_numpy().max()),
     )
     cache = common.load_cache()
     bg2 = pl.read_parquet(score.BG2_PATH)
