@@ -26,41 +26,47 @@ hypothesis: >-
   is still better than the frozen model.
 prediction: >-
   Written before any score is read. Scored over leads 0.5 to 168 hours at the five decision
-  substations, a gap ending at the forecast's data cutoff. Rule (a), coast, beats rule (c), the
-  frozen GAM, by at least 0.05 points for gaps of 3 and 6 hours, and loses to rule (c) at 72 hours,
-  so the crossover lies between 6 and 72 hours. Recovery after a 24-hour gap, which is the number of
-  hours between the readings returning and the score being back within 0.02 points of the no-gap
-  score, is under 12 hours. Rule (b), coast with widened bands, has q05 and q95 coverage closer to
-  the nominal 5% and 95% than rule (a) at 24 and 72 hours, and a quantile score no more than 0.01
-  points worse than rule (a) at 3 and 6 hours. If rule (a) never loses to rule (c), the serving rule
-  is to always coast.
+  substations, with a gap that ends at the forecast's data cutoff. Rule (a), coast, beats rule (c2),
+  the same pipeline with the filter dropped, by at least 0.05 points for gaps of 3 and 6 hours, and
+  loses to it at 72 hours, so a crossover lies between 6 and 72 hours. Rule (a) also beats rule (c),
+  the frozen GAM alone, at 3 and 6 hours by more than it beats (c2). After a 24-hour gap the score
+  is back within 0.02 points of the no-gap score at k = 6 hours or less, where k is the number of
+  hours between the gap's end and the cutoff. Rule (b), coast with widened bands, has q05 and q95
+  coverage closer to nominal than rule (a) at 24 and 72 hours, and a quantile score no more than
+  0.01 points worse than rule (a) at every length. If rule (a) never loses to rule (c2), the serving
+  rule is to always coast.
 decision_rule: >-
-  The headline contrasts are C1 to C4, rule (a) minus rule (c) at gap lengths of 3, 6, 24, and 72
-  hours, and C5 to C8, rule (b) minus rule (a) at the same lengths, on the full pipeline of
-  experiment 155's arm D (the filter, the winter night offset, and recipe R) for rules (a) and (b),
-  and on the frozen GAM alone for rule (c). Each is read at the 99.375% level of the month-resampled
-  paired bootstrap (12 calendar months of the origins, 20,000 resamples), which is 95% across the
-  eight contrasts. The crossover exists when C1 and C2 have point estimates of at most -0.05 with
-  intervals wholly below zero, and C4 has an interval wholly above zero; the crossover gap length is
-  the shortest tested length at which the interval of C1 to C4 is wholly above zero. The hypothesis
-  is `supported` when the crossover exists and the recovery after a 24-hour gap is under 12 hours.
-  It is `partly supported` when C1 and C2 hold but C4's interval is not wholly above zero, in which
-  case the serving rule is to always coast, and this is the finding. It is `refuted` when C1 or C2
-  has an interval not wholly below zero. It is `inconclusive` otherwise. The recovery of a rule is
-  the smallest tested k (the hours between the end of the gap and the cutoff, among 0, 3, 6, 12, 24,
-  and 48) at which the all-lead score minus the no-gap score is at most 0.02 points at that k and at
-  every larger tested k. Rule (b) replaces rule (a) in the recommendation when its mean absolute
-  distance of q05 and q95 coverage from nominal is smaller at gap lengths of 24 and 72 hours and its
-  score minus rule (a)'s is at most +0.01 at every length. A switch from coasting to the frozen GAM
-  adds a branch to the serving path, so a crossover is recommended only when rule (c) beats rule (a)
-  by at least 0.02 points at some tested length; otherwise the recommendation is to always coast.
-  The verdict is capped at `inconclusive` if the control fails: with no gap injected, the pipeline
-  must reproduce experiment 155's arm D on the same rows to within 0.001 points, and a rule (a)
-  forecast with a gap of 0 hours must equal it exactly.
+  Headline family: C1 to C4, rule (a) minus rule (c2) at gap lengths of 3, 6, 24, and 72 hours, and
+  C5 to C8, rule (b) minus rule (a) at the same lengths, all at k = 0, over leads 0.5 to 168 hours,
+  pooled over D5, D10, D11, D14, and D16. Rule (c2) is the comparator because it differs from rule
+  (a) only by the filter; rule (c), the frozen GAM alone, is reported as an absolute floor and its
+  contrasts are descriptive. Each headline contrast is read at the 99.375% level of the
+  month-resampled paired bootstrap (the 12 calendar months of the origins, 20,000 resamples), which
+  is 95% across the eight contrasts; everything else (recovery, coverage, per-substation and
+  under-24-hour views) is descriptive. A contrast is `below` when its interval is wholly below zero,
+  `above` when wholly above zero, and `straddling` otherwise. The hypothesis is `supported` when C1
+  and C2 are `below` with point estimates of at most -0.05, the crossover exists, and the recovery
+  after a 24-hour gap is at most 6 hours. The crossover is the smallest tested length L* such that C
+  at L* and at every longer tested length is `above`. It is `partly supported` when C1 and C2 hold
+  as above but no crossover exists; the serving rule is then to always coast, and that is the
+  finding. It is `refuted` when C1 or C2 is `above` or has a point estimate of zero or more. It is
+  `inconclusive` otherwise, including when C1 or C2 is `straddling` or `below` with a point estimate
+  above -0.05. The recovery of a rule at gap length L is the smallest tested k (0, 3, 6, 12, 24, or
+  48) at which the all-lead score minus the no-gap score is at most 0.02 points at that k and every
+  larger tested k; a rule that has not recovered by k = 48 fails. Recovery is reported for L = 24 on
+  the all-lead and the under-24-hour scores, and the verdict reads the all-lead one. The serving
+  recommendation is a separate line: switch from coasting to dropping the filter only if a crossover
+  exists and (c2) beats (a) by at least 0.02 points at L*, because the switch adds a branch to the
+  serving path; otherwise always coast. Rule (b) replaces rule (a) when its mean absolute distance
+  of q05 and q95 coverage from nominal is smaller at 24 and 72 hours by more than the binomial
+  standard error of the difference, and its score minus rule (a)'s is at most +0.01 at every length.
+  The verdict is capped at `inconclusive` if a control fails: with no gap the rebuilt rule (a)
+  reproduces experiment 155's arm D to within 0.001 points on the mean forecast; replacing the
+  actuals hidden in a gap by random numbers leaves every output unchanged; and rule (b) with the
+  extra variance set to zero equals rule (a) exactly.
 benchmark: >-
-  The no-gap score of the same runs under the same pipeline (arm D of experiment 155, rebuilt here),
-  the frozen GAM alone (rule c), and climatology and manual_heuristic as stored by experiment 111
-  for absolute skill
+  The no-gap score of the same event runs under the same pipeline (arm D of experiment 155, rebuilt
+  here), rule (c2), and the frozen GAM alone (rule c)
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Quantile score (twice the mean pinball loss over the 11 quantiles of experiment 87) in points of
@@ -89,24 +95,37 @@ a gap length exists beyond which the filter should be dropped.
   full pipeline is the arm D of [experiment
   155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the filter, the
   winter night offset, and recipe R (minus 0.75 times the 14-day mean error profile).
-- **Events.** For each substation, one run per 7-day block of origins is chosen at random (seed 205)
-  from the replicate and scored runs, so the events are at least a few days apart and one event's
-  gap hardly touches the next. The same events are used for every gap length.
-- **Gap.** The readings of every hour band are removed for the L hours up to k hours before the
-  event run's data cutoff, with L in {3, 6, 24, 72} and k in {0, 3, 6, 12, 24, 48}. All 24
-  combinations are scored. Headline contrasts use k = 0, the gap that ends at the cutoff. Larger k
-  measure recovery. Actuals inside a gap are also hidden from recipe R's error profile.
-- **Rules.** (a) Coast: the filter runs on the gapped stream, so the transient decays and the level
-  holds, then the offset and R apply. (b) Coast with widened bands: rule (a)'s quantile offsets from
-  its mean are multiplied by sqrt(1 + v / s^2), where v is the filter's extra predictive variance
-  since the band's last reading (the level's q per day times the days elapsed, plus the transient's
-  stationary variance times 1 - phi^(2 n) for n half-hours elapsed, minus the same at one half-hour)
-  and s is (q95 - q05) / 3.29 of the row. (c) Frozen GAM alone: the unfiltered forecast with a
-  spread refitted on the tuning months, with no filter, offset, or R. Secondary rules: (a0) and (b0)
-  are (a) and (b) with the filter alone, no offset or R. (c2) is the frozen GAM with the offset and
-  R, which keeps the later corrections but drops the filter for the event run.
-- **Scored.** Five decision substations, D5, D10, D11, D14, and D16, with leads 0.5 to 168 hours.
-  Spread tables are fitted on the tuning months, with no gap, and held fixed.
+- **Events.** For each substation the origins of the replicate and scored runs (excluding the
+  every-fifth-day stride runs and any origin before 2024-07-16) are cut into blocks of 8 days, and
+  one run is drawn at random (seed 205) from the first 3 days of each block, so two events are at
+  least 6 days apart and no gap window reaches the previous event's cutoff. The same event runs are
+  used for every gap length and rule.
+- **Gap.** The readings of all four hour bands are removed for the L hours up to k hours before the
+  event run's data cutoff, with L in {3, 6, 24, 72} and k in {0, 3, 6, 12, 24, 48}; all 24
+  combinations are scored, and the headline contrasts use k = 0. One filter pass per (substation, L,
+  k) applies the gaps of all that substation's events together, which is equivalent to one pass per
+  event because the windows do not overlap.
+- **What each stage sees.** The filter reads the gapped stream. The winter night offset and the
+  spread table are fitted on the tuning months of the no-gap forecasts and held fixed, because no
+  gap falls in a tuning month. Recipe R is recomputed from the gapped timeline: it uses the errors
+  of the earlier runs from the gapped filter, and the actuals whose valid time falls inside any gap
+  are hidden from its error blocks (a block with fewer than 40 readings is unusable, as in
+  experiment 155). Scoring reads the true actuals of the event run's own rows, which all fall after
+  its origin.
+- **Rules.** Each rule's offset, R profile, and spread come from that rule's own forecast errors.
+  (a) Coast: the gapped filter, then the offset and R. (b) Coast with widened bands: rule (a)'s 11
+  quantiles with their offsets from the mean multiplied by sqrt(1 + v / s^2), where s = (q95 - q05)
+  / 3.29 of the row, in points, and v is the extra predictive variance of the level and transient,
+  in points squared, over the no-gap filter at the same cutoff. With n and n0 the half-hours from
+  the target band's last reading to the cutoff in the gapped and the no-gap stream, v = max(0, w(n)
+  - w(n0)), where w(n) = q n / 48 + sigma_z^2 (1 - phi^(2n)) / (1 - phi^2), using the single pooled
+  setting (q, phi, sigma_z) of experiment 133 that arm A uses. (c2) The no-gap pipeline with the
+  filter dropped for all runs: the frozen GAM plus its own offset and R. (c) The frozen GAM alone,
+  with a spread refitted on its tuning months, no offset and no R. Secondary: (a0) and (b0) are (a)
+  and (b) with the filter alone, no offset and no R, spread refitted on the filtered tuning errors.
+- **Scored.** Five decision substations, D5, D10, D11, D14, and D16, over leads 0.5 to 168 hours,
+  then under 24 hours and 12 to 36 hours; per-substation contrasts and the number of events per
+  substation and length are reported beside the pooled ones.
 - **Compute.** CPU only, 4 cores, no new fit; the filter re-runs on a masked stream per (substation,
   L, k).
 
