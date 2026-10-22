@@ -184,14 +184,12 @@ def print_numbers(*, table: pl.DataFrame) -> None:
         )
         print("Curve of all five farms (mean 1) and the range of the farms' own monthly scales")
         print(mean_curve)
+        factors = mean_curve["mean"].to_numpy()
         print(
             "largest over smallest factor:",
-            float(mean_curve["mean"].max() / mean_curve["mean"].min()),
+            float(factors.max() / factors.min()),
             "; April to September only:",
-            float(
-                mean_curve.filter(pl.col("month").is_between(4, 9))["mean"].max()
-                / mean_curve.filter(pl.col("month").is_between(4, 9))["mean"].min()
-            ),
+            float(factors[3:9].max() / factors[3:9].min()),
         )
         own = pl.read_parquet(common.WORK_DIR / "own_site.parquet")
         print("Own-site share of squared output explained, per farm")
