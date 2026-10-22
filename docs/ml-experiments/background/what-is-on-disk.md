@@ -9,11 +9,11 @@ the machine.
 
 - **`studies.sources.REPO_DATA_DIR` points at the main checkout's `data/` from any worktree.**
   Set the `DATA_PATH_INTERNAL` environment variable to override it. A remote URI is not supported
-  in these scripts.
+  in these scripts (disk).
 - **Only one agent may re-run a published study script at a time.** All worktrees share the folder,
-  so a second agent's re-run overwrites the first agent's evidence.
+  so a second agent's re-run overwrites the first agent's evidence (disk).
 - **Name the path through the constants in `studies.sources`**: `STUDIES_DATA_DIR`,
-  `ML_EXPERIMENTS_DATA_DIR`, `DOWNLOADS_DIR`, and the four download folders below.
+  `ML_EXPERIMENTS_DATA_DIR`, `DOWNLOADS_DIR`, and the four download folders below (disk).
 
 ## Production outputs
 
@@ -21,9 +21,9 @@ These are written by the Dagster application, not by experiments.
 
 | Folder | Holds | How to read |
 |---|---|---|
-| `data/NGED/power_time_series.delta` | Raw power telemetry, appended from NGED's S3 bucket | Only for availability questions; see [NGED power telemetry](nged-power-telemetry.md#raw-and-cleaned-tables) |
+| `data/NGED/power_time_series.delta` | Raw power telemetry, appended from NGED's S3 bucket | See [NGED power telemetry](nged-power-telemetry.md#raw-and-cleaned-tables) |
 | `data/NGED/cleaned_power_time_series.delta` | The raw rows plus a `drop_reason` column | `studies.power.scan_power` |
-| `data/NGED/metadata.parquet` | The `TimeSeriesMetadata` table (33 rows, 32 series with data) | `pl.read_parquet` |
+| `data/NGED/metadata.parquet` | The `TimeSeriesMetadata` table | `pl.read_parquet` |
 | `data/NGED/list_of_downloaded_files.parquet` | Which NGED files the ingest has downloaded | Ingest bookkeeping |
 | `data/NWP/` | The ECMWF ENS Delta table, from 2024-04-01 | `delta_store.nwp`; see [weather inputs](weather-inputs-by-product.md#ecmwf-ens) |
 | `data/h3_grid_weights.parquet` | Fractional H3 cell overlap with the Great Britain boundary | Spatial NWP aggregation |
@@ -32,12 +32,10 @@ These are written by the Dagster application, not by experiments.
 | `data/power_forecasts/`, `data/forecast_metrics/` | Stored cross-validation forecasts and metrics for `manual_heuristic`, `climatology`, and `xgboost_baseline` | Delta, partitioned by `experiment_name` |
 | `data/production_model/` | The promoted production model | `BaseForecaster.load` |
 
-- **`data/NWP-polar-backup-issue-525/` is a backup copy of the NWP table** made for issue 525. No
-  experiment reads it.
 - **The hierarchy files sit in `data/NGED/substation_hierarchy_2026-10-15/`.** The folder holds
   `Substations.csv`, `Primary Substation Interconnections.csv`, `Monitor Direction.csv`,
   `Peak Loads.xlsx`, `Switching Logs.xlsx`, and a `README.md`. They are private. The folder's
-  README says the switching logs and peak loads were not examined when it was written.
+  README says the switching logs and peak loads were not examined when it was written (disk).
 
 ## Studies
 
@@ -52,31 +50,26 @@ These are written by the Dagster application, not by experiments.
 | `market/` | About 30 folders of Elexon, NESO, Octopus Agile, carbon-intensity, and PV_Live data |
 
 - **Check `data/studies/downloads/` before fetching a product again.** A re-fetch or an egress that
-  costs over £30 needs the maintainer's approval first.
+  costs over £30 needs the maintainer's approval first (disk).
 - **Studies write their built frames under `data/studies/<study>/`**, and private tables under
-  `data/studies/_private/`. Neither goes to git.
+  `data/studies/_private/`. Neither goes to git (disk).
 
 ## Experiments
 
 - **Each experiment writes to `data/ml-experiments/<id>-<slug>/`**, created by
-  `experiment_store.reserve_experiment`. About 200 folders exist.
+  `experiment_store.reserve_experiment`. About 200 folders exist (disk).
 - **Predictions live at `predictions/<name>/` inside that folder**, as `predictions.parquet` and a
   `manifest.json`, written by `experiment_store.write_predictions` and read by
-  `experiment_store.read_predictions`. The reader raises when the row set differs.
+  `experiment_store.read_predictions`. The reader raises when the row set differs (disk).
 - **Other subfolders vary by experiment** (`work/`, `logs/`, `briefs/`, tables). The DP data look
   of experiment 103 stores `rows.parquet`, `sites.parquet`, `series_table.parquet`,
-  `recommended_cut_dates.csv`, and `decisions.json` there.
+  `recommended_cut_dates.csv`, and `decisions.json` there (disk).
 - **`data/ml-experiments/briefs/` holds the manager's private briefs** and is not part of any
-  experiment.
-- **The cleaned metered-farm table for experiments 179 and 183 is under
-  `data/ml-experiments/00179-*/cleaned_solar_farms.parquet`.** Keep every table and plot of one
-  farm's time series under `data/`, labelled A to F.
+  experiment (disk).
 
 ## Disk space
 
-- **`data/` sits on the second SSD** (the main checkout's `data/` is a symbolic link to
-  `/mnt/data/nged-substation-forecast/data`).
-- **The largest folders are `data/studies/` (about 400 GB), `data/ml-experiments/` (about 180 GB),
-  and `data/NWP/` (about 150 GB) as of 2026-10-22.**
+- **`data/` sits on the second SSD:** the main checkout's `data/` is a symbolic link to
+  `/mnt/data/nged-substation-forecast/data` (disk)
 
 Last checked against experiment 183.

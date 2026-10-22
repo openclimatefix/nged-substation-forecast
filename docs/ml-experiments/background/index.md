@@ -8,45 +8,40 @@ the planner did not open.
 
 ## Reading order
 
-1. **This page**, for the reading order and the update rule.
-2. **[NGED power telemetry](nged-power-telemetry.md)**: the series, their units, the raw and
-   cleaned tables, and the timestamp convention.
-3. **[Weather inputs by product](weather-inputs-by-product.md)**: which weather product exists at
-   forecast time, which exists only in hindsight, and the rule for choosing a training product.
-4. **[Row sets and scoring](row-sets-and-scoring.md)**: the named row sets, the metric, the
-   interval conventions, the tail and curtailment reporting, and the retraining defaults.
-5. **[What is on disk](what-is-on-disk.md)**: where each data set sits under `data/`, and how to
-   read it.
-6. **[Data processing](../data-processing.md)**: the processing steps that every experiment applies
-   to the power readings, the switching log, and the capacity estimates. This page links it and
-   does not copy it.
-7. **[Glossary](../glossary.md)** for any term the experiment pages use without defining.
+1. **This page**: the reading order and the update rule.
+2. **[NGED power telemetry](nged-power-telemetry.md)**: series, units, tables, timestamps.
+3. **[Weather inputs by product](weather-inputs-by-product.md)**: which weather exists when.
+4. **[Row sets and scoring](row-sets-and-scoring.md)**: row sets, metric, intervals, gating.
+5. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
+6. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
 
-## Five facts that have cost experiments time
+The reference page [What is on disk](what-is-on-disk.md) says where each data set sits under
+`data/` and how to read it.
+
+## Three facts that have cost experiments time
 
 - **The `TimeSeriesMetadata` table has 33 rows, and 32 series carry data.** Count 32 series; do not
   change 32 to 33 ([NGED power telemetry](nged-power-telemetry.md#the-series)).
-- **Read power through `studies.power.scan_power`.** The raw table holds rows that cleaning flags,
-  such as a transformer that was switched out and read exactly 0
-  ([NGED power telemetry](nged-power-telemetry.md#raw-and-cleaned-tables)).
 - **ERA5 reaches the forecast about 5 days late.** Any ERA5 value used at a lag time is a ceiling.
   Name the weather source at lag times in every write-up
   ([weather inputs](weather-inputs-by-product.md#availability-at-forecast-time)).
-- **Scores on different row sets, quantile levels, or series cannot be compared.** State the
-  `row_set_id`, and take the benchmark from the same row set
-  ([row sets and scoring](row-sets-and-scoring.md#row-sets)).
-- **Power timestamps mark the end of the half-hour.** Do not shift them
-  ([NGED power telemetry](nged-power-telemetry.md#timestamps)).
+- **Read power through `studies.power.scan_power`.** The raw table holds rows that cleaning flags
+  ([NGED power telemetry](nged-power-telemetry.md#raw-and-cleaned-tables)).
 
 ## Update rule
 
 - **The experiment that learns or overturns a fact about the data fixes the page.** Edit the
   bullet in place so that the page describes the present, and change its "last checked" line.
 - **Add or correct at most five bullets per experiment.** Write the bullet where a planner would
-  look first, state its scope, and link the experiment or page that owns the evidence. If nothing
-  changed, write "background: no change" in the pull request body.
-- **A later experiment may overturn a bullet.** Every bullet states the scope of its evidence for
-  that reason.
+  look first, and link the experiment or page that owns the evidence. If nothing changed, write
+  "background: no change" in the pull request body. The merger checks that the pull request body
+  lists the changed bullets or says "background: no change".
+- **End every factual bullet with an evidence tag** in the form `(exp 179; 6 farms, one year;
+  provisional)`: the experiment ids, the scope of the evidence, and a status of `established`,
+  `provisional`, or `overturned by N`. A bullet about code or disk layout says `(code)` or
+  `(disk)`. A bullet whose evidence nobody has traced says `(unchecked)`.
+- **A later experiment may overturn a bullet.** The overturning experiment changes the status in the
+  tag to `overturned by N`, where N is its id, and rewrites the bullet to state the present fact.
 - **Do not copy a rule from a page that owns it.** Link the owner page instead.
 
 Last checked against experiment 183.

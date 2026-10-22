@@ -6,24 +6,24 @@ curtailment reporting that every forecasting experiment carries, and the retrain
 procedure is in the [`ml-experiment` skill](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.claude/skills/ml-experiment/SKILL.md),
 and terms are in the [glossary](../glossary.md).
 
-## Series counts
+## Series sets
 
-- **The trial area has 32 series with data:** 16 Primaries, 6 solar farms, 3 wind farms, 2 GSPs,
-  2 BSPs, and 3 other generators or storage units ([NGED power
-  telemetry](nged-power-telemetry.md#the-series)).
 - **The fold-A demand set has 22 demand-side series (D1 to D22):** 16 Primaries, 4 BSPs or GSPs,
-  and a battery and a biofuel generator ([glossary](../glossary.md#d-codes)).
-- **The generator experiments score 9 series** (6 solar farms and 3 wind farms).
-- **The differentiable-physics (DP) series uses five long-history MW Primaries as its decision set**,
-  because only five Primaries hold long histories ([NGED power
-  telemetry](nged-power-telemetry.md#gaps-ramp-up-and-regime-changes)).
+  and a battery and a biofuel generator ([glossary](../glossary.md#d-codes)) (exp 1, 3; fold A;
+  established).
+- **The generator experiments score 9 series** (6 solar farms and 3 wind farms) (exp 1, 3; fold A;
+  established).
+- **The differentiable-physics (DP) series uses five long-history MW Primaries as its decision
+  set** ([NGED power telemetry](nged-power-telemetry.md#gaps-ramp-up-and-regime-changes)) (exp 103;
+  5 Primaries; established).
 
 ## Row sets
 
 - **A row set is a named set of forecast origins, series, and valid times**, and
   `experiment_store.read_predictions` raises when a prediction set covers a different row set.
-  State the `row_set_id` in the plan, and read the benchmark from the same row set.
-- **No experiment scores a valid time on or after 2026-07-01.** That period is kept for a finalist.
+  State the `row_set_id` in the plan, and read the benchmark from the same row set (code).
+- **No experiment scores a valid time on or after 2026-07-01.** That period is kept for a finalist
+  (unchecked).
 
 | `row_set_id` | Rows | Defined in |
 |---|---|---|
@@ -36,82 +36,72 @@ and terms are in the [glossary](../glossary.md).
 | `dp_mva_dark_v1` | 352,841 dark half-hours at the MVA-only Primaries | Experiment 103 |
 | `dp_christmas_daily_v1`, `age1_daily_2025_07_to_2026_06_v1` | Christmas-period origins; the old-year training check | Experiments 173 and 93 |
 
-- **Read the defining experiment before reusing a row set.**
+- **Read the defining experiment before reusing a row set** (code).
 - **The DP series uses season-years from July to June.** Tuning is 2023-24, the replicate year is
   2024-25, and the scored year is 2025-26 (`FIRST_SEASON_MONTH` in `studies.dp_calendar`;
-  experiment 109).
+  exp 109; DP series; established).
 - **Count eligible long-history sites at each tuning year's first day.** Five Primaries qualify at
-  2024-07-01 (experiment 103).
+  2024-07-01 (exp 103; 5 Primaries; established).
 - **Choose a row set that covers every weekday**, and give each experiment a climatology row
-  (experiment 3).
+  (exp 3; fold A; established).
 
-## The score
+## The score and its intervals
 
-- **The score is the quantile score in points of capacity.** It is twice the probability-mass
-  weighted mean of the pinball losses over the quantile levels, and a lower score is better. One
-  point is 1% of the series' capacity ([glossary](../glossary.md#capacity-and-points-of-capacity)).
+- **The score, skill, baselines, capacity, and interval level are defined in the glossary.** See
+  [quantile score](../glossary.md#quantile-score-and-pinball-loss),
+  [skill](../glossary.md#skill), [capacity](../glossary.md#capacity-and-points-of-capacity),
+  [interval-level convention](../glossary.md#interval-level-convention), and
+  [rolling refit](../glossary.md#refit-and-rolling-refit). The procedure is in the `ml-experiment`
+  skill (code).
 - **The quantile levels changed.** Experiments 33, 34, and 48 use nine levels (0.05 to 0.95).
   Experiment 87 and later use 11 levels (those plus 0.01 and 0.99). Scores with different levels
-  cannot be compared ([glossary](../glossary.md#quantile-score-and-pinball-loss)).
-- **Skill is 100 times (1 minus the best guess's score over `manual_heuristic`'s score)**, pooled
-  over the series being compared ([glossary](../glossary.md#skill)).
-- **The baselines are `manual_heuristic` and `climatology`** (`baseline_forecasters`).
-  `manual_heuristic` takes the same weekday and time in the last 6 weeks and 49 to 55 weeks earlier,
-  and uses no weather. `xgboost_baseline` is the stored production-style forecast; none of the
-  experiments we read confirms that it matches the deployed one ([glossary](../glossary.md#xgboost_baseline)).
+  cannot be compared (exp 33, 34, 48, 87; all experiments; established).
 - **The sample resolves gains of roughly 0.3 points of capacity or more**, on 16 Primaries,
-  9 generator series, and one validation year ([experiments README](../README.md)).
-
-## Intervals
-
-- **Intervals resample whole calendar months (month blocks), and their level follows the number of
-  planned contrasts.** One contrast gives a 95% interval. N contrasts give a Bonferroni-corrected
-  level, such as 99.44% for nine ([glossary](../glossary.md#interval-level-convention)).
-- **Compute them with `studies.bootstrap.bootstrap_difference_at_level`** on the loss frame from
-  `experiment_store.losses_for_bootstrap`, which refuses arms with different seeds.
-- **A contrast counts as a gain when the interval over repeated seeds excludes zero.** Use the
-  scored year and report the replicate year beside it where the experiment has one.
+  9 generator series, and one validation year ([experiments README](../README.md)) (exp 3; 16
+  Primaries, 9 generators, one year; provisional).
 - **Half-hours within a day, and members within a run, are strongly correlated**, so a row
-  bootstrap understates the interval (experiment 111).
+  bootstrap understates the interval (exp 111; 5 Primaries; established).
 
 ## Tails and curtailment
 
 - **Every forecasting experiment reports tail calibration beside the headline score.** The table
-  gives coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99, through `studies.tail_calibration`.
+  gives coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99, through `studies.tail_calibration` (code).
 - **Write `q01` to `q99`, `actual`, `lead_hours`, and `time_series_id` in the predictions**, so the
-  tail and curtailment metrics can score them.
+  tail and curtailment metrics can score them (code).
 - **The curtailment metric is `studies.node_curtailment`** (node plus its generators). The headline
   is the scaled limit: L is f times the node's maximum observed export before the scored year, with
   f = 0.9 by default and 0.75 and 0.5 as sweeps. The real published thermal limit appears only as a
   reference mark and in the event census, because NGED curtails so that one more fault still leaves
-  headroom. Metric details: [cost-savings metrics](../../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost).
+  headroom. Metric details: [cost-savings metrics](../../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost)
+  (code).
 - **Report the manual-heuristic baseline arm (`capacity_forecast`) as the maintainer's unconfirmed
-  understanding of NGED's practice.** Experiment 84 is the pattern to copy.
-- **The scored lead band for curtailment is 12 to 36 hours.**
-
-## Initialisation and lags
-
-- **Experiment 106 initialises at 09:00 UTC**, and treats a power reading as reaching the
-  forecast 3.5 hours after its half-hour (an assumption; see [NGED power
-  telemetry](nged-power-telemetry.md#timestamps)).
-- **Power lag features shorter than the lead time are nullified** to avoid lookahead bias
-  (`_nullify_leaky_lags` in `ml_core`).
+  understanding of NGED's practice.** Experiment 84 is the pattern to copy (exp 84; curtailment; provisional).
+- **The scored lead band for curtailment is 12 to 36 hours** (unchecked).
 
 ## Retraining defaults in R&D
 
-- **Screening a contrast of 0.05 points or more: refit monthly on a rolling 12-month window, 150
-  rounds, eta 0.15 ("P-roll").** It saves 90% to 97% of compute (experiment 85).
-- **Conclusions about cadence or adaptation, and any absolute or tail score: refit weekly on the
-  whole history at 150 rounds.** Reserve weekly refits at production settings for best-guess runs
-  and production.
-- **Do not use quarterly refits** (0.38 points worse than weekly) **or warm starts** (failed in
-  experiment 34).
-- **Say in each write-up which schedule was used and whether the contrast could depend on it.**
+- **Do not use quarterly refits or warm starts** (exp 34; XGBoost refit cadence; established). The
+  defaults are on the [rolling refit](../glossary.md#refit-and-rolling-refit) glossary entry.
+- **Say in each write-up which schedule was used and whether the contrast could depend on it**
+  (exp 34, 85; refit schedules; established).
 
-## Audit triggers
+## How to score and gate an experiment
 
-- **A result that fails a control, contradicts its own prediction, or matches one of the other
-  triggers gets an audit before merging.** The seven triggers are in the `ml-experiment` skill,
-  section "Audit before merge".
+- **Run a known-answer gate before reading any contrast.** Inject a known step or shift into real
+  residuals, or use a fake-ensemble gate, so that a null cannot be a wiring fault. Experiments
+  128, 142, and 172 narrowly missed or failed their gates, so their contrasts are inconclusive,
+  not refuted (exp 111, 128, 142, 172, 175; DP series; established).
+- **State the row definition and the lead range before any score.** A "sunny" gap was 0.05 MW over
+  six substations, but 63% of it came from D5, and it shrank to 0.015 MW under a different
+  definition of sunny (exp 178, 180; 6 substations; established).
+- **Use month-block intervals, and report D5 separately where one substation dominates** (exp
+  111, 180; 5 Primaries; established).
+- **Judge calibration where the loss sits: cold nights and daylight bands, not the all-row
+  average.** Cold-night q95 coverage was 0.846 under the smooth table and 0.896 with one-sided
+  widening, while ensemble spread added nothing over all rows (exp 160, 164, 169; DP Primaries;
+  provisional).
+- **Score a new part on top of the best-guess arm, not on a partial stack.** The drift term improved
+  the score by 0.40 on the bare GAM-K and worsened arm D by 0.03 once the filter, the winter night
+  offset, and recipe R were in (exp 167, 170; DP Primaries; provisional).
 
 Last checked against experiment 183.

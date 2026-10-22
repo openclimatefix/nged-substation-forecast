@@ -131,10 +131,9 @@ which prints a whole list however long it is, and say in the plan which items th
 which it departs from. The overview's "What the experiments taught us so far" section is the
 curated roll-up of the `advice` lists.
 
-A plan also begins by reading `docs/ml-experiments/background/index.md`, which states what earlier
-experiments established about each data set and about the row sets and scoring rules and links the
-page that owns each fact, and then `docs/ml-experiments/data-processing.md`, which lists the
-processing that the data needs before a model trains or scores on it.
+A plan also begins by reading `docs/ml-experiments/background/index.md`, and then
+`docs/ml-experiments/data-processing.md`, which lists the processing that the data needs before a
+model trains or scores on it.
 
 ## How to score
 
@@ -355,12 +354,8 @@ with status `planned`. The overnight session:
   next plan.
 
 **Add or fix at most five bullets in `docs/ml-experiments/background/` in the same PR as the
-write-up, for any fact about a data set, the row sets, or the scoring rules that your result
-established or overturned.** Write the bullet on the page where a later planner would look first,
-state the scope of its evidence, link the experiment or the page that owns the evidence, and update
-the page's "Last checked against experiment" line. Edit an overturned bullet in place. If nothing
-changed, write "background: no change" in the PR body, and the merger checks the PR body for one or
-the other.
+write-up.** The [background index](../../../docs/ml-experiments/background/index.md#update-rule)
+owns the full rule, including the evidence tag every bullet carries.
 
 **Record every new finding about data processing in `docs/ml-experiments/data-processing.md`, in the
 same PR as the write-up.** A finding about data processing is a step that the data needs before a
