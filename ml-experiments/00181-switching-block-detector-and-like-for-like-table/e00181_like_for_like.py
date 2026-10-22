@@ -64,7 +64,7 @@ def summarise(*, table: pl.DataFrame, label: str) -> None:
         f"{label}: {len(weight)} transfers, {weight.sum():.1f} MW. "
         f"XGBoost found {fa.sum()} (MW-weighted {np.sum(weight * fa) / weight.sum():.3f}); "
         f"convex found {fb.sum()} ({np.sum(weight * fb) / weight.sum():.3f}). "
-        f"Paired MW-weighted gap {np.mean(gap):+.3f} (95% {lo:+.3f} to {hi:+.3f}). "
+        f"Paired MW-weighted gap {np.sum(weight * fb) / weight.sum() - np.sum(weight * fa) / weight.sum():+.3f} (95% {lo:+.3f} to {hi:+.3f}). "
         f"Both {int((fa & fb).sum())}, only XGBoost {int((fa & ~fb).sum())}, "
         f"only convex {int((~fa & fb).sum())}, neither {int((~fa & ~fb).sum())}."
     )

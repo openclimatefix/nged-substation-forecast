@@ -46,7 +46,10 @@ def block_days() -> pl.DataFrame:
     )
     series = site_series()
     day_start = (
-        pl.col("local_date").cast(pl.Datetime("us", "Europe/London")).dt.convert_time_zone("UTC")
+        pl.col("local_date")
+        .cast(pl.Datetime("us"))
+        .dt.replace_time_zone("Europe/London")
+        .dt.convert_time_zone("UTC")
     )
     days = days.with_columns(
         series=pl.col("site").replace_strict(series, return_dtype=pl.Int64),
