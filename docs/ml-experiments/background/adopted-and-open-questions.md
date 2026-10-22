@@ -16,8 +16,10 @@ holds as settled or planned. Evidence tags follow the [update rule](index.md#upd
 - **Primaries and supply points:** weekly refits, and a five-member blend at Primaries (experiment
   87). Owner: [production reference and best
   guess](../themes/production-reference-and-best-guess/index.md) (docs).
-- **Retraining:** weekly refitting without the 14-day correction (experiments 34, 48, 81). Owner:
-  [retraining and training history](../themes/retraining-and-training-history/index.md) (docs).
+- **Retraining:** weekly refitting without the 14-day correction (experiments 34, 48, 81). It holds
+  at 16 Primaries on two sets of runs, but 3 series carry much of the gain. Owner:
+  [retraining and training history](../themes/retraining-and-training-history/index.md) (exp 34, 48,
+  81; 16 Primaries; provisional).
 - **Solar and wind farms:** the pooled mixture over ensemble members, the solar spread factor, and
   the wind power-curve base margin (experiments 2, 16, 20). Owner: [calibration and
   uncertainty](../themes/calibration-and-uncertainty/index.md) (docs).

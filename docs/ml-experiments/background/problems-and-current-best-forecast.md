@@ -122,9 +122,9 @@ generators, and curtailment with its tails.** Each bullet ends with an evidence 
 
 - **A 14-day error correction on a frozen model is no longer the default for Primary demand.** The
   position of experiments 17, 19, and 21 is superseded by weekly refitting without the correction
-  (experiments 34 and 48), and by the Kalman filter on recent errors (experiments 106 and 111)
-  ([retraining theme](../themes/retraining-and-training-history/index.md)) (exp 34, 48, 106, 111;
-  Primary demand; provisional).
+  (experiments 34 and 48)
+  ([retraining theme](../themes/retraining-and-training-history/index.md)) (exp 34, 48; Primary
+  demand; provisional).
 - **"Keep ERA5 for stage 1a until a CAMS arm has a bias-corrected ensemble" is superseded.**
   Experiment 14 paired a CAMS-trained stage 1a with a stage 0 correction, and scored 0.067 points
   better than raw ensemble input (97.5% interval -0.094 to -0.039); its verdict is inconclusive
