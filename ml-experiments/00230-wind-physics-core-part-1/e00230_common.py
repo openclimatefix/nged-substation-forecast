@@ -89,19 +89,19 @@ FINE_LEVELS: Final[np.ndarray] = np.arange(1, 200) / 200
 NAMED_LEVELS: Final[tuple[str, ...]] = ("q01", "q05", "q50", "q95", "q99")
 
 TARGET_COVERAGE: Final[float] = 0.90
-SPREAD_GRID: Final[np.ndarray] = np.round(np.arange(0.60, 3.001, 0.05), 2)
+SPREAD_GRID: Final[np.ndarray] = np.round(np.arange(0.60, 2.001, 0.05), 2)
 MIN_FIT_CASES: Final[int] = 5_000
 TRIVIAL_LEVEL: Final[float] = 0.01
 TELEMETRY_DELAY: Final = np.timedelta64(210, "m")
 """A case is known to the spread-factor fit 3.5 hours after its valid time."""
-SHORT_BAND_LAST_DAY: Final[int] = 2
-"""The spread factor is fitted on lead days 0 to 2 and, separately, on later lead days."""
+SHORT_BAND_HOURS: Final[float] = 72.0
+"""The spread factor is fitted for leads under this many hours and, separately, for later leads."""
 
 LEAD_DAY_BANDS: Final[tuple[tuple[str, int, int], ...]] = (
     ("days 0-2", 0, 2),
     ("days 1-2", 1, 2),
     ("days 3-6", 3, 6),
-    ("days 7-10", 7, 10_000),
+    ("days 7+", 7, 10_000),
     ("all leads", 0, 10_000),
 )
 """Lead-day bands, by calendar days from the ENS run's date to the valid time (inclusive)."""
@@ -412,7 +412,7 @@ def apply_spread(*, cases: pl.DataFrame, mixture: np.ndarray) -> np.ndarray:
     valid = cases["valid_time"].to_numpy()
     init = cases["power_fcst_init_time"].to_numpy()
     month = cases["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
-    short = cases["lead_day"].to_numpy() <= SHORT_BAND_LAST_DAY
+    short = cases["lead_hours"].to_numpy() < SHORT_BAND_HOURS
     scorable = mixture[:, UPPER_INDEX] > TRIVIAL_LEVEL
     out = mixture.copy()
     for month_label in sorted(set(month)):

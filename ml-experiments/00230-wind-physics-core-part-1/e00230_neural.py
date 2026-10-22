@@ -1,6 +1,6 @@
 """The small neural components of experiment 00230: the power-curve calibrator and the free network.
 
-The calibrator (B3) adds a bounded correction to the physics core's expected power. The free network
+The calibrator (B9) adds a bounded correction to the physics core's expected power. The free network
 (B6) has no physics: it maps the same inputs straight to 11 monotone quantiles.
 """
 
@@ -24,6 +24,7 @@ FREE_STEPS: Final[int] = 600
 FREE_LEARNING_RATE: Final[float] = 0.01
 FREE_WEIGHT_DECAY: Final[float] = 1e-4
 INPUT_COLUMNS: Final[int] = 6
+RAW_INPUT_COLUMNS: Final[int] = len(common.WEATHER_COLUMNS)
 MAX_LOG_RATIO: Final[float] = 1.5
 
 
@@ -77,10 +78,11 @@ class Calibrator(nn.Module):
             nn.Tanh(),
             nn.Linear(CALIBRATOR_HIDDEN, CALIBRATOR_HIDDEN),
             nn.Tanh(),
-            nn.Linear(CALIBRATOR_HIDDEN, 1),
         )
-        nn.init.zeros_(self.layers[-1].weight)
-        nn.init.zeros_(self.layers[-1].bias)
+        final = nn.Linear(CALIBRATOR_HIDDEN, 1)
+        nn.init.zeros_(final.weight)
+        nn.init.zeros_(final.bias)
+        self.layers.append(final)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """Return the bounded correction to the expected power fraction, one per row."""
@@ -118,11 +120,11 @@ def calibrated_expected_power(
 class FreeQuantileNetwork(nn.Module):
     """A network from the inputs to 11 non-crossing quantiles of the power fraction."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, n_inputs: int) -> None:
         """Build two hidden layers and 11 outputs: a median and 10 positive steps."""
         super().__init__()
         self.layers = nn.Sequential(
-            nn.Linear(INPUT_COLUMNS, FREE_HIDDEN),
+            nn.Linear(n_inputs, FREE_HIDDEN),
             nn.Tanh(),
             nn.Linear(FREE_HIDDEN, FREE_HIDDEN),
             nn.Tanh(),
@@ -145,7 +147,7 @@ def fit_free_network(*, inputs: np.ndarray, target: np.ndarray, seed: int) -> Fr
     """Fit the free network on the pinball loss summed over the 11 levels."""
     torch.manual_seed(seed)
     torch.set_num_threads(core_module.THREADS)
-    network = FreeQuantileNetwork()
+    network = FreeQuantileNetwork(n_inputs=inputs.shape[1])
     features = torch.as_tensor(inputs)
     goal = torch.as_tensor(target, dtype=torch.float32)[:, None]
     levels = torch.as_tensor(common.LEVELS, dtype=torch.float32)[None, :]
@@ -167,3 +169,15 @@ def free_quantiles(*, network: FreeQuantileNetwork, inputs: np.ndarray) -> np.nd
     """Return shape (rows, 11) float32 quantiles clipped to 0 to 1."""
     with torch.no_grad():
         return np.clip(network(torch.as_tensor(inputs)).numpy(), 0.0, 1.0).astype(np.float32)
+
+
+def raw_inputs(*, frame: pl.DataFrame, centre: np.ndarray, scale: np.ndarray) -> np.ndarray:
+    """Return the standardised `WEATHER_COLUMNS` of `frame` as float32, for the pure network."""
+    values = frame.select(common.WEATHER_COLUMNS).to_numpy().astype(np.float64)
+    return ((values - centre) / scale).astype(np.float32)
+
+
+def raw_input_scaling(*, frame: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """Return the per-column mean and standard deviation of the training rows' `WEATHER_COLUMNS`."""
+    values = frame.select(common.WEATHER_COLUMNS).to_numpy().astype(np.float64)
+    return values.mean(axis=0), values.std(axis=0) + 1e-6

@@ -6,7 +6,7 @@ title: >-
   farms as well as the XGBoost best guess, and is the weather input the limit?
 theme: generator-forecasting
 also_relevant_to: []
-status: planned
+status: finished
 date: 2026-10-22
 size: >-
   complex. Stored: private files under data/ml-experiments/00230-wind-physics-core-part-1/ only.
@@ -71,61 +71,130 @@ metric: >-
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00230-wind-physics-core-part-1/
+verdict: not supported
+best_arm: >-
+  A0 and B14 (the XGBoost best guess, with or without the core's columns), 11.66 points on the kept
+  rows over all leads
+headline: >-
+  The physics core (B1) scored 0.13 points worse than the XGBoost best guess (A0) on the kept rows
+  over all leads (95% interval 0.07 to 0.19), and 0.32 worse at lead days 1 and 2.
+take_home_message: >-
+  A physics model of a wind farm, fitted to the three metered farms, forecasts them slightly worse
+  than the XGBoost best guess, so it should not replace it. Most of the forecast error comes from the
+  25 km ensemble wind, not from the power curve: with ERA5 wind as the forecast, the same model
+  scores about half the error. The idle layer and the small neural adapter add nothing, and
+  training the physics core on ERA5 instead of the ensemble control member improves it by 0.4 points.
+advice:
+  - >-
+    Keep XGBoost as the wind forecaster, and do not add a physics stage in front of it or its
+    columns beside it (C1, E2).
+  - >-
+    Train wind models on ERA5, not on the ensemble control member, for the three metered farms (C3).
+  - >-
+    Put effort into the weather input, not the power curve or the idle layer: ERA5 as the forecast
+    halves the score, and the idle layer changes it by under 0.01 (F1, C4).
+  - >-
+    Add air temperature to the XGBoost wind features, which improved the kept-row score by 0.08 in a
+    post hoc contrast that needs a planned repeat (F2).
 ---
 
-**Planned; no result yet.** This page is the plan, committed before any code runs.
+**Take-home: the physics model is slightly worse than XGBoost, and the weather input is the limit.**
+A physics model of a wind farm scored 0.13 points of capacity worse than the XGBoost best guess on
+the three metered wind farms, so we should not port it. The score is far better when ERA5 supplies
+the wind, which shows that the 25 km ensemble wind, not the turbine model, causes most of the error.
 
-## Question
+![The physics core is 0.1 to 0.3 points worse than the best guess](figure_1.svg)
 
-We ask whether a physics model of a wind farm (hub-height wind, air density, a smooth power curve, and
-an idle layer for the reactive-power floor that NGED's MVA meters show at zero output), fitted by
-gradient descent on a 25 km ERA5 wind cell, forecasts the three metered wind farms as well as the
-XGBoost best guess of [experiment 33](../00033-best-guess-architecture-vs-production/result.md).
-Before anything else, Step 0 asks how much a perfect weather forecast (ERA5, the past-weather
-estimate, as the forecast) could improve the fit, to learn whether the weather input or the turbine
-physics is the limit. [Experiment 218](../00218-metered-solar-farm-plant-fit/result.md) found for solar
-farms that per-farm plant parameters added only 0.003 over the fleet shape, so the weather input was
-the ceiling.
+## Results
 
-## Arms
+Scores are the quantile score in points of capacity (smaller is better), on the rows that experiment
+210's mask keeps, over all lead times, for W1, W2, and W3 across 53 Tuesday runs from July 2025 to
+June 2026. The intervals resample whole months and the three seeds, and do not resample farms, so they
+describe these three farms only.
 
-- **A0:** the stored best guess. **A0r:** the same recipe refitted with the 0.01 and 0.99 levels added.
-- **A1:** A0r trained on the ENS control member's forecast wind (the ENS training table holds one
-  member per run) and run on the 51 members.
-- **B1:** the physics core trained on ERA5, run on the 51 ENS members, with the spread factor of
-  experiment 33. **B2:** the core trained on the ENS control member's forecast wind. **B8:** B1
-  with no idle layer.
-- **B3:** B1 plus a small neural calibrator on the power-curve residual. **B5:** B1 plus a per-farm
-  quantile XGBoost stage 2, as in [experiment 29](../00029-physics-stage1-solar-pytorch/result.md).
-  **B6:** a neural network on the same inputs with no physics. Run only if Step 0 allows.
-- **B4 and B7** (B3 and B1 trained per ENS member) wait for W-A's first report.
-- **Reference rows:** the month-by-half-hour climatology, and persistence at 0 to 6 hours.
+- **C1, the decisive contrast: the core minus the best guess is +0.126 (95% interval 0.068 to 0.190).**
+  At lead days 1 and 2 it is +0.322 (0.241 to 0.413). The core is worse, so the porting threshold (an
+  interval wholly below zero) is not met.
+- **C4: the idle layer is worth nothing (B1 minus B8 is 0.000, interval -0.002 to 0.002).**
+  The residual-quantile layer already carries the reactive-power floor.
+- **C2: the neural output adapter (B9) adds nothing (+0.002, -0.004 to 0.007).**
+- **C3: training the core on ERA5 beats training it on the ENS control member by 0.40
+  (interval 0.12 to 0.69).** At lead days 1 and 2 the gap is 1.95 points. Most of it comes from W2.
+- **XGBoost on the core's output (B5) closes about half the gap (B5 minus B1 is -0.060, -0.120 to -0.004),
+  and still trails the best guess.**
+- **The pure neural network (B6) is no better than the best guess (+0.037, -0.047 to 0.115).**
+- **The best guess with the core's columns added (B14) equals the best guess (-0.007, -0.014 to 0.000).**
+- **ERA5 as the forecast (E0) scores 6.71 against 11.79 for B1.** The 25 km wind, not the power
+  curve, causes most of the error.
 
-## Physics core, as pre-registered
+![Absolute quantile score by lead band](figure_2.svg)
 
-- **Hub-height wind:** the shear exponent between the ERA5 10 m and 100 m speeds, applied to a fitted
-  hub height with a prior of 50 to 80 m (the turbine model and hub height are not on disk).
-- **Air density:** the dry-air density from the 2 m temperature and the surface pressure, applied as
-  the cube root ratio to the standard density.
-- **Power curve:** a smooth monotone curve with a cut-in speed, a rated speed, a shape exponent, a
-  logistic cut-out, and a Gaussian turbulence blur that stands for the 25 km cell's sub-grid wind.
-  The rated power starts from the registered turbine count times rating (W1 26 MW, W2 9.6 MW, W3
-  2.6 MW, where the effective capacity is that of experiment 52), and a per-farm scale is fitted.
-- **Idle layer (W1 and W3, in MVA):** the expected apparent power is the square root of the squared
-  active power plus a squared idle floor, with a small fitted dip as the wind rises from zero; the
-  floor is fitted on the rows experiment 210 marks as the idle band. W2 (in MW) has no floor. The
-  spread of the observation at each forecast level comes from the empirical residual quantiles,
-  fitted on the ERA5-training rows in bins of the predicted power, which carry the meter noise.
-- **Fit:** PyTorch, full batch, Adam, on CPU with one thread per process, an L1 loss on the power
-  fraction, on valid times before 2025-06-17.
+| Arm | Description | Kept rows, all leads | Kept rows, lead days 1 and 2 | All rows, all leads |
+|---|---|---|---|---|
+| A0r | Best guess, refitted here | 11.66 | 7.03 | 11.04 |
+| B14 | Best guess plus the core's columns | 11.66 | 7.02 | 11.03 |
+| B6 | Neural network, no physics | 11.70 | 7.22 | 11.08 |
+| B5 | Core plus XGBoost stage 2 | 11.73 | 7.13 | 11.09 |
+| B1 | Physics core, ERA5-trained | 11.79 | 7.35 | 11.14 |
+| B9 | Core plus neural output adapter | 11.79 | 7.34 | 11.14 |
+| B8 | Core without the idle layer | 11.79 | 7.35 | 11.14 |
+| B2 | Core, ENS-control-trained | 12.20 | 9.30 | 11.68 |
+| A1 | Best guess, ENS-control-trained | 12.17 | 9.24 | 11.67 |
+| CLIM | Climatology | 13.55 | 13.12 | 13.12 |
+| E0 | ERA5 as the forecast (reference) | 6.71 | 6.36 | 6.32 |
 
-## Checks and caveats fixed in advance
+**Beyond day 7, climatology (13.48 on the kept rows) beats every trained arm (13.84 to 13.93).** The
+tails behave alike across arms: on the kept rows the 0.01 pinball loss is 0.285 to 0.288 and the 0.99
+loss is 0.658 to 0.676 for A0r, B1, B5, B6, and B14, and the 5% to 95% band covers 91.4% to 91.7% of
+rows. Persistence on hours 0 to 6 scores 15.57, worse than every other arm.
 
-- **Departures from the design brief:** ENS-mean training (A1, B2) uses the ENS control member,
-  because the ENS training table holds only member 0 and extracting the 51 members of 456 runs would
-  cost days; the idle layer shapes the mean, and the noise comes from the empirical residual
-  quantiles; the physics arms are deterministic, so their three seeds repeat one fit, as the
-  climatology rows do.
-- **Comparison with experiment 221:** the write-up compares B1 and A0 with [experiment
-  221](../00221-wind-correction-head-on-stored-predictions/result.md), which put a neural head on A0.
-- **Anonymisation:** farms are W1 to W3. No farm's identity, coordinates, or series is shown.
+## Step 0: the ERA5 ceiling
+
+![Step 0 ceiling on the held-out year](figure_3.svg)
+
+- **With ERA5 as the weather, a flexible XGBoost model (X) beats the physics core (P) by 0.27 points
+  and the binned power curve (S) by 0.54 (interval 0.43 to 0.64) on all rows.** The gate asked whether
+  S was within 0.02 of the ceiling. It was not, so the other arms ran.
+- **The core explains 0.84, 0.76, and 0.72 of the power's variance (R squared) at W1, W2, and W3.**
+  X explains 0.85, 0.77, and 0.75.
+- **Stop rule 3 fired literally at W2.** The 5% to 95% band of B1 covered 59% of W2's idle rows
+  (threshold 80%). W2 is in MW, observed idle power can be negative, and the clip at zero is shared by
+  every arm, so the arms stay comparable.
+
+## Comparison with experiment 221
+
+[Experiment 221](../00221-wind-correction-head-on-stored-predictions/result.md) put a neural head on
+the stored best guess, and found no reliable gain. On the same kept rows at lead days 1 and 2, its A0
+scored 7.223 and its head 7.403. Here the best guess scores 7.02 to 7.03 on the same rows, B6 (a neural
+network with no physics) 7.22, and the core 7.35. Neural components and a physics core thus land in
+the same place: neither beats XGBoost on these three farms.
+
+## Checks
+
+- **Median minus mean:** the median of the forecast sits 5.2 points below the mean on the kept rows
+  for A0r and 5.3 for B1, so all arms share the same skew and the mean-error contrasts agree in
+  direction with the quantile-score contrasts.
+- **A0r reproduces A0** on the nine shared levels (11.035 against 11.037, all rows).
+- **Leave-one-farm-out:** C1 stays positive without any single farm (0.11 to 0.14), and C3 stays
+  negative.
+- **Row sets:** on the rows above the farm's fitted rated speed, C1 is +0.43 (0.30 to 0.57). On all
+  rows it is +0.10.
+- **Audit triggers 1 and 4 fired** (and trigger 7 may have). The manager decides whether an Opus audit
+  is worth the quota.
+
+## Departures from the plan
+
+- **ENS control member instead of the ENS mean** for A1 and B2.
+- **Temperature-only density correction:** ERA5 surface pressure is not on disk, so the core uses a
+  fixed 100 kPa.
+- **The idle layer shapes the mean, and the noise comes from the residual quantiles.**
+- **The fitted hub heights (32 to 37 m) are not physical.** They absorb the 25 km cell's sub-grid wind.
+- **The physics arms are deterministic**, so their three seeds repeat one fit.
+- **E0 and A0rT (A0r with temperature) are post hoc.**
+- **Not run:** B10 to B13, the no-history tests, and the curtailment-cost metric.
+- **The wind-farm identities and series are anonymised;** the mask stays private.
+
+## What the next experiment should answer
+
+Does a better weather input, such as a blend of weather models or a downscaled wind, close any of the
+6-point gap between the ensemble wind and ERA5 wind?

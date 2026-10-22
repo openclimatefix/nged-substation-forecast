@@ -8,6 +8,7 @@ power, and an optional idle layer turns active power into apparent power for the
 spread of the observation about the expected power comes from `ResidualQuantiles`.
 """
 
+import os
 from dataclasses import dataclass
 from typing import Final, Self
 
@@ -27,7 +28,7 @@ FIT_STEPS: Final[int] = 800
 LEARNING_RATE: Final[float] = 0.05
 RESIDUAL_BINS: Final[int] = 14
 IDLE_FRACTION_FLOOR: Final[float] = 0.0
-THREADS: Final[int] = 1
+THREADS: Final[int] = int(os.environ.get("E00230_TORCH_THREADS", "1"))
 
 
 def _sigmoid_range(raw: torch.Tensor, low: float, high: float) -> torch.Tensor:
@@ -71,6 +72,9 @@ class WeatherArrays:
 
 class WindCore(nn.Module):
     """One farm's physics core: weather in, expected power as a fraction of capacity out."""
+
+    blur_nodes: torch.Tensor
+    blur_weights: torch.Tensor
 
     def __init__(self, *, with_idle_layer: bool, idle_floor: float) -> None:
         """Set the starting parameters.
@@ -170,9 +174,9 @@ def fit_core(
 ) -> WindCore:
     """Fit one farm's core by full-batch Adam on the L1 loss of the observed fraction.
 
-    A weak log-normal prior (median `HUB_HEIGHT_PRIOR_M`) keeps the hub height near 50 to 80 m,
-    because the hub height and the shear exponent are not separately identified by ERA5's two
-    levels.
+    A log-normal prior (median `HUB_HEIGHT_PRIOR_M`) enters the loss with a weight of one over the
+    number of rows, so it is negligible: the fitted hub height is an effective parameter that
+    absorbs ERA5's wind bias at the farm, not a physical hub height.
 
     Args:
         weather: The training rows' weather.

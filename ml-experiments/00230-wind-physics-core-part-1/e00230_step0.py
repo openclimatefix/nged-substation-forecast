@@ -22,6 +22,7 @@ import e00230_common as common  # noqa: E402
 import e00230_core as core_module  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
+import torch  # noqa: E402
 import xgboost as xgb  # noqa: E402
 
 N_ROUNDS = 500
@@ -196,10 +197,8 @@ def main() -> None:
     print(json.dumps(report, indent=1))
 
 
-def torch_softplus(raw: object) -> float:
+def torch_softplus(raw: torch.Tensor) -> float:
     """Return softplus of a scalar tensor as a Python float."""
-    import torch
-
     return float(torch.nn.functional.softplus(raw.detach()))
 
 

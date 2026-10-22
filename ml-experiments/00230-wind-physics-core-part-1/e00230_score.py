@@ -14,6 +14,7 @@ Output: `work/score.json`.
 
 import json
 import os
+from collections.abc import Callable
 
 for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_name, "1")
@@ -26,19 +27,24 @@ ARM_DIR = common.WORK_DIR / "arms"
 RESAMPLES = 50_000
 CONTRASTS = (
     ("C1", "B1", "A0"),
-    ("C2", "B3", "B1"),
+    ("C2", "B9", "B1"),
     ("C3", "B1", "B2"),
     ("C4", "B1", "B8"),
     ("D1", "B1", "A0r"),
     ("D2", "A1", "A0r"),
     ("D3", "B2", "A1"),
-    ("D4", "B3", "A0r"),
+    ("D4", "B9", "A0r"),
     ("D5", "B5", "B1"),
-    ("D6", "B6", "B3"),
+    ("D6", "B6", "B9"),
+    ("E1", "B6", "A0"),
+    ("E2", "B14", "A0"),
+    ("E3", "B6", "B1"),
+    ("F1", "E0", "B1"),
+    ("F2", "A0rT", "A0r"),
 )
 DECISIVE: tuple[str, ...] = ("C1", "C2", "C3", "C4")
 BONFERRONI_LEVEL = 1 - 0.05 / 4
-SCORE_BANDS = ("days 1-2", "days 3-6", "days 7-10", "all leads")
+SCORE_BANDS = ("days 1-2", "days 3-6", "days 7+", "all leads")
 
 
 def read_arm(*, name: str, cases: pl.DataFrame) -> pl.DataFrame | None:
@@ -127,7 +133,22 @@ def main() -> None:  # noqa: PLR0912
         )
     )
     arms = {}
-    for name in ("A0", "A0r", "A0rT", "A1", "B1", "B2", "B3", "B5", "B6", "B8"):
+    for name in (
+        "A0",
+        "A0r",
+        "A0rT",
+        "CLIM",
+        "PERS",
+        "A1",
+        "B1",
+        "B2",
+        "B8",
+        "B9",
+        "B5",
+        "B6",
+        "B14",
+        "E0",
+    ):
         frame = read_arm(name=name, cases=cases)
         if frame is not None:
             arms[name] = (frame, case_scores(frame=frame))
@@ -136,12 +157,13 @@ def main() -> None:  # noqa: PLR0912
         "kept rows": lambda f: ~f["masked"].to_numpy(),
         "above rated": lambda f: f["above_rated"].to_numpy(),
     }
-    band_masks = {
+    band_masks: dict[str, Callable[..., np.ndarray]] = {
         name: lambda f, lo=lo, hi=hi: (
             (f["lead_day"].to_numpy() >= lo) & (f["lead_day"].to_numpy() <= hi)
         )
         for name, lo, hi in common.LEAD_DAY_BANDS
     }
+    band_masks["hours 0-6"] = lambda f: f["lead_hours"].to_numpy() <= 6.0
     report: dict = {"scores": {}, "contrasts": {}, "per_farm": {}, "checks": {}}
     for name, (frame, scores) in arms.items():
         report["scores"][name] = {}
@@ -149,7 +171,8 @@ def main() -> None:  # noqa: PLR0912
             for band, bm in band_masks.items():
                 keep = rs(frame) & bm(frame)
                 report["scores"][name][f"{rs_name} | {band}"] = {
-                    metric: float(values[keep].mean()) for metric, values in scores.items()
+                    metric: float(values[keep].mean()) if keep.any() else None
+                    for metric, values in scores.items()
                 } | {"rows": int(keep.sum())}
         by_farm = {}
         for farm in sites["site"].to_list():
@@ -177,12 +200,25 @@ def main() -> None:  # noqa: PLR0912
                         seed=frame_a["seed"].to_numpy()[keep],
                         levels=levels,
                     )
+    report["leave_one_farm_out"] = {}
+    for label, first, second in CONTRASTS:
+        if label not in report["contrasts"]:
+            continue
+        (frame_a, sa), (_, sb) = arms[first], arms[second]
+        for farm in sites["site"].to_list():
+            keep = ~frame_a["masked"].to_numpy() & (frame_a["site"] != farm).to_numpy()
+            report["leave_one_farm_out"][f"{label} without {farm}"] = bootstrap(
+                difference=(sa["qs"] - sb["qs"])[keep],
+                month=frame_a["month"].to_numpy()[keep],
+                seed=frame_a["seed"].to_numpy()[keep],
+                levels=(0.95,),
+            )
     (common.WORK_DIR / "score.json").write_text(json.dumps(report, indent=1))
     for name in arms:
         print(
             name,
             {
-                k: round(v["qs"], 3)
+                k: v["qs"] and round(v["qs"], 3)
                 for k, v in report["scores"][name].items()
                 if k.startswith(("all rows", "kept rows"))
             },
