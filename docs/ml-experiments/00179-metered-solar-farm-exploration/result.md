@@ -132,6 +132,8 @@ stands.
   and −0.21 (−0.6 to +0.2). One month at D (February 2020, a partial outage) is left out of the fit.
   Drift is not detected at A, D, E, or F, with wide uncertainty. B and C have intervals that exclude
   zero but are small, and the fit includes months with 20 to 25% partial outages.
+- **Replication status:** the count of farms with clipping is unreplicated, and the post hoc rule
+  is exploratory; no other experiment or data set has confirmed either.
 - **Audit triggers:** the audit trigger for a result that contradicts its own prediction fires in
   form. The explanation, a too-strict rule, was tested by the post hoc rule above. The trigger for a
   later design that depends on an unreplicated result applies, because follow-up 4 depends on the
