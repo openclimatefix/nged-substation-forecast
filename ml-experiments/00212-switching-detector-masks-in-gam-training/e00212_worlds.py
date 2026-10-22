@@ -30,7 +30,7 @@ import e00212_g_common as common
 import e00212_g_members as members
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00212_common import E195_DIR, GRID_START, WORK_DIR, load_panel, stamp_months
 from e00212_g_arms import quantile_score
 from studies.dp_features import FeatureCache, naive_utc

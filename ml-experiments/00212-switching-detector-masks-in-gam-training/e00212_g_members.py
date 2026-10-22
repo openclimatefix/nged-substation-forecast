@@ -26,7 +26,7 @@ from typing import Final
 import e00212_g_common as common
 import e00212_g_ens as ens
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00212_common import WORK_DIR
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens import member_means

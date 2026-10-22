@@ -25,6 +25,7 @@ import time
 import e00212_events as ev
 import e00212_fed as fed
 import e00212_fits as fits_module
+import e00212_g_members as members
 import e00212_nra as nra
 import numpy as np
 import polars as pl
@@ -88,7 +89,7 @@ def main(site: str) -> None:
         blocked[max(r["onset"] + offset, 0) : min(r["end"] + offset + nra.TAIL, n)] = True
     rows = np.flatnonzero(np.isfinite(base.actual) & ~blocked[base.position])
     spread = fed.k0_spread(site)
-    cuts = [f.cut for f in __import__("e00212_g_members").load_fits(site=site)]
+    cuts = [f.cut for f in members.load_fits(site=site)]
     flags = post_flags(data=base, events=logged, offset=offset, cuts=cuts)
     run_flags = flags[base.run_of_row[rows]]
     scores = []

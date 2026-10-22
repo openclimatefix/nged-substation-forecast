@@ -26,7 +26,7 @@ import e00212_g_common as common
 import e00212_g_members as members
 import e00212_nra as nra
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00212_common import WORK_DIR
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import GamFit, GamSpec, TrainingWindow, fit_gam
