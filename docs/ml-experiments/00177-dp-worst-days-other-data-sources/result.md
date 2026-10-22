@@ -9,7 +9,7 @@ theme: differentiable-physics-forecast-engine
 also_relevant_to:
 - switching-labels-in-the-forecast
 - production-reference-and-best-guess
-status: planned
+status: done
 size: >-
   simple. Stored: private tables under data/ml-experiments/00177-dp-worst-days-other-data-sources/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is
@@ -50,9 +50,115 @@ metric: >-
   2026-06-30.
 code: ml-experiments/00177-dp-worst-days-other-data-sources/
 date: 2026-10-22
+verdict: refuted
+best_arm: >-
+  Not applicable (descriptive). No source explains the 37 worst days beyond chance. The best is a
+  high system price on 18 of 37 days, against 14.9 on matched ordinary days (95% range 11 to 18),
+  which is 3 days more, under the 15-point bar.
+headline: >-
+  The union of logged switching, reading quality, and the substation's own bad weekdays covers 5 of
+  37 unlabelled worst days, against 5.4 on matched ordinary days. Demand Flexibility Service events
+  cover 9 (ordinary 8.5), and a high national system price covers 18 (ordinary 14.9, p = 0.075). The
+  raw NGED files carry no field beyond time and power.
+lessons:
+  - >-
+    The worst unlabelled days are not explained by the logged switching, reading faults, a
+    recurring bad weekday, Demand Flexibility Service events, or national price spikes.
+  - >-
+    The raw NGED telemetry holds only time and power per reading, so no voltage, current, or tap
+    position exists to read.
+  - >-
+    The metered generators sit on their own substation numbers, so none maps to a Primary or its
+    neighbours and a generator-step source cannot be tested without a location join.
+take_home_message: >-
+  The 37 worst days of the best-guess forecast that carry no label are not explained by any data we
+  hold or can read free of charge: logged switching, reading faults, repeat bad weekdays, Demand
+  Flexibility Service events, and national price spikes all cover them no more often than they cover
+  ordinary days. The raw NGED files hold only time and power, so no extra telemetry exists. The
+  remaining candidates are local: planned outage notices, local events, and a location join to the
+  metered generators.
+advice:
+  - >-
+    Do not look for the unlabelled worst days in the raw NGED files: each reading holds only
+    `startTime`, `endTime`, and `value` (check of three files, one per decision Primary).
+  - >-
+    Do not expect national Elexon system prices or Demand Flexibility Service events to explain
+    single-substation worst days: both cover them as often as ordinary days (figure 1).
+  - >-
+    Join metered generators to Primaries by location before testing generator steps as a cause: the
+    generators sit on their own substation numbers (stage 1, source S2).
+production_status: not-for-production
+adopted_in: none
 ---
 
-**This page is the pre-registration. No day has been compared with any source yet.**
+**The 37 worst unlabelled days are not explained by any data we hold or can read free of charge.**
+[Experiment 172](../00172-dp-error-budget-worst-days/result.md) found the 37 worst days of five
+Primary substations that carry no label.
+[Experiment 174](../00174-dp-unlabelled-worst-days-weather-shared-or-single-site/result.md) found
+that better weather explains under a third of their loss, and
+[experiment 175](../00175-dp-unlabelled-day-shapes/result.md) found that about half are sharp-edged
+blocks. We asked whether data we have not yet used marks those days: NGED's logged switching
+operations, faults in the substation's own readings, its own bad weekdays, and public Demand
+Flexibility Service (DFS) events and national system prices from NESO and Elexon. For each source we
+counted the days it covers among the 37 and among 1,000 random sets of 37 ordinary days from the
+same substations and months. No source covers the 37 days more often than ordinary days by the
+15 points the plan set as the bar.
+
+**The verdict is `refuted`.** The three sources readable on disk cover 5 of 37 days together,
+against 5.4 on ordinary days. DFS events cover 9 (ordinary 8.5). A high national system price covers
+18 (ordinary 14.9, one-sided p = 0.075), the closest of any source and still 3 days, not 5.5.
+
+![Days explained by each source: the 37 worst days against 37 matched ordinary days](fig1_sources.svg)
+
+| Source | 37 worst days | Ordinary days (mean, 95% range) | Share of all days the rule covers |
+|---|---|---|---|
+| Logged switching, confirmed (S1) | 0 | 0.3 (0 to 1) | 0.7% |
+| Reading quality (S3) | 0 | 0.0 (0 to 0) | 0.4% |
+| Own bad weekday (S4) | 5 | 5.1 (2 to 8) | 12.4% |
+| Union of stage 1 | 5 | 5.4 (2 to 9) | 13.4% |
+| DFS event (P1) | 9 | 8.5 (6 to 11) | 25.9% |
+| High system price, top 5% (P2) | 18 | 14.9 (11 to 18) | 39.9% |
+| Metered generator step (S2) | not testable | not testable | 0% |
+
+- **Raw NGED files carry no extra field.** Three files, one for each of three decision Primaries,
+  hold only `startTime`, `endTime`, and `value` in each reading, plus the top-level fields the
+  metadata table already stores. No voltage, current, power factor, or tap position exists.
+- **S2 could not be tested.** The 13 metered generators have their own substation numbers, so none
+  shares a number with a Primary or an interconnected Primary. A step test needs a location join
+  that this experiment did not build.
+- **Looser versions of the rules are uninformative.** Switching-log rows of any state cover 15 of
+  37 days (ordinary 11.2, p = 0.035) but the rule covers 39.5% of all days. A step in any
+  generator in the area covers 26 of 37 (ordinary 20.5) and covers 62.6% of all days.
+- **The switching log ends on 2026-03-25,** and the DFS archive on 2026-03-27, so about 3 of the 12
+  scored months, and 14 of the 37 days for DFS, have no record to test.
+- **The ordinary-day draws match by substation and month,** but one of the 37 days has no ordinary
+  day of the same month at its substation, so each draw falls back to the substation's other months
+  for that day.
+
+## Checks
+
+- **Median forecast minus mean forecast, and the error of the mean or median forecast:** not
+  applicable, because the experiment fits no model and scores no forecast.
+- **Audit triggers:** none fired. No control, quantile-score contrast, nested arm, or interval
+  comparison exists to trigger one. Trigger 7 does not apply, because no later experiment's design
+  depends on this result's sign.
+- **Public data checks:** 365 days of system prices (17,520 settlement periods, 363 days of 48 plus
+  one of 50 and one of 46 at the clock changes) with no duplicate keys, no nulls, prices from
+  -97.92 to 800.00 pounds per megawatt-hour, and a monthly mean from 64.6 to 103.2.
+
+## What the next experiment should answer
+
+**The remaining candidates are local, and each needs a source we do not hold yet.** The sources
+still open are planned outage notices from NGED, local events and school terms, and a location join
+of the metered generators to the Primaries so that a step in a nearby generator can be tested. The
+shape result of experiment 175 points the same way: half the days are blocks at one substation that
+no neighbour mirrors. A source of the load itself, such as a customer-level or feeder-level record
+from NGED, would test the hypothesis directly. Ask NGED whether an outage list exists for these
+Primaries.
+
+## Pre-registration
+
+**This page began as the pre-registration. The sections below were written before any result was read.**
 
 ## Sources and indicators, fixed before any result is read
 

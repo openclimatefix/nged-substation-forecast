@@ -1,0 +1,171 @@
+{
+  "s1": {
+    "observed_of_37": 0,
+    "ordinary_mean_of_37": 0.334,
+    "ordinary_95pct_range": [
+      0.0,
+      1.0
+    ],
+    "one_sided_p": 1.0,
+    "all_scored_days_rate": 0.0071301247771836
+  },
+  "s2": {
+    "observed_of_37": 0,
+    "ordinary_mean_of_37": 0.0,
+    "ordinary_95pct_range": [
+      0.0,
+      0.0
+    ],
+    "one_sided_p": 1.0,
+    "all_scored_days_rate": 0.0
+  },
+  "s3": {
+    "observed_of_37": 0,
+    "ordinary_mean_of_37": 0.0,
+    "ordinary_95pct_range": [
+      0.0,
+      0.0
+    ],
+    "one_sided_p": 1.0,
+    "all_scored_days_rate": 0.0041592394533571005
+  },
+  "s4": {
+    "observed_of_37": 5,
+    "ordinary_mean_of_37": 5.061,
+    "ordinary_95pct_range": [
+      2.0,
+      8.0
+    ],
+    "one_sided_p": 0.624,
+    "all_scored_days_rate": 0.12358882947118241
+  },
+  "s1_own_sheet": {
+    "observed_of_37": 0,
+    "ordinary_mean_of_37": 0.334,
+    "ordinary_95pct_range": [
+      0.0,
+      1.0
+    ],
+    "one_sided_p": 1.0,
+    "all_scored_days_rate": 0.0017825311942959
+  },
+  "s1_any_state": {
+    "observed_of_37": 15,
+    "ordinary_mean_of_37": 11.177,
+    "ordinary_95pct_range": [
+      8.0,
+      15.0
+    ],
+    "one_sided_p": 0.035,
+    "all_scored_days_rate": 0.39512774806892453
+  },
+  "s1_pm1": {
+    "observed_of_37": 0,
+    "ordinary_mean_of_37": 0.367,
+    "ordinary_95pct_range": [
+      0.0,
+      1.0
+    ],
+    "one_sided_p": 1.0,
+    "all_scored_days_rate": 0.0142602495543672
+  },
+  "s2_any_area": {
+    "observed_of_37": 26,
+    "ordinary_mean_of_37": 20.471,
+    "ordinary_95pct_range": [
+      16.0,
+      25.0
+    ],
+    "one_sided_p": 0.019,
+    "all_scored_days_rate": 0.6256684491978609
+  },
+  "s3_missing": {
+    "observed_of_37": 0,
+    "ordinary_mean_of_37": 0.0,
+    "ordinary_95pct_range": [
+      0.0,
+      0.0
+    ],
+    "one_sided_p": 1.0,
+    "all_scored_days_rate": 0.0041592394533571005
+  },
+  "s3_stuck": {
+    "observed_of_37": 0,
+    "ordinary_mean_of_37": 0.0,
+    "ordinary_95pct_range": [
+      0.0,
+      0.0
+    ],
+    "one_sided_p": 1.0,
+    "all_scored_days_rate": 0.0
+  },
+  "union": {
+    "observed_of_37": 5,
+    "ordinary_mean_of_37": 5.395,
+    "ordinary_95pct_range": [
+      2.0,
+      9.0
+    ],
+    "one_sided_p": 0.687,
+    "all_scored_days_rate": 0.13368983957219252
+  },
+  "_fallback_draw_picks": 1000,
+  "_days_with_generator_on_same_or_interconnected_primary": 0
+}
+shape: (5, 12)
+┌──────┬─────┬─────┬─────┬───┬─────────────┬────────────┬──────────┬───────┐
+│ site ┆ s1  ┆ s2  ┆ s3  ┆ … ┆ s2_any_area ┆ s3_missing ┆ s3_stuck ┆ union │
+│ ---  ┆ --- ┆ --- ┆ --- ┆   ┆ ---         ┆ ---        ┆ ---      ┆ ---   │
+│ str  ┆ u32 ┆ u32 ┆ u32 ┆   ┆ u32         ┆ u32        ┆ u32      ┆ u32   │
+╞══════╪═════╪═════╪═════╪═══╪═════════════╪════════════╪══════════╪═══════╡
+│ D14  ┆ 0   ┆ 0   ┆ 0   ┆ … ┆ 8           ┆ 0          ┆ 0        ┆ 0     │
+│ D5   ┆ 0   ┆ 0   ┆ 0   ┆ … ┆ 4           ┆ 0          ┆ 0        ┆ 0     │
+│ D16  ┆ 0   ┆ 0   ┆ 0   ┆ … ┆ 4           ┆ 0          ┆ 0        ┆ 2     │
+│ D10  ┆ 0   ┆ 0   ┆ 0   ┆ … ┆ 4           ┆ 0          ┆ 0        ┆ 0     │
+│ D11  ┆ 0   ┆ 0   ┆ 0   ┆ … ┆ 6           ┆ 0          ┆ 0        ┆ 3     │
+└──────┴─────┴─────┴─────┴───┴─────────────┴────────────┴──────────┴───────┘
+{
+  "p95_price": 143.5,
+  "p995_price": 185.49,
+  "p1": {
+    "observed_of_37": 9,
+    "ordinary_mean_of_37": 8.501,
+    "ordinary_95pct_range": [
+      6.0,
+      11.0
+    ],
+    "one_sided_p": 0.487,
+    "all_scored_days_rate": 0.2590612002376708
+  },
+  "p2": {
+    "observed_of_37": 18,
+    "ordinary_mean_of_37": 14.867,
+    "ordinary_95pct_range": [
+      11.0,
+      18.024999999999977
+    ],
+    "one_sided_p": 0.075,
+    "all_scored_days_rate": 0.39928698752228164
+  },
+  "p2_top05": {
+    "observed_of_37": 1,
+    "ordinary_mean_of_37": 2.744,
+    "ordinary_95pct_range": [
+      0.0,
+      5.0
+    ],
+    "one_sided_p": 0.96,
+    "all_scored_days_rate": 0.058229352346999406
+  },
+  "union": {
+    "observed_of_37": 24,
+    "ordinary_mean_of_37": 21.565,
+    "ordinary_95pct_range": [
+      18.0,
+      25.0
+    ],
+    "one_sided_p": 0.179,
+    "all_scored_days_rate": 0.5662507427213309
+  },
+  "target_days_after_dfs_archive_ends": 14
+}
