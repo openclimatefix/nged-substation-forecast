@@ -39,10 +39,10 @@ decision_rule: >-
   C1 PRE minus POST at D+1; C2 PRE minus R0 at D+1 and at all leads 0.5 to 168 hours; C3 PRE-T
   minus PRE at D+1. `supported` when C1 is at most -0.02 with its interval wholly below zero, and
   the Checks list shows no sign flip when one substation is left out. `partly supported` when C1's
-interval is wholly below zero but its point estimate is above -0.02. `not supported` otherwise (the
-order does not matter). The threshold -0.02 is set by cost: a network at the GAM stage replaces the
-network after the filter, so the cost is the same one trained component, and a smaller gain does not
-justify redesigning the serving order.
+  interval is wholly below zero but its point estimate is above -0.02. `not supported` otherwise (the
+  order does not matter). The threshold -0.02 is set by cost: a network at the GAM stage replaces the
+  network after the filter, so the cost is the same one trained component, and a smaller gain does not
+  justify redesigning the serving order.
 benchmark: >-
   Arm D of experiment 155 (R0) and experiment 201's arm 2 network (POST), on the scored year
 row_set_id: >-
