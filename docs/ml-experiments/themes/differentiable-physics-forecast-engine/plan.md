@@ -6,6 +6,7 @@ order for the maintainer to change.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| Ensemble members in the best-guess stack (experiment 187) | Does passing the 51 ensemble members through the solar term lower the daylight score by at least 1% under a corrected known-answer gate, and how much of the gain needs the day's own members? | 1 (follow-up to experiment 184) | Nothing; CPU, 4 cores | Planned |
 | Unlabelled worst days (experiment 174) | Is the loss on the 37 worst days that experiment 172 could not label weather error, a day shared with other Primaries, or an error at one substation only? | 1 (decides whether fine-tuning targets weather, switching, or single-site faults) | Nothing; CPU, under 2 hours | Planned |
 | Holiday-aware filter updating (experiment 143) | Does leaving holiday readings out of the GAM-K filter's update lower the score on the days after a holiday, without hurting holiday days? | 1 (the forecast is judged over this Christmas) | Nothing; CPU, about 1 hour | Planned |
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
