@@ -1,0 +1,86 @@
+PS5 (a): series whose `information` field names an added-back generator or a reading that is not working
+  series in the table: 33; with an information note: 5
+  generator (Biofuel, EHV Customer): customer not exporting
+  D8 (Disaggregated Demand, Primary): added-back generators and analogues not working
+  generator (PV, EHV Customer): analogue suspect
+  generator (PV, HV Customer): analogue not working
+  generator (Other (Generation), HV Customer): analogue not working
+  Primaries typed Disaggregated Demand: 16; with an added-back note: 1
+  metered generators and batteries: 13; with a note: 4
+
+PS5 (b): reading availability of the metered generators and batteries since 2024-01-01 (anonymous labels)
+  BESS 1: 1.11 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+  Biofuel 1: 1.01 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+  Other (Generation) 1: 0.04 of half-hours since 2024-01-01 have a reading; last reading 2026-01-26
+  PV 1: 0.95 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
+  PV 2: 1.00 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
+  PV 3: 0.78 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+  PV 4: 0.91 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
+  PV 5: 0.98 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
+  PV 6: 0.95 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
+  PV 7: 0.00 of half-hours since 2024-01-01 have a reading; last reading 2024-09-26
+  Wind 1: 1.12 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+  Wind 2: 1.11 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+  Wind 3: 1.10 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+
+PS5 (c): left-tail share (residual below -2.5 MW) step of every Primary in the stored panel
+  D10: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
+  D11: overall share 0.003, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.050, max block share 0.050
+  D12: overall share 0.002, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.014, max block share 0.014
+  D14: overall share 0.008, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.134, max block share 0.134
+  D15: overall share nan, half-hours present 0.00, 13-week blocks with data 0, largest block-to-block change nan, max block share nan
+  D16: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.003, max block share 0.003
+  D18: overall share 0.013, half-hours present 0.22, 13-week blocks with data 4, largest block-to-block change 0.040, max block share 0.041
+  D19: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
+  D2: overall share 0.004, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.022, max block share 0.022
+  D21: overall share 0.002, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.012, max block share 0.012
+  D22: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
+  D3: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.001, max block share 0.001
+  D4: overall share 0.001, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.007, max block share 0.007
+  D5: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
+  D8: overall share 0.150, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.173, max block share 0.344
+  D9: overall share 0.012, half-hours present 0.56, 13-week blocks with data 10, largest block-to-block change 0.125, max block share 0.125
+
+PS5 (c2): weekly one-step fit (as for D8) on every Primary with data, weeks before 2026-01-01
+    highest single week 2023-06-05: 0.021; step at least 0.1: False
+    highest single week 2023-05-01: 0.003; step at least 0.1: False
+    highest single week 2023-05-01: 0.003; step at least 0.1: False
+    highest single week 2023-05-01: 0.000; step at least 0.1: False
+    highest single week 2025-12-15: 0.598; step at least 0.1: True
+    highest single week 2024-01-22: 0.652; step at least 0.1: False
+    highest single week 2023-06-26: 0.006; step at least 0.1: False
+    highest single week 2023-10-30: 0.030; step at least 0.1: False
+    highest single week 2026-05-04: 0.048; step at least 0.1: False
+    highest single week 2025-09-29: 0.074; step at least 0.1: False
+  D15: only 0 usable weeks; not fitted
+    highest single week 2025-05-19: 0.006; step at least 0.1: False
+  D18: only 27 usable weeks; not fitted
+    highest single week 2023-05-01: 0.003; step at least 0.1: False
+    highest single week 2023-06-12: 0.071; step at least 0.1: False
+    highest single week 2025-12-15: 0.003; step at least 0.1: False
+
+PS5 (d): price-following assets in the August 2026 ECR, by Primary D-label
+  register slots with a technology: 21633
+  demand-side response register rows: 0; columns 25
+  slots under the 16 Primaries: 312
+  D11: battery, Connected: 1 slot(s), 0.20 MW, 0.00 MWh, connected 2026-04-13 to 2026-04-13
+  D14: gas or oil engine, not CHP, Connected: 1 slot(s), 6.00 MW, 0.00 MWh, connected 2023-06-13 to 2023-06-13
+  D16: battery, Accepted to connect: 1 slot(s), 0.20 MW, 0.00 MWh, connected None to None
+  D2: battery, Connected: 1 slot(s), 0.20 MW, 0.00 MWh, connected 2026-05-01 to 2026-05-01
+  D3: battery, Accepted to connect: 1 slot(s), 0.20 MW, 0.00 MWh, connected None to None
+  D5: gas or oil engine, not CHP, Connected: 1 slot(s), 1.00 MW, 0.00 MWh, connected 2021-03-11 to 2021-03-11
+  D9: battery, Connected: 1 slot(s), 0.25 MW, 0.00 MWh, connected 2024-04-02 to 2024-04-02
+  Primaries with no price-following asset: ['D10', 'D12', 'D15', 'D18', 'D19', 'D21', 'D22', 'D4', 'D8']
+  connected, all 16 Primaries: battery: 3 slot(s), 0.65 MW, 3 Primaries
+  connected, all 16 Primaries: gas or oil engine, not CHP: 2 slot(s), 7.00 MW, 2 Primaries
+  connected price-following slots of at least 1 MW: 2; by site: [('D14', 6.0), ('D5', 1.0)]
+  those with a connection date after 2023-06-01 (the window that matters for D8's history): [('D14', 6.0, datetime.date(2023, 6, 13))]
+  connected CHP slots under the 16 Primaries: 2, 1.40 MW; by site [('D10', 1.4)]
+  whole register, connected gas or oil engines of at least 1 MW: 168, 1265.8 MW (all Primaries, trial or not)
+
+PS1: register entries near G2 (MW and distance only)
+  ECR: gas or oil engine, not CHP, 6.00 MW, Connected, connected 2023-06-13, 0.00 km from G2's coordinates
+  ECR: battery, 10.98 MW, Connected, connected 2021-05-01, 0.27 km from G2's coordinates
+  Capacity Market: gas-fuelled component, connection capacity None MW, 0.05 km from G2's coordinates (grid reference is six-figure, so about 0.07 km precision)
+  Capacity Market: gas-fuelled component, connection capacity None MW, 0.05 km from G2's coordinates (grid reference is six-figure, so about 0.07 km precision)
+  the nearest ECR price-following slot is registered under Primary D14

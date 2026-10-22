@@ -1,0 +1,61 @@
+D8 left-tail share (residual below -2.5 MW) by month; n = half-hours with a residual
+  2023-05:0.001 2023-06:0.035 2023-07:0.000 2023-08:0.112 2023-09:0.353 2023-10:0.357 2023-11:0.235 2023-12:0.194 2024-01:0.255 2024-02:0.149 2024-03:0.259 2024-04:0.187 2024-05:0.353 2024-06:0.343 2024-07:0.319 2024-08:0.173 2024-09:0.262 2024-10:0.220 2024-11:0.205 2024-12:0.170 2025-01:0.319 2025-02:0.102 2025-03:0.206 2025-04:0.185 2025-05:0.293 2025-06:0.326 2025-07:0.459 2025-08:0.363 2025-09:0.188 2025-10:0.229 2025-11:0.147 2025-12:0.361 2026-01:0.292 2026-02:0.174 2026-03:0.070 2026-04:0.008 2026-05:0.022 2026-06:0.039
+  design: May 2023 0.000; Jun 0.035; Jul 0.000; Aug 0.112; Sep 0.353; Oct 0.353; Nov 2025 0.147; Jan 2026 0.292; Feb 0.174; Mar 0.070; Apr 0.008; May 0.022; Jun 0.039
+  months with under 80% of half-hours present: []
+  July 2023: 0/1488 = 0.000 (Wilson 0.000 to 0.003)
+  Sep 2023: 509/1440 = 0.353 (Wilson 0.329 to 0.379)
+  Jan 2026: 434/1488 = 0.292 (Wilson 0.269 to 0.315)
+  Apr 2026: 12/1437 = 0.008 (Wilson 0.005 to 0.015)
+
+D8 left-tail share by quarter (design: 0.197 to 0.343 for every quarter 2023Q3 to 2025Q4)
+  2023-04: 0.017 (n=2928)
+  2023-07: 0.153 (n=4416)
+  2023-10: 0.262 (n=4416)
+  2024-01: 0.223 (n=4368)
+  2024-04: 0.295 (n=4368)
+  2024-07: 0.251 (n=4416)
+  2024-10: 0.198 (n=4416)
+  2025-01: 0.212 (n=4320)
+  2025-04: 0.268 (n=4368)
+  2025-07: 0.338 (n=4416)
+  2025-10: 0.247 (n=4416)
+  2026-01: 0.179 (n=4319)
+  2026-04: 0.023 (n=4362)
+  calendar-quarter note: 3-month bins start in May, so also by calendar quarter below
+  calendar quarters: 2023Q2:0.017 2023Q3:0.153 2023Q4:0.262 2024Q1:0.223 2024Q2:0.295 2024Q3:0.251 2024Q4:0.198 2025Q1:0.212 2025Q2:0.268 2025Q3:0.338 2025Q4:0.247 2026Q1:0.179 2026Q2:0.023
+  2023Q3 to 2025Q4: min 0.153, max 0.338
+  every month Sep 2023 to Jan 2026 at least 0.10? min 0.102 (month 2025-02); months below 0.10: []
+  July 2023 at most 0.02? 0.000
+
+Springs (March to May) and April, D8
+  2024: March-May 0.267 (n=4416); April 0.187
+  2025: March-May 0.228 (n=4416); April 0.185
+  2026: March-May 0.034 (n=4411); April 0.008
+
+Experiment 191's scoring window (D8 data from 2025-04-01; scored runs 2025-07-01 to 2026-06-30)
+  D8 monthly left-tail share: 2025-04:0.185 2025-05:0.293 2025-06:0.326 2025-07:0.459 2025-08:0.363 2025-09:0.188 2025-10:0.229 2025-11:0.147 2025-12:0.361 2026-01:0.292 2026-02:0.174 2026-03:0.070 2026-04:0.008 2026-05:0.022 2026-06:0.039
+  scored year 2025-07 to 2026-06: share 0.197 over 17513 half-hours (1.00 of the scored year)
+  2025-07 to 2026-01: share 0.292 over 10320 half-hours (0.59 of the scored year)
+  2026-02 to 2026-06: share 0.061 over 7193 half-hours (0.41 of the scored year)
+
+Weekly step fits (weeks with at least 168 half-hours, before 2026-01-01; threshold -2.5 MW)
+  D8: change point (first week of new regime) 2023-08-14; share 0.010 before, 0.257 after (step +0.246); likelihood-ratio set 2023-08-14 to 2023-08-14; block-bootstrap 95% 2023-08-14 to 2023-08-21; 140 weeks
+  D3: change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step -0.000); likelihood-ratio set 2023-06-26 to 2024-05-13; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
+  D5: change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step +0.000); likelihood-ratio set 2023-06-26 to 2025-11-10; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
+  D14: change point (first week of new regime) 2025-09-29; share 0.000 before, 0.005 after (step +0.005); likelihood-ratio set 2025-09-22 to 2025-09-29; block-bootstrap 95% 2023-07-10 to 2025-11-10; 140 weeks
+  control D3: change point 49 days from D8's; step -0.000; a change point of at least 0.1 in share: False
+  control D5: change point 49 days from D8's; step +0.000; a change point of at least 0.1 in share: False
+  control D14: change point 777 days from D8's; step +0.005; a change point of at least 0.1 in share: False
+
+Sensitivity: capacity-scaled threshold (0.241 x the site's capacity, i.e. -2.5 MW at D8)
+  D8: capacity 10.38 MW, threshold -2.50 MW, overall share 0.210
+  D8 (scaled): change point (first week of new regime) 2023-08-14; share 0.010 before, 0.257 after (step +0.246); likelihood-ratio set 2023-08-14 to 2023-08-14; block-bootstrap 95% 2023-08-14 to 2023-08-21; 140 weeks
+  D3: capacity 12.86 MW, threshold -3.10 MW, overall share 0.000
+  D3 (scaled): change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step -0.000); likelihood-ratio set 2023-06-26 to 2024-05-13; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
+  D5: capacity 5.72 MW, threshold -1.38 MW, overall share 0.002
+  D5 (scaled): change point (first week of new regime) 2025-11-10; share 0.001 before, 0.008 after (step +0.007); likelihood-ratio set 2025-11-10 to 2025-11-10; block-bootstrap 95% 2023-07-03 to 2025-11-10; 140 weeks
+  D14: capacity 11.71 MW, threshold -2.82 MW, overall share 0.001
+  D14 (scaled): change point (first week of new regime) 2025-09-29; share 0.000 before, 0.005 after (step +0.005); likelihood-ratio set 2025-09-22 to 2025-09-29; block-bootstrap 95% 2023-06-26 to 2025-11-10; 140 weeks
+
+Two-step fit of D8 over the whole window (up then down), weeks with at least 168 half-hours
+  up at 2023-08-14 (share 0.010 -> 0.254); down at 2026-03-09 (-> 0.029)

@@ -205,6 +205,15 @@ date after the experiment's window, not rechecked there), and D5 shows a flat mi
 2023-07) and D11 (2020-04). Applies to experiments. Evidence: [experiment
 103](00103-differentiable-physics-1-data-look/result.md) for the step list and D8.
 
+**Treat D8's reading as gross of one gas engine until the weeks of 2023-06-13 to 2023-08-15, and as net
+of it afterwards (provisional, medium confidence).** While the engine's own reading carried output
+(2023-07-03 to 2023-08-15), D8's residual rose by 0.02 MW per MW of engine output, where a net reading
+would fall by 1 MW per MW. D8's share of half-hours with a residual below -2.5 MW then stepped from
+0.010 to 0.257 in the week of 2023-08-14 and stayed between 0.10 and 0.46 in every month to January
+2026. The share fell to under 0.04 from March 2026 with no change in the engine's own readings, so
+whether the engine is visible in D8 from 2026 is unknown. Applies to experiments and production. Evidence:
+[experiment 194](00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md).
+
 **Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
 coefficients exactly at each step) to a window of three months or shorter.** An exact
 least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
