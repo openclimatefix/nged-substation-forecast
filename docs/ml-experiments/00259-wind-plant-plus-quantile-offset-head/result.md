@@ -49,7 +49,8 @@ decision_rule: >-
   trained network to the serving path; a result can therefore be `supported` and still not be worth
   porting. An interval too wide to separate C1 from zero is reported as `inconclusive`, with the
   interval half-width. C5, the 0.99 pinball loss by lead day, and everything else (per farm, per
-  lead band, season, the other arms, coverage) are descriptive and labelled so. The intervals describe these three farms.
+  lead band, season, the other arms, coverage) are descriptive and labelled so.
+  The intervals describe these three farms.
 benchmark: >-
   R0, the XGBoost recipe of experiment 230's A0r fitted on ERA5 before 2024-04-01, and R1, the
   physics core (experiment 230's B1) fitted on the same window, both run on the 51 members with the
@@ -103,7 +104,8 @@ guess. This experiment re-creates the base forecasts on every daily 00 UTC ensem
   learning rate of 0.002 and weight decay of 0.0001, up to 60 epochs, batches of 512, pooled over W1
   to W3, 5 seeds (the seeds are a variance component of the head only; the base fits are
   deterministic or repeated per seed). The epoch with the lowest validation loss is kept and the
-  head is not refitted on the validation runs. Early stopping uses the last 2 months of the training period as validation, by whole
+  head is not refitted on the validation runs. Early stopping uses the last 2 months of the
+  training period as validation, by whole
   ENS runs: training uses runs initialised before 2025-04-16 whose valid time is also before
   2025-04-16, and validation uses runs initialised from 2025-04-16. All settings are frozen before
   any scored month is read.
