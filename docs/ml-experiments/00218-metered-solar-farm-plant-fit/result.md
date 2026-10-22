@@ -21,11 +21,10 @@ hypothesis: >-
   parameters fitted per farm reproduces each farm's output better than the one fleet shape (tilt 35
   degrees, facing south, DC:AC ratio 1.15, 0.4% loss per kelvin, cell temperature equal to air
   temperature plus 25 K times the shape), and explains why the flat top of farms C, D, E, and F
-  falls 6% to 9% from spring to summer ([experiment 183](../00183-metered-farm-flat-top-cause/result.md)).
+  falls 6% to 9% from spring to summer (experiment 183).
 prediction: >-
   The median over the six farms of the fraction of metered output fitted rises from about 0.93
-  (the ceiling of one scale of the fleet shape in [experiment
-  157](../00157-differentiable-physics-joint-pv-capacity-known-answer/result.md), measured on other
+  (the ceiling of one scale of the fleet shape in experiment 157, measured on other
   rows) to 0.97 or more, scored on the 12 months after the tuning months, with CAMS irradiance.
 decision_rule: >-
   The fraction of output fitted is 1 minus the sum of squared errors over the sum of squared metered
