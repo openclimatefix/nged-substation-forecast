@@ -50,8 +50,8 @@ def log_events() -> pl.DataFrame:
         if not m:
             continue
         first, second = int(m.group(1)), m.group(2)
-        for i, r in enumerate(ws.iter_rows(values_only=True)):
-            if i == 0 or len(r) < 6 or not isinstance(r[3], datetime):
+        for r in ws.iter_rows(values_only=True):
+            if len(r) < 6 or not isinstance(r[3], datetime):
                 continue
             rows.append(
                 {

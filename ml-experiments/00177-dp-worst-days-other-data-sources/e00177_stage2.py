@@ -5,6 +5,7 @@ unlabelled worst days with 1,000 draws of 37 matched ordinary days, as `e00177_r
 """
 
 import json
+from datetime import date
 from pathlib import Path
 from typing import Final
 
@@ -29,8 +30,9 @@ def main() -> None:
         date=pl.col("settlementDate").str.to_date(),
         price=pl.max_horizontal("systemSellPrice", "systemBuyPrice"),
     )
-    p95 = prices["price"].quantile(0.95)
-    p995 = prices["price"].quantile(0.995)
+    scored = prices.filter(pl.col("date").is_between(date(2025, 7, 3), date(2026, 6, 30)))
+    p95 = scored["price"].quantile(0.95)
+    p995 = scored["price"].quantile(0.995)
     spike = prices.group_by("date").agg(
         p2=(pl.col("price") >= p95).any(), p2_top05=(pl.col("price") >= p995).any()
     )
