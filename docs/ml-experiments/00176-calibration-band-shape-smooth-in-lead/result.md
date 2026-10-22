@@ -9,7 +9,7 @@ status: done
 size: >-
   simple. Stored: private files under
   data/ml-experiments/00176-calibration-band-shape-smooth-in-lead/ only. Serving path: not touched.
-  Degradation rule: not touched. Designs: the four arms and the shrinkage constant's selection rule
+  Degradation rule: not touched. Designs: the six arms and the shrinkage constant's selection rule
   are pre-registered below, so no choice of design is left open. Callers: this folder's scripts,
   which read experiment 169's stored forecasts and experiment 160's stored spread tables and call
   the reviewed `studies.*` modules without changing them. No refit of the mean forecast.
@@ -67,8 +67,9 @@ headline: >-
   D5's median q05 to q95 width already rises with lead on the rows the experiments score (19.7 to
   27.8 points). The dips and the day-7 jump appear when the switching-event rows are added and when
   the 282 rows at exactly 168.0 hours are binned into an eighth day. A growth in lead that is
-  non-decreasing and piecewise linear costs no score (pooled -0.0017, -0.0076 to +0.0050) and does
-  not remove the all-rows dip, so the dip is not a property of the table.
+  non-decreasing and piecewise linear leaves the score unchanged (pooled difference -0.0017, 95%
+  interval -0.0076 to +0.0050) and does not remove the all-rows dip, so a smoother table of this
+  family does not remove D5's dip.
 lessons:
   - >-
     The dips the brief describes appear in D5's median width only when the switching-event rows are
@@ -77,18 +78,21 @@ lessons:
   - >-
     A growth curve that is non-decreasing in lead, fitted to median-centred tuning residuals,
     scores the same as the stored table (pooled -0.0017, -0.0076 to +0.0050 in the scored year;
-    +0.0005, -0.0080 to +0.0094 in the replicate months), so a smooth shape is free but does not
-    remove D5's all-rows dip.
+    +0.0005, -0.0080 to +0.0094 in the replicate months), so a smooth shape does not change the
+    score but also does not remove D5's all-rows dip.
   - >-
     Shrinking each stored cell towards the pooled table lowers D10's score by 0.0884 (-0.1719 to
     -0.0178) and D14's by 0.0100 (-0.0166 to -0.0036), and raises D5's by 0.0095 in the scored year
     and 0.0205 in the replicate months. Without D10 the pooled change is -0.0015.
 take_home_message: >-
   D5's forecast band already widens steadily with lead time on the rows we score, and the dips
-  appear only when switching-event rows are added, so the stored table does not need smoothing. A
-  smooth widening curve costs no accuracy but does not remove the dips either. Pulling noisy table
+  appear only when switching-event rows are added, so these results give no reason to smooth the
+  stored table. A
+  smooth widening curve does not reduce accuracy but does not remove the dips either. Pulling noisy
+  table
   cells towards a pooled table helps D10 and D14, hurts D5, and leaves cold-night coverage slightly
-  low, so it needs more substations before anyone ports it.
+  low, so shrinkage needs testing on more substations before anyone adds shrinkage to the production
+  forecast.
 advice:
   - >-
     Report band width by lead day on the scored rows and per hour band, not as a median over all
@@ -99,8 +103,8 @@ advice:
     (diagnosis bullet).
   - >-
     Fit any new spread curve to residuals centred on the median of each cell, as the stored table
-    is; fitting raw residuals carried each cell's bias into the band and cost +0.0644 in the
-    replicate months (Checks, audit finding F1).
+    is; fitting raw residuals carried each cell's bias into the band and raised the replicate
+    months' score by +0.0644 (Checks, audit finding F1).
   - >-
     Test shrinking stored spread cells towards a pooled table on more substations before porting:
     the scored-year gain of -0.0196 comes from D10 (-0.0884) and D14 (-0.0100), and D5 loses
@@ -112,22 +116,30 @@ date: 2026-10-22
 
 # Experiment 176: does the band width need to be smoother in lead?
 
-**D5's forecast band already widens with lead time on the rows we score, so the dips seen on D5
-are not a property of the spread table, and smoothing the table does not remove them.** The
-forecast is arm A of [experiment
-169](../00169-calibration-combined-fixes-and-ensemble-spread/result.md): the interpolated spread
-table of [experiment 160](../00160-calibration-band-width-fix-on-stage-2-winner/result.md) plus the
-cold-day widening of [experiment 164](../00164-calibration-cold-night-tail-under-coverage/result.md).
-Its band is the q05 to q95 interval, and its width is the q95 minus the q05, in points of effective
-capacity (percentage points of a substation's rated demand). A lead day counts from the forecast
-time: day 0 is up to 24 hours ahead. The brief reported that D5's median width by lead day peaks on
-day 3, dips, and jumps on day 7, and asked whether three fixes remove the shape. Fix P is a growth
-in lead that is non-decreasing and piecewise linear. Fix S shrinks sparse cells of the stored table
-towards the table pooled across the six substations. Fix PS combines the two. We fitted every fix
-on the tuning months (the odd months of 2024-07 to 2025-06), and scored it on the scored year
-(2025-07-02 to 2026-06-29) and on the replicate months (the even months). The mean forecast is
-unchanged. No fix passes the pre-registered rule. Fix P costs no score and leaves the dip. Fix S
-lowers the score at D10 and D14 and raises it at D5.
+**D5's forecast band already widens with lead time on the rows we score. The dips seen on D5 are
+therefore not a property of the spread table, and smoothing the table does not remove them.** The
+spread table holds one quantile offset for each cell, a combination of hour band, calendar quarter,
+and lead band. D5 is one of six anonymised substations (D5, D9, D10, D11, D14, and D16). The five
+decision substations are all of them except D9. The forecast is arm A of [experiment
+169](../00169-calibration-combined-fixes-and-ensemble-spread/result.md). Arm A reads the
+interpolated spread table of [experiment
+160](../00160-calibration-band-width-fix-on-stage-2-winner/result.md) and widens the upper
+quantiles on forecast-cold days, as [experiment
+164](../00164-calibration-cold-night-tail-under-coverage/result.md) did (fix O). Arm A's band is the
+interval from its q05 to its q95, the 5th and 95th percentile forecasts, and its width is the q95
+minus the q05, in points of effective capacity (percentage points of a substation's rated demand).
+Lead day 0 is the first 24 hours ahead. A request from the experiment manager reported that D5's
+median width by lead day peaks on day 3, dips, and jumps on day 7, and asked whether three fixes
+remove that shape. Fix P is a growth in lead that is non-decreasing and piecewise linear. Fix S
+shrinks sparse cells of the stored table towards the table pooled across the six substations (the
+mean of the substations' tables, each scaled by its substation's mean width). Fix PS combines the
+two. We fitted every fix on the tuning months (the odd months of 2024-07 to 2025-06) and scored
+each fix on the scored year (2025-07-02 to 2026-06-29) and on the replicate months (the even
+months). The score is the quantile score: twice the mean pinball loss over 11 quantiles, in
+points, where lower is better. A row is one forecast of one substation from one forecast run (one
+issue time) for one valid time. The scored rows are the rows outside the hand-filtered switching
+events, which every experiment in this series scores. The mean forecast is unchanged. Fix P leaves
+the score unchanged and leaves the dip. Fix S lowers the score at D10 and D14 and raises it at D5.
 
 ![D5 median width by lead day](figure_1_d5_width_by_lead_day.svg)
 
@@ -152,7 +164,8 @@ lowers the score at D10 and D14 and raises it at D5.
   either row set (figure 2).
 - **Arms.** A: the reference. P: offset = scale(substation, hour band, quarter) times a growth
   curve per hour band and quarter, pooled over substations, non-decreasing in lead with a knot every
-  24 hours, fitted on the pinball loss by linear programme (HiGHS) at the eight levels q01, q05,
+  24 hours, fitted on the pinball loss by linear programme (the open-source HiGHS solver) at the
+  eight levels q01, q05,
   q10, q25, q75, q90, q95, and q99. PB: the growth curve per hour band only. U: a growth curve per
   substation, hour band, and quarter (no pooling). S: each cell of the stored table shrunk towards
   the pooled table (the pool includes D9), with weight runs / (runs + k), where runs counts the
@@ -163,15 +176,15 @@ lowers the score at D10 and D14 and raises it at D5.
   Contrasts: C1 is P minus A, C2 is S minus A, C3 is PS minus A.
 - **Shrinkage constant.** Three-fold cross-validation across alternate tuning months gave held-out
   pinball losses of 19.91, 19.58, 19.40, 19.32, 19.32, and 19.33 for k = 0, 5, 20, 80, 320, and
-  1280. The curve is flat from 80 upwards, so 80 is weakly identified. The grid began at 0 to 80
-  and was extended to 1280 after a first run chose 80, the edge of the grid. The same k = 80 is
+  1280. The curve is flat from 80 upwards, so 80 is weakly identified. The grid runs from 0 to 1280.
+  The same k = 80 is
   reused for PS, whose cells hold about four times as many runs, so PS shrinks less than S.
 - **Row set and schedule.** `fold_a_daily_gap_v1`, the five decision substations D5, D10, D11, D14,
   and D16 (D9 is scored beside them, is in the pool of fix S, and is in the per-substation limit of
   rule 2 but not in any pooled contrast), leads 0.5 to 168 hours, rows outside the switching
   events, 464,363 rows over the five substations in the scored year. The mean forecasts are
-  experiment 155's monthly refits, so no contrast depends on the retraining schedule. Arm A rebuilt
-  from experiment 169's reference arm and the fix-O multipliers scores 2.7521 over the five
+  experiment 155's monthly refits, so no contrast depends on the retraining schedule. We rebuilt arm
+  A from experiment 169's reference arm and the fix-O multipliers. It scores 2.7521 over the five
   substations against the printed 2.7519, inside the 0.001 cap.
 - **Pre-registered rule, scored year.** The plan's "all-row" score means the rows outside the
   switching events. Rule 1 (D5's median width non-decreasing to within 3% on both row sets): A
@@ -197,8 +210,8 @@ lowers the score at D10 and D14 and raises it at D5.
   in the scored year and -0.0006 (-0.0100 to +0.0087) in the replicate months, and PS is -0.0027
   (-0.0107 to +0.0056) and -0.0015 (-0.0158 to +0.0144). Leaving out any other substation keeps S
   at -0.022 to -0.026 in the scored year. D10's quarter-3 cells come from November 2024 alone
-  (about 30 runs each, a shrinkage weight of 0.27), a month with q05 offsets down to -31.5 points,
-  so the shrinkage pulls those cells strongly towards the pool. The audit found the same D10 gain
+  (about 30 runs each, a shrinkage weight of 0.27). The month has q05 offsets down to -31.5 points.
+  Shrinkage therefore pulls those cells strongly towards the pool. The audit found the same D10 gain
   in October 2024 and in October to December 2025.
 - **Tail pinball loss, scored year, five substations (q01, q05, q95, q99).** A: 0.216, 0.714,
   0.745, 0.232. P: 0.210, 0.710, 0.746, 0.228. S: 0.217, 0.705, 0.732, 0.223. PS: 0.213, 0.704,
@@ -208,20 +221,23 @@ lowers the score at D10 and D14 and raises it at D5.
   0.951.
 - **Caveats.** The tuning months are six alternate months, so a cell holds about 45 forecast runs.
   The shrinkage cross-validation holds out whole months, so a held-out November or May is scored
-  against cells built from a few runs in the same quarter, which favours heavy shrinkage. Month-end
+  against cells built from a few runs in the same quarter. That set-up makes heavy shrinkage score
+  well. Month-end
   runs forecast seven days into the next month, so 18% of the replicate months' valid times are
-  also targets of tuning runs (the scored year has no overlap). Rule 2's limit of +0.005 at every
-  substation cannot be met by month-resampled intervals of 12 months unless the effect is near
-  zero (half-widths run from 0.004 to 0.10). S's drop in cold-night coverage comes mostly from D11
+  also targets of tuning runs (the scored year has no overlap). No arm can meet rule 2 unless its
+  effect is near zero. Month-resampled intervals over 12 months have half-widths of 0.004 to 0.10,
+  and rule 2 requires an upper bound of +0.005 at every substation. S's drop in cold-night coverage
+  comes mostly from D11
   (0.846 to 0.810), not D5. The cold-night rows are dominated by D10, D11, and D14 (1,583 rows
   each) over D5 and D16 (323 each).
-- **What to try next.** (1) Show the substation cards' band width by lead day on the scored rows,
+- **Candidate follow-ups.** (1) Show the substation cards' band width by lead day on the scored
+  rows,
   per hour band. (2) Test shrinking stored cells on more substations. (3) A small neural component
   that learns the offsets as a smooth function of lead, hour band, and season, pooled over
   substations and fitted to residuals from a longer history, is a candidate, with the convex
   growth as the comparison arm. The prediction that could fail: its pooled score stays within
-  +-0.005 of arm A's, because the convex growth already scores within that range, so it can gain
-  only by improving a substation that shrinkage improves (D10 or D14).
+  ±0.005 of arm A's, because the convex growth already scores within that range. The neural
+  component can then gain only by improving a substation that shrinkage improves (D10 or D14).
 
 ## Checks
 
@@ -231,21 +247,21 @@ lowers the score at D10 and D14 and raises it at D5.
   the mean is unchanged.
 - **Reproduction control.** Arm A rebuilt from the stored reference and fix-O multipliers differs
   from experiment 169's stored arm A by at most 1.5e-5 points in any quantile.
-- **Triggers.** Trigger 2 fired: fix S moved the pooled score by -0.0196 against a prediction of
-  under 0.003, and D10 moved by -0.0884. The leave-one-out and the audit explain both (D10's
-  November cells). Trigger 4 fired: S's and PS's pooled gains lose significance without D10, and
+- **Triggers.** Trigger 2 of the ml-experiment skill (a result contradicts its prediction) fired:
+  fix S moved the pooled score by -0.0196 against a prediction of under 0.003, and D10 moved by
+  -0.0884. The leave-one-out and the audit explain the D10 move and the fix-S move (D10's November
+  cells). Trigger 4 (leaving one site out changes a contrast's verdict) fired: S's and PS's pooled
+  gains lose significance without D10, and
   S's replicate-month gain does without D14. The experiment's verdict does not depend on either,
   because every arm fails rule 2 with or without them.
 - **Audit (fresh Opus agent; report private, `data/ml-experiments/briefs/e176_audit_report.md`).**
-  F1: the first fits of P, PB, U, and PS used raw residuals, while the stored table is centred on
-  each cell's median, so each cell carried the tuning months' bias into the band. P then scored
-  +0.0052 in the scored year and +0.0644 in the replicate months (D10 +0.1695). The fits were
-  redone on centred residuals, and every number on this page is from the redone fits. F2: fix S
-  matches an independent rebuild with a gap of 0, and D10's gain is real but comes from one
-  substation's one-month cells; named above. F3: the shrinkage cross-validation built uncentred
-  tables; redone centred (k stayed 80). F4: the pool includes D9; stated in Arms. F5: no leakage;
-  the 18% overlap is in the caveats.
-- **Code review (Sonnet).** No leakage and no bug that changes a result. Triage: the
-  cross-validation confound with season and the reuse of k for PS are in the caveats; the fix-O
-  tolerance constant was a unit slip (0.1 instead of 0.01), corrected, with no change in any
-  number; the 0.001 reproduction cap is applied by hand (gap 0.00016).
+  The stored table is centred on each cell's median, so every fit here uses residuals centred the
+  same way (audit finding F1). Fitting raw residuals instead carried each cell's bias into the band
+  and gave P +0.0052 in the scored year and +0.0644 in the replicate months (D10 +0.1695). The
+  shrinkage cross-validation builds centred tables too (F3), and k stayed 80. Fix S matches an
+  independent rebuild with a gap of 0, and D10's gain is real but comes from one substation's
+  one-month cells, as described under "Leaving one substation out" (F2). The pool includes D9
+  (F4). The audit found no leakage; the 18% overlap is in the caveats (F5).
+- **Code review (Sonnet).** The reviewer found no leakage and no bug that changes a result in the
+  scripts it read. The cross-validation's confound with season and the reuse of k for PS are in the
+  caveats. The 0.001 reproduction cap is applied by hand (gap 0.00016).
