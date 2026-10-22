@@ -1,0 +1,135 @@
+== Events: 35 transfers over 1 day (pairs lettered A.. by moved MW) ==
+shape: (18, 3)
+┌──────┬─────┬───────┐
+│ mw   ┆ n   ┆ label │
+│ ---  ┆ --- ┆ ---   │
+│ f64  ┆ u32 ┆ str   │
+╞══════╪═════╪═══════╡
+│ 11.5 ┆ 6   ┆ A     │
+│ 3.9  ┆ 1   ┆ B     │
+│ 3.2  ┆ 3   ┆ C     │
+│ 2.75 ┆ 4   ┆ D     │
+│ 2.55 ┆ 3   ┆ E     │
+│ …    ┆ …   ┆ …     │
+│ 0.95 ┆ 2   ┆ N     │
+│ 0.9  ┆ 1   ┆ O     │
+│ 0.9  ┆ 1   ┆ P     │
+│ 0.85 ┆ 1   ┆ Q     │
+│ 0.7  ┆ 1   ┆ R     │
+└──────┴─────┴───────┘
+
+== Headline: arms at 80 unexplained odd-month alarms ==
+arm | found/35 | onset only/35 | found/66 | MW-weighted recall [95%] | minus RO-NC [95%] | gained | lost | median onset err h | found/29 both-see
+RO-NC | 19 | 22 | 19 | 0.678 [0.479, 0.799] | +0.000 [+0.000, +0.000] | 0 | 0 | 0.50 | 15/29
+Pair alarm | 5 | 5 | 5 | 0.166 [0.042, 0.364] | -0.512 [-0.697, -0.224] | 1 | 15 | 0.50 | 5/29
+U RO-NC + pair (rule) | 18 | 20 | 18 | 0.657 [0.447, 0.782] | -0.021 [-0.087, +0.000] | 0 | 1 | 0.50 | 14/29
+F logistic | 23 | 26 | 23 | 0.742 [0.572, 0.853] | +0.064 [+0.012, +0.154] | 4 | 0 | 0.50 | 19/29
+F tree | 22 | 25 | 22 | 0.728 [0.555, 0.839] | +0.050 [-0.002, +0.132] | 4 | 1 | 0.50 | 18/29
+F network | 21 | 24 | 21 | 0.637 [0.410, 0.786] | -0.041 [-0.261, +0.115] | 4 | 2 | 0.50 | 17/29
+R re-ranker | 23 | 25 | 23 | 0.742 [0.572, 0.853] | +0.064 [+0.012, +0.154] | 4 | 0 | 0.50 | 19/29
+C stack | 21 | 24 | 21 | 0.637 [0.410, 0.786] | -0.041 [-0.261, +0.115] | 4 | 2 | 0.50 | 17/29
+U F network + RO-NC | 23 | 25 | 23 | 0.742 [0.572, 0.853] | +0.064 [+0.012, +0.154] | 4 | 0 | 0.50 | 19/29
+U F network + pair | 21 | 24 | 21 | 0.637 [0.410, 0.786] | -0.041 [-0.261, +0.115] | 4 | 2 | 0.50 | 17/29
+U R re-ranker + pair | 23 | 25 | 23 | 0.742 [0.572, 0.853] | +0.064 [+0.012, +0.154] | 4 | 0 | 0.50 | 19/29
+I F network & RO-NC | 21 | 24 | 21 | 0.717 [0.533, 0.831] | +0.039 [-0.023, +0.123] | 3 | 1 | 0.50 | 17/29
+I F network & pair | 10 | 11 | 10 | 0.299 [0.160, 0.466] | -0.379 [-0.564, -0.125] | 2 | 11 | 0.50 | 9/29
+
+== Count difference vs RO-NC (events), 95% pair interval ==
+Pair alarm: -14.0 events [-19.6, -7.0] (unweighted share x 35)
+U RO-NC + pair (rule): -1.0 events [-3.9, +0.0] (unweighted share x 35)
+F logistic: +4.0 events [+0.9, +7.8] (unweighted share x 35)
+F tree: +3.0 events [+0.0, +6.4] (unweighted share x 35)
+F network: +2.0 events [-2.1, +5.7] (unweighted share x 35)
+R re-ranker: +4.0 events [+0.9, +7.8] (unweighted share x 35)
+C stack: +2.0 events [-2.1, +5.7] (unweighted share x 35)
+U F network + RO-NC: +4.0 events [+0.9, +7.8] (unweighted share x 35)
+U F network + pair: +2.0 events [-2.1, +5.7] (unweighted share x 35)
+U R re-ranker + pair: +4.0 events [+0.9, +7.8] (unweighted share x 35)
+I F network & RO-NC: +2.0 events [-1.9, +5.8] (unweighted share x 35)
+I F network & pair: -9.0 events [-15.7, -1.3] (unweighted share x 35)
+
+== Found per pair (35 events) ==
+RO-NC: A=4 B=1 C=2 D=2 E=1 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=1 N=0 O=1 P=0 Q=0 R=1
+Pair alarm: A=0 B=0 C=1 D=0 E=1 F=1 G=0 H=0 I=1 J=0 K=1 L=0 M=0 N=0 O=0 P=0 Q=0 R=0
+U RO-NC + pair (rule): A=4 B=1 C=2 D=2 E=1 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=1 N=0 O=0 P=0 Q=0 R=1
+F logistic: A=4 B=1 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=2 N=0 O=1 P=1 Q=0 R=1
+F tree: A=4 B=1 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=1 N=0 O=1 P=1 Q=0 R=1
+F network: A=4 B=0 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=1 N=0 O=1 P=1 Q=0 R=1
+R re-ranker: A=4 B=1 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=2 N=0 O=1 P=1 Q=0 R=1
+C stack: A=4 B=0 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=1 N=0 O=1 P=1 Q=0 R=1
+U F network + RO-NC: A=4 B=1 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=2 N=0 O=1 P=1 Q=0 R=1
+U F network + pair: A=4 B=0 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=1 N=0 O=1 P=1 Q=0 R=1
+U R re-ranker + pair: A=4 B=1 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=2 N=0 O=1 P=1 Q=0 R=1
+I F network & RO-NC: A=4 B=1 C=2 D=3 E=2 F=1 G=2 H=1 I=2 J=0 K=0 L=0 M=0 N=0 O=1 P=1 Q=0 R=1
+I F network & pair: A=1 B=0 C=1 D=3 E=1 F=1 G=0 H=0 I=1 J=0 K=0 L=0 M=0 N=0 O=0 P=1 Q=0 R=1
+events per pair: A=6 B=1 C=3 D=4 E=3 F=1 G=3 H=1 I=2 J=1 K=1 L=1 M=2 N=2 O=1 P=1 Q=1 R=1
+
+== Leave one pair out: found/35 total with the pair removed (best learned arm vs RO-NC) ==
+F network minus RO-NC with one pair removed: A:+2 B:+3 C:+2 D:+1 E:+1 F:+2 G:+2 H:+2 I:+2 J:+2 K:+2 L:+2 M:+2 N:+2 O:+2 P:+1 Q:+2 R:+2
+R re-ranker minus RO-NC with one pair removed: A:+4 B:+4 C:+4 D:+3 E:+3 F:+4 G:+4 H:+4 I:+4 J:+4 K:+4 L:+4 M:+3 N:+4 O:+4 P:+3 Q:+4 R:+4
+C stack minus RO-NC with one pair removed: A:+2 B:+3 C:+2 D:+1 E:+1 F:+2 G:+2 H:+2 I:+2 J:+2 K:+2 L:+2 M:+2 N:+2 O:+2 P:+1 Q:+2 R:+2
+U RO-NC + pair (rule) minus RO-NC with one pair removed: A:-1 B:-1 C:-1 D:-1 E:-1 F:-1 G:-1 H:-1 I:-1 J:-1 K:-1 L:-1 M:-1 N:-1 O:+0 P:-1 Q:-1 R:-1
+
+== Injected transfers (odd months): recall of start and end, by arm ==
+eval_held | RO-NC | n=998 | found 0.259 | onset 0.322 | over 1 day 0.576 | unmetered receiver 0.198 (n=339) | metered 0.290 (n=659)
+eval_held | Pair alarm | n=998 | found 0.102 | onset 0.193 | over 1 day 0.216 | unmetered receiver 0.018 (n=339) | metered 0.146 (n=659)
+eval_held | U RO-NC + pair (rule) | n=998 | found 0.258 | onset 0.353 | over 1 day 0.568 | unmetered receiver 0.198 (n=339) | metered 0.288 (n=659)
+eval_held | F logistic | n=998 | found 0.261 | onset 0.416 | over 1 day 0.568 | unmetered receiver 0.198 (n=339) | metered 0.293 (n=659)
+eval_held | F tree | n=998 | found 0.262 | onset 0.418 | over 1 day 0.571 | unmetered receiver 0.201 (n=339) | metered 0.293 (n=659)
+eval_held | F network | n=998 | found 0.254 | onset 0.414 | over 1 day 0.559 | unmetered receiver 0.204 (n=339) | metered 0.279 (n=659)
+eval_held | R re-ranker | n=998 | found 0.268 | onset 0.370 | over 1 day 0.602 | unmetered receiver 0.221 (n=339) | metered 0.291 (n=659)
+eval_held | C stack | n=998 | found 0.259 | onset 0.415 | over 1 day 0.571 | unmetered receiver 0.204 (n=339) | metered 0.287 (n=659)
+eval_held | U F network + RO-NC | n=998 | found 0.267 | onset 0.421 | over 1 day 0.583 | unmetered receiver 0.206 (n=339) | metered 0.297 (n=659)
+eval_held | U F network + pair | n=998 | found 0.246 | onset 0.402 | over 1 day 0.544 | unmetered receiver 0.195 (n=339) | metered 0.273 (n=659)
+eval_held | U R re-ranker + pair | n=998 | found 0.264 | onset 0.394 | over 1 day 0.588 | unmetered receiver 0.212 (n=339) | metered 0.290 (n=659)
+eval_held | I F network & RO-NC | n=998 | found 0.266 | onset 0.361 | over 1 day 0.592 | unmetered receiver 0.201 (n=339) | metered 0.299 (n=659)
+eval_held | I F network & pair | n=998 | found 0.136 | onset 0.254 | over 1 day 0.285 | unmetered receiver 0.032 (n=339) | metered 0.190 (n=659)
+eval_fitted | RO-NC | n=639 | found 0.257 | onset 0.305 | over 1 day 0.534 | unmetered receiver 0.243 (n=255) | metered 0.266 (n=384)
+eval_fitted | Pair alarm | n=639 | found 0.119 | onset 0.208 | over 1 day 0.217 | unmetered receiver 0.027 (n=255) | metered 0.180 (n=384)
+eval_fitted | U RO-NC + pair (rule) | n=639 | found 0.266 | onset 0.355 | over 1 day 0.545 | unmetered receiver 0.243 (n=255) | metered 0.281 (n=384)
+eval_fitted | F logistic | n=639 | found 0.286 | onset 0.440 | over 1 day 0.572 | unmetered receiver 0.271 (n=255) | metered 0.297 (n=384)
+eval_fitted | F tree | n=639 | found 0.302 | onset 0.460 | over 1 day 0.607 | unmetered receiver 0.278 (n=255) | metered 0.318 (n=384)
+eval_fitted | F network | n=639 | found 0.293 | onset 0.440 | over 1 day 0.586 | unmetered receiver 0.275 (n=255) | metered 0.305 (n=384)
+eval_fitted | R re-ranker | n=639 | found 0.274 | onset 0.358 | over 1 day 0.572 | unmetered receiver 0.259 (n=255) | metered 0.284 (n=384)
+eval_fitted | C stack | n=639 | found 0.293 | onset 0.440 | over 1 day 0.586 | unmetered receiver 0.275 (n=255) | metered 0.305 (n=384)
+eval_fitted | U F network + RO-NC | n=639 | found 0.293 | onset 0.438 | over 1 day 0.586 | unmetered receiver 0.275 (n=255) | metered 0.305 (n=384)
+eval_fitted | U F network + pair | n=639 | found 0.288 | onset 0.438 | over 1 day 0.576 | unmetered receiver 0.271 (n=255) | metered 0.299 (n=384)
+eval_fitted | U R re-ranker + pair | n=639 | found 0.280 | onset 0.401 | over 1 day 0.576 | unmetered receiver 0.267 (n=255) | metered 0.289 (n=384)
+eval_fitted | I F network & RO-NC | n=639 | found 0.277 | onset 0.336 | over 1 day 0.572 | unmetered receiver 0.263 (n=255) | metered 0.286 (n=384)
+eval_fitted | I F network & pair | n=639 | found 0.158 | onset 0.271 | over 1 day 0.300 | unmetered receiver 0.059 (n=255) | metered 0.224 (n=384)
+
+== Alarm accounting (mean over folds) ==
+RO-NC | alarms (all months) 296 | unexplained odd 80 | balanced-opposite among those 10.0 | unexplained all months 149 | per Primary-month (odd months) 0.185
+Pair alarm | alarms (all months) 378 | unexplained odd 80 | balanced-opposite among those 7.0 | unexplained all months 193 | per Primary-month (odd months) 0.185
+U RO-NC + pair (rule) | alarms (all months) 334 | unexplained odd 80 | balanced-opposite among those 11.0 | unexplained all months 148 | per Primary-month (odd months) 0.185
+F logistic | alarms (all months) 370 | unexplained odd 80 | balanced-opposite among those 16.3 | unexplained all months 161 | per Primary-month (odd months) 0.185
+F tree | alarms (all months) 346 | unexplained odd 80 | balanced-opposite among those 14.7 | unexplained all months 107 | per Primary-month (odd months) 0.185
+F network | alarms (all months) 315 | unexplained odd 80 | balanced-opposite among those 16.7 | unexplained all months 103 | per Primary-month (odd months) 0.185
+R re-ranker | alarms (all months) 263 | unexplained odd 80 | balanced-opposite among those 14.0 | unexplained all months 94 | per Primary-month (odd months) 0.185
+C stack | alarms (all months) 319 | unexplained odd 80 | balanced-opposite among those 17.3 | unexplained all months 104 | per Primary-month (odd months) 0.185
+U F network + RO-NC | alarms (all months) 350 | unexplained odd 80 | balanced-opposite among those 16.7 | unexplained all months 127 | per Primary-month (odd months) 0.185
+U F network + pair | alarms (all months) 343 | unexplained odd 80 | balanced-opposite among those 17.0 | unexplained all months 118 | per Primary-month (odd months) 0.185
+U R re-ranker + pair | alarms (all months) 303 | unexplained odd 80 | balanced-opposite among those 13.7 | unexplained all months 106 | per Primary-month (odd months) 0.185
+I F network & RO-NC | alarms (all months) 289 | unexplained odd 77 | balanced-opposite among those 14.3 | unexplained all months 124 | per Primary-month (odd months) 0.177
+I F network & pair | alarms (all months) 330 | unexplained odd 77 | balanced-opposite among those 14.0 | unexplained all months 132 | per Primary-month (odd months) 0.178
+
+== Candidate ceilings (real record) ==
+RO-NC candidates (x): onset candidate for 29/35, start-and-end candidate for 26/35, 1781 candidates
+x + pair candidates: onset candidate for 29/35, start-and-end candidate for 26/35, 2980 candidates
+
+== Which events each arm finds that RO-NC misses (lettered pair, hours, MW) ==
+Pair alarm: gains 1 [K 100 h 1.2 MW]; loses 15
+U RO-NC + pair (rule): gains 0 []; loses 1
+F logistic: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 0
+F tree: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 1
+F network: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 2
+R re-ranker: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 0
+C stack: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 2
+U F network + RO-NC: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 0
+U F network + pair: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 2
+U R re-ranker + pair: gains 4 [D 55 h 0.6 MW; P 71 h 0.9 MW; M 59 h 0.5 MW; E 93 h 0.8 MW]; loses 0
+I F network & RO-NC: gains 3 [D 55 h 0.6 MW; P 71 h 0.9 MW; E 93 h 0.8 MW]; loses 1
+I F network & pair: gains 2 [D 55 h 0.6 MW; P 71 h 0.9 MW]; loses 11
+fold 0: {"tree_config": [4, 300], "n_parameters": {"F network": 2209, "R re-ranker": 10089}, "stack_coefficients": [3.587476592554568, 0.41668321949176473, 0.39400197894922645, 0.16417778177973202], "train_rows": 31060, "train_positives": 1859}
+fold 1: {"tree_config": [4, 300], "n_parameters": {"F network": 2209, "R re-ranker": 10089}, "stack_coefficients": [5.421712782504873, 0.47018067237190264, 0.383394798334837, 0.007031958222048347], "train_rows": 31236, "train_positives": 2181}
+fold 2: {"tree_config": [4, 300], "n_parameters": {"F network": 2209, "R re-ranker": 10089}, "stack_coefficients": [4.493445993446243, 0.15882106426873405, -0.06032063096317366, 0.1575497035196184], "train_rows": 31084, "train_positives": 1999}
