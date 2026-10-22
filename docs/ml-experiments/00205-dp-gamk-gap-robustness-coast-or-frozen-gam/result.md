@@ -11,7 +11,8 @@ size: >-
   medium. Stored: private files under
   data/ml-experiments/00205-dp-gamk-gap-robustness-coast-or-frozen-gam/
   only. Serving path: not touched. Degradation rule: not changed (the result is evidence for a later
-  rule about missing power readings, which is a separate issue). Designs: more than one is defensible
+  rule about missing power readings, which is a separate issue). Designs: more than one is
+  defensible
   (where a gap sits relative to the forecast, how the bands are widened, whether the fallback keeps
   the later corrections), and this plan pre-registers one of each and runs the alternative of the
   last as a labelled secondary rule. Callers: this folder's scripts, which copy the base-forecast
@@ -62,7 +63,9 @@ decision_rule: >-
   of q05 and q95 coverage from nominal is smaller at 24 and 72 hours by more than the binomial
   standard error of the difference, and its score minus rule (a)'s is at most +0.01 at every length.
   The verdict is capped at `inconclusive` if a control fails: with no gap the rebuilt rule (a)
-  reproduces experiment 155's arm D to within 0.001 points on the mean forecast; replacing, with random numbers, every actual at or after a run's origin leaves that run's mean forecast unchanged; and rule (b) with the
+  reproduces experiment 155's arm D to within 0.001 points on the mean forecast; replacing, with
+  random numbers, every actual at or after a run's origin leaves that run's mean forecast
+  unchanged; and rule (b) with the
   extra variance set to zero equals rule (a) exactly.
 benchmark: >-
   The no-gap score of the same event runs under the same pipeline (arm D of experiment 155, rebuilt
@@ -70,7 +73,8 @@ benchmark: >-
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Quantile score (twice the mean pinball loss over the 11 quantiles of experiment 87) in points of
-  effective capacity, over leads 0.5 to 168 hours on rows outside the hand-filtered switching events,
+  effective capacity, over leads 0.5 to 168 hours on rows outside the hand-filtered switching
+  events,
   and under 24 hours and 12 to 36 hours; q05 and q95 coverage; mean absolute error of the mean
   forecast beside every quantile-score contrast
 code: ml-experiments/00205-dp-gamk-gap-robustness-coast-or-frozen-gam/
