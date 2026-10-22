@@ -91,13 +91,15 @@ date: 2026-10-22
 **The 17 unlabelled worst days are mostly short blocks of 1 to 4 noise units, and a detector built
 for blocks finds none of them at the number of false alarms RO-NC is allowed.** A block is a
 switching-like change in the power a Primary substation draws: it steps up, stays level, and steps
-back. [Experiment 175](../00175-dp-unlabelled-day-shapes/result.md) found 17 sharp-edged block days among the 37 worst
-days that no label explains, and neither RO-NC (the refit-offset neighbour-count detector of
-[experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)) nor the
-opposite-step pair alarm of
+back. [Experiment
+175](../00175-dp-unlabelled-day-shapes/result.md) found 17 sharp-edged block days among the 37 worst
+days that no label explains. Neither RO-NC (the refit-offset neighbour-count detector of
 [experiment
-156](../00156-switching-faster-onset-alarm-from-opposite-steps/result.md) fired on any of them. We asked why, wrote a rectangular-block detector, and counted how
-many of the 17 days it finds when it is allowed the same 80 unexplained alarms in odd-numbered months as RO-NC.
+82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)) nor the opposite-step
+pair alarm of [experiment
+156](../00156-switching-faster-onset-alarm-from-opposite-steps/result.md) fired on any of them. We
+asked why, wrote a rectangular-block detector, and counted how many of the 17 days it finds when it
+is allowed the same 80 unexplained alarms in odd-numbered months as RO-NC.
 It finds 0 (prediction: at least 12), so the verdict is `refuted`.
 A second question, from the maintainer, is whether the convex-model residual helps RO-NC on real
 transfers more than the XGBoost residual does. On the 35 labelled real transfers lasting over 1 day,
