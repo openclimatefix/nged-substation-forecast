@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [213](../../00213-calibration-online-band-adaptation-from-coverage-misses/result.md) | Does moving each band's scale up on a miss and down on a hit lift cold-night q95 coverage to 0.90 or more without a second fitted spread? | 1 | Experiment 169's stored forecasts | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
