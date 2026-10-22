@@ -41,12 +41,12 @@ decision_rule: >-
   bands, and an ERA5 day mean below 2 °C, the definition of experiments 160 and 164. The hypothesis
   is `supported` when SP passes on both the scored year and the replicate months, `partly supported`
   when SP passes on the scored year only, `refuted` when SP's cold-night q95 coverage exceeds arm
-  A's by less than 0.01 in the scored year, and `inconclusive` otherwise. The threshold is set by the
-  effort of porting: the spread model adds 8 quantile levels times 9 fitted coefficients, stored
-  beside the spread table, and two ensemble columns that the weather pipeline already computes, so
-  a change whose upper bound stays under 0.01 points (under 0.5% of the score) is worth porting.
-  Every coefficient is fitted on the tuning months and nothing is fitted on the replicate months or
-  the scored year. The verdict is capped at `inconclusive` if arm A rescored from experiment 164's
+  A's by less than 0.01 in the scored year, and `inconclusive` otherwise. The threshold is set by
+  the effort of porting: the spread model adds 8 quantile levels times 9 fitted coefficients, stored
+  beside the spread table, and two ensemble columns that the weather pipeline already computes, so a
+  change whose upper bound stays under 0.01 points (under 0.5% of the score) is worth porting. Every
+  coefficient is fitted on the tuning months and nothing is fitted on the replicate months or the
+  scored year. The verdict is capped at `inconclusive` if arm A rescored from experiment 164's
   stored forecasts differs from experiment 164's printed fix O score of 2.7519 by more than 0.001
   points.
 benchmark: >-
@@ -63,10 +63,10 @@ metric: >-
 code: ml-experiments/00169-calibration-combined-fixes-and-ensemble-spread/
 verdict: partly supported
 best_arm: >-
-  Arm SP, cold-night q95 coverage 0.907 in the scored year against arm A's 0.896 (+0.010, 95%
-  month-resampled interval +0.005 to +0.016); all-row quantile score 2.7533 against 2.7519 (C2
-  +0.0014, -0.0056 to +0.0077); but the control SP0 (SP without its spread terms) reaches 0.906 and
-  2.7526, so the intercept, not the spread, produces the gain
+  Arm SP, cold-night q95 coverage 0.907 in the scored year against arm A's 0.896 (+0.010; the lift
+  is 56 of 5,395 cold-night rows); all-row quantile score 2.7533 against 2.7519 (C2 +0.0014, -0.0056
+  to +0.0077); but the control SP0 (SP without its spread terms) reaches 0.906 and 2.7526, so the
+  intercept, not the spread, produces the gain
 headline: >-
   The combined forecast (smooth table plus one-sided cold-day widening) reproduces experiment 164's
   0.896 cold-night q95 coverage. The ensemble-spread scale model lifts it to 0.907 in the scored year
@@ -91,7 +91,7 @@ take_home_message: >-
   Combining the smooth spread table with the cold-day widening reproduces its 0.896 coverage of the
   95% quantile on cold nights, and adding the spread of the ensemble weather forecast lifts that to
   0.907. The lift comes from widening the 95% and 99% quantiles by 4% and 10%, which the same
-  model gives with its spread terms removed, so the ensemble spread adds nothing to cold-night
+  model gives with its spread terms removed, so the ensemble spread is not what lifts cold-night
   coverage. The next step is a bias correction of the mean forecast on the coldest days, and judging
   cold nights over more than one winter.
 advice:
@@ -99,9 +99,10 @@ advice:
     Do not add the ensemble temperature or shortwave-radiation spread to the residual scale: the
     spread terms add 0.000 to cold-night q95 coverage (C5).
   - >-
-    If cold-night q95 coverage matters, widen the upper offsets by a fitted constant (1.04 at q95,
-    1.10 at q99) on top of experiment 164's fix O, and judge it over at least two winters; it
-    reaches 0.906 in the scored year and 0.917 in the replicate months (C6, post hoc).
+    If cold-night q95 coverage matters, widen the upper offsets by a constant on top of experiment
+    164's fix O (an intercept-only refit in the audit gave 1.06 at q90 and q95 and 1.11 at q99), and
+    judge it over at least two winters; SP0's intercepts reach 0.906 in the scored year and 0.917
+    in the replicate months (C6, post hoc).
   - >-
     Do not add experiment 164's lower-tail multipliers (fix T) to fix O: they leave the q95 coverage
     unchanged and raise cold-night q05 coverage from 0.090 to 0.107, which is worse (C4).
@@ -168,12 +169,12 @@ points of effective capacity (percentage points of each substation's rated deman
   cold nights -0.095 (-0.143 to -0.048); cold-night q95 coverage +0.050 (+0.031 to +0.070).
   Replicate months: all rows +0.0002 (-0.0029 to +0.0036), cold-night q95 coverage 0.913.
 - **Spread model (C2, SP minus A), scored year.** All rows +0.0014 (-0.0056 to +0.0077); cold nights
-  -0.006 (-0.040 to +0.021); cold-night q95 coverage +0.010 (+0.005 to +0.016). By lead: under 24
+  -0.006 (-0.040 to +0.021); cold-night q95 coverage +0.010. By lead: under 24
   hours -0.0011, 24 to 72 hours +0.0006, 72 to 168 hours +0.0024 (-0.0062 to +0.0103). Replicate
   months: all rows +0.0062 (-0.0025 to +0.0145), cold-night q95 coverage 0.918.
 - **Control (C5, SP minus SP0, and C6, SP0 minus A).** C5, scored year: all rows +0.0007 (-0.0013 to
   +0.0026); cold nights -0.001 (-0.002 to 0.000); cold-night q95 coverage +0.000. C6: all rows
-  +0.0006 (-0.0067 to +0.0070); cold-night q95 coverage +0.010 (+0.005 to +0.015). Replicate months:
+  +0.0006 (-0.0067 to +0.0070); cold-night q95 coverage +0.010. Replicate months:
   C5 all rows +0.0037 (+0.0005 to +0.0075), C6 +0.0026 (-0.0056 to +0.0081).
 - **Lower tail (C4, AT minus A).** All rows +0.0003 (-0.0038 to +0.0045); cold nights +0.018 (-0.001
   to +0.054). Fix T's lower multipliers raise the cold-night q05 coverage from 0.090 to 0.107, away
@@ -241,6 +242,17 @@ points of effective capacity (percentage points of each substation's rated deman
 - **Prediction check.** Cold-night coverage rose by 0.010 (predicted 0.00 to 0.03) and the all-row score
   by +0.0014 (predicted -0.01 to +0.005): both inside the ranges. The prediction about shortwave
   against temperature coefficients by quarter could not be tested.
-- **Audit triggers.** Trigger 4 fired: leaving D14 out lowers SP's cold-night q95 coverage from 0.907
-  to 0.886, below the 0.90 line that decides the scored-year pass. Triggers 1 to 3 and 5 to 7 did not
-  fire (SP0 is a post hoc control, and SP minus SP0 is small).
+- **Audit.** A fresh Opus audit re-derived the headline coverages (A 0.8962, SP 0.9066, SP0 0.9064)
+  and the contrasts from the stored forecasts with its own code, and agreed. Its findings and triage:
+  (F1) the pass is two rows deep: SP beats A by 56 cold-night rows and the `refuted` line is 54, and
+  refitting on a different 150,000-row sample gave +0.0085 (`refuted`), while a fit on all 361,676
+  tuning rows gave +0.0108 (`partly supported`); the verdict stays `partly supported`, as
+  pre-registered with the 150,000-row cap, and the margin is recorded here. (F2) SP0's intercepts were
+  fitted together with the spread terms, so a true intercept-only refit is wider (1.03 at q75, 1.06 at
+  q90 and q95, 1.11 at q99), reaches 0.910 (scored year) and 0.921 (replicate months) cold-night q95
+  coverage, and costs +0.0021 and +0.0066 all-row score against A; the conclusion that the widening,
+  not the spread, produces the lift stands, and the advice quotes the refit values. (F3) the
+  month-resampled intervals on cold-night coverage rested on three months and are removed. No
+  leakage, no effect of sorting the quantiles (7 of 484,113 rows), and the leave-one-out figures
+  were confirmed. The audit report is private (`data/ml-experiments/briefs/e169_audit_report.md`).
+  Trigger 4 fired; triggers 1 to 3 and 5 to 7 did not.
