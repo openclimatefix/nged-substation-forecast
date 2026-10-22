@@ -67,15 +67,16 @@ metric: >-
   percentage change from arm A, with absolute pinball loss, q05 and q95 coverage, q05-to-q95
   interval width, and the tail pinball loss at 0.01, 0.05, 0.95, and 0.99
 code: ml-experiments/00184-dp-ens-daylight-calibration/
-verdict: supported
-production_status: candidate
+verdict: inconclusive
+production_status: not-for-production
 adopted_in: none
 best_arm: >-
   Arm M, 51 members through the solar term: daylight quantile score 3.551 against arm A's 3.632
   points in the scored year, -2.23% (97.5% interval -3.07% to -1.38%); -1.76% (-2.68% to -0.93%) in
   the replicate months
 headline: >-
-  Passing each ensemble member's irradiance through the solar term of the convex model lowers the
+  Inconclusive under the pre-registered rule, because a known-answer gate (G3) failed on 22 of 1,058
+  fake-ensemble rows; every other part of the rule is met in both periods. Passing each ensemble member's irradiance through the solar term of the convex model lowers the
   daylight quantile score by 2.2% in the scored year and 1.8% in the replicate months, leaves night
   unchanged by design, and moves the daylight q05-to-q95 coverage from 0.854 to 0.894 (nominal
   0.90). Placebos with the same widening but members from another day (-0.1%) or no members (-0.2%)
@@ -83,17 +84,21 @@ headline: >-
   (arm S) lower the score by 0.3%, with an interval that includes zero.
 lessons:
   - >-
-    The 51 members carry real cloud information in daylight: the placebos with members from another
-    day and with no members score -0.1% and -0.2% where the real members score -2.2%.
+    The 51 members carry cloud information in daylight: the placebos with members from another day
+    and with no members score -0.1% and -0.2% where the real members score -2.2%. A stricter shuffle
+    in the audit, keeping lead day and cloud band, scores -0.8%, so about two thirds of the gain
+    needs the day's own members.
   - >-
     The gain comes from the spread of the members' solar responses, not from a shift in their mean:
     centring the responses on zero keeps -2.0%, and the mean forecast's own error changes by -0.13%
     (-0.45% to +0.27%).
   - >-
     A scale model on three spread statistics of the clear-sky index (arm S) adds almost nothing to
-    arm A, so a single number per half-hour cannot replace the 51 member responses.
+    arm A, but the audit found that a Gaussian with each row's own mean and spread of the member
+    responses scores -2.13%, so two numbers per row can carry most of the gain: arm S failed through
+    its inputs and form.
   - >-
-    The pre-registered monotonic check of the fake ensemble failed on 1.8% of physical rows because
+    The pre-registered monotonic check of the fake ensemble failed on 22 of 1,058 daylight rows (2.1%) because
     the unit PV shape from `SunGeometry.pv_shape_and_ghi` falls as irradiance rises at low sun.
 take_home_message: >-
   Running each of the 51 ensemble weather members through the solar part of the demand model
@@ -178,7 +183,7 @@ of effective capacity (percentage points of each substation's rated demand), low
   daylight: A 3.453, M 3.393, S 3.449.
 - **Calibration, daylight, scored year.** The q05-to-q95 coverage (nominal 0.90) is 0.854 for A,
   0.894 for M, 0.877 for S, 0.881 for MR, and 0.889 for MP. Coverage alone cannot separate M from
-  the placebos, which is why the scores matter. The median q05-to-q95 width is 24.6 points for A and
+  the placebos, which is why the scores matter. The mean q05-to-q95 width is 24.6 points for A and
   26.8 for M.
 - **Tails, daylight, scored year (coverage / pinball loss).** A: q01 0.027 / 0.265, q05 0.078 /
   0.907, q95 0.933 / 0.924, q99 0.979 / 0.262. M: 0.013 / 0.230, 0.053 / 0.837, 0.947 / 0.880,
@@ -197,8 +202,8 @@ of effective capacity (percentage points of each substation's rated demand), low
 - **Sunniest third (experiment 178's rule).** M -4.85% (-7.67% to -2.92%) in the scored year; MP
   -1.77% (-3.74% to -0.47%). The gap to BG2 in the absolute error of the median, over 74,728 sunny
   half-hours at the five substations: arm A +0.044 MW, reproducing experiment 178's +0.044 MW (the
-  interval 0.006 to 0.071); M +0.026 MW (interval includes zero, -0.022 to +0.059); MP +0.034 MW.
-  Without D5: A +0.007, M -0.008 MW. At D5: A +0.202, M +0.170 MW. D5 holds most of what remains.
+  interval 0.007 to 0.072); M +0.026 MW (interval includes zero, -0.020 to +0.059); MP +0.034 MW.
+  Without D5: A +0.007, M -0.0075 MW. At D5: A +0.202, M +0.170 MW. D5 holds most of what remains.
 - **Checks.** Median minus mean forecast per substation at 12 to 36 hours: exactly 0.000 for A and
   S, and -0.14 (D5), -0.05, -0.05, -0.05, and -0.05 points (D10, D11, D14, D16) for M, because the
   members' skewed responses pull the mixture median below the mean. The mean forecast's own daylight
