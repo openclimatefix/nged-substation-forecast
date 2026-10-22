@@ -1,0 +1,81 @@
+Gas price excluded as implausible: 2026-06-17 0.473 pence per kWh
+Gas price excluded as implausible: 2026-06-12 63.9394 pence per kWh
+Gas price excluded as implausible: 2025-11-29 0.509 pence per kWh
+Gas price excluded as implausible: 2024-07-25 72.82 pence per kWh
+Gas price range of the kept days: 1.9 to 5.2 pence per kWh
+== Step 1: drop shape ==
+D8: 28 drops since 2023-07-01; median depth 2.79 MW; flat blocks (relative interquartile range of the 3-hour median depth under 0.25): 0 of 28 (0.00); median relative range 1.06; sensitivity under 0.35: 0, under 0.50: 0; median share of half-hours within +/-25% of the drop median: 0.33; median share of variance explained by hour of day: 0.51; median start step / depth 0.55, end step / depth 0.81
+D3: no drops in the window
+D14: no drops in the window
+D5: no drops in the window
+
+== Control: flat-block test on injected constant blocks ==
+Injected constant 2.8 MW blocks in ordinary windows of the drops' lengths (494 windows): median relative range 0.70; flat (under 0.25) in 0.09; under 0.50 in 0.30
+Control percentiles of the relative range (10, 25, 50, 75, 90): 0.27, 0.43, 0.70, 1.05, 1.44
+D8 drops' relative range, same percentiles: 0.77, 0.86, 1.06, 1.27, 1.43; drops under the control's median (0.70): 3 of 28; under the control's 75th percentile: 14
+D3 comparator (runs of 2 days or more under the series' own 5th percentile, -0.49 MW): 9 runs; median depth 0.63 MW; median relative range 0.58; flat 0; median hour-of-day R-squared 0.60
+D14 comparator (runs of 2 days or more under the series' own 5th percentile, -0.49 MW): 5 runs; median depth 0.79 MW; median relative range 0.77; flat 0; median hour-of-day R-squared 0.51
+D5 comparator (runs of 2 days or more under the series' own 5th percentile, -0.22 MW): 4 runs; median depth 0.39 MW; median relative range 0.74; flat 0; median hour-of-day R-squared 0.41
+
+== Step 2: spark spread ==
+Days with price, gas price and D8 reading: 1085 of 1090 in the window
+System price pounds/MWh: mean 79.2, median 80.6; gas SAP pounds/MWh thermal: mean 31.0
+Efficiency 35%: gas cost per MWh electric 88.5 + 5.0 variable cost; share of all days with positive daily-mean spread 0.24; evening (16-19) 0.55
+Efficiency 40%: gas cost per MWh electric 77.4 + 5.0 variable cost; share of all days with positive daily-mean spread 0.51; evening (16-19) 0.70
+Efficiency 45%: gas cost per MWh electric 68.8 + 5.0 variable cost; share of all days with positive daily-mean spread 0.71; evening (16-19) 0.79
+
+== Step 3: drop days against matched ordinary days ==
+Drop days (>= 75% of the day inside a drop): 126 in 28 drops
+Ordinary pool: 838 days; matches per drop day: median 8, min 2
+positive daily spread, efficiency 35%: drop days 0.51, matched ordinary days 0.26, difference +25.753 (+10.291 to +42.112) points
+positive evening spread, efficiency 35%: drop days 0.60, matched ordinary days 0.55, difference +5.995 (-8.788 to +21.187) points
+positive daily spread, efficiency 40%: drop days 0.82, matched ordinary days 0.54, difference +28.371 (+15.966 to +42.484) points
+positive evening spread, efficiency 40%: drop days 0.79, matched ordinary days 0.69, difference +10.688 (-0.775 to +22.730) points
+positive daily spread, efficiency 45%: drop days 0.94, matched ordinary days 0.74, difference +20.101 (+9.522 to +31.668) points
+positive evening spread, efficiency 45%: drop days 0.87, matched ordinary days 0.75, difference +12.426 (+1.204 to +23.491) points
+positive daily spread with the gas price held at its mean, efficiency 40% (price alone): drop days 0.67, matched ordinary days 0.44, difference +24.366 (+11.035 to +38.665) points
+system price alone in its top third (> 89 pounds/MWh): drop days 0.44, matched ordinary days 0.33, difference +11.955 (-2.197 to +28.305) points
+system price (pounds/MWh): drop days 91.29, matched 77.88, difference +13.831 (+6.686 to +21.234)
+gas price (pounds/MWh thermal): drop days 29.76, matched 30.21, difference -0.340 (-2.408 to +1.624)
+daily spread at 40% efficiency (pounds/MWh): drop days 11.88, matched -2.55, difference +14.683 (+9.176 to +21.403)
+D8 day-mean ERA5 temperature (degrees C): drop days 13.47, matched 13.24, difference +0.037 (-0.385 to +0.434)
+
+== Step 3e (post hoc): matching on calendar year as well ==
+  2023: 10 drop days; 164 ordinary days, 0.45 with a positive 40% spread
+  2024: 22 drop days; 310 ordinary days, 0.43 with a positive 40% spread
+  2025: 84 drop days; 214 ordinary days, 0.50 with a positive 40% spread
+  2026: 10 drop days; 150 ordinary days, 0.53 with a positive 40% spread
+Drop days with no same-year match (left out of this check): 25
+Positive daily spread, 40%, matched on year too: drop days 0.85, matched 0.54, difference +31.647 (+14.420 to +48.894) points; matches per drop day min 1
+
+== Step 3b: half-hourly depth inside drops, spread positive against not ==
+Efficiency 35%: depth (after removing the drop's own hour-of-day mean) in positive-spread half-hours minus other half-hours, mean over 28 drops +0.42 MW (95% +0.31 to +0.52); higher in 26 of 28 drops
+Efficiency 40%: depth (after removing the drop's own hour-of-day mean) in positive-spread half-hours minus other half-hours, mean over 28 drops +0.43 MW (95% +0.32 to +0.53); higher in 27 of 28 drops
+Efficiency 45%: depth (after removing the drop's own hour-of-day mean) in positive-spread half-hours minus other half-hours, mean over 25 drops +0.50 MW (95% +0.36 to +0.65); higher in 24 of 25 drops
+
+== Step 3c: spread around drop starts and ends (daily spread, 40% efficiency) ==
+Change in the direction the hypothesis expects at the drop start (rise of the mean spread over 5 days after versus 5 before): mean +9.8 pounds/MWh over 28 drops (95% +2.3 to +16.9); in the predicted direction in 20 of 28
+Change in the direction the hypothesis expects at the drop end (fall of the mean spread over 5 days after versus 5 before): mean +8.0 pounds/MWh over 28 drops (95% +2.0 to +14.3); in the predicted direction in 18 of 28
+
+== Step 4: triads ==
+Triad 2023-12-05 period 35: inside a D8 drop False; D8 depth at the Triad +5.01 MW against the day's median +2.13 MW
+Triad 2024-01-04 period 35: inside a D8 drop False; D8 depth at the Triad +4.83 MW against the day's median +0.27 MW
+Triad 2024-01-17 period 36: inside a D8 drop True; D8 depth at the Triad +5.97 MW against the day's median +1.26 MW
+Triad 2024-11-20 period 37: inside a D8 drop False; D8 depth at the Triad +1.06 MW against the day's median -0.27 MW
+Triad 2025-01-09 period 36: inside a D8 drop False; D8 depth at the Triad +2.59 MW against the day's median +0.58 MW
+Triad 2025-02-10 period 36: inside a D8 drop False; D8 depth at the Triad +1.01 MW against the day's median -0.44 MW
+Triad 2025-11-20 period 34: inside a D8 drop False; D8 depth at the Triad -0.55 MW against the day's median +0.67 MW
+Triad 2026-01-05 period 35: inside a D8 drop False; D8 depth at the Triad -0.90 MW against the day's median +1.92 MW
+Triad 2026-02-03 period 37: inside a D8 drop False; D8 depth at the Triad +0.19 MW against the day's median -0.49 MW
+Triad half-hours inside a drop: 1 of 9; share of November-to-February weekdays in a drop 0.10; chance of >= 1 by random winter weekdays 0.620
+Winter weekday depth 16:00-19:00 minus other hours inside drops: mean -0.20 MW over 9 drops with winter weekdays (95% -1.14 to +0.79); deeper in 3
+Same contrast on winter weekdays outside drops: +1.20 MW
+Depth at the Triad half-hour minus the mean depth at the same period on other winter weekdays outside drops: mean +0.19 MW over 9 Triads (95% -1.37 to +1.74); positive in 4
+Drop 4 (2024-01-17 to 2024-01-19) covers Triad 2024-01-17 period 36
+
+== Step 3d: all days, depth against spread, with temperature and calendar controls ==
+Out-of-fold R-squared (leave one month out): controls only -0.071
+  + system price: gain -0.0006
+  + gas price: gain +0.0375
+  + spread 40%: gain +0.0349
+  + price and gas price: gain +0.0625

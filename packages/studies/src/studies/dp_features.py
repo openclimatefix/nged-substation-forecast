@@ -286,13 +286,16 @@ def _site_table(*, row: Mapping[str, Any], sites_row: Mapping[str, Any]) -> Site
     )
 
 
-def unit_pv_shape(*, cams: pl.DataFrame, table: SiteTable, grid: pl.Series) -> np.ndarray:
+def unit_pv_shape(
+    *, cams: pl.DataFrame, table: SiteTable, grid: pl.Series, plant: PlantParameters = FLEET
+) -> np.ndarray:
     """Return the unit PV shape of the site's CAMS irradiance on the grid, `NaN` if missing.
 
     Args:
         cams: Columns `site`, `time` (the end of the hour), and `ghi_w_m2`.
         table: The substation's table, which gives the site label and the coordinates.
         grid: The half-hour end stamps of the feature cache's time grid.
+        plant: The plant whose output is the shape; the generic south-facing fleet by default.
 
     Returns:
         The unit PV shape on the grid.
@@ -311,7 +314,7 @@ def unit_pv_shape(*, cams: pl.DataFrame, table: SiteTable, grid: pl.Series) -> n
     shape = pl.DataFrame(
         {
             "time": pl.Series(sky.half_hour_end_time).dt.replace_time_zone("UTC"),
-            "pv_unit_shape": plant_power_mw(sky=sky, parameters=FLEET),
+            "pv_unit_shape": plant_power_mw(sky=sky, parameters=plant),
         }
     )
     joined = pl.DataFrame({"time": grid}).join(
