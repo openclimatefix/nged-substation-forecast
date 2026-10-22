@@ -77,3 +77,38 @@ metric: >-
 ---
 
 Planned; the write-up replaces this page when the scores are done.
+
+## Choices fixed after the plan and before any gate or arm was read
+
+These pin down points the plan left open. The harness code was run and its output for one series
+(series 10, aggregated over all its rows) was printed to test the scorer before these choices were
+committed; no gate and no contrast was read.
+
+- **Origins and leads.** Origins every 6 hours from 31 days after the grid starts (2022-01-01), each
+  with 336 half-hourly targets (leads 0 to 7 days). Lead bands: under 24 hours, 24 to 72 hours, and
+  72 hours to 7 days. Hour bands are the four local-time bands of `studies.dp_calendar`.
+- **Quantile offsets.** One table per series, hour band, and lead band: the 11 quantiles of the
+  no-mask residual over odd UTC months of the target, shared by every arm.
+- **Effective capacity.** The single value stored for each series in the stage 1 pilot's series
+  table, not re-estimated from data before each origin. The plan said "from data before each
+  origin"; the stored value is the one every earlier page used.
+- **GAM forecast.** The frozen forecast of experiment 130 uses, for each target, the fit made at
+  the latest refit on or before the target. A row whose origin lies before a refit and whose target
+  lies after it therefore sees a fit made up to 7 days after the origin.
+- **ORACLE.** Masks every one of the 66 labelled real load shifts that involves the series.
+- **Gate G1 rows.** The 13 pairs of load shift and Primary series that experiment 227 scored (11
+  load shifts in its scored and replicate months). Rows: forecast origin at or after the logged
+  onset and target within 72 hours after the logged end, every origin in the harness, leads 0 to 7
+  days. The day-ahead lead band is reported beside the pooled figure. The gate is the pooled K0
+  minus ORACLE score on these rows, within 30% of 5.339 points.
+- **Gate G2 rows.** Experiment 141's 44 stored worlds at the six Primaries, the stream being the
+  real residual plus the injected megawatts (in points). Rows follow experiment 208: injected
+  transfers of 25% of load or more lasting over 1 day, forecast cutoff at or after the injected
+  onset and not within 96 half-hours of it (the AFTER phase is cutoff at least 96 half-hours after
+  the onset and target at or after the end), target within 96 half-hours of the end, scored against
+  the stream without the injected megawatts. PERFECT masks the true interval, known at the onset
+  with the end known at once. The gate is PERFECT minus K0 within 30% of 1.50 points.
+- **ORDINARY rows.** The target lies outside every closure of experiment 37's log of 629 that names
+  the series as a side, and outside the 72 hours after it. A variant that also drops closures of
+  connected neighbours is reported beside it.
+- **Month for the odd and even split.** The UTC calendar month of the target.
