@@ -1,0 +1,59 @@
+D8 on the British National Grid: easting 533519, northing 342315
+REPD rows: 14657; operational 3132
+REPD operational plants within 5 km of D8, by technology (MW electric):
+  Advanced Conversion Technologies: 1 plants, 10.5 MW
+  Solar Photovoltaics: 2 plants, 2.9 MW
+  Landfill Gas: 1 plants, 1.3 MW
+  gas-fuelled or combined-heat-and-power plants (landfill gas, biogas, anaerobic digestion, sewage gas, or CHP flagged): 1 plants, 1.3 MW
+REPD operational plants within 10 km of D8, by technology (MW electric):
+  Solar Photovoltaics: 6 plants, 31.2 MW
+  Advanced Conversion Technologies: 1 plants, 10.5 MW
+  Anaerobic Digestion: 1 plants, 1.4 MW
+  Landfill Gas: 1 plants, 1.3 MW
+  gas-fuelled or combined-heat-and-power plants (landfill gas, biogas, anaerobic digestion, sewage gas, or CHP flagged): 2 plants, 2.7 MW
+REPD operational plants within 20 km of D8, by technology (MW electric):
+  Wind Onshore: 2 plants, 38.7 MW
+  Solar Photovoltaics: 7 plants, 36.2 MW
+  Advanced Conversion Technologies: 1 plants, 10.5 MW
+  Anaerobic Digestion: 4 plants, 7.3 MW
+  Landfill Gas: 1 plants, 1.3 MW
+  gas-fuelled or combined-heat-and-power plants (landfill gas, biogas, anaerobic digestion, sewage gas, or CHP flagged): 5 plants, 8.6 MW
+
+Capacity Market components rows 29840; gas-like rows 10224
+Gas-like Capacity Market components with a postcode in ('PE20', 'PE21', 'PE22', 'PE24', 'PE23', 'PE25'): 7
+  2022-23 (T-1) One Year Ahead Capacity Auction: 1 components, fuel None, type T-1, connection capacity 0.0
+  2022-23 (T-3) Three Year Ahead Capacity Auction: 2 components, fuel None, type T-3, connection capacity 0.0
+  2022-23 (T-4) Four Year Ahead Capacity Auction: 2 components, fuel None, type T-4, connection capacity 0.0
+  2023-24 (T-4) Four Year Ahead Capacity Auction: 2 components, fuel None, type T-4, connection capacity 0.0
+  description of a unit at 0.5 km: 6MW Gas fired reciprocating engines
+  description of a unit at 0.5 km: 6MW Gas fired reciprocating engines
+  description of a unit at 0.5 km: The CMU will be formed of multiple individual generating units controlled centrally and ex
+
+Capacity Market gas-fuelled CM units with a grid reference within 30 km of D8 (unit names withheld):
+  0.5 km from D8: Reciprocating engines, connection capacity 6.0 MW, Distribution, delivery years 2022 to 2022
+  0.5 km from D8: Reciprocating engines, connection capacity 6.0 MW, Distribution, delivery years 2022 to 2023
+  0.5 km from D8: Reciprocating engines, connection capacity 20.0 MW, Distribution, delivery years 2022 to 2022
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2027 to 2027
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2028 to 2028
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2029 to 2029
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2022 to 2022
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2022 to 2023
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2024 to 2024
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2025 to 2025
+  19.0 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 950.0 MW, Transmission, delivery years 2026 to 2026
+  19.3 km from D8: Open Cycle Gas Turbine (OCGT), connection capacity 299.99 MW, Transmission, delivery years 2019 to 2019
+  19.5 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 903.0 MW, Transmission, delivery years 2021 to 2021
+  19.5 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 530.0 MW, Transmission, delivery years 2021 to 2021
+  21.6 km from D8: Reciprocating engines, connection capacity 20.0 MW, Distribution, delivery years 2022 to 2022
+  21.6 km from D8: Reciprocating engines, connection capacity 20.0 MW, Distribution, delivery years 2022 to 2023
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 819.0 MW, Transmission, delivery years 2021 to 2021
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2022 to 2022
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2022 to 2023
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2024 to 2024
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2025 to 2025
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2025 to 2025
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2026 to 2026
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2027 to 2027
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2028 to 2028
+  26.7 km from D8: Combined Cycle Gas Turbine (CCGT), connection capacity 850.0 MW, Transmission, delivery years 2029 to 2029
+Gas-fuelled CM units with any grid reference in the register: 1508
