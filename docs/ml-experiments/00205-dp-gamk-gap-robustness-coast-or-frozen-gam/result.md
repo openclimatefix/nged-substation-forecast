@@ -96,36 +96,37 @@ a gap length exists beyond which the filter should be dropped.
   155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the filter, the
   winter night offset, and recipe R (minus 0.75 times the 14-day mean error profile).
 - **Events.** For each substation the origins of the replicate and scored runs (excluding the
-  every-fifth-day stride runs and any origin before 2024-07-16) are cut into blocks of 8 days, and
-  one run is drawn at random (seed 205) from the first 3 days of each block, so two events are at
-  least 6 days apart and no gap window reaches the previous event's cutoff. The same event runs are
-  used for every gap length and rule.
+    every-fifth-day stride runs and any origin before 2024-07-16) are cut into blocks of 8 days, and
+    one run is drawn at random (seed 205) from the first 3 days of each block, so two events are at
+    least 6 days apart and no gap window reaches the previous event's cutoff. The same event runs
+    are used for every gap length and rule.
 - **Gap.** The readings of all four hour bands are removed for the L hours up to k hours before the
-  event run's data cutoff, with L in {3, 6, 24, 72} and k in {0, 3, 6, 12, 24, 48}; all 24
-  combinations are scored, and the headline contrasts use k = 0. One filter pass per (substation, L,
-  k) applies the gaps of all that substation's events together, which is equivalent to one pass per
-  event because the windows do not overlap.
+    event run's data cutoff, with L in {3, 6, 24, 72} and k in {0, 3, 6, 12, 24, 48}; all 24
+    combinations are scored, and the headline contrasts use k = 0. One filter pass per (substation,
+    L, k) applies the gaps of all that substation's events together, which is equivalent to one pass
+    per event because the windows do not overlap.
 - **What each stage sees.** The filter reads the gapped stream. The winter night offset and the
-  spread table are fitted on the tuning months of the no-gap forecasts and held fixed, because no
-  gap falls in a tuning month. Recipe R is recomputed from the gapped timeline: it uses the errors
-  of the earlier runs from the gapped filter, and the actuals whose valid time falls inside any gap
-  are hidden from its error blocks (a block with fewer than 40 readings is unusable, as in
-  experiment 155). Scoring reads the true actuals of the event run's own rows, which all fall after
-  its origin.
+    spread table are fitted on the tuning months of the no-gap forecasts and held fixed, because no
+    gap falls in a tuning month. Recipe R is recomputed from the gapped timeline: it uses the errors
+    of the earlier runs from the gapped filter, and the actuals whose valid time falls inside any
+    gap are hidden from its error blocks (a block with fewer than 40 readings is unusable, as in
+    experiment 155). Scoring reads the true actuals of the event run's own rows, which all fall
+    after its origin.
 - **Rules.** Each rule's offset, R profile, and spread come from that rule's own forecast errors.
-  (a) Coast: the gapped filter, then the offset and R. (b) Coast with widened bands: rule (a)'s 11
-  quantiles with their offsets from the mean multiplied by sqrt(1 + v / s^2), where s = (q95 - q05)
-  / 3.29 of the row, in points, and v is the extra predictive variance of the level and transient,
-  in points squared, over the no-gap filter at the same cutoff. With n and n0 the half-hours from
-  the target band's last reading to the cutoff in the gapped and the no-gap stream, v = max(0, w(n)
-  - w(n0)), where w(n) = q n / 48 + sigma_z^2 (1 - phi^(2n)) / (1 - phi^2), using the single pooled
-  setting (q, phi, sigma_z) of experiment 133 that arm A uses. (c2) The no-gap pipeline with the
-  filter dropped for all runs: the frozen GAM plus its own offset and R. (c) The frozen GAM alone,
-  with a spread refitted on its tuning months, no offset and no R. Secondary: (a0) and (b0) are (a)
-  and (b) with the filter alone, no offset and no R, spread refitted on the filtered tuning errors.
+    (a) Coast: the gapped filter, then the offset and R. (b) Coast with widened bands: rule (a)'s 11
+    quantiles with their offsets from the mean multiplied by sqrt(1 + v / s^2), where s = (q95 -
+    q05) / 3.29 of the row, in points, and v is the extra predictive variance of the level and
+    transient, in points squared, over the no-gap filter at the same cutoff. With n and n0 the
+    half-hours from the target band's last reading to the cutoff in the gapped and the no-gap
+    stream, v = max(0, w(n) - w(n0)), where w(n) = q n / 48 + sigma_z^2 (1 - phi^(2n)) / (1 -
+    phi^2), using the single pooled setting (q, phi, sigma_z) of experiment 133 that arm A uses.
+    (c2) The no-gap pipeline with the filter dropped for all runs: the frozen GAM plus its own
+    offset and R. (c) The frozen GAM alone, with a spread refitted on its tuning months, no offset
+    and no R. Secondary: (a0) and (b0) are (a) and (b) with the filter alone, no offset and no R,
+    spread refitted on the filtered tuning errors.
 - **Scored.** Five decision substations, D5, D10, D11, D14, and D16, over leads 0.5 to 168 hours,
-  then under 24 hours and 12 to 36 hours; per-substation contrasts and the number of events per
-  substation and length are reported beside the pooled ones.
+    then under 24 hours and 12 to 36 hours; per-substation contrasts and the number of events per
+    substation and length are reported beside the pooled ones.
 - **Compute.** CPU only, 4 cores, no new fit; the filter re-runs on a masked stream per (substation,
   L, k).
 
