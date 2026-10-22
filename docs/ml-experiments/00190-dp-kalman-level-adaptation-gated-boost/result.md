@@ -123,7 +123,8 @@ much
 of its extra loss each filter removed. We then scored the filters on the real scored year at the
 five
 decision Primaries. The tested method is a variant of the Kalman filter on additive-model
-coefficients, not a method of ours. Arm D is rebuilt here to the stored score (2.7562 against 2.756, inside the plan's 0.005).
+coefficients, not a method of ours. Arm D is rebuilt here to the stored score (2.7562 against 2.756,
+inside the plan's 0.005).
 
 **Verdict: `inconclusive`, by the pre-registered rule that a failed gate caps the verdict.** The
 gate
