@@ -55,11 +55,9 @@ SEED: Final[int] = 175
 class ResidualGrid:
     """A continuous half-hour grid and the residual series of several sites on it.
 
-    Attributes:
-        end_times: UTC end of each half-hour, ascending, one row per grid position.
-        local_dates: Europe/London date of each half-hour's start.
-        local_hours: Europe/London hour of day (a float, 0 to 24) of each half-hour's start.
-        residual: Each site's observed minus forecast, `NaN` where the row is missing.
+    The grid holds `end_times` (the UTC end of each half-hour), `local_dates` and `local_hours`
+    (the Europe/London date and hour of day of each half-hour's start), and `residual` (each
+    site's observed minus forecast, `NaN` where the row is missing).
     """
 
     def __init__(self, *, residual: dict[str, np.ndarray]) -> None:

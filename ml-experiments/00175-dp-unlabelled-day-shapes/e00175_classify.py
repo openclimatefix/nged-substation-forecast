@@ -201,6 +201,9 @@ def classify_day(
         hours: Local hour of day of each of the day's half-hours.
         edges: The day's block edges from `step_candidates`.
         scale: The day-before spread `s`.
+
+    Returns:
+        The day's shape class.
     """
     if edges:
         return "a_block"
