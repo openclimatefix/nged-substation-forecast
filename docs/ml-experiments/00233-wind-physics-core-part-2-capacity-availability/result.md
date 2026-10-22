@@ -136,11 +136,11 @@ metered wind farms, anonymised.
 ## Question and answer
 
 **We asked whether the fitted wind-turbine model of [experiment 230][e230] (called "the core"
-below) can show that a farm has lost capacity.** The monitor divides observed power by the power the core expects, adds up both
-over a trailing 60 days of strong-wind half-hours (those where the core expects at least 95% of
-the farm's fitted maximum output, its "scale"), and divides by the same ratio before July 2024, so
-that 1.0 means normal. An alarm is raised when that relative ratio falls below the lowest value seen
-in 2021-09 to 2024-06.
+below) can show that a farm has lost capacity.** The monitor divides observed power by the power
+the core expects, adds up both over a trailing 60 days of strong-wind half-hours (those where the
+core expects at least 95% of the farm's fitted maximum output, its "scale"), and divides by the same
+ratio before July 2024, so that 1.0 means normal. An alarm is raised when that relative ratio falls
+below the lowest value seen in 2021-09 to 2024-06.
 
 **The planned monitor was too slow in a simulation.** We cut observed power by 10%, 25%, and 50%
 from 30 random start dates and counted the days until an alarm. A 25% loss raised an alarm within
