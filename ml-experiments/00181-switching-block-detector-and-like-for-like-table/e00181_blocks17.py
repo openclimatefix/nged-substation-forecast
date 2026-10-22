@@ -1,11 +1,10 @@
-"""The 17 sharp-edged unlabelled worst days of experiment 175, placed on the RO-NC residual panel."""
+"""The 17 sharp-edged unlabelled worst days of experiment 175, on the RO-NC residual panel."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Final
 
-import numpy as np
 import polars as pl
 from e00181_common import GRID_LENGTH, GRID_START, ML_EXPERIMENTS_DATA_DIR
 
@@ -46,10 +45,16 @@ def block_days() -> pl.DataFrame:
         .sort("site", "local_date")
     )
     series = site_series()
+    day_start = (
+        pl.col("local_date").cast(pl.Datetime("us", "Europe/London")).dt.convert_time_zone("UTC")
+    )
     days = days.with_columns(
         series=pl.col("site").replace_strict(series, return_dtype=pl.Int64),
-        onset_stamp=pl.col("edge_position") + OFFSET_STAMPS,
-    )
+        edge_stamp=pl.col("edge_position") + OFFSET_STAMPS,
+        day_first_stamp=((day_start.dt.epoch("s") - int(GRID_START.timestamp())) // 1800).cast(
+            pl.Int64
+        ),
+    ).with_columns(day_last_stamp=pl.col("day_first_stamp") + 47)
     if days.height != 17:
         raise ValueError(f"expected 17 block days, found {days.height}")
     return days
@@ -62,5 +67,15 @@ def stamp_time(*, stamp: int) -> datetime:
 
 if __name__ == "__main__":
     pl.Config.set_tbl_cols(20)
-    print(block_days().select("site", "series", "local_date", "onset_stamp", "edge_shift"))
+    print(
+        block_days().select(
+            "site",
+            "series",
+            "local_date",
+            "edge_stamp",
+            "day_first_stamp",
+            "day_last_stamp",
+            "edge_shift",
+        )
+    )
     print(GRID_LENGTH)

@@ -1,0 +1,57 @@
+S0 {"threshold": 4.371440390284409, "unexplained_odd": 80, "unexplained_even": 78, "found_edge": 0, "found_day": 0, "found_day_even_months": 0, "found_edge_even_months": 0, "n_even_months": 5, "n_alarms_all": 256}
+shape: (17, 8)
+┌──────┬────────┬────────────┬────────────┬────────────┬───────────┬───────┬────────────┐
+│ site ┆ series ┆ local_date ┆ edge_stamp ┆ found_edge ┆ found_day ┆ month ┆ even_month │
+│ ---  ┆ ---    ┆ ---        ┆ ---        ┆ ---        ┆ ---       ┆ ---   ┆ ---        │
+│ str  ┆ i64    ┆ date       ┆ i64        ┆ bool       ┆ bool      ┆ i64   ┆ bool       │
+╞══════╪════════╪════════════╪════════════╪════════════╪═══════════╪═══════╪════════════╡
+│ D10  ┆ 10     ┆ 2025-07-03 ┆ 61402      ┆ false      ┆ false     ┆ 7     ┆ false      │
+│ D10  ┆ 10     ┆ 2025-10-08 ┆ 66078      ┆ false      ┆ false     ┆ 10    ┆ true       │
+│ D10  ┆ 10     ┆ 2025-10-17 ┆ 66508      ┆ false      ┆ false     ┆ 10    ┆ true       │
+│ D10  ┆ 10     ┆ 2025-11-01 ┆ 67220      ┆ false      ┆ false     ┆ 11    ┆ false      │
+│ D10  ┆ 10     ┆ 2026-05-26 ┆ 77086      ┆ false      ┆ false     ┆ 5     ┆ false      │
+│ …    ┆ …      ┆ …          ┆ …          ┆ …          ┆ …         ┆ …     ┆ …          │
+│ D16  ┆ 18     ┆ 2026-01-20 ┆ 71065      ┆ false      ┆ false     ┆ 1     ┆ false      │
+│ D16  ┆ 18     ┆ 2026-01-24 ┆ 71254      ┆ false      ┆ false     ┆ 1     ┆ false      │
+│ D5   ┆ 17     ┆ 2026-04-22 ┆ 75486      ┆ false      ┆ false     ┆ 4     ┆ true       │
+│ D5   ┆ 17     ┆ 2026-05-07 ┆ 76205      ┆ false      ┆ false     ┆ 5     ┆ false      │
+│ D5   ┆ 17     ┆ 2026-05-20 ┆ 76817      ┆ false      ┆ false     ┆ 5     ┆ false      │
+└──────┴────────┴────────────┴────────────┴────────────┴───────────┴───────┴────────────┘
+S1 {"threshold": 5.369427789110896, "unexplained_odd": 80, "unexplained_even": 72, "found_edge": 0, "found_day": 1, "found_day_even_months": 1, "found_edge_even_months": 0, "n_even_months": 5, "n_alarms_all": 282}
+shape: (17, 8)
+┌──────┬────────┬────────────┬────────────┬────────────┬───────────┬───────┬────────────┐
+│ site ┆ series ┆ local_date ┆ edge_stamp ┆ found_edge ┆ found_day ┆ month ┆ even_month │
+│ ---  ┆ ---    ┆ ---        ┆ ---        ┆ ---        ┆ ---       ┆ ---   ┆ ---        │
+│ str  ┆ i64    ┆ date       ┆ i64        ┆ bool       ┆ bool      ┆ i64   ┆ bool       │
+╞══════╪════════╪════════════╪════════════╪════════════╪═══════════╪═══════╪════════════╡
+│ D10  ┆ 10     ┆ 2025-07-03 ┆ 61402      ┆ false      ┆ false     ┆ 7     ┆ false      │
+│ D10  ┆ 10     ┆ 2025-10-08 ┆ 66078      ┆ false      ┆ false     ┆ 10    ┆ true       │
+│ D10  ┆ 10     ┆ 2025-10-17 ┆ 66508      ┆ false      ┆ false     ┆ 10    ┆ true       │
+│ D10  ┆ 10     ┆ 2025-11-01 ┆ 67220      ┆ false      ┆ false     ┆ 11    ┆ false      │
+│ D10  ┆ 10     ┆ 2026-05-26 ┆ 77086      ┆ false      ┆ false     ┆ 5     ┆ false      │
+│ …    ┆ …      ┆ …          ┆ …          ┆ …          ┆ …         ┆ …     ┆ …          │
+│ D16  ┆ 18     ┆ 2026-01-20 ┆ 71065      ┆ false      ┆ false     ┆ 1     ┆ false      │
+│ D16  ┆ 18     ┆ 2026-01-24 ┆ 71254      ┆ false      ┆ false     ┆ 1     ┆ false      │
+│ D5   ┆ 17     ┆ 2026-04-22 ┆ 75486      ┆ false      ┆ true      ┆ 4     ┆ true       │
+│ D5   ┆ 17     ┆ 2026-05-07 ┆ 76205      ┆ false      ┆ false     ┆ 5     ┆ false      │
+│ D5   ┆ 17     ┆ 2026-05-20 ┆ 76817      ┆ false      ┆ false     ┆ 5     ┆ false      │
+└──────┴────────┴────────────┴────────────┴────────────┴───────────┴───────┴────────────┘
+S2 {"threshold": 4.402504324665375, "unexplained_odd": 80, "unexplained_even": 84, "found_edge": 2, "found_day": 5, "found_day_even_months": 4, "found_edge_even_months": 1, "n_even_months": 5, "n_alarms_all": 262}
+shape: (17, 8)
+┌──────┬────────┬────────────┬────────────┬────────────┬───────────┬───────┬────────────┐
+│ site ┆ series ┆ local_date ┆ edge_stamp ┆ found_edge ┆ found_day ┆ month ┆ even_month │
+│ ---  ┆ ---    ┆ ---        ┆ ---        ┆ ---        ┆ ---       ┆ ---   ┆ ---        │
+│ str  ┆ i64    ┆ date       ┆ i64        ┆ bool       ┆ bool      ┆ i64   ┆ bool       │
+╞══════╪════════╪════════════╪════════════╪════════════╪═══════════╪═══════╪════════════╡
+│ D10  ┆ 10     ┆ 2025-07-03 ┆ 61402      ┆ false      ┆ false     ┆ 7     ┆ false      │
+│ D10  ┆ 10     ┆ 2025-10-08 ┆ 66078      ┆ false      ┆ true      ┆ 10    ┆ true       │
+│ D10  ┆ 10     ┆ 2025-10-17 ┆ 66508      ┆ false      ┆ true      ┆ 10    ┆ true       │
+│ D10  ┆ 10     ┆ 2025-11-01 ┆ 67220      ┆ false      ┆ false     ┆ 11    ┆ false      │
+│ D10  ┆ 10     ┆ 2026-05-26 ┆ 77086      ┆ false      ┆ false     ┆ 5     ┆ false      │
+│ …    ┆ …      ┆ …          ┆ …          ┆ …          ┆ …         ┆ …     ┆ …          │
+│ D16  ┆ 18     ┆ 2026-01-20 ┆ 71065      ┆ false      ┆ false     ┆ 1     ┆ false      │
+│ D16  ┆ 18     ┆ 2026-01-24 ┆ 71254      ┆ false      ┆ false     ┆ 1     ┆ false      │
+│ D5   ┆ 17     ┆ 2026-04-22 ┆ 75486      ┆ false      ┆ true      ┆ 4     ┆ true       │
+│ D5   ┆ 17     ┆ 2026-05-07 ┆ 76205      ┆ false      ┆ false     ┆ 5     ┆ false      │
+│ D5   ┆ 17     ┆ 2026-05-20 ┆ 76817      ┆ false      ┆ false     ┆ 5     ┆ false      │
+└──────┴────────┴────────────┴────────────┴────────────┴───────────┴───────┴────────────┘

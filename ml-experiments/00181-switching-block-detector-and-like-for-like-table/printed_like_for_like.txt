@@ -1,0 +1,3 @@
+All 35: 35 transfers, 42.7 MW. XGBoost found 12 (MW-weighted 0.357); convex found 18 (0.657). Paired MW-weighted gap +0.296 (95% +0.089 to +0.505). Both 10, only XGBoost 2, only convex 8, neither 15.
+Readings in both panels: 29 transfers, 31.2 MW. XGBoost found 12 (MW-weighted 0.489); convex found 14 (0.604). Paired MW-weighted gap +0.114 (95% -0.046 to +0.300). Both 10, only XGBoost 2, only convex 4, neither 13.
+No readings in XGBoost panel: 6 transfers, 11.5 MW. XGBoost found 0 (MW-weighted 0.000); convex found 4 (0.800). Paired MW-weighted gap +0.780 (95% +0.402 to +1.000). Both 0, only XGBoost 0, only convex 4, neither 2.

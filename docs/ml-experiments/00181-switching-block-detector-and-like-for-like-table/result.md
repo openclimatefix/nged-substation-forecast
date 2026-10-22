@@ -4,7 +4,7 @@ slug: switching-block-detector-and-like-for-like-table
 theme: switching-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00181-switching-block-detector-and-like-for-like-table/
   and data/ml-experiments/briefs/ only (a label table for NGED review is never committed). Serving
@@ -44,30 +44,143 @@ metric: >-
   Block days found out of 17, unexplained alarms on odd and even months, and for part 3 the real
   transfers found out of 35 and by moved MW.
 code: ml-experiments/00181-switching-block-detector-and-like-for-like-table/
+verdict: refuted
+best_arm: >-
+  The block detector with the odd-month noise unit (S0) finds 0 of the 17 block days at RO-NC's
+  budget of 80 unexplained odd-month alarms (threshold 4.37 noise units). The post hoc variant with a
+  previous-7-day noise unit (S2) finds 5 of 17 (4 of the 5 days in even months).
+headline: >-
+  0 of 17 block days found at 80 alarms (prediction: at least 12). The best-fitting block of the 17
+  days has a median score of 2.3 noise units and a median length of 12 hours. Injected blocks of 5
+  noise units or more are found 57% to 65% of the time and of 6 noise units about 90%. On the 35 real
+  transfers, RO-NC on the convex-model residual finds 18 against 12 on the XGBoost residual, but
+  only 14 against 12 on the 29 transfers that both residuals can see.
+lessons: >-
+  The 17 missed days are mostly short blocks of 1 to 4 noise units on the residual that RO-NC reads,
+  so neither a longer or shorter averaging window nor a block-shaped statistic separates them from
+  the residual's ordinary variation at 80 alarms. The convex model's lead on real transfers comes
+  mostly from readings the XGBoost panel lacks.
+take_home_message: >-
+  The 17 unlabelled worst days are mostly blocks of 6 to 12 hours whose size on the detector's
+  residual is 1 to 4 noise units, and a detector built for blocks finds none of them at the same
+  number of false alarms as the existing detector, so a residual-only block alarm will not
+  find them. The next step is the candidate label table, where NGED can confirm which of the blocks
+  are real switching. On the 35 real transfers lasting over 1 day, the detector on the convex-model
+  residual finds 18 and on the XGBoost residual 12, but 4 of the 6 extra finds are transfers where
+  the XGBoost panel has no readings, so the better forecast adds 2 finds at most.
+advice:
+  - >-
+    Do not expect a residual-only block detector to find the 17 unlabelled worst days at RO-NC's
+    budget of 80 alarms: the days sit at 1 to 4 noise units (figures 2 and 3).
+  - >-
+    Quote the convex-model residual's real-transfer lead as 18 against 12 of 35 with the coverage
+    caveat, and as 14 against 12 of 29 where both panels hold readings (figure 1).
+  - >-
+    Send the candidate label table to NGED before building another detector for short blocks, so
+    that the 17 days can be told apart as switching or not (part 2).
+  - >-
+    Test a noise unit taken from the previous 7 days before ruling out block detection: it found 5
+    of 17 at the same 80 alarms (post hoc, figure 2).
+production_status: not-for-production
+adopted_in: none
+date: 2026-10-22
 ---
 
-# Experiment 181: why were 17 block days missed, and can a block detector find them?
+**The 17 unlabelled worst days are mostly short blocks of 1 to 4 noise units, and a detector built
+for blocks finds none of them at the number of false alarms RO-NC is allowed.** A block is a switching-like change in the power
+a Primary substation draws: it steps up, stays level, and steps back. [Experiment
+175](../00175-dp-unlabelled-day-shapes/result.md) found 17 sharp-edged block days among the 37 worst
+days that no label explains, and neither RO-NC (the refit-offset neighbour-count detector of
+[experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)) nor the
+opposite-step pair alarm of [experiment 156](../00156-switching-faster-onset-alarm-from-opposite-steps/result.md)
+fired on any of them. We asked why, wrote a rectangular-block detector, and counted how many of the
+17 days it finds when it is allowed the same 80 unexplained alarms in odd-numbered months as RO-NC.
+It finds 0 (prediction: at least 12), so the verdict is `refuted`.
+A second question, from the maintainer, is whether the convex-model residual helps RO-NC on real
+transfers more than the XGBoost residual does. On the 35 labelled real transfers lasting over 1 day,
+RO-NC finds 18 on the convex-model residual and 12 on the XGBoost residual, but 4 of the 6 extra
+finds are transfers where the XGBoost panel has no readings.
 
-Planned. The write-up follows once the fits finish.
+![Real transfers found by each residual](figure_1_like_for_like.svg)
 
-## Pre-registered design
+![Block days found against alarms](figure_2_block_days_found.svg)
 
-- **Residual.** The frozen convex-model residual of experiment 130, arm B, on the 15 series, 2022-01
-  to 2026-06 (RO-NC's input). Lab shortcuts: past weather (ERA5) and hindsight, as in experiment
-  130.
-- **Block statistic.** For each series, each half-hour `t`, and each block length `L` in 12, 24, 48,
-  96, and 240 half-hours (6 hours, 12 hours, 1 day, 2 days, 5 days): the mean of the residual over
-  `[t, t+L)` minus the mean over the `F = min(L, 48)` half-hours before `t`, and the same minus
-  the mean over the `F` half-hours from `t+L`. The score is the smaller of the two (up block) or the
-  larger of the two (down block), in noise units: the odd-month median absolute deviation (times
-  1.4826) of that score for that series and length. A window needs 75% of its readings present.
-- **Alarms.** The largest score over the lengths at each `t`, local peaks within 48 half-hours,
-  as RO-NC does. An alarm is unexplained when no logged closure on its series lies within 24
-  hours and no labelled real transfer on its series contains it, as in the false-alarm check.
-- **Budget.** The threshold is the smallest one that leaves at most 80 unexplained alarms in the
-  odd-numbered months of 2022-01 to 2026-06, the count RO-NC's threshold was tuned to.
-- **Neighbour support (descriptive arm S1).** The own score plus the best opposite-signed score of a
-  metered interconnected series at the same `t` and `L`, clipped to 0 to 3 noise units, with weight
-  1. S0 (no neighbour term) is the headline.
-- **Found.** An alarm on the same series within 3 hours of the block's onset (experiment 175's
-  window). The looser count (any alarm within the local day) is also reported.
+![Best block score of each block day](figure_3_block_scores.svg)
+
+![Injected blocks found](figure_4_injected_blocks.svg)
+
+## Results
+
+- **Part 3, like-for-like table** (RO-NC at 80 odd-month alarms on each residual; "found" is an
+  alarm within 2 hours of the labelled start and an end within the larger of 6 hours and 10% of the
+  duration; the same code scored both):
+
+| Transfers | XGBoost residual found (MW-weighted) | Convex-model residual found (MW-weighted) | Paired MW-weighted gap (95% interval) |
+|---|---|---|---|
+| All 35 (42.7 MW) | 12 (0.357) | 18 (0.657) | +0.296 (+0.089 to +0.505) |
+| 29 with readings in both panels (31.2 MW) | 12 (0.489) | 14 (0.604) | +0.114 (-0.046 to +0.300) |
+| 6 with no readings in the XGBoost panel (11.5 MW) | 0 (0.000) | 4 (0.800) | +0.780 (+0.402 to +1.000) |
+
+- **Injected transfers** (experiment 130, quoted): 0.794 convex against 0.772 XGBoost, a gap of
+  +0.023 (-0.001 to +0.046).
+- **What differed between experiments 101 and 130:** nothing in the matching rule or the 35
+  transfers, because experiment 130 copied experiment 101's scoring code. The two differ in the
+  residual, in the 15 series (against 16, with the same 12 found by the XGBoost arm on either), and
+  in the six transfers at two Primaries that the XGBoost panel lacks. The convex model also trained
+  with these real transfers masked, which flatters it on them.
+- **Part 1, step 1: why the 17 days were missed.** On the convex-model residual, the best-fitting
+  block of each day has a median score of 2.3 noise units (largest 4.4) and a median length of 12
+  hours; 13 of the 17 best-fitting blocks last 12 hours or less. RO-NC's 24-hour step statistic has
+  a median of 2.2 noise units against its threshold of 4.35, and exceeds it on 2 days (5.2 and 7.2),
+  where RO-NC still raises no alarm; why is not tested. All 17 days have at least two metered
+  interconnected Primaries, so a missing partner does not explain the misses. No RO-NC or pair alarm
+  falls inside any of the 17 local days.
+- **Part 1, step 2: block detector.** Threshold at 80 unexplained odd-month alarms: 4.37 noise
+  units (78 unexplained alarms in even months). S0 finds 0 of 17 days (0 of the 5 in even months).
+  Neighbour support (S1, threshold 5.37) finds 1. The post hoc S2, which divides by the previous 7
+  days' spread, finds 5 of 17 (4 of 5 in even months; 84 unexplained even-month alarms). S0 finds 7
+  of 17 only at about 1,300 unexplained odd-month alarms.
+- **Injected-block control.** Blocks of height 5 noise units are found 57% to 65% of the time at
+  lengths of 6 to 48 hours, and 6 noise units 89% to 92%, so the detector works on blocks of the
+  size it is tuned for. At 3 to 4 noise units it finds 5% to 29%.
+- **Part 2, candidate label table:** 133 rows in
+  `data/ml-experiments/briefs/sw_block_detector_label_table.csv` (private, not committed): 17 block
+  days (3 of medium confidence), 21 balanced-opposite alarms (all low), 29 drops of D8 (23 of medium
+  confidence, with a logged closure within 24 hours), and 66 labelled real transfers (50 of medium or
+  high confidence). Columns: onset, end, depth in MW, duration, pair, source, confidence.
+
+## Checks
+
+- **Median minus mean forecast, and the mean-forecast error:** not applicable, because no forecast is
+  scored.
+- **Trigger 2 fired** (0 found against a prediction of at least 12). The explanation that the blocks
+  are too small is tested by the threshold curve and the injected-block control. The audit is left
+  to the manager.
+- **Trigger 4** (leaving a site out) was not run. **Triggers 1, 3, 5, 6, and 7** did not fire: the
+  injected-block control passes.
+
+## Deviations and caveats
+
+- **Residual.** The block detector reads the convex-model residual of experiment 130 (ERA5 weather,
+  frozen), not the forecast residual of arm D (ensemble weather and Kalman filter) on which
+  experiment 175 found the days. The blocks are visible in both, but the noise unit differs, and
+  the Kalman filter in arm D absorbs a multi-day block. This is the main caveat on "0 of 17".
+- **Found rule.** The plan said an alarm within 3 hours of the block's onset. The strongest edge of
+  experiment 175 can be the block's return edge, so the headline counts an alarm inside the local day
+  or within 3 hours of it. The edge rule finds 0 (S0) and 2 (S2).
+- **Post hoc.** S2 was added after S0 found nothing. Its threshold is set on odd months, but the
+  choice of S2 followed the 17 days.
+- **Unexplained alarms** may include true unlogged switching, so the budget is conservative for any
+  detector that finds real blocks.
+- **Lab shortcuts.** The residual uses past weather that arrives about 5 days late, and block
+  extents use hindsight.
+
+## What to try next
+
+Send the candidate label table to NGED to learn which of the 17 blocks are switching. A block
+detector on the arm D residual, which has a smaller noise unit on these days, is the untested
+alternative, and needs a longer history than the one year experiment 175 covers.
+
+Code: `ml-experiments/00181-switching-block-detector-and-like-for-like-table/`; the numbers above are
+printed by `e00181_like_for_like.py`, `e00181_why_missed.py`, `e00181_block.py`, and
+`e00181_block_control.py`, and kept as `printed_*.txt` in that folder.

@@ -1,8 +1,9 @@
 """Part 1, step 1: why neither RO-NC nor the pair alarm fired on the 17 block days.
 
-For each block day, reads the arm B residual panel (RO-NC's input) and reports the step in noise
-units at four window lengths, the block's length on that residual, whether a neighbour stepped the
-other way, and the nearest stored RO-NC alarm. Nothing is fitted.
+For each block day, reads the arm B residual panel (RO-NC's input) and reports the largest block
+score of the day (the block's length and size in noise units), the largest step at four window
+lengths, RO-NC's own 24-hour step statistic against its threshold, whether a neighbour stepped the
+other way, and the nearest stored RO-NC and pair alarms. Nothing is fitted.
 
     OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00181-*/e00181_why_missed.py
 """
@@ -13,48 +14,36 @@ from typing import Final
 
 import numpy as np
 import polars as pl
+from e00181_block import LENGTHS, best_z, series_scores
 from e00181_blocks17 import block_days, stamp_time
 from e00181_common import ADJACENCY, ML_EXPERIMENTS_DATA_DIR, WORK_DIR
 from e00181_detectors import level_shift, robust_scale
 from e00181_variants import load_both, scales_for, shifts
 
 RUN_130_B: Final = ML_EXPERIMENTS_DATA_DIR / "00130-ro-nc-detector-on-the-gam-k-residual" / "B"
-SEARCH: Final[int] = 4
-"""Stamps (2 hours) either side of the block's onset searched for the largest step."""
-WINDOWS: Final[tuple[int, ...]] = (8, 12, 24, 48)
-"""Half-hours in the step statistic's two windows: 4, 6, 12, and 24 hours."""
-LEVEL_WINDOW: Final[int] = 12
-MAX_BLOCK: Final[int] = 7 * 48
-
-
-def block_extent(*, residual: np.ndarray, onset: int) -> tuple[float, float, float]:
-    """Return the step in MW and the block's length in hours (NaN if it never returns)."""
-    pre = np.nanmedian(residual[onset - LEVEL_WINDOW : onset])
-    after = np.nanmedian(residual[onset : onset + LEVEL_WINDOW])
-    step = float(after - pre)
-    for t in range(onset + LEVEL_WINDOW, onset + MAX_BLOCK):
-        window = residual[t : t + LEVEL_WINDOW]
-        if np.isfinite(window).sum() < LEVEL_WINDOW // 2:
-            continue
-        if (np.nanmedian(window) - pre) * np.sign(step) < 0.5 * abs(step):
-            return step, (t - onset) / 2, float(np.nanmedian(window) - pre)
-    return step, float("nan"), float("nan")
+MARGIN: Final[int] = 6
+"""Stamps (3 hours) added either side of the local day, as in experiment 175."""
+STEP_WINDOWS: Final[tuple[int, ...]] = (8, 12, 24, 48)
+"""Half-hours in the two windows of a step statistic: 4, 6, 12, and 24 hours."""
+X_THRESHOLD: Final[float] = 4.35
+"""The threshold of RO-NC's refit-offset step statistic (experiment 130, arm B)."""
 
 
 def main() -> None:
     """Print and write one row per block day."""
     panel, offset_panel = load_both()
-    residual = panel["residual"]
+    residual = {s: v for s, v in panel["residual"].items() if np.isfinite(v).any()}
+    block_scores = {s: series_scores(values=v)[0] for s, v in residual.items()}
     scales = {
         w: {s: robust_scale(shift=level_shift(values=v, window=w)) for s, v in residual.items()}
-        for w in WINDOWS
+        for w in STEP_WINDOWS
     }
     shift_by_window = {
-        w: {s: level_shift(values=v, window=w) for s, v in residual.items()} for w in WINDOWS
+        w: {s: level_shift(values=v, window=w) for s, v in residual.items()} for w in STEP_WINDOWS
     }
-    x_scale = scales_for(variant="X", residual=residual, offset=offset_panel["residual"])
-    x_shift = shifts(variant="X", residual=residual, offset=offset_panel["residual"])
-    alarms = pl.read_parquet(RUN_130_B / "alarms.parquet")
+    x_scale = scales_for(variant="X", residual=panel["residual"], offset=offset_panel["residual"])
+    x_shift = shifts(variant="X", residual=panel["residual"], offset=offset_panel["residual"])
+    alarms = pl.read_parquet(RUN_130_B / "alarms.parquet").filter(pl.col("setting") == "XL")
     pair = pl.read_parquet(
         ML_EXPERIMENTS_DATA_DIR
         / "00156-switching-faster-onset-alarm-from-opposite-steps"
@@ -63,47 +52,73 @@ def main() -> None:
     )
     rows = []
     for day in block_days().iter_rows(named=True):
-        s, onset = day["series"], day["onset_stamp"]
-        step_mw, length_h, _ = block_extent(residual=residual[s], onset=onset)
+        s = day["series"]
+        lo, hi = day["day_first_stamp"] - MARGIN, day["day_last_stamp"] + MARGIN + 1
+        z, length = best_z(scores=block_scores[s])
+        pick = lo + int(np.argmax(np.abs(z[lo:hi])))
+        sign = float(np.sign(z[pick]))
         row = {
             "site": day["site"],
             "series": s,
             "local_date": day["local_date"],
-            "onset_utc": stamp_time(stamp=onset),
-            "step_mw": step_mw,
-            "block_hours": length_h,
+            "block_start_utc": stamp_time(stamp=pick),
+            "block_hours": int(length[pick]) / 2,
+            "block_z": abs(float(z[pick])),
+            "block_sign": sign,
         }
-        sign = np.sign(step_mw)
-        for w in WINDOWS:
-            z = shift_by_window[w][s][onset - SEARCH : onset + SEARCH + 1] / scales[w][s]
-            row[f"z_w{w}"] = float(np.nanmax(sign * z)) if np.isfinite(z).any() else float("nan")
-        zx = x_shift[s][onset - SEARCH : onset + SEARCH + 1] / x_scale[s]
-        row["z_ronc_statistic"] = (
-            float(np.nanmax(sign * zx)) if np.isfinite(zx).any() else float("nan")
-        )
+        row["sign_agrees_with_experiment_175"] = bool(sign == np.sign(day["edge_shift"]))
+        for w in STEP_WINDOWS:
+            zw = sign * shift_by_window[w][s][lo:hi] / scales[w][s]
+            row[f"step_z_{w // 2}h_window"] = (
+                float(np.nanmax(np.abs(zw))) if np.isfinite(zw).any() else float("nan")
+            )
+        zx = np.abs(x_shift[s][lo:hi] / x_scale[s])
+        row["ronc_statistic_z"] = float(np.nanmax(zx)) if np.isfinite(zx).any() else float("nan")
         neighbours = [n for n in ADJACENCY.get(s, ()) if n in residual]
-        metered = [n for n in neighbours if np.isfinite(residual[n][onset - 48 : onset + 48]).any()]
+        metered = [n for n in neighbours if np.isfinite(residual[n][lo:hi]).sum() > 24]
         best = 0.0
         for n in metered:
-            z = shift_by_window[8][n][onset - SEARCH : onset + SEARCH + 1] / scales[8][n]
-            if np.isfinite(z).any():
-                best = max(best, float(np.nanmax(-sign * z)))
+            segment = np.concatenate(
+                [-sign * block_scores[n][length_][lo:hi] for length_ in LENGTHS]
+            )
+            if np.isfinite(segment).any():
+                best = max(best, float(np.nanmax(segment)))
         row["n_neighbours"], row["n_metered_neighbours"] = len(neighbours), len(metered)
-        row["best_opposite_neighbour_z_w8"] = best
-        for name, table in (("ronc_alarm", alarms.filter(pl.col("setting") == "XL")), ("pair", pair)):
-            near = table.filter(pl.col("series") == s).with_columns(
-                gap=(pl.col("stamp") - onset) / 2
-            )
-            row[f"nearest_{name}_hours"] = (
-                float(near.sort(pl.col("gap").abs())["gap"][0]) if near.height else float("nan")
-            )
+        row["best_opposite_neighbour_block_z"] = best
+        for name, table in (("ronc", alarms), ("pair", pair)):
+            near = table.filter(pl.col("series") == s, pl.col("stamp").is_between(lo, hi - 1))
+            row[f"{name}_alarms_in_day"] = near.height
         rows.append(row)
     table = pl.DataFrame(rows)
     WORK_DIR.mkdir(parents=True, exist_ok=True)
     table.write_parquet(WORK_DIR / "why_missed.parquet")
-    with pl.Config(tbl_rows=30, tbl_cols=30, tbl_width_chars=300):
-        print(table)
-        print(table.select(pl.all().exclude("site", "local_date", "onset_utc").median()))
+    with pl.Config(tbl_rows=30, tbl_cols=30, tbl_width_chars=320):
+        print(
+            table.select(
+                "site",
+                "local_date",
+                "block_hours",
+                "block_z",
+                "sign_agrees_with_experiment_175",
+                "step_z_4h_window",
+                "step_z_24h_window",
+                "ronc_statistic_z",
+                "n_metered_neighbours",
+                "best_opposite_neighbour_block_z",
+                "ronc_alarms_in_day",
+                "pair_alarms_in_day",
+            )
+        )
+        print(
+            table.select(
+                "block_hours",
+                "block_z",
+                "step_z_4h_window",
+                "step_z_24h_window",
+                "ronc_statistic_z",
+                "best_opposite_neighbour_block_z",
+            ).median()
+        )
 
 
 if __name__ == "__main__":
