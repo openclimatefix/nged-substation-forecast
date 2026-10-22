@@ -105,3 +105,29 @@ design choices fixed before any score is read.
 Sources: [Hart (1992)](https://doi.org/10.1109/5.192069) for non-intrusive load monitoring and
 [Kolter and Jaakkola (2012)](https://proceedings.mlr.press/v22/zico12.html) for the additive
 factorial form.
+
+## Clarifications after the plan review
+
+- **Deviations from the design, stated.** The noise parameters are fitted on odd months of the clean
+  history and false alarms are scored on even months, so the noise is not scored in sample. D3 is
+  added to the design's five decision Primaries (D5, D10, D11, D14, D16). The panel's expected reading
+  replaces a refitted convex model, and `studies.dp_meter` is not reused, because a fit through the
+  meter needs the whole convex-model pipeline; the detector's meter is the closed form
+  `sqrt((L - k g)^2 + q^2)`.
+- **Exact inference with autoregressive errors.** The error at half-hour t is conditioned on the
+  previous error computed under the previous state, so the emission depends on the pair
+  (previous k, new k) and the forward-backward pass stays exact over 8 discrete states. Steps
+  of whole units are therefore outside the autoregression.
+- **The gate runs on the wide prior.** The verdict uses the fit with the unit-size prior centred on
+  2.5 MW (standard deviation 1.0 MW), which does not use G2's record. The fit with the design's
+  1.97 MW prior is reported beside it. The state space of 0 to 3 units still comes from G2's record.
+- **Re-centring never sees the answer.** Offsets are re-estimated on each injected copy by the
+  same routine, from the detector's own labels, and the transition tables and unit size stay frozen
+  from the fit window.
+- **Definitions.** A false active day has 4 or more flagged half-hours. Recall, precision, and the
+  energy error are computed on half-hours with a G2 reading, pooled over the 9 K2 windows. The
+  1-unit recall is also given with a 95% interval from resampling whole days. Energy error is the
+  sum of the posterior mean `k g` over scored half-hours against the injected sum.
+- **Verdict gaps closed.** A pass on recall with a failed precision or energy bound is
+  `partly supported`. The stop rule on the unit size applies to the gate fit, between the fit and
+  each retrain round. The regime outputs for 2026 are descriptive and do not change the verdict.
