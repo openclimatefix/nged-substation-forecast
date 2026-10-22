@@ -234,14 +234,18 @@ def aggregate(
     since = pairs["since_start_h"].to_numpy()
     case = pairs["case"].to_numpy()
     for name, loss in losses.items():
-        frame = pl.DataFrame(
-            {
-                "case": case,
-                "since": since,
-                "read_class": classes,
-                "loss": loss,
-            }
-        ).drop_nulls()
+        frame = (
+            pl.DataFrame(
+                {
+                    "case": case,
+                    "since": since,
+                    "read_class": classes,
+                    "loss": loss,
+                }
+            )
+            .with_columns(pl.col("loss").fill_nan(None))
+            .drop_nulls()
+        )
         for label, low, high in HOURS_BINS:
             part = frame.filter((pl.col("since") >= low) & (pl.col("since") < high))
             summary = part.group_by("case", "read_class").agg(
