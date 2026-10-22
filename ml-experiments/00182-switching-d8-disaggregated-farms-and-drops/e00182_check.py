@@ -2,7 +2,7 @@
 """Compare D8's multi-day drops (experiment 159) with the readings of its two disaggregated farms.
 
 Farms appear only as `farm 1` and `farm 2`. Reads the drops table of experiment 159, the stored D8
-power and expected-power panel, and the raw (uncleaned) power table. Writes private tables under
+power and expected-power panel, and the cleaned power table (which holds the same rows as the raw table for both farms). Writes private tables under
 `WORK_DIR` and prints every number the write-up quotes into `printed_report.txt`.
 
 Run as `OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue
@@ -17,7 +17,8 @@ from typing import Final
 import numpy as np
 import polars as pl
 import pvlib
-from studies.sources import ML_EXPERIMENTS_DATA_DIR, REPO_DATA_DIR
+from studies.power import scan_power
+from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 SLUG: Final[str] = "00182-switching-d8-disaggregated-farms-and-drops"
 WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / SLUG
@@ -29,7 +30,6 @@ DROPS_PATH: Final[Path] = (
 ARRAYS_PATH: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "briefs" / "sw_false_alarms" / "work" / "arrays.pkl"
 )
-RAW_POWER: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 GRID_START: Final[datetime] = datetime(2022, 1, 1, tzinfo=UTC)
 D8: Final[int] = 26
 FARMS: Final[dict[int, str]] = {32: "farm 1", 33: "farm 2"}
@@ -101,7 +101,7 @@ def main() -> None:  # noqa: D103, PLR0915
     local_hour = stamps.dt.convert_time_zone("Europe/London").dt.hour().to_numpy()
 
     raw = (
-        pl.scan_delta(RAW_POWER)
+        scan_power()
         .filter(pl.col("time_series_id").is_in(list(FARMS)))
         .collect()
         .with_columns(stamp=((pl.col("time") - GRID_START) / timedelta(minutes=30)).cast(pl.Int64))
@@ -113,7 +113,7 @@ def main() -> None:  # noqa: D103, PLR0915
         arr[sub["stamp"].to_numpy()] = sub["power"].to_numpy()
         farm_power[tsid] = arr
         say(
-            f"{label}: {sub.height} raw readings on the grid, {sub.filter(pl.col('power') > 0).height} above zero, "
+            f"{label}: {sub.height} readings on the grid, {sub.filter(pl.col('power') > 0).height} above zero, "
             f"first {sub['time'].min()}, last {sub['time'].max()}"
         )
     avail = pl.DataFrame(

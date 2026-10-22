@@ -9,7 +9,7 @@ size: >-
   simple. Stored: private tables under data/ml-experiments/00182-switching-d8-disaggregated-farms-and-drops/
   only. Serving path: not touched. Degradation rule: not touched. Designs: one (a descriptive
   comparison). Callers: this folder's scripts only, which read the stored drops of experiment 159 and
-  the raw power table.
+  the power table.
 hypothesis: >-
   D8 (Marsh Lane) is a disaggregated Primary: the metadata says the output of two solar farms was
   added back to its reading, and that both farms' analogues are not working. When an analogue fails,
@@ -25,7 +25,7 @@ decision_rule: >-
   per drop, drawn from 2023-07-01 onwards at the same time of day. Also test whether the drop depth
   by hour of day follows clear-sky irradiance.
 benchmark: Experiment 159 drops table (29 drops).
-row_set_id: none (describes stored residuals and raw power, no forecast is scored)
+row_set_id: none (describes stored residuals and power, no forecast is scored)
 metric: >-
   Drops with a farm anomaly out of 29, against random windows; correlation of depth by hour with
   clear-sky irradiance.
@@ -35,7 +35,7 @@ best_arm: >-
   Not applicable (descriptive). The farm-anomaly count is 29 of 29 for the drops and 29.0 of 29 for
   random windows, so the readings do not separate them.
 headline: >-
-  The two farms' readings cannot test the hypothesis, because farm 1 has 1 reading in the raw power
+  The two farms' readings cannot test the hypothesis, because farm 1 has 1 reading in the power
   table and farm 2 has 4,643 (441 above zero, none after 2026-01-26), so both are "missing" in every
   drop and every random window. D8's shortfall is deeper at midday than at night in 24 of 29 drops
   (median +1.5 MW; bootstrap 95% +0.5 to +3.7), which fits a lost solar farm but also peaks in the
@@ -53,11 +53,11 @@ take_home_message: >-
   with the drop depth.
 advice:
   - >-
-    Do not use the farms behind D8's disaggregation as evidence about D8's drops, because their raw
+    Do not use the farms behind D8's disaggregation as evidence about D8's drops, because their
     readings are absent in every drop and in every random window (Figure 2).
   - >-
     Treat a note in the metadata table's `information` field as a snapshot taken in July 2026, not
-    a history, because the raw files from before then carry no `information` value (Checks).
+    a history, because the files from before then carry no `information` value (Checks).
   - >-
     To test whether D8's drops are lost farm output, model the farms from capacity and weather and
     compare with the drop depth by hour, because D8's shortfall is deeper at midday than at night in
@@ -75,7 +75,7 @@ analogue (the stand-in measurement that supplies each farm's output) of both far
 working". [Experiment 159](../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md)
 found 29 multi-day drops at D8 that no neighbour step or detector explains. The hypothesis was
 that, when an analogue fails, D8's reading loses that farm's output, so a drop equals the lost
-output. Farm 1 has one reading in the raw power table, and farm 2 has 4,643 readings, of which 441
+output. Farm 1 has one reading in the power table, and farm 2 has 4,643 readings, of which 441
 are above zero and none come after 2026-01-26. The farm reading is therefore "missing" inside all 29
 drops and inside every random window (Figure 2), so the pre-registered count (at least 15 of 29
 against at most 5 for random windows) cannot be met on the random side. The verdict is
