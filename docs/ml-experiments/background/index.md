@@ -12,8 +12,11 @@ the planner did not open.
 2. **[NGED power telemetry](nged-power-telemetry.md)**: series, units, tables, timestamps.
 3. **[Weather inputs by product](weather-inputs-by-product.md)**: which weather exists when.
 4. **[Row sets and scoring](row-sets-and-scoring.md)**: row sets, metric, intervals, gating.
-5. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
-6. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
+5. **[Problems and the best forecast](problems-and-current-best-forecast.md)**: baselines, best
+   guess, scores.
+6. **[Adopted and open questions](adopted-and-open-questions.md)**: what is settled, who owns the rest.
+7. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
+8. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
 
 The reference page [What is on disk](what-is-on-disk.md) says where each data set sits under
 `data/` and how to read it.
