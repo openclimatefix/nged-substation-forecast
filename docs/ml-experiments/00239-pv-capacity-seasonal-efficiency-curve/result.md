@@ -4,7 +4,7 @@ slug: pv-capacity-seasonal-efficiency-curve
 theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - solar-disaggregation
-status: planned
+status: finished
 size: >-
   medium. Stored: private files under data/ml-experiments/00239-<slug>/ only. Serving path: not
   touched. Degradation rule: not touched. Designs: more than one defensible form of the curve (12
@@ -44,17 +44,152 @@ metric: >-
   output over the same half-hours, both of alternating-current output in MW. The plain capacity
   ratio, in the unit of experiment 231, is reported too. Farm-only fit: the share of a farm's
   squared output that one scale of the shape explains
+verdict: not supported
+production_status: not-for-production
+adopted_in: none
+date: 2026-10-22
+pr: 1545
+headline: >-
+  A shared seasonal efficiency curve raised the share of a farm's squared output that one scale of
+  the satellite shape explains from 0.946 to 0.949 (all years; target 0.968) and the pooled recovery
+  of an injected farm by 0.039 with the injection of experiment 231 (5 of 5 Primaries at 0.03 or
+  more) but by 0.025 with a full-sun injection (0 of 5).
+best_arm: none; the satellite shape without the curve stays
+take_home_message: >-
+  Twelve monthly efficiency factors fitted on the metered farms' output do not close the recovery
+  shortfall: the farm-only fit rises by 0.003, and the recovery of an injected farm rises by 0.039
+  or 0.025 depending on whether the injected farm keeps its low-sun output. The farms fall below the
+  satellite shape in November to January (factors 0.71 to 0.88), and show no fall of 6% to 9% from
+  spring to summer (April to September factors differ by 3%). Experiment 231's injection also zeroed
+  the farm's output when the sun is lower than 15 degrees above the horizon, which lowers the
+  recovery by 0.033 by itself.
+lessons:
+  - >-
+    The injection of experiments 129 and 231 sets the farm's output to zero when the sun is under 15
+    degrees above the horizon, which covers most of the daylight half-hours of December. Keeping
+    that
+    output raises the pooled recovery from 0.780 to 0.822 (gain 0.033, 80% interval 0.027 to
+    0.035).
+  - >-
+    The seasonal fall of the farms' output is a winter effect on the satellite shape (November
+    to January), not a spring-to-summer effect.
+advice:
+  - >-
+    Inject the farm's output at every sun height in known-answer tests, because zeroing it under 15
+    degrees of sun height lowers the pooled recovery by 0.033 (figure 2).
+  - >-
+    Do not add a seasonal efficiency curve to the solar shape to raise recovery: the gain is 0.025
+    with a full-sun injection, below the 0.03 threshold (figure 2).
+  - >-
+    Report recovery as the ratio of 99th percentiles of output, because the capacity ratio changes
+    sign when the shape is rescaled by a curve (figure 2).
 code: ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/
 ---
 
 # PV capacity: does a shared seasonal efficiency curve help?
 
-**Planned, not yet run.** The experiment repeats the injection test of experiment 231 (the recorded
-output of a real solar farm is added to a Primary substation's power at 50% of the Primary's pinned
-capacity, and the convex capacity fit of experiment 129 reports how much of the farm it finds
-again; farms A to F are metered generators and are never named). The change is a multiplier on the
-solar shape for each calendar month. Fits stop at 2026-07-01, so the maintainer's labelled
-exception (data to 2026-07-31) is not used. No forecast is scored.
+**Take-home message: twelve monthly efficiency factors fitted on the metered farms' output do not
+close the recovery shortfall, and the injection of experiment 231 was itself part of it.** The
+curve raises the farm-only fit from 0.946 to 0.949, below the target of 0.968. It raises the pooled
+recovery by 0.039 with the injection of experiment 231 and by 0.025 when the injected farm keeps
+its low-sun output. Keeping that output alone raises the recovery by 0.033.
+
+**What was done.** We added the recorded output of a real solar farm (farms A to F are metered
+generators and are never named) to a Primary substation's power at 50% of the Primary's pinned
+capacity, as in experiment 231, and the convex capacity fit of experiment 129 reported how much of
+the farm it found again. The fit used the satellite-based solar shape, with and without a seasonal
+efficiency curve. The curve has 12 monthly factors, each the mean over the four other farms of the
+least-squares scale of a farm's output on its own satellite-based shape, divided by the mean of the
+12 values. The injected farm is never one of the four. Injection as in experiment 231 sets the
+farm's output to zero when the sun is under 15 degrees above the horizon (zenith over 75
+degrees), which covers most of December. We therefore also ran a full-sun injection, which keeps
+the output at every sun height and takes the unit from the same 99th percentile, so that the two
+injections differ only in the low-sun half-hours. D5, D10, D11, D14, and D16 are the five decision
+Primaries (the substations whose capacity is judged), and D9 is shown beside them. The recovery is
+the 99th percentile of the recovered output over daylight half-hours of season-year 2024 (July 2024
+to June 2025), divided by the 99th percentile of the injected farm's output over the same
+half-hours, both in alternating-current MW. Fits stop at 2026-07-01, so the maintainer's labelled
+exception (data to 2026-07-31) is not used, and no forecast is scored.
+
+![Seasonal efficiency curve](figure_01_curve.svg)
+
+**Figure 1. The farms fall below the satellite shape in November to January and differ by 3% from
+April to September.**
+
+![Recovery with and without the curve](figure_02_recovery.svg)
+
+**Figure 2. The curve raises the pooled recovery from 0.780 to 0.825 with the injection of
+experiment 231 and from 0.822 to 0.843 with a full-sun injection.**
+
+## Findings
+
+- **The prediction failed.** The farm-only fit rose from 0.946 to 0.949 over all years and from
+  0.955 to 0.962 in season-year 2024 (median over farms), against a target of 0.968. The decision
+  rule needs both the fit and the recovery, so it is not met.
+- **The curve is a winter effect.** The factors are 0.82 in January, 0.88 in November, and 0.71 in
+  December, and 1.01 to 1.10 from February to October. From April to September the largest factor
+  is 1.03 times the smallest, so the 6% to 9% fall of the flat top from spring to summer does not
+  appear as a monthly scale on the satellite shape. The range over farms is 0.62 to 0.80 in
+  December.
+- **Pooled recovery, with 80% intervals from resampling whole months (median over the five injected
+  farms, then over the five Primaries):**
+    - **Injection as in experiment 231:** 0.780 (0.767 to 0.791) without the curve and 0.825 (0.810
+      to 0.828) with it. The gain is 0.039 (0.034 to 0.042), at least 0.03 at 5 of 5 Primaries.
+    - **Full-sun injection:** 0.822 (0.806 to 0.823) without the curve and 0.843 (0.831 to 0.849)
+      with it. The gain is 0.025 (0.023 to 0.028), at least 0.03 at 0 of 5 Primaries.    - **With
+      the demand terms frozen** the gain is 0.021 (0.017 to 0.024) with the injection of
+      experiment 231 and 0.015 (0.012 to 0.017) with the full-sun injection.
+- **The low-sun cut of the injection costs recovery.** Keeping the farm's low-sun output raises the
+  pooled recovery by 0.033 (80% interval 0.027 to 0.035), and the gain is 0.029 to 0.036 at each
+  Primary. The injection of experiments 129 and 231 therefore understates the recovery of a
+  farm that produces in winter.
+- **The capacity ratio of experiment 231 falls with the curve** (0.827 to 0.812, a change of
+  -0.021), while the ratio of 99th percentiles rises. The curve has mean 1 over the year, so it
+  raises the shape in April to October and lowers it in November to January, which changes the
+  scale that the fit finds. The ratio of 99th percentiles does not depend on that scale, so we
+  report it as the recovery.
+- **Row counts.** The full-sun injection removes 89 to 223 of 45,000 to 89,000 training rows per
+  Primary (median over farms); the two shapes use identical rows.
+
+## Checks
+
+- **Reproduction:** the satellite shape with the injection of experiment 231 reproduces
+  experiment 231's rung 4 (the full joint fit on all rows) at every Primary and injected farm,
+  with a largest difference of 0.00e+00.
+- **Derating:** the script checks that the curved shape, derated by the fit, equals the satellite
+  shape times the curve to within 1e-6, and it did at every Primary and farm.
+- **Same rows:** the satellite and curved shapes train on the same number of rows under each
+  injection, as the script asserts.
+- **Median forecast minus mean forecast, and the mean-forecast error:** not applicable, because the
+  experiment scores no forecast.
+- **Audit triggers** (the seven triggers in the `ml-experiment` skill's "Audit before merge"):
+  trigger 2 fires, because the result contradicts its own prediction, and the explanation above
+  (a winter effect and not a spring-to-summer effect) is the test recorded here. Trigger 7 fires
+  because the finding on the low-sun cut changes how experiments 231, 235, 236, and 238 should be
+  read. The maintainer's decision on an audit is pending.
+- **Review:** one Sonnet review of the plan, one of the code, and one of the page.
+
+## Limits
+
+- **The farm's temperature is the mean of the six Primaries' temperatures,** because the farm
+  frame holds no temperature. The temperature derating at the farm's own site is approximate, and
+  the curve partly absorbs the heat loss, so it overlaps with the derating that the fit applies.
+- **The curve has no interval for its own uncertainty.** Each resample holds the curve fixed, and
+  the range over farms is reported separately.
+- **The full-sun injection takes its unit from half-hours with the sun above 15 degrees,** as in
+  experiment 129, so the capacity unit is the same in both injections.
+- **The satellite shape at the farm and at the Primary differs,** because the farm sits tens of
+  kilometres from the Primary, so the curve fitted at the farms is applied to a different shape.
+
+## What the next experiment should answer
+
+- **Does the full-sun injection change the winter finding of experiment 231?** That experiment
+  found 0.475 from winter rows with the farm's low-sun output zeroed; the recovery in winter rows
+  with the full-sun injection has not been measured.
+- **How much demand absorption remains once the injection is realistic?** With the demand terms
+  frozen at the
+  base fit, the pooled recovery is 0.919 with the full-sun injection and 0.883 with the injection
+  of experiment 231, against 0.822 and 0.780 with the demand terms free.
 
 ## Plan: design
 
