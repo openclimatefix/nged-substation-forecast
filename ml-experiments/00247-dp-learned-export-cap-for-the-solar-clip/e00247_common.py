@@ -44,6 +44,10 @@ EXPERIMENT_180_WORK_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00180-dp-sunny-daylight-fix-d5-solar-shape" / "work"
 )
 """Experiment 180's stored arms (the control `c` and the 60% and 80% arms), read-only."""
+EXPERIMENT_214_WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00214-dp-pv-clip-ceiling-as-of-and-screen" / "work"
+)
+"""Experiment 214's stored clip arms (`k50` to `k90`), read-only."""
 E136_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00136-dp-bg-stage1-assembly-on-the-ensemble-mean" / "work"
 )
@@ -250,4 +254,8 @@ def arm_file(*, arm: str, period: str, site: str) -> Path:
     own = WORK_DIR / "arms" / arm / "dp_preds_s2" / f"d_{period}_{site}.parquet"
     if own.exists():
         return own
-    return EXPERIMENT_180_WORK_DIR / "arms" / arm / "dp_preds_s2" / f"d_{period}_{site}.parquet"
+    name = f"d_{period}_{site}.parquet"
+    stored = EXPERIMENT_180_WORK_DIR / "arms" / arm / "dp_preds_s2" / name
+    if stored.exists():
+        return stored
+    return EXPERIMENT_214_WORK_DIR / "arms" / arm / "dp_preds_s2" / name
