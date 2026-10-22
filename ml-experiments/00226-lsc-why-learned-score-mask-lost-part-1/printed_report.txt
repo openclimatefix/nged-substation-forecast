@@ -1,0 +1,279 @@
+Running as unit: run-p3563517-i83171045.scope; invocation ID: 08b9047810994aeca865c88a2349041b
+ordinary rows: 1579711 by site [{'site': 'D10', 'len': 263669}, {'site': 'D11', 'len': 271649}, {'site': 'D14', 'len': 266161}, {'site': 'D16', 'len': 255360}, {'site': 'D5', 'len': 251286}, {'site': 'D9', 'len': 271586}]
+
+== G2: ordinary-day rows, arm minus K0 (points of effective capacity) ==
+PAIR_NEW     pooled +0.055 (+0.009 to +0.105)  winter +0.055 (-0.046 to +0.156)  other +0.056 (+0.017 to +0.111)  mean-forecast |error| +0.106 (+0.033 to +0.187)
+PAIR_GATED   pooled +0.030 (-0.012 to +0.074)  winter +0.036 (-0.060 to +0.135)  other +0.026 (+0.002 to +0.061)  mean-forecast |error| +0.064 (-0.003 to +0.140)
+LEARNED_R    pooled +0.031 (-0.020 to +0.086)  winter +0.031 (-0.097 to +0.175)  other +0.031 (+0.002 to +0.067)  mean-forecast |error| +0.042 (-0.031 to +0.123)
+LEARNED_F    pooled +0.109 (+0.022 to +0.226)  winter +0.286 (+0.071 to +0.562)  other +0.007 (-0.016 to +0.032)  mean-forecast |error| +0.154 (+0.022 to +0.321)
+RONC_195     pooled +0.144 (+0.054 to +0.258)  winter +0.291 (+0.078 to +0.558)  other +0.059 (+0.005 to +0.122)  mean-forecast |error| +0.231 (+0.096 to +0.394)
+LEARNED_R96  pooled +0.030 (-0.024 to +0.092)  winter +0.039 (-0.089 to +0.195)  other +0.025 (-0.013 to +0.067)  mean-forecast |error| +0.040 (-0.041 to +0.133)
+U1           pooled +0.057 (+0.015 to +0.100)  winter +0.049 (-0.047 to +0.139)  other +0.062 (+0.024 to +0.105)  mean-forecast |error| +0.104 (+0.035 to +0.176)
+U2           pooled -0.007 (-0.041 to +0.013)  winter -0.032 (-0.120 to +0.020)  other +0.007 (+0.001 to +0.016)  mean-forecast |error| -0.007 (-0.055 to +0.026)
+U3           pooled +0.025 (-0.026 to +0.081)  winter +0.028 (-0.101 to +0.173)  other +0.023 (-0.005 to +0.060)  mean-forecast |error| +0.033 (-0.041 to +0.114)
+U4           pooled +0.062 (+0.021 to +0.106)  winter +0.065 (-0.026 to +0.164)  other +0.060 (+0.023 to +0.103)  mean-forecast |error| +0.103 (+0.038 to +0.174)
+L_BOTH       pooled -0.008 (-0.040 to +0.010)  winter -0.026 (-0.112 to +0.024)  other +0.002 (+0.000 to +0.005)  mean-forecast |error| -0.007 (-0.051 to +0.021)
+L_ONLY       pooled +0.038 (+0.002 to +0.089)  winter +0.055 (-0.014 to +0.174)  other +0.029 (-0.000 to +0.066)  mean-forecast |error| +0.048 (-0.007 to +0.121)
+L_ONLY_NOBAL pooled +0.036 (-0.000 to +0.086)  winter +0.056 (-0.014 to +0.175)  other +0.024 (-0.004 to +0.061)  mean-forecast |error| +0.041 (-0.011 to +0.115)
+K0 absolute: 2.718
+  LEARNED_R    fold 0: +0.039 (-0.014 to +0.099)
+  LEARNED_R    fold 1: +0.017 (-0.030 to +0.070)
+  LEARNED_R    fold 2: +0.036 (-0.019 to +0.096)
+  LEARNED_F    fold 0: +0.098 (+0.010 to +0.214)
+  LEARNED_F    fold 1: +0.117 (+0.028 to +0.233)
+  LEARNED_F    fold 2: +0.113 (+0.024 to +0.230)
+  RONC_195     fold 0: +0.144 (+0.054 to +0.258)
+  RONC_195     fold 1: +0.144 (+0.054 to +0.258)
+  RONC_195     fold 2: +0.144 (+0.054 to +0.258)
+  LEARNED_R96  fold 0: +0.040 (-0.017 to +0.105)
+  LEARNED_R96  fold 1: +0.015 (-0.035 to +0.076)
+  LEARNED_R96  fold 2: +0.035 (-0.023 to +0.101)
+  U1           fold 0: +0.064 (+0.018 to +0.112)
+  U1           fold 1: +0.039 (+0.002 to +0.076)
+  U1           fold 2: +0.068 (+0.019 to +0.121)
+  U2           fold 0: -0.009 (-0.043 to +0.013)
+  U2           fold 1: -0.007 (-0.041 to +0.015)
+  U2           fold 2: -0.006 (-0.039 to +0.013)
+  U3           fold 0: +0.034 (-0.020 to +0.093)
+  U3           fold 1: +0.011 (-0.035 to +0.065)
+  U3           fold 2: +0.030 (-0.025 to +0.090)
+  U4           fold 0: +0.072 (+0.023 to +0.128)
+  U4           fold 1: +0.043 (+0.009 to +0.078)
+  U4           fold 2: +0.072 (+0.025 to +0.123)
+  L_BOTH       fold 0: -0.009 (-0.040 to +0.010)
+  L_BOTH       fold 1: -0.007 (-0.039 to +0.012)
+  L_BOTH       fold 2: -0.009 (-0.041 to +0.009)
+  L_ONLY       fold 0: +0.047 (+0.005 to +0.101)
+  L_ONLY       fold 1: +0.022 (-0.007 to +0.069)
+  L_ONLY       fold 2: +0.046 (+0.004 to +0.101)
+  L_ONLY_NOBAL fold 0: +0.044 (+0.003 to +0.099)
+  L_ONLY_NOBAL fold 1: +0.020 (-0.009 to +0.066)
+  L_ONLY_NOBAL fold 2: +0.043 (+0.001 to +0.098)
+
+-- leave one substation out (pooled, arm minus K0) --
+PAIR_GATED {'D5': 0.04, 'D10': 0.002, 'D11': 0.034, 'D14': 0.036, 'D16': 0.031, 'D9': 0.036}
+LEARNED_R {'D5': 0.043, 'D10': 0.012, 'D11': 0.036, 'D14': 0.035, 'D16': 0.038, 'D9': 0.019}
+LEARNED_F {'D5': 0.135, 'D10': -0.0, 'D11': 0.127, 'D14': 0.13, 'D16': 0.138, 'D9': 0.127}
+RONC_195 {'D5': 0.179, 'D10': 0.028, 'D11': 0.163, 'D14': 0.17, 'D16': 0.185, 'D9': 0.139}
+
+-- median minus mean forecast, per site (ordinary rows, points) --
+[{'site': 'D10', 'K0': -0.05781741812825203}, {'site': 'D11', 'K0': -0.02987418882548809}, {'site': 'D14', 'K0': 0.03689596429467201}, {'site': 'D16', 'K0': 0.017362479120492935}, {'site': 'D5', 'K0': -0.14583709836006165}, {'site': 'D9', 'K0': -0.019016660749912262}]
+[{'site': 'D10', 'LEARNED_R': -0.05781741812825203}, {'site': 'D11', 'LEARNED_R': -0.029874185100197792}, {'site': 'D14', 'LEARNED_R': 0.03689596801996231}, {'site': 'D16', 'LEARNED_R': 0.017362480983138084}, {'site': 'D5', 'LEARNED_R': -0.14583709836006165}, {'site': 'D9', 'LEARNED_R': -0.01901666633784771}]
+
+== alarms and masked half-hours (all folds summed per arm; per fold in report.json) ==
+shape: (35, 6)
+┌──────────────┬──────┬────────┬────────────┬────────────────┬───────────────┐
+│ arm          ┆ fold ┆ alarms ┆ half_hours ┆ outside_logged ┆ share_outside │
+│ ---          ┆ ---  ┆ ---    ┆ ---        ┆ ---            ┆ ---           │
+│ str          ┆ i64  ┆ u32    ┆ i64        ┆ i64            ┆ f64           │
+╞══════════════╪══════╪════════╪════════════╪════════════════╪═══════════════╡
+│ LEARNED_F    ┆ 0    ┆ 135    ┆ 35962      ┆ 29611          ┆ 0.823397      │
+│ LEARNED_F    ┆ 1    ┆ 150    ┆ 42625      ┆ 36211          ┆ 0.849525      │
+│ LEARNED_F    ┆ 2    ┆ 142    ┆ 41008      ┆ 34848          ┆ 0.849785      │
+│ LEARNED_R    ┆ 0    ┆ 123    ┆ 21067      ┆ 17525          ┆ 0.83187       │
+│ LEARNED_R    ┆ 1    ┆ 108    ┆ 16203      ┆ 12670          ┆ 0.781954      │
+│ LEARNED_R    ┆ 2    ┆ 104    ┆ 19240      ┆ 15812          ┆ 0.82183       │
+│ LEARNED_R96  ┆ 0    ┆ 123    ┆ 31175      ┆ 25521          ┆ 0.818637      │
+│ LEARNED_R96  ┆ 1    ┆ 108    ┆ 24750      ┆ 19270          ┆ 0.778586      │
+│ LEARNED_R96  ┆ 2    ┆ 104    ┆ 27644      ┆ 22453          ┆ 0.81222       │
+│ L_BOTH       ┆ 0    ┆ 29     ┆ 5395       ┆ 3965           ┆ 0.73494       │
+│ L_BOTH       ┆ 1    ┆ 27     ┆ 5313       ┆ 3883           ┆ 0.730849      │
+│ L_BOTH       ┆ 2    ┆ 23     ┆ 5186       ┆ 3757           ┆ 0.72445       │
+│ L_ONLY       ┆ 0    ┆ 94     ┆ 15672      ┆ 13560          ┆ 0.865237      │
+│ L_ONLY       ┆ 1    ┆ 81     ┆ 10890      ┆ 8787           ┆ 0.806887      │
+│ L_ONLY       ┆ 2    ┆ 81     ┆ 14054      ┆ 12055          ┆ 0.857763      │
+│ L_ONLY_NOBAL ┆ 0    ┆ 76     ┆ 13301      ┆ 11758          ┆ 0.883994      │
+│ L_ONLY_NOBAL ┆ 1    ┆ 64     ┆ 8926       ┆ 7295           ┆ 0.817275      │
+│ L_ONLY_NOBAL ┆ 2    ┆ 69     ┆ 12848      ┆ 11321          ┆ 0.881149      │
+│ PAIR_GATED   ┆ -1   ┆ 110    ┆ 33557      ┆ 27743          ┆ 0.826743      │
+│ PAIR_NEW     ┆ -1   ┆ 242    ┆ 62772      ┆ 54355          ┆ 0.865912      │
+│ RONC_195     ┆ 0    ┆ 129    ┆ 48401      ┆ 42606          ┆ 0.880271      │
+│ RONC_195     ┆ 1    ┆ 129    ┆ 48401      ┆ 42606          ┆ 0.880271      │
+│ RONC_195     ┆ 2    ┆ 129    ┆ 48401      ┆ 42606          ┆ 0.880271      │
+│ U1           ┆ 0    ┆ 305    ┆ 76888      ┆ 67528          ┆ 0.878264      │
+│ U1           ┆ 1    ┆ 292    ┆ 72087      ┆ 62736          ┆ 0.870282      │
+│ U1           ┆ 2    ┆ 292    ┆ 75147      ┆ 65932          ┆ 0.877374      │
+│ U2           ┆ 0    ┆ 24     ┆ 6709       ┆ 4829           ┆ 0.719779      │
+│ U2           ┆ 1    ┆ 19     ┆ 6385       ┆ 4602           ┆ 0.720752      │
+│ U2           ┆ 2    ┆ 13     ┆ 5366       ┆ 3583           ┆ 0.667723      │
+│ U3           ┆ 0    ┆ 123    ┆ 18898      ┆ 15643          ┆ 0.82776       │
+│ U3           ┆ 1    ┆ 108    ┆ 14401      ┆ 11155          ┆ 0.774599      │
+│ U3           ┆ 2    ┆ 104    ┆ 17411      ┆ 14234          ┆ 0.817529      │
+│ U4           ┆ 0    ┆ 336    ┆ 77854      ┆ 67200          ┆ 0.863154      │
+│ U4           ┆ 1    ┆ 323    ┆ 75598      ┆ 64927          ┆ 0.858845      │
+│ U4           ┆ 2    ┆ 323    ┆ 78986      ┆ 68482          ┆ 0.867014      │
+└──────────────┴──────┴────────┴────────────┴────────────────┴───────────────┘
+
+== AFTER rows: mean score by scope (points of effective capacity) ==
+shared     rows  3675 cards  7 {'K0': 13.686, 'PAIR_NEW': 6.321, 'PAIR_GATED': 6.336, 'LEARNED_R': 7.31, 'LEARNED_F': 7.37, 'RONC_195': 7.361, 'LEARNED_R96': 7.363, 'U1': 6.35, 'U2': 7.336, 'U3': 7.31, 'U4': 6.419, 'L_BOTH': 7.336, 'L_ONLY': 13.651, 'L_ONLY_NOBAL': 13.651, 'BG2': 10.091}
+stack_only rows  5993 cards 11 {'K0': 10.129, 'PAIR_NEW': 6.083, 'PAIR_GATED': 5.752, 'LEARNED_R': 5.623, 'LEARNED_F': 5.66, 'RONC_195': 5.707, 'LEARNED_R96': 5.647, 'U1': 5.154, 'U2': 6.186, 'U3': 5.639, 'U4': 5.196, 'L_BOTH': 6.241, 'L_ONLY': 9.506, 'L_ONLY_NOBAL': 9.555}
+all_runs   rows  9833 cards 13 {'K0': 8.313, 'PAIR_NEW': 5.351, 'PAIR_GATED': 5.119, 'LEARNED_R': 4.829, 'LEARNED_F': 4.795, 'RONC_195': 4.782, 'LEARNED_R96': 4.79, 'U1': 4.444, 'U2': 5.485, 'U3': 4.842, 'U4': 4.471, 'L_BOTH': 5.519, 'L_ONLY': 7.621, 'L_ONLY_NOBAL': 7.659}
+
+Positive controls (shared scope; printed to 3 decimals):
+  K0: 13.686 (163 printed 13.686)  OK
+  PAIR_NEW: 6.321 (163 printed 6.321)  OK
+  BG2: 10.091 (163 printed 10.091)  OK
+
+== Gain contrasts on AFTER rows (arm minus PAIR_NEW; resampling whole transfers) ==
+shared     LEARNED_R    minus PAIR_NEW  +0.989 (-2.229 to +6.963)
+shared     LEARNED_R    minus K0        -6.376 (-11.436 to -0.007)
+shared     LEARNED_F    minus PAIR_NEW  +1.049 (-2.226 to +7.132)
+shared     LEARNED_F    minus K0        -6.316 (-11.432 to +0.153)
+shared     RONC_195     minus PAIR_NEW  +1.040 (-2.236 to +7.128)
+shared     RONC_195     minus K0        -6.325 (-11.443 to +0.151)
+shared     LEARNED_R96  minus PAIR_NEW  +1.043 (-2.229 to +7.130)
+shared     LEARNED_R96  minus K0        -6.323 (-11.436 to +0.146)
+shared     U1           minus PAIR_NEW  +0.029 (-0.103 to +0.236)
+shared     U1           minus K0        -7.336 (-9.810 to -0.021)
+shared     U2           minus PAIR_NEW  +1.016 (-2.214 to +6.986)
+shared     U2           minus K0        -6.349 (-11.420 to -0.000)
+shared     U3           minus PAIR_NEW  +0.989 (-2.229 to +6.963)
+shared     U3           minus K0        -6.376 (-11.436 to -0.007)
+shared     U4           minus PAIR_NEW  +0.098 (+0.018 to +0.325)
+shared     U4           minus K0        -7.267 (-9.761 to +0.184)
+shared     L_BOTH       minus PAIR_NEW  +1.016 (-2.214 to +6.986)
+shared     L_BOTH       minus K0        -6.349 (-11.420 to -0.000)
+shared     L_ONLY       minus PAIR_NEW  +7.330 (-0.119 to +9.810)
+shared     L_ONLY       minus K0        -0.035 (-0.152 to +0.000)
+shared     L_ONLY_NOBAL minus PAIR_NEW  +7.330 (-0.119 to +9.810)
+shared     L_ONLY_NOBAL minus K0        -0.035 (-0.152 to +0.000)
+shared     PAIR_NEW     minus K0        -7.365 (-9.810 to -0.031)
+shared     winter rows 3255 cards 5  LEARNED_R minus PAIR_NEW +1.059 (-2.432 to +8.118)
+shared     mean-forecast |error| LEARNED_R minus PAIR_NEW +0.525 (-3.238 to +7.311)
+stack_only LEARNED_R    minus PAIR_NEW  -0.460 (-3.505 to +3.718)
+stack_only LEARNED_R    minus K0        -4.507 (-9.191 to -0.050)
+stack_only LEARNED_F    minus PAIR_NEW  -0.422 (-3.500 to +3.822)
+stack_only LEARNED_F    minus K0        -4.469 (-9.183 to +0.019)
+stack_only RONC_195     minus PAIR_NEW  -0.376 (-3.480 to +3.858)
+stack_only RONC_195     minus K0        -4.423 (-9.170 to +0.071)
+stack_only LEARNED_R96  minus PAIR_NEW  -0.435 (-3.508 to +3.807)
+stack_only LEARNED_R96  minus K0        -4.482 (-9.190 to +0.005)
+stack_only U1           minus PAIR_NEW  -0.929 (-3.245 to +0.074)
+stack_only U1           minus K0        -4.976 (-8.340 to +0.051)
+stack_only U2           minus PAIR_NEW  +0.104 (-2.080 to +3.979)
+stack_only U2           minus K0        -3.943 (-8.815 to -0.000)
+stack_only U3           minus PAIR_NEW  -0.444 (-3.504 to +3.734)
+stack_only U3           minus K0        -4.490 (-9.190 to -0.036)
+stack_only U4           minus PAIR_NEW  -0.887 (-3.194 to +0.125)
+stack_only U4           minus K0        -4.933 (-8.299 to +0.112)
+stack_only L_BOTH       minus PAIR_NEW  +0.159 (-2.054 to +4.015)
+stack_only L_BOTH       minus K0        -3.888 (-8.797 to +0.017)
+stack_only L_ONLY       minus PAIR_NEW  +3.423 (-2.727 to +7.764)
+stack_only L_ONLY       minus K0        -0.624 (-2.048 to -0.009)
+stack_only L_ONLY_NOBAL minus PAIR_NEW  +3.472 (-2.656 to +7.772)
+stack_only L_ONLY_NOBAL minus K0        -0.574 (-2.021 to +0.000)
+stack_only PAIR_NEW     minus K0        -4.047 (-7.917 to +1.076)
+stack_only winter rows 3329 cards 6  LEARNED_R minus PAIR_NEW +1.036 (-2.402 to +7.854)
+stack_only mean-forecast |error| LEARNED_R minus PAIR_NEW -1.221 (-4.773 to +3.648)
+all_runs   LEARNED_R    minus PAIR_NEW  -0.522 (-3.086 to +2.704)
+all_runs   LEARNED_R    minus K0        -3.484 (-7.725 to -0.032)
+all_runs   LEARNED_F    minus PAIR_NEW  -0.557 (-3.183 to +2.743)
+all_runs   LEARNED_F    minus K0        -3.518 (-7.735 to -0.026)
+all_runs   RONC_195     minus PAIR_NEW  -0.569 (-3.180 to +2.742)
+all_runs   RONC_195     minus K0        -3.531 (-7.740 to -0.000)
+all_runs   LEARNED_R96  minus PAIR_NEW  -0.561 (-3.185 to +2.738)
+all_runs   LEARNED_R96  minus K0        -3.523 (-7.738 to -0.029)
+all_runs   U1           minus PAIR_NEW  -0.908 (-2.924 to +0.045)
+all_runs   U1           minus K0        -3.869 (-7.141 to +0.006)
+all_runs   U2           minus PAIR_NEW  +0.134 (-1.583 to +2.965)
+all_runs   U2           minus K0        -2.828 (-7.265 to -0.000)
+all_runs   U3           minus PAIR_NEW  -0.509 (-3.083 to +2.716)
+all_runs   U3           minus K0        -3.471 (-7.716 to -0.019)
+all_runs   U4           minus PAIR_NEW  -0.881 (-2.899 to +0.079)
+all_runs   U4           minus K0        -3.842 (-7.102 to +0.037)
+all_runs   L_BOTH       minus PAIR_NEW  +0.167 (-1.559 to +2.999)
+all_runs   L_BOTH       minus K0        -2.794 (-7.239 to +0.010)
+all_runs   L_ONLY       minus PAIR_NEW  +2.269 (-2.319 to +6.400)
+all_runs   L_ONLY       minus K0        -0.692 (-2.161 to -0.011)
+all_runs   L_ONLY_NOBAL minus PAIR_NEW  +2.307 (-2.273 to +6.427)
+all_runs   L_ONLY_NOBAL minus K0        -0.654 (-2.127 to +0.003)
+all_runs   PAIR_NEW     minus K0        -2.962 (-6.607 to +0.644)
+all_runs   winter rows 4482 cards 6  LEARNED_R minus PAIR_NEW +0.984 (-2.234 to +6.966)
+all_runs   mean-forecast |error| LEARNED_R minus PAIR_NEW -1.129 (-4.239 to +2.616)
+
+-- leave one substation out, stack_only, LEARNED_R minus PAIR_NEW --
+{'D5': -1.514, 'D10': -0.427, 'D11': -0.46, 'D14': -0.567, 'D16': 0.635, 'D9': -0.46}
+
+== per transfer (stack_only AFTER): mean score ==
+shape: (13, 19)
+┌──────┬────────────┬────────────┬──────┬───────────┬──────────┬────────────┬───────────┬───────────┬──────────┬─────────────┬───────┬───────────┬───────────┬───────┬───────────┬───────────┬──────────────┬───────┐
+│ site ┆ card       ┆ run_period ┆ rows ┆ K0        ┆ PAIR_NEW ┆ PAIR_GATED ┆ LEARNED_R ┆ LEARNED_F ┆ RONC_195 ┆ LEARNED_R96 ┆ U1    ┆ U2        ┆ U3        ┆ U4    ┆ L_BOTH    ┆ L_ONLY    ┆ L_ONLY_NOBAL ┆ BG2   │
+│ ---  ┆ ---        ┆ ---        ┆ ---  ┆ ---       ┆ ---      ┆ ---        ┆ ---       ┆ ---       ┆ ---      ┆ ---         ┆ ---   ┆ ---       ┆ ---       ┆ ---   ┆ ---       ┆ ---       ┆ ---          ┆ ---   │
+│ str  ┆ str        ┆ str        ┆ u32  ┆ f32       ┆ f32      ┆ f32        ┆ f32       ┆ f32       ┆ f32      ┆ f32         ┆ f32   ┆ f32       ┆ f32       ┆ f32   ┆ f32       ┆ f32       ┆ f32          ┆ f64   │
+╞══════╪════════════╪════════════╪══════╪═══════════╪══════════╪════════════╪═══════════╪═══════════╪══════════╪═════════════╪═══════╪═══════════╪═══════════╪═══════╪═══════════╪═══════════╪══════════════╪═══════╡
+│ D10  ┆ da56d516c2 ┆ replicate  ┆ 1008 ┆ 4.33      ┆ 4.7      ┆ 4.7        ┆ 4.03      ┆ 4.09      ┆ 4.38     ┆ 4.03        ┆ 4.4   ┆ 4.03      ┆ 4.16      ┆ 4.4   ┆ 4.33      ┆ 4.03      ┆ 4.33         ┆ null  │
+│ D14  ┆ a2d72ea3d1 ┆ replicate  ┆ 621  ┆ 1.92      ┆ 2.53     ┆ 1.77       ┆ 1.98      ┆ 1.9       ┆ 1.92     ┆ 1.9         ┆ 2.53  ┆ 1.92      ┆ 1.97      ┆ 2.53  ┆ 1.98      ┆ 1.92      ┆ 1.92         ┆ null  │
+│ D16  ┆ 5008604518 ┆ replicate  ┆ 615  ┆ 7.71      ┆ 11.07    ┆ 8.51       ┆ 2.32      ┆ 2.33      ┆ 2.33     ┆ 2.32        ┆ 2.33  ┆ 7.71      ┆ 2.28      ┆ 2.33  ┆ 7.71      ┆ 2.32      ┆ 2.32         ┆ null  │
+│ D16  ┆ 5954dbdf21 ┆ replicate  ┆ 74   ┆ 1.51      ┆ 1.51     ┆ 1.51       ┆ 1.51      ┆ 1.51      ┆ 1.51     ┆ 1.51        ┆ 1.51  ┆ 1.51      ┆ 1.51      ┆ 1.51  ┆ 1.51      ┆ 1.51      ┆ 1.51         ┆ null  │
+│ D10  ┆ 6dc4dc912d ┆ scored     ┆ 102  ┆ 1.45      ┆ 1.45     ┆ 1.45       ┆ 1.45      ┆ 1.45      ┆ 1.45     ┆ 1.45        ┆ 1.45  ┆ 1.45      ┆ 1.45      ┆ 1.45  ┆ 1.45      ┆ 1.45      ┆ 1.45         ┆ 3.11  │
+│ D14  ┆ 1fd002318a ┆ scored     ┆ 128  ┆ 2.34      ┆ 2.41     ┆ 2.34       ┆ 2.34      ┆ 2.34      ┆ 2.34     ┆ 2.34        ┆ 2.41  ┆ 2.34      ┆ 2.34      ┆ 2.41  ┆ 2.34      ┆ 2.34      ┆ 2.34         ┆ 1.34  │
+│ D14  ┆ e892000837 ┆ scored     ┆ 292  ┆ 3.82      ┆ 3.08     ┆ 3.08       ┆ 3.75      ┆ 3.83      ┆ 3.82     ┆ 3.75        ┆ 3.81  ┆ 3.82      ┆ 3.75      ┆ 3.81  ┆ 3.82      ┆ 3.75      ┆ 3.75         ┆ 3.83  │
+│ D14  ┆ e94a3ad204 ┆ scored     ┆ 246  ┆ 2.85      ┆ 2.59     ┆ 2.85       ┆ 2.85      ┆ 2.85      ┆ 2.85     ┆ 2.85        ┆ 2.59  ┆ 2.85      ┆ 2.85      ┆ 2.59  ┆ 2.85      ┆ 2.85      ┆ 2.85         ┆ 2.63  │
+│ D16  ┆ b2f7c05895 ┆ scored     ┆ 857  ┆ 14.65     ┆ 2.06     ┆ 2.06       ┆ 2.06      ┆ 2.06      ┆ 2.04     ┆ 2.06        ┆ 2.06  ┆ 2.06      ┆ 2.06      ┆ 2.06  ┆ 2.06      ┆ 14.65     ┆ 14.65        ┆ 5.66  │
+│ D16  ┆ e2fb25b426 ┆ scored     ┆ 172  ┆ 2.0       ┆ 2.21     ┆ 2.21       ┆ 1.68      ┆ 1.68      ┆ 1.6      ┆ 1.68        ┆ 1.68  ┆ 1.68      ┆ 1.68      ┆ 1.68  ┆ 1.68      ┆ 2.0       ┆ 2.0          ┆ 2.07  │
+│ D5   ┆ b2f7c05895 ┆ scored     ┆ 857  ┆ 18.15     ┆ 8.89     ┆ 8.89       ┆ 3.54      ┆ 3.54      ┆ 3.54     ┆ 3.54        ┆ 8.89  ┆ 3.54      ┆ 3.54      ┆ 8.99  ┆ 3.54      ┆ 18.15     ┆ 18.15        ┆ 19.41 │
+│ D5   ┆ ce4b82f23a ┆ scored     ┆ 849  ┆ 22.450001 ┆ 12.81    ┆ 12.81      ┆ 22.450001 ┆ 22.68     ┆ 22.68    ┆ 22.68       ┆ 12.81 ┆ 22.450001 ┆ 22.450001 ┆ 12.81 ┆ 22.450001 ┆ 22.450001 ┆ 22.450001    ┆ 14.69 │
+│ D5   ┆ e2fb25b426 ┆ scored     ┆ 172  ┆ 3.03      ┆ 3.47     ┆ 3.47       ┆ 2.77      ┆ 2.77      ┆ 2.77     ┆ 2.77        ┆ 3.38  ┆ 3.22      ┆ 2.77      ┆ 4.35  ┆ 3.22      ┆ 2.39      ┆ 2.39         ┆ 3.01  │
+└──────┴────────────┴────────────┴──────┴───────────┴──────────┴────────────┴───────────┴───────────┴──────────┴─────────────┴───────┴───────────┴───────────┴───────┴───────────┴───────────┴──────────────┴───────┘
+
+== tail calibration on stack_only AFTER rows (coverage and pinball, points) ==
+K0
+shape: (4, 5)
+┌───────┬────────┬──────────┬───────────┬──────────┐
+│ level ┆ n_rows ┆ coverage ┆ gap       ┆ pinball  │
+│ ---   ┆ ---    ┆ ---      ┆ ---       ┆ ---      │
+│ f64   ┆ i64    ┆ f64      ┆ f64       ┆ f64      │
+╞═══════╪════════╪══════════╪═══════════╪══════════╡
+│ 0.01  ┆ 5993   ┆ 0.296513 ┆ 0.286513  ┆ 3.550105 │
+│ 0.05  ┆ 5993   ┆ 0.352912 ┆ 0.302912  ┆ 4.983161 │
+│ 0.95  ┆ 5993   ┆ 0.840814 ┆ -0.109186 ┆ 2.693944 │
+│ 0.99  ┆ 5993   ┆ 0.893209 ┆ -0.096791 ┆ 1.468704 │
+└───────┴────────┴──────────┴───────────┴──────────┘
+PAIR_NEW
+shape: (4, 5)
+┌───────┬────────┬──────────┬───────────┬──────────┐
+│ level ┆ n_rows ┆ coverage ┆ gap       ┆ pinball  │
+│ ---   ┆ ---    ┆ ---      ┆ ---       ┆ ---      │
+│ f64   ┆ i64    ┆ f64      ┆ f64       ┆ f64      │
+╞═══════╪════════╪══════════╪═══════════╪══════════╡
+│ 0.01  ┆ 5993   ┆ 0.171867 ┆ 0.161867  ┆ 1.472826 │
+│ 0.05  ┆ 5993   ┆ 0.247122 ┆ 0.197122  ┆ 2.527916 │
+│ 0.95  ┆ 5993   ┆ 0.898215 ┆ -0.051785 ┆ 1.416624 │
+│ 0.99  ┆ 5993   ┆ 0.937427 ┆ -0.052573 ┆ 0.574757 │
+└───────┴────────┴──────────┴───────────┴──────────┘
+LEARNED_R
+shape: (4, 5)
+┌───────┬────────┬──────────┬───────────┬──────────┐
+│ level ┆ n_rows ┆ coverage ┆ gap       ┆ pinball  │
+│ ---   ┆ ---    ┆ ---      ┆ ---       ┆ ---      │
+│ f64   ┆ i64    ┆ f64      ┆ f64       ┆ f64      │
+╞═══════╪════════╪══════════╪═══════════╪══════════╡
+│ 0.01  ┆ 5993   ┆ 0.129818 ┆ 0.119818  ┆ 2.144738 │
+│ 0.05  ┆ 5993   ┆ 0.178375 ┆ 0.128375  ┆ 3.00777  │
+│ 0.95  ┆ 5993   ┆ 0.93459  ┆ -0.01541  ┆ 0.93123  │
+│ 0.99  ┆ 5993   ┆ 0.979977 ┆ -0.010023 ┆ 0.248015 │
+└───────┴────────┴──────────┴───────────┴──────────┘
+LEARNED_F
+shape: (4, 5)
+┌───────┬────────┬──────────┬───────────┬──────────┐
+│ level ┆ n_rows ┆ coverage ┆ gap       ┆ pinball  │
+│ ---   ┆ ---    ┆ ---      ┆ ---       ┆ ---      │
+│ f64   ┆ i64    ┆ f64      ┆ f64       ┆ f64      │
+╞═══════╪════════╪══════════╪═══════════╪══════════╡
+│ 0.01  ┆ 5993   ┆ 0.130652 ┆ 0.120652  ┆ 2.165723 │
+│ 0.05  ┆ 5993   ┆ 0.182546 ┆ 0.132546  ┆ 3.034434 │
+│ 0.95  ┆ 5993   ┆ 0.948273 ┆ -0.001727 ┆ 0.943344 │
+│ 0.99  ┆ 5993   ┆ 0.982813 ┆ -0.007187 ┆ 0.261169 │
+└───────┴────────┴──────────┴───────────┴──────────┘
+RONC_195
+shape: (4, 5)
+┌───────┬────────┬──────────┬───────────┬──────────┐
+│ level ┆ n_rows ┆ coverage ┆ gap       ┆ pinball  │
+│ ---   ┆ ---    ┆ ---      ┆ ---       ┆ ---      │
+│ f64   ┆ i64    ┆ f64      ┆ f64       ┆ f64      │
+╞═══════╪════════╪══════════╪═══════════╪══════════╡
+│ 0.01  ┆ 5993   ┆ 0.12815  ┆ 0.11815   ┆ 2.167105 │
+│ 0.05  ┆ 5993   ┆ 0.171033 ┆ 0.121033  ┆ 3.034204 │
+│ 0.95  ┆ 5993   ┆ 0.941265 ┆ -0.008735 ┆ 0.943928 │
+│ 0.99  ┆ 5993   ┆ 0.979643 ┆ -0.010357 ┆ 0.26458  │
+└───────┴────────┴──────────┴───────────┴──────────┘
