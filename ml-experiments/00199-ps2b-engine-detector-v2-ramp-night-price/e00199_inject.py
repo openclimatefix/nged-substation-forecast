@@ -105,3 +105,28 @@ def synthetic(
     y_new = y.copy()
     y_new[inject] = through_meter(y=y[inject], output=out[inject], q=q)
     return Injection(y=y_new, output=out, window_id=window)
+
+
+K3_FIRST_DESTINATION = datetime(2025, 3, 3, tzinfo=UTC)
+N_K3_WINDOWS = 5
+
+
+def build_k3(*, y: np.ndarray, g2: np.ndarray, q: float = Q_FLOOR) -> Injection:
+    """G2's record shifted by whole weeks into five windows of D8's history from 2025-03.
+
+    D8 may already hold an engine there, so the scores are recall only and carry no precision.
+    """
+    n = len(y)
+    out = np.full(n, np.nan)
+    window = np.full(n, -1)
+    lo, hi = stamp(G2_FIRST), stamp(G2_LAST)
+    record = np.clip(g2[lo:hi], 0.0, None)
+    for i in range(N_K3_WINDOWS):
+        start = K3_FIRST_DESTINATION + timedelta(days=K2_PITCH_DAYS * i)
+        a = stamp(start) + _bst_shift(when=start + timedelta(days=22))
+        out[a : a + len(record)] = record
+        window[a : a + len(record)] = 20 + i
+    inject = np.isfinite(out)
+    y_new = y.copy()
+    y_new[inject] = through_meter(y=y[inject], output=out[inject], q=q)
+    return Injection(y=y_new, output=np.where(window >= 0, out, np.nan), window_id=window)

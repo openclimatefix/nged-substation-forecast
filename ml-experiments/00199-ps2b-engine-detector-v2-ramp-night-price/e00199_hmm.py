@@ -279,11 +279,17 @@ def detect(
     return forward_backward(log_e=log_e, ctx=ctx, params=params, weight=np.zeros(len(y)))
 
 
-def rolling_offset(*, y: np.ndarray, load: np.ndarray, g_unused: float, q: float) -> np.ndarray:
+def rolling_offset(
+    *, y: np.ndarray, load: np.ndarray, g_unused: float, q: float, nan_to_null: bool = False
+) -> np.ndarray:
     """Round-zero offset: the centred 30-day rolling median of y minus the zero-unit mean."""
     res = y - unit_means(load=load, g=0.0, q=q)[:, 0]
-    frame = pl.DataFrame({"r": res}).with_columns(
-        pl.col("r").rolling_median(window_size=1441, min_samples=300, center=True).alias("m")
+    frame = (
+        pl.DataFrame({"r": res})
+        .with_columns(pl.col("r").fill_nan(None) if nan_to_null else pl.col("r"))
+        .with_columns(
+            pl.col("r").rolling_median(window_size=1441, min_samples=300, center=True).alias("m")
+        )
     )
     out = frame["m"].to_numpy().copy()
     ok = np.isfinite(out)

@@ -150,6 +150,7 @@ def run_loop(
     q: float = Q_FLOOR,
     rounds: int = 2,
     local_reference: np.ndarray | None = None,
+    nan_to_null: bool = False,
 ) -> tuple[np.ndarray, Posterior]:
     """Frozen detector: detect, re-centre from the zero-unit half-hours, detect again.
 
@@ -157,7 +158,7 @@ def run_loop(
     """
     if local_reference is not None:
         noise = with_local_noise(s=s, noise=noise, reference_rows=local_reference)
-    offset = rolling_offset(y=s.y, load=s.load, g_unused=params.g, q=q)
+    offset = rolling_offset(y=s.y, load=s.load, g_unused=params.g, q=q, nan_to_null=nan_to_null)
     for _ in range(rounds):
         post = detect(y=s.y, load=s.load, offset=offset, ctx=s.ctx, noise=noise, q=q, params=params)
         offset = recentre(
