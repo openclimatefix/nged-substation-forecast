@@ -218,6 +218,10 @@ nav:
           - Summary: ml-experiments/themes/retraining-and-training-history/index.md
           - Experiments: ml-experiments/themes/retraining-and-training-history/experiments.md
           - Research plan: ml-experiments/themes/retraining-and-training-history/plan.md
+      - Metered solar farms:
+          - Summary: ml-experiments/themes/metered-solar-farms/index.md
+          - Experiments: ml-experiments/themes/metered-solar-farms/experiments.md
+          - Research plan: ml-experiments/themes/metered-solar-farms/plan.md
       - Solar disaggregation:
           - Summary: ml-experiments/themes/solar-disaggregation/index.md
           - Experiments: ml-experiments/themes/solar-disaggregation/experiments.md
