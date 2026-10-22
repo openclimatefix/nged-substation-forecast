@@ -93,7 +93,7 @@ def _one_panel(
             yOffset="period:N",
         )
     )
-    return alt.layer(zero, line, point).properties(width=WIDTH, height=height, title=title or "")  # ty: ignore[unresolved-attribute]
+    return alt.layer(zero, line, point).properties(width=WIDTH, height=height, title=title or "")
 
 
 def _interval_chart(
