@@ -1,0 +1,213 @@
+== Days per site (at least 24 rows)
+shape: (6, 4)
+┌──────┬────────┬──────────────┬────────────┐
+│ site ┆ n_days ┆ median_score ┆ mean_score │
+│ ---  ┆ ---    ┆ ---          ┆ ---        │
+│ str  ┆ u32    ┆ f32          ┆ f32        │
+╞══════╪════════╪══════════════╪════════════╡
+│ D10  ┆ 288    ┆ 2.353884     ┆ 2.68962    │
+│ D11  ┆ 291    ┆ 2.002479     ┆ 2.242772   │
+│ D14  ┆ 285    ┆ 1.81399      ┆ 1.953544   │
+│ D16  ┆ 276    ┆ 1.856448     ┆ 2.269438   │
+│ D5   ┆ 252    ┆ 2.751767     ┆ 3.126393   │
+│ D9   ┆ 291    ┆ 1.84309      ┆ 2.110066   │
+└──────┴────────┴──────────────┴────────────┘
+
+== HEADLINE: worst 5% of days carry 0.417 of the excess (95% interval 0.335 to 0.469)
+  D5: 0.422
+  D10: 0.376
+  D11: 0.344
+  D14: 0.373
+  D16: 0.529
+  D9: 0.357
+  leave out D5: 0.416
+  leave out D10: 0.430
+  leave out D11: 0.433
+  leave out D14: 0.424
+  leave out D16: 0.381
+  worst 10%: 0.592
+
+== Labels (decision sites)
+ shape: (6, 5)
+┌───────────┬───────────────────┬─────────────────────┬──────────────┬───────────────────────┐
+│ label     ┆ share_of_all_days ┆ share_of_worst_days ┆ n_worst_days ┆ share_of_total_excess │
+│ ---       ┆ ---               ┆ ---                 ┆ ---          ┆ ---                   │
+│ str       ┆ f64               ┆ f64                 ┆ i64          ┆ f64                   │
+╞═══════════╪═══════════════════╪═════════════════════╪══════════════╪═══════════════════════╡
+│ switching ┆ 0.094828          ┆ 0.402778            ┆ 29           ┆ 0.292406              │
+│ flagged   ┆ 0.0               ┆ 0.0                 ┆ 0            ┆ 0.0                   │
+│ cold      ┆ 0.020115          ┆ 0.097222            ┆ 7            ┆ 0.053                 │
+│ economy7  ┆ 0.008621          ┆ 0.0                 ┆ 0            ┆ 0.001194              │
+│ holiday   ┆ 0.041667          ┆ 0.111111            ┆ 8            ┆ 0.071998              │
+│ labelled  ┆ 0.145115          ┆ 0.486111            ┆ 35           ┆ 0.358032              │
+└───────────┴───────────────────┴─────────────────────┴──────────────┴───────────────────────┘
+shape: (6, 3)
+┌──────┬─────┬──────────┐
+│ site ┆ n   ┆ labelled │
+│ ---  ┆ --- ┆ ---      │
+│ str  ┆ u32 ┆ f64      │
+╞══════╪═════╪══════════╡
+│ D10  ┆ 15  ┆ 0.466667 │
+│ D11  ┆ 15  ┆ 0.333333 │
+│ D14  ┆ 15  ┆ 0.266667 │
+│ D16  ┆ 14  ┆ 0.714286 │
+│ D5   ┆ 13  ┆ 0.692308 │
+│ D9   ┆ 15  ┆ 0.4      │
+└──────┴─────┴──────────┘
+== Unlabelled worst days by local month
+shape: (11, 2)
+┌───────┬─────┐
+│ month ┆ len │
+│ ---   ┆ --- │
+│ i8    ┆ u32 │
+╞═══════╪═════╡
+│ 1     ┆ 4   │
+│ 3     ┆ 3   │
+│ 4     ┆ 3   │
+│ 5     ┆ 6   │
+│ 6     ┆ 5   │
+│ 7     ┆ 1   │
+│ 8     ┆ 1   │
+│ 9     ┆ 3   │
+│ 10    ┆ 3   │
+│ 11    ┆ 6   │
+│ 12    ┆ 2   │
+└───────┴─────┘
+
+== Cold nights
+-- day mean below 2.0 C (pre-registered): 28 of 1392 days, 7 of the worst days
+   row-level ratio (pre-registered): 2.880 (95% interval -0.423 to 5.813)
+   day-level ratio (post hoc): 2.635 (95% interval 1.902 to 3.553)
+   night score ratio (post hoc): 1.705 (95% interval 1.200 to 1.961)
+-- day mean below 3.0 C (post hoc): 50 of 1392 days, 7 of the worst days
+   row-level ratio (pre-registered): 0.985 (95% interval -3.248 to 2.079)
+   day-level ratio (post hoc): 1.701 (95% interval 1.040 to 2.481)
+   night score ratio (post hoc): 1.399 (95% interval 1.063 to 1.603)
+-- day mean below 5.0 C (post hoc): 141 of 1392 days, 13 of the worst days
+   row-level ratio (pre-registered): -0.204 (95% interval -3.930 to 0.920)
+   day-level ratio (post hoc): 1.363 (95% interval 0.611 to 1.899)
+   night score ratio (post hoc): 1.232 (95% interval 0.991 to 1.490)
+
+== Random-day control {'draw_mean': 0.031211519613862038, 'draw_max': 0.08450931310653687, 'real': 0.4173303544521332, 'draws_at_or_above_real': 0}
+== Injected control, pooled: 0.892 of injected days in the worst 5%
+   by site: {'D5': 0.94, 'D10': 1.0, 'D11': 1.0, 'D14': 1.0, 'D16': 0.519}
+== Injected control, 10 points (post hoc): {'D5': 1.0, 'D10': 1.0, 'D11': 1.0, 'D14': 1.0, 'D16': 1.0, 'pooled': 1.0}
+
+== Pooled curve at 5%, 10%, 25%, 50% of days: [0.417, 0.592, 0.867, 1.0]
+
+== Worst days
+shape: (87, 11)
+┌──────┬────────────┬───────────┬───────────┬───────────┬─────────┬───────┬──────────┬─────────┬───────────────────┬────────────┐
+│ site ┆ local_date ┆ score     ┆ excess    ┆ switching ┆ flagged ┆ cold  ┆ economy7 ┆ holiday ┆ day_temperature_c ┆ step_share │
+│ ---  ┆ ---        ┆ ---       ┆ ---       ┆ ---       ┆ ---     ┆ ---   ┆ ---      ┆ ---     ┆ ---               ┆ ---        │
+│ str  ┆ date       ┆ f32       ┆ f32       ┆ bool      ┆ bool    ┆ bool  ┆ bool     ┆ bool    ┆ f64               ┆ f32        │
+╞══════╪════════════╪═══════════╪═══════════╪═══════════╪═════════╪═══════╪══════════╪═════════╪═══════════════════╪════════════╡
+│ D5   ┆ 2026-01-15 ┆ 21.026001 ┆ 18.274235 ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.839359          ┆ 0.0        │
+│ D16  ┆ 2026-05-12 ┆ 15.610432 ┆ 13.753983 ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.919522          ┆ 0.138168   │
+│ D5   ┆ 2026-01-16 ┆ 13.230291 ┆ 10.478525 ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 4.627992          ┆ 0.069123   │
+│ D16  ┆ 2026-01-15 ┆ 11.397326 ┆ 9.540878  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.654867          ┆ 0.0        │
+│ D16  ┆ 2026-01-16 ┆ 11.29688  ┆ 9.440432  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 4.475018          ┆ 0.010701   │
+│ D10  ┆ 2026-06-11 ┆ 11.082829 ┆ 8.728946  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 11.864618         ┆ 0.075172   │
+│ D16  ┆ 2026-05-11 ┆ 9.862593  ┆ 8.006145  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.367934          ┆ 0.002289   │
+│ D10  ┆ 2025-11-20 ┆ 9.012852  ┆ 6.658968  ┆ false     ┆ false   ┆ true  ┆ false    ┆ false   ┆ 1.396567          ┆ 0.054447   │
+│ D16  ┆ 2026-01-17 ┆ 8.498721  ┆ 6.642273  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.509109          ┆ 0.009363   │
+│ D16  ┆ 2026-05-14 ┆ 8.127318  ┆ 6.27087   ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.271977          ┆ 0.065302   │
+│ D16  ┆ 2026-05-16 ┆ 8.116666  ┆ 6.260218  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.81769           ┆ 0.173547   │
+│ D16  ┆ 2026-04-20 ┆ 7.878892  ┆ 6.022444  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.683011          ┆ 0.137023   │
+│ D11  ┆ 2026-01-04 ┆ 7.835838  ┆ 5.83336   ┆ true      ┆ false   ┆ true  ┆ false    ┆ false   ┆ -1.424288         ┆ 0.063111   │
+│ D10  ┆ 2026-05-26 ┆ 8.166552  ┆ 5.812668  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 21.525085         ┆ 0.059271   │
+│ D16  ┆ 2026-05-15 ┆ 7.632553  ┆ 5.776105  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.894498          ┆ 0.019039   │
+│ D10  ┆ 2025-12-01 ┆ 7.637958  ┆ 5.284074  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.750115          ┆ 0.0        │
+│ D9   ┆ 2025-08-13 ┆ 7.052798  ┆ 5.209708  ┆ false     ┆ true    ┆ false ┆ false    ┆ false   ┆ 20.681967         ┆ 0.1532     │
+│ D16  ┆ 2026-01-19 ┆ 6.466124  ┆ 4.609675  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.245216          ┆ 0.041026   │
+│ D5   ┆ 2026-01-17 ┆ 7.359468  ┆ 4.607701  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.469407          ┆ 0.063011   │
+│ D16  ┆ 2025-12-27 ┆ 6.21455   ┆ 4.358102  ┆ true      ┆ false   ┆ false ┆ false    ┆ true    ┆ 5.690268          ┆ 0.0        │
+│ D5   ┆ 2026-01-24 ┆ 7.026722  ┆ 4.274955  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.143851          ┆ 0.0        │
+│ D11  ┆ 2026-01-02 ┆ 6.259146  ┆ 4.256667  ┆ false     ┆ false   ┆ true  ┆ false    ┆ true    ┆ 0.473921          ┆ 0.192698   │
+│ D9   ┆ 2025-08-14 ┆ 6.036925  ┆ 4.193835  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 21.234898         ┆ 0.302844   │
+│ D10  ┆ 2026-01-02 ┆ 6.522566  ┆ 4.168682  ┆ true      ┆ false   ┆ true  ┆ false    ┆ true    ┆ 0.473921          ┆ 0.281819   │
+│ D9   ┆ 2026-03-20 ┆ 5.930605  ┆ 4.087515  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.289981          ┆ 0.0        │
+│ D16  ┆ 2026-01-20 ┆ 5.716784  ┆ 3.860336  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.15309           ┆ 0.0        │
+│ D10  ┆ 2025-11-26 ┆ 6.055707  ┆ 3.701824  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 3.465178          ┆ 0.093775   │
+│ D5   ┆ 2026-01-19 ┆ 6.442171  ┆ 3.690404  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.079609          ┆ 0.021763   │
+│ D10  ┆ 2026-06-10 ┆ 5.986143  ┆ 3.632259  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 11.182413         ┆ 0.000896   │
+│ D10  ┆ 2025-10-08 ┆ 5.978732  ┆ 3.624848  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 13.043159         ┆ 0.0        │
+│ D9   ┆ 2026-04-01 ┆ 5.44382   ┆ 3.60073   ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.319922          ┆ 0.0        │
+│ D5   ┆ 2026-01-22 ┆ 6.274299  ┆ 3.522532  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.762396          ┆ 0.078322   │
+│ D16  ┆ 2026-04-19 ┆ 5.362047  ┆ 3.505599  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.556686          ┆ 0.0        │
+│ D14  ┆ 2026-06-20 ┆ 5.287995  ┆ 3.474005  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 20.593936         ┆ 0.067478   │
+│ D5   ┆ 2026-04-02 ┆ 6.158964  ┆ 3.407197  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.742165          ┆ 0.0        │
+│ D9   ┆ 2026-03-06 ┆ 5.221175  ┆ 3.378085  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.810822          ┆ 0.0        │
+│ D9   ┆ 2026-05-25 ┆ 5.218516  ┆ 3.375426  ┆ false     ┆ false   ┆ false ┆ false    ┆ true    ┆ 19.553371         ┆ 0.0        │
+│ D11  ┆ 2025-11-05 ┆ 5.377241  ┆ 3.374762  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 14.803592         ┆ 0.0        │
+│ D11  ┆ 2025-09-04 ┆ 5.305372  ┆ 3.302893  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 14.341888         ┆ 0.071168   │
+│ D14  ┆ 2025-10-04 ┆ 5.103885  ┆ 3.289895  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 12.289465         ┆ 0.0        │
+│ D14  ┆ 2025-11-28 ┆ 5.100017  ┆ 3.286027  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.901139          ┆ 0.0        │
+│ D5   ┆ 2026-05-07 ┆ 6.023706  ┆ 3.27194   ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.991943          ┆ 0.011958   │
+│ D16  ┆ 2026-01-24 ┆ 5.119152  ┆ 3.262704  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.046922          ┆ 0.041118   │
+│ D11  ┆ 2026-01-05 ┆ 5.242989  ┆ 3.24051   ┆ true      ┆ false   ┆ true  ┆ false    ┆ false   ┆ -2.18301          ┆ 0.0        │
+│ D10  ┆ 2025-12-02 ┆ 5.531375  ┆ 3.177491  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.417877          ┆ 0.165997   │
+│ D9   ┆ 2025-10-26 ┆ 5.014406  ┆ 3.171316  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.891246          ┆ 0.041068   │
+│ D10  ┆ 2025-10-17 ┆ 5.477507  ┆ 3.123623  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 10.807303         ┆ 0.0        │
+│ D9   ┆ 2026-06-01 ┆ 4.950304  ┆ 3.107214  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 16.24613          ┆ 0.0        │
+│ D9   ┆ 2026-05-26 ┆ 4.913251  ┆ 3.070161  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 18.331461         ┆ 0.0        │
+│ D5   ┆ 2026-05-20 ┆ 5.811084  ┆ 3.059317  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 14.665308         ┆ 0.0        │
+│ D10  ┆ 2025-07-03 ┆ 5.375739  ┆ 3.021855  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 16.503134         ┆ 0.057135   │
+│ D5   ┆ 2026-01-21 ┆ 5.771973  ┆ 3.020206  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.171456          ┆ 0.150207   │
+│ D5   ┆ 2026-04-22 ┆ 5.662238  ┆ 2.910471  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.378119          ┆ 0.0        │
+│ D5   ┆ 2026-04-21 ┆ 5.642754  ┆ 2.890987  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.124157          ┆ 0.0        │
+│ D9   ┆ 2026-05-10 ┆ 4.72221   ┆ 2.87912   ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.676542          ┆ 0.083449   │
+│ D11  ┆ 2025-09-24 ┆ 4.876645  ┆ 2.874166  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 12.216731         ┆ 0.093222   │
+│ D5   ┆ 2026-01-20 ┆ 5.578532  ┆ 2.826765  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.104953          ┆ 0.12498    │
+│ D10  ┆ 2025-11-01 ┆ 5.128508  ┆ 2.774624  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 11.704951         ┆ 0.119761   │
+│ D10  ┆ 2025-12-26 ┆ 5.08151   ┆ 2.727626  ┆ true      ┆ false   ┆ false ┆ false    ┆ true    ┆ 4.865647          ┆ 0.122168   │
+│ D11  ┆ 2025-10-02 ┆ 4.714321  ┆ 2.711842  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 14.194009         ┆ 0.000451   │
+│ D9   ┆ 2026-03-10 ┆ 4.441081  ┆ 2.597991  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.610622          ┆ 0.0        │
+│ D14  ┆ 2026-04-02 ┆ 4.403654  ┆ 2.589664  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.742165          ┆ 0.004646   │
+│ D11  ┆ 2026-03-23 ┆ 4.519502  ┆ 2.517023  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.081413          ┆ 0.117373   │
+│ D14  ┆ 2026-05-07 ┆ 4.311891  ┆ 2.497901  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.991943          ┆ 0.0        │
+│ D14  ┆ 2026-04-06 ┆ 4.301224  ┆ 2.487234  ┆ false     ┆ false   ┆ false ┆ false    ┆ true    ┆ 8.391944          ┆ 0.0        │
+│ D9   ┆ 2026-05-24 ┆ 4.325565  ┆ 2.482475  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 16.461676         ┆ 0.0        │
+│ D9   ┆ 2026-05-02 ┆ 4.323786  ┆ 2.480696  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 13.05808          ┆ 0.0        │
+│ D14  ┆ 2026-05-20 ┆ 4.228966  ┆ 2.414976  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 14.665308         ┆ 0.0        │
+│ D11  ┆ 2026-04-02 ┆ 4.384755  ┆ 2.382276  ┆ true      ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.496437          ┆ 0.016495   │
+│ D11  ┆ 2025-11-13 ┆ 4.351797  ┆ 2.349318  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 12.366135         ┆ 0.000659   │
+│ D9   ┆ 2025-10-29 ┆ 4.171068  ┆ 2.327978  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 10.002126         ┆ 0.003114   │
+│ D14  ┆ 2025-12-30 ┆ 4.112438  ┆ 2.298448  ┆ false     ┆ false   ┆ false ┆ false    ┆ true    ┆ 4.255884          ┆ 0.0        │
+│ D10  ┆ 2025-12-30 ┆ 4.635718  ┆ 2.281834  ┆ true      ┆ false   ┆ false ┆ false    ┆ true    ┆ 4.217027          ┆ 0.0        │
+│ D9   ┆ 2026-06-04 ┆ 4.114066  ┆ 2.270976  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 14.938107         ┆ 0.007291   │
+│ D14  ┆ 2026-01-06 ┆ 4.062832  ┆ 2.248842  ┆ false     ┆ false   ┆ true  ┆ false    ┆ false   ┆ -1.185964         ┆ 0.0        │
+│ D10  ┆ 2026-06-20 ┆ 4.588165  ┆ 2.234282  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 20.377444         ┆ 0.0        │
+│ D11  ┆ 2026-06-08 ┆ 4.18804   ┆ 2.185561  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 13.664726         ┆ 0.0        │
+│ D11  ┆ 2026-06-21 ┆ 4.142242  ┆ 2.139763  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 18.198021         ┆ 0.000363   │
+│ D11  ┆ 2025-12-10 ┆ 4.105647  ┆ 2.103168  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 9.761819          ┆ 0.004473   │
+│ D11  ┆ 2025-11-28 ┆ 4.068721  ┆ 2.066242  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 8.634402          ┆ 0.073399   │
+│ D11  ┆ 2025-12-31 ┆ 4.003018  ┆ 2.00054   ┆ false     ┆ false   ┆ true  ┆ false    ┆ true    ┆ 1.269686          ┆ 0.0        │
+│ D14  ┆ 2025-09-12 ┆ 3.713291  ┆ 1.899301  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 13.475237         ┆ 0.0        │
+│ D14  ┆ 2026-05-19 ┆ 3.555791  ┆ 1.741802  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 13.051237         ┆ 0.0        │
+│ D14  ┆ 2026-03-20 ┆ 3.468594  ┆ 1.654604  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 7.194176          ┆ 0.0        │
+│ D14  ┆ 2026-03-06 ┆ 3.379403  ┆ 1.565413  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 6.93157           ┆ 0.0        │
+│ D14  ┆ 2026-06-29 ┆ 3.289471  ┆ 1.475482  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 18.076078         ┆ 0.052827   │
+│ D14  ┆ 2025-08-22 ┆ 3.199362  ┆ 1.385372  ┆ false     ┆ false   ┆ false ┆ false    ┆ false   ┆ 15.173628         ┆ 0.0        │
+└──────┴────────────┴───────────┴───────────┴───────────┴─────────┴───────┴──────────┴─────────┴───────────────────┴────────────┘
+
+== Checks
+shape: (6, 7)
+┌──────┬───────────────────┬────────────────────────┬──────────────────────────┬───────────────────────────┬────────────┬────────────┐
+│ site ┆ median_minus_mean ┆ mean_abs_error_of_mean ┆ mean_abs_error_of_median ┆ max_abs_median_minus_mean ┆ first_day  ┆ last_day   │
+│ ---  ┆ ---               ┆ ---                    ┆ ---                      ┆ ---                       ┆ ---        ┆ ---        │
+│ str  ┆ f32               ┆ f32                    ┆ f32                      ┆ f32                       ┆ date       ┆ date       │
+╞══════╪═══════════════════╪════════════════════════╪══════════════════════════╪═══════════════════════════╪════════════╪════════════╡
+│ D10  ┆ 0.0               ┆ 4.545352               ┆ 4.545352                 ┆ 0.0                       ┆ 2025-07-03 ┆ 2026-06-30 │
+│ D11  ┆ 0.0               ┆ 3.999375               ┆ 3.999375                 ┆ 0.0                       ┆ 2025-07-03 ┆ 2026-06-30 │
+│ D14  ┆ 0.0               ┆ 3.42029                ┆ 3.42029                  ┆ 0.0                       ┆ 2025-07-03 ┆ 2026-06-30 │
+│ D16  ┆ 0.0               ┆ 3.800138               ┆ 3.800138                 ┆ 0.0                       ┆ 2025-07-03 ┆ 2026-06-30 │
+│ D5   ┆ 0.0               ┆ 5.263264               ┆ 5.263264                 ┆ 0.0                       ┆ 2025-07-03 ┆ 2026-06-30 │
+│ D9   ┆ 0.0               ┆ 3.718115               ┆ 3.718115                 ┆ 0.0                       ┆ 2025-07-03 ┆ 2026-06-30 │
+└──────┴───────────────────┴────────────────────────┴──────────────────────────┴───────────────────────────┴────────────┴────────────┘
+share of the mean forecast's absolute error carried by its worst 5%: 0.367
+worst pinball days also among the worst mean-error days: 76 of 87
+
+== Sensitivities
+-- all leads 0 to 168 h: share 0.449; worst days labelled 0.478
+-- D+1, switching rows kept: share 0.456; worst days labelled 0.627
