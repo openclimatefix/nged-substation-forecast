@@ -180,7 +180,7 @@ def figure_groups(*, m12: dict) -> alt.TopLevelMixin:
                 legend=alt.Legend(title=None, orient="top", direction="horizontal"),
             ),
         )
-    )  # ty: ignore[unresolved-attribute]
+    )
     return chart.properties(
         width=WIDTH - 120,
         height=260,
