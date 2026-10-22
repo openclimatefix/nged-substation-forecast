@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [176](../../00176-calibration-band-shape-smooth-in-lead/result.md) | Does a band width that rises smoothly with lead (monotone fit, shrinkage, or both) remove the dips in the q05 to q95 width without worsening the score? | 1 | Nothing | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
