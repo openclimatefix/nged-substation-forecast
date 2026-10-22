@@ -131,8 +131,9 @@ which prints a whole list however long it is, and say in the plan which items th
 which it departs from. The overview's "What the experiments taught us so far" section is the
 curated roll-up of the `advice` lists.
 
-A plan also begins by reading `docs/ml-experiments/data-processing.md`, which lists the processing
-that the data needs before a model trains or scores on it.
+A plan also begins by reading `docs/ml-experiments/background/index.md`, and then
+`docs/ml-experiments/data-processing.md`, which lists the processing that the data needs before a
+model trains or scores on it.
 
 ## How to score
 
@@ -351,6 +352,10 @@ with status `planned`. The overnight session:
 - **Ends with a morning report as its final message:** one line per experiment that opens with its
   take-home message, then its verdict and link, what failed, and the hypotheses it proposes for the
   next plan.
+
+**Add or fix at most five bullets in `docs/ml-experiments/background/` in the same PR as the
+write-up.** The [background index](../../../docs/ml-experiments/background/index.md#update-rule)
+owns the full rule, including the evidence tag every bullet carries.
 
 **Record every new finding about data processing in `docs/ml-experiments/data-processing.md`, in the
 same PR as the write-up.** A finding about data processing is a step that the data needs before a
