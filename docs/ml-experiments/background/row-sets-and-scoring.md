@@ -111,5 +111,12 @@ and terms are in the [glossary](../glossary.md).
 - **Score a new model component on top of the best-guess arm, not on a partial stack.** The drift
   term improved the score by 0.40 on the bare GAM-K and worsened arm D by 0.03 once the filter, the
   winter night offset, and recipe R were in (exp 167, 170; DP Primaries; provisional).
+- **Gains do not always remove the same error: the correction network and the two-number solar
+  summary added on arm A.** Together they scored 0.136 below arm A, 99% of the sum of their single
+  gains of 0.099 and 0.038 (exp 220; 5 Primaries, one year; provisional).
+- **Quote a neural network's score per seed, or say the seeds were averaged.** Averaging the
+  quantiles of the three seeds of the correction network scored 0.123 below arm D at six
+  substations, against 0.104 for the mean of the single-seed scores (exp 201, 220; 6 substations,
+  one year; provisional).
 
-Last checked against experiment 183.
+Last checked against experiment 220.
