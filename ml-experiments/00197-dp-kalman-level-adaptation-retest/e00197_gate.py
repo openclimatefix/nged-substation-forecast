@@ -36,7 +36,7 @@ import e00197_gated as gated
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
-from studies.dp_assimilation import correction_at
+from studies.dp_assimilation import CorrectionTrace, correction_at
 
 SITES: Final[tuple[str, ...]] = common.DECISION_SITES
 SIZES: Final[tuple[float, ...]] = (0.05, 0.10, 0.20)
@@ -176,7 +176,9 @@ def spread_table(*, context: base.SiteContext, stream: np.ndarray, band: np.ndar
     return table
 
 
-def read_class(*, pairs: pl.DataFrame, band: np.ndarray, clean_trace) -> np.ndarray:  # noqa: ANN001
+def read_class(
+    *, pairs: pl.DataFrame, band: np.ndarray, clean_trace: CorrectionTrace
+) -> np.ndarray:
     """Return each pair's read class: what readings since the offset began could reach the target.
 
     Args:
