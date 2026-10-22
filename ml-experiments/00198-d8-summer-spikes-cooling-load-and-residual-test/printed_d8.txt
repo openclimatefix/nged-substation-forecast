@@ -1,0 +1,12 @@
+Summer (June to September) departures from expected power, by year:
+2022 {'half_hours': 5856, 'downward_share': 0.183, 'upward_share': 0.05, 'artefact_share': 0.001, 'mean_resid': -0.317, 'upward_max_mw': 3.161, 'downward_min_mw': -9.281}
+2023 {'half_hours': 5856, 'downward_share': 0.188, 'upward_share': 0.077, 'artefact_share': 0.0, 'mean_resid': -0.484, 'upward_max_mw': 2.749, 'downward_min_mw': -7.576}
+2024 {'half_hours': 5856, 'downward_share': 0.359, 'upward_share': 0.105, 'artefact_share': 0.001, 'mean_resid': -1.176, 'upward_max_mw': 4.299, 'downward_min_mw': -8.288}
+2025 {'half_hours': 5856, 'downward_share': 0.521, 'upward_share': 0.065, 'artefact_share': 0.002, 'mean_resid': -1.553, 'upward_max_mw': 5.898, 'downward_min_mw': -7.502}
+2026 {'half_hours': 1439, 'downward_share': 0.113, 'upward_share': 0.213, 'artefact_share': 0.0, 'mean_resid': 0.306, 'upward_max_mw': 6.034, 'downward_min_mw': -4.579}
+median hour of upward/downward departures: 13.5 14.0
+mean temperature at upward/downward/all summer half-hours: 18.977509059766103 17.583225411313666 16.958758037011574
+D8 partial Spearman (afternoon residual vs hinge tau 20, warm days, before the break): +0.004 on 912 half-hours
+D8 same correlation after the break: 0.05121188996490731 1308
+D8 fit-summer afternoon days above tau: {16.0: {'fit_days_above': 176}, 18.0: {'fit_days_above': 156}, 20.0: {'fit_days_above': 120}, 22.0: {'fit_days_above': 76}, 24.0: {'fit_days_above': 40}}
+D8 cooling hinge: {'tau': 20.0, 'held_out_scores': {16.0: 0.0047840743810955155, 18.0: 0.00010219678011158528, 20.0: -0.0015259173702945605, 22.0: -0.0012699477914152602, 24.0: -0.001487533080149983}, 'coef': [0.21816354560359102, 0.6592434315008538, 0.07280722797691826, -0.04909017403790961, -0.047493137717203086, 0.1805233771079642], 'mae_change_mw': [-0.000997196989035678, -0.0035581543512424305, 0.0008716907099960216], 'mae_change_noisy_mw': [-0.00014008771260944772, -0.0017604305286106302, 0.0013561559038755139], 'scored_half_hours': 15407, 'mae_before_mw': 1.9717219398886459}

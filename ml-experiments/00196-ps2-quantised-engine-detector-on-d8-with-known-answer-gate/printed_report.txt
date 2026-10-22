@@ -1,0 +1,70 @@
+unit size (gate fit): 1.75 [1.5, 1.75, 1.75] local-noise: 1.5 [1.5, 1.5, 1.5]
+== fixed noise (pre-registered)
+K1 units {'0': 1704, '1': 137, '2': 133, '3': 80} {'recall_1_unit': [0.832, 0.63, 0.97], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.843, 0.669, 0.965], 'energy_error': [-0.013, -0.1, 0.13], 'flagged_share': [0.189, 0.119, 0.266]} filtered recall 0.943 exact-k 0.941 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+K2 units {'0': 15336, '1': 1233, '2': 1197, '3': 720} {'recall_1_unit': [0.85, 0.787, 0.909], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.926, 0.893, 0.956], 'energy_error': [-0.084, -0.108, -0.058], 'flagged_share': [0.173, 0.151, 0.196]} filtered recall 0.912 exact-k 0.964 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+synthetic_x0.5 units {'0': 17485, '1': 568, '2': 566, '3': 389} {'recall_1_unit': [0.94, 0.889, 0.979], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.824, 0.733, 0.917], 'energy_error': [-0.001, -0.059, 0.069], 'flagged_share': [0.095, 0.079, 0.111]} filtered recall 0.971 exact-k 0.978 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+synthetic_x2.0 units {'0': 13958, '1': 1738, '2': 2005, '3': 1307} {'recall_1_unit': [0.936, 0.896, 0.97], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.961, 0.939, 0.982], 'energy_error': [-0.062, -0.078, -0.043], 'flagged_share': [0.27, 0.25, 0.29]} filtered recall 0.979 exact-k 0.962 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+q_0.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.847, 0.784, 0.904], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.918, 0.884, 0.949], 'energy_error': [-0.078, -0.102, -0.051], 'flagged_share': [0.174, 0.152, 0.197]} filtered recall 0.915 exact-k 0.962 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+q_0.5 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.862, 0.802, 0.913], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.888, 0.842, 0.928], 'energy_error': [-0.056, -0.086, -0.021], 'flagged_share': [0.182, 0.158, 0.205]} filtered recall 0.917 exact-k 0.955 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+q_1.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.847, 0.786, 0.904], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.903, 0.86, 0.94], 'energy_error': [-0.06, -0.086, -0.029], 'flagged_share': [0.177, 0.155, 0.2]} filtered recall 0.918 exact-k 0.954 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+false alarms clean even months {'rows': 12045, 'flagged_share': 8.302200083022001e-05, 'false_active_days': 0, 'days': 251, 'false_active_days_per_month': 0.0}
+false alarms clean all {'rows': 26828, 'flagged_share': 0.007044878485164753, 'false_active_days': 5, 'days': 559, 'false_active_days_per_month': 0.27191413237924866}
+flagged_share_fit_window 0.4019
+left_tail_share_fit_window 0.2578
+flagged_share_fall 0.4114
+left_tail_share_fall 0.1194
+flagged_share_post_fall 0.4336
+left_tail_share_post_fall 0.0229
+== local noise (post hoc)
+K1 units {'0': 1704, '1': 137, '2': 133, '3': 80} {'recall_1_unit': [0.65, 0.358, 0.885], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.956, 0.93, 0.978], 'energy_error': [-0.103, -0.181, -0.031], 'flagged_share': [0.154, 0.088, 0.226]} filtered recall 0.886 exact-k 0.9 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+K2 units {'0': 15336, '1': 1233, '2': 1197, '3': 720} {'recall_1_unit': [0.81, 0.74, 0.875], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.922, 0.89, 0.948], 'energy_error': [-0.096, -0.127, -0.065], 'flagged_share': [0.171, 0.148, 0.194]} filtered recall 0.915 exact-k 0.91 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+synthetic_x0.5 units {'0': 17485, '1': 568, '2': 566, '3': 389} {'recall_1_unit': [0.81, 0.728, 0.882], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.651, 0.551, 0.765], 'energy_error': [0.073, -0.017, 0.18], 'flagged_share': [0.114, 0.093, 0.136]} filtered recall 0.935 exact-k 0.925 pass False {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': False, 'energy_within_15pct': True}
+synthetic_x2.0 units {'0': 13958, '1': 1738, '2': 2005, '3': 1307} {'recall_1_unit': [0.858, 0.805, 0.907], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.946, 0.918, 0.97], 'energy_error': [-0.076, -0.098, -0.052], 'flagged_share': [0.267, 0.247, 0.287]} filtered recall 0.946 exact-k 0.874 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+q_0.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.813, 0.746, 0.875], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.915, 0.883, 0.943], 'energy_error': [-0.093, -0.122, -0.062], 'flagged_share': [0.173, 0.15, 0.195]} filtered recall 0.915 exact-k 0.909 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+q_0.5 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.817, 0.749, 0.878], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.916, 0.884, 0.944], 'energy_error': [-0.09, -0.119, -0.059], 'flagged_share': [0.173, 0.15, 0.195]} filtered recall 0.914 exact-k 0.908 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+q_1.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.822, 0.755, 0.882], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.918, 0.886, 0.946], 'energy_error': [-0.082, -0.112, -0.05], 'flagged_share': [0.173, 0.15, 0.195]} filtered recall 0.915 exact-k 0.904 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
+false alarms clean even months {'rows': 12045, 'flagged_share': 0.01012868410128684, 'false_active_days': 4, 'days': 251, 'false_active_days_per_month': 0.4844621513944223}
+false alarms clean all {'rows': 26828, 'flagged_share': 0.010697778440435367, 'false_active_days': 9, 'days': 559, 'false_active_days_per_month': 0.4894454382826476}
+flagged_share_fit_window 0.3676
+left_tail_share_fit_window 0.2578
+flagged_share_fall 0.3838
+left_tail_share_fall 0.1194
+flagged_share_post_fall 0.3887
+left_tail_share_post_fall 0.0229
+fixed D3 0.0053 0.34 {'2022': 0.00011514104778353483, '2023': 0.0006906077348066298, '2024': 0.0005723443223443224, '2025': 0.0017265193370165745, '2026': 0.04214015151515151}
+fixed D5 0.0165 2.02 {'2022': 0.01358977311988944, '2023': 0.010130079429031887, '2024': 0.01694139194139194, '2025': 0.022674953959484347, '2026': 0.02225378787878788}
+fixed D10 0.0067 1.05 {'2022': 0.0049493554327808475, '2023': 0.006675874769797422, '2024': 0.007441327990841442, '2025': 0.00748158379373849, '2026': 0.007339015151515152}
+fixed D11 0.0322 1.12 {'2022': 0.05228005527406725, '2023': 0.02935082872928177, '2024': 0.06158424908424909, '2025': 0.00011510128913443831, '2026': 0.0016571969696969697}
+fixed D14 0.0029 0.3 {'2022': 0.004378889144964277, '2023': 0.0003454231433506045, '2024': 0.0027472527472527475, '2025': 0.004028545119705341, '2026': 0.003077651515151515}
+fixed D16 0.0002 0.04 {'2022': 0.00011530035743110804, '2023': 0.0, '2024': 0.00011446886446886447, '2025': 0.0, '2026': 0.0014204545454545455}
+local D3 0.007 0.34 {'2022': 0.00011514104778353483, '2023': 0.0008057090239410681, '2024': 0.0005723443223443224, '2025': 0.001841620626151013, '2026': 0.05823863636363636}
+local D5 0.0154 2.06 {'2022': 0.012438097431763216, '2023': 0.009094048578335444, '2024': 0.016025641025641024, '2025': 0.0231353591160221, '2026': 0.017282196969696968}
+local D10 0.0066 0.86 {'2022': 0.0023020257826887663, '2023': 0.002992633517495396, '2024': 0.013508872352604465, '2025': 0.007021178637200737, '2026': 0.007339015151515152}
+local D11 0.0385 1.31 {'2022': 0.05320128972823584, '2023': 0.0315377532228361, '2024': 0.08699633699633699, '2025': 0.00011510128913443831, '2026': 0.0016571969696969697}
+local D14 0.0072 0.45 {'2022': 0.00472459091956672, '2023': 0.0010362694300518134, '2024': 0.019116300366300368, '2025': 0.0050644567219152855, '2026': 0.004734848484848485}
+local D16 0.0005 0.07 {'2022': 0.00046120142972443215, '2023': 0.0, '2024': 0.00011446886446886447, '2025': 0.00023020257826887662, '2026': 0.0026041666666666665}
+baseline K1 RO-NC D0_48_4.0 {'spells': 56, 'spells_found': 4, 'spell_recall': 0.071, 'half_hour_recall_found_spells': 0.077, 'half_hour_recall_block_span': None, 'alarms_in_windows': 3}
+baseline K1 RO-NC D1_48_2.5 {'spells': 56, 'spells_found': 0, 'spell_recall': 0.0, 'half_hour_recall_found_spells': 0.0, 'half_hour_recall_block_span': None, 'alarms_in_windows': 0}
+baseline K1 RO-NC D0_8_6.0 {'spells': 56, 'spells_found': 8, 'spell_recall': 0.143, 'half_hour_recall_found_spells': 0.237, 'half_hour_recall_block_span': None, 'alarms_in_windows': 12}
+baseline K1 RO-NC D1_8_3.75 {'spells': 56, 'spells_found': 0, 'spell_recall': 0.0, 'half_hour_recall_found_spells': 0.0, 'half_hour_recall_block_span': None, 'alarms_in_windows': 0}
+baseline K1 block S0 {'spells': 56, 'spells_found': 3, 'spell_recall': 0.054, 'half_hour_recall_found_spells': 0.094, 'half_hour_recall_block_span': 0.094, 'alarms_in_windows': 3}
+baseline K2 RO-NC D0_48_4.0 {'spells': 504, 'spells_found': 6, 'spell_recall': 0.012, 'half_hour_recall_found_spells': 0.022, 'half_hour_recall_block_span': None, 'alarms_in_windows': 14}
+baseline K2 RO-NC D1_48_2.5 {'spells': 504, 'spells_found': 1, 'spell_recall': 0.002, 'half_hour_recall_found_spells': 0.003, 'half_hour_recall_block_span': None, 'alarms_in_windows': 1}
+baseline K2 RO-NC D0_8_6.0 {'spells': 504, 'spells_found': 58, 'spell_recall': 0.115, 'half_hour_recall_found_spells': 0.202, 'half_hour_recall_block_span': None, 'alarms_in_windows': 94}
+baseline K2 RO-NC D1_8_3.75 {'spells': 504, 'spells_found': 2, 'spell_recall': 0.004, 'half_hour_recall_found_spells': 0.006, 'half_hour_recall_block_span': None, 'alarms_in_windows': 2}
+baseline K2 block S0 {'spells': 504, 'spells_found': 27, 'spell_recall': 0.054, 'half_hour_recall_found_spells': 0.094, 'half_hour_recall_block_span': 0.094, 'alarms_in_windows': 27}
+baseline synthetic_x0.5 RO-NC D0_48_4.0 {'spells': 231, 'spells_found': 2, 'spell_recall': 0.009, 'half_hour_recall_found_spells': 0.027, 'half_hour_recall_block_span': None, 'alarms_in_windows': 6}
+baseline synthetic_x0.5 RO-NC D1_48_2.5 {'spells': 231, 'spells_found': 0, 'spell_recall': 0.0, 'half_hour_recall_found_spells': 0.0, 'half_hour_recall_block_span': None, 'alarms_in_windows': 1}
+baseline synthetic_x0.5 RO-NC D0_8_6.0 {'spells': 231, 'spells_found': 35, 'spell_recall': 0.152, 'half_hour_recall_found_spells': 0.292, 'half_hour_recall_block_span': None, 'alarms_in_windows': 56}
+baseline synthetic_x0.5 RO-NC D1_8_3.75 {'spells': 231, 'spells_found': 2, 'spell_recall': 0.009, 'half_hour_recall_found_spells': 0.022, 'half_hour_recall_block_span': None, 'alarms_in_windows': 3}
+baseline synthetic_x0.5 block S0 {'spells': 231, 'spells_found': 33, 'spell_recall': 0.143, 'half_hour_recall_found_spells': 0.271, 'half_hour_recall_block_span': 0.25, 'alarms_in_windows': 31}
+baseline synthetic_x2.0 RO-NC D0_48_4.0 {'spells': 697, 'spells_found': 25, 'spell_recall': 0.036, 'half_hour_recall_found_spells': 0.069, 'half_hour_recall_block_span': None, 'alarms_in_windows': 28}
+baseline synthetic_x2.0 RO-NC D1_48_2.5 {'spells': 697, 'spells_found': 0, 'spell_recall': 0.0, 'half_hour_recall_found_spells': 0.0, 'half_hour_recall_block_span': None, 'alarms_in_windows': 0}
+baseline synthetic_x2.0 RO-NC D0_8_6.0 {'spells': 697, 'spells_found': 112, 'spell_recall': 0.161, 'half_hour_recall_found_spells': 0.29, 'half_hour_recall_block_span': None, 'alarms_in_windows': 156}
+baseline synthetic_x2.0 RO-NC D1_8_3.75 {'spells': 697, 'spells_found': 3, 'spell_recall': 0.004, 'half_hour_recall_found_spells': 0.012, 'half_hour_recall_block_span': None, 'alarms_in_windows': 2}
+baseline synthetic_x2.0 block S0 {'spells': 697, 'spells_found': 76, 'spell_recall': 0.109, 'half_hour_recall_found_spells': 0.188, 'half_hour_recall_block_span': 0.181, 'alarms_in_windows': 72}
+positive spells (>=4 half-hours above +1.5 MW) clean history: 13 in 528 days = 2.5 per 100 days
+positive spells (>=4 half-hours above +1.5 MW) 2023-09 to 2025-02: 193 in 547 days = 35.3 per 100 days
+positive spells (>=4 half-hours above +1.5 MW) 2025-03 to 2025-12: 205 in 306 days = 67.0 per 100 days
+positive spells (>=4 half-hours above +1.5 MW) 2026-04 to 2026-06: 81 in 91 days = 89.0 per 100 days
+figures written

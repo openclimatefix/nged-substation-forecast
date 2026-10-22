@@ -205,6 +205,19 @@ date after the experiment's window, not rechecked there), and D5 shows a flat mi
 2023-07) and D11 (2020-04). Applies to experiments. Evidence: [experiment
 103](00103-differentiable-physics-1-data-look/result.md) for the step list and D8.
 
+**Treat D8's reading as including one gas engine's output until 2023-08-15, and as excluding it
+afterwards (provisional, medium confidence).** The engine connected on 2023-06-13 and its own
+readings carry output from 2023-07-03. While those readings arrived, D8's residual rose by 0.02 MW
+per MW of engine output, where a reading without the output would fall by 1 MW per MW.
+
+D8's share of half-hours with a residual below -2.5 MW then stepped from 0.010 to 0.257 in the week
+of 2023-08-14 and stayed between 0.10 and 0.46 in every month to January 2026. The share fell from
+0.292 in January 2026 to 0.070 in March and 0.008 in April, with no matching change in the engine's
+own readings, so whether the engine is visible in D8 from 2026 is unknown. Applies to experiments;
+whether it applies to production awaits NGED's answer. Evidence:
+[experiment
+194](00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md).
+
 **Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
 coefficients exactly at each step) to a window of three months or shorter.** An exact
 least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
@@ -384,6 +397,16 @@ the run at those substations; the ensemble mixture then pools the remaining 50 m
 ([experiment 111](00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)).
 Applies to experiments and production.
 
+**Do not assume the unit PV shape rises with irradiance at low sun.** *Applies to: experiments.*
+`SunGeometry.pv_shape_and_ghi` returned a unit PV shape that fell from 0.124 to 0.090 as
+half-hourly irradiance rose from 150 to 227 W/m2 at an elevation of about 14 degrees, in a fake
+ensemble that scaled the irradiance of one substation by 0.6 to 1.4. The response of the
+T-all fit to member irradiance was therefore not monotone on 1.8% of the daylight rows with a
+physical clear-sky index, all at elevations of 14 to 16 degrees
+([experiment 184](00184-dp-ens-daylight-calibration/result.md)). The scored contrast did not
+change when rows under 17 degrees were dropped. The confidence is moderate, and the entry is
+provisional until the experiment has had its reviews.
+
 ## Embedded solar capacity
 
 **Hold embedded-solar capacity as one value per Primary per season-year, and do not estimate it
@@ -552,6 +575,13 @@ capacity fitted from its own rows before the cut instead (D9 at the 2024-07-01 c
 109](00109-differentiable-physics-n0-partially-pooled-convex-model/result.md); provisional: not
 measured, and the experiment's gate did not pass under its pre-registered definition).
 
+**Do not rely on the farm series behind a disaggregated Primary's reading.** For D8 (Marsh Lane),
+the metadata table names two farms whose output was added back, and the raw power table holds 1
+reading for one farm and 4,643 for the other (441 above zero, none after 2026-01-26). The notes in
+the `information` field are a July 2026 snapshot, so the files carry no history of when an analogue
+failed ([experiment
+182](00182-switching-d8-disaggregated-farms-and-drops/result.md)).
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers
@@ -682,6 +712,19 @@ the stored best-guess quantiles at Primaries swung from 0.88 to 0.97 across mont
 recalibration fitted on earlier months did not move coverage by more than its own interval
 ([experiment 97](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md)). Applies to
 experiments, for the 12 to 36 hour lead band.
+
+**Re-fit a residual detector's noise for D8 before and after 2025-03, and label D8's engine only
+up to 2025-02 (provisional).** *Applies to: experiments.* D8's residual noise (the median absolute
+step-to-step error of the residual) is 0.17 to 0.27 MW in clean months and 0.35 to 0.75 MW from
+2024-05, rising most after 8.91 MW of 11 kV solar was connected on 2025-03-24. A detector with its
+noise fitted on 2022 to 2023 flags 40% to 45% of D8's half-hours from 2025-03 onward, even in April
+to June 2026, when 2% of half-hours are below -2.5 MW
+([experiment 196](00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)). The
+flags are not solar noise alone: the same detector flags 29% to 36% of D8's night half-hours from
+2025-03, and neither night-only evidence, an edge test, nor a price gate removes them
+([experiment 199](00199-ps2b-engine-detector-v2-ramp-night-price/result.md)). The
+scope is one Primary; the confidence is moderate, and the entry is provisional until the experiment
+has had its reviews.
 
 ## Privacy and anonymisation
 
