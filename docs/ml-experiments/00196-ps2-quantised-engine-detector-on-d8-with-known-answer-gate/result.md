@@ -54,8 +54,6 @@ metric: >-
 code: ml-experiments/00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/
 ---
 
-# Experiment 196: can a model of 0 to 3 engine units find D8's engine?
-
 *Planned; the write-up replaces this page when the scripts have run.*
 
 Prediction, decision rule and stop rule are in the front matter. The rest of this page records the
