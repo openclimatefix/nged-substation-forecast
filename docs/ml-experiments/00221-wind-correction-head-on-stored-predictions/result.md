@@ -61,8 +61,6 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 221: does a small neural-network head lower the wind farms' error at 1 to 2 days ahead?
-
 **Plan only; the results are not in yet.**
 
 ## Plan
