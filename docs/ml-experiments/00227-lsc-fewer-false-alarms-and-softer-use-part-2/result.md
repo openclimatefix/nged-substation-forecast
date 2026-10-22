@@ -135,14 +135,14 @@ shifts) and shows no measurable harm on ordinary days. The threshold was chosen 
 A load shift is demand that the electricity network operator moves between neighbouring Primary
 substations for hours or days. An alarm tells the forecast that a load shift is probably under way,
 and a "mask" then sets recent power readings aside while the alarm is open. [Experiment
-208](../00208-switching-value-of-a-detector-by-phase-and-quality/result.md) found that no real alarm source stayed
-inside the ordinary-day harm limit of 0.05 points, because each raised 104 to 242 alarms for 15 to
-20 matched load shifts. This experiment asks whether a stricter threshold (part a) or a gentler use
-of the alarm (part b) fixes that. Part (a) does: at a budget of 20 unexplained odd-month candidates
-the learned score matches 21 load shifts, raises 5.0 alarms per match, and has ordinary-day harm of
--0.007 points (95% interval -0.039 to +0.014). Part (b) adds little where the mask is already
-harmless, and the verdict is `partly supported`. Points are percentages of a substation's effective
-capacity, and a lower score is better.
+208](../00208-switching-value-of-a-detector-by-phase-and-quality/result.md) found that no real alarm
+source stayed inside the ordinary-day harm limit of 0.05 points, because each raised 104 to 242
+alarms for 15 to 20 matched load shifts. This experiment asks whether a stricter threshold (part a)
+or a gentler use of the alarm (part b) fixes that. Part (a) does: at a budget of 20 unexplained
+odd-month candidates the learned score matches 21 load shifts, raises 5.0 alarms per match, and has
+ordinary-day harm of -0.007 points (95% interval -0.039 to +0.014). Part (b) adds little where the
+mask is already harmless, and the verdict is `partly supported`. Points are percentages of a
+substation's effective capacity, and a lower score is better.
 
 ![Figure 1: load shifts matched against alarms per matched load shift, by alarm source and
 threshold](precision_recall.svg)
