@@ -1,0 +1,2 @@
+RO-NC on the convex residual, 35 transfers over 1 day: start and end found 18, start only found 20
+(from real_transfers() onset_found_ronc and found_ronc, experiment 130 arm B)
