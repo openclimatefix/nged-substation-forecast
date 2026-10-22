@@ -1,0 +1,67 @@
+{
+  "n_real_with_features": 63,
+  "n_injected": 336,
+  "auc": 0.5916005291005291,
+  "auc_95": [
+    0.5197516312190226,
+    0.6614462492154732
+  ],
+  "auc_by_classifier": {
+    "logistic": [
+      0.5916005291005291,
+      0.5197516312190226,
+      0.6614462492154732
+    ],
+    "boosted": [
+      0.5429657974300831,
+      0.4691112805799201,
+      0.629477257820771
+    ]
+  },
+  "standin_recall_real_all": 0.38095238095238093,
+  "standin_recall_real_long": 0.6666666666666666,
+  "ronc_onset_found_real_all": 0.3492063492063492,
+  "ronc_onset_found_real_long": 0.5757575757575758,
+  "standin_recall_injected_all": 0.28869047619047616,
+  "standin_recall_injected_long": 0.5448275862068965,
+  "median_log_depth_z": {
+    "real": 0.8384687663814752,
+    "injected": 0.969335515711006
+  },
+  "median_log_depth_mw": {
+    "real": -0.09511365796023848,
+    "injected": 0.09294409616122942
+  },
+  "median_log_hours": {
+    "real": 3.258096538021482,
+    "injected": 2.6390573296152584
+  },
+  "median_onset_sin": {
+    "real": 0.6087614290087209,
+    "injected": 0.49999999999999994
+  },
+  "median_onset_cos": {
+    "real": -0.7071067811865475,
+    "injected": -0.6087614290087207
+  },
+  "median_weekend": {
+    "real": 0.0,
+    "injected": 0.0
+  },
+  "median_day_night": {
+    "real": 0.0,
+    "injected": 0.0
+  },
+  "median_n_opposite": {
+    "real": 0.0,
+    "injected": 0.0
+  },
+  "median_balance": {
+    "real": -0.0,
+    "injected": 0.0
+  },
+  "median_n_series": {
+    "real": 2.0,
+    "injected": 2.0
+  }
+}
