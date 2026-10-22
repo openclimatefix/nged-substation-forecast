@@ -90,15 +90,15 @@ reasons. The demand terms of the fit take part of the solar signal, and the fixe
 not match the farm's flat top. The sunshine input is not the limit.**
 
 **What was done.** We added the recorded output of a real solar farm to a Primary substation's
-power, at 50% of the Primary's pinned capacity (the unmetered solar capacity that
-experiment 45's real-time estimate gives the Primary). Then we asked the capacity fit of
-experiment 129 how much of the farm it finds again. The share found is the recovery: the capacity found with the farm added, minus the
-capacity found without it, divided by the injected capacity. The full fit finds 0.827 (median over
-the five decision Primaries, 80% interval 0.814 to 0.842). Five further fits, each simpler or
-narrower, show where the missing 0.173 goes. Fitting the farm alone against the fixed solar shape
-finds 0.931, the highest recovery any fit of that shape can reach. Fitting the full model with its
-demand terms frozen finds 0.928. The verdict is `partly supported`: demand absorption took the
-share the plan predicted, and the other three predicted shares were wrong.
+power, at 50% of the Primary's pinned capacity (the unmetered solar capacity that experiment 45's
+real-time estimate gives the Primary). Then we asked the capacity fit of experiment 129 how much of
+the farm it finds again. The share found is the recovery: the capacity found with the farm added,
+minus the capacity found without it, divided by the injected capacity. The full fit finds 0.827
+(median over the five decision Primaries, 80% interval 0.814 to 0.842). Five further fits, each
+simpler or narrower, show where the missing 0.173 goes. Fitting the farm alone against the fixed
+solar shape finds 0.931, the highest recovery any fit of that shape can reach. Fitting the full
+model with its demand terms frozen finds 0.928. The verdict is `partly supported`: demand absorption
+took the share the plan predicted, and the other three predicted shares were wrong.
 
 **Terms used below.** D5, D10, D11, D14, and D16 are the five decision Primaries of experiment
 103's data set, and D9 is shown beside them. Farms A to F are metered generators and are never
