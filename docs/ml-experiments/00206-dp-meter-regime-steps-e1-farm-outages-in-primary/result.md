@@ -78,8 +78,8 @@ take_home_message: >-
 
 # E1: do a solar farm's meter outages show up in its Primary's power?
 
-**At D10, a Primary substation, the power does not change by the output of a metered solar farm
-when that farm's readings drop to zero.** NGED removes the output of a metered solar farm from the
+**Metered-farm outages do not show up as extra solar generation at D10: the Primary's power does
+not change by the output of a metered solar farm when that farm's readings drop to zero.** NGED removes the output of a metered solar farm from the
 power supplied by the Primary substation the farm sits under. If a farm's meter fails, the farm's
 output should then reappear in that Primary's power, which would look like a step up in the Primary's
 unmetered solar capacity. We found the outages of the six metered solar farms (labelled A to F) that

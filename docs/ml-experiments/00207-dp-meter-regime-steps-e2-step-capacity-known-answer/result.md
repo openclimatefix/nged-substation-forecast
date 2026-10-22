@@ -94,7 +94,8 @@ take_home_message: >-
 # E2: can a step in solar capacity be seen? A known-answer test
 
 **A solar capacity that can change each month finds a known step in solar output, in size and to
-within a month, and a capacity that changes once a year does not.** We asked whether the demand model
+within a month, but at the pre-registered penalty it also invents steps at 2 of 5 Primaries (D10 and
+D11), so the gate fails.** We asked whether the demand model
 of `studies.dp_gam` (a regression that stays convex, so it has one best fit) can find a sudden step in
 the solar capacity it infers for a Primary substation, which is a substation that feeds homes and
 businesses. The pinned capacity is the real-time estimate of the Primary's solar capacity that
