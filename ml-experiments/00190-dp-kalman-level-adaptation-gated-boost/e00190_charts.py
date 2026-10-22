@@ -217,7 +217,10 @@ def figure_curve(*, data: dict) -> alt.TopLevelMixin:
         width=WIDTH - 120,
         height=200,
         title=_title(
-            text="The recovery stays near zero at every hour since the offset started, but the gate's ceiling is low",
+            text=(
+                "The recovery stays near zero at every hour since the offset started, "
+                "but the gate's ceiling is low"
+            ),
             subtitle=(
                 "Known-answer gate, offset of 0.10 of the median load lasting 36 hours, 40 cases. "
                 "The telemetry delay of 3.5 hours means the first hours cannot be recovered."
