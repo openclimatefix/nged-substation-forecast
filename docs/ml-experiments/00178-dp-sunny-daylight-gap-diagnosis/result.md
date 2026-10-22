@@ -214,3 +214,11 @@ The three rows drop half-hours where the clear-sky irradiance is under 20 W per 
   the GAM does well.
 - Ask for the by-condition plot's row definition and the models it scored, so the 0.13 MW gap can
   be reproduced before another experiment is built on it.
+- A small neural component looks worth testing, after the cheap shape check above. D5 loses to BG2
+  in every hour, lead band, and clear-sky band, which points at the fixed south-facing solar shape
+  more than at the irradiance forecast. A learned smooth response from irradiance and solar
+  elevation to solar output, fitted per substation inside the GAM, could replace that shape. The
+  convex GAM stays as the comparison arm. The prediction that can fail: the learned response cuts
+  D5's all-lead gap to BG2 from +0.20 MW to +0.10 MW or less, and raises the error at D10 and D16
+  (where the GAM already beats BG2) by less than 0.02 MW. If D5's gap stays above +0.15 MW, the
+  cause is not the solar shape.
