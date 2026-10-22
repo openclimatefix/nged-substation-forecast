@@ -92,7 +92,13 @@ decision_rule: >-
   interval that excludes 0 but below 1/3, `refuted` when the point estimate is at most 0, and
   `inconclusive` otherwise. C1: the location error contrast (located minus alarm time), reported
   per family. The real transfers are reported in the same form and decide nothing: there are few
-  of them. A threshold of 1/3 is the maintainer's figure for porting a located-onset step, which
+  of them. Matching, fixed before any mask score was read: in an injected world an alarm finds a
+  transfer when an interval of the family on one of the substation's series has a step stamp within
+  48 half-hours (24 hours) of the true onset, and the earliest-known such interval is used; for a
+  real transfer experiment 171's rule applies (a step from 24 hours before the logged onset to the
+  logged end). The cached forecasts are daily, so each found transfer is scored on the one run
+  whose newest usable stamp lies from the first usable origin to 24 hours after it, all leads. A
+  threshold of 1/3 is the maintainer's figure for porting a located-onset step, which
   adds a search to the serving path and so needs a gain this size. Post hoc and labelled: the
   located onset recomputed at each later origin; the mask from the located onset with a gated alarm
   only; the quantised origin's share of the error.
