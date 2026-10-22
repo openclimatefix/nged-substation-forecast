@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 255 | Does a better metered solar farm forecast lower the curtailment cost at its bulk supply point? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
