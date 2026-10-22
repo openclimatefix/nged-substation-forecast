@@ -3,7 +3,7 @@ id: "00171"
 slug: switching-gated-mask-no-harm-pooled-months
 title: >-
   Does the gated mask on recent power do no harm on ordinary days, once 27 months of rows are pooled?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

@@ -2,7 +2,7 @@
 id: "00063"
 slug: sw2-10-linear-joint-fit-v2-in-miniature
 theme: differentiable-physics-demand-calendar-and-weather
-also_relevant_to: [switching-detectors, solar-disaggregation]
+also_relevant_to: [lsc-detectors, solar-disaggregation]
 status: finished
 size: medium
 hypothesis: >-

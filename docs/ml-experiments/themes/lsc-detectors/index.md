@@ -1,4 +1,4 @@
-# Switching detectors
+# LSC detectors
 
 **The best switching detector, [RO-NC](../../glossary.md#ro-nc), finds most of the [moved
 power](../../glossary.md#recall-mw-weighted) (the megawatts a transfer moves) of injected load

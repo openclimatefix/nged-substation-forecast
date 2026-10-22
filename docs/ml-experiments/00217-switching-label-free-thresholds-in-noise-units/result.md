@@ -3,8 +3,8 @@ id: "00217"
 slug: switching-label-free-thresholds-in-noise-units
 title: >-
   Does one threshold in noise units give predictable alarm rates across Primary substations, with no
-  switching labels?
-theme: switching-detectors
+  load-shift labels?
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: >-

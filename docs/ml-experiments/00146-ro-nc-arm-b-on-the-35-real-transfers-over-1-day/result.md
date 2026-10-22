@@ -1,7 +1,7 @@
 ---
 id: "00146"
 slug: ro-nc-arm-b-on-the-35-real-transfers-over-1-day
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: >-

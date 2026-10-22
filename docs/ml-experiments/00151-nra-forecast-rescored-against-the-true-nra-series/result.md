@@ -4,7 +4,7 @@ slug: nra-forecast-rescored-against-the-true-nra-series
 title: "NRA forecast rescored against the true NRA series, with the merged RO-NC intervals"
 theme: switching-labels-in-the-forecast
 also_relevant_to:
-  - switching-detectors
+  - lsc-detectors
 status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00151-nra-forecast-rescored-against-the-true-nra-series/

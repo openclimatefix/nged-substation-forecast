@@ -1,7 +1,7 @@
 ---
 id: "00195"
 slug: switching-neural-plus-detector-features
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done
