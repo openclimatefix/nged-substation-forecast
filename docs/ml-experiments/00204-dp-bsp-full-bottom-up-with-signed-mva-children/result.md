@@ -12,7 +12,8 @@ size: >-
   data/ml-experiments/00204-dp-bsp-full-bottom-up-with-signed-mva-children/ only. Serving path: not
   touched. Degradation rule: not touched. Designs: more than one is defensible (how the signed
   history of a child that reports apparent power is built, how the weights are fitted, which spread
-  table the sum uses), and this plan pre-registers one of each. Callers: this folder's scripts, which
+  table the sum uses), and this plan pre-registers one of each. Callers: this folder's scripts,
+  which
   copy experiment 161's, and read experiment 152's and 155's stored forecasts. No new package code.
 hypothesis: >-
   A bulk supply point (BSP) is forecast better bottom-up than top-down when the sum covers every
@@ -40,14 +41,17 @@ decision_rule: >-
   score at that BSP, as the brief sets it, because bottom-up adds a remainder chain, a weight table,
   and the forecasts of up to nine children to the serving path. C2 is (d) minus (c) at each BSP.
   The hypothesis is `supported` when (i) at least one BSP has a C1 interval wholly below minus the
-  threshold and (ii) at that BSP the upper end of C2's interval is at most +0.03 points, so (d) is no worse
+  threshold and (ii) at that BSP the upper end of C2's interval is at most +0.03 points, so (d) is
+  no worse
   than (c) (at D13 the two should match; at D17 C2's point estimate and its interval against zero
-  are also reported, because the prediction is that (d) beats (c) there). It is `partly supported` when at least one C1
+  are also reported, because the prediction is that (d) beats (c) there). It is `partly supported`
+  when at least one C1
   interval lies wholly below zero but condition (i) or (ii) fails. It is `refuted` when both C1
   intervals lie wholly above zero. It is `inconclusive` otherwise, and is capped there if the
   reproduction control, the oracle control, or the known-answer check fails. If every full arm
   still scores worse than top-down, the page says that coverage was not the reason and shows where
-  the BSP's error lives (experiment 161's figure 3, redrawn at full coverage). Two intervals that both
+  the BSP's error lives (experiment 161's figure 3, redrawn at full coverage). Two intervals that
+  both
   straddle zero mean there was no detectable gain from coverage, as in experiment 161; a C1
   interval that touches the threshold counts as not wholly below it. C3 to C8 carry no verdict.
 benchmark: >-
@@ -72,7 +76,8 @@ This page is the plan. Results are added after the run.
 ## Question
 
 Experiment [161](../00161-dp-bsp-top-down-against-bottom-up/result.md) found that forecasting a BSP
-bottom-up scored 0.5% to 0.6% worse than forecasting it as a stand-alone series. Its sum reached only
+bottom-up scored 0.5% to 0.6% worse than forecasting it as a stand-alone series. Its sum reached
+only
 42% (D13) and 56% (D17) of the BSP's effective capacity, because the children that report apparent
 power (MVA) stayed in the remainder with the unmetered load. NGED say we hold data for every Primary
 under both BSPs. This experiment puts every child with a usable history into the sum and asks
@@ -104,7 +109,8 @@ present, unflagged half-hours (17,520 to the year). Primaries may be named. The 
 | D17 | D18 Wrangle T2 | MW | 2024-12-11 | 1.64 | (e) only |
 
 The two Wrangle transformers have under 8 months of readings at the first scored run, so no arm D
-forecast exists for them. NGED's hierarchy also lists metered generators under each BSP (wind, solar,
+forecast exists for them. NGED's hierarchy also lists metered generators under each BSP (wind,
+solar,
 biofuel, and battery sites). They are not Primaries and stay in the remainder, as in experiment 161.
 Experiment 152's Step 0 found reverse flow at D12 only (every sunny midday); D22 has 3.7% and the
 other six apparent-power children have none, so arms (c) and (d) differ materially at D17 only.
@@ -141,7 +147,8 @@ D12 on sunny middays and at essentially no other child. The sign of the converte
 risk, so Step 1 prints it for D12 before anything is fitted. The sign error enters the remainder
 and the child forecast through the same meter fit, so the two are coupled, not independent.
 
-**Weights.** Non-negative least squares of the BSP's reading on all children's signed readings with no
+**Weights.** Non-negative least squares of the BSP's reading on all children's signed readings with
+no
 intercept, on the winter window 2023-10-01 to 2024-03-31 of experiment 161, bounded to 0.8 to 1.2.
 The unbounded fit is printed as a diagnostic only. Winter has no reverse flow, so the weights do not
 depend on the sign convention. D8's series changes meaning in April 2025 (experiment 152), so its
@@ -156,13 +163,16 @@ the scored year only, and D13 also has a replicate year.
    signed history of D12 cannot be rebuilt from stored experiment 110 outputs or a re-run of
    `studies.dp_meter` on D12 alone.
 2. **Controls.** Reproduce experiment 161's top-down and partial bottom-up scores to three decimals.
-   **Known-answer check.** For the five MW Primaries of experiment 152's injection test (D5, D10, D11,
-   D14, D16), take its folded series at injection levels 0, 1.0, and 2.0 times the midday median, sum
+   **Known-answer check.** For the five MW Primaries of experiment 152's injection test (D5, D10,
+   D11,
+   D14, D16), take its folded series at injection levels 0, 1.0, and 2.0 times the midday median,
+   sum
    the five children, and compare the sum's mean forecast built as in (c) (arm N's `mean`) and as in
    (d) (arm F's `flow`) with the signed sum from the `signed` files. The pass criterion uses the
    power-factor-0.97 folding (`pf97`, which matches real meters); the idealised `q0` folding is
    reported beside it. This check tests experiment 152's latent-flow forecast only. It does not test
-   the signed-history rule or the remainder chain. Pass: at level 2.0 the mean absolute error of (d)'s summed signed flow is at least 20%
+   the signed-history rule or the remainder chain. Pass: at level 2.0 the mean absolute error of
+   (d)'s summed signed flow is at least 20%
    below (c)'s, and at level 0 (d) is no more than 5% worse than (c). Experiment 152 stored these
    forecasts, so the check costs minutes.
 3. **Chains.** Remainder chains for (c) and (d) at both BSPs, and for (e) at D17: experiment 161's
@@ -195,7 +205,8 @@ the sign convention of the converted flow.
 ## Resources
 
 CPU only, at most 4 cores with every thread cap at 1, each job under `systemd-run --user --scope -p
-MemoryMax=16G -p OOMPolicy=continue`. No GPU. The children's forecasts of experiments 152 and 155 and
+MemoryMax=16G -p OOMPolicy=continue`. No GPU. The children's forecasts of experiments 152 and 155
+and
 the spread tables of experiment 161 (`d_tuning_D13`, `d_tuning_D17`, and its `bu_r_tdspread` files)
 are reused. Arm (e) needs new pooled-shape fits and chains for D15 and D18, so it runs last and is
 dropped if the earlier arms use up the budget.
@@ -203,7 +214,8 @@ dropped if the earlier arms use up the budget.
 ## Advice followed and departures
 
 - **Followed:** experiment 161's advice to fix the weights' bounds and forecast the apparent-power
-  children before expecting a gain; experiment 152's advice to keep the meter fit and fold only where
+  children before expecting a gain; experiment 152's advice to keep the meter fit and fold only
+  where
   reverse flow exists (here, D12); experiment 124's rescaling is not used, since the latent flow is
   already active power.
 - **Departure from the brief's wording:** the brief asks for a gain of 5% with an interval wholly
