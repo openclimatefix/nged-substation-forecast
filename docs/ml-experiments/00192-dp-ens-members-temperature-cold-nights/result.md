@@ -83,8 +83,8 @@ lessons:
     interval -0.36% to -0.06%), but not in the replicate months (+0.11%, -0.08% to +0.37%), so the
     day's own spread adds little.
 take_home_message: >-
-  Running each ensemble member's temperature through the demand model gave no detectable improvement in the
-  forecast bands on cold winter nights, because the 51 members' temperatures differ too little to
+  Running each ensemble member's temperature through the demand model gave no detectable
+  improvement in the forecast bands on cold winter nights, because the 51 members' temperatures differ too little to
   signal the day's error. The cold-night bands are already too narrow. The cause of the
   cold-night error is still unknown; widening the bands directly, and testing wind, night cloud
   cover, and switching as inputs, are the candidates.
