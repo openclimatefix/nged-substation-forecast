@@ -1,0 +1,116 @@
+rows outside logged transfers: 1579711
+D5 251286
+D9 271586
+D10 263669
+D11 271649
+D14 266161
+D16 255360
+
+== G1 and G2 ==
+pooled: MASK_GATED minus K0 +0.030 (-0.011 to +0.074)  rows 1579711, months 27
+winter: MASK_GATED minus K0 +0.036 (-0.060 to +0.135)  rows 579096, months 10
+other months: MASK_GATED minus K0 +0.026 (+0.002 to +0.060)  rows 1000615, months 17
+
+== DECISION RULE (pre-registered in result.md) ==
+G1 pooled interval inside +/-0.03: False (half-width 0.042)
+G2 winter interval inside +/-0.05: False (half-width 0.098)
+verdict: inconclusive
+
+== post hoc ==
+valid time from 2025-07 (experiment 166's year): MASK_GATED minus K0 +0.011 (-0.066 to +0.085)  rows 706762, months 12
+valid time before 2025-07: MASK_GATED minus K0 +0.045 (-0.000 to +0.102)  rows 872949, months 15
+pooled: MASK_NEW minus K0 +0.055 (+0.009 to +0.105)  rows 1579711, months 27
+pooled: MASK_UNION minus K0 +0.197 (+0.078 to +0.342)  rows 1579711, months 27
+without D5: MASK_GATED minus K0 +0.040 (-0.001 to +0.088)  rows 1328425, months 27
+without D9: MASK_GATED minus K0 +0.036 (-0.014 to +0.089)  rows 1308125, months 27
+without D10: MASK_GATED minus K0 +0.002 (-0.036 to +0.035)  rows 1316042, months 27
+without D11: MASK_GATED minus K0 +0.034 (-0.015 to +0.086)  rows 1308062, months 27
+without D14: MASK_GATED minus K0 +0.036 (-0.014 to +0.089)  rows 1313550, months 27
+without D16: MASK_GATED minus K0 +0.031 (-0.005 to +0.077)  rows 1324351, months 27
+only D5: MASK_GATED minus K0 -0.027 (-0.099 to +0.009)  rows 251286, months 27
+only D9: MASK_GATED minus K0 +0.000 (+0.000 to +0.000)  rows 271586, months 27
+only D10: MASK_GATED minus K0 +0.170 (+0.011 to +0.383)  rows 263669, months 27
+only D11: MASK_GATED minus K0 +0.010 (+0.001 to +0.024)  rows 271649, months 27
+only D14: MASK_GATED minus K0 +0.001 (-0.004 to +0.007)  rows 266161, months 27
+only D16: MASK_GATED minus K0 +0.023 (-0.105 to +0.167)  rows 255360, months 27
+rows with a gated alarm active: 122598 share 0.07760786624895313
+gated alarm active: MASK_GATED minus K0 +0.386 (-0.164 to +0.893)  rows 122598, months 22
+no gated alarm active: MASK_GATED minus K0 -0.000 (-0.001 to +0.001)  rows 1457113, months 27
+
+== absolute scores, pooled ==
+K0 2.7177
+MASK_GATED 2.7475
+MASK_NEW 2.773
+MASK_UNION 2.9147
+
+== checks ==
+median minus mean forecast, D5: -0.146
+median minus mean forecast, D9: -0.019
+median minus mean forecast, D10: -0.058
+median minus mean forecast, D11: -0.030
+median minus mean forecast, D14: +0.037
+median minus mean forecast, D16: +0.017
+absolute error of the mean forecast, MASK_GATED minus K0: +0.064 (-0.003 to +0.140)
+
+== MASK_GATED: alarms starting on or after 2024-04-10, and masked half-hours ==
+shape: (14, 5)
+┌──────┬──────┬────────┬───────────────────┬────────────────┐
+│ site ┆ year ┆ alarms ┆ masked_half_hours ┆ outside_logged │
+│ ---  ┆ ---  ┆ ---    ┆ ---               ┆ ---            │
+│ str  ┆ i32  ┆ u32    ┆ i64               ┆ i64            │
+╞══════╪══════╪════════╪═══════════════════╪════════════════╡
+│ D10  ┆ 2024 ┆ 4      ┆ 3528              ┆ 3396           │
+│ D10  ┆ 2025 ┆ 7      ┆ 1982              ┆ 1982           │
+│ D10  ┆ 2026 ┆ 4      ┆ 819               ┆ 819            │
+│ D11  ┆ 2024 ┆ 4      ┆ 928               ┆ 928            │
+│ D11  ┆ 2025 ┆ 5      ┆ 1711              ┆ 1711           │
+│ …    ┆ …    ┆ …      ┆ …                 ┆ …              │
+│ D16  ┆ 2025 ┆ 4      ┆ 1765              ┆ 769            │
+│ D16  ┆ 2026 ┆ 3      ┆ 979               ┆ 710            │
+│ D5   ┆ 2024 ┆ 1      ┆ 186               ┆ 186            │
+│ D5   ┆ 2025 ┆ 7      ┆ 3639              ┆ 1637           │
+│ D5   ┆ 2026 ┆ 3      ┆ 979               ┆ 710            │
+└──────┴──────┴────────┴───────────────────┴────────────────┘
+MASK_GATED: 65 alarms, 21051 masked half-hours, 17028 outside every logged transfer (share 0.809)
+
+== MASK_NEW: alarms starting on or after 2024-04-10, and masked half-hours ==
+shape: (14, 5)
+┌──────┬──────┬────────┬───────────────────┬────────────────┐
+│ site ┆ year ┆ alarms ┆ masked_half_hours ┆ outside_logged │
+│ ---  ┆ ---  ┆ ---    ┆ ---               ┆ ---            │
+│ str  ┆ i32  ┆ u32    ┆ i64               ┆ i64            │
+╞══════╪══════╪════════╪═══════════════════╪════════════════╡
+│ D10  ┆ 2024 ┆ 6      ┆ 3914              ┆ 3782           │
+│ D10  ┆ 2025 ┆ 13     ┆ 3803              ┆ 3803           │
+│ D10  ┆ 2026 ┆ 7      ┆ 1538              ┆ 1538           │
+│ D11  ┆ 2024 ┆ 4      ┆ 928               ┆ 928            │
+│ D11  ┆ 2025 ┆ 9      ┆ 2870              ┆ 2870           │
+│ …    ┆ …    ┆ …      ┆ …                 ┆ …              │
+│ D16  ┆ 2025 ┆ 12     ┆ 3378              ┆ 1624           │
+│ D16  ┆ 2026 ┆ 3      ┆ 979               ┆ 710            │
+│ D5   ┆ 2024 ┆ 6      ┆ 1411              ┆ 1411           │
+│ D5   ┆ 2025 ┆ 29     ┆ 8611              ┆ 6491           │
+│ D5   ┆ 2026 ┆ 9      ┆ 2039              ┆ 1765           │
+└──────┴──────┴────────┴───────────────────┴────────────────┘
+MASK_NEW: 146 alarms, 39789 masked half-hours, 34279 outside every logged transfer (share 0.862)
+
+== MASK_UNION: alarms starting on or after 2024-04-10, and masked half-hours ==
+shape: (18, 5)
+┌──────┬──────┬────────┬───────────────────┬────────────────┐
+│ site ┆ year ┆ alarms ┆ masked_half_hours ┆ outside_logged │
+│ ---  ┆ ---  ┆ ---    ┆ ---               ┆ ---            │
+│ str  ┆ i32  ┆ u32    ┆ i64               ┆ i64            │
+╞══════╪══════╪════════╪═══════════════════╪════════════════╡
+│ D10  ┆ 2024 ┆ 11     ┆ 8726              ┆ 8594           │
+│ D10  ┆ 2025 ┆ 16     ┆ 6845              ┆ 6845           │
+│ D10  ┆ 2026 ┆ 7      ┆ 1455              ┆ 1455           │
+│ D11  ┆ 2024 ┆ 6      ┆ 1672              ┆ 1672           │
+│ D11  ┆ 2025 ┆ 10     ┆ 2964              ┆ 2964           │
+│ …    ┆ …    ┆ …      ┆ …                 ┆ …              │
+│ D5   ┆ 2025 ┆ 24     ┆ 7920              ┆ 5918           │
+│ D5   ┆ 2026 ┆ 10     ┆ 2520              ┆ 2189           │
+│ D9   ┆ 2024 ┆ 6      ┆ 951               ┆ 951            │
+│ D9   ┆ 2025 ┆ 8      ┆ 2986              ┆ 2986           │
+│ D9   ┆ 2026 ┆ 6      ┆ 593               ┆ 593            │
+└──────┴──────┴────────┴───────────────────┴────────────────┘
+MASK_UNION: 178 alarms, 54660 masked half-hours, 48736 outside every logged transfer (share 0.892)
