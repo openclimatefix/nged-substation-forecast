@@ -121,34 +121,37 @@ best_arm: >-
   2.797 from the true onset. Part 1: none; the pooled gated-mask difference stays at +0.014 (-0.022
   to +0.051).
 headline: >-
-  Part 2 passes its pre-registered rule: masking from the located onset removes 0.91 of the extra
-  error of masking from the alarm time (95% interval 0.74 to 0.98). The detector's own step stamp
-  removes 0.95, so the search of the look-back adds nothing (located minus step stamp +0.013, -0.008
-  to +0.037 points). Part 1 fails its prediction: with 8 confirmed unlogged events removed the pooled
-  gated-mask-minus-no-mask difference is +0.014 (-0.022 to +0.051), wider than +/-0.03.
+  Part 2 passes its pre-registered rule: masking from the located onset removes 91% of the extra
+  error of masking from the alarm time (95% interval 74% to 98%). The detector's own step stamp
+  removes 95%, so the search of the look-back adds nothing (located minus step stamp +0.013, -0.008
+  to +0.037 points). Part 1 fails its prediction: with 8 confirmed unlogged events removed the
+  pooled gated-mask-minus-no-mask difference is +0.014 (-0.022 to +0.051), wider than +/-0.03.
 lessons: >-
   The detector already reports where the step happened, so masking back to that stamp once the alarm
   fires is the whole gain, and a second search over the look-back is not worth porting. Only 3 of
   D10's 13 unlogged gated alarm intervals are confirmed by an independent step test, so D10's
-  extra error is mostly not unlogged switching, and no-harm of the gated mask on ordinary days is
-  still not shown.
+  extra error is not shown to be unlogged switching, and no-harm of the gated mask on ordinary days
+  is still not shown.
 take_home_message: >-
   Once a switching alarm fires, masking recent power back to the alarm's own step stamp removes
   almost all the extra error of masking only from the alarm time, and searching the look-back for a
-  more precise onset adds nothing. D10's extra error under the gated mask is mostly not unlogged
-  switching, since an independent step test confirms only 3 of its 13 unlogged alarm intervals, so
-  showing that the gated mask does no harm on ordinary days still needs more months of forecasts.
+  more precise onset adds nothing. D10's extra error under the gated mask is not shown to be
+  unlogged switching, since an independent step test confirms only 3 of its 13 unlogged alarm
+  intervals (its recall was not measured), so showing that the gated mask does no harm on ordinary
+  days still needs more months of forecasts.
 advice:
   - >-
     Mask recent power back to the detector's own step stamp once an alarm fires, not from the alarm
-    time: the extra error falls by 0.95 (0.83 to 1.00) (C2, figure 1).
+    time: the extra error falls by 95% (83% to 100%) (C2, figure 1).
   - >-
     Do not add a search of the look-back to locate the onset: the detector's step stamp is already
-    a median 0 half-hours from the true onset, and the located onset is no closer (figure 3).
+    a median 0 half-hours from the true onset, and the located onset is no closer and has a larger
+    90th-percentile error (figure 3).
   - >-
-    Do not treat D10's gated alarms as unlogged switching: an independent persistent-step test
-    confirms 3 of 13 of its unlogged alarm intervals, and D10 alone still scores +0.081 (-0.007 to
-    +0.232) worse with the 3 removed (part 1, figure 2).
+    Do not assume D10's gated alarms are unlogged switching: an independent persistent-step test
+    confirms 3 of 13 of its unlogged alarm intervals (its recall was not measured), and D10 alone
+    still has a positive point estimate of +0.081 (interval -0.007 to +0.232) with the 3 removed
+    (part 1, figure 2).
   - >-
     Do not read the real-transfer scores as evidence: 15 transfers were found by the alarms, and
     RO-NC's mask from the step stamp scored 12.9 against 8.3 with no mask on 6 of them (real rows).
@@ -156,45 +159,59 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**Masking back to the detector's own step stamp removes almost all the extra error of masking
-only from the alarm time, and a search of the look-back for a more precise onset adds nothing.** The
-verdict is `partly supported`. Part 2 passes its pre-registered rule, but its comparison arm
-(masking from the alarm time) is one that experiment 171 never used. Part 1 does not: the gated
-mask's no-harm interval stays wider than the limit of +/-0.03.
+**Masking back to the detector's own step stamp removes almost all the extra error of masking only
+from the alarm time, and a search of the readings since the last forecast for a more precise onset
+adds nothing.** Part 2 meets its pre-registered rule (`supported`), but its comparison arm, masking
+from the alarm time, is an arm that experiment 171 never used. Part 1 misses its rule
+(`inconclusive`): the interval of the gated mask's difference from no mask is not inside +/-0.03.
+The overall verdict, `partly supported`, is a judgement, because the plan registered a verdict for
+each part only.
 
-**Background: what the mask is, and what was asked.** Our forecast corrects itself using recent
-power. A "mask" sets recent power aside while a switching alarm is active. A pair alarm is a step
-at one substation matched by an opposite step at a neighbouring metered substation; RO-NC is the
-refit-offset neighbour-count detector of [experiment
-147](../00147-causal-live-end-rule-for-ro-nc/result.md). [Experiment
+**Background: what a mask is.** Our forecast corrects itself using recent power. A "mask" sets
+recent power aside while a switching alarm is active. A pair alarm is a step in power at one
+substation matched by an opposite step at a neighbouring metered substation. A gated alarm is a
+pair alarm whose balance score is 0.7 or more, meaning the two steps are close in size. RO-NC is the
+detector of [experiment 147](../00147-causal-live-end-rule-for-ro-nc/result.md), which fires on a
+step in a refitted residual with support from neighbouring series. A step stamp is the half-hourly
+timestamp at which a detector says the step happened. The alarm time is the later timestamp at
+which the alarm became known: about 6 hours after the step for the pair alarm (a median of 12
+half-hours), and 48 hours for RO-NC (96 half-hours). The look-back is the readings between the step
+and the forecast origin, the moment a forecast run is issued (every 6 hours in production).
+
+**Background: what experiment 171 found and what we asked.** [Experiment
 171](../00171-switching-gated-mask-no-harm-pooled-months/result.md) found that the gated mask scores
-0.030 points of effective capacity worse than no mask on 27 months of rows outside logged
-transfers (95% interval -0.011 to +0.074), and that leaving out one substation, D10, removes the
-difference. A logged transfer is a movement of load between two substations recorded in NGED's
-switching log. **Part 1** asked whether D10's gated alarms follow switching that NGED did not log.
-**Part 2** asked whether the onset of a transfer can be located more precisely inside the readings
-since the previous 6-hourly forecast, and whether masking from the located onset beats masking
-from the stamp the alarm is known.
+0.030 points of effective capacity worse than no mask on 27 months of rows outside logged transfers
+(95% interval -0.011 to +0.074), and that leaving out one substation, D10, removes the difference.
+Scores are twice the mean pinball loss over 11 quantiles, in points of effective capacity (the
+score in megawatts over the substation's AC capacity, times 100). A logged transfer is a movement of
+load between two substations recorded in the switching log of National Grid Electricity
+Distribution (NGED). The six substations scored, anonymised as D5, D9, D10, D11, D14, and D16, are
+Primary substations. **Part 1** asked whether D10's gated alarms follow switching that NGED did not
+log. **Part 2** asked whether the onset of a transfer can be located more precisely in the look-back
+than the alarm time gives, and whether masking from the located onset beats masking from the alarm
+time.
 
-**Part 1 method.** Of the 49 gated alarms since 2024-04-10, 40 touch a decision substation, and 31
-of those match no logged transfer. We confirmed an alarm when a persistent step (median residual
+**Part 1 method.** Of the 49 gated alarms since 2024-04-10, 40 touch a scored substation, and 31 of
+those match no logged transfer. We confirmed an alarm when a persistent step (the median residual
 over the 12 hours after the alarm's step stamp minus the median over the 12 hours before) at its
 substation had an opposite step of similar size (0.5 to 2 times) at its partner substations, using
 thresholds fixed in the plan. We removed the rows from the step to 72 hours after each confirmed
-event and re-scored experiment 171's rows with the same quantile score and the same month-resampled
-interval. The scores are twice the mean pinball loss over 11 quantiles, in points of effective
-capacity (the score in megawatts over the substation's effective capacity, times 100). The forecast
-is a frozen generalised additive model with a [Kalman filter](https://doi.org/10.1115/1.3662552), as
-in experiment 171.
+event and re-scored experiment 171's rows with the same quantile score and the same
+month-resampled interval. A row is one forecast for one half-hour from one forecast origin. The
+forecast is a frozen generalised additive model with a [Kalman
+filter](https://doi.org/10.1115/1.3662552), as in experiment 171.
 
-**Part 2 method.** We injected 247 transfers (found by an alarm) in experiment 141's 44 worlds, and
-used 15 logged transfers (found by an alarm). The alarm is known several hours (pair alarm) or 48
-hours (RO-NC) after the step. At the first 6-hourly origin that can see the alarm we searched the
-stamps within 24 hours of the detector's own step stamp for the largest step of the right sign
-over the readings available, which is the onset we call "located". Four masks differ only in the
-first masked stamp: the alarm time, the detector's step stamp, the located onset, and the true
-onset. The extra error of a mask is its score minus the score of the mask from the true onset, on
-all leads of the daily forecast issued in the first 24 hours after the alarm.
+**Part 2 method.** Experiment 141's 44 worlds hold 210 injected transfers, and the two alarms find
+them 247 times in total (a transfer found by both alarms counts twice). We score those 247 matches
+and 15 logged transfers found by an alarm. At the first 6-hourly origin that can see an alarm, we
+searched the stamps within 24 hours of the detector's step stamp for the largest step with the
+same sign as the alarm's step, using only readings up to that origin. The stamp found is the
+"located" onset. Four masks differ only in the first masked stamp: the alarm time, the detector's
+step stamp, the located onset, and the true onset. The extra error of a mask is its score minus the
+score of the mask from the true onset, in points of effective capacity, on all leads of the daily
+forecast issued in the first 24 hours after the alarm. C2 is the share of the alarm-time mask's
+extra error that another mask removes: 1 minus the extra error of that mask over the extra error of
+the alarm-time mask.
 
 ![Figure 1: Masking back to the step stamp removes the extra error; locating adds nothing](figure_1_headline.svg)
 
@@ -221,12 +238,12 @@ all leads of the daily forecast issued in the first 24 hours after the alarm.
   step, which carry the transfer, stay in the filter.
 - **Location error, injected (half-hours; median |error| / 90th percentile).** Alarm time: pair
   12.0 / 25.8, RO-NC 96.0 / 97.0. Step stamp: pair 0.0 / 29.6, RO-NC 0.0 / 5.1. Located onset: pair
-  0.0 / 33.6, RO-NC 0.0 / 16.0. The median located error is 0, so it is not dominated by the
-  12-half-hour origin spacing. The located onset is closer than the step stamp for 10% (pair) and
-  14% (RO-NC) of transfers and farther for 14% and 26%.
-- **Sensitivity (post hoc).** Resampling whole worlds (39) gives 0.907 (0.747 to 0.974). Leaving
-  out any one substation leaves the reduction between 0.88 and 0.97. D10 alone, 14 transfers: 0.780
-  (-0.351 to 0.965).
+  0.0 / 33.6, RO-NC 0.0 / 16.0. The median located error is 0 half-hours, well below the
+  12-half-hour (6-hour) spacing of forecast origins. The located onset is closer than the step stamp
+  for 10% (pair) and 14% (RO-NC) of transfers and farther for 14% and 26%.
+- **Sensitivity (post hoc).** Resampling the 39 worlds with scored transfers (of 44) gives 0.907
+  (0.747 to 0.974). Leaving out any one substation leaves the reduction between 0.88 and 0.97. D10
+  alone, 14 transfers: 0.780 (-0.351 to 0.965).
 - **Real logged transfers (secondary, decide nothing).** 9 transfers found by the pair alarm and 6
   by RO-NC. Pair alarm: extra error over the true-onset mask alarm time -0.027 (-0.713 to +0.677),
   step stamp +0.151, located +0.095. RO-NC: alarm time -1.536, step stamp +2.991, located +2.742
@@ -242,19 +259,20 @@ all leads of the daily forecast issued in the first 24 hours after the alarm.
   that the interval would fall inside +/-0.03 failed.
 - **Part 1, how many alarms were confirmed.** 8 of the 31 unlogged gated alarms at a decision
   substation (the plan's candidates). The same rule applied at whole-week shifts of each alarm's
-  stamp confirms 5.6%, which is the rate expected by chance. Unlogged and confirmed per substation
-  (gated alarm intervals on the substation's series, so one alarm counts at each substation it
-  touches; 65 intervals for 49 alarms): D5 6 and 2, D9 0 and 0, D10 13 and 3, D11 14 and 0, D14 14
-  and 4, D16 3 and 1.
+  stamp confirms 5.6%, a placebo share that estimates how often the rule confirms an alarm by
+  chance. Unlogged and confirmed per substation (gated alarm intervals on the substation's series,
+  so one alarm counts at each substation it touches; 50 unlogged intervals from 31 alarms, and 10
+  confirmed intervals from 8 alarms): D5 6 and 2, D9 0 and 0, D10 13 and 3, D11 14 and 0, D14 14 and
+  4, D16 3 and 1.
 - **Part 1, where the harm is.** Rows of confirmed events alone: +0.726 (-0.011 to +1.191). Rows of
   unconfirmed gated alarms alone: +0.212 (-0.002 to +0.615). D10 alone: +0.170 (+0.012 to +0.382)
-  before and +0.081 (-0.007 to +0.232) after removal. So the harm remains where the independent
-  test finds no matching opposite step.
+  before and +0.081 (-0.007 to +0.232) after removal. So the point estimate stays positive where the
+  independent test finds no matching opposite step, but its interval includes 0.
 - **Tail calibration (injected rows; coverage at q01 / q05 / q95 / q99, nominal 0.01 / 0.05 / 0.95
   / 0.99).** No mask 0.032 / 0.066 / 0.875 / 0.952. Alarm time 0.024 / 0.059 / 0.888 / 0.962. Step
   stamp 0.029 / 0.080 / 0.962 / 0.990. Located onset 0.029 / 0.080 / 0.962 / 0.991 (true onset
   0.029 / 0.081 / 0.964 / 0.991). Every masked arm covers the upper tail better than no mask, and
-  the step stamp, located and true-onset arms over-cover the lower q05 more (0.080 against 0.066,
+  the step stamp, located, and true-onset arms over-cover the lower q05 more (0.080 against 0.066,
   nominal 0.05). The curtailment-cost metric was not scored, because the experiment scores single
   substations and the metric needs a node and its generators.
 
@@ -295,13 +313,13 @@ all leads of the daily forecast issued in the first 24 hours after the alarm.
 - **The step stamp's location error is truncated.** An alarm counts as finding a transfer only when
   its step stamp lies within 24 hours of the true onset, so the step stamp's error cannot exceed
   48 half-hours, while the located onset (searched 24 hours either side of the step stamp) can.
-  This favours the step stamp in the location comparison.
-- **MASK_ALARM starts at the known stamp.** The plan said the first usable origin's newest stamp;
-  the code masks from the known stamp, up to 11 half-hours earlier (mean 5.0 to 5.7). That makes
-  the alarm-time arm slightly better than registered and biases C2 downward.
+  That truncation favours the step stamp in the location comparison.
+- **The alarm-time mask starts at the known stamp.** The plan said the first usable origin's
+  newest stamp; the code masks from the known stamp, up to 11 half-hours earlier (mean 5.0 to 5.7).
+  That makes the alarm-time arm slightly better than registered and biases C2 downward.
 - **Overlapping alarms.** Every alarm at a substation is applied to every scored row there, so a
   row scored for one transfer can see another alarm's located onset, computed from readings up to
-  11 half-hours after that row's cutoff. Few rows are affected.
+  11 half-hours after that row's cutoff. The share of rows affected was not counted.
 - **The overall verdict is a judgement.** The plan registered a verdict for each part only.
 - **The real logged transfers are few.** 15 transfers found by an alarm, and the logged onset is
   coarser than a half-hour.
@@ -311,8 +329,9 @@ all leads of the daily forecast issued in the first 24 hours after the alarm.
 - **The forecasts are daily.** A 6-hourly cadence is simulated by taking, per found transfer, the
   one daily run whose newest stamp lies in the first 24 hours after the first origin that sees the
   alarm. The located onset is computed once, at that first origin.
-- **Schedule.** The cached forecasts are the frozen stack of experiment 171, with no refitting, so
-  the contrasts do not depend on a retraining schedule.
+- **The retraining schedule does not affect the contrasts.** The cached forecasts are the frozen
+  stack of experiment 171, with no refitting, so the contrasts do not depend on a retraining
+  schedule.
 
 ## What the next experiment should answer
 
