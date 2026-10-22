@@ -177,8 +177,8 @@ residual and D9 2.5 years; the rest 4.5.
   the residual that the alarms read, so their link to the alarm rate is partly built in. The
   leave-one-Primary-out test shows the link holds across Primaries, not that the statistic is
   independent of the alarms.
-- **Only 15 Primaries, 6 of them a single year apart in exposure.** D18 has 1 year and D9 2.5 years
-  of residual; the intervals in figure 1 are wide, and alarms in the same week are not independent.
+- **Only 15 Primaries.** D18 has 1 year and D9 2.5 years of residual. The intervals in figure 1 are
+  wide, and alarms in the same week are not independent.
 - **Lab shortcuts.** The residual uses ERA5 weather, which arrives about 5 days late, and a convex
   model refitted on the 1st and the 16th of each month, as in experiment 130. A live service would
   have ensemble forecast weather instead. The learned-score alarms are the stored cross-fitted
