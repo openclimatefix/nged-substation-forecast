@@ -69,32 +69,34 @@ headline: >-
   verdict is `inconclusive` and the contrasts are not evidence about the real days.
 lessons:
   - >-
-    No setting of the level's process noise recovered an injected offset: the gate's recovery was
-    within about 5 percentage points of zero for the tuned gated boost, the always-on boost, the
-    shared-level boost, and a post hoc multiplier of 100 on every one of them.
+    No setting of the level's process noise recovered 50% of an injected offset's excess loss. The
+    tuned gated boost stayed within 4 percentage points of zero, and the always-on boost, the
+    shared-level boost, and a post hoc multiplier of 100 made the loss worse in most cells (down to
+    -114%).
   - >-
     The counter was on for 0.6% to 1.2% of readings, so the gated boost is close to arm D by
-    construction, and the boost that is on all the time scored 0.023 points worse.
+    construction, and the boost that is on all the time scored 0.023 points worse (interval
+    -0.002 to +0.048 with the refitted spread).
   - >-
     On the smooth-offset day plotted in figure 4, all four arms forecast about 10 points too high
-    through the whole day, so a faster filter did not change a forecast that was wrong from the
-    first half-hour.
+    through the whole day. One day is an illustration, not evidence.
 take_home_message: >-
-  Making the Kalman filter's level state faster when the residual keeps one sign did not help:
-  the gated version scored the same as the current filter (+0.0002 points), and a version that is
-  always fast scored 0.023 points worse. The known-answer gate also failed, because no setting of
-  the level's process noise recovered an injected offset, so the filter's speed is not what limits
-  the forecast on smooth-offset days. The next lever is the mean model or a new input, not the
-  filter.
+  Making the Kalman filter's level state faster when the residual keeps one sign did not help in
+  this test: the gated version scored the same as the current filter (+0.0002 points), and a
+  version that is always fast scored 0.023 points worse. The known-answer gate also failed, since
+  no setting of the level's process noise recovered an injected offset, so the contrasts are
+  suggestive only. They point to the mean model or a new input, not the filter's speed, as the
+  next lever.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Do not raise the level's process noise in the GAM-K filter, gated or not: the gated boost
-    scored +0.0002 points against arm D and the always-on boost +0.023 (C1, C2).
+    Do not spend effort raising the level's process noise in the GAM-K filter: the gated boost
+    scored +0.0002 points against arm D and the always-on boost +0.023 (C1, C2), though the failed
+    gate makes both suggestive only.
   - >-
-    Look for the cause of a smooth same-sign offset in the mean model or its inputs, not in the
-    filter's speed: no boost recovered an injected offset, even at 100 times the noise (gate).
+    Look for the cause of a smooth same-sign offset in the mean model or its inputs before
+    changing the filter: no boost recovered an injected offset, even at 100 times the noise (gate).
   - >-
     Run a known-answer gate that injects an offset into the observed power before reading any
     filter contrast, and report recovery by hours since the offset started (figure 3).
@@ -121,12 +123,12 @@ much
 of its extra loss each filter removed. We then scored the filters on the real scored year at the
 five
 decision Primaries. The tested method is a variant of the Kalman filter on additive-model
-coefficients, not a method of ours. Arm D is rebuilt here bit for bit (2.7562 against 2.7562).
+coefficients, not a method of ours. Arm D is rebuilt here to the stored score (2.7562 against 2.756, inside the plan's 0.005).
 
 **Verdict: `inconclusive`, by the pre-registered rule that a failed gate caps the verdict.** The
 gate
 asked for at least 50% recovery at the 0.10 size for 16-hour and 36-hour offsets. The gated boost
-recovered -0.6% (95% interval -3.5% to +0.8%) and +0.4% (-1.3% to +2.2%).
+recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%).
 
 ![Contrasts over all rows](figure_1_contrasts.svg)
 
@@ -183,7 +185,7 @@ recovered -0.6% (95% interval -3.5% to +0.8%) and +0.4% (-1.3% to +2.2%).
 - **P2 holds with the refitted spread.** A1 minus A0 is +0.0002 and the upper bound is +0.0062. With
   the
   fixed spread the upper bound is +0.0103, just above the +0.01 limit.
-- **P3 holds on the point estimate.** A1 beats A2 by 0.023 points, with an interval that includes
+- **P3 holds on the point estimate only.** A1 beats A2 by 0.023 points, with an interval that includes
   zero
   (excluding it with the fixed spread: -0.033, -0.057 to -0.007).
 - **P4 fails.** A3 changed the excess loss on the smooth-offset days by -9.5% (-20.4% to +6.4%),
@@ -200,8 +202,11 @@ recovered -0.6% (95% interval -3.5% to +0.8%) and +0.4% (-1.3% to +2.2%).
   loss to recover.
 - A1 minus A0 on the 40 left-alone days: -0.001 points (-0.014 to +0.014); A2 +0.079 (+0.001 to
   +0.159); A3 +0.015 (-0.074 to +0.111).
-- Post hoc, a multiplier of 100 on A1, A2, and A3 recovered no more (-1.1 to +0.1 at the 0.10 and
-  0.20 sizes, 40 cases per cell).
+- Post hoc, a multiplier of 100 on A1, A2, and A3 recovered less: -110% to +10% at the 0.10 and
+  0.20 sizes (A1: -25% at 16 hours, A2: -45%, A3: -114%), 40 cases per cell.
+- The harm half of the gate also failed: A1 minus A0 on the left-alone days has an interval of
+  -0.014 to +0.014, wider than the pass mark of +0.005, and the post hoc multiplier of 100 on A1
+  cost +0.28 (+0.15 to +0.42).
 - Wiring check (`e00190_wiring_check.py`): on a stream with no noise, A0 follows a 7.8-point offset
   to
   between 4.9 and 7.1 points, A1 to between 5.2 and 7.1, and A3 reaches the bands whose own

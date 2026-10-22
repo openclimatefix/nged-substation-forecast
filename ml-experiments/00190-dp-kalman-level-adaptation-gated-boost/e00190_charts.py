@@ -169,7 +169,7 @@ def figure_recovery(*, data: dict) -> alt.TopLevelMixin:
         .resolve_scale(color="shared")
         .properties(
             title=_title(
-                text="No boost removes more than a few percent of an injected offset's excess loss",
+                text="No boost reaches the 50% pass mark, and most make the excess loss worse",
                 subtitle=(
                     "Known-answer gate: a one-signed offset added to the observed power on 40 "
                     "ordinary days per panel row (8 per substation), forecasts with "
