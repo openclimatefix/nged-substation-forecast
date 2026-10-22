@@ -106,8 +106,8 @@ and the time forecast. Nothing was refitted.
 - **Solar arms.** The XGBoost-free forecast is a physical model of the solar farm (a plant model)
   fed the mean and spread of the 51 European Centre for Medium-Range Weather Forecasts (ECMWF)
   ensemble members. The XGBoost forecast is arm 5 of experiment 224
-  ([PR 1533](https://github.com/openclimatefix/nged-substation-forecast/pull/1533), open at the time of
-  writing).
+  ([PR 1533](https://github.com/openclimatefix/nged-substation-forecast/pull/1533), open when
+  written).
 - **Wind arms.** The XGBoost-free forecast is a physics-based wind model, B1. The XGBoost forecast is
   the best guess refit with 11 levels, A0r. Both come from experiment 230, read from its work folder
   before that experiment merged, so the wind numbers are provisional.
