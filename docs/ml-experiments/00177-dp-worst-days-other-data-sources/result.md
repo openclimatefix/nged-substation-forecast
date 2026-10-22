@@ -90,3 +90,20 @@ date: 2026-10-22
   range), and the union.
 - Each indicator's coverage of the whole year, so that an indicator true on most days (the log
   may cover only part of the year) is reported as uninformative.
+
+## Stage 2 addendum, fixed before any public data was read
+
+**Stage 1 ran first and found no source that passes.** The raw NGED file check is done: three
+files, one per decision Primary, carry only `startTime`, `endTime`, and `value` in each reading,
+and the same top-level fields the metadata table already holds. So no unparsed telemetry field
+exists, and that source is closed. Stage 2 reads public data under the same decision rule and the
+same 1,000 matched ordinary-day draws.
+
+- **P1, Demand Flexibility Service (DFS) events.** Source: the NESO DFS service-requirement
+  archive for 2025/2026. Indicator: a live or test DFS event is scheduled on the local date.
+- **P2, system price spikes.** Source: Elexon settlement system prices for each day. Indicator:
+  the highest system sell price or system buy price in any settlement period of the local date
+  lies in the top 5% of all settlement periods in 2025-07-03 to 2026-06-30.
+- **Reading the result.** A national indicator can only explain a single-substation block through
+  a mechanism, such as a demand-turn-down event moving load. A rate near the ordinary-day rate is
+  reported as no explanation, however many days the indicator covers.
