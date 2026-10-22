@@ -89,6 +89,4 @@ metric: >-
 code: ml-experiments/00203-switching-replay-learned-score-in-masked-forecast/
 ---
 
-# Experiment 203: do the transfers a learned score finds lower the masked forecast's error?
-
-Planned. The write-up is added when the replay has run.
+**Planned.** The write-up is added when the replay has run.
