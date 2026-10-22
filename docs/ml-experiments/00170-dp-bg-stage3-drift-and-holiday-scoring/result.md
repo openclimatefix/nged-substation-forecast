@@ -99,7 +99,7 @@ take_home_message: >-
   (lower scores are better), and training on all years of history did not change that. The filter
   already appears to remove the slow level error that the drift term fixes, because without the
   filter the drift term improves the score by about 0.2 points. The drift term should not be added
-  to experiment 155's arm D. Christmas (24 December to 2 January) scored 1.12 times an ordinary
+  to experiment 155's arm D. Christmas (24 December to 2 January) scored 1.13 times an ordinary
   weekday at the same half-hours, below the 1.5 times predicted, and recipe R improved the Christmas
   score by 0.04 points.
 advice:
@@ -113,14 +113,15 @@ advice:
     with the filter (filter diagnostic).
   - >-
     Keep recipe R in the assembly and drop the night offset if one part must go: dropping R worsens
-    the score by 0.016 points, and dropping the offset worsens it by 0.001 (C5, C4).
+    the score by 0.016 points, and dropping the offset improves
+    it by 0.001 (C5, C4).
   - >-
     Keep recipe R on over Christmas: it improved the quantile score on 24 December to 2 January by
     0.04 points with and without drift, and worsened it on only 3 to 5 of 20 dates (event-day
     section).
   - >-
     A separate Christmas forecasting model is not justified by a 1.5 times error: the quantile score
-    on 24 December to 2 January was 1.09 to 1.19 times the weekday score at the same half-hours, in
+    on 24 December to 2 January was 1.10 to 1.19 times the weekday score at the same half-hours, in
     two Christmases (figure 4).
   - >-
     Treat a drift term for cold nights as a candidate for a follow-up test, not a result: it
@@ -166,12 +167,12 @@ refit, without lookahead, cuts the loss from +0.028 to +0.011 (-0.002 to +0.026)
 still does not win. The code that makes the drift fits is checked by a reproduction control: the
 same code with no drift reproduces experiment 136's stage 1 forecast exactly.
 
-**Christmas is only 1.12 times as hard to forecast as an ordinary weekday, and recipe R improves the
+**Christmas is only 1.13 times as hard to forecast as an ordinary weekday, and recipe R improves the
 score on those days by 0.04 points.** The experiment also scored 24 December to 2 January, Easter,
 and
-the bank holidays. The quantile score on 24 December to 2 January was 1.12 times the score on
+the bank holidays. The quantile score on 24 December to 2 January was 1.13 times the score on
 ordinary
-weekdays at the same half-hours of the day (arm D; 1.09 in 2024-25 and 1.19 in 2025-26). The plan
+weekdays at the same half-hours of the day (arm D; 1.10 in 2024-25 and 1.19 in 2025-26). The plan
 predicted at least 1.5 times, and predicted that recipe R would worsen the score on those days. Both
 predictions failed.
 
@@ -209,7 +210,8 @@ predictions failed.
   12 months lower. Replicate year +0.002 (-0.027 to +0.035).
 - **C3, drift on all years minus D:** +0.011 (-0.027 to +0.039).
 - **Drop-one table.** Dropping the drift term improves the score by 0.031 (C1). Dropping the offset
-  worsens it by 0.001 on 24 months (C4, +0.001; -0.005 to +0.007) and by 0.000 on all years (C6).
+  improves it by 0.001 on 24 months (C4, +0.001; -0.005 to +0.007) and changes it by 0.000 on all
+  years (C6).
   Dropping recipe R worsens it by 0.016 on 24 months (C5, -0.016 for the full assembly minus the
   assembly without R; -0.031 to -0.003) and by 0.025 on all years (C7, -0.025; -0.040 to -0.012).
   Without drift, R lowered the score by 0.037 in experiment 155.
@@ -219,7 +221,9 @@ predictions failed.
   coverage on cold nights is 83.7% for D, 86.2% for drift on 24 months, and 85.2% for drift on all
   years.
 - **Christmas rows of the calendar (Christmas Day, Boxing Day, and the Christmas run; 7,775 rows,
-  one Christmas).** D 3.176, drift on 24 months 3.215, drift on all years 2.900, BG2 2.309.
+  one Christmas).** D 3.176, drift on 24 months 3.215, drift on all years 2.900, BG2 2.309. BG2 beat
+  arm D by 0.87 points on those rows, from one Christmas and 12 runs, as in experiment 155; it is
+  not a ranking.
 - **Tails, all leads (coverage at q01, q05, q95, q99; nominal 1, 5, 95, and 99%).** D 2.4, 7.0,
   94.7, and 98.3%; drift on 24 months 2.5, 7.2, 94.8, and 98.2%; drift on all years 2.4, 7.3, 94.8,
   and 98.2%. Pinball loss at q99: 0.232, 0.234, and 0.232.
@@ -237,7 +241,7 @@ are May Day, the Spring and Late Summer Bank Holidays, and one-off holidays. The
 the
 spread, so only the replicate year and the scored year are scored. The ratios are for leads 0.5 to
 168
-hours; `printed_report.txt` has D+1 and the Sunday reference.
+hours; `printed_report.txt` has the D+1 and Sunday-reference rows.
 
 | Event (dates, rows) | Ratio to weekdays, arm D | Ratio, drift on 24 months with offset and R | Ratio to Sundays, arm D |
 |---|---|---|---|
@@ -245,8 +249,9 @@ hours; `printed_report.txt` has D+1 and the Sunday reference.
 | Easter (8 dates, 12,140 rows) | 1.045 | 1.044 | 1.125 |
 | Other bank holidays (5 dates, 6,340 rows) | 1.057 | 1.037 | 1.138 |
 
-- **Christmas by year.** Arm A (no corrections, no drift) scored 1.089 times a weekday in 2024-25
-  and 1.194 in 2025-26. The 2024-25 rows hold December origins only, so 1 January and 2 January are
+- **Christmas by year.** Arm D scored 1.099 times a weekday in 2024-25 and 1.194 in 2025-26; arm A
+  (no corrections, no drift) scored 1.089 and 1.194. The 2024-25 rows hold December origins only, so
+  1 January and 2 January are
   forecast at long leads there.
 - **Recipe R on Christmas.** R lowered the quantile score by 0.041 points without drift (5 of 20
   dates worse, 1 of 5 substations worse) and by 0.040 with drift (3 of 20 dates, 2 of 5
@@ -316,5 +321,6 @@ hours; `printed_report.txt` has D+1 and the Sunday reference.
   that improves the score.
 - If a drift term is tried again on a filtered forecast, re-base the filter's level at each refit
   first; the audit found no gain over no drift even then (+0.011).
-- If a drift term is wanted for cold nights, test it as a winter-night-only term; its gain on nights
-  with a day mean below 2 C (-0.19 points) is the one place it helped.
+- If a drift term is wanted for cold nights, test it as a winter-night-only term. Its gain on nights
+  with a day mean below 2 C (-0.19 points) is not significant, rests on 3 months, and did not
+  appear in the replicate year on 24 months (D 2.182, drift 2.190), so it is a lead and not a result.

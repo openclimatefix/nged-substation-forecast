@@ -11,8 +11,9 @@ Each stage 1 arm of `e00170_run.py` gets four stage 2 arms, named with a prefix 
 | `<prefix>_d` | `<prefix>_b` | recipe R at every lead, on the offset forecast's own past errors |
 
 So `r_a`, `r_b`, `r_c`, and `r_d` repeat experiment 155's arms A, B, C, and D with this folder's
-fitting code. Each arm's quantiles are its corrected mean plus a spread table refitted on its own
-tuning-month forecasts, every factor 1. The output is in the `dp_preds` layout.
+fitting code. Arms `_b` to `_d` have quantiles equal to the corrected mean plus a spread table
+refitted on their own tuning-month forecasts, every factor 1; arm `_a` keeps the stage 1 spread.
+The output is in the `dp_preds` layout.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00170-*/e00170_stage2.py [--workers 6]

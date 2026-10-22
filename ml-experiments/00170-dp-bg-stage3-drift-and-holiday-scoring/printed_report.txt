@@ -506,7 +506,184 @@ shape: (378, 8)
 │ sall_d ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday        ┆ 2160         ┆ 2.907875   ┆ 1.215394 │
 │ a155   ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday        ┆ 1344         ┆ 3.063549   ┆ 1.208291 │
 │ c155   ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday        ┆ 1344         ┆ 2.972927   ┆ 1.196267 │
-│ …      ┆ …     ┆ …         ┆ …            ┆ …              ┆ …            ┆ …          ┆ …        │
+│ d155   ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday        ┆ 1344         ┆ 2.960432   ┆ 1.194851 │
+│ s24_a  ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday        ┆ 1344         ┆ 3.06626    ┆ 1.203555 │
+│ s24_c  ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday        ┆ 1344         ┆ 2.968673   ┆ 1.188034 │
+│ s24_d  ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday        ┆ 1344         ┆ 2.962146   ┆ 1.18992  │
+│ sall_d ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday        ┆ 1344         ┆ 2.533678   ┆ 1.021392 │
+│ a155   ┆ D+1   ┆ both      ┆ christmas    ┆ weekday_winter ┆ 3504         ┆ 2.913552   ┆ 1.172909 │
+│ c155   ┆ D+1   ┆ both      ┆ christmas    ┆ weekday_winter ┆ 3504         ┆ 2.839054   ┆ 1.173354 │
+│ d155   ┆ D+1   ┆ both      ┆ christmas    ┆ weekday_winter ┆ 3504         ┆ 2.852951   ┆ 1.174375 │
+│ s24_a  ┆ D+1   ┆ both      ┆ christmas    ┆ weekday_winter ┆ 3504         ┆ 2.938596   ┆ 1.161151 │
+│ s24_c  ┆ D+1   ┆ both      ┆ christmas    ┆ weekday_winter ┆ 3504         ┆ 2.859388   ┆ 1.159894 │
+│ s24_d  ┆ D+1   ┆ both      ┆ christmas    ┆ weekday_winter ┆ 3504         ┆ 2.863411   ┆ 1.15043  │
+│ sall_d ┆ D+1   ┆ both      ┆ christmas    ┆ weekday_winter ┆ 3504         ┆ 2.764348   ┆ 1.116605 │
+│ a155   ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday_winter ┆ 2160         ┆ 2.82022    ┆ 1.15766  │
+│ c155   ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday_winter ┆ 2160         ┆ 2.755755   ┆ 1.152364 │
+│ d155   ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday_winter ┆ 2160         ┆ 2.786074   ┆ 1.140046 │
+│ s24_a  ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday_winter ┆ 2160         ┆ 2.85916    ┆ 1.124847 │
+│ s24_c  ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday_winter ┆ 2160         ┆ 2.791388   ┆ 1.117699 │
+│ s24_d  ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday_winter ┆ 2160         ┆ 2.801975   ┆ 1.08315  │
+│ sall_d ┆ D+1   ┆ replicate ┆ christmas    ┆ weekday_winter ┆ 2160         ┆ 2.907875   ┆ 1.125934 │
+│ a155   ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday_winter ┆ 1344         ┆ 3.063549   ┆ 1.221397 │
+│ c155   ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday_winter ┆ 1344         ┆ 2.972927   ┆ 1.221488 │
+│ d155   ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday_winter ┆ 1344         ┆ 2.960432   ┆ 1.222255 │
+│ s24_a  ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday_winter ┆ 1344         ┆ 3.06626    ┆ 1.214179 │
+│ s24_c  ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday_winter ┆ 1344         ┆ 2.968673   ┆ 1.212127 │
+│ s24_d  ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday_winter ┆ 1344         ┆ 2.962146   ┆ 1.214047 │
+│ sall_d ┆ D+1   ┆ scored    ┆ christmas    ┆ weekday_winter ┆ 1344         ┆ 2.533678   ┆ 1.046095 │
+│ a155   ┆ D+1   ┆ both      ┆ easter       ┆ sunday         ┆ 1680         ┆ 2.623982   ┆ 1.170935 │
+│ c155   ┆ D+1   ┆ both      ┆ easter       ┆ sunday         ┆ 1680         ┆ 2.641212   ┆ 1.209695 │
+│ d155   ┆ D+1   ┆ both      ┆ easter       ┆ sunday         ┆ 1680         ┆ 2.638269   ┆ 1.204202 │
+│ s24_a  ┆ D+1   ┆ both      ┆ easter       ┆ sunday         ┆ 1680         ┆ 2.681329   ┆ 1.187549 │
+│ s24_c  ┆ D+1   ┆ both      ┆ easter       ┆ sunday         ┆ 1680         ┆ 2.717249   ┆ 1.235138 │
+│ s24_d  ┆ D+1   ┆ both      ┆ easter       ┆ sunday         ┆ 1680         ┆ 2.709221   ┆ 1.224501 │
+│ sall_d ┆ D+1   ┆ both      ┆ easter       ┆ sunday         ┆ 1680         ┆ 2.688254   ┆ 1.221739 │
+│ a155   ┆ D+1   ┆ replicate ┆ easter       ┆ sunday         ┆ 960          ┆ 2.456935   ┆ 1.123743 │
+│ c155   ┆ D+1   ┆ replicate ┆ easter       ┆ sunday         ┆ 960          ┆ 2.428756   ┆ 1.149513 │
+│ d155   ┆ D+1   ┆ replicate ┆ easter       ┆ sunday         ┆ 960          ┆ 2.42774    ┆ 1.134078 │
+│ s24_a  ┆ D+1   ┆ replicate ┆ easter       ┆ sunday         ┆ 960          ┆ 2.496516   ┆ 1.126466 │
+│ s24_c  ┆ D+1   ┆ replicate ┆ easter       ┆ sunday         ┆ 960          ┆ 2.468579   ┆ 1.152985 │
+│ s24_d  ┆ D+1   ┆ replicate ┆ easter       ┆ sunday         ┆ 960          ┆ 2.47327    ┆ 1.132522 │
+│ sall_d ┆ D+1   ┆ replicate ┆ easter       ┆ sunday         ┆ 960          ┆ 2.49138    ┆ 1.153479 │
+│ a155   ┆ D+1   ┆ scored    ┆ easter       ┆ sunday         ┆ 720          ┆ 2.846711   ┆ 1.252665 │
+│ c155   ┆ D+1   ┆ scored    ┆ easter       ┆ sunday         ┆ 720          ┆ 2.924486   ┆ 1.314766 │
+│ d155   ┆ D+1   ┆ scored    ┆ easter       ┆ sunday         ┆ 720          ┆ 2.918975   ┆ 1.314878 │
+│ s24_a  ┆ D+1   ┆ scored    ┆ easter       ┆ sunday         ┆ 720          ┆ 2.927748   ┆ 1.282994 │
+│ s24_c  ┆ D+1   ┆ scored    ┆ easter       ┆ sunday         ┆ 720          ┆ 3.04881    ┆ 1.364617 │
+│ s24_d  ┆ D+1   ┆ scored    ┆ easter       ┆ sunday         ┆ 720          ┆ 3.023821   ┆ 1.356571 │
+│ sall_d ┆ D+1   ┆ scored    ┆ easter       ┆ sunday         ┆ 720          ┆ 2.950753   ┆ 1.326915 │
+│ a155   ┆ D+1   ┆ both      ┆ easter       ┆ weekday        ┆ 1680         ┆ 2.623982   ┆ 1.06027  │
+│ c155   ┆ D+1   ┆ both      ┆ easter       ┆ weekday        ┆ 1680         ┆ 2.641212   ┆ 1.090622 │
+│ d155   ┆ D+1   ┆ both      ┆ easter       ┆ weekday        ┆ 1680         ┆ 2.638269   ┆ 1.088271 │
+│ s24_a  ┆ D+1   ┆ both      ┆ easter       ┆ weekday        ┆ 1680         ┆ 2.681329   ┆ 1.074045 │
+│ s24_c  ┆ D+1   ┆ both      ┆ easter       ┆ weekday        ┆ 1680         ┆ 2.717249   ┆ 1.111732 │
+│ s24_d  ┆ D+1   ┆ both      ┆ easter       ┆ weekday        ┆ 1680         ┆ 2.709221   ┆ 1.10559  │
+│ sall_d ┆ D+1   ┆ both      ┆ easter       ┆ weekday        ┆ 1680         ┆ 2.688254   ┆ 1.09867  │
+│ a155   ┆ D+1   ┆ replicate ┆ easter       ┆ weekday        ┆ 960          ┆ 2.456935   ┆ 1.033458 │
+│ c155   ┆ D+1   ┆ replicate ┆ easter       ┆ weekday        ┆ 960          ┆ 2.428756   ┆ 1.046966 │
+│ d155   ┆ D+1   ┆ replicate ┆ easter       ┆ weekday        ┆ 960          ┆ 2.42774    ┆ 1.038173 │
+│ s24_a  ┆ D+1   ┆ replicate ┆ easter       ┆ weekday        ┆ 960          ┆ 2.496516   ┆ 1.034094 │
+│ s24_c  ┆ D+1   ┆ replicate ┆ easter       ┆ weekday        ┆ 960          ┆ 2.468579   ┆ 1.047643 │
+│ s24_d  ┆ D+1   ┆ replicate ┆ easter       ┆ weekday        ┆ 960          ┆ 2.47327    ┆ 1.035718 │
+│ sall_d ┆ D+1   ┆ replicate ┆ easter       ┆ weekday        ┆ 960          ┆ 2.49138    ┆ 1.041313 │
+│ a155   ┆ D+1   ┆ scored    ┆ easter       ┆ weekday        ┆ 720          ┆ 2.846711   ┆ 1.122767 │
+│ c155   ┆ D+1   ┆ scored    ┆ easter       ┆ weekday        ┆ 720          ┆ 2.924486   ┆ 1.176775 │
+│ d155   ┆ D+1   ┆ scored    ┆ easter       ┆ weekday        ┆ 720          ┆ 2.918975   ┆ 1.178118 │
+│ s24_a  ┆ D+1   ┆ scored    ┆ easter       ┆ weekday        ┆ 720          ┆ 2.927748   ┆ 1.149187 │
+│ s24_c  ┆ D+1   ┆ scored    ┆ easter       ┆ weekday        ┆ 720          ┆ 3.04881    ┆ 1.220104 │
+│ s24_d  ┆ D+1   ┆ scored    ┆ easter       ┆ weekday        ┆ 720          ┆ 3.023821   ┆ 1.214695 │
+│ sall_d ┆ D+1   ┆ scored    ┆ easter       ┆ weekday        ┆ 720          ┆ 2.950753   ┆ 1.189526 │
+│ a155   ┆ D+1   ┆ both      ┆ easter       ┆ weekday_winter ┆ 1680         ┆ 2.623982   ┆ 1.056336 │
+│ c155   ┆ D+1   ┆ both      ┆ easter       ┆ weekday_winter ┆ 1680         ┆ 2.641212   ┆ 1.091588 │
+│ d155   ┆ D+1   ┆ both      ┆ easter       ┆ weekday_winter ┆ 1680         ┆ 2.638269   ┆ 1.086004 │
+│ s24_a  ┆ D+1   ┆ both      ┆ easter       ┆ weekday_winter ┆ 1680         ┆ 2.681329   ┆ 1.059495 │
+│ s24_c  ┆ D+1   ┆ both      ┆ easter       ┆ weekday_winter ┆ 1680         ┆ 2.717249   ┆ 1.102236 │
+│ s24_d  ┆ D+1   ┆ both      ┆ easter       ┆ weekday_winter ┆ 1680         ┆ 2.709221   ┆ 1.088481 │
+│ sall_d ┆ D+1   ┆ both      ┆ easter       ┆ weekday_winter ┆ 1680         ┆ 2.688254   ┆ 1.085868 │
+│ a155   ┆ D+1   ┆ replicate ┆ easter       ┆ weekday_winter ┆ 960          ┆ 2.456935   ┆ 1.008537 │
+│ c155   ┆ D+1   ┆ replicate ┆ easter       ┆ weekday_winter ┆ 960          ┆ 2.428756   ┆ 1.015624 │
+│ d155   ┆ D+1   ┆ replicate ┆ easter       ┆ weekday_winter ┆ 960          ┆ 2.42774    ┆ 0.993418 │
+│ s24_a  ┆ D+1   ┆ replicate ┆ easter       ┆ weekday_winter ┆ 960          ┆ 2.496516   ┆ 0.982176 │
+│ s24_c  ┆ D+1   ┆ replicate ┆ easter       ┆ weekday_winter ┆ 960          ┆ 2.468579   ┆ 0.988443 │
+│ s24_d  ┆ D+1   ┆ replicate ┆ easter       ┆ weekday_winter ┆ 960          ┆ 2.47327    ┆ 0.956084 │
+│ sall_d ┆ D+1   ┆ replicate ┆ easter       ┆ weekday_winter ┆ 960          ┆ 2.49138    ┆ 0.964666 │
+│ a155   ┆ D+1   ┆ scored    ┆ easter       ┆ weekday_winter ┆ 720          ┆ 2.846711   ┆ 1.134946 │
+│ c155   ┆ D+1   ┆ scored    ┆ easter       ┆ weekday_winter ┆ 720          ┆ 2.924486   ┆ 1.201585 │
+│ d155   ┆ D+1   ┆ scored    ┆ easter       ┆ weekday_winter ┆ 720          ┆ 2.918975   ┆ 1.205139 │
+│ s24_a  ┆ D+1   ┆ scored    ┆ easter       ┆ weekday_winter ┆ 720          ┆ 2.927748   ┆ 1.15933  │
+│ s24_c  ┆ D+1   ┆ scored    ┆ easter       ┆ weekday_winter ┆ 720          ┆ 3.04881    ┆ 1.244848 │
+│ s24_d  ┆ D+1   ┆ scored    ┆ easter       ┆ weekday_winter ┆ 720          ┆ 3.023821   ┆ 1.239324 │
+│ sall_d ┆ D+1   ┆ scored    ┆ easter       ┆ weekday_winter ┆ 720          ┆ 2.950753   ┆ 1.218295 │
+│ a155   ┆ all   ┆ both      ┆ bank_holiday ┆ sunday         ┆ 6340         ┆ 2.814135   ┆ 1.091848 │
+│ c155   ┆ all   ┆ both      ┆ bank_holiday ┆ sunday         ┆ 6340         ┆ 2.836683   ┆ 1.11528  │
+│ d155   ┆ all   ┆ both      ┆ bank_holiday ┆ sunday         ┆ 6340         ┆ 2.910743   ┆ 1.138076 │
+│ s24_a  ┆ all   ┆ both      ┆ bank_holiday ┆ sunday         ┆ 6340         ┆ 2.798318   ┆ 1.068146 │
+│ s24_c  ┆ all   ┆ both      ┆ bank_holiday ┆ sunday         ┆ 6340         ┆ 2.831755   ┆ 1.094551 │
+│ s24_d  ┆ all   ┆ both      ┆ bank_holiday ┆ sunday         ┆ 6340         ┆ 2.900182   ┆ 1.113387 │
+│ sall_d ┆ all   ┆ both      ┆ bank_holiday ┆ sunday         ┆ 6340         ┆ 2.926468   ┆ 1.13375  │
+│ a155   ┆ all   ┆ replicate ┆ bank_holiday ┆ sunday         ┆ 2260         ┆ 2.789591   ┆ 1.135491 │
+│ c155   ┆ all   ┆ replicate ┆ bank_holiday ┆ sunday         ┆ 2260         ┆ 2.794718   ┆ 1.15542  │
+│ d155   ┆ all   ┆ replicate ┆ bank_holiday ┆ sunday         ┆ 2260         ┆ 2.914659   ┆ 1.190103 │
+│ s24_a  ┆ all   ┆ replicate ┆ bank_holiday ┆ sunday         ┆ 2260         ┆ 2.833091   ┆ 1.124462 │
+│ s24_c  ┆ all   ┆ replicate ┆ bank_holiday ┆ sunday         ┆ 2260         ┆ 2.851026   ┆ 1.149477 │
+│ s24_d  ┆ all   ┆ replicate ┆ bank_holiday ┆ sunday         ┆ 2260         ┆ 2.964331   ┆ 1.175863 │
+│ sall_d ┆ all   ┆ replicate ┆ bank_holiday ┆ sunday         ┆ 2260         ┆ 2.929863   ┆ 1.174361 │
+│ a155   ┆ all   ┆ scored    ┆ bank_holiday ┆ sunday         ┆ 4080         ┆ 2.827731   ┆ 1.066258 │
+│ c155   ┆ all   ┆ scored    ┆ bank_holiday ┆ sunday         ┆ 4080         ┆ 2.859928   ┆ 1.091136 │
+│ d155   ┆ all   ┆ scored    ┆ bank_holiday ┆ sunday         ┆ 4080         ┆ 2.908574   ┆ 1.107845 │
+│ s24_a  ┆ all   ┆ scored    ┆ bank_holiday ┆ sunday         ┆ 4080         ┆ 2.779056   ┆ 1.036223 │
+│ s24_c  ┆ all   ┆ scored    ┆ bank_holiday ┆ sunday         ┆ 4080         ┆ 2.821079   ┆ 1.063048 │
+│ s24_d  ┆ all   ┆ scored    ┆ bank_holiday ┆ sunday         ┆ 4080         ┆ 2.864649   ┆ 1.077881 │
+│ sall_d ┆ all   ┆ scored    ┆ bank_holiday ┆ sunday         ┆ 4080         ┆ 2.924588   ┆ 1.109629 │
+│ a155   ┆ all   ┆ both      ┆ bank_holiday ┆ weekday        ┆ 6340         ┆ 2.814135   ┆ 1.009822 │
+│ c155   ┆ all   ┆ both      ┆ bank_holiday ┆ weekday        ┆ 6340         ┆ 2.836683   ┆ 1.033112 │
+│ d155   ┆ all   ┆ both      ┆ bank_holiday ┆ weekday        ┆ 6340         ┆ 2.910743   ┆ 1.057214 │
+│ s24_a  ┆ all   ┆ both      ┆ bank_holiday ┆ weekday        ┆ 6340         ┆ 2.798318   ┆ 0.990906 │
+│ s24_c  ┆ all   ┆ both      ┆ bank_holiday ┆ weekday        ┆ 6340         ┆ 2.831755   ┆ 1.016542 │
+│ s24_d  ┆ all   ┆ both      ┆ bank_holiday ┆ weekday        ┆ 6340         ┆ 2.900182   ┆ 1.037472 │
+│ sall_d ┆ all   ┆ both      ┆ bank_holiday ┆ weekday        ┆ 6340         ┆ 2.926468   ┆ 1.050658 │
+│ a155   ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday        ┆ 2260         ┆ 2.789591   ┆ 1.021966 │
+│ c155   ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday        ┆ 2260         ┆ 2.794718   ┆ 1.04299  │
+│ d155   ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday        ┆ 2260         ┆ 2.914659   ┆ 1.079589 │
+│ s24_a  ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday        ┆ 2260         ┆ 2.833091   ┆ 1.018795 │
+│ s24_c  ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday        ┆ 2260         ┆ 2.851026   ┆ 1.044107 │
+│ s24_d  ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday        ┆ 2260         ┆ 2.964331   ┆ 1.074003 │
+│ sall_d ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday        ┆ 2260         ┆ 2.929863   ┆ 1.063596 │
+│ a155   ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday        ┆ 4080         ┆ 2.827731   ┆ 1.002374 │
+│ c155   ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday        ┆ 4080         ┆ 2.859928   ┆ 1.026424 │
+│ d155   ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday        ┆ 4080         ┆ 2.908574   ┆ 1.043979 │
+│ s24_a  ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday        ┆ 4080         ┆ 2.779056   ┆ 0.975162 │
+│ s24_c  ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday        ┆ 4080         ┆ 2.821079   ┆ 1.000568 │
+│ s24_d  ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday        ┆ 4080         ┆ 2.864649   ┆ 1.016776 │
+│ sall_d ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday        ┆ 4080         ┆ 2.924588   ┆ 1.042972 │
+│ a155   ┆ all   ┆ both      ┆ bank_holiday ┆ weekday_winter ┆ 6340         ┆ 2.814135   ┆ 0.975307 │
+│ c155   ┆ all   ┆ both      ┆ bank_holiday ┆ weekday_winter ┆ 6340         ┆ 2.836683   ┆ 0.999682 │
+│ d155   ┆ all   ┆ both      ┆ bank_holiday ┆ weekday_winter ┆ 6340         ┆ 2.910743   ┆ 1.020179 │
+│ s24_a  ┆ all   ┆ both      ┆ bank_holiday ┆ weekday_winter ┆ 6340         ┆ 2.798318   ┆ 0.948283 │
+│ s24_c  ┆ all   ┆ both      ┆ bank_holiday ┆ weekday_winter ┆ 6340         ┆ 2.831755   ┆ 0.974948 │
+│ s24_d  ┆ all   ┆ both      ┆ bank_holiday ┆ weekday_winter ┆ 6340         ┆ 2.900182   ┆ 0.990044 │
+│ sall_d ┆ all   ┆ both      ┆ bank_holiday ┆ weekday_winter ┆ 6340         ┆ 2.926468   ┆ 1.003787 │
+│ a155   ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday_winter ┆ 2260         ┆ 2.789591   ┆ 0.955262 │
+│ c155   ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday_winter ┆ 2260         ┆ 2.794718   ┆ 0.963959 │
+│ d155   ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday_winter ┆ 2260         ┆ 2.914659   ┆ 0.989551 │
+│ s24_a  ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday_winter ┆ 2260         ┆ 2.833091   ┆ 0.932613 │
+│ s24_c  ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday_winter ┆ 2260         ┆ 2.851026   ┆ 0.946155 │
+│ s24_d  ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday_winter ┆ 2260         ┆ 2.964331   ┆ 0.961218 │
+│ sall_d ┆ all   ┆ replicate ┆ bank_holiday ┆ weekday_winter ┆ 2260         ┆ 2.929863   ┆ 0.952882 │
+│ a155   ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday_winter ┆ 4080         ┆ 2.827731   ┆ 0.985839 │
+│ c155   ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday_winter ┆ 4080         ┆ 2.859928   ┆ 1.018694 │
+│ d155   ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday_winter ┆ 4080         ┆ 2.908574   ┆ 1.035836 │
+│ s24_a  ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday_winter ┆ 4080         ┆ 2.779056   ┆ 0.955677 │
+│ s24_c  ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday_winter ┆ 4080         ┆ 2.821079   ┆ 0.989585 │
+│ s24_d  ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday_winter ┆ 4080         ┆ 2.864649   ┆ 1.004028 │
+│ sall_d ┆ all   ┆ scored    ┆ bank_holiday ┆ weekday_winter ┆ 4080         ┆ 2.924588   ┆ 1.031102 │
+│ a155   ┆ all   ┆ both      ┆ christmas    ┆ sunday         ┆ 25673        ┆ 3.129356   ┆ 1.212493 │
+│ c155   ┆ all   ┆ both      ┆ christmas    ┆ sunday         ┆ 25673        ┆ 3.088056   ┆ 1.21242  │
+│ d155   ┆ all   ┆ both      ┆ christmas    ┆ sunday         ┆ 25673        ┆ 3.110391   ┆ 1.214442 │
+│ s24_a  ┆ all   ┆ both      ┆ christmas    ┆ sunday         ┆ 25673        ┆ 3.152353   ┆ 1.201675 │
+│ s24_c  ┆ all   ┆ both      ┆ christmas    ┆ sunday         ┆ 25673        ┆ 3.112853   ┆ 1.201575 │
+│ s24_d  ┆ all   ┆ both      ┆ christmas    ┆ sunday         ┆ 25673        ┆ 3.121628   ┆ 1.196787 │
+│ sall_d ┆ all   ┆ both      ┆ christmas    ┆ sunday         ┆ 25673        ┆ 3.070188   ┆ 1.187796 │
+│ a155   ┆ all   ┆ replicate ┆ christmas    ┆ sunday         ┆ 16260        ┆ 2.991627   ┆ 1.21095  │
+│ c155   ┆ all   ┆ replicate ┆ christmas    ┆ sunday         ┆ 16260        ┆ 2.953439   ┆ 1.214363 │
+│ d155   ┆ all   ┆ replicate ┆ christmas    ┆ sunday         ┆ 16260        ┆ 2.985791   ┆ 1.21262  │
+│ s24_a  ┆ all   ┆ replicate ┆ christmas    ┆ sunday         ┆ 16260        ┆ 3.072937   ┆ 1.213017 │
+│ s24_c  ┆ all   ┆ replicate ┆ christmas    ┆ sunday         ┆ 16260        ┆ 3.035792   ┆ 1.217467 │
+│ s24_d  ┆ all   ┆ replicate ┆ christmas    ┆ sunday         ┆ 16260        ┆ 3.043291   ┆ 1.201042 │
+│ sall_d ┆ all   ┆ replicate ┆ christmas    ┆ sunday         ┆ 16260        ┆ 3.190945   ┆ 1.272396 │
+│ a155   ┆ all   ┆ scored    ┆ christmas    ┆ sunday         ┆ 9413         ┆ 3.367269   ┆ 1.269924 │
+│ c155   ┆ all   ┆ scored    ┆ christmas    ┆ sunday         ┆ 9413         ┆ 3.320593   ┆ 1.267162 │
+│ d155   ┆ all   ┆ scored    ┆ christmas    ┆ sunday         ┆ 9413         ┆ 3.325625   ┆ 1.266949 │
+│ s24_a  ┆ all   ┆ scored    ┆ christmas    ┆ sunday         ┆ 9413         ┆ 3.289536   ┆ 1.226777 │
+│ s24_c  ┆ all   ┆ scored    ┆ christmas    ┆ sunday         ┆ 9413         ┆ 3.245967   ┆ 1.22341  │
+│ s24_d  ┆ all   ┆ scored    ┆ christmas    ┆ sunday         ┆ 9413         ┆ 3.256947   ┆ 1.225732 │
+│ sall_d ┆ all   ┆ scored    ┆ christmas    ┆ sunday         ┆ 9413         ┆ 2.861593   ┆ 1.085938 │
+│ a155   ┆ all   ┆ both      ┆ christmas    ┆ weekday        ┆ 25673        ┆ 3.129356   ┆ 1.1214   │
+│ c155   ┆ all   ┆ both      ┆ christmas    ┆ weekday        ┆ 25673        ┆ 3.088056   ┆ 1.123137 │
+│ d155   ┆ all   ┆ both      ┆ christmas    ┆ weekday        ┆ 25673        ┆ 3.110391   ┆ 1.128173 │
+│ s24_a  ┆ all   ┆ both      ┆ christmas    ┆ weekday        ┆ 25673        ┆ 3.152353   ┆ 1.114799 │
+│ s24_c  ┆ all   ┆ both      ┆ christmas    ┆ weekday        ┆ 25673        ┆ 3.112853   ┆ 1.115999 │
 │ s24_d  ┆ all   ┆ both      ┆ christmas    ┆ weekday        ┆ 25673        ┆ 3.121628   ┆ 1.115224 │
 │ sall_d ┆ all   ┆ both      ┆ christmas    ┆ weekday        ┆ 25673        ┆ 3.070188   ┆ 1.100788 │
 │ a155   ┆ all   ┆ replicate ┆ christmas    ┆ weekday        ┆ 16260        ┆ 2.991627   ┆ 1.089095 │
@@ -610,99 +787,99 @@ shape: (378, 8)
 └────────┴───────┴───────────┴──────────────┴────────────────┴──────────────┴────────────┴──────────┘
 == with-minus-without differences on event days
 shape: (90, 11)
-┌─────────────────────────────────┬───────┬──────────────┬───────────┬───────┬───────┬───────────┬────────────────────────┬─────────────┬─────────────┬─────────┐
-│ difference                      ┆ scope ┆ event        ┆ period    ┆ rows  ┆ dates ┆ mean_qs   ┆ mean_abs_error_of_mean ┆ dates_worse ┆ sites_worse ┆ n_sites │
-│ ---                             ┆ ---   ┆ ---          ┆ ---       ┆ ---   ┆ ---   ┆ ---       ┆ ---                    ┆ ---         ┆ ---         ┆ ---     │
-│ str                             ┆ str   ┆ str          ┆ str       ┆ i64   ┆ i64   ┆ f64       ┆ f64                    ┆ i64         ┆ i64         ┆ i64     │
-╞═════════════════════════════════╪═══════╪══════════════╪═══════════╪═══════╪═══════╪═══════════╪════════════════════════╪═════════════╪═════════════╪═════════╡
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ 0.078745  ┆ 0.118226               ┆ 2           ┆ 5           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ 0.105897  ┆ 0.181903               ┆ 1           ┆ 3           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ 0.069567  ┆ 0.096701               ┆ 1           ┆ 4           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ 0.074078  ┆ 0.116021               ┆ 2           ┆ 3           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ 0.103541  ┆ 0.174913               ┆ 1           ┆ 4           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ 0.064119  ┆ 0.096114               ┆ 1           ┆ 4           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ -0.046042 ┆ -0.104019              ┆ 1           ┆ 2           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ -0.047259 ┆ -0.078465              ┆ 0           ┆ 1           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ -0.045631 ┆ -0.112656              ┆ 1           ┆ 2           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ -0.053661 ┆ -0.104576              ┆ 1           ┆ 1           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ -0.042992 ┆ -0.06875               ┆ 0           ┆ 1           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ -0.057267 ┆ -0.116686              ┆ 1           ┆ 2           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ -0.050709 ┆ -0.106223              ┆ 1           ┆ 1           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ -0.049615 ┆ -0.085455              ┆ 0           ┆ 1           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ -0.051079 ┆ -0.113244              ┆ 1           ┆ 2           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ -0.079208 ┆ -0.124242              ┆ 2           ┆ 0           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ -0.067772 ┆ -0.075591              ┆ 2           ┆ 1           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ -0.097587 ┆ -0.202429              ┆ 0           ┆ 0           ┆ 4       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ -0.074498 ┆ -0.107618              ┆ 2           ┆ 0           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ -0.064465 ┆ -0.067376              ┆ 2           ┆ 0           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ -0.090623 ┆ -0.172294              ┆ 0           ┆ 0           ┆ 4       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ 0.020335  ┆ 0.018021               ┆ 9           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ 0.035634  ┆ 0.057231               ┆ 5           ┆ 4           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ -0.004254 ┆ -0.044995              ┆ 4           ┆ 2           ┆ 4       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ 0.01046   ┆ 0.002642               ┆ 9           ┆ 2           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ 0.015901  ┆ 0.030453               ┆ 5           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ 0.001714  ┆ -0.042054              ┆ 4           ┆ 2           ┆ 4       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ 0.025044  ┆ 0.034644               ┆ 7           ┆ 3           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ 0.03894   ┆ 0.065447               ┆ 5           ┆ 4           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ 0.002711  ┆ -0.014859              ┆ 2           ┆ 2           ┆ 4       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.03592   ┆ 0.051978               ┆ 6           ┆ 3           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ -0.027937 ┆ -0.059418              ┆ 3           ┆ 1           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.121062  ┆ 0.200506               ┆ 3           ┆ 5           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.01723   ┆ 0.002723               ┆ 6           ┆ 3           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ -0.028179 ┆ -0.086041              ┆ 3           ┆ 2           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.077775  ┆ 0.121074               ┆ 3           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.076038  ┆ 0.174665               ┆ 5           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ 0.039822  ┆ 0.106207               ┆ 2           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.124324  ┆ 0.265942               ┆ 3           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.070951  ┆ 0.163151               ┆ 5           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ 0.04553   ┆ 0.114716               ┆ 2           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.104846  ┆ 0.22773                ┆ 3           ┆ 3           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.057348  ┆ 0.125409               ┆ 5           ┆ 3           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ 0.03958   ┆ 0.079583               ┆ 2           ┆ 2           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.081037  ┆ 0.18651                ┆ 3           ┆ 3           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ 0.033437  ┆ 0.052562               ┆ 3           ┆ 3           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.017935  ┆ 0.037179               ┆ 1           ┆ 1           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ 0.042023  ┆ 0.061083               ┆ 2           ┆ 5           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ 0.022547  ┆ 0.035717               ┆ 2           ┆ 2           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.005127  ┆ 0.011587               ┆ 1           ┆ 1           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ 0.032197  ┆ 0.049083               ┆ 1           ┆ 4           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ -0.004928 ┆ -0.021847              ┆ 2           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.056309  ┆ 0.081007               ┆ 2           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ -0.038848 ┆ -0.078819              ┆ 0           ┆ 2           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ -0.010561 ┆ -0.026587              ┆ 3           ┆ 2           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.049672  ┆ 0.077454               ┆ 2           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ -0.043925 ┆ -0.084217              ┆ 1           ┆ 2           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ -0.015817 ┆ -0.038692              ┆ 2           ┆ 2           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.043501  ┆ 0.055415               ┆ 2           ┆ 3           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ -0.048675 ┆ -0.090819              ┆ 0           ┆ 2           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ -0.0395   ┆ -0.083052              ┆ 3           ┆ 2           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ -0.037145 ┆ -0.074992              ┆ 2           ┆ 3           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.043568 ┆ -0.096975              ┆ 1           ┆ 0           ┆ 4       │
-│ R without drift (c155 minus a1… ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ -0.0413   ┆ -0.092909              ┆ 5           ┆ 1           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ -0.038188 ┆ -0.081846              ┆ 3           ┆ 1           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.046676 ┆ -0.11202               ┆ 2           ┆ 1           ┆ 4       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ 0.024797  ┆ 0.089857               ┆ 9           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ 0.082354  ┆ 0.144518               ┆ 6           ┆ 4           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.074626 ┆ -0.004565              ┆ 3           ┆ 0           ┆ 4       │
-│ drift with offset and R (s24_d… ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ 0.011237  ┆ 0.07051                ┆ 8           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ 0.0575    ┆ 0.114946               ┆ 5           ┆ 4           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.068678 ┆ -0.00625               ┆ 3           ┆ 1           ┆ 4       │
-│ drift without R (s24_a minus a… ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ 0.022997  ┆ 0.08                   ┆ 9           ┆ 3           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ 0.08131   ┆ 0.137665               ┆ 6           ┆ 4           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.077733 ┆ -0.01961               ┆ 3           ┆ 0           ┆ 4       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.025587  ┆ 0.047861               ┆ 6           ┆ 2           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.017003  ┆ 0.039397               ┆ 3           ┆ 2           ┆ 5       │
-│ R with drift (s24_c minus s24_… ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.036228  ┆ 0.058354               ┆ 3           ┆ 2           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.015724  ┆ 0.003578               ┆ 6           ┆ 2           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.020069  ┆ 0.000188               ┆ 3           ┆ 2           ┆ 5       │
-│ R without drift (c155 minus a1… ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.010338  ┆ 0.007781               ┆ 3           ┆ 2           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.045119  ┆ 0.085606               ┆ 6           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.029322  ┆ 0.048778               ┆ 2           ┆ 3           ┆ 5       │
-│ drift with R (s24_c minus c155… ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.064704  ┆ 0.131268               ┆ 4           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.039771  ┆ 0.06413                ┆ 7           ┆ 3           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.027508  ┆ 0.026585               ┆ 3           ┆ 4           ┆ 5       │
-│ drift with offset and R (s24_d… ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.054975  ┆ 0.110679               ┆ 4           ┆ 3           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.035257  ┆ 0.041323               ┆ 6           ┆ 3           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.032388  ┆ 0.009568               ┆ 3           ┆ 2           ┆ 5       │
-│ drift without R (s24_a minus a… ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.038814  ┆ 0.080695               ┆ 3           ┆ 3           ┆ 5       │
-└─────────────────────────────────┴───────┴──────────────┴───────────┴───────┴───────┴───────────┴────────────────────────┴─────────────┴─────────────┴─────────┘
+┌────────────────────────────────────────────┬───────┬──────────────┬───────────┬───────┬───────┬───────────┬────────────────────────┬─────────────┬─────────────┬─────────┐
+│ difference                                 ┆ scope ┆ event        ┆ period    ┆ rows  ┆ dates ┆ mean_qs   ┆ mean_abs_error_of_mean ┆ dates_worse ┆ sites_worse ┆ n_sites │
+│ ---                                        ┆ ---   ┆ ---          ┆ ---       ┆ ---   ┆ ---   ┆ ---       ┆ ---                    ┆ ---         ┆ ---         ┆ ---     │
+│ str                                        ┆ str   ┆ str          ┆ str       ┆ i64   ┆ i64   ┆ f64       ┆ f64                    ┆ i64         ┆ i64         ┆ i64     │
+╞════════════════════════════════════════════╪═══════╪══════════════╪═══════════╪═══════╪═══════╪═══════════╪════════════════════════╪═════════════╪═════════════╪═════════╡
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ 0.078745  ┆ 0.118226               ┆ 2           ┆ 5           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ 0.105897  ┆ 0.181903               ┆ 1           ┆ 3           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ 0.069567  ┆ 0.096701               ┆ 1           ┆ 4           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ 0.074078  ┆ 0.116021               ┆ 2           ┆ 3           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ 0.103541  ┆ 0.174913               ┆ 1           ┆ 4           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ 0.064119  ┆ 0.096114               ┆ 1           ┆ 4           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ -0.046042 ┆ -0.104019              ┆ 1           ┆ 2           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ -0.047259 ┆ -0.078465              ┆ 0           ┆ 1           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ -0.045631 ┆ -0.112656              ┆ 1           ┆ 2           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ -0.053661 ┆ -0.104576              ┆ 1           ┆ 1           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ -0.042992 ┆ -0.06875               ┆ 0           ┆ 1           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ -0.057267 ┆ -0.116686              ┆ 1           ┆ 2           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ bank_holiday ┆ both      ┆ 950   ┆ 4     ┆ -0.050709 ┆ -0.106223              ┆ 1           ┆ 1           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ bank_holiday ┆ replicate ┆ 240   ┆ 1     ┆ -0.049615 ┆ -0.085455              ┆ 0           ┆ 1           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ bank_holiday ┆ scored    ┆ 710   ┆ 3     ┆ -0.051079 ┆ -0.113244              ┆ 1           ┆ 2           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ -0.079208 ┆ -0.124242              ┆ 2           ┆ 0           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ -0.067772 ┆ -0.075591              ┆ 2           ┆ 1           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ -0.097587 ┆ -0.202429              ┆ 0           ┆ 0           ┆ 4       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ -0.074498 ┆ -0.107618              ┆ 2           ┆ 0           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ -0.064465 ┆ -0.067376              ┆ 2           ┆ 0           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ -0.090623 ┆ -0.172294              ┆ 0           ┆ 0           ┆ 4       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ 0.020335  ┆ 0.018021               ┆ 9           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ 0.035634  ┆ 0.057231               ┆ 5           ┆ 4           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ -0.004254 ┆ -0.044995              ┆ 4           ┆ 2           ┆ 4       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ 0.01046   ┆ 0.002642               ┆ 9           ┆ 2           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ 0.015901  ┆ 0.030453               ┆ 5           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ 0.001714  ┆ -0.042054              ┆ 4           ┆ 2           ┆ 4       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ christmas    ┆ both      ┆ 3504  ┆ 17    ┆ 0.025044  ┆ 0.034644               ┆ 7           ┆ 3           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ christmas    ┆ replicate ┆ 2160  ┆ 9     ┆ 0.03894   ┆ 0.065447               ┆ 5           ┆ 4           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ christmas    ┆ scored    ┆ 1344  ┆ 8     ┆ 0.002711  ┆ -0.014859              ┆ 2           ┆ 2           ┆ 4       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.03592   ┆ 0.051978               ┆ 6           ┆ 3           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ -0.027937 ┆ -0.059418              ┆ 3           ┆ 1           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.121062  ┆ 0.200506               ┆ 3           ┆ 5           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.01723   ┆ 0.002723               ┆ 6           ┆ 3           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ -0.028179 ┆ -0.086041              ┆ 3           ┆ 2           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.077775  ┆ 0.121074               ┆ 3           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.076038  ┆ 0.174665               ┆ 5           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ 0.039822  ┆ 0.106207               ┆ 2           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.124324  ┆ 0.265942               ┆ 3           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.070951  ┆ 0.163151               ┆ 5           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ 0.04553   ┆ 0.114716               ┆ 2           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.104846  ┆ 0.22773                ┆ 3           ┆ 3           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ easter       ┆ both      ┆ 1680  ┆ 8     ┆ 0.057348  ┆ 0.125409               ┆ 5           ┆ 3           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ easter       ┆ replicate ┆ 960   ┆ 4     ┆ 0.03958   ┆ 0.079583               ┆ 2           ┆ 2           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ D+1   ┆ easter       ┆ scored    ┆ 720   ┆ 4     ┆ 0.081037  ┆ 0.18651                ┆ 3           ┆ 3           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ 0.033437  ┆ 0.052562               ┆ 3           ┆ 3           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.017935  ┆ 0.037179               ┆ 1           ┆ 1           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ 0.042023  ┆ 0.061083               ┆ 2           ┆ 5           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ 0.022547  ┆ 0.035717               ┆ 2           ┆ 2           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.005127  ┆ 0.011587               ┆ 1           ┆ 1           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ 0.032197  ┆ 0.049083               ┆ 1           ┆ 4           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ -0.004928 ┆ -0.021847              ┆ 2           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.056309  ┆ 0.081007               ┆ 2           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ -0.038848 ┆ -0.078819              ┆ 0           ┆ 2           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ -0.010561 ┆ -0.026587              ┆ 3           ┆ 2           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.049672  ┆ 0.077454               ┆ 2           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ -0.043925 ┆ -0.084217              ┆ 1           ┆ 2           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ bank_holiday ┆ both      ┆ 6340  ┆ 5     ┆ -0.015817 ┆ -0.038692              ┆ 2           ┆ 2           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ bank_holiday ┆ replicate ┆ 2260  ┆ 2     ┆ 0.043501  ┆ 0.055415               ┆ 2           ┆ 3           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ bank_holiday ┆ scored    ┆ 4080  ┆ 3     ┆ -0.048675 ┆ -0.090819              ┆ 0           ┆ 2           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ -0.0395   ┆ -0.083052              ┆ 3           ┆ 2           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ -0.037145 ┆ -0.074992              ┆ 2           ┆ 3           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.043568 ┆ -0.096975              ┆ 1           ┆ 0           ┆ 4       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ -0.0413   ┆ -0.092909              ┆ 5           ┆ 1           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ -0.038188 ┆ -0.081846              ┆ 3           ┆ 1           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.046676 ┆ -0.11202               ┆ 2           ┆ 1           ┆ 4       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ 0.024797  ┆ 0.089857               ┆ 9           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ 0.082354  ┆ 0.144518               ┆ 6           ┆ 4           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.074626 ┆ -0.004565              ┆ 3           ┆ 0           ┆ 4       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ 0.011237  ┆ 0.07051                ┆ 8           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ 0.0575    ┆ 0.114946               ┆ 5           ┆ 4           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.068678 ┆ -0.00625               ┆ 3           ┆ 1           ┆ 4       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ christmas    ┆ both      ┆ 25673 ┆ 20    ┆ 0.022997  ┆ 0.08                   ┆ 9           ┆ 3           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ christmas    ┆ replicate ┆ 16260 ┆ 10    ┆ 0.08131   ┆ 0.137665               ┆ 6           ┆ 4           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ christmas    ┆ scored    ┆ 9413  ┆ 10    ┆ -0.077733 ┆ -0.01961               ┆ 3           ┆ 0           ┆ 4       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.025587  ┆ 0.047861               ┆ 6           ┆ 2           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.017003  ┆ 0.039397               ┆ 3           ┆ 2           ┆ 5       │
+│ R with drift (s24_c minus s24_a)           ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.036228  ┆ 0.058354               ┆ 3           ┆ 2           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.015724  ┆ 0.003578               ┆ 6           ┆ 2           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.020069  ┆ 0.000188               ┆ 3           ┆ 2           ┆ 5       │
+│ R without drift (c155 minus a155)          ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.010338  ┆ 0.007781               ┆ 3           ┆ 2           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.045119  ┆ 0.085606               ┆ 6           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.029322  ┆ 0.048778               ┆ 2           ┆ 3           ┆ 5       │
+│ drift with R (s24_c minus c155)            ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.064704  ┆ 0.131268               ┆ 4           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.039771  ┆ 0.06413                ┆ 7           ┆ 3           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.027508  ┆ 0.026585               ┆ 3           ┆ 4           ┆ 5       │
+│ drift with offset and R (s24_d minus d155) ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.054975  ┆ 0.110679               ┆ 4           ┆ 3           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ easter       ┆ both      ┆ 12140 ┆ 8     ┆ 0.035257  ┆ 0.041323               ┆ 6           ┆ 3           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ easter       ┆ replicate ┆ 6720  ┆ 4     ┆ 0.032388  ┆ 0.009568               ┆ 3           ┆ 2           ┆ 5       │
+│ drift without R (s24_a minus a155)         ┆ all   ┆ easter       ┆ scored    ┆ 5420  ┆ 4     ┆ 0.038814  ┆ 0.080695               ┆ 3           ┆ 3           ┆ 5       │
+└────────────────────────────────────────────┴───────┴──────────────┴───────────┴───────┴───────┴───────────┴────────────────────────┴─────────────┴─────────────┴─────────┘

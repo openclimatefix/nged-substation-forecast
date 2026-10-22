@@ -26,8 +26,9 @@ def contrast_line(*, label: str, entry: dict) -> str:
 
 def main() -> None:  # noqa: PLR0912
     """Print the report."""
-    pl.Config.set_tbl_rows(200)
-    pl.Config.set_tbl_cols(20)
+    pl.Config.set_tbl_rows(-1)
+    pl.Config.set_tbl_cols(-1)
+    pl.Config.set_fmt_str_lengths(100)
     pl.Config.set_tbl_width_chars(220)
     folder = common.WORK_DIR / "report"
     report = json.loads((folder / "report.json").read_text())

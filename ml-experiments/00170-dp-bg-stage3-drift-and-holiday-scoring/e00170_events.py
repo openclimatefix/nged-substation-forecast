@@ -24,7 +24,6 @@ Christmas, and the number of dates on which the with arm scored worse.
     uv run --no-sync python ml-experiments/00170-*/e00170_events.py
 """
 
-from datetime import date
 from typing import Final
 
 import e00170_report as report
@@ -58,12 +57,6 @@ DIFFERENCES: Final[dict[str, tuple[str, str]]] = {
     "drift with R (s24_c minus c155)": ("s24_c", "c155"),
     "drift with offset and R (s24_d minus d155)": ("s24_d", "d155"),
 }
-
-
-def christmas_year(*, local_date: date) -> str:
-    """Return the label of the Christmas a date in 24 December to 2 January belongs to."""
-    start = local_date.year if local_date.month == 12 else local_date.year - 1
-    return f"{start}-{str(start + 1)[2:]}"
 
 
 def classify(*, frame: pl.DataFrame) -> pl.DataFrame:
