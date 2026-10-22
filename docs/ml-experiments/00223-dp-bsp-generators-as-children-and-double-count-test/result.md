@@ -143,9 +143,8 @@ with the sign the BSP's reading implies. The remainder chain is refitted on the 
 
 | Arm | Generator forecast |
 |---|---|
-| G-oracle | The observed output (a control: the most that any generator forecast could give) |
-| G-clim | A climatology of the output by local month, half-hour of the day, and weekend flag,
-  fitted before the scored year |
+| G-oracle | The observed output (an upper bound, not a deployable forecast) |
+| G-clim | Climatology by local month, half-hour, and weekend flag, fitted before the scored year |
 | arm (d) | Experiment 204's arm (d), the reference |
 
 A generator forecast from the generator-forecasting theme would replace the climatology if one
