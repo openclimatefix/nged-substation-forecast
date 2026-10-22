@@ -184,7 +184,10 @@ fold. A window found from the data picks up drift and solar growth as well ([exp
 103](00103-differentiable-physics-1-data-look/result.md), figure 12; medium confidence): a
 drift-removed fit finds April 2020 more than 5 points low only at D11 (-26 points) and D10 (-7
 points), and August 2020 to September 2021 sits 5 to 17 points above the fit at D5, D10, D11, and
-D14. Applies to experiments and production.
+D14. Applies to experiments and production. The window removes every row before 2021-07-20 from
+training, so a dataset that ends earlier has no training rows to compare with: the feed-in tariff
+register's last commissioning date is 2021-03-24, and none of its dates falls in the months a fit
+trains on ([experiment 215](00215-dp-pv-step-scan-real-series-register-match/result.md)).
 
 **Check how many days of training rows a demand-model fit kept after the lockdown window is removed,
 and flag a fit with fewer than 180 days (provisional; medium confidence).** Leaving the lockdown

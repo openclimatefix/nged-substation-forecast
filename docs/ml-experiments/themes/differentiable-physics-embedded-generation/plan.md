@@ -2,7 +2,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 215, step scan of the real series | Does experiment 207's step path find real solar-capacity steps in the Primaries' 2019 to 2026 series, and do the increases match feed-in tariff commissioning dates? | High | [Experiment 207](../../00207-dp-meter-regime-steps-e2-step-capacity-known-answer/result.md) | Planned |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
