@@ -1,7 +1,8 @@
 # ruff: noqa: E501
 """Print the numbers experiment 248's write-up quotes beyond the scorer.
 
-The numbers are the seed spread, per-farm contrasts, leave-one-farm-out, the Checks (mean forecast, median minus mean), and coverage.
+The numbers are the seed spread, per-farm contrasts, leave-one-farm-out, the Checks (mean
+forecast, median minus mean), and coverage.
 
     uv run --no-sync python ml-experiments/00248-*/e00248_report.py
 """
