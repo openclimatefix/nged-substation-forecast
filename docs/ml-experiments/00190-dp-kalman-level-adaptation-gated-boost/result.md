@@ -113,24 +113,22 @@ have been passed by any filter with one state per hour band, so the null says li
 speed. A redesigned gate and a wider grid of multipliers are the fair test.
 
 We asked whether a Kalman filter that speeds up its level state when the recent forecast errors keep
-one sign cuts the loss on days like those, without harming ordinary days. The filter is that of the
-convex demand model ([experiment
-111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)),
-and the forecast it corrects is the best-guess forecast of
-[experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) (arm
-D).
-We first added a known one-signed offset to the observed power of ordinary days and measured how
-much
-of its extra loss each filter removed. We then scored the filters on the real scored year at the
-five
-decision Primaries. The tested method is a variant of the Kalman filter on additive-model
-coefficients, not a method of ours. Arm D is rebuilt here to the stored score (2.7562 against 2.756,
-inside the plan's 0.005).
+one sign cuts the loss on days when the forecast error keeps one sign for hours, without harming
+ordinary days. The level state is the slowly moving offset that the filter adds to the forecast. The
+filter is that of the convex demand model ([experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)), and the forecast
+it corrects is the best-guess forecast of [experiment
+155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) (arm D). We first
+added a known one-signed offset to the observed power of ordinary days and measured how much of its
+extra loss each filter removed. We then scored the filters on the real scored year at the five
+decision Primaries. Arm D is rebuilt here to the stored quantile score (2.7562 points against 2.756
+points, inside the plan's tolerance of 0.005 points).
 
-**Verdict: `inconclusive`, by the pre-registered rule that a failed gate caps the verdict.** The gate
-asked for at least 50% recovery at the 0.10 size for 16-hour and 36-hour offsets. The gated boost
-recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%). The audit found that the
-gate's ceiling lies far below the pass mark (see "Audit").
+**Verdict: `inconclusive`, by the pre-registered rule that a failed gate caps the verdict.** The
+gate asked for at least 50% recovery of the extra loss, for an offset of 0.10 of the day's median
+load lasting 16 hours and lasting 36 hours. The gated boost recovered -0.6% (95% interval -3.6% to
++0.9%) and +0.4% (-1.3% to +2.2%). The audit found that the gate's ceiling lies far below the pass
+mark (see "Audit").
 
 ![Contrasts over all rows](figure_1_contrasts.svg)
 
@@ -185,11 +183,9 @@ gate's ceiling lies far below the pass mark (see "Audit").
 - **P1 fails.** On the 15 smooth-offset days of experiment 175, A1 changed the excess loss by -1.4%
   (interval -2.5% to +0.3%); a cut of 20% was predicted.
 - **P2 holds with the refitted spread.** A1 minus A0 is +0.0002 and the upper bound is +0.0062. With
-  the
-  fixed spread the upper bound is +0.0103, just above the +0.01 limit.
-- **P3 holds on the point estimate only.** A1 beats A2 by 0.023 points, with an interval that includes
-  zero
-  (excluding it with the fixed spread: -0.033, -0.057 to -0.007).
+  the fixed spread the upper bound is +0.0103, just above the +0.01 limit.
+- **P3 holds on the point estimate only.** A1 beats A2 by 0.023 points, with an interval that
+  includes zero (excluding it with the fixed spread: -0.033, -0.057 to -0.007).
 - **P4 fails.** A3 changed the excess loss on the smooth-offset days by -9.5% (-20.4% to +6.4%),
   worse than A1.
 - **P5 holds.** On the 17 block days A1 cut the excess loss by 1.5% (+0.1% to +3.7%).
@@ -197,27 +193,25 @@ gate's ceiling lies far below the pass mark (see "Audit").
 **Known-answer gate:**
 
 - A1 recovered -0.4%, -0.6%, and +0.4% of the offset's excess loss at the 0.10 size for 8, 16, and
-  36
-  hours. At the 0.20 size the values for A1 were within about 3% of zero.
+  36 hours. At the 0.20 size the values for A1 were within about 3% of zero.
 - The excess loss of A0 at the 0.10 size was 1.5, 1.0, and 0.9 points of quantile score, so there
-  was
-  loss to recover.
+  was loss to recover.
 - A1 minus A0 on the 40 left-alone days: -0.001 points (-0.014 to +0.014); A2 +0.079 (+0.001 to
   +0.159); A3 +0.015 (-0.074 to +0.111).
-- Post hoc, a multiplier of 100 on A1, A2, and A3 recovered less: -110% to +10% at the 0.10 and
-  0.20 sizes (A1: -25% at 16 hours, A2: -45%, A3: -114%), 40 cases per cell.
+- Post hoc, a multiplier of 100 on A1, A2, and A3 recovered less: -110% to +10% at the 0.10 and 0.20
+  sizes (A1: -25% at 16 hours, A2: -45%, A3: -114%), 40 cases per cell.
 - The harm half of the gate also failed: A1 minus A0 on the left-alone days has an interval of
   -0.014 to +0.014, wider than the pass mark of +0.005, and the post hoc multiplier of 100 on A1
-  cost +0.28 (+0.15 to +0.42).
+  raised the quantile score by 0.28 points (+0.15 to +0.42).
 - Wiring check (`e00190_wiring_check.py`): on a stream with no noise, A0 follows a 7.8-point offset
-  to between 4.9 and 7.1 points, A1 to between 5.2 and 7.1, and A3 reaches the bands whose own
-  windows have not been read (8.6 in one band). The code works.
+  to between 4.9 and 7.1 points, A1 to between 5.2 and 7.1, and A3 also moves the bands that have
+  not yet been read, as designed (8.6 points in one band). The code does what the plan specifies.
 
 ## Audit
 
-The audit (a fresh Opus agent, private brief `e190_audit.md`) re-derived the gate losses to 4e-15,
-and found no bug in the injection, the filter, the reproduction, or the tuning. It found three
-things about the design:
+The audit (a fresh Opus agent, private brief `e190_audit.md`) re-derived the gate losses to within
+4e-15 points, and found no bug in the injection, the filter, the reproduction, or the tuning. It
+made three findings about the design:
 
 - **The gate's ceiling lies below its pass mark (F1).** The filter keeps one state per hour band,
   the telemetry delay is 3.5 hours, and the first origins come 6 hours before the offset starts. On
@@ -233,8 +227,7 @@ things about the design:
   0.066 to 0.082, because the autoregressive transient already supplies a total gain of about 0.38.
   The gated boost is therefore close to arm D by construction.
 
-The scored-year contrasts and the verdict stand. The lessons and advice were rewritten after the
-audit.
+The scored-year contrasts and the verdict stand.
 
 ## Checks
 
@@ -258,8 +251,8 @@ audit.
   from the comparison.
 - The gate as run cannot be passed (see "Audit"), so its recovery numbers are not a measure of
   filter speed.
-- Tuning used the stage-1 score, not arm D's, and every setting was scored with A0's spread table, which
-  understates the gain of a setting whose errors are smaller.
+- Tuning used the stage-1 score, not arm D's, and every setting was scored with A0's spread table,
+  which understates the gain of a setting whose errors are smaller.
 - The counter counts readings, so after a gap in the data it can span more than the stated hours.
 - The subsets "within 24 hours after a trigger" and cold nights are defined after the fact, from
   triggers and temperatures that a run at the origin could not yet see.
