@@ -105,9 +105,9 @@ advice:
 filter recovers a long offset only late, and only by scoring worse on quiet days. A level shared
 across the four hour bands recovered under a fifth of the offset. The 15 smooth-offset days of
 [experiment 175](../00175-dp-unlabelled-day-shapes/result.md), on which the forecast error kept one
-sign for hours, are therefore not helped by the settings tried: no setting on the grid (m 3 to 50, k 2 to 6,
-z 0.5) recovered an injected offset of that kind without harming quiet days. Level adaptation is
-dropped.
+sign for hours, are therefore not helped by the settings tried: no setting on the grid (m 3 to 50,
+k 2 to 6, z 0.5) recovered an injected offset of that kind without harming quiet days. Level
+adaptation is dropped.
 
 We asked again whether a Kalman filter that speeds up its level state helps when the forecast error
 keeps one sign for hours. The level state is the slowly moving offset that the filter adds to the
