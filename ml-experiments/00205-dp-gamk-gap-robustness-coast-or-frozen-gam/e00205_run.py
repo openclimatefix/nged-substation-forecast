@@ -162,6 +162,8 @@ def losses(*, frame: pl.DataFrame) -> pl.DataFrame:
         "qs": score,
         "abs_mean": np.abs(actual - frame["mean"].to_numpy()),
         "abs_median": np.abs(actual - frame["q50"].to_numpy()),
+        "median_minus_mean": frame["q50"].to_numpy().astype(np.float64)
+        - frame["mean"].to_numpy().astype(np.float64),
     }
     for name, level in (("q01", 0.01), ("q05", 0.05), ("q95", 0.95), ("q99", 0.99)):
         diff = actual - frame[name].to_numpy().astype(np.float64)

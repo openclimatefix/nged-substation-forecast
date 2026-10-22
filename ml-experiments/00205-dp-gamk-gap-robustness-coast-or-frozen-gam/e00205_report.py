@@ -122,6 +122,16 @@ def main() -> None:
         entry["coverage_q01_q99"] = {
             q: mean_by(losses=scoped, metric=f"cov_{q}") for q in ("q01", "q99")
         }
+        entry["median_minus_mean_by_site"] = {
+            rule: {
+                site: float(v)
+                for site, v in scoped.filter(pl.col("arm") == rule)
+                .group_by("site_label")
+                .agg(pl.col("median_minus_mean").mean())
+                .iter_rows()
+            }
+            for rule in ("n", "a", "b", "c2")
+        }
         entry["n_run_site_pairs"] = int(
             losses.filter(pl.col("arm") == "n").select("site", "run").unique().height
         )
@@ -140,6 +150,11 @@ def main() -> None:
             "a_minus_c": contrast(losses=scoped, treatment="a", reference="c"),
             "a_minus_n": contrast(losses=scoped, treatment="a", reference="n"),
             "c2_minus_n": contrast(losses=scoped, treatment="c2", reference="n"),
+            "b_minus_n": contrast(losses=scoped, treatment="b", reference="n"),
+            "c_minus_n": contrast(losses=scoped, treatment="c", reference="n"),
+            "a_minus_c2_12_36h": contrast(
+                losses=scope_rows(frame=losses, scope="12-36 h"), treatment="a", reference="c2"
+            ),
             "a_minus_c2_mean_abs_error": contrast(
                 losses=scoped, treatment="a", reference="c2", metric="abs_mean"
             ),
@@ -147,6 +162,10 @@ def main() -> None:
             "a_under_24h_minus_c2": contrast(
                 losses=scope_rows(frame=losses, scope="under 24 h"), treatment="a", reference="c2"
             ),
+            "coverage_b_minus_a": {
+                q: contrast(losses=scoped, treatment="b", reference="a", metric=f"cov_{q}")
+                for q in NOMINAL
+            },
             "per_site": {},
             "leave_one_site_out": {},
         }
@@ -171,6 +190,7 @@ def main() -> None:
         entry = {}
         for scope in ("all", "under 24 h"):
             scores, reference = {}, None
+            scores_filter_only, reference_filter_only = {}, None
             for distance in DISTANCES:
                 losses = scope_rows(
                     frame=arms(varying=varying, fixed=fixed, hours=hours, distance=distance),
@@ -178,11 +198,18 @@ def main() -> None:
                 )
                 means = mean_by(losses=losses, metric="qs")
                 scores[distance] = means["a"]
+                scores_filter_only[distance] = means["a0"]
                 reference = means["n"]
+                reference_filter_only = means["n0"]
             entry[scope] = {
                 "a_score_by_distance": scores,
                 "no_gap": reference,
                 "recovery_hours": recovery(scores=scores, reference=reference),
+                "a0_score_by_distance": scores_filter_only,
+                "no_gap_filter_only": reference_filter_only,
+                "a0_recovery_hours": recovery(
+                    scores=scores_filter_only, reference=reference_filter_only
+                ),
             }
         report["recovery"][str(hours)] = entry
     # Recovery interval for the 24-hour gap on the all-lead score: a minus n at each distance.

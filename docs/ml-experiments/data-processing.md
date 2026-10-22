@@ -370,6 +370,17 @@ interval): readings 0 hours old lowered the score by 0.016 points, readings 24 h
 Provisional: the delay was not measured on live telemetry. Confidence: low for the delay, medium for
 the size of its effect.
 
+**When power readings are missing, let the Kalman filter coast and widen the quantile bands; do not
+fall back to the frozen demand model alone (provisional, low to medium confidence).** Coasting
+means running the filter with no update, so the transient decays and the level holds. After
+injected gaps of 3 to 72 hours, coasting scored 0.245 to 0.439 points better than the frozen model
+over leads 0.5 to 168 hours. Widening each quantile's offset from the mean by the filter's variance
+growth since the last reading brought the q05 coverage from 7.7% back to 5.5% after a 24-hour gap
+at no cost in score. Whether to drop the filter after about 72 hours could not be decided. Applies
+to production. Evidence: [experiment
+205](00205-dp-gamk-gap-robustness-coast-or-frozen-gam/result.md), five Primaries, 56 injected gaps
+each, readings hidden in clean data.
+
 ## Weather products
 
 **Train each model on the history of the weather product that will serve it, and do not train on the
