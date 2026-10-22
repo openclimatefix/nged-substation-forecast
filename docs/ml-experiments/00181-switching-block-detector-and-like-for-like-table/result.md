@@ -189,6 +189,9 @@ the 66 labelled real transfers that last over 1 day.
   found; the injected-block recall includes chance exceedances. Both favour the detector. The
   noise-unit floor of S2 uses all months. The like-for-like intervals resample transfers, not
   Primaries, and "has readings" means at least half of the transfer's half-hours are present.
+- **The 5-of-17 result is exploratory.** S2 was added after the 17 days were seen, so its count is a
+  hint for a later pre-registered test and not evidence that block detection works. No Opus audit was
+  run, by the manager's decision.
 - **Post hoc.** S2 was added after S0 found nothing. Its threshold is set on odd months, but the
   choice of S2 followed the 17 days.
 - **Unexplained alarms** may include true unlogged switching, so the budget is conservative for any
