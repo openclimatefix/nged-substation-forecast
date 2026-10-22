@@ -57,7 +57,8 @@ best_arm: >-
   been read; on the scored year A3 scored 0.0775 points worse than A0
 headline: >-
   With a gate that scores only pairs the filter can know about, a faster per-band level and a level
-  shared across bands both fail to recover a one-signed offset within the +0.005-point bound on days with no offset.
+  shared across bands both fail to recover a one-signed offset within the +0.005-point bound on days
+  with no offset.
   A1 recovered at least 0.5 only for 36-hour offsets, and only with settings that score 0.09 to
   0.21 points worse on days with no offset. A3 recovered 0.11 to 0.17 and scored 0.7 points worse on
   quiet days. On the scored year A3 minus A0 is +0.0775 points (95% interval +0.042 to +0.118).
@@ -113,14 +114,14 @@ forecast, in the convex demand model (a generalised additive model, GAM) with a 
 counted many pairs (an origin and a target half-hour) that no filter with one state per hour band
 can learn about. This time we added a
 known one-signed offset to the observed power of ordinary days, as in experiment 190, and scored only
-the pairs the filter could know about. We measured the share of the offset's extra quantile-score loss that each
-filter removed (its recovery), and checked the filters on quiet days, which have no injected offset.
+the pairs the filter could know about. We measured the share of the offset's extra quantile-score
+loss that each filter removed (its recovery), and checked the filters on quiet days, which have no injected offset.
 A0 is the unchanged filter, A1 a faster per-band level, and A3 a level shared across bands (there is
 no A2 here; experiment 190's A2, the always-on boost, appears only in the next paragraph).
 
-**Verdict: `not supported`.** Neither pre-registered recovery of 50% was reached within the +0.005-point
-bound on harm on quiet days. Experiment 190's finding stands: the always-on boost scored 0.023 points worse on the
-scored year, so a faster filter alone is not the answer.
+**Verdict: `not supported`.** Neither pre-registered recovery of 50% was reached within the
++0.005-point bound on harm on quiet days. Experiment 190's finding stands: the always-on boost
+scored 0.023 points worse on the scored year, so a faster filter alone is not the answer.
 
 ![Recovery on the pairs each arm was pre-registered for](figure_1_gate.svg)
 
@@ -212,5 +213,5 @@ already follows most of the offset there and the boost overshoots. Figure 3 clip
 - One option is to look at the mean forecast model for the 15 smooth-offset days: an input the GAM
   lacks, such as heating or behaviour, is the remaining candidate.
 - Another option is a small learned head that reads whether neighbouring Primaries show the
-  same-sign residual, with the convex GAM-K as the comparison arm. The prediction that could fail: it recovers at least 20% of
-  the excess loss on the 15 smooth-offset days, which no filter here did.
+  same-sign residual, with the convex GAM-K as the comparison arm. The prediction that could fail: it
+  recovers at least 20% of the excess loss on the 15 smooth-offset days, which no filter here did.
