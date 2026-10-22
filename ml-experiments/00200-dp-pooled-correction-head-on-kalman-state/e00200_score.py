@@ -27,7 +27,7 @@ N_RESAMPLES = 20_000
 
 def site_labels() -> dict[int, str]:
     out = {}
-    for path in sorted((data_module.SRC_DIR.glob("d_scored_D*.parquet"))):
+    for path in sorted(data_module.SRC_DIR.glob("d_scored_D*.parquet")):
         if "spread" in path.name:
             continue
         out[int(pl.read_parquet(path, columns=["time_series_id"])["time_series_id"][0])] = (

@@ -169,7 +169,7 @@ def figure_sites() -> alt.TopLevelMixin:
         .properties(
             width=WIDTH,
             height=170,
-            title="Stage 3: all six substations gain with the head; D5 gains more with the blind head",
+            title="Stage 3: all six substations gain with the head; D5 gains more with the blind head",  # noqa: E501
         )
     )
 
