@@ -82,8 +82,8 @@ training objective. At D5 the learned ceiling stays between 55% and 70%, close t
 *Figure 1. The arms against the unclipped fit at D5 and D9.*
 
 **What already exists.** Experiment 214 picks the clip ceiling as-of from a grid of shares by
-out-of-sample error, and experiment 110's `profile_clip` fits the ceiling in sample. Neither experiment learns
-the cap from the series alone without scoring a grid of candidate shares on forecast error. The
+out-of-sample error, and experiment 110's `profile_clip` fits the ceiling in sample.
+Neither experiment learns the cap from the series alone without scoring a grid of candidate shares on forecast error. The
 as-of choice of experiment 214 scores about the same as the profile fit at D5 (0.129 MW).
 
 **Closure at the decision site.** Closure is an arm's gain over the unclipped fit divided by the
@@ -128,8 +128,8 @@ capacity instead of 2.0) gives the same gain as the hand-set clip: 0.132 MW at D
 
 ## Which clip form the final assembly should use
 
-**Use the hand-set 60% ceiling.** The hand-set 60% ceiling gives a gain close to the profile fit's and needs no
-fitting step at each cut. The softer edge changes nothing, so the experiment-180 form stays. Where a
+**Use the hand-set 60% ceiling.** Its gain is close to the profile fit's, and it needs no fitting
+step at each cut. The softer edge changes nothing, so the experiment-180 form stays. Where a
 site has no hand-set value, the profile fit is the better of the two learned choices.
 
 ## What the next experiment should answer
