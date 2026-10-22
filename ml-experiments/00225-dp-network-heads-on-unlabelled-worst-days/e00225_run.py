@@ -42,7 +42,9 @@ SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 KEYS: Final[tuple[str, ...]] = ("site", "power_fcst_init_time", "valid_time")
 LOCAL_TZ: Final[str] = "Europe/London"
 HALF_HOUR_US: Final[int] = 30 * 60 * 1_000_000
-SCORED_FIRST: Final[datetime] = datetime(2025, 7, 2, tzinfo=UTC)
+SCORED_FIRST: Final[datetime] = datetime(
+    2025, 7, 2, tzinfo=UTC
+)  # local days from 2025-07-03 start at 2025-07-02 23:00 UTC in summer time
 SCORED_LAST: Final[datetime] = datetime(2026, 6, 30, 23, 59, tzinfo=UTC)
 D1_FIRST_LEAD: Final[float] = 15.0
 D1_LAST_LEAD: Final[float] = 39.0
