@@ -63,53 +63,54 @@ best_arm: >-
   year, against 2.7564 for the gated boost (A1), 2.7791 for the always-on boost (A2), and 2.8336 for
   the shared-level boost (A3)
 headline: >-
-  The known-answer gate failed: the gated boost removed -0.6% to +0.4% of the excess loss of an
-  injected offset of 0.10 of the median load, against a pass mark of 50%. On the scored year the
-  gated boost scored +0.0002 points against arm D (95% interval -0.0046 to +0.0062), so the
-  verdict is `inconclusive` and the contrasts are not evidence about the real days.
+  The known-answer gate failed, but the audit found it could not have been passed: a perfect filter
+  with one state per hour band recovers at most 0.5% (16-hour offset) and 9% (36-hour offset) of an
+  injected offset's excess loss, against a pass mark of 50%. On the scored year the gated boost
+  scored +0.0002 points against arm D (95% interval -0.0046 to +0.0062), close to arm D by
+  construction, and the always-on boost scored 0.023 points worse. The verdict is `inconclusive`.
 lessons:
   - >-
-    No setting of the level's process noise recovered 50% of an injected offset's excess loss. The
-    tuned gated boost stayed within 4 percentage points of zero, and the always-on boost, the
-    shared-level boost, and a post hoc multiplier of 100 made the loss worse in most cells (down to
-    -114%).
+    The gate was built so that no per-band filter could pass it: the target's hour band has
+    usually not been read since the offset began, because of the 3.5-hour delay and origins that
+    start 6 hours before the offset (audit, F1). The gate's near-zero recoveries therefore say
+    little about the filter's speed.
   - >-
-    The counter was on for 0.6% to 1.2% of readings, so the gated boost is close to arm D by
-    construction, and the boost that is on all the time scored 0.023 points worse (interval
-    -0.002 to +0.048 with the refitted spread).
+    Where the offset is visible to the target's band, faster filters do recover it: the always-on
+    boost recovered 52% at the 0.10 size and 36 hours, and a multiplier of 100 recovered 69% at the
+    0.20 size (audit, F2).
   - >-
-    On the smooth-offset day plotted in figure 4, all four arms forecast about 10 points too high
-    through the whole day. One day is an illustration, not evidence.
+    The gated boost is close to arm D by construction: a multiplier of 5 raises the level gain only
+    from 0.066 to 0.082, and the counter was on for 0.6% to 1.2% of readings (audit, F3). The
+    always-on boost scored 0.023 points worse on the scored year.
 take_home_message: >-
-  Making the Kalman filter's level state faster when the residual keeps one sign did not help in
-  this test: the gated version scored the same as the current filter (+0.0002 points), and a
-  version that is always fast scored 0.023 points worse. The known-answer gate also failed, since
-  no setting of the level's process noise recovered an injected offset, so the contrasts are
-  suggestive only. They point to the mean model or a new input, not the filter's speed, as the
-  next lever.
+  A Kalman filter whose level state speeds up when the residual keeps one sign scored the same as
+  the current filter (+0.0002 points), and an always-fast version scored 0.023 points worse. The
+  test cannot say that filter speed is useless: its known-answer gate could not have been passed
+  by any filter with one state per hour band, and a faster filter did recover offsets where they
+  were visible. A fair test needs a redesigned gate and a wider grid of multipliers.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Do not spend effort raising the level's process noise in the GAM-K filter: the gated boost
-    scored +0.0002 points against arm D and the always-on boost +0.023 (C1, C2), though the failed
-    gate makes both suggestive only.
+    Do not port the gated boost with a multiplier of 5: it is close to arm D by construction and
+    scored +0.0002 points against it (C1, audit F3).
   - >-
-    Look for the cause of a smooth same-sign offset in the mean model or its inputs before
-    changing the filter: no boost recovered an injected offset, even at 100 times the noise (gate).
+    Score a known-answer gate for a per-band filter only on pairs where the target's hour band has
+    been read since the offset began, or as a share of the oracle ceiling, and start origins after
+    the offset starts (audit, F1).
   - >-
-    Run a known-answer gate that injects an offset into the observed power before reading any
-    filter contrast, and report recovery by hours since the offset started (figure 3).
+    Widen the grid of level-noise multipliers beyond 10 and keep the shared-level state out until
+    its own scored-year loss of 0.077 points is understood (C4, audit F2).
 ---
 
 # Faster Kalman level state when the residual keeps one sign
 
 ---
 
-**Take-home: a faster level state does not rescue the forecast on days when the residual keeps one
-sign.** The gated version scored the same as the current filter, the always-on version scored worse,
-and the known-answer gate failed, so the filter's speed is not the limit. The next lever is the mean
-model or a new input.
+**Take-home: this test could not tell whether a faster level state helps.** The gated version
+scored the same as the current filter and the always-fast version scored worse. The gate could not
+have been passed by any filter with one state per hour band, so the null says little about filter
+speed. A redesigned gate and a wider grid of multipliers are the fair test.
 
 We asked whether a Kalman filter that speeds up its level state when the recent forecast errors keep
 one sign cuts the loss on days like those, without harming ordinary days. The filter is that of the
@@ -126,10 +127,10 @@ decision Primaries. The tested method is a variant of the Kalman filter on addit
 coefficients, not a method of ours. Arm D is rebuilt here to the stored score (2.7562 against 2.756,
 inside the plan's 0.005).
 
-**Verdict: `inconclusive`, by the pre-registered rule that a failed gate caps the verdict.** The
-gate
+**Verdict: `inconclusive`, by the pre-registered rule that a failed gate caps the verdict.** The gate
 asked for at least 50% recovery at the 0.10 size for 16-hour and 36-hour offsets. The gated boost
-recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%).
+recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%). The audit found that the
+gate's ceiling lies far below the pass mark (see "Audit").
 
 ![Contrasts over all rows](figure_1_contrasts.svg)
 
@@ -209,10 +210,31 @@ recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%).
   -0.014 to +0.014, wider than the pass mark of +0.005, and the post hoc multiplier of 100 on A1
   cost +0.28 (+0.15 to +0.42).
 - Wiring check (`e00190_wiring_check.py`): on a stream with no noise, A0 follows a 7.8-point offset
-  to
-  between 4.9 and 7.1 points, A1 to between 5.2 and 7.1, and A3 reaches the bands whose own
-  windows have not been read (8.6 in one band). The code works; the real residual's noise is what
-  limits recovery.
+  to between 4.9 and 7.1 points, A1 to between 5.2 and 7.1, and A3 reaches the bands whose own
+  windows have not been read (8.6 in one band). The code works.
+
+## Audit
+
+The audit (a fresh Opus agent, private brief `e190_audit.md`) re-derived the gate losses to 4e-15,
+and found no bug in the injection, the filter, the reproduction, or the tuning. It found three
+things about the design:
+
+- **The gate's ceiling lies below its pass mark (F1).** The filter keeps one state per hour band,
+  the telemetry delay is 3.5 hours, and the first origins come 6 hours before the offset starts. On
+  most pairs the target's band has not been read since the offset began, so every per-band filter
+  gives the clean correction there. An oracle that knew the offset exactly, but only where the
+  target's own band had been read, would recover 0.5% (16 hours) and 9% (36 hours) at the 0.10 size.
+  An oracle that used any band would recover 25% and 39%. No filter could have reached 50%.
+- **Faster filters do recover where the offset is visible (F2).** On pairs whose band had been read
+  since the offset began, the always-on boost recovered 52% (0.10 size, 36 hours) and a multiplier
+  of 100 recovered 69% (0.20 size, 36 hours). Those pairs are a small share of all pairs (2% to
+  38%).
+- **A multiplier of 5 barely changes the filter (F3).** At steady state the level gain rises from
+  0.066 to 0.082, because the autoregressive transient already supplies a total gain of about 0.38.
+  The gated boost is therefore close to arm D by construction.
+
+The scored-year contrasts and the verdict stand. The lessons and advice were rewritten after the
+audit.
 
 ## Checks
 
@@ -226,20 +248,16 @@ recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%).
   3.309,
   3.765.
 - Rows within 24 hours after a trigger (194,765 rows): C1 +0.0009 (-0.0060 to +0.0083).
-- Audit triggers: trigger 1 fired (the known-answer gate failed). The failure was explained by the
-  noise in the residual and tested by the wiring check above, and a fresh Opus audit has not been
-  run.
+- Audit triggers: trigger 1 fired (the known-answer gate failed) and the audit above ran.
 - Curtailment cost was not scored: this experiment has no generator forecasts to feed the
   node-plus-generators metric.
 
 ## Caveats
 
 - The gate runs on the proxy-weather forecast, not on ensemble weather, so it removes weather error
-  from the
-  comparison and makes recovery easier than in the real forecast.
-- The counter's rule is one of several defensible gates, but no setting tried, up to 100 times the
-  noise,
-  recovered an offset.
+  from the comparison.
+- The gate as run cannot be passed (see "Audit"), so its recovery numbers are not a measure of
+  filter speed.
 - Tuning used the stage-1 score, not arm D's, and every setting was scored with A0's spread table, which
   understates the gain of a setting whose errors are smaller.
 - The counter counts readings, so after a gap in the data it can span more than the stated hours.
@@ -249,11 +267,13 @@ recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%).
 
 ## What to try next
 
-- Look at the mean model: on the plotted day every arm forecasts about 10 points too high all day,
-  so the
-  error is in the weather-driven part or a missing input, as experiment 175 suggested.
+- Redesign the gate: score recovery only on pairs whose target band has been read since the offset
+  began, or as a share of the oracle ceiling, and start origins after the offset starts.
+- Widen the grid of multipliers beyond 10 (the audit's multiplier of 100 recovered 69% where the
+  offset was visible), and test whether a shared level across bands removes the per-band limit.
+- Look at the mean model as well: on the plotted day every arm forecasts about 10 points too high
+  all day.
 - A small learned correction that reads whether several neighbouring Primaries show the same-sign
-  residual
-  (a neural head on the filter's innovations). The prediction that could fail: it recovers at least
-  20%
-  of the excess loss on the 15 smooth-offset days, which none of the four filters here did.
+  residual (a neural head on the filter's innovations). The prediction that could fail: it
+  recovers at least 20% of the excess loss on the 15 smooth-offset days, which none of the four
+  filters here did.
