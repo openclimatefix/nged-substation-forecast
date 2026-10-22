@@ -49,10 +49,10 @@ headline: >-
   (gate 15%). Scored year: the head beats arm D by 0.071 points trained on one year and 0.125 points
   trained on 2020 onward, but a head given no error inputs gets 0.054 and 0.100 of that.
 take_home_message: >-
-  A small neural network trained on arm D's own past errors lowers the day-ahead score by 0.07 to
-  0.12 points at five substations, but a copy that cannot see any recent error gets four fifths of
-  that gain. So the network mostly corrects a systematic bias in arm D by calendar, lead, and
-  substation, and it does not read recent errors better than the Kalman filter and recipe R do.
+  A small neural network trained on arm D's own past errors lowers the day-ahead score by 0.07 to 0.12
+  points at five substations, but a copy that cannot see any recent error gets most of that gain. The
+  gain comes from correcting how arm D's error depends on its own forecast level and the calendar, not
+  from reading recent errors, and a pinball-loss table matches the network on one year of data.
 lessons:
   - >-
     Reading recent errors and the Kalman state added -0.017 points (one year) and -0.025 points (2020
@@ -73,17 +73,18 @@ advice:
 code: ml-experiments/00200-dp-pooled-correction-head-on-kalman-state/
 ---
 
-**Take-home: most of the network's gain does not come from reading recent errors, and a plain table
-recalibration of arm D reproduces only about a quarter of it.** Arm D is our convex demand model
-with a Kalman filter (a method that updates a forecast from its recent errors), the night offset,
-and recipe R (subtract 0.75 times the mean error of the last 14 days). We trained one network,
-shared by 6 substations, to correct arm D's median and rescale its spread. Trained on 2020 onward it
-lowers the day-ahead score by 0.125 points (99% interval 0.060 to 0.209). A copy that cannot see any
-error or Kalman state gets 0.100, so reading errors adds only 0.025 (interval -0.029 to +0.106,
-including zero). A ridge table on the same calendar, lead, substation, and forecast-level inputs,
-with no network, gets 0.030 (0.007 to 0.053) when fitted to the ensemble year, and is worse than arm
-D when fitted to all years. The blind network's extra gain over the table is unexplained, which is
-why an audit was run. This is a weaker test than the brief planned: 6 substations, not 16 Primaries,
+**Take-home: the network's gain over arm D comes mainly from correcting how arm D's error depends on
+its own forecast level and on the calendar, and only a small part from reading recent errors.** Arm
+D is our convex demand model with a Kalman filter (a method that updates a forecast from its recent
+errors), the night offset, and recipe R (subtract 0.75 times the mean error of the last 14 days). We
+trained one network, shared by 6 substations, to correct arm D's median and rescale its spread.
+Trained on 2020 onward it lowers the day-ahead score by 0.125 points (99% interval 0.060 to 0.209).
+A copy that cannot see any error or Kalman state gets 0.100, so reading errors adds only 0.025
+(interval -0.029 to +0.106, including zero). An audit found no leakage. It also found that on the
+same one year of ensemble rows, a table fitted with the pinball loss gets 0.038 and the blind network
+0.047 to 0.057, so a network is not needed there. The extra gain from 2020-onward training needs
+arm D's forecast level and an ensemble-era flag together, and an additive table fitted to all years
+is worse than arm D. This is a weaker test than the brief planned: 6 substations, not 16 Primaries,
 and no weather input. The verdict is `partly supported`: the headline contrast passes its rule, the
 known-answer gate marginally fails (29% against 30%), and reading recent errors is not what helps.
 
@@ -128,10 +129,11 @@ known-answer gate marginally fails (29% against 30%), and reading recent errors 
   half-hour, site by day of week, site by lead band, site by forecast-level bin, and half-hour by
   day of week, plus an ensemble-era flag, shifts arm D's median; a per-cell factor, chosen by
   pinball loss, scales the quantile offsets. Fitted to all training rows it scores 0.049 points
-  worse than arm D (interval -0.001 to +0.096), because 80% of the rows are past-weather forecasts
-  with smaller errors. Fitted to the ensemble year only it scores -0.030 against arm D (interval
-  -0.053 to -0.007; 2.402 points), +0.070 worse than the blind network (+0.042 to +0.097) and 0.095
-  worse than the head (0.038 to 0.181).
+  worse than arm D (interval -0.001 to +0.096). Fitted to the ensemble year only it scores -0.030
+  (interval -0.053 to -0.007). The audit refitted the table with the pinball loss on the same
+  ensemble year and got -0.038, against -0.047 to -0.057 for the blind network, so the ridge's
+  smaller gain came from its squared-error fit. The comparison of that ridge with the 2020-onward
+  network is therefore not like for like.
 - **Per substation, stage 3 head minus arm D:** D5 -0.179, D10 -0.075, D11 -0.008, D14 -0.133, D16
   -0.243, D9 -0.104. Stage 2: D5 -0.081, D10 -0.066, D11 +0.040, D14 -0.112, D16 -0.142, D9 +0.014.
 - **Tails (decision substations, stage 3 head against arm D).** Pinball at q99: 0.391 against 0.411.
@@ -139,6 +141,17 @@ known-answer gate marginally fails (29% against 30%), and reading recent errors 
   head lowers tail pinball loss but lowers coverage in the upper tail.
 - **Curtailment cost and the manual heuristic.** Not scored: the stored rows are single-substation
   demand, not node and generator forecasts.
+- **Audit (Opus, fresh agent, report in the private briefs folder).** No leakage: the error inputs
+  never use a reading newer than 3.5 hours before the origin (tested by overwriting the error grid
+  from 25 random positions), the Kalman level and anomaly are the filter state at the cut-off, and
+  training ends before the scored year. Retrained arms match the stored contrasts within 0.01 points.
+  In the ensemble era the level and anomaly come from experiment 136's arm A2 filter, not arm D's own
+  filter, so they are causal but inconsistent between eras. The 2020-onward gain needs the forecast
+  level and the era flag together: zeroing either cuts the blind arm from -0.099 to about -0.05. The
+  spread head is worth 0.014 (one year) and 0.030 (2020 onward). The 29% step recovery reflects the
+  data: arm D already contains the filter and recipe R, so its training errors rarely keep a level
+  shift, and a median regression on the three error features recovers at best 30% of the step.
+  Recipe R's 67% is not comparable, because it assumes arm D would not react to the injected errors.
 - **Caveats.** No ensemble weather input. Stage 3 trains on 4 years of forecasts built on past
   weather, whose errors are smaller than live ensemble errors, and it flags the era. The gate is one
   8-week block per injection. The prediction that the stage 2 gain would be -0.04 to +0.02 was too
@@ -152,12 +165,12 @@ known-answer gate marginally fails (29% against 30%), and reading recent errors 
   4.006, blind head 4.063; the contrasts point the same way.
 - **Triggers that fired:** (1) the known-answer gate marginally failed, 29% against 30%; (5) the
   blind head, nested in the head, scores almost as well; (7) the sibling experiment's design may
-  depend on this result. Leaving one substation out never changes the sign of C1 (range -0.097 to
-  -0.145 in stage 3). An audit by a fresh Opus agent was requested from the ML manager and has not
-  run.
+  depend on this result. The audit confirmed the contrasts and found no leakage (see Results).
+  Leaving one substation out never changes the sign of C1 (range -0.097 to -0.145 in stage 3). All
+  audit findings were accepted: the take-home and the recalibration bullet were rewritten.
 
 ## What to try next
 
-- Find out why the blind network beats the ridge table by 0.07 points: test the forecast-level
-  interaction, the spread head, and a gradient-boosted table (audit question 3).
+- Fit a pinball-loss table with a forecast-level by era term to all years. If it matches the blind
+  network, no network is needed for this gain.
 - Add the ensemble-mean temperature and shortwave inputs, which the stored forecasts lack.

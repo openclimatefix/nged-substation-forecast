@@ -1,7 +1,7 @@
 """Rows for experiment 200's correction head, built from arm D's stored forecasts.
 
 A row is one (substation, run, valid time) of a run's day-ahead window. Every input is known at the
-run's origin: the errors (actual minus arm D mean) up to 3.5 hours before the origin, never the
+run's origin: the errors (actual minus arm D median) up to 3.5 hours before the origin, never the
 target's own error. `error_grid` puts each substation's shortest-lead error on a half-hourly grid,
 so that the injection of the known-answer gate can edit the grid and rebuild the inputs.
 """
