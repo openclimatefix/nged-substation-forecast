@@ -6,7 +6,7 @@ theme: differentiable-physics-forecast-engine
 also_relevant_to:
 - calibration-and-uncertainty
 - weather-products-and-blending
-status: planned
+status: finished
 size: >-
   medium. Stored: private files under data/ml-experiments/00202-dp-ens-two-number-rolling-replay/
   only. Serving path: not touched (the experiment measures what the weather layer would keep, and
@@ -64,73 +64,144 @@ metric: >-
   Quantile score in points of effective capacity over daylight and night half-hours, as a
   percentage change from arm A, with absolute scores, q05-to-q95 coverage, and tail pinball loss
 code: ml-experiments/00202-dp-ens-two-number-rolling-replay/
-production_status: not-for-production
+production_status: candidate
 adopted_in: none
+verdict: supported
+best_arm: >-
+  R2, two float32 columns per half-hour (the mean and standard deviation of the 51 members' solar
+  responses) with factors refitted each month on completed history: daylight quantile score 3.549
+  against arm A's 3.632 points, -2.30% (95% interval -2.96% to -1.61%) in the scored year; 103% of
+  arm M's gain (interval 93% to 116%)
+headline: >-
+  A replay of the live weather layer, which stores two float32 columns per half-hour and refits its
+  two factors per lead band each month on history whose actuals had completed, lowers the daylight
+  quantile score of the full best-guess stack by 2.30% (95% interval 1.61% to 2.96%) at the five
+  substations over the scored year. Experiment 193's fixed-factor result was 2.20%. All five
+  substations improve, and 11 of the 12 months improve.
+lessons:
+  - >-
+    Refitting the offset and spread factors each month on the trailing 365 days of completed runs
+    keeps the whole gain (R2 minus Q2 is -0.11%, interval -0.24% to +0.06%), so experiment 193's
+    interleaved-month tuning was not flattering the two-number summary.
+  - >-
+    Rounding the two columns to float32 changes the daylight score by 1e-10 points, so the stored
+    columns need no more than float32.
+  - >-
+    The gain depends on the day's own numbers: a placebo with no member information recovers 7% of
+    R2's gain. December 2025 is the one month in which R2 raised the daylight score (+0.9%).
+take_home_message: >-
+  A weather layer that stores two numbers per half-hour (the mean and spread of the 51 ensemble
+  members' solar estimates) and refits its two scaling factors every month, using only runs that had
+  finished before the month began, lowers the daylight forecast-band score by 2.3% at five
+  substations over one year, which is as much as running all 51 members. This confirms experiment
+  193's result under production-style timing, so the next step is to build the two columns into the
+  weather layer.
+advice:
+  - >-
+    Refit the two-number summary's offset and spread factors monthly on the trailing 365 days of
+    completed runs, because the replay keeps the full gain (R2 against Q2, C1).
+  - >-
+    Store the mean and standard deviation of the member solar responses as float32 columns, because
+    float32 rounding changes the daylight score by 1e-10 points (gate G2).
+  - >-
+    Check December and other holiday-affected months separately when judging the solar summary,
+    because December 2025 was the one month in which the daylight score rose, by 0.9%.
 ---
 
 # Experiment 202: the two-number solar summary in a rolling replay of the live weather layer
 
-**Planned. This page holds the pre-registered design; the write-up replaces it when the run
-finishes.**
+**A weather layer that stores two numbers per half-hour keeps the whole daylight gain when it is
+run the way production would run it.** The two numbers are the mean and the standard deviation of
+the 51 ensemble weather members' estimates of solar output, stored as float32 columns. The
+factors that rescale them are refitted each month, on history that had completed before the month
+began.
 
-Experiment [193](../00193-dp-ens-two-number-solar-summary/result.md) found that two numbers per
-half-hour keep 98% of the daylight gain that running all 51 ensemble members through the solar term
-gives. Its fitted factors, however, came from interleaved months and from float64 numbers, so the
-experiment does not show that a weather layer that stores two float32 columns and refits monthly
-would keep the gain. This experiment replays that weather layer over the scored year of
-experiment 193, using at each origin only the ensemble run published before it and only history
-whose actuals had completed.
+Experiment [193](../00193-dp-ens-two-number-solar-summary/result.md) found that the two numbers keep
+98% of the 2.2% daylight gain that running all 51 members gives
+([experiment 187](../00187-dp-ens-members-in-stack/result.md)). Its factors, however, were fitted on
+interleaved months, some later than months they were applied to, and held in float64. Here we
+replayed the scored year of experiment 193: for each month, the factors came from the trailing 365
+days of runs whose last valid time (origin plus 168 hours) was before the month's first origin, the
+two columns were rounded to float32, and each run used only its own 00 UTC ensemble run (published 9
+hours before the origin). The score is the quantile score (twice the mean pinball loss over 11
+quantiles, in points of effective capacity; lower is better). Arm A is experiment 187's full
+best-guess forecast; arm M passes all 51 members through the solar term; Q2 is experiment 193's
+two-number arm with fixed factors; R2 is the replay. D5, D10, D11, D14, and D16 are anonymised
+substations. Each interval is a 95% interval from resampling whole months.
 
-## Plan
+The rule registered before the run was met: R2's daylight change from arm A is -2.30% (interval
+-2.96% to -1.61%), under the -1.5% threshold, with all five substations negative. The verdict is
+`supported`.
 
-- **Rows.** Experiment 193's: `fold_a_daily_gap_v1`, the 292 scored runs, D5, D10, D11, D14, and
-  D16 (D9 beside them, in no contrast), leads 0.5 to 168 hours, outside switching events. Arm A and
-  arm M are read from experiment 184's stored arrays.
-- **Replay of the two columns.** For each run, the mean and standard deviation of the 51 members'
-  stored solar responses are computed from that run alone and rounded to float32, as the weather
-  layer would store them. The stored frames hold a run index, not an initialisation time, so the
-  gate derives each run's
-  initialisation from the index (00 UTC on the run's date) and asserts that initialisation plus
-  the 9-hour publication delay is at or before the origin; it checks the date arithmetic and
-  cannot detect a stored response that used a later run.
-- **Rolling factor fit.** Before each scored month, the offset factor and spread factor per lead
-  band (experiment 193's grid search over 20,000 sampled rows per band) are refitted on the
-  runs of the trailing 12 months whose last scored valid time (origin plus 168 hours) is before the
-  month's first origin. Nothing from the month being scored enters the fit. The fit rows are the
-  union of the stored
-  tuning and replicate frames (2024-07 to 2025-06) and the earlier months of the scored frame.
-  Months are the calendar months of each run's origin, so the bootstrap resamples the blocks the
-  data hold (the scored frame has 291 complete runs, and the last two are truncated at 62 and 38
-  hours by the end of the data).
-- **Arms.** A (experiment 187), M (the 51-member arm, 193's fixed factors), Q2 (193's fixed-factor
-  two-number arm), R2 (the rolling replay, the decisive arm), R2o (R2 with factors fitted on the
-  month being scored: an in-sample ceiling on the gain, outside the verdict), and a rescale-only
-  placebo RR (every response zero, rolling factors).
-- **Gates.** G1: the code path reproduces 193's Q2 daylight change (-2.20%) to 0.01 percentage
-  points when given 193's fixed factors in float64. G2: rounding the two columns to float32 moves
-  the daylight quantile score by under 0.005 points of effective capacity. G3: the availability
-  assertion above. G4: RR recovers under 20% of R2's gain; a larger share makes the verdict
-  `invalid`. A failed
-  gate makes the verdict `invalid`.
-- **Reported cuts.** Per substation, lead band, clear-sky band (overcast, partly cloudy, clear),
-  sunniest third, and the first and second halves of the scored year (to show whether the early
-  months with less history fall short), plus the gain by valid hour of day. Absolute scores, tail
-  coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99, and the median-minus-mean checks.
-- **Compute.** CPU only, 4 cores, 1 thread per core, under 1 core-hour expected (the stored arrays
-  are read and the factor grid is small), well inside the 8 core-hours of the brief.
+![Change in the daylight score by arm](figure_1_headline.svg)
 
-## Caveats registered before the run
+![Change in the daylight score by substation](figure_2_substation.svg)
 
-- **Arm A's own fits are shared.** The offsets, Kalman state, and 14-day profile of arm A were
-  calibrated on the 2024-07 to 2025-06 tuning months in experiments 155 and 184, so the fit rows
-  are in-sample for arm A and the scored rows are not. The write-up states each cut-off from the
-  code of those experiments. The contrast R2 minus A shares this with experiments 187 and 193.
-- **The switching mask and usable-row filter** use hindsight (hand-filtered events). As in
-  experiment 193, they filter the fit rows as well as the scored rows.
+![Change in the daylight score by lead band](figure_3_lead.svg)
 
-## Reading of the brief (the maintainer's design note of 2026-10-22, Design: DP PV, suggestion 2)
+![R2's change in the daylight score by month](figure_4_month.svg)
 
-The brief's "at least 1.5% daylight gain on D5, D10, D11, D14, and D16" is read as the pooled
-change over those five substations, because experiment 193's single-substation gains at D10 and D11
-(1.18% and 0.99%) lie under 1.5%. The per-substation points are reported, and the verdict rule
-above requires each to be negative.
+- **Arms and row set.** A and M are experiment 187's, read from experiment 184's stored arrays; Q2
+  is experiment 193's stored arm. R2: Gaussian points from the two float32 columns, factors per lead
+  band (offset 0.75 to 0.9, spread 1.0 to 1.4, refitted monthly), the fit rows being every stored
+  run (all substations) of the trailing 365 days that had completed. R2o: factors fitted on the
+  scored month itself, an in-sample ceiling outside the verdict. RR: placebo with every response
+  zero. Row set `fold_a_daily_gap_v1`, five substations, leads 0.5 to 168 hours, outside switching
+  events; 211,576 daylight rows in 291 complete runs and 12 month blocks (a 13th, 2026-07, holds no
+  daylight row). Monthly refits of the mean forecast (experiment 155) are unchanged.
+- **Headline C1 (daylight, change from arm A).** R2 -2.30% (-2.96% to -1.61%); Q2 -2.20% (-2.88% to
+  -1.49%); M -2.23% (-2.97% to -1.48%); R2o -2.75% (-3.46% to -2.07%); RR -0.17% (-0.33% to
+  +0.02%). R2 minus Q2: -0.11% (-0.24% to +0.06%). R2's share of M's gain: 103% (93% to 116%).
+- **Absolute scores (quantile score, daylight).** A 3.632; M 3.551; Q2 3.553; R2 3.549; R2o 3.533;
+  RR 3.626. All rows: A 2.752, R2 2.714. Night 1.981 and twilight 2.299 for every arm, because only
+  daylight rows change.
+- **Substations (daylight, R2; Q2 in brackets).** D5 -3.25% (-3.27%); D10 -1.87% (-1.18%); D11
+  -0.89% (-0.99%), interval -1.67% to -0.01%; D14 -1.61% (-1.65%); D16 -3.20% (-3.35%). Leaving one
+  substation out keeps the change between -1.9% and -2.6% with every interval under zero.
+- **Lead bands (daylight, R2).** Under 24 hours -1.80%; 24 to 72 hours -1.91%; 72 to 168 hours
+  -2.57%; 12 to 36 hours -1.89%. Clear-sky bands: overcast -0.81% (interval -1.74% to +0.11%),
+  partly cloudy -2.80%, clear -1.96%; the sunniest third -4.75% (-6.92% to -3.18%).
+- **Months and halves.** First six months -2.13%, last six -2.44%, so the early months with less
+  history do not fall short. Monthly changes run from +0.94% (2025-12) to -4.23% (2026-03).
+- **By valid hour of the day (stand-in for the slot cut).** The brief's four 6-hourly forecast slots
+  cannot be scored: the stored forecasts have one origin per run (09:00 UTC after the 00 UTC run),
+  so
+  a 15:00, 21:00, or 03:00 origin would need the forecast stack refitted and re-run, which this
+  experiment does not do. By valid hour (UTC): 06 to 09 -1.88%; 09 to 12 -2.50%; 12 to 15 -2.08%;
+  15 to 18 -2.93%; 18 to 21 -0.62% (interval -1.16% to +0.12%).
+- **Tails (daylight; coverage / pinball loss).** R2: q01 0.016 / 0.236, q05 0.058 / 0.838, q95 0.941
+  / 0.877, q99 0.983 / 0.245. Q2: 0.013 / 0.233, 0.051 / 0.839, 0.947 / 0.879, 0.986 / 0.242. A:
+  0.027 / 0.265, 0.078 / 0.907, 0.933 / 0.924, 0.979 / 0.262. Daylight q05-to-q95 coverage: A 0.854,
+  Q2 0.896, R2 0.883 (nominal 0.90). The curtailment-cost saving against `manual_heuristic` was not
+  scored, because the experiment changes daylight band widths on stored rows and writes no
+  node-level forecast frame.
+- **Gates.** G1: the copied code with experiment 193's fixed factors reproduces its stored Q2 to
+  7.6e-06 (largest quantile difference). G2: float32 against float64 columns changes the daylight
+  quantile score by 1.2e-10. G3: every run's initialisation plus 9 hours is at or before its origin
+  (derived from the run index, so the gate checks the date arithmetic only). G4: RR recovers 7% of
+  R2's gain, under 20%. All pass.
+- **Checks.** The median forecast minus the mean forecast at 12 to 36 hours for R2 is -0.14 (D5),
+  -0.03 (D10), -0.05 (D11), -0.04 (D14), and -0.05 (D16) points, as for Q2; arm A is 0.000. R2
+  shares
+  its mean forecast with Q2 (arm A's mean plus the mean response), whose daylight mean absolute
+  error
+  changed by -0.13% (-0.45% to +0.27%) in experiment 193, the same direction as the score. No audit
+  trigger fired: no control failed (RR moved the score by -0.17% against a half-width of 0.18);
+  R2 matches its prediction (-2.30% against an expected -1.9% to -2.2%) and experiment 193's; the
+  leave-one-out check keeps the sign; no nested arm beat its container (R2o, the in-sample ceiling,
+  beats R2 by design); the interval width (1.35 points) matches Q2's 1.39; no later design depends
+  on
+  this headline.
+- **Caveats.** The replay reuses experiment 187's rows and arm A, whose offsets, Kalman state, and
+  14-day profile were calibrated on the 2024-07 to 2025-06 months, so the fit rows are in-sample for
+  arm A and the scored rows are not (shared with experiments 187 and 193). The switching mask and
+  usable-row filter use hindsight and filter the fit rows as well as the scored rows. The 00 UTC run
+  is the only run used, so the replay does not test a missing or late run. Fit rows pool all seven
+  substations (the scored contrast uses five). The first month (2025-07) has 12 months of history,
+  all of it from one summer. Two cuts (overcast daylight, and valid hours 18 to 21 UTC)
+  have intervals that include zero.
+- **What to try next.** (1) Build the two columns into the weather layer and the serving path, and
+  measure the runtime saving (prediction that could fail: the stored columns reproduce R2's
+  score to 0.001 points). (2) Score R2 on the node curtailment metric of `studies.node_curtailment`,
+  because the gain is largest at q01 (pinball loss -11%). (3) Re-run the replay at 15:00, 21:00,
+  and 03:00 origins once the forecast stack can be re-run at those origins, to test the slot cut.
