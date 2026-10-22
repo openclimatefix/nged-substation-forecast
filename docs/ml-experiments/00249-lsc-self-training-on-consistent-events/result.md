@@ -65,8 +65,8 @@ lessons: >-
   The real record probably holds too few events that pass a consistency rule to move a score
   trained on about 2,000 injected transfers per fold. Giving the pseudo-positives a quarter of the
   injected positives' total weight (post hoc) moved the logistic regression by one transfer (+1,
-  interval 0 to +3, so indistinguishable from no change) and the re-ranker by none. The strict balanced-pair tier passes only
-  14 to 16 candidates per fold.
+  interval 0 to +3, so indistinguishable from no change) and the re-ranker by none. The strict
+  balanced-pair tier passes only 14 to 16 candidates per fold.
 take_home_message: >-
   Retraining the learned load-shift score on its own consistent real events found no extra real
   transfers: the score still finds 24 of 35. Only 38 to 47 real events per fold pass the
