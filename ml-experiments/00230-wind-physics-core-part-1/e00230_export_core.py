@@ -17,7 +17,7 @@ import e00230_common as common  # noqa: E402
 import e00230_core as core_module  # noqa: E402
 import e00230_step0 as step0  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 
 
 def main() -> None:

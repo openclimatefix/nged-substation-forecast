@@ -10,8 +10,8 @@ import e00230_common as common
 import e00230_core as core_module
 import numpy as np
 import polars as pl
-import torch
-from torch import nn
+import torch  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
 
 CALIBRATOR_CAP: Final[float] = 0.15
 """The calibrator's output is capped at plus or minus this fraction of capacity."""

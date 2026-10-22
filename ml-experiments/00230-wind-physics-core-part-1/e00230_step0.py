@@ -22,7 +22,7 @@ import e00230_common as common  # noqa: E402
 import e00230_core as core_module  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 import xgboost as xgb  # noqa: E402
 
 N_ROUNDS = 500
