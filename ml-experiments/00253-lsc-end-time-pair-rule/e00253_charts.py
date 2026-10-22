@@ -96,7 +96,7 @@ def figure_disagreement(*, rows: pl.DataFrame) -> alt.TopLevelMixin:
             width=WIDTH // 3 - 20,
             height=150,
             title=_title(
-                text="The joint score P2 halves the disagreement after an unrelated step",
+                text="The joint score P2 cuts the disagreement after an unrelated step",
                 line="Share of transfers, where both sides alarmed, whose two ends differ by "
                 "more than 6 hours.",
             ),

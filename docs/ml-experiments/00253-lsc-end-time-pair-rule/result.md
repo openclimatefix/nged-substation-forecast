@@ -39,14 +39,16 @@ decision_rule: >-
   within the end tolerance (the larger of 6 hours and 10% of the duration) of the true end. The
   share found is MW-weighted by the MW moved, pooled over shapes S2, S3, and S4, for transfers that
   start in even months, on experiment 148's draw, with no alarm merging. The false-end share is the
-  share of onset-found sides whose end is earlier than the true end by more than the tolerance. Intervals
+  share of onset-found sides whose end is earlier than the true end by more than the tolerance.
+  Intervals
   resample whole calendar months 20,000 times. P2 is `supported` when, on the clean draw, the lower
   end of its share-found contrast is above -0.02 and its false-end share is at most 0.10, and on
   the draw with the injected unrelated step its share-found contrast has an interval above zero,
   and on the draw with 10% unequal step sizes the first condition holds again. It is `partly
   supported` when the clean-draw and unequal-step conditions hold but the unrelated-step contrast
   interval includes zero. It is `refuted` when the upper end of the clean-draw contrast is under
-  -0.02 or P2 scores below R0 on the unrelated-step draw. Otherwise it is `inconclusive`. The
+  -0.02 or the upper end of the unrelated-step contrast is below zero. Otherwise it is
+  `inconclusive`. The
   smallest gain worth porting is zero: the rules cost nothing in production beyond the 24-hour wait
   of experiment 148, so the margin is that experiment's -0.02. End disagreement (the gap in hours
   between the ends the two sides call, for pair transfers where both sides alarm) is reported as
@@ -76,32 +78,34 @@ headline: >-
   +0.011).
 lessons: >-
   The pair rule trades a small loss on ordinary transfers for a gain when an unrelated step follows
-  the end. The loss is concentrated in transfers with two or more metered receivers. The real
+  the end. The loss appears to be concentrated in transfers with two or more metered receivers; that
+  is inferred from the one-receiver subset, whose loss is smaller. The real
   14 January 2026 shift is not changed by any rule, because neither card's end comes from the step
   rules.
 take_home_message: >-
   Reading the two substations together makes their end times agree when an unrelated step follows
   the true end: the median gap falls from 8.5 to 2.5 hours and the share of moved MW with a correct
-  end rises by 0.04. On ordinary transfers the same rule loses about 0.02, so the experiment cannot
-  say the pair rule is safe to port. It does not change the 14 January 2026 shift between D5 and
-  D16, because one side has no step to read and the other side's candidate steps are all
-  unbalanced.
+  end rises by 0.04 (from 0.593 to 0.633). On ordinary transfers the same rule falls by about 0.02
+  (from 0.788 to 0.770), so the experiment cannot say the pair rule is safe to port. The pair rule
+  does not change the end times of the real 14 January 2026 shift between substations D5 and D16,
+  because D16 shows no demand step large enough to be the end, and none of D5's 13 candidate steps
+  is matched by an opposite step on D16.
 advice:
   - >-
     Do not port the pair rule P2 yet: it loses 0.017 (-0.034 to +0.007) of the share found on
-    ordinary transfers and gains 0.041 only when an unrelated step follows the end (contrasts P2
-    minus R0, clean and C).
+    ordinary transfers and gains 0.041 only when an unrelated step follows the end (contrast P2
+    minus R0 on the clean draw and on the unrelated-step draw, in Results).
   - >-
     Score end rules side by side, not as the best of the sides: the best-of-sides share found is
     already 0.962 on transfers with a metered receiver, so it cannot show a gain of more than 0.018
-    (ceiling check).
+    (the ceiling bullet in Results).
   - >-
     Do not add a neural scorer to the end rule: P3 minus P2 is -0.011 (-0.023 to +0.016) on the
     clean draw (secondary contrast).
   - >-
     When one side of a pair has no qualifying return step, tie its end to the other side's
     balanced end instead of keeping its level-tracked end; this is the case on 14 January 2026
-    (case report).
+    (the 14 January 2026 bullet in Results).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -109,22 +113,32 @@ adopted_in: none
 # Experiment 253: does the pair of substations give a better end time for a load shift?
 
 **Reading the two substations of a load shift together makes their end times agree and finds the
-right end more often when an unrelated step follows the end, but it costs a little on ordinary
-transfers, and it leaves the real 14 January 2026 shift between D5 and D16 unchanged.** When demand
-moves from one Primary substation to another, the donor's demand drops and the receiver's rises by
-the same amount, so the end of the shift restores the pair's summed demand. Each substation's card
-now reads its own end alone. We took the load-shift screen (LSC) of [experiment
-148](../00148-switching-end-rule-lookahead-ro-nc/result.md) and added three rules that use the
-neighbouring substations. We scored all of them side by side on the 1,160 transfers that experiment
-148 injected into real demand, on a copy where an unrelated step follows the end of one side, on a
-copy where the two steps differ by 10%, and on the labelled real transfers.
+true end more often when an unrelated step follows it, but it finds the true end slightly less often
+on ordinary transfers, and it leaves the real 14 January 2026 shift between substations D5 and D16
+unchanged.** A load shift is a temporary move of demand from one Primary substation (the donor) to
+another (the receiver). The end of the shift is the step that returns the donor's and the
+receiver's summed demand to its earlier level. Today the forecast card of each substation reports
+an end time estimated from that substation's demand alone, and the two cards can disagree by days.
+The load-shift screen (LSC) is the detector that raises an alarm where a substation's demand steps.
+We took the LSC of [experiment 148](../00148-switching-end-rule-lookahead-ro-nc/result.md), whose
+rule R0 waits 24 hours before it fixes an end, and added three rules (P1, P2, and P3) that
+estimate the end from a substation together with its metered neighbours. We scored every rule on
+four sets of transfers. The first is the 1,160 transfers that experiment 148 added to real demand
+(the clean draw). The second repeats them with an extra demand step, unrelated to the shift, added
+after the true end of one substation. The third repeats them with the donor's and receivers' steps
+differing by 10%. The fourth is the labelled real transfers, whose start and end come from
+NGED's switching log. A side is the donor or a metered receiver of one transfer, and "found" means
+that the side's alarm starts within 2 hours of the true start and ends within a tolerance of the
+true end.
 
-On the clean draw the best rule, P2, finds 0.770 of the moved MW against 0.788 for the lookahead
-rule R0 (-0.017, 98.75% interval -0.034 to +0.007). With an unrelated step added it finds 0.633
-against 0.593 (+0.041, +0.007 to +0.074). The pre-registered rule needs the clean-draw lower end
-above -0.02, so the verdict is `inconclusive`. The result narrows the search: a balance test on the
-pair is worth keeping for the case it was built for, and the next change should make it fall back
-to the other side's end where a side has no step of its own.
+On the clean draw the best of the new rules, P2, finds the end for 0.770 of the MW moved, against
+0.788 for R0
+(-0.017, 98.75% interval -0.034 to +0.007). With the unrelated step added it finds 0.633 against
+0.593 (+0.041, +0.007 to +0.074). The decision rule, written before the run, needed the lower end
+of the clean-draw interval to be above -0.02, and it is -0.034, so the verdict is `inconclusive`.
+The next version should keep the balance test (the check that the donor's and receivers' steps sum
+to about zero), and should let a substation with no return step of its own take the other
+substation's end.
 
 ![Contrasts of the share found](contrasts.svg)
 
@@ -137,13 +151,15 @@ to the other side's end where a side has no step of its own.
   half-hour where its demand steps most, and the alarm opens an interval. The step is measured as
   the mean demand over the next 24 hours minus the mean over the 24 hours before. A noise unit is
   the usual size of that step in odd-numbered months, per substation, when nothing is injected.
-- **Injected draw:** the 1,806 transfers that experiment 148 added to real demand, drawn with
-  seeds 8200 and 8300 and not changed. Each moves a share of the donor substation's demand to one
+- **Injected draw:** the 1,160 transfers that experiment 148 added to real demand, drawn with seed
+  8200 and not changed (602 of them start in even months and do not have series 12 as the donor).
+  Each moves a share of the donor substation's demand to one
   to three receivers, some metered and some not. The shapes S2, S3, and S4 give the transfer a
   flat, a receiver-shaped, and a mixed daily profile.
 - **Detector:** arm B of experiment 138, with that experiment's stored scorer and threshold.
-- **Share found:** the MW-weighted share of sides whose interval starts within 2 hours of the true
-  start and ends within the tolerance of the true end; experiment 148 scored a transfer as found if
+- **Share found:** the share of sides whose interval starts within 2 hours of the true start and
+  ends within the tolerance of the true end, weighted by the MW moved divided by the number of
+  sides of the transfer; experiment 148 scored a transfer as found if
   any side was, and R0 reproduces that number as a check.
 
 ## Arms
@@ -200,13 +216,16 @@ to the other side's end where a side has no step of its own.
   0 hours for R0 and P2, and the share over 6 hours is 0.145 (R0) and 0.153 (P2). With the
   unrelated step the median falls from 8.5 hours (R0) to 2.5 (P2), and the share over 6 hours from
   0.579 to 0.339. P3's median is 5.0 hours.
-- **Predictions:** the share-found prediction of -0.01 to +0.02 on the clean draw held for P2
-  (-0.017) and failed for P1 (-0.028). The predicted gain of +0.05 to +0.20 with the unrelated step
+- **Predictions:** the share-found prediction of -0.01 to +0.02 on the clean draw failed for
+  P2 (-0.017) and for P1 (-0.028). The prediction that P1 and P2 keep two thirds of their clean-draw
+  gain under unequal steps cannot be scored, because the clean-draw gain is negative. The predicted
+  gain of +0.05 to +0.20 with the unrelated step
   was not reached (P2 +0.041, P1 +0.013). The prediction that P3 beats P2 by under 0.02 held, and P3
   is not adopted.
 - **Real labelled transfers (descriptive):** 55 transfers have two or more metered sides (111
   sides), and the start is found on 26 sides. The end is within the tolerance of the logged close
-  on 20 sides for R0, 21 for P1 and P2, and 22 for P3. For the 6 transfers where both sides
+  on 20 sides for R0, 21 for P1 and P2, and 22 for P3, but P3's median end error is 2.8 hours
+  against 0.8 for R0 and P2. For the 6 transfers where both sides
   alarmed, the median gap between the ends is 6.8 hours for R0 and 0.0 for P2.
 - **The 14 January 2026 shift:** every rule gives the same ends as the card: D5 ends after 9.2
   days and D16 after 2.0 days. D16 has no stamp where the opposite step reaches the 5.0 noise units
@@ -226,19 +245,31 @@ to the other side's end where a side has no step of its own.
 - **Forecast checks:** no forecast is scored, so the median-minus-mean and mean-error checks do not
   apply.
 - **Audit triggers:** trigger 5 (a nested arm beats the arm that contains it) fires, because R0
-  beats P1 and P2 on the clean draw. The explanation tested here is that the balance test rejects
+  beats P1 and P2 on the clean draw, and the unequal-step condition of the decision rule also fails
+  (P2 minus R0
+  -0.012, -0.029 to +0.011). The explanation tested here is that the balance test rejects
   the true end when the group is not fully balanced; the single-receiver and group-balance runs
   above show the loss shrinks to -0.009 for one receiver and does not vanish with group balance.
   Trigger 2 (a prediction contradicted) fires for the unrelated-step gain, which came out at +0.041
-  against +0.05 to +0.20. A Sonnet code and numbers audit replaced the Opus audit, because the
-  brief allows Sonnet only and the manager session was not running; its findings are triaged in
-  the pull request. The other five triggers did not fire. Leaving one series out was not run, and
-  no claim here is per series.
+  against +0.05 to +0.20. A code and numbers audit by a reviewer agent replaced the Opus audit
+  that the `ml-experiment` skill asks for; its findings are triaged in the pull request. The seven
+  triggers are listed in that skill's "Audit before merge" section. The other five triggers did
+  not fire. Leaving one series out was not run, and no claim here is per series.
 - **Not run on all transfers:** the long transfers of experiment 148 and alarm merging were left
   out.
 
 ## Caveats
 
+- **Series 12 is blanked in the detector's input.** Where it is a receiver, its side row can never
+  alarm, so it lowers every rule's share found by the same amount (54 side rows in the clean draw).
+- **The unrelated step also changes which alarms exist:** the share of sides with a start found
+  falls from 0.836 to 0.784 under variant C for every rule, so absolute shares under C mix the two
+  effects, and the contrasts do not.
+- **The fallback to R0's end is reported late.** When no balanced stamp exists, P1, P2, and P3 keep
+  R0's end, but the end is reported only when the 14-day search window has ended, because a
+  balanced stamp could still appear.
+- **Disagreement counts any transfer with two or more alarmed sides,** including transfers with
+  three or four sides; the real-transfer figure rests on 6 transfers.
 - **Partner finding is favourable on the injected draw,** because the neighbour table that finds
   partners is the table the injection draws receivers from. The test of 1.5 noise units is the only
   detection step.
@@ -257,5 +288,6 @@ case the 14 January 2026 shift shows, where one side has nothing to read. Counti
 in the real telemetry decides whether the gain of +0.04 is worth the loss of 0.017.
 
 Code: `ml-experiments/00253-lsc-end-time-pair-rule/`; every number above is printed by
-`e00253_contrasts.py` (saved at `data/ml-experiments/00253-lsc-end-time-pair-rule/printed_report.txt`)
+`e00253_contrasts.py` (saved at
+`data/ml-experiments/00253-lsc-end-time-pair-rule/printed_report.txt`)
 and `e00253_case.py` (`case_report.txt` in the same folder).

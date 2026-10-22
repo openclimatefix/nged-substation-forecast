@@ -9,12 +9,11 @@ the number of sides of the transfer.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Final
 
 import numpy as np
 import polars as pl
-from e00253_common import GRID_START, WORK_DIR, stamp_months, stamp_year_months
+from e00253_common import WORK_DIR, stamp_months, stamp_year_months
 
 RUN_DIR: Final = WORK_DIR / "run"
 N_RESAMPLES: Final[int] = 20_000
@@ -33,14 +32,7 @@ CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 POST_HOC: Final[frozenset[str]] = frozenset({"P1G", "P2G"})
 """Settings added after the first results; their contrasts are not part of the 4 planned."""
-D_LABELS: Final[dict[int, str]] = {17: "D5", 10: "D10", 8: "D11", 16: "D14", 18: "D16", 7: "D9"}
-"""The D label of every detector series the repository has a label for; others print as series N."""
 SEED: Final[int] = 253
-
-
-def label(*, series: int) -> str:
-    """The D label of a detector series, or `series N` when none is recorded."""
-    return D_LABELS.get(series, f"series {series}")
 
 
 def sides() -> pl.DataFrame:
@@ -216,21 +208,33 @@ def real_pairs() -> None:
             f"median {d.median() if d.len() else float('nan'):.1f} h, under 48 h "
             f"{int((d < 48).sum())}"
         )
-    day = datetime(2026, 1, 14, tzinfo=UTC)
-    stamp = int((day - GRID_START).total_seconds() // 1800)
-    event = real.filter((pl.col("onset") - stamp).abs() <= 96, pl.col("side").is_in([17, 18]))
-    print("\n14 January 2026 shift (D5 and D16):")
-    for row in event.sort("setting", "side").iter_rows(named=True):
-        print(
-            f"  {row['setting']} {label(series=row['side'])}: onset found {row['onset_found']}, "
-            f"end error {row['end_error_hours']:.1f} h, disagreement "
-            f"{row['disagreement_hours']:.1f} h, true duration {row['hours']:.1f} h"
-        )
+
+
+def print_counts(*, data: pl.DataFrame) -> None:
+    """Print the transfers behind each population, and the side rows of blanked series 12."""
+    base = data.filter(
+        pl.col("kind") == "event", pl.col("variant") == "clean", pl.col("setting") == "R0"
+    )
+    print(
+        f"Even-month transfer rows (3 shapes): {base.height}; with a metered receiver "
+        f"{base.filter(pl.col('metered_receivers') >= 1).height}"
+    )
+    blank = data.filter(
+        pl.col("kind") == "side",
+        pl.col("variant") == "clean",
+        pl.col("setting") == "R0",
+        pl.col("side") == 12,
+        pl.col("metered_receivers") >= 1,
+    )
+    print(
+        f"Side rows on blanked series 12: {blank.height}, start found {blank['onset_found'].sum()}"
+    )
 
 
 def main() -> None:
     """Print every table."""
     data = sides()
+    print_counts(data=data)
     results = {v: analyse(variant=v, data=data) for v in ("clean", "C", "U10")}
     for variant in ("clean", "C", "U10"):
         analyse(variant=variant, data=data, exactly_one=True)

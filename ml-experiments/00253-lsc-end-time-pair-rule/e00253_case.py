@@ -8,9 +8,10 @@ from __future__ import annotations
 import pickle
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 from e00253_common import GRID_START, WORK_DIR
-from e00253_endrule import RULES, set_scorer
-from e00253_run import build_detectors, make_state
+from e00253_endrule import RULES, Candidates, set_scorer
+from e00253_run import CAP_DAYS, build_detectors, detect, make_state
 from e00253_variants import load_both
 
 SIDES: dict[int, str] = {17: "D5", 18: "D16"}
@@ -42,6 +43,30 @@ def main() -> None:
                     f"{rule} {SIDES[interval.series]}: starts {start:%Y-%m-%d %H:%M}, "
                     f"lasts {(interval.end - interval.onset) / 48:.1f} days"
                 )
+    diagnose(panel=panel, offset_panel=offset_panel, state=state, centre=centre)
+
+
+def diagnose(*, panel: dict, offset_panel: dict, state: dict, centre: int) -> None:
+    """Print why the step rules cannot move the ends: how many stamps qualify and balance."""
+    _, tracked, fast = detect(
+        panel=panel,
+        offset_panel=offset_panel,
+        residual=panel["residual"],
+        offset=offset_panel["residual"],
+        scales=state["scales"],
+        thresholds=state["thresholds"],
+        models=state["models"],
+    )
+    for interval in tracked:
+        if interval.series in SIDES and abs(interval.onset - centre) < 3 * 48:
+            cand = Candidates(inputs=fast, iv=interval, cap_days=CAP_DAYS)
+            qualifying = cand.qualifies()
+            print(
+                f"{SIDES[interval.series]}: tracked end {(interval.end - interval.onset) / 48:.1f} "
+                f"days, noise units needed {cand.need_z:.1f}, largest return "
+                f"{np.nanmax(cand.z_ret):.1f}, qualifying stamps {int(qualifying.sum())}, "
+                f"balanced and qualifying {int((qualifying & cand.balanced()).sum())}"
+            )
 
 
 if __name__ == "__main__":

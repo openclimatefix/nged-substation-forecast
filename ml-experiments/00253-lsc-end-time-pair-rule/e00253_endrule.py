@@ -213,7 +213,9 @@ def live_end_intervals(
     - P2: R0 on the joint score of the side and its partners, over the balanced stamps.
     - P3: R0 on the scorer's probability over the balanced stamps.
 
-    A side with no partner, or with no balanced qualifying stamp, keeps R0's end. When no stamp
+    A side with no partner, or with no balanced qualifying stamp, keeps R0's end. For the second
+    case the end is called only when the search window has ended, because a balanced stamp could
+    still come. When no stamp
     qualifies, the interval keeps its tracked end and the stamp it was known from.
     """
     out: list[Interval] = []
@@ -232,6 +234,7 @@ def live_end_intervals(
             end, known = cand.base + best, cand.base + first + 2 * window
         else:
             usable = plain
+            fallback = False
             kind = rule.removesuffix("G")
             if kind != "R0" and cand.paired:
                 keep = qualifies & cand.balanced()
@@ -244,8 +247,14 @@ def live_end_intervals(
                     keep &= score >= FIRST_SHARE
                 if keep.any():
                     usable = np.where(keep, score, -np.inf)
+                else:
+                    fallback = True
             first = int(np.flatnonzero(np.isfinite(usable))[0])
             end, known = lookahead_end(usable=usable, first=first, base=cand.base, window=window)
+            if fallback:
+                # A live service cannot know that no balanced stamp will come until the search
+                # window has ended.
+                known = max(known, iv.onset + cap_days * BLOCK + window)
         out.append(replace(iv, end=int(end), known_from=int(known)))
     return out
 
