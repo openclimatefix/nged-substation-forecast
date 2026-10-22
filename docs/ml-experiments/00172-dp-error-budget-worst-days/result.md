@@ -45,7 +45,7 @@ decision_rule: >-
   interval; a ratio whose interval lies wholly above 1 says the loss sits on cold nights. A random
   control draws 1,000 sets of days of the same number per site and reports where the real share
   falls in the draws. The verdict is capped at `inconclusive` if the control, which injects a
-  known excess of 5 points of loss into 18 random days per site, does not put those days in the
+  known excess of 5 points of loss into 10 random days per site, does not put those days in the
   worst 5% of days at least 90% of the time.
 benchmark: >-
   Randomly chosen days (the 1,000-draw control above), and the flat-loss share of 5%
