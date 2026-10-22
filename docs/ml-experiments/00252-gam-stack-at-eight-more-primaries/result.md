@@ -51,8 +51,6 @@ adopted_in: none
 date: 2026-10-22
 ---
 
-# Experiment 252: does the best-guess stack work at the eight Primaries that have no stack forecast?
-
 **Planned; no score has been read.** Fourteen substation cards have a BG2 line, but only D5, D9,
 D10, D11, D14, and D16 have a best-guess line and example weeks. This experiment fits the same
 stack at D2, D3, D4, D8, D12, D19, D21, and D22 and asks whether it stays within 0.05 points of
@@ -60,13 +58,22 @@ BG2.
 
 ## Arms
 
-- **A0.** The stack as merged for the six sites (experiment 247's chain), with the pinned solar
-  capacity set from the card's own inference where one exists, and zero PV otherwise.
-- **A1.** A0 without the solar term and clip, to test whether sites with little PV are hurt by a
-  zero-capacity term.
-- **A2.** A0 with the monotone neural network on the clipped PV term (experiment 250). Pre-registered
-  as above.
-- **References.** BG2, climatology, and the manual heuristic.
+**Plan amendment, committed before any score was read.** The brief assumed a pinned solar capacity
+"from the card's own inference where one exists". No real-time capacity vintage exists for the eight
+sites (experiment 45's vintages cover the MW Primaries only), so the pinned solar term is zero at
+all eight. That changes three arms.
+
+- **A0 (verdict arm).** Experiment 247's chain with a zero pinned solar term: T-all monthly fits
+  (heating split by day type), shared filter noise (POOL), ensemble-mean weather, winter night
+  offset, and recipe R (experiment 155's arm D), fitted on the apparent-power reading as experiment
+  152's arm N does. The 60% clip acts on the pinned solar output, so it is inert at zero capacity.
+  Experiment 169's band fixes are not applied (their code is tied to the six sites).
+- **A1 (dropped).** A0 without the solar term is A0 itself, so the arm is empty.
+- **A2 (not run).** The monotone network of experiment 250 acts on a non-zero clipped solar term,
+  and none exists here, so prediction 4 is untested.
+- **Control gate.** The same code, reading experiment 111's stores, reproduces experiment 155's
+  stored arm D at D10 and D11 (maximum difference 0.0 in the median and the mean).
+- **References.** BG2, climatology, and the manual heuristic of experiment 87.
 
 ## Sites, rows, and caveats
 
