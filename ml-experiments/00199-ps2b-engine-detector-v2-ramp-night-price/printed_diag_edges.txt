@@ -1,0 +1,5 @@
+flagged start  n= 452 pass=0.71
+flagged end    n= 452 pass=0.87
+true start     n= 560 pass=0.69
+true end       n= 560 pass=0.81
+flagged start, boundary shifted by -2..2: {-2: 0.12, -1: 0.77, 0: 0.71, 1: 0.67, 2: 0.48}

@@ -14,7 +14,7 @@ import polars as pl
 import pytest
 from studies.dp_features import FeatureCache, naive_utc
 from studies.ens_members import ENSEMBLE_SIZE, mixture_quantiles
-from studies.pv_physics import half_hour_sun_and_sky, plant_power_mw
+from studies.pv_physics import PlantParameters, half_hour_sun_and_sky, plant_power_mw
 
 from studies import dp_ens_weather as weather
 
@@ -337,6 +337,10 @@ def test_the_batched_pv_shape_equals_the_pipeline_of_the_cache_and_blanks_a_miss
     assert np.isnan(blanked[0, 10])
     assert np.isnan(blanked[0, 11])
     assert np.isfinite(blanked[0, 12])
+    east = PlantParameters(tilt_deg=30.0, azimuth_deg=90.0, dc_capacity_mw=1.15, ac_capacity_mw=1.0)
+    shape_east, _ = sun.pv_shape_and_ghi(ghi_w_m2=half_hourly[None, :], plant=east)
+    assert np.abs(shape_east[0] - plant_power_mw(sky=sky, parameters=east)).max() < 1e-9
+    assert np.abs(shape_east[0] - shape[0]).max() > 0.01
 
 
 def test_the_clear_sky_peaks_at_solar_noon_and_is_zero_at_night():
