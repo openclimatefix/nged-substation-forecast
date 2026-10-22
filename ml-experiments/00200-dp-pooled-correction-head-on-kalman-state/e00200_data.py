@@ -6,6 +6,7 @@ target's own error. `error_grid` puts each substation's shortest-lead error on a
 so that the injection of the known-answer gate can edit the grid and rebuild the inputs.
 """
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
@@ -18,6 +19,11 @@ EXPERIMENT_ID: Final[int] = 200
 SLUG: Final[str] = "dp-pooled-correction-head-on-kalman-state"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
 WORK_DIR: Final[Path] = DATA_DIR / "work"
+SHARED = os.environ.get("E200_SHARED") == "1"
+"""Read the shared 6-site file with the Kalman state and the early era (stage 3)."""
+TAG: Final[str] = "3" if SHARED else "2"
+"""Stage 2 reads the stored substations, stage 3 the shared file with the early era."""
+SHARED_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00201-dp-gam-residual-mlp" / "work" / "gam_d"
 SRC_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
     / "00155-dp-bg-stage2-assembly-night-offset-and-error-correction"
@@ -63,11 +69,14 @@ class Site:
 
 def load_site(*, time_series_id: int) -> Site:
     """Read arm D (seed 0, all periods) for one substation and build its error grid."""
-    frames = [
-        pl.read_parquet(path)
-        for path in sorted(SRC_DIR.glob("d_*_D*.parquet"))
-        if "spread" not in path.name
-    ]
+    if SHARED:
+        frames = [pl.read_parquet(path) for path in sorted(SHARED_DIR.glob("D*.parquet"))]
+    else:
+        frames = [
+            pl.read_parquet(path)
+            for path in sorted(SRC_DIR.glob("d_*_D*.parquet"))
+            if "spread" not in path.name
+        ]
     rows = (
         pl.concat(frames)
         .filter((pl.col("arm") == "d") & (pl.col("time_series_id") == time_series_id))
@@ -185,4 +194,13 @@ def build_features(*, site: Site, error_grid: np.ndarray) -> dict[str, np.ndarra
         "q50": rows["q50"].to_numpy().astype(np.float32),
         "quantiles": rows.select(QUANTILES).to_numpy().astype(np.float32),
         "switching": rows["switching_mask"].to_numpy(),
+        "level": rows["level"].to_numpy().astype(np.float32)
+        if SHARED
+        else np.zeros(len(rows), np.float32),
+        "anomaly": rows["anomaly"].to_numpy().astype(np.float32)
+        if SHARED
+        else np.zeros(len(rows), np.float32),
+        "era_ens": (rows["era"] == "ens").to_numpy().astype(np.float32)
+        if SHARED
+        else np.ones(len(rows), np.float32),
     }

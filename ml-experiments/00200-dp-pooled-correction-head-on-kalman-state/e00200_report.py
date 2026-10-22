@@ -14,8 +14,8 @@ DECISION = ["D5", "D10", "D11", "D14", "D16"]
 
 
 def main() -> None:
-    head = pl.read_parquet(data_module.WORK_DIR / "stage2_head_rows.parquet")
-    blind = pl.read_parquet(data_module.WORK_DIR / "stage2_blind_rows.parquet")
+    head = pl.read_parquet(data_module.WORK_DIR / f"stage{data_module.TAG}_head_rows.parquet")
+    blind = pl.read_parquet(data_module.WORK_DIR / f"stage{data_module.TAG}_blind_rows.parquet")
     rng = np.random.default_rng(0)
     h = head.filter(pl.col("arm") == "head")
     b = blind.filter(pl.col("arm") == "head")

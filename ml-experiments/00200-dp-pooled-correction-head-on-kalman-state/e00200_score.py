@@ -27,7 +27,7 @@ N_RESAMPLES = 20_000
 
 def site_labels() -> dict[int, str]:
     out = {}
-    for path in sorted(data_module.SRC_DIR.glob("d_scored_D*.parquet")):
+    for path in sorted((data_module.SRC_DIR.glob("d_scored_D*.parquet"))):
         if "spread" in path.name:
             continue
         out[int(pl.read_parquet(path, columns=["time_series_id"])["time_series_id"][0])] = (
@@ -65,10 +65,12 @@ def main() -> None:
     sites = [data_module.load_site(time_series_id=i) for i in ids]
     feats = [data_module.build_features(site=s, error_grid=s.error_grid) for s in sites]
     blind = "--blind" in sys.argv
+    tag = "3" if data_module.SHARED else "2"
     x = [model_module.design(f=f) for f in feats]
     if blind:
         for matrix in x:
             matrix[:, :18] = 0.0  # every column built from past errors
+            matrix[:, -3:-1] = 0.0  # the Kalman level and anomaly
     parts = {"train": [], "valid": []}
     for k, f in enumerate(feats):
         init = f["init"]
@@ -138,7 +140,7 @@ def main() -> None:
             )
     df = pl.concat(records)
     df.write_parquet(
-        data_module.WORK_DIR / ("stage2_blind_rows.parquet" if blind else "stage2_rows.parquet")
+        data_module.WORK_DIR / f"stage{tag}_{'blind' if blind else 'head'}_rows.parquet"
     )
     rng = np.random.default_rng(0)
     report: dict[str, object] = {"train_rows": len(train.y)}
@@ -179,7 +181,7 @@ def main() -> None:
         )
         for s in labels.values()
     }
-    Path(data_module.WORK_DIR / ("stage2_blind.json" if blind else "stage2.json")).write_text(
+    Path(data_module.WORK_DIR / f"stage{tag}_{'blind' if blind else 'head'}.json").write_text(
         json.dumps(report, indent=2)
     )
     print(json.dumps(report, indent=2))

@@ -25,7 +25,8 @@ BATCH: Final[int] = 1024
 LEARNING_RATE: Final[float] = 2e-3
 WEIGHT_DECAY: Final[float] = 1e-2
 LOG_SCALE_LIMIT: Final[float] = 0.7
-N_FEATURES: Final[int] = N_RECENT + 3 + 1 + 1 + 2 + 7 + 1 + 2
+N_FEATURES: Final[int] = N_RECENT + 3 + 1 + 1 + 2 + 7 + 1 + 2 + 3
+"""The last 3 columns are the Kalman level, the Kalman anomaly, and the ensemble-era flag."""
 
 
 def design(*, f: dict[str, np.ndarray]) -> np.ndarray:
@@ -46,6 +47,9 @@ def design(*, f: dict[str, np.ndarray]) -> np.ndarray:
             np.cos(angle),
             dow,
             f["mean"] / 100.0,
+            f["level"] / ERROR_SCALE,
+            f["anomaly"] / ERROR_SCALE,
+            f["era_ens"],
         ]
     ).astype(np.float32)
 

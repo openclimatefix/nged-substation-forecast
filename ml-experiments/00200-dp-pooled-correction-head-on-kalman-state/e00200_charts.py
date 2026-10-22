@@ -31,10 +31,10 @@ def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     print("wrote", name)
 
 
-def contrasts() -> pl.DataFrame:
+def contrasts(*, tag: str) -> pl.DataFrame:
     rng = np.random.default_rng(0)
-    head = pl.read_parquet(data_module.WORK_DIR / "stage2_head_rows.parquet")
-    blind = pl.read_parquet(data_module.WORK_DIR / "stage2_blind_rows.parquet")
+    head = pl.read_parquet(data_module.WORK_DIR / f"stage{tag}_head_rows.parquet")
+    blind = pl.read_parquet(data_module.WORK_DIR / f"stage{tag}_blind_rows.parquet")
     keep = pl.col("site").is_in(DECISION)
     h, b, d = (
         x.filter(keep & (pl.col("arm") == arm))
@@ -49,16 +49,25 @@ def contrasts() -> pl.DataFrame:
     ):
         diff = left["loss"].to_numpy() - right["loss"].to_numpy()
         m, lo, hi = score_module.interval(diff=diff, months=months, level=0.99, rng=rng)
-        rows.append({"contrast": name, "difference": m, "lower": lo, "upper": hi})
+        rows.append(
+            {
+                "kind": name,
+                "contrast": name
+                + (" (one year, stage 2)" if tag == "2" else " (2020 onward, stage 3)"),
+                "difference": m,
+                "lower": lo,
+                "upper": hi,
+            }
+        )
     return pl.DataFrame(rows)
 
 
 def figure_contrasts() -> alt.TopLevelMixin:
-    data = contrasts()
+    data = pl.concat([contrasts(tag="2"), contrasts(tag="3")])
     base = alt.Chart(data).encode(
         y=alt.Y("contrast:N", sort=None, title=None),
         color=alt.Color(
-            "contrast:N",
+            "kind:N",
             legend=None,
             scale=alt.Scale(
                 domain=["Head minus arm D", "Blind head minus arm D", "Head minus blind head"],
@@ -85,7 +94,7 @@ def figure_contrasts() -> alt.TopLevelMixin:
     )
     return (zero + threshold + bars + points).properties(
         width=WIDTH,
-        height=130,
+        height=230,
         title="The head beats arm D, but most of the gain comes without reading any error",
     )
 
@@ -131,8 +140,8 @@ def figure_gate() -> alt.TopLevelMixin:
 
 
 def figure_sites() -> alt.TopLevelMixin:
-    head = pl.read_parquet(data_module.WORK_DIR / "stage2_head_rows.parquet")
-    blind = pl.read_parquet(data_module.WORK_DIR / "stage2_blind_rows.parquet")
+    head = pl.read_parquet(data_module.WORK_DIR / f"stage{data_module.TAG}_head_rows.parquet")
+    blind = pl.read_parquet(data_module.WORK_DIR / f"stage{data_module.TAG}_blind_rows.parquet")
     d = head.filter(pl.col("arm") == "arm_d")
     rows = []
     for name, frame in (("Head", head), ("Blind head", blind)):
@@ -160,7 +169,7 @@ def figure_sites() -> alt.TopLevelMixin:
         .properties(
             width=WIDTH,
             height=170,
-            title="Four of six substations gain in both arms; D11 and D9 get worse with the head",
+            title="Stage 3: all six substations gain with the head; D5 gains more with the blind head",
         )
     )
 
