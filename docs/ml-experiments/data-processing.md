@@ -582,6 +582,16 @@ the `information` field are a July 2026 snapshot, so the files carry no history 
 failed ([experiment
 182](00182-switching-d8-disaggregated-farms-and-drops/result.md)).
 
+**Clip the solar term at D5 at 60% of the held capacity (medium confidence, provisional).** D5 is
+the one substation with the export-clip flag in the series table, and its sunny-daylight forecast
+error against BG2 falls from +0.202 MW to +0.069 MW when the solar output the GAM subtracts from
+demand is capped at 60% of the capacity held after the cut. The same clip at D10 and D16, which show
+no plateau in clear-sky net power, leaves their sunny error unchanged and raises their error over
+all half-hours by 0.005 to 0.006 MW, so apply it only where the limit exists. A ceiling of 100%
+clips nothing. The evidence is one substation and one scored year, with the ceiling chosen on the
+tuning months ([experiment 180](00180-dp-sunny-daylight-fix-d5-solar-shape/result.md); applies to
+experiments and production).
+
 ## Switching and the switching log
 
 **Mask switching with the 66 hand-filtered real transfers, and with nothing else.** The transfers
