@@ -1,0 +1,92 @@
+rows 3937291 worlds 44 sites 6
+shape: (84, 10)
+┌─────────────────────────────────┬──────────────┬─────────┬─────────┬──────────────────────┬───────────┬──────────┬───────────┬─────────┬─────────┐
+│ stratum                         ┆ phase        ┆ source  ┆ design  ┆ kind                 ┆ est       ┆ lo       ┆ hi        ┆ n_rows  ┆ n_units │
+│ ---                             ┆ ---          ┆ ---     ┆ ---     ┆ ---                  ┆ ---       ┆ ---      ┆ ---       ┆ ---     ┆ ---     │
+│ str                             ┆ str          ┆ str     ┆ str     ┆ str                  ┆ f64       ┆ f64      ┆ f64       ┆ i64     ┆ i64     │
+╞═════════════════════════════════╪══════════════╪═════════╪═════════╪══════════════════════╪═══════════╪══════════╪═══════════╪═════════╪═════════╡
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ PERFECT ┆ MASK    ┆ gain                 ┆ 0.6132    ┆ 0.4346   ┆ 0.8093    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ PERFECT ┆ SOFT_2  ┆ gain                 ┆ 0.001     ┆ 0.0006   ┆ 0.0015    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ PERFECT ┆ SOFT_4  ┆ gain                 ┆ 0.003     ┆ 0.0018   ┆ 0.0044    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ PERFECT ┆ SOFT_16 ┆ gain                 ┆ 0.0127    ┆ 0.008    ┆ 0.0181    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ PERFECT ┆ HALF    ┆ gain                 ┆ 0.508     ┆ 0.3956   ┆ 0.6341    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ PERFECT ┆ SUB     ┆ gain                 ┆ 0.3477    ┆ 0.1699   ┆ 0.5421    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ DET     ┆ MASK    ┆ gain                 ┆ -0.0899   ┆ -0.3323  ┆ 0.1493    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ DET     ┆ SOFT_2  ┆ gain                 ┆ 0.0004    ┆ 0.0001   ┆ 0.0009    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ DET     ┆ SOFT_4  ┆ gain                 ┆ 0.0012    ┆ 0.0003   ┆ 0.0024    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ DET     ┆ SOFT_16 ┆ gain                 ┆ 0.005     ┆ 0.0012   ┆ 0.0099    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ DET     ┆ HALF    ┆ gain                 ┆ 0.1485    ┆ 0.0139   ┆ 0.3026    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ DET     ┆ SUB     ┆ gain                 ┆ -0.3969   ┆ -0.7098  ┆ -0.101    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ BEFORE_ALARM ┆ PERFECT ┆ MASK    ┆ reference_gain       ┆ 0.6132    ┆ 0.4346   ┆ 0.8093    ┆ 105675  ┆ 353     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ PERFECT ┆ MASK    ┆ gain                 ┆ 1.4608    ┆ 0.6856   ┆ 2.3008    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ PERFECT ┆ SOFT_2  ┆ gain                 ┆ -0.0002   ┆ -0.0008  ┆ 0.0007    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ PERFECT ┆ SOFT_4  ┆ gain                 ┆ -0.0008   ┆ -0.0024  ┆ 0.0017    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ PERFECT ┆ SOFT_16 ┆ gain                 ┆ -0.0036   ┆ -0.0096  ┆ 0.005     ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ PERFECT ┆ HALF    ┆ gain                 ┆ 1.2074    ┆ 0.7045   ┆ 1.7971    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ PERFECT ┆ SUB     ┆ gain                 ┆ 1.5728    ┆ 0.8568   ┆ 2.3672    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ DET     ┆ MASK    ┆ gain                 ┆ 0.4382    ┆ -0.0229  ┆ 1.0195    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ DET     ┆ SOFT_2  ┆ gain                 ┆ 0.0001    ┆ -0.0002  ┆ 0.0004    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ DET     ┆ SOFT_4  ┆ gain                 ┆ 0.0002    ┆ -0.0005  ┆ 0.0012    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ DET     ┆ SOFT_16 ┆ gain                 ┆ 0.001     ┆ -0.002   ┆ 0.0047    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ DET     ┆ HALF    ┆ gain                 ┆ 0.425     ┆ 0.1126   ┆ 0.8582    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ DET     ┆ SUB     ┆ gain                 ┆ 0.3327    ┆ -0.1259  ┆ 0.905     ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ DURING       ┆ PERFECT ┆ MASK    ┆ reference_gain       ┆ 1.4608    ┆ 0.6856   ┆ 2.3008    ┆ 56200   ┆ 133     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ PERFECT ┆ MASK    ┆ gain                 ┆ 1.5003    ┆ 1.0719   ┆ 1.9607    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ PERFECT ┆ SOFT_2  ┆ gain                 ┆ 0.0006    ┆ 0.0001   ┆ 0.0011    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ PERFECT ┆ SOFT_4  ┆ gain                 ┆ 0.0016    ┆ 0.0003   ┆ 0.003     ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ PERFECT ┆ SOFT_16 ┆ gain                 ┆ 0.0067    ┆ 0.0019   ┆ 0.0123    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ PERFECT ┆ HALF    ┆ gain                 ┆ 1.211     ┆ 0.9363   ┆ 1.5057    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ PERFECT ┆ SUB     ┆ gain                 ┆ 1.349     ┆ 0.8981   ┆ 1.8405    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ DET     ┆ MASK    ┆ gain                 ┆ 0.7939    ┆ 0.4399   ┆ 1.1862    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ DET     ┆ SOFT_2  ┆ gain                 ┆ 0.0004    ┆ 0.0001   ┆ 0.0008    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ DET     ┆ SOFT_4  ┆ gain                 ┆ 0.0012    ┆ 0.0002   ┆ 0.0022    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ DET     ┆ SOFT_16 ┆ gain                 ┆ 0.005     ┆ 0.0011   ┆ 0.0089    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ DET     ┆ HALF    ┆ gain                 ┆ 0.7304    ┆ 0.4943   ┆ 0.9932    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ DET     ┆ SUB     ┆ gain                 ┆ 0.4082    ┆ 0.0261   ┆ 0.8309    ┆ 50010   ┆ 301     │
+│ headline (25% or more, over 1 … ┆ AFTER        ┆ PERFECT ┆ MASK    ┆ reference_gain       ┆ 1.5003    ┆ 1.0719   ┆ 1.9607    ┆ 50010   ┆ 301     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ PERFECT ┆ MASK    ┆ gain                 ┆ 0.6032    ┆ 0.4271   ┆ 0.7999    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ PERFECT ┆ SOFT_2  ┆ gain                 ┆ 0.001     ┆ 0.0006   ┆ 0.0016    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ PERFECT ┆ SOFT_4  ┆ gain                 ┆ 0.0029    ┆ 0.0018   ┆ 0.0044    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ PERFECT ┆ SOFT_16 ┆ gain                 ┆ 0.0125    ┆ 0.008    ┆ 0.0182    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ PERFECT ┆ HALF    ┆ gain                 ┆ 0.5014    ┆ 0.3896   ┆ 0.6263    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ PERFECT ┆ SUB     ┆ gain                 ┆ 0.3393    ┆ 0.1645   ┆ 0.5311    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ DET     ┆ MASK    ┆ gain                 ┆ -0.0883   ┆ -0.3348  ┆ 0.1502    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ DET     ┆ SOFT_2  ┆ gain                 ┆ 0.0004    ┆ 0.0001   ┆ 0.0009    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ DET     ┆ SOFT_4  ┆ gain                 ┆ 0.0012    ┆ 0.0002   ┆ 0.0024    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ DET     ┆ SOFT_16 ┆ gain                 ┆ 0.0049    ┆ 0.0012   ┆ 0.0099    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ DET     ┆ HALF    ┆ gain                 ┆ 0.1465    ┆ 0.0116   ┆ 0.2971    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ DET     ┆ SUB     ┆ gain                 ┆ -0.3908   ┆ -0.7048  ┆ -0.0965   ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ BEFORE_ALARM ┆ PERFECT ┆ MASK    ┆ reference_gain       ┆ 0.6032    ┆ 0.4271   ┆ 0.7999    ┆ 107210  ┆ 361     │
+│ all transfers                   ┆ DURING       ┆ PERFECT ┆ MASK    ┆ gain                 ┆ 1.4608    ┆ 0.6856   ┆ 2.3008    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ PERFECT ┆ SOFT_2  ┆ gain                 ┆ -0.0002   ┆ -0.0008  ┆ 0.0007    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ PERFECT ┆ SOFT_4  ┆ gain                 ┆ -0.0008   ┆ -0.0024  ┆ 0.0017    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ PERFECT ┆ SOFT_16 ┆ gain                 ┆ -0.0036   ┆ -0.0096  ┆ 0.005     ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ PERFECT ┆ HALF    ┆ gain                 ┆ 1.2074    ┆ 0.7045   ┆ 1.7971    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ PERFECT ┆ SUB     ┆ gain                 ┆ 1.5728    ┆ 0.8568   ┆ 2.3672    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ DET     ┆ MASK    ┆ gain                 ┆ 0.4382    ┆ -0.0229  ┆ 1.0195    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ DET     ┆ SOFT_2  ┆ gain                 ┆ 0.0001    ┆ -0.0002  ┆ 0.0004    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ DET     ┆ SOFT_4  ┆ gain                 ┆ 0.0002    ┆ -0.0005  ┆ 0.0012    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ DET     ┆ SOFT_16 ┆ gain                 ┆ 0.001     ┆ -0.002   ┆ 0.0047    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ DET     ┆ HALF    ┆ gain                 ┆ 0.425     ┆ 0.1126   ┆ 0.8582    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ DET     ┆ SUB     ┆ gain                 ┆ 0.3327    ┆ -0.1259  ┆ 0.905     ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ DURING       ┆ PERFECT ┆ MASK    ┆ reference_gain       ┆ 1.4608    ┆ 0.6856   ┆ 2.3008    ┆ 56200   ┆ 133     │
+│ all transfers                   ┆ AFTER        ┆ PERFECT ┆ MASK    ┆ gain                 ┆ 1.4976    ┆ 1.0768   ┆ 1.9619    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ PERFECT ┆ SOFT_2  ┆ gain                 ┆ 0.0006    ┆ 0.0001   ┆ 0.0011    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ PERFECT ┆ SOFT_4  ┆ gain                 ┆ 0.0016    ┆ 0.0003   ┆ 0.003     ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ PERFECT ┆ SOFT_16 ┆ gain                 ┆ 0.0067    ┆ 0.0019   ┆ 0.0123    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ PERFECT ┆ HALF    ┆ gain                 ┆ 1.2087    ┆ 0.9385   ┆ 1.5075    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ PERFECT ┆ SUB     ┆ gain                 ┆ 1.3461    ┆ 0.8977   ┆ 1.8352    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ DET     ┆ MASK    ┆ gain                 ┆ 0.7925    ┆ 0.4463   ┆ 1.195     ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ DET     ┆ SOFT_2  ┆ gain                 ┆ 0.0004    ┆ 0.0001   ┆ 0.0008    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ DET     ┆ SOFT_4  ┆ gain                 ┆ 0.0012    ┆ 0.0002   ┆ 0.0022    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ DET     ┆ SOFT_16 ┆ gain                 ┆ 0.0049    ┆ 0.0011   ┆ 0.0089    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ DET     ┆ HALF    ┆ gain                 ┆ 0.7291    ┆ 0.4953   ┆ 0.9963    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ DET     ┆ SUB     ┆ gain                 ┆ 0.4067    ┆ 0.0288   ┆ 0.8376    ┆ 50123   ┆ 306     │
+│ all transfers                   ┆ AFTER        ┆ PERFECT ┆ MASK    ┆ reference_gain       ┆ 1.4976    ┆ 1.0768   ┆ 1.9619    ┆ 50123   ┆ 306     │
+│ ordinary near false alarms      ┆ ORDINARY     ┆ DET     ┆ MASK    ┆ harm_per_false_alarm ┆ 999.9589  ┆ 640.7813 ┆ 1415.6948 ┆ 3723758 ┆ 157     │
+│ ordinary near false alarms      ┆ ORDINARY     ┆ DET     ┆ SOFT_2  ┆ harm_per_false_alarm ┆ -0.2261   ┆ -0.3941  ┆ -0.0788   ┆ 3723758 ┆ 157     │
+│ ordinary near false alarms      ┆ ORDINARY     ┆ DET     ┆ SOFT_4  ┆ harm_per_false_alarm ┆ -0.6307   ┆ -1.1047  ┆ -0.2136   ┆ 3723758 ┆ 157     │
+│ ordinary near false alarms      ┆ ORDINARY     ┆ DET     ┆ SOFT_16 ┆ harm_per_false_alarm ┆ -2.2698   ┆ -4.0768  ┆ -0.6497   ┆ 3723758 ┆ 157     │
+│ ordinary near false alarms      ┆ ORDINARY     ┆ DET     ┆ HALF    ┆ harm_per_false_alarm ┆ 23.6864   ┆ -84.7527 ┆ 144.76    ┆ 3723758 ┆ 157     │
+│ ordinary near false alarms      ┆ ORDINARY     ┆ DET     ┆ SUB     ┆ harm_per_false_alarm ┆ 1249.8605 ┆ 960.4072 ┆ 1576.0177 ┆ 3723758 ┆ 157     │
+└─────────────────────────────────┴──────────────┴─────────┴─────────┴──────────────────────┴───────────┴──────────┴───────────┴─────────┴─────────┘
