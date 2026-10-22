@@ -25,24 +25,31 @@ hypothesis: >-
   mixture of a wind model and the ensemble's wind summaries, and adds an offset to each of 11
   quantiles, lowers the quantile score against the wind model alone (R1, the physics core), matches
   the XGBoost best guess (R0), and lowers the pinball loss at the 0.99 quantile, once it can learn
-  from about 440 daily runs of the ensemble forecast instead of the 13 to 40 that experiment 221's
-  head saw.
+  from daily runs of the ensemble forecast over 15 months (about 440 runs) instead of the 13 to 40
+  Tuesday runs that experiment 221's head saw.
 prediction: >-
   Written before any fit. C1, H5c minus R1, kept rows, all leads: -0.15 to -0.40 points of capacity.
   C2, H5c minus R0: inside -0.10 to +0.10, with H5c's 0.99 pinball loss 5% to 15% lower than R0's at
   lead days 1 and 2. C3, H5c minus the better non-neural arm (N5-lin or N5-xgb): at least 0.03
   points lower. C4, H5c minus K5: at least 0.05 points lower. The blind share, (BL5 minus R1) divided
-  by (H5c minus R1), is under 0.5. H5c's 5% to 95% band covers 0.86 to 0.92 of kept rows.
+  by (H5c minus R1), is under 0.5, reported only when C1's point estimate is below zero. H5c's 5% to
+  95% band covers 0.80 to 0.90 of kept rows (experiment 221's pinball-trained heads shrank the band
+  to 0.77 to 0.85). C5, H5c minus H5c trained on the Tuesday runs of the same hindcast period only
+  (descriptive): -0.05 to -0.20, which tests whether daily runs, and not just more months, help.
 decision_rule: >-
-  Four decisive contrasts, C1 to C4 above, each on the quantile score over all leads on the rows kept
-  by experiment 210's mask, read at 98.75% (Bonferroni across four), resampling whole months of the
-  ENS run and the five seeds, 50,000 resamples. Supported: C1 wholly below zero, C2 wholly below
-  +0.05 (no worse than XGBoost by 0.05), and the tail score T (the mean of the 0.01 and 0.99
-  pinball losses) of H5c below R0's with an interval wholly below zero. The threshold for keeping the
-  network over the non-neural arm is 0.03 points (C3). The threshold for replacing XGBoost in
-  production is C2 wholly below zero, because the change adds a trained network to the serving path.
-  H5x beside H5c is descriptive. Everything else (per farm, per lead band, season, the other
-  arms, coverage) is descriptive and labelled so. The intervals describe these three farms.
+  Four decisive contrasts, C1 to C4, each paired per case, on the quantile score over all leads on
+  the rows kept by experiment 210's mask, read at 98.75% (Bonferroni across four), resampling whole
+  months of the ENS run and the five seeds, 50,000 resamples. The tail score T (the mean of the
+  0.01 and 0.99 pinball losses, H5c minus R0) is read at the same level and is a fifth test, so the
+  verdict needs all of: C1 interval wholly below zero; C2 upper end below +0.05; T interval wholly
+  below zero. C3 (interval wholly below -0.03, the threshold for keeping the network over the
+  non-neural arm chosen on the early-stopping runs) and C4 (interval wholly below zero) decide
+  whether the network earns its inputs and are reported beside the verdict, not inside it. The
+  threshold for replacing XGBoost in production is C2 wholly below zero, because the change adds a
+  trained network to the serving path; a result can therefore be `supported` and still not be worth
+  porting. An interval too wide to separate C1 from zero is reported as `inconclusive`, with the
+  interval half-width. C5, the 0.99 pinball loss by lead day, and everything else (per farm, per
+  lead band, season, the other arms, coverage) are descriptive and labelled so. The intervals describe these three farms.
 benchmark: >-
   R0, the XGBoost recipe of experiment 230's A0r fitted on ERA5 before 2024-04-01, and R1, the
   physics core (experiment 230's B1) fitted on the same window, both run on the 51 members with the
@@ -80,8 +87,12 @@ guess. This experiment re-creates the base forecasts on every daily 00 UTC ensem
   Tuesday-run frames of experiment 230 exactly. Rows with no observed power, and rows in experiment
   210's mask, are dropped from training and scoring.
 - **Spread factor.** The monthly spread factor of experiment 33 (fitted on earlier cases only) is
-  applied to the mixture of R0 and R1 on the hindcast runs and on the scored year, so the head adds
-  offsets to the spread-adjusted base.
+  applied separately to each base model's own mixture, in one pass over the hindcast and scored
+  cases together, so that the scored months see the hindcast cases as earlier cases. The first
+  hindcast months, with fewer than 5,000 earlier cases, keep the unadjusted mixture and are flagged;
+  the head trains on them as they are, and the write-up reports its score with and without them.
+  Experiment 210's mask is checked to cover the hindcast dates; rows it does not cover are
+  reported.
 - **Head inputs, shared by every neural arm unless stated.** The base 11 quantiles as fractions of
   capacity; the members' mean, standard deviation, 10th percentile, and 90th percentile of the 100 m
   wind speed; the sine and cosine of the direction of the members' mean wind vector at 100 m; the
@@ -89,8 +100,10 @@ guess. This experiment re-creates the base forecasts on every daily 00 UTC ensem
 - **Head form.** Experiment 243's H5: two hidden layers of 64 units with GELU, a zero-initialised
   last layer, 11 corrections of 0.3 times tanh added to the base quantiles, sorted so they cannot
   cross, clamped to 0 to 1, trained on the mean pinball loss over the 11 levels, with AdamW at a
-  learning rate of 0.002 and weight decay of 0.0001, 60 epochs, batches of 512, pooled over W1 to
-  W3, 5 seeds. Early stopping uses the last 2 months of the training period as validation, by whole
+  learning rate of 0.002 and weight decay of 0.0001, up to 60 epochs, batches of 512, pooled over W1
+  to W3, 5 seeds (the seeds are a variance component of the head only; the base fits are
+  deterministic or repeated per seed). The epoch with the lowest validation loss is kept and the
+  head is not refitted on the validation runs. Early stopping uses the last 2 months of the training period as validation, by whole
   ENS runs: training uses runs initialised before 2025-04-16 whose valid time is also before
   2025-04-16, and validation uses runs initialised from 2025-04-16. All settings are frozen before
   any scored month is read.
@@ -102,14 +115,17 @@ All arms use seeds 0 to 4; the deterministic arms repeat their rows once per see
 - **R0:** the XGBoost recipe on 51 members (pre-2024-04 fit) with the spread factor.
 - **R1:** the physics core with residual quantiles on 51 members (pre-2024-04 fit) with the spread
   factor.
-- **H5c:** R1 plus the head. **H5x:** R0 plus the same head, trained on R0's mixture.
+- **H5c:** R1 plus the head. **H5c-Tue:** the same head trained only on the hindcast period's
+  Tuesday 00 UTC runs (about 65), for C5.
 - **N5-lin:** 11 linear quantile regressions on the head's inputs, fitted by gradient descent on the
   pinball loss, adding offsets to R1, sorted.
 - **N5-xgb:** a per-level XGBoost quantile stage with the head's inputs, adding offsets to R1.
   `colsample_bytree` is 1.
 - **K5 (calibration only):** the head with only the base quantiles, the lead, and the farm column.
 - **BL5 (blind control):** the head with only the lead, the farm column, and the sine and cosine of
-  the hour and the day of the year, adding offsets to R1.
+  the hour and the day of the year, adding offsets to R1. The hindcast sees July to March once, so
+  the blind share is also reported on the April-to-June cases alone, where the calendar has two
+  training years.
 - **T5 (table):** one offset per lead day, quantile level, and farm, the pinball-optimal constant
   fitted on the training runs.
 - **References:** climatology (experiment 230's CLIM), and experiment 230's stored A0r and B1.
@@ -120,9 +136,12 @@ All arms use seeds 0 to 4; the deterministic arms repeat their rows once per see
   report the cause before any head is trained. A shorter training window (4.6 years against 5.8) is
   an expected cause, and it will be recorded as a departure from the plan.
 - If under 95% of the daily runs have all 51 members at the farms' cells, stop and report.
-- If H5c's score on its own training runs beats R1 by more than three times its gain on the
-  early-stopping runs, and H5c is worse than R1 on those runs, stop tuning and report. No setting is
-  tuned on a scored month.
+- If H5c is worse than R1 on the early-stopping runs while better than R1 on its training runs,
+  stop tuning and report. No setting is tuned on a scored month.
+- R1's error is reported by quarter of the hindcast and scored period, because R0 and R1 are fitted
+  before 2024-04 and the head learns their error at 0 to 14 months after that and is applied at 15
+  to 27 months. A drift in R1's error between the hindcast and the scored year is a caveat on the
+  head, which is static.
 
 ## Compute
 
