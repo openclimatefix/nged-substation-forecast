@@ -1,7 +1,7 @@
 ---
 id: "00189"
 slug: switching-neural-onset-end-block-detector
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done
@@ -87,7 +87,7 @@ adopted_in: none
 date: 2026-10-22
 ---
 
-# Experiment 189: can a small neural network, trained on realistic injected transfers, find real switching?
+# Experiment 189: can a small neural network, trained on realistic injected transfers, find real load shifts?
 
 **A small neural network (33,604 learned weights), trained only on synthetic transfers, found 7 of
 the 35 real transfers that lasted longer than 1 day. The rule-based detector RO-NC found 18.** A

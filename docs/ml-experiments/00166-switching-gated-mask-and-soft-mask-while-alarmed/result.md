@@ -4,7 +4,7 @@ slug: switching-gated-mask-and-soft-mask-while-alarmed
 title: >-
   A mask on recent power that trusts only balanced pair alarms, and a soft mask that inflates the
   filter's observation noise
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
   - production-reference-and-best-guess

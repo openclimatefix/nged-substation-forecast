@@ -4,7 +4,7 @@ slug: load-transfer-census-capture-recapture
 title: >-
   How many large load transfers exist, estimated without labels by capture-recapture between
   detectors?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: >-
