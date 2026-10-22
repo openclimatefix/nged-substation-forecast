@@ -86,7 +86,7 @@ def figure_overlaps() -> None:
         .properties(
             title=_title(
                 text="Most large events are found by one detector only",
-                line="Count of matched events by the detectors that found them, over 15 Primaries and 61.8 Primary-years (one learned-score fold). An event is a 3-hour-or-longer interval of at least 10% of a Primary's 99th percentile of demand.",
+                line="Count of matched events by the detectors that found them, over 15 Primary substations and 61.8 Primary-years (one learned-score fold). An event is a 3-hour-or-longer interval of at least 10% of a Primary's 99th percentile of demand.",
             )
         )
         .save(OUT_DIR / "figure_1_overlaps.svg")
@@ -141,7 +141,7 @@ def figure_events_per_year() -> None:
         height=170,
         title=_title(
             text="The estimated number of large events is far above the number seen, and its interval is very wide",
-            line="Orange diamond: events seen by any detector. Blue dot and line: three-list estimate and 95% interval from resampling whole calendar months. Green square: Chao lower bound. Median over three learned-score folds.",
+            line="Orange diamond: events seen by any detector. Blue dot and line: three-list estimate and 95% interval from resampling whole calendar months (Chao's lower bound where the three-list estimate is undefined). Green square: Chao lower bound. Median over three learned-score folds.",
         ),
     )
     chart.save(OUT_DIR / "figure_2_events_per_primary_year.svg")
@@ -201,7 +201,7 @@ def figure_injected() -> None:
         height=190,
         title=_title(
             text="Every estimator undercounts the known injected transfers; the grey band is the pre-registered 25%",
-            line="Experiment 195's held-out injected transfers of at least 24 hours (419 events), split into thirds by size. Each detector's found flag comes from matching to the known event.",
+            line="Experiment 195's held-out injected transfers of at least 24 hours (419 events), split into thirds by size. Each detector's found flag comes from matching to the known event. The three-list estimate is undefined in every row, so the Chao lower bound stands in for it.",
         ),
     ).save(OUT_DIR / "figure_3_injected_known_count.svg")
 
@@ -251,7 +251,7 @@ def figure_recall() -> None:
         height=170,
         title=_title(
             text="The label-free recall estimate is far below the measured recall for all large events",
-            line="Learned re-ranker: 23 of 35 (midpoint of 22 to 24). Three-list estimate, median over three learned-score folds. The 40%-or-more estimate rests on 10 events.",
+            line="Learned re-ranker: 23 of 35 (midpoint of 22 to 24). Three-list estimate, median over three learned-score folds; at 40% or more it is Chao's lower bound, so the recall is an upper bound from 7 events.",
         ),
     ).save(OUT_DIR / "figure_4_recall_against_logged.svg")
 

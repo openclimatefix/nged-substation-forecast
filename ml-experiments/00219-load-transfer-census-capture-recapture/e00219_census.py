@@ -73,6 +73,7 @@ def summarise(*, flags: np.ndarray, weights: np.ndarray) -> dict[str, float]:
     out["chao"] = seen + chao if np.isfinite(chao) else float("nan")
     primary = out["nti"] if np.isfinite(out["nti"]) else out["chao"]
     out["primary"] = max(primary, seen) if np.isfinite(primary) else float("nan")
+    out["chao_fallback"] = float(not np.isfinite(out["nti"]))
     for i in range(3):
         out[f"recall_{DETECTORS[i]}"] = (
             n[i] / out["primary"] if out["primary"] > 0 else float("nan")
@@ -101,7 +102,7 @@ def large_intervals(*, frame: pl.DataFrame, p99: dict[int, float], frac: float) 
     return rows.filter(
         (pl.col("hours") >= MIN_HOURS)
         & (pl.col("step_mw").abs() >= frac * pl.min_horizontal("p_alarm", "p_series"))
-    ).with_columns(ratio=pl.col("step_mw").abs() / pl.col("p_alarm"))
+    ).with_columns(ratio=pl.col("step_mw").abs() / pl.min_horizontal("p_alarm", "p_series"))
 
 
 def components(*, rows: pl.DataFrame) -> np.ndarray:
@@ -116,6 +117,16 @@ def components(*, rows: pl.DataFrame) -> np.ndarray:
         return x
 
     series, onset, end = rows["series"].to_numpy(), rows["onset"].to_numpy(), rows["end"].to_numpy()
+    # A partner-side interval is the same transfer as its alarm-side interval of the same detector.
+    alarm_series = rows["alarm_series"].to_numpy()
+    detector = rows["detector"].to_numpy()
+    first_of: dict[tuple, int] = {}
+    for i in range(n):
+        key = (detector[i], int(alarm_series[i]), int(onset[i]))
+        if key in first_of:
+            parent[find(i)] = find(first_of[key])
+        else:
+            first_of[key] = i
     order = np.argsort(onset)
     for a_pos, a in enumerate(order):
         for b in order[a_pos + 1 :]:
@@ -184,7 +195,15 @@ def bootstrap(*, flags: np.ndarray, groups: np.ndarray) -> dict[str, tuple[float
         for g in pick:
             w[index[g]] += 1
         draws.append(summarise(flags=flags, weights=w))
-    keys = ("primary", "nti", "chao", "recall_RO-NC", "recall_pair", "recall_learned")
+    keys = (
+        "primary",
+        "nti",
+        "chao",
+        "recall_RO-NC",
+        "recall_pair",
+        "recall_learned",
+        "chao_fallback",
+    )
     return {
         k: (
             float(np.nanpercentile([d[k] for d in draws], 2.5)),
