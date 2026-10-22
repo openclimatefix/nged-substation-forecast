@@ -206,10 +206,10 @@ The 20 worst days of the 72 are below. The full list is in
   worst pinball days (six substations) are among the worst mean-error days. Both measures point
   the same way.
 - **Audit triggers:** trigger 1 (a control fails) fired, because of the injected control. An Opus
-  audit ran, and the "Audit" section below gives its findings and their triage. Trigger 2 was also considered, because
-  the labelled fraction (48.6%) came in just under the predicted half: the sensitivity with the
-  switching rows kept (62.7%) tests the explanation that the scored rows hide switching days.
-  Dropping one substation moves the share by at most 3.6 points.
+  audit ran, and the "Audit" section below gives its findings and their triage. Trigger 2 was also
+  considered, because the labelled fraction (48.6%) came in just under the predicted half: the
+  sensitivity with the switching rows kept (62.7%) tests the explanation that the scored rows hide
+  switching days. Dropping one substation moves the share by at most 3.6 points.
 
 ## Sensitivities (post hoc)
 
