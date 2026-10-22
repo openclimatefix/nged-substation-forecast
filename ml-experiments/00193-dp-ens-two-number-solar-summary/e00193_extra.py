@@ -7,7 +7,7 @@
 - The mean forecast of arms M and F is arm A's mean plus the mean over members of the response.
 - Tail calibration (coverage and pinball loss at 0.01, 0.05, 0.95, 0.99) for daylight and all rows.
 
-    uv run --no-sync python ml-experiments/00187-*/e00193_extra.py
+    uv run --no-sync python ml-experiments/00193-*/e00193_extra.py
 """
 
 import json

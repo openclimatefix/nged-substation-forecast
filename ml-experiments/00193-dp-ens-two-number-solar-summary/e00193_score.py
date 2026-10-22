@@ -4,7 +4,7 @@ The score is the quantile score: twice the mean pinball loss over the 11 quantil
 effective capacity. A contrast is the arm's total minus arm A's total over a subset, as a
 percentage of arm A's total, with the months of the period resampled as whole blocks (paired).
 
-    uv run --no-sync python ml-experiments/00187-*/e00193_score.py
+    uv run --no-sync python ml-experiments/00193-*/e00193_score.py
 """
 
 import json
