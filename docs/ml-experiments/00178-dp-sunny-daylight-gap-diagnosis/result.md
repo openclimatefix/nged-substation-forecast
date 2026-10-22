@@ -152,7 +152,8 @@ sunniest third.
     - Lead band: 72 to 168 hours holds 77% of the gap and 58% of the rows. The rule is not met.
 - **D5 loses in every band:** at every hour from 08:00 to 18:00; in all four lead bands (0 to 12 h
   0.572 against 0.387 MW, 12 to 36 h 0.581 against 0.393, 36 to 72 h 0.610 against 0.411, 72 to 168
-  h 0.704 against 0.494); and in every clear-sky band with more than 100 half-hours (0.873 against 0.590 MW at 0.4 to 0.7,
+  h 0.704 against 0.494); and in every clear-sky band with more than 100 half-hours (0.873 against
+  0.590 MW at 0.4 to 0.7,
   0.523 against 0.412 at 0.7 to 0.9, 0.602 against 0.304 at 0.9 and above). The gap at 0.9 and above
   (0.298 MW) is about as large as at 0.4 to 0.7 (0.283 MW), so at D5 the loss is not confined to
   half-hours with a lower clear-sky index.
@@ -160,8 +161,9 @@ sunniest third.
   MW), and its loss grows with lead.
 - **Solar share:** D5 has the largest relative fall from the night mean to the sunny-daylight mean
   (3.44 to 1.14 MW, 67%), which we use as a proxy for its solar share because the fitted capacities
-  can only be read in the GPU environment, which this session does not have. D10 has the next largest relative fall (2.42 to 1.26 MW, 48%) and the
-  GAM beats BG2 at D10 (-0.009 MW), so solar share alone does not explain D5. D9's sunny-daylight mean is not lower than its night mean.
+  can only be read in the GPU environment, which this session does not have. D10 has the next
+  largest relative fall (2.42 to 1.26 MW, 48%) and the GAM beats BG2 at D10 (-0.009 MW), so solar
+  share alone does not explain D5. D9's sunny-daylight mean is not lower than its night mean.
 - **Ensemble clear-sky index on the sunny rows:** the median is 0.77, and the 5th to 95th
   percentile range is 0.52 to 0.98.
 
