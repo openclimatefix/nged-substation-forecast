@@ -1,6 +1,6 @@
 # NGED power telemetry
 
-**The power readings are half-hourly telemetry from 32 time series in NGED's East Midlands licence
+**The power readings are half-hourly telemetry from 32 time series in NGED's trial
 area, and several of their properties change how an experiment must read them.** This page lists
 the properties that have cost experiments time. The processing steps themselves are on the
 [data-processing page](../data-processing.md), and the context of the network is on the [network
@@ -42,16 +42,17 @@ page](../../background/network.md).
 - **Two Delta tables hold the power: `data/NGED/power_time_series.delta` (raw) and
   `data/NGED/cleaned_power_time_series.delta` (cleaned).** The cleaned table holds every raw row
   plus a nullable `drop_reason` column that names the cleaning rule that flagged the row.
-- **Read power through `studies.power.scan_power`.** It keeps only the rows with a null
-  `drop_reason`. A study must not name the raw table; a test enforces this.
+- **Read power through `studies.power.scan_power`.** `scan_power` keeps only the rows with a
+  null `drop_reason`. A study must not name the raw table; a test enforces this.
 - **Read the raw table only when the question is about availability.** The raw table is what NGED
   delivered, and it holds the rows that cleaning flags (experiment 182).
 - **One cleaning rule exists today: `substation_zero`.** It flags a reading of exactly 0 from a
   Primary, BSP, or GSP (`nged_data.cleaning`).
 - **`substation_zero` drops real zeros for a switched-out transformer.** Switching experiments
-  that need those rows must treat the flagged rows as kept ([switching
+  that need those rows must treat the flagged rows as kept ([zero-reading
   entry](../data-processing.md#decide-which-rows-are-demand), experiment 132; provisional).
-- **For series 32 and 33, the cleaned and raw tables hold identical rows** (experiment 182).
+- **For `time_series_id` 32 and 33, the cleaned and raw tables hold identical rows** (experiment
+  182, `e00182_check.py`).
 
 ## Timestamps
 
@@ -62,9 +63,9 @@ page](../../background/network.md).
   (`PowerTimeSeries.correct_late_timestamps`). A study must not shift the stamp a second time.
 - **Join power to an hourly weather product on `(time - 1 µs).truncate("1h") + 1h`.** The same
   page gives the evidence.
-- **Assume a power reading reaches the forecast 3.5 hours after the half-hour it covers.** This is
-  an assumption: no experiment has measured the delay on live telemetry (experiments 87, 104, 106;
-  provisional).
+- **Assume a power reading reaches the forecast 3.5 hours after the half-hour it covers.** The
+  3.5-hour delay is an assumption: no experiment has measured the delay on live telemetry
+  (experiments 87, 104, 106; provisional).
 
 ## Gaps, ramp-up, and regime changes
 
@@ -88,7 +89,7 @@ page](../../background/network.md).
 - **A flat top in a farm's output is not proof of clipping.** A pre-registered rule found AC
   clipping at 2 of 6 farms and a post hoc rule at 4 of 6, and an export cap or panel geometry
   makes the same shape (experiment 179).
-- **The farm series behind a disaggregated Primary can be almost absent.** For D8, one farm has 1
+- **The farm series behind a disaggregated Primary can be almost absent.** For D8, one farm has one
   raw reading ever, so "missing" is the baseline (experiment 182).
 - **A metered farm's `effective_capacity_mw` may itself be estimated from output.** Power over
   capacity near 1.0 is therefore not an independent level (experiment 179).

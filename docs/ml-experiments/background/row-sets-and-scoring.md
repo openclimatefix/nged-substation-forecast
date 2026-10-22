@@ -14,7 +14,7 @@ and terms are in the [glossary](../glossary.md).
 - **The fold-A demand set has 22 demand-side series (D1 to D22):** 16 Primaries, 4 BSPs or GSPs,
   and a battery and a biofuel generator ([glossary](../glossary.md#d-codes)).
 - **The generator experiments score 9 series** (6 solar farms and 3 wind farms).
-- **The differentiable-physics (DP) series uses 5 long-history MW Primaries as its decision set**,
+- **The differentiable-physics (DP) series uses five long-history MW Primaries as its decision set**,
   because only five Primaries hold long histories ([NGED power
   telemetry](nged-power-telemetry.md#gaps-ramp-up-and-regime-changes)).
 
@@ -36,7 +36,7 @@ and terms are in the [glossary](../glossary.md).
 | `dp_mva_dark_v1` | 352,841 dark half-hours at the MVA-only Primaries | Experiment 103 |
 | `dp_christmas_daily_v1`, `age1_daily_2025_07_to_2026_06_v1` | Christmas-period origins; the old-year training check | Experiments 173 and 93 |
 
-- **Each row set above is a short digest.** Read the defining experiment before reusing a row set.
+- **Read the defining experiment before reusing a row set.**
 - **The DP series uses season-years from July to June.** Tuning is 2023-24, the replicate year is
   2024-25, and the scored year is 2025-26 (`FIRST_SEASON_MONTH` in `studies.dp_calendar`;
   experiment 109).

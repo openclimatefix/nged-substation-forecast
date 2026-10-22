@@ -19,7 +19,6 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 | UKV (Met Office) | 2 km deterministic UK weather model | Three variants exist; see below | Only the live feed | Train on the product that will serve; never train on the Centre for Environmental Data Analysis (CEDA) archive and serve the live feed |
 | GEFS, ICON-EU, IFS, AIFS-ENS, WeatherNext 3 | Further forecast products | Differs by product | Studies only | Not in production; see the weather theme |
 
-- **Each cell is a digest.** The owner page of each row is linked in the section below.
 - **A weather product that is "as accurate as ERA5" is a ceiling for demand, not a forecast.**
   ERA5 weather in place of ENS weather lowered the Primary demand quantile score by 0.10 points
   (experiment 22).
@@ -29,18 +28,18 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 
 ## Training product: the rule
 
-- **Train each model on the history of the weather product that will serve it.** The arms are
-  ENS-trained, ENS plus the other product as columns, and the other product alone. An
-  ERA5-trained model is only a reference ([weather theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details),
+- **Train each XGBoost model on the history of the weather product that will serve it.** The arms
+  are ENS-trained, ENS plus the other product as columns, and the other product alone. An
+  ERA5-trained XGBoost model is only a reference ([weather theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details),
   experiment 22).
-- **Pair a CAMS-trained irradiance model with a stage 0 quantile mapping of ENS shortwave.** The
+- **Pair a CAMS-trained XGBoost model with a stage 0 quantile mapping of ENS shortwave.** The
   pair scored 0.102 points better than the ERA5-trained arm for Primary demand, against 0.035
   without the mapping (experiment 14, which supersedes experiment 9's advice to keep ERA5).
 - **Calibrate ENS temperature and irradiance before they drive a model trained on past weather.**
   Shifts of up to about 2 K and 20% were needed at five Primaries (experiment 111; medium
   confidence).
-- **"Better weather adds little" was measured only for a model trained on ENS.** Do not read it as
-  a result for an ERA5-trained model (experiment 22, [weather
+- **"Better weather adds little" was measured only for an XGBoost model trained on ENS.** Do not
+  read it as a result for an ERA5-trained XGBoost model (experiment 22, [weather
   theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details)).
 - **Training on ERA5 lowered the solar and wind farm error up to day 6, but for demand a long
   history did not carry over** ([weather theme](../themes/weather-products-and-blending/index.md)).

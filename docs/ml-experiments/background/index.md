@@ -2,9 +2,9 @@
 
 **Read this page, and the pages it links, before you plan an experiment.** The pages state what
 earlier experiments established about the data sets and about the scoring rules, in short bullets,
-and link the page that owns each fact. They exist because most mistakes that cost an experiment a
-re-run were facts that an earlier experiment had already found and filed on a page the planner did
-not open.
+and link the page that owns each fact. The pages exist because several mistakes that cost an
+experiment a re-run were facts that an earlier experiment had already found and filed on a page
+the planner did not open.
 
 ## Reading order
 
