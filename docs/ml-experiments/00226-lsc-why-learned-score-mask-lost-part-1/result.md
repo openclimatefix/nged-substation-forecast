@@ -4,7 +4,7 @@ slug: lsc-why-learned-score-mask-lost-part-1
 title: >-
   Why did the learned LSC score find more load shifts but give a worse masked forecast, and does a
   combined mask fix it?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done
@@ -164,12 +164,12 @@ reproduce here (no mask 13.686, pair-alarm mask 6.321, best guess 2 10.091).
   (+0.018 to +0.325). On the 11: U1 -0.929 (-3.245 to +0.074), U2 +0.104 (-2.080 to +3.979), U3
   -0.444 (-3.504 to +3.734), U4 -0.887 (-3.194 to +0.125). Leaving D5 out of the 7 load shifts moves
   the learned-score gap from +0.99 to +0.09.
-- **The 0.99 point gap is two load shifts.** The 7 load shifts give 9 scoring windows (the bars of figure 3), because two
-  load shifts touch two of the six substations. One 580-hour load shift at D5 (card ce4b, where a
-  card is the identifier of a logged load shift) adds +2.226 points. The pair alarm is known 7 hours
-  before the logged start, and its step is 13 hours before the logged start. The learned score has
-  no alarm at the step. Its only alarm there is, by experiment 203's account, the next load shift's start, known 95.5 hours after
-  this load shift ends.
+- **The 0.99 point gap is two load shifts.** The 7 load shifts give 9 scoring windows (the bars of
+  figure 3), because two load shifts touch two of the six substations. One 580-hour load shift at D5
+  (card ce4b, where a card is the identifier of a logged load shift) adds +2.226 points. The pair
+  alarm is known 7 hours before the logged start, and its step is 13 hours before the logged start.
+  The learned score has no alarm at the step. Its only alarm there is, by experiment 203's account,
+  the next load shift's start, known 95.5 hours after this load shift ends.
 - **The learned score wins where the pair mask is over-long.** One 372-hour load shift at D5 (card
   b2f7) adds -1.248. The learned mask covers 580 hours with 218 outside the logged interval, and the
   pair mask covers 1,164 hours with 794 outside. The other seven scoring windows add +0.011 in
@@ -187,13 +187,13 @@ reproduce here (no mask 13.686, pair-alarm mask 6.321, best guess 2 10.091).
   months).** Pair alarm +0.055 (+0.009 to +0.105), learned re-ranker +0.031 (-0.020 to +0.086), U1
   +0.057 (+0.015 to +0.100), U2 -0.007 (-0.041 to +0.013), U3 +0.025 (-0.026 to +0.081), U4 +0.062
   (+0.021 to +0.106).
-- **Split of the re-ranker's alarm intervals (counts are merged intervals) by whether a pair alarm also raises them (within 24 hours).**
-  Alarms both raise (23 to 29 per fold): -0.008 (-0.040 to +0.010). Learned-only alarms (81 to 94
-  per fold): +0.038 (+0.002 to +0.089). Learned-only alarms without the balanced-opposite candidates
-  (an opposite step of 0.4 to 2.5
-  times the own step, which experiment 195 treats as probable unlogged load shifts when no logged load shift explains the alarm; 64 to 76 per
-  fold): +0.036 (-0.000 to +0.086). Removing the probable unlogged load shifts therefore does not
-  remove the harm.
+- **Split of the re-ranker's alarm intervals (counts are merged intervals) by whether a pair alarm
+  also raises them (within 24 hours).** Alarms both raise (23 to 29 per fold): -0.008 (-0.040 to
+  +0.010). Learned-only alarms (81 to 94 per fold): +0.038 (+0.002 to +0.089). Learned-only alarms
+  without the balanced-opposite candidates (an opposite step of 0.4 to 2.5 times the own step, which
+  experiment 195 treats as probable unlogged load shifts when no logged load shift explains the
+  alarm; 64 to 76 per fold): +0.036 (-0.000 to +0.086). Removing the probable unlogged load shifts
+  therefore does not remove the harm.
 - **Learned-only alarms give no gain after a load shift.** On the 7 load shifts a mask built from
   them scores 13.651 against 13.686 with no mask (-0.035, -0.152 to +0.000), and on the 11 load
   shifts 9.506 against 10.129 (-0.624, -2.048 to -0.009). The extra load shifts the learned score
