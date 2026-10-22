@@ -48,7 +48,7 @@ LEAD_MAX: Final[float] = 48.0
 SCORE_LEAD_MIN: Final[float] = 15.5
 SCORE_LEAD_MAX: Final[float] = 39.0
 R_KAPPA: Final[float] = 0.75
-STEP: Final[pl.Duration] = pl.duration(minutes=30)
+STEP: Final[pl.Duration] = pl.duration(minutes=30)  # ty: ignore[invalid-assignment]
 
 
 @dataclass
@@ -78,18 +78,18 @@ def load_site(*, time_series_id: int) -> Site:
     short = (
         rows.sort("valid_time", "lead_hours")
         .unique(subset="valid_time", keep="first")
-        .select("valid_time", error=pl.col("actual") - pl.col("mean"))
+        .select("valid_time", error=pl.col("actual") - pl.col("q50"))
         .sort("valid_time")
     )
     t0 = short["valid_time"].min()
-    n = int((short["valid_time"].max() - t0).total_seconds() // 1800) + 1
+    n = int((short["valid_time"].max() - t0).total_seconds() // 1800) + 1  # ty: ignore[unsupported-operator]
     grid = np.full(n, np.nan, dtype=np.float32)
     idx = ((short["valid_time"] - t0).dt.total_seconds() // 1800).to_numpy().astype(np.int64)
     grid[idx] = short["error"].to_numpy()
     return Site(
         time_series_id=time_series_id,
         rows=rows,
-        t0=np.datetime64(t0.replace(tzinfo=None), "us"),
+        t0=np.datetime64(t0.replace(tzinfo=None), "us"),  # ty: ignore[missing-argument, no-matching-overload, unknown-argument, unresolved-attribute]
         error_grid=grid,
     )
 
@@ -153,7 +153,7 @@ def build_features(*, site: Site, error_grid: np.ndarray) -> dict[str, np.ndarra
 
     actual = rows["actual"].to_numpy()
     mean = rows["mean"].to_numpy()
-    target = (actual - mean).astype(np.float32)
+    target = (actual - rows["q50"].to_numpy()).astype(np.float32)
     # The target is actual minus mean at the (possibly injected) grid value of the row's own time.
     injected_delta = np.where(
         (idx_v >= 0) & (idx_v < n), error_grid[np.clip(idx_v, 0, n - 1)], np.nan
@@ -182,4 +182,7 @@ def build_features(*, site: Site, error_grid: np.ndarray) -> dict[str, np.ndarra
         "valid": valid,
         "init": init,
         "actual": actual.astype(np.float32),
+        "q50": rows["q50"].to_numpy().astype(np.float32),
+        "quantiles": rows.select(QUANTILES).to_numpy().astype(np.float32),
+        "switching": rows["switching_mask"].to_numpy(),
     }

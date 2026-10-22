@@ -1,3 +1,4 @@
+# ruff: noqa: D102,D107
 """The pooled correction head: an MLP over recent errors and calendar, trained with pinball loss.
 
 It emits a median correction `c` and a log-scale `s`; the 11 quantiles are

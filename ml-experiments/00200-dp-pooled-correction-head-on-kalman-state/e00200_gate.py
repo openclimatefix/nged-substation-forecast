@@ -1,3 +1,4 @@
+# ruff: noqa: B023,D103,E501
 """Experiment 200, stage 1: the known-answer gate on the 6 stored substations.
 
 A +3-point step for 8 weeks, and a +3-point shift on Saturdays 17:00 to 21:00 UTC for 8 weeks, are
@@ -90,7 +91,7 @@ def main() -> None:
             net = model_module.fit(
                 train=train, valid=valid, n_sites=len(sites), seed=seed, device=device
             )
-            rise, r_rise, n_scored = [], [], []
+            rise, r_rise = [], []
             for k, (c, i) in enumerate(zip(clean, injected, strict=True)):
                 score = (c["lead"] >= data_module.SCORE_LEAD_MIN) & (
                     c["lead"] <= data_module.SCORE_LEAD_MAX
