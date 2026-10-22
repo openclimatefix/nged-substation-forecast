@@ -192,7 +192,7 @@ def build_base(
             features=features,
             pinned=pinned,
             index=index,
-            clip=common.clip_of(site=site),
+            clip=common.clip_of(site=site, pinned=pinned),
         )
     month_keys = cache.end_times[index].astype("datetime64[M]")
     months, month_of_row = np.unique(month_keys, return_inverse=True)
@@ -597,6 +597,6 @@ def predict_arm(
             features=features,
             pinned=base.pinned,
             index=index,
-            clip=common.clip_of(site=base.site),
+            clip=common.clip_of(site=base.site, pinned=base.pinned),
         )
     return out

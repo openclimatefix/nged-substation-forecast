@@ -101,7 +101,7 @@ def predict_tall(*, cache: FeatureCache, fit: TallFit, index: np.ndarray) -> np.
         features=features,
         pinned=fit.pinned,
         index=index,
-        clip=common.clip_of(site=fit.site),
+        clip=common.clip_of(site=fit.site, pinned=fit.pinned),
     )
 
 
@@ -138,7 +138,7 @@ def _job(job: tuple[str, str]) -> str:
     torch.set_num_threads(1)
     cadence, site = job
     started = time.monotonic()
-    cache = common.load_cache()
+    cache = common.variant_cache(cache=common.load_cache(), site=site)
     vintages = read_vintages()
     fits = [
         fit_tall(

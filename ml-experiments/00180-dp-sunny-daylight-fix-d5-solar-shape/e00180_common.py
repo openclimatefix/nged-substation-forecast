@@ -18,6 +18,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
+import numpy as np
+from studies.dp_ens_weather import SunGeometry, replace_site
 from studies.dp_features import (
     FLEET,
     FeatureCache,
@@ -25,6 +27,7 @@ from studies.dp_features import (
     load_or_build_feature_cache,
 )
 from studies.dp_gam import ClipSpec, GamSpec, TrainingWindow
+from studies.dp_pinned_capacity import PinnedCapacity
 from studies.pv_physics import PlantParameters
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -196,6 +199,32 @@ def plant_of(*, site: str) -> PlantParameters:
     )
 
 
-def clip_of(*, site: str) -> ClipSpec | None:
-    """Return the running arm's export clip at a site, or `None`."""
-    return ClipSpec() if arm_spec(site=site).get("clip") else None
+def clip_of(*, site: str, pinned: PinnedCapacity) -> ClipSpec | None:
+    """Return the running arm's export clip at a site, or `None`.
+
+    A spec with `clip_share` clips at that share of the capacity held after the cut. A spec with
+    `clip_points` clips at that fixed number of points at every cut, whatever the held capacity.
+    """
+    spec = arm_spec(site=site)
+    if not spec.get("clip"):
+        return None
+    if "clip_points" in spec:
+        return ClipSpec(p_max_share=float(spec["clip_points"]) / float(pinned.held_points))
+    return ClipSpec(p_max_share=float(spec.get("clip_share", 1.0)))
+
+
+def variant_cache(*, cache: FeatureCache, site: str) -> FeatureCache:
+    """Return the cache with the site's training-row unit PV shape from the running arm's plant."""
+    features = cache.sites[site]
+    n_even = len(cache.end_times) // 2 * 2
+    sun = SunGeometry.build(
+        end_times=cache.end_times[:n_even],
+        latitude=features.table.latitude,
+        longitude=features.table.longitude,
+    )
+    shape, _ = sun.pv_shape_and_ghi(
+        ghi_w_m2=features.ghi_w_m2[None, :n_even], plant=plant_of(site=site)
+    )
+    # The grid ends at 23:30 on a June night, so the unpaired last half-hour has no output.
+    shape = np.concatenate([shape[0], np.zeros(len(cache.end_times) - n_even)])[None, :]
+    return replace_site(cache=cache, site=site, pv_unit_shape=shape[0])

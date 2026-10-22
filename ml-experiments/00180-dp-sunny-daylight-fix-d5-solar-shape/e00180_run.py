@@ -36,7 +36,7 @@ import polars as pl
 import torch
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens import proxy_residual_stream
-from studies.dp_ens_weather import Calibration, SunGeometry, proxy_cache, replace_site
+from studies.dp_ens_weather import Calibration, proxy_cache
 from studies.dp_features import FeatureCache, naive_utc
 
 ARM_NAMES: Final[tuple[str, ...]] = ("a0", "a1", "a2", "a3")
@@ -93,27 +93,10 @@ class SiteContext:
     setup: ens.SiteSetup
 
 
-def variant_cache(*, cache: FeatureCache, site: str) -> FeatureCache:
-    """Return the cache with the site's training-row unit PV shape from the running arm's plant."""
-    features = cache.sites[site]
-    n_even = len(cache.end_times) // 2 * 2
-    sun = SunGeometry.build(
-        end_times=cache.end_times[:n_even],
-        latitude=features.table.latitude,
-        longitude=features.table.longitude,
-    )
-    shape, _ = sun.pv_shape_and_ghi(
-        ghi_w_m2=features.ghi_w_m2[None, :n_even], plant=common.plant_of(site=site)
-    )
-    # The grid ends at 23:30 on a June night, so the unpaired last half-hour has no output.
-    shape = np.concatenate([shape[0], np.zeros(len(cache.end_times) - n_even)])[None, :]
-    return replace_site(cache=cache, site=site, pv_unit_shape=shape[0])
-
-
 def load_site(*, site: str, cache: FeatureCache | None = None) -> SiteContext:
     """Load a substation's ensemble setup with experiment 111's calibration and solar shrink."""
     cache = cache if cache is not None else common.load_cache()
-    cache = variant_cache(cache=cache, site=site)
+    cache = common.variant_cache(cache=cache, site=site)
     calibration = load_calibration(site=site).with_solar_shrink(
         solar_shrink=read_tuned()["solar_shrink"]
     )

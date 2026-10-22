@@ -7,7 +7,7 @@ title: >-
 theme: differentiable-physics-embedded-generation
 also_relevant_to:
 - production-reference-and-best-guess
-status: planned
+status: finished
 size: >-
   complex. Stored: private files under data/ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-
   shape/
@@ -50,26 +50,171 @@ metric: >-
   half-hours; pinball loss averaged over the 11 quantiles in MW; the same two scores on the
   maintainer's by-condition slices; quantile score in points of effective capacity
 code: ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/
-verdict: null
-production_status: not-for-production
+verdict: supported
+production_status: candidate
 adopted_in: none
+take_home_message: >-
+  D5's solar output is limited at the export point: capping the solar output the forecast subtracts
+  from demand at 60% of D5's capacity cuts the best GAM's sunny-daylight loss to BG2 from 0.20 MW to
+  0.07 MW, and moves the two substations without a gap by under 0.01 MW on sunny half-hours. A
+  different panel tilt or azimuth does nothing measurable. D5 is the only one of the six substations with this clip flag, so
+  the next question is whether the 60% ceiling is stable from year to year.
+date: 2026-10-22
+headline: >-
+  D5, sunny daylight, all leads, scored year: GAM minus BG2 mean absolute error +0.202 MW (control)
+  to +0.069 MW with a 60% export clip (arm K minus control -0.133 MW, 98.75% interval -0.214 to
+  -0.033); placebos D10 +0.004 and D16 -0.004 MW. Tilt and azimuth (arm P): -0.018 MW (-0.031 to
+  +0.007).
+best_arm: >-
+  K, the export clip at 60% of held capacity at D5 (-0.133 MW on sunny daylight, +0.069 MW against
+  BG2)
+lessons:
+  - >-
+    D5's implied solar output per unit of the fleet shape falls towards midday while the other four
+    substations stay flat, which is the signature of an export limit (figure 4).
+  - >-
+    The clip ceiling mattered: 90% did almost nothing, and 50% to 60% gave the largest gain on both
+    the tuning and the replicate months (figure 3). A clip at 100% of held capacity changes nothing.
+  - >-
+    The tilt and azimuth chosen from 25 candidates per substation moved no substation's sunny error
+    by an interval excluding zero, as experiments 73 and 77 found for orientation.
+advice:
+  - >-
+    Clip the solar term at D5 at 60% of the held capacity before comparing any solar-shape
+    alternative at D5 (figures 1 and 3).
+  - >-
+    Do not search tilt and azimuth per substation to fix a sunny-daylight loss; the chosen cells
+    moved no sunny error by an interval excluding zero (figure 2).
+  - >-
+    Use `p_max_share` of 1.0 only as a null control: it clips nothing, because the unit shape never
+    reaches the held capacity (arm K at 100%, results).
 ---
 
-**We ask whether the loss of the best generalised additive model (GAM) to BG2 on sunny daylight
-half-hours at one substation, D5, is caused by the fixed solar shape the GAM subtracts from
-demand.**
-[Experiment 178](../00178-dp-sunny-daylight-gap-diagnosis/result.md) found that on the sunniest
-third of each substation's daylight half-hours the GAM's mean absolute error exceeds BG2's by 0.05
-MW over six substations, and that D5 alone holds 63% of that gap (+0.202 MW, 95% interval +0.111 to
-+0.273) with 16% of the rows. The experiment first inspects D5's solar properties without fitting
-anything. Then it replaces the GAM's solar term at D5, and at one substation with no gap, with
-solar terms of increasing flexibility, and re-scores the same rows. The design builds on the convex
-GAM of
-[experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) and on
-the pinned solar capacity of
-[experiment 45](../00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md).
+**D5's solar output is limited at the export point, and a 60% ceiling on the solar term removes most
+of the substation's loss to BG2.** We asked whether the best generalised additive model (GAM) loses
+to
+BG2 on sunny afternoons at one substation, D5, because the GAM subtracts the wrong solar shape from
+demand. [Experiment 178](../00178-dp-sunny-daylight-gap-diagnosis/result.md) had found that D5 holds
+63% of the six-substation gap. We re-ran the GAM of [experiment
+155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) with three solar
+terms and scored the same half-hours. Choosing each substation's panel tilt and azimuth did not
+help.
+Capping the solar term at 60% of D5's held capacity, using the smooth clip that experiments 103 and
+110 had flagged at D5, cut the gap from +0.202 MW to +0.069 MW. A learned response from irradiance
+to solar output was not run, because the clip already met the target.
 
-## Plan
+![Figure 1. D5's gap to BG2 by arm](figure_01_headline.svg)
+
+![Figure 2. Each arm's change against the control, by substation](figure_02_no_harm.svg)
+
+![Figure 3. The clip ceiling on the tuning and replicate months](figure_03_clip_share.svg)
+
+![Figure 4. D5's implied solar output per unit of the fleet shape](figure_04_implied_solar_by_shape_decile.svg)
+
+## Results
+
+- **Rows and scope:** experiment 178's rows, the scored year (2025-07-02 to 2026-06-29), leads to
+  168
+  hours, outside the switching events. A sunny daylight half-hour is in the top third of its
+  substation's daylight half-hours ranked by the fixed fleet shape. D5 has 14,045 such half-hours.
+  The control re-run reproduces experiment 178's D5 gap of +0.202 MW and arm D's forecasts exactly.
+- **Absolute scores at D5, sunny daylight (MW):** the control's mean absolute error is 0.655, arm
+  P's
+  is 0.637, arm K's is 0.523, and BG2's is 0.453. Pinball loss (average over 11 quantiles) is 0.185
+  for the control, 0.181 for P, and 0.154 for K.
+- **Headline (arm K minus control, mean absolute error, 98.75% interval):** -0.133 MW (-0.214 to
+  -0.033). The gap to BG2 falls to +0.069 MW (98.75% interval +0.023 to +0.094). Over all D5
+  half-hours, arm K's gap to
+  BG2 is -0.011 MW (-0.040 to +0.009), against +0.007 MW for the control.
+- **Placebos:** arm K moves D10 by +0.004 MW (-0.025 to +0.037) and D16 by -0.004 MW (-0.051 to
+  +0.049), inside the 0.02 MW margin. Over all half-hours the clip raises D10's error by +0.005 MW
+  (+0.001 to +0.011) and D16's by +0.006 MW (-0.000 to +0.014), and the audit found rises of +0.012
+  to +0.020 MW on daylight half-hours outside the sunny third at D5, D10, and D16. A clip belongs
+  only where the export limit exists. Arm K was not run at D9, D11, or D14.
+- **Arm P (tilt and azimuth):** the selection kept the fleet shape at D11 and D9. It chose a tilt of
+  15 degrees at D5, 55 at D10, and 15 at D14 and D16. The sunny-daylight change against the control
+  is -0.018 MW at D5 (-0.031 to +0.007), +0.007 at D10 (-0.001 to +0.014), -0.008 at D14, and -0.008
+  at D16, none with an interval excluding zero. The 25-cell selection surface per substation is in
+  the private `work/select.json`.
+- **A fixed ceiling in points gives the same gain.** D5's held capacity swings from 62 to 81 points
+  across the cuts, so a ceiling of 60% of it moves with the capacity. A post hoc arm with a fixed
+  ceiling of 39 points (60% of the held capacity's typical value before the scored year) gives
+  -0.130 MW (-0.225 to -0.021) on the scored year and -0.088 and -0.119 MW on the tuning and
+  replicate months, so the gain does not come from the capacity's swings.
+- **Six-substation total:** with arm K at D5 and the control elsewhere, the total sunny-daylight gap
+  to BG2 is about +0.029 MW, against +0.050 MW (computed from the per-substation means, without an
+  interval).
+- **By-condition slices at D5 (mean absolute error, MW; control, K):** all half-hours 0.344 and
+  0.325; winter 0.365 and 0.367; winter nights 0.225 and 0.226; cold nights (834 half-hours) 0.197
+  and 0.201; Economy 7 step hours 0.156 and 0.155; bank holidays (1,900 half-hours) 0.328 and 0.291.
+  Arm K changes none of the winter slices by an interval excluding zero. Over all D5 half-hours it
+  lowers the error by 0.018 MW (-0.041 to -0.000). Christmas has too few
+  half-hours to score.
+- **Decision rule:** `supported`. The best arm's D5 gap is +0.069 MW against a target of +0.10 MW,
+  its
+  interval against the control lies wholly below zero, and both placebos move by under 0.02 MW. The
+  other four substations are unchanged by construction for arm K.
+- **Not run:** the learned response (arm L), the neural network (arm N), the farm-learned response
+  (arm F), and known-answer gates 1 and 2. The plan ran them only if the target stayed out of reach
+  (arm N) or after the gates (arms L and F), and arm K met the target. Gate 1 therefore did not
+  fail,
+  and the verdict is not capped.
+- **Post hoc:** the clip ceiling. The plan fixed 100% of held capacity, which clips nothing, so
+  the planned arm K gave an exact null (-0.000 MW). We then scored ceilings of 50%, 60%, 70%, 80%,
+  and 90%, and chose 60% on the tuning months alone. The replicate months agreed (figure 3). The
+  scored year was read for arm K at 60% after that choice. It had also been read earlier for arm K
+  at 80%, the first post hoc guess, before the sweep. The other ceilings were scored on the tuning
+  and replicate months only. The scores of every ceiling and of the
+  null arm are in the private `work/scores_*.json` files.
+
+## Checks
+
+- **Median minus mean forecast:** zero at all six substations in arm D's stored forecasts (the mean
+  equals the median), so no spread shifts the forecast.
+- **Mean-forecast error beside the quantile score:** the pinball loss and the mean absolute error
+  point the same way at D5, D10, and D16 for arm K. At the placebos both are indistinguishable from
+  the control.
+- **Tail calibration at D5, sunny rows (coverage; pinball loss in MW):** for the control, q01 0.051
+  and 0.025, q05 0.168 and 0.097, q95 0.967 and 0.081, q99 0.993 and 0.022. For arm K, q01 0.056 and
+  0.023, q05 0.176 and 0.085, q95 0.996 and 0.076, q99 0.999 and 0.021. Arm K narrows the upper tail
+  losses but leaves the lower tail under-covered (q05 coverage 0.18 against 0.05 nominal).
+- **Triggers fired:** a result that contradicts its own prediction (the plan expected no arm to
+  reach
+  +0.10 MW). The explanation, tested before the audit, is figure 4: D5's solar output per unit of
+  shape falls towards midday while the other four substations stay flat. The Opus audit reproduced
+  the headline (-0.133 MW, 98.75% interval -0.223 to -0.036) and found no leakage. The Sonnet code
+  review found that arm P's fits had been trained on the fleet shape; we fixed that, refitted arm P,
+  and replaced its numbers. The audit's request for a ceiling fixed in points is the fixed-ceiling
+  bullet above.
+
+## Caveats
+
+- **One substation and one year.** The headline interval is 98.75% from 12 monthly blocks, and it
+  spans -0.214 to -0.033 MW. The clip ceiling was chosen on 6 tuning months at the same substation.
+- **The clip ceiling is a share of the capacity held after each cut.** It follows the pinned
+  capacity, so a step in D5's capacity moves the ceiling with it.
+- **The learned response was not tested.** Whether it beats the clip at D5 is unknown.
+- **The gain is concentrated late in the scored year.** The audit found 80% of it in April to June
+  2026, though dropping any one month leaves it between -0.100 and -0.147 MW, and every lead band
+  improves (-0.087 MW at 0 to 24 hours to -0.147 MW).
+- **The clip is a partial fix.** On clear summer days D5's net power stays flat from about 08:00 to
+  15:00 UTC, as an export limit would make it, and D10 and D16 show no plateau. The shoulder
+  half-hours keep an error, and the sunny rows keep a negative bias (the forecast is too low by 0.36
+  MW for the control and 0.39 MW for arm K).
+- **Shared limits of the chain.** The monthly fits train on the CAMS-derived shape of experiment
+  106's cache and the forecasts use a shape recomputed from the same irradiance, which is identical
+  to 1e-9 for the fleet. Arm P's selection scored all half-hours with a reading, including those in
+  the switching events.
+
+## What to try next
+
+- Re-score the 60% ceiling at D5 on a later year, once the hold-out from 2026-07-01 is lifted.
+- Test the same clip at D9, the second substation where the GAM trails BG2 by +0.079 MW (it has no
+  clip flag in the site table, and no pinned-capacity vintage before 2025-04).
+- A learned response from irradiance to solar output is still untested. Its target is now D9 and any
+  residual at D5 after the clip.
+
+## Pre-registered plan
 
 **Reading the earlier advice.** The plan follows experiments 139 and 157 (the pinned capacity stays
 untouched in every arm), experiment 111 (month-block bootstrap on paired differences), and

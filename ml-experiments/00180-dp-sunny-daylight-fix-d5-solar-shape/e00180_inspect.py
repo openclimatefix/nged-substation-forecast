@@ -8,6 +8,7 @@ flattens at the top if the solar output is clipped.
     uv run --no-sync python ml-experiments/00180-*/e00180_inspect.py
 """
 
+import json
 from typing import Final
 
 import numpy as np
@@ -30,6 +31,7 @@ def main() -> None:
     cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=CACHE_DIR)
     month = cache.calendar.local_date.astype("datetime64[M]").astype(np.int64) % 12 + 1
     half_hour = cache.calendar.half_hour.astype(np.int64)
+    stored = {}
     for site in SITES:
         f = cache.sites[site]
         clear = haurwitz_w_m2(apparent_zenith_deg=90.0 - f.elevation_deg)
@@ -52,6 +54,7 @@ def main() -> None:
         )
         slope = (night_mean - deciles["y"]) / deciles["u"]
         print(f"== {site}: night mean {night_mean:.1f} pts; summer clear half-hours {frame.height}")
+        stored[site] = [float(s) for s in slope]
         print(
             "  net-power minimum at half-hour",
             int(prof["hh"][int(np.argmin(prof["y"].to_numpy()))]),
@@ -62,6 +65,14 @@ def main() -> None:
             "  implied points of solar per unit shape, by shape decile:",
             [round(float(s), 1) for s in slope],
         )
+
+    target = (
+        ML_EXPERIMENTS_DATA_DIR
+        / "00180-dp-sunny-daylight-fix-d5-solar-shape"
+        / "work"
+        / "stage0.json"
+    )
+    target.write_text(json.dumps(stored))
 
 
 if __name__ == "__main__":
