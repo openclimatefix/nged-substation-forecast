@@ -7,7 +7,7 @@ replace the solar term of the demand forecast with the network's output. Arms:
 - `n`: the unclipped forecast (experiment 180's control `c`) with its solar term replaced.
 - `nc`: the 60%-clip forecast (experiment 214's `k60`) with its clipped solar term replaced.
 - `n2`: as `n`, plus the mean and standard deviation of the 51 members' solar responses
-  (experiment 237), at D5 and D9 only.
+  (experiment 184's stored member responses).
 
 The band of each arm is the base arm's band scaled by one factor per lead band, fitted on the
 training rows. Writes `work/arms/<arm>/dp_preds_s2/d_scored_<site>.parquet`, in the format of the

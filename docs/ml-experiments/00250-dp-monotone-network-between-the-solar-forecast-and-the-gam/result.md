@@ -41,7 +41,7 @@ metric: >-
   Mean absolute error of the median in MW on the sunniest third of daylight half-hours (experiment
   178's cut), as a gap to BG2, at D5 and D9, with D10 and D16 as placebos; q95 coverage
 code: ml-experiments/00250-dp-monotone-network-between-the-solar-forecast-and-the-gam/
-verdict: small gain
+verdict: not supported
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-22
@@ -59,37 +59,40 @@ lessons:
     The network corrects the clip's remaining error a little at D5 and D9 (-0.028 and -0.016 MW)
     and moves the placebos D10 and D16 by at most 0.007 MW.
   - >-
-    The network cannot replace the clip: without the clip it is worse than the clip at D5.
+    At D5 the network cannot replace the clip: without the clip it is worse than the clip.
   - >-
-    The two-number ensemble summary adds under 0.01 MW to the unclipped network, an amount that is
-    not distinguishable from zero.
+    The mean and standard deviation of the 51 members' solar responses lower the unclipped network's
+    D5 error by 0.008 MW, which is small against its 0.088 MW excess over the clip.
 advice:
   - >-
     Keep the hand-set 60% clip as the solar saturation in the final assembly and do not add a
-    monotone network on top of it unless a gain of 0.02 MW at coastal sites is worth a trained
+    monotone network on top of it unless a gain of 0.02 to 0.03 MW at D5 and D9 is worth a trained
     component (the sunny-daylight figure).
   - >-
     Calibrate the upper tail separately: the clip leaves the 95% quantile covering 99.5% of sunny
     daylight half-hours at D5, and the network does not change that (the coverage table).
 take_home_message: >-
   A small neural network that sits between the solar forecast and the demand model improves the
-  sunny-day forecast at the coastal substation D5 by about 0.03 MW on top of the hard clip, which is
+  sunny-day forecast at D5 by about 0.03 MW on top of the hard clip, which is
   less than half of what is left to close. It does not replace the clip, so the final forecast keeps
   the clip alone.
 ---
 
 **On top of the hard clip, the network lowers sunny-daylight error a little, but not by the 50% of
 the remaining gap that the plan required.** The network reads the solar term after the 60% clip, the
-clear-sky index, the hour, and the cap. At D5 it lowers the sunny-daylight error by 0.028 MW against
+clear-sky index, the hour, and the cap. At D5 the network lowers the sunny-daylight error by 0.028
+MW against
 the clip alone (figure 1).
 
 ![Change in sunny-daylight error against the 60% clip](sunny_error_change.svg)
 
 *Figure 1. Each arm against the 60% clip at D5 and D9. Smaller is better.*
 
-**Without the clip, the network is worse than the clip.** The network on the unclipped solar term
-raises D5's sunny-daylight error by 0.088 MW (0.019 to 0.142) against the clip, and the two-number
-ensemble summary changes that by 0.008 MW.
+**At D5, the network without the clip is worse than the clip.** The network on the unclipped solar
+term
+raises D5's sunny-daylight error by 0.088 MW (0.019 to 0.142) against the clip, and adding the mean
+and standard deviation of the 51 members' solar responses lowers
+that excess by 0.008 MW.
 
 | Arm | D5 gap to BG2 (MW) | D5 closure beyond the clip | D9 closure beyond the clip |
 |---|---|---|---|
@@ -102,7 +105,8 @@ The gap is the mean absolute error of the median minus BG2's, on the sunniest th
 half-hours. The closure at D9 is unstable because the clip's own gap there is 0.042 MW with an
 interval that includes zero.
 
-**The placebos do not move.** The network and clip arm changes the all-half-hour error at D10 and
+**The placebos change by less than 0.01 MW.** The network and clip arm changes the all-half-hour
+error at D10 and
 D16 by -0.002 and -0.003 MW against the clip (figure 2), inside the 0.01 MW limit.
 
 ![Placebo sites](placebos.svg)
@@ -111,10 +115,14 @@ D16 by -0.002 and -0.003 MW against the clip (figure 2), inside the 0.01 MW limi
 
 **The tail check fails for the clip and the network alike.** At D5 the 95% quantile covers 99.5% of
 sunny-daylight half-hours (the clip alone: 99.6%) and 92.3% of all half-hours (the clip alone:
-92.3%). Both are more than 2 points from 95%.
+92.3%). Both coverages are more than 2 points from 95%.
 
 ## Checks
 
+- The learned-cap arm of experiment 247 scores 0.005 MW worse than the clip on D5's sunny-daylight
+  rows (-0.007 to 0.019), so it does not close the gap either.
+- The band-width factors are fitted on the same rows as the network, of which 85% are in the
+  network's training split. That may narrow the bands and contribute to the 92.3% coverage.
 - Each network fit uses only forecasts whose valid time falls in the 12 months before the monthly
   cut. The early-stopping rows are the latest 15% of those rows.
 - The network's output at a zero solar term is subtracted, so the network removes nothing at night.
@@ -125,7 +133,8 @@ sunny-daylight half-hours (the clip alone: 99.6%) and 92.3% of all half-hours (t
 
 ## Which clip form the final assembly should use
 
-**Use the hand-set 60% clip alone.** The network adds 0.028 MW at D5 and 0.016 MW at D9 for a
+**Use the hand-set 60% clip alone.** The network removes 0.028 MW at D5 and 0.016 MW at D9 of sunny-
+daylight error, for a
 trained component on the serving path.
 
 ## What the next experiment should answer

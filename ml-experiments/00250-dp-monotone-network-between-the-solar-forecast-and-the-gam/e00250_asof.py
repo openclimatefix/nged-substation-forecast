@@ -1,11 +1,11 @@
-"""Experiment 247: score the learned-cap arms against the control and the stored clip arms.
+"""Experiment 250: score the network arms against the control and the stored clip arms.
 
 Reads each arm's stage 2 forecasts at D5, D9, and the placebos D10 and D16, on experiment 178's
-rows, and contrasts them with the unclipped control `c`. The 60% clip and the as-of choice are
-experiment 214's stored scores. Writes `work/scores.json`, including the closure at D5 and D9:
-the learned arm's sunny-daylight error reduction as a share of the 60% clip's.
+rows, and contrasts them with the unclipped control `c`. The 60% clip is experiment 214's stored arm.
+Writes `work/scores.json`, including the closure beyond the clip at D5 and D9: the share of the
+60% clip's remaining sunny-daylight gap to BG2 that an arm closes.
 
-    uv run --no-sync python ml-experiments/00247-*/e00250_asof.py
+    uv run --no-sync python ml-experiments/00250-*/e00250_asof.py
 """
 
 from typing import Final
