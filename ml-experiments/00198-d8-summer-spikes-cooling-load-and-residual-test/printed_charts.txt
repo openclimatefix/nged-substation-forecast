@@ -1,0 +1,7 @@
+Hot-end afternoon residual (valid 12:00-18:00 UTC, June-September, leads up to 24 h, ensemble-mean T >= 25):
+D5: 232 rows on 26 days, mean residual +0.90 points; at 19 to 25 degrees -0.97 points
+D10: 85 rows on 8 days, mean residual +4.68 points; at 19 to 25 degrees -1.08 points
+D11: 109 rows on 12 days, mean residual +2.48 points; at 19 to 25 degrees -0.27 points
+D14: 174 rows on 22 days, mean residual +0.60 points; at 19 to 25 degrees -1.36 points
+D16: 251 rows on 29 days, mean residual +1.17 points; at 19 to 25 degrees -0.92 points
+D9: 45 rows on 5 days, mean residual +5.09 points; at 19 to 25 degrees +0.42 points
