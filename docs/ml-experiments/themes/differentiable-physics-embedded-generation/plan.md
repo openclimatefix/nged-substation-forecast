@@ -3,7 +3,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | Sunny-daylight gap | Which hour, clear-sky band, lead, or substation holds the best GAM's loss to BG2 on sunny daylight half-hours? | High | Nothing | Planned, experiment 178 |
-| Meter-regime steps, E1 and E2 | Do a metered solar farm's meter outages show up in its Primary's power (E1, experiment 206), and can a convex step-capable capacity path recover a known injected step (E2, experiment 207)? | High | Nothing; E3 and E4 wait for the E2 gate | Planned, experiments 206 and 207 |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
