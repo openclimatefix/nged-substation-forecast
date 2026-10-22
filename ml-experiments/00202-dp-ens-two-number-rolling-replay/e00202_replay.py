@@ -99,7 +99,8 @@ def replay_month(m: str) -> tuple[str, np.ndarray, dict]:
         "r2f64": (STATE["stats64"], fit_rows),
         "r2o": (STATE["stats32"], rows_m),
     }
-    quantiles, log = {}, {"n_fit_rows": len(fit_rows), "first_origin": str(first)}
+    quantiles: dict = {}
+    log: dict = {"n_fit_rows": len(fit_rows), "first_origin": str(first)}
     for name, (stats, fr) in spec.items():
         factors = fit_on(frame=frame, stats=stats, rows=fr, spread=True)
         log[name] = factors

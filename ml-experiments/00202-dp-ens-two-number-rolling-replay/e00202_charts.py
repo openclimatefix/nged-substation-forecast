@@ -179,12 +179,12 @@ def figure_month(*, report: dict) -> None:
     zero = (
         alt.Chart(pl.DataFrame({"y": [0.0]}))
         .mark_rule(color="#808080", strokeDash=[4, 3])
-        .encode(y="y:Q")
-    )  # ty: ignore[unresolved-attribute]
+        .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+    )
     bars = (
         alt.Chart(frame)
-        .mark_bar(color=ocf.BRAND_ORANGE)  # ty: ignore[unresolved-attribute]
-        .encode(
+        .mark_bar(color=ocf.BRAND_ORANGE)
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("month:N", sort=None, title="Month of the forecast origin"),
             y=alt.Y(
                 "change:Q",

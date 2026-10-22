@@ -98,7 +98,7 @@ def main() -> None:
             continue
         entry: dict = {"rows": int(mask.sum())}
         for arm in ARM_NAMES:
-            m = {k: float(v[mask].mean()) for k, v in metrics[arm].items()}
+            m: dict = {k: float(v[mask].mean()) for k, v in metrics[arm].items()}
             if arm != "a":
                 m["change_pct"] = contrast(month=month, metrics=metrics, mask=mask, arm=arm)
             if arm in ("r2", "r2f64", "r2o", "rr"):
