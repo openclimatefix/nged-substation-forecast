@@ -15,10 +15,10 @@ page](../../background/network.md).
   change 32 to 33 (disk).
 - **"32" also counts something else on the network page.** The 41 connected hydro sites sit across
   "32 distinct primary substations" ([network page](../../background/network.md)). That is a count
-  of Primaries across all four licence areas and has no link to the 32 trial series (unchecked).
+  of Primaries across all four licence areas and has no link to the 32 trial series (docs).
 - **The `time_series_type` column does not say what a generator is.** A type of "Other
-  (Generation)" need not be solar, so do not assume a daylight profile (exp 182; the Other
-  (Generation) series; provisional).
+  (Generation)" need not be solar, so do not assume a daylight profile (exp 182; one farm
+  behind D8; provisional).
 - **Label the generators "Solar farm A" to "Solar farm F" and similar outside the private data
   store.** `studies.anonymise` holds the labels. Substations may be named. The D codes (D1 to D22)
   that the write-ups use are anonymised labels of the demand-side series, defined in the
@@ -60,13 +60,15 @@ page](../../background/network.md).
 
 - **The `time` column marks the end of the half-hour that the reading covers.** Do not shift it.
   Power timestamps show no 30-minute error on either side of NGED's fix of 2026-03-26 08:30 UTC
-  ([data-processing page](../data-processing.md#timestamps-and-availability); exp 103; the DP
-  decision series; established).
+  ([data-processing page](../data-processing.md#timestamps-and-availability); exp 103; 6 metered
+  solar farms, with the Primaries only weakly tested; provisional).
 - **Before that instant, the ingest moves NGED's stamp 30 minutes earlier**
   (`PowerTimeSeries.correct_late_timestamps`). A study must not shift the stamp a second time
   (code).
-- **Join power to an hourly weather product on `(time - 1 µs).truncate("1h") + 1h`.** The
-  data-processing page gives the evidence (unchecked).
+- **Join hourly power to a weather product that stamps the end of its hour on
+  `(time - 1 µs).truncate("1h") + 1h`.** The evidence is on the
+  [data-processing page](../data-processing.md#timestamps-and-availability) (exp 103; CAMS and 6
+  metered solar farms; provisional).
 - **Assume a power reading reaches the forecast 3.5 hours after the half-hour it covers.** No
   experiment has measured the delay on live telemetry (exp 87, 104, 106; assumption; provisional).
 
@@ -79,7 +81,7 @@ page](../../background/network.md).
   start of each series](../data-processing.md#trim-the-start-of-each-series) and [fixed
   windows](../data-processing.md#fixed-windows) (exp 6, 102, 103, 173; established).
 - **Some series changed regime.** D8's weekday daytime demand fell from about 9 MW to about 3 MW
-  between 2023-10 and 2025 (exp 103; D8; established).
+  between 2023-10 and 2025 (exp 103; D8; provisional).
 - **A metered solar farm can climb to its rated output in stages over months.** One farm took eight
   months ([network page](../../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months)).
   The metered farms miss 7.6% to 27.6% of their half-hours, so check coverage before comparing

@@ -34,12 +34,18 @@ The reference page [What is on disk](what-is-on-disk.md) says where each data se
   bullet in place so that the page describes the present, and change its "last checked" line.
 - **Add or correct at most five bullets per experiment.** Write the bullet where a planner would
   look first, and link the experiment or page that owns the evidence. If nothing changed, write
-  "background: no change" in the pull request body. The merger checks that the pull request body
-  lists the changed bullets or says "background: no change".
+  "background: no change" in the pull request body. The merger checks the pull request body for the
+  list of changed bullets or for that sentence.
 - **End every factual bullet with an evidence tag** in the form `(exp 179; 6 farms, one year;
   provisional)`: the experiment ids, the scope of the evidence, and a status of `established`,
   `provisional`, or `overturned by N`. A bullet about code or disk layout says `(code)` or
-  `(disk)`. A bullet whose evidence nobody has traced says `(unchecked)`.
+  `(disk)`. A bullet that digests a linked docs page says `(docs)`, and that page owns the
+  evidence. A bullet whose evidence nobody has traced says `(unchecked)`.
+- **Mark a bullet `established` only when it states a count or a definition, or when a second
+  experiment or row set reproduced the finding.** Every other bullet is `provisional`.
+- **Check a tag before you rely on it.** Open the `result.md` of each cited experiment and confirm
+  that the experiment supports the claim, that the scope matches, and that the status fits. Replace
+  `(unchecked)` with a traced tag whenever you find the owning source.
 - **A later experiment may overturn a bullet.** The overturning experiment changes the status in the
   tag to `overturned by N`, where N is its id, and rewrites the bullet to state the present fact.
 - **Do not copy a rule from a page that owns it.** Link the owner page instead.
