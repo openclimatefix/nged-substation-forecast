@@ -2,8 +2,9 @@
 """Compare D8's multi-day drops (experiment 159) with the readings of its two disaggregated farms.
 
 Farms appear only as `farm 1` and `farm 2`. Reads the drops table of experiment 159, the stored D8
-power and expected-power panel, and the cleaned power table (which holds the same rows as the raw table for both farms). Writes private tables under
-`WORK_DIR` and prints every number the write-up quotes into `printed_report.txt`.
+power and expected-power panel, and the cleaned power table (which holds the same rows as the raw
+table for both farms). Writes private tables under `WORK_DIR` and prints every number the write-up
+quotes into `printed_report.txt`.
 
 Run as `OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue
 uv run --no-sync python e00182_check.py`.
