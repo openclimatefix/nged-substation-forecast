@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 243 | Does a physics plant with a small neural head beat the plant, XGBoost, and a neural network alone? | 1 | Nothing | Running |
 
 ## Planned experiments
 
