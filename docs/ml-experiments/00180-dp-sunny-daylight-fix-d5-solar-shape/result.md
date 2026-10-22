@@ -9,7 +9,8 @@ also_relevant_to:
 - production-reference-and-best-guess
 status: planned
 size: >-
-  complex. Stored: private files under data/ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/
+  complex. Stored: private files under data/ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-
+  shape/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is
   defensible, because the maintainer fixed five arms and the order they run in is ours. Callers:
   this folder's scripts call `studies.dp_gam`, `studies.dp_features`, `studies.dp_ens_weather`, and
@@ -55,20 +56,22 @@ adopted_in: none
 ---
 
 **We ask whether the loss of the best generalised additive model (GAM) to BG2 on sunny daylight
-half-hours at one substation, D5, is caused by the fixed solar shape the GAM subtracts from demand.**
+half-hours at one substation, D5, is caused by the fixed solar shape the GAM subtracts from
+demand.**
 [Experiment 178](../00178-dp-sunny-daylight-gap-diagnosis/result.md) found that on the sunniest
 third of each substation's daylight half-hours the GAM's mean absolute error exceeds BG2's by 0.05
 MW over six substations, and that D5 alone holds 63% of that gap (+0.202 MW, 95% interval +0.111 to
-+0.273) with 16% of the rows. This experiment first inspects D5's solar properties without fitting
-anything. It then replaces the GAM's solar term at D5, and at one substation with no gap, with
-solar terms of increasing flexibility, and re-scores the same rows. It builds on the convex GAM of
++0.273) with 16% of the rows. The experiment first inspects D5's solar properties without fitting
+anything. Then it replaces the GAM's solar term at D5, and at one substation with no gap, with
+solar terms of increasing flexibility, and re-scores the same rows. The design builds on the convex
+GAM of
 [experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) and on
 the pinned solar capacity of
 [experiment 45](../00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md).
 
 ## Plan
 
-**Reading the earlier advice.** This plan follows experiment 139 and 157 (the pinned capacity stays
+**Reading the earlier advice.** The plan follows experiments 139 and 157 (the pinned capacity stays
 untouched in every arm), experiment 111 (month-block bootstrap on paired differences), and
 experiment 178 (state the row definition and the lead range with every gap). It departs from
 experiment 73, which dropped the search over the DC:AC ratio as unidentified: arm P searches tilt
@@ -83,17 +86,31 @@ every arm is scored on identical rows. Forecast rows stay before 2026-07-01.
 
 **Control.** Experiment 155's arm D re-run through the same code path as the arms, with the fixed
 fleet shape (tilt 35, south, DC:AC 1.15, 0.4%/K de-rating, cell temperature = air + 25 K x shape).
-Its median forecast must reproduce the stored arm D's to 0.005 MW mean absolute difference at D5 and
-the placebo, or the comparison does not proceed. The chain is experiment 136's A2 (T-all monthly
+The control's median forecast must reproduce the stored arm D's to 0.005 MW mean absolute
+difference at all six substations, or the comparison does not proceed. The chain is experiment 136's
+A2 (T-all monthly
 fits, pooled noise setting, calibrated ensemble mean), then experiment 155's winter night offset and
-recipe R. The arms reuse the quantile offsets that the chain refits on its own tuning months, so
-the pinball contrasts show the shift of the mean forecast and nothing else; experiments 160 and 164
-change quantile offsets only, and the median forecast of 178's GAM equals arm D's.
+recipe R. Each arm reruns the whole chain, including its spread table, so the pinball contrasts
+include
+that refit. The pinball scores are arm D's, not the calibrated quantiles of experiments 160 and
+164, which change quantile offsets only; the median forecast of 178's GAM equals arm D's, so the
+headline mean absolute error is comparable.
 
 **Where the solar shape enters, and how an arm swaps it.** The shape enters the training rows
 (`unit_pv_shape` from CAMS), the analysis proxy (`proxy_cache`), and each ensemble member
 (`SunGeometry.pv_shape_and_ghi`). Each of the three takes an optional plant. The pinned capacity,
 in points of effective capacity, multiplies the shape in all three places, and stays as it is.
+Three more couplings are fixed here. First, the temperature de-rating and the finite-row and
+last-trained masks (`derated_unit_shape`, `LAST_TRAINED_MIN_SHAPE`, the filters in `dp_gam`,
+`dp_ens`, and experiment 136's scripts) read the swapped shape, as the control reads the fleet
+shape. Second, any rescaling of an arm's shape is applied after the inverter clip. Third, the
+sunny-row ranking reads a separate frozen copy of the fleet shape, never the swapped array, and
+the scripts assert that every arm's scored row keys equal experiment 178's. The code review
+checks each of these readers.
+
+Arms L and N apply their nonlinear response to the calibrated ensemble-mean irradiance, because
+the chain forecasts from the mean as one member. A response fitted on CAMS rows therefore meets a
+smoother input at forecast time. The write-up reports this as a limit.
 
 ### Stage 0: inspect D5's solar properties (CPU, no fit, before any arm)
 
@@ -117,19 +134,27 @@ Each item is reported as a finding, not only the one that explains the gap.
 
 - **Gate 1, held-out farm:** fit each learned response on five of the six metered solar farms (A to
   F, as experiments 129 and 157 use) and score it on the sixth farm's metered output, against the
-  fixed fleet shape's best single scale. The response must lower the held-out MAE by 10% or more at
-  4 of 6 farms. The farms' output comes from experiment 179's `cleaned_solar_farms.parquet` (rows
-  with a null `drop_reason`), which is provisional until experiment 179 merges. The metered-PV session adds the
+  fixed fleet shape's best single scale. Arms L and N each have their own gate. The response and the
+  fleet shape each get one scale fitted on the held-out farm's first calendar year and are scored on
+  its later years, so both see the same
+  amount of the held-out farm. The response must lower the held-out MAE by 10% or more at 4 of 6
+  farms. The farms' output comes from experiment 179's `cleaned_solar_farms.parquet` (rows
+  with a null `drop_reason`), which is provisional until experiment 179 merges. The metered-PV
+  session adds the
   same test; its code is reused if merged. Farms appear on any page only under their anonymised
   letters.
 - **Gate 2, injection:** inject a metered farm's output at 50% of the substation's pinned capacity
   into its net power for the forecast year, with the shape held at the response learned without
-  the injection. The forecast error on the injected half-hours must fall by 0.75 to 1.25 of the
-  injection when the capacity is raised by the injected amount (experiments 129 and 157). The gate
+  the injection. The recovery is (mean absolute error on the injected half-hours with the injection
+  and the
+  old capacity, minus the same with the raised capacity) divided by the injection's mean. It must
+  lie in 0.75 to 1.25 (experiments 129 and 157). The injection enters the training rows of the
+  monthly refits, and the forecast year's refits are the ones scored. The gate
   runs at D5 and at the placebo only.
 - **Stop rules:** if gate 1 fails, arms L, N, and F do not run, the shape ceiling (experiment 157
   found one scale of the fleet shape fits a median 0.92 to 0.94 of a farm's output) is written up
-  as real, and the verdict is capped at `inconclusive`. Arms P and K are parametric, have their
+  as real, and the verdict is capped at `inconclusive`. Arms P and K change only the shape's fixed
+  parameters, have their
   own selection rule, and still run. If gate 2 fails at D5 or at the placebo, the confounding is
   reported and only arm F runs.
 
@@ -141,13 +166,22 @@ runs at the four other substations (D9, D10, D11, D14) as the no-harm check.
 - **C, control:** the fixed fleet shape.
 - **P, per-substation tilt and azimuth (the lead arm):** the shape comes from `plant_power_mw` for
   the substation's chosen tilt (15, 25, 35, 45, 55 degrees) and azimuth (135, 157.5, 180, 202.5, 225
-  degrees), DC:AC 1.15. Each candidate shape is scaled so that its sum over the selection window's
-  daylight half-hours equals the fleet shape's, which keeps the pinned capacity's meaning. The
+  degrees), DC:AC 1.15. Each candidate shape gets one scale per substation, fixed so that its sum
+  over all daylight
+  half-hours from 2023-04-01 to 2024-03-31 on CAMS irradiance equals the fleet shape's. The scale
+  is then frozen for every later cut. This keeps the pinned capacity's annual meaning. The
   selection rule is fixed here: for each of the 25 cells, fit T-all at the quarterly cuts
-  2023-04-01, 2023-07-01, 2023-10-01, and 2024-01-01, score each fit on the daylight half-hours of
-  the following quarter with the CAMS-driven shape, and take the cell with the lowest mean absolute
-  error over the four quarters. The chosen cell replaces the fleet shape only if its error is at
-  least 1% lower than the fleet's (35, 180); otherwise the substation keeps the fleet shape. All
+  2023-04-01, 2023-07-01, 2023-10-01, and 2024-01-01, score each fit on the following quarter's
+  sunny daylight half-hours (the fleet-shape ranking, with the CAMS-driven shape), and take the
+  cell with the lowest mean absolute error over the four quarters. The scores of all 25 cells are
+  reported per substation. D9 has no pinned-capacity vintage before 2025-04, so it keeps the fleet
+  shape. At the other substations the early cuts use the later vintage's level (hindsight, as the
+  `dp_pinned_capacity` docstring says); the capacity is the same for all 25 cells at a cut, so
+  it cannot favour one cell. The chosen cell replaces the fleet shape only if its error is at
+  least 1% lower than the fleet's (35, 180), a guard against selection noise that the reported
+  surface lets a reader judge; otherwise the substation keeps the fleet shape, and arm P equals
+  the control there. The write-up lists the substations that changed, and arm P is left out of the
+  best-arm choice at D5 if D5 keeps the fleet shape. All
   selection data end before 2024-04-01, the first scored-chain run. If the selection fits take
   more than 4 hours at the slot's cores, the grid shrinks to tilt 25, 35, 45 and azimuth 157.5,
   180, 202.5 before any score is read.
@@ -167,7 +201,9 @@ runs at the four other substations (D9, D10, D11, D14) as the no-harm check.
 - **F, farm-learned response, frozen:** the response of L or N learned on the farms A to F pooled,
   then frozen and used at D5 and the placebo. It runs only if gate 1 passes and gate 2 fails.
 
-**Placebo:** D16, chosen before any fit because it has the most negative sunny-daylight gap in
+**Placebo:** D16 is the placebo, and D10 (-0.009 MW) is a second placebo for every arm because
+both are cheap and neither is the target;
+D16 is chosen before any fit because it has the most negative sunny-daylight gap in
 experiment 178's rows (-0.025 MW; D10 -0.009, D11 +0.013, D14 +0.048, D9 +0.079, D5 +0.202). Every
 arm that changes the solar term at D5 also runs at D16, which must move by under 0.02 MW. A larger
 move means the change is not specific to D5's shape.
@@ -186,18 +222,29 @@ move means the change is not specific to D5's shape.
 
 ### Stop rules
 
-- After the first replicate (the even tuning months), stop if the best arm minus control at D5 has
-  an interval wholly above zero on sunny daylight half-hours.
-- Stop and say so if D5 stays above +0.15 MW with every arm run.
+- After the replicate period (the even months of 2024-07 to 2025-06), stop if the best arm minus
+  control at D5 has an interval wholly above zero on sunny daylight half-hours. The best arm is
+  chosen on the replicate period, and the scored year then tests it once.
+- If D5's gap stays above +0.15 MW with every arm and no interval lies wholly below zero, say the
+  cause is not the solar shape and stop. Arm K's earlier failure at D5 (experiment 110) counts as
+  prior evidence for this outcome.
+- Arm F is descriptive and outside the four-contrast correction.
 
 ### Compute and reviews
 
 - At most 8 cores (`OMP_NUM_THREADS=1` per worker), `systemd-run --user --scope -p MemoryMax=16G
   -p OOMPolicy=continue` per job, and a GPU share of at most 4 GB for arm N only. One monthly
-  T-all fit is timed at D5 before any grid is launched.
-- Reviews: one Sonnet plan review, one Sonnet code review for leakage (no response sees data after
+  T-all fit is timed at D5 before any grid is launched. The fit count is about 27 monthly
+  fits per arm per substation (arms C and P at six substations, K, L, N, F at D5, D16, and D10),
+  plus 25 cells x 4 cuts x 5 substations = 500 selection fits. The 4-hour shrink rule counts the
+  selection fits only, at the timed cost per fit and 8 cores.
+- Reviews: one Sonnet plan review (done; the manager's brief asks for Sonnet reviewers, so the Opus
+plan and
+  code reviews of the full tier are skipped), one Sonnet code review for leakage (no response sees
+  data after
   its fit's cut) and for the control reproducing arm D, and one Sonnet prose review. An Opus audit
-  runs only if one of the `ml-experiment` skill's seven triggers fires. The experiment adds no
+  runs only if one of the seven triggers in the `ml-experiment` skill's "Audit before merge" fires.
+  The experiment adds no
   production code.
 - Departures from the design brief, for the manager to overrule: arm K is added; the DC:AC search is
   dropped from arm P; arms P and K run when gate 1 fails; and arm P's selection keeps the fleet
