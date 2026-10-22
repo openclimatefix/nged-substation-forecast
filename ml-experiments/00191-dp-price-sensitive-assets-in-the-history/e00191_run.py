@@ -1,7 +1,7 @@
 """Run experiment 191's arms at one or more sites and write the prediction frames.
 
-systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00191-*/e00191_run.py --sites D8 D14 [--ungated]
+Run it under `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue` with
+`uv run --no-sync python`, for example with the arguments `--sites D8 D14 [--ungated]`.
 """
 
 import argparse
