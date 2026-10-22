@@ -2,6 +2,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 241, PV calibrated interval | Does an interval built from leave-one-farm-out injected recoveries cover the injected capacity about 80% of the time? | Medium | None | Planned |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
