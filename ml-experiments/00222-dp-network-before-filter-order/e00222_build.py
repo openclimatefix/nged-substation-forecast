@@ -12,8 +12,7 @@ Kalman filter's level and anomaly. The convex forecast alone is `raw = mean - le
   spread refit follow exactly as in arm D. `k` scales the filter's observation noise (`1.00` is
   POOL's setting).
 
-    systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00222-*/e00222_build.py [--workers 4]
+    uv run --no-sync python ml-experiments/00222-*/e00222_build.py [--workers 4]
 """
 
 import argparse

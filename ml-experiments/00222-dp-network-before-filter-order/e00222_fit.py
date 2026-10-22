@@ -8,8 +8,7 @@ corrected by the full network. Each network is trained for three seeds and the c
 averaged. Writes `work/nn/<site>.npz` (the correction on the stream grid) and
 `work/nn/<site>_rows.parquet` (the correction on experiment 136's arm A2 forecast rows).
 
-    systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00222-*/e00222_fit.py [--threads 4]
+    uv run --no-sync python ml-experiments/00222-*/e00222_fit.py [--threads 4]
 """
 
 import argparse

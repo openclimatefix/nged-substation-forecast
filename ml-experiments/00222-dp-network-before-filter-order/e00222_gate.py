@@ -16,8 +16,7 @@ without it (R0). Recovery is the mean rise in the filter's level plus anomaly at
 (15.5 to 39 hours) on rows valid in the block, from runs with origins from the third day of the
 block, divided by 3. The gate asks for PRE's recovery to be within 5 percentage points of R0's.
 
-    systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00222-*/e00222_gate.py
+    uv run --no-sync python ml-experiments/00222-*/e00222_gate.py
 """
 
 import json
