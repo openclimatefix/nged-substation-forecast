@@ -26,7 +26,7 @@ prediction: >-
   noise or genuine meter changes; the page then says the two failure modes are separate.
 decision_rule: >-
   Supported when the share of localised false steps at D10 and D11 with an explanation is at least
-  0.5 and its matched-sample 95% interval for the ratio to the base rate excludes values below 2.
+  0.5 and its bootstrap 95% interval for the ratio to the base rate excludes values below 2.
   Not supported otherwise. A positive outcome is a candidate cause only, because a month-resolution
   capacity step cannot show that a neighbour caused it. No verdict on experiment 207 is given.
 benchmark: >-
@@ -61,9 +61,9 @@ lessons:
     had a balanced opposite step at a metered neighbour, and the alarms fire as often in random
     windows (0.50) as at the false steps (0.43).
   - >-
-    10 of the 26 false-step counts at D10 and 5 of the 15 at D11 are the net change from one
-    August to the next April, a winter ramp that no residual step can date, so about a third of the
-    gate failure is not a step at all.
+    10 of the 26 false-step counts at D10 and 5 of the 15 at D11 (rate per year times 5 row sets and
+    3 years) are the net change from one August to the next April, which no residual step can date;
+    without it D11 would pass the false-step test (0.67) and D10 would still fail (1.07).
 advice:
   - >-
     Do not read a false step in the month-resolution capacity path as a load transfer; test the
@@ -78,8 +78,8 @@ advice:
 take_home_message: >-
   The false steps that made experiment 207's test fail are not load moved between connected
   Primaries: none has a matching opposite step at a metered neighbour, and the load-shift alarms
-  fire as often in random months as at the false steps. A third of the failed count is a slow
-  winter drift in the fitted capacity rather than a step, and three false steps sit beside
+  fire as often in random months as at the false steps. A third of the failed count is the
+  net drift from one summer to the next rather than a step, and three false steps sit beside
   readings the cleaning rule flags as zero, so the false steps and the load-shift detectors are
   separate problems.
 ---
@@ -103,11 +103,11 @@ and the first thing to check at the jumps is the cleaning rule's zero readings.
 **Verdict `not supported`.** The pre-registered prediction (at least half of the false steps
 explained, at twice the base rate) fails. At D10 and D11, 3 of 7 localised false steps have an
 explanation (0.43), against a matched base rate of 0.66 (ratio 0.65; 95% interval 0.19 to 1.0
-from resampling the 7 false steps). No false step has a balanced opposite neighbour step (0 of 7,
-base rate 0.51). The gate of experiment 207, recounted with the explained steps removed, passes at
-D10 (0.80 false steps per year, from 1.73) and still fails at D11 (1.00). Chance alone would have
-removed a similar share, so the recount shows nothing about cause. No verdict on experiment 207 is
-given.
+from a bootstrap over the 7 false steps). No false step has a balanced opposite neighbour step
+(0 of 7, base rate 0.51). The gate of experiment 207, recounted with the explained steps removed,
+passes at D10 (0.80 false steps per year, from 1.73) and still fails at D11 (1.00). Matched random
+windows are explained more often (0.66) than the false steps are (0.43), so the recount shows
+nothing about cause. No verdict on experiment 207 is given.
 
 ![Figure 1: share of windows with each explanation, false steps against matched random windows](figure_1.svg)
 
@@ -120,11 +120,14 @@ given.
 - **Explained share (7 localised false steps at D10 and D11, base rate from matched windows):**
   balanced opposite neighbour step 0 of 7 (0.00; base 0.51), RO-NC alarm 2 of 7 (0.29; 0.48), pair
   alarm 1 of 7 (0.14; 0.00), learned score alarm 4 of 7 (0.57; 0.50), any alarm 3 of 7 (0.43;
-  0.50), any explanation 3 of 7 (0.43; 0.66). The one pair alarm is at D11, August 2022, where no
-  matched window had one, so a single event moves that row.
+  0.50), any explanation 3 of 7 (0.43; 0.66). An explanation counts only where the Primary's
+  largest residual step in the window reaches 3 noise units: at D11, August 2022, the step is 2.7
+  noise units, so its pair and learned alarms are not counted. Counting them would give 4 of 7
+  (0.57) explained, still under the base rate of 0.66. The one pair alarm is at D11, August 2022,
+  where no matched window had one, so a single event moves that row.
 - **Ratio to the base rate, any explanation:** 0.65 (0.19 to 1.0) at D10 and D11, 0.75 at D10
-  alone (5 events), 0.00 at D11 alone (2 events); for all four Primaries with false steps (8
-  events) 0.71 (0.26 to 1.0).
+  alone (5 events), 0.00 at D11 alone (2 events); for the 8 of the 10 localised false steps at
+  the four Primaries that have matched windows (D14 has none) 0.71 (0.26 to 1.0).
 - **Wider window:** an alarm anywhere in the 30-day window at 4 of 7 false steps, against 0.55 of
   matched windows.
 - **Cleaning flags (descriptive, not scored):** 3 of the 10 localised false steps (D11 August 2022,
@@ -137,8 +140,8 @@ given.
 - **Forecast checks:** no forecast is scored, so the median-minus-mean forecast and the
   mean-forecast error do not apply.
 - **Audit triggers:** none fired. The failed prediction was pre-registered as a possible outcome,
-  no control or nested arm exists, leaving D10 or D11 out does not change the verdict (0.60 against
-  0.80 at D10, 0.00 against 0.30 at D11), and no later experiment depends on the result.
+  no control or nested arm exists, D10 alone and D11 alone give the same verdict (0.60 against 0.80
+  at D10, 0.00 against 0.30 at D11), and no later experiment depends on the result.
 
 ## Notes
 
