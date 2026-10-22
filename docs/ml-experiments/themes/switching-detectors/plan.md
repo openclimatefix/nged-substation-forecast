@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals |
+| [189](../../00189-switching-neural-onset-end-block-detector/result.md) | Does a small neural network trained on realistic injected transfers find the real transfers at RO-NC's alarm budget? | 1 | Experiment 181 merging | Planned |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the
 interconnection edges between Primary substations and scores them on injected transfers; see the
