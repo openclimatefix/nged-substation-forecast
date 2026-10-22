@@ -125,10 +125,27 @@ def print_numbers(*, table: pl.DataFrame) -> pl.DataFrame:
         print(result)
         point = result.filter(pl.col("site").is_in(common.DECISION_SITES))
         print(f"rise >= {RISE} at {int((point['rise'] >= RISE).sum())} of 5 decision Primaries")
-        for stat in ("recovery_frozen", "capacity_ratio", "explained", "farm_only_scale"):
+        for stat in (
+            "p99_factor",
+            "recovery_frozen",
+            "capacity_ratio",
+            "explained",
+            "farm_only_scale",
+        ):
             values = site_values(table=table, stat=stat)
             print(stat)
             print(intervals(values=with_pooled(values=values), columns=columns).sort("site"))
+        factor = (
+            table.filter(pl.col("stat") == "p99_factor")
+            .group_by("site", "arm")
+            .agg(pl.col("value").median())
+            .pivot(on="arm", index="site", values="value")
+            .sort("site")
+        )
+        print(
+            "p99_factor: p99 of the arm shape over p99 of the injected output (median over farms)"
+        )
+        print(factor)
         pairs = (
             farm_arm_values(table=table, stat="recovery")
             .filter(pl.col("b") == 0)

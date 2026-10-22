@@ -46,7 +46,9 @@ metric: >-
   output over the same half-hours. The recovered output is the capacity found with the farm added at
   50% of the Primary's pinned capacity, minus the capacity found without it, times the fitted solar
   shape. Both percentiles are of alternating-current output, in MW, so the ratio does not depend on
-  the unit of the shape. The plain capacity ratio, in the unit of experiment 231, is reported too
+  the unit of the shape. The injected farm's percentile is over
+  half-hours at which the farm's output is positive and the arm's derated shape exceeds 0.01. The
+  plain capacity ratio, in the unit of experiment 231, is reported too
 verdict: partly supported
 production_status: not-for-production
 adopted_in: none
@@ -61,9 +63,10 @@ best_arm: nearby farm's output as the shape, pooled recovery 0.867
 take_home_message: >-
   A nearby farm's measured output finds more of an injected solar farm than the satellite
   irradiance does: 0.867 against 0.780 of its output, and at least 0.05 more at all five Primaries.
-  The gain is smaller when the two farms are 5 to 25 km apart (0.02 to 0.14) than when they are 2 km
-  apart (0.17 to 0.24), and it falls to 0.052 when recovery is read in the capacity unit of
-  experiment 231. The farm may carry plant effects as well as sunshine, so the result does not yet
+  The gain is 0.02 to 0.14 when the two farms are 5 to 25 km apart and 0.17 to 0.24 for the one pair
+  of farms 2 km apart, and it falls to 0.052, reaching 0.05 at 3 of 5 Primaries, when recovery is
+  read in the capacity unit of experiment 231. The farm may carry plant effects as well as sunshine,
+  so the result does not yet
   show that the satellite irradiance is the limit.
 lessons:
   - >-
@@ -74,7 +77,8 @@ lessons:
   - >-
     The gain measured by the ratio of 99th percentiles (0.090) is larger than the gain measured by
     the capacity ratio of experiment 231 (0.052), because the reference farm's 99th percentile is
-    higher than that of the injected farm over the same rows.
+    higher, relative to the injected farm's, than the satellite shape's (1.02 against 0.95 to 0.96
+    at four decision Primaries).
 advice:
   - >-
     Test a shared seasonal efficiency curve fitted on the farms' output before using a nearby farm
@@ -82,7 +86,8 @@ advice:
     the shape, because the nearby farm may be supplying plant shape and not sunshine (figure 1).
   - >-
     Report any recovery that uses a farm as the shape against the distance between the injected farm
-    and the reference farm, because two farms 2 km apart gain 0.17 to 0.24 and farms 5 to 25 km
+    and the reference farm, because the one pair of farms 2 km apart gains 0.17 to 0.24 and farms 5
+    to 25 km
     apart gain 0.02 to 0.14 (figure 2).
 code: ml-experiments/00238-pv-capacity-nearest-farm-sunshine-reference/
 ---
@@ -115,7 +120,8 @@ exception (data to 2026-07-31) is not used, and no forecast is scored.
 
 ![Gain against distance between the two farms](figure_02_distance.svg)
 
-**Figure 2. The gain is 0.17 to 0.24 for two farms 2 km apart and 0.02 to 0.14 for farms 5 to 25
+**Figure 2. The gain is 0.17 to 0.24 for the one pair of farms 2 km apart and 0.02 to 0.14 for farms
+5 to 25
 km apart.**
 
 ## Findings
@@ -129,37 +135,52 @@ km apart.**
     - **Satellite shape on all rows** 0.780 (0.767 to 0.791), and **on the rows where the
       reference farm has a reading** 0.780 (0.765 to 0.790).
     - **Nearby farm's output** 0.867 (0.863 to 0.878).
-    - **Gain on the same rows** 0.090 (0.074 to 0.100). Per Primary the gain is 0.058 (D5), 0.138
+    - **Gain on the same rows** (median over farms of each farm's paired difference, so not the
+      difference of the medians) 0.090 (0.074 to 0.100). Per Primary the gain is 0.058 (D5), 0.138
       (D10), 0.115 (D11), 0.066 (D14), and 0.090 (D16), and 0.168 at D9.
 - **The gain is smaller in the capacity unit of experiment 231.** The plain capacity ratio rises
   from 0.826 to 0.869, a gain of 0.052 (0.029 to 0.061), and the gain reaches 0.05 at 3 of 5
   Primaries (D10, D11, and D16). The two readings differ because the reference farm's 99th
   percentile over the rows is higher than the injected farm's.
-- **Two farms 2 km apart share nearly all their weather, so those 5 pairs flatter the result.** The
+- **The 5 pairs under 5 km are the same 2 farms (A and C) in both directions.** They may flatter the
+  result, because two farms 2 km apart probably share nearly all their weather. The
   median gain is 0.198 for the 5 pairs less than 5 km apart, 0.069 for the 8 pairs 5 to 12 km
   apart, and 0.073 for the 16 pairs 12 to 30 km apart. Without the pairs under 5 km, the median
   gain per decision Primary is still 0.058 to 0.116, at least 0.05 at 5 of 5.
-- **The gain does not depend on freeing the demand terms.** With the demand terms frozen at the
+- **The gain shrinks with the demand terms frozen, but remains.** With the demand terms frozen at
+  the
   base fit, the recovery rises from 0.897 to 0.959 (gain 0.064, 80% interval 0.057 to 0.080),
   against 0.090 with the demand terms free.
-- **Row counts.** The reference farm's dropouts remove 151 to 3,941 of 45,168 to 89,172
+- **The farm-only gain is small.** The share of the injected farm's output that one scale of the
+  shape explains rises by 0.025 (0.018 to 0.047), from 0.929 to 0.954. The share of squared output
+  rises by 0.054, from 0.895 to 0.953. The prediction quoted 0.953 as the satellite shape's value
+  from experiment 218, a different statistic (a fit at the farm's own site), so the 0.97 target is
+  not comparable with the figures here.
+- **The decision rule is met on the pre-registered metric.** The recovery rises by at least 0.05 at
+  5 of 5 Primaries by the 99th-percentile ratio and at 3 of 5 by the capacity ratio. The reference
+  is kept only as a test of plant shape, not as a sunshine measure.
+- **Row counts.** The reference farm's dropouts remove 151 to 3,941 (median over farms) of 45,168 to
+  89,172
   training rows per Primary. The satellite and reference arms use identical rows.
 
 ## Checks
 
 - **Reproduction:** the satellite shape on all rows reproduces experiment 231's rung 4 (the full
-  joint fit on all rows) at every Primary and injected farm, with a largest difference of 0.000.
+  joint fit on all rows) at every Primary and injected farm, with a largest difference of 0.000 at
+  three decimal places.
 - **Derating:** the script checks that the reference shape, derated by the fit, equals the farm's
-  output to within 1e-6 on every daylight half-hour, and it did at every Primary.
+  output to within 1e-6 on every half-hour at which both farms have output, and it did at every
+  Primary.
 - **Same rows:** the satellite and reference arms train on the same number of rows at every
   Primary, as the script asserts.
 - **Median forecast minus mean forecast, and the mean-forecast error:** not applicable, because
   the experiment scores no forecast.
 - **Audit triggers** (the seven triggers in the `ml-experiment` skill's "Audit before merge"):
-  trigger 2 fires, because the result contradicts the finding of experiment 231 that the
-  irradiance contributes almost none of the shortfall, and the explanation below was not tested
-  here. Trigger 7 fires because experiment E's design may depend on whether the gain is plant
-  shape or sunshine. The maintainer's decision on an audit is pending.
+  trigger 2 fires, because the result is in apparent tension with the finding of experiment 231
+  that the irradiance contributes almost none of the shortfall, and the explanation in the Limits
+  section was not tested here. Trigger 7 fires because the design of experiment 239 (the seasonal
+  efficiency curve) depends on
+  whether the gain is plant shape or sunshine. The maintainer's decision on an audit is pending.
 - **Review:** one Sonnet review of the plan, one of the code, and one of the page.
 
 ## Limits
@@ -172,14 +193,15 @@ km apart.**
   the distance from a real unmetered farm to its nearest metered farm. Figure 2 shows the gain
   against that distance.
 - **A reference farm metered behind the Primary** would sit in both the base and the injected
-  series and cancel in their difference, so it cannot bias the recovery.
+  series and cancel in their difference, so it should cancel to first order (the bounded, penalised
+  fit is not linear).
 - **The interval covers month-to-month variation only,** and the spread over injected farms is
   shown by the dots of figure 2.
 
 ## What the next experiment should answer
 
 - **Does the gain come from sunshine or from plant shape?** Fit the shared seasonal efficiency
-  curve of experiment E on the farms' output first. If the curve recovers most of the 0.09, the
+  curve of experiment 239 on the farms' output first. If the curve recovers most of the 0.09, the
   nearby farm was supplying plant shape. The prediction that could fail is a gain from the curve
   of at least 0.03 at 4 of 5 Primaries.
 - **A neural component** that learns the plant shape from the farms' output could be tested
@@ -187,14 +209,13 @@ km apart.**
 
 ## Plan: design
 
-- **Distances.** From the farms' and Primaries' coordinates, the Primaries' nearest farms are
-  3 to 22 km away (D5, D10, D14, and D16 within 6 km; D9 and D11 at 20 to 22 km), so every Primary
-  passes the brief's 30 km rule.
+- **Distances.** Each Primary has a metered farm within 30 km (the brief's rule). The nearest
+  farms to the five decision Primaries and D9 are 3 to 23 km away.
 - **The reference farm.** For an injected farm X, the reference is the nearest farm to the Primary
   among the other farms with data from 2019-09 (A, B, C, D, F), provided it lies within 30 km of
   X. A reference at X itself would return the injected output and make the test trivial. The
   injected farm and the reference farm are different sites, as a real unmetered farm and a metered
-  reference would be, but their distance (up to 30 km) is often larger than the distance from a
+  reference would be, but their distance (up to 25 km) is often larger than the distance from a
   real unmetered farm to its nearest metered farm. The recovery is therefore also reported against
   the distance between the injected farm and the reference farm. Farm E is neither injected nor a
   reference, because its record starts later than 2019-09. A Primary with fewer than three eligible
@@ -209,7 +230,8 @@ km apart.**
   at which the reference farm has a dropout or no reading drop out of both the
   base and the injected fit.
 - **Controls.** The CAMS shape on the identical rows (so a change in the rows is not mistaken for a
-  change of shape), and the CAMS shape on all rows. The script asserts that the CAMS and reference
+  change of shape), and the CAMS shape on all rows. The script asserts that the satellite and
+  reference
   arms train on the same number of rows. The CAMS shape on all rows, fed through the same
   shape-substitution code, must reproduce experiment 231's rung 4 (the full joint fit on all rows)
   to within 1e-6.
