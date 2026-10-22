@@ -56,9 +56,10 @@ def alarm_set(*, source: str) -> tuple[pl.DataFrame, pl.DataFrame]:
 
     A learned source's alarm on a series comes from every fold that holds out a labelled Primary pair
     containing the series; the alarms from those folds count 1 / (number of such folds) each, so a series
-    in pairs of two folds contributes one model's worth of alarms. An alarm that strictly matches a labelled
-    load shift in the load shift's fold counts once with weight 1 and replaces its non-matching twins in the
-    other folds. RO-NC and the pair alarm have one table. An alarm is `strict` when one of its table rows matches a labelled load shift of its fold.
+    in pairs of two folds contributes one model's worth of alarms. An alarm that strictly matches a
+    labelled load shift in the load shift's fold counts once with weight 1 and replaces its
+    non-matching twins in the other folds. RO-NC and the pair alarm have one table. An alarm is
+    `strict` when one of its table rows matches a labelled load shift of its fold.
     """
     tables = d.alarm_tables(source=source)
     foldless = source.startswith(("PG_", "RO_"))

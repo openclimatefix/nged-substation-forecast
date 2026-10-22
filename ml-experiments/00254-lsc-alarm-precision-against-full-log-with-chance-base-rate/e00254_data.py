@@ -159,7 +159,7 @@ def series_folds() -> dict[int, list[int]]:
 
 
 def logged_closures() -> pl.DataFrame:
-    """Logged closures of 2 hours to 60 days: first_stamp, last_stamp_exclusive, side_a, side_b (experiment 37's log)."""
+    """Logged closures of 2 hours to 60 days (experiment 37's log), with their start and end stamps and sides."""
     return pl.read_parquet(LOGGED_PATH).filter((pl.col("hours") >= 2) & (pl.col("hours") <= 1440))
 
 
@@ -263,10 +263,10 @@ def _pair_table() -> pl.DataFrame:
 
 
 def alarm_tables(*, source: str) -> dict[int, pl.DataFrame]:
-    """Each fold's interval table for one source id, rows being alarms (a foldless source repeats its table).
+    """Each fold's interval table for one source id (a foldless source repeats its table).
 
-    Columns include `series`, `onset` (the step stamp), `end`, `opp_ratio` and `n_opposite` (learned and RO-NC
-    sources), and `balance_score` (the pair alarm).
+    Columns include `series`, `onset` (the step stamp), `end`, `opp_ratio` and `n_opposite`
+    (learned and RO-NC sources), and `balance_score` (the pair alarm).
     """
     kind, value = source.split("_")
     number = int(value[1:])
