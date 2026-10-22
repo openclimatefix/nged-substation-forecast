@@ -86,9 +86,11 @@ adopted_in: none
 date: 2026-10-22
 ---
 
+# Experiment 181: why were 17 block days missed, and can a block detector find them?
+
 **The 17 unlabelled worst days are mostly short blocks of 1 to 4 noise units, and a detector built
-for blocks finds none of them at the number of false alarms RO-NC is allowed.** A block is a switching-like change in the power
-a Primary substation draws: it steps up, stays level, and steps back. [Experiment
+for blocks finds none of them at the number of false alarms RO-NC is allowed.** A block is a
+switching-like change in the power a Primary substation draws: it steps up, stays level, and steps back. [Experiment
 175](../00175-dp-unlabelled-day-shapes/result.md) found 17 sharp-edged block days among the 37 worst
 days that no label explains, and neither RO-NC (the refit-offset neighbour-count detector of
 [experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)) nor the
