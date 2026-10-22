@@ -730,6 +730,9 @@ step-to-step error of the residual) is 0.17 to 0.27 MW in clean months and 0.35 
 noise fitted on 2022 to 2023 flags 40% to 45% of D8's half-hours from 2025-03 onward, even in April
 to June 2026, when 2% of half-hours are below -2.5 MW
 ([experiment 196](00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)). The
+flags are not solar noise alone: the same detector flags 29% to 36% of D8's night half-hours from
+2025-03, and neither night-only evidence, an edge test, nor a price gate removes them
+([experiment 199](00199-ps2b-engine-detector-v2-ramp-night-price/result.md)). The
 scope is one Primary; the confidence is moderate, and the entry is provisional until the experiment
 has had its reviews.
 

@@ -1,0 +1,90 @@
+== D8_clean: night share of rows 0.46, left tail (night) 0.006, rows with a price 576
+  v1 | night                         night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v1+S | night                       night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v1+P | night                       night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  N | night                          night   2.6%  1.45 d/mo | all   6.2%  4.72 d/mo
+  v2 = N+S+P | night                 night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.5 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.7 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  post hoc N+P | night               night   2.6%  1.45 d/mo | all   6.2%  4.72 d/mo
+  post hoc N+S(either edge)+P | night night   0.2%  0.12 d/mo | all   0.4%  0.24 d/mo
+== D8_2025-03_to_2025-12: night share of rows 0.44, left tail (night) 0.188, rows with a price 14673
+  v1 | night                         night  36.3% 22.85 d/mo | all  54.0% 30.20 d/mo
+  v1+S | night                       night  23.5% 15.50 d/mo | all  33.2% 23.84 d/mo
+  v1+P | night                       night  36.0% 22.55 d/mo | all  49.9% 28.81 d/mo
+  N | night                          night  33.1% 22.15 d/mo | all  48.9% 29.21 d/mo
+  v2 = N+S+P | night                 night  16.7% 10.63 d/mo | all  22.8% 12.92 d/mo
+  v2 = N+S+P sharp0.5 | night        night  19.2% 12.32 d/mo | all  26.3% 14.70 d/mo
+  v2 = N+S+P sharp0.7 | night        night  13.4%  8.84 d/mo | all  18.9% 11.03 d/mo
+  post hoc N+P | night               night  32.5% 21.76 d/mo | all  46.4% 27.82 d/mo
+  post hoc N+S(either edge)+P | night night  31.6% 21.26 d/mo | all  45.0% 27.02 d/mo
+== D8_2026-01_to_2026-06: night share of rows 0.44, left tail (night) 0.116, rows with a price 8582
+  v1 | night                         night  32.5% 18.81 d/mo | all  46.3% 29.90 d/mo
+  v1+S | night                       night  20.3% 11.92 d/mo | all  23.5% 17.47 d/mo
+  v1+P | night                       night  32.1% 18.64 d/mo | all  42.0% 27.21 d/mo
+  N | night                          night  30.3% 18.48 d/mo | all  41.6% 26.54 d/mo
+  v2 = N+S+P | night                 night  16.5%  9.74 d/mo | all  20.8% 11.92 d/mo
+  v2 = N+S+P sharp0.5 | night        night  17.8% 10.58 d/mo | all  22.5% 13.10 d/mo
+  v2 = N+S+P sharp0.7 | night        night  13.4%  8.06 d/mo | all  17.5%  9.91 d/mo
+  post hoc N+P | night               night  29.2% 17.97 d/mo | all  39.9% 25.36 d/mo
+  post hoc N+S(either edge)+P | night night  28.7% 17.47 d/mo | all  37.6% 23.51 d/mo
+== D3: night share of rows 0.46, left tail (night) 0.000, rows with a price 27408
+  v1 | night                         night   0.4%  0.22 d/mo | all   0.5%  0.34 d/mo
+  v1+S | night                       night   0.0%  0.00 d/mo | all   0.0%  0.04 d/mo
+  v1+P | night                       night   0.4%  0.22 d/mo | all   0.5%  0.26 d/mo
+  N | night                          night   0.5%  0.22 d/mo | all   3.1%  4.64 d/mo
+  v2 = N+S+P | night                 night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.5 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.7 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  post hoc N+P | night               night   0.5%  0.22 d/mo | all   3.1%  4.56 d/mo
+  post hoc N+S(either edge)+P | night night   0.0%  0.00 d/mo | all   0.1%  0.19 d/mo
+== D10: night share of rows 0.46, left tail (night) 0.000, rows with a price 27407
+  v1 | night                         night   0.1%  0.04 d/mo | all   0.7%  1.05 d/mo
+  v1+S | night                       night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v1+P | night                       night   0.1%  0.04 d/mo | all   0.5%  0.90 d/mo
+  N | night                          night   0.3%  0.15 d/mo | all   3.1%  5.42 d/mo
+  v2 = N+S+P | night                 night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.5 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.7 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  post hoc N+P | night               night   0.3%  0.15 d/mo | all   3.1%  5.35 d/mo
+  post hoc N+S(either edge)+P | night night   0.0%  0.00 d/mo | all   0.1%  0.11 d/mo
+== D11: night share of rows 0.46, left tail (night) 0.009, rows with a price 27408
+  v1 | night                         night   4.6%  1.08 d/mo | all   3.2%  1.12 d/mo
+  v1+S | night                       night   1.3%  0.30 d/mo | all   0.9%  0.30 d/mo
+  v1+P | night                       night   4.6%  1.08 d/mo | all   3.2%  1.12 d/mo
+  N | night                          night   4.5%  1.23 d/mo | all   5.6%  5.80 d/mo
+  v2 = N+S+P | night                 night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.5 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.7 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  post hoc N+P | night               night   2.7%  0.79 d/mo | all   4.4%  5.27 d/mo
+  post hoc N+S(either edge)+P | night night   2.2%  0.56 d/mo | all   1.6%  0.71 d/mo
+== D14: night share of rows 0.46, left tail (night) 0.001, rows with a price 27405
+  v1 | night                         night   0.2%  0.11 d/mo | all   0.3%  0.30 d/mo
+  v1+S | night                       night   0.1%  0.04 d/mo | all   0.1%  0.04 d/mo
+  v1+P | night                       night   0.2%  0.11 d/mo | all   0.3%  0.22 d/mo
+  N | night                          night   0.2%  0.07 d/mo | all   2.6%  4.64 d/mo
+  v2 = N+S+P | night                 night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.5 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.7 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  post hoc N+P | night               night   0.2%  0.07 d/mo | all   2.6%  4.56 d/mo
+  post hoc N+S(either edge)+P | night night   0.2%  0.07 d/mo | all   0.2%  0.26 d/mo
+== D16: night share of rows 0.46, left tail (night) 0.000, rows with a price 27408
+  v1 | night                         night   0.0%  0.00 d/mo | all   0.0%  0.04 d/mo
+  v1+S | night                       night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v1+P | night                       night   0.0%  0.00 d/mo | all   0.0%  0.04 d/mo
+  N | night                          night   0.2%  0.15 d/mo | all   2.7%  4.56 d/mo
+  v2 = N+S+P | night                 night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.5 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.7 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  post hoc N+P | night               night   0.2%  0.15 d/mo | all   2.7%  4.49 d/mo
+  post hoc N+S(either edge)+P | night night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+== D5: night share of rows 0.46, left tail (night) 0.000, rows with a price 27407
+  v1 | night                         night   0.3%  0.07 d/mo | all   1.7%  2.02 d/mo
+  v1+S | night                       night   0.0%  0.00 d/mo | all   0.1%  0.19 d/mo
+  v1+P | night                       night   0.3%  0.07 d/mo | all   1.5%  1.72 d/mo
+  N | night                          night   0.3%  0.07 d/mo | all   2.8%  4.67 d/mo
+  v2 = N+S+P | night                 night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.5 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  v2 = N+S+P sharp0.7 | night        night   0.0%  0.00 d/mo | all   0.0%  0.00 d/mo
+  post hoc N+P | night               night   0.3%  0.07 d/mo | all   2.7%  4.60 d/mo
+  post hoc N+S(either edge)+P | night night   0.3%  0.07 d/mo | all   0.3%  0.15 d/mo
