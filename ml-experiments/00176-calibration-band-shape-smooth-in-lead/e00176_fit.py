@@ -38,7 +38,7 @@ ROUNDS: Final[int] = 3
 SCALE_FLOOR: Final[float] = 1e-3
 SHRINKAGE_GRID: Final[tuple[float, ...]] = (0.0, 5.0, 20.0, 80.0, 320.0, 1280.0)
 N_FOLDS: Final[int] = 3
-FIX_O_TOLERANCE: Final[float] = 1e-3
+FIX_O_TOLERANCE: Final[float] = 1e-2
 
 
 def load(*, arm: str, period: str, site: str) -> pl.DataFrame:
@@ -76,7 +76,7 @@ def fix_o_multipliers(*, ref: pl.DataFrame, arm_a: pl.DataFrame) -> dict[int, fl
     for position in common.UPPER_FIX_POSITIONS:
         usable = cold & (base[:, position] > 0.5)
         ratio = scaled[usable, position] / base[usable, position]
-        if np.ptp(ratio) > FIX_O_TOLERANCE * 100:
+        if np.ptp(ratio) > FIX_O_TOLERANCE:
             msg = f"fix O is not one multiplier at position {position}: {ratio.min()} {ratio.max()}"
             raise ValueError(msg)
         out[position] = float(np.median(ratio))
@@ -148,6 +148,17 @@ class SiteData:
         self.run = used["run"].to_numpy().astype(np.int64)
         self.month = used["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
         self.residual = (used["actual"] - used["mean"]).to_numpy().astype(np.float64)
+        self.raw_residual = self.residual.copy()
+        edges = np.array(common.LEAD_BAND_UPPER_HOURS)
+        lead_band = np.minimum(
+            np.searchsorted(edges, self.lead, side="left"), common.N_LEAD_BANDS - 1
+        )
+        for band in range(common.N_HOUR_BANDS):
+            for quarter in range(common.N_QUARTERS):
+                for k in range(common.N_LEAD_BANDS):
+                    chosen = (self.band == band) & (self.quarter == quarter) & (lead_band == k)
+                    if chosen.any():
+                        self.residual[chosen] -= np.median(self.raw_residual[chosen])
         self.offsets = offsets_of(frame=used)
 
 
@@ -342,7 +353,7 @@ def shrink_toward_pool(
 
 
 def empirical_table(*, data: SiteData, rows: np.ndarray) -> np.ndarray:
-    """Return the empirical offsets by (hour band, quarter, lead band, level); NaN where empty."""
+    """Return the median-centred empirical offsets by cell and level; NaN where a cell is empty."""
     edges = np.array(common.LEAD_BAND_UPPER_HOURS)
     lead_band = np.minimum(
         np.searchsorted(edges, data.lead[rows], side="left"), common.N_LEAD_BANDS - 1
@@ -357,7 +368,8 @@ def empirical_table(*, data: SiteData, rows: np.ndarray) -> np.ndarray:
             & (lead_band == index[2])
         )
         if chosen.sum() >= 2:
-            out[index] = np.quantile(data.residual[rows][chosen], common.LEVELS)
+            cell = data.raw_residual[rows][chosen]
+            out[index] = np.quantile(cell, common.LEVELS) - np.median(cell)
     return out
 
 
@@ -369,7 +381,7 @@ def pinball_of_table(*, data: SiteData, rows: np.ndarray, table: np.ndarray) -> 
     offsets = interpolated_offsets(
         table=table, band=data.band[rows], quarter=data.quarter[rows], lead_hours=data.lead[rows]
     )[:, list(common.FIT_LEVEL_POSITIONS)]
-    error = data.residual[rows][:, None] - offsets
+    error = data.raw_residual[rows][:, None] - offsets
     levels = common.LEVELS[list(common.FIT_LEVEL_POSITIONS)][None, :]
     loss = np.maximum(levels * error, (levels - 1.0) * error)
     return float(np.nanmean(loss))
