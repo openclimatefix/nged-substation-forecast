@@ -204,8 +204,8 @@ The 20 worst days of the 72 are below. The full list is in
   absolute error gives a worst-5% share of 36.7% (41.7% for the quantile score), and 76 of the 87
   worst pinball days (six substations) are among the worst mean-error days. Both measures point
   the same way.
-- **Audit triggers:** trigger 1 (a control fails) fired, because of the injected control. The
-  audit's findings and their triage are in the next section. Trigger 2 was also considered, because
+- **Audit triggers:** trigger 1 (a control fails) fired, because of the injected control. An Opus
+  audit ran, and the "Audit" section below gives its findings and their triage. Trigger 2 was also considered, because
   the labelled fraction (48.6%) came in just under the predicted half: the sensitivity with the
   switching rows kept (62.7%) tests the explanation that the scored rows hide switching days.
   Dropping one substation moves the share by at most 3.6 points.
@@ -216,11 +216,37 @@ The 20 worst days of the 72 are below. The full list is in
 - **All leads (0 to 168 hours) instead of the D+1 band:** the share is 44.9% and 47.8% of the worst
   days are labelled.
 
+## Audit
+
+An Opus agent re-derived the numbers from the stored forecasts with its own code. Its report is
+private (`data/ml-experiments/briefs/e172_audit_report.md`). No headline conclusion changed.
+
+- **Reproduced:** the worst-5% share (41.73%), the per-site shares, the leave-one-out range, and the
+  month bootstrap interval match. The audit's day table matches ours on every day, and its labels
+  for switching, cold snap, holiday, flagged reading, and any label agree on all 1,392 days.
+  Economy 7 was not re-derived.
+- **The share is robust:** 39.6% to 42.5% across 18 day definitions (local or UTC days, start or end
+  dating, 1 to 48 minimum rows). Dropping January 2026 gives 38.0%.
+- **The labelled fraction sits on the 50% bar:** a one-day pad around switching intervals, or UTC
+  dating, gives 52.8%. Padding both switching and holiday days gives 56.9%. RO-NC intervals alone
+  give 45.8%. A different window would therefore read as `supported` where ours reads `partly
+  supported`, so "about half" is the finding.
+- **The switching label is not an artefact:** shifting the switching days by 7 to 28 days labels 2
+  to 6 of the worst days, against 29 for the real label. One D10 interval runs 60 days
+  (2025-12-12 to 2026-02-10) and covers 17% of D10's days.
+- **The control failure is explained:** D16 has 9 days with more than 5 points of excess, and 14
+  worst-day slots, so a 5-point injection must beat the fifth-largest real excess (6.6 points) and
+  about half of the injected days land. Ranking by excess cannot misorder days, so the control tests
+  the size of D16's tail and not the method. The pre-registered cap stays.
+- **Fixed:** the detector stamps mark the end of a half-hour and were dated as starts. Correcting
+  them changed no day and no number. The flagged-reading day is dated by the reading's own
+  timestamp and was not changed.
+
 ## Method and caveats
 
 - **Row set:** `fold_a_daily_gap_v1`, the scored year of experiment 155, arm D, `d_scored_*`
   forecasts. Days with fewer than 24 rows in the D+1 band are dropped, which removes about 13% of D5's
-  days (252 of 1,392 remain) because many of its switching rows are excluded, and ranks D5's tail on
+  days (252 of 287 remain) because many of its switching rows are excluded, and ranks D5's tail on
   fewer days. No forecasting model was fitted. The run used one CPU core and about a minute.
 - **Dating:** a row's day is the local date of the half-hour's start, as in the holiday flag of
   `studies.dp_calendar`.

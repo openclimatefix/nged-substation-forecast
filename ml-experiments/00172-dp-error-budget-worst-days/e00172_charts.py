@@ -138,8 +138,8 @@ def label_chart() -> alt.TopLevelMixin:
             title=alt.TitleParams(
                 "Switching events label the most worst days; half the worst days have no label",
                 subtitle=lines(
-                    text="Five substations, 72 worst days of 1,392 substation-days. A day can carry several "
-                    "labels, so the bars do not sum to the 'Any label' bar."
+                    text="Five substations, 72 worst days of 1,392 substation-days. A day can "
+                    "carry several labels, so the bars do not sum to the 'Any label' bar."
                 ),
             ),
         )

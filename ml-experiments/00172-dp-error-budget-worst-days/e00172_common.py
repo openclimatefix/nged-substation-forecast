@@ -150,7 +150,7 @@ def switching_days(*, series_of_site: dict[str, int]) -> pl.DataFrame:
     """Return the (site, local_date) pairs that a detector's interval or alarm covers."""
 
     def local_dates(*, first: int, last: int) -> list:
-        starts = [GRID_START + HALF_HOUR * i for i in (first, last)]
+        starts = [GRID_START + HALF_HOUR * (i - 1) for i in (first, last)]  # stamps mark ends
         days = pl.datetime_range(starts[0], starts[1], interval="30m", time_zone="UTC", eager=True)
         return days.dt.convert_time_zone(LOCAL_TZ).dt.date().unique().to_list()
 
