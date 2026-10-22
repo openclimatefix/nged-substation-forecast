@@ -4,7 +4,7 @@ slug: dp-pv-clip-ceiling-as-of-and-screen
 theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - production-reference-and-best-guess
-status: planned
+status: finished
 size: >-
   medium. Stored: private files under data/ml-experiments/00214-dp-pv-clip-ceiling-as-of-and-screen/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one defensible
@@ -46,57 +46,132 @@ metric: >-
   fleet shape, as in experiment 180), and over all half-hours, with the tail slice of the sunny
   rows (coverage and pinball at q01, q05, q95, q99)
 code: ml-experiments/00214-dp-pv-clip-ceiling-as-of-and-screen/
+verdict: partly supported
+production_status: candidate
+adopted_in: none
+date: 2026-10-22
+best_arm: >-
+  Ceiling chosen as-of at D5 (60% at 11 of 12 refits, 50% at one): -0.129 MW on sunny daylight
+  (98.33% interval -0.212 to -0.029)
+headline: >-
+  D5, sunny daylight, all leads, scored year, mean absolute error minus the control's: as-of
+  ceiling -0.129 MW (-0.212 to -0.029), fixed 60% -0.133 MW (-0.212 to -0.035). D9 with an as-of
+  ceiling -0.032 MW (-0.076 to +0.007). D10, D11, D14, and D16 at 60%: +0.004, +0.017, -0.001, and
+  -0.004 MW, each interval spanning zero.
+lessons:
+  - >-
+    D5's ceiling does not depend on hindsight: from earlier data alone the 60% ceiling is chosen at
+    11 of 12 refits and 50% at the other, and the gain is 97% of the fixed-60% gain.
+  - >-
+    Only D5 shows the export-limit signature in all three summers (figure 3). D9 gains a point
+    estimate of 0.03 MW, but its interval includes zero and its diagnostic is not interpretable.
+  - >-
+    A 60% clip at D11 raises the sunny error by 0.017 MW (interval -0.005 to +0.041), so the clip
+    should be switched on per substation and not as a fleet default.
+advice:
+  - >-
+    Choose the D5 clip ceiling at each refit from the previous 12 months of forecasts, with 50% to
+    90% candidates and no clip as a candidate; it picks 60% almost always (figure 2).
+  - >-
+    Do not apply the clip to other Primaries by default; D11 gets worse by 0.017 MW and D10, D14,
+    and D16 do not move (figure 1).
+  - >-
+    Re-test D9 once it has two or more summers of data before the scored year; the screen could
+    not run on its 2022 and 2023 summers (figure 3).
+take_home_message: >-
+  The 60% cap on D5's solar output holds up when it is chosen only from earlier data: at each
+  monthly refit the cap picked from the previous 12 months was 60% 11 times out of 12, and the
+  forecast keeps 97% of the gain. No other Primary shows the same flattening of net power; D9 gains
+  a little (0.03 MW, not clearly different from zero) and D11 loses a little, so the cap is a D5
+  property for now.
 ---
 
-# Plan: does D5's clip ceiling hold as-of, and does another Primary show the signature?
+# Does the 60% export clip at D5 hold when its ceiling is chosen as-of?
 
-**This experiment tests whether experiment 180's export clip at D5 is a real property of the
-substation or a fit to the year it was scored on.** [Experiment
-180](../00180-dp-sunny-daylight-fix-d5-solar-shape/result.md) chose the 60% ceiling on its tuning
-months and scored it on the scored year, so the ceiling was never chosen as-of. The experiment
-follows suggestion 1 of the DP PV overnight brief.
+**The 60% ceiling at D5 survives being chosen only from earlier data, and no other Primary shows the
+same signature clearly enough to say the clip generalises.** [Experiment
+180](../00180-dp-sunny-daylight-fix-d5-solar-shape/result.md) found that capping the solar output a
+demand forecast subtracts from a Primary substation's power at 60% of the solar capacity held for
+D5 lowers the forecast's error on sunny half-hours. We asked two follow-up questions. First, if the
+ceiling is picked at each monthly refit from the previous 12 months of forecasts, instead of on
+the months the result was later scored on, does the gain remain? Second, do the other five
+Primaries show the same flattening of net power as the sun rises? As-of selection kept 97% of the
+gain (-0.129 MW against -0.133 MW). The screen found the flattening at D5 only. D9 improved by 0.032
+MW with an interval that includes zero, and D11 worsened by 0.017 MW.
 
-## Design
+![Figure 1. Sunny-daylight error against the control, by Primary](figure_01_headline.svg)
 
-- **Stage 1, screen (no fit).** Repeat experiment 180's stage-0 diagnostic (implied output per unit
-  of the fixed fleet shape, by decile of the shape, clear May to August half-hours) at D5, D9, D10,
-  D11, D14, and D16, one panel per summer of 2022, 2023, and 2024, using rows before 2025-07-01
-  only. A Primary shows the signature when the mean of its top two deciles is at most 85% of the
-  mean of deciles 4 to 6 in all three summers. D9's decile values are negative in experiment 180,
-  so the ratio is undefined there; D9 is swept regardless, because the brief names it first.
-- **Stage 2, ceiling sweep.** Every Primary that shows the signature, and D9, runs arms with the
-  clip at 50%, 60%, 70%, 80%, and 90% of the held capacity (100% is the control), through
-  experiment 180's chain (monthly T-all fits, the A2 forecast, and the stage-2 arm `d`). Arms that
-  experiment 180 already stored are reused: D5 at 60% and 80% over the scored year, and every
-  ceiling at D5 over the tuning and replicate months. D11 and D14 run at 60% only, to check the
-  "the rest move under 0.01 MW" part. D10 and D16 at 60% are experiment 180's placebos.
-- **As-of ceiling.** At the first day of each month of the scored year (12 cuts), the ceiling is
-  the one with the lowest mean absolute error of q50 on that Primary's sunny daylight half-hours
-  over the 12 months before the cut, using only forecast origins whose 168-hour window ended before
-  the cut. The sunny threshold comes from rows before 2024-07-01. The forecasts of the cut's own
-  month are then taken from the arm with that ceiling. Where the control beats every clipped
-  ceiling over the window, the as-of choice is no clip. The replicate months use an expanding
-  window from 2024-07 with at least 3 months before the cut, which is post hoc contaminated,
-  because experiment 180 chose 60% on the tuning months, and is labelled so.
-- **Row definition and leads.** Experiment 178's rows: the scored year's 292 runs of
-  `fold_a_daily_gap_v1`, outside the hand-filtered switching events, with a reading, leads 0.5 to
-  168 hours. The as-of selection and the scored contrast use the same sunny definition.
-- **Intervals.** Month-block bootstrap on paired differences (`studies.bootstrap`), 98.33% level.
-  Placebo substations: D10 and D16.
-- **Compute.** CPU only, at most 4 cores, thread caps all 1, inside `systemd-run --user --scope
-  -p MemoryMax=16G -p OOMPolicy=continue`. The brief estimates about 3 core-hours.
+![Figure 2. The clip ceiling at D5 and D9, scored year](figure_02_ceiling_sweep.svg)
 
-## Earlier advice followed and departed from
+![Figure 3. The screen: implied solar output per unit shape, by summer](figure_03_screen.svg)
 
-- **Followed:** clip the solar term at D5 at 60% before comparing other solar shapes (experiment
-  180); do not search tilt and azimuth per substation (experiment 180).
-- **Departed from:** none.
+**Verdict `partly supported`.** The pre-registered D5 part holds. The as-of ceiling lay in 50% to
+70% at 12 of 12 refits (60% at 11, 50% at one), and the as-of arm keeps 0.129 MW of the 0.133 MW
+gain, against a required 0.08 MW. The D5 interval is wholly below zero and both placebos move by
+under 0.02 MW. The other-Primary part is mixed. D9's gain of 0.03 MW or more is met by the point
+estimate but not by the interval, which the plan required to lie wholly below zero for `supported`.
+The plan did not say how to label that case, so we chose `partly supported`. D11 moves by more than
+the 0.01 MW the plan allowed for the rest.
 
-## The five sizing triggers
+## Results
 
-- **What gets stored:** private parquet and JSON files under the experiment's data folder.
-- **Serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes for the as-of rule (window, criterion); the brief fixes
-  the 12-month window.
-- **Callers not nameable without a search:** no; scripts copy experiment 180's.
+- **Rows and scope:** experiment 178's rows (the scored year, 292 runs of `fold_a_daily_gap_v1`,
+  outside the switching events, leads 0.5 to 168 hours). Sunny daylight is the top third of
+  the substation's daylight half-hours by the fixed fleet shape. D5 has 14,045 such half-hours and
+  D9 has 15,415.
+- **Schedule and models:** the same monthly refits as experiment 180 (T-all, calibrated ensemble
+  mean, stage-2 arm `d`). Only the ceiling differs between arms, so the contrast does not depend on
+  the retraining schedule.
+- **Reproduction:** the new fixed-60% arm at D5 matches experiment 180's stored forecasts exactly
+  (maximum difference 0 in q50 and q99).
+- **Screen (figure 3):** the mean of the top two deciles over the mean of deciles 4 to 6 is 0.77,
+  0.68, and 0.73 at D5 in the summers of 2022, 2023, and 2024, against 0.98 to 3.74 at D10, D11, D14,
+  and D16. D9 has 0 and 28 clear half-hours in 2022 and 2023 and a negative decile profile in 2024,
+  so its ratio is undefined and it fails the screen.
+- **As-of ceiling at D5:** 60% at 11 cuts and 50% at the cut of 2026-03-01 (error 0.468 MW at both
+  50% and 60%). At the first cut the window errors were 0.494 MW at 60%, 0.502 at 50%, 0.519 at 70%,
+  and 0.591 at no clip.
+- **Absolute scores at D5, sunny daylight (MW):** control mean absolute error 0.655, as-of 0.527,
+  fixed 60% 0.523. Pinball averaged over 11 quantiles 0.185, 0.155, and 0.154.
+- **Gap to BG2 at D5 (arm minus BG2):** +0.073 MW (0.028 to 0.099) as-of, +0.069 MW fixed 60%,
+  +0.202 MW control.
+- **D9:** the as-of ceiling is 60% at 10 of 12 cuts and 50% at two. As-of minus control is -0.032 MW
+  (-0.076 to +0.007), and fixed 60% is -0.037 MW (-0.080 to 0.000). Its gap to BG2 falls from
+  +0.079 MW to +0.047 MW at the as-of arm (-0.008 to +0.080). Control, as-of: 0.497 and 0.465 MW.
+- **The rest at 60% (arm minus control, sunny MW):** D10 +0.004 (-0.024 to +0.037), D11 +0.017
+  (-0.005 to +0.041), D14 -0.001 (-0.049 to +0.049), D16 -0.004 (-0.050 to +0.048); pooled
+  +0.004 (-0.029 to +0.043).
+- **Tail calibration at D5, sunny rows (coverage, pinball in MW), as-of against control:** q01 0.056
+  and 0.051 (0.0230 and 0.0252), q05 0.178 and 0.168 (0.0841 and 0.0972), q95 0.996 and 0.967
+  (0.0765 and 0.0806), q99 0.999 and 0.993 (0.0209 and 0.0218). The upper quantiles over-cover in
+  both arms, and the clip raises the over-coverage.
+- **Replicate months:** the as-of window grows from 3 to 11 months and again picks 60% at every cut
+  (-0.124 MW at D5, -0.031 at D9, the same as fixed 60%). The tuning months were used to pick 60% in
+  experiment 180, so this is a repeat of the choice and not independent evidence.
+- **Ceiling sweep (figure 2):** at D5 the gain peaks at 50% to 60% (-0.126 and -0.133 MW) and is
+  -0.007 MW at 90%. At D9 the shape is the same at one third of the size.
+- **Caveats:** D9 has data from 2024, so its as-of windows hold 12 months of forecasts but its
+  fits have a short history. The as-of rule picks the ceiling by sunny error, the quantity scored.
+- **Compute:** 11 arm-and-substation fits (about 45 s each on one core) and the scoring, at most 4
+  cores, inside a 16 GB scope.
+
+## Checks
+
+- **Median minus mean forecast, per site:** 0.000 MW at D5 and D9 (sunny rows, as-of arm). The
+  stored mean and median agree, so the spread does not shift the forecast.
+- **Error of the mean forecast beside each quantile-score contrast:** the mean-forecast contrast
+  equals the median-forecast contrast to the third decimal (D5 as-of -0.129 MW, D9 -0.032 MW), so
+  trigger 3 cannot fire.
+- **Triggers:** none fired. The reproduction gate passed, both placebos stayed inside 0.02 MW, no
+  nested arm beats the arm containing it, and the D5 interval has about the same width as experiment
+  180's. Dropping D11 from the pooled rest moves the pooled estimate from +0.004 MW to about 0 and
+  does not change the label. D9's wide interval is reported, not treated as a flip.
+
+## What to try next
+
+- **Port the D5 clip as an as-of rule:** choose the ceiling at each refit from the previous 12
+  months, candidates 50% to 90% and no clip. It costs one selection per refit.
+- **Re-test D9 with more history:** D9's gain is within noise and its screen could not run, so a
+  later release with two or more summers of D9 data can repeat the test.
+- **Suggestion 3 of the brief (combination check)** builds on the D5 clip and can use this as-of
+  rule in place of the fixed ceiling.
