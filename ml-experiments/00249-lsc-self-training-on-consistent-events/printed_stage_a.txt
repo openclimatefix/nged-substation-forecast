@@ -1,0 +1,3 @@
+fold 0: 14 pass the strict tier; 49 pass the loose rule; 47 after the event hold-out (26 after the series hold-out); 113 hard negatives; 19 pseudo-positives in odd months; 43 of source x; done in 60 s
+fold 1: 15 pass the strict tier; 49 pass the loose rule; 38 after the event hold-out (15 after the series hold-out); 114 hard negatives; 18 pseudo-positives in odd months; 32 of source x; done in 49 s
+fold 2: 16 pass the strict tier; 49 pass the loose rule; 45 after the event hold-out (9 after the series hold-out); 114 hard negatives; 16 pseudo-positives in odd months; 39 of source x; done in 40 s
