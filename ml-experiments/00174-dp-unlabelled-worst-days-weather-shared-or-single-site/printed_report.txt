@@ -1,0 +1,141 @@
+== Reproduction of experiment 172's day table: days 1683 vs 1683 max |score difference| 0.0
+worst days (decision sites): 72
+== BG2 series: 16 on 15 Primaries; interconnected pairs of Primaries: 25
+rows without a BG2 day: 0
+
+== unlabelled: 37 days, total excess 108.1
+  weather shares: {'W': 0.315, 'W_spread_a': 0.319, 'W_filter_on_era5': 0.34, 'W_absolute_reference': 0.367, 'W_mean_error': 0.292}
+  shared (any other Primary): 0.486; interconnected neighbour: 0.162; mean others 0.84
+
+== labelled: 35 days, total excess 188.0
+  weather shares: {'W': 0.063, 'W_spread_a': 0.087, 'W_filter_on_era5': 0.069, 'W_absolute_reference': 0.085, 'W_mean_error': 0.077}
+  shared (any other Primary): 0.657; interconnected neighbour: 0.343; mean others 1.26
+
+== all 72: 72 days, total excess 296.1
+  weather shares: {'W': 0.155, 'W_spread_a': 0.172, 'W_filter_on_era5': 0.168, 'W_absolute_reference': 0.188, 'W_mean_error': 0.16}
+  shared (any other Primary): 0.569; interconnected neighbour: 0.250; mean others 1.04
+
+== Unlabelled-days bootstrap (months):
+  W: point 0.313, 95% interval 0.219 to 0.398
+  S: point 0.487, 95% interval 0.279 to 0.704
+  shared_part: point 0.384, 95% interval 0.206 to 0.569
+  neither_part: point 0.303, 95% interval 0.159 to 0.484
+  split of the unlabelled days' excess: weather 0.315, shared 0.389, neither 0.295
+  ... of which remains on days with an interconnected neighbour also worst: 0.216
+
+== Leave one substation out (unlabelled days): W, S
+  without D5: W 0.277, S 0.485
+  without D10: W 0.329, S 0.483
+  without D11: W 0.353, S 0.556
+  without D14: W 0.276, S 0.500
+  without D16: W 0.346, S 0.424
+== Median forecast minus mean forecast, ERA5 arm, per site:
+shape: (6, 3)
+┌──────┬───────────────────┬─────────┐
+│ site ┆ median_minus_mean ┆ max_abs │
+│ ---  ┆ ---               ┆ ---     │
+│ str  ┆ f32               ┆ f32     │
+╞══════╪═══════════════════╪═════════╡
+│ D10  ┆ 0.0               ┆ 0.0     │
+│ D11  ┆ 0.0               ┆ 0.0     │
+│ D14  ┆ 0.0               ┆ 0.0     │
+│ D16  ┆ 0.0               ┆ 0.0     │
+│ D5   ┆ 0.0               ┆ 0.0     │
+│ D9   ┆ 0.0               ┆ 0.0     │
+└──────┴───────────────────┴─────────┘
+== Circular-shift control, any_other: observed 0.486; chance mean 0.466 (95% interval 0.297 to 0.649); share of draws at or above observed 0.475
+== Circular-shift control, any_neighbour: observed 0.162; chance mean 0.156 (95% interval 0.054 to 0.297); share of draws at or above observed 0.520
+
+== Known-answer controls (10 points on 10 random days per decision site):
+   {'demand_side': {'recovered': 1.0, 'mean_weather_share': 0.033, 'n': 50, 'recovered_D10': 1.0, 'recovered_D11': 1.0, 'recovered_D14': 1.0, 'recovered_D16': 1.0, 'recovered_D5': 1.0}, 'weather_side': {'recovered': 0.92, 'mean_weather_share': 0.886, 'n': 50, 'recovered_D10': 0.9, 'recovered_D11': 1.0, 'recovered_D14': 1.0, 'recovered_D16': 0.9, 'recovered_D5': 0.8}}
+== Circular-shift control with one shared shift for all other Primaries, any_other: chance mean 0.355 (95% interval 0.189 to 0.568); share of draws at or above observed 0.078
+
+== Unlabelled worst days
+shape: (37, 7)
+┌──────┬────────────┬────────────┬─────────────┬─────────┬──────────┬──────────────┐
+│ site ┆ local_date ┆ excess_ens ┆ excess_era5 ┆ weather ┆ n_others ┆ n_neighbours │
+│ ---  ┆ ---        ┆ ---        ┆ ---         ┆ ---     ┆ ---      ┆ ---          │
+│ str  ┆ date       ┆ f32        ┆ f32         ┆ f32     ┆ i32      ┆ i32          │
+╞══════╪════════════╪════════════╪═════════════╪═════════╪══════════╪══════════════╡
+│ D16  ┆ 2026-01-17 ┆ 6.64       ┆ 6.93        ┆ 0.0     ┆ 2        ┆ 1            │
+│ D10  ┆ 2026-05-26 ┆ 5.81       ┆ 7.46        ┆ 0.0     ┆ 1        ┆ 1            │
+│ D16  ┆ 2026-01-19 ┆ 4.61       ┆ 4.96        ┆ 0.0     ┆ 2        ┆ 1            │
+│ D16  ┆ 2026-01-20 ┆ 3.86       ┆ 2.72        ┆ 1.15    ┆ 2        ┆ 1            │
+│ D10  ┆ 2025-11-26 ┆ 3.7        ┆ 2.12        ┆ 1.59    ┆ 1        ┆ 0            │
+│ D10  ┆ 2025-10-08 ┆ 3.62       ┆ 1.99        ┆ 1.64    ┆ 0        ┆ 0            │
+│ D14  ┆ 2026-06-20 ┆ 3.47       ┆ 0.91        ┆ 2.56    ┆ 1        ┆ 0            │
+│ D5   ┆ 2026-04-02 ┆ 3.41       ┆ 0.6         ┆ 2.81    ┆ 2        ┆ 0            │
+│ D11  ┆ 2025-11-05 ┆ 3.37       ┆ 3.01        ┆ 0.36    ┆ 2        ┆ 0            │
+│ D11  ┆ 2025-09-04 ┆ 3.3        ┆ 3.18        ┆ 0.12    ┆ 0        ┆ 0            │
+│ D14  ┆ 2025-11-28 ┆ 3.29       ┆ 1.7         ┆ 1.58    ┆ 2        ┆ 0            │
+│ D5   ┆ 2026-05-07 ┆ 3.27       ┆ 1.56        ┆ 1.71    ┆ 0        ┆ 0            │
+│ D16  ┆ 2026-01-24 ┆ 3.26       ┆ 1.4         ┆ 1.86    ┆ 1        ┆ 1            │
+│ D10  ┆ 2025-12-02 ┆ 3.18       ┆ 4.84        ┆ 0.0     ┆ 0        ┆ 0            │
+│ D10  ┆ 2025-10-17 ┆ 3.12       ┆ 1.88        ┆ 1.25    ┆ 0        ┆ 0            │
+│ D5   ┆ 2026-05-20 ┆ 3.06       ┆ 0.04        ┆ 3.02    ┆ 0        ┆ 0            │
+│ D10  ┆ 2025-07-03 ┆ 3.02       ┆ 2.13        ┆ 0.89    ┆ 1        ┆ 1            │
+│ D5   ┆ 2026-04-22 ┆ 2.91       ┆ 2.81        ┆ 0.1     ┆ 1        ┆ 0            │
+│ D11  ┆ 2025-09-24 ┆ 2.87       ┆ 1.6         ┆ 1.27    ┆ 0        ┆ 0            │
+│ D10  ┆ 2025-11-01 ┆ 2.77       ┆ 5.21        ┆ 0.0     ┆ 0        ┆ 0            │
+│ D11  ┆ 2025-10-02 ┆ 2.71       ┆ 2.26        ┆ 0.45    ┆ 4        ┆ 0            │
+│ D14  ┆ 2026-04-02 ┆ 2.59       ┆ 1.19        ┆ 1.4     ┆ 1        ┆ 0            │
+│ D11  ┆ 2026-03-23 ┆ 2.52       ┆ 2.92        ┆ 0.0     ┆ 0        ┆ 0            │
+│ D14  ┆ 2026-05-07 ┆ 2.5        ┆ 0.34        ┆ 2.16    ┆ 0        ┆ 0            │
+│ D14  ┆ 2026-05-20 ┆ 2.41       ┆ 0.65        ┆ 1.76    ┆ 0        ┆ 0            │
+│ D11  ┆ 2025-11-13 ┆ 2.35       ┆ 0.75        ┆ 1.6     ┆ 0        ┆ 0            │
+│ D10  ┆ 2026-06-20 ┆ 2.23       ┆ -0.08       ┆ 2.23    ┆ 1        ┆ 0            │
+│ D11  ┆ 2026-06-08 ┆ 2.19       ┆ 2.77        ┆ 0.0     ┆ 0        ┆ 0            │
+│ D11  ┆ 2026-06-21 ┆ 2.14       ┆ 1.9         ┆ 0.24    ┆ 0        ┆ 0            │
+│ D11  ┆ 2025-12-10 ┆ 2.1        ┆ 1.75        ┆ 0.36    ┆ 0        ┆ 0            │
+│ D11  ┆ 2025-11-28 ┆ 2.07       ┆ 1.45        ┆ 0.61    ┆ 1        ┆ 0            │
+│ D14  ┆ 2025-09-12 ┆ 1.9        ┆ 1.22        ┆ 0.68    ┆ 0        ┆ 0            │
+│ D14  ┆ 2026-05-19 ┆ 1.74       ┆ 1.69        ┆ 0.05    ┆ 0        ┆ 0            │
+│ D14  ┆ 2026-03-20 ┆ 1.65       ┆ 3.08        ┆ 0.0     ┆ 3        ┆ 0            │
+│ D14  ┆ 2026-03-06 ┆ 1.57       ┆ 1.07        ┆ 0.49    ┆ 3        ┆ 0            │
+│ D14  ┆ 2026-06-29 ┆ 1.48       ┆ 1.32        ┆ 0.16    ┆ 0        ┆ 0            │
+│ D14  ┆ 2025-08-22 ┆ 1.39       ┆ 2.03        ┆ 0.0     ┆ 0        ┆ 0            │
+└──────┴────────────┴────────────┴─────────────┴─────────┴──────────┴──────────────┘
+
+== Per site (unlabelled)
+shape: (5, 6)
+┌──────┬─────┬───────────┬───────────┬──────────────┬──────────┐
+│ site ┆ n   ┆ excess    ┆ weather   ┆ shared_share ┆ w        │
+│ ---  ┆ --- ┆ ---       ┆ ---       ┆ ---          ┆ ---      │
+│ str  ┆ u32 ┆ f32       ┆ f32       ┆ f64          ┆ f32      │
+╞══════╪═════╪═══════════╪═══════════╪══════════════╪══════════╡
+│ D10  ┆ 8   ┆ 27.471214 ┆ 7.590271  ┆ 0.5          ┆ 0.276299 │
+│ D11  ┆ 10  ┆ 25.624739 ┆ 5.011055  ┆ 0.3          ┆ 0.195555 │
+│ D14  ┆ 11  ┆ 23.984547 ┆ 10.847045 ┆ 0.454545     ┆ 0.452251 │
+│ D16  ┆ 4   ┆ 18.374989 ┆ 3.006497  ┆ 1.0          ┆ 0.163619 │
+│ D5   ┆ 4   ┆ 12.648926 ┆ 7.640045  ┆ 0.5          ┆ 0.604007 │
+└──────┴─────┴───────────┴───────────┴──────────────┴──────────┘
+
+== Per month (unlabelled)
+shape: (11, 5)
+┌────────────┬─────┬───────────┬──────────┬──────────────┐
+│ year_month ┆ n   ┆ excess    ┆ weather  ┆ shared_share │
+│ ---        ┆ --- ┆ ---       ┆ ---      ┆ ---          │
+│ i32        ┆ u32 ┆ f32       ┆ f32      ┆ f64          │
+╞════════════╪═════╪═══════════╪══════════╪══════════════╡
+│ 202507     ┆ 1   ┆ 3.021855  ┆ 0.887532 ┆ 1.0          │
+│ 202508     ┆ 1   ┆ 1.385372  ┆ 0.0      ┆ 0.0          │
+│ 202509     ┆ 3   ┆ 8.076361  ┆ 2.073708 ┆ 0.0          │
+│ 202510     ┆ 3   ┆ 9.460313  ┆ 3.331362 ┆ 0.333333     │
+│ 202511     ┆ 6   ┆ 17.552797 ┆ 5.745991 ┆ 0.666667     │
+│ 202512     ┆ 2   ┆ 5.28066   ┆ 0.355163 ┆ 0.0          │
+│ 202601     ┆ 4   ┆ 18.374989 ┆ 3.006497 ┆ 1.0          │
+│ 202603     ┆ 3   ┆ 5.73704   ┆ 0.491693 ┆ 0.666667     │
+│ 202604     ┆ 3   ┆ 8.907333  ┆ 4.308183 ┆ 1.0          │
+│ 202605     ┆ 6   ┆ 18.798603 ┆ 8.703339 ┆ 0.166667     │
+│ 202606     ┆ 5   ┆ 11.509092 ┆ 5.191446 ┆ 0.4          │
+└────────────┴─────┴───────────┴──────────┴──────────────┘
+
+== All days of decision sites: pooled score ENS vs ERA5
+shape: (1, 5)
+┌──────────┬──────────┬──────────┬──────────┬──────────┐
+│ ens      ┆ era5     ┆ spread_a ┆ mae_ens  ┆ mae_era5 │
+│ ---      ┆ ---      ┆ ---      ┆ ---      ┆ ---      │
+│ f32      ┆ f32      ┆ f32      ┆ f32      ┆ f32      │
+╞══════════╪══════════╪══════════╪══════════╪══════════╡
+│ 2.441259 ┆ 2.210389 ┆ 2.225625 ┆ 4.204687 ┆ 3.834754 │
+└──────────┴──────────┴──────────┴──────────┴──────────┘
