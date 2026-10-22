@@ -13,9 +13,6 @@ holds as settled or planned. Evidence tags follow the [update rule](index.md#upd
 
 ## Candidates for the next release
 
-- **Primary demand, best guess:** N1 with the 14-day correction and a spread factor of 1.15
-  (experiments 19, 33). Owner: [production reference and best
-  guess](../themes/production-reference-and-best-guess/index.md) (docs).
 - **Primaries and supply points:** weekly refits, and a five-member blend at Primaries (experiment
   87). Owner: [production reference and best
   guess](../themes/production-reference-and-best-guess/index.md) (docs).
@@ -27,13 +24,15 @@ holds as settled or planned. Evidence tags follow the [update rule](index.md#upd
 - **Solar offset:** a forecast of the unmetered solar output as an XGBoost base margin at Primaries
   with a clean capacity estimate (experiments 64, 78). Owner: [solar
   disaggregation](../themes/solar-disaggregation/index.md) (docs).
-- **Physics-based demand line:** the convex model with a Kalman filter, the correction network, and
-  the two-number solar summary (experiments 111, 155, 220). Owner: [differentiable physics: forecast
+- **Physics-based demand model:** the convex model with a Kalman filter (experiment 111), a
+  recent-error correction recipe (experiment 155), and a correction neural network with a two-number
+  solar summary (experiment 220). Owner: [differentiable physics: forecast
   engine](../themes/differentiable-physics-forecast-engine/index.md) (docs).
 
 ## Open questions by theme
 
-- **Does the 14-day correction and the weekly refit hold on a second validation year?** Owner:
+- **Do the spread factor, the blend, and the solar offset hold on a second validation year?** The
+  first year chose their settings. Owner:
   [production reference and best guess](../themes/production-reference-and-best-guess/index.md)
   (docs).
 - **Which training source suits solar and wind farms, the ERA5-trained mixture or the ensemble's own
@@ -45,8 +44,8 @@ holds as settled or planned. Evidence tags follow the [update rule](index.md#upd
 - **Do old years of history help the physics-based demand model?** The answer changed sign between
   two scored years. Owner: [differentiable physics: long history and
   drift](../themes/differentiable-physics-long-history-and-drift/index.md) (docs).
-- **Does one model pooled across Primaries match a model per substation, and beat it for a substation
-  with a short history?** Owners: [hierarchy and pooling](../themes/hierarchy-and-pooling/index.md)
+- **Does one model pooled across Primaries match a model per substation, and does pooling hold at
+  hundreds of series?** Owners: [hierarchy and pooling](../themes/hierarchy-and-pooling/index.md)
   and [differentiable physics: pooling across
   substations](../themes/differentiable-physics-pooling-across-substations/index.md) (docs).
 - **Does a calibrator that sees recent power help solar and wind farms, and does a missing-lag flag
@@ -78,7 +77,5 @@ holds as settled or planned. Evidence tags follow the [update rule](index.md#upd
   solar terms?** Owner:
   [differentiable physics: demand, calendar and
   weather](../themes/differentiable-physics-demand-calendar-and-weather/index.md) (docs).
-- **What do the interconnections between Primaries add to a demand forecast?** Owner:
-  [differentiable physics: network](../themes/differentiable-physics-network/index.md) (docs).
 
 Last checked against experiment 225.
