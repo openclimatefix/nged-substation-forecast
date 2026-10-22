@@ -45,11 +45,13 @@ verdict: supported
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  On the sunny daylight half-hours we could reconstruct, the best generalised additive model is 0.05
-  MW worse than BG2 over all leads, not the 0.13 MW of the by-condition plot. Most of the gap is
-  one substation, D5, where the model is worse than BG2 in every clear-sky band and lead band. D9
-  is a smaller second loss, and the other four substations show no gap, so the next experiment
-  should look at the solar shape at D5 and D9 before touching the irradiance input.
+  On the sunniest third of each substation's daylight half-hours, the best generalised additive
+  model (GAM) has a mean absolute error 0.05 MW higher than BG2 across six substations, not the 0.13
+  MW of an earlier plot of errors by weather condition. Most of the gap is at one substation, D5,
+  where the GAM is worse than BG2 at every hour, lead, and clear-sky band. D9 is a smaller second
+  loss, and the other four substations show no clear gap, so how the model represents solar
+  generation at D5 and D9 is a better place to look than the irradiance forecast for all
+  substations.
 date: 2026-10-22
 headline: >-
   Sunny daylight, six substations, all leads: GAM minus BG2 mean absolute error +0.050 MW (95%
@@ -78,40 +80,46 @@ advice:
 ---
 
 **On sunny daylight half-hours, the best generalised additive model (GAM) has a mean absolute error
-0.05 MW higher than BG2, and one substation, D5, holds most of that gap.** A sunny daylight
-half-hour is one in the top third of a substation's daylight half-hours by solar output, defined
-below. BG2 is the XGBoost model of experiment 87. We asked which hour of day, clear-sky band, lead
-band, or substation holds the gap. We joined the stored forecasts of both models for the scored year
-on the same substation, run, and half-hour, and cut the gap four ways. Without D5, the gap falls to
-0.02 MW and the gap's interval includes zero. The by-condition plot shown to us earlier gave 0.13
-MW, and we could not reproduce that figure, so the loss is smaller than the plot suggested.
+0.05 MW higher than BG2.** One substation, D5, holds most of that gap. A sunny daylight half-hour is
+one in the top third of its substation's daylight half-hours, ranked by the output per megawatt of
+capacity of a fixed south-facing solar fleet driven by CAMS irradiance. BG2 is the second
+best-guess XGBoost forecast, built in experiment 87. We asked which hour of day, clear-sky band
+(the ensemble-mean forecast irradiance as a fraction of clear-sky irradiance), lead band (hours
+between the forecast run and the half-hour), or substation holds the gap. We joined both models'
+stored forecasts for the scored year on the same substation, daily forecast run, and half-hour, and
+cut the gap four ways. Without D5, the gap falls to 0.02 MW and its 95% interval, resampled by
+month, includes zero.
 
-The GAM is a convex model of demand and solar output fitted by experiment 155 and calibrated by
-experiments 160 and 164. Its forecasts are experiment 164's fix O, which is arm A of experiment
-169, and its median forecast equals that of experiment 155's arm D on these rows. BG2 is experiment
-87's `p_s6_bg2`. We take the top third by the unit solar shape of experiment 106's feature cache,
-the definition experiment 139 uses for its sunniest third. The by-condition plot's code is not in
-the repository, so this definition is our reconstruction. The definition gives 90,143 half-hours
-over all leads and 13,198 at 12 to 36 hours, against 12,125 in the plot.
+**An earlier plot of errors by weather condition gave a gap of 0.13 MW, and we could not reproduce
+it.** The plot's code is not in the repository, so the rows above are our reconstruction. Under this
+definition the gap is 0.05 MW over all leads, and we do not know whether the plot used different
+rows. The definition gives 90,143 half-hours over all leads and 13,198 at 12 to 36 hours, against
+12,125 in the plot.
+
+**The GAM is experiment 164's fix O.** It is a convex model fitted by experiment 155 and calibrated
+by experiments 160 and 164, the same forecast as arm A of experiment 169. Its median forecast equals
+that of experiment 155's arm D on these rows. BG2 is experiment 87's `p_s6_bg2`. The ranking uses
+the unit solar shape of experiment 106's feature cache, the definition experiment 139 uses for its
+sunniest third.
 
 ## Figures
 
-![Gap by hour of day](figure_01_hour.svg)
+![Figure 1. Gap by hour of day: no 2-hour bin holds more than a third of the gap](figure_01_hour.svg)
 
-![Gap by clear-sky band](figure_02_clear_sky_band.svg)
+![Figure 2. Gap by clear-sky band: the 0.4 to 0.7 band holds most of the gap](figure_02_clear_sky_band.svg)
 
-![Gap by lead band](figure_03_lead.svg)
+![Figure 3. Gap by lead band: 72 to 168 hours holds most of the gap and most of the rows](figure_03_lead.svg)
 
-![Gap by substation](figure_04_site.svg)
+![Figure 4. Gap by substation: D5 holds 63% of the gap with 16% of the rows](figure_04_site.svg)
 
-![Gap by clear-sky band without D5](figure_05_clear_sky_band_without_d5.svg)
+![Figure 5. Gap by clear-sky band at the five substations other than D5](figure_05_clear_sky_band_without_d5.svg)
 
 ## Results
 
 - **Rows and scope:** six substations (D5, D10, D11, D14, D16, D9), the 291 daily runs of
   `fold_a_daily_gap_v1` that both models forecast, from 2025-07-02 to 2026-06-29, on rows outside
   the hand-filtered switching events. The plan did not fix the lead range, so the headline uses all
-  leads to 168 hours (post hoc). The 12 to 36 hour range, nearest to the plot's row count, is beside
+  leads to 168 hours (chosen after seeing the data). The 12 to 36 hour range, nearest to the plot's row count, is beside
   it. The "five decision substations" are D5, D10, D11, D14, and D16, the substations of the
   differentiable-physics series' contrasts; D9 is reported beside them.
 - **Absolute errors (MW), sunny daylight, all leads:** mean absolute error 0.590 for the GAM against
@@ -135,39 +143,38 @@ over all leads and 13,198 at 12 to 36 hours, against 12,125 in the plot.
 - **Cuts (all leads; rule: at least 60% of the gap in a level holding under 40% of the rows):**
     - Substation: D5 holds 63% of the gap with 16% of the rows. The rule is met.
     - Clear-sky band: the 0.4 to 0.7 band holds 83% of the gap with 32% of the rows. The rule is
-      met. In this partly cloudy band the GAM is worse (0.749 MW against 0.622 MW). In the 0.9 and
-      above band, the GAM is better than BG2 at the five substations other than D5 (0.438 MW
-      against 0.499 MW).
+      met. In this band the GAM's error is 0.749 MW against BG2's 0.622 MW. In the 0.9 and above
+      band, the GAM's error at the five substations other than D5 is 0.438 MW against BG2's 0.499 MW.
     - Hour of day: no 2-hour bin holds more than 32% of the gap (10:00 to 12:00 UK local time), and
       the two busiest bins hold 26% and 29% of the rows. The rule is not met. The 16:00 to 18:00 bin
-      holds 16% of the gap with 10% of the rows, and without D5 it holds 35% with 10%.
+      holds 16% of the gap with 10% of the rows. Without D5, that bin holds 35% of the remaining gap
+      with 10% of the remaining rows.
     - Lead band: 72 to 168 hours holds 77% of the gap and 58% of the rows. The rule is not met.
 - **D5 loses in every band:** at every hour from 08:00 to 18:00; in all four lead bands (0 to 12 h
   0.572 against 0.387 MW, 12 to 36 h 0.581 against 0.393, 36 to 72 h 0.610 against 0.411, 72 to 168
-  h 0.704 against 0.494); and in every clear-sky band (0.873 against 0.590 MW at 0.4 to 0.7, 0.523
-  against 0.412 at 0.7 to 0.9, 0.602 against 0.304 at 0.9 and above). The loss is largest on clear
-  half-hours, so D5's problem is not the partly cloudy damping of the ensemble mean.
+  h 0.704 against 0.494); and in every clear-sky band with more than 100 half-hours (0.873 against 0.590 MW at 0.4 to 0.7,
+  0.523 against 0.412 at 0.7 to 0.9, 0.602 against 0.304 at 0.9 and above). The gap at 0.9 and above
+  (0.298 MW) is about as large as at 0.4 to 0.7 (0.283 MW), so at D5 the loss is not confined to
+  half-hours with a lower clear-sky index.
 - **D9 is a second loss site:** it holds 27% of the gap with 17% of the rows (0.497 against 0.418
   MW), and its loss grows with lead.
 - **Solar share:** D5 has the largest relative fall from the night mean to the sunny-daylight mean
   (3.44 to 1.14 MW, 67%), which we use as a proxy for its solar share because the fitted capacities
-  need the GPU environment. D10 has the next largest relative fall (2.42 to 1.26 MW, 48%) and the
-  GAM beats BG2 at D10 (-0.009 MW), so solar share alone does not explain D5. D9 has no fall.
+  can only be read in the GPU environment, which this session does not have. D10 has the next largest relative fall (2.42 to 1.26 MW, 48%) and the
+  GAM beats BG2 at D10 (-0.009 MW), so solar share alone does not explain D5. D9's sunny-daylight mean is not lower than its night mean.
 - **Ensemble clear-sky index on the sunny rows:** the median is 0.77, and the 5th to 95th
   percentile range is 0.52 to 0.98.
 
 ## Checks
 
-- **Median minus mean forecast:** not computable for BG2, which stores no mean. The GAM's stored
+- **Mean versus median forecast:** not computable for BG2, which stores no mean. The GAM's stored
   mean equals its median in the files of experiment 164, so the median is used for both models.
 - **Mean-forecast error beside the quantile score:** the mean absolute error of the median forecast
   and the pinball loss point the same way in every row of the results table and in every hour bin.
-- **Triggers fired:** trigger 4 of the `ml-experiment` skill's audit list (leaving one site out
-  changes a verdict). Without D5 the all-lead gap's interval includes zero. The leave-one-out
-  result is the finding of this experiment, and no planned contrast depends on it. No audit was
-  run; the manager decides whether one is needed. Trigger 2 (a result contradicting its own
-  prediction or an earlier finding) applies to the shoulder-hour prediction, which failed, and the
-  page records that.
+- **Audit conditions met:** two of the `ml-experiment` skill's audit conditions apply. Leaving out
+  one substation changes a verdict: without D5, the all-leads gap's interval includes zero. The
+  result also contradicts the experiment's own prediction, because the shoulder hours did not hold
+  60% to 70% of the gap. No audit was run, and the manager decides whether one is needed.
 
 ## Caveats
 
@@ -178,8 +185,8 @@ over all leads and 13,198 at 12 to 36 hours, against 12,125 in the plot.
   11,670 half-hours). That check is not in the script, so it cannot be verified from the repository.
 - **Level shares are descriptive.** Only the totals carry month-resampled intervals, and 12 monthly
   blocks make those intervals coarse.
-- **The plot's 12,125 rows resemble the 12 to 36 hour range,** where the total gap's interval
-  includes zero.
+- **The plot's 12,125 half-hours are close to our 13,198 at 12 to 36 hours,** and not to our 90,143
+  over all leads. At 12 to 36 hours the total gap's interval includes zero.
 
 ## What to try next
 
