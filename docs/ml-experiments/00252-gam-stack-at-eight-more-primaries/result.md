@@ -49,7 +49,8 @@ code: ml-experiments/00252-gam-stack-at-eight-more-primaries/
 verdict: not supported
 best_arm: >-
   A1 (post hoc, solar capacity fitted): pooled quantile score minus BG2 +0.562 points (95% interval
-  +0.393 to +0.749); below BG2 at D2, D3, D4, D19, and D21, above it at D8, D12, and D22
+  +0.393 to +0.749); point estimates below BG2 at D2, D3, D4, D19, and D21 (intervals wholly below
+  only at D3 and D21), above it at D8, D12, and D22
 headline: >-
   The stack with no solar term scores +0.690 points above BG2 pooled over the eight Primaries (95%
   interval +0.520 to +0.864) and is within 0.05 points of BG2 at 2 of 8 sites (D3 and D4). D8 alone
@@ -57,11 +58,12 @@ headline: >-
   sites, with intervals excluding zero at two, and D8, D12, and D22 stay above it.
 lessons:
   - >-
-    The gap to BG2 sits in sunny daylight rows (+1.043 pooled for A0) and a fitted solar term closes
-    part of it (+0.754 for A1); winter nights are level with BG2 or better at six of eight sites.
+    The gap to BG2 per row is largest in sunny daylight rows (+1.043 pooled for A0) and a fitted
+    solar term narrows it (+0.754 for A1); winter nights are below BG2 on the A0 point estimate at
+    six of eight sites. D8 also has a large gap in winter nights, so not every gap is a solar one.
   - >-
     D8, D12, and D22 are not within reach of the stack: D8 has 12 monthly fits on under 15 months of
-    data, D12 has reverse flow that the apparent-power reading folds, and the cause of D22's
+    data, D12's apparent-power reading folds reverse flow (experiment 152), and the cause of D22's
     +0.384 gap is unclear.
 production_status: not-for-production
 adopted_in: none
@@ -78,7 +80,7 @@ advice:
   - >-
     Fit the solar capacity at each refit when porting the stack to a Primary with no real-time
     capacity vintage, because a zero solar term adds 0.19 to 0.34 points of quantile score at D2,
-    D3, D19, D21, and D22 (A1 minus A0 in the Predictions bullet).
+    D3, D19, D21, and D22 on the point estimates, with no interval (Predictions bullet).
   - >-
     Do not run the stack at D8 until it has more monthly fits than the 12 available here; its q01
     line is above 20% of readings (Tails bullet).
@@ -170,9 +172,12 @@ Primaries, so no solar term could be pinned. Arm A0 therefore has no solar term.
   is 0.010: A0 is 0.017 to 0.042 at seven sites and 0.204 at D8; BG2 is 0.002 to 0.011. q95 target
   0.950: A0 0.933 to 0.954 at seven sites and 0.736 at D8; BG2 0.935 to 0.985. Cold-night q95
   coverage at D8 is 0.640 for A0 and 0.644 for BG2.
-- **Caveats.** Only A0 was pre-registered. The card decision on A1 is post hoc. The pinned solar
-  capacity of the brief could not be built, so these results do not test the clip. D8's fit rests on
-  fewer than 15 months of data and its series changed meaning in April 2025.
+- **Caveats.** The hypothesised stack had a pinned solar capacity and the 60% clip, which could not be
+  built, so the verdict covers the stack with no solar term (A0) and with a fitted one (A1), not the
+  stack as specified. A1 was chosen after A0 failed, and its five-site reading uses the same 12
+  scored months with no held-out period. Only A0 was pre-registered, so the card decision on A1 is post hoc. These results do not test the
+  clip. D8's fit rests on fewer than 15 months of data, and its series changed meaning in April 2025
+  (see the data-processing page).
 
 ## Checks
 

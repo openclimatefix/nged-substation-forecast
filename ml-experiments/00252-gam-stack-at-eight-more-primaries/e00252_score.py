@@ -144,7 +144,6 @@ def contrast(*, frames: dict[str, pl.DataFrame], column: str, flag: str) -> dict
 def add_scores(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Add each forecast's per-row quantile score, in points, and the point-forecast errors."""
     actual = frame["actual"].to_numpy().astype(np.float64)
-    columns = {"a0": QUANTILES}
     built = [
         pl.Series(
             "s_a0",
@@ -156,7 +155,6 @@ def add_scores(*, frame: pl.DataFrame) -> pl.DataFrame:
     for name in REFERENCES:
         quantiles = frame.select([f"{name}_{q}" for q in QUANTILES]).to_numpy().astype(np.float64)
         built.append(pl.Series(f"s_{name}", score(actual=actual, quantiles=quantiles)))
-    del columns
     return (
         frame.with_columns(*built)
         .with_columns(
@@ -242,7 +240,7 @@ def print_report(*, out: dict) -> None:
         print(site, out["rows"][site], {k: round(v, 3) for k, v in out["absolute"][site].items()})
         print(site, "checks", out["checks"][site])
     print(
-        "leave one out (pooled A0 minus BG2)",
+        "leave one out (pooled arm minus BG2)",
         {k: tuple(round(x, 3) for x in v) for k, v in out["leave_one_out_pooled_d_bg2"].items()},
     )
 
