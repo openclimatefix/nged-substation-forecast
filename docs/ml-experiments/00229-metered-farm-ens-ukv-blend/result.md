@@ -112,7 +112,7 @@ We asked whether a metered solar farm's output is forecast better from the ECMWF
 European Centre for Medium-Range Weather Forecasts' 51-member ensemble) plus UKV than from the
 ensemble alone. For each of six farms, A to F, we compared a solar plant model on the ensemble's
 mean and standard deviation (arm A1, the day-ahead design of
-[experiment 224](../00224-metered-farm-dayahead-two-number/result.md), with the plant of
+experiment 224 (the metered-farm day-ahead experiment, not yet merged), with the plant of
 [experiment 218](../00218-metered-solar-farm-plant-fit/result.md)), a plant model on a blend of
 ensemble and UKV irradiance (A3), and XGBoost second-stage trees with and without UKV variables.
 Each weather product was trained on its own history. Shuffling UKV across days of the same month,
