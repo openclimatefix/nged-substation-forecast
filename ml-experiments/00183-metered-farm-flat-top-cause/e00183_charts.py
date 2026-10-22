@@ -18,16 +18,16 @@ MONTH_NAMES: Final[dict[int, str]] = {4: "Apr", 5: "May", 6: "Jun", 7: "Jul", 8:
 def main() -> None:  # noqa: D103
     levels = (
         pl.read_csv(DATA_DIR / "monthly_levels_by_quantile.csv")
-        .filter(pl.col("quantile") != 0.95)  # noqa: PLR2004
+        .filter(pl.col("quantile") != 0.95)
         .with_columns(
             month_name=pl.col("month").replace_strict(MONTH_NAMES),
-            percentile=pl.when(pl.col("quantile") == 0.90)  # noqa: PLR2004
+            percentile=pl.when(pl.col("quantile") == 0.90)
             .then(pl.lit("90th percentile (planned)"))
             .otherwise(pl.lit("99th percentile")),
         )
     )
     chart = (
-        alt.Chart(levels)
+        alt.Chart(levels)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, clip=True)
         .encode(
             x=alt.X(
@@ -57,7 +57,8 @@ def main() -> None:  # noqa: D103
             title=alt.TitleParams(
                 [
                     "Flat level of power over capacity by month at high clear-sky irradiance",
-                    "(above 650 W/m²), farms C to F, April to August. A constant line would indicate an export cap.",
+                    "(above 650 W/m²), farms C to F, April to August.",
+                    "A constant line would indicate an export cap.",
                 ],
                 anchor="start",
             ),

@@ -20,9 +20,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 SLUG: Final[str] = "00183-metered-farm-flat-top-cause"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / SLUG
 CLEANED: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR
-    / "00179-metered-solar-farm-exploration"
-    / "cleaned_solar_farms.parquet"
+    ML_EXPERIMENTS_DATA_DIR / "00179-metered-solar-farm-exploration" / "cleaned_solar_farms.parquet"
 )
 FARMS: Final[tuple[str, ...]] = ("C", "D", "E", "F")
 FLEET_TILT_DEG: Final[float] = 35.0
@@ -93,7 +91,9 @@ def main() -> None:  # noqa: D103
             half=pl.when(pl.col("time").dt.year() % 2 == 0)
             .then(pl.lit("even years"))
             .otherwise(pl.lit("odd years")),
-            side=pl.when(pl.col("sun_az") < 180).then(pl.lit("morning")).otherwise(pl.lit("afternoon")),
+            side=pl.when(pl.col("sun_az") < 180)
+            .then(pl.lit("morning"))
+            .otherwise(pl.lit("afternoon")),
         )
         .filter(pl.col("month").is_in(SEASON_MONTHS))
     )
@@ -139,7 +139,12 @@ def main() -> None:  # noqa: D103
     )
     pl.DataFrame(sensitivity).write_csv(DATA_DIR / "quantile_sensitivity.csv")
     print(pl.DataFrame(sensitivity).pivot(on="quantile", index="site", values="spread"))
-    print(hi.group_by("site", "month").agg(pl.col("ratio").quantile(0.99).alias("p99")).pivot(on="month", index="site", values="p99").sort("site"))
+    print(
+        hi.group_by("site", "month")
+        .agg(pl.col("ratio").quantile(0.99).alias("p99"))
+        .pivot(on="month", index="site", values="p99")
+        .sort("site")
+    )
 
     rows = []
     for site in FARMS:
@@ -155,7 +160,7 @@ def main() -> None:  # noqa: D103
             entry[f"spread_{half}"] = round(spread(h["level"]), 4) if h.height >= 3 else None
             entry[f"months_{half}"] = ",".join(map(str, h["month"].to_list()))
         s = by_side.filter(pl.col("site") == site)
-        if s.height == 2:  # noqa: PLR2004
+        if s.height == 2:
             entry["morning_over_afternoon"] = round(
                 float(s.filter(pl.col("side") == "morning")["level"][0])
                 / float(s.filter(pl.col("side") == "afternoon")["level"][0]),
