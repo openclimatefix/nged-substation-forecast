@@ -25,9 +25,10 @@ HIGH_CS_W_M2: Final[float] = 500.0
 CLIP_RATIO: Final[float] = 1.02
 CLIP_SLOPE_FRACTION: Final[float] = 0.10
 POST_HOC_SLOPE_FRACTION: Final[float] = 0.25
+PARTIAL_OUTAGE_REL: Final[float] = 0.75
+"""Months under this share of their calendar month's mean are left out of the drift fit."""
 COMMISSIONED_FROM: Final[dict[str, datetime]] = {
     "E": datetime(2024, 10, 6, tzinfo=UTC),  # `studies.commissioning.SETTLED_OUTPUT_FROM`
-    "D": datetime(2019, 10, 1, tzinfo=UTC),  # first partial month reads 0.19 of later yield
 }
 
 
@@ -154,9 +155,17 @@ def main() -> None:  # noqa: D103, PLR0915
         bin_rows.append(env)
         e = env.sort("ghi_cs")
         top = e.tail(3)
-        slope = lambda f: float(np.polyfit(f["ghi_cs"].to_numpy(), f["p95"].to_numpy(), 1)[0])  # noqa: E731
-        top_slope, mid_slope = slope(top), slope(e.slice(e.height // 4, 4))
+
+        def slope(f: pl.DataFrame, column: str) -> float:
+            return float(np.polyfit(f["ghi_cs"].to_numpy(), f[column].to_numpy(), 1)[0])
+
+        mid_bins = e.slice(e.height // 4, 4)
+        top_slope, mid_slope = slope(top, "p95"), slope(mid_bins, "p95")
+        top_slope_p50, mid_slope_p50 = slope(top, "p50"), slope(mid_bins, "p50")
         top_ratio = float(top["p99"].mean() / top["p95"].mean())  # ty: ignore[unsupported-operator]
+        clipping_literal = (
+            top_ratio <= CLIP_RATIO and top_slope_p50 <= CLIP_SLOPE_FRACTION * mid_slope_p50
+        )
         clipping = top_ratio <= CLIP_RATIO and top_slope <= CLIP_SLOPE_FRACTION * mid_slope
         clip_rows.append(
             {
@@ -165,7 +174,9 @@ def main() -> None:  # noqa: D103, PLR0915
                 "p95_slope_top_over_mid": round(top_slope / mid_slope, 3),
                 "p99_peak_over_capacity": round(float(e["p99"].max()), 3),  # ty: ignore[invalid-argument-type]
                 "p95_peak_over_capacity": round(float(e["p95"].max()), 3),  # ty: ignore[invalid-argument-type]
-                "clipping": clipping,
+                "p50_slope_top_over_mid": round(top_slope_p50 / mid_slope_p50, 3),
+                "clipping_literal_p50": clipping_literal,
+                "clipping_p95_slope": clipping,
                 "clipping_post_hoc": top_slope <= POST_HOC_SLOPE_FRACTION * mid_slope,
             }
         )
@@ -187,17 +198,25 @@ def main() -> None:  # noqa: D103, PLR0915
             t=pl.col("month").dt.year() + (pl.col("month").dt.month() - 1) / 12,
         )
         mm = mm.with_columns(rel=pl.col("yield_p90") / pl.col("yield_p90").mean().over("m"))
+        kept = mm.filter(pl.col("rel") >= PARTIAL_OUTAGE_REL)
+        t_arr, r_arr = kept["t"].to_numpy(), kept["rel"].to_numpy()
+        trend = 100 * np.polyfit(t_arr, r_arr, 1)[0]
+        rng = np.random.default_rng(0)
+        index_draws = [rng.integers(0, kept.height, kept.height) for _ in range(2000)]
+        draws = [100 * np.polyfit(t_arr[i], r_arr[i], 1)[0] for i in index_draws]
         drift_rows.append(
             {
                 "site": site,
-                "months": mm.height,
-                "drift_pct_per_year": round(
-                    100 * float(np.polyfit(mm["t"].to_numpy(), mm["rel"].to_numpy(), 1)[0]), 2
-                ),
+                "months": kept.height,
+                "months_excluded_partial_outage": mm.height - kept.height,
+                "drift_pct_per_year": round(float(trend), 2),
+                "lo90": round(float(np.percentile(draws, 5)), 2),
+                "hi90": round(float(np.percentile(draws, 95)), 2),
             }
         )
-        # Candidate outage runs: days whose peak power is under 5% of capacity in months whose
-        # median-day peak exceeds 30% of capacity, in runs of 3 or more days.
+        # Total-outage runs only: April-to-September days (with 40 or more readings) whose peak
+        # power is under 5% of capacity, in runs of 3 or more such days. Partial outages and
+        # missing data are not detected, and a run may span a data gap.
         daily = (
             p.filter(
                 pl.col("flag").is_null() | pl.col("flag").is_in(["stuck", "zero_in_clear_sky"])
@@ -243,7 +262,7 @@ def main() -> None:  # noqa: D103, PLR0915
     pl.Config.set_tbl_width_chars(250)
     print(checks_df)
     print(clip_df)
-    print("farms with clipping:", int(clip_df["clipping"].sum()), "of", clip_df.height)
+    print("farms with clipping:", int(clip_df["clipping_p95_slope"].sum()), "of", clip_df.height)
     print(steps_df)
     drift_df = pl.DataFrame(drift_rows)
     drift_df.write_csv(DOCS_DIR / "drift.csv")

@@ -69,7 +69,7 @@ def main() -> None:  # noqa: D103
         .resolve_scale(color="shared")
         .properties(
             title=[
-                "Power against clear-sky irradiance: a flat top at high irradiance means AC clipping.",
+                "Power against clear-sky irradiance: a flat top at high irradiance may be AC clipping or an export cap.",
                 "Lines are the median, 95th, and 99th percentiles per irradiance bin.",
             ]
         )
