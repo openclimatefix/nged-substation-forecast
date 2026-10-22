@@ -10,7 +10,7 @@ quantile of the chosen probability and `sigma` the standard deviation of the fit
 
 **No sign uses a fit trained on a later reading.** A half-hour at time `t` takes its sign from the
 monthly meter fit with the latest cut at or before `t`, and a half-hour before the first cut takes
-its sign from the first fit, which is only ever used by fits of cut `>= ` that first cut.
+its sign from the first fit, which is only ever used by fits of a cut at or after that first cut.
 """
 
 import pickle
