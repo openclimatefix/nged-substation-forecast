@@ -4,7 +4,7 @@ slug: ps2-quantised-engine-detector-on-d8-with-known-answer-gate
 title: >-
   Can a hidden Markov model of 0 to 3 engine units find D8's price-following engine in its residual,
   and does it pass a known-answer test built from the engine's own recorded output?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - differentiable-physics-embedded-generation
 status: done

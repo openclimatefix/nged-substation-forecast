@@ -1,7 +1,7 @@
 ---
 id: "00066"
 slug: sw2-16-end-rule-as-baseline
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium
@@ -108,7 +108,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 66 (SW2-16, part of the switching-event detector series): which window and cap should the end rule use?
+# Experiment 66 (SW2-16, part of the LSC series): which window and cap should the end rule use?
 
 **Ending each alarm's interval at the first opposite step that is at least half the size of the step
 that raised the alarm finds more of the moved power than searching 14 days for the strongest

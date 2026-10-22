@@ -4,7 +4,7 @@ slug: switching-faster-onset-alarm-from-opposite-steps
 title: >-
   A faster onset alarm from simultaneous opposite steps at a metered neighbour, feeding a mask
   forecast
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

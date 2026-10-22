@@ -4,7 +4,7 @@ slug: switching-replay-learned-score-in-masked-forecast
 title: >-
   Do the extra real transfers that experiment 195's learned score finds lower the masked forecast's
   error, without harm on ordinary days?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done
