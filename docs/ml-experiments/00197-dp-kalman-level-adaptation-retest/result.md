@@ -160,7 +160,8 @@ scored year, so a faster filter alone is not the answer.
 **Pre-registered predictions** (the 0.10 size; recovery with its 95% interval):
 
 - **P1 fails.** A1 at m 50, k 2 recovered -0.95 (-7.7 to +0.2) of a 16-hour offset on `band_read`
-  pairs, and 0.42 (-0.5 to +1.3) of a 36-hour offset. Four settings (m 10 k 2, m 20 k 2, m 20 k 4, m 50 k 4)
+  pairs, and 0.42 (-0.5 to +1.3) of a 36-hour offset. Four settings
+  (m 10 k 2, m 20 k 2, m 20 k 4, m 50 k 4)
   reached 0.53 to 0.59, at 36 hours only. The 16-hour test holds just 141 `band_read` pairs (26 days).
 - **P2 fails.** A3 at m 10, k 2 recovered 0.11 (-1.1 to +0.8) and 0.17 (-0.3 to +0.5) of 16-hour and
   36-hour offsets on `other_read` pairs. At experiment 190's setting A3 recovered -0.01 and -0.02.
@@ -208,8 +209,8 @@ already follows most of the offset there and the boost overshoots. Figure 3 clip
 
 ## What to try next
 
-- One option is to look at the mean forecast model for the 15 smooth-offset days: an input the GAM lacks, such as heating or
-  behaviour, is the remaining candidate.
-- Another option is a small learned head that reads whether neighbouring Primaries show the same-sign residual, with
-  the convex GAM-K as the comparison arm. The prediction that could fail: it recovers at least 20% of
+- One option is to look at the mean forecast model for the 15 smooth-offset days: an input the GAM
+  lacks, such as heating or behaviour, is the remaining candidate.
+- Another option is a small learned head that reads whether neighbouring Primaries show the
+  same-sign residual, with the convex GAM-K as the comparison arm. The prediction that could fail: it recovers at least 20% of
   the excess loss on the 15 smooth-offset days, which no filter here did.
