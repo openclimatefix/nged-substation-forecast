@@ -1,0 +1,31 @@
+Part 2 (demand-side response) register rows: 0 (the sheet holds headings only)
+ECR asset slots under the 16 named Primaries: 312
+shape: (7, 6)
+┌──────┬────────────────────────────┬─────────────────────┬─────┬──────┬─────────────┐
+│ site ┆ asset_class                ┆ status              ┆ n   ┆ mw   ┆ storage_mwh │
+│ ---  ┆ ---                        ┆ ---                 ┆ --- ┆ ---  ┆ ---         │
+│ str  ┆ str                        ┆ str                 ┆ u32 ┆ f64  ┆ f64         │
+╞══════╪════════════════════════════╪═════════════════════╪═════╪══════╪═════════════╡
+│ D11  ┆ battery                    ┆ Connected           ┆ 1   ┆ 0.2  ┆ 0.0         │
+│ D14  ┆ gas or oil engine, not CHP ┆ Connected           ┆ 1   ┆ 6.0  ┆ 0.0         │
+│ D16  ┆ battery                    ┆ Accepted to connect ┆ 1   ┆ 0.2  ┆ 0.0         │
+│ D2   ┆ battery                    ┆ Connected           ┆ 1   ┆ 0.2  ┆ 0.0         │
+│ D3   ┆ battery                    ┆ Accepted to connect ┆ 1   ┆ 0.2  ┆ 0.0         │
+│ D5   ┆ gas or oil engine, not CHP ┆ Connected           ┆ 1   ┆ 1.0  ┆ 0.0         │
+│ D9   ┆ battery                    ┆ Connected           ┆ 1   ┆ 0.25 ┆ 0.0         │
+└──────┴────────────────────────────┴─────────────────────┴─────┴──────┴─────────────┘
+Connected price-following assets: date connected and distance from the substation
+shape: (5, 6)
+┌──────┬────────────────────────────┬──────┬─────────────┬────────────────┬─────────────┐
+│ site ┆ asset_class                ┆ mw   ┆ storage_mwh ┆ connected_date ┆ distance_km │
+│ ---  ┆ ---                        ┆ ---  ┆ ---         ┆ ---            ┆ ---         │
+│ str  ┆ str                        ┆ f64  ┆ f64         ┆ date           ┆ f64         │
+╞══════╪════════════════════════════╪══════╪═════════════╪════════════════╪═════════════╡
+│ D11  ┆ battery                    ┆ 0.2  ┆ null        ┆ 2026-04-13     ┆ 2.253177    │
+│ D14  ┆ gas or oil engine, not CHP ┆ 6.0  ┆ null        ┆ 2023-06-13     ┆ 0.371956    │
+│ D2   ┆ battery                    ┆ 0.2  ┆ null        ┆ 2026-05-01     ┆ null        │
+│ D5   ┆ gas or oil engine, not CHP ┆ 1.0  ┆ null        ┆ 2021-03-11     ┆ 3.250334    │
+│ D9   ┆ battery                    ┆ 0.25 ┆ null        ┆ 2024-04-02     ┆ 1.862435    │
+└──────┴────────────────────────────┴──────┴─────────────┴────────────────┴─────────────┘
+Sites with no price-following asset at all:
+['D10', 'D12', 'D15', 'D18', 'D19', 'D21', 'D22', 'D4', 'D8']
