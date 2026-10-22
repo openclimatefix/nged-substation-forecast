@@ -117,7 +117,7 @@ scores 0.9526, so the clip accounts for 0.0004 of the 0.003.
 
 ![Figure 3: fraction of output fitted for each farm](figure_3_per_farm.svg)
 
-![Figure 4: monthly 90th percentile flat level, metered and modelled on all fold-1 half-hours (mostly tuning months), farms C to F](figure_4_flat_top.svg)
+![Figure 4: monthly 90th percentile flat level, metered and modelled, farms C to F](figure_4_flat_top.svg)
 
 ## Numbers
 

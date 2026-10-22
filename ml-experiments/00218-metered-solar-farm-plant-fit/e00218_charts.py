@@ -208,7 +208,7 @@ def flat_top() -> None:
             title=alt.TitleParams(
                 [
                     "90th percentile of power over capacity by month, at clear-sky",
-                    "irradiance above 650 W/m², farms C to F; all fold-1 rows, mostly tuning months.",
+                    "irradiance above 650 W/m², farms C to F; all fold-1 rows.",
                 ],
                 anchor="start",
                 fontSize=12,
