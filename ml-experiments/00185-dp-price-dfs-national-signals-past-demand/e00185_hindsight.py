@@ -36,7 +36,7 @@ import e00185_x155_corrections as corr
 import e00185_x155_run as run155
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens_weather import proxy_cache
 
