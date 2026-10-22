@@ -1,7 +1,7 @@
 ---
 id: "00067"
 slug: sw2-15-joint-edge-flow-estimator
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: complex
