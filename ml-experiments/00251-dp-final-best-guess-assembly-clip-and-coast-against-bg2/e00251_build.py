@@ -3,7 +3,7 @@
 
 Arm 1 is experiment 220's A+H+S. Arm 2 adds the hand-set 60% clip at D5 as a per-row mean shift
 (the clipped arm D of experiment 180 minus its unclipped arm D, which equals experiment 220's arm
-D), added to every quantile at D5. Arm 2b adds the same shift to A+S (no network head). Arm 2c (post hoc) is arm 2b at D5 and arm 1 at the other five substations. Arm 3 is
+D; the shift includes the clip's effect on the filter state and the fit, so it is non-zero at night too), added to every quantile at D5. Arm 2b adds the same shift to A+S (no network head). Arm 2c (post hoc) is arm 2b at D5 and arm 1 at the other five substations. Arm 3 is
 arm 2 on every row without a reading gap, so it is arm 2 here. Comparison arms are experiment 87's
 BG2, manual heuristic, climatology, and weak production-style XGBoost model. Output goes to
 `work/arms/scored/`.

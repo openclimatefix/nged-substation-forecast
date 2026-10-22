@@ -3,7 +3,7 @@
 
 The quantile score (CRPS) is twice the mean pinball loss over the 11 quantiles, in points of
 effective capacity. The tail-weighted score raises the quantiles and the observation to the
-series' historical 95th (or 99th) percentile of power before the scored year first. Intervals
+series' historical 95th (or 99th) percentile of power before 2025-07-02 first. Intervals
 resample the months of the forecast run's initialisation time, 20,000 draws; a month's own interval
 resamples that month's initialisation days.
 
@@ -48,7 +48,11 @@ def thresholds() -> dict[str, dict[str, float]]:
         for site in common.SCORED_SITES
         for period in ("tuning", "replicate")
     ]
-    frame = pl.concat(pieces).unique(subset=["site", "valid_time"])
+    frame = (
+        pl.concat(pieces)
+        .filter(pl.col("valid_time") < common.SCORED_START)
+        .unique(subset=["site", "valid_time"])
+    )
     out: dict[str, dict[str, float]] = {}
     for (site,), group in frame.group_by("site"):
         values = group["actual"].to_numpy().astype(np.float64)
@@ -89,7 +93,7 @@ def mean_interval(*, values: np.ndarray, mask: np.ndarray, blocks: np.ndarray, r
     labels, codes = np.unique(blocks[mask], return_inverse=True)
     n = len(labels)
     if n == 0:
-        return {"est": float("nan"), "lo": float("nan"), "hi": float("nan"), "n": 0}
+        return {"est": float("nan"), "lo": float("nan"), "hi": float("nan"), "n": 0, "blocks": 0}
     sums = np.bincount(codes, weights=values[mask], minlength=n)
     counts = np.bincount(codes, minlength=n).astype(np.float64)
     draws = rng.integers(0, n, size=(N_RESAMPLES, n))
@@ -240,7 +244,7 @@ def main() -> None:
     rep["clip"] = clip
     other = ~d5
     rep["arm2_equals_arm1_off_d5"] = bool(np.array_equal(arms["arm1"][other], arms["arm2"][other]))
-    # MAE and QS against lead time: arms by 12-hour lead bin
+    # MAE and QS against lead time: arms by 24-hour lead bin
     edges_lead = np.arange(0.0, 168.0 + LEAD_BIN_HOURS, LEAD_BIN_HOURS)
     bins = np.digitize(lead, edges_lead[1:-1], right=False)
     rep["by_lead_bin"] = {

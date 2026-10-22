@@ -268,7 +268,7 @@ def curtailment() -> None:
     zero = _chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#333333").encode(x="x:Q")
     chart = (
         zero
-        + base.mark_rule(strokeWidth=2).encode(x=alt.X("low:Q", title="Saving against the manual heuristic (GBP million per year, five substations; above zero is better)"), x2="high:Q")
+        + base.mark_rule(strokeWidth=2).encode(x=alt.X("low:Q", title="Saving against the manual heuristic (GBP million over the scored rows, five substations; above zero is better)"), x2="high:Q")
         + base.mark_point(filled=True, size=50).encode(x="saving:Q")
     ).properties(width=WIDTH, height=180, title=_title(
         title="Curtailment cost saved against the manual heuristic, by forecast",

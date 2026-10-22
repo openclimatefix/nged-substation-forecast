@@ -112,7 +112,7 @@ Scored year 2025-07-02 to 2026-06-30, six Primaries (D5, D9, D10, D11, D14, D16)
 leads 0.5 to 168 h. Quantiles and `actual` are in points of effective capacity.
 
 - `dp_preds/arm1_scored_<site>.parquet`: arm 1, experiment 220's A+H+S (arm D, network head,
-  two-number solar summary). Columns as in experiment 169's `dp_preds`, plus `mean`.
+  two-number solar summary). Columns as in experiment 169's `dp_preds`, plus `mean`, which is arm D's unshifted mean for every file.
 - `dp_preds/arm2c_scored_<site>.parquet`: arm 2c (post hoc), arm 1 with D5 replaced by the clipped
   forecast without the network head; the other five substations equal arm 1. Pre-registered winner:
   arm 1 (see the result page).

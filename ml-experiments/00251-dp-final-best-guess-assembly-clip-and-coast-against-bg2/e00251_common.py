@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """Constants and helpers shared by the scripts of experiment 251 (final best-guess assembly)."""
 
+import datetime as dt
 import json
 from pathlib import Path
 from typing import Final
@@ -50,6 +51,7 @@ QUANTILES: Final[tuple[str, ...]] = (
 )  # fmt: skip
 LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time"]
+SCORED_START: Final[dt.datetime] = dt.datetime(2025, 7, 2, tzinfo=dt.UTC)
 GATE_ARM_A: Final[float] = 2.7519
 GATE_ARM_1: Final[float] = 2.617
 GATE_BG2: Final[float] = 2.780
