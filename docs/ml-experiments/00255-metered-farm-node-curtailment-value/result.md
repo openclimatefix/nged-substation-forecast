@@ -31,7 +31,8 @@ decision_rule: >-
   event census run before scoring found 72 event half-hours at f = 0.5, 5 at 0.75, and 2 at 0.9 in
   the causal rows). Intervals resample the months of the forecast origin (2,000 draws) at the 99%
   level (Bonferroni over five planned contrasts). C1 to C3: plant, XGBoost, and H5 (seed 0) minus
-  the NGED baseline; supported when the whole 99% interval of each of C1 to C3 is below zero (95% intervals are shown beside them for information). C4: H5 (seed 0) minus XGBoost; C5: H5
+  the NGED baseline; supported when the whole 99% interval of each of C1 to C3 is below zero (95%
+  intervals are shown beside them for information). C4: H5 (seed 0) minus XGBoost; C5: H5
   (seed 0) minus the plant. "H5 and XGBoost are equivalent" needs the whole C4 interval inside
   plus or minus 5% of XGBoost's avoidable cost; the page reports the interval's half-width as the
   smallest difference the window can detect. Porting the neural head in place of XGBoost for
@@ -59,7 +60,8 @@ verdict_note: >-
   between the two nodes. H5 beats XGBoost by 3.2% (99% interval 0.2% to 7.5%), under the 10%
   that would justify porting a neural network for this metric.
 best_arm: >-
-  H5 (seed 0) has the lowest avoidable cost of the planned arms, GBP 1.87 million (95% interval 0.55 to 3.42 million)
+  H5 (seed 0) has the lowest avoidable cost of the planned arms, GBP 1.87 million (95% interval 0.55
+  to 3.42 million)
   at 0.5 times each node's earlier maximum export, 2025-09 to 2026-06, causal rows, against GBP
   2.57 million for the NGED baseline (0.59 to 5.18 million).
 headline: >-
