@@ -101,7 +101,10 @@ def consistent(
 
 
 def hard_negatives(*, table: pl.DataFrame, rule: np.ndarray) -> np.ndarray:
-    """Real candidates that fail the rule and are on a bank holiday or isolated, outside D8 drops, block days, and logged or labelled events."""
+    """Real candidates that fail the rule and are on a bank holiday or isolated.
+
+    They lie outside D8 drops, block days, and logged or labelled events.
+    """
     isolated = np.zeros(table.height, dtype=bool)
     stamps = np.sort(table["stamp"].to_numpy())
     for i, t in enumerate(table["stamp"].to_numpy()):

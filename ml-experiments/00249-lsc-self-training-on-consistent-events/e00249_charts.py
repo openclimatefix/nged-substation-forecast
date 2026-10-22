@@ -40,11 +40,8 @@ def main() -> None:
     frame = pl.DataFrame(rows)
     base: Any = alt.Chart(frame)
     y = alt.Y("arm:N", sort=list(ROUND_ARMS[1:]), title=None)
-    zero: Any = (
-        alt.Chart(pl.DataFrame({"x": [0.0]}))
-        .mark_rule(strokeDash=[4, 3], color="#555555")
-        .encode(x="x:Q")
-    )
+    zero_base: Any = alt.Chart(pl.DataFrame({"x": [0.0]}))
+    zero: Any = zero_base.mark_rule(strokeDash=[4, 3], color="#555555").encode(x="x:Q")
     chart = alt.layer(
         base.mark_rule(strokeWidth=2, color=ocf.DATA_BLUE).encode(
             y=y,

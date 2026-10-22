@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Alarm selection at a fixed alarm budget and scoring against the labelled real transfers and injected ones.
+"""Alarm selection at a fixed alarm budget, scored against real and injected transfers.
 
 Copies the scoring helpers of experiment 195's `e00195_run.py` so that this folder imports only itself.
 """
