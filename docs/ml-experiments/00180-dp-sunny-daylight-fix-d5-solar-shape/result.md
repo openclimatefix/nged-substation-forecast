@@ -57,8 +57,9 @@ take_home_message: >-
   D5's solar output is limited at the export point: capping the solar output the forecast subtracts
   from demand at 60% of D5's capacity cuts the best GAM's sunny-daylight loss to BG2 from 0.20 MW to
   0.07 MW, and moves the two substations without a gap by under 0.01 MW on sunny half-hours. A
-  different panel tilt or azimuth does nothing measurable. D5 is the only one of the six substations with this clip flag, so
-  the next question is whether the 60% ceiling is stable from year to year.
+  different panel tilt or azimuth does nothing measurable. D5 is the only one of the six
+  substations with this clip flag, so the next question is whether the 60% ceiling is stable from
+  year to year.
 date: 2026-10-22
 headline: >-
   D5, sunny daylight, all leads, scored year: GAM minus BG2 mean absolute error +0.202 MW (control)
