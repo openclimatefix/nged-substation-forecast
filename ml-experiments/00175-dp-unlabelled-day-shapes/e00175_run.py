@@ -269,7 +269,9 @@ def chance_rate(*, ctx: Context, blocks: pl.DataFrame, residuals: dict[str, np.n
             cases.append((metered, edges))
     rates = []
     for _ in range(N_SHIFT_DRAWS):
-        shifts = {n: int(rng.integers(*SHIFT_DAYS)) * STEPS_PER_DAY for n in ctx.bg2}
+        shifts = {
+            n: int(rng.integers(SHIFT_DAYS[0], SHIFT_DAYS[1] + 1)) * STEPS_PER_DAY for n in ctx.bg2
+        }
         hit_days = sum(
             any(
                 rules.neighbour_opposite_step(
@@ -342,6 +344,20 @@ def main() -> None:
     ordinary_table = run_days(ctx=ctx, days=ordinary, residuals=residuals)
     ordinary_table.write_parquet(common.WORK_DIR / "ordinary_day_shapes.parquet")
     shape_counts(table=ordinary_table, title="Ordinary days (middle half by excess loss)")
+    for name in ctx.detectors:
+        with_onset = sum(
+            fired(
+                ctx=ctx,
+                table=name,
+                series=ctx.ids[site],
+                positions=range(
+                    int(ctx.grid.positions_of(day=day)[0]) - DETECTOR_WINDOW_READINGS,
+                    int(ctx.grid.positions_of(day=day)[-1]) + DETECTOR_WINDOW_READINGS + 1,
+                ),
+            )
+            for site, day in ordinary.iter_rows()
+        )
+        print(f"Ordinary days with a {name} onset within 3 hours of the day: {with_onset} of 200")
     block_summary(blocks=ordinary_table.filter(pl.col("shape") == "a_block"), label="Ordinary")
     print("\nKnown-answer control (shape injected into ordinary days):")
     print(injected_control(ctx=ctx, ordinary=ordinary, residuals=residuals))

@@ -77,17 +77,17 @@ Unlabelled worst days: 37 days
 
 By site:
 shape: (5, 5)
-┌──────┬─────────┬──────────┬───────┬──────────────────┐
-│ site ┆ a_block ┆ b_offset ┆ mixed ┆ c_ramp_or_midday │
-│ ---  ┆ ---     ┆ ---      ┆ ---   ┆ ---              │
-│ str  ┆ u32     ┆ u32      ┆ u32   ┆ u32              │
-╞══════╪═════════╪══════════╪═══════╪══════════════════╡
-│ D10  ┆ 6       ┆ 2        ┆ 0     ┆ 0                │
-│ D11  ┆ 0       ┆ 8        ┆ 0     ┆ 2                │
-│ D14  ┆ 6       ┆ 3        ┆ 1     ┆ 1                │
-│ D16  ┆ 2       ┆ 2        ┆ 0     ┆ 0                │
-│ D5   ┆ 3       ┆ 0        ┆ 0     ┆ 1                │
-└──────┴─────────┴──────────┴───────┴──────────────────┘
+┌──────┬──────────┬──────────────────┬───────┬─────────┐
+│ site ┆ b_offset ┆ c_ramp_or_midday ┆ mixed ┆ a_block │
+│ ---  ┆ ---      ┆ ---              ┆ ---   ┆ ---     │
+│ str  ┆ u32      ┆ u32              ┆ u32   ┆ u32     │
+╞══════╪══════════╪══════════════════╪═══════╪═════════╡
+│ D10  ┆ 2        ┆ 0                ┆ 0     ┆ 6       │
+│ D11  ┆ 8        ┆ 2                ┆ 0     ┆ 0       │
+│ D14  ┆ 3        ┆ 1                ┆ 1     ┆ 6       │
+│ D16  ┆ 2        ┆ 0                ┆ 0     ┆ 2       │
+│ D5   ┆ 0        ┆ 1                ┆ 0     ┆ 3       │
+└──────┴──────────┴──────────────────┴───────┴─────────┘
 Class (c) days with at least half the squared residual 10:00-16:00: 4 of 4
 
 Unlabelled: class (a) days 17; with a metered neighbour 17; opposite-signed neighbour step on 9 (0.529, Wilson 0.310 to 0.738)
@@ -98,13 +98,16 @@ Unlabelled: class (a) days 17; with a metered neighbour 17; opposite-signed neig
   persists over the next 7 days: 1; reverts: 14; unknown: 2
 Rule: class (a) at least 19 of 37
 
-Chance rate of an opposite-signed neighbour step (each neighbour rolled by whole days, 1000 draws, 17 days): mean 0.709, 95% range 0.529 to 0.882
+Chance rate of an opposite-signed neighbour step (each neighbour rolled by whole days, 1000 draws, 17 days): mean 0.712, 95% range 0.529 to 0.882
 
 Ordinary days (middle half by excess loss): 200 days
   a_block: 55 (0.275, 95% Wilson 0.218 to 0.341)
   b_offset: 32 (0.160, 95% Wilson 0.116 to 0.217)
   c_ramp_or_midday: 62 (0.310, 95% Wilson 0.250 to 0.377)
   mixed: 51 (0.255, 95% Wilson 0.200 to 0.320)
+Ordinary days with a R2_M48 onset within 3 hours of the day: 0 of 200
+Ordinary days with a R0_M48 onset within 3 hours of the day: 0 of 200
+Ordinary days with a pair_alarm_W8 onset within 3 hours of the day: 3 of 200
 
 Ordinary: class (a) days 55; with a metered neighbour 55; opposite-signed neighbour step on 27 (0.491, Wilson 0.364 to 0.619)
   fired_R2_M48: 0 of 55
