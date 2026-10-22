@@ -370,6 +370,21 @@ interval): readings 0 hours old lowered the score by 0.016 points, readings 24 h
 Provisional: the delay was not measured on live telemetry. Confidence: low for the delay, medium for
 the size of its effect.
 
+**When power readings are missing, let the Kalman filter coast and widen the quantile bands; do not
+fall back to the convex demand model with no correction (provisional, low to medium confidence).**
+Coasting means running the Kalman filter, which estimates the recent error of the demand model's
+forecast, without feeding it new readings, so its short-lived error component decays and its
+slowly varying error component holds steady. After injected gaps of 3 to 72 hours, coasting
+scored 0.245 to 0.439 points of quantile score better (in percent of effective capacity, lower is
+better) than the demand model with no correction, over leads of 0.5 to 168 hours. Widening each
+quantile's offset from the mean by the filter's variance growth since the last reading reduced the
+share of readings below the predicted 5% quantile from 7.7% to 5.5% after a 24-hour gap (the target
+is 5%), without worsening the quantile score. The data could not show whether, after about 72
+hours, it would be better to drop the filter but keep the winter night offset and recipe R. Applies
+to production. Evidence: [experiment
+205](00205-dp-gamk-gap-robustness-coast-or-frozen-gam/result.md), at five Primary substations (up
+to 56 injected gaps each, made by hiding readings in clean data).
+
 ## Weather products
 
 **Train each model on the history of the weather product that will serve it, and do not train on the
