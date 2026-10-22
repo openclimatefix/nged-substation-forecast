@@ -6,7 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| – | No experiment is queued; the proposals below are not yet agreed | – | The maintainer | Open |
+| 00246 | Does adding ICON-D2 to the ensemble plus UKV lower a metered solar farm's day-ahead error by 1.5% or more? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
