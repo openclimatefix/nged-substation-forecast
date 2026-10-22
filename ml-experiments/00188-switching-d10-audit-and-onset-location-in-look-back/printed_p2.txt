@@ -1,0 +1,148 @@
+
+== location error, injected (half-hours; signed median, median |e|, p90 |e|) ==
+injected PAIR: n=153; alarm_time +12.0/12.0/25.8; step +0.0/0.0/29.6; located_err +0.0/0.0/33.6; mean wait to first origin 5.0; located closer than step 0.10, farther 0.14
+injected RONC: n=430; alarm_time +96.0/96.0/97.0; step +0.0/0.0/5.1; located_err +0.0/0.0/16.0; mean wait to first origin 5.7; located closer than step 0.14, farther 0.26
+
+== location error, real (half-hours; signed median, median |e|, p90 |e|) ==
+real PAIR: n=20; alarm_time +12.0/12.0/31.1; step +0.0/1.0/32.6; located_err +0.0/0.0/36.1; mean wait to first origin 5.0; located closer than step 0.25, farther 0.25
+real RONC: n=19; alarm_time +96.0/96.0/221.4; step +0.0/3.0/125.4; located_err +1.0/1.0/125.2; mean wait to first origin 7.0; located closer than step 0.32, farther 0.37
+
+rows scored: 502141 files: 116
+found transfers scored: 262
+
+== injected PAIR: 87 found transfers ==
+  mean score K0: 3.221
+  mean score CLEAN: 2.554
+  mean score MASK_ALARM: 2.810
+  mean score MASK_STEP: 2.677
+  mean score MASK_LOCATED: 2.674
+  mean score MASK_TRUE: 2.635
+  extra error MASK_ALARM minus MASK_TRUE: +0.175 (+0.098 to +0.254)
+  extra error MASK_STEP minus MASK_TRUE: +0.042 (+0.009 to +0.087)
+  extra error MASK_LOCATED minus MASK_TRUE: +0.039 (+0.007 to +0.083)
+  extra error K0 minus MASK_TRUE: +0.585 (+0.306 to +0.942)
+  C2 reduction in extra error, located vs alarm time: +0.779 (+0.519 to +0.961)
+  same for the detector's step stamp: +0.759 (+0.502 to +0.939)
+  MASK_ALARM minus MASK_LOCATED: +0.136 (+0.063 to +0.214)
+  MASK_LOCATED minus MASK_STEP: -0.003 (-0.010 to +0.002)
+  MASK_LOCATED minus MASK_TRUE: +0.039 (+0.007 to +0.083)
+  error of the mean forecast, MASK_ALARM minus MASK_LOCATED: +0.243 (+0.107 to +0.387)
+
+== injected RONC: 160 found transfers ==
+  mean score K0: 3.387
+  mean score CLEAN: 2.445
+  mean score MASK_ALARM: 3.300
+  mean score MASK_STEP: 2.890
+  mean score MASK_LOCATED: 2.912
+  mean score MASK_TRUE: 2.885
+  extra error MASK_ALARM minus MASK_TRUE: +0.415 (+0.107 to +0.723)
+  extra error MASK_STEP minus MASK_TRUE: +0.005 (-0.015 to +0.026)
+  extra error MASK_LOCATED minus MASK_TRUE: +0.027 (-0.007 to +0.064)
+  extra error K0 minus MASK_TRUE: +0.502 (+0.154 to +0.858)
+  C2 reduction in extra error, located vs alarm time: +0.936 (+0.725 to +1.021)
+  same for the detector's step stamp: +0.989 (+0.905 to +1.051)
+  MASK_ALARM minus MASK_LOCATED: +0.388 (+0.081 to +0.694)
+  MASK_LOCATED minus MASK_STEP: +0.022 (-0.011 to +0.059)
+  MASK_LOCATED minus MASK_TRUE: +0.027 (-0.007 to +0.064)
+  error of the mean forecast, MASK_ALARM minus MASK_LOCATED: +0.726 (+0.260 to +1.208)
+
+== injected BOTH: 247 found transfers ==
+  mean score K0: 3.328
+  mean score CLEAN: 2.483
+  mean score MASK_ALARM: 3.127
+  mean score MASK_STEP: 2.815
+  mean score MASK_LOCATED: 2.828
+  mean score MASK_TRUE: 2.797
+  extra error MASK_ALARM minus MASK_TRUE: +0.330 (+0.133 to +0.529)
+  extra error MASK_STEP minus MASK_TRUE: +0.018 (-0.000 to +0.038)
+  extra error MASK_LOCATED minus MASK_TRUE: +0.031 (+0.005 to +0.059)
+  extra error K0 minus MASK_TRUE: +0.531 (+0.286 to +0.786)
+  C2 reduction in extra error, located vs alarm time: +0.907 (+0.735 to +0.984)
+  same for the detector's step stamp: +0.946 (+0.832 to +1.001)
+  MASK_ALARM minus MASK_LOCATED: +0.300 (+0.102 to +0.499)
+  MASK_LOCATED minus MASK_STEP: +0.013 (-0.008 to +0.037)
+  MASK_LOCATED minus MASK_TRUE: +0.031 (+0.005 to +0.059)
+  error of the mean forecast, MASK_ALARM minus MASK_LOCATED: +0.556 (+0.253 to +0.873)
+
+== real PAIR: 9 found transfers ==
+  mean score K0: 5.965
+  mean score MASK_ALARM: 6.160
+  mean score MASK_STEP: 6.337
+  mean score MASK_LOCATED: 6.282
+  mean score MASK_TRUE: 6.187
+  extra error MASK_ALARM minus MASK_TRUE: -0.027 (-0.713 to +0.677)
+  extra error MASK_STEP minus MASK_TRUE: +0.151 (-0.239 to +0.749)
+  extra error MASK_LOCATED minus MASK_TRUE: +0.095 (-0.246 to +0.576)
+  extra error K0 minus MASK_TRUE: -0.222 (-2.004 to +1.288)
+  C2 reduction in extra error, located vs alarm time: +4.580 (-4.164 to +5.335)
+  same for the detector's step stamp: +6.666 (-6.014 to +7.795)
+  MASK_ALARM minus MASK_LOCATED: -0.122 (-0.528 to +0.251)
+  MASK_LOCATED minus MASK_STEP: -0.055 (-0.181 to +0.021)
+  MASK_LOCATED minus MASK_TRUE: +0.095 (-0.246 to +0.576)
+  error of the mean forecast, MASK_ALARM minus MASK_LOCATED: -0.104 (-0.567 to +0.345)
+
+== real RONC: 6 found transfers ==
+  mean score K0: 8.298
+  mean score MASK_ALARM: 8.422
+  mean score MASK_STEP: 12.949
+  mean score MASK_LOCATED: 12.700
+  mean score MASK_TRUE: 9.958
+  extra error MASK_ALARM minus MASK_TRUE: -1.536 (-5.738 to +2.276)
+  extra error MASK_STEP minus MASK_TRUE: +2.991 (-0.212 to +6.201)
+  extra error MASK_LOCATED minus MASK_TRUE: +2.742 (-0.569 to +6.071)
+  extra error K0 minus MASK_TRUE: -1.659 (-5.870 to +2.121)
+  C2 reduction in extra error, located vs alarm time: +2.785 (-30.148 to +45.712)
+  same for the detector's step stamp: +2.947 (-32.294 to +49.496)
+  MASK_ALARM minus MASK_LOCATED: -4.279 (-6.881 to -1.590)
+  MASK_LOCATED minus MASK_STEP: -0.248 (-0.495 to -0.042)
+  MASK_LOCATED minus MASK_TRUE: +2.742 (-0.569 to +6.071)
+  error of the mean forecast, MASK_ALARM minus MASK_LOCATED: -4.640 (-7.446 to -1.724)
+
+== real BOTH: 15 found transfers ==
+  mean score K0: 6.899
+  mean score MASK_ALARM: 7.065
+  mean score MASK_STEP: 8.982
+  mean score MASK_LOCATED: 8.849
+  mean score MASK_TRUE: 7.695
+  extra error MASK_ALARM minus MASK_TRUE: -0.630 (-2.503 to +0.865)
+  extra error MASK_STEP minus MASK_TRUE: +1.287 (-0.105 to +3.089)
+  extra error MASK_LOCATED minus MASK_TRUE: +1.154 (-0.205 to +2.964)
+  extra error K0 minus MASK_TRUE: -0.797 (-2.853 to +0.968)
+  C2 reduction in extra error, located vs alarm time: +2.830 (-23.959 to +23.720)
+  same for the detector's step stamp: +3.041 (-25.579 to +25.927)
+  MASK_ALARM minus MASK_LOCATED: -1.784 (-3.466 to -0.382)
+  MASK_LOCATED minus MASK_STEP: -0.133 (-0.269 to -0.023)
+  MASK_LOCATED minus MASK_TRUE: +1.154 (-0.205 to +2.964)
+  error of the mean forecast, MASK_ALARM minus MASK_LOCATED: -1.918 (-3.718 to -0.386)
+
+== DECISION: C2 +0.907 (+0.735 to +0.984); verdict supported ==
+
+C2 resampling whole worlds (39): +0.907 (+0.747 to +0.974)
+  C2 without D10: +0.970 (+0.830 to +1.069) (n=233)
+  C2 only D10: +0.780 (-0.351 to +0.965) (n=14)
+  C2 without D11: +0.892 (+0.545 to +1.000) (n=189)
+  C2 only D11: +0.949 (+0.844 to +0.989) (n=58)
+  C2 without D14: +0.882 (+0.548 to +0.982) (n=237)
+  C2 only D14: +0.994 (+0.979 to +1.000) (n=10)
+  C2 without D16: +0.910 (+0.827 to +0.963) (n=164)
+  C2 only D16: +0.923 (+0.334 to +1.368) (n=83)
+  C2 without D5: +0.903 (+0.706 to +0.983) (n=229)
+  C2 only D5: +0.971 (+0.787 to +1.101) (n=18)
+  C2 without D9: +0.885 (+0.352 to +1.033) (n=183)
+  C2 only D9: +0.938 (+0.804 to +1.023) (n=64)
+
+== tail calibration, injected rows: coverage (share of readings at or below the quantile) and pinball loss ==
+K0: q01 cov 0.032 pin 0.283; q05 cov 0.066 pin 0.858; q95 cov 0.875 pin 0.876; q99 cov 0.952 pin 0.265;
+CLEAN: q01 cov 0.012 pin 0.163; q05 cov 0.051 pin 0.594; q95 cov 0.974 pin 0.639; q99 cov 0.995 pin 0.171;
+MASK_ALARM: q01 cov 0.024 pin 0.240; q05 cov 0.059 pin 0.788; q95 cov 0.888 pin 0.790; q99 cov 0.962 pin 0.225;
+MASK_STEP: q01 cov 0.029 pin 0.252; q05 cov 0.080 pin 0.744; q95 cov 0.962 pin 0.691; q99 cov 0.990 pin 0.188;
+MASK_LOCATED: q01 cov 0.029 pin 0.253; q05 cov 0.080 pin 0.748; q95 cov 0.962 pin 0.691; q99 cov 0.990 pin 0.189;
+MASK_TRUE: q01 cov 0.029 pin 0.252; q05 cov 0.081 pin 0.744; q95 cov 0.964 pin 0.688; q99 cov 0.991 pin 0.188;
+
+== median minus mean forecast, per site, MASK_LOCATED, all rows ==
+  D10: -0.110
+  D11: -0.055
+  D14: +0.022
+  D16: +0.035
+  D5: -0.367
+  D9: -0.074
