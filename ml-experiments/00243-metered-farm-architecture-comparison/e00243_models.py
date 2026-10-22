@@ -7,8 +7,8 @@ forecast equals the plant's forecast plus the tuning-month offsets. Powers are o
 
 import math
 
-import torch
-from torch import nn
+import torch  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
 
 TILT_RAD = math.radians(35.0)
 PANEL_AZIMUTH_RAD = math.radians(180.0)
