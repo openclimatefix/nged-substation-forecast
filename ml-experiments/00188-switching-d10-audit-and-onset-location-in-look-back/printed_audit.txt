@@ -1,0 +1,39 @@
+gated alarms from 2024-04-10: 49
+not matched to a logged transfer: 36
+of those, confirmed: 8
+placebo share confirmed (shifted by whole weeks): 0.056
+
+== alarms per site, by interval series (a transfer appears at both ends) ==
+
+== experiment 171's rows (reproduced) ==
+171 pooled: MASK_GATED minus K0 +0.030 (-0.012 to +0.074)  rows 1579711
+
+== G1' and G2' ==
+pooled, confirmed events removed: MASK_GATED minus K0 +0.014 (-0.022 to +0.051)  rows 1543752
+winter, confirmed events removed: MASK_GATED minus K0 +0.002 (-0.094 to +0.100)  rows 550326
+G1' False (half-width 0.036); G2' False; verdict inconclusive
+
+== beside the contrast ==
+rows of confirmed events alone: MASK_GATED minus K0 +0.726 (-0.011 to +1.191)  rows 35959
+rows of unconfirmed gated alarms alone: MASK_GATED minus K0 +0.212 (-0.002 to +0.615)  rows 88739
+only D5, all rows: MASK_GATED minus K0 -0.027 (-0.098 to +0.009)  rows 251286
+only D5, confirmed events removed: MASK_GATED minus K0 -0.028 (-0.101 to +0.007)  rows 246232
+only D9, all rows: MASK_GATED minus K0 +0.000 (+0.000 to +0.000)  rows 271586
+only D9, confirmed events removed: MASK_GATED minus K0 +0.000 (+0.000 to +0.000)  rows 271586
+only D10, all rows: MASK_GATED minus K0 +0.170 (+0.012 to +0.382)  rows 263669
+only D10, confirmed events removed: MASK_GATED minus K0 +0.081 (-0.007 to +0.232)  rows 240527
+only D11, all rows: MASK_GATED minus K0 +0.010 (+0.001 to +0.024)  rows 271649
+only D11, confirmed events removed: MASK_GATED minus K0 +0.010 (+0.001 to +0.024)  rows 271649
+only D14, all rows: MASK_GATED minus K0 +0.001 (-0.005 to +0.008)  rows 266161
+only D14, confirmed events removed: MASK_GATED minus K0 +0.002 (-0.002 to +0.008)  rows 261660
+only D16, all rows: MASK_GATED minus K0 +0.023 (-0.105 to +0.166)  rows 255360
+only D16, confirmed events removed: MASK_GATED minus K0 +0.020 (-0.110 to +0.166)  rows 252098
+gated alarm active, confirmed removed: MASK_GATED minus K0 +0.219 (-0.382 to +0.809)  rows 96411
+
+== per site: gated alarm intervals (unlogged) confirmed / total ==
+D5: gated 11, unlogged 6, confirmed 2
+D9: gated 0, unlogged 0, confirmed 0
+D10: gated 15, unlogged 13, confirmed 3
+D11: gated 15, unlogged 14, confirmed 0
+D14: gated 17, unlogged 14, confirmed 4
+D16: gated 7, unlogged 3, confirmed 1
