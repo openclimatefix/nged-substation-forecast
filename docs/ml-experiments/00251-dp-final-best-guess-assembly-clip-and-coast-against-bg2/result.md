@@ -224,8 +224,12 @@ points (95% interval -0.277 to -0.005) and beats the manual heuristic on all fou
   trigger 3 did not fire. For arm 1 the mean's absolute error is 5.31, 4.21, 3.69, 4.48, 6.01, and
   4.21 at D10, D11, D14, D16, D5, and D9, against 5.36, 4.20, 3.53, 4.03, 5.83, and 4.25 for the
   median.
-- **Triggers:** none of 1, 3, 4, 6 fired (the gate passed; leaving D5 or D9 out leaves arm 1 minus
-  BG2 negative). Trigger 5 fired: arm 1, which contains no clip, beats arm 2 at D5 (+0.075, +0.033
-  to +0.120). Experiment 232 predicted that, and arm 2b tests the explanation. Trigger 2 did not
-  fire, because the plan's P2 predicted that result. Trigger 7 is open: later work depends on the
-  winter gain, which one year of data supports.
+- **Triggers:** none of 1, 3, 6 fired (the gate passed, and the contrasts agree in sign). Trigger 4
+  fired in part: leaving one substation out keeps arm 1 minus BG2 negative every time (-0.110 to
+  -0.164), but the 95% interval then spans zero when D11, D14, or D16 is left out, so the gain
+  over BG2 depends on all six substations and its upper bound is only -0.005. A fresh Sonnet agent
+  re-derived the headline contrasts from the stored arrays with its own code and found no difference
+  above 0.005 points. Trigger 5 fired: arm 1, which contains no clip, beats arm 2 at D5 (+0.075,
+  +0.033 to +0.120). Experiment 232 predicted that, and arm 2b tests the explanation. Trigger 2 did
+  not fire, because the plan's P2 predicted that result. Trigger 7 is open: later work depends on
+  the winter gain, which one year of data supports.
