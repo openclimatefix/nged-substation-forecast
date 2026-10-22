@@ -6,7 +6,6 @@ order for the maintainer to change.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| National price and DFS signals (experiment 185) | Do system price, DFS events, or other national signals explain the best-guess forecast's loss across the scored year, and does a hindsight covariate in the Kalman filter lower the score? | 1 (the maintainer asked for it directly) | Nothing; public data | Planned |
 | Unlabelled worst days (experiment 174) | Is the loss on the 37 worst days that experiment 172 could not label weather error, a day shared with other Primaries, or an error at one substation only? | 1 (decides whether fine-tuning targets weather, switching, or single-site faults) | Nothing; CPU, under 2 hours | Planned |
 | Holiday-aware filter updating (experiment 143) | Does leaving holiday readings out of the GAM-K filter's update lower the score on the days after a holiday, without hurting holiday days? | 1 (the forecast is judged over this Christmas) | Nothing; CPU, about 1 hour | Planned |
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
