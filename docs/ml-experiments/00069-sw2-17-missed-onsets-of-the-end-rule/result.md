@@ -1,7 +1,7 @@
 ---
 id: "00069"
 slug: sw2-17-missed-onsets-of-the-end-rule
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

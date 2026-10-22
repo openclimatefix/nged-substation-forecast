@@ -1,7 +1,7 @@
 ---
 id: "00148"
 slug: switching-end-rule-lookahead-ro-nc
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: >-

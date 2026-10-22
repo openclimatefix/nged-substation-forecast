@@ -1,7 +1,7 @@
 ---
 id: "00082"
 slug: sw2-18-19-combined-refit-offset-and-same-sign-count
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: simple

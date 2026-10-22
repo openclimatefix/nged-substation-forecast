@@ -11,7 +11,7 @@ The question is whether telling the XGBoost forecast about transfers lets it for
 [normal running
 arrangement](../../glossary.md#abnormal-running-arrangement-ara-and-normal-running-arrangement-nra)
 would have carried. The labels come from NGED's logs or from the [RO-NC](../../glossary.md#ro-nc)
-detector, whose own results are on the [switching detectors](../switching-detectors/index.md) page.
+detector, whose own results are on the [switching detectors](../lsc-detectors/index.md) page.
 All results are from the lab: 16 Primary series, one validation year (292 daily forecast runs, July
 2025 to June 2026), and labels that use hindsight.
 

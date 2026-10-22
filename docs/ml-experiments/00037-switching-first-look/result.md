@@ -1,7 +1,7 @@
 ---
 id: "00037"
 slug: switching-first-look
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

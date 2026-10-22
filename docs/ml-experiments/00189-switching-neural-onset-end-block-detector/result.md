@@ -1,7 +1,7 @@
 ---
 id: "00189"
 slug: switching-neural-onset-end-block-detector
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

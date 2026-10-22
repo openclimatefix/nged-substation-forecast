@@ -1,7 +1,7 @@
 ---
 id: "00038"
 slug: switching-mask-value
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

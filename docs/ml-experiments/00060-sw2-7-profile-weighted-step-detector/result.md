@@ -1,7 +1,7 @@
 ---
 id: "00060"
 slug: sw2-7-profile-weighted-step-detector
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

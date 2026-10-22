@@ -1,7 +1,7 @@
 ---
 id: "00181"
 slug: switching-block-detector-and-like-for-like-table
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

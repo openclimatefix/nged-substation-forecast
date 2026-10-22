@@ -1,7 +1,7 @@
 ---
 id: "00066"
 slug: sw2-16-end-rule-as-baseline
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

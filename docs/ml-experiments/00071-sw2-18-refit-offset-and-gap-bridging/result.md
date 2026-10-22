@@ -1,7 +1,7 @@
 ---
 id: "00071"
 slug: sw2-18-refit-offset-and-gap-bridging
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

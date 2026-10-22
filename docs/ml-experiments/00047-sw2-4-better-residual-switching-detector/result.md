@@ -1,7 +1,7 @@
 ---
 id: "00047"
 slug: sw2-4-better-residual-switching-detector
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

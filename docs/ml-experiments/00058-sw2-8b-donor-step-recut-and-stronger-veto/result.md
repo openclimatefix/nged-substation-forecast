@@ -1,7 +1,7 @@
 ---
 id: "00058"
 slug: sw2-8b-donor-step-recut-and-stronger-veto
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: simple

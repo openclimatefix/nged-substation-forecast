@@ -1,7 +1,7 @@
 ---
 id: "00147"
 slug: causal-live-end-rule-for-ro-nc
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: >-

@@ -2,7 +2,7 @@
 id: "00086"
 slug: sw2-12-detector-labels-for-nra-forecast
 theme: switching-labels-in-the-forecast
-also_relevant_to: [switching-detectors]
+also_relevant_to: [lsc-detectors]
 status: done
 size: medium
 hypothesis: >-

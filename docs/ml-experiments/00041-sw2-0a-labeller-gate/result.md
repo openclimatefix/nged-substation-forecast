@@ -1,7 +1,7 @@
 ---
 id: "00041"
 slug: sw2-0a-labeller-gate
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: complex

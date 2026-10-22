@@ -1,7 +1,7 @@
 ---
 id: "00061"
 slug: sw2-6-paired-step-intervals
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

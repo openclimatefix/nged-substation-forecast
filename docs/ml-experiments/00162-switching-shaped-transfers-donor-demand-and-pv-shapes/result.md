@@ -4,7 +4,7 @@ slug: switching-shaped-transfers-donor-demand-and-pv-shapes
 title: >-
   Do load transfers follow the donor's demand and solar shapes, and does a constant-MW injection
   flatter the LSC detectors?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

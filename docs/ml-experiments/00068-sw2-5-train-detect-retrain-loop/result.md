@@ -1,7 +1,7 @@
 ---
 id: "00068"
 slug: sw2-5-train-detect-retrain-loop
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium

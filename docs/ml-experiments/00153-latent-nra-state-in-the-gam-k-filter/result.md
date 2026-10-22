@@ -4,7 +4,7 @@ slug: latent-nra-state-in-the-gam-k-filter
 title: "A latent normal-running-arrangement state inside the GAM-K filter"
 theme: switching-labels-in-the-forecast
 also_relevant_to:
-  - switching-detectors
+  - lsc-detectors
 status: finished
 size: >-
   medium. Stored: private score tables under data/ml-experiments/00153-latent-nra-state-in-the-gam-k-filter/

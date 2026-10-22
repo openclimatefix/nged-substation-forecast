@@ -4,7 +4,7 @@ slug: switching-d10-audit-and-onset-location-in-look-back
 title: >-
   Are D10's extra errors from unlogged load shifts, and does locating the onset inside the look-back
   help the mask?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

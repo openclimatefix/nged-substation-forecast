@@ -2,7 +2,7 @@
 id: "00044"
 slug: sw2-2-switching-share-of-best-guess-score
 theme: switching-labels-in-the-forecast
-also_relevant_to: [switching-detectors]
+also_relevant_to: [lsc-detectors]
 status: done
 size: simple
 take_home_message: >-
