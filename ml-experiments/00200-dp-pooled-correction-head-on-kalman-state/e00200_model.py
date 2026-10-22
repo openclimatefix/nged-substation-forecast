@@ -9,9 +9,9 @@ from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00200_data import N_RECENT
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 LEVELS: Final[torch.Tensor] = torch.tensor(
     [0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99]
