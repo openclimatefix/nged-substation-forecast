@@ -61,6 +61,9 @@ def mixture(
         delta: Each member's response, shape (rows, members), with no missing value.
         offsets: Arm A's 11 quantiles minus its mean, shape (rows, 11).
         factor: The offsets' factor per row, shape (rows,).
+
+    Returns:
+        The mixture's 11 quantiles, shape (rows, 11).
     """
     out = np.empty((len(mean), len(data.QUANTILES)))
     for start in range(0, len(mean), CHUNK):

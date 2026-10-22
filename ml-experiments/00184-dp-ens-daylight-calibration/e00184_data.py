@@ -40,6 +40,11 @@ def load_site(
 ) -> tuple[pl.DataFrame, np.ndarray, np.ndarray]:
     """Return arm A's rows of one site and period, with their labels, and the two member deltas.
 
+    Args:
+        site: The substation's label.
+        period: `tuning`, `replicate`, or `scored`.
+        cache: The feature cache.
+
     Returns:
         The frame, `delta_m` and `delta_f` (rows, 51), in the frame's row order.
     """
