@@ -1,0 +1,145 @@
+== 35 labelled transfers over 1 day; arms at 80 unexplained odd-month alarms ==
+arm | found/35 | MW-weighted recall [95%] | count minus R1 (or F1 for F arms) [95%] | gained | lost | found/66
+RO-NC | 19 | 0.678 [0.479, 0.799] | -5.0 [-9.7, -1.0] | 0 | 5 | 19
+Pair alarm | 5 | 0.166 [0.041, 0.367] | -19.0 [-25.2, -11.2] | 1 | 20 | 5
+F1 | 22 | 0.721 [0.539, 0.841] | +0.0 [+0.0, +0.0] | 0 | 0 | 22
+R1 | 24 | 0.752 [0.585, 0.865] | +0.0 [+0.0, +0.0] | 0 | 0 | 24
+F2 w0.25 | 22 | 0.721 [0.539, 0.841] | +0.0 [+0.0, +0.0] | 0 | 0 | 22
+R2 w0.25 | 24 | 0.752 [0.585, 0.865] | +0.0 [+0.0, +0.0] | 0 | 0 | 24
+F2 w0.5 | 22 | 0.721 [0.539, 0.841] | +0.0 [+0.0, +0.0] | 0 | 0 | 22
+R2 w0.5 | 22 | 0.728 [0.554, 0.837] | -2.0 [-4.7, +0.0] | 0 | 2 | 22
+F2 w0.25 even months | 22 | 0.721 [0.539, 0.841] | +0.0 [+0.0, +0.0] | 0 | 0 | 22
+R2 w0.25 even months | 22 | 0.728 [0.554, 0.837] | -2.0 [-4.7, +0.0] | 0 | 2 | 22
+F2 w0.25 series hold-out | 22 | 0.721 [0.539, 0.841] | +0.0 [+0.0, +0.0] | 0 | 0 | 22
+R2 w0.25 series hold-out | 23 | 0.742 [0.574, 0.850] | -1.0 [-3.0, +0.0] | 0 | 1 | 23
+F2 w0.25 strict tier | 22 | 0.721 [0.539, 0.841] | +0.0 [+0.0, +0.0] | 0 | 0 | 22
+R2 w0.25 strict tier | 22 | 0.728 [0.554, 0.837] | -2.0 [-4.7, +0.0] | 0 | 2 | 22
+F2 heavy | 23 | 0.731 [0.549, 0.855] | +1.0 [+0.0, +3.0] | 1 | 0 | 23
+R2 heavy | 24 | 0.752 [0.585, 0.865] | +0.0 [+0.0, +0.0] | 0 | 0 | 24
+F3 w0.25 | 22 | 0.721 [0.539, 0.841] | +0.0 [+0.0, +0.0] | 0 | 0 | 22
+R3 w0.25 | 24 | 0.752 [0.585, 0.865] | +0.0 [+0.0, +0.0] | 0 | 0 | 24
+
+== MW-weighted recall difference minus round 1 [95%] ==
+F2 w0.25: +0.000 [+0.000, +0.000]
+R2 w0.25: +0.000 [+0.000, +0.000]
+F2 w0.5: +0.000 [+0.000, +0.000]
+R2 w0.5: -0.023 [-0.071, +0.000]
+F2 w0.25 even months: +0.000 [+0.000, +0.000]
+R2 w0.25 even months: -0.023 [-0.071, +0.000]
+F2 w0.25 series hold-out: +0.000 [+0.000, +0.000]
+R2 w0.25 series hold-out: -0.009 [-0.034, +0.000]
+F2 w0.25 strict tier: +0.000 [+0.000, +0.000]
+R2 w0.25 strict tier: -0.023 [-0.071, +0.000]
+F2 heavy: +0.009 [+0.000, +0.034]
+R2 heavy: +0.000 [+0.000, +0.000]
+F3 w0.25: +0.000 [+0.000, +0.000]
+R3 w0.25: +0.000 [+0.000, +0.000]
+
+== Events found by a round 2 or 3 arm and missed by round 1 ==
+F2 w0.25: gains 0 []; loses 0
+R2 w0.25: gains 0 []; loses 0
+F2 w0.5: gains 0 []; loses 0
+R2 w0.5: gains 0 []; loses 2
+F2 w0.25 even months: gains 0 []; loses 0
+R2 w0.25 even months: gains 0 []; loses 2
+F2 w0.25 series hold-out: gains 0 []; loses 0
+R2 w0.25 series hold-out: gains 0 []; loses 1
+F2 w0.25 strict tier: gains 0 []; loses 0
+R2 w0.25 strict tier: gains 0 []; loses 2
+F2 heavy: gains 1 [48 h 0.4 MW pair-alarm=no RO-NC=no]; loses 0
+R2 heavy: gains 0 []; loses 0
+F3 w0.25: gains 0 []; loses 0
+R3 w0.25: gains 0 []; loses 0
+
+== Found per pair (35 transfers) ==
+RO-NC: A=0 B=0 C=4 D=1 E=0 F=0 G=1 H=1 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=2
+Pair alarm: A=1 B=0 C=0 D=0 E=0 F=0 G=0 H=0 I=1 J=1 K=0 L=0 M=0 N=1 O=0 P=0 Q=1 R=0
+F1: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+R1: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=4
+F2 w0.25: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+R2 w0.25: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=4
+F2 w0.5: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+R2 w0.5: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=1 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+F2 w0.25 even months: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+R2 w0.25 even months: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=1 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+F2 w0.25 series hold-out: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+R2 w0.25 series hold-out: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+F2 w0.25 strict tier: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+R2 w0.25 strict tier: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=1 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+F2 heavy: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=4
+R2 heavy: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=4
+F3 w0.25: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=1 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=3
+R3 w0.25: A=0 B=0 C=4 D=1 E=0 F=1 G=1 H=2 I=2 J=2 K=1 L=2 M=0 N=1 O=1 P=0 Q=2 R=4
+
+== Injected transfers (odd months): recall of start and end, by arm ==
+eval_held | RO-NC | n=998 | found 0.259 | over 1 day 0.576
+eval_held | Pair alarm | n=998 | found 0.102 | over 1 day 0.216
+eval_held | F1 | n=998 | found 0.264 | over 1 day 0.580
+eval_held | R1 | n=998 | found 0.266 | over 1 day 0.595
+eval_held | F2 w0.25 | n=998 | found 0.264 | over 1 day 0.580
+eval_held | R2 w0.25 | n=998 | found 0.263 | over 1 day 0.588
+eval_held | F2 w0.5 | n=998 | found 0.264 | over 1 day 0.580
+eval_held | R2 w0.5 | n=998 | found 0.262 | over 1 day 0.588
+eval_held | F2 w0.25 even months | n=998 | found 0.264 | over 1 day 0.580
+eval_held | R2 w0.25 even months | n=998 | found 0.266 | over 1 day 0.597
+eval_held | F2 w0.25 series hold-out | n=998 | found 0.264 | over 1 day 0.580
+eval_held | R2 w0.25 series hold-out | n=998 | found 0.263 | over 1 day 0.592
+eval_held | F2 w0.25 strict tier | n=998 | found 0.264 | over 1 day 0.580
+eval_held | R2 w0.25 strict tier | n=998 | found 0.265 | over 1 day 0.592
+eval_held | F2 heavy | n=998 | found 0.260 | over 1 day 0.571
+eval_held | R2 heavy | n=998 | found 0.266 | over 1 day 0.592
+eval_held | F3 w0.25 | n=998 | found 0.264 | over 1 day 0.580
+eval_held | R3 w0.25 | n=998 | found 0.263 | over 1 day 0.588
+eval_fitted | RO-NC | n=639 | found 0.257 | over 1 day 0.534
+eval_fitted | Pair alarm | n=639 | found 0.119 | over 1 day 0.217
+eval_fitted | F1 | n=639 | found 0.285 | over 1 day 0.569
+eval_fitted | R1 | n=639 | found 0.275 | over 1 day 0.576
+eval_fitted | F2 w0.25 | n=639 | found 0.285 | over 1 day 0.569
+eval_fitted | R2 w0.25 | n=639 | found 0.279 | over 1 day 0.583
+eval_fitted | F2 w0.5 | n=639 | found 0.285 | over 1 day 0.569
+eval_fitted | R2 w0.5 | n=639 | found 0.275 | over 1 day 0.576
+eval_fitted | F2 w0.25 even months | n=639 | found 0.285 | over 1 day 0.569
+eval_fitted | R2 w0.25 even months | n=639 | found 0.277 | over 1 day 0.579
+eval_fitted | F2 w0.25 series hold-out | n=639 | found 0.285 | over 1 day 0.569
+eval_fitted | R2 w0.25 series hold-out | n=639 | found 0.277 | over 1 day 0.579
+eval_fitted | F2 w0.25 strict tier | n=639 | found 0.285 | over 1 day 0.569
+eval_fitted | R2 w0.25 strict tier | n=639 | found 0.275 | over 1 day 0.576
+eval_fitted | F2 heavy | n=639 | found 0.286 | over 1 day 0.572
+eval_fitted | R2 heavy | n=639 | found 0.277 | over 1 day 0.579
+eval_fitted | F3 w0.25 | n=639 | found 0.285 | over 1 day 0.569
+eval_fitted | R3 w0.25 | n=639 | found 0.279 | over 1 day 0.583
+
+== Pseudo-positives used (headline variant '2 w0.25'), pooled over folds ==
+shape: (3, 5)
+┌──────┬─────┬─────┬──────────┬───────────┐
+│ fold ┆ n   ┆ odd ┆ source_x ┆ median_mw │
+│ ---  ┆ --- ┆ --- ┆ ---      ┆ ---       │
+│ i32  ┆ u32 ┆ u32 ┆ u32      ┆ f64       │
+╞══════╪═════╪═════╪══════════╪═══════════╡
+│ 0    ┆ 47  ┆ 19  ┆ 43       ┆ 0.579342  │
+│ 1    ┆ 38  ┆ 18  ┆ 32       ┆ 0.604336  │
+│ 2    ┆ 45  ┆ 16  ┆ 39       ┆ 0.658389  │
+└──────┴─────┴─────┴──────────┴───────────┘
+by series: {3: 12, 8: 9, 9: 12, 10: 12, 11: 10, 14: 1, 15: 15, 16: 6, 17: 12, 18: 7, 24: 23, 25: 3, 26: 8}
+by size: {'<1 MW': 99, '1-3 MW': 31}
+distinct pseudo-positives across folds: 56; within 2 hours of a labelled transfer's onset on its series (post hoc, after scoring): 12
+
+== Alarm accounting (mean over folds) ==
+RO-NC | alarms (all months) 296 | unexplained odd 80
+Pair alarm | alarms (all months) 378 | unexplained odd 80
+F1 | alarms (all months) 370 | unexplained odd 80
+R1 | alarms (all months) 266 | unexplained odd 80
+F2 w0.25 | alarms (all months) 371 | unexplained odd 80
+R2 w0.25 | alarms (all months) 277 | unexplained odd 80
+F2 w0.5 | alarms (all months) 371 | unexplained odd 80
+R2 w0.5 | alarms (all months) 278 | unexplained odd 80
+F2 w0.25 even months | alarms (all months) 372 | unexplained odd 80
+R2 w0.25 even months | alarms (all months) 277 | unexplained odd 80
+F2 w0.25 series hold-out | alarms (all months) 370 | unexplained odd 80
+R2 w0.25 series hold-out | alarms (all months) 271 | unexplained odd 80
+F2 w0.25 strict tier | alarms (all months) 370 | unexplained odd 80
+R2 w0.25 strict tier | alarms (all months) 272 | unexplained odd 80
+F2 heavy | alarms (all months) 379 | unexplained odd 80
+R2 heavy | alarms (all months) 299 | unexplained odd 80
+F3 w0.25 | alarms (all months) 371 | unexplained odd 80
+R3 w0.25 | alarms (all months) 280 | unexplained odd 80
