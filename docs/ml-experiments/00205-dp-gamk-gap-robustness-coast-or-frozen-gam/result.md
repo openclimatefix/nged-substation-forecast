@@ -74,15 +74,43 @@ code: ml-experiments/00205-dp-gamk-gap-robustness-coast-or-frozen-gam/
 
 **Planned, nothing has been run.** The design below is fixed before any score is read.
 
-**Question.** In production the convex demand model with a Kalman filter (GAM-K, the Kalman filter on recent errors of [experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md); the method re-implements [de Vilmarest and Wintenberger (2022)](https://arxiv.org/abs/2104.10777)) will sometimes receive no power readings for hours or days. We ask which rule to serve then, and whether a gap length exists beyond which the filter should be dropped.
+**Question.** In production the convex demand model with a Kalman filter (GAM-K, the Kalman filter
+on recent errors of [experiment
+111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md); the method
+re-implements [de Vilmarest and Wintenberger (2022)](https://arxiv.org/abs/2104.10777)) will
+sometimes receive no power readings for hours or days. We ask which rule to serve then, and whether
+a gap length exists beyond which the filter should be dropped.
 
 **Design.**
 
-- **Inputs.** The unfiltered forecast of every run (experiment 136's A2: the T-all fits driven by the calibrated ensemble mean), rebuilt from the stored fits and ensemble arrays as in [experiment 197](../00197-dp-kalman-level-adaptation-retest/result.md), and the filter's residual stream. The full pipeline is the arm D of [experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the filter, the winter night offset, and recipe R (minus 0.75 times the 14-day mean error profile).
-- **Events.** For each substation, one run per 7-day block of origins is chosen at random (seed 205) from the replicate and scored runs, so the events are at least a few days apart and one event's gap hardly touches the next. The same events are used for every gap length.
-- **Gap.** The readings of every hour band are removed for the L hours up to k hours before the event run's data cutoff, with L in {3, 6, 24, 72} and k in {0, 3, 6, 12, 24, 48}. All 24 combinations are scored. Headline contrasts use k = 0, the gap that ends at the cutoff. Larger k measure recovery. Actuals inside a gap are also hidden from recipe R's error profile.
-- **Rules.** (a) Coast: the filter runs on the gapped stream, so the transient decays and the level holds, then the offset and R apply. (b) Coast with widened bands: rule (a)'s quantile offsets from its mean are multiplied by sqrt(1 + v / s^2), where v is the filter's extra predictive variance since the band's last reading (the level's q per day times the days elapsed, plus the transient's stationary variance times 1 - phi^(2 n) for n half-hours elapsed, minus the same at one half-hour) and s is (q95 - q05) / 3.29 of the row. (c) Frozen GAM alone: the unfiltered forecast with a spread refitted on the tuning months, with no filter, offset, or R. Secondary rules: (a0) and (b0) are (a) and (b) with the filter alone, no offset or R. (c2) is the frozen GAM with the offset and R, which keeps the later corrections but drops the filter for the event run.
-- **Scored.** Five decision substations, D5, D10, D11, D14, and D16, with leads 0.5 to 168 hours. Spread tables are fitted on the tuning months, with no gap, and held fixed.
-- **Compute.** CPU only, 4 cores, no new fit; the filter re-runs on a masked stream per (substation, L, k).
+- **Inputs.** The unfiltered forecast of every run (experiment 136's A2: the T-all fits driven by
+  the calibrated ensemble mean), rebuilt from the stored fits and ensemble arrays as in [experiment
+  197](../00197-dp-kalman-level-adaptation-retest/result.md), and the filter's residual stream. The
+  full pipeline is the arm D of [experiment
+  155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the filter, the
+  winter night offset, and recipe R (minus 0.75 times the 14-day mean error profile).
+- **Events.** For each substation, one run per 7-day block of origins is chosen at random (seed 205)
+  from the replicate and scored runs, so the events are at least a few days apart and one event's
+  gap hardly touches the next. The same events are used for every gap length.
+- **Gap.** The readings of every hour band are removed for the L hours up to k hours before the
+  event run's data cutoff, with L in {3, 6, 24, 72} and k in {0, 3, 6, 12, 24, 48}. All 24
+  combinations are scored. Headline contrasts use k = 0, the gap that ends at the cutoff. Larger k
+  measure recovery. Actuals inside a gap are also hidden from recipe R's error profile.
+- **Rules.** (a) Coast: the filter runs on the gapped stream, so the transient decays and the level
+  holds, then the offset and R apply. (b) Coast with widened bands: rule (a)'s quantile offsets from
+  its mean are multiplied by sqrt(1 + v / s^2), where v is the filter's extra predictive variance
+  since the band's last reading (the level's q per day times the days elapsed, plus the transient's
+  stationary variance times 1 - phi^(2 n) for n half-hours elapsed, minus the same at one half-hour)
+  and s is (q95 - q05) / 3.29 of the row. (c) Frozen GAM alone: the unfiltered forecast with a
+  spread refitted on the tuning months, with no filter, offset, or R. Secondary rules: (a0) and (b0)
+  are (a) and (b) with the filter alone, no offset or R. (c2) is the frozen GAM with the offset and
+  R, which keeps the later corrections but drops the filter for the event run.
+- **Scored.** Five decision substations, D5, D10, D11, D14, and D16, with leads 0.5 to 168 hours.
+  Spread tables are fitted on the tuning months, with no gap, and held fixed.
+- **Compute.** CPU only, 4 cores, no new fit; the filter re-runs on a masked stream per (substation,
+  L, k).
 
-Prior advice followed: the Kalman state is the one of experiment 111 with the POOL setting (experiment 136, A2); no faster level is used (experiment 197); recipe R at every lead and no offset on top of R is experiment 155's finding, but this plan keeps arm D, the pipeline that experiment 155 tested, so the offset stays in the gapped pipeline and the comparison stays with the stored arm D.
+Prior advice followed: the Kalman state is the one of experiment 111 with the POOL setting
+(experiment 136, A2); no faster level is used (experiment 197); recipe R at every lead and no offset
+on top of R is experiment 155's finding, but this plan keeps arm D, the pipeline that experiment 155
+tested, so the offset stays in the gapped pipeline and the comparison stays with the stored arm D.
