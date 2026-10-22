@@ -134,9 +134,10 @@ class Table(torch.nn.Module):
             sizes["level_dow_lead"] = N_LEVEL * 7 * 6
         if arm == "T3":
             sizes = {k: v * 2 if k in ERA_SPLIT else v for k, v in sizes.items()}
-        self.terms = torch.nn.ModuleDict({k: torch.nn.Embedding(v, 1) for k, v in sizes.items()})
-        for emb in self.terms.values():
-            torch.nn.init.zeros_(emb.weight)  # ty: ignore[invalid-argument-type]
+        embeddings = {k: torch.nn.Embedding(v, 1) for k, v in sizes.items()}
+        for emb in embeddings.values():
+            torch.nn.init.zeros_(emb.weight)
+        self.terms = torch.nn.ModuleDict(embeddings)
         self.scale = torch.nn.Embedding(6 * 6 * 6, 1)
         torch.nn.init.zeros_(self.scale.weight)
         self.temperature = torch.nn.Parameter(torch.zeros(6, 2))
