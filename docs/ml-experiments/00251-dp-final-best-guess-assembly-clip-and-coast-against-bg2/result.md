@@ -61,7 +61,6 @@ adopted_in: none
 date: 2026-10-22
 ---
 
-
 **Plan, written before any score is read.** The experiment assembles stored forecasts and fits
 nothing. Its question is whether the stack of [experiment
 220](../00220-dp-bg-stage4-assembly-with-drop-one/result.md) (arm D, a network head, and the
