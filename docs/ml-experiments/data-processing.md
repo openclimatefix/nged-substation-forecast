@@ -640,6 +640,14 @@ run from January 2022, and the raw log holds many events too small to matter ([e
 set of [experiment 41](00041-sw2-0a-labeller-gate/result.md)). Applies to experiments, and to
 production once a detector runs there.
 
+**Do not rely on a training mask for switching transfers to improve the convex GAM.** Training
+the 24-month convex GAM with no mask worsened the score by 0.002 points on clean rows and 0.003
+points after a logged transfer, and 476 simulated transfers worsened it by 0.009 points, because the
+hand mask is at most 7% of the training half-hours ([experiment
+212](00212-switching-detector-masks-in-gam-training/result.md)). Applies to experiments and
+production at D5, D10, D11, D14, and D16. Confidence: moderate, with a provisional status until the
+experiment's review is merged.
+
 **Expect D10 to carry unlabelled jumps of 15 to 20 points.** D10's night-time floor rose from 25 to
 45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to 20
 points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and both
