@@ -94,6 +94,45 @@ falling flat top. No weather model is trained. The plant model is the one in `st
 - **Forecast-time repeat.** The best arm repeated with the ECMWF 51-member ensemble mean at 12 to 36
   hour leads, which does exist at forecast time, over the months the ensemble store covers.
 
+## Amendments after the plan review (before any fit)
+
+- **The 0.97 is a point estimate** of the median over farms on fold 1; the interval is reported
+  beside it. Arm 1 on the same rows is the reference, and the 0.93 of experiment 157 is quoted only
+  as background. The fraction uses squared error against a zero baseline, so MAE in MW and in points
+  of capacity is reported beside it, with slices for sunny half-hours (clear-sky irradiance above 650
+  W/m²), hot half-hours (air temperature above the farm's 90th percentile), and the shoulder months
+  (March, April, September, October).
+- **Folds.** Fold 1 tunes on every month before 2025-09 and scores 2025-09 to 2026-08. Fold 2 tunes
+  on months before 2024-09 and scores 2024-09 to 2025-08; it is a replication with less tuning data,
+  not an independent test. A farm needs at least 12 tuning months to enter a fold, so farm E is out
+  of fold 2.
+- **The bootstrap** resamples the 12 scored calendar months with replacement, the same months for
+  all farms at once, 10,000 draws, seed 218. The number of months where arm 2 beats arm 1 is reported
+  too, because 12 blocks give an interval close to the range of the draws.
+- **Arm 3's penalty** is chosen by 5-fold cross-validation over contiguous blocks of whole tuning
+  months. "Cell means" are the weighted means of arm 2's prediction inside each (irradiance,
+  elevation) cell of the hat basis, and the fit is a non-negative least-squares problem on the
+  increments, which is a convex bounded quadratic.
+- **Arm 4** re-searches tilt and azimuth with the heat coefficient fixed at 0, so C3 measures the
+  heat term after refitting. **DC:AC ratio** is the fitted DC scale over the fitted AC limit.
+- **C4** pools tilt, azimuth, and heat from the other five farms (summed tuning error divided by each
+  farm's squared output), and each farm still fits its own scale and clip. It has no gate; a
+  positive value favours a farm's own geometry.
+- **The flat-top test.** For farms C to F, take the range over its mean of the monthly 90th
+  percentile of power over capacity from April to August, on half-hours with clear-sky irradiance
+  above 650 W/m², for the metered series (experiment 183's figure) and for each arm's predictions
+  on the same half-hours, with the actual CAMS irradiance so that cloud acts on both. The gap is the
+  absolute difference of the two ranges. The heat term explains the fall when arm 2's mean gap over
+  C to F is at least 2 points smaller than arm 4's, the soft clip when it is at least 2 points
+  smaller than the no-clip ablation's, both when both hold, and neither otherwise.
+- **Deliverables also include** the fitted parameters per farm and fold (tilt, azimuth, DC:AC ratio,
+  heat coefficient, clip sharpness fixed at 6) for the farm page.
+- **Weather names.** Fit: CAMS irradiance (about 2 days late) and ERA5 temperature (about 5 days
+  late), neither available at forecast time. Forecast-time repeat: ECMWF ensemble mean irradiance and
+  temperature at 12 to 36 hour leads, available at forecast time, for the arm with the highest fold-1
+  median.
+- **Schedule.** One CPU job on 4 cores, no GPU; the grid search is exhaustive, with no seeds.
+
 ## Prior advice followed
 
 - Judge a flat level at the 99th percentile as well as the 90th, because the 90th is exposed to cloud
