@@ -16,15 +16,15 @@ size: >-
   path: not touched. Degradation rule: not touched (experiment 205's coast-and-widen rule is
   reported from experiment 205's stored scores, not changed). Designs: more than one is defensible
   for adding the D5 clip to a stack whose network head was trained without it; this plan
-  pre-registers two (with and without the head) and picks the winner by a stated rule. Callers:
-  this folder's scripts, which copy experiments 220 and 228 and call reviewed `studies.*` modules
-  without changing them. No refits.
+  pre-registers two (with and without the head) and picks the winner by a stated rule. Callers: this
+  folder's scripts, which copy experiments 220 and 228 and call reviewed `studies.*` modules without
+  changing them. No refits.
 hypothesis: >-
-  The full best-guess stack of experiment 220 (arm D, the network head, and the two-number solar
-  summary) beats BG2, the manual heuristic, climatology, and a weak production-style XGBoost model
-  over the scored year of 2025-07 to 2026-06. Adding the hand-set 60% clip at D5 lowers the D5 error
-  on sunny half-hours when the network head is absent, and adds nothing measurable when the head is
-  present, because experiment 232 found the head cancels most of the clip's gain.
+  The full best-guess stack of experiment 220 (arm D, the neural-network head, and the two-number
+  solar summary) beats BG2, the manual heuristic, climatology, and a weak production-style XGBoost
+  model over the scored year of 2025-07 to 2026-06. Adding the hand-set 60% clip at D5 lowers the D5
+  error on sunny half-hours when the neural-network head is absent, and adds nothing measurable when
+  the head is present, because experiment 232 found the head cancels most of the clip's gain.
 prediction: >-
   Written before any score is read; each can fail. P1 and P4's BG2 clause reproduce experiment 228
   and are a replication check; the contest between arms is the D5 sunny-daylight cut. (P1) The gate
@@ -46,36 +46,36 @@ decision_rule: >-
   keys of every arm match exactly. The winning arm is arm 2 if its D5 sunny-daylight quantile score
   is at least 0.05 points below arm 1's with the 95% interval excluding zero; otherwise arm 1 (and
   arm 2b is reported as a post hoc variant). `supported` needs the winning arm to beat BG2 on the
-  six-substation quantile score with the month-resampled 95% interval excluding zero and to beat
-  the manual heuristic on all four headline metrics. `partly supported` needs the BG2 contrast but
-  not all four heuristic contrasts. `not supported` if the BG2 interval includes zero. The threshold
-  is zero because every part is already built and this is a final scoring, not a port decision.
+  six-substation quantile score with the month-resampled 95% interval excluding zero and to beat the
+  manual heuristic on all four headline metrics. `partly supported` needs the BG2 contrast but not
+  all four heuristic contrasts. `not supported` if the BG2 interval includes zero. The threshold is
+  zero because every part is already built and this is a final scoring, not a port decision.
 benchmark: >-
   BG2 (experiment 87 p_s6_bg2), the manual heuristic, climatology, and the weak production-style
   XGBoost model (experiment 87 ref_xgboost_baseline), on the rows of experiment 228.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Mean absolute error of the median, CRPS (twice the mean pinball loss over 11 quantiles, in points
-  of effective capacity), tail-weighted CRPS at the 95th percentile, and the scaled-limit curtailment
-  cost; coverage and pinball loss at q01, q05, q95, q99.
+  of effective capacity), tail-weighted CRPS at the 95th percentile, and the scaled-limit
+  curtailment cost; coverage and pinball loss at q01, q05, q95, q99.
 code: ml-experiments/00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/
 verdict: supported
 best_arm: >-
-  Arm 1 (experiment 220's A+H+S: arm D, the network head, and the two-number solar summary), 2.617
-  points on the five decision substations against BG2's 2.781; six-substation difference from BG2
-  -0.136 (95% interval -0.277 to -0.005), 9 of 12 months
+  Arm 1 (experiment 220's A+H+S: arm D, the neural-network head, and the two-number solar summary),
+  2.617 points on the five decision substations against BG2's 2.781; six-substation difference from
+  BG2 -0.136 (95% interval -0.277 to -0.005), 9 of 12 months
 headline: >-
   Arm 1 beats BG2 by 0.136 points and the manual heuristic by 0.818 points (interval -1.080 to
   -0.574) of quantile score, and beats the manual heuristic on all four headline metrics. The D5
-  clip adds nothing once the network head is in, and lowers D5's sunny-daylight error by 0.103 MW
-  (interval 0.033 to 0.170) when the head is left out at D5.
+  clip adds nothing once the neural-network head is in, and lowers D5's sunny-daylight error by
+  0.103 MW (interval 0.033 to 0.170) when the head is left out at D5.
 lessons:
   - >-
     The stack's gain over BG2 is a November to March gain (-0.435 points in December to February);
     in April to June it is 0.05 to 0.22 points worse than BG2.
   - >-
     At D5 on sunny daylight half-hours the stack is still 1.30 points worse than BG2 (0.54 with the
-    clip and no head), so the solar term at D5 is the largest remaining loss.
+    clip and no head), so the solar term at D5 is the largest loss among the cuts we scored.
   - >-
     The weak production-style XGBoost model stored by experiment 87 has quantile bands 14 times
     narrower than BG2's (q99 minus q01 of 2.6 against 36.6 points), so only its median error is a
@@ -87,45 +87,52 @@ take_home_message: >-
   Over the one year we can score, the full best-guess demand forecast (arm D, a small neural network
   that corrects its median, and a two-number summary of the ensemble's solar response) beats BG2 by
   0.136 points of quantile score (5%; lower is better) and the manual heuristic by 0.818 points, and
-  it beats the manual heuristic on every headline metric we scored, including curtailment cost.
-  The gain over BG2 is a winter gain: the stack is level with BG2 in summer and worse in April to
-  June, and at D5 on sunny hours it is clearly worse than BG2. Adding the 60% solar clip at D5 helps
-  only when the network head is left out at D5, so the next work is the solar term at D5, not
+  it beats the manual heuristic on every headline metric we scored, including curtailment cost. The
+  gain over BG2 is a winter gain: the stack is level with BG2 in summer and worse in April to June,
+  and at D5 on sunny hours it is clearly worse than BG2. Adding the 60% solar clip at D5 helps only
+  when the neural-network head is left out at D5, so the next work is the solar term at D5, not
   another stacked part.
 advice:
   - >-
-    Leave the network head out at D5 when the 60% clip is on: the clip with the head scores 0.038
-    points worse on D5 sunny daylight than the stack alone, and the clip without it scores 0.76
-    points better (C2, C3).
+    Leave the neural-network head out at D5 when the 60% clip is on: the clip with the head scores
+    0.038 points worse on D5 sunny daylight than the stack alone, and the clip without it scores
+    0.76 points better (arm 2 and arm 2b minus arm 1, D5 clip bullet under Results).
   - >-
-    Judge the stack on April to June separately before any release: it is 0.05 to 0.22 points
-    worse than BG2 in those months (figure 3).
+    Judge the stack on April to June separately before any release: it is 0.05 to 0.22 points worse
+    than BG2 in those months (figure 3).
   - >-
     Score the weak production-style XGBoost model on its median error only, because its quantile
-    bands are far too narrow (q95 coverage 0.52) (Checks).
+    bands are far too narrow (q95 coverage 0.52; weak model bullet under Results).
 date: 2026-10-22
 ---
 
-**The full best-guess demand forecast beats BG2 and the manual heuristic over the scored year, but
-its gain is a winter gain, and at D5 on sunny hours it is still clearly worse than BG2.** BG2 is the
-production-style XGBoost forecast with the best settings found so far, and the manual heuristic is
-the rule NGED uses today. D5, D9, D10, D11, D14, and D16 are anonymised Primary substations, which
+**The full best-guess demand forecast has a lower error than BG2 and the manual heuristic over
+2025-07-02 to 2026-06-30, but its gain comes from winter, and at substation D5 on sunny half-hours
+it is still clearly worse than BG2.** BG2 is an XGBoost forecast configured like the production
+service, with the settings that scored best in [experiment
+87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md). The manual heuristic is
+the rule NGED uses today. D5, D9, D10, D11, D14, and D16 are anonymised primary substations, which
 feed homes and businesses. We took the forecast of [experiment
-220](../00220-dp-bg-stage4-assembly-with-drop-one/result.md) (arm 1: the convex demand model with a
-Kalman filter, a small neural network that corrects its median, and a mean-and-standard-deviation
-summary of the 51 ensemble weather members' solar response) and added the 60% solar clip at D5 from
-[experiment 180](../00180-dp-sunny-daylight-fix-d5-solar-shape/result.md). We scored every forecast
-on the same 561,207 rows from 2025-07-02 to 2026-06-30. A quantile score (also our CRPS, the
-continuous ranked probability score) is twice the mean pinball loss over 11 quantiles, in points of
-the substation's effective capacity, and lower is better.
+220](../00220-dp-bg-stage4-assembly-with-drop-one/result.md) (arm 1). Arm D is the convex demand
+model with a Kalman filter. Arm 1 is arm D plus a small neural network that corrects its median (the
+neural-network head) and a mean-and-standard-deviation summary of the 51 ensemble weather members'
+solar response. We called arm 1 "the stack". We then added the 60% solar clip at D5 from [experiment
+180](../00180-dp-sunny-daylight-fix-d5-solar-shape/result.md). The clip caps the modelled solar
+output that the forecast subtracts from demand at 60% of the solar capacity held for D5. We scored
+every forecast on the same 561,207 rows from 2025-07-02 to 2026-06-30. A row is one forecast of one
+substation's half-hour from one forecast run, at one lead time. A quantile score (also our CRPS, the
+continuous ranked probability score) is twice the mean pinball loss over 11 quantiles (q01, q05,
+q10, q25, q40, q50, q60, q75, q90, q95, q99), in points, meaning percentage points of the
+substation's effective capacity (its rated demand). Lower is better.
 
-The clip arms are an approximation. The shift includes the clip's effect on the filter state and the
-fit, so it is non-zero at night as well as at midday, and the solar summary and the network head
-were built on the unclipped solar term. Arm 2 adds the clip's per-row shift in the mean forecast,
-measured on arm D alone, to every quantile of arm 1 at D5. Arm 2b adds it to the stack without the
-head, and arm 2c (post hoc) uses arm 2b at D5 and arm 1 at the other five substations. [Experiment
-237](../00237-dp-two-number-solar-summary-with-clip/result.md) scored the solar summary with the
-clip applied inside the member pass. The coast-and-widen rule of [experiment
+The clip arms are an approximation, because we added the clip's per-row shift in the mean forecast
+to stored forecasts instead of refitting them. That shift includes the clip's effect on the filter
+state and the fit, so it is non-zero at night as well as at midday, and the solar summary and the
+network head were built on the unclipped solar term. Arm 2 adds the clip's per-row shift in the mean
+forecast, measured on arm D alone, to every quantile of arm 1 at D5. Arm 2b adds it to the stack
+without the head, and arm 2c (post hoc) uses arm 2b at D5 and arm 1 at the other five substations.
+[Experiment 237](../00237-dp-two-number-solar-summary-with-clip/result.md) scored the solar summary
+with the clip applied inside the member pass. The coast-and-widen rule of [experiment
 205](../00205-dp-gamk-gap-robustness-coast-or-frozen-gam/result.md) changes only rows after a
 reading gap, so on the scored year's rows arm 3 equals arm 2 and the rule is reported from
 experiment 205's injected gaps.
@@ -136,19 +143,19 @@ experiment 205's injected gaps.
 
 ![Figure 3. Quantile score minus BG2, by month](figure_3_by_month_against_bg2.svg)
 
-![Figure 4. The D5 clip with and without the network head](figure_4_d5_clip.svg)
+![Figure 4. The D5 clip with and without the neural-network head](figure_4_d5_clip.svg)
 
 ![Figure 5. Tail coverage by hour band](figure_5_tail_coverage_by_hour.svg)
 
 ![Figure 6. Curtailment saving against the manual heuristic](figure_6_curtailment_saving.svg)
 
-**Verdict `supported`.** The gate passed: arm A scored 2.7524 (required 2.7519 within 0.005), BG2
-2.7809 (2.780), and arm 1 2.6167 (2.617) on the five decision substations. Arm 1 is the
-pre-registered winner, because arm 2 was 0.038 points worse than arm 1 on D5 sunny daylight
-(interval -0.169 to +0.274), not 0.05 points better. It beats BG2 on the six-substation quantile
-score by 0.136 points (95% interval -0.277 to -0.005) and beats the manual heuristic on all four
-headline metrics. The upper bound of the BG2 interval is only 0.005 below zero, so the margin is
-thin.
+**Verdict `supported`.** The gate passed on the five decision substations. Arm A scored 2.7524
+against the required 2.7519 ± 0.005, BG2 2.7809 against 2.780 ± 0.005, and arm 1 2.6167 against
+2.617 ± 0.005. Arm 1 is the pre-registered winner, because arm 2 was 0.038 points worse than arm 1
+on D5 sunny daylight (interval -0.169 to +0.274), not 0.05 points better. It beats BG2 on the
+six-substation quantile score by 0.136 points (95% interval -0.277 to -0.005). It also beats the
+manual heuristic on all four headline metrics. The upper bound of the BG2 interval is only 0.005
+below zero, so the margin is thin.
 
 ## Results
 
@@ -185,9 +192,9 @@ thin.
   (December 2025 and January 2026), so the interval is not informative. April to June are positive
   for arm 1 (+0.054 to +0.220). Winter is -0.425 (-0.586 to -0.259), 12 to 36 hours ahead -0.192,
   and daylight -0.200.
-- **Cold nights below 2 C and bank holidays (arm 2c minus BG2):** -0.711 (-2.825 to +0.828) on 3
-  months and -0.734 (-1.778 to -0.021). On cold nights the q95 coverage is 0.965 for arm 2c, 0.781
-  for BG2, and 0.538 for the manual heuristic.
+- **Cold nights below 2 C and bank holidays (arm 2c minus BG2):** cold nights -0.711 (-2.825 to
+  +0.828), over 3 months; bank holidays -0.734 (-1.778 to -0.021). On cold nights the q95 coverage
+  is 0.965 for arm 2c, 0.781 for BG2, and 0.538 for the manual heuristic.
 - **Tails, six substations (coverage; pinball loss, arm 2c against BG2):** q01 0.013; 0.172 against
   0.010; 0.211. q05 0.048; 0.621 against 0.041; 0.623. q95 0.950; 0.696 against 0.944; 0.751. q99
   0.983; 0.213 against 0.983; 0.253. By UTC hour band the q95 coverage of arm 1 runs from 0.935
@@ -201,8 +208,8 @@ thin.
   of 3, 6, 24, and 72 hours score 2.759, 2.788, 2.857, and 2.948 with coasting and widened bands,
   against 2.747 with no gap and 3.198 for the frozen model alone, so coasting is 0.25 to 0.44 below
   the frozen model alone. At 72 hours coasting without widening (2.953) and with it (2.948) are not
-  better than the frozen model with its offset and recipe   R (2.940). We did not measure the share
-  of scored rows that follow a natural reading gap.
+  better than the frozen model with its offset and recipe R (2.940). We did not measure the share of
+  scored rows that follow a natural reading gap.
 - **Weak production-style XGBoost model (experiment 87's `ref_xgboost_baseline`):** its median error
   (6.206) sits level with the manual heuristic's (6.034), but its q01 to q99 band is 2.6 points wide
   against BG2's 36.6, and its q01 and q95 coverages are 0.41 and 0.52. Its quantile score of 5.697
@@ -214,10 +221,9 @@ thin.
   available at forecast time. No downloads.
 - **Post hoc:** arm 2b, arm 2c, and the weak XGBoost comparison; every cut other than the planned D5
   sunny-daylight rows.
-- **What to try next:** the solar term at D5 on sunny hours (a learned export cap and a monotone
-  network, experiments 247 and 250, were not adopted); a retrained head on clipped residuals, which
-  would replace the shift approximation; and a second scored year once BG2 is rerun for earlier
-  months.
+- **What to try next:** the solar term at D5 on sunny hours; a retrained head on clipped residuals,
+  which would replace the shift approximation; and A second scored year would need BG2 to be rerun
+  for earlier months.
 
 ## Checks
 
@@ -229,12 +235,14 @@ thin.
   trigger 3 did not fire. For arm 1 the mean's absolute error is 5.31, 4.21, 3.69, 4.48, 6.01, and
   4.21 at D10, D11, D14, D16, D5, and D9, against 5.36, 4.20, 3.53, 4.03, 5.83, and 4.25 for the
   median.
-- **Triggers:** none of 1, 3, 6 fired (the gate passed, and the contrasts agree in sign). Trigger 4
-  fired in part: leaving one substation out keeps arm 1 minus BG2 negative every time (-0.110 to
-  -0.164), but the 95% interval then spans zero when D11, D14, or D16 is left out, so the gain over
-  BG2 depends on all six substations and its upper bound is only -0.005. A fresh Sonnet agent
-  re-derived the headline contrasts from the stored arrays with its own code and found no difference
-  above 0.005 points. Trigger 5 fired: arm 1, which contains no clip, beats arm 2 at D5 (+0.075,
-  +0.034 to +0.121). Experiment 232 predicted that, and arm 2b tests the explanation. Trigger 2 did
-  not fire, because the plan's P2 predicted that result. Trigger 7 is open: later work depends on
-  the winter gain, which one year of data supports.
+- **Triggers (the seven audit triggers of the experiment guide):** the failed control (1), the
+  median-versus-mean disagreement (3), and the interval-width mismatch (6) did not fire; the gate
+  passed and the contrasts agree in sign. Trigger 4 fired in part: leaving one substation out keeps
+  arm 1 minus BG2 negative every time (-0.110 to -0.164), but the 95% interval then spans zero when
+  D11, D14, or D16 is left out, so the gain over BG2 depends on all six substations and its upper
+  bound is only -0.005. A fresh Sonnet agent re-derived the headline contrasts from the stored
+  arrays with its own code and found no difference above 0.005 points. Trigger 5 fired: arm 1, which
+  contains no clip, beats arm 2 at D5 (+0.075, +0.034 to +0.121). [Experiment
+  232](../00232-dp-pv-clip-with-correction-heads/result.md) predicted that, and arm 2b tests the
+  explanation. Trigger 2 did not fire, because the plan's P2 predicted that result. Trigger 7 is
+  open: later work depends on the winter gain, which one year of data supports.
