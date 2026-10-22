@@ -7,7 +7,9 @@ theme: differentiable-physics-forecast-engine
 also_relevant_to: [calibration-and-uncertainty]
 status: done
 size: >-
-  simple. Stored: private files under data/ml-experiments/00209-dp-pinball-table-vs-network-head-on-arm-d/
+  simple (pre-registered arms T0, T1, T2; the later arms T3 and T4 are post hoc). Stored: private
+  files under
+  data/ml-experiments/00209-dp-pinball-table-vs-network-head-on-arm-d/
   only. Serving path: not touched. Degradation rule: not touched. Designs: one table design is
   pre-registered and a second arm adds one term. Callers: this folder's scripts, which read the
   stored rows of experiments 200 and 201. No new data and no new method (a table fitted by gradient
@@ -50,46 +52,55 @@ production_status: not-for-production
 adopted_in: none
 headline: >-
   No binned table gets within 0.02 points of the network without error inputs: the plain table is
-  0.065 points worse (99% interval 0.042 to 0.086), and five variants all stay within 0.006 of it.
+  0.065 points worse (99% interval 0.042 to 0.086), and four variants stay within 0.006 of it.
 take_home_message: >-
-  A table of binned calendar, lead, and forecast-level corrections to arm D gains only 0.03 to 0.04
-  points, against 0.10 for a neural network given the same inputs and no recent errors. So the
-  network is learning something a binned table cannot: a smooth dependence on the continuous inputs,
-  or a combination of them. A temperature-extremes term adds under 0.001 points.
+  A lookup table of corrections to our best day-ahead forecast lowers its error score by only 0.03
+  to 0.04 points, against 0.10 points for a neural network given similar inputs and no recent
+  errors. This table design therefore does not match the network, and the cause is not yet isolated.
+  A temperature-extremes term lowers the score by under 0.001 points.
 lessons:
   - >-
     Splitting the table by weather era, or adding forecast level by time of day by era and by weekday
-    by lead band, changed the score by under 0.003 points, so low-order binned interactions are not
-    what the network learned.
+    by lead band, changed the score by under 0.003 points, so those two interactions are not what the
+    network learned.
   - >-
     A temperature-extremes term (a median lift below -3 degrees Celsius and above 24 degrees
     Celsius) lowered the table's score by 0.0009 points (interval -0.0022 to -0.0001), too small to
     port.
 advice:
   - >-
-    Do not replace the network with a binned table of arm D's recalibration; it recovers about a
-    third of the gain (T0, T3, T4).
+    Do not replace the network with a binned table of arm D's recalibration; the tables recover a
+    third to 40% of the network's gain (T0 to T4 minus arm D).
   - >-
     Find what the network without error inputs learns before building more tables: ablate its
-    continuous inputs one at a time or fit a gradient-boosted model on the same inputs (this
-    experiment, T0 minus network).
+    continuous inputs one at a time or fit a gradient-boosted model on the same inputs (T0 minus the
+    network without error inputs).
   - >-
     Leave the temperature-extremes term out of the demand model on this evidence; the gain is under
     0.001 points (T1 minus T0).
 code: ml-experiments/00209-dp-pinball-table-vs-network-head-on-arm-d/
 ---
 
-**Take-home: a table of binned corrections to arm D gains 0.03 to 0.04 points, a neural network given
-the same inputs but no recent errors gains 0.10, so the network learns something a binned table
-cannot.** Experiment 200 found that a network head beats arm D, that a copy given no past errors gets
-most of that gain, and that a table came within 0.01 to 0.02 points of the network when both
-trained on one year. This experiment asked whether a table still matches the network when both train
-on 2020 onward. It does not. The table is 0.065 points worse than the network without error inputs
-(99% interval 0.042 to 0.086), and five table variants stay within 0.006 points of one another. A
-temperature-extremes term, the lead from experiment 201, adds under 0.001 points. The verdict is
-`not supported`: the pre-registered rule needs the table to come within 0.02 points of the network.
+**Take-home: lookup tables of corrections to arm D lower its score by only 0.03 to 0.04 points,
+while a neural network given similar inputs and no recent errors lowers it by 0.10, so this table
+design does not match the network and the cause is not yet isolated.** Arm D is our best day-ahead
+demand forecast, from [experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md).
+In [experiment 200](../00200-dp-pooled-correction-head-on-kalman-state/result.md) a neural network
+learned corrections to arm D's median and uncertainty bands, and a copy of it that was given no
+recent forecast errors (the "network without error inputs") still gained 0.10 points. A lookup table
+had come within 0.01 to 0.02 points of that copy when both trained on one year of data. We asked
+whether a table still matches the network when both train on every year from 2020 on, and whether a
+term for temperature extremes (found in experiment 201) helps the table.
 
-![Contrasts](figure_1_tables_and_networks.svg)
+**Answer: no table matches the network, and the temperature term helps by under 0.001 points.** All
+scores are quantile scores in points of effective capacity, where a lower score is better. On the
+five decision substations in 2025-07-02 to 2026-06-29, the plain table (T0) scores 0.065 points worse
+than the network without error inputs (T0 minus network; 99% interval over resampled months 0.042 to
+0.086). Four table variants (T1 to T4) stay within 0.006 points of T0. The verdict is `not supported`,
+because the rule fixed before the run needed the table to come within 0.02 points of the network.
+
+![Each arm's score minus arm D's, with 99% intervals. Orange are networks and blue are tables; all
+tables sit near -0.04 and the network without error inputs near -0.10.](figure_1_tables_and_networks.svg)
 
 ## Results
 
@@ -101,7 +112,8 @@ temperature-extremes term, the lead from experiment 201, adds under 0.001 points
   validation block, and scored rows (2025-07-02 to 2026-06-29, 15.5 to 39 hours ahead, outside
   switching events) are those of [experiment
   200](../00200-dp-pooled-correction-head-on-kalman-state/result.md). The network scores are
-  experiment 200's stored rows. Three seeds are averaged. The table fits ran on CPU.
+  experiment 200's stored rows. The table fits ran on CPU, with the median shifts and log-scales
+  averaged over three seeds. The network rows are experiment 200's stored rows.
 - **Arms.** T0: median shift by site and half-hour, site and weekday, site and lead band, half-hour
   and weekday, site by arm D's forecast level (12 bins) by weather era, and the ensemble-era flag.
   T1: T0 plus a temperature-extremes term. T2: T0 without the forecast level by era term. T3 and T4
@@ -113,7 +125,7 @@ temperature-extremes term, the lead from experiment 201, adds under 0.001 points
 - **Contrasts against arm D (99% month-resampled intervals).** T0 -0.035 (-0.058 to -0.014), T1
   -0.036 (-0.060 to -0.015), T2 -0.041 (-0.061 to -0.022), T3 -0.036 (-0.057 to -0.014), T4 -0.037
   (-0.062 to -0.015), network without error inputs -0.100 (-0.140 to -0.064), network with error
-  inputs -0.125 (-0.206 to -0.061).
+  inputs -0.125 (-0.207 to -0.060).
 - **Decision contrasts.** T0 minus network without error inputs +0.065 (+0.042 to +0.086). T0 minus
   network with error inputs +0.090 (+0.038 to +0.171). T1 minus T0 -0.0009 (-0.0022 to -0.0001). T2
   minus T0 -0.006 (-0.014 to +0.001), so the forecast level by era term does not help the table. T3
@@ -123,15 +135,27 @@ temperature-extremes term, the lead from experiment 201, adds under 0.001 points
 - **Per substation, T0 minus arm D.** D5 -0.056, D10 +0.026, D11 +0.014, D14 -0.099, D16 -0.063, D9
   +0.018. Leaving one decision substation out keeps T0 minus the network without error inputs between
   +0.039 and +0.077.
-- **Checks.** Triggers fired: 2 (the result contradicts the pre-registered prediction and the
-  experiment 200 audit's reading, and the post hoc arms T3 and T4 tested two explanations without
-  closing the gap). No audit was run, by the manager's instruction. The rows align with experiment
-  200's stored rows (arm D losses match within 0.001).
-- **Caveats.** The network has continuous inputs (lead, the sine and cosine of the half-hour,
-  arm D's forecast) where the table has bins, and a spread head. The experiment does not say which of
+- **Pre-registered predictions.** The table within 0.02 points of the network failed (+0.065). The
+  temperature term lowering the score by 0.01 to 0.04 points failed (0.0009). The decision rule's
+  gain condition for the temperature term (an interval wholly below zero) is met, but at 0.0009
+  points the term is not worth porting. The prediction that an additive table without the era term
+  scores worse than arm D was not tested as written: T2 drops only the forecast level by era term
+  and keeps the era flag, and it beats arm D by 0.041.
+- **Caveats.** The network has continuous inputs (lead, the sine and cosine of the half-hour, arm
+  D's forecast) where the table has bins, and a spread head. The experiment does not say which of
   these the network needs. The table's spread scale is a lookup by site, lead band, and six-hour
-  block. The temperature term is a linear hinge per substation, and the driver temperature is the
+  block. The temperature term is a linear hinge per substation. The driver temperature is the
   ensemble mean in the ensemble era and past weather before it.
+
+## Checks
+
+- **Median minus mean forecast per site and the error of the median forecast** were not computed:
+  the stored rows hold quantile scores only, and every table shifts the median directly. The
+  contrasts rest on the quantile score alone.
+- **Triggers fired:** trigger 2, because the result contradicts the pre-registered prediction and
+  the reading of experiment 200's audit. The post hoc arms T3 and T4 tested two explanations and did
+  not close the gap. The ML manager instructed that no audit run for this experiment.
+- **Row alignment:** the rows match experiment 200's stored rows (arm D losses agree within 0.001).
 
 ## What to try next
 
