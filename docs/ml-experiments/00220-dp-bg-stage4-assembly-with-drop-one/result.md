@@ -177,3 +177,35 @@ otherwise the page says it was not scored.
 The median forecast minus the mean forecast per site, the error of the mean beside every quantile
 score contrast, and which of the seven audit triggers fired. Triggers 3 and 5 are the likely ones:
 A+H shifts the median away from the mean, and H-own is a different band construction.
+
+## Amendments after the plan review (before any contrast is read)
+
+- **Prediction 1 needs both clauses.** C1 at most -0.10 with its 99% interval below zero, and a
+  stacking ratio of at least 0.85. The ratio gets a month-resampled interval. If either single
+  gain (A+H or A+S) is under 0.02 points, the ratio is reported as undefined and only the
+  interaction decides. A ratio above 1.15 is reported as super-additive, not as a quiet pass.
+  Leads 0.5 to 168 hours at the five decision substations decide prediction 1; the 15.5 to 39
+  hour rows are descriptive. If prediction 1 fails, the write-up opens with the pairwise
+  interactions and the drop-one differences.
+- **`delta` re-centres only.** A+H adds `delta` to all 11 quantiles and keeps A's offsets. The
+  write-up reports A+H coverage at q05 and q95 on all rows, cold nights, and daylight. A refit of
+  the offsets is not run unless A+H's coverage is off by more than 0.02.
+- **Frozen-network bias.** `delta` was learned on arm D, which contains recipe R and the offset, so
+  the frozen-network rows understate the cost of removing R or the offset. Prediction 3 is
+  therefore judged on both versions (with and without the network) and a pass on the frozen
+  version alone is weak evidence.
+- **Quantile order.** Every arm is sorted per row after construction; the number of rows that
+  needed it is reported.
+- **Self-consistency gate 6.** A+H+S built directly (R2 plus `delta`) equals A plus (R2 minus A)
+  plus `delta`; the two are compared to 1e-6.
+- **Row counts and keys.** Joins use `(site, run, valid_time)` with a one-to-one check; row counts
+  after each join are in the gates file. Every arm covers the same rows.
+- **Tables.** One tail-calibration table per arm (q01, q05, q95, q99 coverage and pinball) on all
+  rows, cold nights, and daylight. Cold nights are experiment 169's definition, which is
+  experiment 160's and 164's (ERA5 daily mean below 2 °C, November to March, night and evening).
+- **Gap arm.** Sorted after the addition, with the gap-row count per gap length and the fraction of
+  rows rearranged; it cannot show any interaction between a gap and the network or solar summary.
+- **Citations and the unused network.** The experiment also builds on
+  [experiment 187](../00187-dp-ens-members-in-stack/result.md) and [experiment
+  170](../00170-dp-bg-stage3-drift-and-holiday-scoring/result.md). Experiment 211's blind reference
+  network is not used. The replicate year is dropped for every arm.
