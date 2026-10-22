@@ -50,43 +50,55 @@ headline: >-
   trained on 2020 onward, but a head given no error inputs gets 0.054 and 0.100 of that.
 take_home_message: >-
   A small neural network trained on arm D's own past errors lowers the day-ahead score by 0.07 to 0.12
-  points at five substations, but a copy that cannot see any recent error gets most of that gain. The
-  gain comes from correcting how arm D's error depends on its own forecast level and the calendar, not
-  from reading recent errors, and a pinball-loss table matches the network on one year of data.
+  points at five substations, but a copy that sees no recent error gets most of that gain. The gain
+  comes from correcting how arm D's error depends on its forecast level and the calendar, and a
+  pinball-loss table comes within 0.01 to 0.02 points of the network on one year of data.
 lessons:
   - >-
     Reading recent errors and the Kalman state added -0.017 points (one year) and -0.025 points (2020
     onward) beyond a head with those inputs zeroed; both intervals include zero.
   - >-
-    Four times the training rows lifted the headline gain from 0.071 to 0.125 points and every
-    substation gained, so the pooled head does learn something; the gate still marginally failed.
+    Training on the 2020-onward rows (4.7 times as many) lifted the headline gain from 0.071 to 0.125
+    points and every substation gained, so the pooled head does learn something; the gate still marginally failed.
 advice:
   - >-
-    Test a plain calendar, lead, and substation recalibration of arm D's median before another neural
-    error corrector (blind-head control, C2).
+    Fit a pinball-loss table with a forecast-level by era term to all years before trusting a neural
+    error corrector; it decides whether a network is needed at all (audit, blind-head control C2).
   - >-
     Give any learned corrector a same-weekday error input; without it a Saturday-evening shift is not
     recovered (gate: -1.5% against 21%).
   - >-
     Train a learned corrector on the 2020-onward past-weather rows as well as the ensemble year; it
-    doubled the gain over one year (C1, stage 3).
+    nearly doubled the gain over one year (C1, stage 3).
 code: ml-experiments/00200-dp-pooled-correction-head-on-kalman-state/
 ---
 
 **Take-home: the network's gain over arm D comes mainly from correcting how arm D's error depends on
-its own forecast level and on the calendar, and only a small part from reading recent errors.** Arm
-D is our convex demand model with a Kalman filter (a method that updates a forecast from its recent
-errors), the night offset, and recipe R (subtract 0.75 times the mean error of the last 14 days). We
-trained one network, shared by 6 substations, to correct arm D's median and rescale its spread.
-Trained on 2020 onward it lowers the day-ahead score by 0.125 points (99% interval 0.060 to 0.209).
-A copy that cannot see any error or Kalman state gets 0.100, so reading errors adds only 0.025
-(interval -0.029 to +0.106, including zero). An audit found no leakage. It also found that on the
-same one year of ensemble rows, a table fitted with the pinball loss gets 0.038 and the blind network
-0.047 to 0.057, so a network is not needed there. The extra gain from 2020-onward training needs
-arm D's forecast level and an ensemble-era flag together, and an additive table fitted to all years
-is worse than arm D. This is a weaker test than the brief planned: 6 substations, not 16 Primaries,
-and no weather input. The verdict is `partly supported`: the headline contrast passes its rule, the
-known-answer gate marginally fails (29% against 30%), and reading recent errors is not what helps.
+its own forecast level and the calendar, and reading recent errors adds little that we can detect.**
+Arm D is the best forecast of
+[experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): a convex demand model, a Kalman filter (a method that updates a forecast from its recent errors), a
+winter night offset, and recipe R (subtract 0.75 times the mean error of the last 14 days). We asked
+whether a small neural network, trained on many substations at once, can correct arm D better than
+the filter and recipe R do. This extends [experiment
+142](../00142-differentiable-physics-sequence-model-on-gam-k-residuals/result.md), whose network
+failed its test for lack of rows. We trained one network on 6 substations, scored it on 5 of them
+(D5, D10, D11, D14, D16) in the year from 2025-07-02, and compared it with a copy that was given no
+past errors and no Kalman state (the "blind head"). The result is `partly supported`. The network
+beats arm D, the blind head gets most of that gain, and a table without a network comes within 0.01
+to 0.02 points of the blind head when both train on one year.
+
+**The numbers.** Scores are quantile scores (twice the mean pinball loss over 11 quantiles) in points
+of effective capacity, at 15.5 to 39 hours ahead, and a lower score is better. Trained on 2020
+onward, the network scores 0.125 points lower than arm D (99% interval 0.060 to 0.209 points lower)
+and the blind head 0.100 lower, so reading errors adds 0.025 (head minus blind head -0.025, interval
+-0.106 to +0.029, which includes zero). Trained on the ensemble-weather year only, the network is
+0.071 lower, the blind head 0.054 lower, and a table fitted with the pinball loss 0.038 lower. An
+Opus audit found no leakage. The extra gain from 2020-onward training needs arm D's forecast level
+and an ensemble-era flag together. The known-answer gate marginally failed (29% against 30%), and
+under the pre-registered rule that removes the neural corrector from the queue. We keep the
+verdict `partly supported` because the gate failure is within the seed range (22% to 34%) and the
+audit explains it. This is a weaker test than the brief planned: 6 substations, not 16 Primary
+substations, and no weather input.
 
 ## Figures
 
@@ -98,6 +110,8 @@ known-answer gate marginally fails (29% against 30%), and reading recent errors 
 
 ## Results
 
+- **The head is compared with arm D, which already contains recipe R.** Its contrast stands in for
+  the pre-registered contrast with recipe R.
 - **Method.** One network (two hidden layers of 128 units, a 4-dimensional substation embedding, a
   linear skip) trained with the pinball loss at the 11 quantiles ([Koenker and Bassett
   (1978)](https://doi.org/10.2307/1913643)) on arm D's rows at leads 12 to 48 hours, following the
@@ -132,7 +146,7 @@ known-answer gate marginally fails (29% against 30%), and reading recent errors 
   worse than arm D (interval -0.001 to +0.096). Fitted to the ensemble year only it scores -0.030
   (interval -0.053 to -0.007). The audit refitted the table with the pinball loss on the same
   ensemble year and got -0.038, against -0.047 to -0.057 for the blind network, so the ridge's
-  smaller gain came from its squared-error fit. The comparison of that ridge with the 2020-onward
+  smaller gain probably came from its squared-error fit. The comparison of that ridge with the 2020-onward
   network is therefore not like for like.
 - **Per substation, stage 3 head minus arm D:** D5 -0.179, D10 -0.075, D11 -0.008, D14 -0.133, D16
   -0.243, D9 -0.104. Stage 2: D5 -0.081, D10 -0.066, D11 +0.040, D14 -0.112, D16 -0.142, D9 +0.014.
@@ -155,7 +169,7 @@ known-answer gate marginally fails (29% against 30%), and reading recent errors 
 - **Caveats.** No ensemble weather input. Stage 3 trains on 4 years of forecasts built on past
   weather, whose errors are smaller than live ensemble errors, and it flags the era. The gate is one
   8-week block per injection. The prediction that the stage 2 gain would be -0.04 to +0.02 was too
-  pessimistic about the sign; the bound on reading errors held.
+  pessimistic about the sign; the prediction that error-reading adds little held.
 
 ## Checks
 
@@ -166,8 +180,8 @@ known-answer gate marginally fails (29% against 30%), and reading recent errors 
 - **Triggers that fired:** (1) the known-answer gate marginally failed, 29% against 30%; (5) the
   blind head, nested in the head, scores almost as well; (7) the sibling experiment's design may
   depend on this result. The audit confirmed the contrasts and found no leakage (see Results).
-  Leaving one substation out never changes the sign of C1 (range -0.097 to -0.145 in stage 3). All
-  audit findings were accepted: the take-home and the recalibration bullet were rewritten.
+  Leaving one substation out never changes the sign of C1 (range -0.096 to -0.156 in stage 3). The
+  audit found nothing that changes a contrast.
 
 ## What to try next
 
