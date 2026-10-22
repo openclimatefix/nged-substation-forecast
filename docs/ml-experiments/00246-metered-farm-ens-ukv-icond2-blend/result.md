@@ -193,4 +193,3 @@ interval including zero; the B3 interval excludes zero by a small margin (-1.8% 
 - **What to try next.** A weather product of a different kind from a regional deterministic
   forecast, such as a satellite-derived cloud nowcast for the early hours of the day, and a small
   learned irradiance-response component fed by the three products.
-
