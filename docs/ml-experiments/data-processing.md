@@ -62,7 +62,11 @@ skill at the 8 MVA-only Primaries from its skill at the 8 MW Primaries (inconclu
 factor to only 2 of the 8 MVA-only Primaries (and recovered one of them, D12), because the other 6
 have almost no reverse flow in
 their training rows. It held the power factor at 0.97 at those 6, and modelling the meter as
-apparent power scored 0.13 points of capacity better than reading it as real power.
+apparent power scored 0.13 points of capacity better than reading it as real power. [Experiment
+204](00204-dp-bsp-full-bottom-up-with-signed-mva-children/result.md) summed the apparent-power children
+of two bulk supply points into the bulk supply point's reading: reading the magnitude as signed power
+or converting it with a fitted sign scored within 0.03 points at one bulk supply point and 0.02 to
+0.03 points better with the sign at the other, where Stickney (D12) has reverse flow. Provisional.
 
 **Read power through the cleaned table, and read the raw table only when the question is about
 availability.** The cleaned table holds only unflagged rows
