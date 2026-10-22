@@ -6,7 +6,7 @@ title: >-
   set the width of the cold-night bands?
 theme: differentiable-physics-forecast-engine
 also_relevant_to: [calibration-and-uncertainty]
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00244-dp-deep-ensemble-heads-cold-night-bands/
   only. Serving path: not touched. Degradation rule: not touched. Designs: several are defensible
@@ -56,33 +56,155 @@ metric: >-
   and coverage and pinball loss at the 0.01, 0.05, 0.95, and 0.99 quantiles, all rows and cold
   nights
 code: ml-experiments/00244-dp-deep-ensemble-heads-cold-night-bands/
+date: 2026-10-22
+verdict: inconclusive
+best_arm: >-
+  none; E3 (bands scaled by the real spread) lifts cold-night q95 coverage from 0.8875 to 0.8939,
+  and the shuffled-spread placebo lifts it to 0.8951
+production_status: not-for-production
+adopted_in: none
+headline: >-
+  The registered gate failed (the spread of 20 networks fell by 8% when the forecast-level input was
+  shifted), so no contrast counts as evidence; the cold-night Spearman of spread with error is 0.00
+  (95% interval -0.19 to +0.18) and the shuffled-spread placebo lifts cold-night coverage as much as
+  the real spread does.
+lessons:
+  - >-
+    The disagreement between 20 networks measures how far a row's inputs sit from the training
+    inputs, not how large the forecast error will be: it correlates with absolute error at 0.27 over
+    all rows and 0.00 on cold nights.
+  - >-
+    E3's coverage lift comes from its intercept (q95 offsets times 1.017); scaling by the spread adds
+    nothing, and the shuffled spread gives the same lift.
+  - >-
+    The registered 4 C shift moves cold-night inputs towards the middle of the training inputs, so
+    the spread fell; a shift of 25 times that size raised it 6-fold.
+take_home_message: >-
+  The disagreement between 20 independently trained correction networks does not tell us how wrong
+  the forecast will be on cold nights (correlation 0.00), so it cannot set the width of the
+  cold-night bands: scaling the bands by it lifts the 95% quantile's coverage by 0.006, the same as a
+  shuffled spread does. The check that the spread reacts to an unusual input failed for a realistic
+  4 C error, so the experiment cannot say more. The cold-night shortfall is therefore not something
+  more training seeds can fix, and more history or new inputs are the remaining routes.
+advice:
+  - >-
+    Do not scale bands by the disagreement between independently trained correction networks to fix
+    cold-night coverage; the shuffled-spread placebo lifts coverage as much as the real spread (E3
+    minus P).
+  - >-
+    If cold-night q95 coverage matters, widen E0's q95 offsets by a constant (about 1.02 here) and
+    judge it over more than one winter; 782 cold-night rows on 10 days cannot separate 0.8875 from
+    0.8939 (E3 minus E0).
+  - >-
+    Test an input-distance score, such as the distance of the forecast level from its training
+    range, as a band-width covariate before more ensemble work; the spread correlates with the level
+    at 0.50 on cold nights (audit, point 5).
+  - >-
+    Average 20 seeds of the pooled correction network if the head is used: the ensemble mean scores
+    2.3315 against arm D's 2.4317 and the single seeds' mean gain is 0.090 with a seed-to-seed
+    standard deviation of 0.005 (prediction 3).
 ---
 
-# Experiment 244: does the disagreement between independently trained correction networks set the cold-night band width?
+**Take-home: the disagreement between 20 independently trained correction networks does not predict
+the forecast's error on cold nights, so it cannot set the width of the cold-night bands.** Scaling
+the bands by the disagreement lifts coverage of the 95% quantile by 0.006, and a shuffled
+disagreement lifts it by 0.008. The cold-night shortfall is not epistemic uncertainty of the
+correction network, so more seeds do not fix it; more history or new inputs remain. The pre-registered
+check that the disagreement reacts to an unusual input failed, so the verdict is `inconclusive` by the
+rule, although every contrast points the same way as `refuted`.
 
-Status `planned`: the arms, the gate, and the decision rule above are fixed before any score is read.
-This page is rewritten as the write-up when the run finishes.
+We asked whether the demand forecast's cold-night errors are something the correction network does not
+know, which the disagreement between independently trained copies of the network would show.
+[Experiment 192](../00192-dp-ens-members-temperature-cold-nights/result.md) found that the 51 ensemble
+weather members differ too little to signal the error. A cold night is a winter night (November to
+March, evening or night hours) whose ERA5 day-mean temperature (ECMWF's estimate of past weather) is
+below 2 C. We trained 20 copies of the pooled correction network of [experiment
+200](../00200-dp-pooled-correction-head-on-kalman-state/result.md) and [experiment
+211](../00211-dp-boosted-tree-calibrator-and-input-ablations/result.md), once without and once with
+recent-error inputs, with different seeds and on bootstrap resamples of whole months. Deep ensembles
+are the method of [Lakshminarayanan et al. (2017)](https://arxiv.org/abs/1612.01474). The spread of
+the 20 corrections scaled the bands of E0, the combined bands of [experiment
+169](../00169-calibration-combined-fixes-and-ensemble-spread/result.md) (arm D with experiment
+[160](../00160-calibration-band-width-fix-on-stage-2-winner/result.md)'s smooth table and experiment
+[164](../00164-calibration-cold-night-tail-under-coverage/result.md)'s widening). Scores are quantile
+scores in points of effective capacity, lower is better, on experiment 211's rows: scored year
+2025-07-02 to 2026-06-29, leads 15.5 to 39 h, five decision substations. The year holds 782
+cold-night rows on 10 days, so every cold-night number is noisy.
 
-- **Arms.** E0: experiment 169 arm A. E1: 20 networks of the same design trained with different
-  seeds, once without error inputs (the reference of experiment 211) and once with the error inputs
-  of experiment 200; the mean of the 20 median corrections replaces the single network's
-  correction. E2: the same with 20 bootstrap resamples of the training months (whole months). E3:
-  E0's quantile offsets times `c + a1 max(z - k1, 0) + a2 max(z - k2, 0)` with `z` the spread of the
-  20 median corrections divided by the head set's median spread, knots at the tuning-month 50th and
-  90th percentiles, `c` in [0.3, 3] and `a` non-negative, fitted by linear programme on the tuning
-  months (odd months of 2024-07 to 2025-06) only. P: E3 with `z` shuffled among rows of the same
-  substation, valid month, and hour band.
-- **Primary E3.** The reference network's seed-ensemble spread (E1). The bagged spread (E2) and the
-  error-input networks are descriptive.
-- **Replicate year without leakage.** The networks trained to 2025-06-28 have seen 2024-07 to
-  2025-06, so their spread there is in-sample. For that year, two cross-fit sets hold out 2024-07
-  to 2024-12 and 2025-01 to 2025-06 in turn (15-day purge, early-stopping block in the other half),
-  and predict the held-out half.
-- **Gate input.** The networks have no temperature input; a +4 C error on 2% of the scored year's
-  cold-night rows is injected through arm D's forecast-level input, shifted by 4 C times the
-  substation's cold-night slope of the forecast level on ensemble-mean temperature.
+![E0's coverage of its q95 by decile of the spread. Nothing rises or falls with the
+spread.](figure_1_coverage_by_spread_decile.svg)
 
-## Plan-review amendments (made before any score or spread was read)
+![Spread of the 20 corrections against the size of the injected shift.](figure_2_gate_shift_size.svg)
+
+![The 20 seed gains over arm D.](figure_3_seed_gains.svg)
+
+![Cold-night q95 coverage lift of E3 and of the placebo.](figure_4_coverage_lift_and_placebo.svg)
+
+## Results
+
+- **Gate (failed).** The registered shift (4 C times the substation's cold-night slope, applied to the
+  forecast-level input) lowered the spread of the network without error inputs from 0.426 to 0.393 on
+  the 18 injected rows (ratio 0.92, 95% interval 0.87 to 0.99) and from 0.387 to 0.360 on all 894
+  cold-night rows. The rule needed a ratio of at least 1.1, so the verdict is capped at `inconclusive`.
+  The failure comes from the gate's design: cold-night inputs already sit at the 70th to 95th percentile
+  of each substation's training levels, so the registered shift moves them towards the middle. A shift
+  of 25 times the size raised the spread 6.4-fold, and the opposite sign gave 1.10 (audit, post hoc).
+- **Prediction 1 (fails).** Cold-night Spearman correlation of the seed-ensemble spread with the
+  absolute error of E0's median: 0.00 (95% day-resampled interval -0.19 to +0.18) in the scored year,
+  -0.16 (-0.50 to +0.34) in the replicate even months on 257 rows over 4 days, -0.07 in the odd (tuning)
+  months. Over all rows it is 0.27 (0.25 to 0.29). The error-input networks reach 0.29 (0.05 to 0.41)
+  in the scored year and -0.01 in the replicate months. Pre-registered rule: at least 0.2 with a lower
+  bound above 0.1 in both years.
+- **Prediction 2 (fails).** E0's cold-night q95 coverage is 0.8875 on these rows (0.896 in experiment
+  169 over leads to 168 h). E3 reaches 0.8939 (+0.0064, 0.0014 to 0.0116), below 0.90. The placebo P
+  (20 shuffles within substation, month, and hour band) reaches 0.8951, E3 minus P is -0.0012 (-0.0036
+  to 0.0000), and the shuffle across substations gives +0.0077. E3's q95 scale is 1.017 plus 0.024 per
+  unit of spread above the 90th percentile; the intercept alone gives the whole lift.
+- **Prediction 3 (passes).** The 20 single-network gains over arm D range from 0.083 to 0.100 (mean
+  0.090, standard deviation 0.0052) without error inputs and from 0.076 to 0.128 (mean 0.107, standard
+  deviation 0.0147) with them (figure 3).
+- **Arms, scored year, five decision substations.** Arm D 2.4317, E0 2.4302, E1 (mean of the 20
+  corrections, arm D's offsets) 2.3315 without and 2.2920 with error inputs, E1 bagged 2.3328 and
+  2.3095, E3 2.4307 (E3 minus E0 +0.0005, -0.0021 to +0.0030). Replicate even months: E3 minus E0
+  +0.0009 (-0.0023 to +0.0042). E3 on the error-input spread scores 0.007 lower than E0 (-0.0124 to
+  -0.0021), post hoc and descriptive: it was not the registered arm and the placebo was run on the
+  reference spread only.
+- **Tail calibration, scored year (coverage / pinball loss; nominal 0.01, 0.05, 0.95, 0.99).** All rows,
+  E0: q01 0.022 / 0.386, q05 0.064 / 1.265, q95 0.948 / 1.320, q99 0.981 / 0.416. All rows, E3:
+  0.022 / 0.387, 0.072 / 1.273, 0.950 / 1.319, 0.984 / 0.410. Cold nights, E0: 0.042 / 0.751,
+  0.088 / 1.752, 0.887 / 1.491, 0.962 / 0.420. Cold nights, E3: 0.043 / 0.754, 0.091 / 1.764,
+  0.894 / 1.475, 0.972 / 0.397. Cold nights, E1 without error inputs: 0.038 / 0.629, 0.086 / 1.594,
+  0.797 / 1.859, 0.910 / 0.661;
+  the network head moves the cold-night upper tail further from nominal than E0.
+- **Checks.**
+    - Median minus mean forecast: E0's median equals its mean at every substation (difference 0.0);
+      E1's centre minus the mean is -0.52, 0.01, -0.35, 0.19, and -0.04 at D10, D11, D14, D16, and D5.
+    - Mean-forecast error beside the contrasts: E3 shares E0's centre, so its centre error is E0's
+      (mean error -0.32, absolute error 4.19). E1's centre scores 4.06 absolute error against 4.19, the
+      same direction as its score gain. On cold nights E1's mean error is +1.78 against E0's +1.22 and
+      its absolute error 5.10 against 5.14.
+    - Leave one substation out: E3's cold-night coverage lift stays positive at all five substations
+      (+0.004 to +0.009); the all-row score contrast changes sign (D11 -0.0014, D10 +0.0023), inside
+      its interval.
+    - Triggers: the failed gate (a known-answer test) fired trigger 1, so a fresh Opus audit
+      re-derived every headline from the stored files and found no error that changes a number or the
+      verdict (the report is in the private briefs folder). Its points: row alignment and out-of-sample
+      head sets correct, no leakage in the training masks, the gate wired correctly and failing by
+      design, E3's lift from its intercept alone. Trigger 6 (an interval under half as wide as a sister
+      experiment's) is not met on like rows: experiment 169's interval covers leads to 168 h and resamples
+      months, this one covers 15.5 to 39 h and resamples days.
+- **Caveats.** The gate injects through the forecast-level input because the networks have no
+  temperature input, and its slope uses ERA5 temperature rather than the ensemble-mean temperature.
+  The replicate year uses two cross-fit networks sets trained on 3 to 5 months of ensemble-weather rows
+  each, so it is not like-for-like with the scored year. D9's training data starts in 2024. Schedule:
+  one fit per network, no retraining cadence; the contrasts do not depend on it.
+- **What to try next.** (1) An input-distance score (the forecast level's distance from its training
+  range) as the band-width covariate, since the spread tracks it at 0.50 on cold nights. (2) A bias
+  correction of the mean forecast at ensemble-mean temperatures near 0 C, as experiment 169 proposed.
+  (3) A small neural layer is not indicated by this result; the prediction that could fail is that a
+  learned scale on the cold-night residual beats the constant 1.017 widening on 3 winters.
+
+## Pre-registration amendments (made before any score or spread was read)
 
 - **Early stopping and purge.** The `full` and `cfx` sets stop on 2025-04-28 to 2025-06-24; `cfy`
   stops on 2024-10-01 to 2024-11-10, because its held-out half contains the usual block. All

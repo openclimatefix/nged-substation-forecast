@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 244: score the deep ensembles, the band scaling E3, and the placebo P.
 
 Reads `work/rows.parquet` and `work/preds_*.npz` (from `e00244_predict.py`) and writes
@@ -9,7 +10,7 @@ Reads `work/rows.parquet` and `work/preds_*.npz` (from `e00244_predict.py`) and 
 import argparse
 import json
 from concurrent.futures import ProcessPoolExecutor
-from typing import Final
+from typing import Any, Final
 
 import e00244_data as data_module
 import e00244_fit as fit_module
@@ -179,7 +180,7 @@ def fit_many(
 
 
 def apply_scale(
-    *, mean: np.ndarray, offsets: np.ndarray, z: np.ndarray, coef: dict, knots
+    *, mean: np.ndarray, offsets: np.ndarray, z: np.ndarray, coef: dict, knots: tuple[float, float]
 ) -> np.ndarray:
     """Quantiles `mean + offset * scale`, sorted per row."""
     scale = np.ones_like(offsets)
@@ -201,7 +202,7 @@ def shuffled(*, z: np.ndarray, groups: np.ndarray, rng: np.random.Generator) -> 
 # ---------------------------------------------------------------- main
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Run the whole analysis."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--workers", type=int, default=5)
@@ -228,7 +229,7 @@ def main() -> None:  # noqa: PLR0915
     tuning = period == "tuning"
     rep_even = (period == "replicate") & (head_set != "full")
     resampler = Days(days=days)
-    report: dict = {"counts": {}}
+    report: dict[str, Any] = {"counts": {}}
     for name, m in (("scored", scored), ("replicate_even", rep_even), ("tuning", tuning)):
         report["counts"][name] = {
             "rows_decision": int((m & decision).sum()),
@@ -250,7 +251,7 @@ def main() -> None:  # noqa: PLR0915
 
     # ---- Prediction 1: Spearman of spread against the absolute error of E0's median.
     abs_err = np.abs(y - e0[:, 5])
-    p1: dict = {}
+    p1: dict[str, Any] = {}
     for combo, sp in spread.items():
         for what in ("c_std", "s_std"):
             entry = {}
@@ -262,7 +263,7 @@ def main() -> None:  # noqa: PLR0915
                 mask = m & decision & cold_night
                 entry[scope_name] = resampler.spearman_ci(a=sp[what], b=abs_err, mask=mask)
             p1[f"{combo[0]}_{combo[1]}_{what}"] = entry
-    allrow = {}
+    allrow: dict[str, Any] = {}
     for scope_name, m in (("scored", scored), ("replicate_even", rep_even)):
         allrow[scope_name] = resampler.spearman_ci(
             a=spread["ref", "seed"]["c_std"], b=abs_err, mask=m & decision
@@ -272,7 +273,7 @@ def main() -> None:  # noqa: PLR0915
     print("prediction 1 (ref seed c_std, cold nights):", p1["ref_seed_c_std"], flush=True)
 
     # ---- Gate.
-    gate = {}
+    gate: dict[str, Any] = {}
     injected = rows["injected"].to_numpy()
     for combo in COMBOS:
         sp = spread[combo]
@@ -316,7 +317,7 @@ def main() -> None:  # noqa: PLR0915
     arms: dict[str, np.ndarray] = {"arm_d": armd, "E0": e0}
     for combo in COMBOS:
         arms[f"E1_{combo[0]}_{combo[1]}"] = e1_quantiles(combo)
-    table: dict = {}
+    table: dict[str, Any] = {}
     for name, q in arms.items():
         ok = np.isfinite(q).all(axis=1)
         table[name] = {
@@ -326,7 +327,7 @@ def main() -> None:  # noqa: PLR0915
     report["table"] = table
 
     # ---- Prediction 3: the single networks' gains over arm D.
-    gains: dict = {}
+    gains: dict[str, Any] = {}
     base = pinball(q=armd[scored_dec], y=y[scored_dec]).mean(axis=1)
     for kind in ("ref", "err"):
         p = preds[kind, "seed"]
@@ -355,7 +356,7 @@ def main() -> None:  # noqa: PLR0915
     }
     del tune_mask_all
     specs: dict[str, dict] = {}
-    norm: dict = {}
+    norm: dict[str, Any] = {}
     for combo in COMBOS:
         sp = spread[combo]
         # Tuning rows use the cross-fit networks' spread; the scored year uses the full set's.
@@ -478,7 +479,7 @@ def main() -> None:  # noqa: PLR0915
     cov95 = {
         k: (y <= q[:, 9]).astype(float) for k, q in arms.items() if k.startswith("E3") or k == "E0"
     }
-    contrasts: dict = {}
+    contrasts: dict[str, Any] = {}
     for scope_name, scope in (("scored", scored), ("replicate_even", rep_even)):
         mask_all, mask_cold = scope & decision, scope & decision & cold_night
         for key in ("ref_seed", "ref_bag", "err_seed", "err_bag"):
@@ -515,7 +516,7 @@ def main() -> None:  # noqa: PLR0915
 
     # ---- Coverage by spread decile (scored year, primary spread).
     z0 = specs["ref_seed"]["z"]
-    deciles: dict = {}
+    deciles: dict[str, Any] = {}
     for name, mask in (("cold_nights", cold_dec), ("all_rows", scored_dec)):
         edges = np.percentile(z0[mask], np.linspace(0, 100, 11))
         bins = np.clip(np.searchsorted(edges, z0[mask], side="right") - 1, 0, 9)
@@ -535,7 +536,11 @@ def main() -> None:  # noqa: PLR0915
     report["deciles"] = deciles
 
     # ---- Checks: centres per site, mean-forecast error, leave-one-site-out.
-    checks: dict = {"median_minus_mean_by_site": {}, "centre_error": {}, "leave_one_site_out": {}}
+    checks: dict[str, Any] = {
+        "median_minus_mean_by_site": {},
+        "centre_error": {},
+        "leave_one_site_out": {},
+    }
     for s in sorted(set(site)):
         m = scored & (site == s)
         checks["median_minus_mean_by_site"][s] = {
@@ -562,7 +567,7 @@ def main() -> None:  # noqa: PLR0915
             "cold_q95_cov_E3": float(cov95["E3_ref_seed"][m_cold].mean()),
         }
     report["checks"] = checks
-    per_site = {}
+    per_site: dict[str, Any] = {}
     for s in sorted(set(site)):
         m = scored & (site == s) & cold_night
         per_site[s] = {

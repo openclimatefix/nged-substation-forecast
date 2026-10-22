@@ -43,7 +43,7 @@ def main() -> None:
         )
         nets.append(net.eval())
     out = {
-        "rows": int(len(idx)),
+        "rows": len(idx),
         "input_level_mean": float(x[:, 28].mean()),
         "input_level_sd": float(x[:, 28].std()),
         "typical_shift": float(np.abs(level / 100).mean()),
