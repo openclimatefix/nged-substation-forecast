@@ -30,7 +30,7 @@ decision_rule: >-
   scores no forecast. The smallest share worth acting on is 15% of the shortfall, because a cause
   below that cannot recover more than 0.03 of the injected capacity.
 benchmark: >-
-  Experiment 129's arm 2 recovery of a real farm at 50% of the pinned capacity (rung 4 must
+  Experiment 129's arm 2 recovery of a real farm at 50% of the pinned capacity at season-year 2024 (rung 4 must
   reproduce it to within 0.005 at every Primary and farm)
 row_set_id: >-
   Experiment 129's training rows (the feature cache of experiment 106) before 2026-07-01, at D5,
@@ -39,8 +39,8 @@ row_set_id: >-
 metric: >-
   Recovery: the capacity found with a real farm's output added at 50% of the Primary's pinned
   capacity, minus the capacity found without it, divided by the injected capacity, read at
-  season-year 2025 (July 2025 to June 2026). Capacity unit: the 99th percentile of alternating-
-  current output over daylight half-hours, in MW. Shares are fractions of the shortfall 1 minus
+  season-year 2024 (July 2024 to June 2025, the last complete season-year in experiment 129's
+  known-answer table). Capacity unit: the 99th percentile of alternating-current output over daylight half-hours, in MW. Shares are fractions of the shortfall 1 minus
   rung 4
 code: ml-experiments/00231-pv-capacity-audit-where-recovery-goes/
 ---
@@ -57,13 +57,13 @@ maintainer's labelled exception (data to 2026-07-31) is not used. No forecast is
 
 ## The ladder of fits
 
-Every rung reports the recovery at season-year 2025, as a median over the five farms, with a
+Every rung reports the recovery at season-year 2024, as a median over the five farms, with a
 month-block 80% interval (a stratified bootstrap of the training months, 200 resamples, the same
 draws for every farm at a Primary). The brief's "injection start months" is read as the training
 months, because the injection covers the whole history.
 
 - **Rung 1, farm only:** the least-squares scale of the farm's output on the temperature-derated
-  fleet unit shape (CAMS irradiance), over all daylight half-hours of season-year 2025. No demand.
+  fleet unit shape (CAMS irradiance), over all daylight half-hours of season-year 2024. No demand.
 - **Rung 2, farm only on clear half-hours:** the same scale over the half-hours where the Primary's
   CAMS global irradiance is at least 0.9 of its clear-sky value and the clear-sky value is at
   least 200 W/m².
@@ -87,8 +87,16 @@ ladder and not terms of the sum.
 
 ## Plan checks
 
-- **Reproduction:** rung 4 at 50% injection must reproduce experiment 129's `kat_arm2` matched-farm
-  recovery without cloud load to within 0.005 at every Primary and farm, otherwise the ladder is
-  not measuring the number the brief names.
+- **Read-out year (changed before the real run):** the first draft of this plan read the recovery at
+  season-year 2025. A one-farm pilot at D10 (10 resamples, not a result) then showed that
+  experiment 129's known-answer table stops at season-year 2024, so the plan reads season-year 2024
+  to make rung 4 comparable with it. The pilot's numbers played no part in the choice.
+
+- **Reproduction:** the injected fit's capacity must equal experiment 129's `kat_arm2` matched-farm
+  capacity (50% injection, no cloud load, season-year 2024) to within 1e-6 relative at every Primary
+  and farm. Experiment 129 subtracts one base capacity fitted on all rows from every injected fit,
+  whereas this experiment fits the base on the rows where the farm has a reading, so that the two
+  fits of a recovery share one row set. The page reports rung 4 with both bases, and the two
+  recoveries must agree to within 0.02.
 - **Wiring:** the monthly Gram matrices must sum to the Gram matrix of `accumulate_gram` to within
   1e-8 relative, and the rung-4 base capacity must equal `fit_gam`'s.
