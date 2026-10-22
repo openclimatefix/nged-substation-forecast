@@ -192,9 +192,7 @@ def resolve_knots(*, cache: FeatureCache, base: BaseFit, arm: ArmSpec) -> ArmSpe
     return replace(arm, knots=knots)
 
 
-def tail_columns(
-    *, cache: FeatureCache, site: str, index: np.ndarray, arm: ArmSpec
-) -> np.ndarray:
+def tail_columns(*, cache: FeatureCache, site: str, index: np.ndarray, arm: ArmSpec) -> np.ndarray:
     """Return an arm's tail hinge columns, then its linear columns, shape (n, n_extra).
 
     The tail columns are ordered by window, then knot (cold knots before hot), then hour band; a
@@ -511,7 +509,9 @@ def arm_penalty(*, layout: GamLayout, arm: ArmSpec, n_rows: int) -> ArmPenalty:
     constrained[hinge] = True
     matrix[linear, linear] = ridge * np.eye(n_linear)
     return ArmPenalty(
-        matrix=matrix, constrained=constrained, n_new_columns=core.n_new_columns + n_hinge + n_linear
+        matrix=matrix,
+        constrained=constrained,
+        n_new_columns=core.n_new_columns + n_hinge + n_linear,
     )
 
 

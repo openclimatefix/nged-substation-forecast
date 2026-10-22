@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Fit each arm's monthly T-all fits and forecast arm D from them, at the six substations.
 
 An arm is T-all (`r0`, rebuilt as the pipeline control) or T-all with the tail columns of F1 or F2
@@ -252,6 +253,14 @@ def _job(job: tuple[str, str]) -> str:
     context = load_site(site=site)
     fits = fit_site(arm=arm, site=site, cache=context.cache)
     base = base_frame(forecaster=ArmForecaster(fits=fits, context=context, arm=arm))
+    base_target = common.WORK_DIR / "base_preds" / f"{arm}_{site}.parquet"
+    base_target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = base_target.with_name(f"{base_target.name}.{os.getpid()}.tmp")
+    base.select(
+        "power_fcst_init_time", "valid_time", "lead_hours", "actual", "mean", "period",
+        "switching_mask",
+    ).write_parquet(temporary)  # fmt: skip
+    temporary.rename(base_target)
     rows = write_arm_d(arm=arm, site=site, frame=arm_d(base=base))
     return f"{arm} {site}: {rows:,} rows, {time.monotonic() - started:.0f} s"
 

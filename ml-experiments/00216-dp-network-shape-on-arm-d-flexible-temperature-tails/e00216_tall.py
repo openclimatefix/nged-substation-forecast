@@ -10,8 +10,8 @@ import argparse
 import os
 import pickle
 import time
-from concurrent.futures import ProcessPoolExecutor
 from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -61,7 +61,7 @@ def fit_tall(
     cut: datetime,
     penalty_weight: float,
     arm: design.ArmSpec | None = None,
-    target_scale: Callable[[design.BaseFit], np.ndarray] | None = None,
+    target_shift: Callable[[design.BaseFit], np.ndarray] | None = None,
 ) -> TallFit:
     """Fit T-all, or the given arm, at one site and cut.
 
@@ -72,8 +72,8 @@ def fit_tall(
         cut: The cut.
         penalty_weight: T-all's difference penalty weight, used when `arm` is `None`.
         arm: The arm to fit, or `None` for T-all.
-        target_scale: For the known-answer gate: a function of the base fit that returns a
-            multiplier per training row, applied to the training target.
+        target_shift: For the known-answer gate: a function of the base fit that returns an
+            amount per training row, added to the training target.
 
     Returns:
         The fit; its `arm` carries the resolved tail knots.
@@ -82,12 +82,11 @@ def fit_tall(
     if arm is None:
         arm = design.interaction_arm(name="t_all", penalty_weight=penalty_weight)
     assert base.pinned is not None
-    if target_scale is not None:
-        base = replace(base, target=base.target * target_scale(base))
+    if target_shift is not None:
+        base = replace(base, target=base.target + target_shift(base))
     fit = design.fit_arm(cache=cache, base=base, arm=arm)
-    return TallFit(
-        site=site, cut=cut, layout=base.layout, pinned=base.pinned, arm=fit.arm, fit=fit
-    )
+    assert base.pinned is not None
+    return TallFit(site=site, cut=cut, layout=base.layout, pinned=base.pinned, arm=fit.arm, fit=fit)
 
 
 def predict_tall(*, cache: FeatureCache, fit: TallFit, index: np.ndarray) -> np.ndarray:

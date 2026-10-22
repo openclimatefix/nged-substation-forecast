@@ -44,13 +44,16 @@ decision_rule: >-
   months, and its median monthly difference must be negative too). The convex route is supported
   (prediction 1 passes) when F1 or F2 has the point
   estimate at or below the larger of -0.05 and minus half of the network's measured gain at the
-  same substations (reported with its interval), and an interval wholly below zero in the scored year, and a point
+  same substations (reported with its interval), and an interval wholly below zero in the scored
+  year, and a point
   estimate below zero in the replicate year. It is partly supported when the interval is wholly
   below zero in the scored year but the gain is under 0.05 or the replicate year disagrees. If
   predictions 1 and 2 both fail, the network uses an input that arm D lacks, and the write-up says
-  which of calendar, lagged errors, and holiday flags the stored network arms add. The threshold of 0.05
+  which of calendar, lagged errors, and holiday flags the stored network arms add. The threshold of
+  0.05
   is the brief's, half of the network's gain; the replicate year has no stored network, so that
-  year is read against arm D only, which departs from the brief. A gain of 0.02 would already pay for the 32
+  year is read against arm D only, which departs from the brief. A gain of 0.02 would already pay
+  for the 32
   columns the tail terms add per substation, because they ride on the existing fit and add no
   trained component to the serving path, so the write-up states the verdict at 0.05 and at 0.02. The
   known-answer gate runs first (below) and caps the verdict at `inconclusive` if it fails.
