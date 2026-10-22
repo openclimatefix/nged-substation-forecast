@@ -186,6 +186,17 @@ drift-removed fit finds April 2020 more than 5 points low only at D11 (-26 point
 points), and August 2020 to September 2021 sits 5 to 17 points above the fit at D5, D10, D11, and
 D14. Applies to experiments and production.
 
+**Check how many days of training rows a demand-model fit kept after the lockdown window is removed,
+and flag a fit with fewer than 180 days (provisional; medium confidence).** Leaving the lockdown
+window out of training left Christmas 2020-21 fits with 51 to 143 days of rows. Every substation's
+Christmas 2021-22 fit had the same 104 summer days and no winter, and D9's 2023-24 fit had 31 days.
+The fits with under 180 days scored 1.38 to 1.91 times their ordinary-weekday error pooled over
+substations at Christmas, and D9 alone scored 5.6 times, where fits with at least 180 days scored
+0.97 to 1.22 times ([experiment 173](00173-dp-christmas-more-years-and-sites/result.md); the 180-day
+threshold was chosen after the scores were read, and thresholds of 90 and 270 days gave the same
+picture for 2022-23 onwards). The Kalman filter and recipe R in that experiment do not repair a fit
+that saw little or no winter. Applies to experiments and production.
+
 **Give the series that changed regime an individual start date or a flag (medium confidence).** D8
 weekday daytime demand falls from about 9 MW to about 3 MW between 2023-10 and 2025. D12 switches
 between a high-night and a low-night regime. D18 steps up about 1.1 MW at night around 2026-07-03 (a
