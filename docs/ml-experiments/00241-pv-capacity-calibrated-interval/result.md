@@ -127,7 +127,8 @@ cloud-driven load is added.**
   corrected estimate is within 10% for 73% of the injections.
 - **The coverage depends on the calibration set.** At season-year 2024 the interval covers 58.7% of
   the 75 held-out injections with same-year calibration and 78.7% with all-years calibration. Over
-  all season-years (six at three Primaries, four at D14 and D16) the coverage is 60.8% and 71.8% (390 injections). The target is 70% to 90%.
+  all season-years (six at three Primaries, four at D14 and D16) the coverage is 60.8% and 71.8%
+  (390 injections). The target is 70% to 90%.
 - **The two conditions are met by different calibration sets, so neither set meets both.**
   Same-year calibration meets the accuracy condition and misses the coverage range. All-years
   calibration is in the coverage range and misses the 4-of-5 accuracy requirement (3 of 5 Primaries
