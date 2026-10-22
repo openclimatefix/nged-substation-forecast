@@ -4,7 +4,7 @@ slug: switching-detector-masks-in-gam-training
 title: >-
   Can alarms raised by a live switching detector replace hand labels when the forecast model is
   trained?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: planned
