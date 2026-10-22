@@ -31,7 +31,7 @@ import e00237_ens as ens
 import e00237_tall as tall
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_ens import choose_fit
 from studies.dp_ens_weather import RunWindow, replace_site
 from studies.dp_features import FeatureCache
