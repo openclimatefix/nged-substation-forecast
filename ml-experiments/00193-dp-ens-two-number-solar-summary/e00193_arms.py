@@ -22,6 +22,7 @@ the daily-loss grid search of experiment 187 (`f` first with `s = 1`, then `s`, 
         uv run --no-sync python ml-experiments/00193-*/e00193_arms.py
 """
 
+from collections.abc import Callable
 from typing import Final
 
 import e00193_common as common
@@ -98,13 +99,18 @@ def daylight_rows(*, frame: pl.DataFrame) -> np.ndarray:
     return ((frame["kind"] == "daylight") & (frame["n_members"] > 0)).to_numpy()
 
 
-def fit_factors(*, frame: pl.DataFrame, make_points, fit_spread: bool) -> list[tuple[float, float]]:  # noqa: ANN001
+def fit_factors(
+    *, frame: pl.DataFrame, make_points: Callable[[float], np.ndarray], fit_spread: bool
+) -> list[tuple[float, float]]:
     """Return `(f, s)` per lead band minimising the tuning daylight loss.
 
     Args:
         frame: The tuning rows.
         make_points: Called as `make_points(spread)`, returns the (rows, 51) centres' responses.
         fit_spread: When False, `s` stays 1.
+
+    Returns:
+        The pair `(f, s)` of each lead band.
     """
     usable = data.usable_rows(frame=frame) & daylight_rows(frame=frame)
     lead_band = lead_band_of_hours(lead_hours=frame["lead_hours"].to_numpy())
@@ -134,7 +140,7 @@ def fit_factors(*, frame: pl.DataFrame, make_points, fit_spread: bool) -> list[t
 def apply_arm(
     *,
     frame: pl.DataFrame,
-    make_points,  # noqa: ANN001
+    make_points: Callable[[float], np.ndarray],
     factors: list[tuple[float, float]],
     rows: np.ndarray | None = None,
 ) -> np.ndarray:
@@ -145,6 +151,9 @@ def apply_arm(
         make_points: Called as `make_points(spread)`, returns (rows, 51) responses.
         factors: `(f, s)` per lead band.
         rows: The row indices to change; daylight rows with a member when None.
+
+    Returns:
+        The 11 quantiles of every row, shape (rows, 11).
     """
     out = frame.select(list(data.QUANTILES)).to_numpy().astype(np.float64)
     if rows is None:
