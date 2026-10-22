@@ -21,7 +21,7 @@ import e00205_common as common
 import e00205_filters as filters
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 PREP_DIR: Final[Path] = common.WORK_DIR / "prep"
 MEAN_TOLERANCE: Final[float] = 1e-3

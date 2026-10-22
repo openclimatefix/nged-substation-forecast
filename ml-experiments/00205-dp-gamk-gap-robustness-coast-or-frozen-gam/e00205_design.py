@@ -23,7 +23,7 @@ from typing import Final, Literal
 import e00205_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_calendar import SMOOTHING_HOURS
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (
