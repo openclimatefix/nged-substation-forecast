@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Build the scored-year rows and arms of experiment 251.
 
 Arm 1 is experiment 220's A+H+S. Arm 2 adds the hand-set 60% clip at D5 as a per-row mean shift (the
