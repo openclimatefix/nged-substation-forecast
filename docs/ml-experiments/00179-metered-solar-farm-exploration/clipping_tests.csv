@@ -1,0 +1,7 @@
+site,p99_over_p95_top_bins,p95_slope_top_over_mid,p99_peak_over_capacity,p95_peak_over_capacity,clipping,clipping_post_hoc
+A,1.078,0.851,1.164,1.1,false,false
+B,1.045,0.456,1.119,1.08,false,false
+C,1.019,0.145,1.062,1.053,false,true
+D,1.044,-0.089,1.083,1.039,false,true
+E,1.015,0.056,1.064,1.052,true,true
+F,1.024,0.074,1.059,1.035,false,true
