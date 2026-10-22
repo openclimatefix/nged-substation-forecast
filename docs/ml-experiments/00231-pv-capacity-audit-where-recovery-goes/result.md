@@ -187,6 +187,9 @@ summer.**
       experiment's width.
 - **Review:** one Sonnet code review found no finding that changes a result, and one Sonnet review
   of the page checked every number against the printed report.
+- **No Opus audit was run.** The ML manager decided that quota did not allow an Opus review of
+  any of this series' experiments, so every audit trigger listed above stays unaudited and a
+  Sonnet reviewer read the code and the page instead.
 
 ## What the next experiment should answer
 
