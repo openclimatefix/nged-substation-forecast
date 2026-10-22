@@ -28,7 +28,7 @@ import e00190_gated as gated
 import e00190_run as run
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import correction_at
 
 SIZES: Final[tuple[float, ...]] = (0.05, 0.10, 0.20)

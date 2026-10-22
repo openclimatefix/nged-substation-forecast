@@ -33,7 +33,7 @@ import e00190_gated as gated
 import e00190_stage2_common as stage2
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 SITES: Final[tuple[str, ...]] = common.DECISION_SITES
 GRID_M: Final[tuple[float, ...]] = (3.0, 5.0, 10.0)
