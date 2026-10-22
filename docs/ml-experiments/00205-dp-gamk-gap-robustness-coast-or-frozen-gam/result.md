@@ -105,9 +105,7 @@ a gap length exists beyond which the filter should be dropped.
     combinations are scored, and the headline contrasts use k = 0. One filter pass per (substation,
     L, k) applies the gaps of all that substation's events together, which is equivalent to one pass
     per event because the windows do not overlap.
-- **What each stage sees.** The filter reads the gapped stream. The winter night offset and the
-    spread table are fitted on the tuning months of the no-gap forecasts and held fixed, because no
-    gap falls in a tuning month. Recipe R is recomputed from the gapped timeline: it uses the errors
+- **What each stage sees.** The filter reads the gapped stream. The winter night offset is refitted monthly on the errors of the earlier rows of the gapped timeline, as in experiment 155. The spread table is fitted on the tuning months, in which no gap falls. Recipe R is recomputed from the gapped timeline: it uses the errors
     of the earlier runs from the gapped filter, and the actuals whose valid time falls inside any
     gap are hidden from its error blocks (a block with fewer than 40 readings is unusable, as in
     experiment 155). Scoring reads the true actuals of the event run's own rows, which all fall
