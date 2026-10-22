@@ -109,12 +109,12 @@ network never saw the scored year, 2025-07 to 2026-06, which covers six substati
 a network the residual history only.
 
 **Most of the gain is a recalibration of arm D's own output, the useful lead is a lift of up to 3
-points in the median below -3 °C and above 24 °C, and holidays get worse.** Arms 1 to 4 each score about 0.09 to 0.11 points below arm D. A neural network given
-calendar, lead, and site but no forecast or weather (arm 0) scored +0.017 against arm D, which is
-no gain. A neural network given only arm D's forecast, lead, and time of day (arm 6) scored -0.086.
-The gain therefore comes from re-reading arm D's own output. The neural network mostly raises the
-median on hot days and very cold days, which suggests the convex demand model lacks a temperature
-term.
+points in the median below -3 °C and above 24 °C, and holidays get worse.** Arms 1 to 4 each score
+about 0.09 to 0.11 points below arm D. A neural network given calendar, lead, and site but no
+forecast or weather (arm 0) scored +0.017 against arm D, which is no gain. A neural network given
+only arm D's forecast, lead, and time of day (arm 6) scored -0.086. The gain therefore comes from
+re-reading arm D's own output. The neural network mostly raises the median on hot days and very cold
+days, which suggests the convex demand model lacks a temperature term.
 
 **The pre-registered prediction failed on both conditions.** The interval of arm 3 or arm 4 was not
 wholly below -0.02 points, and bank holidays and Christmas worsened by more than 0.05 points. The
