@@ -143,7 +143,8 @@ shrinking the cells is all at D10, and the refits lose score on months they were
   mix. We did not identify which cells the switching rows sit in. The brief's "day 7" holds the 282
   rows at a lead of exactly 168.0 hours, all in hour band 1 with a median width of 37.6, because
   `floor(lead / 24)` puts them in an eighth day. Binning by `ceil(lead / 24) - 1` removes day 7. The
-  other five substations have no fall larger than 3% from one lead day to the next on either row set (figure 2).
+  other five substations have no fall larger than 3% from one lead day to the next on either row
+  set (figure 2).
 - **Arms.** A: the reference. PB: offset = scale(substation, hour band, quarter) times a growth
   curve per hour band, non-decreasing in lead with a knot every 24 hours, fitted on the pinball loss
   by linear programme (HiGHS) pooled over substations and quarters (the first attempt). P: one
@@ -160,7 +161,8 @@ shrinking the cells is all at D10, and the refits lose score on months they were
   before the brief's per-quarter design (P), and are reported because their scores match P's.
 - **Row set and schedule.** `fold_a_daily_gap_v1`, the five decision substations D5, D10, D11, D14,
   and D16 (D9 beside, in no pooled contrast), leads 0.5 to 168 hours, rows outside the switching
-  events, 464,363 rows over the five substations in the scored year. The mean forecasts are experiment 155's monthly
+  events, 464,363 rows over the five substations in the scored year. The mean forecasts are
+  experiment 155's monthly
   refits, so no contrast depends on the retraining schedule. Arm A rebuilt from experiment 169's
   reference arm and the fix-O multipliers scores 2.7521 over the five substations against the
   printed 2.7519, inside the 0.001 cap.
