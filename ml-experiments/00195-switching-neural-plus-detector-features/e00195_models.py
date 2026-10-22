@@ -14,12 +14,12 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00195_data import WORLD_DIR
 from e00195_ronc import FEATURE_NAMES, RAW_LENGTH, pair_scores, ronc_scores
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 N_SEEDS: Final[int] = 3
 POS_WEIGHT_CAP: Final[float] = 10.0
