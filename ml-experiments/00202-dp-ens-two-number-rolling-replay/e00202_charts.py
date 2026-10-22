@@ -185,7 +185,7 @@ def figure_month(*, report: dict) -> None:
         alt.Chart(frame)
         .mark_bar(color=ocf.BRAND_ORANGE)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("month:N", sort=None, title="Month of the forecast origin"),
+            x=alt.X("month:N", sort=None, title="Calendar month of the valid time"),
             y=alt.Y(
                 "change:Q",
                 title="Change in daylight score from arm A (%; negative is better)",
@@ -197,7 +197,7 @@ def figure_month(*, report: dict) -> None:
         height=260,
         title=_title(
             text="Eleven of the 12 months improve; December 2025 got 0.9% worse",
-            subtitle="Bars: R2's change in the daylight score of the five substations, by month of the forecast origin. Dashed rule: same as arm A.",
+            subtitle="Bars: R2's change in the daylight score of the five substations, by calendar month of the valid time. Dashed rule: same as arm A.",
         ),
     )
     _save(chart, name="figure_4_month")

@@ -40,7 +40,8 @@ decision_rule: >-
   that the replay causes. C1 is R2 minus arm A in the quantile score (twice the mean pinball loss
   over 11 quantiles) over daylight half-hours (sun 5 degrees or more above the horizon), leads 0.5
   to 168 hours, outside the hand-filtered switching events, pooled over D5, D10, D11, D14, and D16
-  in the scored year (292 runs), as a percentage change of arm A's daylight score, with a paired
+  in the scored year (the 292 registered runs, of which 291 are in the stored rows), as a percentage
+  change of arm A's daylight score, with a paired
   month-resampled bootstrap (20,000 resamples) at the 95% level (one decisive contrast). `supported`
   when C1 is at or under -1.5%, its interval is wholly under zero, the night score is within 0.5% of
   arm A's, and each of the five substations' point estimates is under zero; `partly supported`
@@ -192,7 +193,10 @@ The rule registered before the run was met: R2's daylight change from arm A is -
   7.6e-06 (largest quantile difference). G2: float32 against float64 columns changes the daylight
   quantile score by 1.2e-10. G3: every run's initialisation plus 9 hours is at or before its origin
   (derived from the run index, so the gate checks the date arithmetic only). G4: RR recovers 7% of
-  R2's gain, under 20%. All pass.
+  R2's gain, under 20%. G5: the fit code run on experiment 193's tuning rows with float64 columns
+  returns experiment 193's
+  four stored factor pairs exactly, so the monthly fit is a test of the same code path. G1 tests the
+  apply path only. All pass.
 - **Checks.** The median forecast minus the mean forecast at 12 to 36 hours for R2 is -0.14 (D5),
   -0.03 (D10), -0.05 (D11), -0.04 (D14), and -0.05 (D16) points, the same pattern as Q2; arm A is
   0.000. R2
