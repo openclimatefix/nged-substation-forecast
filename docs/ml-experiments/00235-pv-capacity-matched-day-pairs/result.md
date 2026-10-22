@@ -170,6 +170,9 @@ daylight half-hours, in MW.
   linearity caveat
   anticipated why the plain test was uninformative.
 - **Review:** one Sonnet code review and one Sonnet review of the page.
+- **No Opus audit was run.** The ML manager decided that quota did not allow an Opus review of
+  any of this series' experiments, so every audit trigger listed above stays unaudited and a
+  Sonnet reviewer read the code and the page instead.
 
 ## What the next experiment should answer
 
