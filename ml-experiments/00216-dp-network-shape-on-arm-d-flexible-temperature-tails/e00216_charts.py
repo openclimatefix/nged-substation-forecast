@@ -33,7 +33,7 @@ ZERO = (
     alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
     .mark_rule(color="#808080", strokeDash=[4, 3])
     .encode(x="x:Q")
-)  # ty: ignore[unresolved-attribute]
+)
 
 
 def save(chart: alt.TopLevelMixin, name: str) -> None:
