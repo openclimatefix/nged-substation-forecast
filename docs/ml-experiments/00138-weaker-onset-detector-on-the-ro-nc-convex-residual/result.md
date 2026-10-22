@@ -1,7 +1,7 @@
 ---
 id: "00138"
 slug: weaker-onset-detector-on-the-ro-nc-convex-residual
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: >-

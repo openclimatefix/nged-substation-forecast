@@ -1,7 +1,7 @@
 ---
 id: "00186"
 slug: switching-d8-gas-peaker-spark-spread-and-triads
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - differentiable-physics-embedded-generation
 status: done

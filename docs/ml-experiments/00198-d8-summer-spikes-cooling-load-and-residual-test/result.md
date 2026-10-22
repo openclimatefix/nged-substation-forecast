@@ -7,7 +7,7 @@ title: >-
 theme: differentiable-physics-demand-calendar-and-weather
 also_relevant_to:
   - differentiable-physics-embedded-generation
-  - switching-detectors
+  - lsc-detectors
 status: done
 size: >-
   medium. Stored: private tables and figures under

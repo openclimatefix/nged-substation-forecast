@@ -89,7 +89,7 @@ adopted_in: none
 code: ml-experiments/00096-*/
 ---
 
-# Experiment 96: do synthetic switches in the training data make the NRA forecast recover the normal arrangement better?
+# Experiment 96: do synthetic load shifts in the training data make the NRA forecast recover the normal arrangement better?
 
 **Take-home message: adding about three times as many synthetic switching transfers to the
 training data did not improve the forecast of the power a substation would have drawn without the

@@ -1,7 +1,7 @@
 ---
 id: "00069"
 slug: sw2-17-missed-onsets-of-the-end-rule
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium
@@ -104,7 +104,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 69 (SW2-17, part of the switching-event detector series): why do real transfers raise no alarm at their start?
+# Experiment 69 (SW2-17, part of the LSC series): why do real transfers raise no alarm at their start?
 
 **Half of the 24 real load transfers with no alarm at their start are not a threshold problem.
 Accepting weaker alarms that a step back confirms did not help either, because the stricter

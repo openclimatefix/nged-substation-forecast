@@ -1,7 +1,7 @@
 ---
 id: "00159"
 slug: switching-d8-multi-day-drops-recurrence-and-report
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
 status: done

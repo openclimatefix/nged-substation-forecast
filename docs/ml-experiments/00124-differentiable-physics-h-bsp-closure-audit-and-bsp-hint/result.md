@@ -3,7 +3,7 @@ id: "00124"
 slug: differentiable-physics-h-bsp-closure-audit-and-bsp-hint
 theme: differentiable-physics-pooling-across-substations
 part: H
-also_relevant_to: [hierarchy-and-pooling, switching-detectors]
+also_relevant_to: [hierarchy-and-pooling, lsc-detectors]
 status: done
 size: >-
   Complex for the new module studies.dp_hierarchy (own PR, two code reviews), medium for the

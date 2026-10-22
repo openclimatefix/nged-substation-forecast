@@ -1,7 +1,7 @@
 ---
 id: "00130"
 slug: ro-nc-detector-on-the-gam-k-residual
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - differentiable-physics-forecast-engine
 status: done
