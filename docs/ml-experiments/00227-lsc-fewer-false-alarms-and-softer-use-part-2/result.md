@@ -135,7 +135,7 @@ shifts) and shows no measurable harm on ordinary days. The threshold was chosen 
 A load shift is demand that the electricity network operator moves between neighbouring Primary
 substations for hours or days. An alarm tells the forecast that a load shift is probably under way,
 and a "mask" then sets recent power readings aside while the alarm is open. [Experiment
-208](../00208-switching-what-is-a-detector-worth/result.md) found that no real alarm source stayed
+208](../00208-switching-value-of-a-detector-by-phase-and-quality/result.md) found that no real alarm source stayed
 inside the ordinary-day harm limit of 0.05 points, because each raised 104 to 242 alarms for 15 to
 20 matched load shifts. This experiment asks whether a stricter threshold (part a) or a gentler use
 of the alarm (part b) fixes that. Part (a) does: at a budget of 20 unexplained odd-month candidates
