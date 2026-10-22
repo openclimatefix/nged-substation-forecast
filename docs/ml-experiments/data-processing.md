@@ -713,6 +713,16 @@ recalibration fitted on earlier months did not move coverage by more than its ow
 ([experiment 97](00097-cal1-post-hoc-recalibration-of-bg2-quantiles-tails/result.md)). Applies to
 experiments, for the 12 to 36 hour lead band.
 
+**Re-fit a residual detector's noise for D8 before and after 2025-03, and label D8's engine only
+up to 2025-02 (provisional).** *Applies to: experiments.* D8's residual noise (the median absolute
+step-to-step error of the residual) is 0.17 to 0.27 MW in clean months and 0.35 to 0.75 MW from
+2024-05, rising most after 8.91 MW of 11 kV solar was connected on 2025-03-24. A detector with its
+noise fitted on 2022 to 2023 flags 40% to 45% of D8's half-hours from 2025-03 onward, even in April
+to June 2026, when 2% of half-hours are below -2.5 MW
+([experiment 196](00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)). The
+scope is one Primary; the confidence is moderate, and the entry is provisional until the experiment
+has had its reviews.
+
 ## Privacy and anonymisation
 
 **Never publish the name, the identifier, or the time series of an NGED metered generator, and label
