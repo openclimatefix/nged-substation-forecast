@@ -180,11 +180,11 @@ farms.
   against a half-width of 0.085. Trigger 7 is a later experiment whose design depends on this
   result: the experiment that trains a neural head on daily ensemble hindcasts adds this
   experiment's best column set to its XGBoost reference if the columns are supported.
-- **A fresh Sonnet audit matched every number and found C1 resting on W2.** It re-derived C1, C3, and
+- **A fresh audit matched every number and found C1 resting on W2.** It re-derived C1, C3, and
   the calendar arm's contrast from the stored forecasts with its own code. C3 is negative on every
   farm. The calendar arm's gain is concentrated in W1, W2, and 8 of 12 months. The three seeds agree
   to about 0.002 points, so the intervals reflect only 12 months of variation. The audit found no
-  leakage route. The report is private, and the experiment used Sonnet and not Opus to save quota.
+  leakage route. The report is private.
 
 ## Caveats and departures from the plan
 
