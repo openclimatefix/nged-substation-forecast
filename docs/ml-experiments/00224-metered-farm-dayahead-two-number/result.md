@@ -22,7 +22,7 @@ hypothesis: >-
   output a spread that carries information the ensemble mean lacks, and the mean and standard
   deviation of
   the 51 plant responses keep most of that information, as they did for Primary substations in
-  [experiment 193](../00193-dp-ens-two-number-solar-summary/result.md). A two-number plant forecast
+  experiment 193. A two-number plant forecast
   therefore forecasts a metered solar farm 12 to 36 hours ahead about as well as XGBoost, and gives
   calibrated tails.
 prediction: >-
