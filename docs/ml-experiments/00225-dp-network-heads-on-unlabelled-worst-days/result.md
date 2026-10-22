@@ -6,7 +6,7 @@ title: >-
   explains?
 theme: differentiable-physics-forecast-engine
 also_relevant_to: [calibration-and-uncertainty]
-status: planned
+status: done
 size: >-
   simple. Stored: private tables under
   data/ml-experiments/00225-dp-network-heads-on-unlabelled-worst-days/ only. Serving path: not
@@ -50,42 +50,103 @@ metric: >-
   of arm
   D.
 code: ml-experiments/00225-dp-network-heads-on-unlabelled-worst-days/
+date: 2026-10-22
+verdict: partly supported
+best_arm: >-
+  Arm 2 of experiment 201 (arm D plus calendar and holiday flags): removes 22.6% of the 37
+  unlabelled worst days' excess loss (seeds 19.8%, 25.9%, 22.3%), against 11.8% on the 35 labelled
+  worst days.
+production_status: not-for-production
+adopted_in: none
+headline: >-
+  The neural network removes 22.6% of the unlabelled worst days' excess loss, but those days are
+  not hot or cold extremes: 4 of 37 lie in the outer 10% of temperature, against about 7 or 8
+  expected by chance.
+take_home_message: >-
+  The neural network does cut the loss on the 37 worst days that no label explains, by about a
+  fifth, and cuts it by more than on the 35 days that do carry a label. Those days are not at
+  temperature extremes, so a network aimed at the hottest and coldest days would not target them.
+  What helps on them is the forecast input: a network without one removes 4%.
+advice:
+  - >-
+    Do not build a tail-focused network for the unlabelled worst days: they are not at temperature
+    extremes (4 of 37 in the outer 10%, figure 1).
+  - >-
+    Keep the forecast inputs in any network aimed at the worst days: a network with no forecast
+    input removes 3.9% of their excess, against 22.6% with it (figure 2).
+  - >-
+    Read the share of excess removed on worst days beside a control, because days chosen for a high
+    arm D error improve a little under any change (the blind network, figure 2).
 ---
 
-**Status: planned. No score has been read.**
+**The neural network removes 22.6% of the excess loss on the 37 worst days that no label explains,
+but those days are not hot or cold extremes.** Only 4 of the 37 days lie in the outer 10% of their
+substation's temperature range, fewer than the 7 or 8 expected for random days. Prediction 1 passes
+and prediction 2 fails, so the result is partly supported. The network helps those days through its
+forecast input, not through a temperature-extreme correction.
 
-The question is whether the neural network's corrections of
-[experiment 201](../00201-dp-gam-residual-mlp/result.md) reach the 37 worst days of
-[experiment 172](../00172-dp-error-budget-worst-days/result.md) that carry no label, and whether
-those days are hot or cold extremes. The plan reads stored tables only and fits nothing.
+This experiment reads the stored tables of
+[experiment 172](../00172-dp-error-budget-worst-days/result.md) (the worst days) and the stored
+predictions of [experiment 201](../00201-dp-gam-residual-mlp/result.md) (the neural network), and
+fits nothing. A day's score is the mean quantile score of its day-ahead rows (leads 15 to 39
+hours), so "points" below are points of the quantile score, in percentage points of effective
+capacity. A day's excess is its score minus its substation's median day score. Arm D is the
+best-guess convex demand forecast of
+[experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md).
+Rebuilding experiment 172's day table from the stored rows gives all 1,392 days with a maximum score
+difference of 0.0.
 
-## Design
+![Temperature percentile of the 37 unlabelled worst days, and the share in the outer 10% of
+temperature in 1,000 draws of 37 ordinary days.](figure_1_temperature_of_the_unlabelled_days.svg)
 
-- **Sites and days.** The five decision substations (D5, D10, D11, D14, D16). The 72 worst days
-  (worst 5% of each substation's days by excess loss) split into 37 with no label and 35 with at
-  least one label, from experiment 172's `worst_days_table.parquet`. The sixth substation (D9) has
-  no contrast.
-- **Networks.** The headline network is arm 2 of experiment 201 (arm D's inputs plus calendar and
-  holiday flags), the stored network with the largest gain. Experiment 200's heads store losses by
-  month only, so they cannot be scored by day; their change in loss by month is a sign cross-check.
-  Arm 0 of experiment 201 (lead, calendar, and substation only, no forecast) is the blind network,
-  and arm 4 (adds lagged power) is the network with recent power. Each arm has three seeds, scored
-  separately; the day score of an arm is the mean over the seeds, and the seed spread is reported.
-- **Rows.** A day's rows are arm D's D+1 rows (lead 15 to 39 hours) outside the hand-filtered
-  switching masks, on the keys (substation, power forecast initialisation time, valid time). The
-  scored rows of experiment 201 (2025-07-02 to 2026-06-29) are checked against experiment 172's
-  scored year, and the overlap is used if they differ.
-- **Temperature.** Each day's temperature is the mean of the ensemble-mean 2-metre temperature that
-  arm D used (the `drv_temp_c` column of experiment 201's feature files) over the day's half-hours,
-  as a percentile among the same substation's days before 2025-07-01.
-- **Controls.** 1,000 draws of 37 days that are not among the worst 72, matching each unlabelled
-  day's substation and calendar month. Each draw gives the share in the outer 10% of temperature and
-  the network's share of excess removed.
-- **Reported.** For the 37 unlabelled days, the 35 labelled days, and the 72 together: arm D's and
-  the networks' day scores, the share of excess removed, and the same by temperature decile.
+![Share of arm D's excess loss removed on the unlabelled and labelled worst days by four stored
+neural networks, with the range over three seeds.](figure_2_excess_removed_by_class.svg)
 
-## Figures
+![Five unlabelled worst days: observed power, arm D, and arm D plus the neural
+network.](figure_3_five_unlabelled_days.svg)
 
-1. The temperature percentile of the 37 unlabelled days against the random draws.
-2. The network's change in excess loss for the unlabelled, labelled, and control days.
-3. Five unlabelled days: arm D, arm D plus the network, and the observed power.
+## Results
+
+- **Prediction 1 (the network cuts the unlabelled days' excess loss by at least 20%): passed.**
+  Arm 2 of experiment 201 removes 22.6% (seeds 19.8%, 25.9%, 22.3%). The day score falls from 4.93
+  to 4.29 points. On the 35 labelled worst days it removes 11.8% (7.03 to 6.46 points), and on all
+  1,392 days 33.4% of excess.
+- **The gain is larger than on random days.** The mean gain per day on the unlabelled worst days is
+  0.64 points, against 0.21 points (5th to 95th percentile 0.03 to 0.42) over 1,000 draws of 37
+  ordinary days matched on substation and calendar month.
+- **Prediction 2 (at least half the days at temperature extremes): failed.** 4 of the 37 days (1
+  below the 10th percentile and 3 above the 90th) are in the outer 10%, against a
+  mean of 20.1% (5th to 95th percentile 10.8% to 29.7%) over the random draws; the real share sits
+  at the 8th percentile of the draws. The 35 labelled days are more extreme (8 of 35), and the
+  unlabelled days are milder than average (mean 11.3 degrees Celsius against 11.5 for all days).
+- **Which inputs matter.** A network with no forecast input (arm 0) removes 3.9% of the unlabelled
+  days' excess, so the gain is not an artefact of choosing days with a high arm D error. A network
+  with recent power (arm 4) removes 26.6%, and one given arm D's outputs only (arm 6) 23.2%.
+- **Seeds.** Three seeds of arm 2 span 19.8% to 25.9% on the unlabelled days, so the 20% threshold
+  is within the seed spread.
+
+## Checks
+
+- **Control recovery.** Experiment 172's control recovered 89.2% of the days it injected, so each
+  share is read as approximate.
+- **Temperature definition.** The headline uses the ensemble-mean temperature that arm D used. With
+  ERA5 day temperature, as in experiment 172, the unlabelled days average 11.5 degrees Celsius.
+- **Descriptive only.** The unit is one day and the sample is 37 days, so the shares carry no
+  interval beyond the random draws.
+
+## Caveats
+
+- **Regression to the mean.** The worst days were chosen for a high arm D error, so any other
+  forecast would improve them. The blind network's 3.9% sets the size of that effect, and the
+  22.6% is read against it.
+- **Pooled across substations.** The result is for the five decision substations together and was
+  not split by substation.
+
+## Experiments this builds on
+
+[Experiments 172](../00172-dp-error-budget-worst-days/result.md),
+[174](../00174-dp-unlabelled-worst-days-weather-shared-or-single-site/result.md),
+[175](../00175-dp-unlabelled-day-shapes/result.md),
+[200](../00200-dp-pooled-correction-head-on-kalman-state/result.md),
+[201](../00201-dp-gam-residual-mlp/result.md), and
+[209](../00209-dp-pinball-table-vs-network-head-on-arm-d/result.md).
