@@ -1,4 +1,4 @@
-"""Score experiment 155's arms and print every number the write-up quotes.
+"""Score experiment 170's arms and print every number the write-up quotes.
 
 Reads `work/dp_preds/` and the stored predictions of experiment 111 (GAM-K) and experiment 87 (BG2,
 climatology, manual heuristic), puts every arm on common rows (a reading, outside the hand-filtered
@@ -9,6 +9,7 @@ intervals, the tail tables, the lead check, and the checks.
     uv run --no-sync python ml-experiments/00155-*/e00170_report.py
 """
 
+import argparse
 import json
 from datetime import UTC, datetime
 from typing import Final
@@ -36,6 +37,7 @@ LEAD_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("all", 0.0, 168.0),
 )
 OURS: Final[tuple[str, ...]] = run.ARM_NAMES
+STORED_155: Final[dict[str, str]] = {"a155": "a", "c155": "c", "d155": "d"}
 STORED_111: Final[dict[str, str]] = {"k111": "gamk"}
 STORED_87: Final[dict[str, str]] = {
     "bg2": "p_s6_bg2",
@@ -48,26 +50,32 @@ E87_PREDICTIONS: Final = (
     / "predictions"
 )
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
-    "C1": ("b", "a"),
-    "C2": ("c", "a"),
-    "C3": ("d", "a"),
-    "C4": ("d", "c"),
-    "C5": ("d", "b"),
-    "C6": ("d", "bg2"),
-    "C7": ("e", "d"),
-    "C8": ("c48", "c"),
-    "C9": ("d48", "d"),
-    "C10": ("c48", "a"),
-    "C11": ("d48", "a"),
-    "C12": ("e", "a"),
-    "C13": ("a", "k111"),
-    "C14": ("a", "bg2"),
-    "S1": ("b_spread_a", "a"),
-    "S2": ("c_spread_a", "a"),
-    "S3": ("d_spread_a", "a"),
-    "S4": ("b0", "a"),
-    "S5": ("b", "b0"),
+    "C1": ("s24_d", "d155"),
+    "C2": ("sall_d", "s24_d"),
+    "C3": ("sall_d", "d155"),
+    "C4": ("s24_d", "s24_c"),
+    "C5": ("s24_d", "s24_b"),
+    "C6": ("sall_d", "sall_c"),
+    "C7": ("sall_d", "sall_b"),
+    "C8": ("s24_a", "a155"),
+    "C9": ("sall_a", "a155"),
+    "C10": ("s24_c", "c155"),
+    "C11": ("s24_d", "s24_a"),
+    "C12": ("s24_d", "bg2"),
+    "C13": ("sall_d", "bg2"),
+    "C14": ("s24_d", "k111"),
+    "R1": ("r_a", "a155"),
+    "R2": ("r_d", "d155"),
+    "H1": ("s24_c", "s24_a"),
+    "H2": ("c155", "a155"),
+    "H3": ("s24_a", "a155"),
 }
+"""The contrasts as (treatment, reference). C1 to C14 are scored in full at the scored year; R1 and
+R2 are the reproduction controls; H1 to H3 are the with-minus-without recipe R and drift pairs that
+Part 2 reads on event days."""
+PERIOD_ORDER: Final[tuple[str, ...]] = ("scored", "replicate", "tuning")
+FULL_CONTRASTS: Final[frozenset[str]] = frozenset({"C1", "C2", "C3", "C4", "C5", "C12"})
+"""The contrasts scored in every lead band and breakout; the others at all leads and D+1 only."""
 LEVEL_PERCENT: Final[float] = 99.0
 N_RESAMPLES: Final[int] = 20_000
 COLD_TEMPERATURE_C: Final[float] = 3.0
@@ -119,6 +127,9 @@ def annotate(*, frame: pl.DataFrame, cache) -> pl.DataFrame:  # noqa: ANN001
             masked=pl.Series(features.switching_mask[target]),
             hour_band=pl.Series(cache.calendar.band[target].astype(np.int8)),
             holiday=pl.Series(holiday_code >= 0),
+            holiday_code=pl.Series(holiday_code.astype(np.int8)),
+            local_date=pl.Series(cache.calendar.local_date[target]),
+            half_hour=pl.Series(cache.calendar.half_hour[target].astype(np.int16)),
             christmas=pl.Series(np.isin(holiday_code, CHRISTMAS_CODES)),
             cold3=pl.Series(
                 np.nan_to_num(features.temperature_c[target], nan=99.0) <= COLD_TEMPERATURE_C
@@ -143,16 +154,17 @@ def in_period(*, frame: pl.DataFrame, period: str) -> pl.DataFrame:
 def load(*, arm: str, period: str, cache) -> pl.DataFrame | None:  # noqa: ANN001
     """Return an arm's scorable rows for a period, or `None` if the arm has none."""
     ids = {s: cache.sites[s].table.time_series_id for s in common.SCORED_SITES}
-    if arm in OURS or arm in STORED_111:
+    if arm in OURS or arm in STORED_155 or arm in STORED_111:
         pieces = []
         for site in common.SCORED_SITES:
-            path = (
-                common.out_path(arm=arm, period=period, site=site)
-                if arm in OURS
-                else common.E111_WORK_DIR
-                / "dp_preds"
-                / f"{STORED_111[arm]}_{period}_{site}.parquet"
-            )
+            if arm in OURS:
+                path = common.out_path(arm=arm, period=period, site=site)
+            elif arm in STORED_155:
+                path = common.E155_PREDS_DIR / f"{STORED_155[arm]}_{period}_{site}.parquet"
+            else:
+                path = (
+                    common.E111_WORK_DIR / "dp_preds" / f"{STORED_111[arm]}_{period}_{site}.parquet"
+                )
             if path.exists():
                 pieces.append(pl.read_parquet(path).with_columns(site=pl.lit(site)))
         if not pieces:
@@ -269,7 +281,7 @@ def subset_filters() -> dict[str, pl.Expr]:
         "winter": winter,
         "winter nights": winter & night,
         "cold nights (day mean below 2 C)": winter & pl.col("cold2") & night,
-        "cold nights (3 C or below, as experiment 170)": pl.col("cold3") & night,
+        "cold nights (3 C or below, as experiment 136)": pl.col("cold3") & night,
         "holidays and Christmas": pl.col("holiday"),
         "Christmas only": pl.col("christmas"),
         "bank holidays without Christmas": pl.col("holiday") & ~pl.col("christmas"),
@@ -316,8 +328,8 @@ def tail_table(*, losses: pl.DataFrame, sites: tuple[str, ...]) -> dict:
         "12-36 h": lead_filter(frame=scope, low=12.0, high=36.0),
         "all leads": scope,
         "cold nights (day mean below 2 C)": scope.filter(subset_filters()[COLD_KEY]),
-        "cold nights (3 C or below, as experiment 170)": scope.filter(
-            subset_filters()["cold nights (3 C or below, as experiment 170)"]
+        "cold nights (3 C or below, as experiment 136)": scope.filter(
+            subset_filters()["cold nights (3 C or below, as experiment 136)"]
         ),
         "holidays and Christmas": scope.filter(pl.col("holiday")),
     }
@@ -346,7 +358,7 @@ def winter_night_by_half_hour(*, losses: pl.DataFrame, sites: tuple[str, ...]) -
     )
 
 
-def lead_check(*, losses: pl.DataFrame, arms: list[str], seed: int = 155) -> dict:
+def lead_check(*, losses: pl.DataFrame, arms: list[str], seed: int = 170) -> dict:
     """Return each arm's lead-growth difference against A, with a 99% month-resampled interval.
 
     The statistic is (score at 3.5 to 9.5 hours minus score at 0.5 to 3.5 hours) of the arm minus
@@ -377,8 +389,8 @@ def lead_check(*, losses: pl.DataFrame, arms: list[str], seed: int = 155) -> dic
         return stat[1] - stat[0]
 
     out = {}
-    base = growth("a", draws)
-    point_a = growth("a", np.arange(len(months))[None, :])[0]
+    base = growth("a155", draws)
+    point_a = growth("a155", np.arange(len(months))[None, :])[0]
     for arm in arms:
         point = growth(arm, np.arange(len(months))[None, :])[0]
         diff = growth(arm, draws) - base
@@ -401,7 +413,10 @@ def stack(*, frames: dict[str, pl.DataFrame]) -> pl.DataFrame:
     cache = common.load_cache()
     labels = {cache.sites[s].table.time_series_id: s for s in common.SCORED_SITES}
     keep = [*KEYS, "lead_hours", "seed", *QUANTILE_COLUMNS, "actual", "mean"]
-    extra = ["hour_band", "holiday", "christmas", "cold2", "cold3", "valid_month"]
+    extra = [
+        "hour_band", "holiday", "holiday_code", "local_date", "half_hour", "christmas", "cold2",
+        "cold3", "valid_month",
+    ]  # fmt: skip
     stacked = losses_for_bootstrap(
         arm_losses={
             name: with_losses(frame=f.select([*keep, *extra])) for name, f in frames.items()
@@ -447,30 +462,12 @@ def checks(*, frames: dict[str, pl.DataFrame]) -> dict:
     return {"median_minus_mean": out}
 
 
-def zero_shift_runs() -> dict:
-    """Count, per period and substation, the runs of arm C whose mean equals A's (no R shift)."""
-    out: dict = {}
-    for period in common.PERIODS:
-        for site in common.SCORED_SITES:
-            a = pl.read_parquet(common.out_path(arm="a", period=period, site=site))
-            c = pl.read_parquet(common.out_path(arm="c", period=period, site=site))
-            diff = (a["mean"] - c["mean"]).abs().alias("d")
-            frame = (
-                pl.DataFrame({"run": a["run"], "d": diff}).group_by("run").agg(pl.col("d").max())
-            )
-            out[f"{period} {site}"] = {
-                "runs": frame.height,
-                "zero_shift": int((frame["d"] == 0).sum()),
-            }
-    return out
-
-
 def period_report(*, period: str) -> tuple[dict, dict[str, pl.DataFrame]]:
     """Return the period's tables and contrasts, and the common-row frames."""
     cache = common.load_cache()
     loaded = {
         arm: frame
-        for arm in (*OURS, *STORED_111, *STORED_87)
+        for arm in (*OURS, *STORED_155, *STORED_111, *STORED_87)
         if (frame := load(arm=arm, period=period, cache=cache)) is not None
     }
     frames = common_rows(frames=loaded)
@@ -482,11 +479,11 @@ def period_report(*, period: str) -> tuple[dict, dict[str, pl.DataFrame]]:
         "tables": arm_table(losses=losses, sites=common.DECISION_SITES),
         "tail": tail_table(losses=losses, sites=common.DECISION_SITES),
         "winter_night_by_half_hour": winter_night_by_half_hour(
-            losses=decision.filter(pl.col("arm").is_in(["a", "b", "d"])),
+            losses=decision.filter(pl.col("arm").is_in(["a155", "d155", "s24_a", "s24_d"])),
             sites=common.DECISION_SITES,
         ),
         "lead_check": lead_check(
-            losses=decision, arms=[a for a in (*OURS, "k111") if a in frames and a != "a"]
+            losses=decision, arms=[a for a in (*OURS, "d155", "k111") if a in frames]
         ),
         "contrasts": {},
         "site_gains": {},
@@ -502,7 +499,7 @@ def period_report(*, period: str) -> tuple[dict, dict[str, pl.DataFrame]]:
             losses=losses, treatment=treatment, reference=reference
         )
         entry: dict = {}
-        full = period == "scored" and label.startswith("C") and label not in ("C13", "C14")
+        full = period == "scored" and label in FULL_CONTRASTS
         for scope_name, low, high in LEAD_BANDS:
             if not full and scope_name not in ("all", "D+1"):
                 continue
@@ -531,18 +528,26 @@ def period_report(*, period: str) -> tuple[dict, dict[str, pl.DataFrame]]:
 
 
 def main() -> None:
-    """Score the three periods and write the report."""
-    report: dict = {}
-    for period in ("scored", "replicate", "tuning"):
-        period_data, frames = period_report(period=period)
-        report[period] = period_data
+    """Score one period (or merge the three periods' files) and write the report."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--period", choices=("scored", "replicate", "tuning", "merge"), required=True
+    )
+    period = parser.parse_args().period
+    folder = common.WORK_DIR / "report"
+    if period != "merge":
+        data, frames = period_report(period=period)
         if period == "scored":
-            report["checks"] = checks(frames=frames)
-    report["zero_shift_runs"] = zero_shift_runs()
+            data["checks"] = checks(frames=frames)
+        common.write_json_atomic(path=folder / f"report_{period}.json", content=data)
+        print(period, "written")
+        return
+    report = {p: json.loads((folder / f"report_{p}.json").read_text()) for p in PERIOD_ORDER}
+    report["checks"] = report["scored"].pop("checks")
     controls = common.WORK_DIR / "controls.json"
     if controls.exists():
         report["controls"] = json.loads(controls.read_text())
-    common.write_json_atomic(path=common.WORK_DIR / "report" / "report.json", content=report)
+    common.write_json_atomic(path=folder / "report.json", content=report)
     print("report written")
 
 

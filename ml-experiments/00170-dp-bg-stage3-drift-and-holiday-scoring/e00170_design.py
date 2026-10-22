@@ -1,4 +1,4 @@
-"""Experiment 136's T-all design code (from experiment 114), copied for experiment 167.
+"""Experiment 167's T-all design code (from experiment 114), copied for experiment 170.
 
 The designs of experiment 114: B0's columns, split interaction columns, and hinge thresholds.
 
@@ -25,7 +25,7 @@ from typing import Final, Literal
 import e00170_common as common
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_calendar import SMOOTHING_HOURS
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (

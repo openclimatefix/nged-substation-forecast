@@ -6,7 +6,6 @@ order for the maintainer to change.
 
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| Stage 3 assembly: drift term on arm D, and the Christmas and bank-holiday scores (experiment 170) | Does experiment 167's drift term still lower the score once the night offset and recipe R are in, at 24 months and at all years, and how do the holidays score with and without recipe R and drift? | 1 | Nothing; CPU only | Planned |
 | Holiday-aware filter updating (experiment 143) | Does leaving holiday readings out of the GAM-K filter's update lower the score on the days after a holiday, without hurting holiday days? | 1 (the forecast is judged over this Christmas) | Nothing; CPU, about 1 hour | Planned |
 | Margin arms at weekly cadence (proposed) | Does the DP's forecast as the starting point of lagged XGBoost help when the XGBoost model refits weekly, as the production recipe does, rather than monthly? | 3 | The maintainer's GPU budget (about 60 GPU-hours at the measured speed) | Proposed |
 | ENS history of 2021 to 2024 (proposed) | Do three more years of ensemble history give XGBoost a fair training history, and a second validation year for the DP against XGBoost? | 2 | The maintainer's approval of a fetch from Source Cooperative | Proposed |

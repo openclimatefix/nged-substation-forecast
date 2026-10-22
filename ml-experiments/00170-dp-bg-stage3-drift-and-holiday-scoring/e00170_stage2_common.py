@@ -1,13 +1,14 @@
-"""Constants and loaders shared by the scripts of experiment 155 (best-guess stage 2 assembly).
+"""Constants and loaders shared by the stage 2 scripts of experiment 170.
 
-Arm A is experiment 170's A2, read from that experiment's private `dp_preds` folder. Every other
-arm is arm A's forecast plus a correction, then a spread refitted on the tuning months. This
-experiment writes only under its own `WORK_DIR`.
+Experiment 155's stage 2 code is copied here and reads this experiment's stage 1 forecasts
+(`work/stage1_preds/`, written by `e00170_run.py`) in place of experiment 136's arm A2. Every
+stage 2 arm is a stage 1 forecast plus a correction, then a spread refitted on the tuning months.
+This experiment writes only under its own `WORK_DIR`.
 
-**Three periods, each with one role** (as in experiment 170). The tuning period is the odd months of
-2024-07 to 2025-06 (the spread's fit), the replicate period is the even months of the same year (the
-sign of the contrasts), and the scored year is the 292 runs of `fold_a_daily_gap_v1` from 2025-07-02
-to 2026-06-29. A run belongs to the month of its `power_fcst_init_time`.
+**Three periods, each with one role** (as in experiments 136 and 155). The tuning period is the odd
+months of 2024-07 to 2025-06 (the spread's fit), the replicate period is the even months of the same
+year (the sign of the contrasts), and the scored year is the 292 runs of `fold_a_daily_gap_v1` from
+2025-07-02 to 2026-06-29. A run belongs to the month of its `power_fcst_init_time`.
 """
 
 import json
@@ -20,14 +21,18 @@ import polars as pl
 from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-EXPERIMENT_ID: Final[int] = 155
-SLUG: Final[str] = "dp-bg-stage2-assembly-night-offset-and-error-correction"
+EXPERIMENT_ID: Final[int] = 170
+SLUG: Final[str] = "dp-bg-stage3-drift-and-holiday-scoring"
 ROW_SET_ID: Final[str] = "fold_a_daily_gap_v1"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
 WORK_DIR: Final[Path] = DATA_DIR / "work"
 OUT_DIR: Final[Path] = WORK_DIR / "dp_preds"
-E136_WORK_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00136-dp-bg-stage1-assembly-on-the-ensemble-mean" / "work"
+STAGE1_DIR: Final[Path] = WORK_DIR / "stage1_preds"
+E155_PREDS_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00155-dp-bg-stage2-assembly-night-offset-and-error-correction"
+    / "work"
+    / "dp_preds"
 )
 E111_WORK_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
@@ -114,10 +119,10 @@ def period_origins(*, period: str) -> list[datetime]:
     return [r + PUBLICATION_DELAY for r in run_dates() if period_of_run(run=r) == period]
 
 
-def read_base(*, site: str) -> pl.DataFrame:
-    """Return arm A (experiment 170's A2) at a site: all three periods, ascending by origin."""
+def read_base(*, site: str, base: str) -> pl.DataFrame:
+    """Return a stage 1 arm at a site: all three periods, ascending by origin."""
     pieces = [
-        pl.read_parquet(E136_WORK_DIR / "dp_preds" / f"a2_{period}_{site}.parquet")
+        pl.read_parquet(STAGE1_DIR / f"{base}_{period}_{site}.parquet")
         .select(list(BASE_COLUMNS))
         .with_columns(period=pl.lit(period))
         for period in PERIODS

@@ -1,4 +1,6 @@
-"""The filters of experiment 170: GAM-K's two-state filter with an optional online variance.
+"""The filters of experiment 136, copied for experiment 170.
+
+They are GAM-K's two-state filter with an optional online variance.
 
 `filter_band` runs the same two-state filter as `studies.dp_assimilation`'s `_kalman_band` over one
 hour band's readings, and adds the scalar variant of VIKING ([de Vilmarest and Wintenberger

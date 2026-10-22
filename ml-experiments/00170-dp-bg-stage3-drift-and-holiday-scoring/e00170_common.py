@@ -1,4 +1,4 @@
-"""Constants and helpers shared by the scripts of experiment 170 (best-guess stage 1 assembly).
+"""Constants and helpers shared by the scripts of experiment 170 (best-guess stage 3 assembly).
 
 The constants, periods, and run dates are experiment 111's, copied so this folder imports only
 itself.

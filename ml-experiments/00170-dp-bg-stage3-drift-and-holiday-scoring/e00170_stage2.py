@@ -1,22 +1,21 @@
-"""Build every arm of experiment 155 at every substation and write the prediction frames.
+"""Build the stage 2 arms of experiment 170 at every substation and write the prediction frames.
+
+Each stage 1 arm of `e00170_run.py` gets four stage 2 arms, named with a prefix for the stage 1 arm
+(`r` for `a2_repro`, `s24` for `m24_d1`, `sall` for `all_d1`):
 
 | Arm | Built from | Correction |
 |---|---|---|
-| `a` | experiment 170's A2 | none |
-| `b` | `a` | winter night offset |
-| `c` | `a` | recipe R at every lead |
-| `d` | `b` | recipe R at every lead, on `b`'s own past errors |
-| `c48` | `a` | recipe R at leads of 48 hours or less |
-| `d48` | `b` | recipe R at leads of 48 hours or less |
-| `e` | `b` | ANALOG+R (experiment 145's tuned values) at every lead |
-| `b0` | `a` | the offset's constants and weekend flag only (ablation) |
-| `*_spread_a` | `a` | `b`, `c`, `d` with arm `a`'s spread table (sensitivity) |
+| `<prefix>_a` | the stage 1 arm | none (spread as stored) |
+| `<prefix>_b` | `<prefix>_a` | winter night offset |
+| `<prefix>_c` | `<prefix>_a` | recipe R at every lead |
+| `<prefix>_d` | `<prefix>_b` | recipe R at every lead, on the offset forecast's own past errors |
 
-Each arm's quantiles are its corrected mean plus a spread table refitted on its own tuning-month
-forecasts, every factor 1. The output is in the `dp_preds` layout.
+So `r_a`, `r_b`, `r_c`, and `r_d` repeat experiment 155's arms A, B, C, and D with this folder's
+fitting code. Each arm's quantiles are its corrected mean plus a spread table refitted on its own
+tuning-month forecasts, every factor 1. The output is in the `dp_preds` layout.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00155-*/e00170_run.py [--workers 6]
+        uv run --no-sync python ml-experiments/00170-*/e00170_stage2.py [--workers 6]
 """
 
 import argparse
@@ -30,18 +29,10 @@ import e00170_stage2_common as common
 import numpy as np
 import polars as pl
 
-ARM_NAMES: Final[tuple[str, ...]] = (
-    "a",
-    "b",
-    "c",
-    "d",
-    "c48",
-    "d48",
-    "e",
-    "b0",
-    "b_spread_a",
-    "c_spread_a",
-    "d_spread_a",
+STAGE1_PREFIX: Final[dict[str, str]] = {"a2_repro": "r", "m24_d1": "s24", "all_d1": "sall"}
+SUFFIXES: Final[tuple[str, ...]] = ("a", "b", "c", "d")
+ARM_NAMES: Final[tuple[str, ...]] = tuple(
+    f"{prefix}_{suffix}" for prefix in STAGE1_PREFIX.values() for suffix in SUFFIXES
 )
 OUTPUT_COLUMNS: Final[tuple[str, ...]] = (
     "time_series_id", "run", "power_fcst_init_time", "valid_time", "lead_hours", "seed", "arm",
@@ -49,47 +40,30 @@ OUTPUT_COLUMNS: Final[tuple[str, ...]] = (
 )  # fmt: skip
 
 
-def build_arms(*, site: str, frame: pl.DataFrame | None = None) -> dict[str, pl.DataFrame]:
-    """Return every arm's frame at a substation, all three periods together.
+def build_arms(*, site: str, stage1: str) -> dict[str, pl.DataFrame]:
+    """Return the four stage 2 arms of a stage 1 arm at a substation, all periods together.
 
     Args:
         site: The substation's label.
-        frame: Arm A's frame with the calendar columns, or `None` to read and annotate it.
+        stage1: The stage 1 arm's name (a key of `STAGE1_PREFIX`).
 
     Returns:
         The frames by arm name, each with the base frame's rows and a `period` column.
     """
-    base = frame if frame is not None else corr.add_calendar(frame=common.read_base(site=site))
+    prefix = STAGE1_PREFIX[stage1]
+    base = corr.add_calendar(frame=common.read_base(site=site, base=stage1))
     mean_a = base["mean"].to_numpy().astype(np.float64)
     offset, _ = corr.winter_offset_shift(frame=base, variant="winter")
-    offset_const, _ = corr.winter_offset_shift(frame=base, variant="const")
     mean_b = mean_a + offset
-    arms = {"a": base}
-    arms["b"] = corr.apply_shift_and_refit_spread(frame=base, shift=offset)
-    arms["b0"] = corr.apply_shift_and_refit_spread(frame=base, shift=offset_const)
-    shift_c = corr.recipe_r_shift(frame=base, forecast=mean_a)
     shift_d = offset + corr.recipe_r_shift(frame=base, forecast=mean_b)
-    mean_c, mean_d = mean_a + shift_c, mean_a + shift_d
-    arms["c"] = corr.apply_shift_and_refit_spread(frame=base, shift=shift_c)
-    arms["c48"] = corr.apply_shift_and_refit_spread(
-        frame=base, shift=corr.recipe_r_shift(frame=base, forecast=mean_a, short_only=True)
-    )
-    arms["d"] = corr.apply_shift_and_refit_spread(frame=base, shift=shift_d)
-    arms["d48"] = corr.apply_shift_and_refit_spread(
-        frame=base,
-        shift=offset + corr.recipe_r_shift(frame=base, forecast=mean_b, short_only=True),
-    )
-    arms["e"] = corr.apply_shift_and_refit_spread(
-        frame=base,
-        shift=offset
-        + corr.analog_shift(frame=base, forecast=mean_b, site=site, spec=corr.AnalogSpec()),
-    )
-    for name, mean in (("b", mean_b), ("c", mean_c), ("d", mean_d)):
-        arms[f"{name}_spread_a"] = base.with_columns(
-            pl.Series("mean", mean.astype(np.float32)),
-            *[(pl.col(q) + pl.Series(mean - mean_a)).cast(pl.Float32) for q in common.QUANTILES],
-        )
-    return arms
+    return {
+        f"{prefix}_a": base,
+        f"{prefix}_b": corr.apply_shift_and_refit_spread(frame=base, shift=offset),
+        f"{prefix}_c": corr.apply_shift_and_refit_spread(
+            frame=base, shift=corr.recipe_r_shift(frame=base, forecast=mean_a)
+        ),
+        f"{prefix}_d": corr.apply_shift_and_refit_spread(frame=base, shift=shift_d),
+    }
 
 
 def _write(*, arm: str, site: str, frame: pl.DataFrame) -> int:
@@ -108,7 +82,9 @@ def _write(*, arm: str, site: str, frame: pl.DataFrame) -> int:
 
 def _job(site: str) -> str:
     started = time.monotonic()
-    arms = build_arms(site=site)
+    arms = {}
+    for stage1 in STAGE1_PREFIX:
+        arms.update(build_arms(site=site, stage1=stage1))
     rows = {arm: _write(arm=arm, site=site, frame=frame) for arm, frame in arms.items()}
     return f"{site}: {sum(rows.values()):,} rows, {time.monotonic() - started:.0f} s"
 

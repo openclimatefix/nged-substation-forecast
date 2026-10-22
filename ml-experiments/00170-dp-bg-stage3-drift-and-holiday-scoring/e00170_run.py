@@ -38,9 +38,14 @@ from studies.dp_ens_weather import Calibration, proxy_cache
 from studies.dp_features import FeatureCache, naive_utc
 
 ARM_NAMES: Final[tuple[str, ...]] = ("a2_repro", "m24_d1", "all_d1")
+NO_FILTER_SUFFIX: Final[str] = "_nf"
+NO_FILTER_ARMS: Final[tuple[str, ...]] = tuple(f"{a}{NO_FILTER_SUFFIX}" for a in ARM_NAMES)
+"""Diagnostic arms: the same fits with the Kalman filter's correction left out of the forecast
+(post hoc, run to test why a drift term helps without the filter and not with it)."""
 PERIODS: Final[tuple[str, ...]] = ("tuning", "replicate", "scored")
 OUT_DIR: Final[Path] = common.WORK_DIR / "stage1_preds"
 ARM_FITS: Final[dict[str, str]] = {"a2_repro": "m24", "m24_d1": "m24_d1", "all_d1": "all_d1"}
+ARM_FITS.update({f"{a}{NO_FILTER_SUFFIX}": ARM_FITS[a] for a in ARM_NAMES})
 
 
 def out_path(*, arm: str, period: str, site: str) -> Path:
@@ -164,7 +169,7 @@ class ArmForecaster:
             setup=self.context.setup,
             fits=self.fits,
             spread=spread,
-            trace=self.run.trace,
+            trace=None if self.arm.endswith(NO_FILTER_SUFFIX) else self.run.trace,
             run_indices=runs,
             arm=self.arm,
         )

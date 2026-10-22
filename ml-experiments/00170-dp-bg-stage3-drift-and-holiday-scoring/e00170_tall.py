@@ -193,8 +193,11 @@ def main() -> None:
     parser.add_argument("--sites", nargs="+", default=list(common.SCORED_SITES))
     args = parser.parse_args()
     jobs = [(f, s) for f in args.fit_sets for s in args.sites]
+    # Map the module's own `_job`, so a pickled `TallFit` names `e00170_tall`, not `__main__`.
+    import e00170_tall as module
+
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        for line in pool.map(_job, jobs):
+        for line in pool.map(module._job, jobs):
             print(line, flush=True)
 
 

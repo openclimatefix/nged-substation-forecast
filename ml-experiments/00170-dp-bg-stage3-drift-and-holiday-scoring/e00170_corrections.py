@@ -1,4 +1,6 @@
-"""The corrections of experiment 155: the winter night offset, recipe R, and the analog profile.
+"""The corrections of experiment 155, copied for experiment 170.
+
+They are the winter night offset, recipe R, and the analog profile.
 
 **Every correction is a shift added to arm A's mean and quantiles, then the spread is refitted.**
 `add_calendar` adds the columns that the corrections read. `winter_offset_shift` is the night term
@@ -391,7 +393,7 @@ def apply_shift_and_refit_spread(*, frame: pl.DataFrame, shift: np.ndarray) -> p
 
     The quantiles are the corrected mean plus the centred residual table (hour band, calendar
     quarter, and lead band) of the corrected forecasts of the tuning runs outside the hand-filtered
-    switching events, every spread factor 1, as experiment 170 builds them.
+    switching events, every spread factor 1, as experiment 155 builds them.
 
     Args:
         frame: The base forecast frame, with the `period` column.
