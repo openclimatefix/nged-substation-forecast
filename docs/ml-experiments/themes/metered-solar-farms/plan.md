@@ -6,7 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| – | No experiment is queued; the proposals below are not yet agreed | – | The maintainer | Open |
+| 00229 | Does adding the UKV weather forecast to the ECMWF ensemble lower a metered solar farm's day-ahead error by 3% or more? | 1 | Nothing; reuses experiment 224's ensemble arm design | Planned |
 
 ## Planned experiments
 
