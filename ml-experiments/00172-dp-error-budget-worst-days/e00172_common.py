@@ -1,8 +1,9 @@
 """Paths, constants, and the day table shared by the scripts of experiment 172.
 
-The forecasts are experiment 155's arm D, read from its private folder. This experiment writes only
-under its own `WORK_DIR`. A day is a local (Europe/London) calendar day, and a row is one half-hour
-of the D+1 band (lead 15 to 39 hours), which holds each valid half-hour once.
+The forecasts are experiment 155's arm D, read from its private folder. This experiment writes
+only under its own `WORK_DIR`. A day is a local (Europe/London) calendar day, dated by the
+half-hour's start (`valid_time` is the half-hour's end). A row is one half-hour of the D+1 band
+(lead 15 to 39 hours), which holds each valid half-hour once.
 """
 
 import json
@@ -97,13 +98,14 @@ def read_rows(*, lead_band: tuple[float, float], drop_masked: bool) -> pl.DataFr
     )
     if drop_masked:
         rows = rows.filter(~pl.col("switching_mask"))
-    local = pl.col("valid_time").dt.convert_time_zone(LOCAL_TZ)
+    start = pl.col("valid_time") - HALF_HOUR
+    local = start.dt.convert_time_zone(LOCAL_TZ)
     return rows.with_columns(
         local_date=local.dt.date(),
         local_hour=local.dt.hour(),
         month=local.dt.month(),
-        utc_hour=pl.col("valid_time").dt.hour(),
-        utc_minute=pl.col("valid_time").dt.minute(),
+        utc_hour=start.dt.hour(),
+        utc_minute=start.dt.minute(),
     )
 
 
@@ -117,7 +119,7 @@ def weather_and_calendar(*, rows: pl.DataFrame, cache: FeatureCache) -> pl.DataF
     pieces, day_means = [], []
     end_times = cache.end_times
     local_date_of_grid = (
-        pl.Series(end_times.astype("datetime64[us]"))
+        pl.Series(end_times.astype("datetime64[us]") - np.timedelta64(30, "m"))
         .dt.replace_time_zone("UTC")
         .dt.convert_time_zone(LOCAL_TZ)
         .dt.date()

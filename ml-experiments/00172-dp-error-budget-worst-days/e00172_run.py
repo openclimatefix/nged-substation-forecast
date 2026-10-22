@@ -92,7 +92,12 @@ def report_controls(*, days: pl.DataFrame, rng) -> None:  # noqa: ANN001
     """Print the random-day and injected-excess controls."""
     print("\n== Random-day control", stats.random_control(days=days, sites=SITES, rng=rng))
     recovered = stats.injected_control(days=days, sites=SITES, rng=rng)
-    print(f"== Injected control: {recovered:.3f} of injected days in the worst 5% (needs 0.90)")
+    print(
+        f"== Injected control, pooled: {recovered['pooled']:.3f} of injected days in the worst 5%"
+    )
+    print("   by site:", {k: round(v, 3) for k, v in recovered.items() if k != "pooled"})
+    larger = stats.injected_control(days=days, sites=SITES, rng=rng, points=10.0)
+    print("== Injected control, 10 points (post hoc):", {k: round(v, 3) for k, v in larger.items()})
 
 
 def report_checks(*, days: pl.DataFrame, rows: pl.DataFrame, worst: pl.DataFrame) -> None:
@@ -104,6 +109,9 @@ def report_checks(*, days: pl.DataFrame, rows: pl.DataFrame, worst: pl.DataFrame
             median_minus_mean=(pl.col("q50") - pl.col("mean")).mean(),
             mean_abs_error_of_mean=(pl.col("actual") - pl.col("mean")).abs().mean(),
             mean_abs_error_of_median=(pl.col("actual") - pl.col("q50")).abs().mean(),
+            max_abs_median_minus_mean=(pl.col("q50") - pl.col("mean")).abs().max(),
+            first_day=pl.col("local_date").min(),
+            last_day=pl.col("local_date").max(),
         )
         .sort("site")
     )

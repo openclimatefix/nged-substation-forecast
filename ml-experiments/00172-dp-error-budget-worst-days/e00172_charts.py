@@ -95,7 +95,7 @@ def curve_chart() -> alt.TopLevelMixin:
         width=WIDTH,
         height=300,
         title=alt.TitleParams(
-            "The worst 5% of days carry about 40% of the excess loss",
+            "The worst 5% of days carry more than 40% of the excess loss",
             subtitle=lines(
                 text="Excess loss is a day's quantile score (points of effective capacity, D+1 "
                 "rows, 2025-07-02 to 2026-06-29) minus the substation's median day. Thick black "
@@ -138,7 +138,7 @@ def label_chart() -> alt.TopLevelMixin:
             title=alt.TitleParams(
                 "Switching events label the most worst days; half the worst days have no label",
                 subtitle=lines(
-                    text="Five substations, 72 worst days of 1,391 days. A day can carry several "
+                    text="Five substations, 72 worst days of 1,392 substation-days. A day can carry several "
                     "labels, so the bars do not sum to the 'Any label' bar."
                 ),
             ),
@@ -158,7 +158,11 @@ def example_days() -> list[dict]:
         ("cold snap", pl.col("cold") & ~pl.col("switching") & ~pl.col("holiday")),
         ("no label", ~pl.col("labelled")),
     ):
-        row = worst.filter(condition).sort("excess", descending=True).row(0, named=True)
+        row = (
+            worst.filter(condition, pl.col("n_rows") == 48)
+            .sort("excess", descending=True)
+            .row(0, named=True)
+        )
         picks.append({"name": name, "site": row["site"], "date": row["local_date"]})
     return picks
 
@@ -198,11 +202,11 @@ def example_chart() -> alt.TopLevelMixin:
         panels.append((band + forecast + actual).properties(width=WIDTH, height=130, title=title))
     return alt.vconcat(*panels).properties(
         title=alt.TitleParams(
-            "Four typical worst days: the actual power leaves the forecast's 90% band",
+            "Four typical worst days: the actual power sits far from the median forecast",
             subtitle=lines(
                 text="Orange: actual power. Blue line: median forecast. Blue band: 5% to 95% "
                 "quantiles. Forecasts made 15 to 39 hours ahead. One worst day per label class "
-                "(the highest-loss day of each class, switching rows excluded from scoring)."
+                "(the highest-loss day of each class among days with all 48 half-hours scored)."
             ),
         )
     )

@@ -187,17 +187,23 @@ def random_control(*, days: pl.DataFrame, sites: tuple[str, ...], rng: np.random
 
 
 def injected_control(
-    *, days: pl.DataFrame, sites: tuple[str, ...], rng: np.random.Generator
-) -> float:
-    """Return the share of injected days that land in the worst 5% of days."""
-    hits, injected = 0, 0
+    *,
+    days: pl.DataFrame,
+    sites: tuple[str, ...],
+    rng: np.random.Generator,
+    points: float = common.INJECTED_POINTS,
+) -> dict[str, float]:
+    """Return, per site and pooled, the share of injected days that land in the worst 5%."""
+    hits_by_site = dict.fromkeys(sites, 0)
+    per_site = common.INJECTED_DAYS * INJECTION_REPEATS
     for _ in range(INJECTION_REPEATS):
         for site in sites:
             score = days.filter(pl.col("site") == site)["score"].to_numpy().copy()
             chosen = rng.choice(len(score), size=common.INJECTED_DAYS, replace=False)
-            score[chosen] += common.INJECTED_POINTS
+            score[chosen] += points
             excess = score - np.median(score)
             worst = np.argsort(-excess)[: math.ceil(len(score) * common.WORST_FRACTION)]
-            hits += len(set(worst) & set(chosen))
-            injected += common.INJECTED_DAYS
-    return hits / injected
+            hits_by_site[site] += len(set(worst) & set(chosen))
+    out = {site: hits / per_site for site, hits in hits_by_site.items()}
+    out["pooled"] = sum(hits_by_site.values()) / (per_site * len(sites))
+    return out
