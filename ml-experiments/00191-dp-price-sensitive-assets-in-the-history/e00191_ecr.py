@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 191, step 1: price-following assets under each metered Primary, from NGED's ECR.
 
 Reads the August 2026 Embedded Capacity Register (both Part 1 sheets, and Part 2 for demand-side

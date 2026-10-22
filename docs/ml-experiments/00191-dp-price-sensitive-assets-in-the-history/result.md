@@ -5,7 +5,7 @@ theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - switching-labels-in-the-forecast
   - differentiable-physics-forecast-engine
-status: planned
+status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00191-dp-price-sensitive-assets-in-the-history/ only (public price files are
@@ -57,46 +57,161 @@ metric: >-
   half-hours with a positive spark spread at 40% efficiency; q05-to-q95 coverage; lead bands.
 code: ml-experiments/00191-dp-price-sensitive-assets-in-the-history/
 date: 2026-10-22
+verdict: not supported
+production_status: not-for-production
+adopted_in: none
+best_arm: >-
+  None. At D8 the hindsight arm H (true price at forecast time) scores -0.64% of the reference's mean
+  absolute error (95% interval -2.51% to +1.12%), against a pre-registered bar of -5%.
+headline: >-
+  Letting the model see the price in its history does not improve the forecast at D8 or D14. The
+  ceiling that uses the true price at forecast time gains 0.6% at D8, and every arm that could run
+  live is no better than a model with no price input.
+lessons:
+  - >-
+    At D8 the price columns explain 2.7% to 4.8% of the error on the rows they are fitted to, so even
+    a perfect price forecast could not have reached the pre-registered 5% bar.
+  - >-
+    The fitted price response at D8 is 1.2 to 1.9 MW, the size of a gas engine's block, but it does
+    not carry forward: out of sample the best arm gains 0.6%, with an interval that includes zero.
+  - >-
+    At D14, where the register places the 6 MW gas engine, the fitted response is 0 to 0.14 MW. The
+    engine's footprint appears at D8, not D14.
+  - >-
+    Removing the price-driven half-hours from training (T) and replacing the price by its expected
+    value (M) do not help, and persisting yesterday's price (P) hurts D8 by 4.4%.
+take_home_message: >-
+  Modelling a price-following asset in the history does not make the forecast better at D8 or D14.
+  A model that is given the true price at forecast time, which no live service has, gains only 0.6% at
+  D8, and the models that use a price available at forecast time lose 0.9% to 4.4%. The gas engine's
+  response is real enough to fit (1.2 to 1.9 MW at D8 within the training rows), so the remaining
+  D8 error comes from something the price does not explain, and NGED's half-hourly output for the
+  engine is the next thing to ask for.
+advice:
+  - >-
+    Do not add half-hourly price indicators to the demand model for D8 or D14: the hindsight ceiling
+    gains 0.6% at D8 and loses 0.5% at D14 (Figure 1).
+  - >-
+    Ask NGED for the half-hourly output of the gas engine registered near D8, because the price
+    columns reach at most 4.8% of the error even on their own training rows (Results, in-sample gain).
+  - >-
+    Fit D8's spread on D8's own residuals before adding another input: the q05 to q95 interval covers
+    42% of readings and the q05 quantile sits above 31% of them (Results, tails).
+  - >-
+    Treat D14 as the site where the register lists a gas engine but the data shows no price response;
+    do not gate a D14 model on the connection date (Figure 2).
 ---
 
 # Experiment 191: can price-following assets be modelled in the history so the forecast improves?
 
-This page is the plan. The results are added after the scripts have run.
+**Take-home message: modelling a price-following asset in the history does not improve the forecast
+at D8 or D14.** D8 and D14 are two substations of National Grid Electricity Distribution (NGED) in
+the Boston area. [Experiment 186](../00186-switching-d8-gas-peaker-spark-spread-and-triads/result.md)
+found that D8's multi-day drops in demand look partly like a gas engine that runs when electricity is
+dear relative to gas. A price cannot be forecast days ahead, so we asked a narrower question: if the
+demand model sees the price in its training history, does it learn a cleaner picture of the rest of
+the demand, and does the forecast improve even when the price is unknown at forecast time? We added
+four price indicators to a convex demand model, each lowering net load by a fitted, non-negative
+amount, switched on from the connection date of a registered 6 MW gas engine. We tested four ways of
+using them at forecast time and scored the forecasts on a year that the fits had not seen. The best
+arm, which uses the true price at forecast time and so cannot run live, lowers D8's mean absolute
+error by 0.6%, with an interval that includes zero. The pre-registered bar was 5%, so the verdict is
+`not supported`. The model reproduces earlier work to numerical precision (see Checks), the gas
+engine's response is visible in the fitted coefficients, and it still does not carry forward.
 
-## Plan
+![Mean absolute error of each price-aware arm minus the reference's, at D8 and D14](figure_1_error_against_reference.svg)
 
-- **Question.** Experiment 186 found that D8's multi-day drops look partly like a gas engine that
-  follows the spark spread (the system price minus the cost of the gas burned at 40% efficiency).
-  The August 2026 Embedded Capacity Register lists a 6 MW gas engine, not combined heat and power,
-  connected on 2023-06-13, 0.4 km from the Primary labelled D14 and about 0.8 km from D8. The price
-  cannot be forecast days ahead, so the question is whether the model can use the price to understand
-  the past and forecast the rest better.
-- **Sites.** D8 first (apparent power only, series valid from 2025-04-01, 12 monthly refits from
-  2025-07). D14 as a second test site, because the engine is registered under it and its history
-  runs back to 2020, so the connection date is a structural break the fit can learn. D5 (a 1 MW
-  gas engine connected in 2021, gate always on) and D10, D11 and D16 (no price-following asset
-  connected, gate always off) as the no-harm check.
-- **Arms.** A0 (the reference). H (hindsight price at forecast time). M (price features replaced at
-  forecast time by their training-period expected value given the half-hour of the day, the day type
-  and the quarter). T (the half-hours that H's fitted price term explains are dropped from training;
-  the forecast model has no price term). P (the last settled day's price at the same half-hour of
-  the day, the only price known at the 09:00 UTC origin; the day-ahead auction price is published
-  after the origin and is not used). N, a learned monotone price-response curve, runs only if the
-  above leave time and GPU budget.
-- **Price features.** Four non-negative indicators of the half-hour, multiplied by the asset's
-  gate (1 from the connection date): system price above its 50th, 75th and 90th percentile (fixed
-  thresholds from 2023-06 to 2026-06), and a positive spark spread at 40% efficiency with a 5 pound
-  per MWh operating cost (experiment 186's assumptions; days with a gas price above 15 pence per
-  kWh are data errors and are excluded). Each enters the design with a minus sign and a
-  non-negative coefficient, so a price-following asset can only lower net load.
-- **No-harm check.** Where the gate is always off, the price columns are zero and every arm equals
-  A0 by construction. The plan also runs M with the gate switched on for the whole history at the
-  sites with no asset, as the stricter test.
-- **Stated simplification.** A0 is the ensemble-driven GAM-K with fitted solar capacity (experiment
-  152's engine), not experiment 155's arm D. D8 has no pinned PV capacity vintage, and its series
-  restarted in April 2025. T-all, the winter night offset and the 14-day error profile of recipe R
-  are added to every arm at the end only if the score of A0 differs from arm D at D14 by more than
-  the contrasts under test.
-- **Past weather.** The price at lag times is public and settles within the hour. The ERA5
-  temperature and CAMS irradiance used in training exist only after the fact, as in every earlier
-  experiment of this series; the ensemble mean drives the forecast.
+![Fitted price response in MW at each monthly fit, D8 and D14](figure_2_fitted_price_response.svg)
+
+## What was built
+
+- **The register.** NGED's Embedded Capacity Register (August 2026) lists one connected gas engine
+  that is not combined heat and power under the Primaries with metered series: 6 MW, connected on
+  2023-06-13, 0.4 km from D14's coordinates and about 0.8 km from D8's. D8 itself lists only solar and
+  a 1.35 MW row of unknown type. D5 has a 1 MW gas engine connected in 2021. Batteries of 0.2 to 0.25
+  MW are connected at D2, D9 and D11 (2024 to 2026), and two more are accepted but not connected, at
+  D3 and D16. The demand-side-response sheet holds no rows. The eight other Primaries that the
+  register covers list no price-following asset (`printed_ecr.txt`).
+- **Reference (A0).** The ensemble-driven convex demand model of
+  [experiment 152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md) (fitted solar
+  capacity, monthly refits on a 24-month window, shared Kalman filter, spread fitted on tuning months),
+  with no price input. At D8 it has 12 monthly fits from 3 to 14 months of history, because the series
+  is valid only from 2025-04-01. At D14 it has 27 fits. It is not the best-guess stack of
+  [experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the
+  winter night offset and the 14-day error profile are absent, because D8 has no tuning months to fit
+  the offset on. At D14 the reference's mean absolute error is 3.84 points against 3.69 for the
+  best-guess stack.
+- **Arms.** H uses the true price at forecast time (a ceiling). M uses the expected indicator given
+  the half-hour of the day, day type and quarter. P uses the last settled day's indicator at the same
+  half-hour, the only price known at the 09:00 UTC origin. T removes the half-hours that the fitted
+  price term explains from training and forecasts without a price term. A diagnostic arm (JB) is the
+  price-aware fit's base model with its price term switched off at forecast time. The learned
+  monotone price curve (arm N) was not run.
+- **Price indicators.** System price above its 50th, 75th and 90th percentile, and a positive spark
+  spread at 40% efficiency (system price minus gas cost per MWh of electricity minus 5 pounds per
+  MWh), from public data, 2023-06 to 2026-06. The gate is 1 from the engine's connection date.
+- **Masking rule (fixed after one coefficient check, before any score was read).** T drops a training
+  half-hour when the fitted price output there is at least 25% of the largest fitted output and that
+  largest output is at least 1 point (1% of the substation's effective capacity). Without the
+  1-point floor the rule dropped half of D14's training rows for a response of 0.04 MW.
+
+## Results
+
+- **Absolute scores (D8, scored year, all rows, leads 0.5 to 168 hours).** Reference: mean absolute
+  error 15.18 points (1.6 MW), quantile score 10.95, q05-to-q95 coverage 0.42. D14: 3.84, 2.16, 0.89.
+- **Mean absolute error against the reference, D8.** H -0.64% (-2.51% to +1.12%), M +0.88% (-0.39%
+  to +2.27%), P +4.41% (+3.02% to +5.82%), T +3.44% (+0.82% to +6.40%), JB +5.73% (+2.57% to
+  +8.65%). The quantile score gives the same signs: H -1.04%, M +1.00%, P +5.36%, T +4.56%.
+- **Mean absolute error against the reference, D14.** H +0.49% (+0.23% to +0.78%), M +0.02%, P
+  +0.16%, T +0.14%, JB -0.13% (-0.54% to +0.24%).
+- **High-spread half-hours (spark spread above zero), D8.** The reference's error is 16.37 points
+  against 13.96 on other half-hours. H -0.74%, M +1.08%, P +3.73%, T +5.27%. No arm is better where
+  the price signal should be strongest.
+- **By lead, D8, H.** The quantile score falls 2.2% (interval -4.3% to -0.1%, not corrected for the
+  number of cuts) at 0 to 24 hours, 1.8% at 24 to 72 hours and 0.4% at 72 to 168 hours.
+- **In-sample gain (the ceiling).** On each fit's own training rows the price columns lower D8's mean
+  absolute error by 4.1% on average over the 12 fits (2.7% to 4.8%). The fitted response, with all
+  four indicators on, is 1.9 MW at the first fit and 1.2 MW at the last. At D14 the in-sample gain is
+  0.0% and the response is 0 to 0.14 MW. At D5 it is 0.0%.
+- **No-harm check.** The largest rise in quantile score at any of the five decision Primaries (D5,
+  D10, D11, D14, D16) is 0.011 points, at D14 for H, against the 0.02 limit. With the gate switched on
+  for the whole history at sites with no asset (placebo), D10 rises by 0.009 points for H.
+- **Tails.** At D8 the reference's q05 quantile lies above 30.8% of readings (nominal 5%), q95 above
+  73.1% (nominal 95%), q01 above 20.6% (1%) and q99 above 83.9% (99%). H changes none of them by more
+  than 0.5 points. D14 is close to nominal (q05 6.4%, q95 95.1%). The D8 spread comes from six other
+  Primaries and is far too narrow for D8, so D8's quantile scores are weaker evidence than its mean
+  absolute errors.
+- **Post hoc: settlement-day indicators.** Replacing the half-hourly indicators by the settlement
+  day's mean price and spread lowers nothing: D8 H +2.23% (+0.41% to +4.29%), M +2.40%, P +3.83%, T
+  +5.75%.
+- **Not computed.** The curtailment-cost metric (it needs a node and its generators) and the
+  climatology and manual-heuristic baselines.
+- **Schedule.** Monthly refits on a 24-month window, as in experiment 152, not weekly refits, so the
+  absolute scores are not production-setting scores. The contrasts could depend on the schedule at D8,
+  where a longer history would help the price columns.
+
+## Checks
+
+- **Control.** The reference reproduces the stored experiment 152 arm N at D8 (mean absolute gap
+  1e-12 on 97,012 rows) and `studies.dp_gam.fit_gam` at one cut (largest coefficient gap 2e-10).
+  Where the gate is off (D10, D11, D16) every arm equals the reference.
+- **Median minus mean forecast.** 0.000 points at every site and arm, because the spread is
+  symmetric about the corrected mean.
+- **Mean-forecast error beside the quantile score.** Both are reported in Results and have the same
+  sign in every contrast of the main tables.
+- **Audit triggers.** Trigger 2 fired: H gained 0.6% against a pre-registered 5%. The explanation was
+  tested and is the in-sample figure: even on the rows the price columns are fitted to they explain at
+  most 4.8%. Trigger 5 fired: at D14 H, which contains the reference, is 0.49% worse than the
+  reference. JB, which keeps the base fit and drops the price term, is within 0.13% of the
+  reference, so the loss comes from the price term, whose coefficients move between 0 and 0.9 points
+  from fit to fit. No Opus audit was run, because neither result changes the next step. Triggers 1, 3,
+  4, 6 and 7 did not fire.
+
+## What the next experiment should answer
+
+- **Does a spread fitted on D8's own residuals change the picture?** The reference covers 42% of
+  readings where it should cover 90%, so D8's interval scores are weak evidence.
+- **Does a wider band on spark-spread-positive days help?** D8's error is 17% larger on those
+  half-hours. This was not tested.
+- **What does the engine's own output show?** Ask NGED for its half-hourly output, because the
+  price indicators reach at most 4.8% of the error on their own training rows.
