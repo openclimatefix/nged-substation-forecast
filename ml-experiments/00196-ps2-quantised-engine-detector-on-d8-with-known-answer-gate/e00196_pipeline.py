@@ -1,5 +1,7 @@
-"""Series preparation, the noise fit, and the detect, re-centre, detect loop used by every script."""
+"""Series preparation, the noise fit, and the detect and re-centre loop used by every script."""
 
+import itertools
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -9,15 +11,15 @@ from e00196_common import CLEAN_END, Q_FLOOR, key_of, load_panel, stamp, times
 from e00196_hmm import (
     Noise,
     Params,
+    Posterior,
     context_ids,
     detect,
     fit_em,
     forward_backward,
-    log_emissions,
     initial_params,
+    log_emissions,
     recentre,
     rolling_offset,
-    unit_means,
 )
 
 
@@ -34,16 +36,25 @@ class Series:
     hour: np.ndarray
     weekend: np.ndarray
 
-    def with_reading(self, y: np.ndarray) -> "Series":
+    def with_reading(self, y: np.ndarray) -> Series:
         """Same site with another reading (an injected copy)."""
-        return Series(self.label, y, self.load, y - self.load, self.ctx, self.month, self.hour,
-                      self.weekend)
+        return Series(
+            self.label, y, self.load, y - self.load, self.ctx, self.month, self.hour, self.weekend
+        )
 
-    def window(self, lo: int, hi: int) -> "Series":
+    def window(self, lo: int, hi: int) -> Series:
         """A slice of the grid."""
         s = slice(lo, hi)
-        return Series(self.label, self.y[s], self.load[s], self.resid[s], self.ctx[s],
-                      self.month[s], self.hour[s], self.weekend[s])
+        return Series(
+            self.label,
+            self.y[s],
+            self.load[s],
+            self.resid[s],
+            self.ctx[s],
+            self.month[s],
+            self.hour[s],
+            self.weekend[s],
+        )
 
 
 def load_series(*, label: str, q: float = Q_FLOOR) -> Series:
@@ -57,8 +68,16 @@ def load_series(*, label: str, q: float = Q_FLOOR) -> Series:
     hour = t.dt.hour().to_numpy()
     weekday = t.dt.weekday().to_numpy() - 1
     month = (t.dt.year().to_numpy() * 12 + t.dt.month().to_numpy()).astype(int)
-    return Series(label, y, load, y - expected, context_ids(hours=hour, weekdays=weekday), month,
-                  hour, (weekday >= 5).astype(int))
+    return Series(
+        label,
+        y,
+        load,
+        y - expected,
+        context_ids(hours=hour, weekdays=weekday),
+        month,
+        hour,
+        (weekday >= 5).astype(int),
+    )
 
 
 def clean_mask(*, n: int) -> np.ndarray:
@@ -89,7 +108,7 @@ def fit_noise(*, s: Series, rows: np.ndarray, odd_months_only: bool = True) -> N
     lo = s.load[1:][pair[1:]]
     edges = np.quantile(lo, np.linspace(0, 1, 6))
     centres, sds = [], []
-    for a, b in zip(edges[:-1], edges[1:], strict=True):
+    for a, b in itertools.pairwise(edges):
         sel = (lo >= a) & (lo <= b)
         if sel.sum() > 200:
             centres.append(lo[sel].mean())
@@ -111,7 +130,9 @@ def with_local_noise(*, s: Series, noise: Noise, reference_rows: np.ndarray) -> 
     r = s.resid
     u = np.abs(r[1:] - noise.rho * r[:-1])
     frame = pl.DataFrame({"u": np.concatenate([[np.nan], u])}).with_columns(
-        pl.col("u").rolling_median(window_size=LOCAL_WINDOW, min_samples=200, center=True).alias("m")
+        pl.col("u")
+        .rolling_median(window_size=LOCAL_WINDOW, min_samples=200, center=True)
+        .alias("m")
     )
     local = frame["m"].to_numpy()
     ok = np.isfinite(local)
@@ -122,9 +143,14 @@ def with_local_noise(*, s: Series, noise: Noise, reference_rows: np.ndarray) -> 
 
 
 def run_loop(
-    *, s: Series, noise: Noise, params: Params, q: float = Q_FLOOR, rounds: int = 2,
+    *,
+    s: Series,
+    noise: Noise,
+    params: Params,
+    q: float = Q_FLOOR,
+    rounds: int = 2,
     local_reference: np.ndarray | None = None,
-) -> tuple[np.ndarray, "object"]:
+) -> tuple[np.ndarray, Posterior]:
     """Frozen detector: detect, re-centre from the zero-unit half-hours, detect again.
 
     Returns the final offset and the final posterior.
@@ -134,8 +160,15 @@ def run_loop(
     offset = rolling_offset(y=s.y, load=s.load, g_unused=params.g, q=q)
     for _ in range(rounds):
         post = detect(y=s.y, load=s.load, offset=offset, ctx=s.ctx, noise=noise, q=q, params=params)
-        offset = recentre(y=s.y, load=s.load, p_zero=post.smoothed[:, 0], month=s.month,
-                          hour=s.hour, weekend=s.weekend, q=q)
+        offset = recentre(
+            y=s.y,
+            load=s.load,
+            p_zero=post.smoothed[:, 0],
+            month=s.month,
+            hour=s.hour,
+            weekend=s.weekend,
+            q=q,
+        )
     post = detect(y=s.y, load=s.load, offset=offset, ctx=s.ctx, noise=noise, q=q, params=params)
     return offset, post
 
@@ -144,50 +177,118 @@ STARTS: tuple[float, ...] = tuple(float(x) for x in np.arange(1.0, 3.51, 0.25))
 """Unit sizes of the profile likelihood, in MW; the transitions are refitted at each."""
 
 
-def objective(*, sub: Series, offset: np.ndarray, noise: Noise, params: Params, q: float,
-              prior_mean: float, prior_sd: float) -> float:
+def objective(
+    *,
+    sub: Series,
+    offset: np.ndarray,
+    noise: Noise,
+    params: Params,
+    q: float,
+    prior_mean: float,
+    prior_sd: float,
+) -> float:
     """Log-likelihood of the stretch plus the Gaussian log prior on the unit size."""
     log_e = log_emissions(y=sub.y, load=sub.load, offset=offset, g=params.g, q=q, noise=noise)
     post = forward_backward(log_e=log_e, ctx=sub.ctx, params=params, weight=np.ones(len(sub.y)))
     return post.loglik - 0.5 * ((params.g - prior_mean) / prior_sd) ** 2
 
 
-def best_start(*, sub: Series, offset: np.ndarray, noise: Noise, q: float, prior_mean: float,
-               prior_sd: float, init: Params | None, log) -> Params:
+def best_start(
+    *,
+    sub: Series,
+    offset: np.ndarray,
+    noise: Noise,
+    q: float,
+    prior_mean: float,
+    prior_sd: float,
+    init: Params | None,
+    log: Callable[[str], None],
+) -> Params:
     """Profile the unit size: refit the transitions at each size, keep the best objective."""
     best, best_value = None, -np.inf
     starts = STARTS if init is None else (init.g,)
     for g0 in starts:
         start = initial_params(g=g0) if init is None else init
-        params = fit_em(y=sub.y, load=sub.load, offset=offset, ctx=sub.ctx, noise=noise, q=q,
-                        params=start, prior_mean=g0, prior_sd=1e-3, n_iter=8)
-        value = objective(sub=sub, offset=offset, noise=noise, params=params, q=q,
-                          prior_mean=prior_mean, prior_sd=prior_sd)
+        params = fit_em(
+            y=sub.y,
+            load=sub.load,
+            offset=offset,
+            ctx=sub.ctx,
+            noise=noise,
+            q=q,
+            params=start,
+            prior_mean=g0,
+            prior_sd=1e-3,
+            n_iter=8,
+        )
+        value = objective(
+            sub=sub,
+            offset=offset,
+            noise=noise,
+            params=params,
+            q=q,
+            prior_mean=prior_mean,
+            prior_sd=prior_sd,
+        )
         log(f"    start g0={g0:.1f} -> g={params.g:.2f} MW, objective {value:.0f}")
         if value > best_value:
             best, best_value = params, value
+    if best is None:
+        raise ValueError("no start produced a fit")
     return best
 
 
 def train_rounds(
-    *, s: Series, lo: int, hi: int, noise: Noise, prior_mean: float,
-    prior_sd: float, q: float = Q_FLOOR, retrains: int = 2, log=print,
+    *,
+    s: Series,
+    lo: int,
+    hi: int,
+    noise: Noise,
+    prior_mean: float,
+    prior_sd: float,
+    q: float = Q_FLOOR,
+    retrains: int = 2,
+    log: Callable[[str], None] = print,
 ) -> tuple[Params, list[float]]:
     """Multi-start EM on rows [lo, hi), then `retrains` times: detect, re-centre, refit."""
     sub = s.window(lo, hi)
     noise = noise.window(lo, hi)
     offset = rolling_offset(y=s.y, load=s.load, g_unused=0.0, q=q)[lo:hi]
-    params = best_start(sub=sub, offset=offset, noise=noise, q=q, prior_mean=prior_mean,
-                        prior_sd=prior_sd, init=None, log=log)
+    params = best_start(
+        sub=sub,
+        offset=offset,
+        noise=noise,
+        q=q,
+        prior_mean=prior_mean,
+        prior_sd=prior_sd,
+        init=None,
+        log=log,
+    )
     path = [params.g]
     log(f"  EM round 0: g = {params.g:.3f} MW")
     for r in range(retrains):
-        post = detect(y=sub.y, load=sub.load, offset=offset, ctx=sub.ctx, noise=noise, q=q,
-                      params=params)
-        offset = recentre(y=sub.y, load=sub.load, p_zero=post.smoothed[:, 0], month=sub.month,
-                          hour=sub.hour, weekend=sub.weekend, q=q)
-        params = best_start(sub=sub, offset=offset, noise=noise, q=q, prior_mean=prior_mean,
-                            prior_sd=prior_sd, init=None, log=log)
+        post = detect(
+            y=sub.y, load=sub.load, offset=offset, ctx=sub.ctx, noise=noise, q=q, params=params
+        )
+        offset = recentre(
+            y=sub.y,
+            load=sub.load,
+            p_zero=post.smoothed[:, 0],
+            month=sub.month,
+            hour=sub.hour,
+            weekend=sub.weekend,
+            q=q,
+        )
+        params = best_start(
+            sub=sub,
+            offset=offset,
+            noise=noise,
+            q=q,
+            prior_mean=prior_mean,
+            prior_sd=prior_sd,
+            init=None,
+            log=log,
+        )
         path.append(params.g)
         log(f"  retrain {r + 1}: g = {params.g:.3f} MW")
     return params, path

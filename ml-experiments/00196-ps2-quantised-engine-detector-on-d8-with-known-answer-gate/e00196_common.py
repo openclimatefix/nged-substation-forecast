@@ -45,7 +45,7 @@ def stamp(when: datetime) -> int:
 
 def load_panel() -> dict[int, dict]:
     """Return the stored residual panel."""
-    return pickle.loads(ARRAYS_PATH.read_bytes())  # noqa: S301  (our own stored file)
+    return pickle.loads(ARRAYS_PATH.read_bytes())
 
 
 def key_of(*, panel: dict[int, dict], label: str) -> int:
@@ -66,7 +66,9 @@ def g2_output(*, n: int) -> np.ndarray:
         scan_power().filter(pl.col("time_series_id") == G2_SERIES).select("time", "power").collect()
     )
     out = np.full(n, np.nan)
-    idx = ((frame["time"].dt.epoch("s").to_numpy() - int(GRID_START.timestamp())) // 1800).astype(int)
+    idx = ((frame["time"].dt.epoch("s").to_numpy() - int(GRID_START.timestamp())) // 1800).astype(
+        int
+    )
     keep = (idx >= 0) & (idx < n)
     out[idx[keep]] = frame["power"].to_numpy()[keep]
     return out

@@ -1,5 +1,7 @@
 """Scores of a detector's posterior against an injection: recall, precision, energy, intervals."""
 
+from typing import Any
+
 import numpy as np
 from e00196_common import UNIT_MW
 from e00196_inject import Injection
@@ -13,12 +15,9 @@ def flagged(*, smoothed: np.ndarray) -> np.ndarray:
     return smoothed[:, 1:].sum(axis=1) > THRESHOLD
 
 
-def _day_resample(rng: np.random.Generator, days: np.ndarray, n: int) -> np.ndarray:
-    uniq = np.unique(days)
-    return rng.choice(uniq, size=(n, len(uniq)))
-
-
-def score(*, inj: Injection, smoothed: np.ndarray, filtered: np.ndarray, g: float, seed: int = 0) -> dict:
+def score(
+    *, inj: Injection, smoothed: np.ndarray, filtered: np.ndarray, g: float, seed: int = 0
+) -> dict[str, Any]:
     """Pooled scores over the scored half-hours of `inj`, with day-resampled intervals."""
     sc = inj.scored
     truth = inj.truth_units[sc]
@@ -41,7 +40,7 @@ def score(*, inj: Injection, smoothed: np.ndarray, filtered: np.ndarray, g: floa
     order = np.argsort(days, kind="stable")
     sorted_days = days[order]
     uniq, first = np.unique(sorted_days, return_index=True)
-    bounds = list(first) + [len(order)]
+    bounds = [*list(first), len(order)]
     groups = [order[bounds[i] : bounds[i + 1]] for i in range(len(uniq))]
     draws = []
     for _ in range(N_RESAMPLES):
@@ -50,8 +49,10 @@ def score(*, inj: Injection, smoothed: np.ndarray, filtered: np.ndarray, g: floa
     draws = np.array(draws)
     lo, hi = np.nanpercentile(draws, [2.5, 97.5], axis=0)
     names = ("recall_1_unit", "recall_2_or_3_units", "precision", "energy_error", "flagged_share")
-    out = {n: {"value": float(v), "lo": float(a), "hi": float(b)} for n, v, a, b in
-           zip(names, base, lo, hi, strict=True)}
+    out: dict[str, Any] = {
+        n: {"value": float(v), "lo": float(a), "hi": float(b)}
+        for n, v, a, b in zip(names, base, lo, hi, strict=True)
+    }
     out["recall_filtered_any_running"] = float(flag_f[truth >= 1].mean())
     out["exact_k_accuracy"] = float((smoothed[sc].argmax(axis=1) == truth).mean())
     out["n_scored"] = int(sc.sum())

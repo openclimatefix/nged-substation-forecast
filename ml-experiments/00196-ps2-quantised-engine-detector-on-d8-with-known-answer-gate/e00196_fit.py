@@ -1,15 +1,13 @@
 """Fit the noise on D8's clean history and the detector on 2023-09 to 2025-12; save the fits.
 
-    systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        env OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00196-*/e00196_fit.py
+OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00196-*/e00196_fit.py
 """
 
 import pickle
-from datetime import UTC, datetime
 import sys
+from datetime import UTC, datetime
 
 import numpy as np
-
 from e00196_common import DATA_DIR, FIT_END, FIT_START, Q_FLOOR, UNIT_MW, stamp
 from e00196_pipeline import clean_mask, fit_noise, load_series, train_rounds, with_local_noise
 
@@ -29,18 +27,29 @@ def main() -> None:
     local = "local" in sys.argv[1:]
     if local:
         noise = with_local_noise(s=s, noise=noise, reference_rows=clean)
-        print("local-noise variant: multiplier on 2023-09 to 2025-12 has median "
-              f"{float(np.median(noise.mult[stamp(FIT_START):stamp(FIT_END)])):.2f}")
+        assert noise.mult is not None
+        print(
+            "local-noise variant: multiplier on 2023-09 to 2025-12 has median "
+            f"{float(np.median(noise.mult[stamp(FIT_START) : stamp(FIT_END)])):.2f}"
+        )
     names = [a for a in sys.argv[1:] if a in PRIORS] or list(PRIORS)
     for name in names:
         mean, sd = PRIORS[name]
         print(f"prior {name}: centre {mean} MW, sd {sd} MW")
         params, path = train_rounds(
-            s=s, lo=lo, hi=hi, noise=noise, prior_mean=mean, prior_sd=sd, q=Q_FLOOR,
+            s=s,
+            lo=lo,
+            hi=hi,
+            noise=noise,
+            prior_mean=mean,
+            prior_sd=sd,
+            q=Q_FLOOR,
         )
         fits[name] = {"params": params, "g_path": path}
         DATA_DIR.mkdir(parents=True, exist_ok=True)
-        (DATA_DIR / f"fit_{name}{'_local' if local else ''}{'_presolar' if presolar else ''}.pkl").write_bytes(pickle.dumps({"noise": noise, "fits": {name: fits[name]}}))
+        (
+            DATA_DIR / f"fit_{name}{'_local' if local else ''}{'_presolar' if presolar else ''}.pkl"
+        ).write_bytes(pickle.dumps({"noise": noise, "fits": {name: fits[name]}}))
 
 
 if __name__ == "__main__":

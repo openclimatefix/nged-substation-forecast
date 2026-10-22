@@ -1,8 +1,8 @@
 """Hidden Markov model of 0 to 3 engine units read through a magnitude meter.
 
-State: the active-period flag a (0 or 1) and the number of units running k (0 to 3), eight states in
-all. Reading: y_t = sqrt((L_t - k g)^2 + q^2) + d_t + e_t, where L_t is the expected real power, g is
-the unit size, q is a reactive-power floor, d_t is a slowly varying offset, and e_t is a
+State: the active-period flag a (0 or 1) and the number of units running k (0 to 3), eight states
+in all. Reading: y_t = sqrt((L_t - k g)^2 + q^2) + d_t + e_t, where L_t is the expected real power,
+g is the unit size, q is a reactive-power floor, d_t is a slowly varying offset, and e_t is a
 first-order autoregressive error with Student-t innovations. The innovation is computed from the
 previous error under the previous state, so the emission depends on the pair (previous k, new k)
 and the forward-backward pass stays exact. A whole-unit step is therefore outside the
@@ -43,7 +43,7 @@ class Noise:
         base = np.maximum(self.s0 + self.s1 * (load - 7.0), 0.25 * self.s0)
         return base if self.mult is None else base * self.mult
 
-    def window(self, lo: int, hi: int) -> "Noise":
+    def window(self, lo: int, hi: int) -> Noise:
         """The noise for rows [lo, hi)."""
         return Noise(self.rho, self.s0, self.s1, None if self.mult is None else self.mult[lo:hi])
 
@@ -57,13 +57,16 @@ class Params:
     k_matrix: np.ndarray
     """Shape (2, N_CONTEXTS, 4, 4): by the new active flag, context, previous k, new k."""
 
-    def copy(self) -> "Params":
+    def copy(self) -> Params:
         """Return an independent copy."""
         return Params(g=self.g, a_matrix=self.a_matrix.copy(), k_matrix=self.k_matrix.copy())
 
 
 def initial_params(*, g: float) -> Params:
-    """Return the starting transitions: rare moves to any other count (several units can start together), rarer outside active periods."""
+    """Return the starting transitions: rare moves to any count, rarer outside active periods.
+
+    Several units can start together, so every other count is reachable from each count.
+    """
     a_matrix = np.array([[0.998, 0.002], [0.01, 0.99]])
     k_matrix = np.zeros((2, N_CONTEXTS, N_K, N_K))
     for a, move in ((0, 0.01), (1, 0.12)):
@@ -102,7 +105,7 @@ def log_emissions(
     err = y[:, None] - mu - offset[:, None]  # (T, 4) error under each state
     scale = noise.scale(load=load)
     prev_err = np.concatenate([np.full((1, N_K), np.nan), err[:-1]])
-    first = ~np.isfinite(prev_err[:, 0])
+    first = ~np.isfinite(prev_err[:, 0])  # no previous error: row 0 or the row after a gap
     innov = err[:, None, :] - noise.rho * np.nan_to_num(prev_err)[:, :, None]  # (T, prev, new)
     stationary = scale / np.sqrt(1 - noise.rho**2)
     out = np.where(
@@ -248,15 +251,28 @@ def fit_em(
         post = forward_backward(log_e=log_e, ctx=ctx, params=params, weight=weight)
         m_step_transitions(post=post, params=params, start=start)
         params.g = m_step_unit_size(
-            post=post, y=y, load=load, offset=offset, noise=noise, q=q, weight=weight,
-            prior_mean=prior_mean, prior_sd=prior_sd,
+            post=post,
+            y=y,
+            load=load,
+            offset=offset,
+            noise=noise,
+            q=q,
+            weight=weight,
+            prior_mean=prior_mean,
+            prior_sd=prior_sd,
         )
     return params
 
 
 def detect(
-    *, y: np.ndarray, load: np.ndarray, offset: np.ndarray, ctx: np.ndarray, noise: Noise,
-    q: float, params: Params,
+    *,
+    y: np.ndarray,
+    load: np.ndarray,
+    offset: np.ndarray,
+    ctx: np.ndarray,
+    noise: Noise,
+    q: float,
+    params: Params,
 ) -> Posterior:
     """Run the frozen model over all rows."""
     log_e = log_emissions(y=y, load=load, offset=offset, g=params.g, q=q, noise=noise)
@@ -278,10 +294,18 @@ def rolling_offset(*, y: np.ndarray, load: np.ndarray, g_unused: float, q: float
 
 
 def recentre(
-    *, y: np.ndarray, load: np.ndarray, p_zero: np.ndarray, month: np.ndarray, hour: np.ndarray,
-    weekend: np.ndarray, q: float, threshold: float = 0.9, min_rows: int = 100,
+    *,
+    y: np.ndarray,
+    load: np.ndarray,
+    p_zero: np.ndarray,
+    month: np.ndarray,
+    hour: np.ndarray,
+    weekend: np.ndarray,
+    q: float,
+    threshold: float = 0.9,
+    min_rows: int = 100,
 ) -> np.ndarray:
-    """Offset from the half-hours labelled zero units: a monthly level plus an hour-by-day-type profile."""
+    """Offset from the half-hours labelled zero units: a monthly level plus an hourly profile."""
     res = y - unit_means(load=load, g=0.0, q=q)[:, 0]
     use = np.isfinite(res) & (p_zero > threshold)
     levels = {}

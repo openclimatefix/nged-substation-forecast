@@ -7,8 +7,8 @@ synthetic_x2.0 units {'0': 13958, '1': 1738, '2': 2005, '3': 1307} {'recall_1_un
 q_0.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.847, 0.784, 0.904], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.918, 0.884, 0.949], 'energy_error': [-0.078, -0.102, -0.051], 'flagged_share': [0.174, 0.152, 0.197]} filtered recall 0.915 exact-k 0.962 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
 q_0.5 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.862, 0.802, 0.913], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.888, 0.842, 0.928], 'energy_error': [-0.056, -0.086, -0.021], 'flagged_share': [0.182, 0.158, 0.205]} filtered recall 0.917 exact-k 0.955 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
 q_1.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.847, 0.786, 0.904], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.903, 0.86, 0.94], 'energy_error': [-0.06, -0.086, -0.029], 'flagged_share': [0.177, 0.155, 0.2]} filtered recall 0.918 exact-k 0.954 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
-false alarms clean even months {'rows': 12048, 'flagged_share': 8.300132802124833e-05, 'false_active_days': 0, 'days': 251, 'false_active_days_per_month': 0.0}
-false alarms clean all {'rows': 26832, 'flagged_share': 0.0070438282647584975, 'false_active_days': 5, 'days': 559, 'false_active_days_per_month': 0.27191413237924866}
+false alarms clean even months {'rows': 12045, 'flagged_share': 8.302200083022001e-05, 'false_active_days': 0, 'days': 251, 'false_active_days_per_month': 0.0}
+false alarms clean all {'rows': 26828, 'flagged_share': 0.007044878485164753, 'false_active_days': 5, 'days': 559, 'false_active_days_per_month': 0.27191413237924866}
 flagged_share_fit_window 0.4019
 left_tail_share_fit_window 0.2578
 flagged_share_fall 0.4114
@@ -23,8 +23,8 @@ synthetic_x2.0 units {'0': 13958, '1': 1738, '2': 2005, '3': 1307} {'recall_1_un
 q_0.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.813, 0.746, 0.875], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.915, 0.883, 0.943], 'energy_error': [-0.093, -0.122, -0.062], 'flagged_share': [0.173, 0.15, 0.195]} filtered recall 0.915 exact-k 0.909 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
 q_0.5 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.817, 0.749, 0.878], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.916, 0.884, 0.944], 'energy_error': [-0.09, -0.119, -0.059], 'flagged_share': [0.173, 0.15, 0.195]} filtered recall 0.914 exact-k 0.908 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
 q_1.0 units {'0': 17040, '1': 1370, '2': 1330, '3': 800} {'recall_1_unit': [0.822, 0.755, 0.882], 'recall_2_or_3_units': [1.0, 1.0, 1.0], 'precision': [0.918, 0.886, 0.946], 'energy_error': [-0.082, -0.112, -0.05], 'flagged_share': [0.173, 0.15, 0.195]} filtered recall 0.915 exact-k 0.904 pass True {'recall_2_or_3_units_ge_0.80': True, 'recall_1_unit_ge_0.50': True, 'precision_ge_0.80': True, 'energy_within_15pct': True}
-false alarms clean even months {'rows': 12048, 'flagged_share': 0.010126162018592297, 'false_active_days': 4, 'days': 251, 'false_active_days_per_month': 0.4844621513944223}
-false alarms clean all {'rows': 26832, 'flagged_share': 0.01069618366129994, 'false_active_days': 9, 'days': 559, 'false_active_days_per_month': 0.4894454382826476}
+false alarms clean even months {'rows': 12045, 'flagged_share': 0.01012868410128684, 'false_active_days': 4, 'days': 251, 'false_active_days_per_month': 0.4844621513944223}
+false alarms clean all {'rows': 26828, 'flagged_share': 0.010697778440435367, 'false_active_days': 9, 'days': 559, 'false_active_days_per_month': 0.4894454382826476}
 flagged_share_fit_window 0.3676
 left_tail_share_fit_window 0.2578
 flagged_share_fall 0.3838

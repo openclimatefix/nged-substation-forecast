@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import numpy as np
-from e00196_common import G2_FIRST, G2_LAST, GRID_START, N_UNITS, Q_FLOOR, UNIT_MW, stamp
+from e00196_common import G2_FIRST, G2_LAST, N_UNITS, Q_FLOOR, UNIT_MW, stamp
 
 K2_FIRST_DESTINATION = datetime(2022, 1, 3, tzinfo=UTC)
 K2_PITCH_DAYS = 49
@@ -40,7 +40,9 @@ def through_meter(*, y: np.ndarray, output: np.ndarray, q: float = Q_FLOOR) -> n
 
 def _bst_shift(*, when: datetime) -> int:
     """Half-hours to add so a summer (UTC+1) clock pattern keeps its local time at `when`."""
-    summer = datetime(when.year, 3, 25, tzinfo=UTC) <= when < datetime(when.year, 10, 25, tzinfo=UTC)
+    summer = (
+        datetime(when.year, 3, 25, tzinfo=UTC) <= when < datetime(when.year, 10, 25, tzinfo=UTC)
+    )
     return 0 if summer else 2
 
 
@@ -71,19 +73,20 @@ def build(
     return Injection(y=y_new, output=np.where(in_window, out, np.nan), window_id=window)
 
 
-def synthetic(*, y: np.ndarray, g2: np.ndarray, rate: float, seed: int, q: float = Q_FLOOR) -> Injection:
-    """Spells resampled from G2's record at `rate` times its running rate, in the nine K2 windows."""
+def synthetic(
+    *, y: np.ndarray, g2: np.ndarray, rate: float, seed: int, q: float = Q_FLOOR
+) -> Injection:
+    """Spells resampled from G2's record at `rate` times its running rate, in the K2 windows."""
     rng = np.random.default_rng(seed)
     lo, hi = stamp(G2_FIRST), stamp(G2_LAST)
     record = np.clip(np.nan_to_num(g2[lo:hi]), 0.0, None)
     running = record > 0.5 * UNIT_MW
     edges = np.flatnonzero(np.diff(np.concatenate([[0], running.astype(int), [0]])))
     spells = [(a, b) for a, b in zip(edges[::2], edges[1::2], strict=True)]
-    start_hours = np.array([(a // 1) % 48 for a, _ in spells])
     n = len(y)
     out = np.full(n, np.nan)
     window = np.full(n, -1)
-    n_spells = int(round(len(spells) * rate))
+    n_spells = round(len(spells) * rate)
     for i in range(N_K2_WINDOWS):
         a0 = stamp(K2_FIRST_DESTINATION + timedelta(days=K2_PITCH_DAYS * i))
         length = hi - lo
