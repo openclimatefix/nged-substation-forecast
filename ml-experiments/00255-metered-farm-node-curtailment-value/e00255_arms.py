@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from typing import Final, Literal
 
 import e00255_inputs as inputs
-import numpy as np
 import polars as pl
 from studies.node_curtailment import NodeTable, capacity_forecast, scale_to_megawatts
 
@@ -71,7 +70,9 @@ def _node_and_other_generators(
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Return experiment 48's best-guess node forecast and non-farm generator forecast, in MW."""
     raw = inputs.read_arm_frames(names=("weekly", "gen_monthly"))
-    window = (pl.col("valid_time") >= inputs.SCORED_START) & (pl.col("valid_time") < inputs.SCORED_END)
+    window = (pl.col("valid_time") >= inputs.SCORED_START) & (
+        pl.col("valid_time") < inputs.SCORED_END
+    )
     node_ids = set(table.nodes["time_series_id"].to_list())
     farm_ids = set(inputs.farm_sites()["time_series_id"].to_list())
     generator_ids = set(table.generators["generator_id"].to_list()) - farm_ids
@@ -125,9 +126,7 @@ def _farm_rows(
     )
     grid = (
         keys.join(farms, how="cross")
-        .join(
-            daylight.rename({"farm": "site"}), on=["site", "valid_time"], how="left"
-        )
+        .join(daylight.rename({"farm": "site"}), on=["site", "valid_time"], how="left")
         .join(capacity, on="series", how="left")
     )
     night = (
@@ -157,7 +156,15 @@ def _farm_rows(
             ),
         )
     )
-    columns = ["site", "series", "power_fcst_init_time", "valid_time", "seed", "capacity_mw", "actual"]
+    columns = [
+        "site",
+        "series",
+        "power_fcst_init_time",
+        "valid_time",
+        "seed",
+        "capacity_mw",
+        "actual",
+    ]
     return pl.concat(
         [night.select(*columns, *inputs.QUANTILES), day.select(*columns, *inputs.QUANTILES)]
     ).rename({"series": "time_series_id"})
@@ -173,7 +180,12 @@ def _clip_to_capacity(*, frame: pl.DataFrame, capacities: pl.DataFrame) -> pl.Da
 
 
 def build_arms(
-    *, table: NodeTable, capacity_mw: Mapping[int, float], pairing: PairingType
+    *,
+    table: NodeTable,
+    capacity_mw: Mapping[int, float],
+    pairing: PairingType,
+    forecasts: Mapping[str, pl.DataFrame],
+    reference_arm: str,
 ) -> Arms:
     """Return every arm's node and generator forecast frames in MW.
 
@@ -182,6 +194,10 @@ def build_arms(
         capacity_mw: Effective capacity in MW by series, as experiment 48 normalised by.
         pairing: `causal` drops the node rows whose daylight farm forecast comes from a later run
             than the node origin; `valid_time` keeps every row.
+        forecasts: The farm forecast arms to score, each on the same farm rows, in fractions of
+            capacity.
+        reference_arm: The arm in `forecasts` whose rows the baseline, the perfect arm and the
+            diagnostic arm copy.
 
     Returns:
         The arms, and the count of node `(origin, valid time)` keys before and after the pairing.
@@ -221,7 +237,6 @@ def build_arms(
             strict=True,
         )
     )
-    forecasts = inputs.read_farm_forecasts()
     farm_frames = {
         arm: _farm_rows(
             forecast=forecasts[arm],
@@ -231,7 +246,7 @@ def build_arms(
             sites=sites,
             capacity_by_series=capacity_by_series,
         )
-        for arm in FORECAST_ARMS
+        for arm in forecasts
     }
     generator_columns = [
         "time_series_id",
@@ -254,26 +269,36 @@ def build_arms(
     ).with_columns(pl.col("seed").cast(pl.Int64))
 
     def generators(arm: str) -> pl.DataFrame:
-        farms = farm_frames[arm].select(generator_columns).with_columns(pl.col("seed").cast(pl.Int64))
+        farms = (
+            farm_frames[arm].select(generator_columns).with_columns(pl.col("seed").cast(pl.Int64))
+        )
         both = pl.concat([farms, others_full.select(generator_columns)], how="vertical_relaxed")
         return _clip_to_capacity(frame=both, capacities=capacities)
 
-    generator_frames = {arm: generators(arm) for arm in FORECAST_ARMS}
-    node_frame = nodes.drop("capacity_missing", strict=False).with_columns(pl.col("seed").cast(pl.Int64))
-    node_frames = dict.fromkeys(FORECAST_ARMS, node_frame)
+    generator_frames = {arm: generators(arm) for arm in forecasts}
+    node_frame = nodes.drop("capacity_missing", strict=False).with_columns(
+        pl.col("seed").cast(pl.Int64)
+    )
+    node_frames = dict.fromkeys(forecasts, node_frame)
 
-    quantile_columns = [q for q in inputs.QUANTILES]
+    quantile_columns = list(inputs.QUANTILES)
 
     def perfect(frame: pl.DataFrame) -> pl.DataFrame:
         return frame.with_columns(*(pl.col("actual").alias(q) for q in quantile_columns))
 
-    reference_generators = generator_frames[H5]
+    reference_generators = generator_frames[reference_arm]
     generator_frames[PERFECT] = _clip_to_capacity(
         frame=perfect(reference_generators), capacities=capacities
     )
-    node_frames[PERFECT] = perfect(node_frame.with_columns(*(
-        pl.lit(None, dtype=pl.Float64).alias(q) for q in quantile_columns if q not in node_frame.columns
-    )))
+    node_frames[PERFECT] = perfect(
+        node_frame.with_columns(
+            *(
+                pl.lit(None, dtype=pl.Float64).alias(q)
+                for q in quantile_columns
+                if q not in node_frame.columns
+            )
+        )
+    )
     node_frames[DIAGNOSTIC] = node_frame
     generator_frames[DIAGNOSTIC] = generator_frames[PERFECT]
     node_frames[CAPACITY_BASELINE] = node_frame

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Inputs of experiment 255: the pilot node table, the node forecasts, and the six farms' forecasts.
 
 The node table joins generators to substations, so it stays private. Farms appear only as labels A
@@ -87,6 +88,19 @@ QUANTILES: Final[tuple[str, ...]] = (
 NODE_QUANTILES: Final[tuple[str, ...]] = QUANTILES[1:-1]
 """The nine levels experiment 48 stored for nodes and the other generators."""
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
+LEVELS: Final[tuple[float, ...]] = (
+    0.01,
+    0.05,
+    0.10,
+    0.25,
+    0.40,
+    0.50,
+    0.60,
+    0.75,
+    0.90,
+    0.95,
+    0.99,
+)
 
 
 def read_capacity_mw() -> dict[int, float]:
@@ -158,7 +172,11 @@ def farm_sites() -> pl.DataFrame:
 
 def read_farm_power_mw() -> pl.DataFrame:
     """Return `time_series_id`, `valid_time`, `output_mw` of the farms' cleaned, unflagged power."""
-    path = ML_EXPERIMENTS_DATA_DIR / "00179-metered-solar-farm-exploration" / "cleaned_solar_farms.parquet"
+    path = (
+        ML_EXPERIMENTS_DATA_DIR
+        / "00179-metered-solar-farm-exploration"
+        / "cleaned_solar_farms.parquet"
+    )
     return (
         pl.read_parquet(path)
         .filter(pl.col("drop_reason").is_null())
@@ -173,15 +191,15 @@ def read_farm_power_mw() -> pl.DataFrame:
 def is_daylight(*, valid_times: pl.Series, latitude: float, longitude: float) -> np.ndarray:
     """Return a mask of the half-hours (labelled by their end) with the sun above the horizon limit."""
     midpoints = valid_times.dt.offset_by("-15m")
-    return (90.0 - zenith(stamps=midpoints, latitude=latitude, longitude=longitude)) > MIN_ELEVATION_DEG
+    return (
+        90.0 - zenith(stamps=midpoints, latitude=latitude, longitude=longitude)
+    ) > MIN_ELEVATION_DEG
 
 
 def _with_run_time(*, frame: pl.DataFrame, time_column: str) -> pl.DataFrame:
     """Add `run_time`: the latest 00 UTC run at least `RUN_LEAD_MIN_HOURS` before the valid time."""
     return frame.with_columns(
-        run_time=pl.col(time_column)
-        .dt.offset_by(f"-{int(RUN_LEAD_MIN_HOURS)}h")
-        .dt.truncate("1d")
+        run_time=pl.col(time_column).dt.offset_by(f"-{int(RUN_LEAD_MIN_HOURS)}h").dt.truncate("1d")
     )
 
 
@@ -204,7 +222,11 @@ def read_farm_forecasts() -> dict[str, pl.DataFrame]:
         ("plant_two_number", "a3_two_number"),
     ):
         pieces[arm] = yearly.filter(pl.col("arm") == name).select(
-            farm="time_series_id", valid_time="valid_time", actual="actual", lead_hours="lead_hours", *QUANTILES
+            *QUANTILES,
+            farm="time_series_id",
+            valid_time="valid_time",
+            actual="actual",
+            lead_hours="lead_hours",
         )
     for arm, name, setting in (
         ("xgboost", "xgboost", "own_history"),
@@ -213,10 +235,13 @@ def read_farm_forecasts() -> dict[str, pl.DataFrame]:
     ):
         pieces[arm] = _mean_over_seeds(name=name, setting=setting, seeds=(0,))
     pieces["h5_mean5"] = _mean_over_seeds(name="h5_quantile", setting="own_history", seeds=SEEDS)
-    keys = None
+    keys: pl.DataFrame | None = None
     for frame in pieces.values():
         ok = frame.filter(pl.col("q50").is_finite()).select("farm", "valid_time")
         keys = ok if keys is None else keys.join(ok, on=["farm", "valid_time"], how="inner")
+    if keys is None:
+        msg = "no farm forecast arms"
+        raise ValueError(msg)
     return {
         arm: frame.join(keys, on=["farm", "valid_time"], how="inner").sort("farm", "valid_time")
         for arm, frame in pieces.items()
@@ -229,7 +254,9 @@ def _mean_over_seeds(*, name: str, setting: str, seeds: tuple[int, ...]) -> pl.D
     H5 holds five seeds; XGBoost holds one, because it has no random draw to vary.
     """
     files = [
-        f for k in seeds for f in sorted((E243_DIR / "predictions" / setting).glob(f"{name}_s{k}_*.parquet"))
+        f
+        for k in seeds
+        for f in sorted((E243_DIR / "predictions" / setting).glob(f"{name}_s{k}_*.parquet"))
     ]
     frame = pl.concat([pl.read_parquet(f) for f in files])
     return (
@@ -249,11 +276,11 @@ def seed_forecasts(*, name: str, setting: str, seed: int) -> pl.DataFrame:
     return (
         pl.concat([pl.read_parquet(f) for f in files])
         .select(
+            *(pl.col(q).cast(pl.Float64) for q in QUANTILES),
             farm="time_series_id",
             valid_time="time",
             actual=pl.col("actual").cast(pl.Float64),
             lead_hours=pl.col("lead_hours").cast(pl.Float64),
-            *(pl.col(q).cast(pl.Float64) for q in QUANTILES),
         )
         .sort("farm", "valid_time")
     )
