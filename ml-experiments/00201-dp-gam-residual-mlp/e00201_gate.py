@@ -21,7 +21,7 @@ import e00201_data as data
 import e00201_nn as nn_
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 ARM = 3
 COLD_FULL_C = -3.0

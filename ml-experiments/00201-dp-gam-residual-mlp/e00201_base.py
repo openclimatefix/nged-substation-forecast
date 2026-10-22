@@ -32,7 +32,7 @@ import e00201_filters as filters
 import e00201_tall as tall
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import (
     DEFAULT_DELAY_HOURS,
     correction_at,
