@@ -31,7 +31,7 @@ decision_rule: >-
   event census run before scoring found 72 event half-hours at f = 0.5, 5 at 0.75, and 2 at 0.9 in
   the causal rows). Intervals resample the months of the forecast origin (2,000 draws) at the 99%
   level (Bonferroni over five planned contrasts). C1 to C3: plant, XGBoost, and H5 (seed 0) minus
-  the NGED baseline; supported when all three are below zero. C4: H5 (seed 0) minus XGBoost; C5: H5
+  the NGED baseline; supported when the whole 99% interval of each of C1 to C3 is below zero (95% intervals are shown beside them for information). C4: H5 (seed 0) minus XGBoost; C5: H5
   (seed 0) minus the plant. "H5 and XGBoost are equivalent" needs the whole C4 interval inside
   plus or minus 5% of XGBoost's avoidable cost; the page reports the interval's half-width as the
   smallest difference the window can detect. Porting the neural head in place of XGBoost for
@@ -59,7 +59,7 @@ verdict_note: >-
   between the two nodes. H5 beats XGBoost by 3.2% (99% interval 0.2% to 7.5%), under the 10%
   that would justify porting a neural network for this metric.
 best_arm: >-
-  H5 (seed 0) has the lowest avoidable cost, GBP 1.87 million (95% interval 0.55 to 3.42 million)
+  H5 (seed 0) has the lowest avoidable cost of the planned arms, GBP 1.87 million (95% interval 0.55 to 3.42 million)
   at 0.5 times each node's earlier maximum export, 2025-09 to 2026-06, causal rows, against GBP
   2.57 million for the NGED baseline (0.59 to 5.18 million).
 headline: >-
@@ -89,7 +89,6 @@ advice:
     Investigate why the full-capacity baseline beats every farm forecast at Skegness before using
     farm forecasts to set caps there (Figure 3).
 ---
-
 **Forecasting each solar farm's output cut the cost of curtailing at Boston and raised it at
 Skegness, so across the two bulk supply points (132 kV to 33 kV substations) the saving of about a
 quarter is within noise.** National Grid Electricity Distribution (NGED) meters six solar farms,
@@ -99,7 +98,6 @@ generators whenever a forecast said a substation would export more than a limit,
 the farm forecasts of experiments [224](../00224-metered-farm-dayahead-two-number/result.md) and
 [243](../00243-metered-farm-architecture-comparison/result.md), the same substation forecast in
 every arm, and compared each with a baseline that assumes every generator runs at full capacity.
-
 **Verdict: inconclusive.** At 0.5 times each substation's earlier maximum export, the avoidable cost
 (the cost above a perfect forecast, GBP 2,000 per MWh) is GBP 1.87 million for H5 (the plant plus a
 neural network, seed 0), 1.88 million for the plant alone, 1.93 million for XGBoost, and 2.57
@@ -149,10 +147,10 @@ justify porting a neural network.
   equivalence band (its lower end is -7.5%) and short of the 10% threshold. The 99% half-widths of
   C1 to C3 are about GBP 1.6 million, so the window cannot resolve a difference under about 60% of
   the baseline's avoidable cost.
-- **The other limits.** Causal, 0.75: H5 minus XGBoost -6.1% (95% interval -23% to 0%). Causal, 0.9:
-  -10.5% (-43% to 0%), on 2 half-hours. Valid-time pairing, 0.5: baseline 10.5, H5 7.25, XGBoost
-  7.36 (GBP million); H5 minus baseline -3.27 million (95% interval -10.4 to +0.8); H5 minus XGBoost
-  -1.5% (-3.9% to +0.5%).
+- **The other limits.** Causal, 0.75: H5 minus XGBoost -6.1% (99% interval -23% to 0%). Causal, 0.9:
+  -10.5% (99% interval -43% to 0%), on 2 half-hours. Valid-time pairing, 0.5: baseline 10.5, H5
+  7.25, XGBoost 7.36 (GBP million); H5 minus baseline -3.27 million (95% interval -10.4 to +0.8); H5
+  minus XGBoost -1.5% (99% interval -3.9% to +0.5%).
 - **By substation (causal, 0.5, a sum over the generators beneath each).** Boston: baseline 2.06, H5
   1.23, XGBoost 1.26 (GBP million). Skegness: baseline 0.51, H5 0.64, XGBoost 0.67. H5 beats XGBoost
   at both.
@@ -174,14 +172,14 @@ justify porting a neural network.
   9.96. MAE of the mean forecast: H5 9.98, plant 10.22, XGBoost 10.19. H5's small gain over XGBoost
   in cost (3.2%) agrees in direction with both.
 - **Triggers fired.** Trigger 2 (the result contradicts the prediction): the first part fails on
-  power, which the interval half-widths show; the second part holds in size but not in interval,
-  because paired differences of 3% are consistent across months. Trigger 4 (leaving one site out
-  flips a contrast): leaving Boston out flips C1 to C3, because the baseline is 24% cheaper than H5
-  at Skegness. Trigger 5 (a more informed arm does worse): the arm that knows every generator's
-  actual output costs GBP 1.96 million against H5's 1.87 million, because a forecast below the
-  actual output sets a lower cap and so cuts more (H5 curtails 491 MWh against 368 MWh, and breaches
-  29 MWh against 38 MWh), the same pattern as experiment 84. No Opus audit was run, to save quota. A
-  Sonnet reviewer read the plan, and the code and write-up reviews are recorded in the pull request.
+  power, which the interval half-widths show; the second part holds in size (3.2%, under 5%) but not
+  in interval, which excludes zero. Trigger 4 (leaving one site out flips a contrast): leaving
+  Boston out flips C1 to C3, because H5 is 24% dearer than the baseline at Skegness. Trigger 5 (a
+  more informed arm does worse): the arm that knows every generator's actual output costs GBP 1.96
+  million against H5's 1.87 million, because a forecast below the actual output sets a lower cap and
+  so cuts more (H5 curtails 491 MWh against 368 MWh, and breaches 29 MWh against 38 MWh), the same
+  pattern as experiment 84. No Opus audit was run, to save quota. A Sonnet reviewer read the plan,
+  and the code and write-up reviews are recorded in the pull request.
 
 ## What the next experiment should answer
 
