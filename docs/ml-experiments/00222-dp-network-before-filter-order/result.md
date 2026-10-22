@@ -198,6 +198,12 @@ stands.
 - The network trains on residuals against the analysis proxy and the cache's own weather, then
   corrects forecast rows driven by ensemble-mean weather. The post-filter network trained on
   forecast rows. That difference may explain the result and was not isolated.
+- The spread table is refitted on tuning-month rows, which carry corrections from networks trained
+  on two folds, while scored rows use the network trained on three folds. PRE-T's noise scale is
+  chosen on those tuning rows pooled over all six substations.
+- Gate G1 holds out fold 0 (January, May, and September of every year), so its 2,832 held-out hot
+  days sit in cooler months and the recovery may understate what the network learns in summer. The
+  injected amount is 3% of the absolute convex forecast.
 - Six substations, one scored year, one network architecture, no weather beyond temperature.
 
 ## What to try next
