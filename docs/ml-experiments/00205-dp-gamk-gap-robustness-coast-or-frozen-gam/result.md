@@ -43,7 +43,8 @@ decision_rule: >-
   pooled over D5, D10, D11, D14, and D16. Rule (c2) is the comparator because it differs from rule
   (a) only by the filter; rule (c), the frozen GAM alone, is reported as an absolute floor and its
   contrasts are descriptive. Each headline contrast is read at the 99.375% level of the
-  month-resampled paired bootstrap (the 12 calendar months of the origins, 20,000 resamples), which
+  month-resampled paired bootstrap (the 18 year-and-month groups of the origins, 20,000
+  resamples), which
   is 95% across the eight contrasts; everything else (recovery, coverage, per-substation and
   under-24-hour views) is descriptive. A contrast is `below` when its interval is wholly below zero,
   `above` when wholly above zero, and `straddling` otherwise. The hypothesis is `supported` when C1
@@ -80,7 +81,7 @@ metric: >-
 code: ml-experiments/00205-dp-gamk-gap-robustness-coast-or-frozen-gam/
 verdict: inconclusive
 best_arm: >-
-  Coast with widened bands (rule b): 2.758, 2.788, 2.857, and 2.948 points over leads 0.5 to 168
+  Coast with widened bands (rule b): 2.759, 2.788, 2.857, and 2.948 points over leads 0.5 to 168
   hours after gaps of 3, 6, 24, and 72 hours, against 2.747 with no gap, 2.905 to 2.940 for the
   same pipeline with the filter dropped (c2), and 3.198 for the frozen model alone (c)
 headline: >-
@@ -91,26 +92,30 @@ headline: >-
   inconclusive on the pre-registered rule.
 lessons:
   - >-
-    Never drop the whole forecast to the frozen model when readings stop: coasting scored 0.245 to
+    In these tests, dropping the whole forecast to the frozen model when readings stop was
+    worse: coasting scored 0.245 to
     0.439 points better than the frozen model alone at gaps of 3 to 72 hours (C-a-minus-c).
   - >-
     The filter's advantage over dropping it shrinks as the gap grows: 0.147 points after 3 hours and
-    0.013 worse after 72 hours, and the 72-hour estimate crosses zero, but 56 events per substation
+    0.013 worse after 72 hours, and the 72-hour estimate crosses zero, but 275 events in all
     cannot resolve it (C1 to C4 all span zero).
   - >-
     Widening the bands by the filter's own variance growth costs nothing in score (-0.004 to +0.000)
     and moves the q05 coverage after a 24-hour gap from 7.7% to 5.5% (nominal 5%).
   - >-
-    Recovery is slow because recipe R loses source days: with the filter alone the score is within
+    Recovery is slower with recipe R and the offset than without: with the filter alone the
+    score is within
     0.02 points of its no-gap value 24 hours after a 24-hour gap, and with recipe R it is not within
-    48 hours (+0.025).
+    48 hours (+0.025); recipe R's loss of source days is the suspected cause and was not tested.
 take_home_message: >-
   When power readings stop for 3 to 72 hours, keep running the Kalman filter without updates and
-  widen the quantile bands: that forecast is 0.25 to 0.44 points (about 8% to 14%) better than
-  falling back to the frozen demand model alone, at every gap length tested. Whether dropping the
+  widen the quantile bands: that forecast is 0.25 to 0.44 points (8% to 14% of the frozen model's
+  score) better than falling back to the frozen demand model alone, at every gap length tested; at
+  72 hours the interval's near end is only 0.04 points. Whether dropping the
   filter would be even better after a gap of about 72 hours could not be told: the two forecasts
-  differ by less than the month-to-month noise at every length. The first score after a gap takes
-  about 24 hours to recover.
+  differ by less than the month-to-month noise at every length. After a 24-hour gap the full
+  forecast was still 0.025 points above its no-gap score 48 hours later; the filter alone was back
+  within 24 hours.
 advice:
   - >-
     Serve coasting (the filter running with no update) when power readings are missing, for gaps of
@@ -124,8 +129,8 @@ advice:
     the synthetic 72-hour gap cannot separate coasting from dropping it (C4).
   - >-
     Run an experiment that needs recovery after a gap with a filter-alone arm beside the full
-    pipeline: recipe R's loss of source days kept the score above the 0.02-point margin at 48 hours
-    (figure 3).
+    pipeline: the full pipeline stayed above the 0.02-point margin at 48 hours after a 24-hour
+    gap while the filter alone recovered (figure 3).
 date: 2026-10-22
 pr: 1508
 production_status: candidate
@@ -148,8 +153,9 @@ Wintenberger (2022)](https://arxiv.org/abs/2104.10777)), plus the corrections of
 [experiment
 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md). We hid the
 readings
-of 3, 6, 24, or 72 hours before the forecast's data cutoff, at 56 forecast runs at each of five
-substations, and scored the forecast over the next 168 hours. Coasting kept the forecast within
+of 3, 6, 24, or 72 hours before the forecast's data cutoff, at up to 56 forecast runs at each of
+five substations (275 in all), and scored the forecast over the next 168 hours. Coasting kept the
+forecast within
 0.011
 points of its no-gap score (2.747) after a 3-hour gap and 0.206 points after a 72-hour gap. Dropping
 the filter cost 0.158 to 0.193 points whatever the gap.
@@ -168,15 +174,18 @@ the filter cost 0.158 to 0.193 points whatever the gap.
     readings. (b) coast with the quantile offsets widened by the filter's variance growth since the
     last reading. (c2) the same pipeline with the filter dropped. (c) the frozen model alone, with
     no filter, offset, or recipe R. Pre-registered in [the plan](#planned-design) below.
-- **Row set.** Five decision substations (D5, D10, D11, D14, D16), 56 event runs each (one per 8-day
+- **Row set.** Five decision substations (D5, D10, D11, D14, D16), 53 to 56 event runs each (275 in
+    all) (one per 8-day
     block of the replicate and scored runs), leads 0.5 to 168 hours outside the hand-filtered
     switching events. Gap ends at the cutoff for the headline (k = 0). Spread tables are the no-gap
     ones. Filter, GAM, and settings are those of experiment 136's arm A2. No weather input changes.
 - **Absolute scores (all leads, points).** No gap 2.747. Rule (a): 2.758, 2.790, 2.857, 2.953 at 3,
-    6, 24, 72 hours. Rule (b): 2.759, 2.788, 2.857, 2.948. Rule (c2): 2.905, 2.905, 2.914, 2.940. Rule
+    6, 24, 72 hours. Rule (b): 2.759, 2.788, 2.857, 2.948. Rule (c2): 2.905, 2.905, 2.914, 2.940.
+Rule
     (c): 3.198 (no gap dependence).
 - **Headline contrasts (a minus c2, 99.4% month-resampled interval).** 3 h: -0.147 (-0.321 to
-    +0.030). 6 h: -0.116 (-0.287 to +0.060). 24 h: -0.057 (-0.232 to +0.123). 72 h: +0.013 (-0.152 to
+    +0.030). 6 h: -0.116 (-0.287 to +0.060). 24 h: -0.057 (-0.232 to +0.123). 72 h: +0.013 (-0.152
+to
     +0.203). All four span zero, so the crossover is not established, and C1 and C2 fail the
     pre-registered test. Under 24 hours of lead the contrast is below zero at 3, 6, and 24 hours
     (-0.480, -0.401, -0.295) and spans zero at 72 hours (-0.167, -0.353 to +0.022).
@@ -184,9 +193,17 @@ the filter cost 0.158 to 0.193 points whatever the gap.
     -0.341, and -0.245 (-0.478 to -0.040) at 3, 6, 24, and 72 hours.
 - **Wider bands (b minus a).** Score -0.004 to +0.000 at every length, every interval spanning
     zero (72 h: -0.004, -0.033 to +0.014). The q05 coverage moves by -0.006, -0.011, -0.023, and
-    -0.028 (24 h: -0.032 to -0.015), and the q95 coverage by +0.003, +0.007, +0.014, and +0.018. Rule
-    (a) covers 7.3%, 7.6%, 7.7%, and 8.4% below q05 and 95.1%, 94.9%, 94.5%, and 94.2% below q95; rule
+    -0.028 (24 h: -0.032 to -0.015), and the q95 coverage by +0.003, +0.007, +0.014, and +0.018.
+Rule
+    (a) covers 7.3%, 7.6%, 7.7%, and 8.4% below q05 and 95.1%, 94.9%, 94.5%, and 94.2% below q95;
+rule
     (b) covers 6.6%, 6.4%, 5.5%, and 5.6% and 95.5%, 95.6%, 95.9%, and 95.9%; no gap 7.1% and 95.1%.
+- **Rule (b) replaces rule (a).** The mean absolute distance of the q05 and q95 coverage from
+    nominal is 0.016 for (a) and 0.007 for (b) at 24 hours, and 0.021 and 0.008 at 72 hours. The
+    month-resampled intervals of the coverage differences exclude zero (24 h: q05 -0.032 to -0.015,
+    q95 +0.010 to +0.018), and the score difference is at most +0.000 against the +0.01 limit. The
+    plan's binomial standard error is replaced by the month-resampled interval, which allows for
+    months moving together.
 - **Tails (rule a, 3 to 72 h).** Pinball loss at q01 0.222 to 0.257 and q99 0.231 to 0.242; coverage
     below q01 2.5% to 3.2% and below q99 98.1% to 98.4%; rule (b) 1.6% to 2.2% and 98.6% to 98.8%.
 - **Recovery after a 24-hour gap.** Rule (a) minus no gap is +0.110, +0.074, +0.061, +0.060,
@@ -204,7 +221,9 @@ hours.
     spread table places the median at the mean. The check cannot expose a shifted forecast here.
 - **Error of the mean forecast beside the quantile score.** Rule (a) minus rule (c2) is -0.270
     (3 h, below zero), -0.219, -0.124, and -0.006 points; the sign agrees with the quantile score at
-    every length (trigger 3 did not fire).
+3, 6, and 24 hours and differs at 72 hours, where both contrasts are indistinguishable from zero
+(mean error -0.006, interval -0.233 to +0.234). Trigger 3 (contrasts pointing different ways)
+therefore fired at 72 hours only, on two contrasts whose intervals both span zero.
 - **Controls.** The rebuilt no-gap arm D reproduces experiment 155's stored arm D exactly (largest
     mean difference 0.0 at all five substations); widening by zero variance leaves the quantiles
     unchanged; randomising every actual at or after a run's origin leaves three tested runs' mean
@@ -222,7 +241,7 @@ hours.
     modelled.
 - **Spread tables are no-gap tables.** Tuning-month rows keep the no-gap forecast, so every rule's
     spread is the no-gap one. Rule (c) has its own table.
-- **Events are one per 8-day block.** The 56 events per substation sit in the replicate months and
+- **Events are one per 8-day block.** The 275 events sit in the replicate months and
     the scored year; the interval resamples 18 calendar months.
 
 ## What to try next
@@ -232,7 +251,8 @@ hours.
     more events or real gaps to resolve.
 - **A learned recovery.** A small neural head on the filter state that takes the hours since the
     last reading and rescales the transient's decay could shorten the recovery. A prediction that
-    could fail: it brings the 24-hour gap's score within 0.02 points of the no-gap score at 12 hours.
+    could fail: it brings the 24-hour gap's score within 0.02 points of the no-gap score at 12
+hours.
     The convex GAM-K stays the comparison arm.
 
 ## Planned design
@@ -251,10 +271,13 @@ a gap length exists beyond which the filter should be dropped.
 **Design.**
 
 - **Inputs.** The unfiltered forecast of every run (experiment 136's A2: the T-all fits driven by
-    the calibrated ensemble mean), rebuilt from the stored fits and ensemble arrays as in [experiment
-    197](../00197-dp-kalman-level-adaptation-retest/result.md), and the filter's residual stream. The
+    the calibrated ensemble mean), rebuilt from the stored fits and ensemble arrays as in
+[experiment
+    197](../00197-dp-kalman-level-adaptation-retest/result.md), and the filter's residual stream.
+The
     full pipeline is the arm D of [experiment
-    155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the filter, the
+    155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): the filter,
+the
     winter night offset, and recipe R (minus 0.75 times the 14-day mean error profile).
 - **Events.** For each substation the origins of the replicate and scored runs (excluding the
     every-fifth-day stride runs and any origin before 2024-07-16) are cut into blocks of 8 days, and

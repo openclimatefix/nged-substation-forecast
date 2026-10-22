@@ -199,8 +199,7 @@ def figure_recovery(*, report: dict) -> alt.TopLevelMixin:
             text="Recovery after a 24-hour gap is slow and uneven",
             subtitle=(
                 "Rule (a), all leads. Dotted line: the 0.02-point recovery margin. The score is "
-                "still above the margin 48 hours after a 24-hour gap, partly because recipe R "
-                "loses source days."
+                "still above the margin 48 hours after a 24-hour gap."
             ),
         ),
     )

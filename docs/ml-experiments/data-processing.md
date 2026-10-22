@@ -378,8 +378,8 @@ over leads 0.5 to 168 hours. Widening each quantile's offset from the mean by th
 growth since the last reading brought the q05 coverage from 7.7% back to 5.5% after a 24-hour gap
 at no cost in score. Whether to drop the filter after about 72 hours could not be decided. Applies
 to production. Evidence: [experiment
-205](00205-dp-gamk-gap-robustness-coast-or-frozen-gam/result.md), five Primaries, 56 injected gaps
-each, readings hidden in clean data.
+205](00205-dp-gamk-gap-robustness-coast-or-frozen-gam/result.md), five Primaries, up to 56 injected
+gaps each, readings hidden in clean data.
 
 ## Weather products
 
