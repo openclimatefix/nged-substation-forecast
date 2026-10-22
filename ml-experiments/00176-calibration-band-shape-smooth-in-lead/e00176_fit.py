@@ -66,6 +66,13 @@ def fit_rows_mask(*, frame: pl.DataFrame) -> np.ndarray:
 def fix_o_multipliers(*, ref: pl.DataFrame, arm_a: pl.DataFrame) -> dict[int, float]:
     """Return experiment 164's fix-O multiplier at each upper level, read from the stored arms.
 
+    Args:
+        ref: The reference forecasts (experiment 160's arm I) of the tuning months.
+        arm_a: Experiment 169's arm A for the same rows.
+
+    Returns:
+        The multiplier at each position of the upper levels in `QUANTILES`.
+
     Raises:
         ValueError: If the multiplier is not constant on the forecast-cold rows of a level.
     """
@@ -218,6 +225,11 @@ def fit_smooth_arms(  # noqa: PLR0912
     *, data: dict[str, SiteData], tables: dict[str, np.ndarray], workers: int
 ) -> dict:
     """Fit the growth curves and cell scales at the eight levels for each way of sharing a curve.
+
+    Args:
+        data: The tuning rows of each substation.
+        tables: Experiment 160's stored spread table of each substation, which starts the scales.
+        workers: The number of processes that fit growth curves in parallel.
 
     Returns:
         `{mode: {position: {"growth": array, "scale": array}}}`, where `growth` has shape
