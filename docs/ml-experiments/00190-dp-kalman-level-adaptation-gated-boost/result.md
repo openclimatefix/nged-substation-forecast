@@ -240,7 +240,12 @@ recovered -0.6% (95% interval -3.6% to +0.9%) and +0.4% (-1.3% to +2.2%).
 - The counter's rule is one of several defensible gates, but no setting tried, up to 100 times the
   noise,
   recovered an offset.
-- Tuning used the stage-1 score, not arm D's, to keep the 18 settings cheap.
+- Tuning used the stage-1 score, not arm D's, and every setting was scored with A0's spread table, which
+  understates the gain of a setting whose errors are smaller.
+- The counter counts readings, so after a gap in the data it can span more than the stated hours.
+- The subsets "within 24 hours after a trigger" and cold nights are defined after the fact, from
+  triggers and temperatures that a run at the origin could not yet see.
+- The post hoc settings (`a1_fast`, and the multiplier of 100) are diagnostic only.
 
 ## What to try next
 

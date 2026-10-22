@@ -202,8 +202,8 @@ def day_subsets() -> dict[str, pl.DataFrame]:
 def excess_reduction(*, losses: pl.DataFrame, days: pl.DataFrame, treatment: str) -> dict:
     """Return the cut in excess loss on the listed days, treatment against `d0`.
 
-    A day's excess loss is its mean quantile score minus the arm's mean over all scored rows of
-    the same substations. The reduction is one minus the treatment's excess over the reference's.
+    A day's excess loss is its mean quantile score minus arm D's mean over all scored rows of
+    the same substations (one common baseline for every arm). The reduction is one minus the treatment's excess over the reference's.
     """
     sub = losses.join(days, on=["site", "local_date"], how="inner")
     if sub.is_empty():

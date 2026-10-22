@@ -148,7 +148,8 @@ def ordinary_days(*, context: base.SiteContext) -> np.ndarray:
 def spread_table(*, context: base.SiteContext, stream: np.ndarray, band: np.ndarray) -> np.ndarray:
     """Return the clean A0 errors' quantile offsets by hour band, shape (4, 11).
 
-    The errors are those of origins at 09:00 UTC on every tuning-month day, over the next 36 hours.
+    The errors are those of origins every 6 hours from 6 hours before each tuning-month day's 09:00 UTC
+    to 36 hours after it, over the 36 hours that follow each origin.
     """
     cache = context.cache
     clean = gated.gated_stream(
