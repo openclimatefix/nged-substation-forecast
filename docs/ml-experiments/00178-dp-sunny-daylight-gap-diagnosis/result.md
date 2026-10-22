@@ -104,15 +104,15 @@ sunniest third.
 
 ## Figures
 
-![Figure 1. Gap by hour of day: no 2-hour bin holds more than a third of the gap](figure_01_hour.svg)
+![Figure 1. Gap by hour of day](figure_01_hour.svg)
 
-![Figure 2. Gap by clear-sky band: the 0.4 to 0.7 band holds most of the gap](figure_02_clear_sky_band.svg)
+![Figure 2. Gap by clear-sky band](figure_02_clear_sky_band.svg)
 
-![Figure 3. Gap by lead band: 72 to 168 hours holds most of the gap and most of the rows](figure_03_lead.svg)
+![Figure 3. Gap by lead band](figure_03_lead.svg)
 
-![Figure 4. Gap by substation: D5 holds 63% of the gap with 16% of the rows](figure_04_site.svg)
+![Figure 4. Gap by substation](figure_04_site.svg)
 
-![Figure 5. Gap by clear-sky band at the five substations other than D5](figure_05_clear_sky_band_without_d5.svg)
+![Figure 5. Gap by clear-sky band without D5](figure_05_clear_sky_band_without_d5.svg)
 
 ## Results
 
