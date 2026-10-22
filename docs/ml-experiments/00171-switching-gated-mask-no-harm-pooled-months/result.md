@@ -119,8 +119,8 @@ while a "gated alarm" was active. A gated alarm is a pair alarm (a step at one s
 an opposite step at a neighbouring metered substation, from [experiment
 156](../00156-switching-faster-onset-alarm-from-opposite-steps/result.md)) with a balance score of
 0.7 or more. The balance score measures how nearly the two steps cancel, and 1 means exactly.
-Experiment 166 found a gain of 7.35 points in the 72 hours after a logged transfer ends. It could not show that the mask does no
-harm on other rows, because 12 months of rows gave an interval of -0.068 to +0.081. A score in
+Experiment 166 found a gain of 7.35 points in the 72 hours after a logged transfer ends. It could
+not show that the mask does no harm on other rows, because 12 months of rows gave an interval of -0.068 to +0.081. A score in
 points of effective capacity is the score in megawatts divided by the substation's effective
 capacity (as in experiment 166), times 100. Primary substations are the substations that step power
 down onto the local distribution network.
