@@ -52,7 +52,8 @@ best_arm: none; the fit on all rows stays the better read-out
 take_home_message: >-
   Fitting the solar capacity only on clear, high-sun half-hours did not find more of an injected
   solar farm: 0.818 against 0.827 for all rows, with an interval 1.8 times wider. The farm alone
-  fits better on those half-hours (0.965), so the demand terms seem to absorb more of the solar signal
+  fits better on those half-hours (0.965), so the demand terms seem to absorb more of the solar
+  signal
   when only clear half-hours are used (0.147 against 0.104). Do not restrict the rows by sky
   condition; reduce demand absorption instead.
 lessons:
@@ -73,7 +74,8 @@ code: ml-experiments/00236-pv-capacity-clear-sky-fit/
 # Photovoltaic (PV) capacity: does fitting only on clear, high-sun half-hours help?
 
 **Take-home message: fitting the solar capacity only on clear, high-sun half-hours does not find
-more of an injected solar farm, and the interval gets wider.** Consistent with experiment 231, the sunshine
+more of an injected solar farm, and the interval gets wider.** Consistent with experiment 231, the
+irradiance
 input does not appear to be the limit, and restricting the rows seems to move the loss into the
 demand terms.
 
@@ -81,10 +83,13 @@ demand terms.
 power, at 50% of the Primary's pinned capacity (the unmetered solar capacity that experiment 45's
 real-time estimate gives the Primary). Then we asked the capacity fit of experiment 129 how much of
 the farm it finds again, using only the half-hours where the Primary's satellite irradiance is at
-least 0.9 of its clear-sky value, the clear-sky irradiance is at least 200 W/m2, and the sun is at
+least 0.9 of its clear-sky value, the clear-sky irradiance is at least 200 watts per square metre,
+and the sun is at
 least 20 degrees above the horizon. The share found is the recovery: the capacity found with the
-farm added, minus the capacity found without it, divided by the injected capacity. Farms A to F are
-metered generators and are never named. D5, D10, D11, D14, and D16 are the five decision Primaries
+farm added, minus the capacity found without it, divided by the injected capacity. The five farms A,
+B, C, D, and F
+are metered generators and are never named. D5, D10, D11, D14, and D16 are the five decision
+Primaries
 of experiment 103's data set, and D9 is shown beside them. The recovery is read at season-year 2024
 (July 2024 to June 2025), and the capacity unit is the 99th percentile of alternating-current
 output over daylight half-hours, in MW.
@@ -104,10 +109,11 @@ output over daylight half-hours, in MW.
   rows.
 - **The farm alone fits better on the clear half-hours (0.965; 0.951 to 0.967), but the full fit
   does not.** Demand absorption, the farm-alone scale minus the full-fit recovery, is 0.147 on clear
-  rows and 0.104 on all rows (experiment 231's rung 1 minus its rung 4, 0.931 and 0.827). A possible
-  cause is that the clear-day solar curve is smooth, which makes the curve closer to the seasonal
-  demand terms, so the demand terms take more of it. That explanation was not tested directly
-  here.
+  rows and 0.104 on all rows (experiment 231's rung 1, the farm alone on all daylight half-hours,
+  minus its rung 4, the full fit on all rows: 0.931 and 0.827). A possible
+  cause is that the clear-day solar curve is smooth. A smooth curve is closer to the seasonal demand
+  terms, so the demand terms may take more of it. The smooth-curve explanation was not tested
+  directly here.
 - **The clear rows are a small share of the training rows.** At the five decision Primaries, 5,600
   to 5,900 of 78,000 to 89,000 training half-hours remain (3,300 of 45,000 at D9), and 1,300 to
   1,600 remain in the read-out season-year.
@@ -127,12 +133,13 @@ output over daylight half-hours, in MW.
   condition stood in for it. The intervals are month-block bootstrap intervals only; the plan's
   range over the five farms is not reported.
 - **No Opus audit was run.** The ML manager decided that quota did not allow an Opus review of
-  any of this series' experiments, so every audit trigger listed above stays unaudited and a
+  any of this series' experiments, so the judgement that no trigger fired has no Opus audit, and a
   Sonnet reviewer read the code and the page instead.
 
 ## What the next experiment should answer
 
-- **Reduce demand absorption.** Matched sunny-minus-cloudy day pairs (experiment 235) target it
+- **Reduce demand absorption.** Matched sunny-minus-cloudy day pairs (experiment 235) target demand
+  absorption
   directly.
 - **Neural components:** a learned smooth response of the demand's dependence on irradiance could
   separate the demand's cloud response from the solar term. The prediction that could fail is a
@@ -140,11 +147,13 @@ output over daylight half-hours, in MW.
 
 ## Plan: design
 
-- **Rows.** The row rule is applied through month weights and a row mask on the Gram matrices, as
+- **Rows.** The row rule is applied through month weights and a row mask on the per-month Gram
+  matrices (the sums of products of the design columns), as
   in experiment 231, so that the base and injected fits share one row set.
 - **Demand terms.** The demand columns of the fit are unchanged. On clear days the solar shape is
   closer to a smooth seasonal curve than on all days, so the demand harmonics may absorb more of it;
-  the experiment reports that as the contrast between the farm-only scale on clear rows and the
+  the experiment reports demand absorption as the contrast between the farm-only scale on clear rows
+  and the
   full fit on clear rows.
 - **Reported rows.** The recovery on clear rows, the recovery on all rows (rung 4 of experiment
   231), the number of training rows kept, and the share of each season-year kept.
