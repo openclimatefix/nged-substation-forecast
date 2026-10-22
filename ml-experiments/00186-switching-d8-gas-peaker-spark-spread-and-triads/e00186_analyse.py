@@ -32,7 +32,8 @@ MERGE_GAP: Final[int] = 24
 MIN_DURATION: Final[int] = 96
 """The drop definition of experiment 159: 24-hour rolling median under -1.5 MW, merged, >= 2 days."""
 MAX_PLAUSIBLE_GAS_P_PER_KWH: Final[float] = 15.0
-"""Two daily values (72.8 and 63.9 pence per kWh) are data errors; the rest lie between 1 and 11."""
+MIN_PLAUSIBLE_GAS_P_PER_KWH: Final[float] = 1.0
+"""Four daily values (72.8, 63.9, 0.51, and 0.47 pence per kWh) lie far outside the rest and are excluded."""
 EFFICIENCIES: Final[tuple[float, ...]] = (0.35, 0.40, 0.45)
 CENTRAL_EFFICIENCY: Final[float] = 0.40
 VARIABLE_COST: Final[float] = 5.0
@@ -91,7 +92,7 @@ def local_calendar(*, n: int) -> pl.DataFrame:
     )
     # Settlement period 1 starts at local midnight; the first period of a day is at hour 0.
     return frame.with_columns(
-        sp=(pl.col("hour") * 2).round().cast(pl.Int64) + 1,
+        sp=pl.int_range(pl.len()).over("date") + 1,
     )
 
 
@@ -110,7 +111,20 @@ def prices() -> tuple[pl.DataFrame, pl.DataFrame]:
             price=pl.max_horizontal("systemSellPrice", "systemBuyPrice"),
         )
         .select("date", "sp", "price")
-        .unique(subset=["date", "sp"])
+        .unique(subset=["date", "sp"], keep="first", maintain_order=True)
+    )
+    raw_gas = pl.read_csv(common.PUBLIC_DIR / "gas_sap.csv").with_columns(
+        date=pl.col("Applicable For").str.to_date("%d/%m/%Y"),
+        value=pl.col("Value").cast(pl.Float64, strict=False),
+    )
+    for row in raw_gas.filter(
+        ~pl.col("value").is_between(MIN_PLAUSIBLE_GAS_P_PER_KWH, MAX_PLAUSIBLE_GAS_P_PER_KWH)
+        | pl.col("value").is_null()
+    ).iter_rows(named=True):
+        say(f"Gas price excluded as implausible: {row['date']} {row['value']} pence per kWh")
+    say(
+        f"Gas price range of the kept days: {raw_gas.filter(pl.col('value').is_between(MIN_PLAUSIBLE_GAS_P_PER_KWH, MAX_PLAUSIBLE_GAS_P_PER_KWH))['value'].min():.1f} to "
+        f"{raw_gas.filter(pl.col('value').is_between(MIN_PLAUSIBLE_GAS_P_PER_KWH, MAX_PLAUSIBLE_GAS_P_PER_KWH))['value'].max():.1f} pence per kWh"
     )
     gas = (
         pl.read_csv(common.PUBLIC_DIR / "gas_sap.csv")
@@ -119,8 +133,12 @@ def prices() -> tuple[pl.DataFrame, pl.DataFrame]:
             gas_pence_per_kwh=pl.col("Value").cast(pl.Float64, strict=False),
         )
         .select("date", "gas_pence_per_kwh")
-        .unique(subset="date")
-        .filter(pl.col("gas_pence_per_kwh").is_between(0.5, MAX_PLAUSIBLE_GAS_P_PER_KWH))
+        .unique(subset="date", keep="first", maintain_order=True)
+        .filter(
+            pl.col("gas_pence_per_kwh").is_between(
+                MIN_PLAUSIBLE_GAS_P_PER_KWH, MAX_PLAUSIBLE_GAS_P_PER_KWH
+            )
+        )
         .with_columns(gas_gbp_per_mwh_thermal=pl.col("gas_pence_per_kwh") * 10.0)
     )
     return system, gas
@@ -203,7 +221,7 @@ def add_spread(*, days: pl.DataFrame, system: pl.DataFrame, gas: pl.DataFrame) -
         n_sp=pl.len(),
     )
     out = days.join(daily, on="date", how="inner").join(gas, on="date", how="inner")
-    out = out.filter(pl.col("n_sp") >= 46).sort("date")
+    out = out.filter(pl.col("n_sp") >= 46).sort("date").with_columns(year=pl.col("date").dt.year())
     for eff in EFFICIENCIES:
         tag = f"{round(eff * 100)}"
         out = out.with_columns(
@@ -218,7 +236,11 @@ def add_spread(*, days: pl.DataFrame, system: pl.DataFrame, gas: pl.DataFrame) -
 
 
 def matched_pool(
-    *, table: pl.DataFrame, drop_days: pl.DataFrame, in_any_drop_pad: set[date]
+    *,
+    same_year: bool = False,
+    table: pl.DataFrame,
+    drop_days: pl.DataFrame,
+    in_any_drop_pad: set[date],
 ) -> tuple[list[np.ndarray], pl.DataFrame]:
     """For each drop day, the row indices of ordinary days matched on weekday, season, temperature."""
     ordinary = table.filter(~pl.col("date").is_in(list(in_any_drop_pad)))
@@ -226,12 +248,15 @@ def matched_pool(
     o_wd = ordinary["weekday"].to_numpy()
     o_doy = ordinary["doy"].to_numpy()
     o_temp = ordinary["temp"].to_numpy()
+    o_year = ordinary["year"].to_numpy()
     pools = []
     for row in drop_days.iter_rows(named=True):
         gap = np.abs(o_doy - row["doy"])
         gap = np.minimum(gap, 365 - gap)
         for tol in (2.0, 4.0, 6.0):
             ok = (o_wd == row["weekday"]) & (gap <= 30) & (np.abs(o_temp - row["temp"]) <= tol)
+            if same_year:
+                ok &= o_year == row["year"]
             if ok.sum() >= 3:
                 break
         pools.append(o_idx[ok])
@@ -499,6 +524,39 @@ def main() -> None:  # noqa: PLR0912, PLR0915
 
     pl.DataFrame(rows3).write_parquet(common.WORK_DIR / "step3_results.parquet")
 
+    # Post hoc sensitivity: also match on calendar year (gas prices fell over the window).
+    say("\n== Step 3e (post hoc): matching on calendar year as well ==")
+    by_year = drop_day_rows.group_by("year").agg(drop_days=pl.len()).sort("year")
+    ord_year = (
+        ordinary.group_by("year")
+        .agg(ordinary_days=pl.len(), share_positive_40=(pl.col("spread_40") > 0).mean())
+        .sort("year")
+    )
+    for row in by_year.join(ord_year, on="year", how="left").iter_rows(named=True):
+        say(
+            f"  {row['year']}: {row['drop_days']} drop days; {row['ordinary_days']} ordinary days, "
+            f"{row['share_positive_40']:.2f} with a positive 40% spread"
+        )
+    pools_y, _ = matched_pool(
+        table=table, drop_days=drop_day_rows, in_any_drop_pad=near, same_year=True
+    )
+    keep = np.array([len(q) > 0 for q in pools_y])
+    say(f"Drop days with no same-year match (left out of this check): {int((~keep).sum())}")
+    pools_y = [q for q, k in zip(pools_y, keep, strict=True) if k]
+    stat = (drop_day_rows["spread_40"] > 0).cast(pl.Float64).to_numpy()[keep]
+    ordinary_stat = (ordinary["spread_40"] > 0).cast(pl.Float64).to_numpy()
+    kept_drops = drop_idx[keep]
+    remap_y = {k: i for i, k in enumerate(sorted(set(kept_drops.tolist())))}
+    obs, mat, diff, diffs = matched_test(
+        rng=rng, stat=stat, ordinary_stat=ordinary_stat, pools=pools_y,
+        drop_of_day=np.array([remap_y[k] for k in kept_drops]), n_drops=len(remap_y),
+    )  # fmt: skip
+    say(
+        f"Positive daily spread, 40%, matched on year too: drop days {obs:.2f}, matched {mat:.2f}, "
+        f"difference {interval(diffs * 100)} points; matches per drop day min "
+        f"{min(len(q) for q in pools_y)}"
+    )
+
     # Half-hourly depth against half-hourly spread, inside the drops.
     say("\n== Step 3b: half-hourly depth inside drops, spread positive against not ==")
     cal_stamped = cal.with_columns(stamp=pl.int_range(pl.len()), depth=pl.Series(-d8["resid"]))
@@ -532,11 +590,14 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     say("\n== Step 3c: spread around drop starts and ends (daily spread, 40% efficiency) ==")
     spread = dict(zip(table["date"], table["spread_40"], strict=True))
     for label, key, sign in (("start", "start_date", 1), ("end", "end_date", -1)):
+        first_after = 0 if sign == 1 else 1
         diffs_ev = []
         for row in drops_frame.iter_rows(named=True):
             d0 = row[key]
             before = [spread.get(d0 - timedelta(days=k)) for k in range(1, 6)]
-            after = [spread.get(d0 + timedelta(days=k)) for k in range(5)]
+            after = [
+                spread.get(d0 + timedelta(days=k)) for k in range(first_after, first_after + 5)
+            ]
             before = [v for v in before if v is not None]
             after = [v for v in after if v is not None]
             if len(before) >= 3 and len(after) >= 3:

@@ -25,6 +25,9 @@ Gas-like Capacity Market components with a postcode in ('PE20', 'PE21', 'PE22', 
   2022-23 (T-3) Three Year Ahead Capacity Auction: 2 components, fuel None, type T-3, connection capacity 0.0
   2022-23 (T-4) Four Year Ahead Capacity Auction: 2 components, fuel None, type T-4, connection capacity 0.0
   2023-24 (T-4) Four Year Ahead Capacity Auction: 2 components, fuel None, type T-4, connection capacity 0.0
+  description of a unit at 0.5 km: 6MW Gas fired reciprocating engines
+  description of a unit at 0.5 km: 6MW Gas fired reciprocating engines
+  description of a unit at 0.5 km: The CMU will be formed of multiple individual generating units controlled centrally and ex
 
 Capacity Market gas-fuelled CM units with a grid reference within 30 km of D8 (unit names withheld):
   0.5 km from D8: Reciprocating engines, connection capacity 6.0 MW, Distribution, delivery years 2022 to 2022

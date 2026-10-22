@@ -149,6 +149,9 @@ def main() -> None:
         km = float(np.hypot(xy[0] - d8_e, xy[1] - d8_n) / 1000.0)
         if km <= 30:
             info = cmu_gas.filter(pl.col("CMU ID") == row["CMU ID"]).row(0, named=True)
+            if km < 1.0:
+                text = (row["Description of CMU Components"] or "").replace("\n", " ")[:90]
+                say(f"  description of a unit at {km:.1f} km: {text}")
             near_rows.append(
                 (
                     km,
