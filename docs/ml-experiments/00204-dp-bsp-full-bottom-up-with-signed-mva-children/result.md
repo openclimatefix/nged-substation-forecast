@@ -244,8 +244,8 @@ includes zero. The estimates are lowest below 72 hours at both BSPs.
 the remainder's error has a standard deviation of 7.9 points and the weighted children's summed
 error 4.7 points; at D17 the figures are 15.4 and 5.4. The two parts' errors correlate positively
 (0.48 and 0.32). The bottom-up error (10.95 and 17.91) is therefore about the same as the top-down
-error (10.94 and 17.94). The remainder is the load that no Primary in the sum meters: the generators beneath
-the BSP, losses, and D8 and the Wrangle transformers at D17.
+error (10.94 and 17.94). The remainder is the load that no Primary in the sum meters: the
+generators beneath the BSP, losses, and D8 and the Wrangle transformers at D17.
 
 ![Known-answer check: error of the summed signed flow of five Primaries with injected solar](figure_4_known_answer.svg)
 

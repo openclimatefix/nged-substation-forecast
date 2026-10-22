@@ -310,6 +310,13 @@ def fit_weights(
     and the columns are the children's readings in MW as the `variant` sees them, on the half-hours
     of `weight_rows`.
 
+    Args:
+        cache: The feature cache holding the BSP and its children.
+        bsp: The BSP's label.
+        end: The last half-hour of the weight window.
+        variant: `naive`, `fold`, or `fold50`.
+        bounded: Whether to bound the weights to 0.8 to 1.2.
+
     Returns:
         The weights by child, the number of rows, the in-sample residual standard deviation in MW,
         and the share of the BSP's variance the fit leaves unexplained.
