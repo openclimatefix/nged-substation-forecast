@@ -79,7 +79,8 @@ date: 2026-10-22
   Only dates before the day count for the second branch.
 - **Deferred to stage 2, needing a download or a decision from the ML MANAGER:** Elexon and
   NESO public data (demand turn-up, balancing actions, Demand Flexibility Service events),
-  Distribution Future Energy Scenarios, published outage lists, school terms, and local events. Local convective cloud, fog, snow, and
+  Distribution Future Energy Scenarios, published outage lists, school terms, and local events.
+  Local convective cloud, fog, snow, and
   wind-chill are weather that the ENS mean misses, and experiment 174 already put an upper bound
   on that share.
 
