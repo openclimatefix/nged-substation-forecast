@@ -1,0 +1,244 @@
+== tail ratio selection (tuning months; tail = outer deciles 1 and 10) ==
+{
+ "0.01": {
+  "all": 4.748191820139038,
+  "tail": 4.720941855011151
+ },
+ "0.1": {
+  "all": 4.7356836597820475,
+  "tail": 4.680279613546601
+ },
+ "1": {
+  "all": 4.7080169938583225,
+  "tail": 4.590736455332976
+ },
+ "r0": {
+  "all": 4.723950781396747,
+  "tail": 4.601793189898399
+ }
+}
+chosen: 1
+== scored: absolute (five decision substations) ==
+f1_1 {'abs_mean': 4.6564, 'abs_median': 4.6564, 'qs': 2.7293, 'rows': 464363}
+f2_1 {'abs_mean': 4.6408, 'abs_median': 4.6408, 'qs': 2.7205, 'rows': 464363}
+r0 {'abs_mean': 4.7096, 'abs_median': 4.7096, 'qs': 2.7562, 'rows': 464363}
+stored {'abs_mean': 4.7096, 'abs_median': 4.7096, 'qs': 2.7562, 'rows': 464363}
+== scored: contrasts (treatment minus reference) ==
+f1_1_vs_r0 {'difference': -0.0268, 'lower_95': -0.0488, 'lower_97.5': -0.0524, 'upper_95': -0.0089, 'upper_97.5': -0.0068}
+f1_1_vs_r0_mean_error {'difference': -0.0532, 'lower_95': -0.0998, 'lower_97.5': -0.1079, 'upper_95': -0.016, 'upper_97.5': -0.0124}
+f1_1_vs_stored {'difference': -0.0268, 'lower_95': -0.0488, 'lower_97.5': -0.0524, 'upper_95': -0.0089, 'upper_97.5': -0.0068}
+f2_1_vs_r0 {'difference': -0.0357, 'lower_95': -0.0689, 'lower_97.5': -0.0743, 'upper_95': -0.0092, 'upper_97.5': -0.0065}
+f2_1_vs_r0_mean_error {'difference': -0.0688, 'lower_95': -0.1369, 'lower_97.5': -0.1489, 'upper_95': -0.0154, 'upper_97.5': -0.0106}
+f2_1_vs_stored {'difference': -0.0357, 'lower_95': -0.0689, 'lower_97.5': -0.0743, 'upper_95': -0.0092, 'upper_97.5': -0.0065}
+r0_vs_stored {'difference': 0.0, 'lower_95': 0.0, 'lower_97.5': 0.0, 'upper_95': 0.0, 'upper_97.5': 0.0}
+== scored: by lead band (vs r0) ==
+f1_1_from_6h {'difference': -0.0277, 'lower_95': -0.0505, 'lower_97.5': -0.0543, 'upper_95': -0.0091, 'upper_97.5': -0.0071}
+f1_1_under_6h {'difference': -0.0013, 'lower_95': -0.0185, 'lower_97.5': -0.0205, 'upper_95': 0.0179, 'upper_97.5': 0.0209}
+f2_1_from_6h {'difference': -0.0363, 'lower_95': -0.0704, 'lower_97.5': -0.0757, 'upper_95': -0.0091, 'upper_97.5': -0.0065}
+f2_1_under_6h {'difference': -0.0159, 'lower_95': -0.037, 'lower_97.5': -0.0402, 'upper_95': 0.0023, 'upper_97.5': 0.0044}
+== scored: by substation ==
+f1_1 {'D10': 3.1881, 'D11': 2.3232, 'D14': 2.0747, 'D16': 2.6417, 'D5': 3.5073, 'D9': 2.3665}
+f1_1_minus_r0 {'D10': -0.0351, 'D11': -0.0308, 'D14': -0.0197, 'D16': -0.0327, 'D5': -0.0146, 'D9': -0.015}
+f1_1_vs_r0_leave_one_out {'D10': -0.0247, 'D11': -0.0258, 'D14': -0.0287, 'D16': -0.0254, 'D5': -0.0295}
+f2_1 {'D10': 3.184, 'D11': 2.3165, 'D14': 2.072, 'D16': 2.6218, 'D5': 3.4959, 'D9': 2.352}
+f2_1_minus_r0 {'D10': -0.0392, 'D11': -0.0375, 'D14': -0.0224, 'D16': -0.0526, 'D5': -0.026, 'D9': -0.0295}
+f2_1_vs_r0_leave_one_out {'D10': -0.0347, 'D11': -0.0352, 'D14': -0.0391, 'D16': -0.0315, 'D5': -0.0378}
+r0 {'D10': 3.2232, 'D11': 2.354, 'D14': 2.0945, 'D16': 2.6744, 'D5': 3.5219, 'D9': 2.3815}
+stored {'D10': 3.2232, 'D11': 2.354, 'D14': 2.0945, 'D16': 2.6744, 'D5': 3.5219, 'D9': 2.3815}
+== scored: median minus mean per substation ==
+f1_1 {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+f2_1 {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+r0 {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+stored {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+== scored: tail calibration ==
+f1_1 [(0.01, 0.0232, 0.2133), (0.05, 0.0685, 0.7057), (0.95, 0.9493, 0.7446), (0.99, 0.9836, 0.2315)]
+f2_1 [(0.01, 0.0232, 0.2128), (0.05, 0.0683, 0.7038), (0.95, 0.9507, 0.7414), (0.99, 0.984, 0.2311)]
+r0 [(0.01, 0.0237, 0.2149), (0.05, 0.0703, 0.7116), (0.95, 0.9475, 0.7493), (0.99, 0.9826, 0.2318)]
+stored [(0.01, 0.0237, 0.2149), (0.05, 0.0703, 0.7116), (0.95, 0.9475, 0.7493), (0.99, 0.9826, 0.2318)]
+== replicate: absolute (five decision substations) ==
+f1_1 {'abs_mean': 4.6321, 'abs_median': 4.6321, 'qs': 2.6954, 'rows': 299306}
+f2_1 {'abs_mean': 4.6587, 'abs_median': 4.6587, 'qs': 2.7137, 'rows': 299306}
+r0 {'abs_mean': 4.6207, 'abs_median': 4.6207, 'qs': 2.6882, 'rows': 299306}
+stored {'abs_mean': 4.6207, 'abs_median': 4.6207, 'qs': 2.6882, 'rows': 299306}
+== replicate: contrasts (treatment minus reference) ==
+f1_1_vs_r0 {'difference': 0.0072, 'lower_95': -0.0052, 'lower_97.5': -0.0059, 'upper_95': 0.021, 'upper_97.5': 0.023}
+f1_1_vs_r0_mean_error {'difference': 0.0113, 'lower_95': -0.0075, 'lower_97.5': -0.0094, 'upper_95': 0.0314, 'upper_97.5': 0.0342}
+f1_1_vs_stored {'difference': 0.0072, 'lower_95': -0.0052, 'lower_97.5': -0.0059, 'upper_95': 0.021, 'upper_97.5': 0.023}
+f2_1_vs_r0 {'difference': 0.0255, 'lower_95': -0.0085, 'lower_97.5': -0.01, 'upper_95': 0.0837, 'upper_97.5': 0.0863}
+f2_1_vs_r0_mean_error {'difference': 0.038, 'lower_95': -0.0134, 'lower_97.5': -0.016, 'upper_95': 0.1216, 'upper_97.5': 0.1262}
+f2_1_vs_stored {'difference': 0.0255, 'lower_95': -0.0085, 'lower_97.5': -0.01, 'upper_95': 0.0837, 'upper_97.5': 0.0863}
+r0_vs_stored {'difference': 0.0, 'lower_95': 0.0, 'lower_97.5': 0.0, 'upper_95': 0.0, 'upper_97.5': 0.0}
+== replicate: by lead band (vs r0) ==
+f1_1_from_6h {'difference': 0.0083, 'lower_95': -0.005, 'lower_97.5': -0.0059, 'upper_95': 0.0231, 'upper_97.5': 0.0252}
+f1_1_under_6h {'difference': -0.0267, 'lower_95': -0.0455, 'lower_97.5': -0.0489, 'upper_95': -0.0082, 'upper_97.5': -0.007}
+f2_1_from_6h {'difference': 0.0268, 'lower_95': -0.0084, 'lower_97.5': -0.0098, 'upper_95': 0.0867, 'upper_97.5': 0.0897}
+f2_1_under_6h {'difference': -0.012, 'lower_95': -0.0243, 'lower_97.5': -0.0268, 'upper_95': -0.0021, 'upper_97.5': -0.0013}
+== replicate: by substation ==
+f1_1 {'D10': 3.6609, 'D11': 2.7286, 'D14': 2.0074, 'D16': 2.1275, 'D5': 2.9741, 'D9': 2.1874}
+f1_1_minus_r0 {'D10': 0.1065, 'D11': -0.0191, 'D14': -0.0012, 'D16': -0.0376, 'D5': -0.0086, 'D9': 0.045}
+f1_1_vs_r0_leave_one_out {'D10': -0.0167, 'D11': 0.0139, 'D14': 0.0093, 'D16': 0.0185, 'D5': 0.0112}
+f2_1 {'D10': 3.7525, 'D11': 2.7272, 'D14': 2.0107, 'D16': 2.1244, 'D5': 2.9782, 'D9': 2.1717}
+f2_1_minus_r0 {'D10': 0.1981, 'D11': -0.0205, 'D14': 0.0021, 'D16': -0.0407, 'D5': -0.0045, 'D9': 0.0293}
+f2_1_vs_r0_leave_one_out {'D10': -0.016, 'D11': 0.0373, 'D14': 0.0313, 'D16': 0.0423, 'D5': 0.0332}
+r0 {'D10': 3.5544, 'D11': 2.7477, 'D14': 2.0086, 'D16': 2.1652, 'D5': 2.9827, 'D9': 2.1424}
+stored {'D10': 3.5544, 'D11': 2.7477, 'D14': 2.0086, 'D16': 2.1652, 'D5': 2.9827, 'D9': 2.1424}
+== replicate: median minus mean per substation ==
+f1_1 {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+f2_1 {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+r0 {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+stored {'D10': 0.0, 'D11': 0.0, 'D14': 0.0, 'D16': 0.0, 'D5': 0.0, 'D9': 0.0}
+== replicate: tail calibration ==
+f1_1 [(0.01, 0.0248, 0.2348), (0.05, 0.0763, 0.7236), (0.95, 0.9587, 0.6807), (0.99, 0.9895, 0.1874)]
+f2_1 [(0.01, 0.026, 0.2427), (0.05, 0.0775, 0.7341), (0.95, 0.9585, 0.6831), (0.99, 0.9893, 0.1883)]
+r0 [(0.01, 0.0234, 0.2328), (0.05, 0.0726, 0.7198), (0.95, 0.9571, 0.683), (0.99, 0.9888, 0.1889)]
+stored [(0.01, 0.0234, 0.2328), (0.05, 0.0726, 0.7198), (0.95, 0.9571, 0.683), (0.99, 0.9888, 0.1889)]
+== stored network (arm 2 of experiment 201) minus arm D, per seed ==
+n_seed0 {'absolute_n': 2.6197, 'absolute_stored_same_rows': 2.7562, 'difference': -0.1365, 'lower_95': -0.2208, 'lower_97.5': -0.2332, 'upper_95': -0.0623, 'upper_97.5': -0.0538}
+n_seed1 {'absolute_n': 2.6153, 'absolute_stored_same_rows': 2.7562, 'difference': -0.1409, 'lower_95': -0.2306, 'lower_97.5': -0.2447, 'upper_95': -0.0614, 'upper_97.5': -0.0526}
+n_seed2 {'absolute_n': 2.6396, 'absolute_stored_same_rows': 2.7562, 'difference': -0.1166, 'lower_95': -0.1996, 'lower_97.5': -0.2127, 'upper_95': -0.0406, 'upper_97.5': -0.0308}
+== deciles ==
+rows 464363 rows share outer 0.2354 arm D score share outer 0.2226
+outer share of gain {
+ "f1": {
+  "lower_95": -0.3370773258822241,
+  "share": 0.2815515508028931,
+  "upper_95": 0.6473761838295319
+ },
+ "f2": {
+  "lower_95": -0.6009574033270583,
+  "share": 0.2299192857364983,
+  "upper_95": 0.5506485351845849
+ },
+ "n": {
+  "lower_95": 0.1104093668661023,
+  "share": 0.24819571359348142,
+  "upper_95": 0.49252167525195717
+ }
+}
+1 {'gain_f1': 0.0446, 'gain_f2': 0.06, 'gain_n': 0.1011, 'mean_qs_r0': 2.8592, 'rows': 32606}
+2 {'gain_f1': 0.0042, 'gain_f2': 0.0028, 'gain_n': 0.1407, 'mean_qs_r0': 3.0059, 'rows': 37708}
+3 {'gain_f1': 0.012, 'gain_f2': 0.0171, 'gain_n': 0.2244, 'mean_qs_r0': 3.173, 'rows': 40843}
+4 {'gain_f1': 0.0169, 'gain_f2': 0.0159, 'gain_n': 0.0658, 'mean_qs_r0': 2.9673, 'rows': 50166}
+5 {'gain_f1': 0.0103, 'gain_f2': 0.0097, 'gain_n': 0.0775, 'mean_qs_r0': 2.6968, 'rows': 47983}
+6 {'gain_f1': -0.0014, 'gain_f2': 0.0017, 'gain_n': 0.0315, 'mean_qs_r0': 2.8005, 'rows': 46582}
+7 {'gain_f1': 0.0205, 'gain_f2': 0.0398, 'gain_n': 0.1255, 'mean_qs_r0': 2.6266, 'rows': 48823}
+8 {'gain_f1': 0.051, 'gain_f2': 0.095, 'gain_n': 0.1874, 'mean_qs_r0': 2.719, 'rows': 35858}
+9 {'gain_f1': 0.0891, 'gain_f2': 0.1116, 'gain_n': 0.2134, 'mean_qs_r0': 2.4968, 'rows': 47072}
+10 {'gain_f1': 0.0268, 'gain_f2': 0.0241, 'gain_n': 0.1543, 'mean_qs_r0': 2.4989, 'rows': 76722}
+cold_band0 {'gain_f1': 0.0724, 'gain_f2': 0.0859, 'gain_n': 0.2315, 'rows': 8014}
+cold_band1 {'gain_f1': 0.0534, 'gain_f2': 0.0657, 'gain_n': -0.0242, 'rows': 6840}
+cold_band2 {'gain_f1': 0.0096, 'gain_f2': 0.0329, 'gain_n': -0.0706, 'rows': 6934}
+cold_band3 {'gain_f1': 0.0407, 'gain_f2': 0.0546, 'gain_n': 0.1939, 'rows': 10818}
+hot_band0 {'gain_f1': 0.1034, 'gain_f2': 0.0972, 'gain_n': 0.1819, 'rows': 18943}
+hot_band1 {'gain_f1': 0.0208, 'gain_f2': -0.0269, 'gain_n': 0.0137, 'rows': 15891}
+hot_band2 {'gain_f1': 0.0502, 'gain_f2': 0.1137, 'gain_n': 0.281, 'rows': 16183}
+hot_band3 {'gain_f1': -0.0407, 'gain_f2': -0.0546, 'gain_n': 0.1411, 'rows': 25705}
+== arm S (convex surface on the network's median correction) ==
+{
+ "S_both_smooth0.1": {
+  "in_sample": 0.21181130155109662,
+  "leave_one_month_out": 0.08869083161569868,
+  "leave_one_month_out_in_range": 0.08885190815472499,
+  "share_in_range": 0.999679118963673
+ },
+ "S_both_smooth1": {
+  "in_sample": 0.20881125067824646,
+  "leave_one_month_out": 0.09481800690325348,
+  "leave_one_month_out_in_range": 0.09491549849942249,
+  "share_in_range": 0.999679118963673
+ },
+ "S_both_smooth10": {
+  "in_sample": 0.20309792407408156,
+  "leave_one_month_out": 0.09317358971885303,
+  "leave_one_month_out_in_range": 0.09315670890440686,
+  "share_in_range": 0.999679118963673
+ },
+ "S_filter_smooth0.1": {
+  "in_sample": 0.13088210305450976,
+  "leave_one_month_out": 0.002632249449938895,
+  "leave_one_month_out_in_range": 0.002657061826206175,
+  "share_in_range": 0.999679118963673
+ },
+ "S_filter_smooth1": {
+  "in_sample": 0.12712793322859994,
+  "leave_one_month_out": 0.008999264121997586,
+  "leave_one_month_out_in_range": 0.008975247800170894,
+  "share_in_range": 0.999679118963673
+ },
+ "S_filter_smooth10": {
+  "in_sample": 0.11880777405985454,
+  "leave_one_month_out": 0.006492955910453402,
+  "leave_one_month_out_in_range": 0.006332845722819225,
+  "share_in_range": 0.999679118963673
+ },
+ "S_season_smooth0.1": {
+  "in_sample": 0.18928277097665713,
+  "leave_one_month_out": 0.0997155562463724,
+  "leave_one_month_out_in_range": 0.0999416735817894,
+  "share_in_range": 0.999679118963673
+ },
+ "S_season_smooth1": {
+  "in_sample": 0.18628071530609425,
+  "leave_one_month_out": 0.10609242097426297,
+  "leave_one_month_out_in_range": 0.1062483828077685,
+  "share_in_range": 0.999679118963673
+ },
+ "S_season_smooth10": {
+  "in_sample": 0.180607803853025,
+  "leave_one_month_out": 0.10393812919896983,
+  "leave_one_month_out_in_range": 0.10397945591284252,
+  "share_in_range": 0.999679118963673
+ },
+ "S_smooth0.1": {
+  "in_sample": 0.10270682068070891,
+  "leave_one_month_out": 0.0005882104365073637,
+  "leave_one_month_out_in_range": 0.0007023557342964448,
+  "share_in_range": 0.999679118963673
+ },
+ "S_smooth1": {
+  "in_sample": 0.09883097915628092,
+  "leave_one_month_out": 0.007654365588022349,
+  "leave_one_month_out_in_range": 0.007702651602639721,
+  "share_in_range": 0.999679118963673
+ },
+ "S_smooth10": {
+  "in_sample": 0.0900668174329744,
+  "leave_one_month_out": 0.005690355387628077,
+  "leave_one_month_out_in_range": 0.005592414014937708,
+  "share_in_range": 0.999679118963673
+ },
+ "rows": 561363,
+ "variance_of_correction": 5.550721456008249
+}
+== gate (mean over substations and tuning-month cuts) ==
+shape: (15, 6)
+┌─────────┬──────┬────────────────┬───────────────┬───────────────────┬──────────────────┐
+│ variant ┆ arm  ┆ train_recovery ┆ held_recovery ┆ train_tail_change ┆ held_tail_change │
+│ ---     ┆ ---  ┆ ---            ┆ ---           ┆ ---               ┆ ---              │
+│ str     ┆ str  ┆ f64            ┆ f64           ┆ f64               ┆ f64              │
+╞═════════╪══════╪════════════════╪═══════════════╪═══════════════════╪══════════════════╡
+│ cold    ┆ f1_1 ┆ 0.654          ┆ 0.544         ┆ -0.003            ┆ -0.004           │
+│ cold    ┆ f2_1 ┆ 0.655          ┆ 0.539         ┆ 0.002             ┆ -0.002           │
+│ cold    ┆ r0   ┆ 0.448          ┆ 0.411         ┆ -0.013            ┆ -0.013           │
+│ null    ┆ f1_1 ┆ 0.0            ┆ 0.0           ┆ 0.0               ┆ 0.0              │
+│ null    ┆ f2_1 ┆ 0.0            ┆ 0.0           ┆ 0.0               ┆ 0.0              │
+│ …       ┆ …    ┆ …              ┆ …             ┆ …                 ┆ …                │
+│ ramp    ┆ f2_1 ┆ 0.664          ┆ 0.524         ┆ 0.448             ┆ 0.402            │
+│ ramp    ┆ r0   ┆ 0.108          ┆ 0.115         ┆ 0.103             ┆ 0.115            │
+│ step    ┆ f1_1 ┆ 0.624          ┆ 0.546         ┆ 0.624             ┆ 0.546            │
+│ step    ┆ f2_1 ┆ 0.656          ┆ 0.577         ┆ 0.656             ┆ 0.577            │
+│ step    ┆ r0   ┆ 0.199          ┆ 0.214         ┆ 0.199             ┆ 0.214            │
+└─────────┴──────┴────────────────┴───────────────┴───────────────────┴──────────────────┘
+shape: (6, 2)
+┌──────┬────────────────┐
+│ site ┆ train_recovery │
+│ ---  ┆ ---            │
+│ str  ┆ f64            │
+╞══════╪════════════════╡
+│ D10  ┆ 0.662          │
+│ D11  ┆ 0.591          │
+│ D14  ┆ 0.618          │
+│ D16  ┆ 0.631          │
+│ D5   ┆ 0.594          │
+│ D9   ┆ 0.65           │
+└──────┴────────────────┘
