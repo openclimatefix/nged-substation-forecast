@@ -212,7 +212,7 @@ def figure_curve(*, gate: dict) -> alt.TopLevelMixin:
         alt.Chart(pl.DataFrame({"y": [0.5]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color=GREY, strokeDash=[4, 3])
         .encode(y="y:Q")
-    )  # ty: ignore[unresolved-attribute]
+    )
     return (rule + chart).properties(
         width=WIDTH - 80,
         height=220,
@@ -271,7 +271,7 @@ def figure_tradeoff(*, gate: dict) -> alt.TopLevelMixin:
         alt.Chart(pl.DataFrame({"y": [0.5]}))  # ty: ignore[unresolved-attribute]
         .mark_rule(color=GREY, strokeDash=[4, 3])
         .encode(y="y:Q")
-    )  # ty: ignore[unresolved-attribute]
+    )
     return (rule + points).properties(
         width=WIDTH - 80,
         height=240,
@@ -302,7 +302,7 @@ def figure_real(*, real: dict) -> alt.TopLevelMixin:
                 "high": cell["upper"],
             }
         )
-    base = alt.Chart(pl.DataFrame(rows)).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(pl.DataFrame(rows)).encode(
         y=alt.Y("contrast:N", title=None, axis=alt.Axis(labelLimit=300))
     )
     rule = base.mark_rule(strokeWidth=2, color=ocf.BRAND_ORANGE).encode(x="low:Q", x2="high:Q")  # ty: ignore[unresolved-attribute]
