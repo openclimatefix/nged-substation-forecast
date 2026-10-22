@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| – | No experiment is queued; the proposals below are not yet agreed | – | The maintainer | Open |
 
 ## Planned experiments
 
