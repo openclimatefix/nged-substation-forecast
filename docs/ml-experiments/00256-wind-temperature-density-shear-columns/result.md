@@ -12,8 +12,8 @@ size: >-
   simple. Stored: private files under data/ml-experiments/00256-wind-temperature-density-shear-columns/
   only. Serving path: not touched (a column the ENS table already carries). Degradation rule: not
   touched. Designs: one defensible test, a column permutation of experiment 230's recipe with a
-  placebo. Callers: this folder's scripts, which copy experiment 230's helpers. One Sonnet code
-  review, one Sonnet write-up review, one Sonnet prose review.
+  placebo. Callers: this folder's scripts, which copy experiment 230's helpers. One code
+  review, one write-up review, and one prose review.
 hypothesis: >-
   Adding 2 m air temperature (arm T1) to the six wind columns of the XGBoost wind model lowers the
   quantile score on the three metered wind farms (W1 to W3), because air density and stability change
