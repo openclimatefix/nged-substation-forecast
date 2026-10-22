@@ -52,23 +52,26 @@ headline: >-
   0.328.
 best_arm: none; the convex fit of experiment 129 stays the read-out
 take_home_message: >-
-  Pairing sunny and cloudy days does not remove the demand that follows cloud. With a cloud-driven
-  load added, the pair estimator over-recovers the injected farm by 0.3 of its capacity, more than
-  the convex fit's 0.2, and a December-and-January test finds 0.33 of the farm. Pairs of spring
-  and summer days alone find 0.91 of the farm, which agrees with experiment 231's finding that
-  winter rows identify solar capacity poorly.
+  Pairing sunny and cloudy days removed none of a synthetic load that follows cloud, so a real
+  cloud-following demand is unlikely to cancel either. With the load added, the pair estimator
+  over-recovers the injected farm by 0.3 of its capacity, against 0.2 for the convex fit, and a
+  December-and-January test finds 0.33 of the farm. Pairs of days with at least 10 hours of daylight
+  find 0.91 of the farm, in line with experiment 231's finding that winter rows identify solar
+  capacity poorly. The load is built to follow the pairing variable exactly, so 0.3 is a worst case.
 lessons:
   - >-
     A linear estimator's recovery of an injected farm is the farm-only scale on the estimator's
     own rows, so demand cancelling in pairs cannot show up in the plain injection test; only the
     cloud-driven load tests it.
   - >-
-    Including days with 5 to 10 hours of daylight lowers the pair recovery from 0.91 to 0.76, so
-    winter days weaken a capacity estimate in the pair estimator as they do in the convex fit.
+    In the post hoc run, restricting the pairs to days with at least 10 hours of daylight raised
+    the pair recovery from 0.76 to 0.91; short winter days may weaken the pair estimator as they
+    do the convex fit, but the split also changes which pairs exist.
 advice:
   - >-
-    Do not rely on matched day pairs to remove cloud-following demand: a cloud-driven load of 10%
-    of the injected capacity biases the pair recovery by 0.27 to 0.30 (figure 1).
+    Do not rely on matched day pairs to remove cloud-following demand: a synthetic cloud-driven
+    load of 10% of the injected capacity biases the pair recovery by 0.27 (days with at least 10
+    hours of daylight) to 0.30 (all days) (figure 1).
   - >-
     Restrict any day-pair capacity estimate to days with at least 10 hours of daylight if it is
     used at all, because adding shorter days lowers the recovery from 0.91 to 0.76 (post hoc
@@ -78,22 +81,30 @@ code: ml-experiments/00235-pv-capacity-matched-day-pairs/
 
 # Photovoltaic (PV) capacity: does matching sunny and cloudy days remove the demand?
 
-**Take-home message: pairing a sunny day with a cloudy day of the same day type and temperature does
-not remove the demand that follows cloud, so the pair estimator is no better than the convex fit.**
-With a synthetic cloud-driven load added, the pair estimator over-recovers the injected farm by
-about 0.3 of its capacity, against about 0.2 for the convex fit of experiment 129.
+**Take-home message: pairing a sunny day with a cloudy day of the same day type and temperature
+removed none of a synthetic load that follows cloud, so the pair estimator is no better than the
+convex fit.** The convex fit is the least-squares fit of solar capacity per season-year that
+experiment 129 used. The synthetic load is 10% of the injected capacity, scaled by each day's
+cloudiness, which is the variable the pairs are chosen on. It therefore tests the worst case, not a
+measured demand response. With the load added, the pair estimator over-recovers the injected farm by
+about 0.3 of its capacity, against about 0.2 for the convex fit.
 
 **What was done.** We added the recorded output of a real solar farm to a Primary substation's
 power, at 50% of the Primary's pinned capacity (the unmetered solar capacity that experiment 45's
 real-time estimate gives the Primary). Farms A to F are metered generators and are never named.
 Then we measured how much of the farm a matched-pair estimator finds. A pair is two days of the same
-day type (weekday, Saturday, or Sunday) and the same clock offset, at most 21 days apart, whose mean
+day type (weekday, Saturday, or Sunday) and the same clock offset (local time minus UTC, which
+separates summer-time days from
+winter-time days), at most 21 days apart, whose mean
 daylight temperatures differ by at most 1 K, where the sunny day's clear-sky index exceeds the
 cloudy day's by at least 0.4. The clear-sky index is the satellite global irradiance divided by its
 clear-sky value. The estimator is the least-squares scale of the pair's difference in net power on
-the pair's difference in the solar shape, with no demand terms. The share found is the recovery: the
+the pair's difference in the solar shape (the unit PV output per MW of capacity, derated for
+temperature), with no demand terms: the net power is the Primary's demand minus its solar output.
+The share found is the recovery: the
 capacity found with the farm added, minus the capacity found without it, divided by the injected
-capacity. D5, D10, D11, D14, and D16 are the five decision Primaries of experiment 103's data set,
+capacity. D5, D10, D11, D14, and D16 are the five decision Primaries (the substations whose capacity
+is judged), with temperatures in kelvin (K),
 and D9 is shown beside them. The recovery is read from pairs in season-year 2024 (July 2024 to
 June 2025), and the capacity unit is the 99th percentile of alternating-current output over
 daylight half-hours, in MW.
@@ -110,7 +121,8 @@ daylight half-hours, in MW.
 
 - **The pre-registered prediction failed.** The plain recovery was predicted at 0.90 to 1.10 at 4
   of the 5 decision Primaries, and it was in that range at 0 of 5 and under 0.88 at 5 of 5. The
-  plan's rule drops the estimator in that case. The placebo was predicted under 0.15 and was above
+  plan's rule drops the estimator in that case. (D5's recovery is 0.8997, just under 0.90.) The
+  placebo was predicted under 0.15 and was above
   it at 5 of 5. With the cloud-driven load, the recovery was predicted to stay within 0.10 of the
   plain recovery, and it stayed within 0.10 at 0 of 5.
 - **Pooled, with 80% intervals from resampling whole months (median over five farms, then over the
@@ -118,7 +130,8 @@ daylight half-hours, in MW.
     - **Plain recovery** 0.758 (0.742 to 0.783); over the five farms the range is 0.65 to 0.82.
     - **With the cloud-driven load** 1.058 (1.041 to 1.075), so the load adds 0.295 (0.286 to
       0.304).
-    - **Placebo** (December and January pairs) 0.328, with 0.24 to 0.34 across Primaries. The
+    - **Placebo** (pairs whose sunny day is in December or January; the cloudy partner can fall
+      up to 21 days away) 0.328, with 0.24 to 0.34 across Primaries. The
       placebo has one month per resampling stratum and so no interval.
     - **Capacity of the real power** 0.905 (0.838 to 0.956) of the convex fit's.
 - **The estimator is linear, so the plain injection test cannot show demand absorption.** The
@@ -126,16 +139,21 @@ daylight half-hours, in MW.
   the one input that reaches demand, is the informative test.
 - **The placebo is not a clean zero.** The injected farm still produces output in winter, and
   experiment 231's winter-rows fit found 0.475, so 0.33 is a farm-only winter scale and not an
-  invented solar signal. The plan's limit of 0.15 was too low for that reason.
-- **Post hoc sensitivity, days with at least 20 daylight half-hours (set after the pilot).** The
+  invented solar signal. The 0.33 is below the 0.475 of experiment 231 because the pair estimator
+  uses only pairs whose sunny day is in December or January, not every winter row. The plan's limit
+  of 0.15 was too low for that reason.
+- **Post hoc sensitivity, days with at least 20 daylight half-hours (10 hours).** The
   plan fixed no minimum number of daylight half-hours for a day to be paired. The first choice, 20,
   left no December or January day, so the placebo had no pairs, and the minimum was lowered to 10
   half-hours for the main run. The run with 20 is kept as a post hoc sensitivity. Its pooled
   recovery is 0.908 (0.899 to 0.928), in 0.90 to 1.10 at 4 of 5 Primaries, with 43 to 90 pairs per
-  Primary against 122 to 181. The load still adds 0.266 (0.263 to 0.272), and the capacity of the real
-  power is 0.969 (0.914 to 1.006) of the convex fit's. Longer days alone find more of the farm, in
+  Primary against 122 to 181. The load still adds 0.266 (0.263 to 0.272), and the capacity of the
+  real
+  power is 0.969 (0.914 to 1.006) of the convex fit's. Restricting to days with at least 10 hours of
+  daylight finds more of the farm, in
   line with experiment 231's finding that winter rows weaken the fit.
-- **Pair counts:** 122 to 181 pairs per Primary (2,100 to 3,500 half-hours) for the main run, and
+- **Pair counts:** medians over the farms of 122 to 181 pairs per Primary (2,100 to 3,500
+  half-hours) for the main run, and
   84 to 140 for the placebo.
 
 ## Checks
@@ -147,14 +165,17 @@ daylight half-hours, in MW.
 - **Toy check:** the pair estimator returned a synthetic capacity of 7 and a farm recovery of 0.5
   to within 1e-6 before any real fit ran.
 - **Audit triggers** (the seven triggers in the `ml-experiment` skill's "Audit before merge"): none
-  fired. The result contradicts the pre-registered prediction, and the plan's own linearity caveat
+  fired. The month-block interval covers month-to-month variation only, and the spread over farms is
+  reported separately. The result contradicts the pre-registered prediction, and the plan's own
+  linearity caveat
   anticipated why the plain test was uninformative.
 - **Review:** one Sonnet code review and one Sonnet review of the page.
 
 ## What the next experiment should answer
 
-- **Demand absorption in the convex fit needs a different remedy than pairing.** A learned model of
-  the demand's cloud response, fitted on the metered farms' own cloud dependence, is one option.
+- **Pairing did not remove the synthetic cloud-driven load, so a different remedy is worth
+  testing.** A learned model of the demand's response to cloud, fitted on the metered farms' own
+  cloud dependence, is one option.
 - **Neural components:** a small neural network for the demand's dependence on irradiance could
   separate it from the solar term. The prediction that could fail is a bias under 0.10 on the
   cloud-driven load test.
@@ -164,7 +185,8 @@ daylight half-hours, in MW.
 - **Pairs.** Within season-year 2024, a day is sunny when its daylight mean of the clear-sky index
   (CAMS global irradiance over clear-sky irradiance at the Primary) is at least 0.4 above the other
   day's. A pair needs the same day type, a mean daylight temperature within 1 K, and the two days
-  within 21 days of each other. Each day takes at most three partners, the ones with the smallest
+  within 21 days of each other. Each sunny day takes at most three cloudy partners, the ones with
+  the smallest
   temperature gap. Holiday periods are excluded.
 - **Estimator.** The least-squares scale through the origin of the pair difference in net power on
   the pair difference in the temperature-derated unit shape of the fit in experiment 129, over the

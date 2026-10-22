@@ -412,6 +412,9 @@ extra-paths = [
 # scripts that go with those.
 include = [
     "packages/studies/src/studies/battery_recurrence.py",
+    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_common.py",
+    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_fit.py",
+    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_report.py",
     "packages/studies/src/studies/battery_state_space.py",
     "packages/studies/src/studies/capacity_physics_torch.py",
     "packages/studies/src/studies/dp_edge_flow.py",
