@@ -38,8 +38,8 @@ decision_rule: >-
   brief's bar; round 2 adds a retraining loop to the R&D pipeline only (no serving-path change), so
   no larger porting threshold is set. Reported beside it, not bars: the same contrast for the
   logistic regression (F), the second weight (0.5), pseudo-positives from even months only (so the
-  odd-month alarm threshold never sees a pseudo-positive), a series-level hold-out, and a second
-  round.
+  odd-month alarm threshold never sees a pseudo-positive), a series-level hold-out, the strict tier, a post hoc
+  heavy weight (pseudo-positives holding 25% of the injected positives' weight), and a third round.
 benchmark: >-
   Round 1 re-ranker (experiment 195: 24 of 35, MW-weighted recall 0.752), round 1 logistic
   regression (22 of 35), RO-NC (19 of 35), and the pair alarm (5 of 35), all at 80 unexplained
@@ -66,14 +66,21 @@ score finds more of the 35 labelled real transfers.
 - **Round 1** is experiment 195's re-ranker and logistic regression, retrained here from the same
   stored injected worlds with the same seeds.
 - **Pseudo-positive rule** (label-free; evaluated on every real candidate of every source, over all
-  months): not in a D8 drop and not on one of the 17 block days; own 6-hour step and the opposite
-  step at the best neighbour both at least 3.0 noise units; at least 1 metered opposite
-  neighbour; opposite-to-own step ratio between 0.5 and 1.5; opposite step within 2 hours of the
-  own step; round 1 score above the 90th percentile of that fold's round 1 scores over all real
-  candidates; and a clean return: the estimated end lies 48 to 192 half-hours after the step and
-  the own residual falls by at least 70% of the step across the end (mean of the 12 half-hours
-  before the end minus mean of the 12 after, against the step measured the same way at the onset).
-  The count is recorded in this file before any real transfer is scored.
+  months). Every pseudo-positive is outside the D8 drops and the 17 block days, has a
+  logistic-regression score above the 75th percentile of that fold's scores over all real candidates
+  (the re-ranker scores only RO-NC's candidates, so the logistic regression is the gate), and has a
+  clean return. A clean return means the estimated end lies 48 to 176 half-hours after the step (so
+  that the 12 half-hours after the end lie inside the 4-day window) and the own residual falls across
+  the end by at least 50% of the step (mean of the 12 half-hours before the end minus mean of the 12
+  after, against the step measured the same way at the onset). The **loose rule** (headline) needs a
+  24-hour step of at least 2.5 noise units and an opposite step at any neighbour. The **strict
+  tier** needs an own 6-hour step of at least 3.0, an opposite 6-hour step of at least 2.0 at a
+  metered neighbour within 4 hours, and an opposite-to-own ratio between 0.3 and 2.0. The first
+  draft of the strict tier (opposite step 3.0, ratio 0.5 to 1.5, return 70%, 90th percentile) passed
+  2 candidates per fold, so the thresholds were relaxed and the loose rule added **before any real
+  transfer was scored**. Counts recorded before scoring: strict 14, 15, and 16 candidates in folds
+  0, 1, and 2; loose 49 in every fold, which falls to 47, 38, and 45 after the event hold-out
+  (below), of which 19, 18, and 16 lie in odd months. The real record holds 2,980 candidates in all.
 - **Hold-out.** A pseudo-positive that lies within 48 half-hours before the onset to 48 half-hours
   after the end of a labelled transfer of fold k, on a series of that transfer, is dropped from fold
   k's round 2 training. The round 1 score that gates fold k's pseudo-positives is fold k's own
