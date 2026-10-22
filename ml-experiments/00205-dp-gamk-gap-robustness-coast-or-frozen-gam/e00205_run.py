@@ -16,7 +16,8 @@ the gap from the filter and rebuilds the forecast of every run under these rules
 
 The output is one parquet file per substation under `work/rows/`, long by (L, k, rule), holding
 the per-row losses of the event runs' rows at leads of 0 to 168 hours outside the switching events.
-The control `L = 0` (no gap) is written as well. The controls are written to `work/controls.json`.
+The no-gap run (`n`, `n0`, `c`) is written with a gap length of 0. The controls are written to
+`work/controls/<site>.json`.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00205-*/e00205_run.py [--workers 4]
@@ -106,7 +107,7 @@ def last_reading_gap(*, trace: CorrectionTrace, frame: pl.DataFrame) -> np.ndarr
 
 
 def variance_growth(*, half_hours: np.ndarray, settings: filters.FilterSettings) -> np.ndarray:
-    """Return the level plus transient predictive variance accrued over `half_hours`, in points^2."""
+    """Return the level and transient variance accrued over `half_hours`, in points squared."""
     phi = settings.phi
     level = settings.q * half_hours / 48.0
     transient = settings.sigma_z**2 * (1.0 - phi ** (2.0 * half_hours)) / (1.0 - phi**2)
@@ -118,8 +119,16 @@ def widen(*, frame: pl.DataFrame, extra_variance: np.ndarray) -> pl.DataFrame:
     mean = frame["mean"].to_numpy().astype(np.float64)
     width = (frame["q95"].to_numpy() - frame["q05"].to_numpy()).astype(np.float64)
     scale = np.sqrt(1.0 + extra_variance / np.maximum((width / GAUSSIAN_90_WIDTH) ** 2, 1e-12))
+    widened = extra_variance > 0.0
     return frame.with_columns(
-        pl.Series(c, (mean + (frame[c].to_numpy().astype(np.float64) - mean) * scale))
+        pl.Series(
+            c,
+            np.where(
+                widened,
+                mean + (frame[c].to_numpy().astype(np.float64) - mean) * scale,
+                frame[c].to_numpy().astype(np.float64),
+            ),
+        )
         .cast(pl.Float32)
         .alias(c)
         for c in QUANTILE_COLUMNS
@@ -131,14 +140,14 @@ def d_pipeline(*, frame: pl.DataFrame, hidden_actual: np.ndarray) -> pl.DataFram
 
     Args:
         frame: A forecast frame with `mean`, `period`, `actual`, and the columns of `add_calendar`.
-        hidden_actual: The actual with the readings inside gaps set to `NaN`, for recipe R.
+        hidden_actual: The actual with the readings inside gaps set to `NaN`, for the offset and R.
 
     Returns:
         The frame with the corrected mean and a spread refitted on the tuning months.
     """
     mean = frame["mean"].to_numpy().astype(np.float64)
-    offset, _ = corr.winter_offset_shift(frame=frame, variant="winter")
     shifted = frame.with_columns(pl.Series("actual", hidden_actual.astype(np.float32)))
+    offset, _ = corr.winter_offset_shift(frame=shifted, variant="winter")
     shift = offset + corr.recipe_r_shift(frame=shifted, forecast=mean + offset)
     return corr.apply_shift_and_refit_spread(frame=frame, shift=shift)
 
@@ -195,7 +204,7 @@ def read_stored_d(*, site: str) -> pl.DataFrame:
     )
 
 
-def _job(site: str) -> str:
+def _job(site: str) -> str:  # noqa: PLR0915
     started = time.monotonic()
     frame0 = pl.read_parquet(prep.base_path(site=site))
     stream, band = prep.read_stream(site=site)
@@ -215,18 +224,35 @@ def _job(site: str) -> str:
     true_actual = frame0["actual"].to_numpy().astype(np.float64)
     target = frame0["target"].to_numpy()
 
-    def build(*, trace: CorrectionTrace | None, hidden: np.ndarray):
-        mean_frame = (
-            base.arm_mean_frame(base=frame0, trace=trace)
-            if trace is not None
-            else frame0.with_columns(
+    def mean_frame_of(*, trace: CorrectionTrace | None) -> pl.DataFrame:
+        if trace is None:
+            return frame0.with_columns(
                 mean=pl.col("base_mean").cast(pl.Float32), level=pl.lit(0.0), anomaly=pl.lit(0.0)
             )
-        )
+        return base.arm_mean_frame(base=frame0, trace=trace)
+
+    pinned: dict[str, pl.DataFrame] = {}
+
+    def build(
+        *, trace: CorrectionTrace | None, hidden: np.ndarray
+    ) -> tuple[pl.DataFrame, pl.DataFrame]:
+        mean_frame = mean_frame_of(trace=trace)
+        if trace is not None and "no_gap" in pinned:
+            # Tuning-month rows keep the no-gap filter's forecast, so every rule's spread table is
+            # the no-gap one.
+            is_tuning = (mean_frame["period"] == "tuning").to_numpy()
+            reference = pinned["no_gap"]
+            mean_frame = mean_frame.with_columns(
+                pl.Series(c, np.where(is_tuning, reference[c].to_numpy(), mean_frame[c].to_numpy()))
+                .cast(pl.Float32)
+                .alias(c)
+                for c in ("mean", "level", "anomaly")
+            )
         a0 = corr.add_calendar(frame=base.arm_frame(mean_frame=mean_frame))
         return a0, d_pipeline(frame=a0, hidden_actual=hidden)
 
     trace0 = filters.filter_stream(residual=stream, band=band, settings=settings).trace
+    pinned["no_gap"] = mean_frame_of(trace=trace0)
     filter_only_0, d_0 = build(trace=trace0, hidden=true_actual)
     gap0 = last_reading_gap(trace=trace0, frame=frame0)
     frozen_a0, _ = build(trace=None, hidden=true_actual)

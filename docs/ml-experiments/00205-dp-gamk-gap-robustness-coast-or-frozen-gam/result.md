@@ -61,8 +61,7 @@ decision_rule: >-
   of q05 and q95 coverage from nominal is smaller at 24 and 72 hours by more than the binomial
   standard error of the difference, and its score minus rule (a)'s is at most +0.01 at every length.
   The verdict is capped at `inconclusive` if a control fails: with no gap the rebuilt rule (a)
-  reproduces experiment 155's arm D to within 0.001 points on the mean forecast; replacing the
-  actuals hidden in a gap by random numbers leaves every output unchanged; and rule (b) with the
+  reproduces experiment 155's arm D to within 0.001 points on the mean forecast; replacing, with random numbers, every actual at or after a run's origin leaves that run's mean forecast unchanged; and rule (b) with the
   extra variance set to zero equals rule (a) exactly.
 benchmark: >-
   The no-gap score of the same event runs under the same pipeline (arm D of experiment 155, rebuilt
@@ -105,11 +104,14 @@ a gap length exists beyond which the filter should be dropped.
     combinations are scored, and the headline contrasts use k = 0. One filter pass per (substation,
     L, k) applies the gaps of all that substation's events together, which is equivalent to one pass
     per event because the windows do not overlap.
-- **What each stage sees.** The filter reads the gapped stream. The winter night offset is refitted monthly on the errors of the earlier rows of the gapped timeline, as in experiment 155. The spread table is fitted on the tuning months, in which no gap falls. Recipe R is recomputed from the gapped timeline: it uses the errors
-    of the earlier runs from the gapped filter, and the actuals whose valid time falls inside any
-    gap are hidden from its error blocks (a block with fewer than 40 readings is unusable, as in
-    experiment 155). Scoring reads the true actuals of the event run's own rows, which all fall
-    after its origin.
+- **What each stage sees.** The filter reads the gapped stream. The winter night offset is refitted
+    monthly on the errors of the earlier rows of the gapped timeline, as in experiment 155, with the
+    actuals inside gaps hidden. Rows of the tuning months keep the no-gap filter's forecast, so
+    every rule's spread table is the no-gap one even where a gap reaches back into a tuning month.
+    Recipe R is recomputed from the gapped timeline: it uses the errors of the earlier runs from the
+    gapped filter, and the actuals whose valid time falls inside any gap are hidden from its error
+    blocks (a block with fewer than 40 readings is unusable, as in experiment 155). Scoring reads
+    the true actuals of the event run's own rows, which all fall after its origin.
 - **Rules.** Each rule's offset, R profile, and spread come from that rule's own forecast errors.
     (a) Coast: the gapped filter, then the offset and R. (b) Coast with widened bands: rule (a)'s 11
     quantiles with their offsets from the mean multiplied by sqrt(1 + v / s^2), where s = (q95 -
