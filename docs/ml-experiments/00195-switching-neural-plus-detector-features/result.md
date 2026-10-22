@@ -112,9 +112,9 @@ detail from experiment 130's.
 **A learned score re-ranks RO-NC's candidates, and a logistic regression does nearly as well.** Each
 score reads 25 numbers per candidate, among them the 24-hour step, the opposite step at a
 neighbouring Primary substation, and the hour and season. We trained each score only on synthetic
-transfers, added to the forecast error with the injector of [experiment
-189](../00189-switching-neural-onset-end-block-detector/result.md), plus real stretches with no
-logged or labelled event. We scored each on real transfers of Primary pairs it had never seen. The
+transfers, added to the forecast error with the injector of experiment 189 ([its pull
+request](https://github.com/openclimatefix/nged-substation-forecast/pull/1494)), plus real stretches
+with no logged or labelled event. We scored each on real transfers of Primary pairs it had never seen. The
 best score, a neural network that also reads 4 days of the raw forecast error, found 24 and lost
 none of RO-NC's (+0.074 in the share of moved MW found, 95% interval +0.013 to +0.175, resampling
 whole Primary pairs).
