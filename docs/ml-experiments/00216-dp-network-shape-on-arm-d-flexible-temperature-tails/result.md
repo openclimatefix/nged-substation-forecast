@@ -211,8 +211,9 @@ extra inputs.](figure_4_convex_surface_explains_the_correction.svg)
 - **Triggers fired:** trigger 4. In the replicate year F1's contrast is -0.017 without D10 and +0.009
   to +0.019 without any other substation, because D10 alone is +0.107. Triggers 1 (the placebo
   narrowly fails, which is a control failure) and 7 (the series of network experiments depends on
-  the headline) are also arguable. An audit by a fresh Opus agent is requested from the
-  manager before merge; its findings are not yet in.
+  the headline) are also arguable. **Audit trigger 4 fired and no audit was run**, because of
+  the quota. The verdict is inconclusive and nothing is ported on it. Read the replicate-year F1
+  contrast as unreliable: it flips sign when D10 is left out.
 
 ## Caveats
 
