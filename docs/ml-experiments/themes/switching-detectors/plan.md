@@ -8,6 +8,7 @@
 |---|---|---|---|---|
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals |
 | 186 | Are D8's multi-day drops an embedded gas peaker running (spark spread, triads, flat blocks)? | High (NGED answer relayed 2026-10-22) | Nothing | Planned |
+| 196 | Does a hidden Markov model of 0 to 3 engine units find D8's engine, and pass a known-answer test from the engine's own recorded output? | High (maintainer, 2026-10-22; PS2 of the price-sensitive-generation design) | Experiment 194 (G2's record) | Planned |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the
 interconnection edges between Primary substations and scores them on injected transfers; see the
