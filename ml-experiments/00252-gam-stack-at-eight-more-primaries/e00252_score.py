@@ -186,23 +186,21 @@ def main() -> None:
     out: dict = {"arm": args.arm, "sites": args.sites, "rows": {}, "absolute": {}, "checks": {}}
     for site, frame in frames.items():
         out["rows"][site] = frame.height
-        shared = frame.filter(
-            pl.col("s_climatology").is_not_null() & pl.col("s_manual").is_not_null()
-        )
+        shared = frame.filter(pl.col("s_climatology").is_finite() & pl.col("s_manual").is_finite())
         out["absolute"][site] = {
             "rows": shared.height,
-            **{name: float(shared[f"s_{name}"].mean()) for name in ("a0", *REFERENCES)},
+            **{name: float(shared[f"s_{name}"].to_numpy().mean()) for name in ("a0", *REFERENCES)},
         }
         actual = frame["actual"].to_numpy().astype(np.float64)
         cold = frame.filter(pl.col("cold_night"))
         out["checks"][site] = {
-            "median_minus_mean": float((frame["q50"] - frame["mean"]).mean()),
-            "mae_mean_forecast": float(frame["e_mean"].mean()),
-            "mae_bg2_median": float(frame["e_bg2"].mean()),
-            "q95_cover_cold_night_a0": float((cold["actual"] <= cold["q95"]).mean())
+            "median_minus_mean": float((frame["q50"] - frame["mean"]).to_numpy().mean()),
+            "mae_mean_forecast": float(frame["e_mean"].to_numpy().mean()),
+            "mae_bg2_median": float(frame["e_bg2"].to_numpy().mean()),
+            "q95_cover_cold_night_a0": float((cold["actual"] <= cold["q95"]).to_numpy().mean())
             if cold.height
             else None,
-            "q95_cover_cold_night_bg2": float((cold["actual"] <= cold["bg2_q95"]).mean())
+            "q95_cover_cold_night_bg2": float((cold["actual"] <= cold["bg2_q95"]).to_numpy().mean())
             if cold.height
             else None,
             "tails": {
@@ -225,7 +223,7 @@ def main() -> None:
         rest = {s: f for s, f in frames.items() if s != left}
         leave_out[left] = contrast(frames=rest, column="d_bg2", flag="all")["pooled"]
     out["leave_one_out_pooled_d_bg2"] = leave_out
-    common.write_json_atomic(path=common.WORK_DIR / f"scores_{args.arm}.json", content=out)
+    common.write_json_atomic(path=common.WORK_DIR / f"scores_{common.ARM}.json", content=out)
     print_report(out=out)
 
 

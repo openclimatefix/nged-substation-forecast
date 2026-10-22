@@ -47,7 +47,7 @@ class TallFit:
     site: str
     cut: datetime
     layout: GamLayout
-    pinned: PinnedCapacity
+    pinned: PinnedCapacity | None
     arm: design.ArmSpec
     fit: design.ArmFit
 
@@ -61,9 +61,10 @@ def fit_tall(
     penalty_weight: float,
 ) -> TallFit:
     """Fit T-all at one site and cut."""
-    base = design.build_base(cache=cache, vintages=vintages, site=site, cut=cut)
+    base = design.build_base(
+        cache=cache, vintages=vintages, site=site, cut=cut, fitted=common.FITTED
+    )
     arm = design.interaction_arm(name="t_all", penalty_weight=penalty_weight)
-    assert base.pinned is not None
     return TallFit(
         site=site,
         cut=cut,
@@ -96,7 +97,10 @@ def predict_tall(*, cache: FeatureCache, fit: TallFit, index: np.ndarray) -> np.
     if not np.isfinite(x).all():
         msg = f"{fit.site} has a non-finite input among the rows to predict"
         raise ValueError(msg)
-    return x @ fit.fit.theta - pinned_solar_points(
+    power = x @ fit.fit.theta
+    if fit.pinned is None:
+        return power
+    return power - pinned_solar_points(
         cache=cache,
         features=features,
         pinned=fit.pinned,

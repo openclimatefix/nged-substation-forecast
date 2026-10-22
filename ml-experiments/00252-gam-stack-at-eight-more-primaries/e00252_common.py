@@ -41,6 +41,8 @@ DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
 WORK_DIR: Final[Path] = DATA_DIR / "work" / os.environ.get("E00252_SOURCE", "mva")
 ARM: Final[str] = os.environ.get("E00252_ARM", "a0")
 """The arm this process runs; every fit and forecast path is namespaced by it."""
+FITTED: Final[bool] = ARM == "a1"
+"""Arm `a1` fits the PV capacity at each cut instead of pinning it."""
 ARM_DIR: Final[Path] = WORK_DIR / "arms" / ARM
 SPEC_PATH: Final[Path] = WORK_DIR / "arm_specs.json"
 """`{arm: {site: {tilt_deg, azimuth_deg, scale, clip}}}`; a missing arm or site is the fleet."""
@@ -185,8 +187,14 @@ POOL_PATH: Final[Path] = (
 
 
 def base_spec() -> GamSpec:
-    """Return B0's penalties: GAM-K's ridge, no drift, and the capacity pinned to the vintage."""
-    return GamSpec(ridge=RIDGE, drift="none", capacity="pinned", final_knot="free")
+    """Return B0's penalties: GAM-K's ridge and no drift, with the capacity pinned or fitted.
+
+    Arm `a0` pins the capacity to the vintage (zero at the eight sites); arm `a1` fits it at each
+    cut.
+    """
+    return GamSpec(
+        ridge=RIDGE, drift="none", capacity=("fitted" if FITTED else "pinned"), final_knot="free"
+    )
 
 
 def base_window() -> TrainingWindow:
@@ -272,8 +280,8 @@ def variant_cache(*, cache: FeatureCache, site: str) -> FeatureCache:
 
 
 def arm_file(*, arm: str, period: str, site: str) -> Path:
-    """Return the stage-2 `d` forecast file of an arm."""
-    return WORK_DIR / "arms" / arm / "dp_preds_s2" / f"d_{period}_{site}.parquet"
+    """Return the file of a stage-2 arm's forecasts for one period at one site."""
+    return ARM_DIR / "dp_preds_s2" / f"{arm}_{period}_{site}.parquet"
 
 
 def vintages_for(*, cache: FeatureCache) -> pl.DataFrame:

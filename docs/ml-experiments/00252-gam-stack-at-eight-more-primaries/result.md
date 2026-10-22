@@ -8,7 +8,7 @@ theme: production-reference-and-best-guess
 also_relevant_to:
   - differentiable-physics-embedded-generation
   - calibration-and-uncertainty
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00252-gam-stack-at-eight-more-primaries/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is
@@ -46,44 +46,125 @@ metric: >-
   MAE of q50, the card's condition splits (sunny daylight, winter nights, cold nights, Christmas,
   bank holidays), and q95 coverage on cold nights
 code: ml-experiments/00252-gam-stack-at-eight-more-primaries/
+verdict: not supported
+best_arm: >-
+  A1 (post hoc, solar capacity fitted): pooled quantile score minus BG2 +0.562 points (95% interval
+  +0.393 to +0.749); below BG2 at D2, D3, D4, D19, and D21, above it at D8, D12, and D22
+headline: >-
+  The stack with no solar term scores +0.690 points above BG2 pooled over the eight Primaries (95%
+  interval +0.520 to +0.864) and is within 0.05 points of BG2 at 2 of 8 sites (D3 and D4). D8 alone
+  is +3.619. Fitting a solar capacity at each cut (post hoc) beats BG2 at five sites, but D8, D12,
+  and D22 stay above it.
+lessons:
+  - >-
+    The gap to BG2 sits in sunny daylight rows (+1.043 pooled for A0) and a fitted solar term closes
+    part of it (+0.754 for A1); winter nights are level with BG2 or better at six of eight sites.
+  - >-
+    D8, D12, and D22 are not within reach of the stack: D8 has 12 monthly fits on under 15 months of
+    data, D12 has reverse flow that the apparent-power reading folds, and D22 stays +0.384 above BG2.
 production_status: not-for-production
 adopted_in: none
+take_home_message: >-
+  The best-guess demand stack does not transfer unchanged to the eight Primaries metered only in
+  apparent power: without a solar term it is within 0.05 points of BG2 at only two of them. Fitting
+  a solar term at each retraining brings five of the eight to or below BG2, so those five cards can
+  show a best-guess line, while D8, D12, and D22 should show none.
+advice:
+  - >-
+    Give the cards of D2, D3, D4, D19, and D21 a best-guess line from the fitted-solar-term stack
+    (A1), and no best-guess line at D8, D12, or D22 (Figure 1).
+  - >-
+    Fit the solar capacity at each cut when porting the stack to a Primary with no real-time
+    capacity vintage, because the zero solar term costs 0.19 to 0.34 points at D2, D3, D19, D21,
+    and D22 (A1 minus A0 table).
+  - >-
+    Do not run the stack at D8 until it has more than 12 monthly fits; its lower tail covers 20% of
+    readings at q01 (Tails).
 date: 2026-10-22
 ---
 
-**Planned; no score has been read.** Fourteen substation cards have a BG2 line, but only D5, D9,
-D10, D11, D14, and D16 have a best-guess line and example weeks. This experiment fits the same
-stack at D2, D3, D4, D8, D12, D19, D21, and D22 and asks whether it stays within 0.05 points of
-BG2.
+---
 
-## Arms
+**Take-home.** The best-guess demand stack does not transfer unchanged to the eight Primaries
+metered only in apparent power (MVA). With no solar term it is within 0.05 points of BG2 at only
+two of the eight (D3 and D4), and D8 alone is 3.6 points worse. Fitting a solar capacity at each
+retraining (a post hoc arm) puts five Primaries at or below BG2: D2, D3, D4, D19, and D21. Those five
+cards can show a best-guess line. D8, D12, and D22 should show none.
 
-**Plan amendment, committed before any score was read.** The brief assumed a pinned solar capacity
-"from the card's own inference where one exists". No real-time capacity vintage exists for the eight
-sites (experiment 45's vintages cover the MW Primaries only), so the pinned solar term is zero at
-all eight. That changes three arms.
+We asked whether the stack of earlier experiments, built for six Primaries with a megawatt (MW)
+meter, still scores within 0.05 points of BG2 at eight Primaries that have no stack forecast. The
+stack is [experiment 247](../00247-dp-learned-export-cap-for-the-solar-clip/result.md)'s chain: T-all
+fits (the heating terms split by day type), shared filter noise, ensemble-mean weather, the winter
+night offset, and recipe R of [experiment
+155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md). The ensemble
+stores and calibrations are those of [experiment
+152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md), and BG2 is the production-style
+forecast of [experiment 87](../00087-bg2-best-guess-assembled-with-drop-one-ablations/result.md). The
+score is the quantile score (twice the mean pinball loss over 11 quantiles) in points of effective
+capacity; lower is better. No solar term could be pinned, because no real-time capacity vintage exists
+at these Primaries, so arm A0 has none.
 
-- **A0 (verdict arm).** Experiment 247's chain with a zero pinned solar term: T-all monthly fits
-  (heating split by day type), shared filter noise (POOL), ensemble-mean weather, winter night
-  offset, and recipe R (experiment 155's arm D), fitted on the apparent-power reading as experiment
-  152's arm N does. The 60% clip acts on the pinned solar output, so it is inert at zero capacity.
-  Experiment 169's band fixes are not applied (their code is tied to the six sites).
-- **A1 (dropped).** A0 without the solar term is A0 itself, so the arm is empty.
-- **A2 (not run).** The monotone network of experiment 250 acts on a non-zero clipped solar term,
-  and none exists here, so prediction 4 is untested.
-- **Control gate.** The same code, reading experiment 111's stores, reproduces experiment 155's
-  stored arm D at D10 and D11 (maximum difference 0.0 in the median and the mean).
-- **References.** BG2, climatology, and the manual heuristic of experiment 87.
+![Quantile score minus BG2, by site](figure_1_by_site.svg)
 
-## Sites, rows, and caveats
+![Quantile score minus BG2, by group of rows](figure_2_by_slice.svg)
 
-- **Sites.** D2, D3, D4, D8, D12, D19, D21, D22. Control: D5, D9, D10, D11, D14, D16.
-- **Rows.** `fold_a_daily_gap_v1`, scored year 2025-07 to 2026-06, outside hand-filtered load-shift
-  events, no scoring after 2026-07-01.
-- **Schedule.** Monthly refits on the 24-month window (experiment 247's schedule); the contrast does
-  not depend on the cadence.
-- **Compute.** CPU, 4 cores, about 4 hours.
-- **Risks.** D8 and D12 may lack the 24 months of clean history the stack needs (D8 is scored from
-  2025-04-01); a shortfall is reported rather than hidden. D12's unit is MVA, so its score is not
-  comparable in MW. The pinned capacity comes from a method that recovers about 0.78 of an injected
-  capacity (experiments 231 and 241), and the Kalman filter may absorb a wrong pin.
+## Results
+
+- **Arms.** A0 is the pre-registered arm with a zero solar term. A1 is post hoc: the same chain with
+  the solar capacity fitted at each monthly cut (non-negative increments per season-year, as
+  experiment 152's arm N). The network arm (A2) was not run, because it needs a non-zero clipped solar
+  term. Experiment 169's band fixes are not applied. Monthly refits on a 24-month window; the
+  contrast does not depend on the cadence.
+- **Rows.** Scored year 2025-07 to 2026-06, leads 0.5 to 168 hours, outside the hand-filtered
+  load-shift events, 94,444 to 97,046 rows per site (D8 from 2025-04, with 12 monthly fits and no
+  tuning month; its spread borrows the other six sites' tuning residuals, as experiment 152 does).
+- **Gate passed.** The same code, reading experiment 111's stores, reproduces experiment 155's stored
+  arm D at D10 and D11 (maximum difference 0.0 in the median and the mean).
+- **Absolute scores (A0 / A1 / BG2 / climatology / manual heuristic).** D2 2.419 / 2.079 / 2.179 /
+  2.932 / 2.839; D3 1.603 / 1.417 / 1.626 / 2.325 / 2.052; D4 2.309 / 2.294 / 2.393 / 2.830 / 2.778;
+  D8 11.212 / 11.433 / 7.593 / 9.757 / 8.469; D12 7.415 / 7.414 / 6.468 / 8.768 / 7.836; D19 3.178 /
+  2.969 / 3.047 / 3.935 / 3.760; D21 2.348 / 2.106 / 2.297 / 2.907 / 2.757; D22 4.193 / 3.937 / 3.553
+  / 5.430 / 4.628. D12 is in MVA, so its points are not comparable with the others' in megawatts.
+- **A0 minus BG2 (95% interval over months).** Pooled +0.690 (+0.520 to +0.864). By site: D2 +0.241,
+  D3 -0.022, D4 -0.084, D8 +3.619, D12 +0.946, D19 +0.131, D21 +0.051, D22 +0.639.
+- **A1 minus BG2.** Pooled +0.562 (+0.393 to +0.749). By site: D2 -0.100, D3 -0.209, D4 -0.099,
+  D8 +3.840, D12 +0.946, D19 -0.078, D21 -0.191, D22 +0.384. A1's intervals exclude zero below BG2 at
+  D3 and D21 only.
+- **Predictions.** (1) Failed: pooled +0.690 against -0.12 to +0.05, and 2 of 8 sites within +0.05.
+  (2) Passed: D8 and D12 are the two worst, and D8 is +3.619 above BG2. (3) Not tested as written,
+  because A1 became a fitted-solar-term arm; A1 minus A0 is -0.34 at D2, -0.19 at D3, -0.02 at D4,
+  +0.22 at D8, 0.00 at D12, -0.21 at D19, -0.24 at D21, and -0.26 at D22 (point estimates). (4) Not
+  run.
+- **Groups of rows, pooled A0 / A1 minus BG2.** Sunny daylight +1.043 / +0.754; winter +0.441 /
+  +0.292; winter nights +0.286 / +0.280; cold nights -0.143 / -0.143 (intervals include zero).
+- **Leaving one site out (pooled A0 / A1 minus BG2).** Without D8: +0.272 (+0.117 to +0.424) / +0.093
+  (-0.032 to +0.213). The verdict does not change for either arm.
+- **Tails (coverage below the quantile; A0 against BG2, target in the first column).** q01 target
+  0.010: A0 is 0.017 to 0.042 at seven sites and 0.204 at D8; BG2 is 0.002 to 0.011. q95 target
+  0.950: A0 0.933 to 0.954 at seven sites and 0.736 at D8; BG2 0.935 to 0.985. Cold-night q95
+  coverage at D8 is 0.640 for A0 and 0.644 for BG2.
+- **Caveats.** Only A0 was pre-registered. The card decision on A1 is post hoc. The pinned solar
+  capacity of the brief could not be built, so these results do not test the clip. D8's fit rests on
+  fewer than 15 months of data and its series changed meaning in April 2025.
+
+## Checks
+
+- **Median minus mean forecast, per site.** 0.000 at every site: the spread table is symmetric about
+  the corrected mean, so the median is the mean.
+- **Error of the mean forecast beside the quantile-score contrast (pooled, minus BG2's median).** A0
+  +0.487 (+0.198 to +0.754) against +0.690 on the quantile score; A1 +0.212 (-0.063 to +0.487) against
+  +0.562. The signs agree.
+- **Triggers.** None fired. The control reproduced exactly. The result contradicts the prediction,
+  and the sunny-row analysis and the A1 arm test an explanation. Leaving out D8 does not flip any
+  verdict. A1 does not score worse than A0 except at D8. The six-site stack's pooled interval is
+  0.27 points wide and this one 0.34, a ratio of 1.3.
+
+## What to try next
+
+- **Port the fitted solar term.** The card lines for five Primaries need a stack forecast with a
+  fitted solar capacity (A1) written in the stored layout; this experiment's predictions are not
+  published to the leaderboard.
+- **D8, D12, and D22.** D8 needs more history; D12 needs a fold-aware fit (experiment 152's arm F);
+  D22 stays +0.384 above BG2 with unclear cause.
+- **Network head.** A learned monotone network on a clipped solar term (experiment 250) can be tested
+  only after an as-of solar capacity exists at these Primaries.
