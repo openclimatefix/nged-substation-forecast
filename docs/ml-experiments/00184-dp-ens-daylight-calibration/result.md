@@ -76,7 +76,8 @@ best_arm: >-
   the replicate months
 headline: >-
   Inconclusive under the pre-registered rule, because a known-answer gate (G3) failed on 22 of 1,058
-  fake-ensemble rows; every other part of the rule is met in both periods. Passing each ensemble member's irradiance through the solar term of the convex model lowers the
+  fake-ensemble rows; every other part of the rule is met in both periods. Passing each ensemble member's irradiance
+  through the solar term of the convex model lowers the
   daylight quantile score by 2.2% in the scored year and 1.8% in the replicate months, leaves night
   unchanged by design, and moves the daylight q05-to-q95 coverage from 0.854 to 0.894 (nominal
   0.90). Placebos with the same widening but members from another day (-0.1%) or no members (-0.2%)
@@ -98,7 +99,8 @@ lessons:
     responses scores -2.13%, so two numbers per row can carry most of the gain: arm S failed through
     its inputs and form.
   - >-
-    The pre-registered monotonic check of the fake ensemble failed on 22 of 1,058 daylight rows (2.1%) because
+    The pre-registered monotonic check of the fake ensemble failed on 22 of 1,058 daylight
+    rows (2.1%) because
     the unit PV shape from `SunGeometry.pv_shape_and_ghi` falls as irradiance rises at low sun.
 take_home_message: >-
   Running each of the 51 ensemble weather members through the solar part of the demand model
@@ -212,20 +214,35 @@ of effective capacity (percentage points of each substation's rated demand), low
   Experiment 178's gap for arm A is reproduced. **Gates.** G2 passes: the unit PV shape built from
   CAMS irradiance equals the cached shape (slope 1.000, largest gap 0) at all six substations. G3
   fails its monotonicity criterion: member responses fall with the multiplier on 1,036 of 1,058
-  daylight rows of the fake ensemble (868 of 884 where the fake clear-sky index stays at or under
-  1.1). The failing rows are at elevations of 14 to 16 degrees, where the unit PV shape from
+  daylight rows (22 rows, 2.1%, fail) of the fake ensemble (a post hoc subset: 868 of 884 where the fake clear-sky index stays at or under
+  1.1). The failing rows examined (five of them) are at elevations of 14 to 16 degrees, where the unit PV shape from
   `SunGeometry.pv_shape_and_ghi` itself falls as irradiance rises (0.099, 0.124, then 0.090 as
   irradiance rises from 97 to 227 W/m2 at one half-hour), so the cause lies in the existing shape
   function. The wiring checks of G3 pass exactly: the response of the multiplier-1 member is zero,
   responses at night are zero, and the fake ensemble's spread statistic equals the known multiplier
-  spread. The pre-registered rule capped the verdict at `inconclusive` on a failed gate. M restricted
+  spread. The pre-registered rule caps the verdict at `inconclusive` on a failed gate, so the verdict is
+  `inconclusive`, and every other part of the rule is met by arm M in both periods. M restricted
   to elevations of 17 degrees and over scores -2.47% (-3.57% to -1.44%), so the result does not
   depend on those rows. G4: the members' median clear-sky-index spread is 0.122 raw and 0.112 after
   calibration in clear conditions, 0.177 and 0.165 when partly cloudy, 0.136 and 0.124 when
   overcast: calibration shrinks the spread by about 8%, so a null could not be blamed on it.
+- **Audit (fresh Opus, one).** Findings and triage: (F1, accepted) the `supported` verdict broke the
+  pre-registered cap, so it is `inconclusive`; a re-registered G3 in a follow-up (monotone in the
+  member's unit PV shape, not in irradiance) could lift it. (F2, accepted) MP shuffles across lead
+  and cloud band, so it is a weak placebo; the audit's stricter shuffle keeping lead day and cloud
+  band scores -0.78% in the scored year and -0.33% in the replicate months, and M beats it by
+  -1.47% (-1.83% to -1.10%) and -1.43% (-2.04% to -0.82%). About two thirds of the gain needs the
+  day's own members. (F3, accepted) the audit's Gaussian with each row's own mean and spread of the
+  member responses scores -2.13%, so arm S failed through its inputs and form. (F4, accepted) the
+  widths are means, and three BG2-gap figures were corrected. The gap to BG2 moved by 0.018 MW
+  against a predicted under 0.01, so that part of the prediction failed too. MR and MP were
+  added to the plan after it was committed. No leakage was found, the month-block bootstrap is
+  correct (re-blocking replicate months by origin gives -2.52% to -1.05%), and C1 stays negative
+  leaving out any substation (-1.89% to -2.50%) or any month (-2.00% to -2.44%). The report is
+  private (`data/ml-experiments/briefs/e184_audit_report.md`).
 - **Prediction check.** The pre-registered expectation (probability about 0.7) was that no arm would
   reach -1%, that arm M would change the score by -0.5% to +1.0%, and that any gain would sit under
-  72 hours. Arm M's -2.2% and its larger gain beyond 72 hours contradict all three, and the result
+  72 hours and that the gap to BG2 would change by under 0.01 MW. Arm M's -2.2% and its larger gain beyond 72 hours contradict all three, and the result
   also contradicts experiment 169's null on ensemble spread. The placebos MR, MP, and SP test the
   explanation that widening alone produces the gain, and none reproduces it. Audit triggers fired:
   the failed monotonic check of G3, and a result that contradicts its prediction and an earlier
