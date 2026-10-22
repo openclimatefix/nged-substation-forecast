@@ -81,10 +81,10 @@ training objective. At D5 the learned ceiling stays between 55% and 70%, close t
 
 *Figure 1. The arms against the unclipped fit at D5 and D9.*
 
-**What already exists.** Experiment 214 picks the clip ceiling as-of from a grid of shares by
-out-of-sample error, and experiment 110's `profile_clip` fits the ceiling in sample.
-Neither experiment learns the cap from the series alone without scoring a grid of candidate shares on forecast error. The
-as-of choice of experiment 214 scores about the same as the profile fit at D5 (0.129 MW).
+**What already exists.** Experiment 214 picks the clip ceiling as-of from a grid of shares by out-
+of-sample error, and experiment 110's `profile_clip` fits the ceiling in sample. Neither experiment
+learns the cap from the series alone without scoring a grid of candidate shares on forecast error.
+The as-of choice of experiment 214 scores about the same as the profile fit at D5 (0.129 MW).
 
 **Closure at the decision site.** Closure is an arm's gain over the unclipped fit divided by the
 hand-set clip's gain, on D5's sunniest third of daylight half-hours, months resampled as whole
