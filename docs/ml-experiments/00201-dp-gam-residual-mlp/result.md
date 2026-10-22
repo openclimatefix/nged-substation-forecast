@@ -108,8 +108,8 @@ network never saw the scored year, 2025-07 to 2026-06, which covers six substati
 [Experiment 142](../00142-differentiable-physics-sequence-model-on-gam-k-residuals/result.md) gave
 a network the residual history only.
 
-**The gain is a recalibration of arm D, and the neural network worsens Christmas and bank
-holidays.** Arms 1 to 4 each score about 0.09 to 0.11 points below arm D. A neural network given
+**Most of the gain is a recalibration of arm D's own output, the useful lead is a lift of up to 3
+points in the median below -3 °C and above 24 °C, and holidays get worse.** Arms 1 to 4 each score about 0.09 to 0.11 points below arm D. A neural network given
 calendar, lead, and site but no forecast or weather (arm 0) scored +0.017 against arm D, which is
 no gain. A neural network given only arm D's forecast, lead, and time of day (arm 6) scored -0.086.
 The gain therefore comes from re-reading arm D's own output. The neural network mostly raises the
@@ -170,6 +170,14 @@ Christmas group is one month (2025-12, plus 2 days of 2026-01), so its interval 
   near zero at every lead except the last day (figure 4).
 
 ## Checks
+
+- **Difference from experiment 200's blind arm.** The pooled correction head of experiment 200
+  reports that a head with its error and Kalman-state inputs zeroed keeps most of its gain (-0.100
+  of -0.125). Our arm 0 is blinder: it has no input from arm D at all, so it gains nothing (+0.017).
+  The two agree where they overlap: arm 6, which keeps arm D's mean, bands, lead, and time of day
+  but not the weather, scores -0.086, and arm 5, which drops the filter state, scores -0.070. The
+  gain therefore comes from a function of arm D's own mean and the calendar, not from reading its
+  recent errors.
 
 - **Median minus mean, per site.** Arm D's `q50` equals its mean exactly at all six substations
   (0.000), so rescaling the bands cannot move the median.
