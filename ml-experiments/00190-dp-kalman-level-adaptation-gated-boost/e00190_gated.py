@@ -5,8 +5,8 @@ read the one-step innovations of all bands together. With the boost off (`Gate.m
 reproduces experiment 136's `filter_stream` with a constant observation variance.
 
 **The counter.** After each reading's innovation is known, the counter is on when the last `k`
-innovations (readings, which skip missing half-hours), pooled over the bands, share one sign and their mean exceeds `z` times the root mean
-square of the 48 innovations before those `k`. It is off when fewer than 48 earlier innovations
+innovations (readings, so missing half-hours are skipped), pooled over the bands, share one sign and
+their mean exceeds `z` times the root mean square of the 48 innovations before those `k`. It is off when fewer than 48 earlier innovations
 exist, when the sign flips, or when the run is shorter than `k`.
 
 **The boost.** While the counter is on, the level's process-noise increment since the band's
