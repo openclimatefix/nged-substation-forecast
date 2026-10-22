@@ -59,6 +59,9 @@ def observed_power(*, sites: pl.DataFrame) -> pl.DataFrame:
     The rows of a farm's first weeks after a new meter, defined as experiment 33 defined them (the
     first run of 48 half-hours above 5% of capacity, plus 6 weeks), are dropped.
 
+    Args:
+        sites: The `site_table` rows.
+
     Returns:
         `time_series_id`, `valid_time`, and `target`, the observed power as a fraction of the
         farm's effective capacity.
@@ -100,6 +103,9 @@ def daily_table(*, sites: pl.DataFrame) -> pl.DataFrame:
 
     Joins experiment 230's B1 expected power to the observed power, both as fractions of the farm's
     effective capacity, and drops half-hours with no observation.
+
+    Args:
+        sites: The `site_table` rows.
 
     Returns:
         `site`, `day`, and for each of the two row sets (`above` = expected power at least

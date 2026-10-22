@@ -190,7 +190,7 @@ def injection_summary(
     after_fit: np.ndarray,
     rng: np.random.Generator,
 ) -> dict:
-    """Return delay statistics for one loss size, over the common start dates."""
+    """Return delay statistics for one loss size, over the start dates with no prior alarm."""
     quiet = alarms(ratio=series.ratio(window=window), threshold=threshold)
     delays = []
     for start in start_indices:

@@ -76,7 +76,8 @@ decision_rule: >-
   forecast. The 25% test mostly checks whether the threshold lies above 0.75, so the 10% loss and
   the larger drifts are the informative results.
 benchmark: >-
-  Within-experiment contrasts only (Rule 7 above). No earlier experiment tests capacity inference.
+  Within-experiment contrasts only (Rule 7 above). No earlier experiment in this repository tested
+  capacity inference.
 row_set_id: >-
   none shared. All half-hours of W1 to W3 from 2019-09-01 to 2026-06-30 with an observed power value
   and an expected power from experiment 230's export, dropping the first weeks after a new meter as
@@ -88,122 +89,137 @@ metric: >-
   series
 verdict: not supported
 best_arm: >-
-  none of the pre-registered arms. The post hoc arm that uses every half-hour at 20% of scale or
-  more finds a 25% loss within 120 days at 100%, 87%, and 100% of start dates at W1, W2, and W3
+  none of the pre-registered arms. A variant added after the results were seen, which uses every
+  half-hour at 20% or more of the fitted maximum output, finds a 25% loss within 120 days at 100%,
+  87%, and 100% of start dates at W1, W2, and W3, but it still fails the 9% drift test
 headline: >-
-  The planned statistic found a 25% loss within 120 days at 50% (W1), 63% (W2), and 0% (W3) of the
-  30 start dates, and a 9% seasonal drift raised new alarms at W1 and W2. The stop rule fires.
+  In a simulation that cut observed power by 25% from random dates, the planned monitor raised an
+  alarm within 120 days at 50% (W1), 63% (W2), and 0% (W3) of the start dates. A smooth seasonal
+  swing of 9% in observed power, with no loss, also raised extra alarm days at W1 and W2. The
+  pre-registered rule for stopping is met.
 lessons: >-
-  Half-hours above rated speed are too rare for a 60-day monitor (2% of half-hours at W1, 4% at W2,
-  and 0.6% at W3), and the core adds nothing over a constant on them.
+  Strong-wind half-hours are too rare for a 60-day monitor (2% of half-hours at W1, 4% at W2, and
+  0.6% at W3), and the fitted power curve adds almost nothing over a constant on them.
 take_home_message: >-
-  A monitor that compares observed power with the physics model only in strong wind, where the power
-  curve is flat, cannot show a 25% loss of capacity within 60 days at any of the three wind farms,
-  because strong-wind half-hours are too rare (a 60-day window has enough of them on 21% of days at
-  W1, 45% at W2, and 5% at W3). Using every half-hour at 20% of rated power or more finds a 25% loss
-  within 60 days at the median start date at W1 and W3 and in 52 days at W2, but a smooth 9%
-  seasonal drift then raises false alarms, and a 10% loss is found at only 27% to 73% of start
-  dates. The next step is a monitor that uses the whole power curve and a seasonal baseline, and
-  the real series already shows unexplained shortfalls (W2 in winter 2025 to 2026, W3 from late
-  2024).
+  A monitor that compares observed power with the wind-turbine model only in strong wind, where the
+  power curve is flat, cannot show a 25% loss of capacity in time at any of the three wind farms,
+  because strong-wind half-hours are rare: a trailing 60-day window holds enough of them to give a
+  reading on only 21% of days at W1, 45% at W2, and 5% at W3. A variant added after the results were
+  seen, which uses every half-hour at 20% of maximum output or more, finds a 25% loss with a median
+  delay of 27 days at W1, 52 at W2, and 34 at W3, but a smooth 9% seasonal swing then raises false
+  alarms, and a 10% loss is found at only 27% to 73% of start dates. The next step to test is a
+  monitor on the whole power curve with a seasonal baseline; the real series also shows single
+  months with low output (W2 in winter 2025 to 2026, W3 in 2024 to 2025) that nothing here explains.
 advice:
   - >-
-    Do not monitor wind-farm capacity from half-hours above rated speed alone, because they occupy
-    under 4% of half-hours and a 60-day window has a statistic on only 5% to 45% of days (Figures 1
-    and 3).
+    Do not monitor wind-farm capacity from half-hours when the model expects at least 95% of maximum
+    output alone, because those are at most 4% of half-hours and a 60-day window gives a reading on
+    only 5% to 45% of days (Figure 1; the seasonal pattern is in Figure 3).
   - >-
-    Use every half-hour at 20% of the fitted scale or more for a capacity monitor, with a seasonal
-    baseline, because that statistic found a 25% loss in a median of 27 to 52 days (Figure 1).
+    Use every half-hour at 20% of the fitted maximum output or more for a capacity monitor, with a
+    seasonal baseline, because that variant found a 25% loss with a median delay of 27 to 52 days
+    (Figure 1; the seasonal baseline is untested).
   - >-
-    Do not credit the fitted power curve for a strong-wind capacity statistic, because a constant
-    expected power gave the same detection shares as the core's (Figure 1).
+    Do not credit the fitted power curve for a strong-wind capacity reading, because a constant
+    expected power on the same half-hours gave the same shares and median delays at the 25% and 50%
+    losses (Results).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00233-wind-physics-core-part-2-capacity-availability/
 ---
 
-**A monitor that compares observed power with the physics model only in strong wind cannot show a
-25% loss of capacity in time, because strong-wind half-hours are too rare.** The verdict is **not
-supported**, and the pre-registered stop rule fires. Using every half-hour at 20% of rated power or
-more (a post hoc variant) finds a 25% loss quickly, but a smooth 9% seasonal drift then raises
-false alarms.
+**The planned monitor found a 25% loss within 120 days at only about half the start dates at W1
+and W2, and at none at W3.** The verdict is **not supported**: the pre-registered rule for stopping
+(a median delay above 60 days at 2 or more farms at a 25% loss) is met. W1, W2, and W3 are three
+metered wind farms, anonymised.
 
 ## Question and answer
 
-We asked whether the physics model of [experiment 230](../00230-wind-physics-core-part-1/result.md)
-can show that a wind farm has lost effective capacity. We injected losses of 10%, 25%, and 50% into
-the observed power of three wind farms (W1, W2, W3) from 30 random start dates, and measured how many
-days passed before the ratio of observed to expected power, over a trailing 60 days of strong-wind
-half-hours, fell below an alarm threshold set on earlier years. A 25% loss was found within 120 days
-at 50% of start dates at W1, 63% at W2, and 0% at W3. The post hoc variant that uses every half-hour
-at 20% of the fitted scale or more found it at 100%, 87%, and 100%. The result narrows a capacity
-monitor to the busier part of the power curve with a seasonal baseline.
+**We asked whether the fitted wind-turbine model of [experiment
+230](../00230-wind-physics-core-part-1/result.md) (called "the core" below) can show that a farm
+has lost capacity.** The monitor divides observed power by the power the core expects, adds up both
+over a trailing 60 days of strong-wind half-hours (those where the core expects at least 95% of
+the farm's fitted maximum output, its "scale"), and divides by the same ratio before July 2024, so
+that 1.0 means normal. An alarm is raised when that relative ratio falls below the lowest value seen
+in 2021-09 to 2024-06.
 
-![Share of start dates detected within 120 days, per farm and loss size](figure_1_detection_share.svg)
+**The planned monitor was too slow in a simulation.** We cut observed power by 10%, 25%, and 50%
+from 30 random start dates and counted the days until an alarm. A 25% loss raised an alarm within
+120 days at 50% of start dates at W1, 63% at W2, and 0% at W3 (29 start dates at W3, after one
+that already alarmed was excluded).
 
-![Relative ratio over time for the real series, a 9% drift, and a 25% loss](figure_2_ratio_series.svg)
+**A variant added after the results were seen did better but is not trustworthy.** It uses every
+half-hour at 20% of scale or more. It found a 25% loss within 120 days at 100%, 87%, and 100% of
+start dates (26 at W3 after exclusions). A smooth seasonal swing of 9% in observed power with no
+loss, the size seen in experiment 183's solar farms, raised extra alarm days at all three farms.
 
-![Share of days with at least 4 qualifying half-hours, by calendar month](figure_3_days_with_enough_half_hours.svg)
+![Figure 1: share of start dates detected within 120 days, per farm and loss size](figure_1_detection_share.svg)
 
-![Monthly observed over expected power on the real series](figure_4_real_monthly_ratio.svg)
+![Figure 2: relative ratio over time for the real series, a 9% seasonal swing, and a 25% loss](figure_2_ratio_series.svg)
 
-![Monthly 99th percentile of observed power](figure_5_monthly_p99.svg)
+![Figure 3: share of days with at least 4 qualifying half-hours, by calendar month](figure_3_days_with_enough_half_hours.svg)
+
+![Figure 4: monthly observed over expected power on the real series](figure_4_real_monthly_ratio.svg)
+
+![Figure 5: monthly 99th percentile of observed power, all three farms](figure_5_monthly_p99.svg)
 
 ## Results
 
-- **Row set:** half-hours with the core expecting at least 95% of its fitted scale are 2% of
-  half-hours at W1, 4% at W2, and 0.6% at W3 over 2019-09 to 2026-06. The plan predicted 3% to 14%,
-  because experiment 230's rated-speed rule used the 100 m wind speed and this experiment uses the
-  core's expected power.
-- **Days with a statistic (60-day window, planned rows):** 21% (W1), 45% (W2), and 5% (W3). With the
-  post hoc rows (20% of scale or more), 97%, 97%, and 93%.
-- **Thresholds (60-day, planned rows):** relative ratio below 0.956 (W1), 0.832 (W2), and 0.926
-  (W3). The W1 threshold sits only 4% below 1, so any slow drift of 4% or more alarms there.
-- **25% loss, planned rows:** median delay 121.5 days (W1, bootstrap 95% interval 79 to not
-  reached), 105.5 days (W2, 77.5 to 162), and no detection (W3). Shares detected within 120 days:
-  0.50 (0.22 to 0.76), 0.63 (0.37 to 0.88), and 0.00. The interval is over 18 calendar months of
-  start dates.
-- **25% loss, post hoc rows:** median delay 27 days (W1, 24.5 to 36), 51.5 days (W2, 42 to 75), and
-  34 days (W3, 27 to 43); shares within 120 days 1.00, 0.87 (0.64 to 1.00), and 1.00. A 50% loss is
-  found in 12.5, 27, and 15 days. A 10% loss is found within 120 days at 0.27 (W1), 0.60 (W2), and
-  0.73 (W3).
-- **Constant expected power (planned rows):** the shares and median delays equal the core's at
-  every farm, so the fitted power curve adds nothing on the flat top.
-- **9% seasonal drift, new alarm days over two years:** planned rows 50 (W1), 42 (W2), and none at
-  W3 (no statistic exists); post hoc rows 10, 28, and 62. Drifts of 15% and 25% raise 152 and 340
-  new alarm days at W1 with the post hoc rows.
-- **Real series, alarm days after 2024-07-01 with no injection:** planned rows 0, 102, and 36
-  (W1, W2, W3); post hoc rows 13, 32, and 202. Monthly observed over expected power (post hoc rows)
-  ranges from 0.71 to 1.20 (W1), 0.74 to 1.31 (W2), and 0.35 to 1.27 (W3). On planned rows W2's monthly ratio
-  falls to 0.39 in one month of winter 2025 to 2026, and W3's falls to 0.51 in one month of 2024 to
-  2025; on post hoc rows W3 stays near 0.8 through 2026.
-  No cause is claimed. W1's monthly 99th percentile is mostly 18 to 21 MVA and falls to 9 to 15 MVA in some summer
-  months, so it follows the wind and shows no step.
-- **Starts before and after 2025-06-17** (the end of the core's fitting data) are in `detect.json`;
-  the post hoc rows detect a 25% loss at all starts in both halves at W1 and W3.
+- **Strong-wind half-hours are rare.** They are 2% of half-hours at W1, 4% at W2, and 0.6% at W3
+  over 2019-09 to 2026-06. The plan predicted 3% to 14%, from counts that its own text gave
+  wrongly; its stated counts imply 1.6% to 9%.
+- **The planned monitor has a reading on few days.** A 60-day window holds enough strong-wind
+  half-hours (at least 4 half-hours on each of at least 6 days) on 21% of days at W1, 45% at W2, and
+  5% at W3. The post hoc rows give 97%, 97%, and 93%. W3's planned result is mostly a coverage
+  failure, not a measure of sensitivity.
+- **Alarm thresholds (planned rows):** 0.956 at W1, 0.832 at W2, and 0.926 at W3. The W1 threshold
+  sits 4% below 1, so a slow drift of 4% or more alarms there.
+- **A 25% loss, planned rows:** median delay 121.5 days at W1 (bootstrap 95% interval 79 to not
+  reached), 105.5 days at W2 (77.5 to 162), and never at W3. Shares within 120 days: 0.50 (0.22 to
+  0.76), 0.63 (0.37 to 0.88), and 0.00. The intervals resample 18 calendar months of start dates.
+- **A 25% loss, post hoc rows:** median delay 27 days at W1 (24.5 to 36), 51.5 at W2 (42 to 75),
+  and 34 at W3 (27 to 43). A 50% loss: 12.5, 27, and 15 days. A 10% loss is found within 120 days
+  at 0.27 (W1), 0.60 (W2), and 0.73 (W3) of start dates.
+- **Constant expected power on the planned half-hours** gave the same shares and median delays as
+  the core at the 25% and 50% losses at every farm, and within 0.04 in share at the 10% loss. The
+  fitted power curve adds almost nothing on the flat top.
+- **9% seasonal swing, extra alarm days over two years:** planned rows 50 at W1 and 42 at W2, and 0
+  at W3 (where only 5% of days have a reading); post hoc rows 10, 28, and 62. Swings of 15% and 25%
+  raise 152 and 340 extra alarm days at W1 on the post hoc rows.
+- **Real series with no loss, alarm days after 2024-07-01:** planned rows 0, 102, and 36 (W1, W2,
+  W3); post hoc rows 13, 32, and 202. The monthly observed over expected power on the post hoc rows
+  ranges from 0.71 to 1.20 (W1), 0.74 to 1.31 (W2), and 0.35 to 1.27 (W3). On the planned rows, W2
+  falls to 0.39 in one month of winter 2025 to 2026, and W3 to 0.51 in one month of 2024 to 2025.
+  No cause is claimed.
+- **W1's output shows no step.** Its monthly 99th percentile is mostly 18 to 21 MVA and falls to 9
+  to 15 MVA in some summer months, so it follows the wind.
+- **Starts inside and outside the core's fitting data** (before and after 2025-06-17), post hoc
+  rows, 25% loss: shares within 120 days of 1.00 and 1.00 at W1, 0.79 and 1.00 at W2, and 1.00 and
+  1.00 at W3. Starts before 2025-06-17 sit inside the data the core was fitted on, so the
+  after-2025-06-17 figures are the honest ones.
 
 ## Checks
 
-- **Median minus mean forecast, and the error of the mean forecast:** not applicable, because the
-  experiment produces no forecast.
-- **Audit triggers fired:** trigger 1 (the 9% drift control raises new alarms at W1 and W2) and
-  trigger 2 (the prediction that W1 and W2 detect a 25% loss within 60 days failed; the explanation,
-  that qualifying half-hours are too rare, is tested in Figures 1 and 3 and by the post hoc rows).
-  The audit and its triage are recorded below.
+- **No forecast is produced,** so forecast-error and tail-calibration checks do not apply.
+- **Audit triggers** (listed in the `ml-experiment` skill): trigger 1 fired (the 9% control raises
+  extra alarms at W1 and W2) and trigger 2 fired (the predicted detection within 60 days at W1 and
+  W2 failed; the rarity of strong-wind half-hours explains it, shown in Figure 3 and by the post
+  hoc rows). A fresh Sonnet auditor re-derived the shares, thresholds, median delays, and drift
+  alarm days with its own code from the raw inputs and matched every one. It found no error in
+  window indexing, loss timing, or missing-data handling. It noted that the calibration years
+  overlap the core's fitting data, which tightens the thresholds, and that the loss-free run's
+  alarm days are masked, which makes the delays slightly longer than a plain count.
 - **Hold-out check of the threshold:** calibrating on 2021-09 to 2023-06, 51 of 104 days with a
-  statistic in 2023-07 to 2024-06 alarm at W1 and 50 of 50 at W3, so the minimum-over-years
-  threshold is not stable out of sample at those farms; at W2 none of 159 alarm.
-- **Tail calibration and curtailment cost:** not applicable.
+  reading in 2023-07 to 2024-06 alarm at W1 and 50 of 50 at W3, so the minimum-over-years threshold
+  is not stable out of sample there; at W2 none of 159 alarm.
 
 ## Caveats and what to try next
 
-- **Post hoc rows:** the 20%-of-scale variant was in the plan only as a descriptive contrast, so its
-  numbers are post hoc and have not met the pre-registered drift rule (9% drift raises new alarms
-  at all three farms).
-- **Lab conditions:** the core is frozen, the loss is a multiplier of observed power, and an export
-  cap would hide a loss at strong wind, so the delays are optimistic.
-- **Next:** a monitor on all half-hours above cut-in with a seasonal baseline (the 9% drift is
-  mostly absorbed by a baseline that is a function of month), then a check of the W2 and W3
-  shortfalls against NGED's outage records. A learned correction of the ratio by wind speed is a
-  candidate neural component; its prediction that could fail is that the 9% drift then raises no new
-  alarm at W1.
+- **The post hoc rows are not pre-registered,** and they fail the 9% drift test at all three farms.
+- **Lab conditions:** the core is frozen, the loss multiplies observed power, and an export cap
+  would hide a loss at strong wind, so the delays are optimistic. Start dates that already alarmed
+  without a loss are excluded, so the farms are compared on slightly different start sets.
+- **Next:** a monitor on all half-hours above cut-in with a baseline that depends on the month, which
+  may absorb the 9% swing (untested), then a check of the W2 and W3 low months against NGED's outage
+  records. A learned correction of the ratio by wind speed is a candidate neural component; its
+  prediction that could fail is that the 9% swing then raises no extra alarm at W1.

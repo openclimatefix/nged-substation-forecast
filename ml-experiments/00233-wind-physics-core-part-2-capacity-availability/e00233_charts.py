@@ -73,7 +73,7 @@ def figure_detection(*, results: dict) -> None:
         title=alt.TitleParams(
             [
                 "The planned statistic finds a capacity loss at too few start dates;",
-                "the busier half-hours find 25% and 50% losses at every farm (60-day window)",
+                "a variant using busier half-hours finds a 25% loss at 87% to 100% of start dates (60-day window)",
             ],
             anchor="start",
             fontSize=13,
@@ -101,7 +101,7 @@ def figure_ratio_series(*, results: dict) -> None:
     panels = []
     for farm, entries in results["farms"].items():
         lines = (
-            alt.Chart(data.filter(pl.col("farm") == farm))
+            alt.Chart(data.filter(pl.col("farm") == farm))  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=8)
             .encode(
                 x=alt.X(
@@ -126,7 +126,7 @@ def figure_ratio_series(*, results: dict) -> None:
             )
         )
         rule = (
-            alt.Chart(pl.DataFrame({"threshold": [entries["core/60"]["threshold"]]}))
+            alt.Chart(pl.DataFrame({"threshold": [entries["core/60"]["threshold"]]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#808080", strokeDash=[4, 3])
             .encode(y="threshold:Q")
         )
@@ -155,15 +155,15 @@ def figure_coverage(*, results: dict) -> None:
                 for m, s in zip(monthly["month"], monthly["share"], strict=True)
             ]
     chart = (
-        alt.Chart(pl.DataFrame(rows))
+        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
         .mark_line(point=True)
         .encode(
             x=alt.X(
                 "month:O",
-                title="Calendar month (share of days with at least 4 such half-hours)",
+                title="Calendar month",
                 axis=alt.Axis(labelAngle=0),
             ),
-            y=alt.Y("share:Q", title="Share of days"),
+            y=alt.Y("share:Q", title="Share of days with at least 4 such half-hours"),
             color=alt.Color(
                 "variant:N",
                 legend=alt.Legend(title=None, orient="top", direction="vertical", labelLimit=500),
@@ -212,7 +212,7 @@ def figure_real_monthly() -> None:
         "half-hours at 20% of scale or more",
     ]
     (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=25)
         .encode(
             x=alt.X("month:T", title=None),
@@ -238,7 +238,7 @@ def figure_real_monthly() -> None:
         .sort("site", "month")
     )
     (
-        alt.Chart(power)
+        alt.Chart(power)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, strokeWidth=1.2, color=ocf.DATA_BLUE)
         .encode(
             x=alt.X("month:T", title=None),
