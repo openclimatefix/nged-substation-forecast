@@ -131,6 +131,16 @@ def one_site(*, site: str, cache, bg2: pl.DataFrame) -> pl.DataFrame:  # noqa: A
     )
 
 
+def band(*, values: pl.Series, edges: tuple[float, ...], labels: tuple[str, ...]) -> pl.Series:
+    """Return each value's band label (lower edge included), null where the value is not finite."""
+    array = values.to_numpy().astype(np.float64)
+    names = np.array(labels, dtype=object)[np.digitize(np.nan_to_num(array), edges)]
+    return pl.Series(
+        [n if ok else None for n, ok in zip(names, np.isfinite(array), strict=True)],
+        dtype=pl.String,
+    )
+
+
 def label_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Add the sunny-daylight flag and the level of each cut."""
     sunny_edge = {
@@ -140,15 +150,11 @@ def label_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
         for (s,), g in frame.group_by("site")
     }
     edge = pl.col("site").replace_strict(sunny_edge, return_dtype=pl.Float64)
-    csi_index = pl.col("csi").cut(list(CSI_EDGES), labels=list(CSI_LABELS), left_closed=True)
-    lead_index = pl.col("lead_hours").cut(
-        list(LEAD_EDGES), labels=list(LEAD_LABELS), left_closed=True
-    )
     return frame.with_columns(
         sunny=pl.col("unit") >= edge,
         hour_bin=(pl.col("hour") // 2 * 2),
-        csi_band=csi_index.cast(pl.String),
-        lead_band=lead_index.cast(pl.String),
+        csi_band=band(values=frame["csi"], edges=CSI_EDGES, labels=CSI_LABELS),
+        lead_band=band(values=frame["lead_hours"], edges=LEAD_EDGES, labels=LEAD_LABELS),
         gap_mae=pl.col("gam_abs") - pl.col("bg2_abs"),
         gap_pin=pl.col("gam_pin") - pl.col("bg2_pin"),
     )
@@ -183,7 +189,7 @@ def cut_table(*, frame: pl.DataFrame, column: str) -> list[dict]:
 
 def month_block_interval(*, frame: pl.DataFrame, column: str, rng: np.random.Generator) -> dict:
     """Return the mean of a gap column and its 95% interval from resampling whole months."""
-    monthly = frame.group_by("month").agg(total=pl.col(column).sum(), count=pl.len())
+    monthly = frame.group_by("month").agg(total=pl.col(column).sum(), count=pl.len()).sort("month")
     totals = monthly["total"].to_numpy()
     counts = monthly["count"].to_numpy().astype(np.float64)
     picks = rng.integers(0, len(totals), size=(N_DRAWS, len(totals)))
@@ -218,7 +224,7 @@ def alternative_definitions(*, frame: pl.DataFrame, rng: np.random.Generator) ->
             "total": month_block_interval(frame=sunny, column="gap_mae", rng=rng),
             "d5_only": month_block_interval(frame=d5, column="gap_mae", rng=rng),
             "without_d5": month_block_interval(frame=rest, column="gap_mae", rng=rng),
-            "d5_share": float(d5["gap_mae"].sum() / sunny["gap_mae"].sum()),
+            "d5_share": float(d5["gap_mae"].sum()) / float(sunny["gap_mae"].sum()),
         }
     return out
 

@@ -55,8 +55,8 @@ take_home_message: >-
 date: 2026-10-22
 headline: >-
   Sunny daylight, six substations, all leads: GAM minus BG2 mean absolute error +0.050 MW (95%
-  interval +0.013 to +0.078); D5 alone +0.202 MW (+0.113 to +0.275); without D5 +0.022 MW (-0.008
-  to +0.047). Ranked by realised clear-sky index instead, the total gap is +0.015 MW (-0.025 to
+  interval +0.014 to +0.079); D5 alone +0.202 MW (+0.111 to +0.273); without D5 +0.022 MW (-0.009
+  to +0.046). Ranked by realised clear-sky index instead, the total gap is +0.015 MW (-0.024 to
   +0.049) and D5 holds all of it.
 best_arm: none; a diagnosis with no new fit
 lessons:
@@ -121,8 +121,8 @@ sunniest third.
   `fold_a_daily_gap_v1` that both models forecast, from 2025-07-02 to 2026-06-29, on rows outside
   the hand-filtered switching events. The plan did not fix the lead range, so the headline uses all
   leads to 168 hours (chosen after seeing the data). The 12 to 36 hour range, nearest to the plot's
-  row count, is beside it. The "five decision substations" are D5, D10, D11, D14, and D16, the substations of the
-  differentiable-physics series' contrasts; D9 is reported beside them.
+  row count, is beside it. The "five decision substations" are D5, D10, D11, D14, and D16, the
+  substations of the differentiable-physics series' contrasts; D9 is reported beside them.
 - **Absolute errors (MW), sunny daylight, all leads:** mean absolute error 0.590 for the GAM against
   0.541 for BG2; pinball loss 0.166 against 0.152.
 - **Gap (GAM minus BG2 mean absolute error, MW), with month-resampled 95% intervals from 12 monthly
@@ -130,12 +130,12 @@ sunniest third.
 
 | Scope | Rows | Gap | Interval | Pinball gap |
 |---|---|---|---|---|
-| All leads, six substations | 90,143 | +0.050 | +0.013 to +0.078 | +0.0143 |
+| All leads, six substations | 90,143 | +0.050 | +0.014 to +0.079 | +0.0143 |
 | All leads, five decision substations | 74,728 | +0.044 | +0.006 to +0.071 | +0.0123 |
-| 12 to 36 h, six substations | 13,198 | +0.031 | -0.015 to +0.064 | +0.0083 |
-| 12 to 36 h, five decision substations | 10,952 | +0.027 | -0.019 to +0.060 | +0.0072 |
-| All leads, D5 only | 14,045 | +0.202 | +0.113 to +0.275 | +0.0519 |
-| All leads, without D5 | 76,098 | +0.022 | -0.008 to +0.047 | +0.0073 |
+| 12 to 36 h, six substations | 13,198 | +0.031 | -0.017 to +0.065 | +0.0083 |
+| 12 to 36 h, five decision substations | 10,952 | +0.027 | -0.018 to +0.059 | +0.0072 |
+| All leads, D5 only | 14,045 | +0.202 | +0.111 to +0.273 | +0.0519 |
+| All leads, without D5 | 76,098 | +0.022 | -0.009 to +0.046 | +0.0073 |
 
 - **Verdict against the pre-registered rule:** `partly supported`. On the headline definition and
   all leads the rule is met: D5 holds 63% of the gap with 16% of the rows, and the total gap's
@@ -148,13 +148,14 @@ sunniest third.
 
 | Ranking measure | Half-hours | Total gap | D5 only | Without D5 |
 |---|---|---|---|---|
-| Unit solar shape (headline) | 87,690 | +0.049 (+0.011 to +0.079) | +0.206 | +0.020 |
-| Realised irradiance (CAMS) | 87,701 | +0.055 (+0.019 to +0.082) | +0.219 | +0.024 |
-| Realised clear-sky index | 87,684 | +0.015 (-0.025 to +0.049) | +0.118 | -0.004 |
+| Unit solar shape (headline) | 87,690 | +0.049 (+0.013 to +0.080) | +0.206 | +0.020 |
+| Realised irradiance (CAMS) | 87,701 | +0.055 (+0.018 to +0.083) | +0.219 | +0.024 |
+| Realised clear-sky index | 87,684 | +0.015 (-0.024 to +0.049) | +0.118 | -0.004 |
 
-  The three rows drop half-hours where the clear-sky irradiance is under 20 W per square metre, so
+The three rows drop half-hours where the clear-sky irradiance is under 20 W per square metre, so
   the headline row differs slightly from the 90,143 half-hours above. D5 is worse than BG2 under all
   three, and the other five substations together are level under the third.
+
 - **Cuts (all leads; rule: at least 60% of the gap in a level holding under 40% of the rows):**
     - Substation: D5 holds 63% of the gap with 16% of the rows. The rule is met.
     - Clear-sky band: the 0.4 to 0.7 band holds 83% of the gap with 32% of the rows. The rule is
