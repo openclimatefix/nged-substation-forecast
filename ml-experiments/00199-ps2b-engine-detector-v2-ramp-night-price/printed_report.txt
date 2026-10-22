@@ -1,0 +1,61 @@
+D8_clean                 v1 (experiment 196)                  0.0%   0.00 d/mo
+D8_clean                 Night evidence only                  2.6%   1.45 d/mo
+D8_clean                 Pre-registered v2                    0.0%   0.00 d/mo
+D8_clean                 Post hoc: lenient edge test          0.2%   0.12 d/mo
+D8_2025-03_to_2025-12    v1 (experiment 196)                 36.3%  22.85 d/mo
+D8_2025-03_to_2025-12    Night evidence only                 33.1%  22.15 d/mo
+D8_2025-03_to_2025-12    Pre-registered v2                   16.7%  10.63 d/mo
+D8_2025-03_to_2025-12    Post hoc: lenient edge test         31.6%  21.26 d/mo
+D8_2026-01_to_2026-06    v1 (experiment 196)                 32.5%  18.81 d/mo
+D8_2026-01_to_2026-06    Night evidence only                 30.3%  18.48 d/mo
+D8_2026-01_to_2026-06    Pre-registered v2                   16.5%   9.74 d/mo
+D8_2026-01_to_2026-06    Post hoc: lenient edge test         28.7%  17.47 d/mo
+D3                       v1 (experiment 196)                  0.4%   0.22 d/mo
+D3                       Night evidence only                  0.5%   0.22 d/mo
+D3                       Pre-registered v2                    0.0%   0.00 d/mo
+D3                       Post hoc: lenient edge test          0.0%   0.00 d/mo
+D10                      v1 (experiment 196)                  0.1%   0.04 d/mo
+D10                      Night evidence only                  0.3%   0.15 d/mo
+D10                      Pre-registered v2                    0.0%   0.00 d/mo
+D10                      Post hoc: lenient edge test          0.0%   0.00 d/mo
+D11                      v1 (experiment 196)                  4.6%   1.08 d/mo
+D11                      Night evidence only                  4.5%   1.23 d/mo
+D11                      Pre-registered v2                    0.0%   0.00 d/mo
+D11                      Post hoc: lenient edge test          2.2%   0.56 d/mo
+D14                      v1 (experiment 196)                  0.2%   0.11 d/mo
+D14                      Night evidence only                  0.2%   0.07 d/mo
+D14                      Pre-registered v2                    0.0%   0.00 d/mo
+D14                      Post hoc: lenient edge test          0.2%   0.07 d/mo
+D16                      v1 (experiment 196)                  0.0%   0.00 d/mo
+D16                      Night evidence only                  0.2%   0.15 d/mo
+D16                      Pre-registered v2                    0.0%   0.00 d/mo
+D16                      Post hoc: lenient edge test          0.0%   0.00 d/mo
+D5                       v1 (experiment 196)                  0.3%   0.07 d/mo
+D5                       Night evidence only                  0.3%   0.07 d/mo
+D5                       Pre-registered v2                    0.0%   0.00 d/mo
+D5                       Post hoc: lenient edge test          0.3%   0.07 d/mo
+K12 night v1 (experiment 196)                Recall at 1 unit  0.95 (0.90 to 0.98)
+K12 night v1 (experiment 196)                Precision         0.95 (0.92 to 0.97)
+K12 night Night evidence only                Recall at 1 unit  0.92 (0.86 to 0.97)
+K12 night Night evidence only                Precision         0.88 (0.83 to 0.92)
+K12 night Pre-registered v2                  Recall at 1 unit  0.53 (0.41 to 0.64)
+K12 night Pre-registered v2                  Precision         0.98 (0.97 to 0.99)
+K12 night Post hoc: lenient edge test        Recall at 1 unit  0.88 (0.82 to 0.94)
+K12 night Post hoc: lenient edge test        Precision         0.89 (0.84 to 0.93)
+shape: (5, 4)
+┌─────────────────────────────────┬─────┬──────────┬──────────┐
+│ kind                            ┆ n   ┆ partial  ┆ sharp    │
+│ ---                             ┆ --- ┆ ---      ┆ ---      │
+│ str                             ┆ u32 ┆ f64      ┆ f64      │
+╞═════════════════════════════════╪═════╪══════════╪══════════╡
+│ engine G2                       ┆ 61  ┆ 0.262295 ┆ 0.737705 │
+│ engine G2 injected into D8 noi… ┆ 571 ┆ 0.288967 ┆ 0.711033 │
+│ real transfer end               ┆ 12  ┆ 0.75     ┆ 0.25     │
+│ real transfer onset             ┆ 12  ┆ 0.916667 ┆ 0.083333 │
+│ unlabelled D8 clean-history st… ┆ 49  ┆ 0.346939 ┆ 0.653061 │
+└─────────────────────────────────┴─────┴──────────┴──────────┘
+D8 control 2023-09 to 2025-02 {"night_share_of_rows": 0.5030677184558515, "night_share_of_flagged": 0.3912224967643252, "flagged_half_hours": 8499, "any": {"flagged_days": 481, "unflagged_days": 45, "flagged_days_matched": 343, "flagged_positive_share": 0.4518950437317784, "matched_positive_share": 0.342168036045587, "diff_positive_points": [3.49854227405248, 11.078717201166183, 18.075801749271136], "flagged_mean_spread": -2.2122958874218734, "diff_mean_spread": [15.422830423929014, 19.78215829882665, 24.617729818256816]}, "night": {"flagged_days": 352, "unflagged_days": 45, "flagged_days_matched": 251, "flagged_positive_s
+D8 2025-03 to 2026-06 {"night_share_of_rows": 0.4412658986767162, "night_share_of_flagged": 0.30114730759567876, "flagged_half_hours": 11941, "any": {"flagged_days": 482, "unflagged_days": 3, "flagged_days_matched": 44, "flagged_positive_share": 0.7272727272727273, "matched_positive_share": 0.6590909090909091, "diff_positive_points": [-4.545454545454541, 6.818181818181812, 18.181818181818187], "flagged_mean_spread": 3.235047269884903, "diff_mean_spread": [0.5263162346475168, 8.821974115264291, 16.64764328540108]}, "night": {"flagged_days": 342, "unflagged_days": 3, "flagged_days_matched": 35, "flagged_positive_shar
+D5 {"night_share_of_rows": 0.4610370315343758, "night_share_of_flagged": 0.26744186046511625, "flagged_half_hours": 1290, "any": {"flagged_days": 97, "unflagged_days": 897, "flagged_days_matched": 97, "flagged_positive_share": 0.5567010309278351, "matched_positive_share": 0.5662865562582922, "diff_positive_points": [-14.432989690721648, -1.0309278350515427, 12.371134020618557], "flagged_mean_spread": -0.34800890153152764, "diff_mean_spread": [-8.953465100120454, 0.10757514635693743, 7.274305396861834]}, "night": {"flagged_days": 13, "unflagged_days": 897, "flagged_days_matched": 13, "flagged_posi
+D10 {"night_share_of_rows": 0.4596084816637679, "night_share_of_flagged": 0.03474903474903475, "flagged_half_hours": 518, "any": {"flagged_days": 61, "unflagged_days": 972, "flagged_days_matched": 61, "flagged_positive_share": 0.4426229508196721, "matched_positive_share": 0.586033522637913, "diff_positive_points": [-31.147540983606557, -14.754098360655737, 1.6393442622950838], "flagged_mean_spread": -5.669080796128904, "diff_mean_spread": [-13.649499542968824, -5.6289113944811255, 2.068484888641998]}, "night": {"flagged_days": 2, "unflagged_days": 972}}
+D11 {"night_share_of_rows": 0.4595259681388421, "night_share_of_flagged": 0.654275092936803, "flagged_half_hours": 807, "any": {"flagged_days": 20, "unflagged_days": 1098, "flagged_days_matched": 20, "flagged_positive_share": 0.15, "matched_positive_share": 0.5954330944485592, "diff_positive_points": [-70.0, -45.0, -15.000000000000002], "flagged_mean_spread": -19.295198845808716, "diff_mean_spread": [-35.054927412537936, -19.837386982455385, -5.480059988238926]}, "night": {"flagged_days": 19, "unflagged_days": 1098, "flagged_days_matched": 19, "flagged_positive_share": 0.15789473684210525, "matche
