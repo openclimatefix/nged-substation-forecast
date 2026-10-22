@@ -25,7 +25,7 @@ import e00222_net as net
 import e00222_stream as stream_module
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 NN_DIR: Final[Path] = common.WORK_DIR / f"nn{common.VARIANT}"
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)

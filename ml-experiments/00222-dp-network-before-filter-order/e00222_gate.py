@@ -30,7 +30,7 @@ import e00222_inputs as inputs
 import e00222_stream as stream_module
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 INJECTED_SHARE: Final[float] = 0.03
 STEP_POINTS: Final[float] = 3.0

@@ -12,8 +12,8 @@ from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
-import torch
-from torch import nn
+import torch  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
 
 HIDDEN: Final[int] = 64
 BATCH: Final[int] = 16384
