@@ -194,8 +194,8 @@ Figures 3 to 6 show every one of the 37 days, one panel each, grouped by substat
   of blocks, which covers the 2-day shortfall in class (a) and may move days between classes (a)
   and (b)), the ordinary-day rates (block 27.5% and offset 16.0%), and the neighbour test's
   leniency (49.1% on ordinary-day blocks, 71.2% on rolled neighbours). The pre-registered rule gives
-  `refuted` on both halves, and no later experiment depends on this result's sign yet, so the
-  manager ran no audit, because the experiment is descriptive and fits no model.
+  `refuted` on both halves, and no later experiment depends on this result's sign yet.
+  The manager ran no audit, because the experiment is descriptive and fits no model.
 
 ## Method and caveats
 
