@@ -30,8 +30,8 @@ decision_rule: >-
   scores no forecast. The smallest share worth acting on is 15% of the shortfall, because a cause
   below that cannot recover more than 0.03 of the injected capacity.
 benchmark: >-
-  Experiment 129's arm 2 recovery of a real farm at 50% of the pinned capacity at season-year 2024 (rung 4 must
-  reproduce it to within 0.005 at every Primary and farm)
+  Experiment 129's arm 2 recovery of a real farm at 50% of the pinned capacity at season-year 2024
+  (rung 4 must reproduce its injected-fit capacity at every Primary and farm)
 row_set_id: >-
   Experiment 129's training rows (the feature cache of experiment 106) before 2026-07-01, at D5,
   D10, D11, D14, and D16, with D9 beside them. Rows where the injected farm has no reading drop out
@@ -40,8 +40,8 @@ metric: >-
   Recovery: the capacity found with a real farm's output added at 50% of the Primary's pinned
   capacity, minus the capacity found without it, divided by the injected capacity, read at
   season-year 2024 (July 2024 to June 2025, the last complete season-year in experiment 129's
-  known-answer table). Capacity unit: the 99th percentile of alternating-current output over daylight half-hours, in MW. Shares are fractions of the shortfall 1 minus
-  rung 4
+  known-answer table). Capacity unit: the 99th percentile of alternating-current output over
+  daylight half-hours, in MW. Shares are fractions of the shortfall 1 minus rung 4
 code: ml-experiments/00231-pv-capacity-audit-where-recovery-goes/
 ---
 
