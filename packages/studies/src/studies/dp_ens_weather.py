@@ -55,7 +55,7 @@ from studies.dp_calendar import (
 from studies.dp_features import FLEET, FeatureCache, SiteFeatures, naive_utc
 from studies.ens_members import CONTROL_MEMBER, ENSEMBLE_SIZE
 from studies.power import HALF_HOURS_PER_HOUR
-from studies.pv_physics import SunAndSky, plant_power_mw, solar_position
+from studies.pv_physics import PlantParameters, SunAndSky, plant_power_mw, solar_position
 
 HORIZON_HALF_HOURS: Final[int] = 336
 """The forecast horizon: 168 hours of half-hours, from the origin."""
@@ -613,7 +613,9 @@ class SunGeometry:
             end_times=end_times,
         )
 
-    def pv_shape_and_ghi(self, *, ghi_w_m2: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    def pv_shape_and_ghi(
+        self, *, ghi_w_m2: np.ndarray, plant: PlantParameters = FLEET
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Return the fleet's unit PV shape and the half-hourly irradiance of several series.
 
         Each pair of half-hours ending at :30 and :00 becomes the hour-ending mean, as CAMS is
@@ -621,6 +623,7 @@ class SunGeometry:
 
         Args:
             ghi_w_m2: Irradiance at the block's half-hours, shape (series, half-hours).
+            plant: The plant whose output is the shape; the generic south-facing fleet by default.
 
         Returns:
             The unit shape and the irradiance, both of shape (series, half-hours); `NaN` for an
@@ -643,7 +646,7 @@ class SunGeometry:
             zenith_deg=zenith,
             sun_azimuth_deg=np.tile(self.azimuth_deg, series),
         )
-        shape = plant_power_mw(sky=sky, parameters=FLEET).reshape(series, n)
+        shape = plant_power_mw(sky=sky, parameters=plant).reshape(series, n)
         return np.where(known, shape, np.nan), np.where(known, flux, np.nan)
 
 
@@ -706,12 +709,15 @@ class WeatherContext:
         calibration: The ENS-to-training-weather map.
         climatology: `ghi_climatology`'s table, for the solar shrink.
         proxy: The analysis proxy of the substation's grid cell.
+        plant: The plant whose output is the unit PV shape; the generic south-facing fleet by
+            default.
     """
 
     site: str
     calibration: Calibration
     climatology: np.ndarray
     proxy: AnalysisProxy
+    plant: PlantParameters = FLEET
 
 
 def _bands(*, cache: FeatureCache, positions: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -767,7 +773,7 @@ def proxy_cache(*, cache: FeatureCache, context: WeatherContext) -> FeatureCache
             hour_band=hour_band[span],
             shrink=False,
         )
-        block_shape, block_flux = sun.pv_shape_and_ghi(ghi_w_m2=ghi[None, :])
+        block_shape, block_flux = sun.pv_shape_and_ghi(ghi_w_m2=ghi[None, :], plant=context.plant)
         shape[span], flux[span] = block_shape[0], block_flux[0]
     return replace_site(
         cache=cache,
@@ -895,7 +901,7 @@ class RunWindow:
             lead_band=self.lead_band[None, :],
             hour_band=self.hour_band[None, :],
         )
-        shape, flux = self.sun.pv_shape_and_ghi(ghi_w_m2=ghi)
+        shape, flux = self.sun.pv_shape_and_ghi(ghi_w_m2=ghi, plant=context.plant)
         caches = []
         for index in range(len(chosen)):
             stitched = np.concatenate([self.past_temperature_c, temperature[index]])
