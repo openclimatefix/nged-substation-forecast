@@ -8,7 +8,8 @@ also_relevant_to:
 - lagged-power-and-error-correction
 status: planned
 size: >-
-  medium. Stored: private files under data/ml-experiments/00205-dp-gamk-gap-robustness-coast-or-frozen-gam/
+  medium. Stored: private files under
+  data/ml-experiments/00205-dp-gamk-gap-robustness-coast-or-frozen-gam/
   only. Serving path: not touched. Degradation rule: not changed (the result is evidence for a later
   rule about missing power readings, which is a separate issue). Designs: more than one is defensible
   (where a gap sits relative to the forecast, how the bands are widened, whether the fallback keeps
