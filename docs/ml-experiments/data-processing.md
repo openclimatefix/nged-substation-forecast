@@ -384,6 +384,16 @@ the run at those substations; the ensemble mixture then pools the remaining 50 m
 ([experiment 111](00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)).
 Applies to experiments and production.
 
+**Do not assume the unit PV shape rises with irradiance at low sun.** *Applies to: experiments.*
+`SunGeometry.pv_shape_and_ghi` returned a unit PV shape that fell from 0.124 to 0.090 as
+half-hourly irradiance rose from 150 to 227 W/m2 at an elevation of about 14 degrees, in a fake
+ensemble that scaled the irradiance of one substation by 0.6 to 1.4. The response of the
+T-all fit to member irradiance was therefore not monotone on 1.8% of the daylight rows with a
+physical clear-sky index, all at elevations of 14 to 16 degrees
+([experiment 184](00184-dp-ens-daylight-calibration/result.md)). The scored contrast did not
+change when rows under 17 degrees were dropped. The confidence is moderate, and the entry is
+provisional until the experiment has had its reviews.
+
 ## Embedded solar capacity
 
 **Hold embedded-solar capacity as one value per Primary per season-year, and do not estimate it
