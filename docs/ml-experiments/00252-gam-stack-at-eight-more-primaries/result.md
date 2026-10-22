@@ -175,8 +175,8 @@ Primaries, so no solar term could be pinned. Arm A0 therefore has no solar term.
 - **Caveats.** The hypothesised stack had a pinned solar capacity and the 60% clip, which could not be
   built, so the verdict covers the stack with no solar term (A0) and with a fitted one (A1), not the
   stack as specified. A1 was chosen after A0 failed, and its five-site reading uses the same 12
-  scored months with no held-out period. Only A0 was pre-registered, so the card decision on A1 is post hoc. These results do not test the
-  clip. D8's fit rests on fewer than 15 months of data, and its series changed meaning in April 2025
+  scored months with no held-out period. Only A0 was pre-registered, so the card decision on A1 is
+  post hoc. These results do not test the clip. D8's fit rests on fewer than 15 months of data, and its series changed meaning in April 2025
   (see the data-processing page).
 
 ## Checks
