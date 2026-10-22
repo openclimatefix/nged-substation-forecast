@@ -67,7 +67,8 @@ structure and add XGBoost only where it helps.
 - **A3 and A5:** experiment 224's arm 3 and arm 5, as stored.
 - **R:** XGBoost on the plant mean's residual (output minus the plant mean). Inputs: the plant mean,
   the standard deviation of the 51 plant responses, the ensemble means of global, direct, and diffuse
-  irradiance and of temperature, the spread of global irradiance, and the sun's elevation and azimuth, the lead time, the hour, the month, and the plant mean's error
+  irradiance and of temperature, the spread of global irradiance, the sun's elevation and azimuth,
+  the lead time, the hour, the month, and the plant mean's error
   48 hours earlier (known at forecast time at every lead of 12 to 36 hours). The corrected mean enters
   experiment 224's two-number mixture, with offsets refitted on out-of-fold residuals.
 - **S:** XGBoost with 11 quantile outputs on the residual from the plant mean, same inputs, so the
@@ -80,7 +81,8 @@ structure and add XGBoost only where it helps.
   the contrasts with R, S, and RS are not mixed with sampling noise in the factors (descriptive
   contrasts D6 to D8).
 - Seeds 0, 1, and 2; `colsample_bytree` 1.0; 150 rounds at learning rate 0.15, depth 3; trained on
-  the tuning months before the fold start with 6-fold out-of-fold residuals grouped in blocks of consecutive months, so that most calendar
+  the tuning months before the fold start with 6-fold out-of-fold residuals grouped in blocks of
+  consecutive months, so that most calendar
   months stay in every training set. The offset factors of arm 3 are reused unchanged by R, R0, and PR.
   Arm 3 and arm 5 are stored with one seed and repeat once per seed in the paired resampling.
 - **Wind:** the same arms on the physics core B1's residual, after experiment 230 merges, using its
