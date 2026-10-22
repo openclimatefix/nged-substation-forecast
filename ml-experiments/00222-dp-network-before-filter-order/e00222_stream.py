@@ -88,6 +88,12 @@ def residual_stream(
         fits: The fits, ascending by cut.
         site: The site's label.
         last: The time the last fit stops at, or `None` for the end of the grid.
+
+    Returns:
+        The residual on the cache's grid.
+
+    Raises:
+        ValueError: If the fits are empty or their cuts do not strictly ascend.
     """
     if not fits or any(later.cut <= earlier.cut for earlier, later in pairwise(fits)):
         msg = "the residual stream needs fits with strictly ascending cuts"
