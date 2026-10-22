@@ -12,10 +12,11 @@ size: >-
   medium. Stored: private files under data/ml-experiments/00233-wind-physics-core-part-2-capacity-availability/
   only. Serving path: not touched, because no forecast is produced. Degradation rule: not touched.
   Designs: several are defensible (the statistic, the window, the alarm threshold), and this plan
-  pre-registers one. Callers: this folder's scripts, which copy the helpers of experiment 230
-  and read the observed power of W1 to W3 and the fitted cores and ERA5 expected power that experiment 230 exported. The change is a new analysis that fits
-  nothing (it reads experiment 230's fitted core), so one Sonnet plan review, one Sonnet code
-  review, one Sonnet write-up review, and one Sonnet prose review.
+  pre-registers one. Callers: this folder's scripts, which copy the helpers of experiment 230 and
+  read the observed power of W1 to W3 and the fitted cores and ERA5 expected power that experiment
+  230 exported. The change is a new analysis that fits nothing (it reads experiment 230's fitted
+  core), so one Sonnet plan review, one Sonnet code review, one Sonnet write-up review, and one
+  Sonnet prose review.
 hypothesis: >-
   For the three metered wind farms (W1, W2, W3), the ratio of observed power to the power that the
   fitted physics core of experiment 230 expects, taken over the half-hours when the core expects
@@ -51,7 +52,7 @@ decision_rule: >-
   Observed power from the start day onward is multiplied by one minus the loss, with the core
   frozen. Losses are 10%, 25%, and 50% (whole-turbine losses are the same multipliers, 1 of 13
   turbines at W1 being 7.7%, 1 of 8 at W2 being 12.5%, and 1 of 2 at W3 being 50%, and are reported
-  under the nearest size). Starts are 30 days drawn uniformly from 2024-07-01 to 2025-12-31 with a
+  under the nearest size). Starts are 30 dates drawn uniformly from 2024-07-01 to 2025-12-31 with a
   fixed seed, the same 30 for every loss size and farm. The delay is the number of days from the
   start to the first day on which the injected run alarms and the un-injected run does not. A start
   where the un-injected run already alarms on the day before is excluded and counted. A start with
