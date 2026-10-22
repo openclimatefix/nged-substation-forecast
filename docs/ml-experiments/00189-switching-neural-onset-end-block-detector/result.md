@@ -74,10 +74,11 @@ take_home_message: >-
 advice:
   - >-
     Avoid pairing a learned onset alarm with a learned end alarm from a 7-day window for multi-day
-    transfers: the end of a transfer over 1 day often falls outside a 7-day window that must also hold the start (figure 2).
+    transfers: the end of a transfer over 1 day often falls outside a 7-day window that must also
+    hold the start (figure 2).
   - >-
-    Consider testing a learned onset alarm with RO-NC's end rule before building another learned end detector
-    (figure 2, onset-only rows).
+    Consider testing a learned onset alarm with RO-NC's end rule before building another learned
+    end detector (figure 2, onset-only rows).
   - >-
     Fit the injector's durations to the labelled transfers, not the logged closures, which have a
     median of 3.5 hours against 26 hours for the transfers (figure 3).
