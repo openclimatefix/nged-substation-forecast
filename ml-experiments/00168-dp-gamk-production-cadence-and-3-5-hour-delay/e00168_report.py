@@ -17,7 +17,7 @@ the paired differences:
 """
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 import e00168_common as common
@@ -249,6 +249,17 @@ def stack(*, t: pl.DataFrame, r: pl.DataFrame, labels: dict[int, str]) -> pl.Dat
     return stacked.with_columns(site=pl.col("site").replace_strict(labels, return_dtype=pl.String))
 
 
+def interval_of_months(
+    *, difference: np.ndarray, count: np.ndarray, seed: int = 168
+) -> tuple[float, float]:
+    """Return the 99% interval of a mean from each month's summed difference and row count."""
+    rng = np.random.default_rng(seed)
+    draws = rng.integers(0, len(count), size=(N_RESAMPLES, len(count)))
+    resampled = difference[draws].sum(axis=1) / count[draws].sum(axis=1)
+    tail = (100.0 - LEVEL_PERCENT) / 2.0
+    return float(np.percentile(resampled, tail)), float(np.percentile(resampled, 100.0 - tail))
+
+
 def month_interval(*, losses: pl.DataFrame, metric: str, seed: int = 168) -> tuple[float, float]:
     """Return the 99% interval of the mean paired difference, resampling whole calendar months.
 
@@ -272,6 +283,124 @@ def month_interval(*, losses: pl.DataFrame, metric: str, seed: int = 168) -> tup
     resampled = difference[draws].sum(axis=1) / count[draws].sum(axis=1)
     tail = (100.0 - LEVEL_PERCENT) / 2.0
     return float(np.percentile(resampled, tail)), float(np.percentile(resampled, 100.0 - tail))
+
+
+def held_contrast(
+    *,
+    treatment: pl.DataFrame,
+    reference: pl.DataFrame,
+    treatment_every_hours: int,
+    labels: dict[int, str],
+) -> dict:
+    """Return the contrast between the newest forecasts two schedules hold at each request time.
+
+    At every request time `t` (each half-hour from the first origin to the last), the once-a-day
+    schedule holds the forecast issued at the newest 09:00 UTC origin at or before `t`, and the
+    treatment schedule holds the forecast of the newest origin at or before `t` on a grid of
+    `treatment_every_hours` hours. Both forecasts are scored at the same valid times, `t` plus
+    0.5 to 24 hours, so the request time, the valid time, the actual, and the hour of the day are
+    identical in both arms. A pair is kept when both schedules hold a scored forecast for that
+    valid time. The interval resamples calendar months of the request time.
+    """
+    first = reference["power_fcst_init_time"].min()
+    last = reference["power_fcst_init_time"].max() + timedelta(days=1)  # ty: ignore[unsupported-operator]
+    grid = pl.datetime_range(first, last, interval="30m", eager=True, time_zone="UTC").alias("t")  # ty: ignore[no-matching-overload]
+    request = (
+        pl.DataFrame({"t": grid})
+        .with_columns(
+            origin_reference=(pl.col("t") - pl.duration(hours=9)).dt.truncate("1d")
+            + pl.duration(hours=9),
+            origin_treatment=pl.col("t").dt.truncate(f"{treatment_every_hours}h"),
+        )
+        .join(pl.DataFrame({"k": np.arange(1, 49)}), how="cross")
+        .with_columns(valid_time=pl.col("t") + pl.duration(minutes=30) * pl.col("k"))
+    )
+    columns = [
+        "time_series_id",
+        "valid_time",
+        "qs",
+        "abs_mean",
+        "hour_band",
+        "valid_month",
+        "cold2",
+    ]
+
+    def side(frame: pl.DataFrame, origin: str, suffix: str) -> pl.DataFrame:
+        return frame.select(
+            "time_series_id",
+            pl.col("power_fcst_init_time").alias(origin),
+            *[
+                pl.col(c).alias(f"{c}_{suffix}") if c in ("qs", "abs_mean") else pl.col(c)
+                for c in columns[1:]
+            ],
+        )
+
+    sites = treatment["time_series_id"].unique().to_list()
+    joined = (
+        request.join(pl.DataFrame({"time_series_id": sites}), how="cross")
+        .join(
+            side(treatment, "origin_treatment", "t").select(
+                "time_series_id", "origin_treatment", "valid_time", "qs_t", "abs_mean_t"
+            ),
+            on=["time_series_id", "origin_treatment", "valid_time"],
+            how="inner",
+        )
+        .join(
+            side(reference, "origin_reference", "r"),
+            on=["time_series_id", "origin_reference", "valid_time"],
+            how="inner",
+        )
+        .with_columns(
+            horizon=pl.col("k") / 2.0,
+            month=pl.col("t").dt.strftime("%Y-%m"),
+            window=pl.col("t").dt.hour().is_between(9, 11),
+            site=pl.col("time_series_id").replace_strict(labels, return_dtype=pl.String),
+        )
+    )
+
+    def one(part: pl.DataFrame, metric: str = "qs") -> dict:
+        diff = part[f"{metric}_t"] - part[f"{metric}_r"]
+        by_month = (
+            part.with_columns(diff=diff)
+            .group_by("month")
+            .agg(total=pl.col("diff").sum(), n=pl.len())
+            .sort("month")
+        )
+        lower, upper = interval_of_months(
+            difference=by_month["total"].to_numpy(), count=by_month["n"].to_numpy()
+        )
+        return {
+            "estimate": float(diff.mean()),  # ty: ignore[invalid-argument-type]
+            "lower": lower,
+            "upper": upper,
+            "rows": part.height,
+            "score_treatment": float(part[f"{metric}_t"].mean()),  # ty: ignore[invalid-argument-type]
+            "score_reference": float(part[f"{metric}_r"].mean()),  # ty: ignore[invalid-argument-type]
+        }
+
+    horizon = pl.col("horizon")
+    winter = pl.col("valid_month").is_in(list(WINTER_MONTHS))
+    night = pl.col("hour_band").is_in(list(NIGHT_BANDS))
+    parts = {
+        "0.5-3.5 h": joined.filter(horizon <= 3.5),
+        "3.5-9.5 h": joined.filter((horizon > 3.5) & (horizon <= 9.5)),
+        "9.5-24 h": joined.filter(horizon > 9.5),
+        "request times 09:00-12:00 UTC": joined.filter(pl.col("window")),
+        "other request times": joined.filter(~pl.col("window")),
+        "winter nights": joined.filter(winter & night),
+        "cold nights (day mean below 2 C)": joined.filter(winter & pl.col("cold2") & night),
+    }
+    out: dict = {
+        "all": one(joined),
+        "abs_mean": one(joined, metric="abs_mean"),
+        "pairs": joined.height,
+        "parts": {name: one(part) for name, part in parts.items() if not part.is_empty()},
+    }
+    by_site = joined.group_by("site").agg(
+        (pl.col("qs_t") - pl.col("qs_r")).mean().alias("difference")
+    )
+    out["by_site"] = {row["site"]: row["difference"] for row in by_site.to_dicts()}
+    return out
 
 
 def contrast(*, losses: pl.DataFrame, metric: str = "qs") -> dict:
@@ -302,7 +431,7 @@ def contrast(*, losses: pl.DataFrame, metric: str = "qs") -> dict:
     }
 
 
-def contrast_table(*, losses: pl.DataFrame, full: bool) -> dict:
+def contrast_table(*, losses: pl.DataFrame, full: bool, subsets: bool = True) -> dict:
     """Return one pairing's contrasts by lead band, by origin, and by subset."""
     out: dict = {"bands": {}, "by_slot_under_24": {}, "subsets": {}, "by_site": {}}
     for name, low, high in LEAD_BANDS:
@@ -321,7 +450,7 @@ def contrast_table(*, losses: pl.DataFrame, full: bool) -> dict:
             out["by_slot_under_24"][label] = contrast(losses=part)
     for name, expression in subset_filters().items():
         part = under.filter(expression)
-        if not part.is_empty():
+        if subsets and not part.is_empty():
             out["subsets"][name] = contrast(losses=part)
     for site in common.DECISION_SITES:
         part = under.filter(pl.col("site") == site)
@@ -383,12 +512,12 @@ def score_tables(*, losses: dict[str, pl.DataFrame]) -> dict:
     }
     for arm, frame in decision.items():
         out["by_lead"][arm] = {
-            name: float(lead_filter(frame=frame, low=low, high=high)["qs"].mean())
+            name: float(lead_filter(frame=frame, low=low, high=high)["qs"].mean())  # ty: ignore[invalid-argument-type]
             for name, low, high in LEAD_BANDS
         }
         under = lead_filter(frame=frame, low=0.0, high=24.0)
         out["by_slot_under_24"][arm] = {
-            label: float(under.filter(pl.col("slot") == slot)["qs"].mean())
+            label: float(under.filter(pl.col("slot") == slot)["qs"].mean())  # ty: ignore[invalid-argument-type]
             for slot, label in enumerate(SLOT_LABELS)
             if arm in PRODUCTION_ARMS
         }
@@ -505,12 +634,36 @@ def period_report(*, period: str, cache) -> dict:  # noqa: ANN001
     for label, (treatment, reference, keys, description) in pairings.items():
         t, r = pair(treatment=decision[treatment], reference=decision[reference], on=keys)
         losses = stack(t=t, r=r, labels=labels)
-        entry = contrast_table(losses=losses, full=period == "scored")
+        entry = contrast_table(losses=losses, full=period == "scored", subsets=keys != same_lead)
         entry["description"] = description
         entry["rows"] = t.height
         if label in ("C1", "C2") and period == "scored":
             entry["lead_check"] = growth_check(losses=losses)
         report["contrasts"][label] = entry
+    report["held"] = {
+        "dp_minus_d": held_contrast(
+            treatment=losses_by_arm["dp"].filter(pl.col("site").is_in(list(common.DECISION_SITES))),
+            reference=losses_by_arm["d"].filter(pl.col("site").is_in(list(common.DECISION_SITES))),
+            treatment_every_hours=6,
+            labels=labels,
+        ),
+        "ap_minus_a": held_contrast(
+            treatment=losses_by_arm["ap"].filter(pl.col("site").is_in(list(common.DECISION_SITES))),
+            reference=losses_by_arm["a"].filter(pl.col("site").is_in(list(common.DECISION_SITES))),
+            treatment_every_hours=6,
+            labels=labels,
+        ),
+        "dp0_minus_di0": held_contrast(
+            treatment=losses_by_arm["dp0"].filter(
+                pl.col("site").is_in(list(common.DECISION_SITES))
+            ),
+            reference=losses_by_arm["di0"].filter(
+                pl.col("site").is_in(list(common.DECISION_SITES))
+            ),
+            treatment_every_hours=6,
+            labels=labels,
+        ),
+    }
     if period == "scored":
         report["tail"] = tail_tables(losses=losses_by_arm)
         report["checks"] = checks(frames=decision)

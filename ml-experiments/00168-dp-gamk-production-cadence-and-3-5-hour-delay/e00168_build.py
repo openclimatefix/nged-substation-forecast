@@ -264,13 +264,14 @@ def control(*, base: dict[str, pl.DataFrame], trace: CorrectionTrace, cache: Fea
     out: dict = {}
     scored = issued["scored"]
     out["rows"] = scored.height
-    out["max_abs_mean_a"] = float((scored["mean_a"] - scored["mean"]).abs().max())
-    out["max_abs_mean_d"] = float((scored["mean_d"] - scored["mean_d_stored"]).abs().max())
+    out["max_abs_mean_a"] = float((scored["mean_a"] - scored["mean"]).abs().max())  # ty: ignore[invalid-argument-type]
+    out["max_abs_mean_d"] = float((scored["mean_d"] - scored["mean_d_stored"]).abs().max())  # ty: ignore[invalid-argument-type]
     for arm, mean_column, prefix in (("a", "mean_a", "a_"), ("d", "mean_d", "d_")):
         spread = fit_spread(frame=issued["tuning"], mean_column=mean_column)
         rebuilt = with_quantiles(frame=scored, mean_column=mean_column, spread=spread)
         out[f"max_abs_quantile_{arm}"] = max(
-            float((rebuilt[q] - scored[f"{prefix}{q}"]).abs().max()) for q in QUANTILE_COLUMNS
+            float((rebuilt[q] - scored[f"{prefix}{q}"]).abs().max())  # ty: ignore[invalid-argument-type]
+            for q in QUANTILE_COLUMNS
         )
     return out
 

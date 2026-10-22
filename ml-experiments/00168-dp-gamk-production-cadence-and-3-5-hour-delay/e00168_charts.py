@@ -40,6 +40,7 @@ ARM_COLOURS: Final[dict[str, str]] = {
     "dp0": ocf.DATA_PURPLE,
 }
 CONTRAST_NAMES: Final[dict[str, str]] = {
+    "H": "H 6-hourly minus daily, newest forecast held",
     "C1": "C1 6-hourly minus daily, same lead",
     "C4": "C4 6-hourly minus daily, same valid time",
     "C3": "C3 3.5-hour delay, 6-hourly",
@@ -71,7 +72,7 @@ def _forest(
 ) -> alt.Chart:
     present = {row["period"] for row in rows}
     colours = {k: v for k, v in PERIOD_COLOURS.items() if k in present}
-    base = alt.Chart(pl.DataFrame(rows)).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(pl.DataFrame(rows)).encode(
         y=alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=320)),
         yOffset=alt.YOffset("period:N", sort=list(colours)),
         color=alt.Color(
@@ -97,7 +98,11 @@ def figure_headline(*, data: dict) -> alt.TopLevelMixin:
     rows = []
     for period, label in (("replicate", "even months (replicate)"), ("scored", "scored year")):
         for key, name in CONTRAST_NAMES.items():
-            c = data[period]["contrasts"][key]["bands"]["under 24 h"]["qs"]
+            c = (
+                data[period]["held"]["dp_minus_d"]["all"]
+                if key == "H"
+                else data[period]["contrasts"][key]["bands"]["under 24 h"]["qs"]
+            )
             rows.append(
                 {
                     "label": name,
@@ -112,11 +117,12 @@ def figure_headline(*, data: dict) -> alt.TopLevelMixin:
         order=list(CONTRAST_NAMES.values()),
         height=320,
         title=_title(
-            text="Same lead: 6-hourly scores 0.08 points worse. Same valid time: no worse",
+            text="Holding the newest forecast, 6-hourly is no worse than daily",
             subtitle=(
-                "Dot: difference in mean quantile score over leads 0.5 to 24 hours, five decision "
-                "substations, outside switching events. Line: 99% interval from resampling whole "
-                "calendar months. The line at zero means no difference."
+                "Dot: difference in mean quantile score over horizons 0.5 to 24 hours, five "
+                "decision substations, outside switching events. Line: 99% interval from "
+                "resampling whole calendar months. The line at zero means no difference. H and C4 "
+                "hold the valid time equal; C1 does not hold the hour of the day equal."
             ),
         ),
     )
@@ -163,33 +169,38 @@ def figure_by_hour(*, data: dict) -> alt.TopLevelMixin:
 
 
 def figure_by_slot(*, data: dict) -> alt.TopLevelMixin:
-    """C1 and C3 by production origin, leads under 24 hours."""
-    rows = []
-    for key, name in (
-        ("C1", "C1 same lead"),
-        ("C3", "C3 delay"),
-    ):
-        for slot, c in data["scored"]["contrasts"][key]["by_slot_under_24"].items():
-            rows.append(
-                {
-                    "label": f"{name}, origin {slot}",
-                    "period": "scored year",
-                    "estimate": c["estimate"],
-                    "low": c["lower"],
-                    "high": c["upper"],
-                }
-            )
-    order = [r["label"] for r in rows]
+    """The held contrast (6-hourly minus daily, arm D) by horizon, request time, and subset."""
+    held = data["scored"]["held"]["dp_minus_d"]
+    names = {
+        "0.5-3.5 h": "horizons 0.5-3.5 h",
+        "3.5-9.5 h": "horizons 3.5-9.5 h",
+        "9.5-24 h": "horizons 9.5-24 h",
+        "request times 09:00-12:00 UTC": "request times 09:00-12:00 UTC",
+        "other request times": "all other request times",
+        "winter nights": "winter nights",
+        "cold nights (day mean below 2 C)": "cold nights (day mean below 2 C)",
+    }
+    rows = [
+        {
+            "label": label,
+            "period": "scored year",
+            "estimate": held["parts"][key]["estimate"],
+            "low": held["parts"][key]["lower"],
+            "high": held["parts"][key]["upper"],
+        }
+        for key, label in names.items()
+    ]
     return _forest(
         rows=rows,
-        order=order,
-        height=260,
+        order=list(names.values()),
+        height=300,
         title=_title(
-            text="The same-lead gap is smallest at the 12:00 origin",
+            text="The largest 6-hourly loss falls between 09:00 and 12:00 UTC",
             subtitle=(
-                "Dot: difference in mean quantile score over leads 0.5 to 24 hours, scored "
-                "year, five decision substations. Line: 99% interval from resampling whole "
-                "calendar months. Origins at 00:00 and 06:00 UTC fall on the day after the run."
+                "Dot: 6-hourly minus daily arm D, mean quantile score at the same request time and "
+                "valid time, scored year, five decision substations. Line: 99% interval from "
+                "resampling whole calendar months. From 09:00 to 12:00 UTC the 6-hourly schedule "
+                "still holds the 06:00 forecast."
             ),
         ),
     )
