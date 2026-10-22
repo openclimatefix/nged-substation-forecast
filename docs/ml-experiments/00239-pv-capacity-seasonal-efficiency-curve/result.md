@@ -188,6 +188,9 @@ experiment 231 and from 0.822 to 0.843 with a full-sun injection.**
   how experiments 231, 235, 236, and 238 should be read. The maintainer's decision on an audit is
   pending.
 - **Review:** one Sonnet review of the plan, one of the code, and one of the page.
+- **No Opus audit was run.** The ML manager decided that quota did not allow an Opus review of
+  any of this series' experiments, so every audit trigger listed above stays unaudited and a
+  Sonnet reviewer read the code and the page instead.
 
 ## Limits
 
