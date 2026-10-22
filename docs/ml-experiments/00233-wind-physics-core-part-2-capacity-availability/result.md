@@ -135,9 +135,8 @@ metered wind farms, anonymised.
 
 ## Question and answer
 
-**We asked whether the fitted wind-turbine model of [experiment
-230](../00230-wind-physics-core-part-1/result.md) (called "the core" below) can show that a farm
-has lost capacity.** The monitor divides observed power by the power the core expects, adds up both
+**We asked whether the fitted wind-turbine model of [experiment 230][e230] (called "the core"
+below) can show that a farm has lost capacity.** The monitor divides observed power by the power the core expects, adds up both
 over a trailing 60 days of strong-wind half-hours (those where the core expects at least 95% of
 the farm's fitted maximum output, its "scale"), and divides by the same ratio before July 2024, so
 that 1.0 means normal. An alarm is raised when that relative ratio falls below the lowest value seen
@@ -223,3 +222,5 @@ loss, the size seen in experiment 183's solar farms, raised extra alarm days at 
   may absorb the 9% swing (untested), then a check of the W2 and W3 low months against NGED's outage
   records. A learned correction of the ratio by wind speed is a candidate neural component; its
   prediction that could fail is that the 9% swing then raises no extra alarm at W1.
+
+[e230]: https://github.com/openclimatefix/nged-substation-forecast/blob/ml-exp-wind-physics-core-part-1/docs/ml-experiments/00230-wind-physics-core-part-1/result.md
