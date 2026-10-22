@@ -98,7 +98,8 @@ lessons:
   - >-
     The filter's advantage over dropping it shrinks as the gap grows: 0.147 points after 3 hours and
     0.013 worse after 72 hours, and the 72-hour estimate crosses zero, but 275 events in all
-    cannot resolve it (C1 to C4 all span zero).
+    cannot resolve it (C1 to C4 all span zero), and one switching date drives the 72-hour sign
+    (audit).
   - >-
     Widening the bands by the filter's own variance growth costs nothing in score (-0.004 to +0.000)
     and moves the q05 coverage after a 24-hour gap from 7.7% to 5.5% (nominal 5%).
@@ -125,8 +126,9 @@ advice:
     Widen the quantile offsets by the filter's variance growth since the last reading when readings
     are missing: it fixed the q05 coverage without a score cost (figure 4, C5 to C8).
   - >-
-    Test real outages of the telemetry before porting a rule that drops the filter after a long gap:
-    the synthetic 72-hour gap cannot separate coasting from dropping it (C4).
+    Do not port a rule that drops the filter after a long gap: the 72-hour contrast (C4, +0.013,
+    interval spanning zero) rests on one switching date and is not evidence of a crossover
+    (audit).
   - >-
     Run an experiment that needs recovery after a gap with a filter-alone arm beside the full
     pipeline: the full pipeline stayed above the 0.02-point margin at 48 hours after a 24-hour
@@ -230,7 +232,29 @@ therefore fired at 72 hours only, on two contrasts whose intervals both span zer
     forecasts unchanged (0.0).
 - **Triggers.** Trigger 4 fired: leaving out D14 moves a minus c2 at 24 hours from -0.057 to +0.001,
     and leaving out D16 moves it at 72 hours from +0.013 to -0.040. Both contrasts span zero, so the
-    verdict cannot change. AUDIT_PLACEHOLDER
+    verdict cannot change. A fresh Opus audit re-derived the contrasts from the stored rows (they
+match to 4 decimals), found no leakage path, and traced both sign flips and the 72-hour sign to one
+date, 2026-01-13, at D5 and D16 (finding 1 below).
+
+## Audit findings
+
+- **One switching date carries the 72-hour sign and both leave-one-out flips.** On 2026-01-13 the
+  no-gap filter scored 15.3 points at D16 and 16.9 at D5, against 1.7 and 7.6 for the filter-free
+  pipeline (c2). The 14 days before that cutoff are all in a hand-filtered switching event, yet the
+  filter reads those readings and had learned a load transfer (level +22 points at D16, -9 at D5).
+  The gap is not the cause. Dropping that date after the fact (a post-hoc cut, not the verdict)
+gives
+  a minus c2 of -0.204 (-0.363 to -0.059) at 3 hours and -0.171 (-0.327 to -0.023) at 6 hours, both
+  below zero, and -0.112 and -0.037 at 24 and 72 hours, both spanning zero. On that cut the
+  pre-registered rule would read `partly supported`. The 72-hour "coasting is worse" sign is not a
+  basis for a rule that drops the filter.
+- **At 3 and 6 hours the contrasts mostly measure the filter's no-gap value.** Every origin is at
+  09:00 UTC, so every gap ends at 05:30 UTC and a 3-hour gap touches only the night hour band (and
+  the morning band in summer time). The contrast splits into +0.011 from the gap and -0.158 from
+  the filter's no-gap advantage. A gap ending in the evening would test more.
+- **The widening is crude.** The extra variance is mostly the transient's, it is applied at every
+  lead to 168 hours although it should shrink with lead, and part of the coverage gain corrects the
+  under-coverage that the no-gap forecast already has (7.1% below q05).
 
 ## Caveats
 
@@ -239,8 +263,12 @@ therefore fired at 72 hours only, on two contrasts whose intervals both span zer
 - **The model's refits stay on.** The monthly refits of the demand model read every reading up to
     the refit date, so a gap that spans a refit cut would also thin the training data. This is not
     modelled.
-- **Spread tables are no-gap tables.** Tuning-month rows keep the no-gap forecast, so every rule's
-    spread is the no-gap one. Rule (c) has its own table.
+- **Spread tables are close to the no-gap ones, not identical.** Tuning-month rows keep the no-gap
+    filter's forecast, but the offset and recipe R shifts on those rows still move, so rule (a)'s
+    quantile offsets differ from the no-gap offsets by up to 1.4 points. The change is the same for
+    every rule. Rule (c) has its own table.
+- **Hidden readings stay hidden for later runs.** A telemetry backfill would restore them, so the
+    recovery shown is a worst case.
 - **Events are one per 8-day block.** The 275 events sit in the replicate months and
     the scored year; the interval resamples 18 calendar months.
 
@@ -249,6 +277,9 @@ therefore fired at 72 hours only, on two contrasts whose intervals both span zer
 - **Real outages.** Score the rules on the telemetry's genuine gaps once the cleaned power table's
     outage periods are listed. The 72-hour crossover between coasting and dropping the filter needs
     more events or real gaps to resolve.
+- **Keep switching readings out of the filter.** The filter reads readings inside hand-filtered
+    switching events, which one date shows can cost 14 points; a test that masks them is a candidate
+    for its own experiment, and would also settle the 72-hour contrast.
 - **A learned recovery.** A small neural head on the filter state that takes the hours since the
     last reading and rescales the transient's decay could shorten the recovery. A prediction that
     could fail: it brings the 24-hour gap's score within 0.02 points of the no-gap score at 12
