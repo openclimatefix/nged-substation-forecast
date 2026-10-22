@@ -13,7 +13,7 @@ from resampling whole months and the three seeds. Output: `scores.json`.
 
 import json
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -27,7 +27,20 @@ SOURCE: Final[Path] = (
 LEVELS: Final[np.ndarray] = np.array(MIXTURE_LEVELS)
 COLUMNS: Final[tuple[str, ...]] = tuple(f"q{round(100 * level):02d}" for level in MIXTURE_LEVELS)
 TAILS: Final[tuple[int, ...]] = (0, 1, 9, 10)
-NEW_ARMS: Final[tuple[str, ...]] = ("A3r", "R", "S", "RS", "R0", "PR")
+NEW_ARMS: Final[tuple[str, ...]] = (
+    "A3r",
+    "R",
+    "S",
+    "RS",
+    "R0",
+    "PR",
+    "Rg",
+    "PRg",
+    "RSg",
+    "SQ",
+    "SC",
+    "X5r",
+)
 OLD_ARMS: Final[dict[str, str]] = {"a3_two_number": "A3", "a5_xgboost": "A5"}
 GAP_HALF_THRESHOLD: Final[float] = 0.5
 CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
@@ -43,6 +56,18 @@ CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
     ("D7", "S", "A3r"),
     ("D8", "RS", "A3r"),
     ("D9", "A3r", "A3"),
+    ("H1", "Rg", "A3"),
+    ("H2", "PRg", "A3"),
+    ("H3", "RSg", "A3"),
+    ("H4", "SQ", "S"),
+    ("H5", "SC", "S"),
+    ("H6", "X5r", "A5"),
+    ("H7", "S", "X5r"),
+    ("H8", "SC", "A3"),
+    ("H9", "X5r", "A3"),
+    ("H10", "Rg", "A3r"),
+    ("H11", "S", "A5"),
+    ("H12", "SC", "A5"),
 )
 BONFERRONI_LEVEL: Final[float] = 1 - 0.05 / 3
 RESAMPLES: Final[int] = 20_000
@@ -125,7 +150,7 @@ def main() -> None:
         month = reference["valid_time"].dt.strftime("%Y-%m").to_numpy()
         seed = reference["seed"].to_numpy()
         rows = {arm: per_row(frame=frame) for arm, frame in arms.items()}
-        entry: dict[str, dict] = {"n_rows": reference.height // len(np.unique(seed)), "arms": {}}
+        entry: dict[str, Any] = {"n_rows": reference.height // len(np.unique(seed)), "arms": {}}
         for arm, values in rows.items():
             entry["arms"][arm] = {name: float(v.mean()) for name, v in values.items()}
         entry["contrasts"] = {}

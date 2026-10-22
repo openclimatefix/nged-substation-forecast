@@ -81,7 +81,21 @@ BASE_FEATURES: Final[tuple[str, ...]] = (
     "error_48h",
 )
 CALENDAR_FEATURES: Final[tuple[str, ...]] = ("hour", "month")
-ARMS: Final[tuple[str, ...]] = ("A3r", "R", "S", "RS", "R0", "PR")
+POSTHOC_ARMS: Final[tuple[str, ...]] = ("Rg", "PRg", "RSg", "SQ", "SC", "X5r")
+"""Run after the first scores were read: regularised R, PR, RS; S without the lagged error or the
+calendar columns; direct XGBoost on experiment 224's arm-5 inputs under this experiment's protocol."""
+ARMS: Final[tuple[str, ...]] = ("A3r", "R", "S", "RS", "R0", "PR", *POSTHOC_ARMS)
+X5_FEATURES: Final[tuple[str, ...]] = (
+    "ghi_mean",
+    "ghi_std",
+    "temperature_mean",
+    "dni_mean",
+    "dhi_mean",
+    "unit_mean",
+    "elevation_deg",
+    "sun_azimuth_deg",
+    "lead_hours",
+)
 
 
 @dataclass
@@ -239,7 +253,7 @@ def oof_groups(*, farm: FarmFold) -> np.ndarray:
     return np.array([index[m] for m in months.to_list()])
 
 
-def regressor(*, seed: int, quantile: bool) -> xgb.XGBRegressor:
+def regressor(*, seed: int, quantile: bool, regularised: bool = False) -> xgb.XGBRegressor:
     """Return a small XGBoost model with no column subsampling."""
     params: dict[str, object] = {
         "tree_method": "hist",
@@ -252,13 +266,21 @@ def regressor(*, seed: int, quantile: bool) -> xgb.XGBRegressor:
         "n_jobs": 1,
         "random_state": seed,
     }
+    if regularised:
+        params |= {
+            "n_estimators": 100,
+            "learning_rate": 0.05,
+            "max_depth": 2,
+            "min_child_weight": 300,
+            "reg_lambda": 10.0,
+        }
     if quantile:
         params |= {"objective": "reg:quantileerror", "quantile_alpha": LEVELS}
     return xgb.XGBRegressor(**params)
 
 
 def residual_correction(
-    *, farm: FarmFold, columns: tuple[str, ...], seed: int, permute: bool
+    *, farm: FarmFold, columns: tuple[str, ...], seed: int, permute: bool, regularised: bool = False
 ) -> np.ndarray:
     """Return a correction to the plant mean for every row: out-of-fold on tuning, full-fit scored."""
     x = feature_matrix(farm=farm, columns=columns, base=farm.mu)
@@ -281,9 +303,13 @@ def residual_correction(
         held = farm.tuning & (groups == group)
         if held.sum() == 0:
             continue
-        model = regressor(seed=seed, quantile=False).fit(x[train], y[train])
+        model = regressor(seed=seed, quantile=False, regularised=regularised).fit(
+            x[train], y[train]
+        )
         delta[held] = model.predict(x[held])
-    final = regressor(seed=seed, quantile=False).fit(x[farm.tuning], y[farm.tuning])
+    final = regressor(seed=seed, quantile=False, regularised=regularised).fit(
+        x[farm.tuning], y[farm.tuning]
+    )
     delta[~farm.tuning] = final.predict(x[~farm.tuning])
     return delta
 
@@ -360,6 +386,27 @@ def task(job: tuple[str, str, int]) -> list[pl.DataFrame]:
     out["RS"] = centre_r[:, None] + quantile_offsets(
         farm=farm, columns=full, base=centre_r, seed=seed
     )
+    for arm, permute in (("Rg", False), ("PRg", True)):
+        delta = residual_correction(
+            farm=farm, columns=full, seed=seed, permute=permute, regularised=True
+        )
+        centre = np.clip(farm.mu + delta, 0.0, farm.ceiling)
+        out[arm] = corrected_mixture(centre=centre)
+        if arm == "Rg":
+            centre_g = centre
+    out["RSg"] = centre_g[:, None] + quantile_offsets(
+        farm=farm, columns=full, base=centre_g, seed=seed
+    )
+    no_error = tuple(c for c in full if c != "error_48h")
+    no_calendar = tuple(c for c in full if c not in CALENDAR_FEATURES)
+    out["SQ"] = farm.mu[:, None] + quantile_offsets(
+        farm=farm, columns=no_error, base=farm.mu, seed=seed
+    )
+    out["SC"] = farm.mu[:, None] + quantile_offsets(
+        farm=farm, columns=no_calendar, base=farm.mu, seed=seed
+    )
+    zero = np.zeros(len(farm.mu))
+    out["X5r"] = quantile_offsets(farm=farm, columns=X5_FEATURES, base=zero, seed=seed)
     print("done", fold, site, seed, flush=True)
     return [
         frame_of(farm=farm, fold=fold, quantiles=q, arm=arm, seed=seed) for arm, q in out.items()
