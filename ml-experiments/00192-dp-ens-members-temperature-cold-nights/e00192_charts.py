@@ -21,21 +21,20 @@ DOCS_DIR: Final[Path] = (
     / f"{common.EXPERIMENT_ID:05d}-{common.SLUG}"
 )
 REPORT: Final[Path] = common.WORK_DIR / "report"
-WIDTH: Final[int] = 680
-PLACEBO_LABELS: Final[dict[str, str]] = {
-    "m": "M: the day's own members",
-    "mp_strong": "Other day's members (lead, cloud band)",
-    "mp": "Other day's members (month, hour)",
-    "gauss": "Gaussian, row's own mean and spread",
-    "flip": "Responses reflected about mean",
+WIDTH: Final[int] = 480
+ARM_LABELS: Final[dict[str, str]] = {
+    "t": "T: members through temperature",
+    "st": "ST: members through solar and temperature",
+    "m": "M: members through solar only (experiment 187)",
+    "mr": "Rescale only, no members",
+    "tp": "T with another day's members",
 }
-PLACEBO_COLOURS: Final[list[str]] = [
-    ocf.BRAND_ORANGE,
-    ocf.DATA_BLUE,
-    ocf.DATA_SKY,
-    ocf.DATA_PURPLE,
-    ocf.DATA_GREEN,
-]
+CUT_LABELS: Final[dict[str, str]] = {
+    "cold nights": "Cold nights",
+    "winter evenings (Nov to Feb, 17:00 to 23:00)": "Winter evenings",
+    "non-cold rows": "All other rows",
+    "daylight": "Daylight",
+}
 
 
 def _title(*, text: str, subtitle: str) -> alt.TitleParams:
@@ -54,143 +53,157 @@ def _save(chart: alt.TopLevelMixin, *, name: str) -> None:
     print("wrote", name)
 
 
-def _interval_chart(
-    *,
-    rows: list[dict],
-    colour_field: str,
-    domain: list[str],
-    colours: list[str],
-    title: alt.TitleParams,
-    height: int,
-    y_title: str | None = None,
+def _one_panel(
+    *, frame: pl.DataFrame, height: int, title: str | alt.TitleParams | None
 ) -> alt.TopLevelMixin:
-    frame = pl.DataFrame(rows)
-    base = alt.Chart(frame)
-    rule = (
+    zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}))
         .mark_rule(color="#808080", strokeDash=[4, 3])
         .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
-    line = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
-        y=alt.Y("label:N", sort=None, title=y_title, axis=alt.Axis(labelLimit=400)),
-        x=alt.X(
-            "low:Q",
-            title="Change in the daylight quantile score from arm A (%; more negative is better)",
+    colour = alt.Color(
+        "period:N",
+        scale=alt.Scale(
+            domain=["scored year", "replicate months"], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]
         ),
-        x2="high:Q",
-        color=alt.Color(
-            f"{colour_field}:N", scale=alt.Scale(domain=domain, range=colours), legend=None
-        ),
+        title=None,
     )
-    dot = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
-        y=alt.Y("label:N", sort=None),
-        x="estimate:Q",
-        color=alt.Color(
-            f"{colour_field}:N", scale=alt.Scale(domain=domain, range=colours), legend=None
-        ),
+    line = (
+        alt.Chart(frame)
+        .mark_rule(strokeWidth=2)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("label:N", sort=None, title=None, axis=alt.Axis(labelLimit=420)),
+            x=alt.X(
+                "low:Q",
+                scale=alt.Scale(domain=[-3.5, 3.5]),
+                title="Change in the quantile score from arm A (%; more negative is better)",
+            ),
+            x2="high:Q",
+            color=colour,
+            yOffset="period:N",
+        )
     )
-    return (rule + line + dot).properties(width=WIDTH - 300, height=height, title=title)
-
-
-def figure_headline(*, placebos: dict) -> None:
-    """Change in the daylight score for arm M and each placebo, both periods."""
-    rows = []
-    for period, label in (("scored", "scored year"), ("replicate", "replicate months")):
-        for arm, arm_label in PLACEBO_LABELS.items():
-            c = placebos[period]["daylight"][arm]
-            rows.append(
-                {
-                    "label": f"{arm_label}, {label.split()[0]}",
-                    "series": arm_label,
-                    "estimate": c["point"],
-                    "low": c["lower"],
-                    "high": c["upper"],
-                }
-            )
-    chart = _interval_chart(
-        rows=rows,
-        colour_field="series",
-        domain=list(PLACEBO_LABELS.values()),
-        colours=PLACEBO_COLOURS,
-        title=_title(
-            text="Arm M lowers the daylight score by 2.2% in the scored year; the day's own members carry most of it",
-            subtitle="Dot: estimate. Line: 95% interval from resampling whole months. Daylight half-hours (sun 5 degrees or more up), 5 substations, leads 0.5 to 168 hours. Dashed rule: same as arm A.",
-        ),
-        height=330,
+    point = (
+        alt.Chart(frame)
+        .mark_point(filled=True, size=50)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("label:N", sort=None),
+            x=alt.X("point:Q", scale=alt.Scale(domain=[-3.5, 3.5])),
+            color=colour,
+            yOffset="period:N",
+        )
     )
-    _save(chart, name="figure_1_headline")
+    return alt.layer(zero, line, point).properties(width=WIDTH, height=height, title=title or "")  # ty: ignore[unresolved-attribute]
 
 
-def figure_lead(*, report: dict) -> None:
-    """Change in the daylight score by lead band, both periods."""
-    cuts = [
-        ("daylight, under 24 h", "under 24 h"),
-        ("daylight, 24 to 72 h", "24 to 72 h"),
-        ("daylight, 72 to 168 h", "72 to 168 h"),
+def _interval_chart(
+    *, rows: list[dict], title: alt.TitleParams, row_field: str, height: int
+) -> alt.TopLevelMixin:
+    frame = pl.DataFrame(rows)
+    if not row_field:
+        return _one_panel(frame=frame, height=height, title=title)
+    panels = [
+        _one_panel(frame=frame.filter(pl.col(row_field) == name), height=height, title=name)
+        for name in frame[row_field].unique(maintain_order=True)
     ]
-    rows = []
-    for period, label in (("scored", "scored year"), ("replicate", "replicate months")):
-        for cut, cut_label in cuts:
-            c = report[period]["subsets"][cut]["m"]["change_pct"]
-            rows.append(
-                {
-                    "label": f"{cut_label}, {label.split()[0]}",
-                    "series": label,
-                    "estimate": c["point"],
-                    "low": c["lower"],
-                    "high": c["upper"],
-                }
-            )
-    chart = _interval_chart(
-        rows=rows,
-        colour_field="series",
-        domain=["scored year", "replicate months"],
-        colours=[ocf.BRAND_ORANGE, ocf.DATA_BLUE],
-        title=_title(
-            text="The gain from arm M grows with lead time and holds in both periods",
-            subtitle="Dot: estimate. Line: 97.5% interval from resampling whole months. Daylight half-hours, 5 substations. Dashed rule: same as arm A.",
-        ),
-        height=230,
-    )
-    _save(chart, name="figure_2_lead")
-
-
-def figure_substation(*, report: dict) -> None:
-    """Change in the daylight score by substation, scored year and replicate months."""
-    rows = []
-    for period, label in (("scored", "scored year"), ("replicate", "replicate months")):
-        for site in common.DECISION_SITES:
-            c = report[period]["subsets"][f"daylight, {site}"]["m"]["change_pct"]
-            rows.append(
-                {
-                    "label": f"{site}, {label.split()[0]}",
-                    "series": label,
-                    "estimate": c["point"],
-                    "low": c["lower"],
-                    "high": c["upper"],
-                }
-            )
-    chart = _interval_chart(
-        rows=rows,
-        colour_field="series",
-        domain=["scored year", "replicate months"],
-        colours=[ocf.BRAND_ORANGE, ocf.DATA_BLUE],
-        title=_title(
-            text="Arm M gains at every substation in the scored year; D11's replicate interval includes zero",
-            subtitle="Dot: estimate. Line: 97.5% interval from resampling whole months. Daylight half-hours. Dashed rule: same as arm A.",
-        ),
-        height=300,
-    )
-    _save(chart, name="figure_3_substation")
+    return alt.vconcat(*panels).properties(title=title).resolve_scale(color="shared")  # ty: ignore[invalid-argument-type]
 
 
 def main() -> None:
-    """Draw every figure."""
+    """Write the three figures."""
     report = json.loads((REPORT / "report.json").read_text())
-    placebos = json.loads((REPORT / "placebos.json").read_text())
-    figure_headline(placebos=placebos)
-    figure_lead(report=report)
-    figure_substation(report=report)
+    extra = json.loads((REPORT / "extra.json").read_text())
+    period_names = {"scored": "scored year", "replicate": "replicate months"}
+
+    rows = []
+    for cut, cut_label in CUT_LABELS.items():
+        for arm, arm_label in ARM_LABELS.items():
+            for period, period_label in period_names.items():
+                change = report[period]["subsets"][cut][arm]["change_pct"]
+                rows.append(
+                    {
+                        "cut": cut_label,
+                        "label": arm_label,
+                        "period": period_label,
+                        "point": change["point"],
+                        "low": change["lower"],
+                        "high": change["upper"],
+                    }
+                )
+    _save(
+        _interval_chart(
+            rows=rows,
+            title=_title(
+                text="Members' temperature does not improve cold-night bands",
+                subtitle="Cold nights: ensemble-mean temperature under 2 C, local 17:00 to 08:00. Month-block 95% intervals (97.5% for T and ST).",
+            ),
+            row_field="cut",
+            height=170,
+        ),
+        name="figure_1_headline",
+    )
+
+    rows = []
+    for site in common.DECISION_SITES:
+        for period, period_label in period_names.items():
+            change = report[period]["subsets"][f"cold nights, {site}"]["t"]["change_pct"]
+            rows.append(
+                {
+                    "cut": "",
+                    "label": site,
+                    "period": period_label,
+                    "point": change["point"],
+                    "low": change["lower"],
+                    "high": change["upper"],
+                }
+            )
+    _save(
+        _interval_chart(
+            rows=rows,
+            title=_title(
+                text="Cold-night change by substation, arm T",
+                subtitle="No substation shows a gain in both periods with an interval below zero.",
+            ),
+            row_field="",
+            height=260,
+        ),
+        name="figure_2_substation",
+    )
+
+    scored = extra["scored"]
+    spread = pl.DataFrame(
+        {
+            "label": [
+                "Arm A's half-width, q05 to q95, cold nights",
+                "Spread of the members' temperature responses, cold nights",
+                "Spread of the members' solar responses, daylight",
+            ],
+            "points": [
+                scored["arm_a_cold_half_width_q05_q95"],
+                scored["spread"]["delta_t"]["cold_std_of_members"],
+                scored["spread"]["delta_m"]["daylight_std_of_members"],
+            ],
+        }
+    )
+    bars = (
+        alt.Chart(spread)
+        .mark_bar(color=ocf.DATA_BLUE)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("label:N", sort=None, title=None, axis=alt.Axis(labelLimit=420)),
+            x=alt.X("points:Q", title="Points of effective capacity (scored year)"),
+        )
+    )
+    _save(
+        bars.properties(
+            width=WIDTH,
+            height=120,
+            title=_title(
+                text="The members' temperatures disagree too little to matter on cold nights",
+                subtitle="Mean over rows of the standard deviation of the 51 members' responses.",
+            ),
+        ),
+        name="figure_3_spread",
+    )
 
 
 if __name__ == "__main__":

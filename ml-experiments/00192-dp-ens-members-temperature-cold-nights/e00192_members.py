@@ -89,7 +89,13 @@ def member_statistics(*, flux: np.ndarray, clear: np.ndarray) -> dict[str, np.nd
 def compute_run(
     *, cache: FeatureCache, setup: ens.SiteSetup, fits: list[tall.TallFit], index: int
 ) -> dict[str, np.ndarray]:
-    """Return the deltas and statistics of one run at every half-hour of its window."""
+    """Return each member's temperature-only response of one run at every half-hour of its window.
+
+    `delta_t` is the T-all fit's forecast with the member's calibrated temperature (current and
+    trailing means) and every other input at the ensemble mean, minus the forecast with all inputs
+    at the ensemble mean. `delta_st` repeats experiment 184's `delta_f` (every input from the
+    member) as a wiring check against the stored array.
+    """
     run = setup.runs[index]
     origin = setup.origins[index]
     fit: tall.TallFit = choose_fit(fits=fits, origin=origin)  # ty: ignore[invalid-argument-type, invalid-assignment]
@@ -103,40 +109,29 @@ def compute_run(
     base = tall.predict_tall(cache=mean_driven, fit=fit, index=grid)
     driven = window.driven_caches(context=setup.context, run=run, members=members)
     site = setup.site
-    delta_m = np.full((N_MEMBERS, n), np.nan)
-    delta_f = np.full((N_MEMBERS, n), np.nan)
-    shape_m = np.full((N_MEMBERS, n), np.nan)
-    flux = np.empty((len(members), n))
-    for position, (member, cache_m) in enumerate(zip(members, driven, strict=True)):
+    delta_t = np.full((N_MEMBERS, n), np.nan)
+    delta_st = np.full((N_MEMBERS, n), np.nan)
+    member_temperature = np.full((N_MEMBERS, n), np.nan)
+    for member, cache_m in zip(members, driven, strict=True):
         features_m = cache_m.sites[site]
-        flux[position] = features_m.ghi_w_m2
-        shape_m[member] = features_m.pv_unit_shape
+        member_temperature[member] = features_m.temperature_c
         hybrid = replace_site(
             cache=mean_driven,
             site=site,
-            pv_unit_shape=features_m.pv_unit_shape,
-            ghi_w_m2=features_m.ghi_w_m2,
+            temperature_c=features_m.temperature_c,
+            smoothed_temperature_c=features_m.smoothed_temperature_c,
         )
-        delta_m[member] = tall.predict_tall(cache=hybrid, fit=fit, index=grid) - base
-        delta_f[member] = tall.predict_tall(cache=cache_m, fit=fit, index=grid) - base
-    clear = window.sun.clear_sky_w_m2
-    calibrated = member_statistics(flux=flux, clear=clear)
-    raw = member_statistics(flux=run.shortwave_w_m2[members, :n].astype(np.float64), clear=clear)
+        delta_t[member] = tall.predict_tall(cache=hybrid, fit=fit, index=grid) - base
+        delta_st[member] = tall.predict_tall(cache=cache_m, fit=fit, index=grid) - base
+    mean_features = mean_driven.sites[site]
     return {
         "window_start": np.array([window.window.start]),
-        "delta_m": delta_m.T,
-        "delta_f": delta_f.T,
-        "shape_m": shape_m.T,
+        "delta_t": delta_t.T,
+        "delta_st": delta_st.T,
+        "t_mean": mean_features.temperature_c,
+        "t_member_std": np.nanstd(member_temperature, axis=0),
         "elevation": 90.0 - window.sun.zenith_deg,
-        "z_std": calibrated["std"],
-        "z_range": calibrated["range"],
-        "z_bimodal": calibrated["bimodal"],
-        "csi_cal": calibrated["mean"],
-        "raw_std": raw["std"],
-        "csi_raw": raw["mean"],
-        "clear": clear,
         "base": base,
-        "n_members": np.full(n, len(members), dtype=np.int16),
     }
 
 
@@ -148,7 +143,7 @@ def one_run(
     index: int,
     rows: pl.DataFrame,
 ) -> dict[str, np.ndarray]:
-    """Return the deltas and statistics of one run at the rows of experiment 136's forecast."""
+    """Return the responses of one run at the rows of experiment 136's forecast."""
     full = compute_run(cache=cache, setup=setup, fits=fits, index=index)
     start = int(full.pop("window_start")[0])
     n = len(full["base"])
@@ -160,9 +155,8 @@ def one_run(
         msg = "a stored valid time lies outside the run's window"
         raise ValueError(msg)
     out = {name: values[position] for name, values in full.items()}
-    out["delta_m"] = out["delta_m"].astype(np.float32)
-    out["delta_f"] = out["delta_f"].astype(np.float32)
-    out["shape_m"] = out["shape_m"].astype(np.float32)
+    out["delta_t"] = out["delta_t"].astype(np.float32)
+    out["delta_st"] = out["delta_st"].astype(np.float32)
     out["g1"] = (
         full["base"][position]
         + rows["level"].to_numpy()
