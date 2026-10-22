@@ -26,23 +26,26 @@ hypothesis: >-
   on sunny half-hours when the network head is absent, and adds nothing measurable when the head is
   present, because experiment 232 found the head cancels most of the clip's gain.
 prediction: >-
-  Written before any score is read; each can fail. (P1) The gate passes and arm 1 (A+H+S) beats BG2
-  on the six-substation quantile score by 0.10 to 0.17 points, as experiment 228 found (-0.136).
-  (P2) Arm 2 (arm 1 with the clip) is identical to arm 1 at D9, D10, D11, D14, and D16, and at D5 its
-  quantile score on sunny-daylight rows is within 0.10 points of arm 1's, with an interval that
-  includes zero. (P3) Arm 2b (A+S with the clip and no head) lowers the D5 sunny-daylight median
-  absolute error below arm 1's by at least 0.05 MW, with the 95% interval excluding zero. (P4) The
-  winning arm beats the manual heuristic on all four headline metrics (mean absolute error of the
-  median, CRPS, tail-weighted CRPS at the 95th percentile, and the scaled-limit curtailment cost at
-  f = 0.9), and is worse than BG2 in at least 3 of the 6 months April to September. (P5) Arm 3 (arm
-  2 with coasting) is identical to arm 2 on every row without a reading gap, and on gaps of 3, 6,
-  24, and 72 hours experiment 205's stored scores show coasting 0.25 to 0.44 points below the
-  frozen model.
+  Written before any score is read; each can fail. P1 and P4's BG2 clause reproduce experiment 228
+  and are a replication check; the contest between arms is the D5 sunny-daylight cut. (P1) The gate
+  passes and arm 1 (A+H+S) beats BG2 on the six-substation quantile score (D9 included in the six,
+  not in the gate) by 0.10 to 0.17 points, as experiment 228 found (-0.136). (P2) Arm 2 (arm 1 with
+  the clip) is identical to arm 1 at D9, D10, D11, D14, and D16, and at D5 its quantile score on
+  sunny-daylight rows is less than 0.15 points below arm 1's, because experiment 232 found the head
+  cancels most of the clip's gain. (P3) Arm 2b (A+S with the clip and no head) lowers the D5
+  sunny-daylight median absolute error below arm 1's by at least 0.05 MW, with the 95% interval
+  excluding zero. (P4) The winning arm beats the manual heuristic on all four headline metrics (mean
+  absolute error of the median, CRPS, tail-weighted CRPS at the 95th percentile, and the
+  scaled-limit curtailment cost at f = 0.9), and is worse than BG2 on the quantile score in at least
+  3 of the 6 months April to September. (P5) Arm 3 is arm 2 with experiment 205's injected-gap
+  scores attached, so it equals arm 2 on the scored year's rows; experiment 205's stored scores show
+  coasting 0.25 to 0.44 points below the frozen model at gaps of 3, 6, 24, and 72 hours.
 decision_rule: >-
   Gate first: arm A within 0.005 of 2.7519, BG2 within 0.005 of 2.780, and arm 1 within 0.005 of
-  2.617 on the five decision substations (experiments 220 and 228). The winning arm is arm 2 if its
-  D5 quantile score is below arm 1's with the 95% interval excluding zero; otherwise arm 1 (and arm
-  2b is reported as a post hoc variant). `supported` needs the winning arm to beat BG2 on the
+  2.617 on the five decision substations (experiments 220 and 228), and an assertion that the row
+  keys of every arm match exactly. The winning arm is arm 2 if its D5 sunny-daylight quantile score
+  is at least 0.05 points below arm 1's with the 95% interval excluding zero; otherwise arm 1 (and
+  arm 2b is reported as a post hoc variant). `supported` needs the winning arm to beat BG2 on the
   six-substation quantile score with the month-resampled 95% interval excluding zero and to beat
   the manual heuristic on all four headline metrics. `partly supported` needs the BG2 contrast but
   not all four heuristic contrasts. `not supported` if the BG2 interval includes zero. The threshold
@@ -69,6 +72,14 @@ two-number solar summary), with the D5 export clip of [experiment
 [experiment 205](../00205-dp-gamk-gap-robustness-coast-or-frozen-gam/result.md) added, beats BG2 and
 the manual heuristic over the scored year, and which rows it loses on.
 
+**The clip arms are an approximation.** The solar summary and the network head of arm 1 were built
+on the unclipped solar term, and the head was trained on unclipped errors (experiment 232 found
+that adding the clip after the head loses most of the clip's gain). The clip shift is a mean
+difference per row, added to every quantile, so the bands keep their unclipped width; the write-up
+reports D5 tail coverage for arm 2 to show whether that matters. [Experiment
+237](../00237-dp-two-number-solar-summary-with-clip/result.md) scored the two-number summary with
+the clip applied inside the member pass at D5 and D9 and is the closer test of that combination.
+
 ## Arms
 
 - **Arm 1:** experiment 220's A+H+S.
@@ -86,6 +97,11 @@ the manual heuristic over the scored year, and which rows it loses on.
 
 ## Plan for the write-up
 
+- Tail coverage and pinball loss at q01, q05, q95, and q99 by four UTC hour bands (00-06, 06-12,
+  12-18, 18-24). The curtailment metric is the scaled-limit node cost of
+  [`docs/roadmap/cost-savings-metrics.md`](../../roadmap/cost-savings-metrics.md), Metric 2, at f =
+  0.9 with 0.75 and 0.5 as a sweep, copied from experiment 228. Arm 3 reports the share of scored
+  rows after a reading gap beside experiment 205's gap scores.
 - Figures first: MAE against lead time for every stage and comparison arm, then the contrasts by
   month, season, lead band, and substation, tail coverage by hour band, and the curtailment saving.
 - Cuts: cold nights below 2 C, Christmas and bank holidays, sunny daylight.
