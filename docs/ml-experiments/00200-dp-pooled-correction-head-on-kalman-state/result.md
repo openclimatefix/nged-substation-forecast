@@ -59,7 +59,8 @@ lessons:
     onward) beyond a head with those inputs zeroed; both intervals include zero.
   - >-
     Training on the 2020-onward rows (4.7 times as many) lifted the headline gain from 0.071 to 0.125
-    points and every substation gained, so the pooled head does learn something; the gate still marginally failed.
+    points and every substation gained, so the pooled head does learn something; the gate still
+    marginally failed.
 advice:
   - >-
     Fit a pinball-loss table with a forecast-level by era term to all years before trusting a neural
@@ -76,7 +77,8 @@ code: ml-experiments/00200-dp-pooled-correction-head-on-kalman-state/
 **Take-home: the network's gain over arm D comes mainly from correcting how arm D's error depends on
 its own forecast level and the calendar, and reading recent errors adds little that we can detect.**
 Arm D is the best forecast of
-[experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md): a convex demand model, a Kalman filter (a method that updates a forecast from its recent errors), a
+[experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md):
+a convex demand model, a Kalman filter (a method that updates a forecast from its recent errors), a
 winter night offset, and recipe R (subtract 0.75 times the mean error of the last 14 days). We asked
 whether a small neural network, trained on many substations at once, can correct arm D better than
 the filter and recipe R do. This extends [experiment
