@@ -76,12 +76,13 @@ best_arm: >-
   the replicate months
 headline: >-
   Inconclusive under the pre-registered rule, because a known-answer gate (G3) failed on 22 of 1,058
-  fake-ensemble rows; every other part of the rule is met in both periods. Passing each ensemble member's irradiance
-  through the solar term of the convex model lowers the
+  fake-ensemble rows; every other part of the rule is met in both periods. Passing each ensemble
+  member's irradiance through the solar term of the convex model lowers the
   daylight quantile score by 2.2% in the scored year and 1.8% in the replicate months, leaves night
   unchanged by design, and moves the daylight q05-to-q95 coverage from 0.854 to 0.894 (nominal
   0.90). Placebos with the same widening but members from another day (-0.1%) or no members (-0.2%)
-  do not reproduce the gain, so the gain is cloud information. Summary statistics of the spread
+  do not reproduce the gain, and a stricter shuffle recovers about a third of it, so most of the gain
+  is cloud information. Summary statistics of the spread
   (arm S) lower the score by 0.3%, with an interval that includes zero.
 lessons:
   - >-
@@ -105,8 +106,8 @@ lessons:
 take_home_message: >-
   Running each of the 51 ensemble weather members through the solar part of the demand model
   improves the daylight forecast bands by about 2%, mostly in the lower tail and on partly cloudy
-  half-hours, while night is untouched. Two placebos that widen the bands the same way but without
-  the real members gain nothing, so the benefit is information about cloud. The next step is a
+  half-hours, while night is untouched. Placebos that widen the bands the same way but without
+  the real members gain little, so most of the benefit is information about cloud. The next step is a
   production-cost check of the member pass and a test of its gain on top of the best-guess forecast.
 advice:
   - >-
@@ -131,7 +132,8 @@ daylight bands by about 2%, and two placebos show the gain is information about 
 demand forecast's bands are quantiles of its error: the q05 is the value that the reading should
 fall under on 5% of half-hours. We asked whether the disagreement between the 51 members of the
 ECMWF ensemble about cloud helps those bands in daylight, where cloud changes demand through
-embedded solar generation. [Experiment 169](../00169-calibration-combined-fixes-and-ensemble-spread/result.md)
+embedded solar generation. [Experiment
+  169](../00169-calibration-combined-fixes-and-ensemble-spread/result.md)
 had found no gain from the ensemble spread over all half-hours. We scored daylight (the sun 5
 degrees or more above the horizon) and night separately, on the forecast that experiment 169 called
 arm A. One arm passed each member's irradiance through the solar term and left every other input at
@@ -174,7 +176,7 @@ of effective capacity (percentage points of each substation's rated demand), low
   experiment 111, available at forecast time; the weather source at lag times is the filter's, as in
   arm A.
 - **Headline, C1 and C2 (daylight, change from arm A).** M: -2.23% (97.5% interval -3.07% to
-  -1.38%) in the scored year, -1.76% (-2.68% to -0.93%) in the replicate months. S: -0.34% (-0.72% to
+-1.38%) in the scored year, -1.76% (-2.68% to -0.93%) in the replicate months. S: -0.34% (-0.72% to
   +0.04%) and -0.11% (-0.51% to +0.39%). Arm M meets every part of the pre-registered rule in both
   periods. Arm S does not.
 - **Controls.** MR -0.23% (-0.49% to +0.03%), MP -0.08% (-0.55% to +0.37%), SP -0.13% (-0.38% to
@@ -209,23 +211,24 @@ of effective capacity (percentage points of each substation's rated demand), low
 - **Checks.** Median minus mean forecast per substation at 12 to 36 hours: exactly 0.000 for A and
   S, and -0.14 (D5), -0.05, -0.05, -0.05, and -0.05 points (D10, D11, D14, D16) for M, because the
   members' skewed responses pull the mixture median below the mean. The mean forecast's own daylight
-  error changes by -0.13% (-0.45% to +0.27%) for M, the same direction as the score. The reproduction
+error changes by -0.13% (-0.45% to +0.27%) for M, the same direction as the score. The reproduction
   control G1 rebuilds experiment 136's mean to 5e-6 points on every row of all three periods.
   Experiment 178's gap for arm A is reproduced. **Gates.** G2 passes: the unit PV shape built from
   CAMS irradiance equals the cached shape (slope 1.000, largest gap 0) at all six substations. G3
   fails its monotonicity criterion: member responses fall with the multiplier on 1,036 of 1,058
-  daylight rows (22 rows, 2.1%, fail) of the fake ensemble (a post hoc subset: 868 of 884 where the fake clear-sky index stays at or under
-  1.1). The failing rows examined (five of them) are at elevations of 14 to 16 degrees, where the unit PV shape from
-  `SunGeometry.pv_shape_and_ghi` itself falls as irradiance rises (0.099, 0.124, then 0.090 as
-  irradiance rises from 97 to 227 W/m2 at one half-hour), so the cause lies in the existing shape
-  function. The wiring checks of G3 pass exactly: the response of the multiplier-1 member is zero,
-  responses at night are zero, and the fake ensemble's spread statistic equals the known multiplier
-  spread. The pre-registered rule caps the verdict at `inconclusive` on a failed gate, so the verdict is
-  `inconclusive`, and every other part of the rule is met by arm M in both periods. M restricted
-  to elevations of 17 degrees and over scores -2.47% (-3.57% to -1.44%), so the result does not
-  depend on those rows. G4: the members' median clear-sky-index spread is 0.122 raw and 0.112 after
-  calibration in clear conditions, 0.177 and 0.165 when partly cloudy, 0.136 and 0.124 when
-  overcast: calibration shrinks the spread by about 8%, so a null could not be blamed on it.
+  daylight rows (22 rows, 2.1%, fail) of the fake ensemble (a post hoc subset: 868 of 884 where the
+  fake clear-sky index stays at or under 1.1). The failing rows examined (five of them) are at
+  elevations of 14 to 16 degrees, where the unit PV shape from `SunGeometry.pv_shape_and_ghi` itself
+  falls as irradiance rises (0.099, 0.124, then 0.090 as irradiance rises from 97 to 227 W/m2 at one
+  half-hour), so the cause lies in the existing shape function. The wiring checks of G3 pass
+  exactly: the response of the multiplier-1 member is zero, responses at night are zero, and the
+  fake ensemble's spread statistic equals the known multiplier spread. The pre-registered rule caps
+  the verdict at `inconclusive` on a failed gate, so the verdict is `inconclusive`, and every other
+  part of the rule is met by arm M in both periods. M restricted to elevations of 17 degrees and
+  over scores -2.47% (-3.57% to -1.44%), so the result does not depend on those rows. G4: the
+  members' median clear-sky-index spread is 0.122 raw and 0.112 after calibration in clear
+  conditions, 0.177 and 0.165 when partly cloudy, 0.136 and 0.124 when overcast: calibration shrinks
+  the spread by about 8%, so a null could not be blamed on it.
 - **Audit (fresh Opus, one).** Findings and triage: (F1, accepted) the `supported` verdict broke the
   pre-registered cap, so it is `inconclusive`; a re-registered G3 in a follow-up (monotone in the
   member's unit PV shape, not in irradiance) could lift it. (F2, accepted) MP shuffles across lead
@@ -242,11 +245,11 @@ of effective capacity (percentage points of each substation's rated demand), low
   private (`data/ml-experiments/briefs/e184_audit_report.md`).
 - **Prediction check.** The pre-registered expectation (probability about 0.7) was that no arm would
   reach -1%, that arm M would change the score by -0.5% to +1.0%, and that any gain would sit under
-  72 hours and that the gap to BG2 would change by under 0.01 MW. Arm M's -2.2% and its larger gain beyond 72 hours contradict all three, and the result
-  also contradicts experiment 169's null on ensemble spread. The placebos MR, MP, and SP test the
-  explanation that widening alone produces the gain, and none reproduces it. Audit triggers fired:
-  the failed monotonic check of G3, and a result that contradicts its prediction and an earlier
-  experiment.
+72 hours and that the gap to BG2 would change by under 0.01 MW. Arm M's -2.2% and its larger gain
+  beyond 72 hours contradict all three, and the result also contradicts experiment 169's null on
+  ensemble spread. The placebos MR, MP, and SP test the explanation that widening alone produces the
+  gain, and none reproduces it. Audit triggers fired: the failed monotonic check of G3, and a result
+  that contradicts its prediction and an earlier experiment.
 - **Caveats.** Arms M and F add a 51-member pass of the solar term to the weather layer and four
   fitted factors. The result depends on the weather layer's shape function, which falls with
   irradiance at low sun. The factors below 1 show that the offsets of arm A and the member spread
