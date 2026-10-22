@@ -117,6 +117,8 @@ def one_site(*, site: str, cache, bg2: pl.DataFrame) -> pl.DataFrame:  # noqa: A
     return joined.select("power_fcst_init_time", "valid_time", "lead_hours", "actual").with_columns(
         site=pl.lit(site),
         unit=pl.Series(unit),
+        ghi=pl.Series(arrays.ghi_w_m2[index]),
+        clear=pl.Series(clear),
         csi=pl.Series(csi),
         hour=((local.dt.hour().cast(pl.Int32) * 60 + local.dt.minute().cast(pl.Int32) - 15) // 60),
         month=local.dt.strftime("%Y-%m"),
@@ -190,6 +192,37 @@ def month_block_interval(*, frame: pl.DataFrame, column: str, rng: np.random.Gen
     return {"mean": float(totals.sum() / counts.sum()), "lower": float(low), "upper": float(high)}
 
 
+def alternative_definitions(*, frame: pl.DataFrame, rng: np.random.Generator) -> dict:
+    """Return the all-lead gap under other definitions of a sunny daylight half-hour.
+
+    Each definition takes the top third, per substation, of the daylight half-hours (unit shape
+    above the sun-up limit) ranked by a different measure.
+    """
+    daylight = frame.filter(pl.col("unit") > SUN_UP_UNIT_SHAPE).with_columns(
+        realised_csi=pl.col("ghi") / pl.col("clear")
+    )
+    measures = {
+        "unit shape (the headline)": "unit",
+        "realised irradiance (CAMS)": "ghi",
+        "realised clear-sky index (CAMS over clear sky)": "realised_csi",
+    }
+    out = {}
+    for label, column in measures.items():
+        valid = daylight.filter(pl.col(column).is_finite() & (pl.col("clear") > 20.0))
+        edge = pl.col(column).quantile(2 / 3).over("site")
+        sunny = valid.filter(pl.col(column) >= edge)
+        d5 = sunny.filter(pl.col("site") == "D5")
+        rest = sunny.filter(pl.col("site") != "D5")
+        out[label] = {
+            "rows": sunny.height,
+            "total": month_block_interval(frame=sunny, column="gap_mae", rng=rng),
+            "d5_only": month_block_interval(frame=d5, column="gap_mae", rng=rng),
+            "without_d5": month_block_interval(frame=rest, column="gap_mae", rng=rng),
+            "d5_share": float(d5["gap_mae"].sum() / sunny["gap_mae"].sum()),
+        }
+    return out
+
+
 def main() -> None:
     """Write the report."""
     cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=CACHE_DIR)
@@ -197,6 +230,7 @@ def main() -> None:
     frame = label_rows(frame=pl.concat([one_site(site=s, cache=cache, bg2=bg2) for s in SITES]))
     rng = np.random.default_rng(178)
     report: dict = {"n_all_rows": frame.height}
+    report["alternative_definitions"] = alternative_definitions(frame=frame, rng=rng)
     scopes = {
         "all_leads": frame,
         "lead_12_to_36": frame.filter(pl.col("lead_hours").is_between(12.0, 36.0, closed="left")),

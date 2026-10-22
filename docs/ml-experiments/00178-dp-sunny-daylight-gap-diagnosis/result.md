@@ -41,7 +41,7 @@ metric: >-
   Mean absolute error of the median forecast (q50) in MW, and pinball loss averaged over the 11
   quantiles in MW, on rows outside the hand-filtered switching events
 code: ml-experiments/00178-dp-sunny-daylight-gap-diagnosis/
-verdict: supported
+verdict: partly supported
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
@@ -55,8 +55,9 @@ take_home_message: >-
 date: 2026-10-22
 headline: >-
   Sunny daylight, six substations, all leads: GAM minus BG2 mean absolute error +0.050 MW (95%
-  interval +0.014 to +0.079); D5 alone +0.202 MW (+0.110 to +0.275); without D5 +0.022 MW (-0.010
-  to +0.047).
+  interval +0.013 to +0.078); D5 alone +0.202 MW (+0.113 to +0.275); without D5 +0.022 MW (-0.008
+  to +0.047). Ranked by realised clear-sky index instead, the total gap is +0.015 MW (-0.025 to
+  +0.049) and D5 holds all of it.
 best_arm: none; a diagnosis with no new fit
 lessons:
   - >-
@@ -129,17 +130,31 @@ sunniest third.
 
 | Scope | Rows | Gap | Interval | Pinball gap |
 |---|---|---|---|---|
-| All leads, six substations | 90,143 | +0.050 | +0.014 to +0.079 | +0.0143 |
+| All leads, six substations | 90,143 | +0.050 | +0.013 to +0.078 | +0.0143 |
 | All leads, five decision substations | 74,728 | +0.044 | +0.006 to +0.071 | +0.0123 |
-| 12 to 36 h, six substations | 13,198 | +0.031 | -0.016 to +0.065 | +0.0083 |
-| 12 to 36 h, five decision substations | 10,952 | +0.027 | -0.018 to +0.059 | +0.0072 |
-| All leads, D5 only | 14,045 | +0.202 | +0.110 to +0.275 | +0.0519 |
-| All leads, without D5 | 76,098 | +0.022 | -0.010 to +0.047 | +0.0073 |
+| 12 to 36 h, six substations | 13,198 | +0.031 | -0.015 to +0.064 | +0.0083 |
+| 12 to 36 h, five decision substations | 10,952 | +0.027 | -0.019 to +0.060 | +0.0072 |
+| All leads, D5 only | 14,045 | +0.202 | +0.113 to +0.275 | +0.0519 |
+| All leads, without D5 | 76,098 | +0.022 | -0.008 to +0.047 | +0.0073 |
 
-- **Verdict against the pre-registered rule:** `supported` on all leads, because D5 holds 63% of the
-  gap with 16% of the rows, and the total gap's interval excludes zero. The same rule gives
-  `inconclusive` for the 12 to 36 hour range, whose interval includes zero. The stated prediction
-  failed: the shoulder hours did not hold 60% to 70% of the gap.
+- **Verdict against the pre-registered rule:** `partly supported`. On the headline definition and
+  all leads the rule is met: D5 holds 63% of the gap with 16% of the rows, and the total gap's
+  interval excludes zero. The rule is not met for the 12 to 36 hour range, whose interval includes
+  zero, or when sunny half-hours are ranked by realised clear-sky index (next bullet). The stated
+  prediction also failed: the shoulder hours did not hold 60% to 70% of the gap.
+- **The size of the gap depends on how sunny is defined; D5's loss does not.** The audit of this
+  experiment ranked each substation's daylight half-hours three ways (all leads, top third per
+  substation):
+
+| Ranking measure | Half-hours | Total gap | D5 only | Without D5 |
+|---|---|---|---|---|
+| Unit solar shape (headline) | 87,690 | +0.049 (+0.011 to +0.079) | +0.206 | +0.020 |
+| Realised irradiance (CAMS) | 87,701 | +0.055 (+0.019 to +0.082) | +0.219 | +0.024 |
+| Realised clear-sky index | 87,684 | +0.015 (-0.025 to +0.049) | +0.118 | -0.004 |
+
+  The three rows drop half-hours where the clear-sky irradiance is under 20 W per square metre, so
+  the headline row differs slightly from the 90,143 half-hours above. D5 is worse than BG2 under all
+  three, and the other five substations together are level under the third.
 - **Cuts (all leads; rule: at least 60% of the gap in a level holding under 40% of the rows):**
     - Substation: D5 holds 63% of the gap with 16% of the rows. The rule is met.
     - Clear-sky band: the 0.4 to 0.7 band holds 83% of the gap with 32% of the rows. The rule is
@@ -176,15 +191,17 @@ sunniest third.
 - **Audit conditions met:** two of the `ml-experiment` skill's audit conditions apply. Leaving out
   one substation changes a verdict: without D5, the all-leads gap's interval includes zero. The
   result also contradicts the experiment's own prediction, because the shoulder hours did not hold
-  60% to 70% of the gap. No audit was run, and the manager decides whether one is needed.
+  60% to 70% of the gap. One Opus audit re-derived the conversion, the join, and the gaps from the
+  stored files and reproduced every number. It found that the size of the gap depends on the
+  ranking measure, which the page now reports and which lowered the verdict from `supported`.
 
 ## Caveats
 
 - **The row set is our reconstruction.** The plot's mean absolute error (0.58 against 0.45 MW) is
   not reproduced: the same definition gives 0.59 against 0.54 over all leads and 0.52 against 0.49
   at 12 to 36 hours. An exploratory check that defined sunny days by the realised daily clear-sky
-  index (top third of days) gave no gap (0.44 against 0.45 MW at five substations, 12 to 36 hours,
-  11,670 half-hours). That check is not in the script, so it cannot be verified from the repository.
+  index (top third of days) also gave almost no gap (0.44 against 0.45 MW at five substations, 12 to
+  36 hours, 11,670 half-hours). That daily check is not in the script.
 - **Level shares are descriptive.** Only the totals carry month-resampled intervals, and 12 monthly
   blocks make those intervals coarse.
 - **The plot's 12,125 half-hours are close to our 13,198 at 12 to 36 hours,** and not to our 90,143
