@@ -120,9 +120,9 @@ terms at the temperature extremes and compares it with arm D and with the networ
 
 ## Gate (before any contrast is read)
 
-On real rows at each substation, at the monthly cuts of the tuning months, multiply the target by 1.03 on
-training rows whose 24-hour-averaged temperature is above the training window's 95th percentile, and
-refit F1 and arm D on that altered target. F1 passes at a substation when its fitted values on the
+On real rows at each substation, at the monthly cuts of the tuning months, multiply the target by
+1.03 on training rows whose 24-hour-averaged temperature is above the training window's 95th
+percentile, and refit F1 and arm D on that altered target. F1 passes at a substation when its fitted values on the
 injected rows rise by at least 50% of 3% of the target, averaged over the rows, more than arm D's
 do. The same test runs on held-out months of the same cuts, and with the injection in the cold
 tail (below the 5th percentile). If F1 recovers under 50% of the hot-tail injection at 4 of the 6
