@@ -1,0 +1,167 @@
+
+== History rule: scored origins per site ==
+  D5: 12 origins, first 2023-07-01
+  D10: 12 origins, first 2023-07-01
+  D11: 12 origins, first 2023-07-01
+  D14: 11 origins, first 2023-10-01
+  D16: 11 origins, first 2023-10-01
+  D9: 3 origins, first 2025-10-01
+
+== Absolute quantile score (points), decision sites, rows outside switching masks ==
+m24     pooled 3.229  | D10 4.677, D11 3.021, D14 2.118, D16 3.013, D5 3.215
+        mae 5.481
+all     pooled 3.258  | D10 4.923, D11 2.779, D14 2.180, D16 3.193, D5 3.131
+        mae 5.482
+all_d1  pooled 2.774  | D10 3.676, D11 2.549, D14 2.305, D16 2.500, D5 2.783
+        mae 4.787
+m24_d1  pooled 2.865  | D10 3.789, D11 2.650, D14 2.379, D16 2.600, D5 2.849
+        mae 4.921
+
+D9 (descriptive, scored from 2025-10-01):
+  m24     2.232 over 13093 rows
+  all     2.249 over 13093 rows
+  all_d1  2.376 over 13093 rows
+  m24_d1  2.360 over 13093 rows
+
+== C1: all years with drift minus 24 months (all_d1 - m24) ==
+quantile score pooled: -0.455 (98.33% interval -0.723 to -0.191); n_rows 246237
+mean-absolute-error contrast: -0.694 (98.33% interval -1.104 to -0.293)
+origins below zero: 10 of 12; outside tie band: 9 below, 2 above
+  2023-07-01: -1.066 (se 0.210) side -1
+  2023-10-01: -1.084 (se 0.173) side -1
+  2024-01-01: -1.343 (se 0.205) side -1
+  2024-04-01: -0.136 (se 0.128) side -1
+  2024-07-01: -0.411 (se 0.080) side -1
+  2024-10-01: -0.656 (se 0.186) side -1
+  2025-01-01: -0.096 (se 0.236) side +0
+  2025-04-01: -0.307 (se 0.182) side -1
+  2025-07-01: +0.497 (se 0.093) side +1
+  2025-10-01: +0.106 (se 0.066) side +1
+  2026-01-01: -0.960 (se 0.176) side -1
+  2026-04-01: -0.281 (se 0.262) side -1
+winter-quarter origins: -0.675 (98.33% interval -1.049 to -0.295); 5 of 6 below zero
+summer-quarter origins: -0.229 (98.33% interval -0.562 to +0.082); 5 of 6 below zero
+  without D5: -0.461 (98.33% interval -0.775 to -0.157); 9 of 12 below zero
+  without D10: -0.311 (98.33% interval -0.531 to -0.104); 9 of 12 below zero
+  without D11: -0.451 (98.33% interval -0.754 to -0.155); 10 of 12 below zero
+  without D14: -0.609 (98.33% interval -0.934 to -0.289); 10 of 12 below zero
+  without D16: -0.442 (98.33% interval -0.767 to -0.141); 9 of 12 below zero
+  per site: D5 -0.432, D10 -1.001, D11 -0.472, D14 +0.186, D16 -0.513
+
+== C2: all years without drift minus 24 months (all - m24) ==
+quantile score pooled: +0.029 (98.33% interval -0.123 to +0.163); n_rows 246237
+mean-absolute-error contrast: +0.001 (98.33% interval -0.234 to +0.212)
+origins below zero: 5 of 12; outside tie band: 4 below, 5 above
+  2023-07-01: -0.080 (se 0.031) side -1
+  2023-10-01: +0.120 (se 0.102) side +1
+  2024-01-01: +0.034 (se 0.042) side +0
+  2024-04-01: +0.015 (se 0.027) side +0
+  2024-07-01: +0.203 (se 0.103) side +1
+  2024-10-01: -0.424 (se 0.229) side -1
+  2025-01-01: -0.061 (se 0.137) side +0
+  2025-04-01: -0.167 (se 0.131) side -1
+  2025-07-01: +0.476 (se 0.063) side +1
+  2025-10-01: +0.268 (se 0.076) side +1
+  2026-01-01: -0.350 (se 0.087) side -1
+  2026-04-01: +0.233 (se 0.023) side +1
+winter-quarter origins: -0.068 (98.33% interval -0.298 to +0.146); 3 of 6 below zero
+summer-quarter origins: +0.128 (98.33% interval -0.049 to +0.280); 2 of 6 below zero
+  without D5: +0.056 (98.33% interval -0.111 to +0.206); 5 of 12 below zero
+  without D10: -0.029 (98.33% interval -0.142 to +0.081); 7 of 12 below zero
+  without D11: +0.102 (98.33% interval -0.046 to +0.245); 6 of 12 below zero
+  without D14: +0.021 (98.33% interval -0.165 to +0.180); 5 of 12 below zero
+  without D16: -0.006 (98.33% interval -0.195 to +0.159); 5 of 12 below zero
+  per site: D5 -0.085, D10 +0.246, D11 -0.242, D14 +0.062, D16 +0.180
+
+== C3: drift minus no drift, on all years (all_d1 - all) ==
+quantile score pooled: -0.484 (98.33% interval -0.703 to -0.277); n_rows 246237
+mean-absolute-error contrast: -0.695 (98.33% interval -1.014 to -0.388)
+origins below zero: 11 of 12; outside tie band: 10 below, 0 above
+  2023-07-01: -0.986 (se 0.191) side -1
+  2023-10-01: -1.204 (se 0.146) side -1
+  2024-01-01: -1.377 (se 0.183) side -1
+  2024-04-01: -0.151 (se 0.137) side -1
+  2024-07-01: -0.614 (se 0.167) side -1
+  2024-10-01: -0.232 (se 0.162) side -1
+  2025-01-01: -0.035 (se 0.114) side +0
+  2025-04-01: -0.140 (se 0.070) side -1
+  2025-07-01: +0.021 (se 0.043) side +0
+  2025-10-01: -0.162 (se 0.094) side -1
+  2026-01-01: -0.610 (se 0.108) side -1
+  2026-04-01: -0.514 (se 0.273) side -1
+winter-quarter origins: -0.607 (98.33% interval -0.948 to -0.269); 6 of 6 below zero
+summer-quarter origins: -0.357 (98.33% interval -0.611 to -0.110); 5 of 6 below zero
+  without D5: -0.517 (98.33% interval -0.780 to -0.277); 11 of 12 below zero
+  without D10: -0.282 (98.33% interval -0.461 to -0.111); 11 of 12 below zero
+  without D11: -0.553 (98.33% interval -0.798 to -0.312); 11 of 12 below zero
+  without D14: -0.630 (98.33% interval -0.900 to -0.375); 10 of 12 below zero
+  without D16: -0.436 (98.33% interval -0.732 to -0.151); 10 of 12 below zero
+  per site: D5 -0.348, D10 -1.247, D11 -0.230, D14 +0.125, D16 -0.693
+
+== E1: drift minus no drift, on 24 months (m24_d1 - m24) ==
+quantile score pooled: -0.364 (98.33% interval -0.593 to -0.134); n_rows 246237
+mean-absolute-error contrast: -0.560 (98.33% interval -0.908 to -0.209)
+origins below zero: 11 of 12; outside tie band: 11 below, 1 above
+  2023-07-01: -1.066 (se 0.203) side -1
+  2023-10-01: -0.968 (se 0.161) side -1
+  2024-01-01: -0.949 (se 0.197) side -1
+  2024-04-01: -0.187 (se 0.123) side -1
+  2024-07-01: -0.338 (se 0.107) side -1
+  2024-10-01: -0.581 (se 0.157) side -1
+  2025-01-01: -0.241 (se 0.191) side -1
+  2025-04-01: -0.189 (se 0.139) side -1
+  2025-07-01: +0.724 (se 0.140) side +1
+  2025-10-01: -0.113 (se 0.049) side -1
+  2026-01-01: -0.475 (se 0.172) side -1
+  2026-04-01: -0.288 (se 0.247) side -1
+winter-quarter origins: -0.559 (98.33% interval -0.841 to -0.281); 6 of 6 below zero
+summer-quarter origins: -0.163 (98.33% interval -0.495 to +0.178); 5 of 6 below zero
+  without D5: -0.363 (98.33% interval -0.651 to -0.072); 10 of 12 below zero
+  without D10: -0.225 (98.33% interval -0.428 to -0.026); 8 of 12 below zero
+  without D11: -0.362 (98.33% interval -0.654 to -0.085); 11 of 12 below zero
+  without D14: -0.514 (98.33% interval -0.805 to -0.225); 11 of 12 below zero
+  without D16: -0.353 (98.33% interval -0.624 to -0.099); 9 of 12 below zero
+  per site: D5 -0.367, D10 -0.888, D11 -0.371, D14 +0.261, D16 -0.413
+
+== E2: all years minus 24 months, both with drift (post hoc) (all_d1 - m24_d1) ==
+quantile score pooled: -0.091 (98.33% interval -0.189 to -0.000); n_rows 246237
+mean-absolute-error contrast: -0.134 (98.33% interval -0.294 to +0.024)
+origins below zero: 8 of 12; outside tie band: 7 below, 3 above
+  2023-07-01: -0.000 (se 0.011) side +0
+  2023-10-01: -0.116 (se 0.039) side -1
+  2024-01-01: -0.394 (se 0.048) side -1
+  2024-04-01: +0.050 (se 0.026) side +1
+  2024-07-01: -0.073 (se 0.034) side -1
+  2024-10-01: -0.075 (se 0.049) side -1
+  2025-01-01: +0.146 (se 0.061) side +1
+  2025-04-01: -0.118 (se 0.047) side -1
+  2025-07-01: -0.227 (se 0.060) side -1
+  2025-10-01: +0.219 (se 0.058) side +1
+  2026-01-01: -0.485 (se 0.081) side -1
+  2026-04-01: +0.007 (se 0.045) side +0
+winter-quarter origins: -0.116 (98.33% interval -0.281 to +0.041); 4 of 6 below zero
+summer-quarter origins: -0.065 (98.33% interval -0.160 to +0.011); 4 of 6 below zero
+  without D5: -0.098 (98.33% interval -0.196 to -0.003); 9 of 12 below zero
+  without D10: -0.086 (98.33% interval -0.173 to -0.003); 8 of 12 below zero
+  without D11: -0.089 (98.33% interval -0.189 to +0.007); 7 of 12 below zero
+  without D14: -0.095 (98.33% interval -0.203 to +0.002); 8 of 12 below zero
+  without D16: -0.089 (98.33% interval -0.207 to +0.018); 9 of 12 below zero
+  per site: D5 -0.065, D10 -0.113, D11 -0.101, D14 -0.075, D16 -0.100
+
+== Verdict by the pre-registered rule: supported ==
+C1 -0.455 (98.33% interval -0.723 to -0.191); 10 of 12 origins below zero
+Verdict leaving each site out: D5 supported, D10 supported, D11 supported, D14 supported, D16 supported
+Final verdict after the leave-one-site-out cap: supported
+
+== Checks ==
+Median forecast minus mean forecast, per site (points):
+  m24     D10 +0.000, D11 +0.000, D14 +0.000, D16 +0.000, D5 +0.000
+  all     D10 +0.000, D11 +0.000, D14 +0.000, D16 +0.000, D5 +0.000
+  all_d1  D10 +0.000, D11 +0.000, D14 +0.000, D16 +0.000, D5 +0.000
+  m24_d1  D10 +0.000, D11 +0.000, D14 +0.000, D16 +0.000, D5 +0.000
+Tail coverage (share of actuals at or below the quantile) and pinball loss, decision sites:
+  m24     q01 cover 0.051 pinball 0.304; q05 cover 0.098 pinball 0.850; q95 cover 0.848 pinball 0.919; q99 cover 0.937 pinball 0.311
+  all     q01 cover 0.070 pinball 0.352; q05 cover 0.133 pinball 0.937; q95 cover 0.866 pinball 0.890; q99 cover 0.944 pinball 0.292
+  all_d1  q01 cover 0.040 pinball 0.232; q05 cover 0.105 pinball 0.735; q95 cover 0.914 pinball 0.741; q99 cover 0.972 pinball 0.220
+  m24_d1  q01 cover 0.043 pinball 0.235; q05 cover 0.111 pinball 0.747; q95 cover 0.910 pinball 0.784; q99 cover 0.968 pinball 0.239
+Rows scored per arm: m24 246237, all 246237, all_d1 246237, m24_d1 246237
