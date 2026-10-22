@@ -33,7 +33,8 @@ decision_rule: >-
 benchmark: >-
   Arm D of experiment 155 (it includes recipe R), 2.432 points at D+1 on the five decision substations
 row_set_id: >-
-  experiment 155 arm D rows of the scored year, 6 substations, leads 15.5 to 39 hours (stage 3 reads the same rows from experiment 201's shared file)
+  experiment 155 arm D rows of the scored year, 6 substations, leads 15.5 to 39 hours (stage 3 reads
+  the same rows from experiment 201's shared file)
 metric: >-
   Quantile score over the 11 quantiles in points of effective capacity, D+1, outside switching events
 date: 2026-10-22
