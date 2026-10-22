@@ -24,7 +24,7 @@ hypothesis: >-
   and the mask still does no harm on ordinary days. The mask ignores recent power inside an
   alarm, so extra true alarms should help and extra false alarms should harm.
 prediction: >-
-  Written before any forecast score is read. On the real transfers of experiments 163 (the 72 hours
+  Written before any forecast score is read. On the real transfers of experiment 163 (the 72 hours
   after each logged transfer ends), the learned-score mask scores below the pair-alarm mask's 6.32
   points of effective capacity by at least 0.3 points (best guess 2: 10.09; no mask: 13.69). On
   the pooled rows outside logged transfers (27 months, six Primary substations), the learned-score
@@ -41,29 +41,42 @@ decision_rule: >-
   alarm is known 96 half-hours (2 days) after its step for LEARNED_F and RONC_195, which is
   experiment 156's RO-NC lag and the reach of the `persist` feature, and 192 half-hours (4 days)
   after its step for LEARNED_R, whose raw window reads 4 days after the step. The mask begins at
-  the first 6-hourly forecast origin whose newest stamp is at or after the known stamp. End: the
+  the first cached forecast run whose newest usable stamp is at or after the known stamp. The
+  cached runs are daily (09:00 UTC), not 6-hourly, because the cached GAM-K member forecasts exist
+  only for those runs; a 6-hourly replay needs new ensemble forecasts and is not run. End: the
   alarm's `end_est`, known at the later of experiment 147's stored live `known_from` for the same
   (series, step) when one exists and `end_est` + 96 half-hours; this is the lab shortcut of using
   experiment 147's end rule for alarms it did not raise. Each fold's alarm table is replayed
   separately. A logged transfer is scored with the fold that holds out its Primary pair. A row on
   an ordinary day is scored with all three folds' tables and the three differences are averaged
   row by row (the mask of a learned score trained without that row's pairs). Rows and scores:
-  experiment 163's three row sets (before the alarm, inside, and the 72 hours after the end) with
-  the AFTER set as the headline, first on 163's own runs (scored year and replicate months, the 7
-  transfers of its headline) and then on every cached run (2024-04-10 to 2026-06-29) for the
-  larger set of logged transfers at the six decision substations (D5, D9, D10, D11, D14, D16).
-  Comparison arms are read from the stored scores of experiments 163 and 171 (pair-alarm mask,
-  best guess 2, no mask), never re-fitted. Score: twice the mean pinball loss over 11 quantiles in
+  experiment 163's AFTER set (the 72 hours after each logged transfer ends; rows with a reading, on
+  runs of the scored year and replicate months) is the headline. Its "shared" scope, the rows
+  where best guess 2 also has a score, holds 7 transfers; its "stack-only" scope holds 11. Ordinary
+  days are experiment 171's rows: every cached run (2024-04-10 to 2026-06-29) at the six decision
+  substations (D5, D9, D10, D11, D14, D16), outside every logged transfer and its 72 hours after.
+  Comparison arms are K0 (no mask), PAIR_NEW (every pair alarm, experiment 163's
+  MASK_NEW) and PAIR_GATED (balance score of 0.7 or more, experiment 171's MASK_GATED), recomputed
+  here on the same rows, and best guess 2, read from experiment 87's stored predictions. Positive
+  control: PAIR_NEW, K0, and the gated contrast must reproduce experiment 163's 6.321, 13.686 and
+  10.091 (best guess 2) on the shared AFTER rows, and experiment 171's +0.030 on the pooled rows,
+  to the printed precision; if they do not, the page is `invalid`. Score: twice the mean pinball loss over 11 quantiles in
   points of effective capacity, K0 spread, GAM-K cached members plus the frozen Kalman filter.
   Gate of the harm test: a learned alarm masks whenever it is active (the learned score already
   has its threshold at 80 unexplained odd-month alarms; the balance gate belongs to the pair
   alarm). Intervals: for the gain, transfers resampled whole (95%, 20,000 draws); for the harm,
-  rows resampled by whole calendar month as in experiment 171. G1 (gain): LEARNED_R minus the
-  pair-alarm mask on the AFTER rows of 163's 7 transfers has a point estimate of -0.3 points or
-  lower; its interval is reported, and with 7 transfers it is not expected to exclude zero. G2
+  rows resampled by whole calendar month as in experiment 171. G1 (gain, the brief's bar): LEARNED_R minus the
+  pair-alarm mask on the AFTER rows of 163's 7 transfers (those with best guess 2 scores) has a
+  point estimate of -0.3 points or lower. Experiment 163's oracle mask (true onset and end known
+  at once) scores 6.354 on those rows, against 6.321 for the pair-alarm mask, so G1 requires the
+  learned mask to beat the oracle by 0.33 points; it is kept because the brief states it, and the
+  page reports it as the oracle-capped bar. G1' (gain, where the oracle leaves room): the same
+  contrast on the AFTER rows of all 11 transfers of 163's stack-only set (6.083 for the pair-alarm
+  mask, 4.79 for the oracle), with the point estimate -0.3 points or lower. The intervals of G1
+  and G1' are reported, and with 7 and 11 transfers neither is expected to exclude zero. G2
   (no harm): the pooled LEARNED_R gated mask minus K0 on ordinary days has a 95% interval inside
-  -0.05 to +0.05. Verdict: `supported` when G1 and G2 hold, `partly supported` when exactly one
-  holds, `not supported` when neither holds, and `inconclusive` only for a failed fit or fewer
+  -0.05 to +0.05. Verdict: `supported` when (G1 or G1') and G2 hold, `partly supported` when exactly one of
+  (G1 or G1') and G2 holds, `not supported` when neither holds, and `inconclusive` only for a failed fit or fewer
   than 5 scored transfers. The threshold of 0.3 points is the brief's and
   the harm limit of 0.05 is the brief's; both are set by the cost of porting a learned score,
   which adds a model and a pipeline step to the serving path. Reported beside the contrast (not
