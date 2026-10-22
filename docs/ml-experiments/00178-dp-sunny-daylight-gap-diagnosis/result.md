@@ -119,8 +119,8 @@ sunniest third.
 - **Rows and scope:** six substations (D5, D10, D11, D14, D16, D9), the 291 daily runs of
   `fold_a_daily_gap_v1` that both models forecast, from 2025-07-02 to 2026-06-29, on rows outside
   the hand-filtered switching events. The plan did not fix the lead range, so the headline uses all
-  leads to 168 hours (chosen after seeing the data). The 12 to 36 hour range, nearest to the plot's row count, is beside
-  it. The "five decision substations" are D5, D10, D11, D14, and D16, the substations of the
+  leads to 168 hours (chosen after seeing the data). The 12 to 36 hour range, nearest to the plot's
+  row count, is beside it. The "five decision substations" are D5, D10, D11, D14, and D16, the substations of the
   differentiable-physics series' contrasts; D9 is reported beside them.
 - **Absolute errors (MW), sunny daylight, all leads:** mean absolute error 0.590 for the GAM against
   0.541 for BG2; pinball loss 0.166 against 0.152.
