@@ -186,7 +186,7 @@ def pinball(*, q: torch.Tensor, actual: torch.Tensor, levels: torch.Tensor) -> t
     return torch.mean(torch.maximum(levels * error, (levels - 1.0) * error))
 
 
-def build_model(*, arm: str, st: Setting) -> torch.nn.Module:  # noqa: PLR0911
+def build_model(*, arm: str, st: Setting) -> torch.nn.Module:
     """Return the untrained network for an arm."""
     n_head = st.train["head"].shape[1]
     n_head_ukv = st.train["head_ukv"].shape[1]

@@ -100,9 +100,7 @@ def load_farm(site: str, fold: str) -> Farm:
     """Return a farm's rows, features, and the plant scale and ceiling fitted on its tuning months."""
     table = pl.read_parquet(E224_DIR / "members" / f"{site}_b0.parquet")
     sky = pl.read_parquet(FARM_ROWS).filter(pl.col("site") == site).select("time", "clear_sky")
-    ukv = pl.read_parquet(UKV_DIR / f"{site}_b0.parquet").select(
-        "time", "ukv_usable", *UKV_COLUMNS
-    )
+    ukv = pl.read_parquet(UKV_DIR / f"{site}_b0.parquet").select("time", "ukv_usable", *UKV_COLUMNS)
     table = table.join(sky, on="time", how="left").join(ukv, on="time", how="left").sort("time")
     # Observed power one day earlier (two when the lead is over 24 h), before the forecast was made.
     power = table.select("time", "output")
@@ -158,16 +156,13 @@ def load_farm(site: str, fold: str) -> Farm:
 
 def _placebo(*, table: pl.DataFrame, ukv: np.ndarray) -> np.ndarray:
     """Return the UKV columns taken from another day of the same month, half-hour, and cloud band."""
-    group = (
-        table.select(
-            key=pl.concat_str(
-                pl.col("time").dt.strftime("%Y-%m"),
-                pl.col("time").dt.strftime("%H%M"),
-                (pl.col("csi") * 5).floor().cast(pl.Int32).clip(0, 5).cast(pl.String),
-            )
-        )["key"]
-        .to_numpy()
-    )
+    group = table.select(
+        key=pl.concat_str(
+            pl.col("time").dt.strftime("%Y-%m"),
+            pl.col("time").dt.strftime("%H%M"),
+            (pl.col("csi") * 5).floor().cast(pl.Int32).clip(0, 5).cast(pl.String),
+        )
+    )["key"].to_numpy()
     days = table["time"].dt.date().to_numpy()
     rng = np.random.default_rng(248)
     out = ukv.copy()

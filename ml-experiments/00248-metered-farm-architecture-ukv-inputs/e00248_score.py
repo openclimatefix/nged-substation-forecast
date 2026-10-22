@@ -92,7 +92,9 @@ def load_arms() -> pl.DataFrame:
         by_seed = frame.select("time_series_id", "time", "arm", "seed")
         losses = losses.with_columns(seed=by_seed["seed"])
         pieces.append(losses)
-        f = floors.with_columns(setting=pl.lit(setting))
+        f = floors.join(
+            frame.select("time_series_id", "time").unique(), on=["time_series_id", "time"]
+        ).with_columns(setting=pl.lit(setting))
         pieces.append(row_losses(frame=f).with_columns(seed=pl.lit(0)))
     allrows = pl.concat(pieces)
     averaged = allrows.group_by("setting", "arm", "time_series_id", "time").agg(
@@ -159,9 +161,10 @@ def main() -> None:
     pl.Config.set_tbl_cols(20)
     rows = load_arms()
     rows.write_parquet(common.DATA_DIR / "row_losses.parquet")
+    # The two folds cover different months, so the pooled setting resamples all 10 scored months.
     out_scores, out_contrasts, out_farms = [], [], []
-    for setting in common.SETTINGS:
-        sub = rows.filter(pl.col("setting") == setting)
+    for setting in (*common.SETTINGS, "pooled"):
+        sub = rows if setting == "pooled" else rows.filter(pl.col("setting") == setting)
         for slice_name, slice_rows in (
             ("all", sub),
             ("cloudy", sub.filter(pl.col("csi") < CLOUDY_CSI)),
