@@ -14,6 +14,7 @@ experiment 136's stored mean minus its stored level and anomaly, so no GAM is re
 | `ap` | experiment 136's A2 raw mean | filter state at origin minus 3.5 hours |
 | `dp` | `ap` | plus experiment 155's arm D shift (winter night offset and recipe R) |
 | `ap0`, `dp0` | as `ap`, `dp` | filter state at the origin itself (no data delay; diagnostic) |
+| `ai0`, `di0` | as `ap0`, `dp0` | the same, issued at the original origin (no data delay) |
 
 The shift of arm D is experiment 155's `d` mean minus its `a` mean at the same run and valid time.
 It reads only days before the run's original origin, so it is never later than what a re-issue
@@ -301,11 +302,13 @@ def build_site(*, site: str) -> str:
         path=common.WORK_DIR / "control" / f"{site}.json", content={"site": site, **checks}
     )
     rows = 0
-    for arm, mean_column, delay in (
-        ("ap", "mean_a", DEFAULT_DELAY_HOURS),
-        ("dp", "mean_d", DEFAULT_DELAY_HOURS),
-        ("ap0", "mean_a", 0.0),
-        ("dp0", "mean_d", 0.0),
+    for arm, mean_column, delay, offsets in (
+        ("ap", "mean_a", DEFAULT_DELAY_HOURS, SLOT_OFFSET_HOURS),
+        ("dp", "mean_d", DEFAULT_DELAY_HOURS, SLOT_OFFSET_HOURS),
+        ("ap0", "mean_a", 0.0, SLOT_OFFSET_HOURS),
+        ("dp0", "mean_d", 0.0, SLOT_OFFSET_HOURS),
+        ("ai0", "mean_a", 0.0, (CONTROL_OFFSET_HOURS,)),
+        ("di0", "mean_d", 0.0, (CONTROL_OFFSET_HOURS,)),
     ):
         issued = {}
         for period in PERIODS:
@@ -317,7 +320,7 @@ def build_site(*, site: str) -> str:
                     offset_hours=hours,
                     delay_hours=delay,
                 ).with_columns(slot=pl.lit(slot, dtype=pl.Int8))
-                for slot, hours in enumerate(SLOT_OFFSET_HOURS)
+                for slot, hours in enumerate(offsets)
             ]
             issued[period] = pl.concat(pieces)
         spread = fit_spread(frame=issued["tuning"], mean_column=mean_column)
