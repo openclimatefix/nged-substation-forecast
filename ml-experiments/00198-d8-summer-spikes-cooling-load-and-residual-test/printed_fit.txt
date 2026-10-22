@@ -1,0 +1,35 @@
+[five decision Primaries] eligibility (median site): tau 16: 111 days, 1624 half-hours, ok; tau 18: 91 days, 1288 half-hours, ok; tau 20: 70 days, 935 half-hours, ok; tau 22: 41 days, 475 half-hours, ok; tau 24: 18 days, 193 half-hours, ok
+[five decision Primaries] leave-one-month-out mean held-out difference by tau: {16.0: 0.014913850908100894, 18.0: 0.017444906455145164, 20.0: 0.021077064181798846, 22.0: 0.016612006810135742, 24.0: 0.005854999673303035}
+[five decision Primaries] chosen tau 24; held-out gain negative in 2 of 4 months: {202407: -2.3625825787664003e-05, 202408: -0.008365916979005334, 202409: 2.7644165382594763e-05, 202506: 0.031781897332622544}
+[five decision Primaries] C1 (cooling minus arm D, summer scored rows, 14-day blocks): -0.0002 [-0.0103, +0.0147] n=157860 blocks=11
+C1 by lead band: {'0.5-48 h': [0.006742539999842757, -0.006069254958304713, 0.03435414507997258], '48-168 h': [-0.0030431899528988358, -0.012670107508419397, 0.006652973587896137]}
+Hot days (any Primary, day max >= 25.0 C): 12 in 5 spells
+C1 on hot days: [-0.0013546080219278952, -0.1240607942794553, 0.1327183609053296] rows=12174
+Spells of days with an ensemble-mean day maximum >= tau 24: 10; the hottest spans 7 days
+C1 without the hottest spell (day numbers 20626 to 20632): [-0.0008846641433234335, -0.003456820629230424, 0.0018515232297538142]
+Absolute summer scores: {'D5': {'arm_d': 3.1818863266016755, 'cooling': 3.1775395290930293}, 'D10': {'arm_d': 2.9693075333490286, 'cooling': 2.9723587582635926}, 'D11': {'arm_d': 2.3001559356594043, 'cooling': 2.3072020922480427}, 'D14': {'arm_d': 1.977799304794147, 'cooling': 1.9794640205163896}, 'D16': {'arm_d': 2.314403750092637, 'cooling': 2.3060340946766935}}
+Mean-forecast error and median-minus-mean: {'D5': {'mae_arm_d': 5.547840532029186, 'mae_cooling': 5.537922864660485, 'median_minus_mean': 0.0}, 'D10': {'mae_arm_d': 4.9971382718504485, 'mae_cooling': 4.999237917206694, 'median_minus_mean': 0.0}, 'D11': {'mae_arm_d': 4.121264780468511, 'mae_cooling': 4.130948014274516, 'median_minus_mean': 0.0}, 'D14': {'mae_arm_d': 3.4580859307616834, 'mae_cooling': 3.4541928056893108, 'median_minus_mean': 0.0}, 'D16': {'mae_arm_d': 4.081156210802316, 'mae_cooling': 4.061884470236189, 'median_minus_mean': 0.0}}
+Leave one site out: {'without_D5': [0.0008441298536279547, -0.009141009304099241, 0.017820695899358287], 'without_D10': [-0.0010143912948971498, -0.013518162208729796, 0.014815596012638814], 'without_D11': [-0.0020179926059562276, -0.01504741616187623, 0.012729132468293885], 'without_D14': [-0.0006547678553469483, -0.012255153797842264, 0.01678466326458128], 'without_D16': [0.0018547467550806777, -0.007186007216237681, 0.014509597028198401]}
+Partial Spearman, residual vs tau-20 hinge: {'D5': 0.037302715744871984, 'D5__rows': 972.0, 'D10': 0.2609792343369143, 'D10__rows': 648.0, 'D11': 0.07348077051424831, 'D11__rows': 720.0, 'D14': 0.008850512655893263, 'D14__rows': 864.0, 'D16': 0.06538581108728979, 'D16__rows': 936.0, 'D9': 0.20678021838471233, 'D9__rows': 576.0}
+Placebo gains: {'p05': -0.0014104711974680846, 'median': 0.001873743790821765, 'p95': 0.007874072535047993, 'n': 200} C1 below placebo 5th percentile: False
+[known answer at D10] eligibility (median site): tau 16: 103 days, 1510 half-hours, ok; tau 18: 80 days, 1171 half-hours, ok; tau 20: 62 days, 728 half-hours, ok; tau 22: 33 days, 321 half-hours, ok; tau 24: 10 days, 97 half-hours, DROPPED
+[known answer at D10] leave-one-month-out mean held-out difference by tau: {16.0: 0.004173569717422162, 18.0: 0.006388431226786485, 20.0: 0.02297923574041061, 22.0: 0.02283187081312752}
+[known answer at D10] chosen tau 16; held-out gain negative in 2 of 4 months: {202407: -0.006265039855376303, 202408: -0.09385871024800656, 202409: 0.017807037700794583, 202506: 0.09901099127227692}
+[known answer at D10] C1 (cooling minus arm D, summer scored rows, 14-day blocks): -0.0683 [-0.1553, +0.0043] n=31695 blocks=11
+Known answer: {'tau': 16.0, 'c1': [-0.06827891110808744, -0.1552937658324606, 0.004272106052694099], 'fitted_sum': 12086.567859176463, 'injected_sum': 24471.632679180926, 'ratio': 0.4939011637527163, 'ratio_by_lead': {'0.5-48 h': 0.5093906244117867, '48-168 h': 0.4874487522246699}, 'hot_rows': 6786, 'passes': False}
+[post hoc known answer: tau_20_forced] eligibility (median site): tau 20: 62 days, 728 half-hours, ok
+[post hoc known answer: tau_20_forced] leave-one-month-out mean held-out difference by tau: {20.0: 0.02297923574041061}
+[post hoc known answer: tau_20_forced] chosen tau 20; held-out gain negative in 2 of 4 months: {202407: -0.018302670989334174, 202408: -0.12430687031008433, 202409: 0.003267928489334202, 202506: 0.23125855577172671}
+[post hoc known answer: tau_20_forced] C1 (cooling minus arm D, summer scored rows, 14-day blocks): -0.1168 [-0.2520, -0.0156] n=31695 blocks=11
+Post hoc tau_20_forced {'tau': 20.0, 'c1': [-0.11676847622585948, -0.2520089186518676, -0.015577366024447953], 'sign_ok': False, 'ratio': 0.5876061854059011}
+[post hoc known answer: oracle_era5_temperature] eligibility (median site): tau 16: 103 days, 1510 half-hours, ok; tau 18: 80 days, 1171 half-hours, ok; tau 20: 62 days, 728 half-hours, ok; tau 22: 33 days, 321 half-hours, ok; tau 24: 10 days, 97 half-hours, DROPPED
+[post hoc known answer: oracle_era5_temperature] leave-one-month-out mean held-out difference by tau: {16.0: 0.1368237883017962, 18.0: 0.19436572331158405, 20.0: 0.2540424850753668, 22.0: 0.04863353912203773}
+[post hoc known answer: oracle_era5_temperature] chosen tau 22; held-out gain negative in 3 of 4 months: {202407: -0.11264207545078092, 202408: -0.14942880156428281, 202409: -0.00018101147857477713, 202506: 0.45678604498178943}
+[post hoc known answer: oracle_era5_temperature] C1 (cooling minus arm D, summer scored rows, 14-day blocks): -0.1640 [-0.4027, -0.0244] n=31695 blocks=11
+Post hoc oracle_era5_temperature {'tau': 22.0, 'c1': [-0.16395358182493067, -0.40267513611038486, -0.024403101686892414], 'sign_ok': True, 'ratio': 0.7820541353738866}
+[post hoc known answer: oracle_era5_tau_20] eligibility (median site): tau 20: 62 days, 728 half-hours, ok
+[post hoc known answer: oracle_era5_tau_20] leave-one-month-out mean held-out difference by tau: {20.0: 0.2540424850753668}
+[post hoc known answer: oracle_era5_tau_20] chosen tau 20; held-out gain negative in 2 of 4 months: {202407: -0.051372198927217075, 202408: -0.12265287634603203, 202409: 0.010739473118989795, 202506: 1.1794555424557265}
+[post hoc known answer: oracle_era5_tau_20] C1 (cooling minus arm D, summer scored rows, 14-day blocks): -0.1498 [-0.3518, -0.0231] n=31695 blocks=11
+Post hoc oracle_era5_tau_20 {'tau': 20.0, 'c1': [-0.1497885338507426, -0.35176405897783125, -0.023121429759662596], 'sign_ok': False, 'ratio': 0.8319209141587468}
+Conditions: {'interval_below_bar': False, 'below_zero_without_hottest_spell': False, 'below_placebo_p05': False, 'known_answer': False, 'sign_check': False} -> forecast verdict: inconclusive (a control or the sign check failed)
