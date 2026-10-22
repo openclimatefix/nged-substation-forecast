@@ -9,6 +9,7 @@ from typing import Final
 
 import altair as alt
 import e00239_common as common
+import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 
@@ -74,10 +75,10 @@ def site_values(*, table: pl.DataFrame, stat: str) -> pl.DataFrame:
         .with_columns(
             rise_orig=pl.col("orig_curve") - pl.col("orig_plain"),
             rise_full=pl.col("full_curve") - pl.col("full_plain"),
-            zeroed_cost=pl.col("full_plain") - pl.col("orig_plain"),
+            full_sun_gain=pl.col("full_plain") - pl.col("orig_plain"),
         )
         .group_by("site", "b")
-        .agg(pl.col(c).median() for c in [*SERIES, "rise_orig", "rise_full", "zeroed_cost"])
+        .agg(pl.col(c).median() for c in [*SERIES, "rise_orig", "rise_full", "full_sun_gain"])
     )
 
 
@@ -108,7 +109,7 @@ def intervals(*, values: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
 
 def print_numbers(*, table: pl.DataFrame) -> None:
     """Print the tables the write-up quotes."""
-    columns = [*SERIES, "rise_orig", "rise_full", "zeroed_cost"]
+    columns = [*SERIES, "rise_orig", "rise_full", "full_sun_gain"]
     with pl.Config(tbl_rows=80, tbl_cols=30, float_precision=3, tbl_width_chars=250):
         for stat in (
             "recovery",
@@ -200,6 +201,48 @@ def print_numbers(*, table: pl.DataFrame) -> None:
             .agg(pl.col("value").median())
             .pivot(on="arm", index="stat", values="value")
         )
+
+
+def print_low_sun_check() -> None:
+    """Print the curve refitted on half-hours with the sun above 15 degrees only."""
+    cache = common.load_cache()
+    month = common.calendar_months(cache=cache)
+    curves = {}
+    weight = {}
+    for limit in (common.FARM_MAX_ZENITH_DEG, common.FULL_SUN_ZENITH_DEG):
+        scales, squares = [], []
+        for farm in common.FARMS:
+            norm = common.farm_norm(cache=cache, farm=farm, max_zenith_deg=limit)
+            shape = common.farm_own_shape(cache=cache, farm=farm)
+            frame = pl.read_parquet(common.INJECTION_FRAME_PATH).filter(
+                pl.col("site") == farm, pl.col("kind") == "farm"
+            )
+            zenith = (
+                pl.DataFrame({"time": cache.times_series()})
+                .join(frame.select("time", "zenith"), on="time", how="left")["zenith"]
+                .to_numpy()
+            )
+            usable = (
+                (cache.end_times <= np.datetime64(common.CUT.replace(tzinfo=None)))
+                & np.isfinite(norm)
+                & np.isfinite(shape)
+                & (shape > common.MIN_DAYLIGHT_SHAPE)
+                & (zenith < limit)
+            )
+            cross = np.bincount(month[usable], weights=(norm * shape)[usable], minlength=13)[1:]
+            square = np.bincount(month[usable], weights=(shape**2)[usable], minlength=13)[1:]
+            scales.append(cross / np.where(square > 0, square, np.nan))
+            squares.append(square)
+        mean = np.nanmean(scales, axis=0)
+        curves[limit] = mean / np.nanmean(mean)
+        weight[limit] = np.mean(squares, axis=0)
+    print("Curve refitted with the sun above 15 degrees only, then at every sun height")
+    print(np.round(curves[common.FARM_MAX_ZENITH_DEG], 3))
+    print(np.round(curves[common.FULL_SUN_ZENITH_DEG], 3))
+    print(
+        "share of the fit weight (sum of squared shape) kept by the 15-degree rule, by month:",
+        np.round(weight[common.FARM_MAX_ZENITH_DEG] / weight[common.FULL_SUN_ZENITH_DEG], 2),
+    )
 
 
 def save_chart(chart: alt.TopLevelMixin, *, name: str) -> None:
@@ -321,6 +364,7 @@ def main() -> None:
     """Print the numbers and write the figures."""
     table = load()
     print_numbers(table=table)
+    print_low_sun_check()
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     save_chart(figure_curve(), name="figure_01_curve")
     save_chart(figure_recovery(table=table), name="figure_02_recovery")
