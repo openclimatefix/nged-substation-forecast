@@ -68,18 +68,20 @@ lessons:
     hours: every scored pair has no reading since the onset, because of the 3.5-hour telemetry delay.
   - >-
     Where a boosted per-band filter recovers an offset, it does so late (0.64 of the extra loss at
-    24 to 36 hours after the onset, from pairs of 36-hour offsets), and it overshoots earlier (a
-    recovery of -4.4 at 12 to 24 hours).
+    24 to 36 hours after the onset, from pairs of 36-hour offsets), and earlier the
+    plain filter already removes about 80% of the excess loss on pairs whose band was read, so the
+    boost has little left to recover (audit, finding 3).
   - >-
     Moving every band's level together from one innovation recovers little where another band was
-    read (0.11 to 0.17) and scores worse on quiet days (+0.7 points), so the offsets are not a
-    shared level that bands can borrow from each other.
+    read (0.11 to 0.17) and scores worse on quiet days (+0.7 points). The audit found the shared
+    level does carry 0.43 to 0.55 of the offset to unread bands, so the failure is that the run
+    counter cannot tell an offset from noise, not that offsets are band-specific (audit, finding 2).
 take_home_message: >-
   Making the Kalman filter's level state faster does not fix offsets that last for hours. Faster
   settings recover a long offset only late, and only by scoring worse on quiet days, and a level
-  shared across the four hour bands recovered under a fifth of the offset. The 15 smooth-offset
-  days are therefore unlikely to be a filter-speed problem, since no setting recovered an injected
-  offset of that kind, and level adaptation is dropped.
+  shared across the four hour bands recovered under a fifth of the offset, because its run counter
+  cannot tell an offset from noise. No setting on the grid tried recovered an injected offset
+  without scoring worse on quiet days, so level adaptation is dropped.
 production_status: not-for-production
 adopted_in: none
 advice:
@@ -103,8 +105,9 @@ advice:
 filter recovers a long offset only late, and only by scoring worse on quiet days. A level shared
 across the four hour bands recovered under a fifth of the offset. The 15 smooth-offset days of
 [experiment 175](../00175-dp-unlabelled-day-shapes/result.md), on which the forecast error kept one
-sign for hours, are therefore unlikely to be a filter-speed problem: no setting recovered an
-injected offset of that kind. Level adaptation is dropped.
+sign for hours, are therefore not helped by the settings tried: no setting on the grid (m 3 to 50, k 2 to 6,
+z 0.5) recovered an injected offset of that kind without harming quiet days. Level adaptation is
+dropped.
 
 We asked again whether a Kalman filter that speeds up its level state helps when the forecast error
 keeps one sign for hours. The level state is the slowly moving offset that the filter adds to the
@@ -177,12 +180,19 @@ scored 0.023 points worse on the scored year, so a faster filter alone is not th
   filter can learn about the offset. The share of pairs with the target band read rises from 0 to
   0.05 (6 to 12 hours), 0.19 (12 to 24 hours), and 0.65 (24 to 36 hours) for the 36-hour offsets.
 
-**Where the boost helps and where it overshoots** (A1, m 50, k 2, 36-hour offset, `band_read`
-pairs): recovery is 0.64 at 24 to 36 hours after the onset and -4.4 at 12 to 24 hours, because A0
-already follows most of the offset there and the boost overshoots. Figure 3 clips values at -1.5.
+**Where the boost helps** (A1, m 50, k 2, 36-hour offset, `band_read` pairs): recovery is 0.64 at 24
+to 36 hours after the onset and -4.4 at 12 to 24 hours. The -4.4 is not overshoot: A1 carries 0.72
+of the offset there, and the ratio is large because A0 has already removed most of the excess loss
+(about 80%) and A1's own noise on quiet stretches is divided by the small remainder. Figure 3 clips
+values at -1.5.
+
+- At k 2 and z 0.5 the counter is on for 33% to 43% of quiet readings, so the selected settings act
+  almost as always-on boosts. Selection ignored harm, and z stayed at 0.5.
+- With 40 quiet days the harm interval has a half-width of about 0.014 points, so the +0.005 bound
+  of P3 could not be met even by an arm close to A0.
 
 - Post hoc: A3 on pairs whose target band was already read recovers -2.1 (-15.6 to -0.5) at 36
-  hours, so sharing the level moves a band that was already right.
+  hours; the shared level adds noise to a band that was already right.
 - Experiment 190's setting for A1 (m 5, k 8) recovers 0.09 (0.00 to 0.48) at 36 hours on
   `band_read` pairs, close to arm D by construction.
 
@@ -193,9 +203,10 @@ already follows most of the offset there and the boost overshoots. Figure 3 clip
 - Mean-forecast error beside the quantile score: not recomputed; experiment 190 reported C4 (A3
   minus A1) as worse on both.
 - Triggers: trigger 1 fired (a known-answer test was failed by A3 and by A1 at 16 hours), and
-  trigger 2 may apply, because P2 contradicts the prediction. No audit has run. The explanation
-  tested here is that sharing the level moves bands that are already right (post hoc recovery above,
-  and +0.7 points on quiet days).
+  trigger 2 may apply, because P2 contradicts the prediction. An Opus audit ran
+  (`briefs/e197_audit_report.md`, private). It reproduced the headline numbers, found no bug in the shared
+  level, and cleared selection leakage. Its three corrections (the explanation of A3's failure, the
+  "overshoot" reading, and the counter's on-share) are applied above. The verdict is unchanged.
 - Tails and curtailment cost were not scored: no new forecast exists.
 
 ## Caveats
