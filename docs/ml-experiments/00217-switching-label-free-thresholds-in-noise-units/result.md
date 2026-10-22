@@ -8,21 +8,23 @@ theme: switching-detectors
 also_relevant_to: []
 status: done
 size: >-
-  simple. Stored: private tables under data/ml-experiments/00217-switching-label-free-thresholds-in-noise-units/
-  only. Serving path: not touched. Degradation rule: not touched. Designs: one (descriptive, plus one
-  pre-registered prediction; the candidate noise estimates are listed below). Callers: this folder's
-  scripts only, which import the detector modules of experiments 130 and 156 and read stored alarm
-  tables of experiment 195.
+  simple. Stored: private tables under
+  data/ml-experiments/00217-switching-label-free-thresholds-in-noise-units/ only. Serving path: not
+  touched. Degradation rule: not touched. Designs: one (descriptive, plus one pre-registered
+  prediction; the candidate noise estimates are listed below). Callers: this folder's scripts only,
+  which copy the detector code of experiments 130 and 156 and read stored alarm tables of
+  experiment 195.
 hypothesis: >-
-  At a fixed threshold in noise units, the switching detectors raise alarms at a rate that is similar
-  across Primary substations, so a new Primary needs no tuning. Substations D8 and D9 are the
-  exceptions, because their residuals have heavy tails.
+  At a fixed threshold in noise units, the switching detectors raise alarms at a rate that is
+  similar across Primary substations, so a new Primary needs no tuning. Substations D8 and D9 are
+  the exceptions, because their residuals have heavy tails.
 prediction: >-
   At least 80% of the Primaries other than D8 and D9 (11 of 13) have an alarm rate within a factor
-  of 2 of the cross-Primary median, for each of RO-NC and the pair alarm. A robust (median absolute
-  deviation, MAD) noise estimate brings D8 and D9 inside a factor of 3 of the median. It fails if
-  heavy tails need a per-series treatment; the page then says that version 2 needs an automatic
-  per-series noise rule, and names the residual statistic that predicted the alarm rate best.
+  of 2 of the cross-Primary median, for RO-NC (clarified at write-up: the pair alarm is reported
+  alongside and carries no verdict; it fails both parts). A robust (median absolute deviation, MAD)
+  noise estimate brings D8 and D9 inside a factor of 3 of the median. It fails if heavy tails need a
+  per-series treatment; the page then says that version 2 needs an automatic per-series noise rule,
+  and names the residual statistic that predicted the alarm rate best.
 decision_rule: >-
   Descriptive, except the prediction. Alarm rate is alarms per Primary-year over the whole residual
   history, with 95% intervals that resample whole calendar months. The prediction holds when both
@@ -44,28 +46,28 @@ headline: >-
 lessons: >-
   A threshold in noise units gives similar alarm rates only at low thresholds, where alarms come
   from the bulk of the noise. At high thresholds the rate follows each Primary's heavy tail, which
-  the share of days on which the demand model's daily mean error is large predicts (correlation 0.81
-  across Primaries).
+  the share of days on which the demand model's daily mean error is large predicts RO-NC's rate
+  (correlation 0.81 across Primaries).
 take_home_message: >-
   A switching detector raises about the same number of alarms on every Primary substation only when
   its threshold, measured in units of the residual's noise, is low: at 2.5 noise units, 13 of 13
-  ordinary Primaries are within a factor of 2 of the median alarm rate, and at 4.35 only 9 of 13 are.
-  D8 and D9 are not outliers at a fixed threshold; D9 stands out only under the detector whose
-  threshold was tuned on switching labels. Flexpectation version 2 needs an automatic per-Primary
-  rule for the threshold, and the share of days on which the demand model is badly off is the best
-  candidate statistic.
+  ordinary Primaries are within a factor of 2 of the median alarm rate, and at 4.35 only 9 of 13
+  are. At 4.35 noise units D8 and D9 are within a factor of 3 of the median; D9 is outside it only
+  for the pair alarm and the detector whose threshold was tuned on switching labels. Flexpectation
+  version 2 needs an automatic per-Primary rule for the threshold, and the share of days on which
+  the demand model is badly off is the best candidate statistic for RO-NC.
 advice:
   - >-
     Do not expect one threshold above about 3 noise units to give the same alarm rate on every
-    Primary; set the threshold per Primary from a target alarm rate or a tail statistic (C1,
-    figure 3).
+    Primary; set the threshold per Primary from a target alarm rate or a tail statistic (C1, figure
+    3).
   - >-
-    Use the share of days on which the day's mean residual exceeds 3 noise units as the first
-    candidate for a label-free per-Primary tail statistic, and test it on a held-out period (C2,
-    figure 2).
+    Try the share of days on which the day's mean residual exceeds 3 noise units as a label-free
+    per-Primary tail statistic for RO-NC, and test it on a held-out period; it was the best of about
+    30 candidates on 15 Primaries (C2, figure 2).
   - >-
-    Do not replace the odd-month MAD noise estimate with the MAD of all months; the two agree
-    within 8% and change no alarm rate (C3).
+    Do not expect the MAD of all months to beat the odd-month MAD noise estimate; the two agree
+    within 8% and leave 9 of 13 Primaries within a factor of 2 (C3).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -79,10 +81,11 @@ Primary-year across 15 Primaries. Of the 13 Primaries other than D8 and D9 (two 
 alarms stood out in an earlier analysis), 9 fall within a factor of 2 of the median of 4.7 alarms
 per Primary-year. The pre-registered bar was 11 of 13, so the first part of the prediction fails.
 Post hoc, the same detector at 2.5 noise units puts 13 of 13 within a factor of 2 (median 27 alarms
-per Primary-year). The agreement between Primaries worsens steadily as the threshold rises. D8 and
-D9 are not outliers at a fixed threshold. Of the statistics we measured on the residual, the share
-of days on which the demand model's daily mean error exceeds 3 noise units predicts the alarm rate
-best.
+per Primary-year). The agreement between Primaries worsens steadily as the threshold rises. At 4.35
+noise units D8 and D9 are within a factor of 3 of the median, no more extreme than D18 or D10. Of
+the statistics we measured on the residual, the share of days on which the demand model's daily mean
+error exceeds 3 noise units predicts the RO-NC alarm rate best of the 30 or so statistics we tried,
+on 15 Primaries.
 
 **We asked whether a detector's alarm rate on a new Primary can be predicted from that Primary's
 residual alone, so that Flexpectation version 2, which will have no switching labels, needs no
@@ -116,11 +119,13 @@ threshold from the residual's tail, not only from its noise scale.
   this result.
 - **Prediction, part 2 holds, but was never at risk.** D8 is 2.14 times and D9 is 0.51 times the
   median under the current noise estimate, so both were inside a factor of 3 before any change. The
-  two robust estimates keep them inside (figure 4).
+  two robust estimates keep them inside (figure 4). The verdict therefore rests on part 1. The pair
+  alarm, which carries no verdict, fails both parts: 5 of 13, and D9 has no alarms in 2.5 years.
 - **The two robust estimates do not narrow the spread.** R1, the median absolute deviation (MAD) of
-  all months, equals the current odd-month MAD within 8%, so R1 changes no rate (9 of 13; standard
-  deviation of the base-2 logarithm of the rate 1.00 against 1.17). R2, the 95th percentile divided
-  by 1.96, more than halves the median rate to 2.0 and leaves 9 of 13 (1.30).
+  all months, equals the current odd-month MAD within 8%, so R1 changes most rates by less than 10%,
+  and doubles D12's from 0.9 to 1.8 (9 of 13; standard deviation of the base-2 logarithm of the rate
+  1.00 against 1.17). R2, the 95th percentile divided by 1.96, more than halves the median rate to
+  2.0 and leaves 9 of 13 (1.30).
 - **The label-tuned detectors are not clearly more uniform.** RO-NC XL (stored alarms, threshold
   tuned so that at most 80 alarms in odd months match no logged closure) has 9 of 13 within a factor
   of 2, and D9, at 3.2 times the median, is outside a factor of 3. The learned re-ranker has 10 of
@@ -128,27 +133,33 @@ threshold from the residual's tail, not only from its noise scale.
 - **Rate against threshold (post hoc).** Other Primaries within a factor of 2 of the median: 13 of
   13 at 2.5 noise units, 12 at 3.0, 11 at 3.5, 9 at 4.35, 8 at 5.0, 6 at 6.0, and 4 at 8.0 (figure
   3).
-- **Best predictor.** The share of days on which the day's mean residual exceeds 3 noise units
-  predicts the base-2 logarithm of the RO-NC alarm rate best. Each prediction is made without the
-  Primary it predicts. The mean absolute error is 0.58 (about a factor of 1.5 in the rate), against
-  1.14 for the baseline of predicting the median of the other Primaries' log rates. 13 of 15
-  predictions fall within a factor of 2 (correlation 0.81, figure 2).
+- **Best predictor, for RO-NC only.** The share of days on which the day's mean residual exceeds 3
+  noise units predicts the base-2 logarithm of the RO-NC alarm rate best. Each prediction is made
+  without the Primary it predicts. The mean absolute error is 0.58 (about a factor of 1.5 in the
+  rate), against 1.14 for the baseline of predicting the median of the other Primaries' log rates.
+  13 of 15 predictions fall within a factor of 2 (correlation 0.81, figure 2).
     - Without D18, which has 1 year of residual and the largest share (0.42), the correlation is
       0.72 and the error 0.62 against a baseline of 1.19.
     - The tail ratio (95th percentile over MAD) comes next (error 0.93). The noise scale at any
       window gives 1.03 to 1.04, barely better than the baseline.
     - For the pair alarm the best statistic, the tail ratio, gives 1.46 against a baseline of 1.80.
-      No statistic beats the baseline of 1.34 for RO-NC XL.
+      No statistic beats the baseline of 1.34 for RO-NC XL. No single statistic worked for the pair
+      alarm or RO-NC XL.
+    - The 0.58 is the best of about 30 candidate statistics ranked on 15 Primaries, not a nested
+      leave-one-Primary-out, so it is optimistic.
 - **Winter against the rest.** Pooled over Primaries, RO-NC raises 5.4 alarms per Primary-year in
   December to February and 4.7 in the other months. The pair alarm raises 4.0 in winter and 4.7 in
-  the other months. The per-Primary split is in the table.
-- **D8 and D9 are not outliers at a fixed threshold.** D8 has the largest noise (a 24-hour step
-  scale of 0.62 MW against a median of 0.16) and the heaviest upper tail (95th percentile 0.94 MW),
-  but at a fixed threshold in noise units its rate is 2.1 times the median, not an outlier. D9 is
-  ordinary on every statistic (misfit share 0.14, equal to the median; kurtosis 2.7), and raises 6
-  RO-NC alarms in 2.5 years at 4.35 noise units. Its 34 alarms under RO-NC XL come from the
-  label-trained score, which admits alarms at a lower threshold in noise units; these data do not
-  say which of that score's inputs raises them.
+  the other months. The per-Primary split is in the table. These pooled rates have no interval, so
+  the difference is not evidence of a seasonal effect.
+- **D8 and D9 are within a factor of 3 of the median at 4.35 noise units.** D8 is the highest of the
+  13 other Primaries between 3.0 and 3.5 noise units (2.5 to 2.7 times the median). D8 has the
+  largest noise (a 24-hour step scale of 0.62 MW against a median of 0.16) and the heaviest upper
+  tail (95th percentile 0.94 MW), but at a fixed threshold in noise units its rate is 2.1 times the
+  median, not an outlier. D9 is ordinary on the noise, tail, and misfit statistics (misfit share
+  0.14, equal to the median; kurtosis 2.7), but its holiday misfit share, 0.26, is the fourth
+  highest of 15,, and raises 6 RO-NC alarms in 2.5 years at 4.35 noise units. Its 34 alarms under
+  RO-NC XL come from the label-trained score, which admits alarms at a lower threshold in noise
+  units; these data do not say which of that score's inputs raises them.
 - **Tail calibration and curtailment.** Not applicable: no forecast is scored.
 
 ## Residual statistics and alarm rates per Primary
@@ -195,6 +206,11 @@ over bank holidays and Easter weekends. Rates are alarms per Primary-year at 4.3
   the residual from which the alarms are computed, so the link between each statistic and the alarm
   rate is partly built in. The leave-one-Primary-out test shows the link holds across Primaries, not
   that the statistic is independent of the alarms.
+- **Thresholds were tuned on labels elsewhere.** This experiment reads no label, but the thresholds
+  of 4.35 and 3.75 noise units were chosen in experiments 130 and 156 against logged closures.
+  "Label-free" describes what this experiment reads, not those thresholds. The misfit day compares
+  the day's mean residual with the scale of the 24-hour step statistic, the same scale the alarm
+  threshold divides by.
 - **Only 15 Primaries.** D18 has 1 year and D9 2.5 years of residual. The intervals in figure 1 are
   wide, and alarms in the same week are not independent.
 - **Lab shortcuts.** The residual uses ERA5 weather, which arrives about 5 days late, and a convex
