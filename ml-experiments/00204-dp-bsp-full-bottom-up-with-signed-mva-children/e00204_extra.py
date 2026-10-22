@@ -18,6 +18,7 @@ import e00204_bu as bu
 import e00204_common as common
 import e00204_refs as refs
 import e00204_score as score
+import e00204_sign as sign
 import numpy as np
 import polars as pl
 
@@ -183,6 +184,25 @@ def references(*, cache) -> dict:  # noqa: ANN001
     return out
 
 
+def sign_shares(*, cache) -> dict:  # noqa: ANN001
+    """Return the share of each apparent-power child's usable half-hours with reverse flow."""
+    out = {}
+    months = cache.end_times.astype("datetime64[M]")
+    for child in sorted(common.ALL_MVA):
+        usable = cache.sites[child].default_rows
+        out[child] = {}
+        for probability in (0.9, 0.5):
+            reverse = (sign.sign_of(cache=cache, child=child, probability=probability) < 0) & usable
+            out[child][str(probability)] = {
+                "rows": int(reverse.sum()),
+                "share": float(reverse.sum() / max(int(usable.sum()), 1)),
+                "rows_by_month": {
+                    str(m): int(reverse[months == m].sum()) for m in np.unique(months[reverse])
+                },
+            }
+    return out
+
+
 def main() -> None:
     """Run the three parts and write `extra.json`."""
     cache = common.load_cache()
@@ -191,6 +211,7 @@ def main() -> None:
         "known_answer": known_answer(cache=cache),
         "decomposition": decomposition(cache=cache),
         "references": references(cache=cache),
+        "sign_shares": sign_shares(cache=cache),
     }
     common.write_json_atomic(path=common.WORK_DIR / "extra.json", content=result)
     print(json.dumps(result, indent=1))

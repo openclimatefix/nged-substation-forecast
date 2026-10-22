@@ -4,7 +4,7 @@ Writes `report.json` under the work folder. The headline is C1 (bottom-up minus 
 BSP over leads up to 168 hours in the scored year, at the 97.5% level of the month-resampled paired
 bootstrap, with the decision rule of the plan.
 
-    uv run --no-sync python ml-experiments/00161-*/e00204_report.py
+    uv run --no-sync python ml-experiments/00204-*/e00204_report.py
 """
 
 from typing import Final, cast

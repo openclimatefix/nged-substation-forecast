@@ -13,7 +13,7 @@ imports only itself. The constants, periods, and run dates are experiment 111's.
 
 **Three periods, each with one role.** The tuning period is the odd months of 2024-07 to 2025-06
 (the spread's fit), the replicate period is the even months of the same year (the sign of the
-contrasts), and the scored year is the 292 runs of `fold_a_daily_gap_v1` from 2025-07-02 to
+contrasts), and the scored year is the 291 runs of `fold_a_daily_gap_v1` from 2025-07-02 to
 2026-06-29. A run belongs to the month of its `power_fcst_init_time`.
 """
 
