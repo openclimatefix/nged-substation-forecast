@@ -115,7 +115,8 @@ counted many pairs (an origin and a target half-hour) that no filter with one st
 can learn about. This time we added a
 known one-signed offset to the observed power of ordinary days, as in experiment 190, and scored only
 the pairs the filter could know about. We measured the share of the offset's extra quantile-score
-loss that each filter removed (its recovery), and checked the filters on quiet days, which have no injected offset.
+loss that each filter removed (its recovery), and checked the filters on quiet days, which have no
+injected offset.
 A0 is the unchanged filter, A1 a faster per-band level, and A3 a level shared across bands (there is
 no A2 here; experiment 190's A2, the always-on boost, appears only in the next paragraph).
 
