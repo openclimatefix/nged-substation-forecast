@@ -178,6 +178,8 @@ def load_site(*, site: str, arm: str = "B") -> SiteData:
 
     Args:
         site: The substation's label.
+        arm: The training-mask arm whose fits and cached member forecasts to read (`B` is
+            experiment 111's).
 
     Returns:
         The site data.

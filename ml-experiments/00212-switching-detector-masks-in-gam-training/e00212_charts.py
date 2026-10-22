@@ -49,25 +49,43 @@ def main() -> None:
             rows.append({**r, "row": label, "group": label.split(":")[0]})
     data = pl.DataFrame(rows)
     title = alt.TitleParams(
-        text=textwrap.wrap("No training mask costs at most 0.01 points of score, far below the 0.05 bar", 70),
+        text=textwrap.wrap(
+            "No training mask costs at most 0.01 points of score, far below the 0.05 bar", 70
+        ),
         subtitle=textwrap.wrap(
             "Difference in quantile score (points of effective capacity; positive means the first arm is worse), with 95% intervals. Dashed lines: 0 and the 0.05 bar.",
             85,
         ),
-        anchor="start", fontSize=14, subtitleFontSize=11,
+        anchor="start",
+        fontSize=14,
+        subtitleFontSize=11,
     )
     chart = alt.layer(
-        alt.Chart(data).mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("low:Q", title="Score difference (points)", scale=alt.Scale(domain=[-0.05, 0.07])),
+        alt.Chart(data)
+        .mark_rule(strokeWidth=2)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "low:Q", title="Score difference (points)", scale=alt.Scale(domain=[-0.05, 0.07])
+            ),
             x2="high:Q",
             y=alt.Y("row:N", title=None, sort=None, axis=alt.Axis(labelLimit=330)),
-            color=alt.Color("group:N", legend=None, scale=alt.Scale(range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_GREEN])),
+            color=alt.Color(
+                "group:N",
+                legend=None,
+                scale=alt.Scale(range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_GREEN]),
+            ),
         ),
-        alt.Chart(data).mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
+        alt.Chart(data)
+        .mark_point(filled=True, size=70)
+        .encode(  # ty: ignore[unresolved-attribute]
             x="mean:Q", y=alt.Y("row:N", sort=None), color=alt.Color("group:N", legend=None)
         ),
-        alt.Chart(pl.DataFrame({"v": [0.0]})).mark_rule(strokeDash=[4, 3], color="#888").encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
-        alt.Chart(pl.DataFrame({"v": [0.05]})).mark_rule(strokeDash=[2, 2], color="#444").encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
+        alt.Chart(pl.DataFrame({"v": [0.0]}))
+        .mark_rule(strokeDash=[4, 3], color="#888")
+        .encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
+        alt.Chart(pl.DataFrame({"v": [0.05]}))
+        .mark_rule(strokeDash=[2, 2], color="#444")
+        .encode(x="v:Q"),  # ty: ignore[unresolved-attribute]
     ).properties(width=WIDTH, height=260, title=title)
     chart.save(OUT_DIR / "figure_1_contrasts.svg")
 

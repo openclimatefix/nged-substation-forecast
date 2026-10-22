@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Score the three training-mask arms of experiment 212 at one substation.
 
 Every arm is GAM-K's member forecasts from the arm's own monthly fits plus the K0 Kalman correction
@@ -42,7 +43,10 @@ WINDOW_HALF_HOURS = 48 * 730
 def post_flags(*, data, events: pl.DataFrame, offset: int, cuts: list) -> pl.DataFrame:  # noqa: ANN001
     """Per cached run: POST-NEW, POST-OLD, and the cluster (card of the latest transfer in the window)."""
     cut_positions = np.array(
-        [int(np.searchsorted(data.cache.end_times, naive_utc(moment=c), side="right")) for c in cuts]
+        [
+            int(np.searchsorted(data.cache.end_times, naive_utc(moment=c), side="right"))
+            for c in cuts
+        ]
     )
     cut_times = np.array([naive_utc(moment=c) for c in cuts], dtype="datetime64[us]")
     origins = data.run_origins
@@ -64,7 +68,11 @@ def post_flags(*, data, events: pl.DataFrame, offset: int, cuts: list) -> pl.Dat
             latest = int(np.argmax(np.where(in_window & (gap >= NEW_STAMPS), ends, -1)))
             cluster = cards[latest]
         rows.append((new, old, cluster))
-    return pl.DataFrame(rows, schema={"post_new": pl.Boolean, "post_old": pl.Boolean, "cluster": pl.String}, orient="row")
+    return pl.DataFrame(
+        rows,
+        schema={"post_new": pl.Boolean, "post_old": pl.Boolean, "cluster": pl.String},
+        orient="row",
+    )
 
 
 def main(site: str) -> None:
@@ -86,7 +94,10 @@ def main(site: str) -> None:
     scores = []
     for arm in ARMS:
         data = fed.get_site(site, arm)
-        if not (np.array_equal(data.position, base.position) and np.array_equal(data.run_of_row, base.run_of_row)):
+        if not (
+            np.array_equal(data.position, base.position)
+            and np.array_equal(data.run_of_row, base.run_of_row)
+        ):
             msg = f"{site} {arm}: rows differ from arm B"
             raise ValueError(msg)
         correction = fed.correction_for(

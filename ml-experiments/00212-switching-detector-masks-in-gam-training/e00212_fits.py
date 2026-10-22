@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Refit experiment 111's GAM-K at every monthly cut with three training masks.
 
 Arms: `A` trains on the rows of arm `B` plus the hand-filtered switching rows (no training mask);
@@ -21,7 +22,6 @@ from dataclasses import dataclass, replace
 from types import SimpleNamespace
 
 import e00212_alarms as al
-import e00212_fed as fed
 import e00212_g_common as common
 import e00212_g_members as members
 import e00212_nra as nra
@@ -68,7 +68,9 @@ def detector_mask(*, spans: Spans, n: int, cut_position: int) -> np.ndarray:
     and an interval whose end is not yet known runs to the cut.
     """
     mask = np.zeros(n, dtype=bool)
-    for onset, end, start, known in zip(spans.onset, spans.end, spans.start, spans.known, strict=True):
+    for onset, end, start, known in zip(
+        spans.onset, spans.end, spans.start, spans.known, strict=True
+    ):
         if start > cut_position:
             continue
         stop = end if known <= cut_position else cut_position + 1
@@ -84,7 +86,9 @@ def arm_cache(
     if arm == "B":
         rows = features.default_rows
     else:
-        rows = features.default_rows | (features.switching_mask & features.in_pool & ~features.lockdown)
+        rows = features.default_rows | (
+            features.switching_mask & features.in_pool & ~features.lockdown
+        )
         if arm != "A":
             assert spans is not None
             rows = rows & ~detector_mask(spans=spans, n=len(rows), cut_position=cut_position)
@@ -115,7 +119,9 @@ def fit_arm(*, site: str, arm: str, control: bool = False) -> str:
         position = int(np.searchsorted(cache.end_times, naive_utc(moment=cut), side="right"))
         fits.append(
             fit_gam(
-                cache=arm_cache(cache=cache, site=site, arm=arm, cut_position=position, spans=spans),
+                cache=arm_cache(
+                    cache=cache, site=site, arm=arm, cut_position=position, spans=spans
+                ),
                 site=site,
                 specs=[spec],
                 cut=cut,

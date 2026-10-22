@@ -25,9 +25,9 @@ from typing import Final
 
 import e00212_g_common as common
 import e00212_g_ens as ens
-from e00212_common import WORK_DIR
 import numpy as np
-import torch  # ty: ignore[unresolved-import]
+import torch
+from e00212_common import WORK_DIR
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens import member_means
 from studies.dp_ens_weather import Calibration
@@ -84,6 +84,8 @@ def build_site(site: str, arm: str = "B") -> str:
 
     Args:
         site: The substation's label.
+        arm: The training-mask arm whose fits and cached member forecasts to read (`B` is
+            experiment 111's).
 
     Returns:
         A progress line.

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Injected-transfer worlds: refit the three arms with drawn transfers added to the training readings.
 
 A world is one of experiment 195's `eval_held` worlds (fold k, world w < 4). Its drawn transfers on
@@ -17,6 +18,7 @@ ramp shape is a ramp up over 12 half-hours and down at the end.
 
 from __future__ import annotations
 
+import json
 import pickle
 import sys
 import time
@@ -29,13 +31,11 @@ import e00212_g_members as members
 import numpy as np
 import polars as pl
 import torch
-from e00212_common import E195_DIR, GRID_LENGTH, GRID_START, WORK_DIR, load_panel, stamp_months
+from e00212_common import E195_DIR, GRID_START, WORK_DIR, load_panel, stamp_months
 from e00212_g_arms import quantile_score
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import GamSpec, TrainingWindow, fit_gam
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
-
-import json
 
 MAD_TO_STD = 1.4826
 ONSET_KNOWN = 192
@@ -68,7 +68,13 @@ def pv_profile(*, local_hours: np.ndarray, day_of_year: np.ndarray) -> np.ndarra
     return np.clip(np.cos(np.pi * (local_hours - 12.0) / np.maximum(day_length, 1.0)), 0.0, None)
 
 
-def moved_mw(*, event: dict, sigma: dict[int, float], power: dict[int, np.ndarray], local) -> np.ndarray:
+def moved_mw(
+    *,
+    event: dict,
+    sigma: dict[int, float],
+    power: dict[int, np.ndarray],
+    local: tuple[np.ndarray, np.ndarray],
+) -> np.ndarray:
     """The MW moved at each stamp of an event: mean `depth_z` noise units of the donor."""
     onset, end = event["onset"], event["end"]
     length = end - onset
@@ -93,8 +99,12 @@ def moved_mw(*, event: dict, sigma: dict[int, float], power: dict[int, np.ndarra
 def local_calendar() -> tuple[np.ndarray, np.ndarray]:
     """Local hour of day and day of year of every detector stamp."""
     index = pl.datetime_range(
-        GRID_START, GRID_START.replace(year=2026, month=7), interval="30m", closed="left",
-        time_zone="UTC", eager=True,
+        GRID_START,
+        GRID_START.replace(year=2026, month=7),
+        interval="30m",
+        closed="left",
+        time_zone="UTC",
+        eager=True,
     ).dt.convert_time_zone("Europe/London")
     hour = index.dt.hour().to_numpy() + index.dt.minute().to_numpy() / 60.0
     return hour, index.dt.ordinal_day().to_numpy()
@@ -107,13 +117,21 @@ def world_events(*, fold: int, world: int, series: int) -> pl.DataFrame:
     ).filter(pl.col("series").list.contains(series))
     found = (
         pl.read_parquet(E195_DIR / f"injected_f{fold}.parquet")
-        .filter((pl.col("kind") == "eval_held") & (pl.col("arm") == "R re-ranker") & (pl.col("world") == world))
+        .filter(
+            (pl.col("kind") == "eval_held")
+            & (pl.col("arm") == "R re-ranker")
+            & (pl.col("world") == world)
+        )
         .select("event_id", "found")
     )
-    return events.join(found, on="event_id", how="left").with_columns(pl.col("found").fill_null(False))
+    return events.join(found, on="event_id", how="left").with_columns(
+        pl.col("found").fill_null(False)
+    )
 
 
-def delta_points(*, events: pl.DataFrame, series: int, site: str, offset: int, n: int) -> np.ndarray:
+def delta_points(
+    *, events: pl.DataFrame, series: int, site: str, offset: int, n: int
+) -> np.ndarray:
     """The MW the world adds at a site's series, in points, on the cache grid."""
     panel = load_panel()
     sigma = noise_units(residual=panel["residual"])
@@ -131,7 +149,9 @@ def delta_points(*, events: pl.DataFrame, series: int, site: str, offset: int, n
     return out
 
 
-def interval_mask(*, intervals: list[tuple[int, int, int, int]], n: int, cut_position: int) -> np.ndarray:
+def interval_mask(
+    *, intervals: list[tuple[int, int, int, int]], n: int, cut_position: int
+) -> np.ndarray:
     """Mask (onset, end, start, known) intervals as the alarms known at a cut."""
     mask = np.zeros(n, dtype=bool)
     for onset, end, start, known in intervals:
@@ -142,12 +162,28 @@ def interval_mask(*, intervals: list[tuple[int, int, int, int]], n: int, cut_pos
     return mask
 
 
-def fit_world_arm(*, cache: FeatureCache, site: str, arm: str, name: str, y: np.ndarray, truth: list, found: list, spans) -> None:  # noqa: ANN001
+def fit_world_arm(
+    *,
+    cache: FeatureCache,
+    site: str,
+    arm: str,
+    name: str,
+    y: np.ndarray,
+    truth: list,
+    found: list,
+    spans: fits_module.Spans,
+) -> None:
     """Fit one world arm at every monthly cut and store the fits under the arm's name."""
     settings = json.loads(common.PART_4_TUNED.read_text())
     drift = json.loads((common.SRC_WORK_DIR / "drift.json").read_text())["chosen_step"]
-    spec = GamSpec(ridge=0.1, drift_step=float(drift), step_penalty=settings["step_penalty"],
-                   capacity="pinned", final_knot="free", drift="none")
+    spec = GamSpec(
+        ridge=0.1,
+        drift_step=float(drift),
+        step_penalty=settings["step_penalty"],
+        capacity="pinned",
+        final_knot="free",
+        drift="none",
+    )
     vintages = read_vintages()
     features = cache.sites[site]
     base_rows = features.default_rows
@@ -168,10 +204,15 @@ def fit_world_arm(*, cache: FeatureCache, site: str, arm: str, name: str, y: np.
             cache, sites={**cache.sites, site: replace(features, y=y, default_rows=rows)}
         )
         fits.append(
-            fit_gam(cache=world_cache, site=site, specs=[spec], cut=cut,
-                    window=TrainingWindow(months=fits_module.WINDOW_MONTHS),
-                    season_years=common.SEASON_YEARS,
-                    pinned=pinned_capacity(vintages=vintages, table=features.table, cut=cut))
+            fit_gam(
+                cache=world_cache,
+                site=site,
+                specs=[spec],
+                cut=cut,
+                window=TrainingWindow(months=fits_module.WINDOW_MONTHS),
+                season_years=common.SEASON_YEARS,
+                pinned=pinned_capacity(vintages=vintages, table=features.table, cut=cut),
+            )
         )
     target = WORK_DIR / "fits" / name / f"{site}.pkl"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -193,35 +234,62 @@ def main(fold: int, world: int, site: str) -> None:
     n = len(cache.end_times)
     delta = delta_points(events=events, series=series, site=site, offset=offset, n=n)
     y = np.where(np.isfinite(cache.sites[site].y), cache.sites[site].y + delta, np.nan)
-    truth = [(r["onset"] + offset, r["end"] + offset, r["onset"] + offset, r["end"] + offset)
-             for r in events.iter_rows(named=True)]
-    found = [(r["onset"] + offset, r["end"] + offset, r["onset"] + offset + ONSET_KNOWN,
-              r["end"] + offset + END_KNOWN)
-             for r in events.iter_rows(named=True) if r["found"]]
+    truth = [
+        (r["onset"] + offset, r["end"] + offset, r["onset"] + offset, r["end"] + offset)
+        for r in events.iter_rows(named=True)
+    ]
+    found = [
+        (
+            r["onset"] + offset,
+            r["end"] + offset,
+            r["onset"] + offset + ONSET_KNOWN,
+            r["end"] + offset + END_KNOWN,
+        )
+        for r in events.iter_rows(named=True)
+        if r["found"]
+    ]
     spans = fits_module.detector_spans(cache=cache, site=site, fold=fold)
-    meta = pl.read_parquet(WORK_DIR / f"meta_{site}.parquet").filter(pl.col("run_period") == "scored")
+    meta = pl.read_parquet(WORK_DIR / f"meta_{site}.parquet").filter(
+        pl.col("run_period") == "scored"
+    )
     rows = meta["row"].to_numpy()
     spread = fed.k0_spread(site)
     out = []
     for arm in ("A", "B", "C"):
         name = f"W{fold}{world}{arm}"
-        fit_world_arm(cache=cache, site=site, arm=arm, name=name, y=y, truth=truth, found=found, spans=spans)
+        fit_world_arm(
+            cache=cache, site=site, arm=arm, name=name, y=y, truth=truth, found=found, spans=spans
+        )
         members.build_site(site, name)
         data = fed.get_site(site, name)
-        correction = fed.correction_for(data=data, stream=data.stream, prior=np.zeros(len(data.stream)), multiplier=1.0)
+        correction = fed.correction_for(
+            data=data, stream=data.stream, prior=np.zeros(len(data.stream)), multiplier=1.0
+        )
         q = fed.quantiles_at(data=data, correction=correction, spread=spread, rows=rows)
-        out.append(pl.DataFrame({
-            "arm": arm, "row": rows,
-            "qs": quantile_score(actual=data.actual[rows], quantiles=q).astype(np.float32),
-            "mean_forecast": (data.member_mean[rows] + correction[rows]).astype(np.float32),
-        }))
+        out.append(
+            pl.DataFrame(
+                {
+                    "arm": arm,
+                    "row": rows,
+                    "qs": quantile_score(actual=data.actual[rows], quantiles=q).astype(np.float32),
+                    "mean_forecast": (data.member_mean[rows] + correction[rows]).astype(np.float32),
+                }
+            )
+        )
         (WORK_DIR / "fits" / name / f"{site}.pkl").unlink()
         members.members_path(site=site, arm=name).unlink()
     target = WORK_DIR / "worlds" / f"scores_f{fold}_w{world}_{site}.parquet"
     target.parent.mkdir(parents=True, exist_ok=True)
-    pl.concat(out).with_columns(fold=pl.lit(fold), world=pl.lit(world), site=pl.lit(site),
-                                n_events=pl.lit(events.height), n_found=pl.lit(int(events["found"].sum()))).write_parquet(target)
-    print(f"f{fold} w{world} {site}: {events.height} events, {int(events['found'].sum())} found, {time.time() - started:.0f} s")
+    pl.concat(out).with_columns(
+        fold=pl.lit(fold),
+        world=pl.lit(world),
+        site=pl.lit(site),
+        n_events=pl.lit(events.height),
+        n_found=pl.lit(int(events["found"].sum())),
+    ).write_parquet(target)
+    print(
+        f"f{fold} w{world} {site}: {events.height} events, {int(events['found'].sum())} found, {time.time() - started:.0f} s"
+    )
 
 
 if __name__ == "__main__":
