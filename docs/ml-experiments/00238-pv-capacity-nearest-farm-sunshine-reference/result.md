@@ -182,6 +182,9 @@ km apart.**
   efficiency curve) depends on
   whether the gain is plant shape or sunshine. The maintainer's decision on an audit is pending.
 - **Review:** one Sonnet review of the plan, one of the code, and one of the page.
+- **No Opus audit was run.** The ML manager decided that quota did not allow an Opus review of
+  any of this series' experiments, so every audit trigger listed above stays unaudited and a
+  Sonnet reviewer read the code and the page instead.
 
 ## Limits
 
