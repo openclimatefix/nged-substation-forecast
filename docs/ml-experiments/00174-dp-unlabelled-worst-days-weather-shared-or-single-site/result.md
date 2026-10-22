@@ -104,6 +104,7 @@ advice:
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-22
+pr: 1479
 ---
 
 **Replacing the weather forecast with estimates of past weather removes only about a third of the
