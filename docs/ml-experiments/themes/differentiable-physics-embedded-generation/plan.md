@@ -2,6 +2,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 235, PV matched day pairs | Does the difference in net power between a sunny and a cloudy day of the same day type and temperature recover an injected solar farm better than the convex fit? | High | None | Planned |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
