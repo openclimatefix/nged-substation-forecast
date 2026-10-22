@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Build every arm's 11 quantiles for each farm, fold, and lead band, and write them.
 
 Arms (all in power over capacity):
@@ -22,11 +23,11 @@ then `s`, then `f` again), on the other farms' tuning rows of the same lead band
 """
 
 import itertools
-from collections.abc import Callable
-from functools import cache
 import multiprocessing
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import cache
 from typing import Final
 
 import e00224_common as common
@@ -109,7 +110,9 @@ def _bin_offsets(
     table = np.empty((N_BINS, len(LEVELS)))
     for index in range(N_BINS):
         rows = tuning & (bins == index)
-        table[index] = np.quantile(residual[rows], LEVELS) if rows.sum() >= MIN_BIN_ROWS else overall
+        table[index] = (
+            np.quantile(residual[rows], LEVELS) if rows.sum() >= MIN_BIN_ROWS else overall
+        )
     return bins, table[bins]
 
 
@@ -134,8 +137,19 @@ def build_farm_band(*, site: str, band: int, fold: str) -> FarmBand | None:
     bin0, offsets0 = _bin_offsets(forecast=mu0, residual=output - mu0, tuning=tuning)
     bin_m, offsets_m = _bin_offsets(forecast=mu, residual=output - mu, tuning=tuning)
     return FarmBand(
-        site=site, band=band, table=table, tuning=tuning, scored=scored, output=output, mu0=mu0,
-        response=response, mu=mu, sigma=sigma, bin0=bin0, bin_m=bin_m, offsets0=offsets0,
+        site=site,
+        band=band,
+        table=table,
+        tuning=tuning,
+        scored=scored,
+        output=output,
+        mu0=mu0,
+        response=response,
+        mu=mu,
+        sigma=sigma,
+        bin0=bin0,
+        bin_m=bin_m,
+        offsets0=offsets0,
         offsets_m=offsets_m,
     )
 
@@ -221,9 +235,7 @@ def donors(*, farm: FarmBand, strong: bool, seed: int) -> np.ndarray:
     return source
 
 
-def frame_of(
-    *, farm: FarmBand, fold: str, quantiles: np.ndarray, arm: str
-) -> pl.DataFrame:
+def frame_of(*, farm: FarmBand, fold: str, quantiles: np.ndarray, arm: str) -> pl.DataFrame:
     """Return the scored rows of one arm with the columns the scorer reads."""
     rows = farm.scored
     table = farm.table.filter(pl.Series(rows))
@@ -245,51 +257,56 @@ def frame_of(
     )
 
 
-def heuristic_and_climatology(*, farm: FarmBand, fold: str, full: pl.DataFrame) -> dict[str, np.ndarray]:
+def heuristic_and_climatology(
+    *, farm: FarmBand, fold: str, full: pl.DataFrame
+) -> dict[str, np.ndarray]:
     """Return the two floors' 11 quantiles for every row (NaN where the floor has no member)."""
     start, _ = common.FOLDS[fold]
     times = farm.table.select("time")
     history = full.filter(pl.col("site") == farm.site)
     columns = []
     for weeks in HEURISTIC_LAG_WEEKS:
-        lagged = history.select(
-            time=pl.col("time") + timedelta(weeks=weeks), lag=pl.col("output")
-        )
+        lagged = history.select(time=pl.col("time") + timedelta(weeks=weeks), lag=pl.col("output"))
         columns.append(times.join(lagged, on="time", how="left")["lag"].to_numpy())
     stack = np.column_stack(columns).astype(np.float64)
     count = np.sum(~np.isnan(stack), axis=1)
     heuristic = np.full((len(times), len(LEVELS)), np.nan)
     valid = count > 0
     heuristic[valid] = np.nanquantile(stack[valid], LEVELS, axis=1).T
-    samples = history.filter(pl.col("time") < start).select(
-        "time", "output"
-    ).with_columns(local=pl.col("time").dt.convert_time_zone("Europe/London"))
-    keyed = samples.select(
-        "output",
-        month=pl.col("local").dt.month(),
-        half_hour=pl.col("local").dt.hour() * 2 + pl.col("local").dt.minute() // 30,
-        weekend=pl.col("local").dt.weekday() >= 6,
-    ).join(CLIMATOLOGY_POOLING_OFFSETS, how="cross").select(
-        "output",
-        "weekend",
-        month=((pl.col("month") - 1 + pl.col("month_offset")) % 12 + 1),
-        half_hour=((pl.col("half_hour") + pl.col("half_hour_offset")) % 48),
+    samples = (
+        history.filter(pl.col("time") < start)
+        .select("time", "output")
+        .with_columns(local=pl.col("time").dt.convert_time_zone("Europe/London"))
+    )
+    keyed = (
+        samples.select(
+            "output",
+            month=pl.col("local").dt.month(),
+            half_hour=pl.col("local").dt.hour() * 2 + pl.col("local").dt.minute() // 30,
+            weekend=pl.col("local").dt.weekday() >= 6,
+        )
+        .join(CLIMATOLOGY_POOLING_OFFSETS, how="cross")
+        .select(
+            "output",
+            "weekend",
+            month=((pl.col("month") - 1 + pl.col("month_offset")) % 12 + 1),
+            half_hour=((pl.col("half_hour") + pl.col("half_hour_offset")) % 48),
+        )
     )
     lookup = keyed.group_by("month", "half_hour", "weekend").agg(
         *[pl.col("output").quantile(lv, "linear").alias(f"c{i}") for i, lv in enumerate(LEVELS)]
     )
-    local = farm.table.select(
-        local=pl.col("time").dt.convert_time_zone("Europe/London")
-    ).select(
+    local = farm.table.select(local=pl.col("time").dt.convert_time_zone("Europe/London")).select(
         month=pl.col("local").dt.month(),
         half_hour=pl.col("local").dt.hour() * 2 + pl.col("local").dt.minute() // 30,
         weekend=pl.col("local").dt.weekday() >= 6,
     )
-    climatology = local.join(lookup, on=["month", "half_hour", "weekend"], how="left").select(
-        [f"c{i}" for i in range(len(LEVELS))]
-    ).to_numpy()
+    climatology = (
+        local.join(lookup, on=["month", "half_hour", "weekend"], how="left")
+        .select([f"c{i}" for i in range(len(LEVELS))])
+        .to_numpy()
+    )
     return {"floor_heuristic": heuristic, "floor_climatology": climatology.astype(np.float64)}
-
 
 
 @cache
@@ -316,7 +333,8 @@ def task(job: tuple[str, int, str]) -> list[pl.DataFrame]:
     others = [f for name, f in farms.items() if name != site]
     pool = make_pool(farms=others, seed=SEED + band)
     f_rescale, _ = fit_factors(
-        pool=pool, make_centres=lambda s: np.repeat(pool["mu"][:, None], common.N_MEMBERS, axis=1),
+        pool=pool,
+        make_centres=lambda s: np.repeat(pool["mu"][:, None], common.N_MEMBERS, axis=1),
         fit_spread=False,
     )
     f_members, _ = fit_factors(pool=pool, make_centres=lambda s: pool["response"], fit_spread=False)
@@ -338,7 +356,8 @@ def task(job: tuple[str, int, str]) -> list[pl.DataFrame]:
         shuffled_sigma = farm.sigma[source]
         quantiles[f"p3_{label}"] = mixture(
             centres=centres_two_number(mu=farm.mu, sigma=shuffled_sigma, s=s_two),
-            offsets=farm.offsets_m, f=f_two,
+            offsets=farm.offsets_m,
+            f=f_two,
         )
         deviations = farm.response[source] - farm.mu[source][:, None]
         quantiles[f"p4_{label}"] = mixture(

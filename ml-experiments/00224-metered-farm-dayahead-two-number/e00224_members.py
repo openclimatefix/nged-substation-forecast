@@ -89,7 +89,7 @@ def read_members(*, cell: int) -> tuple[pl.DataFrame, np.ndarray, np.ndarray]:
 
 def sun_grid(*, row: dict[str, float | str], first: pl.Series) -> pl.DataFrame:
     """Return zenith, azimuth, and the mean cosine of each half-hour's 3-hour period."""
-    start = first.min() - timedelta(hours=PERIOD_HOURS)
+    start = common.ENS_START - timedelta(hours=PERIOD_HOURS)
     stop = pl.Series([GRID_END]).str.to_datetime(time_zone="UTC")[0] + timedelta(hours=PERIOD_HOURS)
     times = pl.datetime_range(
         start, stop, interval="30m", time_zone="UTC", eager=True, closed="left"
@@ -112,7 +112,11 @@ def sun_grid(*, row: dict[str, float | str], first: pl.Series) -> pl.DataFrame:
 
 
 def unit_response(
-    *, ghi: np.ndarray, temperature_c: np.ndarray, zenith: np.ndarray, azimuth: np.ndarray,
+    *,
+    ghi: np.ndarray,
+    temperature_c: np.ndarray,
+    zenith: np.ndarray,
+    azimuth: np.ndarray,
     doy: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return the fleet-shape unit response, beam, and diffuse for arrays shaped (rows, k)."""
@@ -177,7 +181,9 @@ def build_farm(site: str) -> str:
                 init_time=(pl.col("time") - timedelta(hours=low)).dt.truncate("1d"),
             )
             .join(
-                keys.rename({"valid_time": "period_end"}), on=["init_time", "period_end"], how="inner"
+                keys.rename({"valid_time": "period_end"}),
+                on=["init_time", "period_end"],
+                how="inner",
             )
             .join(previous, on=["init_time", "period_end"], how="left")
             .filter(pl.col("mean_cosine") > 0)

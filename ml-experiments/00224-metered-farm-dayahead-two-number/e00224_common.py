@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Shared constants and the farm-output reader for experiment 224 (two-number day-ahead farm forecast).
 
 Farms appear only as labels A to F. All tables written here live under `data/ml-experiments/`.

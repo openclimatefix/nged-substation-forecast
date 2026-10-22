@@ -45,11 +45,12 @@ def main() -> None:
     tails = pl.read_csv(common.DATA_DIR / "tails.csv").filter(
         (pl.col("fold") == "scored_year")
         & (pl.col("band") == common.HEADLINE_BAND)
-        & pl.col("arm").is_in(KEY_ARMS + ["floor_climatology"])
+        & pl.col("arm").is_in([*KEY_ARMS, "floor_climatology"])
     )
     print(
-        tails.select("arm", "level", "coverage", "pinball", "pinball_lower_95", "pinball_upper_95")
-        .sort("level", "arm")
+        tails.select(
+            "arm", "level", "coverage", "pinball", "pinball_lower_95", "pinball_upper_95"
+        ).sort("level", "arm")
     )
 
 

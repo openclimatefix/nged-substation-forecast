@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Draw the figures for experiment 224 from the tables `e00224_score.py` wrote (no farm series)."""
 
 from pathlib import Path
@@ -85,40 +86,37 @@ def contrasts() -> None:
         alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888888").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
     chart = (
-        (
-            base.mark_rule(size=3).encode(  # ty: ignore[unresolved-attribute]
-                x=alt.X("lo:Q", title="Change in quantile score (%; negative: first arm better)"),
-                x2="hi:Q",
-                y=y,
-                color=alt.Color(
-                    "lead:N",
-                    sort=list(BAND_LABELS.values()),
-                    scale=alt.Scale(
-                        domain=list(BAND_LABELS.values()),
-                        range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN],
-                    ),
-                    legend=alt.Legend(title="Lead", orient="top"),
+        base.mark_rule(size=3).encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("lo:Q", title="Change in quantile score (%; negative: first arm better)"),
+            x2="hi:Q",
+            y=y,
+            color=alt.Color(
+                "lead:N",
+                sort=list(BAND_LABELS.values()),
+                scale=alt.Scale(
+                    domain=list(BAND_LABELS.values()),
+                    range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_GREEN],
                 ),
-                yOffset="lead:N",
-            )
-            + base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
-                x="percent_change:Q",
-                y=y,
-                color=alt.Color("lead:N", legend=None),
-                yOffset="lead:N",
-            )
-            + zero
-        )
-        .properties(
-            width=PLOT_WIDTH,
-            height=240,
-            title=_title(
-                [
-                    "Contrasts in quantile score, mean over six farms, scored year 2025-09 to 2026-08.",
-                    "Dot: estimate. Line: 95% interval from resampling whole months. Grey rule: no change.",
-                ]
+                legend=alt.Legend(title="Lead", orient="top"),
             ),
+            yOffset="lead:N",
         )
+        + base.mark_point(filled=True, size=60).encode(  # ty: ignore[unresolved-attribute]
+            x="percent_change:Q",
+            y=y,
+            color=alt.Color("lead:N", legend=None),
+            yOffset="lead:N",
+        )
+        + zero
+    ).properties(
+        width=PLOT_WIDTH,
+        height=240,
+        title=_title(
+            [
+                "Contrasts in quantile score, mean over six farms, scored year 2025-09 to 2026-08.",
+                "Dot: estimate. Line: 95% interval from resampling whole months. Grey rule: no change.",
+            ]
+        ),
     )
     chart.save(DOCS_DIR / "figure_2_contrasts.svg")
 
@@ -149,7 +147,9 @@ def per_farm() -> None:
         .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
     chart = (
-        alt.Chart(long).mark_point(filled=True, size=90).encode(  # ty: ignore[unresolved-attribute]
+        alt.Chart(long)
+        .mark_point(filled=True, size=90)
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("change:Q", title="Change in quantile score (%; negative is better)"),
             y=alt.Y("farm:N", title="Farm", sort=list(common.FARMS)),
             color=alt.Color(

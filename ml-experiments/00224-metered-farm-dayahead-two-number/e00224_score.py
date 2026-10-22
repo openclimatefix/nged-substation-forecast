@@ -18,9 +18,7 @@ DRAWS: Final[int] = 20_000
 SEED: Final[int] = 224
 LEVELS: Final[np.ndarray] = np.array(common.LEVELS)
 QUANTILE_COLUMNS: Final[list[str]] = [level_column(level=lv) for lv in common.LEVELS]
-MASSES: Final[np.ndarray] = np.diff(
-    np.concatenate([[0.0], (LEVELS[:-1] + LEVELS[1:]) / 2, [1.0]])
-)
+MASSES: Final[np.ndarray] = np.diff(np.concatenate([[0.0], (LEVELS[:-1] + LEVELS[1:]) / 2, [1.0]]))
 REFERENCE: Final[str] = "a2_mean"
 CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C0 members minus mean": ("a4_members", REFERENCE),
@@ -65,7 +63,9 @@ def per_row(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def cell_sums(*, rows: pl.DataFrame, value: str) -> tuple[np.ndarray, list[str], list[str]]:
+def cell_sums(
+    *, rows: pl.DataFrame, value: str
+) -> tuple[np.ndarray, np.ndarray, list[str], list[str]]:
     """Return sums[arm, farm, month], counts[farm, month], and the arm and month labels."""
     arms = sorted(rows["arm"].unique().to_list())
     farms = common.FARMS
@@ -79,7 +79,7 @@ def cell_sums(*, rows: pl.DataFrame, value: str) -> tuple[np.ndarray, list[str],
         a, f, m = arms.index(r["arm"]), farms.index(r["time_series_id"]), months.index(r["month"])
         sums[a, f, m] = r["total"]
         counts[f, m] = r["n"]
-    return sums, counts, arms, months  # type: ignore[return-value]
+    return sums, counts, arms, months
 
 
 def boot_scores(*, sums: np.ndarray, counts: np.ndarray, draws: int) -> np.ndarray:
@@ -91,7 +91,9 @@ def boot_scores(*, sums: np.ndarray, counts: np.ndarray, draws: int) -> np.ndarr
     out = np.empty((sums.shape[0], draws))
     with np.errstate(invalid="ignore", divide="ignore"):
         for a in range(sums.shape[0]):
-            out[a] = np.nanmean((weights @ sums[a].T) / np.where(denominator > 0, denominator, np.nan), axis=1)
+            out[a] = np.nanmean(
+                (weights @ sums[a].T) / np.where(denominator > 0, denominator, np.nan), axis=1
+            )
     return out
 
 
@@ -120,55 +122,90 @@ def main() -> None:
                 i = index[arm]
                 lo, hi = interval(boot[i])
                 scores_all.append(
-                    {"fold": fold, "band": band, "arm": arm, "score": point[i], "lo": lo, "hi": hi,
-                     "n_rows": int(counts.sum()), "n_months": len(months)}
+                    {
+                        "fold": fold,
+                        "band": band,
+                        "arm": arm,
+                        "score": point[i],
+                        "lo": lo,
+                        "hi": hi,
+                        "n_rows": int(counts.sum()),
+                        "n_months": len(months),
+                    }
                 )
             reference = point[index[REFERENCE]]
-            shares = {}
             for name, (arm, other) in CONTRASTS.items():
                 delta = 100.0 * (boot[index[arm]] - boot[index[other]]) / boot[index[other]]
                 base = 100.0 * (point[index[arm]] - point[index[other]]) / point[index[other]]
                 lo, hi = interval(delta)
                 contrasts_all.append(
-                    {"fold": fold, "band": band, "contrast": name, "percent_change": base, "lo": lo, "hi": hi}
+                    {
+                        "fold": fold,
+                        "band": band,
+                        "contrast": name,
+                        "percent_change": base,
+                        "lo": lo,
+                        "hi": hi,
+                    }
                 )
-            c0 = 100.0 * (boot[index["a4_members"]] - boot[index[REFERENCE]]) / boot[index[REFERENCE]]
-            c1 = 100.0 * (boot[index["a3_two_number"]] - boot[index[REFERENCE]]) / boot[index[REFERENCE]]
+            c0 = (
+                100.0
+                * (boot[index["a4_members"]] - boot[index[REFERENCE]])
+                / boot[index[REFERENCE]]
+            )
+            c1 = (
+                100.0
+                * (boot[index["a3_two_number"]] - boot[index[REFERENCE]])
+                / boot[index[REFERENCE]]
+            )
             c0p = 100.0 * (point[index["a4_members"]] - reference) / reference
             c1p = 100.0 * (point[index["a3_two_number"]] - reference) / reference
             share = c1 / np.where(np.abs(c0) > 1e-9, c0, np.nan)
             lo, hi = interval(share)
             contrasts_all.append(
-                {"fold": fold, "band": band, "contrast": "retained share C1/C0",
-                 "percent_change": c1p / c0p, "lo": lo, "hi": hi}
+                {
+                    "fold": fold,
+                    "band": band,
+                    "contrast": "retained share C1/C0",
+                    "percent_change": c1p / c0p,
+                    "lo": lo,
+                    "hi": hi,
+                }
             )
             # Per farm.
             for farm in common.FARMS:
                 sub = rows.filter(pl.col("time_series_id") == farm)
                 if sub.is_empty():
                     continue
-                table = sub.group_by("arm").agg(
-                    score=pl.col("score").mean(),
-                    mae_median=pl.col("abs_error_median").mean(),
-                    mae_mean=pl.col("abs_error_mean").mean(),
-                    median_minus_mean=pl.col("median_minus_mean").mean(),
-                    n=pl.len(),
-                ).with_columns(fold=pl.lit(fold), band=pl.lit(band), farm=pl.lit(farm))
+                table = (
+                    sub.group_by("arm")
+                    .agg(
+                        score=pl.col("score").mean(),
+                        mae_median=pl.col("abs_error_median").mean(),
+                        mae_mean=pl.col("abs_error_mean").mean(),
+                        median_minus_mean=pl.col("median_minus_mean").mean(),
+                        n=pl.len(),
+                    )
+                    .with_columns(fold=pl.lit(fold), band=pl.lit(band), farm=pl.lit(farm))
+                )
                 farm_all.append(table)
             # Tail calibration pooled over farms (points of capacity).
             for arm in arms:
                 sub = rows.filter(pl.col("arm") == arm).with_columns(
-                    **{c: pl.col(c) * 100.0 for c in QUANTILE_COLUMNS}, actual=pl.col("actual") * 100.0
+                    **{c: pl.col(c) * 100.0 for c in QUANTILE_COLUMNS},
+                    actual=pl.col("actual") * 100.0,
                 )
                 table = tail_calibration_table(frame=sub, levels=TAIL_LEVELS).with_columns(
                     fold=pl.lit(fold), band=pl.lit(band), arm=pl.lit(arm)
                 )
                 tails_all.append(table)
             checks_all.append(
-                rows.group_by("arm").agg(
+                rows.group_by("arm")
+                .agg(
                     mae_median=pl.col("abs_error_median").mean(),
                     mae_mean=pl.col("abs_error_mean").mean(),
-                ).with_columns(fold=pl.lit(fold), band=pl.lit(band))
+                )
+                .with_columns(fold=pl.lit(fold), band=pl.lit(band))
             )
     out = common.DATA_DIR
     scores = pl.DataFrame(scores_all)
