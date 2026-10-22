@@ -143,7 +143,7 @@ def main() -> None:
             "other": other,
             "mean_abs_error": mae,
         }
-    print("K0 absolute:", round(float(wide["qs_K0"].mean()), 3))
+    print("K0 absolute:", round(float(wide["qs_K0"].mean()), 3))  # ty: ignore[invalid-argument-type]
     for arm in LEARNED:
         for fold in range(3):
             f = (
@@ -241,17 +241,17 @@ def main() -> None:
     arms_all = [*FOLDLESS, *LEARNED]
     print("\n== AFTER rows: mean score by scope (points of effective capacity) ==")
     for name, f in scopes.items():
-        means = {a: round(float(f[f"qs_{a}"].mean()), 3) for a in arms_all}
+        means = {a: round(float(f[f"qs_{a}"].mean()), 3) for a in arms_all}  # ty: ignore[invalid-argument-type]
         if name == "shared":
-            means["BG2"] = round(float(f["bg2_qs"].mean()), 3)
+            means["BG2"] = round(float(f["bg2_qs"].mean()), 3)  # ty: ignore[invalid-argument-type]
         print(f"{name:10s} rows {f.height:5d} cards {f['card'].n_unique():2d} {means}")
         report[f"means|{name}"] = {"rows": f.height, "cards": f["card"].n_unique(), **means}
     print("\nPositive controls (shared scope; printed to 3 decimals):")
     shared = scopes["shared"]
     got = {
-        "K0": float(shared["qs_K0"].mean()),
-        "PAIR_NEW": float(shared["qs_PAIR_NEW"].mean()),
-        "BG2": float(shared["bg2_qs"].mean()),
+        "K0": float(shared["qs_K0"].mean()),  # ty: ignore[invalid-argument-type]
+        "PAIR_NEW": float(shared["qs_PAIR_NEW"].mean()),  # ty: ignore[invalid-argument-type]
+        "BG2": float(shared["bg2_qs"].mean()),  # ty: ignore[invalid-argument-type]
     }
     for k, v in CONTROLS.items():
         print(
