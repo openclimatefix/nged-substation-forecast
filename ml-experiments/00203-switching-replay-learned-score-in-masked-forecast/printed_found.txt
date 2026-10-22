@@ -1,0 +1,55 @@
+Known stamp minus logged end, in half-hours (negative: known before the transfer ended)
+shape: (45, 9)
+┌──────┬────────┬───────┬──────────┬──────────┬───────────┬───────────┬──────────┬─────────────┐
+│ site ┆ card   ┆ hours ┆ PAIR_NEW ┆ RONC_147 ┆ LEARNED_R ┆ LEARNED_F ┆ RONC_195 ┆ LEARNED_R96 │
+│ ---  ┆ ---    ┆ ---   ┆ ---      ┆ ---      ┆ ---       ┆ ---       ┆ ---      ┆ ---         │
+│ str  ┆ str    ┆ i64   ┆ i64      ┆ i64      ┆ i64       ┆ i64       ┆ i64      ┆ i64         │
+╞══════╪════════╪═══════╪══════════╪══════════╪═══════════╪═══════════╪══════════╪═════════════╡
+│ D10  ┆ 4b6ae9 ┆ 25    ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D10  ┆ 6dc4dc ┆ 10    ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D10  ┆ 8e22b8 ┆ 4     ┆ 3        ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D10  ┆ 9d01e6 ┆ 8     ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D10  ┆ da56d5 ┆ 416   ┆ null     ┆ null     ┆ -639      ┆ -735      ┆ null     ┆ -735        │
+│ D10  ┆ edf3ba ┆ 100   ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D11  ┆ a675e1 ┆ 48    ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D14  ┆ 1fd002 ┆ 6     ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D14  ┆ a2d72e ┆ 72    ┆ -133     ┆ null     ┆ 47        ┆ -49       ┆ null     ┆ -49         │
+│ D14  ┆ c9b432 ┆ 32    ┆ null     ┆ 93       ┆ 189       ┆ 93        ┆ 93       ┆ 93          │
+│ D14  ┆ dcb2af ┆ 5     ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D14  ┆ e89200 ┆ 14    ┆ -15      ┆ null     ┆ null      ┆ 69        ┆ null     ┆ null        │
+│ D14  ┆ e94a3a ┆ 12    ┆ -12      ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D16  ┆ 212ef4 ┆ 8     ┆ null     ┆ null     ┆ null      ┆ 80        ┆ null     ┆ null        │
+│ D16  ┆ 2c8286 ┆ 102   ┆ null     ┆ -123     ┆ null      ┆ null      ┆ -123     ┆ null        │
+│ D16  ┆ 500860 ┆ 246   ┆ -182     ┆ -397     ┆ -301      ┆ -397      ┆ -397     ┆ -397        │
+│ D16  ┆ 5954db ┆ 78    ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D16  ┆ 60a750 ┆ 13    ┆ -14      ┆ 67       ┆ 163       ┆ 67        ┆ 67       ┆ 67          │
+│ D16  ┆ 7de591 ┆ 9     ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D16  ┆ 89f203 ┆ 108   ┆ null     ┆ -121     ┆ -25       ┆ -121      ┆ -121     ┆ -121        │
+│ D16  ┆ 99f578 ┆ 80    ┆ null     ┆ 91       ┆ null      ┆ 91        ┆ 91       ┆ null        │
+│ D16  ┆ a98ca2 ┆ 60    ┆ -107     ┆ 95       ┆ 191       ┆ 95        ┆ 95       ┆ 95          │
+│ D16  ┆ b2f7c0 ┆ 372   ┆ -730     ┆ -646     ┆ -550      ┆ -646      ┆ -646     ┆ -646        │
+│ D16  ┆ d430a6 ┆ 9     ┆ -6       ┆ 75       ┆ 171       ┆ 75        ┆ 75       ┆ 75          │
+│ D16  ┆ da3aa8 ┆ 9     ┆ -7       ┆ null     ┆ null      ┆ 78        ┆ null     ┆ null        │
+│ D16  ┆ e2fb25 ┆ 6     ┆ 11       ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D16  ┆ e4d70e ┆ 75    ┆ null     ┆ -54      ┆ 42        ┆ -54       ┆ -54      ┆ -54         │
+│ D5   ┆ 212ef4 ┆ 8     ┆ null     ┆ null     ┆ null      ┆ 76        ┆ null     ┆ null        │
+│ D5   ┆ 2c8286 ┆ 102   ┆ null     ┆ -100     ┆ -4        ┆ -100      ┆ -100     ┆ -100        │
+│ D5   ┆ 5209a1 ┆ 5     ┆ 1        ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D5   ┆ 5cc016 ┆ 94    ┆ null     ┆ null     ┆ 2         ┆ -109      ┆ null     ┆ -94         │
+│ D5   ┆ 5d0034 ┆ 4     ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D5   ┆ 60a750 ┆ 13    ┆ -14      ┆ null     ┆ null      ┆ 70        ┆ null     ┆ null        │
+│ D5   ┆ 801c51 ┆ 32    ┆ null     ┆ 32       ┆ 128       ┆ 32        ┆ 32       ┆ 32          │
+│ D5   ┆ 93671a ┆ 384   ┆ null     ┆ null     ┆ -576      ┆ -672      ┆ -672     ┆ -672        │
+│ D5   ┆ 99f578 ┆ 80    ┆ null     ┆ -64      ┆ 32        ┆ -64       ┆ -64      ┆ -64         │
+│ D5   ┆ 9d682b ┆ 16    ┆ -22      ┆ 49       ┆ null      ┆ 95        ┆ 49       ┆ null        │
+│ D5   ┆ 9d9e6e ┆ 8     ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+│ D5   ┆ b2f7c0 ┆ 372   ┆ -730     ┆ -647     ┆ -551      ┆ -647      ┆ -647     ┆ -647        │
+│ D5   ┆ ce4b82 ┆ 580   ┆ -1175    ┆ 95       ┆ 191       ┆ 95        ┆ 95       ┆ 95          │
+│ D5   ┆ d430a6 ┆ 9     ┆ -6       ┆ 49       ┆ null      ┆ 78        ┆ 49       ┆ null        │
+│ D5   ┆ da3aa8 ┆ 9     ┆ -7       ┆ 46       ┆ 142       ┆ 78        ┆ 46       ┆ 46          │
+│ D5   ┆ e2fb25 ┆ 6     ┆ 11       ┆ null     ┆ null      ┆ 83        ┆ null     ┆ null        │
+│ D5   ┆ f4fd05 ┆ 118   ┆ -132     ┆ -141     ┆ -45       ┆ null      ┆ -141     ┆ -141        │
+│ D9   ┆ 7fce88 ┆ 748   ┆ null     ┆ null     ┆ null      ┆ null      ┆ null     ┆ null        │
+└──────┴────────┴───────┴──────────┴──────────┴───────────┴───────────┴──────────┴─────────────┘
+found (not null): {'PAIR_NEW': 20, 'RONC_147': 19, 'LEARNED_R': 19, 'LEARNED_F': 27, 'RONC_195': 20, 'LEARNED_R96': 19}
+known before the end: {'PAIR_NEW': 16, 'RONC_147': 9, 'LEARNED_R': 8, 'LEARNED_F': 11, 'RONC_195': 10, 'LEARNED_R96': 12}
