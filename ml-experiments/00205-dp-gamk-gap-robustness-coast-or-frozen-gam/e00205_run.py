@@ -269,12 +269,12 @@ def _job(site: str) -> str:  # noqa: PLR0915
     joined = d_0.select("run", "valid_time", "mean").join(
         stored.rename({"mean": "stored"}), on=["run", "valid_time"], how="inner"
     )
-    reproduce = float((joined["mean"] - joined["stored"]).abs().max())
+    reproduce = float(np.max(np.abs((joined["mean"] - joined["stored"]).to_numpy())))
     # Control 2: widening by zero extra variance leaves the quantiles unchanged.
     same = widen(frame=d_0, extra_variance=np.zeros(d_0.height))
     widen_zero = float(
         max(
-            (same[c].cast(pl.Float64) - d_0[c].cast(pl.Float64)).abs().max()
+            float(np.max(np.abs((same[c].cast(pl.Float64) - d_0[c].cast(pl.Float64)).to_numpy())))
             for c in QUANTILE_COLUMNS
         )
     )

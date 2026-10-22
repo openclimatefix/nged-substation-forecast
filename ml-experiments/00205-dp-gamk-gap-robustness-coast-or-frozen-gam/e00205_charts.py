@@ -80,7 +80,7 @@ def figure_headline(*, report: dict) -> alt.TopLevelMixin:
         "Drop filter, keep offset and R (c2)": ocf.DATA_BLUE,
         "Frozen model alone (c)": GREY,
     }
-    base = alt.Chart(pl.DataFrame(rows)).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(pl.DataFrame(rows)).encode(
         x=alt.X("gap:N", sort=[f"{g} h" for g in GAPS], title="Gap length", axis=GAP_AXIS),
         xOffset=alt.XOffset("rule:N", sort=list(colours)),
         color=alt.Color(
@@ -130,7 +130,7 @@ def figure_contrast(*, report: dict) -> alt.TopLevelMixin:
         "Coast minus drop-the-filter (c2)": ocf.BRAND_ORANGE,
         "Coast minus frozen model alone (c)": ocf.DATA_BLUE,
     }
-    base = alt.Chart(pl.DataFrame(rows)).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(pl.DataFrame(rows)).encode(
         x=alt.X("gap:N", sort=[f"{g} h" for g in GAPS], title="Gap length", axis=GAP_AXIS),
         xOffset=alt.XOffset("contrast:N", sort=list(colours)),
         color=alt.Color(

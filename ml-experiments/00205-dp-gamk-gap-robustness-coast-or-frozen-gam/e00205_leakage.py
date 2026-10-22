@@ -45,7 +45,9 @@ def main() -> None:
         perturbed_frame = frame.with_columns(pl.Series("actual", noisy.astype(np.float32)))
         perturbed = run.d_pipeline(frame=perturbed_frame, hidden_actual=noisy)
         mine = pl.col("run") == event
-        gap = (reference.filter(mine)["mean"] - perturbed.filter(mine)["mean"]).abs().max()
+        gap = np.max(
+            np.abs((reference.filter(mine)["mean"] - perturbed.filter(mine)["mean"]).to_numpy())
+        )
         results.append(
             {"run": int(event), "origin": str(origin), "max_abs_mean_difference": float(gap)}
         )

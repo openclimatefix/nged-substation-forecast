@@ -109,14 +109,18 @@ lessons:
     0.02 points of its no-gap value 24 hours after a 24-hour gap, and with recipe R it is not within
     48 hours (+0.025); recipe R's loss of source days is the suspected cause and was not tested.
 take_home_message: >-
-  When power readings stop for 3 to 72 hours, keep running the Kalman filter without updates and
-  widen the quantile bands: that forecast is 0.25 to 0.44 points (8% to 14% of the frozen model's
-  score) better than falling back to the frozen demand model alone, at every gap length tested; at
-  72 hours the interval's near end is only 0.04 points. Whether dropping the
-  filter would be even better after a gap of about 72 hours could not be told: the two forecasts
-  differ by less than the month-to-month noise at every length. After a 24-hour gap the full
-  forecast was still 0.025 points above its no-gap score 48 hours later; the filter alone was back
-  within 24 hours.
+  When readings stop for 3, 6, 24, or 72 hours, keep running the Kalman filter, which corrects the
+  convex demand model using its recent forecast errors, without feeding it new readings, and widen
+  the quantile bands. At each of those four gap lengths that forecast scored 0.25 to 0.44 points
+  of quantile score better than the convex demand model with no correction (a quantile score is an
+  error measure in percent of the substation's effective capacity, and lower is better; the gain
+  is 8% to 14% of the uncorrected model's score). At 72 hours the 99.4% bootstrap interval for the
+  gain runs from 0.04 to 0.48 points, so the gain may be small. The data cannot show whether
+  dropping only the filter beats coasting after a gap of about 72 hours: at every gap length the
+  difference between the two forecasts is smaller than the variation between months. The forecast
+  with the filter, winter night offset, and recipe R was still 0.025 points worse than its no-gap
+  score 48 hours after a 24-hour gap ended. The filter alone was within 0.02 points of its no-gap
+  score 24 hours after the gap ended.
 advice:
   - >-
     Serve coasting (the filter running with no update) when power readings are missing, for gaps of
@@ -141,26 +145,26 @@ adopted_in: none
 
 # Gap robustness of the convex model with a Kalman filter: coast or fall back
 
-**Take-home: when power readings stop, keep the Kalman filter running with no update and widen the
-bands.** That forecast scores 0.25 to 0.44 points better than the frozen demand model alone at every
-gap length from 3 to 72 hours. Whether dropping the filter would beat coasting at about 72 hours
-could not be told. The formal verdict is `inconclusive`, because the pre-registered contrasts
-against the filter-free pipeline all span zero.
+**Take-home: when power readings stop, keep the Kalman filter running without new readings
+("coasting") and widen the bands.** At each of the four gap lengths tested (3, 6, 24, and 72 hours)
+that forecast scored 0.25 to 0.44 points of quantile score better than the convex demand model with
+no correction. A quantile score is an error measure in percent of the substation's effective
+capacity, and lower is better. Whether dropping only the filter would beat coasting at about 72
+hours could not be told. The formal verdict is `inconclusive`: each comparison planned in advance
+against the same forecast with the filter dropped has an interval that includes zero.
 
-We asked what a live forecast should do when power readings go missing: let the filter coast, widen
-the bands as well, or drop to the demand model with no filter. The demand model is the convex model
-of [experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)
+We asked what a live forecast should do when power readings go missing: let the filter coast, coast
+and also widen the bands, or drop the filter. The demand model is the convex generalised additive
+model of [experiment 111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)
 with a Kalman filter on its recent errors (GAM-K, a method re-implemented from [de Vilmarest and
-Wintenberger (2022)](https://arxiv.org/abs/2104.10777)), plus the corrections of arm D of
-[experiment
-155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md). We hid the
-readings
-of 3, 6, 24, or 72 hours before the forecast's data cutoff, at up to 56 forecast runs at each of
-five substations (275 in all), and scored the forecast over the next 168 hours. Coasting kept the
-forecast within
-0.011
-points of its no-gap score (2.747) after a 3-hour gap and 0.206 points after a 72-hour gap. Dropping
-the filter cost 0.158 to 0.193 points whatever the gap.
+Wintenberger (2022)](https://arxiv.org/abs/2104.10777)), plus the winter night offset and recipe R
+of arm D of [experiment
+155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md). We hid every
+reading in the 3, 6, 24, or 72 hours ending at the forecast's data cutoff (the time of the last
+usable reading), for up to 56 forecast runs (events) at each of five substations (275 events in
+all), and scored the forecast over the next 168 hours. With coasting, the quantile score (2.747
+points with no gap) worsened by 0.011 points after a 3-hour gap and by 0.206 points after a 72-hour
+gap. With the filter dropped, it worsened by 0.158 to 0.193 points at every gap length.
 
 ![Each rule's score minus the no-gap score by gap length](figure_1_headline.svg)
 
@@ -172,119 +176,125 @@ the filter cost 0.158 to 0.193 points whatever the gap.
 
 ## Headline numbers
 
-- **Arms (rules).** (a) coast: the filter, the winter night offset, and recipe R on the gapped
-    readings. (b) coast with the quantile offsets widened by the filter's variance growth since the
-    last reading. (c2) the same pipeline with the filter dropped. (c) the frozen model alone, with
-    no filter, offset, or recipe R. Pre-registered in [the plan](#planned-design) below.
-- **Row set.** Five decision substations (D5, D10, D11, D14, D16), 53 to 56 event runs each (275 in
-    all) (one per 8-day
-    block of the replicate and scored runs), leads 0.5 to 168 hours outside the hand-filtered
-    switching events. Gap ends at the cutoff for the headline (k = 0). Spread tables are the no-gap
-    ones. Filter, GAM, and settings are those of experiment 136's arm A2. No weather input changes.
-- **Absolute scores (all leads, points).** No gap 2.747. Rule (a): 2.758, 2.790, 2.857, 2.953 at 3,
-    6, 24, 72 hours. Rule (b): 2.759, 2.788, 2.857, 2.948. Rule (c2): 2.905, 2.905, 2.914, 2.940.
-Rule
-    (c): 3.198 (no gap dependence).
-- **Headline contrasts (a minus c2, 99.4% month-resampled interval).** 3 h: -0.147 (-0.321 to
-    +0.030). 6 h: -0.116 (-0.287 to +0.060). 24 h: -0.057 (-0.232 to +0.123). 72 h: +0.013 (-0.152
-to
-    +0.203). All four span zero, so the crossover is not established, and C1 and C2 fail the
-    pre-registered test. Under 24 hours of lead the contrast is below zero at 3, 6, and 24 hours
-    (-0.480, -0.401, -0.295) and spans zero at 72 hours (-0.167, -0.353 to +0.022).
-- **Against the frozen model alone (a minus c, descriptive).** -0.439 (-0.666 to -0.241), -0.408,
-    -0.341, and -0.245 (-0.478 to -0.040) at 3, 6, 24, and 72 hours.
-- **Wider bands (b minus a).** Score -0.004 to +0.000 at every length, every interval spanning
-    zero (72 h: -0.004, -0.033 to +0.014). The q05 coverage moves by -0.006, -0.011, -0.023, and
-    -0.028 (24 h: -0.032 to -0.015), and the q95 coverage by +0.003, +0.007, +0.014, and +0.018.
-Rule
-    (a) covers 7.3%, 7.6%, 7.7%, and 8.4% below q05 and 95.1%, 94.9%, 94.5%, and 94.2% below q95;
-rule
-    (b) covers 6.6%, 6.4%, 5.5%, and 5.6% and 95.5%, 95.6%, 95.9%, and 95.9%; no gap 7.1% and 95.1%.
-- **Rule (b) replaces rule (a).** The mean absolute distance of the q05 and q95 coverage from
-    nominal is 0.016 for (a) and 0.007 for (b) at 24 hours, and 0.021 and 0.008 at 72 hours. The
-    month-resampled intervals of the coverage differences exclude zero (24 h: q05 -0.032 to -0.015,
-    q95 +0.010 to +0.018), and the score difference is at most +0.000 against the +0.01 limit. The
-    plan's binomial standard error is replaced by the month-resampled interval, which allows for
-    months moving together.
-- **Tails (rule a, 3 to 72 h).** Pinball loss at q01 0.222 to 0.257 and q99 0.231 to 0.242; coverage
-    below q01 2.5% to 3.2% and below q99 98.1% to 98.4%; rule (b) 1.6% to 2.2% and 98.6% to 98.8%.
-- **Recovery after a 24-hour gap.** Rule (a) minus no gap is +0.110, +0.074, +0.061, +0.060,
-    +0.012, and +0.025 points when the gap ended 0, 3, 6, 12, 24, and 48 hours before the cutoff. It
-    does not stay within 0.02 points, so the pre-registered recovery (6 hours or less) fails. The
-    filter alone (arm a0 minus its own no-gap score) is within 0.02 points from 24 hours on. After
-    gaps of 3 and 6 hours the recovery is 0 and 24 hours; after 72 hours it is not reached in 48
-hours.
-- **Differences between substations (a minus c2).** At 3 hours: D10 -0.171, D11 -0.228, D14
-    -0.342, D16 +0.056, D5 -0.040. At 72 hours: +0.033, -0.012, -0.235, +0.222, +0.061.
+All differences are in points of quantile score, over leads of 0.5 to 168 hours. An interval is
+the 99.4% bootstrap interval, resampled by calendar month, and "spans zero" means it includes zero.
+Rule letters: (a) coast, (b) coast with wider bands, (c2) drop the filter, (c) the frozen model alone.
+
+- **Rules.** (a) The filter on the gapped readings, then the winter night offset (a monthly refitted
+    correction to winter night forecasts) and recipe R (subtract 0.75 times the mean forecast-error
+    profile of the previous 14 days). (b) Rule (a) with the quantile offsets widened by the filter's
+    variance growth since the last reading. (c2) Rule (a) with the filter dropped. (c) The convex
+    demand model with no filter, offset, or recipe R, called the frozen model. The plan below fixes
+    these rules before any score was read.
+- **Events.** Five decision substations (D5, D10, D11, D14, and D16) with 53 to 56 events each (275
+    in all), one randomly drawn forecast run per 8-day block. The gap ends at the data cutoff (k = 0,
+    where k is the number of hours between the gap's end and the cutoff). The spread tables, which
+    hold the quantile offsets from the mean, come from the no-gap forecast of experiment 136's arm
+    A2.
+- **Absolute scores.** No gap 2.747. Rule (a) 2.758, 2.790, 2.857, and 2.953 at 3, 6, 24, and 72
+    hours. Rule (b) 2.759, 2.788, 2.857, and 2.948. Rule (c2) 2.905, 2.905, 2.914, and 2.940. Rule
+    (c) 3.198, whatever the gap.
+- **Coasting minus dropping the filter (rule (a) minus rule (c2)).** 3 hours -0.147 (-0.321 to
+    +0.030). 6 hours -0.116 (-0.287 to +0.060). 24 hours -0.057 (-0.232 to +0.123). 72 hours +0.013
+    (-0.152 to +0.203). All four span zero, so no crossover length is established and the
+    pre-registered test fails. Over leads under 24 hours the contrast is below zero at 3, 6, and 24
+    hours (-0.480, -0.401, and -0.295) and spans zero at 72 hours (-0.167, -0.353 to +0.022).
+- **Coasting minus the frozen model alone (rule (a) minus rule (c)).** -0.439 (-0.666 to -0.241),
+    -0.408, -0.341, and -0.245 (-0.478 to -0.040) at 3, 6, 24, and 72 hours. The plan treats this
+    contrast as descriptive.
+- **Wider bands (rule (b) minus rule (a)).** The score changes by -0.004 to +0.000 at every length,
+    and every interval spans zero (72 hours: -0.004, -0.033 to +0.014). The share of actual
+    readings below the predicted 5% quantile (q05) changes by -0.006, -0.011, -0.023, and -0.028
+    (24 hours: -0.032 to -0.015), and the share below q95 by +0.003, +0.007, +0.014, and +0.018.
+- **Coverage.** Under rule (a), 7.3%, 7.6%, 7.7%, and 8.4% of actual readings fall below q05 at
+    the four gap lengths, and 95.1%, 94.9%, 94.5%, and 94.2% fall below q95. Under rule (b) the
+    shares are 6.6%, 6.4%, 5.5%, and 5.6% below q05 and 95.5%, 95.6%, 95.9%, and 95.9% below q95.
+    With no gap the shares are 7.1% and 95.1%.
+- **Rule (b) meets the plan's criterion for replacing rule (a).** The mean absolute distance of the
+    q05 and q95 shares from nominal is 0.016 for rule (a) and 0.007 for rule (b) at 24 hours, and
+    0.021 and 0.008 at 72 hours. The intervals of the coverage differences exclude zero (24 hours:
+    q05 -0.032 to -0.015, q95 +0.010 to +0.018), and the score difference is at most +0.000
+    against the +0.01 limit. The coverage differences use the month-resampled interval rather than
+    the plan's binomial standard error, because forecast errors in the same month are correlated.
+- **Tails under rule (a), 3 to 72 hours.** The pinball loss at the 1% quantile is 0.222 to 0.257
+    and at the 99% quantile 0.231 to 0.242. The share of readings below the 1% quantile is 2.5% to
+    3.2% and below the 99% quantile 98.1% to 98.4%. Under rule (b) those shares are 1.6% to 2.2%
+    and 98.6% to 98.8%.
+- **Recovery.** Recovery is the smallest k from which the score stays within 0.02 points of the
+    no-gap score. After a 24-hour gap, rule (a) minus the no-gap score is +0.110, +0.074, +0.061,
+    +0.060, +0.012, and +0.025 points when k is 0, 3, 6, 12, 24, and 48 hours, so the pre-registered
+    recovery (6 hours or less) fails. The filter alone (rule (a0)) is within 0.02 points from 24 hours
+    on. After a 3-hour gap, recovery takes 0 hours; after a 6-hour gap, 24 hours; after a 72-hour
+    gap, the score has not recovered at 48 hours.
+- **Differences between substations (rule (a) minus rule (c2)).** At 3 hours: D10 -0.171, D11
+    -0.228, D14 -0.342, D16 +0.056, and D5 -0.040. At 72 hours: D10 +0.033, D11 -0.012, D14 -0.235,
+    D16 +0.222, and D5 +0.061.
 
 ## Checks
 
 - **Median minus mean forecast.** Exactly 0.000 at every substation and rule, because the centred
     spread table places the median at the mean. The check cannot expose a shifted forecast here.
-- **Error of the mean forecast beside the quantile score.** Rule (a) minus rule (c2) is -0.270
-    (3 h, below zero), -0.219, -0.124, and -0.006 points; the sign agrees with the quantile score at
-3, 6, and 24 hours and differs at 72 hours, where both contrasts are indistinguishable from zero
-(mean error -0.006, interval -0.233 to +0.234). Trigger 3 (contrasts pointing different ways)
-therefore fired at 72 hours only, on two contrasts whose intervals both span zero.
-- **Controls.** The rebuilt no-gap arm D reproduces experiment 155's stored arm D exactly (largest
-    mean difference 0.0 at all five substations); widening by zero variance leaves the quantiles
-    unchanged; randomising every actual at or after a run's origin leaves three tested runs' mean
-    forecasts unchanged (0.0).
-- **Triggers.** Trigger 4 fired: leaving out D14 moves a minus c2 at 24 hours from -0.057 to +0.001,
-    and leaving out D16 moves it at 72 hours from +0.013 to -0.040. Both contrasts span zero, so the
-    verdict cannot change. A fresh Opus audit re-derived the contrasts from the stored rows (they
-match to 4 decimals), found no leakage path, and traced both sign flips and the 72-hour sign to one
-date, 2026-01-13, at D5 and D16 (finding 1 below).
+- **Mean-error contrast beside the quantile score.** Rule (a) minus rule (c2) on the absolute
+    error of the mean forecast is -0.270 (below zero), -0.219, -0.124, and -0.006 points at 3, 6,
+    24, and 72 hours. The sign matches the quantile-score contrast at 3, 6, and 24 hours and differs
+    at 72 hours, where both contrasts span zero (mean error -0.233 to +0.234).
+- **Controls.** The rebuilt no-gap forecast reproduces experiment 155's stored arm D exactly (the
+    largest mean difference is 0.0 at all five substations). Widening by zero variance leaves the
+    quantiles unchanged. Replacing every actual at or after a run's origin with random numbers
+    leaves the mean forecasts of three tested runs unchanged.
+- **Audit.** The skill's audit check fired because leaving out D14 moves the 24-hour contrast from
+    -0.057 to +0.001, and leaving out D16 moves the 72-hour contrast from +0.013 to -0.040. An
+    independent reviewer re-derived the contrasts from the stored forecasts, and they match to 4
+    decimal places. The reviewer found no path by which future readings reach the forecast. The
+    reviewer traced both sign changes and the 72-hour sign to one date, 2026-01-13, at D5 and D16
+    (the first finding below). Both contrasts span zero, so the verdict does not change.
 
 ## Audit findings
 
 - **One switching date carries the 72-hour sign and both leave-one-out flips.** On 2026-01-13 the
-  no-gap filter scored 15.3 points at D16 and 16.9 at D5, against 1.7 and 7.6 for the filter-free
-  pipeline (c2). The 14 days before that cutoff are all in a hand-filtered switching event, yet the
-  filter reads those readings and had learned a load transfer (level +22 points at D16, -9 at D5).
-  The gap is not the cause. Dropping that date after the fact (a post-hoc cut, not the verdict)
-gives
-  a minus c2 of -0.204 (-0.363 to -0.059) at 3 hours and -0.171 (-0.327 to -0.023) at 6 hours, both
-  below zero, and -0.112 and -0.037 at 24 and 72 hours, both spanning zero. On that cut the
-  pre-registered rule would read `partly supported`. The 72-hour "coasting is worse" sign is not a
-  basis for a rule that drops the filter.
-- **At 3 and 6 hours the contrasts mostly measure the filter's no-gap value.** Every origin is at
-  09:00 UTC, so every gap ends at 05:30 UTC and a 3-hour gap touches only the night hour band (and
-  the morning band in summer time). The contrast splits into +0.011 from the gap and -0.158 from
-  the filter's no-gap advantage. A gap ending in the evening would test more.
-- **The widening is crude.** The extra variance is mostly the transient's, it is applied at every
-  lead to 168 hours although it should shrink with lead, and part of the coverage gain corrects the
-  under-coverage that the no-gap forecast already has (7.1% below q05).
+    no-gap forecast scored 15.3 points at D16 and 16.9 at D5, against 1.7 and 7.6 for rule (c2). The
+    14 days before that cutoff all fall inside a hand-filtered switching event, but the filter still
+    read those readings. It had learned the changed load, moving its level estimate by +22 points at
+    D16 and by -9 points at D5. The hidden gap did not cause the large errors. Dropping that date
+    after the fact (a post-hoc cut, not the verdict) gives rule (a) minus rule (c2) of -0.204
+    (-0.363 to -0.059) at 3 hours and -0.171 (-0.327 to -0.023) at 6 hours, both below zero. The
+    same cut gives -0.112 and -0.037 at 24 and 72 hours, both spanning zero. On that cut the
+    pre-registered rule would read `partly supported`. The 72-hour sign, coasting worse, is not a
+    basis for a rule that drops the filter.
+- **At 3 and 6 hours the contrasts mostly measure the filter's no-gap value.** Every forecast
+    starts at 09:00 UTC and its data cutoff is 05:30 UTC, so a 3-hour gap covers only the night hour
+    band (and the morning band in summer time). A band here is a block of hours of the day that
+    gets its own correction. The contrast splits into +0.011 from the gap and -0.158 from the
+    filter's no-gap advantage. A gap ending in the evening would test more.
+- **The widening is crude.** Most of the extra variance comes from the filter's short-lived
+    transient component. The method applies it unchanged at every lead up to 168 hours, although it
+    should shrink as the lead grows. Part of the coverage gain also corrects under-coverage that the
+    no-gap forecast already has (7.1% of readings fall below q05, against a target of 5%).
 
 ## Caveats
 
 - **Gaps are injected, not real.** Hiding readings in clean data does not reproduce a stuck meter,
     a communications fault that backfills later, or a gap at a switching event.
-- **The model's refits stay on.** The monthly refits of the demand model read every reading up to
-    the refit date, so a gap that spans a refit cut would also thin the training data. This is not
-    modelled.
-- **Spread tables are close to the no-gap ones, not identical.** Tuning-month rows keep the no-gap
-    filter's forecast, but the offset and recipe R shifts on those rows still move, so rule (a)'s
-    quantile offsets differ from the no-gap offsets by up to 1.4 points. The change is the same for
-    every rule. Rule (c) has its own table.
+- **The demand model's monthly refits continue during a gap.** A gap that spans a refit cut would
+    also thin the training data, and that effect is not modelled.
+- **The quantile offsets differ slightly from those of the no-gap forecast.** The offsets differ by
+    up to 1.4 points, because the winter night offset and recipe R move on rows near a gap. Rule
+    (c) has its own table.
 - **Hidden readings stay hidden for later runs.** A telemetry backfill would restore them, so the
     recovery shown is a worst case.
-- **Events are one per 8-day block.** The 275 events sit in the replicate months and
-    the scored year; the interval resamples 18 calendar months.
+- **The 275 events lie in 18 calendar months,** and the intervals resample those months.
 
 ## What to try next
 
-- **Real outages.** Score the rules on the telemetry's genuine gaps once the cleaned power table's
-    outage periods are listed. The 72-hour crossover between coasting and dropping the filter needs
-    more events or real gaps to resolve.
-- **Keep switching readings out of the filter.** The filter reads readings inside hand-filtered
-    switching events, which one date shows can cost 14 points; a test that masks them is a candidate
-    for its own experiment, and would also settle the 72-hour contrast.
-- **A learned recovery.** A small neural head on the filter state that takes the hours since the
-    last reading and rescales the transient's decay could shorten the recovery. A prediction that
-    could fail: it brings the 24-hour gap's score within 0.02 points of the no-gap score at 12
-hours.
-    The convex GAM-K stays the comparison arm.
+- **Real outages would be a more realistic test.** They could be scored once the cleaned power
+    table's outage periods are listed. Resolving the 72-hour question would take more events or
+    real gaps.
+- **Masking switching readings from the filter could be tested.** One date shows that unmasked
+    readings can raise the quantile score by 14 points. A test that masks them would also settle the
+    72-hour comparison.
+- **A small neural network could shorten the recovery.** It would take the filter state and the
+    hours since the last reading and rescale how fast the transient decays. If it works, the score
+    after a 24-hour gap would be within 0.02 points of the no-gap score 12 hours after the gap ends.
 
 ## Planned design
 

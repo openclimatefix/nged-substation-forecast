@@ -78,7 +78,7 @@ def contrast(*, losses: pl.DataFrame, treatment: str, reference: str, metric: st
         level=LEVEL_PERCENT,
         n_resamples=N_RESAMPLES,
     )
-    estimate = float(t[metric].mean() - r[metric].mean())
+    estimate = float(np.mean(t[metric].to_numpy()) - np.mean(r[metric].to_numpy()))
     state = "below" if upper < 0 else "above" if lower > 0 else "straddling"
     return {"estimate": estimate, "lower": float(lower), "upper": float(upper), "state": state}
 
@@ -173,15 +173,15 @@ def main() -> None:
             one = scoped.filter(pl.col("site_label") == site)
             report["headline"][str(hours)]["per_site"][site] = {
                 "a_minus_c2": float(
-                    one.filter(pl.col("arm") == "a")["qs"].mean()
-                    - one.filter(pl.col("arm") == "c2")["qs"].mean()
+                    np.mean(one.filter(pl.col("arm") == "a")["qs"].to_numpy())
+                    - np.mean(one.filter(pl.col("arm") == "c2")["qs"].to_numpy())
                 ),
                 "n_events": int(one.filter(pl.col("arm") == "a")["run"].n_unique()),
             }
             rest = scoped.filter(pl.col("site_label") != site)
             report["headline"][str(hours)]["leave_one_site_out"][site] = float(
-                rest.filter(pl.col("arm") == "a")["qs"].mean()
-                - rest.filter(pl.col("arm") == "c2")["qs"].mean()
+                np.mean(rest.filter(pl.col("arm") == "a")["qs"].to_numpy())
+                - np.mean(rest.filter(pl.col("arm") == "c2")["qs"].to_numpy())
             )
         report["headline"][str(hours)]["n_events"] = int(n_events)
     # Recovery: the all-lead and under-24-hour score of rule (a) against the no-gap score.
@@ -189,8 +189,9 @@ def main() -> None:
     for hours in GAPS:
         entry = {}
         for scope in ("all", "under 24 h"):
-            scores, reference = {}, None
-            scores_filter_only, reference_filter_only = {}, None
+            scores: dict[int, float] = {}
+            scores_filter_only: dict[int, float] = {}
+            reference = reference_filter_only = 0.0
             for distance in DISTANCES:
                 losses = scope_rows(
                     frame=arms(varying=varying, fixed=fixed, hours=hours, distance=distance),
@@ -232,7 +233,6 @@ def main() -> None:
     out = common.WORK_DIR / "report" / "report.json"
     common.write_json_atomic(path=out, content=report)
     _print(report=report)
-    _ = np
 
 
 def _print(*, report: dict) -> None:
