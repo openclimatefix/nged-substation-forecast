@@ -55,9 +55,11 @@ def load(*, set_name: str) -> pl.DataFrame:
     """Return the cases of a set with R1's base quantiles, the member summaries, and the mask."""
     summaries = pl.read_parquet(BASE_DIR / f"summaries_{set_name}.parquet")
     base = pl.read_parquet(BASE_DIR / f"R1_{set_name}_seed0.parquet").drop("seed")
-    return summaries.join(base, on=list(common.KEY_COLUMNS), how="inner", validate="1:1").sort(
-        *common.KEY_COLUMNS
-    )
+    joined = summaries.join(base, on=list(common.KEY_COLUMNS), how="inner", validate="1:1")
+    if joined.height != summaries.height:
+        msg = f"{set_name}: the summaries and the R1 quantiles cover different cases"
+        raise ValueError(msg)
+    return joined.sort(*common.KEY_COLUMNS)
 
 
 def features(*, frame: pl.DataFrame, arm: str) -> np.ndarray:
@@ -231,8 +233,12 @@ def xgboost_offsets(
             early_stopping_rounds=30,
             verbose_eval=False,
         )
-        corrected_s[:, k] = base_s[:, k] + booster.predict(xgb.DMatrix(x_s))
-        corrected_v[:, k] = base_h[validation_rows, k] + booster.predict(validation_set)
+        corrected_s[:, k] = base_s[:, k] + booster.predict(
+            xgb.DMatrix(x_s), iteration_range=(0, booster.best_iteration + 1)
+        )
+        corrected_v[:, k] = base_h[validation_rows, k] + booster.predict(
+            validation_set, iteration_range=(0, booster.best_iteration + 1)
+        )
     corrected_s = np.clip(np.sort(corrected_s, axis=1), 0.0, 1.0)
     corrected_v = np.clip(np.sort(corrected_v, axis=1), 0.0, 1.0)
     loss = pinball(
@@ -268,7 +274,9 @@ def table_offsets(*, hindcast: pl.DataFrame, scored: pl.DataFrame) -> tuple[np.n
     )
 
     def apply(frame: pl.DataFrame) -> np.ndarray:
-        joined = with_day(frame).join(offsets, on=list(keys), how="left", suffix="_offset")
+        joined = with_day(frame).join(
+            offsets, on=list(keys), how="left", suffix="_offset", maintain_order="left"
+        )
         correction = joined.select([pl.col(f"{q}_offset").fill_null(0.0) for q in Q]).to_numpy()
         return np.clip(np.sort(frame.select(Q).to_numpy() + correction, axis=1), 0.0, 1.0)
 
@@ -302,6 +310,19 @@ def main() -> None:
     loss_path = OUT_DIR / "validation_loss.json"
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     losses = json.loads(loss_path.read_text()) if loss_path.exists() else {}
+    _, validation_rows = split(train=hindcast)
+    levels = torch.tensor(common.LEVELS, dtype=torch.float32)
+    losses["R1 on the early-stopping runs"] = float(
+        pinball(
+            quantiles=torch.tensor(hindcast.select(Q).to_numpy(), dtype=torch.float32)[
+                torch.tensor(validation_rows)
+            ],
+            actual=torch.tensor(hindcast["actual_norm"].to_numpy(), dtype=torch.float32)[
+                torch.tensor(validation_rows)
+            ],
+            levels=levels,
+        )
+    )
     for arm in wanted:
         by_seed: dict[int, np.ndarray] = {}
         arm_losses: dict[str, float] = {}
