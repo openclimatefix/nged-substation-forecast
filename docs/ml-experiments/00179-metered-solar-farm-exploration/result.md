@@ -2,7 +2,7 @@
 id: '00179'
 slug: metered-solar-farm-exploration
 title: >-
-  Do the 6 metered solar farms show an AC clipping plateau, step drops, or slow drift, and is their
+  Do the six metered solar farms show an AC clipping plateau, step drops, or slow drift, and is their
   cleaned series fit to reuse?
 theme: solar-disaggregation
 also_relevant_to:
@@ -33,13 +33,14 @@ metric: counts of farms with clipping, step drops, and drift; data-validation ch
 verdict: not supported
 best_arm: none (data exploration, no fitting)
 headline: >-
-  Under the pre-registered rule 1 of 6 farms (E) shows clipping, so the prediction of at least 4 fails
-  and the stop rule fires. A looser rule chosen after seeing the figures (post hoc) finds a flat top
-  at 4 of 6 farms (C, D, E, F).
+  Under the pre-registered rule one of six farms (E) shows clipping, so the prediction of at least
+  four fails and the stop rule fires. A looser rule chosen after seeing the figures (post hoc) finds
+  a flat top at four of six farms (C, D, E, F).
 take_home_message: >-
-  Four of the 6 metered solar farms have output that flattens at about 1.05 times their effective
-  capacity once clear-sky irradiance passes about 650 W/m², but the pre-registered test was too
-  strict to say so, and the flat top could be an export cap rather than inverter clipping. Before
+  Four of the six metered solar farms have output that flattens at about 1.05 times their effective
+  capacity once clear-sky irradiance passes about 650 W/m² (read off Figure 1), but the
+  pre-registered test was too strict to say so, and the flat top could be an export cap (a limit on
+  grid export set by the network operator) rather than a limit in the inverters. Before
   any DC-versus-AC follow-up, check each farm's export-cap record and get an independent DC
   capacity.
 production_status: not-for-production
@@ -54,66 +55,79 @@ advice:
     network operator's export-cap record, because curtailment makes the same flat top (Figure 1).
   - >-
     Judge clipping by the flattening of the 95th-percentile envelope against clear-sky irradiance,
-    not by the 99th-to-95th ratio, which noise pushes above 1.02 (clipping_tests.csv).
+    not by the 99th-to-95th-percentile ratio, because noise pushes the ratio above 1.02 (clipping_tests.csv).
 ---
 
-**Four of the 6 metered solar farms (C, D, E, and F) flatten at about 1.05 times capacity at high
-clear-sky irradiance, but the pre-registered test found only one, and the flat top may be an export
-cap.** We asked whether the 6 farms (labelled A to F) show AC clipping, step drops, or slow drift.
-We plotted each farm's half-hourly power over capacity against clear-sky irradiance (Ineichen model,
-the `pvlib` default), ran the `data-validation` checklist, and wrote a cleaned series. No model was
-fitted.
+**Four of the six metered solar farms (C, D, E, and F) flatten at about 1.05 times their capacity at
+high clear-sky irradiance. The pre-registered test found only one farm, and the flat top may be an
+export cap.** We asked whether the six metered solar farms of the trial area (labelled A to F, which
+anonymises them) show alternating-current (AC) clipping, step drops (outages), or slow drift
+(soiling or degradation). AC clipping is output flattening at the inverters' alternating-current
+limit, below the direct-current (DC) capacity of the panels. We plotted each farm's half-hourly power
+over capacity against clear-sky irradiance from the Ineichen clear-sky irradiance model in the
+`pvlib` solar library. We then ran the `data-validation` checklist, which looks for gaps, duplicates,
+stuck readings, spurious zeros, and timestamp errors, and wrote a cleaned series in the private data
+folder, in which flagged half-hours stay in place with a reason. No statistical or forecasting model
+was fitted.
 
-Under the pre-registered rule, 1 of 6 farms (E) shows clipping, against a prediction of at least 4.
-The stop rule (fewer than 3 farms) therefore fires: follow-up 4 (DC versus AC loss) is dropped for
-the other 5 farms. The rule required the 99th percentile within 2% of the 95th, and noise puts it
-above that at 4 farms. A rule chosen after seeing Figure 1 (post hoc) asks only that the 95th
-percentile's slope over the top three irradiance bins be under 25% of its slope at mid irradiance.
-It finds C, D, E, and F. The maintainer decides whether the stop rule stands.
+**Under the pre-registered rule, one of six farms (E) shows clipping, against a prediction of at
+least four, so the stop rule fires.** The stop rule says that follow-up 4 (DC versus AC loss) is
+dropped when fewer than three farms show clipping. It is therefore dropped for the other five farms.
 
-![Power over capacity against clear-sky irradiance per farm](figure_1.svg)
+The rule required the 99th percentile of power within 2% of the 95th at the three highest
+clear-sky irradiance bins, where each bin is one twentieth of the farm's clear-sky irradiance range.
+Noise pushes the 99th percentile above that limit at four farms. A rule chosen after seeing Figure 1
+(post hoc) asks only that, over the top three bins, the 95th-percentile power rises at under 25% of
+the rate at which it rises over the lower-middle bins. The post hoc rule finds clipping at farms C,
+D, E, and F. The maintainer decides whether the stop rule stands.
 
-![Monthly yield index per farm](figure_2.svg)
+![Figure 1: power over capacity against clear-sky irradiance per farm](figure_1.svg)
 
-![Mean daily peak power over capacity per farm and month](figure_3.svg)
+![Figure 2: monthly yield index per farm](figure_2.svg)
+
+![Figure 3: mean daily peak power over capacity per farm and month](figure_3.svg)
 
 ## Checks
 
-- **Clipping tests** (`clipping_tests.csv`): the 99th-to-95th ratio over the top three bins is 1.02
-  (E), 1.02 (C, fails the slope test), 1.02 to 1.08 elsewhere; slope ratio top over mid is 0.85 (A),
-  0.46 (B), 0.15 (C), -0.09 (D), 0.06 (E), and 0.07 (F).
-- **Plateau level:** the 95th percentile peaks at 1.04 to 1.10 times effective capacity. If
-  effective capacity is itself estimated from the observed output, a plateau near 1.0 is partly by
-  construction; not checked here.
-- **Export cap confound:** the flat top is what an export cap also produces, and
-  `studies.export_cap` was not applied. Clipping and curtailment are not separated.
-- **Timestamp convention:** power correlates best with clear-sky irradiance at lag 0 for all 6
-  farms, so the period-ending stamps are consistent.
-- **Gaps:** 7.6% (B) to 27.6% (E) of half-hours are missing, 22.4% at D; no duplicate timestamps.
-- **Zeros in clear sun:** 250 to 1,291 half-hours per farm read zero or less when clear-sky
-  irradiance exceeds 500 W/m², flagged `zero_in_clear_sky` (outage or curtailment).
-- **Stuck runs:** 3 half-hours at D only (6 or more identical positive daylight readings).
-  **Negative and night-time readings:** 0 to 24 and 0 to 30 half-hours per farm.
-- **Commissioning:** 9,226 half-hours at E before 2024-10-06 are flagged, as `studies.commissioning`
-  already does.
-- **Step drops:** four runs of 3 or more April-to-September days with peak under 5% of capacity
-  (`candidate_outages.csv`): B 2022-08-09 (3 days), D 2022-08-10 (5) and 2022-08-27 (3), E
-  2025-09-20 (4).
-- **Slow drift** (trend of the monthly yield index after removing month means, `drift.csv`): -0.55
-  (A), +0.93 (B), -0.53 (C), +1.35 (D), -1.8 (E, 18 months only), and -0.21 (F) percent per year.
-  No farm shows a drift larger than 2% a year.
-- **Median minus mean forecast, and mean-forecast error beside quantile scores:** not applicable,
-  because no forecast was made.
-- **Audit triggers:** trigger 2 (a result against its own prediction) fires in form; the
-  explanation, a too-strict rule, was tested by the post hoc rule above. Trigger 7 applies because
-  follow-up 4 depends on the count. No control, nesting, or leave-one-out check exists here. No audit
-  was run; the manager decides whether one is needed.
+- **Clipping tests** (`clipping_tests.csv`), per farm A to F: the ratio of the 99th to the 95th
+  percentile over the top three bins is 1.08, 1.05, 1.02, 1.04, 1.02, and 1.02. The ratio of the
+  95th-percentile slope over the top three bins to its slope over the lower-middle bins is 0.85,
+  0.46, 0.15, -0.09, 0.06, and 0.07. Only E passes both pre-registered tests; C fails the slope
+  test (limit 0.10) by a small margin.
+- **Plateau level:** the 95th percentile peaks at 1.10, 1.08, 1.05, 1.04, 1.05, and 1.04 times
+  effective capacity for farms A to F. If effective capacity is itself estimated from the observed
+  output, a plateau near 1.0 is partly by construction; this was not checked.
+- **Export cap confound:** an export cap produces the same flat top, and `studies.export_cap` was not
+  applied. Clipping and curtailment are not separated.
+- **Timestamp convention:** each timestamp marks the end of its half-hour. Power correlates best
+  with clear-sky irradiance at lag 0 for all six farms, which is consistent with that convention.
+- **Gaps:** 7.6% (B) to 27.6% (E) of half-hours are missing, and 22.4% at D. There are no duplicate
+  timestamps.
+- **Zeros in clear sun:** 134 to 1,291 half-hours per farm read zero or less when clear-sky
+  irradiance exceeds 500 W/m², flagged `zero_in_clear_sky` (outage or curtailment). The count for
+  E excludes its commissioning period.
+- **Stuck runs:** 3 half-hours at D only (six or more identical positive daylight readings).
+- **Negative readings:** 0 to 24 half-hours per farm. **Night-time readings above 2% of capacity:**
+  0 to 30 half-hours per farm.
+- **Commissioning:** 9,226 half-hours at E before 2024-10-06 are flagged, as
+  `studies.commissioning` already does.
+- **Step drops:** four runs of three or more April-to-September days with peak under 5% of capacity
+  (`candidate_outages.csv`): B from 2022-08-09 (3 days), D from 2022-08-10 (5 days) and 2022-08-27
+  (3 days), and E from 2025-09-20 (4 days).
+- **Slow drift** (trend of the monthly yield index after removing month means, `drift.csv`), farms
+  A to F, in percent per year: −0.55, +0.93, −0.53, +1.35, −1.8 (E, 18 months only), and −0.21. No
+  farm drifts by more than 2% a year.
+- **Audit triggers:** the audit trigger for a result that contradicts its own prediction fires in
+  form. The explanation, a too-strict rule, was tested by the post hoc rule above. The trigger for a
+  later design that depends on an unreplicated result applies, because follow-up 4 depends on the
+  count. This experiment has no control, nested arm, or leave-one-out check. No audit was run; the
+  manager decides whether one is needed.
 
 ## What the next experiment should answer
 
 - Does each farm's flat top coincide with export-cap hours (`studies.export_cap`)?
 - What is each farm's DC capacity from an independent source, so that the AC limit can be separated
   from it?
-- Neural components: a small learned clipping response (a smooth saturation of power against
-  irradiance) could replace the fixed envelope; the prediction that could fail is that it fits
-  farms C, D, E, and F no better than a hard cap at 1.05 times capacity.
+- Does a small learned clipping response (a smooth saturation of power against irradiance) fit farms
+  C, D, E, and F better than a hard cap at 1.05 times capacity? The prediction that could fail is
+  that it fits no better.
