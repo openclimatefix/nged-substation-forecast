@@ -96,8 +96,8 @@ lessons: >-
   40 unexplained odd-month candidates; below that the learned score is both precise and harmless.
   The mask itself is not the problem at that operating point, so a softer use is needed only for a
   source that must run at a higher alarm budget. Soft down-weighting needs a variance factor in
-  the thousands before it does anything, because the filter's level variance is far larger than its
-  observation noise.
+  the thousands before it does anything, probably because the filter's level variance is much
+  larger than its observation noise (not measured here).
 take_home_message: >-
   Keeping only the learned score's most confident alarms gives a mask that finds 21 of 35 real
   load shifts with 5 alarms per match, recovers most of the forecast gain after a load shift, and
@@ -164,9 +164,10 @@ alarm](real_share_by_use.svg)
   is an improvement. The limit is +/-0.05 points.
 - **Rows and phases.** A row is one forecast of one substation for one valid time. On injected load
   shifts, BEFORE_ALARM is the time after the load shift starts and before its alarm is known, DURING
-  is while it lasts, AFTER is the 72 hours after it ends, and ORDINARY is every other row. The real
-  record has AFTER and ORDINARY rows only. The oracle mask opens exactly over the logged load
-  shifts, and "perfect knowledge" means the same on injected load shifts.
+  is while it lasts, AFTER is the 48 hours after it ends, and ORDINARY is every other row. On the
+  real record AFTER is the 72 hours after a logged load shift ends, and only AFTER and ORDINARY rows
+  exist. The oracle mask opens exactly over the logged load shifts, and "perfect knowledge" means
+  the same on injected load shifts.
 - **Match.** An alarm matches a logged load shift when its step lies within 2 hours of the logged
   start and its estimated end within the larger of 6 hours and 10% of the logged duration
   (experiment 195's rule). A span is one continuous period during which an alarm is open. A world is
@@ -187,9 +188,9 @@ alarm](real_share_by_use.svg)
   harm interval inside +/-0.05) is met by LR_b20 with the plain mask, so the plan's rule would give
   `supported` although part (b) added nothing.
 - **Two of three controls reproduce.** The gated pair-alarm mask's ordinary-day harm is +0.030
-  (experiment 171's figure). On injected load shifts perfect knowledge gains 1.50 points in the 72
+  (experiment 171's figure). On injected load shifts perfect knowledge gains 1.50 points in the 48
   hours after a long, large load shift (95% interval 1.07 to 1.96), and RO-NC recovers 0.79 (53%),
-  the shares experiment 208 found for the 48 hours after. The 13.686 and 6.321 scores of experiment
+  the figures experiment 208 found for the same 48 hours. The 13.686 and 6.321 scores of experiment
   203 were not recomputed. The K0 forecast (no mask) scores 10.129 points on the 11 real load shifts
   of experiment 163's scored and replicate months, the logged-oracle mask 4.790, and the pair-alarm
   mask 6.083.
@@ -220,13 +221,13 @@ alarm](real_share_by_use.svg)
   to 100%), and budget 5 recovers 10%. The pair alarm at gate 0.70 recovers 82% (-16% to 101%) and
   RO-NC at budget 80 recovers 83% (-2% to 123%). The intervals are wide because 11 load shifts are
   few, and LR_b20's lower end is -0.1%.
-- **Prediction 1 holds.** LR budgets 10 and 20 and UR h = 5 and 10 each match at least 12, raise 5
-  or fewer alarms per match, recover more than 50%, and have a harm interval inside +/-0.05. LR
-  budget 20 is the carried setting, because it keeps the most matches (21) among the settings at 5.0
-  or fewer alarms. The page carries three sources into part (b), fixed before any part (b) score was
-  read: LR_b20, LR_b80 (experiment 208's operating point), and PG_g70 (the one source of the four
-  with a metered partner for every alarm). RO_b80 was added afterwards as the source with the most
-  harm to repair.
+- **Prediction 1 holds on point estimates.** LR budgets 10 and 20 and UR h = 5 and 10 each match at
+  least 12, raise 5 or fewer alarms per match, recover more than 50%, and have a harm interval
+  inside +/-0.05. LR budget 20 is the carried setting, because it keeps the most matches (21) among
+  the settings at 5.0 or fewer alarms. The page carries three sources into part (b), fixed before
+  any part (b) score was read: LR_b20, LR_b80 (experiment 208's operating point), and PG_g70 (the
+  one source of the four with a metered partner for every alarm). RO_b80 was added afterwards as the
+  source with the most harm to repair.
 - **Part (b), real record, harm and share by use (95% intervals from whole months and whole
   windows).** MASK: LR_b20 -0.007, LR_b80 +0.031, PG_g70 +0.030, RO_b80 +0.144 points. SOFT at
   factors 2, 4, and 16: harm and share both within 0.002 of zero for every source, so soft
@@ -239,15 +240,16 @@ alarm](real_share_by_use.svg)
   and 136. PAIRSUM adds 422, 152, and 2,294. SUB adds 3,113 to 9,279.
 - **PAIRSUM coverage.** The pair-sum correction needs a pair alarm backing the span and a metered
   partner. It applies to 26 of 115 LR_b20 spans, 51 of 335 LR_b80 spans, 19 of 129 RO_b80 spans, and
-  all 110 PG_g70 spans. Elsewhere it falls back to the mask, so its harm on the learned and RO
-  sources is the mask's.
-- **Prediction 2 holds only for the pair alarm, which matches the fewest load shifts.** For PG_g70,
-  PAIRSUM recovers 86% of the mask's gain at 36% of its harm. For every other source PAIRSUM
-  recovers 91% to 95% of the mask's gain and cuts the harm by 3% at most (LR_b80) or raises it
-  (RO_b80). SOFT fails on both counts. HALF recovers 57% to 63% of the mask's gain, below the 80%
-  bar, and removes at least 92% of the harm for LR_b80, PG_g70, and RO_b80.
+  all 110 PG_g70 spans. Elsewhere it falls back to the mask. The counts sum the three folds of a
+  learned source. For RO_b80 the subtraction on the 19 pair-backed spans raises harm above the
+  mask's (+0.187 against +0.144).
+- **Prediction 2's point estimates hold only for the pair alarm, which matches the fewest load
+  shifts.** For PG_g70, PAIRSUM recovers 86% of the mask's gain at 36% of its harm. For every other
+  source PAIRSUM recovers 91% to 95% of the mask's gain and cuts the harm by 3% at most (LR_b80) or
+  raises it (RO_b80). SOFT fails on both counts. HALF recovers 57% to 63% of the mask's gain, below
+  the 80% bar, and removes at least 92% of the harm for LR_b80, PG_g70, and RO_b80.
 - **Injected load shifts (44 worlds of experiment 141, RO-NC alarms, six substations).** In the
-  headline stratum (25% of load or more, over 1 day) the gain over no mask in the 72 hours after a
+  headline stratum (25% of load or more, over 1 day) the gain over no mask in the 48 hours after a
   load shift is MASK 0.794 (0.440 to 1.186), HALF 0.730 (0.494 to 0.993, 92% of the mask), SUB 0.408
   (0.026 to 0.831), and SOFT 0.000 to 0.005. During a load shift the gain is MASK 0.438, HALF 0.425,
   SUB 0.333, and before the alarm arrives MASK -0.090, HALF +0.149, SUB -0.397. Per false alarm
@@ -257,8 +259,8 @@ alarm](real_share_by_use.svg)
   headline stratum's gain after a load shift is 0.18 at a factor of 1,024 and 0.61 at 16,384 for
   RO-NC alarms (the mask gains 0.53), and 0.82 against 0.67 for the mask with perfect alarms. The
   factors are not pre-registered, four worlds are few, and the harm per false alarm at these factors
-  was not measured. The filter's level variance is far larger than its observation noise
-  (`printed_soft_large.txt`), which is why factors of 2 to 16 do nothing.
+  was not measured. A likely reason that factors of 2 to 16 do nothing is that the filter's level
+  variance is much larger than its observation noise, but this page did not measure the variances.
 - **Row sets and schedule.** Experiment 163's after-load-shift rows (here 72 hours, not the 48 of
   experiment 208's headline) and experiment 171's ordinary rows, with the cached daily 09:00 UTC
   forecasts, as in experiments 203 and 226. A learned source's rows use the fold that holds out the
@@ -282,15 +284,19 @@ alarm](real_share_by_use.svg)
   (+0.055, -0.020 to +0.137, against +0.031). Trigger 4: leaving one substation out of the
   ordinary-day contrast keeps LR_b20 inside +/-0.05 every time (-0.009 to -0.001), and leaving one
   out of the share keeps the point estimate at 70% to 88% (`printed_checks.txt`). Trigger 5: the
-  controls that should change nothing (SOFT at factors 2, 4, and 16) move the score by 0.000 to
-  0.001. Trigger 6: the LR_b80 harm interval (-0.021 to +0.087) is as wide as experiment 226's
-  (-0.020 to +0.086). Trigger 7 applies in part: later experiments re-choose operating points with
-  this method, and the result has not been replicated, which the 11-load-shift caveat below covers.
-  No audit was run.
+  controls that should change nothing (SOFT at factors 2, 4, and 16) move the ordinary-day harm by
+  0.000 to 0.001. Trigger 6: the LR_b80 harm interval (-0.021 to +0.087) is as wide as experiment
+  226's (-0.020 to +0.086). Trigger 7 applies in part: later experiments re-choose operating points
+  with this method, and the result has not been replicated, which the 11-load-shift caveat below
+  covers. No audit was run.
 - **Caveats.** The 11 load shifts after which gain is measured give 95% intervals that reach from
-  about 0% to above 100%. The learned score's even months are in-sample. Alarms per match counts
-  alarms on all 16 series over the whole record, while harm is measured at the six substations the
-  forecast covers, so the two figures describe different sets of series.
+  about 0% to above 100%. The learned score's even months are in-sample, and each substation's
+  ordinary-day harm averages three re-rankers of which two were trained with that substation's pair,
+  so the headline harm is not a held-out figure. The harm per false alarm divides by all alarms at
+  the six substations, true ones included, so it is diluted and is not meaningful for arms with
+  negative harm. Alarms per match counts alarms on all 16 series over the whole record, while harm
+  is measured at the six substations the forecast covers, so the two figures describe different sets
+  of series.
 
 ## What the next experiment should answer
 
