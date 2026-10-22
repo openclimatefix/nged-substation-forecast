@@ -182,7 +182,7 @@ def main() -> None:
         "days_in_172": table172.height,
         "days_here": days.height,
         "days_in_both": check.height,
-        "max_abs_score_difference": float((check["score"] - check["score_d"]).abs().max()),
+        "max_abs_score_difference": float((check["score"] - check["score_d"]).abs().max()),  # ty: ignore
     }
     scored_temperature, reference = day_temperatures()
     reference_by_site = {
@@ -250,8 +250,8 @@ def share_removed(*, days: pl.DataFrame, name: str) -> float | None:
     """Return the share of arm D's excess that a network removes over a set of days."""
     if days.height == 0:
         return None
-    excess = float(days["score_d"].sum() - days["site_median"].sum())
-    return float((days["score_d"] - days[name]).sum() / excess)
+    excess = float(days["score_d"].sum() - days["site_median"].sum())  # ty: ignore
+    return float((days["score_d"] - days[name]).sum() / excess)  # ty: ignore
 
 
 def describe(*, days: pl.DataFrame, name: str, seeds: list[str]) -> dict:
@@ -267,8 +267,8 @@ def describe(*, days: pl.DataFrame, name: str, seeds: list[str]) -> dict:
         out["by_class"][label] = {
             "n_days": frame.height,
             "share_removed": share_removed(days=frame, name=name),
-            "mean_score_d": float(frame["score_d"].mean()),
-            f"mean_score_{name}": float(frame[name].mean()),
+            "mean_score_d": float(frame["score_d"].mean()),  # ty: ignore
+            f"mean_score_{name}": float(frame[name].mean()),  # ty: ignore
         }
         out["by_seed"][label] = [share_removed(days=frame, name=seed) for seed in seeds]
     deciles = days.with_columns(
@@ -278,9 +278,9 @@ def describe(*, days: pl.DataFrame, name: str, seeds: list[str]) -> dict:
         frame = deciles.filter(pl.col("decile") == decile)
         out["by_decile"][decile + 1] = {
             "n_days": frame.height,
-            "mean_gain": float((frame["score_d"] - frame[name]).mean()) if frame.height else None,
+            "mean_gain": float((frame["score_d"] - frame[name]).mean()) if frame.height else None,  # ty: ignore
             "mean_gain_worst": float(
-                (
+                (  # ty: ignore
                     frame.filter(pl.col("worst"))["score_d"] - frame.filter(pl.col("worst"))[name]
                 ).mean()
             )
@@ -301,12 +301,12 @@ def temperature_summary(*, days: pl.DataFrame) -> dict:
     }.items():
         out[label] = {
             "n_days": frame.height,
-            "share_outer_10pct": float(frame["outer"].mean()),
+            "share_outer_10pct": float(frame["outer"].mean()),  # ty: ignore
             "n_outer": int(frame["outer"].sum()),
-            "share_below_10pct": float((frame["percentile"] <= OUTER_FRACTION).mean()),
-            "share_above_90pct": float((frame["percentile"] >= 1.0 - OUTER_FRACTION).mean()),
+            "share_below_10pct": float((frame["percentile"] <= OUTER_FRACTION).mean()),  # ty: ignore
+            "share_above_90pct": float((frame["percentile"] >= 1.0 - OUTER_FRACTION).mean()),  # ty: ignore
             "mean_era5_day_temperature_c": float(frame.select(era5_outer.mean()).item()),
-            "mean_ens_day_temperature_c": float(frame["temperature_c"].mean()),
+            "mean_ens_day_temperature_c": float(frame["temperature_c"].mean()),  # ty: ignore
         }
     return out
 
@@ -335,12 +335,12 @@ def random_control(*, days: pl.DataFrame) -> dict:
             pool = pools[(row["site"], row["month"])]
             picked.append(pool[int(rng.integers(pool.height))])
         draw = pl.concat(picked)
-        shares.append(float(draw["outer"].mean()))
+        shares.append(float(draw["outer"].mean()))  # ty: ignore
         for name in NETWORK_ARMS:
-            removed[name].append(float((draw["score_d"] - draw[name]).mean()))
+            removed[name].append(float((draw["score_d"] - draw[name]).mean()))  # ty: ignore
     real = {
-        "share_outer": float(unlabelled["outer"].mean()),
-        **{name: float((unlabelled["score_d"] - unlabelled[name]).mean()) for name in NETWORK_ARMS},
+        "share_outer": float(unlabelled["outer"].mean()),  # ty: ignore
+        **{name: float((unlabelled["score_d"] - unlabelled[name]).mean()) for name in NETWORK_ARMS},  # ty: ignore
     }
     out = {
         "draws_outer_share": shares,

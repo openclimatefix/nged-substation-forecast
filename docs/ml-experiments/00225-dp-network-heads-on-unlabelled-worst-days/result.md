@@ -165,4 +165,3 @@ substation.
 [200](../00200-dp-pooled-correction-head-on-kalman-state/result.md),
 [201](../00201-dp-gam-residual-mlp/result.md), and
 [209](../00209-dp-pinball-table-vs-network-head-on-arm-d/result.md).
-

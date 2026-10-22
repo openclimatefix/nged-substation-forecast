@@ -114,10 +114,10 @@ def figure_removed(results: dict) -> None:
             legend=alt.Legend(orient="top", title=None),
         ),
     )
-    bars = base.mark_rule(strokeWidth=3).encode(
+    bars = base.mark_rule(strokeWidth=3).encode(  # ty: ignore
         x=alt.X("lo:Q", title="Share of arm D's excess loss removed (%); line: range over 3 seeds"),
         x2="hi:Q",
-    )  # ty: ignore[unresolved-attribute]
+    )
     dots = base.mark_point(filled=True, size=70).encode(x="share:Q")  # ty: ignore[unresolved-attribute]
     chart = (bars + dots).properties(
         width=WIDTH,
