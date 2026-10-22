@@ -60,8 +60,8 @@ headline: >-
 lessons:
   - >-
     In the matched-day test, the system price carries most of the spread signal. Holding the gas
-    price at its mean still leaves +24.4 points (+11.0 to +38.7) against +28.4 for the full spread, so the gas price adds
-    about 4 points.
+    price at its mean still leaves +24.4 points (+11.0 to +38.7) against +28.4 for the full spread,
+    so the gas price adds about 4 points.
   - >-
     The pre-registered flat-block cutoff of 0.25 is too strict. Injected constant 2.8 MW blocks pass
     it in 9% of windows, so the cutoff cannot confirm a block on this noisy residual. Compared
