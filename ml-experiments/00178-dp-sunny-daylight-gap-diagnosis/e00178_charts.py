@@ -64,7 +64,7 @@ def main() -> None:
             rows=report["hour_bin"],
             key="hour_bin",
             order=hours,
-            title="The gap is spread across the day, with no shoulder-hour peak",
+            title="No 2-hour bin of the day holds more than a third of the gap",
             x_title="Local hour of day (start of 2-hour bin)",
         ),
         name="figure_01_hour",

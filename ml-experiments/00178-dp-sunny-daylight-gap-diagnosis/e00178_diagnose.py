@@ -81,9 +81,15 @@ def one_site(*, site: str, cache, bg2: pl.DataFrame) -> pl.DataFrame:  # noqa: A
     b = b.with_columns([pl.col(c) * capacity for c in (*(f"b_{q}" for q in QUANTILES), "b_mean")])
     joined = gam.join(b, on=key, how="inner", validate="1:1")
     arrays = cache.sites[site]
+    # `valid_time` is the end of the half-hour, as in the cache's `end_times`.
     index = np.searchsorted(
         cache.end_times, joined["valid_time"].dt.replace_time_zone(None).to_numpy()
     )
+    if not (
+        cache.end_times[index] == joined["valid_time"].dt.replace_time_zone(None).to_numpy()
+    ).all():
+        msg = f"{site}: valid_time is not on the cache's half-hour grid"
+        raise ValueError(msg)
     elevation = arrays.elevation_deg[index]
     unit = arrays.pv_unit_shape[index]
     with np.load(E111_STORE / f"{site}.npz") as stored:
@@ -98,7 +104,9 @@ def one_site(*, site: str, cache, bg2: pl.DataFrame) -> pl.DataFrame:  # noqa: A
         (joined["valid_time"].dt.replace_time_zone(None).to_numpy() - origin)
         // np.timedelta64(30, "m")
     ).astype(np.int64) - 1
-    position = np.clip(position, 0, shortwave.shape[2] - 1)
+    if position.min() < 0 or position.max() >= shortwave.shape[2]:
+        msg = f"{site}: a valid time lies outside the stored ensemble window"
+        raise ValueError(msg)
     ens = np.nanmean(shortwave[run, :, position].astype(np.float64), axis=1)
     clear = haurwitz_w_m2(apparent_zenith_deg=90.0 - elevation)
     csi = np.where(clear > 20.0, ens / np.where(clear > 20.0, clear, 1.0), np.nan)
@@ -191,7 +199,7 @@ def main() -> None:
     report: dict = {"n_all_rows": frame.height}
     scopes = {
         "all_leads": frame,
-        "lead_12_to_36": frame.filter(pl.col("lead_hours").is_between(12.0, 36.0)),
+        "lead_12_to_36": frame.filter(pl.col("lead_hours").is_between(12.0, 36.0, closed="left")),
     }
     for name, scope in scopes.items():
         for label, sites in (("five", SITES[:5]), ("six", SITES)):
@@ -236,7 +244,7 @@ def main() -> None:
                     frame=sunny.filter(pl.col("site") == "D5"), column="gap_pin", rng=rng
                 ),
             }
-            for cut in ("hour_bin", "csi_band"):
+            for cut in ("hour_bin", "csi_band", "lead_band"):
                 entry[f"d5_{cut}"] = cut_table(
                     frame=sunny.filter(pl.col("site") == "D5").drop_nulls(cut), column=cut
                 )
