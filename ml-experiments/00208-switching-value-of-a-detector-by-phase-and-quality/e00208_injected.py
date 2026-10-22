@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PLR0915
 """Score the knowledge sources and the quality sweep at one substation in one injected world.
 
 Every arm is GAM-K's cached member forecasts plus a Kalman filter correction run on the world's
@@ -73,9 +74,7 @@ def site_events(*, delta: np.ndarray, events: np.ndarray) -> list[dict[str, floa
     for row in events:
         onset, end = int(row[2]), int(row[3])
         if np.any(np.nan_to_num(delta[onset:end])):
-            out.append(
-                {"id": int(row[0]), "onset": onset, "end": end, "fraction": float(row[4])}
-            )
+            out.append({"id": int(row[0]), "onset": onset, "end": end, "fraction": float(row[4])})
     return sorted(out, key=lambda e: e["onset"])
 
 
@@ -98,7 +97,7 @@ def perfect_spans(
 
 def with_amount(*, span: nra.Span, factor: float) -> nra.Span:
     """The span with its MW scaled (the blur of the MW)."""
-    scale = (lambda a: None if a is None else a * factor)  # noqa: E731
+    scale = lambda a: None if a is None else a * factor  # noqa: E731
     return dataclasses.replace(span, amount=scale(span.amount), open_amount=scale(span.open_amount))
 
 
@@ -117,14 +116,12 @@ def knowledge_sources(
 ) -> dict[str, tuple[list[nra.Span], tuple[str, ...]]]:
     """Every knowledge source as spans, with the designs (`MASK`, `SUB`) it is scored under."""
     offset = fed.stamp_offset(data)
-    both, mask = ("MASK", "SUB"), ("MASK",)
+    both = ("MASK", "SUB")
     perfect = perfect_spans(events=events, points=points, data=data)
     lagged = nra.true_spans(
         events=[(int(e["onset"]), int(e["end"])) for e in events], delta_points=points, data=data
     )
-    found = [
-        [s for s in detected if matches(span=s, event=e, offset=offset)] for e in events
-    ]
+    found = [[s for s in detected if matches(span=s, event=e, offset=offset)] for e in events]
     out: dict[str, tuple[list[nra.Span], tuple[str, ...]]] = {
         "PERFECT": (perfect, both),
         "PERFECT_LAG": (lagged, both),
@@ -144,20 +141,25 @@ def knowledge_sources(
         rng = np.random.default_rng([rng_seed, 7, int(blur * 100)])
         signs = rng.choice([-1.0, 1.0], size=len(events))
         out[f"BLUR_{blur}"] = (
-            [with_amount(span=s, factor=1.0 + blur * g) for s, g in zip(perfect, signs, strict=True)],
+            [
+                with_amount(span=s, factor=1.0 + blur * g)
+                for s, g in zip(perfect, signs, strict=True)
+            ],
             ("SUB",),
         )
     for repair in REPAIRS:
         rng = np.random.default_rng([rng_seed, 11, int(repair * 100)])
         spans = list(detected)
-        for e, hits, truth in zip(events, found, lagged, strict=True):
+        for hits, truth in zip(found, lagged, strict=True):
             if not hits and rng.random() < repair:
                 spans.append(truth)
         out[f"REPAIR_{repair}"] = (spans, both)
     return out
 
 
-def phase_of(*, cutoff: np.ndarray, target: np.ndarray, onset: np.ndarray, end: np.ndarray) -> np.ndarray:
+def phase_of(
+    *, cutoff: np.ndarray, target: np.ndarray, onset: np.ndarray, end: np.ndarray
+) -> np.ndarray:
     """The phase of each row, fixed by the true transfer and the forecast cutoff alone.
 
     BEFORE_ALARM takes precedence: a row whose cutoff is within `BEFORE_ALARM_STAMPS` of the onset
@@ -196,7 +198,10 @@ def job(args: tuple[str, int]) -> str:
     )
     if EXTRA:
         sources = {
-            f"DELAYX_{d}": (perfect_spans(events=events, points=points, data=data, delay=d), ("MASK",))
+            f"DELAYX_{d}": (
+                perfect_spans(events=events, points=points, data=data, delay=d),
+                ("MASK",),
+            )
             for d in EXTRA_DELAYS
         }
     cutoffs = data.cutoffs(delay_hours=fed.DELAY_HOURS)[data.run_of_row]
@@ -216,7 +221,9 @@ def job(args: tuple[str, int]) -> str:
         if not len(rows):
             continue
         corrections = {
-            "K0|NONE": fed.correction_for(data=data, stream=stream, prior=np.zeros(n), multiplier=1.0),
+            "K0|NONE": fed.correction_for(
+                data=data, stream=stream, prior=np.zeros(n), multiplier=1.0
+            ),
         }
         if not EXTRA:
             corrections["CLEAN|NONE"] = fed.correction_for(
@@ -270,7 +277,10 @@ def job(args: tuple[str, int]) -> str:
     tmp = path.with_suffix(".tmp")
     pl.concat(frames).write_parquet(tmp)
     tmp.rename(path)
-    print(f"{site} {seed}: {len(events)} events, {len(sources)} sources, {time.time() - started:.0f} s", flush=True)
+    print(
+        f"{site} {seed}: {len(events)} events, {len(sources)} sources, {time.time() - started:.0f} s",
+        flush=True,
+    )
     return str(path)
 
 

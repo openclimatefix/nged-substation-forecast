@@ -1,3 +1,4 @@
+# ruff: noqa: PLR0912, PLR0915
 """Score the knowledge sources on the real record's logged transfers, and the false-alarm harm.
 
 Per substation, with GAM-K's cached member forecasts and the Kalman filter correction run on the
@@ -22,7 +23,7 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import Final
+from typing import Any, Final
 
 import e00208_alarms as al
 import e00208_events as ev
@@ -58,9 +59,9 @@ def logged_pair_count() -> int:
     )
 
 
-def onset_month(*, data: object, position: int) -> int:
+def onset_month(*, data: Any, position: int) -> int:
     """The calendar month (1 to 12) of a grid position."""
-    times = data.cache.end_times  # type: ignore[attr-defined]
+    times = data.cache.end_times
     return int(str(times[min(max(position, 0), len(times) - 1)].astype("datetime64[M]"))[5:7])
 
 
@@ -130,7 +131,11 @@ def main(site: str) -> None:
             )
         )
     event_rows = pl.concat(pieces) if pieces else pl.DataFrame()
-    rows = np.unique(event_rows["row"].to_numpy()).astype(np.int64) if len(event_rows) else np.array([], dtype=np.int64)
+    rows = (
+        np.unique(event_rows["row"].to_numpy()).astype(np.int64)
+        if len(event_rows)
+        else np.array([], dtype=np.int64)
+    )
     spread = fed.k0_spread(site)
 
     # ---- spans of every knowledge source ----
@@ -149,7 +154,12 @@ def main(site: str) -> None:
         corrections = {("K0", -1): base}
         for key, arm_spans in spans.items():
             corrections[key] = nra.subtraction_correction(
-                data=data, stream=data.stream, spans=arm_spans, cutoffs=cutoffs, rows=rows, mask=True
+                data=data,
+                stream=data.stream,
+                spans=arm_spans,
+                cutoffs=cutoffs,
+                rows=rows,
+                mask=True,
             )
         for (arm, fold), correction in corrections.items():
             q = fed.quantiles_at(data=data, correction=correction, spread=spread, rows=rows)
@@ -206,8 +216,11 @@ def main(site: str) -> None:
                     continue
                 false_spans.append(
                     nra.Span(
-                        onset, onset + length, onset + nra.ONSET_LAG,
-                        onset + length + nra.END_LAG, 0.0,
+                        onset,
+                        onset + length,
+                        onset + nra.ONSET_LAG,
+                        onset + length + nra.END_LAG,
+                        0.0,
                     )
                 )
             if not false_spans:
@@ -226,10 +239,16 @@ def main(site: str) -> None:
                 rows=near_rows,
                 mask=True,
             )
-            q_arm = fed.quantiles_at(data=data, correction=correction, spread=spread, rows=near_rows)
+            q_arm = fed.quantiles_at(
+                data=data, correction=correction, spread=spread, rows=near_rows
+            )
             alone = nra.subtraction_correction(
-                data=data, stream=data.stream, spans=live_logged, cutoffs=cutoffs,
-                rows=near_rows, mask=True,
+                data=data,
+                stream=data.stream,
+                spans=live_logged,
+                cutoffs=cutoffs,
+                rows=near_rows,
+                mask=True,
             )
             q_logged = fed.quantiles_at(data=data, correction=alone, spread=spread, rows=near_rows)
             diff = quantile_score(actual=data.actual[near_rows], quantiles=q_arm) - quantile_score(

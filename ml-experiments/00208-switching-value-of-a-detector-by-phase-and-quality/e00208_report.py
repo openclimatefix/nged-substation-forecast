@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0912, PLR0915, T201
+# ruff: noqa: E501, PLR0912, PLR0915, PTH207
 """Print every number the page quotes and write the tables the charts read.
 
 Reads the injected-world scores of `e00208_injected.py`, the real-record scores of `e00208_real.py`,
@@ -25,7 +25,9 @@ SITES: Final[tuple[str, ...]] = ("D5", "D10", "D11", "D14", "D16", "D9")
 PHASES: Final[tuple[str, ...]] = ("BEFORE_ALARM", "DURING", "AFTER")
 N_DRAWS: Final[int] = 20_000
 CHUNK: Final[int] = 1_000
-E203_DIR: Final = ML_EXPERIMENTS_DATA_DIR / "00203-switching-replay-learned-score-in-masked-forecast"
+E203_DIR: Final = (
+    ML_EXPERIMENTS_DATA_DIR / "00203-switching-replay-learned-score-in-masked-forecast"
+)
 REPORT_DIR: Final = WORK_DIR / "report"
 WINTER: Final[frozenset[int]] = frozenset({11, 12, 1, 2, 3})
 SIZE_BANDS: Final[dict[str, tuple[float, float]]] = {
@@ -45,11 +47,31 @@ LEAD_BANDS: Final[dict[str, tuple[float, float]]] = {
 }
 SWEEPS: Final[dict[str, list[str]]] = {
     "recall": ["RECALL_0.25|MASK", "RECALL_0.5|MASK", "RECALL_0.75|MASK", "PERFECT|MASK"],
-    "onset delay (half-hours)": ["PERFECT|MASK", "DELAY_6|MASK", "DELAY_12|MASK", "DELAY_24|MASK", "DELAY_48|MASK", "DELAYX_96|MASK", "DELAYX_144|MASK", "DELAYX_192|MASK"],
+    "onset delay (half-hours)": [
+        "PERFECT|MASK",
+        "DELAY_6|MASK",
+        "DELAY_12|MASK",
+        "DELAY_24|MASK",
+        "DELAY_48|MASK",
+        "DELAYX_96|MASK",
+        "DELAYX_144|MASK",
+        "DELAYX_192|MASK",
+    ],
     "MW error (subtraction)": ["PERFECT|SUB", "BLUR_0.25|SUB", "BLUR_0.5|SUB"],
-    "repair of RO-NC misses": ["DET|MASK", "REPAIR_0.25|MASK", "REPAIR_0.5|MASK", "REPAIR_0.75|MASK", "REPAIR_1.0|MASK"],
+    "repair of RO-NC misses": [
+        "DET|MASK",
+        "REPAIR_0.25|MASK",
+        "REPAIR_0.5|MASK",
+        "REPAIR_0.75|MASK",
+        "REPAIR_1.0|MASK",
+    ],
 }
 QCOLS: Final[tuple[str, ...]] = ("q01", "q05", "q95", "q99")
+
+
+def scalar(value: object) -> float:
+    """A polars scalar (a mean or a sum) as a float."""
+    return float(value)  # ty: ignore[invalid-argument-type]
 
 
 def fmt(t: tuple[float, float, float], digits: int = 3) -> str:
@@ -89,9 +111,22 @@ def load_injected() -> tuple[pl.DataFrame, pl.DataFrame]:
     keep_tail = {"K0|NONE", "CLEAN|NONE", "PERFECT|MASK", "PERFECT_LAG|MASK", "DET|MASK"}
     for path in sorted(glob.glob(str(WORK_DIR / "injected" / "*.parquet"))):
         f = pl.read_parquet(path)
-        key = ["site", "world", "row", "period", "event", "phase", "lead_hours", "event_hours", "fraction", "onset_month"]
+        key = [
+            "site",
+            "world",
+            "row",
+            "period",
+            "event",
+            "phase",
+            "lead_hours",
+            "event_hours",
+            "fraction",
+            "onset_month",
+        ]
         wides.append(
-            f.pivot(on="arm", index=key, values="qs").with_columns(pl.col(pl.Float64).cast(pl.Float32))
+            f.pivot(on="arm", index=key, values="qs").with_columns(
+                pl.col(pl.Float64).cast(pl.Float32)
+            )
         )
         tails.append(
             f.filter(pl.col("arm").is_in(keep_tail)).select(
@@ -102,7 +137,11 @@ def load_injected() -> tuple[pl.DataFrame, pl.DataFrame]:
     extras = []
     for path in sorted(glob.glob(str(WORK_DIR / "injected_extra" / "*.parquet"))):
         f = pl.read_parquet(path).filter(pl.col("arm") != "K0|NONE")
-        extras.append(f.pivot(on="arm", index=["site", "world", "row"], values="qs").with_columns(pl.col(pl.Float64).cast(pl.Float32)))
+        extras.append(
+            f.pivot(on="arm", index=["site", "world", "row"], values="qs").with_columns(
+                pl.col(pl.Float64).cast(pl.Float32)
+            )
+        )
     if extras:
         wide = wide.join(pl.concat(extras, how="diagonal"), on=["site", "world", "row"], how="left")
     return wide, pl.concat(tails)
@@ -126,7 +165,9 @@ def gains_by_unit(*, frame: pl.DataFrame, arms: list[str]) -> tuple[np.ndarray, 
     return sums, counts
 
 
-def stratum_table(*, frame: pl.DataFrame, arms: list[str], reference: dict[str, str], seed: int) -> pl.DataFrame:
+def stratum_table(
+    *, frame: pl.DataFrame, arms: list[str], reference: dict[str, str], seed: int
+) -> pl.DataFrame:
     """Gain and share of the perfect gain for each arm on a set of rows, with intervals."""
     sums, counts = gains_by_unit(frame=frame, arms=arms)
     if len(counts) < 2:
@@ -136,7 +177,11 @@ def stratum_table(*, frame: pl.DataFrame, arms: list[str], reference: dict[str, 
     rows = []
     for i, arm in enumerate(arms):
         lo, hi = interval(draws[:, i])
-        ref = arms.index(reference.get(arm, "PERFECT|MASK")) if reference.get(arm, "PERFECT|MASK") in arms else None
+        ref = (
+            arms.index(reference.get(arm, "PERFECT|MASK"))
+            if reference.get(arm, "PERFECT|MASK") in arms
+            else None
+        )
         share = share_lo = share_hi = dropped = None
         if ref is not None and est[ref] > 0:
             with np.errstate(divide="ignore", invalid="ignore"):
@@ -145,7 +190,18 @@ def stratum_table(*, frame: pl.DataFrame, arms: list[str], reference: dict[str, 
             share_lo, share_hi = interval(np.where(draws[:, ref] > 0, s, np.nan))
             dropped = float((draws[:, ref] <= 0).mean())
         rows.append(
-            {"arm": arm, "gain": float(est[i]), "gain_lo": lo, "gain_hi": hi, "share": share, "share_lo": share_lo, "share_hi": share_hi, "share_draws_dropped": dropped, "units": len(counts), "rows": int(counts.sum())}
+            {
+                "arm": arm,
+                "gain": float(est[i]),
+                "gain_lo": lo,
+                "gain_hi": hi,
+                "share": share,
+                "share_lo": share_lo,
+                "share_hi": share_hi,
+                "share_draws_dropped": dropped,
+                "units": len(counts),
+                "rows": int(counts.sum()),
+            }
         )
     return pl.DataFrame(rows)
 
@@ -158,15 +214,24 @@ def main() -> None:
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     wide, tails = load_injected()
     arms = [c for c in wide.columns if "|" in c]
-    gain_arms = [a for a in arms if a not in {"K0|NONE"}]
+    gain_arms = [a for a in arms if a != "K0|NONE"]
     reference = {a: ("PERFECT|SUB" if a.endswith("|SUB") else "PERFECT|MASK") for a in gain_arms}
     reference["PERFECT_LAG|SUB"] = "PERFECT|SUB"
-    print("injected rows:", wide.height, "units:", len(np.unique(unit_of(wide))), "worlds:", wide["world"].n_unique())
+    print(
+        "injected rows:",
+        wide.height,
+        "units:",
+        len(np.unique(unit_of(wide))),
+        "worlds:",
+        wide["world"].n_unique(),
+    )
     print(wide.group_by("phase").agg(rows=pl.len(), units=pl.struct("world", "event").n_unique()))
 
     # ---- control: CLEAN equals K0 before the first injected stamp is asserted in the job ----
     strata: dict[str, pl.Expr] = {"all transfers": pl.lit(True)}
-    strata["headline (25% or more, over 1 d)"] = (pl.col("fraction") >= 0.25) & (pl.col("event_hours") > 24)
+    strata["headline (25% or more, over 1 d)"] = (pl.col("fraction") >= 0.25) & (
+        pl.col("event_hours") > 24
+    )
     for name, (lo, hi) in SIZE_BANDS.items():
         strata[f"size {name}"] = (pl.col("fraction") >= lo) & (pl.col("fraction") < hi)
     for name, (lo, hi) in DURATION_BANDS.items():
@@ -182,29 +247,62 @@ def main() -> None:
     for phase in PHASES:
         for name, expr in strata.items():
             sub = wide.filter((pl.col("phase") == phase) & expr)
-            t = stratum_table(frame=sub, arms=gain_arms + ["K0|NONE"], reference=reference, seed=208 + len(tables))
+            t = stratum_table(
+                frame=sub, arms=[*gain_arms, "K0|NONE"], reference=reference, seed=208 + len(tables)
+            )
             if t.height:
-                tables.append(t.filter(pl.col("arm") != "K0|NONE").with_columns(phase=pl.lit(phase), stratum=pl.lit(name)))
+                tables.append(
+                    t.filter(pl.col("arm") != "K0|NONE").with_columns(
+                        phase=pl.lit(phase), stratum=pl.lit(name)
+                    )
+                )
     result = pl.concat(tables)
     result.write_parquet(REPORT_DIR / "injected_strata.parquet")
 
-    show = ["PERFECT|MASK", "PERFECT_LAG|MASK", "DET|MASK", "DET_NOFALSE|MASK", "CLEAN|NONE", "GAM_ONLY|NONE", "PERFECT|SUB", "PERFECT_LAG|SUB", "DET|SUB"]
-    print("\n== Headline: gain over K0 (points; positive is better) and share of the PERFECT|MASK gain, by phase ==")
+    show = [
+        "PERFECT|MASK",
+        "PERFECT_LAG|MASK",
+        "DET|MASK",
+        "DET_NOFALSE|MASK",
+        "CLEAN|NONE",
+        "GAM_ONLY|NONE",
+        "PERFECT|SUB",
+        "PERFECT_LAG|SUB",
+        "DET|SUB",
+    ]
+    print(
+        "\n== Headline: gain over K0 (points; positive is better) and share of the PERFECT|MASK gain, by phase =="
+    )
     for stratum in ("all transfers", "headline (25% or more, over 1 d)"):
         print(f"\n-- {stratum} --")
         print(
             result.filter((pl.col("stratum") == stratum) & pl.col("arm").is_in(show))
-            .select("phase", "arm", "gain", "gain_lo", "gain_hi", "share", "share_lo", "share_hi", "units", "rows")
+            .select(
+                "phase",
+                "arm",
+                "gain",
+                "gain_lo",
+                "gain_hi",
+                "share",
+                "share_lo",
+                "share_hi",
+                "units",
+                "rows",
+            )
             .sort("phase", "arm")
         )
 
-    print("\n== Quality sweeps: share of PERFECT gain recovered, headline stratum and all transfers ==")
+    print(
+        "\n== Quality sweeps: share of PERFECT gain recovered, headline stratum and all transfers =="
+    )
     for stratum in ("headline (25% or more, over 1 d)", "all transfers"):
         for axis, members in SWEEPS.items():
             print(f"\n-- {stratum} / {axis} --")
             print(
                 result.filter((pl.col("stratum") == stratum) & pl.col("arm").is_in(members))
-                .select("phase", "arm", "gain", "gain_lo", "gain_hi", "share", "share_lo", "share_hi")
+                .select(
+                    "phase", "arm", "gain", "gain_lo", "gain_hi", "share", "share_lo", "share_hi"
+                )
                 .sort("phase", "arm")
             )
 
@@ -219,30 +317,62 @@ def main() -> None:
     print("\n== Leave one substation out: AFTER phase, headline stratum, share recovered ==")
     head = (pl.col("fraction") >= 0.25) & (pl.col("event_hours") > 24)
     for site in (None, *SITES):
-        sub = wide.filter((pl.col("phase") == "AFTER") & head & ((pl.col("site") != site) if site else pl.lit(True)))
-        t = stratum_table(frame=sub, arms=["K0|NONE", "PERFECT|MASK", "DET|MASK", "PERFECT_LAG|MASK"], reference=reference, seed=999)
-        print(site or "none left out", t.filter(pl.col("arm") != "K0|NONE").select("arm", "gain", "share", "units").to_dicts())
+        sub = wide.filter(
+            (pl.col("phase") == "AFTER")
+            & head
+            & ((pl.col("site") != site) if site else pl.lit(True))
+        )
+        t = stratum_table(
+            frame=sub,
+            arms=["K0|NONE", "PERFECT|MASK", "DET|MASK", "PERFECT_LAG|MASK"],
+            reference=reference,
+            seed=999,
+        )
+        print(
+            site or "none left out",
+            t.filter(pl.col("arm") != "K0|NONE").select("arm", "gain", "share", "units").to_dicts(),
+        )
 
     # ---- whole-year pooled gain of perfect knowledge ----
     n_rows = 0
     for site in SITES:
         d = fed.get_site(site)
-        n_rows += int((np.isfinite(d.actual) & np.isin(d.run_period, ["scored", "replicate"])[d.run_of_row]).sum())
+        n_rows += int(
+            (
+                np.isfinite(d.actual) & np.isin(d.run_period, ["scored", "replicate"])[d.run_of_row]
+            ).sum()
+        )
     worlds = wide["world"].n_unique()
-    total = {a: float((wide["K0|NONE"].cast(pl.Float64) - wide[a].cast(pl.Float64)).sum()) for a in ("PERFECT|MASK", "DET|MASK", "PERFECT_LAG|MASK")}
+    total = {
+        a: float((wide["K0|NONE"].cast(pl.Float64) - wide[a].cast(pl.Float64)).sum())
+        for a in ("PERFECT|MASK", "DET|MASK", "PERFECT_LAG|MASK")
+    }
     print("\nWhole-year rows (six substations, scored+replicate periods, per world):", n_rows)
-    print("Whole-year pooled gain (points, over all rows of all worlds):", {a: v / (worlds * n_rows) for a, v in total.items()})
+    print(
+        "Whole-year pooled gain (points, over all rows of all worlds):",
+        {a: v / (worlds * n_rows) for a, v in total.items()},
+    )
 
     # ---- detector recall in the injected worlds ----
-    print("\n== RO-NC recall in the injected worlds (share of injected transfers with an interval starting within 2 hours of the onset) ==")
+    print(
+        "\n== RO-NC recall in the injected worlds (share of injected transfers with an interval starting within 2 hours of the onset) =="
+    )
     hits = tot = 0
     by_size: dict[str, list[int]] = {}
-    for path in sorted(glob.glob(str(ML_EXPERIMENTS_DATA_DIR / "00141-switching-detector-fed-into-gam-k" / "worlds" / "world_*.npz"))):
-        seed = int(path.split("_")[-1].split(".")[0])
+    for path in sorted(
+        glob.glob(
+            str(
+                ML_EXPERIMENTS_DATA_DIR
+                / "00141-switching-detector-fed-into-gam-k"
+                / "worlds"
+                / "world_*.npz"
+            )
+        )
+    ):
         iv = pl.read_parquet(path.replace(".npz", ".parquet")).filter(pl.col("setting") == "R0_M48")
         with np.load(path) as z:
             ev = z["events"]
-            for site, series in fed.SERIES_OF_SITE.items():
+            for series in fed.SERIES_OF_SITE.values():
                 delta = z[f"delta_{series}"]
                 mine = iv.filter(pl.col("series") == series)["onset"].to_numpy()
                 for row in ev:
@@ -252,14 +382,29 @@ def main() -> None:
                     found = bool(np.any(np.abs(mine - o) <= 4))
                     hits += found
                     tot += 1
-                    band = "25% or more" if row[4] >= 0.25 else ("10% to 25%" if row[4] >= 0.10 else "under 10%")
+                    band = (
+                        "25% or more"
+                        if row[4] >= 0.25
+                        else ("10% to 25%" if row[4] >= 0.10 else "under 10%")
+                    )
                     by_size.setdefault(band, []).append(int(found))
-    print(f"recall {hits}/{tot} = {hits / tot:.3f}", {k: (sum(v), len(v)) for k, v in by_size.items()})
+    print(
+        f"recall {hits}/{tot} = {hits / tot:.3f}", {k: (sum(v), len(v)) for k, v in by_size.items()}
+    )
 
     # ---- explanation test: why the injected gain is smaller than the real-record gain ----
     print("\n== Explanation test: size of the injected MW against the logged transfers' MW ==")
     pts = []
-    for path in sorted(glob.glob(str(ML_EXPERIMENTS_DATA_DIR / "00141-switching-detector-fed-into-gam-k" / "worlds" / "world_*.npz"))):
+    for path in sorted(
+        glob.glob(
+            str(
+                ML_EXPERIMENTS_DATA_DIR
+                / "00141-switching-detector-fed-into-gam-k"
+                / "worlds"
+                / "world_*.npz"
+            )
+        )
+    ):
         with np.load(path) as z:
             for row in z["events"]:
                 if row[4] < 0.25 or (row[3] - row[2]) / 2 <= 24:
@@ -268,83 +413,218 @@ def main() -> None:
                     d = np.nan_to_num(z[f"delta_{series}"][int(row[2]) : int(row[3])])
                     if np.any(d):
                         pts.append(100.0 * float(np.mean(np.abs(d))) / fed.CAPACITY_MW[site])
-    print("injected headline transfers: mean |MW| in points of capacity per substation", float(np.mean(pts)), "median", float(np.median(pts)), "n", len(pts))
-    lab = pl.read_parquet(ML_EXPERIMENTS_DATA_DIR / "00041-sw2-0a-labeller-gate" / "real" / "labelled_set.parquet").filter(~pl.col("is_sentinel") & (pl.col("kind") == "real_operation") & pl.col("moved_mw_p50").is_not_null())
+    print(
+        "injected headline transfers: mean |MW| in points of capacity per substation",
+        float(np.mean(pts)),
+        "median",
+        float(np.median(pts)),
+        "n",
+        len(pts),
+    )
+    lab = pl.read_parquet(
+        ML_EXPERIMENTS_DATA_DIR / "00041-sw2-0a-labeller-gate" / "real" / "labelled_set.parquet"
+    ).filter(
+        ~pl.col("is_sentinel")
+        & (pl.col("kind") == "real_operation")
+        & pl.col("moved_mw_p50").is_not_null()
+    )
     real_pts = []
     for r in lab.iter_rows(named=True):
         for site, series in fed.SERIES_OF_SITE.items():
             if str(series) in {str(r["donor"]), str(r["side_a"]), str(r["side_b"])}:
                 real_pts.append(100.0 * abs(float(r["moved_mw_p50"])) / fed.CAPACITY_MW[site])
-    print("logged real transfers touching the six substations: median |MW| in points", float(np.median(real_pts)), "mean", float(np.mean(real_pts)), "n", len(real_pts))
+    print(
+        "logged real transfers touching the six substations: median |MW| in points",
+        float(np.median(real_pts)),
+        "mean",
+        float(np.mean(real_pts)),
+        "n",
+        len(real_pts),
+    )
     k0_after = wide.filter((pl.col("phase") == "AFTER") & head)
-    print("injected headline AFTER rows: K0 mean score", float(k0_after["K0|NONE"].cast(pl.Float64).mean()), "CLEAN mean score", float(k0_after["CLEAN|NONE"].cast(pl.Float64).mean()))
+    print(
+        "injected headline AFTER rows: K0 mean score",
+        scalar(k0_after["K0|NONE"].cast(pl.Float64).mean()),
+        "CLEAN mean score",
+        scalar(k0_after["CLEAN|NONE"].cast(pl.Float64).mean()),
+    )
 
     # ---- tails (headline stratum, AFTER phase) ----
     print("\n== Tail coverage and pinball loss, AFTER phase, headline stratum, injected worlds ==")
-    sub = tails.filter((pl.col("phase") == "AFTER") & (pl.col("fraction") >= 0.25) & (pl.col("event_hours") > 24))
+    sub = tails.filter(
+        (pl.col("phase") == "AFTER") & (pl.col("fraction") >= 0.25) & (pl.col("event_hours") > 24)
+    )
     tail_rows = []
     for arm in sub["arm"].unique().sort():
         a = sub.filter(pl.col("arm") == arm)
         actual = a["actual"].to_numpy()
         for col, level in (("q01", 0.01), ("q05", 0.05), ("q95", 0.95), ("q99", 0.99)):
             q = a[col].to_numpy()
-            tail_rows.append({"arm": arm, "level": level, "coverage": float((actual <= q).mean()), "pinball": float(pinball(actual=actual, quantile=q, level=level).mean()), "rows": len(actual)})
+            tail_rows.append(
+                {
+                    "arm": arm,
+                    "level": level,
+                    "coverage": float((actual <= q).mean()),
+                    "pinball": float(pinball(actual=actual, quantile=q, level=level).mean()),
+                    "rows": len(actual),
+                }
+            )
     tail_table = pl.DataFrame(tail_rows)
     print(tail_table.sort("arm", "level"))
     tail_table.write_parquet(REPORT_DIR / "injected_tails.parquet")
     print("\n== Median minus mean forecast, per substation (points), AFTER phase ==")
-    mm = tails.filter((pl.col("phase") == "AFTER") & pl.col("arm").is_in(["K0|NONE", "PERFECT|MASK"])).group_by("site", "arm").agg(median_minus_mean=(pl.col("err_median") - pl.col("err_mean")).mean())
+    mm = (
+        tails.filter(
+            (pl.col("phase") == "AFTER") & pl.col("arm").is_in(["K0|NONE", "PERFECT|MASK"])
+        )
+        .group_by("site", "arm")
+        .agg(median_minus_mean=(pl.col("err_median") - pl.col("err_mean")).mean())
+    )
     print(mm.sort("site", "arm"))
-    print("\n== Error of the mean forecast (mean absolute, points) beside the score gain, headline stratum ==")
+    print(
+        "\n== Error of the mean forecast (mean absolute, points) beside the score gain, headline stratum =="
+    )
     for phase in PHASES:
-        s = tails.filter((pl.col("phase") == phase) & (pl.col("fraction") >= 0.25) & (pl.col("event_hours") > 24)).group_by("arm").agg(mae_mean=pl.col("err_mean").abs().mean(), bias=pl.col("err_mean").mean())
+        s = (
+            tails.filter(
+                (pl.col("phase") == phase)
+                & (pl.col("fraction") >= 0.25)
+                & (pl.col("event_hours") > 24)
+            )
+            .group_by("arm")
+            .agg(mae_mean=pl.col("err_mean").abs().mean(), bias=pl.col("err_mean").mean())
+        )
         print(phase, s.sort("arm").to_dicts())
 
     # ================= real record =================
     print("\n\n================ REAL RECORD ================")
     real_dir = WORK_DIR / "real"
-    scores = pl.concat([pl.read_parquet(real_dir / f"event_scores_{s}.parquet").with_columns(site=pl.lit(s)) for s in SITES if (real_dir / f"event_scores_{s}.parquet").exists()])
-    rows = pl.concat([pl.read_parquet(real_dir / f"event_rows_{s}.parquet") for s in SITES if (real_dir / f"event_rows_{s}.parquet").exists()])
+    scores = pl.concat(
+        [
+            pl.read_parquet(real_dir / f"event_scores_{s}.parquet").with_columns(site=pl.lit(s))
+            for s in SITES
+            if (real_dir / f"event_scores_{s}.parquet").exists()
+        ]
+    )
+    rows = pl.concat(
+        [
+            pl.read_parquet(real_dir / f"event_rows_{s}.parquet")
+            for s in SITES
+            if (real_dir / f"event_rows_{s}.parquet").exists()
+        ]
+    )
     fold_of = al.card_folds()
-    rows = rows.with_columns(fold=pl.col("card").replace_strict(fold_of, default=-1, return_dtype=pl.Int64))
+    rows = rows.with_columns(
+        fold=pl.col("card").replace_strict(fold_of, default=-1, return_dtype=pl.Int64)
+    )
     # an arm without folds has fold -1; a learned arm uses the fold that holds out the card's Primary pair
     missing = rows.filter(pl.col("fold") == -1)["card"].unique().to_list()
     if missing:
         raise AssertionError(f"cards without a fold: {missing}")
-    j = rows.join(scores, on=["site", "row"], how="inner") if "site" in scores.columns else rows.join(scores, on="row")
-    j = j.filter((pl.col("fold_right") == -1) | (pl.col("fold_right") == pl.col("fold"))) if "fold_right" in j.columns else j
-    wide_r = j.pivot(on="arm", index=["site", "card", "row", "phase", "in_163_after", "cutoff_ok", "hours", "onset_month", "lead_hours"], values="qs")
+    j = (
+        rows.join(scores, on=["site", "row"], how="inner")
+        if "site" in scores.columns
+        else rows.join(scores, on="row")
+    )
+    j = (
+        j.filter((pl.col("fold_right") == -1) | (pl.col("fold_right") == pl.col("fold")))
+        if "fold_right" in j.columns
+        else j
+    )
+    wide_r = j.pivot(
+        on="arm",
+        index=[
+            "site",
+            "card",
+            "row",
+            "phase",
+            "in_163_after",
+            "cutoff_ok",
+            "hours",
+            "onset_month",
+            "lead_hours",
+        ],
+        values="qs",
+    )
     arms_r = ["LOGGED", "RONC", "PAIR_NEW", "PAIR_GATED", "LEARNED_R", "LEARNED_F", "RONC_195"]
-    print("windows (card x substation):", wide_r.select(pl.struct("site", "card").n_unique()).item(), "cards:", wide_r["card"].n_unique())
+    print(
+        "windows (card x substation):",
+        wide_r.select(pl.struct("site", "card").n_unique()).item(),
+        "cards:",
+        wide_r["card"].n_unique(),
+    )
     ctrl = wide_r.filter(pl.col("in_163_after"))
     wide_r = wide_r.filter(pl.col("cutoff_ok"))
-    print("positive control, rows in experiment 163's AFTER set (expect K0 10.129, PAIR_NEW 6.083 for the 11 transfers):", {a: float(ctrl[a].mean()) for a in ("K0", "PAIR_NEW", "LOGGED")}, "rows", ctrl.height)
+    print(
+        "positive control, rows in experiment 163's AFTER set (expect K0 10.129, PAIR_NEW 6.083 for the 11 transfers):",
+        {a: scalar(ctrl[a].mean()) for a in ("K0", "PAIR_NEW", "LOGGED")},
+        "rows",
+        ctrl.height,
+    )
     real_rows = []
     for phase in (*PHASES, "ALL"):
         for scope in ("all", "over 1 d"):
-            sub = wide_r.filter(((pl.col("phase") == phase) if phase != "ALL" else pl.lit(True)) & ((pl.col("hours") > 24) if scope == "over 1 d" else pl.lit(True)))
-            labels, inv = np.unique(sub["card"].to_numpy() if sub.height else np.array([]), return_inverse=True)
+            sub = wide_r.filter(
+                ((pl.col("phase") == phase) if phase != "ALL" else pl.lit(True))
+                & ((pl.col("hours") > 24) if scope == "over 1 d" else pl.lit(True))
+            )
+            labels, inv = np.unique(
+                sub["card"].to_numpy() if sub.height else np.array([]), return_inverse=True
+            )
             if len(labels) < 2:
                 continue
             counts = np.bincount(inv).astype(float)
-            sums = np.stack([np.bincount(inv, weights=np.nan_to_num((sub["K0"] - sub[a]).to_numpy().astype(float)), minlength=len(labels)) for a in arms_r], axis=1)
+            sums = np.stack(
+                [
+                    np.bincount(
+                        inv,
+                        weights=np.nan_to_num((sub["K0"] - sub[a]).to_numpy().astype(float)),
+                        minlength=len(labels),
+                    )
+                    for a in arms_r
+                ],
+                axis=1,
+            )
             draws = boot_matrix(sums=sums, counts=counts, seed=77)
             est = sums.sum(axis=0) / counts.sum()
             for i, a in enumerate(arms_r):
                 lo, hi = interval(draws[:, i])
                 ref = arms_r.index("LOGGED")
                 share = float(est[i] / est[ref]) if est[ref] > 0 else None
-                real_rows.append({"phase": phase, "scope": scope, "arm": a, "gain": float(est[i]), "gain_lo": lo, "gain_hi": hi, "share_of_logged": share, "cards": len(labels), "rows": int(counts.sum())})
+                real_rows.append(
+                    {
+                        "phase": phase,
+                        "scope": scope,
+                        "arm": a,
+                        "gain": float(est[i]),
+                        "gain_lo": lo,
+                        "gain_hi": hi,
+                        "share_of_logged": share,
+                        "cards": len(labels),
+                        "rows": int(counts.sum()),
+                    }
+                )
     real = pl.DataFrame(real_rows)
     real.write_parquet(REPORT_DIR / "real_gain.parquet")
     print(real.sort("phase", "scope", "arm"))
-    print("K0 mean score by phase (points):", wide_r.group_by("phase").agg(pl.col("K0").mean()).to_dicts())
+    print(
+        "K0 mean score by phase (points):",
+        wide_r.group_by("phase").agg(pl.col("K0").mean()).to_dicts(),
+    )
 
     # ---- real record: gain pooled over ordinary rows plus experiment 163's AFTER rows ----
     after163 = j.filter(pl.col("phase").is_in(["AFTER", "TAIL"]) | pl.col("in_163_after"))
     ctrl_rows = wide_r.filter(pl.col("in_163_after") | True).filter(pl.col("in_163_after"))
-    pooled = {a: float((ctrl_rows["K0"] - ctrl_rows[a]).sum() / (1_579_711 + ctrl_rows.height)) for a in arms_r}
-    print("\nReal record, gain pooled over ordinary rows plus experiment 163's AFTER rows (points; the AFTER rows are in the scored and replicate months only):", pooled, "AFTER rows", ctrl_rows.height)
+    pooled = {
+        a: float((ctrl_rows["K0"] - ctrl_rows[a]).sum() / (1_579_711 + ctrl_rows.height))
+        for a in arms_r
+    }
+    print(
+        "\nReal record, gain pooled over ordinary rows plus experiment 163's AFTER rows (points; the AFTER rows are in the scored and replicate months only):",
+        pooled,
+        "AFTER rows",
+        ctrl_rows.height,
+    )
     del after163
 
     # ---- real-record tails, AFTER ----
@@ -352,18 +632,59 @@ def main() -> None:
     for arm in ("K0", "LOGGED", "PAIR_NEW", "LEARNED_R", "RONC"):
         a = t_real.filter(pl.col("arm") == arm)
         actual = a["actual"].to_numpy()
-        print(arm, {c: (round(float((actual <= a[c].to_numpy()).mean()), 3), round(float(pinball(actual=actual, quantile=a[c].to_numpy(), level=lv).mean()), 3)) for c, lv in (("q01", 0.01), ("q05", 0.05), ("q95", 0.95), ("q99", 0.99))})
+        print(
+            arm,
+            {
+                c: (
+                    round(float((actual <= a[c].to_numpy()).mean()), 3),
+                    round(
+                        float(pinball(actual=actual, quantile=a[c].to_numpy(), level=lv).mean()), 3
+                    ),
+                )
+                for c, lv in (("q01", 0.01), ("q05", 0.05), ("q95", 0.95), ("q99", 0.99))
+            },
+        )
 
     # ---- ordinary days: stored scores of experiment 203 ----
-    print("\n== Ordinary-day harm (arm minus K0, points over all ordinary rows) from experiment 203's stored scores ==")
-    ordinary = pl.concat([pl.read_parquet(E203_DIR / f"meta_{s}.parquet").filter(pl.col("ordinary")).select("site", "row", "valid_time") for s in SITES])
-    sc = pl.concat([pl.read_parquet(E203_DIR / f"scores_{s}.parquet").with_columns(site=pl.lit(s)) for s in SITES])
-    sc = sc.join(ordinary, on=["site", "row"], how="inner").with_columns(month=pl.col("valid_time").dt.strftime("%Y-%m"))
-    wide_o = sc.group_by("site", "row", "month", "arm").agg(qs=pl.col("qs").mean()).pivot(on="arm", index=["site", "row", "month"], values="qs")
+    print(
+        "\n== Ordinary-day harm (arm minus K0, points over all ordinary rows) from experiment 203's stored scores =="
+    )
+    ordinary = pl.concat(
+        [
+            pl.read_parquet(E203_DIR / f"meta_{s}.parquet")
+            .filter(pl.col("ordinary"))
+            .select("site", "row", "valid_time")
+            for s in SITES
+        ]
+    )
+    sc = pl.concat(
+        [
+            pl.read_parquet(E203_DIR / f"scores_{s}.parquet").with_columns(site=pl.lit(s))
+            for s in SITES
+        ]
+    )
+    sc = sc.join(ordinary, on=["site", "row"], how="inner").with_columns(
+        month=pl.col("valid_time").dt.strftime("%Y-%m")
+    )
+    wide_o = (
+        sc.group_by("site", "row", "month", "arm")
+        .agg(qs=pl.col("qs").mean())
+        .pivot(on="arm", index=["site", "row", "month"], values="qs")
+    )
     months, inv = np.unique(wide_o["month"].to_numpy(), return_inverse=True)
     counts = np.bincount(inv).astype(float)
     harm_arms = ["PAIR_GATED", "PAIR_NEW", "LEARNED_R", "LEARNED_F", "RONC_195"]
-    sums = np.stack([np.bincount(inv, weights=(wide_o[a] - wide_o["K0"]).to_numpy().astype(float), minlength=len(months)) for a in harm_arms], axis=1)
+    sums = np.stack(
+        [
+            np.bincount(
+                inv,
+                weights=(wide_o[a] - wide_o["K0"]).to_numpy().astype(float),
+                minlength=len(months),
+            )
+            for a in harm_arms
+        ],
+        axis=1,
+    )
     draws = boot_matrix(sums=sums, counts=counts, seed=203)
     est = sums.sum(axis=0) / counts.sum()
     harm_rows = []
@@ -371,15 +692,21 @@ def main() -> None:
         lo, hi = interval(draws[:, i])
         harm_rows.append({"source": a, "harm": float(est[i]), "lo": lo, "hi": hi})
         print(f"{a:12s} {fmt((est[i], lo, hi))}  inside +/-0.05: {lo >= -0.05 and hi <= 0.05}")
-    print("ordinary rows:", wide_o.height, "K0 mean score:", float(wide_o["K0"].mean()))
+    print("ordinary rows:", wide_o.height, "K0 mean score:", scalar(wide_o["K0"].mean()))
 
     # ---- false-alarm precision sweep ----
     print("\n== Precision sweep: LOGGED plus false alarms minus LOGGED alone, ordinary rows ==")
-    fa = pl.concat([pl.read_parquet(f) for f in sorted(glob.glob(str(real_dir / "false_alarm_*.parquet")))])
-    oc = pl.concat([pl.read_parquet(f) for f in sorted(glob.glob(str(real_dir / "ordinary_count_*.parquet")))])
+    fa = pl.concat(
+        [pl.read_parquet(f) for f in sorted(glob.glob(str(real_dir / "false_alarm_*.parquet")))]
+    )
+    oc = pl.concat(
+        [pl.read_parquet(f) for f in sorted(glob.glob(str(real_dir / "ordinary_count_*.parquet")))]
+    )
     # months are counted since 1970-01 plus 1 in the job; the denominator uses the same labels
     month_labels = np.array(sorted(set(oc["month"].to_list())))
-    denominators = np.array([oc.filter(pl.col("month") == m)["len"].sum() for m in month_labels], dtype=float)
+    denominators = np.array(
+        [oc.filter(pl.col("month") == m)["len"].sum() for m in month_labels], dtype=float
+    )
     prec_rows = []
     for precision in sorted(fa["precision"].unique().to_list(), reverse=True):
         f = fa.filter(pl.col("precision") == precision)
@@ -388,8 +715,24 @@ def main() -> None:
         d = boot_matrix(sums=s[:, None], counts=denominators, seed=int(precision * 100))
         lo, hi = interval(d[:, 0])
         est_p = float(s.sum() / denominators.sum())
-        prec_rows.append({"precision": precision, "harm": est_p, "lo": lo, "hi": hi, "n_false_per_draw": float(f.group_by("site", "draw").agg(pl.col("n_false").first()).group_by("draw").agg(pl.col("n_false").sum())["n_false"].mean())})
-        print(f"precision {precision}: {fmt((est_p, lo, hi))}  false alarms per draw (all substations) {prec_rows[-1]['n_false_per_draw']:.1f}")
+        prec_rows.append(
+            {
+                "precision": precision,
+                "harm": est_p,
+                "lo": lo,
+                "hi": hi,
+                "n_false_per_draw": scalar(
+                    f.group_by("site", "draw")
+                    .agg(pl.col("n_false").first())
+                    .group_by("draw")
+                    .agg(pl.col("n_false").sum())["n_false"]
+                    .mean()
+                ),
+            }
+        )
+        print(
+            f"precision {precision}: {fmt((est_p, lo, hi))}  false alarms per draw (all substations) {prec_rows[-1]['n_false_per_draw']:.1f}"
+        )
     pl.DataFrame(prec_rows).write_parquet(REPORT_DIR / "precision_harm.parquet")
     pl.DataFrame(harm_rows).write_parquet(REPORT_DIR / "ordinary_harm.parquet")
 
@@ -410,7 +753,7 @@ def main() -> None:
         print(f"{name}: {t.height} alarms; logged transfers matched {found} of {n_logged}")
 
     summary = {
-        "injected_units": int(len(np.unique(unit_of(wide)))),
+        "injected_units": len(np.unique(unit_of(wide))),
         "worlds": int(worlds),
         "whole_year_pooled": {a: v / (worlds * n_rows) for a, v in total.items()},
     }
