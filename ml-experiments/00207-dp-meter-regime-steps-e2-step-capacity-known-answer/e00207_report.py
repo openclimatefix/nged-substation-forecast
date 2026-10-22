@@ -70,6 +70,7 @@ def recovery_summary(*, table: pl.DataFrame) -> pl.DataFrame:
                 "low": low,
                 "high": high,
                 "date_ok": float((group["date_error_days"] <= common.DATE_TOLERANCE_DAYS).mean()),  # ty: ignore[invalid-argument-type]
+                "date_exact": float((group["date_error_days"] == 0).mean()),  # ty: ignore[invalid-argument-type]
                 "n": group.height,
             }
         )
@@ -77,26 +78,46 @@ def recovery_summary(*, table: pl.DataFrame) -> pl.DataFrame:
 
 
 def placebo_steps(*, paths: pl.DataFrame) -> pl.DataFrame:
-    """Count month-to-month changes above `PLACEBO_STEP_MW` in the base path per year."""
+    """Count false steps above `PLACEBO_STEP_MW` in the base path per year.
+
+    A step is a month-to-month change between two summer months, or the net change from the
+    August level of the year before to the April level of the year (the fit has no winter rows, so
+    the solver may spread a real change over the winter boundaries, which single changes miss).
+    """
     rows = []
     base = paths.filter(pl.col("target") == 0, pl.col("arm").str.starts_with("step_"))
     for (site, farm, arm), group in base.group_by("site", "farm", "arm"):
         ordered = group.sort("month")
         level = ordered["level"].to_numpy()
         month = ordered["month"].to_numpy()
-        change = np.abs(np.diff(level)) * float(ordered["scale_mw_per_point"][0])
-        year = 1970 + month[1:] // 12
-        rows += [
-            {
-                "site": site,
-                "farm": farm,
-                "arm": arm,
-                "year": y,
-                "false_steps": int(((change > common.PLACEBO_STEP_MW) & (year == y)).sum()),
-                "largest_mw": float(change[year == y].max()),
-            }
-            for y in PLACEBO_YEARS
-        ]
+        scale = float(ordered["scale_mw_per_point"][0])
+        calendar_month = month % 12 + 1
+        year = 1970 + month // 12
+        by_key = {
+            (int(y), int(m)): float(v) for y, m, v in zip(year, calendar_month, level, strict=True)
+        }
+        for y in PLACEBO_YEARS:
+            inside = [
+                abs(by_key[y, m] - by_key[y, m - 1]) * scale
+                for m in (5, 6, 7, 8)
+                if (y, m) in by_key and (y, m - 1) in by_key
+            ]
+            gap = (
+                abs(by_key[y, 4] - by_key[y - 1, 8]) * scale
+                if (y, 4) in by_key and (y - 1, 8) in by_key
+                else 0.0
+            )
+            changes = [*inside, gap]
+            rows.append(
+                {
+                    "site": site,
+                    "farm": farm,
+                    "arm": arm,
+                    "year": y,
+                    "false_steps": sum(c > common.PLACEBO_STEP_MW for c in changes),
+                    "largest_mw": max(changes),
+                }
+            )
     return pl.DataFrame(rows)
 
 
@@ -124,6 +145,11 @@ def print_numbers(*, table: pl.DataFrame, paths: pl.DataFrame) -> None:
     gates = gate_table(summary=summary, placebo=placebo)
     with pl.Config(tbl_rows=80, float_precision=3, tbl_cols=14, tbl_width_chars=200):
         print(summary.filter(pl.col("arm").is_in(list(ARM_LABELS))))
+        print(
+            summary.filter(pl.col("arm").is_in(["step_0.3", "smooth", "step_3"]))
+            .group_by("arm")
+            .agg(exact=pl.col("date_exact").min())
+        )
         print(gates)
         print(
             gates.group_by("arm").agg(

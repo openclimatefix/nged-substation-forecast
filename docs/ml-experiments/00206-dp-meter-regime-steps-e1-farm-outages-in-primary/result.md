@@ -146,6 +146,13 @@ E4 are not run. Experiment 207 (E2) ran at the same time, as instructed, and is 
   3.1 to 9.2 km.
 - **Amendment before any shift was seen:** the minimum sunny half-hours were lowered from 100 and
   300 to 20 and 60 (recorded on the plan before the first shift was computed).
+- **Differences from the plan, found in code review:** the minimum is 2 sunny samples per half-hour
+  of the day in each window (the plan said 3 before the amendment, which lowered it to 2); an outage
+  bridges up to 4 calendar days that have fewer than 4 clear-sky half-hours; a placebo window must
+  hold no bad day (at least 80% of clear-sky half-hours flagged or missing) and at least 3 eligible
+  days, and starts in March to September; and the farm's 99th-percentile output is taken over
+  unflagged half-hours with clear-sky irradiance above 20 W/m², which differs slightly from the
+  capacity unit of experiment 129.
 - **Post hoc, labelled:** MVA Primaries and the bulk supply point D13 were tested after the
   decision rule was applied, to explain the result. The bulk supply point uses the CAMS irradiance of
   D10 for its sunny mask.

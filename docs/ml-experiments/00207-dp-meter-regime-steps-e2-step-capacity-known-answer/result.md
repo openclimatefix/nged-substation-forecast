@@ -53,24 +53,29 @@ adopted_in: none
 date: 2026-10-22
 best_arm: >-
   Step path with weight 3 (passes every test at 5 of 5 Primaries); the pre-registered weight 0.3
-  recovers 0.98 to 1.00 of the step but fails the false-step test at D10
+  recovers 0.98 to 1.00 of the step but fails the false-step test at D10 and D11
 headline: >-
   At the 5 decision Primaries the step path recovers a median 0.98 to 1.00 of an injected step (weight
   0.3) and the date within one month in 100% of injections, against 0.87 to 0.91 for the smooth path and 0.24 to 0.49
-  for season-year steps; the no-injection fit shows 1.07 false steps above 0.5 MW per year at D10.
+  for season-year steps. The pre-registered gate fails (all three tests at 3 of 5 Primaries), because
+  the no-injection fit shows 1.7 false steps above 0.5 MW per year at D10 and 1.0 at D11.
 lessons:
   - >-
     Any capacity path with a free level for each month finds the month and most of the size of an
     added solar-farm step in summer rows; only the capacity that changes once a year misses it.
   - >-
-    The limit is false steps, not missed steps: a weight of 3 brings false steps below 1 per year at
-    every decision Primary while keeping 0.89 to 0.96 of the step, and a weight of 30 cuts the
-    real step to 0.61 to 0.81.
+    The limit is false steps, not missed steps: weight 0.3 leaves 1.7 and 1.0 false steps per year at
+    D10 and D11, a weight of 3 brings every Primary below 0.7 while keeping 0.89 to 0.96 of the step,
+    and a weight of 30 cuts the real step to 0.61 to 0.81.
 advice:
   - >-
     Fit a step-capable capacity path with a total-variation weight near 3 (a share of the mean
     diagonal of the month Gram matrix) if a later experiment needs steps, because it passes the
     size, date, and false-step tests at all 5 decision Primaries (gate table).
+  - >-
+    Count false steps as the net change from one summer to the next as well as single month-to-month
+    changes, because a fit with no winter rows spreads a real change over the winter months
+    (Checks).
   - >-
     Do not use a capacity that changes once per season-year to look for a step, because it recovers
     24% to 49% of an injected step and misplaces the month in up to 60% of injections (Figure 1).
@@ -79,11 +84,10 @@ advice:
     was not tested (Notes).
 take_home_message: >-
   A solar capacity that is free to change each month finds a known solar-farm step added to a
-  Primary's power, to within 2% of its size at the pre-registered penalty and 89% to 96% at a
-  stronger penalty that avoids false steps, and places it within one month of the true date. A
-  capacity that changes once a year finds only 24% to 49% of the step. A step the size of one farm's
-  output is therefore visible in summer data, and the open question is whether the real series
-  contain any.
+  Primary's power, to within 2% of its size at the pre-registered penalty, and places it within one
+  month of the true date. At that penalty the fit also invents steps above 0.5 MW in a year without
+  any, at 2 of 5 Primaries, and a stronger penalty that avoids them still finds 89% to 96% of the
+  step. A capacity that changes once a year finds only 24% to 49% of the step.
 
 ---
 
@@ -110,9 +114,10 @@ whether the real series contain such steps (experiment 206 found no meter-failur
 **Verdict `partly supported`.** At the pre-registered weight 0.3 the step path passes the size test
 (median in 0.75 to 1.25) at 5 of 5 Primaries. The step path passes the date test (at least 75% of
 dates within one month boundary of the true date) at 5 of 5 Primaries. The false-step test (fewer
-than 1 step above 0.5 MW per placebo year) passes at 4 of 5, so all three tests pass at 4 of 5
-Primaries and the gate passes by its 4-of-5 reading. D10 fails with 1.07 false steps per year. At
-weight 3 all three tests pass at 5 of 5. The smooth path also passes the
+than 1 step above 0.5 MW per placebo year) passes at 3 of 5, so all three tests pass at 3 of 5
+Primaries and the pre-registered gate, which needs 4 of 5, fails. D10 and D11 fail with 1.73 and 1.00
+false steps per year. At weight 3, one of the pre-registered sensitivity weights, all three tests
+pass at 5 of 5, but the weight was picked after seeing the results. The smooth path also passes the
 size and date bands, so the claim that it blurs the step is not supported: it shrinks the size to 87%
 to 91%.
 
@@ -125,23 +130,28 @@ to 91%.
 ## Checks
 
 - **Gate table (tests passed, out of 5 Primaries), size / date / false steps / all three:** weight
-  0.03 is 5 / 5 / 4 / 4, weight 0.3 is 5 / 5 / 4 / 4, weight 3 is 5 / 5 / 5 / 5, weight 30 is 1 / 5 /
+  0.03 is 5 / 5 / 2 / 2, weight 0.3 is 5 / 5 / 3 / 3, weight 3 is 5 / 5 / 5 / 5, weight 30 is 1 / 5 /
   5 / 1, and weight 300 is 0 / 2 / 5 / 0 (no step is allowed).
 - **False steps per placebo year at weight 0.3 (no injection, mean of 5 row sets over 2022 to
-  2024):** D5 0.00, D10 1.07, D11 0.67, D14 0.60, D16 0.33. The largest false step is 1.66 MW at D11.
-  A step in the no-injection fit may be a real change in capacity, so the count is an upper bound.
+  2024):** D5 0.00, D10 1.73, D11 1.00, D14 0.93, D16 0.60. At weight 3 they are 0.00, 0.60, 0.67,
+  0.53, and 0.13. A false step is a month-to-month change above 0.5 MW between two summer months, or
+  the net change from the August level to the next April level. The largest false step at weight
+  0.3 is 1.79 MW. A step in the no-injection fit may be a real change in capacity, so the count is
+  an upper bound.
 - **Absolute recovery, median (95% interval over the 20 injections), weight 0.3:** D5 0.98 (0.97 to
   0.99), D10 0.99 (0.96 to 1.00), D11 1.00 (0.99 to 1.01), D14 1.00 (0.98 to 1.02), D16 1.00 (0.97 to
   1.01). Smooth path: 0.87, 0.88, 0.90, 0.91, 0.89. Season-year steps: 0.24, 0.34, 0.49, 0.43, 0.37.
-- **Date within one month boundary (31 days):** 100% of injections for the step and smooth paths at every Primary and 40%
-  to 90% for season-year steps. The date is read on month boundaries, so the test cannot tell a step
-  placed a few days into a month from one at its start.
+- **Date within one month boundary (31 days):** 100% of injections for the step path (weights 0.3
+  and 3) and the smooth path at every Primary and 40% to 90% for season-year steps. The exact month is
+  found in 100% of injections for the step path at weight 0.3 and the smooth path, 95% at D11 for
+  weight 3, and 15% to 45% for season-year steps. The date is read on month boundaries, so the test
+  cannot tell a step placed a few days into a month from one at its start.
 - **Spread over the injections:** the median ratio is 0.99 to 1.00 for each combination of size and
   direction, and 0.89 (farm B) to 1.02 (farm D) by farm.
 - **Non-negativity of the level was not enforced:** the lowest level is -0.68 points (a point is 1%
   of the Primary's effective capacity) at weight 0.3, in 3 path values.
 - **Audit triggers:** the first trigger of the `ml-experiment` skill fired, because the placebo
-  control fails at D10 at the pre-registered weight (1.07 against a limit of 1), although the false
+  control fails at D10 and D11 at the pre-registered weight (1.73 and 1.00 against a limit of 1), although the false
   steps are marginal and may be real steps. No forecast is scored, and no later experiment is built
   on this result.
 
@@ -157,6 +167,11 @@ to 91%.
 - **Step dates:** the first of May, June, or July of 2022 to 2024 (seeded). A step in winter is
   not tested, because winter rows are not in the fit.
 - **D9** is left out: its readings start in 2025, so no 2022 to 2024 step can be injected.
+- **Disclosed differences from the plan:** the bounded solver keeps the smooth path's levels at or
+  above zero but not the step path's (the lowest step level is -0.68 points at weight 0.3, in 3 path
+  values). The date tolerance is 31 days, so a step one month boundary away passes. The first draft
+  counted only single month-to-month changes as false steps; a reviewer pointed out that the fit has
+  no winter rows, so the count now also includes the net change from one summer to the next.
 - **Injection:** the farm's output is scaled by its 99th percentile and subtracted from the target
   from the step month on (on-step) or before it (off-step). Recovery is the change in the fitted
   level across the step, injected fit minus the fit without injection, over the injected capacity.
