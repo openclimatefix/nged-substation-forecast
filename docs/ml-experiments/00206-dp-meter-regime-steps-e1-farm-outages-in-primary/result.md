@@ -68,14 +68,20 @@ zero-output runs in the clear-sky hours are visible in the supplied power of nea
   CAMS irradiance at least 80% of clear-sky.
 - **Shift:** for each half-hour of the day, the mean power in the outage minus the mean of the
   14 days before and the 14 days after (days that are themselves in an outage excluded), averaged
-  over the half-hours of the day that have at least 3 sunny samples in both windows. An outage is
-  tested only if it has at least 100 sunny half-hours inside it and at least 300 in the reference
+  over the half-hours of the day that have at least 2 sunny samples in both windows. An outage is
+  tested only if it has at least 20 sunny half-hours inside it and at least 60 in the reference
   windows. The interval resamples days.
 - **Shows the shift:** the shift lies between 0.5 and 1.5 farm-capacity units in the direction of
   lower net power, and its 95% interval excludes zero.
 - **Reporting:** the farm-to-Primary map (with distances), the number of outages found and tested,
   and the share that show the shift, split by `zero` and `missing`, assigned and non-assigned
   Primaries, and direction. Absolute shifts in MW come beside the ratios.
+
+**Amendment, made before any shift was seen.** The first draft set the minimum sunny half-hours at
+100 inside an outage and 300 in the reference windows. The outages are 3 to 6 days long and hold 1 to
+88 sunny half-hours, so that draft would have tested none of them. The minimums are now 20 and 60,
+and the minimum per half-hour of the day is 2 samples in each window. The intervals carry the extra
+noise, and the number of outages tested is reported.
 
 **Sizing (five triggers).** Stores private tables only; not on the serving path; no degradation
 rule; one defensible design; callers are this folder's scripts. Simple, with one Sonnet code review
