@@ -62,7 +62,11 @@ skill at the 8 MVA-only Primaries from its skill at the 8 MW Primaries (inconclu
 factor to only 2 of the 8 MVA-only Primaries (and recovered one of them, D12), because the other 6
 have almost no reverse flow in
 their training rows. It held the power factor at 0.97 at those 6, and modelling the meter as
-apparent power scored 0.13 points of capacity better than reading it as real power.
+apparent power scored 0.13 points of capacity better than reading it as real power. [Experiment
+204](00204-dp-bsp-full-bottom-up-with-signed-mva-children/result.md) summed the apparent-power children
+of two bulk supply points into the bulk supply point's reading: reading the magnitude as signed power
+or converting it with a fitted sign scored within 0.03 points at one bulk supply point and 0.02 to
+0.03 points better with the sign at the other, where Stickney (D12) has reverse flow. Provisional.
 
 **Read power through the cleaned table, and read the raw table only when the question is about
 availability.** The cleaned table holds only unflagged rows
@@ -185,6 +189,12 @@ fold. A window found from the data picks up drift and solar growth as well ([exp
 drift-removed fit finds April 2020 more than 5 points low only at D11 (-26 points) and D10 (-7
 points), and August 2020 to September 2021 sits 5 to 17 points above the fit at D5, D10, D11, and
 D14. Applies to experiments and production.
+
+**A dataset of dated events that ends before 2021-07-20 cannot be compared with the demand-model
+fit's training rows, because the lockdown window removes every earlier row from training.** The
+feed-in tariff register, a list of small solar installations, ends on 2021-03-24, so none of its
+dates falls in a month on which the fit trains ([experiment
+215](00215-dp-pv-step-scan-real-series-register-match/result.md)). Applies to experiments.
 
 **Check how many days of training rows a demand-model fit kept after the lockdown window is removed,
 and flag a fit with fewer than 180 days (provisional; medium confidence).** Leaving the lockdown
