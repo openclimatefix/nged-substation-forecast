@@ -171,7 +171,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     raw = (
         scan_power()
         .filter(
-            pl.col("time_series_id").is_in(ids), pl.col("time") >= datetime(2024, 1, 1, tzinfo=UTC)
+            pl.col("time_series_id").is_in(ids),
+            pl.col("time") >= datetime(2024, 1, 1, tzinfo=UTC),
+            pl.col("time") < datetime(2026, 7, 1, tzinfo=UTC),
         )
         .group_by("time_series_id")
         .agg(n=pl.col("time").n_unique(), last=pl.col("time").max(), first=pl.col("time").min())
@@ -201,9 +203,10 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     for _key, v in sorted(panel.items(), key=lambda kv: kv[1]["site"]):
         tail = (v["resid"] < common.LEFT_TAIL_MW)[np.isfinite(v["resid"])]
         present = np.isfinite(v["resid"]).mean()
+        first = 485 * 48  # 2023-05-01, the start of the study window
         res = np.where(
             np.isfinite(v["resid"]), (v["resid"] < common.LEFT_TAIL_MW).astype(float), np.nan
-        )
+        )[first:]
         # Largest absolute difference in mean share between consecutive 13-week blocks (a crude step screen).
         block = 13 * 336
         means = [
@@ -227,10 +230,11 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             frame=cp.tail_frame(frame=frame, threshold_mw=common.LEFT_TAIL_MW), every="1w"
         )
         usable = wk.filter(pl.col("n") >= cp.MIN_WEEK_HALF_HOURS, pl.col("time") < cp.PLATEAU_END)
-        if usable.height < 30:
+        if usable.height < 20:
             say(f"  {label}: only {usable.height} usable weeks; not fitted")
             continue
         r = cp.fit_one(label=label, weekly=wk, rng=rng)
+        say(cp.REPORT[-1])
         peak = (
             wk.filter(pl.col("n") >= cp.MIN_WEEK_HALF_HOURS)
             .sort("share", descending=True)
@@ -313,8 +317,12 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         .sort("km")
     )
     for r in ecr_near.iter_rows(named=True):
+        owner = next(
+            (k for k, v in PRIMARY_NAMES.items() if v.lower() in (r["primary"] or "").lower()),
+            "none of the 16 Primaries",
+        )
         say(
-            f"  ECR: {r['asset_class']}, {r['mw']:.2f} MW, {r['status']}, connected {r['connected_date']}, {r['km']:.2f} km from G2's coordinates"
+            f"  ECR: {r['asset_class']}, {r['mw']:.2f} MW, {r['status']}, connected {r['connected_date']}, {r['km']:.2f} km from G2's coordinates, registered under {owner}"
         )
     if ecr_near.height == 0:
         say("  ECR: no price-following slot within 1 km of G2's coordinates")

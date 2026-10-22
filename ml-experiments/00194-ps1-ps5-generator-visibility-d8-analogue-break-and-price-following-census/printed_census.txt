@@ -9,54 +9,69 @@ PS5 (a): series whose `information` field names an added-back generator or a rea
   metered generators and batteries: 13; with a note: 4
 
 PS5 (b): reading availability of the metered generators and batteries since 2024-01-01 (anonymous labels)
-  BESS 1: 1.11 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
-  Biofuel 1: 1.01 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+  BESS 1: 1.00 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  Biofuel 1: 0.97 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
   Other (Generation) 1: 0.04 of half-hours since 2024-01-01 have a reading; last reading 2026-01-26
-  PV 1: 0.95 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
-  PV 2: 1.00 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
-  PV 3: 0.78 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
-  PV 4: 0.91 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
-  PV 5: 0.98 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
-  PV 6: 0.95 of half-hours since 2024-01-01 have a reading; last reading 2026-10-21
+  PV 1: 0.88 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  PV 2: 0.92 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  PV 3: 0.74 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  PV 4: 0.86 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  PV 5: 0.90 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  PV 6: 0.89 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
   PV 7: 0.00 of half-hours since 2024-01-01 have a reading; last reading 2024-09-26
-  Wind 1: 1.12 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
-  Wind 2: 1.11 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
-  Wind 3: 1.10 of half-hours since 2024-01-01 have a reading; last reading 2026-10-22
+  Wind 1: 0.99 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  Wind 2: 0.99 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
+  Wind 3: 0.99 of half-hours since 2024-01-01 have a reading; last reading 2026-06-30
 
 PS5 (c): left-tail share (residual below -2.5 MW) step of every Primary in the stored panel
-  D10: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
-  D11: overall share 0.003, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.050, max block share 0.050
-  D12: overall share 0.002, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.014, max block share 0.014
-  D14: overall share 0.008, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.134, max block share 0.134
+  D10: overall share 0.000, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.000, max block share 0.000
+  D11: overall share 0.003, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.003, max block share 0.003
+  D12: overall share 0.002, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.002, max block share 0.002
+  D14: overall share 0.008, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.006, max block share 0.006
   D15: overall share nan, half-hours present 0.00, 13-week blocks with data 0, largest block-to-block change nan, max block share nan
-  D16: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.003, max block share 0.003
-  D18: overall share 0.013, half-hours present 0.22, 13-week blocks with data 4, largest block-to-block change 0.040, max block share 0.041
-  D19: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
-  D2: overall share 0.004, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.022, max block share 0.022
-  D21: overall share 0.002, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.012, max block share 0.012
-  D22: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
-  D3: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.001, max block share 0.001
-  D4: overall share 0.001, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.007, max block share 0.007
-  D5: overall share 0.000, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.000, max block share 0.000
-  D8: overall share 0.150, half-hours present 1.00, 13-week blocks with data 18, largest block-to-block change 0.173, max block share 0.344
-  D9: overall share 0.012, half-hours present 0.56, 13-week blocks with data 10, largest block-to-block change 0.125, max block share 0.125
+  D16: overall share 0.000, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.001, max block share 0.001
+  D18: overall share 0.013, half-hours present 0.22, 13-week blocks with data 3, largest block-to-block change 0.041, max block share 0.041
+  D19: overall share 0.000, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.000, max block share 0.000
+  D2: overall share 0.004, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.003, max block share 0.004
+  D21: overall share 0.002, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.004, max block share 0.008
+  D22: overall share 0.000, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.000, max block share 0.000
+  D3: overall share 0.000, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.000, max block share 0.000
+  D4: overall share 0.001, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.000, max block share 0.000
+  D5: overall share 0.000, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.000, max block share 0.000
+  D8: overall share 0.150, half-hours present 1.00, 13-week blocks with data 12, largest block-to-block change 0.256, max block share 0.353
+  D9: overall share 0.012, half-hours present 0.56, 13-week blocks with data 9, largest block-to-block change 0.026, max block share 0.026
 
 PS5 (c2): weekly one-step fit (as for D8) on every Primary with data, weeks before 2026-01-01
+  D2: change point (first week of new regime) 2023-07-31; share 0.004 before, 0.001 after (step -0.003); likelihood-ratio set 2023-07-24 to 2025-10-27; block-bootstrap 95% 2023-06-26 to 2025-10-06; 140 weeks
     highest single week 2023-06-05: 0.021; step at least 0.1: False
+  D3: change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step -0.000); likelihood-ratio set 2023-06-26 to 2024-05-13; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
     highest single week 2023-05-01: 0.003; step at least 0.1: False
+  D4: change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step -0.000); likelihood-ratio set 2023-06-26 to 2025-11-10; block-bootstrap 95% 2023-06-26 to 2025-11-10; 140 weeks
     highest single week 2023-05-01: 0.003; step at least 0.1: False
+  D5: change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step +0.000); likelihood-ratio set 2023-06-26 to 2025-11-10; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
     highest single week 2023-05-01: 0.000; step at least 0.1: False
+  D8: change point (first week of new regime) 2023-08-14; share 0.010 before, 0.257 after (step +0.246); likelihood-ratio set 2023-08-14 to 2023-08-14; block-bootstrap 95% 2023-08-14 to 2023-08-21; 140 weeks
     highest single week 2025-12-15: 0.598; step at least 0.1: True
+  D9: change point (first week of new regime) 2024-02-26; share 0.198 before, 0.000 after (step -0.198); likelihood-ratio set 2024-02-26 to 2024-02-26; block-bootstrap 95% 2024-02-26 to 2024-02-26; 105 weeks
     highest single week 2024-01-22: 0.652; step at least 0.1: False
+  D10: change point (first week of new regime) 2023-07-03; share 0.001 before, 0.000 after (step -0.001); likelihood-ratio set 2023-07-03 to 2023-10-09; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
     highest single week 2023-06-26: 0.006; step at least 0.1: False
+  D11: change point (first week of new regime) 2024-01-29; share 0.001 before, 0.000 after (step -0.001); likelihood-ratio set 2024-01-29 to 2024-03-04; block-bootstrap 95% 2023-06-26 to 2024-01-29; 140 weeks
     highest single week 2023-10-30: 0.030; step at least 0.1: False
+  D12: change point (first week of new regime) 2025-05-05; share 0.000 before, 0.001 after (step +0.001); likelihood-ratio set 2025-03-24 to 2025-05-05; block-bootstrap 95% 2023-07-24 to 2025-11-10; 140 weeks
     highest single week 2026-05-04: 0.048; step at least 0.1: False
+  D14: change point (first week of new regime) 2025-09-29; share 0.000 before, 0.005 after (step +0.005); likelihood-ratio set 2025-09-22 to 2025-09-29; block-bootstrap 95% 2023-06-26 to 2025-11-10; 140 weeks
     highest single week 2025-09-29: 0.074; step at least 0.1: False
   D15: only 0 usable weeks; not fitted
+  D16: change point (first week of new regime) 2025-05-19; share 0.000 before, 0.000 after (step +0.000); likelihood-ratio set 2023-06-26 to 2025-11-10; block-bootstrap 95% 2023-06-26 to 2025-11-10; 140 weeks
     highest single week 2025-05-19: 0.006; step at least 0.1: False
-  D18: only 27 usable weeks; not fitted
+  D18: change point (first week of new regime) 2025-10-27; share 0.038 before, 0.000 after (step -0.038); likelihood-ratio set 2025-10-27 to 2025-10-27; block-bootstrap 95% 2025-08-25 to 2025-10-27; 27 weeks
+    highest single week 2025-10-20: 0.301; step at least 0.1: False
+  D19: change point (first week of new regime) 2023-06-26; share 0.000 before, 0.000 after (step -0.000); likelihood-ratio set 2023-06-26 to 2024-05-13; block-bootstrap 95% 2023-06-26 to 2023-06-26; 140 weeks
     highest single week 2023-05-01: 0.003; step at least 0.1: False
+  D21: change point (first week of new regime) 2023-09-11; share 0.008 before, 0.000 after (step -0.007); likelihood-ratio set 2023-09-11 to 2023-09-11; block-bootstrap 95% 2023-06-26 to 2025-07-28; 140 weeks
     highest single week 2023-06-12: 0.071; step at least 0.1: False
+  D22: change point (first week of new regime) 2025-11-10; share 0.000 before, 0.000 after (step +0.000); likelihood-ratio set 2024-12-23 to 2025-11-10; block-bootstrap 95% 2023-07-03 to 2025-11-10; 139 weeks
     highest single week 2025-12-15: 0.003; step at least 0.1: False
 
 PS5 (d): price-following assets in the August 2026 ECR, by Primary D-label
@@ -79,8 +94,8 @@ PS5 (d): price-following assets in the August 2026 ECR, by Primary D-label
   whole register, connected gas or oil engines of at least 1 MW: 168, 1265.8 MW (all Primaries, trial or not)
 
 PS1: register entries near G2 (MW and distance only)
-  ECR: gas or oil engine, not CHP, 6.00 MW, Connected, connected 2023-06-13, 0.00 km from G2's coordinates
-  ECR: battery, 10.98 MW, Connected, connected 2021-05-01, 0.27 km from G2's coordinates
+  ECR: gas or oil engine, not CHP, 6.00 MW, Connected, connected 2023-06-13, 0.00 km from G2's coordinates, registered under D14
+  ECR: battery, 10.98 MW, Connected, connected 2021-05-01, 0.27 km from G2's coordinates, registered under none of the 16 Primaries
   Capacity Market: gas-fuelled component, connection capacity None MW, 0.05 km from G2's coordinates (grid reference is six-figure, so about 0.07 km precision)
   Capacity Market: gas-fuelled component, connection capacity None MW, 0.05 km from G2's coordinates (grid reference is six-figure, so about 0.07 km precision)
   the nearest ECR price-following slot is registered under Primary D14
