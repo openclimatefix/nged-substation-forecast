@@ -59,19 +59,20 @@ best_arm: >-
   same 24 as round 1 (difference 0, 95% interval 0 to 0, resampling whole Primary pairs).
 headline: >-
   Retraining the learned score on 47, 38, and 45 real events per fold (56 distinct events in all)
-  that pass a label-free consistency rule changed no alarm that matters: round 2 finds 24 of 35
-  transfers, the same as round 1, and the arms that changed the score lost 0 to 2.
+  that pass a label-free consistency rule found no extra transfer: round 2 finds 24 of 35
+  transfers, the same as round 1, and the other arms changed the count by between −2 and +1.
 lessons: >-
-  The real record holds too few events that pass a consistency rule to move a score trained on
-  thousands of injected transfers. Giving the pseudo-positives a quarter of the injected positives'
-  weight (post hoc) moved the logistic regression by one transfer (+1, interval 0 to +3) and the
-  re-ranker by none. The strict balanced-pair tier passes only 14 to 16 candidates per fold.
+  The real record probably holds too few events that pass a consistency rule to move a score
+  trained on about 2,000 injected transfers per fold. Giving the pseudo-positives a quarter of the
+  injected positives' total weight (post hoc) moved the logistic regression by one transfer (+1,
+  interval 0 to +3, so indistinguishable from no change) and the re-ranker by none. The strict balanced-pair tier passes only
+  14 to 16 candidates per fold.
 take_home_message: >-
   Retraining the learned load-shift score on its own consistent real events found no extra real
-  transfers: it still finds 24 of 35, because only about 50 real events per fold pass the
-  consistency rule, against thousands of injected transfers. Self-training needs many more
-  consistent events than 4.5 years of 16 Primary substations provide, so the next gains must come
-  from better injected transfers or from more data, not from relabelling the existing record.
+  transfers: the score still finds 24 of 35. Only 38 to 47 real events per fold pass the
+  consistency rule, against about 2,000 injected transfers per fold, so the extra rows probably
+  could not move the score. Self-training may need many more consistent events than 4.5 years of
+  16 Primary substations provide.
 advice:
   - >-
     Avoid self-training the learned load-shift score on this record's consistent events: about 50
@@ -80,9 +81,9 @@ advice:
     Check how many events pass a pseudo-label rule before building a training loop on it: the first
     draft of the balanced-pair rule passed 2 candidates per fold (design bullets).
   - >-
-    Consider giving pseudo-positives a large share of the weight only on a record with several
-    hundred consistent events; a quarter of the injected weight moved the logistic regression by
-    one transfer (heavy arm).
+    Avoid expecting a gain from heavier pseudo-positive weights on this record: a quarter of the
+    injected positives' total weight moved the logistic regression by one transfer, with an interval
+    that includes zero (heavy-weight bullet).
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-22
@@ -90,24 +91,29 @@ date: 2026-10-22
 
 # Experiment 249: retraining the learned load-shift score on its own consistent events finds no more real transfers
 
-**Retraining the learned score on real events that pass a label-free consistency check did not find
-any extra real transfer.** Round 2 finds 24 of the 35 real load-shift transfers lasting over 1 day,
-the same 24 as round 1 (difference 0, 95% interval 0 to 0, resampling whole Primary pairs). The
-prediction was at least 3 more, so the hypothesis is refuted. The cause is a shortage of examples:
-only 47, 38, and 45 real events per fold (56 distinct events in all) pass the rule, against
-thousands of injected transfers, so the extra rows could not move the score. A heavier weight, a
-stricter rule, even-month events only, and a third round changed the count by 0 to 2 transfers
-either way.
+**Retraining the learned load-shift score on real events that pass a consistency check, which needs
+no NGED label, did not find any extra real transfer.** A transfer is a period in which a change to
+the network arrangement moves load from one Primary substation (a substation that steps
+transmission voltage down to distribution voltage) to its neighbours. The score is the neural
+network of [experiment 195](../00195-switching-neural-plus-detector-features/result.md), which
+ranks candidate alarms. Before retraining (round 1) it finds 24 of the 35 hand-labelled real
+transfers lasting over 1 day, at 80 unexplained alarms in odd-numbered months. After retraining
+(round 2) it finds the same 24: the difference is 0 in every resample of whole pairs of Primary
+substations. The prediction was at least 3 more of the 35, so the hypothesis is refuted. The
+likely cause is a shortage of examples: 38 to 47 real events per fold (56 distinct events across the
+three folds, because folds share events) pass the check, against about 2,000 injected transfers per
+fold. A fold is one third of the Primary pairs, held out while the score is trained. Giving the
+real events more weight, using a stricter check, using even-numbered months only, and adding a
+third round changed the count by between −2 and +1 transfers.
 
-**What we asked.** Version 2 of the forecast will have no NGED labels, so the learned score of
-[experiment 195](../00195-switching-neural-plus-detector-features/result.md) must be trained on
-injected transfers alone. We asked whether the score finds more real transfers after it is retrained
-on its own most consistent real events. Such self-training follows the usual pseudo-label recipe.
-We fixed the consistency rule before scoring any transfer. A real event counts as consistent when
-the forecast error steps by at least 2.5 noise units over 24 hours, a neighbouring Primary
-substation steps the opposite way, the logistic regression scores it in the top quarter, and the
-error returns to its old level at the estimated end. The remaining design, including the hold-out of
-each Primary pair's own transfers, is below.
+**What we asked.** Flexpectation version 2 will have no NGED labels, so the score must be trained
+on injected (synthetic) transfers alone. We asked whether retraining it on its own most consistent
+real events, as pseudo-labels, lets it find more real transfers. We fixed the consistency check
+before scoring any transfer. A real event counts as consistent when the forecast error steps by at
+least 2.5 noise units over 24 hours, a neighbouring Primary substation steps the opposite way, the
+logistic regression scores it in the top quarter of candidates, and the error returns to its old
+level at the estimated end. The full design, including the hold-out of each pair's own transfers, is
+below.
 
 ![Re-ranker after self-training minus before, in transfers found](figure_1_found_minus_round_1.svg)
 
@@ -115,53 +121,61 @@ each Primary pair's own transfers, is below.
 
 ## Results
 
-- **Headline (re-ranker, 35 transfers over 1 day, 80 unexplained odd-month alarms).** Round 1
-  finds 24 (MW-weighted recall 0.752, 95% interval 0.585 to 0.865). Round 2 at weight 0.25 finds 24
-  (0.752). Round 2 at weight 0.5, with even-month events only, and with the strict tier each find
-  22 (−2, interval −4.7 to 0). The series-level hold-out finds 23. The third round finds 24. The
-  heavy weight finds 24.
-- **Logistic regression.** Round 1 finds 22. Every round 2 and round 3 arm finds 22 except the heavy
-  arm, which finds 23 (+1, interval 0 to +3): the one transfer gained is 48 hours long and moves 0.4
-  MW, and neither the pair alarm nor RO-NC finds it.
-- **Reproduction.** The retrained round 1 re-finds experiment 195's 24 (re-ranker) and 22
-  (logistic regression), RO-NC's 19, and the pair alarm's 5, so the setup matches.
-- **Confirmation bias.** Round 2 gained no transfer, so it did not re-find what the pair alarm
-  finds. Of the 56 distinct pseudo-positives, 12 lie within 2 hours of a labelled transfer's onset
-  (counted after scoring, for this page only). The rest are real events nobody logged or labelled
-  or are false alarms; the rule cannot tell which.
-- **Pseudo-positive mix.** 99 of the 130 fold-level rows step under 1 MW and 31 step 1 to 3 MW;
-  none steps over 3 MW. They sit on 13 of the 16 Primary series; series 24 has 23 of the 130 rows.
-  Each fold holds 16 to 19 events in odd months, where the alarm threshold is chosen.
-- **Injected-world recall.** Rounds 1 and 2 are the same to within 0.01 on both injected sets
-  (held-out pairs, over-1-day recall 0.595 for round 1 and 0.588 for round 2 at weight 0.25), so
-  the pseudo-labels did not make the score overfit to them.
+- **Headline.** No round 2 or round 3 arm of the re-ranker (the neural network that re-scores
+  RO-NC's candidate alarms) finds more transfers than round 1, which finds 24 of 35 (MW-weighted
+  recall 0.752, 95% interval 0.585 to 0.865). RO-NC is the refit-offset neighbour-count detector of
+  [experiment 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md).
+  Round 2 with pseudo-positive weight 0.25 finds 24 (0 gained, 0 lost). Weight 0.5, even-month
+  events only, and the strict tier each find 22 (−2, interval −4.7 to 0). The series-level hold-out
+  finds 23. Round 3 finds 24. The heavy-weight arm finds 24.
+- **Heavy weight (post hoc).** This arm gives the pseudo-positives together a quarter of the total
+  weight of the injected positives, about 15 to 20 times the per-row weight of the 0.25 arm.
+- **Logistic regression.** Round 1 finds 22. Every round 2 and round 3 arm finds 22 except the
+  heavy-weight arm, which finds 23 (+1, interval 0 to +3, so indistinguishable from no change). The
+  one transfer gained lasts 48 hours and moves 0.4 MW, and neither the pair alarm nor RO-NC finds it.
+- **Reproduction.** The retrained round 1 finds 24 (re-ranker) and 22 (logistic regression), the
+  numbers of experiment 195, and its re-runs of RO-NC and the pair alarm find 19 and 5.
+- **Confirmation bias.** Round 2 gained no transfer, so no sign of it re-finding what the pair alarm
+  finds is visible. Of the 56 distinct pseudo-positives, 12 lie within 2 hours of a labelled
+  transfer's onset (counted after scoring, for this page only). The report does not separate the
+  other 44 into unlabelled real events and false alarms.
+- **Pseudo-positive mix.** Of the 130 fold-level rows, 99 step under 1 MW and 31 step 1 to 3 MW, and
+  none steps over 3 MW. They sit on 13 of the 16 Primary series, 23 of them on series 24. Each fold
+  holds 16 to 19 events in odd months, where the alarm threshold is chosen.
+- **Injected-world recall.** Rounds 1 and 2 agree to within 0.01 on both injected sets. On the
+  held-out pairs, recall over 1 day is 0.595 for round 1 and 0.588 for round 2 at weight 0.25, so
+  retraining did not reduce recall on injected transfers.
 - **Downstream test not run.** The decision rule marks the experiment refuted when the count
-  difference is 0 or below, and the headline arm finds exactly the transfers that round 1 finds, so
-  the gated-mask replay of experiment 203 would repeat its result.
-- **Tail calibration, curtailment cost, and forecast quantiles** do not apply: the experiment
-  scores alarms, not a forecast.
+  difference is 0 or below. The headline arm finds exactly the transfers that round 1 finds, but its
+  alarm sets differ elsewhere (277 against 266 alarms over all months), so the gated-mask replay of
+  [experiment 203](../00203-switching-replay-learned-score-in-masked-forecast/result.md) would not
+  be identical. It was not run.
+- **Tail calibration, curtailment cost, and forecast quantiles** do not apply: the experiment scores
+  alarms, not a forecast.
 
 ## Checks
 
 - **Median minus mean forecast per site:** not applicable; no forecast is produced.
 - **Mean-forecast error beside each contrast:** not applicable, for the same reason.
-- **Triggers:** trigger 2 fired (the result contradicts the prediction). The explanation, too few
-  consistent events, was tested in the same run with the heavy arm, which gave pseudo-positives a
-  quarter of the injected positives' weight and still moved the count by 0 to +1, so no audit was
-  run. Trigger 1 did not fire: the reproduction of experiment 195 is the positive control. Triggers
-  3 to 7 do not apply or did not fire.
+- **Triggers:** the "Audit before merge" trigger for a result that contradicts its prediction
+  fired. The explanation, too few
+  consistent events, was tested in the same run with the heavy-weight arm, which moved the count by
+  0 to +1, so no audit was run. The failed-control trigger did not fire: the reproduction of
+  experiment 195 is the positive control. The other five triggers do not apply or did not fire.
 
 ## Caveats and next steps
 
 - **Lab shortcuts:** the logged closures and labelled transfers define the hold-out, the
   explained-alarm flag in the threshold, and the negatives, as in experiment 195.
+- **Printed numbers:** `printed_report.txt`, `printed_stage_a.txt` (pseudo-positive counts), and
+  `printed_counts.txt` (2,980 real candidates, 17 block days, injected training sizes).
 - **Schedule:** a single fit per arm and fold, three seeds averaged in each network; no weekly
   refits, because no forecast is trained.
 - **Rule changes:** the first draft of the strict tier passed 2 candidates per fold, so the
   thresholds were relaxed and the loose rule added before any transfer was scored.
-- **Next step.** Gains must come from a richer injector or from a longer record, not from
-  relabelling this record. A pooled model across the 16 Primaries or the full 2019 history, if
-  disaggregation allows it, would give more consistent events.
+- **Next step.** Neither remedy was tested: a richer injector, or a longer record that holds more
+  consistent events, such as the full history if disaggregation allows it. The choice belongs to
+  the roadmap.
 
 ## Pre-registered design
 
@@ -199,19 +213,11 @@ each Primary pair's own transfers, is below.
   transfers are scored last. The downstream test copies experiment 203's harness with round 2's
   alarms.
 
-## Size (five triggers)
-
-- **Stored:** private tables and weights only.
-- **Serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes (rule thresholds, weights, negatives); all fixed above.
-- **Callers not nameable without searching:** no; this folder's scripts only.
-
 ## Sources
 
-The injector, the held-out-by-pair
-scoring, and the learned score are from experiments
-[189](../00189-switching-neural-onset-end-block-detector/result.md) and
-[195](../00195-switching-neural-plus-detector-features/result.md); the downstream harness is from
-experiments [171](../00171-switching-gated-mask-no-harm-pooled-months/result.md) and
-[203](../00203-switching-replay-learned-score-in-masked-forecast/result.md).
+Experiments [189](../00189-switching-neural-onset-end-block-detector/result.md) and
+[195](../00195-switching-neural-plus-detector-features/result.md) supply the injector, the scoring
+that holds out whole pairs, and the learned score. Experiments
+[171](../00171-switching-gated-mask-no-harm-pooled-months/result.md) and
+[203](../00203-switching-replay-learned-score-in-masked-forecast/result.md) supply the downstream
+harness that this experiment did not run.
