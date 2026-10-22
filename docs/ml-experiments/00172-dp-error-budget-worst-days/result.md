@@ -105,6 +105,7 @@ advice:
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-22
+pr: 1477
 ---
 
 **A small number of bad days carries a large share of the forecast's error.** We asked whether the
