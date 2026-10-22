@@ -1,7 +1,7 @@
 ---
 id: "00182"
 slug: switching-d8-disaggregated-farms-and-drops
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - solar-disaggregation
 status: done

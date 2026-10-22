@@ -1,7 +1,7 @@
 ---
 id: "00047"
 slug: sw2-4-better-residual-switching-detector
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium
@@ -82,7 +82,7 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 code: ml-experiments/00047-sw2-4-better-residual-switching-detector/
 ---
 
-# Experiment 47: does a bank-holiday column in the demand model help the switching detector find transfers?
+# Experiment 47: does a bank-holiday column in the demand model help the LSC find transfers?
 
 **The result is inconclusive: adding a bank-holiday column to the demand model raised the share of
 simulated load transfers the detector found by +0.011 (98.75% interval -0.010 to +0.044), and the

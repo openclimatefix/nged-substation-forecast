@@ -1,7 +1,7 @@
 ---
 id: "00061"
 slug: sw2-6-paired-step-intervals
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium
@@ -83,7 +83,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 61 (SW2-6, part of the switching-event detector series): does pairing an onset step with its return step find more of the moved load?
+# Experiment 61 (SW2-6, part of the LSC series): does pairing an onset step with its return step find more of the moved load?
 
 **Taking the end of each alarm interval from the strongest opposite step finds 0.19 more of the moved
 power than the single-step detector. Scoring the onset step and the return step as one pair finds

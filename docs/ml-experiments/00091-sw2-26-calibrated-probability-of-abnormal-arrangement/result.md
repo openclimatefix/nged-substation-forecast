@@ -79,7 +79,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 91: a probability that a past half-hour lies inside a switching period
+# Experiment 91: a probability that a past half-hour lies inside a load-shift period
 
 **Take-home message: a probability built from the causal switching detector is not reliably better
 than the detector's yes-or-no flag, and against NGED's switching logs it has almost no skill.** The

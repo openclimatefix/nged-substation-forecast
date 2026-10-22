@@ -4,7 +4,7 @@ slug: differentiable-physics-nra-edge-flows-between-primaries
 title: "Differentiable physics, NRA: edge flows between Primaries, and the normal-running forecast"
 part: NRA-A
 theme: differentiable-physics-network
-also_relevant_to: [switching-detectors, switching-labels-in-the-forecast,
+also_relevant_to: [lsc-detectors, switching-labels-in-the-forecast,
   lagged-power-and-error-correction, differentiable-physics-forecast-engine]
 status: done
 size: >-

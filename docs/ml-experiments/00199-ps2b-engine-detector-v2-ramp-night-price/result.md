@@ -5,7 +5,7 @@ title: >-
   Does reading D8's engine by its edge shape, by night-only evidence, and by price cut the false
   alarms of the quantised engine detector, and are the "false alarms" at D5, D10, and D11 real
   engines?
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - differentiable-physics-embedded-generation
 status: done
