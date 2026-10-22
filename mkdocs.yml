@@ -150,6 +150,12 @@ nav:
       - Cross-validation folds: cross-validation/cross-validation-folds.md
   - ML experiments:
       - Overview: ml-experiments/README.md
+      - Background:
+          - Overview: ml-experiments/background/index.md
+          - NGED power telemetry: ml-experiments/background/nged-power-telemetry.md
+          - Weather inputs by product: ml-experiments/background/weather-inputs-by-product.md
+          - Row sets and scoring: ml-experiments/background/row-sets-and-scoring.md
+          - What is on disk: ml-experiments/background/what-is-on-disk.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
       - Calibration and uncertainty:

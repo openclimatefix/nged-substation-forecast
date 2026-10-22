@@ -107,7 +107,9 @@ context is compacted. A brief states the goal, the files to read first, the desi
 agent wrote one, the maintainer's constraints, the slot and its cores, the process and the reviews
 the experiment's size calls for, and the milestones to report. `common.md` carries the rules every
 session shares: its own worktree off `origin/main`, the `ml-experiment` skill, the slot rules, the
-merge rules, and the local CI checks.
+merge rules, and the local CI checks. Tell every planner to read
+`docs/ml-experiments/background/index.md` first, and check at merge that the PR body either lists
+the background bullets the experiment changed or says "background: no change".
 
 - **Start the session with `create_session`.** Set the permission mode to auto and tag it
   `ml-experiment`. Record its id in the ledger and in the state log.
