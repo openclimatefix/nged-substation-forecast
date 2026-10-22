@@ -80,16 +80,18 @@ headline: >-
   forecasts give no detectable gain over the top-down chain.
 lessons:
   - >-
-    Coverage was not the reason for experiment 161's null result: with every child that has a long
-    history in the sum, the BSP score did not move (+0.005 at D13, -0.011 at D17, both intervals
-    include zero).
+    With every child that has a long history in the sum, the BSP score did not detectably move
+    (+0.005 at D13, -0.011 at D17, both intervals include zero and reach about 0.06 points), so
+    coverage gave no sign of being the reason for experiment 161's null result.
   - >-
     The forecast errors of the children and of the remainder are positively correlated (0.48 at
-    D13, 0.32 at D17), and the bottom-up error is 10.95 points against 10.94 for top-down at D13, so
-    the sum shows no gain over the BSP's own chain.
+    D13, 0.32 at D17), and the standard deviation of the bottom-up error is 10.95 points against
+    10.94 for top-down at
+    D13, so the sum shows no gain over the BSP's own chain.
   - >-
     The fold-aware signed flow recovers the signed sum of five Primaries with an injected solar
-    farm much better than reading the magnitude as signed (mean absolute error 3.6 against 6.6 MW at
+    farm much better than reading the magnitude as signed (mean absolute error 3.65 against 6.62 MW
+    at
     the larger injection), but at the two BSPs it matters only at D17, through Stickney (D12).
 take_home_message: >-
   Adding every child Primary to the sum did not improve the forecast of either bulk supply point:
@@ -97,23 +99,27 @@ take_home_message: >-
   include zero. Converting the children that report apparent power to signed flow changed the score
   by at most 0.03 points, at the one bulk supply point where a child has reverse flow. Even with
   every child's reading known exactly the BSP's score gains only 12% to 24%, and the children's
-  forecasts share errors with the remainder, so the next gain has to come from the load nobody
-  meters.
+  forecasts gave no detectable gain over the BSP's own chain, so the next gain may lie in
+  forecasting the generators and the unmetered load beneath each BSP.
 advice:
   - >-
     Keep forecasting a BSP as a stand-alone series with the best-guess chain: summing every child
-    Primary's forecast scored the same, within 0.04 points, at both BSPs (C1).
+    Primary's forecast gave no detectable gain at these two BSPs, and the intervals reach 0.06
+    points (C1).
   - >-
-    Do not build a bottom-up BSP forecast to improve skill; the children's forecast errors are
-    correlated with the remainder's (0.48 and 0.32), and the sum showed no detectable gain over the top-down chain (figure 3).
+    Do not build a bottom-up BSP forecast to improve skill at these two BSPs; the children's
+    forecast errors are
+    correlated with the remainder's (0.48 and 0.32), and the sum showed no detectable gain over the
+    top-down chain (figure 3).
   - >-
     If a later experiment sums apparent-power children, convert the one with reverse flow (D12) to
     signed flow first: it was not detectably better than reading the magnitude as signed at D17
     (-0.019, interval including zero) and no different at D13 (C2).
   - >-
-    Aim the next hierarchy experiment at the remainder (generators and unmetered load beneath the
-    BSP), where 7.9 of 10.9 points (D13) and 15.4 of 17.9 (D17) of the forecast error's standard
-    deviation sit (figure 3).
+    Aim the next hierarchy experiment at the remainder (the generators and unmetered load beneath
+    the
+    BSP): its error has a standard deviation of 7.9 points against 10.9 for the BSP at D13, and 15.4
+    against 17.9 at D17 (figure 3).
 date: 2026-10-22
 pr: 1506
 production_status: not-for-production
@@ -122,26 +128,41 @@ adopted_in: none
 
 # Experiment 204: a bulk supply point is forecast no better from all its children than on its own
 
-**Take-home: putting every child Primary into the sum did not improve the forecast of either bulk
-supply point (BSP).** Forecasting a BSP from its children's forecasts, with the children that report
-apparent power (MVA) converted to signed flow, scored 4.375 points at D13 against 4.370 for the
-top-down forecast (C1, full bottom-up minus top-down: +0.005, 97.5% interval -0.037 to +0.040) and
-7.532 against 7.542 at D17 (-0.011, -0.057 to +0.038). Experiment 161's null result was therefore
-not caused by the sum covering too little of the BSP. The verdict is `inconclusive`, because both
-intervals include zero, and the plan's rule reads that as no detectable gain from coverage.
+**Take-home: putting every child Primary substation into the sum did not improve the forecast of
+either bulk supply point (BSP).** A BSP is the substation above a group of Primaries. D13 (Skegness)
+and D17 (Boston) are the two BSPs studied. The top-down forecast treats the BSP's own half-hourly
+reading as a stand-alone series. The bottom-up forecast adds forecasts of the children (the
+Primaries
+beneath the BSP) to a forecast of the remainder, the BSP's reading minus the weighted children's
+readings. Scores are quantile scores in points: percentages of the BSP's effective capacity (its
+reference power), and lower is better.
+
+The bottom-up forecast, with the children that report apparent power (MVA) converted to signed flow,
+scored 4.375 points at D13 against 4.370 for the top-down forecast (C1, bottom-up minus top-down:
++0.005, 97.5% interval -0.037 to +0.040) and 7.532 against 7.542 at D17 (-0.011, -0.057 to +0.038).
+Each interval comes from resampling whole calendar months of the scored year. The intervals do not
+exclude a difference of up to about 0.06 points either way, so experiment 161's null result gave no
+sign of being caused by the sum covering too little of the BSP. The verdict is `inconclusive`,
+because both intervals include zero, and the plan's rule reads that as no detectable gain from
+coverage.
 
 **We asked** whether the bottom-up forecast of a BSP beats the top-down forecast once the sum
 includes every child Primary that has a long history, as [experiment
-161](../00161-dp-bsp-top-down-against-bottom-up/result.md) could not test. Experiment 161 summed only
+161](../00161-dp-bsp-top-down-against-bottom-up/result.md) could not test. Experiment 161 summed
+only
 the 3 children per BSP that report real power (MW). This experiment adds the 4 children at D13 and
-the 3 at D17 (D3, D12, D22) that report apparent power, which hides the sign of the flow. It builds
-each child's signed flow with the fold-aware model of [experiment
-152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md). **We found** that the
+the 3 at D17 (D3, D12, D22) that report apparent power. Apparent power hides the sign of the flow,
+so
+a child whose solar panels push power back up the network at midday (reverse flow) reads positive
+when its flow is negative. This experiment builds each such child's signed flow with the fold-aware
+generalised additive model of [experiment
+152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md), which fits a hidden (latent)
+signed flow and the reading that follows from it. **We found** that the
 children's forecasts give no detectable gain over the BSP's own forecast chain: the bottom-up error
 equals the top-down error, and the children's forecast errors correlate positively with the
 remainder's. With each child's reading known exactly (the oracle), the score gains 24% at D13 and
-12% at D17, so better child forecasts would help, but the current ones do not. Quantile scores are in points
-(percent of the BSP's effective capacity, lower is better). Scored rows are the 291 daily runs of
+12% at D17, so better child forecasts would help, but the current child forecasts do not. Scored
+rows are the 291 daily runs of
 2025-07-02 to 2026-06-29, leads 0.5 to 168 hours, outside switching events.
 
 **Scope.** D13 is Skegness (7 children) and D17 is Boston (9 children). The sum covers 7 children at
@@ -150,15 +171,39 @@ April 2025 and no consistent history exists. The two Wrangle transformers (D15 a
 too, because they have under 8 months of readings, so arm (e) of the plan was not run. The metered
 generators under each BSP also stay in the remainder.
 
+**Arms.** All arms use the top-down forecast's spread of quantiles around the mean, so they differ
+in the mean only.
+
+- **(a) top-down:** the best-guess forecasting chain of [experiment
+  155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) (arm D) applied
+  to
+  the BSP alone.
+- **(b) partial bottom-up:** experiment 161's sum over the 3 children per BSP that report real power
+  (MW).
+- **(c) full, apparent power read as signed:** the sum over every child with a long history, each
+  apparent-power child's reading and forecast taken as signed.
+- **(d) full, fold-aware:** the same sum with each apparent-power child's signed flow forecast by
+  experiment 152's fold-aware model, and the sign of its past readings set from that model.
+- **(d, sign at probability 0.5):** arm (d) with the sign set wherever the fitted flow is more
+  likely
+  than not to be reverse (arm (d) requires a probability of 0.9).
+- **Oracle:** arm (d) with the children's observed readings in place of their forecasts, a control
+  with no verdict.
+
+The contrasts are C1 (bottom-up (d) minus top-down), C2 ((d) minus (c)), C4 (C1 by lead band), C6
+(C1 at the 0.01, 0.05, 0.95, and 0.99 quantiles), and C7 (oracle minus top-down). The scored year is
+the 291 daily runs from 2025-07-02. The replicate year is the even months of 2024-07 to 2025-06.
+
 ## Results
 
 ![Each bottom-up arm minus top-down, with 97.5% intervals, at both BSPs, in the scored year](figure_1_headline.svg)
 
-**Every bottom-up arm scored the same as top-down, within the noise.** The partial bottom-up arm (b)
-reproduces experiment 161 exactly (4.345 and 7.674 with the top-down spread table, 4.387 and 7.706
-with its own; top-down on 161's rows 4.361 and 7.672). The full arms add 4 children at D13 and 3 at
-D17 and move the score by +0.021 (-0.011 to +0.050) at D13 and by -0.012 (-0.049 to +0.026) at D17
-against (b) (d minus (b)). In the replicate year (even months of 2024-07 to 2025-06), C1 is -0.038
+**Every bottom-up arm scored the same as top-down, within the noise.** Experiment 161's partial
+bottom-up arm (b) is reproduced exactly on 161's own rows (4.345 and 7.674 with the top-down spread
+table, 4.387 and 7.706 with its own; top-down 4.361 and 7.672). The table below uses the smaller set
+of rows on which every arm has a forecast. Adding 4 children at D13 and 3 at D17 to arm (b) moves
+the score by +0.021 (-0.011 to +0.050) at D13 and by -0.012 (-0.049 to +0.026) at D17. In the
+replicate year (even months of 2024-07 to 2025-06), C1 is -0.038
 (-0.102 to +0.026) at D13 and 0.000 (-0.041 to +0.043) at D17.
 
 | Arm (scored year) | D13 score | D17 score |
@@ -167,7 +212,7 @@ against (b) (d minus (b)). In the replicate year (even months of 2024-07 to 2025
 | (b) Partial bottom-up, MW children only, top-down spread table | 4.354 | 7.543 |
 | (c) Full, apparent power read as signed | 4.375 | 7.551 |
 | (d) Full, fold-aware signed flow | 4.375 | 7.532 |
-| (d-p50) Full, signed flow at reverse-flow probability 0.5 | 4.375 | 7.523 |
+| (d, sign at probability 0.5) Full, signed flow | 4.375 | 7.523 |
 | Oracle: observed children | 3.324 | 6.617 |
 | Manual heuristic | 5.485 | 8.305 |
 | Climatology | 5.908 | 8.833 |
@@ -176,13 +221,16 @@ Rows are the shared rows, 95,547 at D13 and 79,839 at D17. The sum of the childr
 capacities is 117% of D13's and 99% of D17's (against 42% and 56% for arm (b)); the children peak at
 different times, so this is not a share of the load.
 
-**The sign of the converted flow mattered at D17 only, and not detectably.** (d) minus (c) is -0.000 (-0.001 to +0.000)
+**The sign of the converted flow mattered at D17 only, and not detectably.** (d) minus (c) is -0.000
+(-0.001 to +0.000)
 at D13, where no child has reverse flow, and -0.019 (-0.051 to +0.011) at D17, where D12 has it.
 Setting the sign at probability 0.5 instead of 0.9 gives -0.028 (-0.058 to -0.003) at D17, the one
 sign contrast whose interval excludes zero. This contrast was not pre-registered and is not adjusted
-for the number of contrasts, so it is a lead for later work, not a finding. The fitted flow of D12 is reverse on 18.5% of its
-usable half-hours at probability 0.9 and 26.9% at 0.5; D22 has none at 0.9 and 39 at 0.5, and the
-other six apparent-power children have none.
+for the number of contrasts, so it is a lead for later work, not a finding.
+
+The fitted flow of D12 is reverse on 18.5% of its usable half-hours at probability 0.9 and 26.9% at
+0.5. D22 has none at 0.9 and 39 half-hours at 0.5. The other five apparent-power children in the sum
+have none.
 
 ![Score by lead band](figure_2_by_lead.svg)
 
@@ -196,7 +244,7 @@ includes zero. The estimates are lowest below 72 hours at both BSPs.
 the remainder's error has a standard deviation of 7.9 points and the weighted children's summed
 error 4.7 points; at D17 the figures are 15.4 and 5.4. The two parts' errors correlate positively
 (0.48 and 0.32). The bottom-up error (10.95 and 17.91) is therefore about the same as the top-down
-error (10.94 and 17.94). The remainder is the load that no Primary meters: the generators beneath
+error (10.94 and 17.94). The remainder is the load that no Primary in the sum meters: the generators beneath
 the BSP, losses, and D8 and the Wrangle transformers at D17.
 
 ![Known-answer check: error of the summed signed flow of five Primaries with injected solar](figure_4_known_answer.svg)
@@ -216,8 +264,10 @@ At level 1.0 the figures are 2.58 against 3.04 MW.
 | D17 (d) | 0.016 | 0.069 | 0.902 | 0.962 |
 
 **Both arms are too narrow in the tails by the same amount**, because they share the top-down spread
-table. C6, the pinball loss at the four tail quantiles, is within 0.02 of top-down at both BSPs
-except the 0.99 quantile at D17 (+0.020, +0.004 to +0.040).
+table. C6, the pinball loss at the four tail quantiles, differs from top-down by 0.02 or less at
+both
+BSPs, and the 0.99 quantile at D17 (+0.020, +0.004 to +0.040) is the one interval that excludes
+zero.
 
 ## Checks
 
@@ -227,14 +277,19 @@ except the 0.99 quantile at D17 (+0.020, +0.004 to +0.040).
   at D17, the same sign as the quantile score; C2 -0.001 and -0.048; C7 (oracle) -1.95 and -1.55.
 - **Controls:** the reproduction of experiment 161 passed (4.361 and 7.672 for top-down, 4.387 and
   7.706 for (b) on its rows). The known-answer check passed. The oracle gained 24% at D13 (predicted
-  20% to 40%) and 12% at D17 (below the predicted 20%), which matches the error decomposition (figure
-  3) and is no plumbing fault: the oracle's error equals the remainder's.
-- **Audit triggers:** trigger 2 fired (C1 predicted -3% to -10% at D13 and found +0.1%). The
-  explanation was tested here: the oracle and the decomposition show the children's errors are
-  correlated with the remainder's. Triggers 1, 3, 4, 5, and 6 did not fire (no control failed, the
-  quantile score and the mean's error agree in sign, no site-level ablation applies to two BSPs,
-  no nested arm beat its container, and the C1 intervals are 0.6 to 0.9 times the width of experiment 161's).
-  Trigger 7 did not fire. No Opus audit was run.
+  20% to 40%) and 12% at D17 (below the predicted 20%), which matches the error decomposition
+  (figure
+  3) and is no data-handling fault: the oracle's error equals the remainder's.
+- **Audit triggers:** the `ml-experiment` skill lists seven. Trigger 2 (a result contradicts its
+  prediction) fired: C1 was predicted at -3% to -10% at D13 and came out at +0.1%. The explanation
+  was tested and is recorded here: the oracle and the decomposition show the bottom-up error equals
+  the top-down error. Trigger 1 (a control fails) did not fire. Trigger 3 (the quantile score and
+  the mean's error disagree in sign) did not fire. Trigger 4 (leaving one site out flips a verdict)
+  does not apply to two BSPs. Trigger 5 (a nested arm beats its container) did not fire. Trigger 6
+  (an interval more than twice or less than half as wide as a sister experiment's) did not fire: the
+  C1 intervals are 0.6 to 0.9 times the width of experiment 161's. Trigger 7 (a later design depends
+  on the headline) did not fire. No Opus audit was run, because only the explained trigger 2 fired
+  and the verdict is `inconclusive` either way.
 
 ## Caveats
 
@@ -246,10 +301,12 @@ except the 0.99 quantile at D17 (+0.020, +0.004 to +0.040).
   the apparent-power children use experiment 152's GAM-K chain (meter fit, additive filter), which
   has neither correction. The oracle bounds how much better any child chain could be.
 - **The latent flow is signed corrected apparent power** and is multiplied by 0.97 here to match the
-  history, which is converted the same way; the stored flow carries the fit's probability-0.5 sign,
-  so (d-p50) is the internally consistent arm and (d) the pre-registered one.
+  signed history, which is converted the same way. The stored flow carries the fit's
+  probability-0.5 sign, so the arm with the sign at probability 0.5 is internally consistent and
+  arm (d) is the pre-registered arm.
 - **Not run:** arm (e) (short-history children), C5 and C8. The decomposition shows that the two
-  Wrangle transformers and D8 sit in a remainder whose error is 7.9 to 15.4 points, so adding them
+  Wrangle transformers and D8 sit in a remainder whose error has a standard deviation of 7.9 to 15.4
+  points, so adding them
   cannot change the conclusion by much.
 - **The curtailment metric was not scored,** because this experiment did not build the generator
   inputs it needs for these BSPs.
