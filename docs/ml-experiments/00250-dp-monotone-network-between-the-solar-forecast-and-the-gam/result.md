@@ -11,8 +11,9 @@ status: finished
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00250-dp-monotone-network-between-the-solar-forecast-and-the-gam/ only.
-  Serving path: not touched. Degradation rule: not touched. Designs: more than one is defensible (where the
-  network sits, how it is kept monotone, which inputs it reads), so the plan fixes one. Callers:
+  Serving path: not touched. Degradation rule: not touched. Designs: more than one is
+  defensible (where the network sits, how it is kept monotone, which inputs it reads), so the plan
+  fixes one. Callers:
   scripts copy the fit, forecast, and member-pass code of experiments 180, 214, 237, and 247. Asset
   graph: not touched.
 hypothesis: >-
