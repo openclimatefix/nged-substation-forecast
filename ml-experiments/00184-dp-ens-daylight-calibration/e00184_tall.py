@@ -21,7 +21,7 @@ import e00184_common as common
 import e00184_design as design
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache
 from studies.dp_gam import GamFit, GamLayout, design_matrix, pinned_solar_points
 from studies.dp_pinned_capacity import PinnedCapacity, read_vintages
