@@ -153,6 +153,8 @@ class Gates:
     shape: bool = False
     price: bool = False
     share: float = SHARP_SHARE
+    either_edge: bool = False
+    """Post hoc: keep a spell when at least one of its two edges is sharp."""
 
 
 def apply_gates(
@@ -172,9 +174,9 @@ def apply_gates(
     for a, b in spells(flag=flag):
         keep = True
         if gates.shape:
-            keep &= edge_is_sharp(x=x, boundary=a - 1, unit=unit, share=gates.share) and (
-                edge_is_sharp(x=x, boundary=b, unit=unit, share=gates.share)
-            )
+            start_ok = edge_is_sharp(x=x, boundary=a - 1, unit=unit, share=gates.share)
+            end_ok = edge_is_sharp(x=x, boundary=b, unit=unit, share=gates.share)
+            keep &= (start_ok or end_ok) if gates.either_edge else (start_ok and end_ok)
         if keep and gates.price:
             seg = spread[a : b + 1]
             seg = seg[np.isfinite(seg)]

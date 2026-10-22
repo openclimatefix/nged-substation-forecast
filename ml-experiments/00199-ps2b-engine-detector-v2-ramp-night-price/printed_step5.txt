@@ -1,0 +1,25 @@
+== D8 control 2023-09 to 2025-02: flagged half-hours 8499, night share of flagged 
+   0.3912224967643252 against 0.50 of all rows
+   any: {"flagged_days": 481, "unflagged_days": 45, "flagged_days_matched": 343, "flagged_positive_share": 0.4518950437317784, "matched_positive_share": 0.342168036045587, "diff_positive_points": [3.49854227405248, 11.078717201166183, 18.075801749271136], "flagged_mean_spread": -2.2122958874218734, "diff_mean_spread": [15.422830423929014, 19.78215829882665, 24.617729818256816]}
+   night: {"flagged_days": 352, "unflagged_days": 45, "flagged_days_matched": 251, "flagged_positive_share": 0.47410358565737054, "matched_positive_share": 0.3626705300012073, "diff_positive_points": [2.7888446215139417, 10.756972111553786, 19.9203187250996], "flagged_mean_spread": -0.6324159160190637, "diff_mean_spread": [12.74264972352526, 17.863929873776307, 24.588994263507097]}
+   flagged half-hours by UTC hour: [104, 102, 90, 91, 121, 190, 306, 427, 450, 392, 320, 295, 278, 274, 326, 499, 742, 877, 866, 703, 474, 280, 163, 129]
+== D8 2025-03 to 2026-06: flagged half-hours 11941, night share of flagged 
+   0.30114730759567876 against 0.44 of all rows
+   any: {"flagged_days": 482, "unflagged_days": 3, "flagged_days_matched": 44, "flagged_positive_share": 0.7272727272727273, "matched_positive_share": 0.6590909090909091, "diff_positive_points": [-4.545454545454541, 6.818181818181812, 18.181818181818187], "flagged_mean_spread": 3.235047269884903, "diff_mean_spread": [0.5263162346475168, 8.821974115264291, 16.64764328540108]}
+   night: {"flagged_days": 342, "unflagged_days": 3, "flagged_days_matched": 35, "flagged_positive_share": 0.8571428571428571, "matched_positive_share": 0.8, "diff_positive_points": [-5.714285714285705, 5.714285714285716, 17.14285714285714], "flagged_mean_spread": 13.516669280005047, "diff_mean_spread": [7.083507190656829, 13.361898184250832, 21.38270772979957]}
+   flagged half-hours by UTC hour: [156, 133, 136, 147, 189, 289, 464, 557, 613, 621, 647, 628, 621, 653, 667, 656, 749, 828, 821, 768, 657, 470, 279, 192]
+== D5: flagged half-hours 1290, night share of flagged 
+   0.26744186046511625 against 0.46 of all rows
+   any: {"flagged_days": 97, "unflagged_days": 897, "flagged_days_matched": 97, "flagged_positive_share": 0.5567010309278351, "matched_positive_share": 0.5662865562582922, "diff_positive_points": [-14.432989690721648, -1.0309278350515427, 12.371134020618557], "flagged_mean_spread": -0.34800890153152764, "diff_mean_spread": [-8.953465100120454, 0.10757514635693743, 7.274305396861834]}
+   night: {"flagged_days": 13, "unflagged_days": 897, "flagged_days_matched": 13, "flagged_positive_share": 0.9230769230769231, "matched_positive_share": 0.6149333758029409, "diff_positive_points": [0.0, 30.76923076923077, 61.53846153846154], "flagged_mean_spread": 26.98086258471339, "diff_mean_spread": [-31.14483526825466, 23.19896795990326, 43.6981458871312]}
+   flagged half-hours by UTC hour: [22, 23, 24, 23, 22, 24, 24, 28, 37, 59, 78, 104, 126, 125, 118, 118, 125, 73, 27, 22, 22, 22, 22, 22]
+== D10: flagged half-hours 518, night share of flagged 
+   0.03474903474903475 against 0.46 of all rows
+   any: {"flagged_days": 61, "unflagged_days": 972, "flagged_days_matched": 61, "flagged_positive_share": 0.4426229508196721, "matched_positive_share": 0.586033522637913, "diff_positive_points": [-31.147540983606557, -14.754098360655737, 1.6393442622950838], "flagged_mean_spread": -5.669080796128904, "diff_mean_spread": [-13.649499542968824, -5.6289113944811255, 2.068484888641998]}
+   night: {"flagged_days": 2, "unflagged_days": 972}
+   flagged half-hours by UTC hour: [1, 2, 3, 2, 3, 4, 5, 12, 15, 30, 66, 64, 64, 39, 40, 39, 43, 32, 26, 20, 5, 0, 2, 1]
+== D11: flagged half-hours 807, night share of flagged 
+   0.654275092936803 against 0.46 of all rows
+   any: {"flagged_days": 20, "unflagged_days": 1098, "flagged_days_matched": 20, "flagged_positive_share": 0.15, "matched_positive_share": 0.5954330944485592, "diff_positive_points": [-70.0, -45.0, -15.000000000000002], "flagged_mean_spread": -19.295198845808716, "diff_mean_spread": [-35.054927412537936, -19.837386982455385, -5.480059988238926]}
+   night: {"flagged_days": 19, "unflagged_days": 1098, "flagged_days_matched": 19, "flagged_positive_share": 0.15789473684210525, "matched_positive_share": 0.5906271000536514, "diff_positive_points": [-68.42105263157895, -42.10526315789474, -15.789473684210526], "flagged_mean_spread": -19.829953262024347, "diff_mean_spread": [-35.995528844009236, -20.590666936853417, -6.233731219411644]}
+   flagged half-hours by UTC hour: [33, 32, 33, 32, 33, 34, 34, 34, 34, 33, 32, 35, 36, 35, 35, 33, 33, 32, 34, 34, 34, 34, 34, 34]

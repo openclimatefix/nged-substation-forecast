@@ -42,6 +42,8 @@ ARMS: dict[str, tuple[bool, Gates]] = {
     "v1+P": (False, Gates(price=True)),
     "N": (True, Gates()),
     "v2 = N+S+P": (True, Gates(shape=True, price=True)),
+    "post hoc N+P": (True, Gates(price=True)),
+    "post hoc N+S(either edge)+P": (True, Gates(shape=True, price=True, either_edge=True)),
 }
 SHARE_SWEEP = (0.5, 0.7)
 """Edge-test sharpness levels reported beside the pre-registered 0.6 (v2 only)."""
@@ -82,7 +84,7 @@ def known_answers() -> dict[str, Any]:
         for arm, (use_night, gates) in ARMS.items():
             post, x = detect(s=si, noise=noise, params=params, night=night if use_night else None)
             variants = {arm: gates}
-            if arm.startswith("v2"):
+            if arm.startswith("v2"):  # the sharpness sweep is for the verdict arm only
                 variants |= {f"{arm} sharp{sh}": replace(gates, share=sh) for sh in SHARE_SWEEP}
             for name, gt in variants.items():
                 sm = apply_gates(
@@ -105,14 +107,15 @@ def _alarm_rows(*, label: str, window: tuple[str, str] | None) -> tuple[np.ndarr
     s = load_series(label=label)
     n = len(s.y)
     finite = np.isfinite(s.y) & np.isfinite(s.load)
+    even = (((s.month - 1) % 12) + 1) % 2 == 0
     if label == "D8":
         if window is None:
-            return clean_mask(n=n) & (((s.month - 1) % 12) + 1) % 2 == 0, clean_mask(n=n)
+            return clean_mask(n=n) & even, clean_mask(n=n)
         a, b = (datetime.fromisoformat(w).replace(tzinfo=UTC) for w in window)
         rows = np.zeros(n, dtype=bool)
         rows[stamp(a) : stamp(b)] = True
         return rows & finite, clean_mask(n=n)
-    return finite & (((s.month - 1) % 12) + 1) % 2 == 0, finite
+    return finite & even, finite
 
 
 def alarms_for(task: tuple[str, str]) -> tuple[str, dict[str, Any]]:
@@ -135,7 +138,7 @@ def alarms_for(task: tuple[str, str]) -> tuple[str, dict[str, Any]]:
     for arm, (use_night, gates) in ARMS.items():
         post, x = detect(s=s, noise=noise, params=params, night=night if use_night else None)
         variants = {arm: gates}
-        if arm.startswith("v2"):
+        if arm.startswith("v2"):  # the sharpness sweep is for the verdict arm only
             variants |= {f"{arm} sharp{sh}": replace(gates, share=sh) for sh in SHARE_SWEEP}
         for name, gt in variants.items():
             sm = apply_gates(
