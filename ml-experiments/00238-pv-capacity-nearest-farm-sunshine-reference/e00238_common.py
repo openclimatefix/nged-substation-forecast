@@ -274,3 +274,7 @@ def reference_unit_shape(*, cache: FeatureCache, site: str, reference: str) -> n
 
 DERATING_TOLERANCE: Final[float] = 1e-6
 """The largest allowed gap between a derated reference shape and the farm's normalised output."""
+AUDIT_LADDER_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00231-pv-capacity-audit-where-recovery-goes" / "work"
+)
+"""Experiment 231's result files, which the reproduction check reads."""
