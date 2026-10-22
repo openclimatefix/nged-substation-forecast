@@ -72,8 +72,8 @@ headline: >-
   0.896 cold-night q95 coverage. The ensemble-spread scale model lifts it to 0.907 in the scored year
   (and 0.918 in the replicate months) with an all-row cost of +0.0014 (upper bound +0.0077), which
   passes the pre-registered rule in the scored year only. The same model with every spread
-  coefficient set to zero reaches 0.906, so the gain comes from a general widening of the upper
-  quantiles by 4% to 10%, not from the ensemble spread.
+  coefficient set to zero reaches 0.906, so the gain comes from widening the q95 and q99 offsets by
+  4% and 10% (with the other offsets slightly narrowed), not from the ensemble spread.
 lessons:
   - >-
     The spread across the 51 members of the temperature and of the shortwave radiation does not
@@ -83,17 +83,17 @@ lessons:
   - >-
     A fitted intercept on the upper offsets (multipliers 1.04 at q95 and 1.10 at q99) raises
     cold-night q95 coverage by 0.010 and all-row q95 coverage from 0.948 to 0.952, at an all-row score
-    cost of +0.0007 (-0.0067 to +0.0070, C6).
+    cost of +0.0006 (-0.0067 to +0.0070, C6).
   - >-
     The 0.90 line is still not met robustly: leaving D14 out drops SP's cold-night q95 coverage to
     0.886, and 10 cold days carry the scored year's figure (day-block interval 0.858 to 0.956).
 take_home_message: >-
   Combining the smooth spread table with the cold-day widening reproduces its 0.896 coverage of the
   95% quantile on cold nights, and adding the spread of the ensemble weather forecast lifts that to
-  0.907. The lift comes from a general 4% to 10% widening of the upper quantiles that the same model
-  gives with its spread terms removed, so the ensemble spread itself adds nothing. The next step is
-  a bias correction of the mean forecast on the coldest days, and judging cold nights over more than
-  one winter.
+  0.907. The lift comes from widening the 95% and 99% quantiles by 4% and 10%, which the same
+  model gives with its spread terms removed, so the ensemble spread adds nothing to cold-night
+  coverage. The next step is a bias correction of the mean forecast on the coldest days, and judging
+  cold nights over more than one winter.
 advice:
   - >-
     Do not add the ensemble temperature or shortwave-radiation spread to the residual scale: the
@@ -116,7 +116,7 @@ adopted_in: none
 # Experiment 169: the combined calibration fixes, and whether the ensemble spread sets the width
 
 **The ensemble spread does not predict how wide the forecast's errors are once the cold-day
-widening is in place; a plain widening of the upper quantiles by 4% to 10% gives the same coverage.**
+widening is in place; a plain widening of the q95 and q99 offsets by 4% and 10% gives the same coverage.**
 We asked two questions about the best demand forecast of
 [experiment 155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md).
 First, do the two calibration fixes found since then work together? They are the smooth spread
@@ -129,7 +129,8 @@ We fitted a convex quantile model on the tuning months, scored it on the scored 
 replicate months of experiment 164, and left the mean forecast unchanged. The two fixes combine
 without loss: the combined forecast reproduces experiment 164's cold-night coverage of the 95%
 quantile (q95), 0.896. The spread model lifts that coverage to 0.907, which meets the pre-registered
-0.90 in the scored year and not in the replicate months. A control with the spread terms switched
+rule in the scored year. In the replicate months the coverage is 0.918, but the all-row score
+bound (+0.0145) exceeds the allowed +0.010. A control with the spread terms switched
 off reaches 0.906, so the lift comes from a general widening, not from the spread. Scores are in
 points of effective capacity (percentage points of each substation's rated demand); lower is better.
 
@@ -146,7 +147,8 @@ points of effective capacity (percentage points of each substation's rated deman
   plus the q01, q05, and q10 multipliers of experiment 164's fix T. SP: A with each offset from the
   mean multiplied by `c + sum a_k max(z1 - k1_k, 0) + sum b_k max(z2 - k2_k, 0)` for the levels 0.01,
   0.05, 0.10, 0.25, 0.75, 0.90, 0.95, and 0.99. Here z1 is the standard deviation across members of
-  the 24-hour mean temperature, z2 the same for shortwave radiation, the knots are their 25th, 50th,
+  the 24-hour mean temperature, z2 the same for shortwave radiation (each divided by its 90th
+  tuning-month percentile), the knots are their 25th, 50th,
   75th, and 90th tuning-month percentiles, and a and b are non-negative. SP0 (post hoc control): SP
   with a and b set to zero, so only the fitted intercept c remains. The pinball loss is linear in
   the coefficients, so each level is a linear programme (HiGHS) on 150,000 tuning rows.
@@ -157,11 +159,11 @@ points of effective capacity (percentage points of each substation's rated deman
   ensemble spreads come from experiment 111's stored 51-member forecasts, which exist at forecast
   time. The store holds temperature and shortwave radiation, not wind, so the wind spread and the
   spread of the GAM-K forecast across members were not tested.
-- **Fitted coefficients.** Every fitted intercept `c` lies between 0.85 and 1.10: 0.99 at q01, 0.94
-  at q05, 0.91 at q10, 0.85 at q25, 0.92 at q75, 1.00 at q90, 1.04 at q95, and 1.10 at q99. The
+- **Fitted coefficients.** Every fitted intercept `c` lies between 0.84 and 1.10: 0.99 at q01, 0.94
+  at q05, 0.91 at q10, 0.84 at q25, 0.92 at q75, 1.00 at q90, 1.04 at q95, and 1.10 at q99. The
   temperature-spread terms are zero except above the 90th percentile of the spread, where the
   coefficient is 0.49 (q75), 0.18 (q90), and 0.10 (q95). The shortwave terms are non-zero at every
-  level, at most 0.2 per knot for the lower levels and 0.2 to 0.9 for the upper ones (figure 4).
+  level, at most 0.18 per knot for the lower levels and 0.02 to 0.88 for the upper ones (figure 4).
 - **Assembly (C1, A minus I), scored year.** All rows -0.0010 (95% interval -0.0032 to +0.0008);
   cold nights -0.095 (-0.143 to -0.048); cold-night q95 coverage +0.050 (+0.031 to +0.070).
   Replicate months: all rows +0.0002 (-0.0029 to +0.0036), cold-night q95 coverage 0.913.
@@ -188,10 +190,10 @@ points of effective capacity (percentage points of each substation's rated deman
   0.748, 0.987 / 0.228. SP0: q05 0.075, q95 0.952. On all rows, C2's q99 loss changes by -0.0042
   (-0.0105 to +0.0016) and its q95 loss by +0.0031 (-0.0011 to +0.0073).
 - **By lead day (q95 coverage, all rows).** A: 0.946, 0.948, 0.951, 0.951, 0.952, 0.946, 0.943 for
-  lead days 0 to 6. SP: 0.951, 0.953, 0.955, 0.956, 0.957, 0.952, 0.951. SP widens the median q05 to
-  q95 width by 0.0 to 0.4 points on every lead day.
+  lead days 0 to 6. SP: 0.951, 0.953, 0.955, 0.956, 0.957, 0.952, 0.951. SP changes the median q05 to
+  q95 width by -0.15 to +0.38 points depending on the lead day (wider on 5 of 7 days).
 - **By hour band (q95 coverage, all rows).** A: 0.954, 0.951, 0.934, 0.951 for the four bands in
-  order (night, morning, daytime, evening as `studies.dp_calendar` orders them); SP: 0.959, 0.956,
+  order (night, morning, midday, evening as `studies.dp_calendar` orders them); SP: 0.959, 0.956,
   0.941, 0.956.
 - **Bank holidays and Christmas, scored year.** Bank holidays (9,812 rows): q95 coverage 0.934 (A)
   and 0.943 (SP); C2 -0.0044 (-0.0246 to +0.0137). Christmas, 24 December to 1 January (8,641
@@ -218,8 +220,11 @@ points of effective capacity (percentage points of each substation's rated deman
   depends on D14. In the replicate months SP's all-row upper bound (+0.0145) is over the +0.010
   limit, and leaving D10 out gives 0.896. The tuning and replicate months share cold days with each
   other. The spread model has no quarter or hour-band term, so the prediction that the shortwave
-  coefficients are larger in summer was not tested. SP0 is a post hoc arm, so its pass on both periods is a
-  suggestion, not a pre-registered result.
+  coefficients are larger in summer was not tested. SP0 is a post hoc arm, so its pass on both
+  periods is a suggestion, not a pre-registered result. The spread terms do change some
+  quantile scores: C5 is -0.0028 (-0.0043 to -0.0014) at leads under 24 hours in the scored year,
+  and +0.0037 (+0.0005 to +0.0075) over all rows in the replicate months, so they help slightly at
+  short leads and hurt at long leads out of sample.
 - **What to try next.** (1) A bias correction of the mean forecast on days the ensemble forecasts
   at 0 °C or below. (2) Fit and score the widening over at least two winters. (3) A spread model with
   hour-band and quarter terms if a wind spread becomes available.
