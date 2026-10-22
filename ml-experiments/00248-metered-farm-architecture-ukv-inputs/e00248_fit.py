@@ -2,8 +2,8 @@
 """Fit every arm of experiment 248 in both folds and write each job's scored quantiles.
 
 A "setting" here is a fold (`scored` or `replicate`); every fit uses the scored farm's own tuning
-months before the fold, on rows with a usable UKV run. One job is one (fold, farm, arm, seed); its output file is written atomically and skipped when it
-exists, so a crashed run resumes. Run:
+months before the fold, on rows with a usable UKV run. One job is one (fold, farm, arm, seed); its output file is written atomically and skipped when
+it exists, so a crashed run resumes. Run:
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00248-*/e00248_fit.py
