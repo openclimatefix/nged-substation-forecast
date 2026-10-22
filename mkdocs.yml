@@ -216,11 +216,11 @@ nav:
           - Summary: ml-experiments/themes/solar-disaggregation/index.md
           - Experiments: ml-experiments/themes/solar-disaggregation/experiments.md
           - Research plan: ml-experiments/themes/solar-disaggregation/plan.md
-      - Switching detectors:
+      - LSC detectors:
           - Summary: ml-experiments/themes/switching-detectors/index.md
           - Experiments: ml-experiments/themes/switching-detectors/experiments.md
           - Research plan: ml-experiments/themes/switching-detectors/plan.md
-      - Switching labels in the forecast:
+      - Load-shift labels in the forecast:
           - Summary: ml-experiments/themes/switching-labels-in-the-forecast/index.md
           - Experiments: ml-experiments/themes/switching-labels-in-the-forecast/experiments.md
           - Research plan: ml-experiments/themes/switching-labels-in-the-forecast/plan.md

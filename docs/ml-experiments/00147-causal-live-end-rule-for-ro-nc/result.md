@@ -94,7 +94,7 @@ production_status: candidate
 adopted_in: none
 ---
 
-# Experiment 147: can the end of a switching interval be called without looking ahead?
+# Experiment 147: can the end of a load-shift interval be called without looking ahead?
 
 **A live service can call the end of a switching interval with no lookahead, and shows no measurable
 loss in MW-weighted share found against the offline rule, by waiting until the step statistic falls

@@ -73,7 +73,7 @@ adopted_in: none
 code: ml-experiments/00037-switching-first-look/
 ---
 
-# Experiment 37: does a neighbour-balance detector find logged switching in the telemetry?
+# Experiment 37: does a neighbour-balance detector find logged load shifts in the telemetry?
 
 We asked whether comparing a substation with its neighbours can find the moments when load was
 switched from one substation to another, which NGED's logs of closures record. We built a detector

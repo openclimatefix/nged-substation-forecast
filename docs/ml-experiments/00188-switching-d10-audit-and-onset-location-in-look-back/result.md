@@ -2,7 +2,7 @@
 id: "00188"
 slug: switching-d10-audit-and-onset-location-in-look-back
 title: >-
-  Are D10's extra errors from unlogged switching, and does locating the onset inside the look-back
+  Are D10's extra errors from unlogged load shifts, and does locating the onset inside the look-back
   help the mask?
 theme: switching-detectors
 also_relevant_to:

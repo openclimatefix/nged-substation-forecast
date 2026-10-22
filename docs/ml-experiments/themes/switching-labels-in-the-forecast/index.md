@@ -1,4 +1,4 @@
-# Switching labels in the forecast
+# Load-shift labels in the forecast
 
 **Giving the Primary demand forecast switching labels has not yet improved it on real data. On
 injected transfers it recovers the lost accuracy only when the megawatts (MW) moved are known: it

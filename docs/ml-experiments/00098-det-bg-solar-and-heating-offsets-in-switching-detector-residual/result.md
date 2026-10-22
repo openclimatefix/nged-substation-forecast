@@ -86,7 +86,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 98: do the best guess's solar and heating offsets sharpen the switching detector?
+# Experiment 98: do the best guess's solar and heating offsets sharpen the LSC?
 
 **Giving the demand forecast behind the switching detector two explicit corrections, one for solar
 output and one for heating, did not detectably raise the share of moved power the detector finds,

@@ -69,7 +69,7 @@ adopted_in: none
 code: ml-experiments/00044-sw2-2-switching-share-of-best-guess-score/
 ---
 
-# Experiment 44: how much do labelled switching events hurt the best guess?
+# Experiment 44: how much do labelled load shifts hurt the best guess?
 
 Experiment 33 produced the best forecast it found of demand at the 16 Primary substations
 (substations that step power down to the local distribution network), which we call the best

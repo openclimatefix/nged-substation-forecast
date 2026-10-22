@@ -103,7 +103,7 @@ production_status: candidate
 adopted_in: none
 ---
 
-# Experiment 71 (SW2-18, part of the switching-event detector series): does ignoring alarms near a refit make the detector miss load transfers?
+# Experiment 71 (SW2-18, part of the LSC series): does ignoring alarms near a refit make the detector miss load transfers?
 
 **The detector ignored every alarm within 24 hours of the monthly refit of its forecasting model.
 Lifting that rule recovers about 5% of the moved power, and the second model that we added to

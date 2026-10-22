@@ -65,7 +65,7 @@ adopted_in: none
 code: ml-experiments/00101-ro-nc-detector-on-real-hand-filtered-switching-events/
 ---
 
-# Experiment 101: how well does the refit-offset neighbour-count detector find real switching events?
+# Experiment 101: how well does the refit-offset neighbour-count detector find real load shifts?
 
 **The refit-offset neighbour-count detector (RO-NC) finds about a third of the real load transfers
 lasting over 1 day (12 of 35) and none of the 31 shorter ones. On injected transfers (synthetic

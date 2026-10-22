@@ -68,7 +68,7 @@ adopted_in: none
 code: ml-experiments/00041-sw2-0a-labeller-gate/
 ---
 
-# Experiment 41: can a labeller pass a known-answer gate on switching events?
+# Experiment 41: can a labeller pass a known-answer gate on load shifts?
 
 We asked whether a program can reliably tell when electricity load really moved from one
 substation to a neighbour, using only the power readings and the engineers' switching log. To test

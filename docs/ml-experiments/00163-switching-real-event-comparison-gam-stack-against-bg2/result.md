@@ -2,7 +2,7 @@
 id: "00163"
 slug: switching-real-event-comparison-gam-stack-against-bg2
 title: >-
-  Real logged load transfers: the XGBoost-free stack with a switching mask against best guess 2
+  Real logged load transfers: the XGBoost-free stack with a load-shift mask against best guess 2
 theme: switching-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast

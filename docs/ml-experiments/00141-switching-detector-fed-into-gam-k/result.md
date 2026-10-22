@@ -1,7 +1,7 @@
 ---
 id: "00141"
 slug: switching-detector-fed-into-gam-k
-title: "Switching detector fed into the GAM-K forecast"
+title: "LSC fed into the GAM-K forecast"
 theme: switching-labels-in-the-forecast
 also_relevant_to:
   - switching-detectors

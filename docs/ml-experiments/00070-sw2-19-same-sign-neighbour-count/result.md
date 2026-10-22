@@ -79,7 +79,7 @@ production_status: candidate
 adopted_in: none
 ---
 
-# Experiment 70 (SW2-19, a switching-event detector experiment): does counting the neighbours that step the same way find more moved load?
+# Experiment 70 (SW2-19, an LSC experiment): does counting the neighbours that step the same way find more moved load?
 
 **Counting how many neighbouring substations step in the same direction as the alarming substation
 finds more of the moved load on injected transfers, so the count is worth testing again on more

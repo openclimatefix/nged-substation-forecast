@@ -87,7 +87,7 @@ pull_request: https://github.com/openclimatefix/nged-substation-forecast/pull/12
 code: ml-experiments/00055-sw2-8-neighbour-veto-single-series-detector/
 ---
 
-# Experiment 55: does a neighbour veto help the single-series switching detector?
+# Experiment 55: does a neighbour veto help the single-series LSC?
 
 **A neighbour veto makes the single-series detector slightly more precise, and at the strengths
 tried it finds only about 1 point more of the injected transfers.** We kept every alarm of the

@@ -100,7 +100,7 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Experiment 68 (SW2-5, part of the switching-event detector series): does refitting the forecast without the load transfers the detector found help the detector?
+# Experiment 68 (SW2-5, part of the LSC series): does refitting the forecast without the load transfers the detector found help the detector?
 
 **Refitting the lagless XGBoost model without the load transfers that the detector found barely
 changed what the detector finds, or the forecast error.** In these 16 series, with this XGBoost

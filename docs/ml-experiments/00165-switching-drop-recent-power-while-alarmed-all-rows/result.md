@@ -2,7 +2,7 @@
 id: "00165"
 slug: switching-drop-recent-power-while-alarmed-all-rows
 title: >-
-  A forecast that ignores recent power whenever a switching alarm is active, scored on every real
+  A forecast that ignores recent power whenever an LSC alarm is active, scored on every real
   row
 theme: switching-detectors
 also_relevant_to:

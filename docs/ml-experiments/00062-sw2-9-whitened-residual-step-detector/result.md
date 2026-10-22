@@ -87,7 +87,7 @@ adopted_in: none
 code: ml-experiments/00062-sw2-9-whitened-residual-step-detector/
 ---
 
-# Experiment 62: does removing the residual's half-hour-to-half-hour memory help the switching detector?
+# Experiment 62: does removing the residual's half-hour-to-half-hour memory help the LSC?
 
 **Filtering out the residual's short memory makes the switching detector find fewer load transfers,
 not more, because the filter removes a day-long step faster than it removes noise.** A load transfer

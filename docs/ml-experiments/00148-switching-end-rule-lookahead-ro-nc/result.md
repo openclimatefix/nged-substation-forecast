@@ -87,7 +87,7 @@ production_status: candidate
 adopted_in: none
 ---
 
-# Experiment 148: how long must a live service wait to fix the end of a switching interval?
+# Experiment 148: how long must a live service wait to fix the end of a load-shift interval?
 
 **On injected transfers, a live service needs only 6 hours of data after the candidate end to fix
 the end of a switching interval of the refit-offset neighbour-count detector (RO-NC), with no loss

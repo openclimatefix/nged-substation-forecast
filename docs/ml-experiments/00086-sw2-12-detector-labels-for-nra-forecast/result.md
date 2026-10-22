@@ -75,7 +75,7 @@ adopted_in: none
 boosters: data/ml-experiments/00086-sw2-12-detector-labels-for-nra-forecast/work/boosters/
 ---
 
-# Experiment 86: do the detector's switching labels give the same gain as NGED's logs?
+# Experiment 86: do the detector's load-shift labels give the same gain as NGED's logs?
 
 **Take-home message: correcting each past power reading (a lag) for switching did not lower the
 error of the XGBoost demand forecast for Primary substations with either source of labels, and the
