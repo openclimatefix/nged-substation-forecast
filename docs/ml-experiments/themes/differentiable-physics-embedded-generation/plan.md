@@ -2,6 +2,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 238, PV nearest-farm sunshine | Does the output of a metered farm within 30 km, used as the sunshine measure in place of CAMS irradiance, recover an injected solar farm better? | Medium | None | Planned |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
