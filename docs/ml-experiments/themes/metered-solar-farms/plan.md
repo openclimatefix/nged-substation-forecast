@@ -6,7 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| – | No experiment is queued; the proposals below are not yet agreed | – | The maintainer | Open |
+| 243 | Does a physics plant with a small neural head beat the plant, XGBoost, and a neural network alone? | 1 | Nothing | Running |
 
 ## Planned experiments
 
