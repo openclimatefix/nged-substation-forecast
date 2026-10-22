@@ -44,21 +44,23 @@ adopted_in: none
 date: 2026-10-22
 best_arm: none (no model is fitted)
 headline: >-
-  At the Primary assigned to the farm, 0 of the 3 zero-output outages that could be tested shifted the
-  Primary's power by the predicted 0.5 to 1.5 times the farm's output; the measured shifts were 1% to
-  6% of the farm's output, the wrong way round, against a test noise of 3% to 15%.
+  At D10, the only decision Primary with a testable zero-output outage, 0 of 3 outages (farms A and
+  C) shifted the Primary's power by the predicted 0.5 to 1.5 times the farm's output; the shifts were
+  -1% to -6% of the farm's output (the opposite sign), against a placebo spread of about 3% to 15%.
+  Nothing could be tested at D5, D11, D14, or D16.
 lessons:
   - >-
     The 6 metered farms have 19 outages of 3 days or more in clear-sky hours (6 with zero readings, 13
-    with no readings), and the nearby Primaries show none of the predicted return of the farm's output.
+    with no readings). Only farm D's outages (1.2 MW, the noisiest test) show the predicted direction
+    at a nearby Primary; the zero-reading outages at farms A and C do not.
   - >-
-    Only the bulk supply point shows a shift that follows a farm outage (farm E's three gaps, at about
-    half its output and the other way round), which suggests the farm is connected above the Primaries
-    we can test.
+    Bulk supply point D13 shows a shift that follows two of farm E's three gaps (about half its output,
+    the opposite sign), which suggests the farm is connected above the Primaries we can test.
 advice:
   - >-
-    Do not plan the step-detector experiments E3 and E4 on the claim that meter failures at the six
-    metered farms cause the capacity steps at D5, D10, D11, D14, and D16 (Figure 1).
+    Do not plan the step-detector experiments E3 and E4 on the claim that meter failures at farms A
+    and C cause capacity steps at D10, where the tests could be run (Figure 1); D5, D11, D14, and D16
+    were not testable.
   - >-
     Get the farm-to-Primary connection list, or the meter fault dates, from NGED before another
     test of the meter-failure mechanism, because the nearest-Primary map is a guess (Method bullets).
@@ -66,24 +68,28 @@ advice:
     Test a shift against windows with no outage at the same Primary, because the noise of the shift
     ranges from 3% to 15% of a farm's output, and 52% for a 1.2 MW farm (Figure 2).
 take_home_message: >-
-  When a metered solar farm's meter reads zero or goes silent for days, the power of the nearby
-  Primary substations does not rise by that farm's output, so meter failures at these six farms do
-  not explain the jumps in solar capacity found at the Primaries. The farms may connect to
-  substations we could not test, so the connection list from NGED would settle it.
+  When a metered solar farm's meter reads zero for days, the power of the Primary substation we
+  could test (D10) does not change by that farm's output. Meter failures at farms A and C therefore
+  do not explain capacity steps at D10, and the other decision Primaries could not be tested. The
+  farms may connect to substations we could not test, so the connection list from NGED would settle
+  it.
 
 ---
 
 # E1: do a solar farm's meter outages show up in its Primary's power?
 
-**NGED's Primary substations do not show the predicted return of a solar farm's output when the
-farm's meter fails.** We asked whether the power supplied by a Primary substation rises, by the
-output of a metered solar farm nearby, when that farm's readings stop. We found each of the 6 metered
-farms' outages of 3 days or more in clear-sky hours, and compared the Primary's power in those days
-with the 14 days either side. At the Primary assigned to the farm, the 3 zero-output outages that
-could be tested changed the Primary's solar generation by 1% to 6% of the farm's output, in the
-wrong direction, where the prediction was 50% to 150% in the right direction. This narrows the
-search: meter failures at these six farms do not explain the capacity jumps, unless the farms feed
-substations that this test could not reach.
+**At D10, a Primary substation, the power does not change by the output of a metered solar farm
+when that farm's readings drop to zero.** NGED removes the output of a metered solar farm from the
+power supplied by the Primary substation the farm sits under. If a farm's meter fails, the farm's
+output should then reappear in that Primary's power, which would look like a step up in the Primary's
+unmetered solar capacity. We found the outages of the six metered solar farms (labelled A to F) that
+last 3 days or more through the clear-sky hours of the day, and compared the Primary's power on those
+days with the 14 days either side. The Primary is the nearest one that shares the farm's bulk supply
+point, which is a guess, because NGED has not given the connections. Farm outputs are scaled by the
+farm's 99th-percentile output. At D10, the three zero-output outages that could be tested (farms A
+and C) changed the Primary's solar generation by -1% to -6% of the farm's output, the opposite sign
+to the prediction of +50% to +150%. The result narrows the search: meter failures at farms A and C
+do not explain capacity steps at D10, and the other decision Primaries could not be tested.
 
 **Verdict `not supported`.** The pre-registered rule needed at least two thirds of the tested
 outages to show the shift, and 0 of 3 did. The brief's stop rule therefore holds: experiments E3 and
@@ -102,7 +108,8 @@ E4 are not run. Experiment 207 (E2) ran at the same time, as instructed, and is 
   6.2, 6.2, and 8.1 MW. The two April 2021 outages overlap in time, so they are not independent.
 - **Untestable:** farm F's zero outage (August 2025) has 1 sunny half-hour at D5, and farm B's
   zero outages are at D15 and D18, which are not decision Primaries. No farm is assigned to D11 or D16.
-- **Noise of the test:** in 840 placebo windows with no outage, 7 met the rule, all at farm D. The
+- **Noise of the test:** in 840 placebo windows with no outage (39 to 200 per farm), 7 shifted by
+  0.5 to 1.5 farm outputs in either direction (3 in the predicted direction), all at farm D. The
   5th to 95th percentile of the placebo shift is within -0.15 to 0.10 of the farm's output for farms
   A, B, C, E, and F and -0.39 to 0.52 for farm D, whose output is only 1.2 MW.
 - **Other nearby substations:** none of the 9 zero outages tested at the MVA Primaries (which carry
@@ -113,15 +120,17 @@ E4 are not run. Experiment 207 (E2) ran at the same time, as instructed, and is 
   1.95 farm outputs (1.49 to 2.59). The stretch is 7 times longer than the 14-day reference windows
   and spans the start of the 2020 lockdown, so the shift mixes demand and season changes with any
   generation effect.
-- **Skegness bulk supply point, post hoc and with no placebo:** farm E's three stretches without
-  readings coincide with a rise of 9 to 10 MW in D13's power, -0.49 to -0.57 of farm E's output (more
-  solar is positive). Farms A and C's overlapping April 2021 outages coincide with a rise of about 10
-  MW, -1.54 and -1.25 of their outputs; one event could cause both.
-- **Triggers of the audit rule:** trigger 2 fired, because the result contradicts its own
-  prediction. The explanations tested are the wrong parent Primary (the MVA Primaries, above) and
-  a connection above the Primaries (the bulk supply point, above); neither shows the predicted shift
-  at a Primary. The placebo control passed (7 of 840). No forecast is scored, so triggers 3 to 6 do
-  not apply, and no later experiment is built on this result.
+- **Bulk supply point D13, post hoc and with no placebo:** two of farm E's three stretches without
+  readings coincide with a rise of 9 to 10 MW in D13's power, -0.57 and -0.56 of farm E's output (more
+  solar is positive); the third, from July to September 2025, is -0.49 (-0.69 to -0.26). Farms A and
+  C's overlapping April 2021 outages coincide with a rise of about 10 MW, -1.54 and -1.25 of their
+  outputs, and one event could cause both. Farm A's March 2020 outage shifts D13 by +0.51 (0.00 to
+  1.10), in the predicted direction.
+- **Audit triggers:** the result contradicts its own prediction, so the `ml-experiment` skill's
+  second trigger fired. We tested two explanations, a wrong parent Primary (the MVA Primaries, above)
+  and a connection above the Primaries (D13, above); neither shows the predicted shift at a Primary.
+  The placebo control passed. No forecast is scored, and no later experiment is built on this
+  result.
 
 ## Method
 
@@ -136,14 +145,14 @@ E4 are not run. Experiment 207 (E2) ran at the same time, as instructed, and is 
   report in MVA, which carries no sign, so the true parent may be one of those. The distances are
   3.1 to 9.2 km.
 - **Amendment before any shift was seen:** the minimum sunny half-hours were lowered from 100 and
-  300 to 20 and 60 (plan page).
-- **Post hoc, labelled:** MVA Primaries and the Skegness bulk supply point D13 were tested after the
+  300 to 20 and 60 (recorded on the plan before the first shift was computed).
+- **Post hoc, labelled:** MVA Primaries and the bulk supply point D13 were tested after the
   decision rule was applied, to explain the result. The bulk supply point uses the CAMS irradiance of
   D10 for its sunny mask.
 
 ## What the next experiment should answer
 
-The result does not say that meter failures never matter; it says that the farms' outages are not
-visible at the substations we could test. The farm-to-Primary connection list from NGED would show
-whether the farms feed the MVA Primaries, and the bulk supply point's response to farm E suggests
-they feed something above the Primaries.
+**A connection list from NGED would show where the farms connect.** The farms' outages are not
+visible at the substations we could test. The list would show whether the farms feed the MVA
+Primaries, and the bulk supply point's response to farm E suggests the farm feeds a substation above
+the Primaries.
