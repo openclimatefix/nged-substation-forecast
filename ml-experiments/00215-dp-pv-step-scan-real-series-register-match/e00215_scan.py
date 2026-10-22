@@ -21,7 +21,7 @@ import e00215_common as common
 import e00215_fit as fit
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache
 from studies.dp_gam import GamSpec, prepare_fit
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages

@@ -57,85 +57,90 @@ adopted_in: none
 date: 2026-10-22
 best_arm: >-
   Step path at weight 3 on the real series: 7 steps of 0.5 MW or more at 4 of 6 Primaries in 5 years
-  (D10 3, D11 2, D14 1, D16 1; D5 and D9 none), none matched to the register
+  (D10 3, D11 2, D14 1, D16 1; D5 and D9 none), none could be matched to an installation date
 headline: >-
-  At weight 3 the real series show 0.0 to 0.6 steps above 0.5 MW per year per Primary (D5 0.00, D9
-  0.00, D10 0.60, D11 0.40, D14 0.20, D16 0.20), at or below experiment 207's false-step rate on
-  series with no step (0.00, 0.60, 0.67, 0.53) at D5, D10, D11, and D14 and 0.07 above it (0.13) at
-  D16. No step can
-  be matched, because the register ends on 2021-03-24 and the fit trains from 2021-07.
+  The fit finds 0 to 0.6 changes of more than 0.5 MW per year at each Primary (D5 0.00, D9 0.00, D10
+  0.60, D11 0.40, D14 0.20, D16 0.20). That is no more than the 0 to 0.67 per year it invents on
+  experiment 207's test series with no change (D5 0.00, D10 0.60, D11 0.67, D14 0.53), except at D16
+  (0.20 against 0.13). No change can be matched to an installation, because the register ends on
+  2021-03-24 and the fit uses only rows from 2021-07.
 lessons:
   - >-
-    The real series show no more steps above 0.5 MW than experiment 207's fit invents on series
-    with no step, so the scan gives no evidence that any real step exists (figure 2).
+    The real series show no more changes above 0.5 MW than experiment 207's fit invents on series
+    with no change, so the scan gives no evidence that any real change exists (figure 2).
   - >-
-    The feed-in tariff register cannot confirm a step: the lockdown window removes every row before
-    2021-07-20, after the register's last date (figure 3).
+    The feed-in tariff register cannot confirm a change: the 2020-03-23 to 2021-07-19 COVID-19
+    lockdown window, which the project excludes from training, removes every row before the
+    register's last date (figure 3).
   - >-
-    The fitted capacity grows smoothly at D10, D11, D14, and D16 (from about 0.4 to 2.7 MW at D10 over
-    5 years) and stays flat at D5, so most of the growth is not in steps (figure 1).
+    At D10, 1.7 MW of the 2.3 MW rise in fitted capacity is in changes above 0.5 MW; at D5 the
+    fitted capacity stays between 2.2 and 2.8 MW (figure 1).
 advice:
   - >-
-    Do not describe any step from the weight-3 scan as a meter fault or a commissioning; it is
-    inferred, unconfirmed, and at the rate of the false steps in experiment 207 (figure 2).
+    Do not describe any change from the weight-3 scan as a meter fault or a commissioning; each is
+    inferred, unconfirmed, and the count is at the rate of experiment 207's false steps (figure 2).
   - >-
-    To match steps to commissioning dates, use a register that covers 2021-07 onward, such as a newer
-    installations list, because the feed-in tariff register in the project ends on 2021-03-24
-    (figure 3).
+    To match changes to commissioning dates, use a register that covers 2021-07 onward, because the
+    feed-in tariff register in the project ends on 2021-03-24 (figure 3).
   - >-
-    Count the first August-to-April change of the scan as a possible fit artefact, because D11 and
-    D14 both show +1.45 MW there and the fit has no earlier summer to anchor it (Results).
+    Treat the first August-to-April change of the scan as a possible fit artefact, because D11 and
+    D14 both show about +1.45 MW there and the fit has no earlier summer to anchor it (Results).
 take_home_message: >-
-  Fitting a step-capable solar capacity to the real Primary series finds 7 changes above 0.5 MW in
-  5 years, at about the rate that the same fit invents on data with no step, so none can be called
-  real. The feed-in tariff register that could confirm them ends in March 2021, before the data the
-  fit uses begins, so the match could not be tested. A register or a metered record that covers 2021
-  to 2026 is what would settle it.
+  The method that finds jumps in solar capacity finds about as many in the real Primary series as it
+  invents when none exists, so we cannot call any of them real. The only list of dated installations
+  we hold ends in March 2021, before the months the fit uses, so no change could be checked against
+  it. The changes do not alter the forecast, but they should not appear on the substation cards as
+  confirmed. A list covering 2021 to 2026, or the metered record of a known installation, would
+  settle the question.
 ---
 
-# Do the real Primary series contain solar-capacity steps that match the register?
+# Do the real Primary series show jumps in solar capacity that match feed-in tariff installation dates?
 
-**The scan finds only as many steps in the real series as the same fit invents on series with no
-step, and the register that could confirm them ends before the data begins, so no step can be
-called real.** [Experiment 207](../00207-dp-meter-regime-steps-e2-step-capacity-known-answer/result.md)
-built a solar capacity that may change by a step each month, and showed that it finds a known
-solar-farm step added to a Primary substation's power. A Primary substation feeds homes and
-businesses; D5, D9, D10, D11, D14, and D16 are anonymised labels for six of them. We ran the same
-fit on each Primary's real power from 2021 to 2026, with no step added. We listed the months in
-which the fitted capacity moved by more than 0.5 MW, and compared the increases with the dates when
-feed-in tariff solar installations were commissioned. The fit found 7 such changes in 5 years, at
-four of the six Primaries. We could not compare them with the register: its last commissioning date
-is 2021-03-24, and the fit trains only on rows from 2021-07.
+**The fit finds no more jumps in solar capacity in the real Primary series than it invents on test
+series where none exists, and the list of feed-in tariff solar installations stops before the
+months the fit uses, so no jump can be confirmed.** We asked whether the power drawn at six Primary
+substations (labelled D5, D9, D10, D11, D14, and D16), which feed homes and businesses, shows sudden
+changes in the capacity of the solar panels connected to them. [Experiment
+207](../00207-dp-meter-regime-steps-e2-step-capacity-known-answer/result.md) built an estimate of
+solar capacity that is allowed to jump from one month to the next, and showed that the estimate
+finds a solar farm that we had added to a substation's power. Here we ran that estimate on the real
+April-to-August power of each Primary from July 2021 to June 2026, with nothing added, and listed
+every change of more than 0.5 MW. We found 7 such changes across 4 of the 6 Primaries. The only
+dated record of installations we hold, the feed-in tariff register (a list of small solar
+installations paid under a UK subsidy scheme), ends on 2021-03-24. The project excludes every row
+before 2021-07-20 from training, because of the COVID-19 lockdown. No change can therefore be matched
+to an installation date.
 
 ![Figure 1. Fitted solar capacity of each Primary](figure_01_paths.svg)
 
-*Figure 1 shows the fitted capacity of each Primary with the month-to-month steps above 0.5 MW.*
+*Figure 1: the fitted capacity rises at D10 to D16 and stays within 2.2 to 2.8 MW at D5, and the
+marked month-to-month changes above 0.5 MW are few.*
 
-![Figure 2. Steps per year against experiment 207's rate](figure_02_step_rate.svg)
+![Figure 2. Changes per year against experiment 207's rate](figure_02_step_rate.svg)
 
-*Figure 2 shows how many steps per year the fit finds in the real series, against how many it finds
-in experiment 207's series with no step.*
+*Figure 2: the real series show no more changes per year than experiment 207's series with no
+change, except at D16.*
 
 ![Figure 3. Months trained on against the register's end](figure_03_register_window.svg)
 
-*Figure 3 shows that no month the fit trains on comes before the register's last commissioning
-date.*
+*Figure 3: no month the fit trains on comes before the register's last commissioning date.*
 
-**Verdict `partly supported`.** The decision rule's `partly supported` branch applies: steps of 0.5
-MW or more exist at four Primaries and none matches a register cluster. The match could not be
-tested, so the prediction that a step at D10 or D16 lies within 60 days of a cluster is neither
-confirmed nor refuted. The placebo part holds: D5 shows 0 steps and D14 shows 0.20 per year, both
-under 1 per year. The gate passed: the scan code reproduces experiment 207's stored fitted
-capacity at D10 to within 2e-13 points.
+**The prediction is partly supported: changes of 0.5 MW or more exist at 4 Primaries, none can be
+matched to an installation, and the placebo Primaries stay under 1 change per year.** Whether a
+change at D10 or D16 lies within 60 days of a register cluster could not be tested, so that part of
+the prediction is neither confirmed nor refuted. D5 shows 0 changes and D14 shows 0.20 per year.
+The check that the scan code reproduces experiment 207's stored result at D10 passed (largest
+difference 1.7e-13, in the units of the fitted capacity).
 
 ## Results
 
-Rows: April to August half-hours from 2021-07 to 2026-06 at each Primary (D9 from 2024-04), after
-the project's default row filter (outside the lockdown window and the switching masks), 34,690 to
-35,804 rows per Primary and 19,041 at D9. The scan is retrospective and uses every row, so it is
-not as-of. The fit is experiment 207's step path with total-variation weight 3.
+We used April to August half-hours from 2021-07 to 2026-06 at each Primary (D9 from 2024-04), after
+dropping the lockdown months and the periods of switching, which leaves 34,690 to 35,804 half-hours
+per Primary and 19,041 at D9. The fit uses every row, including rows after the date it describes,
+so it is a retrospective scan and not a forecast. The penalty on the total change in capacity has
+weight 3, as in experiment 207.
 
-| Weight 3, steps above 0.5 MW | Month-to-month | August-to-April | Per year | Experiment 207 (no step) |
+| Primary | Month-to-month changes | August-to-April changes | Per year | Experiment 207, per year, no change added |
 |---|---|---|---|---|
 | D5 | 0 | 0 | 0.00 | 0.00 |
 | D9 (2.25 years) | 0 | 0 | 0.00 | none |
@@ -144,41 +149,41 @@ not as-of. The fit is experiment 207's step path with total-variation weight 3.
 | D14 | 0 | 1 | 0.20 | 0.53 |
 | D16 | 0 | 1 | 0.20 | 0.13 |
 
-- **The steps (weight 3, all increases):** D10 +0.60 MW (2022-08), +0.51 MW (2023-05) and +0.54 MW
-  from August 2022 to April 2023; D11 +1.08 MW (2022-08) and +1.46 MW from August 2021 to April
-  2022; D14 +1.45 MW from August 2021 to April 2022; D16 +0.58 MW from August 2022 to April 2023.
-  The August-to-April steps are net changes across the winter, which has no data, so their date is
-  unknown within the winter.
-- **Likely artefact:** the +1.45 MW changes at D11 and D14 in the first winter of the fit are
-  equal to within 0.02 MW. The fit has no earlier summer to anchor them, so we treat them as
-  possible fit artefacts and not as installations.
-- **Match to the register:** none of the steps lies in the register's period. The share of month
-  boundaries between 2019-09 and 2021-03 whose 60-day window holds at least 0.5 MW of
-  share-weighted registered capacity is 0 at every Primary, because each Primary's weighted
-  register total is 1.6 to 3.5 MW over its whole history, 70% to 90% of it commissioned in 2011 to 2015.
-  Every step is therefore "inferred, unconfirmed".
-- **Sensitivity (post hoc, not part of the verdict):** at weight 0.3 the fit finds 9, 3, 4, and 6
-  steps at D10, D11, D14, and D16 (none at D5, 2 at D9), and at weight 30 one step at each of D10,
-  D11, and D14. Steps shrink in number as the penalty grows, as experiment 207 found.
-- **Capacity:** the fitted capacity at D10 rises from 0.4 MW in 2021 to 2.7 MW in 2026, a rise
-  of 2.3 MW, and 1.7 MW of it is in steps above 0.5 MW. D5 stays between 2.2 and 2.8 MW.
+- **All 7 changes are increases.** D10: +0.60 MW (August 2022), +0.51 MW (May 2023), and +0.54 MW
+  from August 2022 to April 2023. D11: +1.08 MW (August 2022) and +1.46 MW from August 2021 to April
+  2022. D14: +1.45 MW from August 2021 to April 2022. D16: +0.58 MW from August 2022 to April 2023.
+  An August-to-April change is a net change across the winter. Its date is unknown within the
+  winter, because the fit uses only April to August rows.
+- **The two changes of about +1.45 MW in the first winter, at D11 and D14, are probably fit
+  artefacts.** The two values are equal to within 0.02 MW, and the fit has no earlier summer to
+  anchor either.
+- **No change falls in the register's period, so none can be matched.** Between 2019-09 and
+  2021-03, no 60-day window at any Primary holds 0.5 MW or more of share-weighted registered
+  capacity (the base rate is 0%). The register holds almost nothing from those months: 393
+  installations were commissioned across the whole register from April 2019 to March 2021, against
+  860,064 before April 2019, so even a fit that covered 2019 to 2021 could not find a cluster. Every
+  change is therefore described as inferred, unconfirmed.
+- **Sensitivity (post hoc, not part of the verdict):** at penalty weight 0.3 the fit finds 9, 3, 4,
+  and 6 changes at D10, D11, D14, and D16 (none at D5, 2 at D9). At penalty weight 30 it finds one
+  change each at D10, D11, and D14. The count falls as the penalty grows, as experiment 207 found.
+- **The fitted capacity at D10 rises from 0.4 MW in 2021 to 2.7 MW in 2026, and 1.7 MW of that 2.3
+  MW rise is in changes above 0.5 MW.** D5 stays between 2.2 and 2.8 MW.
 
 ## Checks
 
-- **Gate:** the scan's base path at D10 for weight 3, refitted at experiment 207's cut of
-  2025-07-01 on the same rows, matches experiment 207's stored path in all 48 months (largest
-  difference 1.7e-13 points). `e00215_scan.py` prints it.
-- **Forecast checks:** this experiment scores no forecast, so the median-against-mean check and the
-  quantile-score contrast do not apply.
-- **Audit conditions:** none was met. The prediction's match part could not be tested, and the
-  reason is recorded above, so it is not an unexplained contradiction.
-- **Plan correction:** the plan expected that steps in the summer of 2020 could be matched. The
-  lockdown window removes that summer from training, so the match was untestable from the start.
+- **Reproduction:** refitted using only the data up to 2025-07-01, experiment 207's cut-off, the
+  scan's base path at D10 for weight 3 matches experiment 207's stored path in all 48 months
+  (largest difference 1.7e-13, in the units of the fitted capacity). `e00215_scan.py` prints it.
+- **Forecast checks:** this experiment scores no forecast, so the forecast checks do not apply.
+- **Audit triggers:** none fired. The untested match is explained in the verdict paragraph and is
+  not an unexplained contradiction.
+- **Plan correction:** the plan expected that changes in the summer of 2020 could be matched. The
+  lockdown window removes that summer from training.
 
 ## What to try next
 
-- Match the steps to a register that covers 2021 to 2026, or to the metered record of a known
-  installation, before reading any step as a commissioning.
-- Keep the steps out of the substation cards until one is confirmed, and show them as inferred.
-- A longer history, with the lockdown months handled, would give the fit a summer before 2021 to
-  anchor the first winter.
+- Match the changes to a register that covers 2021 to 2026, or to the metered record of a known
+  installation, before reading any change as a commissioning.
+- Show the changes on the substation cards as inferred, and only once one is confirmed as real.
+- Find a way to use the lockdown months without biasing the fit, so that the fit has a summer
+  before 2021 to anchor the first winter.
