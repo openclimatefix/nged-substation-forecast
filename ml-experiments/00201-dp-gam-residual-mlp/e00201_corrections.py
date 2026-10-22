@@ -1,32 +1,25 @@
-"""The corrections of experiment 155: the winter night offset, recipe R, and the analog profile.
+"""The corrections of experiment 155 that arm D uses: the winter night offset and recipe R.
 
 **Every correction is a shift added to arm A's mean and quantiles, then the spread is refitted.**
 `add_calendar` adds the columns that the corrections read. `winter_offset_shift` is the night term
 of experiment 137 with a winter indicator in place of the cold depth (the audit of that experiment
-found the two do equally well). `recipe_r_shift` and `analog_shift` are experiment 115's recipe R
-and experiment 145's analog-day profile, rebuilt on the rows of a frame. No correction reads
-anything dated on or after the origin of the run it corrects (see the leakage control).
+found the two do equally well). `recipe_r_shift` is experiment 115's recipe R, rebuilt on the rows
+of a frame. No correction reads anything dated on or after the origin of the run it corrects.
 """
 
 from dataclasses import dataclass
-from datetime import date, timedelta
 from typing import Final
 
 import e00201_common as common
 import numpy as np
 import polars as pl
-from studies.dp_calendar import bank_holiday_names
 from studies.dp_ens import LeadHourSpread
 
 EPOCH: Final[np.datetime64] = np.datetime64("1970-01-01", "D")
-EPOCH_DATE: Final[date] = date(1970, 1, 1)
 LONDON: Final[str] = "Europe/London"
 N_HALF_HOURS: Final[int] = 48
 DAY_TYPES: Final[tuple[int, ...]] = (0, 1, 1, 1, 2, 3, 4)
 """The day type of Monday (0) to Sunday (6)."""
-DECEMBER_RUN_DAYS: Final[tuple[int, ...]] = (24, 27, 28, 29, 30, 31)
-MIN_ANALOGS: Final[int] = 3
-MIN_HOLIDAY_FALLBACK: Final[int] = 2
 N_COLUMNS: Final[int] = common.N_NIGHT_SLOTS * 3
 VARIANTS: Final[tuple[str, ...]] = ("winter", "const", "placebo")
 """`winter`: constant, winter indicator, weekend. `const`: no winter indicator. `placebo`: the
@@ -245,145 +238,6 @@ def recipe_r_shift(
     profile, ok = fourteen_day_profiles(days=days)
     by_run = np.where(ok[:, None], -common.R_KAPPA * profile, 0.0)
     return shift_at_rows(days=days, frame=frame, by_run=by_run, short_only=short_only)
-
-
-@dataclass(frozen=True)
-class AnalogSpec:
-    """How the analog profile shift is built (experiment 145's tuned ANALOG+R values).
-
-    Attributes:
-        kappa: The shrink applied to the profile.
-        k: The number of analog days averaged.
-        weeks: The season window, in weeks either side of the target's day of the year.
-        weight: The weight of the analog profile against the 14-day profile.
-    """
-
-    kappa: float = 1.0
-    k: int = 20
-    weeks: int = 13
-    weight: float = 0.5
-
-
-def holiday_identities(*, first: date, last: date) -> dict[date, str]:
-    """Return the holiday-like days between two dates, each with its identity."""
-    out = {day: name for day, name in bank_holiday_names().items() if first <= day <= last}
-    for day, name in bank_holiday_names().items():
-        if name == "Good Friday":
-            out[day + timedelta(days=1)] = "Easter Saturday"
-            out[day + timedelta(days=2)] = "Easter Sunday"
-    day = first
-    while day <= last:
-        if day.month == 12 and day.day in DECEMBER_RUN_DAYS:
-            out.setdefault(day, f"December {day.day}")
-        day += timedelta(days=1)
-    return {day: name for day, name in out.items() if first <= day <= last}
-
-
-def forecast_temperature(*, site: str, days: DayBlocks) -> np.ndarray:
-    """Return each run's D+1 daily mean ENS ensemble-mean temperature, `NaN` where it has none.
-
-    The value is the raw ENS value of experiment 111's store, the weather the run saw, so it exists
-    at forecast time. Row `i` of a run's window is the half-hour `i + 1` after the origin's, so the
-    D+1 block (leads 15.5 to 39 hours) is positions 30 to 77.
-    """
-    with np.load(common.E111_STORE_DIR / f"{site}.npz") as stored:
-        temperature = stored["temperature"]
-    out = np.full(len(days.runs), np.nan)
-    for position, run in enumerate(days.runs.tolist()):
-        values = temperature[run][:, 30:78]
-        if values.shape[1] == N_HALF_HOURS and np.isfinite(values).any():
-            out[position] = np.nanmean(values.mean(axis=0))
-    return out
-
-
-@dataclass(frozen=True)
-class AnalogDays:
-    """The calendar facts of each run's target day, for choosing analog source days."""
-
-    days: DayBlocks
-    temperature_c: np.ndarray
-    day_type: np.ndarray
-    day_of_year: np.ndarray
-    identity: np.ndarray
-
-
-def build_analog_days(*, site: str, days: DayBlocks) -> AnalogDays:
-    """Return the target day's type, day of year, holiday identity, and forecast temperature."""
-    weekday = (days.targets + 3) % 7  # 1970-01-01 was a Thursday; Monday is 0
-    dates = [EPOCH_DATE + timedelta(days=int(t)) for t in days.targets]
-    names = holiday_identities(first=dates[0], last=dates[-1])
-    return AnalogDays(
-        days=days,
-        temperature_c=forecast_temperature(site=site, days=days),
-        day_type=np.array([DAY_TYPES[w] for w in weekday]),
-        day_of_year=np.array([d.timetuple().tm_yday for d in dates]),
-        identity=np.array([names.get(d, "") for d in dates]),
-    )
-
-
-def analog_days_of_run(*, analog: AnalogDays, run: int, spec: AnalogSpec) -> np.ndarray | None:
-    """Return the source days nearest in forecast temperature to a run's target, or `None`.
-
-    A non-holiday target takes non-holiday source days of the same day type within `spec.weeks`
-    weeks of its day of the year. A holiday-like target takes source days with the same holiday
-    identity, else any holiday-like days when at least 2 exist. The nearest `spec.k` by forecast
-    daily mean temperature are kept, ties going to the more recent day.
-    """
-    days = analog.days
-    target = int(days.targets[run])
-    newest = int(np.searchsorted(days.targets, target - common.R_FIRST_SOURCE_BACK, side="right"))
-    past = np.arange(newest)
-    identity = str(analog.identity[run])
-    candidate = days.usable[past] & np.isfinite(analog.temperature_c[past])
-    if not np.isfinite(analog.temperature_c[run]):
-        return None
-    if identity:
-        same = candidate & (analog.identity[past] == identity)
-        if same.any():
-            candidate = same
-        else:
-            candidate = candidate & (analog.identity[past] != "")
-            if candidate.sum() < MIN_HOLIDAY_FALLBACK:
-                return None
-    else:
-        gap = np.abs(analog.day_of_year[past] - analog.day_of_year[run])
-        gap = np.minimum(gap, 365 - gap)
-        candidate = (
-            candidate
-            & (analog.identity[past] == "")
-            & (analog.day_type[past] == analog.day_type[run])
-            & (gap <= 7 * spec.weeks)
-        )
-        if candidate.sum() < MIN_ANALOGS:
-            return None
-    chosen = past[candidate]
-    distance = np.abs(analog.temperature_c[chosen] - analog.temperature_c[run])
-    return chosen[np.lexsort((-days.targets[chosen], distance))[: spec.k]]
-
-
-def analog_shift(
-    *, frame: pl.DataFrame, forecast: np.ndarray, site: str, spec: AnalogSpec
-) -> np.ndarray:
-    """Return the ANALOG+R shift at every row: minus kappa times (A + weight * (W - A)).
-
-    `A` is the 14-day profile and `W` the analog profile; a run with no analog set gets `-kappa * A`
-    and a run whose 14-day profile has too few source days gets zero.
-    """
-    days = day_blocks(frame=frame, forecast=forecast)
-    profile_a, ok = fourteen_day_profiles(days=days)
-    analog = build_analog_days(site=site, days=days)
-    by_run = np.zeros((len(days.targets), N_HALF_HOURS))
-    for run in range(len(days.targets)):
-        if not ok[run]:
-            continue
-        profile = profile_a[run]
-        chosen = analog_days_of_run(analog=analog, run=run, spec=spec)
-        if chosen is not None:
-            profile = profile + spec.weight * (
-                _mean_by_half_hour(blocks=days.blocks[chosen]) - profile
-            )
-        by_run[run] = -spec.kappa * profile
-    return shift_at_rows(days=days, frame=frame, by_run=by_run, short_only=False)
 
 
 def apply_shift_and_refit_spread(*, frame: pl.DataFrame, shift: np.ndarray) -> pl.DataFrame:
