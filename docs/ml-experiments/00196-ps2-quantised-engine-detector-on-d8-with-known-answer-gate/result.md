@@ -64,7 +64,8 @@ take_home_message: >-
   engine output that we injected into D8: every half-hour with 2 or 3 units running and 83% to 85%
   of the half-hours with 1 unit, where the step detectors for load transfers find a quarter or
   less. The model also raises too many false alarms at three of the six other Primaries tested,
-  and from March 2025, when 11 kV solar was connected, it flags 40% to 43% of D8 half-hours even where the left tail is 2%.
+  and from March 2025, when 11 kV solar was connected, it flags 40% to 43% of D8 half-hours even
+  where the left tail is 2%.
   Labels from March 2025 onward should not be used, and the 1-unit labels before that date are
   unvalidated; the noise model for the solar period has to be fixed first.
 advice:
