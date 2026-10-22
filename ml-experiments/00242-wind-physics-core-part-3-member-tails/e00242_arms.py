@@ -123,6 +123,9 @@ def member_powers_mixture(*, powers: np.ndarray) -> np.ndarray:
 
     Args:
         powers: Shape (cases, members) expected powers.
+
+    Returns:
+        Shape (cases, 11) float32 quantiles of the mixture.
     """
     return np.quantile(powers, common.LEVELS, axis=1).T.astype(np.float32)
 
