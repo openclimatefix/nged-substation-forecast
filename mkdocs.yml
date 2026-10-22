@@ -156,6 +156,8 @@ nav:
           - Weather inputs by product: ml-experiments/background/weather-inputs-by-product.md
           - Row sets and scoring: ml-experiments/background/row-sets-and-scoring.md
           - What is on disk: ml-experiments/background/what-is-on-disk.md
+          - Problems and the current best forecast: ml-experiments/background/problems-and-current-best-forecast.md
+          - Adopted and open questions: ml-experiments/background/adopted-and-open-questions.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
       - Calibration and uncertainty:
