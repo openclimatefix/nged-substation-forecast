@@ -239,10 +239,9 @@ Contrasts are written C1 (A+H+S minus A), C2 (the stacking ratio), C3 (H-own min
   network +0.079, removing the network +0.146. H-own minus A+H is 0.000 on this error but -0.048 on
   the score, so the gap is in the bands.
 - **Audit conditions** (the seven in the `ml-experiment` skill). None was met. Condition 2 (H-own
-  beat A+H by more than predicted) was tested
-  with the single-seed and leave-D10-out runs above (`e00220_posthoc.py`), which locate the gap at D10. The nested-arm
-  condition was not met: removing the widening changes the score by -0.0003, inside its interval.
-
+  beat A+H by more than predicted) was tested with the single-seed and leave-D10-out runs above
+  (`e00220_posthoc.py`), which locate the gap at D10. The nested-arm condition was not met: removing
+  the widening changes the score by -0.0003, inside its interval.
 
 ## What was not done
 
