@@ -2,6 +2,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 214, clip ceiling as-of | Does the 60% export clip at D5 hold when its ceiling is chosen only from the 12 months before each refit, and does any other Primary show the same signature? | High | [Experiment 180](../../00180-dp-sunny-daylight-fix-d5-solar-shape/result.md) | Planned |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
