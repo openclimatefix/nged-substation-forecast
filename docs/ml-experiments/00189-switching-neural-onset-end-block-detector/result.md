@@ -57,8 +57,8 @@ best_arm: >-
   unexplained odd-month alarms; the pre-registered 14-epoch network finds 7 (RO-NC: 18).
 headline: >-
   The network finds 7 of 35 real transfers (prediction: at least 15; RO-NC 18; pair alarm 5) when it
-  must place both the start and the end. It places the start alone for 12 (17 after longer training),
-  
+  must place both the start and the end. The network places the start alone for 12 (17 after longer
+  training), and the median start error among transfers found at both ends is 0.5 hours.
 lessons: >-
   Locating the start is learnable from injected transfers, and locating the end is the weak part.
   On injected transfers the network finds only 21% to 34%, so its weakness is not a mismatch between
