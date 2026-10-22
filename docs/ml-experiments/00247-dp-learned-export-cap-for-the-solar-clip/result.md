@@ -53,15 +53,15 @@ lessons:
     A cap learned from data before each cut can match the hand-set 60% clip in the scored year, but
     the interval is too wide to show it reaches 80%.
   - >-
-    The clear-sky envelope picks ceilings of 67% to 100% of held capacity, well above the 55% to
-    75% that the profile fit picks, and so recovers too little of the gain.
+    The clear-sky envelope picks ceilings of 67% to 86% of held capacity at D5, above the 55% to
+    70% that the profile fit picks there, and recovers 60% of the gain (22% to 79%).
   - >-
     Making the clip's edge softer changes the result by less than 0.005 MW, so the edge is not
     where the gain comes from.
 advice:
   - >-
     Keep the hand-set 60% ceiling as the clip form for the final assembly at D5 and D9 (the
-    scored-year table).
+    closure table).
   - >-
     Where no ceiling can be hand-set, learn it with the profile fit over the 12 months before each
     cut, not with a clear-sky envelope quantile (closure figures).
@@ -82,7 +82,7 @@ training objective. At D5 the learned ceiling stays between 55% and 70%, close t
 *Figure 1. The arms against the unclipped fit at D5 and D9.*
 
 **What already exists.** Experiment 214 picks the clip ceiling as-of from a grid of shares by
-out-of-sample error, and experiment 110's `profile_clip` fits the ceiling in sample. Neither learns
+out-of-sample error, and experiment 110's `profile_clip` fits the ceiling in sample. Neither experiment learns
 the cap from the series alone without scoring a grid of candidate shares on forecast error. The
 as-of choice of experiment 214 scores about the same as the profile fit at D5 (0.129 MW).
 
@@ -96,16 +96,16 @@ blocks in pairs.
 | Clear-sky envelope (learned) | 60% (22% to 79%) | 23% (5% to 32%) |
 | 60% clip, softer edge | 100% (99% to 100%) | 104% (98% to 134%) |
 
-The profile fit passes the pre-registered 80% as a point estimate at both sites. Its interval
-reaches below 80%, so the verdict is `partly supported`. The envelope arm fails: its quantile of
-implied clear-sky export sits at 67% to 100% of held capacity (figure 2), above the ceilings that
-help.
+The profile fit passes the pre-registered 80% as a point estimate at both sites. The profile fit's interval
+reaches below 80%, so the verdict is `partly supported`. The envelope arm fails: the quantile of
+implied clear-sky export sits at 67% to 86% of held capacity at D5 and 84% to 100% at D9
+(figure 2), above the ceilings that help.
 
 ![Ceiling picked at each cut](learned_shares.svg)
 
 *Figure 2. The ceiling each learned arm picked at each monthly cut.*
 
-**The placebos do not move.** The learned arms change D10's and D16's sunny-daylight error by
+**The placebos do not move.** The arms change D10's and D16's sunny-daylight error by
 between -0.009 and +0.003 MW (figure 3), inside the 0.02 MW limit.
 
 ![Placebo sites](placebos.svg)
@@ -121,15 +121,18 @@ capacity instead of 2.0) gives the same gain as the hand-set clip: 0.132 MW at D
   the profile fit's training rows end there.
 - The arms read the same rows as experiment 178's cut, and the row counts match the control's.
 - The scoring script raises when an arm's row count differs from the control's after the join.
+- Held capacity can come from an early vintage newer than the cut when no vintage predates it;
+  all arms share that choice.
 - Closure ratios are unstable when the hand-set clip's own gain is small, as at D9 (the interval
   reaches 189%).
 
 ## Which clip form the final assembly should use
 
-**Use the hand-set 60% ceiling.** It matches the profile fit within the interval and needs no
+**Use the hand-set 60% ceiling.** The hand-set 60% ceiling gives a gain close to the profile fit's and needs no
 fitting step at each cut. The softer edge changes nothing, so the experiment-180 form stays. Where a
 site has no hand-set value, the profile fit is the better of the two learned choices.
 
 ## What the next experiment should answer
 
-Experiment 4 reads the clip and the profile-fit cap as the cap input of the monotone network.
+**The next experiment takes the clip and the profile-fit cap as inputs.** The small monotone neural
+network of the brief's experiment 4 receives either ceiling as one of its inputs.
