@@ -1,0 +1,63 @@
+{
+  "seed": 0,
+  "thresholds": {
+    "0": [
+      0.999969482422875,
+      0.9996484518061147
+    ],
+    "1": [
+      0.9999315738687978,
+      0.9995203018198476
+    ],
+    "2": [
+      0.9998972415934072,
+      0.9993680119524465
+    ]
+  },
+  "n_alarms_all_months": {
+    "0": 349,
+    "1": 347,
+    "2": 373
+  },
+  "long_found": 7,
+  "long_onset_found": 12,
+  "long_n": 35,
+  "long_ronc_found": 18,
+  "all_found": 12,
+  "all_onset_found": 23,
+  "all_n": 66,
+  "all_ronc_found": 18,
+  "median_onset_error_h_found": 0.5,
+  "median_onset_error_h_onset_found": 0.5,
+  "found_by_budget_long": {
+    "20": 1,
+    "40": 5,
+    "80": 7,
+    "160": 9,
+    "320": 15
+  },
+  "block_days_found": 1,
+  "block_days_found_odd_month": 0,
+  "block_days_odd_month_n": 36,
+  "block_days_found_by_fold": {
+    "0": 1,
+    "1": 0,
+    "2": 0
+  },
+  "injected_found": {
+    "fitted_pairs": 0.33640552995391704,
+    "held_out_pairs": 0.21301775147928995
+  },
+  "injected_onset_found": {
+    "fitted_pairs": 0.42857142857142855,
+    "held_out_pairs": 0.33727810650887574
+  },
+  "injected_standin_recall": {
+    "fitted_pairs": 0.271889400921659,
+    "held_out_pairs": 0.28402366863905326
+  },
+  "injected_long_found": {
+    "held_out_pairs": 0.18840579710144928,
+    "fitted_pairs": 0.34831460674157305
+  }
+}
