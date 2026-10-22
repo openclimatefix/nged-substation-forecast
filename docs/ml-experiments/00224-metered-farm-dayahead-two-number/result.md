@@ -204,9 +204,9 @@ scoring tables; the SVG files were optimised but
 
 - Does an XGBoost model that is given the plant's mean response and the members' spread as input
   columns beat both the plant forecast and plain XGBoost? The two families win at different quantile
-  levels, That makes a combination plausible.
-- Is the plant's lead at the 0.99 quantile (0.386 against 0.478) real after XGBoost is refitted
-  weekly, or a product of its single fit?
+  levels. That makes a combination plausible.
+- Does the plant's advantage at the 0.99 quantile (0.386 against 0.478) persist when XGBoost is
+  refitted weekly instead of fitted once?
 
 ## Plan amendments (made before scoring)
 
