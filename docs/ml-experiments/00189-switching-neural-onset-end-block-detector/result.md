@@ -98,7 +98,7 @@ neighbouring Primary substations. A transfer counts as found when an alarm falls
 its start and the alarm's end falls within the larger of 6 hours and 10% of its duration of the
 true end. RO-NC is the refit-offset neighbour-count detector of [experiment
 82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md), scored at 80 unexplained
-alarms in [experiment 181](../00181-switching-block-detector-and-like-for-like-table/result.md): an
+alarms in [experiment 181](https://github.com/openclimatefix/nged-substation-forecast/pull/1485): an
 unexplained alarm is one not near a logged closure or labelled transfer, and the count is over
 odd-numbered months.
 
