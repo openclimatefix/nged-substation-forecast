@@ -4,7 +4,7 @@ slug: switching-neural-onset-end-block-detector
 theme: switching-detectors
 also_relevant_to:
   - switching-labels-in-the-forecast
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00189-switching-neural-onset-end-block-detector/
   only (trained weights, injected-event tables, alarm tables). Serving path: not touched. Degradation
@@ -51,38 +51,145 @@ metric: >-
   hours and 10% of the duration), the onset-only count, the median onset error in hours, and
   block days found out of 17.
 code: ml-experiments/00189-switching-neural-onset-end-block-detector/
+verdict: refuted
+best_arm: >-
+  The network trained for 40 epochs (post hoc) finds 8 of the 35 real transfers over 1 day at 80
+  unexplained odd-month alarms; the pre-registered 14-epoch network finds 7 (RO-NC: 18).
+headline: >-
+  The network finds 7 of 35 real transfers (prediction: at least 15; RO-NC 18; pair alarm 5) when it
+  must place both the start and the end. It places the start alone for 12 (17 after longer training),
+  and the median start error among found transfers is 0.5 hours.
+lessons: >-
+  Locating the start is learnable from injected transfers, and locating the end is the weak part.
+  On injected transfers the network finds only 21% to 34%, so its weakness is not a mismatch between
+  injected and real events. The injector looks realistic by the classifier (area under the curve
+  0.59) but is harder than the real events for a rule-based detector (54% against 67%).
+take_home_message: >-
+  A small neural network trained only on injected transfers finds 7 of the 35 real transfers lasting
+  over 1 day, against 18 for the existing rule-based detector, when both the start and the end must
+  be right. It locates the start of 12 transfers (17 after longer training) to within 2 hours, so
+  the learned start alarm is competitive and the end alarm is what fails. The next step is a
+  learned start alarm paired with the rule-based end rule, or a longer input window that holds the
+  end of multi-day transfers.
+advice:
+  - >-
+    Do not pair a learned onset alarm with a learned end alarm from a 7-day window for multi-day
+    transfers: the end falls outside the window for most of them (figure 2).
+  - >-
+    Test a learned onset alarm with RO-NC's end rule before building another learned end detector
+    (figure 2, onset-only rows).
+  - >-
+    Fit the injector's durations to the labelled transfers, not the logged closures, which have a
+    median of 3.5 hours against 26 hours for the transfers (figure 3).
+production_status: not-for-production
+adopted_in: none
+date: 2026-10-22
 ---
 
 # Experiment 189: can a small neural network, trained on realistic injected transfers, find real switching?
 
-Planned. The write-up replaces this page when the experiment finishes.
+**A small neural network trained only on injected transfers finds 7 of the 35 real transfers over 1
+day, against 18 for the existing detector, when it must get both the start and the end right.** A
+transfer is a labelled period in which switching moved load from one Primary substation to
+neighbouring ones. We built an injector that adds synthetic transfers to the real residuals (observed
+minus forecast power from the convex demand model of [experiment
+130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md)), fitted its depth, duration, start
+time, shape, and receivers to the real events, and checked that the injected events look real. We
+then trained a network with under 34,000 weights on 7-day windows of a Primary's residual and its
+neighbours', and scored it on the real transfers of Primary pairs it had never seen, at the same 80
+unexplained odd-month alarms as RO-NC (the refit-offset neighbour-count detector of [experiment
+82](../00082-sw2-18-19-combined-refit-offset-and-same-sign-count/result.md)) in [experiment
+181](../00181-switching-block-detector-and-like-for-like-table/result.md). The verdict is
+`refuted`: 7 found against a prediction of at least 15. **The start of a transfer is learnable, and
+the end is not.** The network places the start within 2 hours for 12 of the 35 transfers (17 after
+longer training, against 20 for RO-NC), with a median start error of 0.5 hours.
 
-## Plan
+![Transfers found against the alarm budget](figure_1_found_against_alarms.svg)
 
-- **Inputs.** For each Primary, a window of 336 half-hours (7 days) of its convex-model residual
-  (arm B of experiment 130, ERA5 weather, frozen: a lab shortcut) divided by the series' noise unit,
-  the same for up to 4 connected neighbours (zero-padded, with a present-or-not channel for each),
-  the sine and cosine of the hour of day, and a bank-holiday flag.
-- **Network.** A stack of dilated one-dimensional convolutions, under 50,000 weights, with a
-  window-level alarm output and a per-half-hour onset map and end map. The onset and end offsets are
-  the maps' peaks.
-- **Training data.** Windows from even-numbered months only: half are real stretches with no logged
-  or labelled event (a fifth of them near bank holidays, a fifth on D8, a fifth on D9), half carry
-  an injected transfer. The network never trains on a real event.
-- **Injector.** Distributions are fitted to the real events outside the held-out fold: depth in MW and
-  in noise units, duration, onset hour and weekday, shape (constant, donor-demand-shaped,
-  PV-shaped, ramp), the receivers' opposite share, and the number of neighbours sharing it. Durations
-  also draw on D8's 29 drops and the block days (6 hours to 19 days).
-- **Folds.** The 66 labelled transfers are grouped by Primary pair into three folds. A model is
-  trained for each fold on an injector fitted without the fold's pairs, and scores the fold's real
-  transfers.
-- **Scoring.** The alarm threshold is set so that unexplained odd-month alarms number 80, as for
-  RO-NC in experiment 181. Real transfers are matched by experiment 130's rule.
-- **Realism checks (before the real events are scored).** A classifier on the features of injected
-  and real events, and the recall of a rule-based stand-in (a 24-hour step above RO-NC's threshold)
-  on injected and real events.
-- **Labelled lab shortcuts.** ERA5-based residual; hindsight inside the 7-day window; the injector
-  adds MW to the residual, not to the power.
+![Real transfers found, by detector and matching rule](figure_2_real_transfers_found.svg)
 
-Advice followed: the unlabelled block days are scored as in experiment 181 (the nearest local day),
-and the opposite share follows experiment 41's `conserved` and `one_sided` labels.
+![Realism of the injector](figure_3_injector_realism.svg)
+
+## Results
+
+- **Architecture.** Dilated one-dimensional convolutions, 33,604 weights. Inputs: 336 half-hours of
+  the Primary's residual and the four most-read neighbours' (each divided by its noise unit, with a
+  present-or-not channel), the hour of day, and a bank-holiday flag. Outputs: a start alarm, an end
+  alarm, and a per-half-hour map for each. An onset alarm takes the earliest end alarm after it as
+  its end.
+- **Training data.** Even-numbered months only: 80,000 windows per fold (40% with an injected
+  transfer, the rest real stretches with no logged or labelled event, a fifth near bank holidays, a
+  fifth on D8, a fifth on D9). The network never sees a real event.
+- **Folds.** The 66 labelled transfers fall in 23 Primary pairs, grouped into 3 folds. Each fold's
+  network and injector are fitted without that fold's pairs (including D8 drops that overlap them).
+- **Real transfers over 1 day (35), 80 unexplained odd-month alarms, experiment 130's rule (start
+  within 2 hours, end within the larger of 6 hours and 10%):**
+
+| Detector | Start and end found | Start only found |
+|---|---|---|
+| Pair alarm (experiment 156, quoted) | 5 | not run |
+| RO-NC on the convex residual | 18 | 20 |
+| Network, 14 epochs (pre-registered, seed 0) | 7 | 12 |
+| Network, 40 epochs (post hoc, seed 1) | 8 | 17 |
+
+- **All 66 labelled transfers:** the 14-epoch network finds 12 (start only 23) and the 40-epoch
+  network 19 (start only 31), against 18 for RO-NC. The 31 transfers of 24 hours or less are
+  mostly found by start alone.
+- **Found against alarms (35 transfers).** Pre-registered network at 20, 40, 80, 160, and 320
+  alarms: 1, 5, 7, 9, 15. Post hoc network: 2, 4, 8, 12, 14.
+- **Median start error of found transfers:** 0.5 hours (both networks).
+- **Injected transfers (odd months, same thresholds), start and end found:** 21% to 34% for the
+  14-epoch network (21% on Primary pairs it never saw, 34% on the pairs the injector was fitted on),
+  21% to 23% for the 40-epoch network. The network is as weak on injected as on real transfers, so
+  the failure is not that the injector is easier or harder than the real events.
+- **Realism check 1.** A logistic regression on ten features measured from the residual (log depth
+  in noise units and MW, log duration, start hour, weekend, day-night difference, opposite
+  neighbours, balance, series count) separates real from injected events with area under the curve
+  0.59 (95% 0.52 to 0.66; 63 real events against 336 injected). The point estimate meets the
+  pre-registered limit of 0.65, the upper end of the interval does not.
+- **Realism check 2.** A stand-in for RO-NC (a 24-hour step above its threshold) has onset recall
+  67% on real transfers over 1 day and 54% on injected ones, a gap of 12 points against the
+  pre-registered tolerance of 10; for all durations the gap is 9 points (38% against 29%). The
+  injected events are slightly harder than the real ones. The check therefore marginally fails for
+  transfers over 1 day. RO-NC's 91% on earlier injected worlds against 51% on real events was the
+  gap to close; it is now a 12-point gap in the other direction.
+- **17 unlabelled block days of experiment 175.** Each fold's network finds 0 to 1 of the 17 at 80
+  alarms (1 in total for the 14-epoch run, 3 for the 40-epoch run, the same days counted by three
+  networks). The block detector of experiment 181 found 0.
+
+## Checks
+
+- **Median minus mean forecast, mean-forecast error, tail calibration, curtailment cost:** not
+  applicable, because no forecast is scored.
+- **Triggers.** Trigger 2 fired (the result contradicts its prediction of at least 15). The
+  explanation tested here is that the injector might be too easy: it is not, because the network
+  also fails on injected transfers. No Opus audit was run (the Sonnet leakage review is below).
+  Triggers 1, 3, 4, 5, 6, and 7 did not fire; leaving a series out was not run.
+
+## Review and deviations
+
+- **A Sonnet code review found a leak, fixed before scoring:** D8 drops overlapping two labelled
+  transfers entered every fold's injector fit. Drops that overlap a held-out transfer are now
+  excluded. A second fix: an all-missing donor window produced NaN inputs.
+- **Reviewer findings not acted on.** The threshold ignores alarms inside labelled spans and gives
+  the end alarm its own 80-alarm budget, so the combined budget is looser than RO-NC's; this favours
+  the network, which still fails. Early stopping used even-month windows after the review. The
+  classifier features cannot see edge sharpness or noise; a convolutional discriminator on raw
+  windows would be a stronger test. The stand-in's threshold was tuned on the same real events.
+  Logged closures at a held-out Primary with a different side tuple are not excluded from the
+  duration fit.
+- **Post hoc.** The 40-epoch run (seed 1) was added after the 14-epoch run failed; its validation
+  loss was not lower, so it is a second draw and not an improvement. Only seed 0 is pre-registered.
+- **Lab shortcuts.** ERA5-based residual (about 5 days late), hindsight for the end alarm, and
+  injection on the residual rather than the power.
+- **Not done.** The brief's optional learned alarm reliability classifier (item 2).
+- **Manager reports.** The experiment manager's session was inactive, so no interim message was sent.
+
+## What to try next
+
+Pair the learned start alarm with RO-NC's end rule: the start alone finds 12 to 17 transfers and
+the end is the failing part. Alternatively, give the network a window long enough to hold the end of
+a multi-day transfer, and fit the injector's durations to the labelled transfers only.
+
+Code: `ml-experiments/00189-switching-neural-onset-end-block-detector/`; numbers are printed to
+`printed_realism.txt`, `printed_score_seed0.json`, and `printed_score_seed1.json` in that folder.
