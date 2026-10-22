@@ -30,7 +30,7 @@ MATCH: Final[int] = 48
 
 
 def first_origin(*, known: int) -> int:
-    """The newest usable stamp of the first 6-hourly origin that can see an alarm known at `known`."""
+    """The newest usable stamp of the first 6-hourly origin that sees an alarm known at `known`."""
     return known + (ORIGIN_PHASE - known) % HALF
 
 

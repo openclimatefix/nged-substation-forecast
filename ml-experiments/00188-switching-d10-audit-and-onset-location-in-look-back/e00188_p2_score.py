@@ -6,7 +6,8 @@ first stamp of an interval that is masked:
 
 - `MASK_ALARM`: the stamp the alarm is known (readings before it, back to the step, stay in).
 - `MASK_STEP`: the detector's own step stamp (experiment 171's arm).
-- `MASK_LOCATED`: the onset located in the look-back at the first 6-hourly origin that sees the alarm.
+- `MASK_LOCATED`: the onset located in the look-back at the first 6-hourly origin that sees
+  the alarm.
 - `MASK_TRUE`: the true onset (injected onset, or logged onset) for alarms that find a transfer.
 
 `K0` is no mask, and `CLEAN` (injected worlds only) is the stream without the injected megawatts.
@@ -34,12 +35,15 @@ import e00188_nra as nra
 import numpy as np
 import polars as pl
 from e00188_common import WORK_DIR
+from e00188_g_site import SiteData
 
 N_WORKERS: Final[int] = 4
 P2: Final[Path] = WORK_DIR / "p2"
 OUT: Final[Path] = WORK_DIR / "p2_scores"
 WORLDS: Final[Path] = WORK_DIR.parent / "00141-switching-detector-fed-into-gam-k" / "worlds"
-DETECT: Final[Path] = WORK_DIR.parent / "00156-switching-faster-onset-alarm-from-opposite-steps" / "detect"
+DETECT: Final[Path] = (
+    WORK_DIR.parent / "00156-switching-faster-onset-alarm-from-opposite-steps" / "detect"
+)
 RUN_WINDOW: Final[int] = 48
 """Half-hours (24 hours) after the first usable origin within which a run's newest stamp may lie."""
 ARMS: Final[tuple[str, ...]] = ("MASK_ALARM", "MASK_STEP", "MASK_LOCATED", "MASK_TRUE")
@@ -67,7 +71,7 @@ def interval_tables(*, tag: str) -> dict[str, pl.DataFrame]:
 
 
 def family_spans(
-    *, data, site: str, table: pl.DataFrame, alarms: pl.DataFrame, true_onsets: dict
+    *, data: SiteData, site: str, table: pl.DataFrame, alarms: pl.DataFrame, true_onsets: dict
 ) -> dict[str, list[nra.Span]]:
     """One span list per arm for a family at a site: the arms differ in the span's onset."""
     offset = fed.stamp_offset(data)
@@ -77,7 +81,9 @@ def family_spans(
     out: dict[str, list[nra.Span]] = {a: [] for a in ARMS}
     for r in rows.iter_rows(named=True):
         a_series = r[key] if key else series
-        found = alarms.filter((pl.col("alarm_series") == a_series) & (pl.col("onset") == r["onset"]))
+        found = alarms.filter(
+            (pl.col("alarm_series") == a_series) & (pl.col("onset") == r["onset"])
+        )
         if found.is_empty():
             continue
         a = found.row(0, named=True)
@@ -97,16 +103,20 @@ def family_spans(
     return out
 
 
-def job(args: tuple[str, str]) -> str:
+def job(args: tuple[str, str]) -> str:  # noqa: PLR0912, PLR0915
     """Score every arm at one site in one world, or in the real stream."""
     site, tag = args
     path = OUT / f"{site}_{tag}.parquet"
     if path.exists():
         return str(path)
-    events_all = pl.read_parquet(P2 / f"events_{tag}.parquet") if (P2 / f"events_{tag}.parquet").stat().st_size else None
+    events_all = (
+        pl.read_parquet(P2 / f"events_{tag}.parquet")
+        if (P2 / f"events_{tag}.parquet").stat().st_size
+        else None
+    )
     if events_all is None or events_all.is_empty() or "site" not in events_all.columns:
         return ""
-    events = events_all.filter(pl.col("site") == site)
+    events = events_all.filter(pl.col("site") == site).with_columns(pl.col("event").cast(pl.String))
     if events.is_empty():
         return ""
     real = tag == "real"
@@ -125,7 +135,9 @@ def job(args: tuple[str, str]) -> str:
         stream = np.where(
             np.isfinite(data.stream),
             data.stream
-            + fed.to_positions(array=100.0 * np.nan_to_num(delta) / fed.CAPACITY_MW[site], data=data),
+            + fed.to_positions(
+                array=100.0 * np.nan_to_num(delta) / fed.CAPACITY_MW[site], data=data
+            ),
             np.nan,
         )
     ok = np.isfinite(data.actual)
@@ -140,8 +152,12 @@ def job(args: tuple[str, str]) -> str:
         if evs.is_empty():
             continue
         alarms = all_alarms.filter(pl.col("family") == family)
-        true_onsets = {(r["alarm_series"], r["onset"]): r["true_onset"] for r in evs.iter_rows(named=True)}
-        spans = family_spans(data=data, site=site, table=table, alarms=alarms, true_onsets=true_onsets)
+        true_onsets = {
+            (r["alarm_series"], r["onset"]): r["true_onset"] for r in evs.iter_rows(named=True)
+        }
+        spans = family_spans(
+            data=data, site=site, table=table, alarms=alarms, true_onsets=true_onsets
+        )
         pairs = []
         for r in evs.iter_rows(named=True):
             c1 = r["first_origin"] + offset
@@ -188,7 +204,10 @@ def main() -> None:
     parser.add_argument("--only", default="")
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
-    tags = ["real"] + sorted(p.stem.removeprefix("events_") for p in P2.glob("events_world_*.parquet"))
+    tags = [
+        "real",
+        *sorted(p.stem.removeprefix("events_") for p in P2.glob("events_world_*.parquet")),
+    ]
     jobs = [(s, t) for t in tags for s in fed.SERIES_OF_SITE]
     if args.only:
         jobs = [j for j in jobs if args.only in j[1]]

@@ -13,11 +13,11 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00188-switching-d10-audit-and-onset-location-in-look-back"
-"""Private tables; never committed."""
-E171_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00171-switching-gated-mask-no-harm-pooled-months"
+WORK_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00188-switching-d10-audit-and-onset-location-in-look-back"
 )
+"""Private tables; never committed."""
+E171_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00171-switching-gated-mask-no-harm-pooled-months"
 """Experiment 171's stored per-row scores, flags and masked spans, read here and never written."""
 E156_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "00156-switching-faster-onset-alarm-from-opposite-steps"

@@ -40,9 +40,7 @@ def window() -> int:
     return int(json.loads((DETECT / "headline.json").read_text())["window"])
 
 
-def match_rows(
-    *, intervals: pl.DataFrame, series: int, lo: int, hi: int
-) -> pl.DataFrame:
+def match_rows(*, intervals: pl.DataFrame, series: int, lo: int, hi: int) -> pl.DataFrame:
     """Interval rows on `series` whose step stamp lies in [lo, hi], earliest known first."""
     return intervals.filter(
         (pl.col("series") == series) & (pl.col("onset") >= lo) & (pl.col("onset") <= hi)
@@ -70,7 +68,7 @@ def event_rows(
                 if hits.is_empty():
                     continue
                 h = hits.row(0, named=True)
-                key = h["alarm_series"] if "alarm_series" in h else series
+                key = h.get("alarm_series", series)
                 found = alarms[family].filter(
                     (pl.col("alarm_series") == key) & (pl.col("onset") == h["onset"])
                 )
@@ -118,7 +116,9 @@ def world_job(args: tuple[int, list]) -> str:
         {"event": e.event_id, "onset": e.onset, "end": e.end, "series": list(e.series)}
         for e in batch
     ]
-    events = event_rows(transfers=transfers, tables=tables, alarms=alarms, tag=f"world_{seed}", real=False)
+    events = event_rows(
+        transfers=transfers, tables=tables, alarms=alarms, tag=f"world_{seed}", real=False
+    )
     OUT.mkdir(parents=True, exist_ok=True)
     pl.concat(list(alarms.values())).write_parquet(OUT / f"alarms_world_{seed}.parquet")
     events.write_parquet(path)

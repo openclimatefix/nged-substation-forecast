@@ -89,8 +89,12 @@ def audit_table() -> pl.DataFrame:
         series = int(r["alarm_series"])
         partners = partner_list(r["partners"])
         on_logged = (
-            logged.filter(pl.col("series").list.set_intersection([series, *partners]).list.len() > 0)
-            .filter((pl.col("onset") - ev.MATCH_BEFORE <= r["onset"]) & (r["onset"] < pl.col("end")))
+            logged.filter(
+                pl.col("series").list.set_intersection([series, *partners]).list.len() > 0
+            )
+            .filter(
+                (pl.col("onset") - ev.MATCH_BEFORE <= r["onset"]) & (r["onset"] < pl.col("end"))
+            )
             .height
             > 0
         )
@@ -127,8 +131,9 @@ def site_flags(*, table: pl.DataFrame) -> pl.DataFrame:
     Each gated alarm covers the intervals on its alarm series and on its partners (the interval
     table has a copy of the alarm on each), so a site is hit when its series is in either role.
     """
-    gated = ev.alarm_tables()["GATED"].filter(pl.col("onset") >= int(
-        (FIRST_RUN - GRID_START).total_seconds() // 1800))
+    gated = ev.alarm_tables()["GATED"].filter(
+        pl.col("onset") >= int((FIRST_RUN - GRID_START).total_seconds() // 1800)
+    )
     keyed = gated.join(
         table.select("alarm_series", "onset", "logged", "confirmed"),
         on=["alarm_series", "onset"],
@@ -181,7 +186,7 @@ def show(*, name: str, frame: pl.DataFrame) -> tuple[float, float, float]:
     """Print and store MASK_GATED minus K0 on `frame`."""
     if frame.is_empty():
         print(f"{name}: no rows")
-        return (float("nan"),) * 3
+        return (float("nan"), float("nan"), float("nan"))
     t = boot(
         values=(frame["MASK_GATED"] - frame["K0"]).to_numpy(), groups=frame["month"].to_numpy()
     )
@@ -199,7 +204,7 @@ def main() -> None:
     unlogged = table.filter(~pl.col("logged"))
     print("not matched to a logged transfer:", unlogged.height)
     print("of those, confirmed:", int(unlogged["confirmed"].sum()))
-    placebo_share = unlogged["placebo_confirmed"].sum() / unlogged["placebo_n"].sum()
+    placebo_share = int(unlogged["placebo_confirmed"].sum()) / int(unlogged["placebo_n"].sum())
     print(f"placebo share confirmed (shifted by whole weeks): {placebo_share:.3f}")
     REPORT["counts"] = {
         "gated": table.height,
@@ -212,13 +217,16 @@ def main() -> None:
     wide_parts = []
     for site in SITES:
         rows = pl.read_parquet(E171_DIR / f"rows_{site}.parquet")
-        wide = rows.pivot(
-            on="arm", index=["site", "row", "valid_time"], values="qs"
-        ).select("site", "row", "valid_time", "K0", "MASK_GATED")
+        wide = rows.pivot(on="arm", index=["site", "row", "valid_time"], values="qs").select(
+            "site", "row", "valid_time", "K0", "MASK_GATED"
+        )
         wide_parts.append(wide)
     wide = pl.concat(wide_parts).join(flags, on=["site", "row"])
     in_logged = pl.concat(
-        [pl.read_parquet(E171_DIR / f"flags_{s}.parquet").select("site", "row", "in_logged") for s in SITES]
+        [
+            pl.read_parquet(E171_DIR / f"flags_{s}.parquet").select("site", "row", "in_logged")
+            for s in SITES
+        ]
     )
     active = pl.concat(
         [
@@ -262,8 +270,13 @@ def main() -> None:
     for site in SITES:
         sub = wide.filter(pl.col("site") == site)
         show(name=f"only {site}, all rows", frame=sub)
-        show(name=f"only {site}, confirmed events removed", frame=sub.filter(~pl.col("in_confirmed")))
-    show(name="gated alarm active, confirmed removed", frame=after.filter(pl.col("active_MASK_GATED")))
+        show(
+            name=f"only {site}, confirmed events removed", frame=sub.filter(~pl.col("in_confirmed"))
+        )
+    show(
+        name="gated alarm active, confirmed removed",
+        frame=after.filter(pl.col("active_MASK_GATED")),
+    )
     print("\n== per site: gated alarm intervals (unlogged) confirmed / total ==")
     # Alarm intervals per site count both ends of a transfer (alarm and partner copies).
     gated = ev.alarm_tables()["GATED"].join(
@@ -274,7 +287,8 @@ def main() -> None:
     for site in SITES:
         mine = gated.filter(pl.col("series") == fed.SERIES_OF_SITE[site])
         un = mine.filter(~pl.col("logged"))
-        line = f"{site}: gated {mine.height}, unlogged {un.height}, confirmed {int(un['confirmed'].sum())}"
+        done = int(un["confirmed"].sum())
+        line = f"{site}: gated {mine.height}, unlogged {un.height}, confirmed {done}"
         print(line)
         REPORT[f"alarms|{site}"] = [mine.height, un.height, int(un["confirmed"].sum())]
     (WORK_DIR / "report_audit.json").write_text(json.dumps(REPORT, indent=1, default=str))
