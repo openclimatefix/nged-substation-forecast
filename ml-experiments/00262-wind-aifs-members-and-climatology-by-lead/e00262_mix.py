@@ -36,7 +36,7 @@ for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
 import e00262_common as common  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 MEMBER_DIR: Final = common.WORK_DIR / "members"
