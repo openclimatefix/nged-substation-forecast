@@ -28,7 +28,7 @@ import e00289_ens as ens
 import e00289_run as run
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens_weather import Calibration, EnsSiteRun
 
