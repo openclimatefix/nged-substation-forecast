@@ -7,7 +7,7 @@ title: >-
 theme: generator-forecasting
 also_relevant_to:
   - calibration-and-uncertainty
-status: planned
+status: finished
 date: 2026-10-23
 size: >-
   medium. Stored: private tables under data/ml-experiments/00261-wind-low-bias-decomposition/ only.
@@ -45,14 +45,156 @@ metric: >-
   Share of rows where observed power is below the forecast's median (calibrated: 50%), by stage,
   farm, and lead day; ensemble-mean minus ERA5 100 m wind speed in m/s; median shift in points of
   capacity
+verdict: partly supported
+best_arm: >-
+  Not an arm contrast. The ensemble's weather input carries 89% of the median shift (95% interval
+  86% to 91%); the oracle share below the median is 52.8% against 34.1% for the final chain
+headline: >-
+  The physics core fed ERA5 wind has 52.8% of kept rows below its median (50.3% to 55.0%). Swapping
+  in the ensemble-mean wind lowers the median by 10.2 of the 11.5 points of the total shift, and
+  mixing the 51 members lowers it by 1.3 more.
 production_status: not-for-production
 adopted_in: none
+lessons: >-
+  The low bias comes from the ensemble's 10 m and 100 m wind speeds, which are slower than ERA5's,
+  and neither the core, the farms, the member mixing, nor the training source explains most of it.
+take_home_message: >-
+  The wind forecast's low median comes mostly from the ensemble's weather: its 10 m and 100 m wind
+  speeds are slower than ERA5's, and the same physics core fed ERA5 wind is calibrated (52.8% of
+  rows below the median). Mixing the 51 members adds about a tenth of the shift, and training the
+  models on nine months of ensemble forecasts removes only about a fifth of the gap. The fix to test
+  next is a correction of the ensemble's wind speeds before the model reads them.
+advice:
+  - >-
+    Correct the ensemble's 10 m and 100 m wind speeds before the wind model reads them, and compare
+    with the offset table of experiment 259, because the ensemble's weather carries 89% of the
+    median shift (stage swap, step 1 and 2).
+  - >-
+    Feed a physics core trained on ERA5 with both the 10 m and the 100 m ensemble speeds or neither,
+    since each swapped alone lowers the median by about 7 points, through the core's shear exponent
+    (input swap).
+  - >-
+    Do not expect training on nine months of ensemble forecasts to remove the low bias: it lifted
+    the share below the median by 3 to 5 points of the 16-point gap (training source).
+  - >-
+    Quote the share below the median on all rows beside the kept rows, since the idle-row mask moves
+    the ensemble stages' share by 4 to 6 points and the oracle's by under 1 (stage table).
 code: ml-experiments/00261-wind-low-bias-decomposition/
 ---
 
-**Planned, not yet run.** Experiment 259 found that observed power was below the physics core's
-median on 34% of kept rows instead of 50%, from the first month after the base fits end. This
-experiment swaps the weather input one stage at a time, holding experiment 259's fitted core
-fixed: ERA5 wind at the valid time, the ensemble-mean wind, then the 51-member mixture. The change in the
-share of rows below the median, and in the median itself, at each swap says where the 16-point
-shortfall enters.
+**Take-home: the wind forecast's low median enters at the ensemble's weather, not at the physics core,
+the farms, or the mixing of the 51 members.** We asked where the low bias that experiment 259 found
+comes from: observed power was below the forecast's median on 34% of rows instead of 50%. We kept
+the physics core of [experiment 259](../00259-wind-plant-plus-quantile-offset-head/result.md) (R1,
+fitted to ERA5, our estimate of past weather, before 2024-04-01) fixed and swapped its weather input
+stage by stage: ERA5 wind at the valid time, the ensemble's mean wind, then the 51 members mixed
+together. With ERA5 wind, 52.8% of kept rows (95% interval 50.3% to 55.0%) were below the median, so
+the core is calibrated when the wind is right. With the ensemble's wind, the share fell to 36.6%
+and then 34.1%. Of the 11.5-point fall in the median (in points of capacity, 1 point being 1% of a
+farm's capacity), the weather swap explains 10.2 points (89%, interval 86% to 91%) and the member
+mixing 1.3 points (11%). The 10 m and the 100 m wind speeds each explain about 7 points on their
+own, and the temperature none. The verdict is `partly supported`: the prediction held for the
+oracle share and for the mixing, but the conversion from wind-speed bias to power that we planned
+explains 48% of the shift, not 70%. Training on ensemble forecasts is not a cure: it lifts the
+share by 3 to 5 points of the 16-point gap.
+
+![Share below the median at each stage, by farm](figure_1.svg)
+
+![Share below the median at each stage, by lead day](figure_2.svg)
+
+![Ensemble minus ERA5 wind speed by ERA5 speed bin](figure_3.svg)
+
+![Mean median forecast when each input is swapped](figure_4.svg)
+
+![ERA5-trained against ensemble-trained models](figure_5.svg)
+
+## Design and results
+
+- **Stages.** The core is experiment 259's R1 (shear exponent to a fitted hub height, air-density
+  factor, blurred power curve, idle layer except at W2, 14 bins of residual quantiles), refitted
+  here with experiment 259's code. Its stored mixture median matches the recomputed one to 0.0003
+  of capacity at every farm, so the refit reproduces experiment 259's forecasts. The spread factor
+  scales quantiles about the median, so it cannot move the median.
+- **Rows.** The 53 Tuesday runs of 2025-07 to 2026-06 at W1 to W3: 96,479 kept rows and 107,121
+  rows in all. The 442 daily hindcast runs (2024-04 to 2025-06, 794,076 kept rows) are descriptive.
+  Intervals resample the 12 months of the scored year 2,000 times; the farms are not resampled.
+- **Share below the median, scored year, kept rows (all rows).** Oracle 52.8% (52.1%); ensemble-mean
+  wind 36.6% (41.2%); 51-member mixture, R1, 34.1% (38.8%); XGBoost mixture, R0, 35.1% (39.8%).
+  Intervals on the kept rows: 50.3% to 55.0%, 33.9% to 39.7%, 31.5% to 37.0%, and 32.6% to 38.0%.
+- **By farm, kept rows (oracle, ensemble-mean wind, mixture).** W1 50.3%, 36.2%, 32.9%; W2 50.9%,
+  29.8%, 28.0%; W3 57.5%, 44.3%, 41.8%. W3's oracle share sits above 50%, and W2's mixture share
+  is the lowest.
+- **By lead band, kept rows (oracle, mixture).** Days 0 to 2: 52.5%, 37.5%. Days 3 to 6: 52.3%,
+  33.7%. Day 7 onward: 53.1%, 33.0%. The shift in the median grows from 4.9 points (days 0 to 2)
+  to 9.4 and 14.8 points.
+- **Median shift, kept rows, in points of capacity.** Total (oracle minus final) 11.5 (9.7 to
+  13.3); weather swap 10.2 (8.5 to 11.8); member mixing 1.3 (0.9 to 1.6). By farm the weather
+  share is 86% (W1), 93% (W2), and 85% (W3). By band it is 85%, 88%, and 89%.
+- **Wind-speed bias, scored year.** The ensemble-mean 100 m wind is 1.00 m/s slower than ERA5 on
+  average (0.70 m/s in the hindcast), 0.37 m/s slower at days 0 to 2 and 1.29 m/s at day 7 onward.
+  By ERA5 100 m speed bin: +1.6 m/s at 3 to 5, +0.2 at 5 to 8, -1.5 at 8 to 12, -3.5 at 12 to 16,
+  and -6.5 at 16 to 20. The 10 m wind is 1.3 m/s slower at 8 to 12 m/s. The planned range (0.3 to
+  0.8 m/s slower at 5 to 12 m/s) was wrong in both size and sign at 5 to 8 m/s.
+- **Slope conversion.** The core curve's slope times the 100 m speed bias gives 5.5 of the 11.5
+  points (48%, interval 43% to 54%). The conversion leaves out the 10 m wind, which sets the
+  core's shear exponent, so the planned 70% was not met.
+- **Input swap, mean median forecast (points of capacity).** ERA5 inputs 29.2; ensemble temperature
+  only 29.3; ensemble 100 m wind only 22.1; ensemble 10 m wind only 22.2; both ensemble winds 18.9;
+  all three 19.0.
+- **Mixing.** The core on the ensemble-mean wind gives a mean forecast of 19.0 points. The mean of
+  the 51 members' forecasts is 22.4 points and their median 18.0 (convexity of the power curve
+  lifts the mean, as the plan expected). The mixture's median is 1.3 points below the core's output
+  on the mean wind.
+- **Training source (ensemble-mean inputs, kept rows).** On the held-out hindcast months (2025-01
+  to 2025-06) the ERA5-trained core has 38.0% of rows below the median and the ensemble-trained
+  core 42.0%; XGBoost gives 37.8% and 42.8%. On the scored year they give 36.6% against 39.8%, and
+  36.7% against 40.5%. In sample (the 9 months of ensemble forecasts that trained them), the
+  ensemble-trained core has 43.7% of kept rows and 50.0% of all rows below the median.
+- **Farm check on ERA5.** The ERA5-fed core has 49.9%, 49.5%, and 47.5% of kept rows below the
+  median in sample at W1, W2, and W3, and 51.2%, 47.3%, and 50.3% from 2024-04 to 2025-06. Over
+  the hindcast the oracle share is 49.5% on kept rows, but it is 52.7% in April to December 2024
+  and 44.0% in January to June 2025, so a period's share moves by several points with no
+  change in the models.
+
+## Checks
+
+- **Median minus mean forecast, per farm (points of capacity, 51-member mixture, kept rows).** The
+  median of the members' forecasts minus their mean is -4.7 (W1), -4.5 (W2), and -3.8 (W3). The mean
+  forecast is also low: 22.4 points against an observed mean of 28.9, so the bias is not only a
+  skew between median and mean.
+- **Control.** The recomputed mixture median matches experiment 259's stored R1 median to within
+  0.0003 at every farm, for both the hindcast and the scored year.
+- **Leave one farm out.** The weather share of the median shift is 85% to 93% at every farm, so no
+  farm carries the conclusion.
+- **No quantile-score contrast and no new forecast.** The mean-forecast-error check of experiment
+  259 does not apply, and no tail-calibration table applies.
+- **Triggers.** None fired. The planned bias range and the slope conversion missed their predictions,
+  and the input swap explains why (the 10 m wind enters through the shear exponent), so the
+  explanation is tested and recorded here.
+
+## Caveats and departures from the plan
+
+- **ERA5 is the reference, not the truth.** The core was fitted to ERA5, so the fitted hub height
+  absorbs ERA5's own bias at each farm. The result says the ensemble's wind is slower than ERA5's,
+  and that the ERA5-fitted core is calibrated on ERA5 wind. It does not say which product matches
+  the wind at the turbines.
+- **Kept rows and all rows differ.** The share on kept rows is 4 to 6 points lower than on all rows
+  for the ensemble stages and within 1 point for the oracle, so the rows the idle-row mask removes
+  are mostly below the ensemble stages' median. The conclusion is the same on both.
+- **Steps run.** The stop rule asked for steps 3 to 6 because the slope conversion fell short of
+  70%, so all six steps ran. Step 4 was not run as a refit: the spread factor cannot move a median
+  (checked above), and R1 has no base margin yet has the same low share as R0, which has one. The
+  BM0 refit was not run for that reason.
+- **Training source uses ensemble-mean inputs.** The models in step 5 read one ensemble-mean value
+  per case, with four wind columns for XGBoost (no 10 m direction), so they isolate the training
+  source from the mixing and are not experiment 259's member-level models.
+- **Three farms.** Intervals describe these farms, and the 12 resampled months share one weather
+  year.
+
+## What the next experiment should answer
+
+- **Does correcting the ensemble's 10 m and 100 m wind speeds remove the shortfall?** Fit a
+  correction by ensemble-mean speed and lead from the hindcast, apply it to every member, and
+  compare the quantile score with the offset table of experiment 259 on the same rows.
+- **Is the speed bias a property of the ensemble or of the grid cell?** Compare the bias at other
+  grid cells and, where observations exist, with measured wind.
