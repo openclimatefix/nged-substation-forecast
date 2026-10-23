@@ -13,8 +13,9 @@ page](../../docs/studies/forecasts/matched-lead-extra-products.md).
 **Five pages draw on the scripts in this folder, so find a page's scripts in this table.** The
 folder holds the matched-lead study, its extra products, the ENS-horizons study, the blends with
 ENS, and the UKV-from-CEDA blends. Tests of these scripts are in
-`packages/studies/tests/nwp_forecast_comparison/`. A script imports only from this folder, from
-`studies.*` (`packages/studies/`), and from the other reviewed packages.
+`packages/studies/tests/nwp_forecast_comparison/`. A script imports from this folder, from other
+study and experiment folders, from `studies.*` (`packages/studies/`), and from the other reviewed
+packages.
 
 | Script | Published page |
 |---|---|

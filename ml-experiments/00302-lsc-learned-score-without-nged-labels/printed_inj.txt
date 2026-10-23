@@ -1,0 +1,25 @@
+fold 1 L3 injected done
+fold 1 L3_5 injected done
+fold 1 L3_2 injected done
+fold 2 L1 injected done
+fold 2 L2 injected done
+fold 2 L3 injected done
+fold 2 L3_5 injected done
+fold 2 L3_2 injected done
+shape: (10, 5)
+┌──────┬─────────────┬──────────┬──────────┬──────┐
+│ arm  ┆ kind        ┆ recall   ┆ onset    ┆ n    │
+│ ---  ┆ ---         ┆ ---      ┆ ---      ┆ ---  │
+│ str  ┆ str         ┆ f64      ┆ f64      ┆ u32  │
+╞══════╪═════════════╪══════════╪══════════╪══════╡
+│ L1   ┆ eval_fitted ┆ 0.223903 ┆ 0.287443 ┆ 661  │
+│ L2   ┆ eval_fitted ┆ 0.252648 ┆ 0.329803 ┆ 661  │
+│ L3   ┆ eval_fitted ┆ 0.234493 ┆ 0.302572 ┆ 661  │
+│ L3_2 ┆ eval_fitted ┆ 0.240545 ┆ 0.311649 ┆ 661  │
+│ L3_5 ┆ eval_fitted ┆ 0.267776 ┆ 0.358548 ┆ 661  │
+│ L1   ┆ eval_held   ┆ 0.24777  ┆ 0.320119 ┆ 1009 │
+│ L2   ┆ eval_held   ┆ 0.273538 ┆ 0.367691 ┆ 1009 │
+│ L3   ┆ eval_held   ┆ 0.269574 ┆ 0.358771 ┆ 1009 │
+│ L3_2 ┆ eval_held   ┆ 0.271556 ┆ 0.361744 ┆ 1009 │
+│ L3_5 ┆ eval_held   ┆ 0.289395 ┆ 0.397423 ┆ 1009 │
+└──────┴─────────────┴──────────┴──────────┴──────┘

@@ -1,0 +1,196 @@
+Running as unit: run-p273384-i88287608.scope; invocation ID: e3ba9cecf45040f5a4bb30a0619466cc
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/ml-experiments/00302-lsc-learned-score-without-nged-labels/e00302_ronc.py:164: RuntimeWarning: All-NaN slice encountered
+  floor = EXPECTED_FLOOR_SHARE * np.nanmedian(expected)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/ml-experiments/00302-lsc-learned-score-without-nged-labels/e00302_ronc.py:164: RuntimeWarning: All-NaN slice encountered
+  floor = EXPECTED_FLOOR_SHARE * np.nanmedian(expected)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/ml-experiments/00302-lsc-learned-score-without-nged-labels/e00302_ronc.py:164: RuntimeWarning: All-NaN slice encountered
+  floor = EXPECTED_FLOOR_SHARE * np.nanmedian(expected)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01NJScCFJTqcP1YbSHuC5Ehv/ml-experiments/00302-lsc-learned-score-without-nged-labels/e00302_ronc.py:164: RuntimeWarning: All-NaN slice encountered
+  floor = EXPECTED_FLOOR_SHARE * np.nanmedian(expected)
+built f0_train_0
+built f0_train_1
+built f0_train_2
+built f0_train_3
+built f0_train_4
+built f0_train_5
+built f0_train_6
+built f0_train_7
+built f0_train_8
+built f0_train_9
+built f0_train_10
+built f0_train_11
+built f0_train_12
+built f0_train_13
+built f0_train_14
+built f0_train_15
+built f0_train_16
+built f0_train_17
+built f0_train_18
+built f0_train_19
+built f0_train_20
+built f0_train_21
+built f0_train_22
+built f0_train_23
+built f0_train_24
+built f0_train_25
+built f0_train_26
+built f0_train_27
+built f0_train_28
+built f0_train_29
+built f0_train_30
+built f0_train_31
+built f0_train_32
+built f0_train_33
+built f0_train_34
+built f0_train_35
+built f0_train_36
+built f0_train_37
+built f0_train_38
+built f0_train_39
+built f0_valid_0
+built f0_valid_1
+built f0_valid_2
+built f0_valid_3
+built f0_valid_4
+built f0_valid_5
+built f0_valid_6
+built f0_valid_7
+built f0_eval_held_0
+built f0_eval_held_1
+built f0_eval_held_2
+built f0_eval_held_3
+built f0_eval_held_4
+built f0_eval_held_5
+built f0_eval_fitted_0
+built f0_eval_fitted_1
+built f0_eval_fitted_2
+built f1_train_0
+built f1_train_1
+built f1_train_2
+built f1_train_3
+built f1_train_4
+built f1_train_5
+built f1_train_6
+built f1_train_7
+built f1_train_8
+built f1_train_9
+built f1_train_10
+built f1_train_11
+built f1_train_12
+built f1_train_13
+built f1_train_14
+built f1_train_15
+built f1_train_16
+built f1_train_17
+built f1_train_18
+built f1_train_19
+built f1_train_20
+built f1_train_21
+built f1_train_22
+built f1_train_23
+built f1_train_24
+built f1_train_25
+built f1_train_26
+built f1_train_27
+built f1_train_28
+built f1_train_29
+built f1_train_30
+built f1_train_31
+built f1_train_32
+built f1_train_33
+built f1_train_34
+built f1_train_35
+built f1_train_36
+built f1_train_37
+built f1_train_38
+built f1_train_39
+built f1_valid_0
+built f1_valid_1
+built f1_valid_2
+built f1_valid_3
+built f1_valid_4
+built f1_valid_5
+built f1_valid_6
+built f1_valid_7
+built f1_eval_held_0
+built f1_eval_held_1
+built f1_eval_held_2
+built f1_eval_held_3
+built f1_eval_held_4
+built f1_eval_held_5
+built f1_eval_fitted_0
+built f1_eval_fitted_1
+built f1_eval_fitted_2
+built f2_train_0
+built f2_train_1
+built f2_train_2
+built f2_train_3
+built f2_train_4
+built f2_train_5
+built f2_train_6
+built f2_train_7
+built f2_train_8
+built f2_train_9
+built f2_train_10
+built f2_train_11
+built f2_train_12
+built f2_train_13
+built f2_train_14
+built f2_train_15
+built f2_train_16
+built f2_train_17
+built f2_train_18
+built f2_train_19
+built f2_train_20
+built f2_train_21
+built f2_train_22
+built f2_train_23
+built f2_train_24
+built f2_train_25
+built f2_train_26
+built f2_train_27
+built f2_train_28
+built f2_train_29
+built f2_train_30
+built f2_train_31
+built f2_train_32
+built f2_train_33
+built f2_train_34
+built f2_train_35
+built f2_train_36
+built f2_train_37
+built f2_train_38
+built f2_train_39
+built f2_valid_0
+built f2_valid_1
+built f2_valid_2
+built f2_valid_3
+built f2_valid_4
+built f2_valid_5
+built f2_valid_6
+built f2_valid_7
+built f2_eval_held_0
+built f2_eval_held_1
+built f2_eval_held_2
+built f2_eval_held_3
+built f2_eval_held_4
+built f2_eval_held_5
+built f2_eval_fitted_0
+built f2_eval_fitted_1
+built f2_eval_fitted_2

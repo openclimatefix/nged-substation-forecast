@@ -5,7 +5,8 @@ description: >-
   queue, allocate GPU and CPU slots, write each session's brief, start and archive sessions, merge
   experiment PRs, run Opus design and planning reviews, and report to the maintainer. Load when you
   are asked to be the "ML experiment manager", to coordinate more than one ml-experiment session, or
-  to run experiments overnight while the maintainer is away. Running a single experiment is the
+  to run experiments overnight while the maintainer is away, or to queue changes to a research
+  default. Running a single experiment is the
   `ml-experiment` skill.
 ---
 
@@ -98,6 +99,18 @@ merges. A hold from the maintainer, such as "start nothing new until PR N merges
 order. Ideas that the maintainer has not agreed to run go to the maintainer as a ranked list, and
 nothing is committed to the plan until the maintainer has seen the ranking. Exploratory questions
 run as a series, as the `ml-experiment` skill's "Exploratory series" section describes.
+
+**Queue changes to a research default one at a time per family.** `docs/ml-experiments/research-default.md`
+defines the families and the adoption rule, and `docs/ml-experiments/research-default-log.md` lists
+the versions. A `change` experiment names the research default version it starts from, for example
+"Primary demand research default 2". Before starting a second `change` experiment in a family, check
+whether the first one's adoption would make the second one stale, and say in the second brief that a
+rebase run follows if it does. Write the naming rule into every `change` brief: the plan, the
+`result.md`, and the PR body cite the version by its full name, and the front matter sets
+`kind: change`. Before merging a `change` PR, check the five adoption conditions, assign the version
+number, and confirm the PR adds the log row. Four cases need the maintainer's approval: a new data
+source, a cost above £30 or a recurring production cost, a change that would need a serving-path
+change to port, and a change whose code must enter `packages/studies`.
 
 ## Starting a session
 
