@@ -7,8 +7,9 @@ least one day before `fit_start`, and predicts the rows whose run (`init_time`) 
 was made. `own_history` trains on the scored farm only and `zero_history` on the other five farms
 only. Arms: `p2` (spread-binned plant), `gam` (depth-1 boosted trees on P2's quantiles as base
 margin), `xgb` (XGBoost, depth 6, no base margin), `mdn` (three-component Gaussian mixture), and the
-`_nolag` copy of each model without the lagged-power columns (own history only, to save compute). One job is one (band, setting, farm,
-refit); its files are written atomically and skipped when they exist.
+`_nolag` copy of each model without the lagged-power columns (own history only, to save compute).
+One job is one (band, setting, farm, refit); its files are written atomically and skipped when they
+exist.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00310-*/e00310_fit.py [band|setting|farm|YYYY-MM ...]
