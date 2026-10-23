@@ -36,7 +36,7 @@ score, the mean absolute error of the median, tail-weighted continuous ranked pr
 | Family | Rows and period | Lead range | First version of the research default | Retraining cadence |
 |---|---|---|---|---|
 | Primary demand (six Primaries) | `fold_a_daily_gap_v1`, scored year 2025-07-02 to 2026-06-30, replicate year 2024-25, rows outside hand-filtered events | 0.5 to 168 hours (7 days) | Primary demand research default 1: the GAM stack A+H+S of experiments [220](00220-dp-bg-stage4-assembly-with-drop-one/result.md) and [251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) | Monthly for the GAM stack; weekly for its XGBoost benchmark BG2 |
-| Metered solar farms A to F | Daylight half-hours, scored year 2025-09 to 2026-08, 6-month replicate | 12 to 36 hours | Metered solar farms research default 1: the best guess assembled by experiment 300, once it reports. Until then the family accepts no adoption | A single fit or monthly, as the family's first version states |
+| Metered solar farms A to F | Daylight half-hours, scored year 2025-09 to 2026-08, 6-month replicate | 12 to 36 hours | Metered solar farms research default 1: the blend assembled by experiment 300 | A single fit or monthly, as the family's first version states |
 | Wind farms W1 to W3 and the public wind farms of experiment 288 | `fold_a_tuesdays_v1`, 53 Tuesday runs | To be named with the first default | Wind farms research default 1: to be named when the first default is chosen. No adoption until then | To be named with the first default |
 | Bulk and grid supply points | `fold_a_daily_gap_v1` | To be named with the first default | Bulk and grid supply points research default 1: to be named when the first default is chosen. No adoption until then | Weekly |
 
