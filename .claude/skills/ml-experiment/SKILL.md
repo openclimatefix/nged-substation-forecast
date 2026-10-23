@@ -111,9 +111,9 @@ experiment's own branch, and do not open a pull request for it. Its front matter
 `take_home_message`, and `advice` (below). A finished experiment also has `production_status`
 (`candidate`, `adopted`, `superseded`, or `not-for-production`) and `adopted_in` (the model release
 number, or `none`). `kind` is `change` (the experiment asks whether a research default plus x
-beats the research default) or `other`, and it is required from id 320 up. `promoted_to` is always optional, needs
-`kind: change`, and names the version of the research default that the experiment created, such as
-"Primary demand research default 2". The field name keeps the word "promoted" although the rule
+beats the research default) or `other`, and it is required from id 320 up. `promoted_to` is always
+optional, needs `kind: change`, and names the version of the research default that the
+experiment created, such as "Primary demand research default 2". The field name keeps the word "promoted" although the rule
 avoids it. Every result has the same front matter, so a later session finds
 results with `grep` over `docs/ml-experiments/*/result.md`.
 
