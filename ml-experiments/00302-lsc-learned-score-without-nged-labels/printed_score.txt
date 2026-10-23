@@ -1,0 +1,31 @@
+fold 0 L0: flagged 111, merged alarms 111, found 8 of 12
+fold 0 L1: flagged 98, merged alarms 98, found 6 of 12
+fold 0 L2: flagged 111, merged alarms 111, found 3 of 12
+fold 0 L3: flagged 110, merged alarms 110, found 4 of 12
+fold 0 L3_5: flagged 311, merged alarms 311, found 6 of 12
+fold 0 L3_2: flagged 123, merged alarms 123, found 4 of 12
+fold 1 L0: flagged 101, merged alarms 101, found 9 of 12
+fold 1 L1: flagged 104, merged alarms 104, found 11 of 12
+fold 1 L2: flagged 101, merged alarms 101, found 8 of 12
+fold 1 L3: flagged 101, merged alarms 101, found 8 of 12
+fold 1 L3_5: flagged 311, merged alarms 311, found 10 of 12
+fold 1 L3_2: flagged 123, merged alarms 123, found 8 of 12
+fold 2 L0: flagged 103, merged alarms 103, found 4 of 11
+fold 2 L1: flagged 101, merged alarms 101, found 3 of 11
+fold 2 L2: flagged 103, merged alarms 103, found 2 of 11
+fold 2 L3: flagged 103, merged alarms 103, found 2 of 11
+fold 2 L3_5: flagged 311, merged alarms 311, found 2 of 11
+fold 2 L3_2: flagged 123, merged alarms 123, found 2 of 11
+shape: (6, 3)
+┌──────┬───────┬─────────────┐
+│ arm  ┆ found ┆ onset_found │
+│ ---  ┆ ---   ┆ ---         │
+│ str  ┆ u32   ┆ u32         │
+╞══════╪═══════╪═════════════╡
+│ L0   ┆ 21    ┆ 24          │
+│ L1   ┆ 20    ┆ 22          │
+│ L2   ┆ 13    ┆ 13          │
+│ L3   ┆ 14    ┆ 14          │
+│ L3_2 ┆ 14    ┆ 14          │
+│ L3_5 ┆ 18    ┆ 20          │
+└──────┴───────┴─────────────┘
