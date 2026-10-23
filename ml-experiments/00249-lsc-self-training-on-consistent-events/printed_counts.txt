@@ -1,0 +1,4 @@
+real candidates: 2980; block days: 17
+fold 0: 40 training worlds; usable candidates 31060 (1859 injected positives); RO-NC candidates only 19564 (1321 positives)
+fold 1: 40 training worlds; usable candidates 31236 (2181 injected positives); RO-NC candidates only 19626 (1562 positives)
+fold 2: 40 training worlds; usable candidates 31084 (1999 injected positives); RO-NC candidates only 19554 (1512 positives)
