@@ -135,7 +135,7 @@ adding a per-row shift to arm D's quantiles follows [experiment
 
 - **Verdict `partly supported`.** The pre-registered rule says the ensemble sunshine is implicated:
   the gain from realised sunshine is 71% of the quantile-score gap (P1 held) and 70% of the
-  mean-absolute-error gap (P2 held), both with intervals above zero. The negative control, weakens
+  mean-absolute-error gap (P2 held), both with intervals above zero. The negative control weakens
   that reading, so the verdict stops short of `supported`.
 - **Headline (April to June, daylight, 0 to 36 hours ahead, D5, D9, D10, and D16 averaged, 97.5%
   intervals over 14 ISO weeks).** BG2 scores 3.223 (2.954 to 3.523) and arm D with ensemble sunshine
