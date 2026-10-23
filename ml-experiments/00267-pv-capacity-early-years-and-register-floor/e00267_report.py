@@ -178,6 +178,15 @@ def main() -> None:
                 a2_clears_dc=pl.col("a2_high_mw") >= pl.col("fit_dc_mw"),
             )
         )
+        print("A2 against A0 in 2021: ratio of raw capacity points and of divisors")
+        print(
+            capacity.filter(pl.col("season_year") == 2021).select(
+                "site",
+                raw_ratio=pl.col("ref_raw_points") / pl.col("raw_points"),
+                divisor_ratio=pl.col("a2_divisor") / pl.col("a0_divisor"),
+                estimate_ratio=pl.col("a2_mw") / pl.col("a0_mw"),
+            )
+        )
         print("reference farm distance and divisors")
         print(capacity.unique("site").select("site", "reference_km", "a2_divisor", "a0_divisor"))
         print("A2 known-answer error (leave one injected farm out), median absolute")
