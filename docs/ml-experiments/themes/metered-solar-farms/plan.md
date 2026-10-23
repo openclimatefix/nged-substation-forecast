@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [282](../../00282-pv-plant-curve-audit/result.md) | Does the plant model's sunshine-to-power curve match the six farms' measured curve? | 1 | nothing | Planned |
 
 ## Planned experiments
 
