@@ -19,8 +19,8 @@ size: >-
   so the plan review and the code review are Sonnet reviews.
 hypothesis: >-
   A load shift detector that is far from perfect can still beat the best forecast that uses no
-  detector, so a detector need not be near-perfect to be worth building. The only detector-based
-  arm that beat that forecast in experiment 297 was the one that subtracts the true megawatts from
+  detector, so a detector need not be near-perfect to be worth building. The one detector-based arm
+  in experiment 297 that beat that forecast was the one that subtracts the true megawatts from
   the readings during a shift and adds them back to the forecast. This experiment degrades that
   arm one axis at a time to find where it stops beating the no-detector forecast. It also asks
   whether the surprise of recent readings against GAM_ONLY's residual bands (band position),
@@ -120,13 +120,15 @@ decision_rule: >-
   a detector design, and the small-against-large shift control tests extrapolation only. (A8) The
   real record is scored with the head fitted on the other month parity; its rows overlap the
   training rows (the real record is the background of every world), and the 7 logged transfers are
-  descriptive with coverage given per substation. (A9) Experiment 264's rows are at D8, outside the
+  descriptive with coverage given per substation. (A9) [Experiment
+  264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md)'s rows are at D8, outside the
   six Primaries, and experiment 209's heads are arm D's; unless the rows overlap, the page says no
   placement is possible and gives experiment 297's as-of widening arm as the nearest comparison.
   (A10) Each clause of P1 to P5 is scored separately; `partly supported` needs at least two of the
   five predictions to hold. (A11) The brief's stop condition was checked: PERFECT_ADD beats
   BAND_HEAD on cost in experiment 297, so the experiment runs.
-  Verdict: `supported` when P1 to P5 all hold, `partly supported` when at least two hold, `not supported`
+  Verdict: `supported` when P1 to P5 all hold, `partly supported` when at least two hold, `not
+  supported`
   when none holds.
 benchmark: >-
   Experiment 297's BAND_HEAD (and BAND_HEAD_HELDOUT for the held-out contrasts) and its
@@ -142,49 +144,62 @@ metric: >-
 code: ml-experiments/00312-lsc-how-good-must-a-detector-be-against-the-band-head/
 verdict: not supported
 verdict_note: >-
-  Only P1 of the five pre-registered predictions held, and the plan scored exactly one as not
-  supported. The added-back-megawatts arm is more tolerant than predicted on delay, megawatt error,
+  Only P1 of the five pre-registered predictions held. The plan's rule gave `partly supported` for
+  two or more holding and `not supported` for none holding, and said nothing about exactly one, so
+  exactly one is scored `not supported`. The added-back-megawatts arm is more tolerant than
+  predicted on delay, megawatt error,
   and false alarms, and band position and the perfect-knowledge inputs add far less to the quantile
   head than predicted.
 best_arm: >-
-  Perfect megawatts added back, degraded to recall 0.5: 3.5% (1.9 to 5.1) lower curtailment cost than
-  BAND_HEAD within 7 days of a shift.
+  Perfect megawatts added back with the megawatts 25% too low: 6.5% (4.8 to 8.4) lower curtailment
+  cost than BAND_HEAD within 7 days of a shift. Weakest arm that still wins on recall: 50% of shifts
+  found, 3.5% (1.9 to 5.1).
 headline: >-
   A detector does not have to be near-perfect to beat BAND_HEAD on curtailment cost. With the true
   megawatts added back, the arm still wins when it finds half the shifts, knows each shift 3 days
-  late, has megawatts wrong by 50%, or raises false alarms at 1 in 2. It loses at 25% found, and RO-NC
+  late, has megawatts wrong by 50%, or raises false alarms at 1 in 2 (near shifts; on ordinary rows
+  precision 0.5 raises the quantile score by 2.5%, 2.1 to 3.0). It loses at 25% found, and RO-NC
   found 33% (28 to 38) on these worlds.
 lessons: >-
-  The break-even recall (0.5) sits just above RO-NC's recall (0.33), so a detector that finds more
-  shifts than RO-NC, even with poor timing and size estimates, is the target. Band position is a
-  weaker detector than RO-NC at every alarm rate, and as an input it gives the quantile head under 2%.
+  The break-even recall (0.5), measured with every other property perfect, sits above RO-NC's recall
+  (0.33). The mixed arm (50% found, 6-hour delay, 25% megawatt error, precision 0.75) wins by only
+  1.4% (0.1 to 2.8). Band position found 28% to 37% of even-month shifts at about 11 alarms per
+  match, against RO-NC's 25% on the same months, but as a head input it gives under 2.5%.
 take_home_message: >-
-  A load shift detector does not need to be near-perfect to improve on the best forecast that uses no
-  detector: with the true megawatts added back, finding half the shifts, learning of each up to 3 days
+  A load shift detector does not need to be near-perfect to improve on the best forecast that uses
+  no
+  detector: with the true megawatts added back, finding half the shifts, learning of each up to 3
+  days
   late, or misjudging the megawatts by half still lowers curtailment cost against that forecast. The
   detector tested earlier (RO-NC) finds only a third of the shifts, which is below the break-even of
-  one half, so the next step is a detector that finds more shifts, and the surprise of recent readings
+  one half (measured with every other property perfect), so the next step is a detector that finds
+  more shifts, and the surprise of recent readings
   against the forecast's bands (band position) is not that detector.
 advice:
   - >-
     Aim a load shift detector at finding at least half of the shifts, and judge it on curtailment
-    cost against the band quantile head, because 50% found still wins and 25% found does not (Break-even
+    cost against the band quantile head, because 50% found still wins and 25% found does not
+    (Break-even
     figure).
   - >-
-    Do not spend effort on timing finer than about 2 days or on megawatts closer than about 25%, because
-    a 3-day delay or a 50% megawatt error still beats the band quantile head on curtailment cost
-    (Break-even figure).
+    Do not spend effort on timing finer than about 2 days or on megawatts closer than about 50%,
+    because
+    a 2-day delay (2.1%, 1.0 to 3.2) or a 50% megawatt error (3.7%, 2.2 to 5.2) still beats the band
+    quantile head on curtailment cost (Break-even figure).
   - >-
-    Score false alarms on ordinary rows, not within 7 days of a shift: the near-shift cost cell cannot
-    see them, and precision 0.5 raised the ordinary-row quantile score by 2.5% (2.1 to 3.0) (Break-even
+    Score false alarms on ordinary rows, not within 7 days of a shift: the near-shift cost cell
+    cannot
+    see them, and precision 0.5 raised the ordinary-row quantile score by 2.5% (2.1 to 3.0)
+    (Break-even
     figure and G1 bullets).
   - >-
     Do not use band position (the normal score of recent readings against the no-lag forecast's
-    residual bands) as a detector or as a head input, because it found at most 19% of shifts at 18
-    alarms per match and lowered the head's upper-tail score by 0.2% (-1.5 to +0.9) (Band position
-    figures).
+    residual bands) as a head input, because it made the head's upper-tail score 0.2% worse (-1.5 to
+    +0.9). Test it as a detector beside RO-NC, because at about 11 alarms per match it found 37% (30
+    to 44) of even-month shifts against RO-NC's 25% (18 to 32) (Band position figures).
   - >-
-    Give a head built on perfect-knowledge inputs the added-back centre instead of K0's centre before
+    Give a head built on perfect-knowledge inputs the added-back centre instead of K0's centre
+    before
     judging it, because the head with the added-back megawatts as an input gained only 1.5% (0.5 to
     3.0) cost against the same head without them, against 6.3% for the added-back arm (Head inputs
     figure).
@@ -194,27 +209,45 @@ date: 2026-10-23
 ---
 
 **This experiment asks how accurate a load shift detector has to be to improve on a forecast that
-uses no detector.** A load shift moves demand from one Primary substation to its neighbours for
-hours or days. We worked on the 44 simulated copies of the real power record from [experiment
-297](../00297-lsc-need-a-detector-no-detector-arms-against-the-mask/result.md), with 411 injected
-shifts at six Primary substations (labelled D5, D9, D10, D11, D14, and D16). Experiment 297 found
-that a quantile model of the forecast's error (BAND_HEAD) beats the RO-NC mask (RO-NC is the
-refit-offset neighbour-count detector). Only perfect knowledge, with the true megawatts of each
-shift subtracted from the readings the Kalman filter sees and added back to the forecast, still beat
-BAND_HEAD on curtailment cost. We spoilt that perfect arm one property at a time: the share of
-shifts found, the delay before a shift is known, the error in the megawatts, and false alarms. We
-report the worst level that still beats BAND_HEAD. We also tested whether band position (how
-surprising recent readings are against the no-lag forecast's own error bands) can detect shifts, and
-whether it or perfect knowledge improves BAND_HEAD as an input.
+uses no detector.** A load shift (LSC, load shift screen) moves demand from one Primary substation,
+a
+substation that feeds local demand, to its neighbours for hours or days. We worked on 44 copies of
+the
+real power record of six Primary substations (labelled D5, D9, D10, D11, D14, and D16), each copy
+with
+shifts added by a simulator, 411 shifts in all ([experiment
+141](../00141-switching-detector-fed-into-gam-k/result.md) made the copies). The forecast, K0, is a
+Kalman filter (an updating estimate of the recent forecast error) that corrects a weather-driven
+forecast using recent power. [Experiment
+297](../00297-lsc-need-a-detector-no-detector-arms-against-the-mask/result.md) found that an XGBoost
+quantile regression model of K0's error (BAND_HEAD), which uses no detector, beats the RO-NC
+detector
+(the refit-offset neighbour-count detector) when RO-NC's mask sets aside readings. One arm still
+beat BAND_HEAD on curtailment cost, the forecast cost of cutting a generator's output (£2,000 per
+MWh,
+relative between forecasts): perfect knowledge, with the true megawatts of each shift subtracted
+from
+the readings K0 sees and added back to K0's forecast. We spoilt that arm one property at a time:
+recall (the share of shifts found), the delay before a shift is known, the error in the megawatts,
+and
+precision (the share of alarms that are real shifts). We report the worst level that still beats
+BAND_HEAD. We also tested band position, how surprising recent readings are against the error bands
+of the forecast with no recent-power correction (GAM_ONLY), as a detector, and as an input to
+BAND_HEAD with the perfect-knowledge inputs.
 
 **The arm tolerates much more than we predicted.** It still beats BAND_HEAD within 7 days of a shift
 when it finds half the shifts, learns of each shift 3 days late, has the megawatts wrong by 50%, or
 raises false alarms at 1 in 2. It stops winning at 25% of shifts found. RO-NC found 33% (28 to 38)
-of the shifts on these worlds. Band position finds fewer shifts than RO-NC at every alarm rate, and
-as an input it lowers the quantile head's
-curtailment cost by under 2.5% and leaves its upper-tail score unchanged.
+of the shifts on these worlds. As a detector at about 11 alarms per matched shift, band position
+finds more shifts than RO-NC on even months (37% against 25%), still below the 50% break-even. As
+an input it lowers BAND_HEAD's curtailment cost by under 2.5% and leaves its upper-tail score unchanged.
 
-Every figure is the lab-condition arm: the true megawatts and the true end of each shift are used,
+**How to read the numbers.** G5 is the rows within 7 days of a shift, and the shift rows are the
+rows before the alarm, during the shift, and 48 hours after it. G1 is ordinary rows, far from any
+shift. The upper-tail score is the continuous ranked probability score weighted towards values above
+the 95th percentile of earlier power (twCRPS). The scaled limit 0.5 is half the largest power the
+substation carried earlier. Every degraded arm is run under lab conditions: the true megawatts and
+the true end of each shift are used,
 and a Primary substation has no published limit, so cost figures compare forecasts and state no
 money saved. Gains are percentages of BAND_HEAD's score, and positive is better for the arm.
 Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%.
@@ -234,7 +267,8 @@ Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%
 - **Headline cell (curtailment cost, scaled limit 0.5, within 7 days of a shift):** perfect
   knowledge gains 6.3% (4.5 to 8.1) over BAND_HEAD, the figure of experiment 297. Without D11 it
   gains 9.0% (6.0 to 12.2), and without D16 7.2% (4.9 to 9.6).
-- **Recall:** 75% found gains 4.6% (3.2 to 6.1), 50% found 3.5% (1.9 to 5.1), and 25% found 0.5%
+- **Recall:** at 75% found the arm gains 4.6% (3.2 to 6.1), 50% found 3.5% (1.9 to 5.1), and 25%
+  found 0.5%
   (-0.9 to 2.0). The break-even is 50%. Without D11 the 25% level wins, at 3.1% (1.0 to 5.5).
 - **Delay:** 6 hours gains 5.3%, 24 hours 3.7% (2.5 to 4.9), 2 days 2.1% (1.0 to 3.2), 3 days 1.4%
   (0.3 to 2.5), and 4 days 0.7% (-0.3 to 1.7). The break-even is 3 days, and 2 days without D16 (3
@@ -247,8 +281,8 @@ Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%
   near shifts, because the near-shift rows seldom overlap a false span (a false span avoids every
   shift and its 72-hour tail). On ordinary rows (G1), precision 0.75 raises the quantile score by
   0.9% (0.7 to 1.1) and the cost by 0.6% (0.4 to 0.7) against the perfect arm, and precision 0.5 by
-  2.5% (2.1 to 3.0) and 1.6% (1.2 to 2.0). K0 plus spread alone is 2.8% (0.7 to 5.3) cheaper than
-  BAND_HEAD on ordinary-row cost.
+  2.5% (2.1 to 3.0) and 1.6% (1.2 to 2.0). K0 plus spread alone is 2.9% (0.6 to 5.3) lower in cost
+  than BAND_HEAD on ordinary rows.
 - **All four mildly together (recall 0.5, 6-hour delay, 25% random error, precision 0.75; post
   hoc):** 1.4% (0.1 to 2.8), and -0.4 to 2.9 without D16.
 - **Upper-tail score on shift rows (before the alarm, during, and 48 hours after a shift):** perfect
@@ -258,14 +292,20 @@ Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%
   degraded arm scores worse than, or no better than, BAND_HEAD on the upper tail (perfect knowledge
   -2.8%, -7.2 to +1.2), because the arms keep K0's bands.
 - **RO-NC on these worlds:** it found 33% (28 to 38) of the shifts, a median 48 hours after onset,
-  with about 10 alarms per matched shift, below the recall break-even of 50%.
+  with about 10 alarms per matched shift, below the recall break-even of 50%. On the even months
+  and replicate periods of the detector comparison it found 25% (18 to 32) at 10.9 alarms per match.
 
 ## Band position and the head inputs
 
-- **As a detector:** at RO-NC's rate of about 10.6 alarms per match (odd months) the mean normal
-  score finds 17% (13 to 21) of even-month shifts, with a median delay of 48 hours, and the mean
-  absolute score finds 19% (15 to 23). Neither threshold reaches 2.7 alarms per match or fewer than
-  4: at higher thresholds recall falls to 0.
+- **As a detector:** the thresholds were chosen on odd months to give RO-NC's rate of 12.8 alarms
+  per match, and scored on even months. There the mean normal score found 37% (30 to 44) of shifts
+  with a median delay of 45 hours at 11.5 alarms per match, and the mean absolute score found 28%
+  (22 to 35) at 11.7. RO-NC found 25% (18 to 32) at 10.9 on the same months. About 90% of
+  band position's alarms were false (912 of 987 for the mean normal score). The lower targets of
+  1.33, 2.0, and 2.7 alarms per match were not reached: the nearest odd-month rate was 2.9 (mean
+  normal score) and 5.1 (mean absolute score), and on even months those thresholds gave 7.5 and 4.2
+  alarms per match with recall 25% and 19%. The odd-month calibration does not transfer exactly to
+  even months.
 - **As a head input (even-month origins):** the upper-tail score within 7 days of a shift changes by
   -0.2% (-1.5 to +0.9) and the cost gains 1.6% (0.8 to 2.7). Held out (fitted on even-seed worlds
   only, scored on odd-seed worlds) the score changes by -1.4% (-2.9 to -0.0) and the cost gains 1.4%
@@ -288,27 +328,34 @@ Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%
   other month parity. These rows overlap the injected worlds' background. The 190 logged transfers
   touching the six series in the replicate and scored months are descriptive; the 7 transfers of the
   brief could not be told apart from them.
-- **Ordinary rows:** the head against K0 changes the quantile score by +1.1% (-1.1 to +3.7), so
-  there is no harm. Readings fall below q01 in 0.9% of rows and above q99 in 0.9%, against 1.8% and
+- **Ordinary rows:** the head against K0 changes the quantile score by +1.1% (-1.1 to +3.7), so the
+  head's quantile score is no worse than K0's (the interval includes zero). Readings fall below q01
+  in 0.9% of rows and above q99 in 0.9%, against 1.8% and
   1.1% for K0.
-- **After a transfer (48 hours):** the head gains 4.7% (-2.6 to +13.2) over K0, and readings fall
+- **After a transfer (48 hours):** the head gains 4.7% (-2.7 to +13.1) over K0, and readings fall
   below q01 in 1.3% of rows and above q99 in 1.1% (K0: 2.4% and 1.0%). The no-correction forecast
   leaves 3.7% of readings above q99.
-- **Experiments 264 and 209:** experiment 264's rows are at D8, outside these six substations, and
-  experiment 209's heads belong to arm D, so no placement is possible. Experiment 297's as-of
+- **Experiments 264 and 209:** [experiment
+  264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md)'s rows are at D8, outside these six
+  substations, and
+  [experiment 209](../00209-dp-pinball-table-vs-network-head-on-arm-d/result.md)'s heads belong to
+  arm D, so no placement is possible. Experiment 297's as-of
   widening arm is the nearest comparison, and BAND_HEAD beat it there.
 
 ## Predictions
+
+A prediction holds only if every clause of it holds, and each clause is scored separately.
 
 - **P1 held.** 50% found beats BAND_HEAD on cost and 25% found does not.
 - **P2 failed.** A 25% random error and a 6-hour delay beat BAND_HEAD, but so does a 24-hour delay
   (3.7%, 2.5 to 4.9), against the prediction that it would not.
 - **P3 failed.** Precision 0.75 wins, and ordinary-row cost stays within 3%, but precision 0.5 also
   beats BAND_HEAD near shifts.
-- **P4 failed.** Band position finds 17% to 19% of shifts at RO-NC's alarm rate against RO-NC's 33%,
-  with a median delay of 46 to 48 hours.
-- **P5 failed.** Band position lowers the upper-tail score by 0.2% (not 2%), and the indicators
-  raise it by 0.5% (not 5%).
+- **P4 passed.** At about 11 alarms per match band position found 28% to 37% of even-month shifts
+  against RO-NC's 25%, with a median delay of 45 hours. Both recalls sit below the 50% break-even,
+  and about 90% of the alarms were false.
+- **P5 failed.** Band position changes the upper-tail score by -0.2% (worse; the bar was a 2%
+  improvement), and the indicators by +0.5% (better; the bar was 5%).
 
 ## Checks
 
@@ -319,7 +366,8 @@ Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%
   0.29 points lower than the mean forecast's at D16 and 0.11 lower at D11, by design. For K0 and the
   added-back arm it lies within 0.02 points at every site.
 - **Mean-forecast error beside the contrasts:** printed for every arm in the report.
-- **Triggers that fired:** a result contradicting its prediction (P2 and P3: the false-alarm cell
+- **Audit triggers that fired:** a result contradicting its prediction (P2 and P3: the false-alarm
+  cell
   cannot see false spans, which is the tested explanation, and the delay arm uses the true end), and
   leave-one-site-out (D11 and D16 move the break-even levels but not the sign of the headline
   contrast). A fresh Sonnet reviewer re-derived the headline contrasts; no Opus audit ran, because
@@ -332,6 +380,12 @@ Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%
 - **False alarms are drawn at random.** A false span avoids shifts, carries a constant size drawn
   from true shifts, and is known at its onset. The cost cell near shifts cannot show the harm of
   false alarms; the ordinary-row figures do.
+- **Band position's quantile table is in sample on odd months.** The table is fitted on the odd
+  months' rows that the heads also score, so the head-input figures for odd-month origins are
+  optimistic; the even-month figures are the clean ones. The head folds follow the target month for
+  ordinary rows and the onset month for shift rows, so rows within a week of a month boundary can
+  sit on both sides of a split.
+- **The indicators use the true end of each shift,** so the heads fed them are upper bounds.
 - **The shifts are 25% of load or more and last over a day**, and the real record's own transfers
   inside the stream count as false alarms in the detector test.
 - **Not done.** BAND_HEAD with the added-back centre, a retrained LR_b20 on the injected worlds, and
@@ -346,7 +400,8 @@ Intervals resample whole shifts, or whole calendar months for ordinary rows, 95%
   added-back megawatts, each fitted three ways (all worlds, held out, small shifts only).
 - **Code reused:** [experiment
   297](../00297-lsc-need-a-detector-no-detector-arms-against-the-mask/result.md)'s harness, scores,
-  and head, and experiment 309's band-position method.
+  and head, and [experiment 309](../00309-lsc-two-forecast-gap-choosing-without-truth/result.md)'s
+  band-position method.
 - **Rows and weather:** experiment 297's 6,879,769 rows (411 shifts, ensemble-weather member
   forecasts), no retraining.
 

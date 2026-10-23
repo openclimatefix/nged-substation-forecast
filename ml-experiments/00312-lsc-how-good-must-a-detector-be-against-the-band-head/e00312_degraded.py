@@ -17,13 +17,12 @@ substation it stores the events, the RO-NC alarm spans, and the band-position se
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import json
 import multiprocessing
 import time
 from concurrent.futures import ProcessPoolExecutor
 from functools import lru_cache
-from pathlib import Path
+from statistics import NormalDist
 
 import e00297_fed as fed
 import e00297_injected as inj
@@ -48,7 +47,6 @@ from e00312_common import (
     WIDTH,
     Z_LIMIT,
 )
-from statistics import NormalDist
 
 N_WORKERS = 4
 MARGIN_STAMPS = score.MARGIN_STAMPS
@@ -140,7 +138,7 @@ def false_spans(
 
 def count_false(*, precision: float, n_true: int) -> int:
     """Number of false spans giving `precision` against `n_true` true spans."""
-    return int(round(FALSE_PER_TRUE[precision] * n_true))
+    return round(FALSE_PER_TRUE[precision] * n_true)
 
 
 def build_sources(
@@ -160,12 +158,15 @@ def build_sources(
         kept = rng.random(len(events)) < recall
         out[f"ADD_R{int(recall * 100)}"] = [s for s, k in zip(perfect, kept, strict=True) if k]
     for delay in DELAYS:
-        out[f"ADD_D{delay}"] = inj.perfect_spans(events=events, points=points, data=data, delay=delay)
+        out[f"ADD_D{delay}"] = inj.perfect_spans(
+            events=events, points=points, data=data, delay=delay
+        )
     for blur in BLURS:
         rng = np.random.default_rng([rng_seed, 7, int(blur * 100)])
         signs = rng.choice([-1.0, 1.0], size=len(events))
         out[f"ADD_B{int(blur * 100)}"] = [
-            inj.with_amount(span=s, factor=1.0 + blur * g) for s, g in zip(perfect, signs, strict=True)
+            inj.with_amount(span=s, factor=1.0 + blur * g)
+            for s, g in zip(perfect, signs, strict=True)
         ]
     for name, factor in BIASES:
         out[f"ADD_{name}"] = [inj.with_amount(span=s, factor=factor) for s in perfect]
@@ -349,7 +350,11 @@ def job(args: tuple[str, int]) -> str:
             ],
             "ronc_delay": [
                 min(
-                    (s.start - (int(e["onset"]) + offset) for s in detected if inj.matches(span=s, event=e, offset=offset)),
+                    (
+                        s.start - (int(e["onset"]) + offset)
+                        for s in detected
+                        if inj.matches(span=s, event=e, offset=offset)
+                    ),
                     default=-1,
                 )
                 for e in events
@@ -361,12 +366,18 @@ def job(args: tuple[str, int]) -> str:
             "onset": [s.onset for s in detected],
             "start": [s.start for s in detected],
             "end": [s.end for s in detected],
-            "month": [
-                int(months[np.clip(s.onset - offset, 0, len(months) - 1)]) for s in detected
+            "month": [int(months[np.clip(s.onset - offset, 0, len(months) - 1)]) for s in detected],
+            "matched": [
+                any(inj.matches(span=s, event=e, offset=offset) for e in events) for s in detected
             ],
-            "matched": [any(inj.matches(span=s, event=e, offset=offset) for e in events) for s in detected],
         },
-        schema={"onset": pl.Int64, "start": pl.Int64, "end": pl.Int64, "month": pl.Int64, "matched": pl.Boolean},
+        schema={
+            "onset": pl.Int64,
+            "start": pl.Int64,
+            "end": pl.Int64,
+            "month": pl.Int64,
+            "matched": pl.Boolean,
+        },
     ).with_columns(site=pl.lit(site), world=pl.lit(seed, dtype=pl.Int32))
     for frame, directory, name in (
         (pl.concat(extra_frames), EXTRA_DIR, f"{site}_{seed}.parquet"),
@@ -376,9 +387,16 @@ def job(args: tuple[str, int]) -> str:
         (pl.concat(score_frames), DEG_DIR, f"{site}_{seed}.parquet"),
     ):
         tmp = directory / (name + ".tmp")
-        frame.with_columns(pl.col(pl.Float64).cast(pl.Float32) if directory in (DEG_DIR, EXTRA_DIR) else pl.col(pl.Float64)).write_parquet(tmp)
+        frame.with_columns(
+            pl.col(pl.Float64).cast(pl.Float32)
+            if directory in (DEG_DIR, EXTRA_DIR)
+            else pl.col(pl.Float64)
+        ).write_parquet(tmp)
         tmp.rename(directory / name)
-    print(f"{site} {seed}: {len(events)} events, {len(sources)} arms, {time.time() - started:.0f} s", flush=True)
+    print(
+        f"{site} {seed}: {len(events)} events, {len(sources)} arms, {time.time() - started:.0f} s",
+        flush=True,
+    )
     return str(path)
 
 

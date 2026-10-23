@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915
+# ruff: noqa: PLR0915
 """Fit and score the new quantile heads: band position and perfect-knowledge inputs.
 
 Every head is experiment 297's BAND_HEAD (K0 centre plus 11 fitted residual quantiles against
@@ -51,7 +51,9 @@ MODES: dict[str, tuple[str, ...]] = {
 def matrix(*, frame: pl.DataFrame, variant: str) -> np.ndarray:
     """Head inputs: experiment 297's six, plus the variant's columns (missing values become 0)."""
     base = p2.head_features(frame)
-    extra = [np.nan_to_num(frame[c].to_numpy().astype(np.float32)) for c in VARIANT_COLUMNS[variant]]
+    extra = [
+        np.nan_to_num(frame[c].to_numpy().astype(np.float32)) for c in VARIANT_COLUMNS[variant]
+    ]
     return np.column_stack([base, *extra]).astype(np.float32) if extra else base
 
 
@@ -141,7 +143,10 @@ def site_job(site: str) -> str:
             have = np.isfinite(part[:, 0])
             if not have.any():
                 continue
-            arms[f"HEAD_{name}"] = (p2.sorted_quantiles(np.where(have[:, None], part, 0.0)), k0_mean[sel])
+            arms[f"HEAD_{name}"] = (
+                p2.sorted_quantiles(np.where(have[:, None], part, 0.0)),
+                k0_mean[sel],
+            )
         scored = score.score_arms(arms=arms, rows=rows, data=data, delta_points=delta, edges=edges)
         # rows a mode did not score are marked by NaN quantiles in `scored_mask`
         have_frame = pl.DataFrame(

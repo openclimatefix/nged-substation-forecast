@@ -1,4 +1,3 @@
-# ruff: noqa: E501, PLR0915
 """The band quantile head on the real record: logged transfers, ordinary rows, and tail coverage.
 
 The real record is the stream with no injected megawatts. For each of the six substations this
@@ -49,7 +48,6 @@ def site_frame(site: str) -> tuple[pl.DataFrame, np.ndarray, np.ndarray]:
         event[lo : hi + AFTER_STAMPS] = i
     k0 = fed.correction_for(data=data, stream=data.stream, prior=np.zeros(n), multiplier=1.0)
     cutoffs_run = data.cutoffs(delay_hours=fed.DELAY_HOURS)
-    cutoffs = cutoffs_run[data.run_of_row]
     scales = score.site_scales(site)
     ratio_run = score.asof_ratio_per_run(
         data=data, stream=data.stream, cutoffs_run=cutoffs_run, rms=scales["stream_rms"]
@@ -63,7 +61,9 @@ def site_frame(site: str) -> tuple[pl.DataFrame, np.ndarray, np.ndarray]:
     ok = np.isfinite(data.actual[rows])
     rows, pos = rows[ok], pos[ok]
     group = np.where(
-        during[pos], "DURING", np.where(after[pos], "AFTER", np.where(~near[pos], "ORDINARY", "MARGIN"))
+        during[pos],
+        "DURING",
+        np.where(after[pos], "AFTER", np.where(~near[pos], "ORDINARY", "MARGIN")),
     )
     stride = data.run_of_row[rows] % score.ORDINARY_RUN_STRIDE == 0
     keep = (group != "ORDINARY") | stride
@@ -124,10 +124,18 @@ def main() -> None:
                 q[idx] = k0_mean[idx][:, None] + booster.predict(xgb.DMatrix(x[idx]))
             arms[f"HEAD_{variant}"] = (np.sort(q, axis=1), k0_mean)
         delta = np.zeros(len(data.cache.end_times))
-        scored = score.score_arms(arms=arms, rows=rows, data=data, delta_points=delta, edges=score.edges_of(data=data))
-        out = scored.join(frame.select("row", "group", "event", "month", "lead_hours", "actual"), on="row", suffix="_f")
+        scored = score.score_arms(
+            arms=arms, rows=rows, data=data, delta_points=delta, edges=score.edges_of(data=data)
+        )
+        out = scored.join(
+            frame.select("row", "group", "event", "month", "lead_hours", "actual"),
+            on="row",
+            suffix="_f",
+        )
         out = out.with_columns(site=pl.lit(site))
-        out.with_columns(pl.col(pl.Float64).cast(pl.Float32)).write_parquet(REAL_DIR / f"{site}.parquet")
+        out.with_columns(pl.col(pl.Float64).cast(pl.Float32)).write_parquet(
+            REAL_DIR / f"{site}.parquet"
+        )
         print(site, frame["group"].value_counts().to_dict(as_series=False), flush=True)
 
 

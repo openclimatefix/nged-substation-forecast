@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """The real-record scores of K0, GAM_ONLY, and the cross-fitted heads: the numbers the page quotes.
 
 Groups: DURING a logged transfer touching the substation's series, AFTER (48 hours after its end),
@@ -28,13 +27,23 @@ def main() -> None:
     for path in sorted(REAL_DIR.glob("D*.parquet")):
         site = path.stem
         long = pl.read_parquet(path)
-        wide = long.filter(pl.col("arm") == "K0").select(
-            "row", "group", "event", "month", "lead_hours_f", "actual_f", "site"
-        ) if "lead_hours_f" in long.columns else long.filter(pl.col("arm") == "K0").select("row", "group", "event", "month", "lead_hours", "actual", "site")
+        wide = (
+            long.filter(pl.col("arm") == "K0").select(
+                "row", "group", "event", "month", "lead_hours_f", "actual_f", "site"
+            )
+            if "lead_hours_f" in long.columns
+            else long.filter(pl.col("arm") == "K0").select(
+                "row", "group", "event", "month", "lead_hours", "actual", "site"
+            )
+        )
         wide = wide.rename({c: c.removesuffix("_f") for c in wide.columns if c.endswith("_f")})
         for arm in ARMS:
             part = long.filter(pl.col("arm") == arm).select(
-                "row", *[pl.col(c).alias(f"{c}__{arm}") for c in ("qs_obs", "tw95_obs", "q01", "q05", "q95", "q99")]
+                "row",
+                *[
+                    pl.col(c).alias(f"{c}__{arm}")
+                    for c in ("qs_obs", "tw95_obs", "q01", "q05", "q95", "q99")
+                ],
             )
             wide = wide.join(part, on="row", how="left", validate="1:1")
         frames.append(wide.with_columns(site=pl.lit(site)))
@@ -44,7 +53,11 @@ def main() -> None:
     unit = np.where(
         group == "ORDINARY",
         -(wide["month"].to_numpy().astype(np.int64) + 1),
-        (pl.Series([hash(s) % 1000 for s in wide["site"]]).to_numpy() * 1000 + wide["event"].to_numpy() + 1).astype(np.int64),
+        (
+            pl.Series([hash(s) % 1000 for s in wide["site"]]).to_numpy() * 1000
+            + wide["event"].to_numpy()
+            + 1
+        ).astype(np.int64),
     )
     rng = np.random.default_rng(312)
     out: dict = {}
@@ -61,7 +74,11 @@ def main() -> None:
         for g in ("DURING", "AFTER", "ORDINARY"):
             m = group == g
             qs = wide[f"qs_obs__{arm}"].to_numpy().astype(np.float64)
-            res = {"arm": arm, "group": g, "mean_qs": float(np.sum(qs[m] * weight[m]) / np.sum(weight[m]))}
+            res = {
+                "arm": arm,
+                "group": g,
+                "mean_qs": float(np.sum(qs[m] * weight[m]) / np.sum(weight[m])),
+            }
             for side, ind in (
                 ("below_q01", actual < wide[f"q01__{arm}"].to_numpy()),
                 ("below_q05", actual < wide[f"q05__{arm}"].to_numpy()),
@@ -73,12 +90,19 @@ def main() -> None:
             print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in res.items()})
     out["table"] = table
     contrasts = []
-    for base, arm in (("K0", "HEAD_BASE"), ("K0", "HEAD_PIT"), ("HEAD_BASE", "HEAD_PIT"), ("K0", "GAM_ONLY")):
+    for base, arm in (
+        ("K0", "HEAD_BASE"),
+        ("K0", "HEAD_PIT"),
+        ("HEAD_BASE", "HEAD_PIT"),
+        ("K0", "GAM_ONLY"),
+    ):
         for g in ("DURING", "AFTER", "ORDINARY"):
             m = group == g
             b = wide[f"qs_obs__{base}"].to_numpy().astype(np.float64)
             a = wide[f"qs_obs__{arm}"].to_numpy().astype(np.float64)
-            res = r297.interval(gain=(b - a)[m], base=b[m], weight=weight[m], units=unit[m], rng=rng)
+            res = r297.interval(
+                gain=(b - a)[m], base=b[m], weight=weight[m], units=unit[m], rng=rng
+            )
             contrasts.append({"base": base, "arm": arm, "group": g, **res})
             r297.show(f"{arm} vs {base} qs {g}", res)
     out["contrasts"] = contrasts
