@@ -1,0 +1,101 @@
+Drops: 29; in scope (start on or after 2023-08-15): 28; from 2025-03-01: 17; 2023-08-15 to 2025-02-28: 11
+Detector check: D8 arm v1 flagged share of the whole grid 0.268 (agrees with experiment 196's stored posterior on every half-hour); arm N 0.280
+Flagged share outside drops, 2023-08-15 to 2025-02-28: v1 0.310; N (night half-hours) 0.229; D5 v1 0.011; D10 v1 0.008; D11 v1 0.031
+Flagged share outside drops, 2025-03-01 to 2026-06-30: v1 0.460; N (night half-hours) 0.281; D5 v1 0.046; D10 v1 0.011; D11 v1 0.001
+
+== Overlap with engine-running states ==
+Placebo candidates per in-scope drop (whole-week shifts): min 30, median 43, max 69
+Arm v1: drops overlapping engine-running states (at least half of half-hours flagged): 27 of 28 (0.96; 0.82 to 0.99); mean share of a drop's half-hours flagged 0.70
+  Matched placebo: expected overlap count 5.3 of 28 (share 0.19; 95% of draws 2 to 9); one-sided p for the observed count 0.0002
+  2023-08-15 to 2025-02-28: 10 of 11 (0.91; 0.62 to 0.98); placebo share 0.12
+  2025-03-01 onward: 17 of 17 (1.00; 0.82 to 1.00); placebo share 0.24
+  Control D5, the drops' own dates: 0 of 28 (0.00; 0.00 to 0.12); matched placebo windows 0.01
+  Control D10, the drops' own dates: 0 of 28 (0.00; 0.00 to 0.12); matched placebo windows 0.00
+  Control D11, the drops' own dates: 0 of 28 (0.00; 0.00 to 0.12); matched placebo windows 0.01
+Arm N: drops overlapping engine-running states (at least half of night half-hours flagged): 14 of 28 (0.50; 0.33 to 0.67); mean share of a drop's half-hours flagged 0.51
+  Matched placebo: expected overlap count 1.3 of 28 (share 0.05; 95% of draws 0 to 4); one-sided p for the observed count 0.0002
+  2023-08-15 to 2025-02-28: 4 of 11 (0.36; 0.15 to 0.65); placebo share 0.04
+  2025-03-01 onward: 10 of 17 (0.59; 0.36 to 0.78); placebo share 0.05
+
+== Depth against multiples of one engine unit ==
+Unit from the engine's recorded output (2023-07-03 to 2023-08-15), levels 1 to 3: 1.93 MW (95% day-resampled interval 1.91 to 1.95); the plan fixed 1.97 MW
+  depth, unit 1.97 MW: mean distance to the nearest multiple 0.287 units (95% bootstrap 0.233 to 0.342); uniform spread over the same range 0.255 (95% of draws 0.203 to 0.307); p for a mean this low 0.8840
+  depth, unit 1.93 MW: mean distance to the nearest multiple 0.277 units (95% bootstrap 0.223 to 0.334); uniform spread over the same range 0.254 (95% of draws 0.203 to 0.303); p for a mean this low 0.8170
+  depth, unit 1.75 MW: mean distance to the nearest multiple 0.230 units (95% bootstrap 0.182 to 0.278); uniform spread over the same range 0.232 (95% of draws 0.179 to 0.286); p for a mean this low 0.4693
+  onset step, unit 1.97 MW: mean distance to the nearest multiple 0.214 units (95% bootstrap 0.159 to 0.273); uniform spread over the same range 0.259 (95% of draws 0.208 to 0.310); p for a mean this low 0.0456
+  onset step, unit 1.93 MW: mean distance to the nearest multiple 0.216 units (95% bootstrap 0.159 to 0.276); uniform spread over the same range 0.254 (95% of draws 0.199 to 0.308); p for a mean this low 0.0842
+  onset step, unit 1.75 MW: mean distance to the nearest multiple 0.222 units (95% bootstrap 0.169 to 0.275); uniform spread over the same range 0.242 (95% of draws 0.190 to 0.295); p for a mean this low 0.2372
+  end step, unit 1.97 MW: mean distance to the nearest multiple 0.264 units (95% bootstrap 0.215 to 0.316); uniform spread over the same range 0.250 (95% of draws 0.198 to 0.304); p for a mean this low 0.7021
+  end step, unit 1.93 MW: mean distance to the nearest multiple 0.264 units (95% bootstrap 0.211 to 0.316); uniform spread over the same range 0.256 (95% of draws 0.202 to 0.310); p for a mean this low 0.6113
+  end step, unit 1.75 MW: mean distance to the nearest multiple 0.259 units (95% bootstrap 0.210 to 0.304); uniform spread over the same range 0.263 (95% of draws 0.209 to 0.314); p for a mean this low 0.4389
+Noise in a 24-hour median of D8's residual outside drops, 2023-08-15 to 2025-02-28: sd 1.20 MW; middle 95% -4.00 to +1.45 MW
+  depth clustering in this period (11 drops): mean distance 0.319 units (95% bootstrap 0.220 to 0.412); median depth 3.63 MW
+Noise in a 24-hour median of D8's residual outside drops, 2025-03-01 onward: sd 0.91 MW; middle 95% -2.23 to +1.61 MW
+  depth clustering in this period (17 drops): mean distance 0.266 units (95% bootstrap 0.202 to 0.331); median depth 2.39 MW
+Depth in units of 1.97 MW, sorted: 0.60 0.73 0.83 0.94 0.94 1.05 1.08 1.16 1.16 1.21 1.22 1.24 1.35 1.38 1.46 1.47 1.51 1.53 1.56 1.61 1.64 1.77 1.84 1.94 2.48 2.53 2.56 2.72
+Onset steps (MW) median 0.96; end steps (MW) median 0.84
+
+== Timing ==
+Onset weekday counts Mon..Sun [3, 4, 7, 3, 1, 5, 5]; chi-squared p 0.481
+Onset 6-hour blocks (0-6, 6-12, 12-18, 18-24, hours UTC) [11, 3, 4, 10]; chi-squared p 0.067
+End weekday counts [3, 2, 3, 4, 5, 8, 3]; 6-hour blocks [6, 4, 6, 12]
+System price fifth at onset (1 cheapest .. 5 dearest; 0 no price) counts [0, 6, 8, 7, 2, 5]
+Mean price fifth across a drop's half-hours: drops 3.44; matched placebo windows 3.03; paired difference +0.414 (Wilcoxon p 0.001)
+Onsets by calendar month Jan..Dec [5, 0, 0, 0, 3, 6, 2, 3, 2, 3, 1, 3]
+Gap from one in-scope drop's end to the next one's start (days): median 11.6; share under 14 days 0.59
+
+== After March 2026 ==
+Drops starting 2025-03-01 to 2026-02-28: 17 (1.4 a month); 2026-03-01 to 2026-06-24: 0. Expected at the earlier rate 5.4; Poisson P(0) 0.0045
+shape: (16, 4)
+┌─────────┬───────────────┬───────────────┬─────────────────┐
+│ month   ┆ drops_started ┆ v1_flag_share ┆ left_tail_share │
+│ ---     ┆ ---           ┆ ---           ┆ ---             │
+│ str     ┆ i64           ┆ f64           ┆ f64             │
+╞═════════╪═══════════════╪═══════════════╪═════════════════╡
+│ 2025-03 ┆ 0             ┆ 0.359543      ┆ 0.205645        │
+│ 2025-04 ┆ 0             ┆ 0.408333      ┆ 0.184722        │
+│ 2025-05 ┆ 2             ┆ 0.608871      ┆ 0.293011        │
+│ 2025-06 ┆ 4             ┆ 0.634722      ┆ 0.326389        │
+│ 2025-07 ┆ 2             ┆ 0.653226      ┆ 0.459005        │
+│ …       ┆ …             ┆ …             ┆ …               │
+│ 2026-02 ┆ 0             ┆ 0.423363      ┆ 0.174107        │
+│ 2026-03 ┆ 0             ┆ 0.400538      ┆ 0.069939        │
+│ 2026-04 ┆ 0             ┆ 0.391667      ┆ 0.008351        │
+│ 2026-05 ┆ 0             ┆ 0.428763      ┆ 0.02152         │
+│ 2026-06 ┆ 0             ┆ 0.480556      ┆ 0.038943        │
+└─────────┴───────────────┴───────────────┴─────────────────┘
+
+== Alarms inside engine spells ==
+Engine spells (flagged runs joined across gaps of 6 half-hours or fewer): 1180; share of eligible half-hours inside a spell widened by 6: 0.733; within 6 of a spell's start or end: 0.511; inside a drop 0.129
+  RO-NC (all 52): 52 alarms; 51 from 2023-08-15; inside a widened engine spell 50 of 51 (0.98; 0.90 to 1.00) against 0.73 at random times (expected 37.4, one-sided p 0.000); within 6 half-hours of a spell edge 39 against 26.0 expected (p 0.000); inside a drop 11 against 6.6 expected
+  RO-NC unexplained (28): 28 alarms; 27 from 2023-08-15; inside a widened engine spell 26 of 27 (0.96; 0.82 to 0.99) against 0.73 at random times (expected 19.8, one-sided p 0.002); within 6 half-hours of a spell edge 21 against 13.8 expected (p 0.004); inside a drop 5 against 3.5 expected
+  Pair alarm (experiment 195): 61 alarms; 60 from 2023-08-15; inside a widened engine spell 60 of 60 (1.00; 0.94 to 1.00) against 0.73 at random times (expected 44.0, one-sided p 0.000); within 6 half-hours of a spell edge 49 against 30.6 expected (p 0.000); inside a drop 11 against 7.7 expected
+  F network (experiment 195): 36 alarms; 36 from 2023-08-15; inside a widened engine spell 36 of 36 (1.00; 0.90 to 1.00) against 0.73 at random times (expected 26.4, one-sided p 0.000); within 6 half-hours of a spell edge 33 against 18.4 expected (p 0.000); inside a drop 7 against 4.6 expected
+  R re-ranker (experiment 195): 36 alarms; 36 from 2023-08-15; inside a widened engine spell 36 of 36 (1.00; 0.90 to 1.00) against 0.73 at random times (expected 26.4, one-sided p 0.000); within 6 half-hours of a spell edge 32 against 18.4 expected (p 0.000); inside a drop 7 against 4.6 expected
+Unexplained RO-NC alarms on D8: 28; inside a widened engine spell: 26; left outside: 2; excess over the random-time expectation: 6.2
+Share of the 148 unexplained alarms supplied by D8 and D9: 0.412; with D8's engine-explained alarms reclassified: kept in the total 0.236; removed from the total 0.287; counting only the excess (6.2): kept 0.370, removed 0.386
+
+== Neighbour step-up at onset, by overlap with engine states ==
+  overlap (v1): at least 0.25 x depth: 9 of 27; at least 0.5 x depth: 6 of 27; at least 0.75 x depth: 3 of 27
+  no overlap (v1): at least 0.25 x depth: 1 of 1; at least 0.5 x depth: 1 of 1; at least 0.75 x depth: 1 of 1
+  Experiment 159's placebo shares: 0.344, 0.214, 0.124 (random times from July 2023)
+
+shape: (29, 11)
+┌──────┬────────────┬────────────┬──────────┬───┬────────────┬────────────┬────────────┬───────────┐
+│ drop ┆ start_date ┆ end_date   ┆ depth_mw ┆ … ┆ night_shar ┆ onset_step ┆ end_step_m ┆ depth_in_ │
+│ ---  ┆ ---        ┆ ---        ┆ ---      ┆   ┆ e          ┆ _mw        ┆ w          ┆ units     │
+│ i64  ┆ date       ┆ date       ┆ f64      ┆   ┆ ---        ┆ ---        ┆ ---        ┆ ---       │
+│      ┆            ┆            ┆          ┆   ┆ f64        ┆ f64        ┆ f64        ┆ f64       │
+╞══════╪════════════╪════════════╪══════════╪═══╪════════════╪════════════╪════════════╪═══════════╡
+│ 1    ┆ 2022-08-09 ┆ 2022-08-23 ┆ 2.0      ┆ … ┆ 0.0        ┆ -1.19      ┆ 0.33       ┆ 1.02      │
+│ 2    ┆ 2023-10-21 ┆ 2023-10-25 ┆ 4.89     ┆ … ┆ 0.77       ┆ -0.29      ┆ 3.7        ┆ 2.48      │
+│ 3    ┆ 2023-10-26 ┆ 2023-10-28 ┆ 5.04     ┆ … ┆ 0.66       ┆ -1.87      ┆ 3.26       ┆ 2.56      │
+│ 4    ┆ 2023-11-29 ┆ 2023-12-02 ┆ 4.99     ┆ … ┆ 0.42       ┆ -0.22      ┆ 4.91       ┆ 2.53      │
+│ 5    ┆ 2024-01-17 ┆ 2024-01-19 ┆ 5.36     ┆ … ┆ 0.41       ┆ 2.58       ┆ 2.78       ┆ 2.72      │
+│ …    ┆ …          ┆ …          ┆ …        ┆ … ┆ …          ┆ …          ┆ …          ┆ …         │
+│ 25   ┆ 2025-12-15 ┆ 2025-12-22 ┆ 3.22     ┆ … ┆ 0.71       ┆ -3.5       ┆ 1.0        ┆ 1.64      │
+│ 26   ┆ 2025-12-28 ┆ 2025-12-31 ┆ 2.9      ┆ … ┆ 0.64       ┆ 0.03       ┆ -2.8       ┆ 1.47      │
+│ 27   ┆ 2026-01-11 ┆ 2026-01-13 ┆ 2.13     ┆ … ┆ 0.55       ┆ 2.09       ┆ 2.55       ┆ 1.08      │
+│ 28   ┆ 2026-01-15 ┆ 2026-01-18 ┆ 3.07     ┆ … ┆ 0.8        ┆ 2.49       ┆ 1.99       ┆ 1.56      │
+│ 29   ┆ 2026-01-27 ┆ 2026-01-31 ┆ 2.66     ┆ … ┆ 0.75       ┆ 2.67       ┆ -0.63      ┆ 1.35      │
+└──────┴────────────┴────────────┴──────────┴───┴────────────┴────────────┴────────────┴───────────┘
