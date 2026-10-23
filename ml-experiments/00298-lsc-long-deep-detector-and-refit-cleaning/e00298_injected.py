@@ -152,21 +152,26 @@ def _with_partner(*, nb, site, partner_resid, days, weeks) -> dict[str, dt.Strea
 _PARTNER: dict[str, str] = {}
 
 
-def main() -> None:
-    """Score all worlds of the detect stage in parallel and write the table."""
-    global _CLEAN  # noqa: PLW0603
-    streams = real.build_streams()
-    _CLEAN.update(streams)
+def _init() -> None:
+    """Build the clean streams and the partner choice inside a worker."""
+    _CLEAN.update(real.build_streams())
     cache = common.load_cache()
     for site in common.INJECT_SITES:
-        options = [n for n in common.NEIGHBOURS.get(site, ()) if n in streams]
+        options = [n for n in common.NEIGHBOURS.get(site, ()) if n in _CLEAN]
         if options:
-            power = {n: float(np.nanmean(cache.sites[n].y) * cache.sites[n].table.effective_capacity_mw) for n in options}
+            power = {
+                n: float(np.nanmean(cache.sites[n].y) * cache.sites[n].table.effective_capacity_mw)
+                for n in options
+            }
             _PARTNER[site] = max(power, key=power.get)
+
+
+def main() -> None:
+    """Score all worlds of the detect stage in parallel and write the table."""
     files = sorted((common.WORLDS_DIR / "detect").glob("streams_*.parquet"))
-    context = multiprocessing.get_context("fork")
+    context = multiprocessing.get_context("spawn")
     rows = []
-    with ProcessPoolExecutor(max_workers=3, mp_context=context) as pool:
+    with ProcessPoolExecutor(max_workers=10, mp_context=context, initializer=_init) as pool:
         for chunk in pool.map(world_rows, files):
             rows.extend(chunk)
     pl.DataFrame(rows).write_parquet(common.EXPERIMENT_DIR / "injected_detection.parquet")
