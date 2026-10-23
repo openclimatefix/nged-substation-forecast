@@ -829,6 +829,15 @@ each row by default and counts the rows that crossed. The scope is the six trial
 (labelled A to F) in experiments 224 and 243; the confidence is high for the count and moderate for
 the size of the effect.
 
+**Take climatology and the manual heuristic from experiment 87's stored references, in fractions of
+capacity, when eleven quantiles are needed (provisional).** *Applies to: experiments.* The stored
+climatology and manual-heuristic forecasts of experiment 48 hold nine quantiles (q05 to q95), so a
+reader that pads q01 and q99 turns them into the capacity or into q05 and q95. The versions in
+experiment 87's `ref_climatology` and `ref_manual_heuristic` hold all eleven, and both experiments
+store power as a fraction of capacity, not in points ([experiment
+277](00277-lsc-curtailment-metric-on-existing-forecasts/result.md)). The scope is the six Primaries
+and the two bulk supply points D13 and D17; the confidence is high.
+
 ## Privacy and anonymisation
 
 **Never publish the name, the identifier, or the time series of an NGED metered generator, and label
