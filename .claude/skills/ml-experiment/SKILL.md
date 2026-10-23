@@ -95,7 +95,8 @@ review as `implement-issue` does.
   name that experiment's folder in the `result.md` bullets. Never edit an earlier experiment's
   script after its PR merged, except to fix a bug, and record that fix in the later experiment's PR
   and `result.md`. The earlier result is immutable, so a fix that would change its numbers is
-  made only together with a correction to the earlier `result.md`; otherwise copy the code into the new folder.
+  made only together with a correction to the earlier `result.md`; otherwise copy the code into the
+  new folder.
 - **The predictions:** `data/ml-experiments/<id>-<slug>/predictions/<name>/`, written with
   `experiment_store.write_predictions`. The folder is private and never committed.
 
