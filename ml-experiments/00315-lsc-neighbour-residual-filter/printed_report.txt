@@ -1,0 +1,69 @@
+Running as unit: run-p2175828-i90192351.scope; invocation ID: 4791a411baef4b708efea8d40c847368
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_013xsCRit19KqYDjC27FajSi/ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth/e00309_detect.py:187: RuntimeWarning: All-NaN slice encountered
+  after = np.nanmedian(r[row["onset"] : row["onset"] + 48])
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_013xsCRit19KqYDjC27FajSi/ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth/e00309_detect.py:188: RuntimeWarning: All-NaN slice encountered
+  before = np.nanmedian(r[max(row["onset"] - 336, 0) : row["onset"]])
+shifts 35; stratum 19; counterpart 22; stratum with counterpart 15
+
+=== Operating point of LR_b20's false alarm rate (plain thresholds of experiments 308 and 309) ===
+carried LR_b20                     k= nan matched 10/35 MW share 0.25 FA   30 apm   4.0  stratum: 7/19 apm   5.7 mw 0.39  rest: 3/16 apm  13.3 mw 0.15  counterpart: 7/22 apm   5.7 mw 0.31  no counterpart: 3/13 apm  13.3 mw 0.16  stratum+cp: 6/15 apm   6.7 mw 0.37  D8 FA 2 D9 FA 1 unlogged 0  FA/yr even 0.55
+r24 plain                          k= 3.5 matched 20/35 MW share 0.78 FA   35 apm   2.8  stratum: 11/19 apm   5.0 mw 0.71  rest: 9/16 apm   6.1 mw 0.83  counterpart: 13/22 apm   4.2 mw 0.76  no counterpart: 7/13 apm   7.9 mw 0.80  stratum+cp: 9/15 apm   6.1 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.91
+r24 filtered (equal all)           k= 3.5 matched 20/35 MW share 0.78 FA   22 apm   2.1  stratum: 11/19 apm   3.8 mw 0.71  rest: 9/16 apm   4.7 mw 0.83  counterpart: 13/22 apm   3.2 mw 0.76  no counterpart: 7/13 apm   6.0 mw 0.80  stratum+cp: 9/15 apm   4.7 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.73
+    stratum+cp apm: plain 6.1 [3.6, 13.167499999999926], filtered 4.7 [2.857142857142857, 9.75]; ratio 0.76 [0.5671517412935323, 0.9375240384615364]
+    pooled apm: plain 2.8 [1.9444444444444444, 4.0], filtered 2.1 [1.5833333333333333, 2.8461538461538463]; ratio 0.76 [0.5666666666666667, 0.9375]
+r24 theta0.10 (equal all)          k= 3.5 matched 20/35 MW share 0.78 FA   21 apm   2.0  stratum: 11/19 apm   3.7 mw 0.71  rest: 9/16 apm   4.6 mw 0.83  counterpart: 13/22 apm   3.2 mw 0.76  no counterpart: 7/13 apm   5.9 mw 0.80  stratum+cp: 9/15 apm   4.6 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.67
+r24 theta0.50 (equal all)          k= 3.5 matched 20/35 MW share 0.78 FA   28 apm   2.4  stratum: 11/19 apm   4.4 mw 0.71  rest: 9/16 apm   5.3 mw 0.83  counterpart: 13/22 apm   3.7 mw 0.76  no counterpart: 7/13 apm   6.9 mw 0.80  stratum+cp: 9/15 apm   5.3 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.79
+r24 drop_on_one (equal all)        k= 3.3 matched 20/35 MW share 0.71 FA   24 apm   2.2  stratum: 12/19 apm   3.7 mw 0.73  rest: 8/16 apm   5.5 mw 0.70  counterpart: 12/22 apm   3.7 mw 0.60  no counterpart: 8/13 apm   5.5 mw 0.88  stratum+cp: 10/15 apm   4.4 mw 0.75  D8 FA 4 D9 FA 3 unlogged 6  FA/yr even 0.91
+r24 filtered (equal stratum+cp)    k= 3.5 matched 20/35 MW share 0.78 FA   22 apm   2.1  stratum: 11/19 apm   3.8 mw 0.71  rest: 9/16 apm   4.7 mw 0.83  counterpart: 13/22 apm   3.2 mw 0.76  no counterpart: 7/13 apm   6.0 mw 0.80  stratum+cp: 9/15 apm   4.7 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.73
+    stratum+cp apm: plain 6.1 [3.5833333333333335, 13.2], filtered 4.7 [2.857142857142857, 9.75]; ratio 0.76 [0.5651918158567775, 0.9375000000000001]
+    pooled apm: plain 2.8 [1.9523809523809523, 4.0], filtered 2.1 [1.5909090909090908, 2.8461538461538463]; ratio 0.76 [0.5692307692307692, 0.9375]
+r24 theta0.10 (equal stratum+cp)   k= 3.5 matched 20/35 MW share 0.78 FA   21 apm   2.0  stratum: 11/19 apm   3.7 mw 0.71  rest: 9/16 apm   4.6 mw 0.83  counterpart: 13/22 apm   3.2 mw 0.76  no counterpart: 7/13 apm   5.9 mw 0.80  stratum+cp: 9/15 apm   4.6 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.67
+r24 theta0.50 (equal stratum+cp)   k= 3.5 matched 20/35 MW share 0.78 FA   28 apm   2.4  stratum: 11/19 apm   4.4 mw 0.71  rest: 9/16 apm   5.3 mw 0.83  counterpart: 13/22 apm   3.7 mw 0.76  no counterpart: 7/13 apm   6.9 mw 0.80  stratum+cp: 9/15 apm   5.3 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.79
+r24 drop_on_one (equal stratum+cp) k= 3.5 matched 18/35 MW share 0.67 FA   20 apm   2.1  stratum: 11/19 apm   3.5 mw 0.71  rest: 7/16 apm   5.4 mw 0.64  counterpart: 11/22 apm   3.5 mw 0.58  no counterpart: 7/13 apm   5.4 mw 0.80  stratum+cp: 9/15 apm   4.2 mw 0.72  D8 FA 3 D9 FA 3 unlogged 4  FA/yr even 0.73
+pit24 plain                        k= 2.8 matched 22/35 MW share 0.81 FA   54 apm   3.5  stratum: 13/19 apm   5.8 mw 0.77  rest: 9/16 apm   8.4 mw 0.83  counterpart: 14/22 apm   5.4 mw 0.78  no counterpart: 8/13 apm   9.5 mw 0.84  stratum+cp: 10/15 apm   7.6 mw 0.75  D8 FA 4 D9 FA 1 unlogged 4  FA/yr even 2.13
+pit24 filtered (equal all)         k= 2.7 matched 22/35 MW share 0.77 FA   41 apm   2.9  stratum: 13/19 apm   4.8 mw 0.77  rest: 9/16 apm   7.0 mw 0.77  counterpart: 13/22 apm   4.8 mw 0.69  no counterpart: 9/13 apm   7.0 mw 0.88  stratum+cp: 10/15 apm   6.3 mw 0.75  D8 FA 3 D9 FA 2 unlogged 3  FA/yr even 1.52
+    stratum+cp apm: plain 7.6 [4.538461538461538, 15.5], filtered 6.3 [3.8461538461538463, 12.75]; ratio 0.83 [0.6436781609195402, 1.0434782608695652]
+    pooled apm: plain 3.5 [2.45, 4.888888888888889], filtered 2.9 [2.0869565217391304, 4.0]; ratio 0.83 [0.6426436842853084, 1.0571273186935934]
+pit24 filtered (equal stratum+cp)  k= 3.0 matched 21/35 MW share 0.75 FA   17 apm   1.8  stratum: 13/19 apm   2.9 mw 0.77  rest: 8/16 apm   4.8 mw 0.74  counterpart: 13/22 apm   2.9 mw 0.69  no counterpart: 8/13 apm   4.8 mw 0.84  stratum+cp: 10/15 apm   3.8 mw 0.75  D8 FA 1 D9 FA 2 unlogged 1  FA/yr even 0.61
+    stratum+cp apm: plain 7.6 [4.538461538461538, 15.333333333333334], filtered 3.8 [2.4166666666666665, 7.333333333333333]; ratio 0.50 [0.3703611111111111, 0.6666666666666666]
+    pooled apm: plain 3.5 [2.4444444444444446, 4.9], filtered 1.8 [1.391304347826087, 2.411764705882353]; ratio 0.52 [0.39080459770114945, 0.6986301369863014]
+
+=== Operating point of RO_b80's false alarm rate (plain thresholds of experiments 308 and 309) ===
+carried RO_b80                     k= nan matched 20/35 MW share 0.68 FA  127 apm   7.3  stratum: 13/19 apm  11.3 mw 0.77  rest: 7/16 apm  21.0 mw 0.61  counterpart: 13/22 apm  11.3 mw 0.59  no counterpart: 7/13 apm  21.0 mw 0.80  stratum+cp: 12/15 apm  12.2 mw 0.85  D8 FA 26 D9 FA 23 unlogged 4  FA/yr even 3.64
+r24 plain                          k= 2.6 matched 24/35 MW share 0.83 FA  119 apm   6.0  stratum: 13/19 apm  11.0 mw 0.70  rest: 11/16 apm  13.0 mw 0.92  counterpart: 14/22 apm  10.2 mw 0.73  no counterpart: 10/13 apm  14.3 mw 0.96  stratum+cp: 10/15 apm  14.3 mw 0.67  D8 FA 17 D9 FA 7 unlogged 12  FA/yr even 3.52
+r24 filtered (equal all)           k= 2.9 matched 24/35 MW share 0.85 FA   50 apm   3.1  stratum: 14/19 apm   5.3 mw 0.80  rest: 10/16 apm   7.4 mw 0.89  counterpart: 15/22 apm   4.9 mw 0.81  no counterpart: 9/13 apm   8.2 mw 0.92  stratum+cp: 11/15 apm   6.7 mw 0.79  D8 FA 8 D9 FA 3 unlogged 11  FA/yr even 1.88
+    stratum+cp apm: plain 14.3 [8.538461538461538, 29.2], filtered 6.7 [4.142857142857143, 12.857589285714248]; ratio 0.47 [0.3380236186348862, 0.6071428571428572]
+    pooled apm: plain 6.0 [4.346153846153846, 8.304551630434766], filtered 3.1 [2.2758620689655173, 4.2105263157894735]; ratio 0.52 [0.40434740894355453, 0.6462804126293078]
+r24 theta0.10 (equal all)          k= 2.9 matched 24/35 MW share 0.85 FA   45 apm   2.9  stratum: 14/19 apm   4.9 mw 0.80  rest: 10/16 apm   6.9 mw 0.89  counterpart: 15/22 apm   4.6 mw 0.81  no counterpart: 9/13 apm   7.7 mw 0.92  stratum+cp: 11/15 apm   6.3 mw 0.79  D8 FA 8 D9 FA 3 unlogged 10  FA/yr even 1.82
+r24 theta0.50 (equal all)          k= 2.9 matched 24/35 MW share 0.85 FA   67 apm   3.8  stratum: 14/19 apm   6.5 mw 0.80  rest: 10/16 apm   9.1 mw 0.89  counterpart: 15/22 apm   6.1 mw 0.81  no counterpart: 9/13 apm  10.1 mw 0.92  stratum+cp: 11/15 apm   8.3 mw 0.79  D8 FA 8 D9 FA 3 unlogged 11  FA/yr even 2.31
+r24 drop_on_one (equal all)        k= 2.5 matched 24/35 MW share 0.77 FA   72 apm   4.0  stratum: 15/19 apm   6.4 mw 0.83  rest: 9/16 apm  10.7 mw 0.73  counterpart: 14/22 apm   6.9 mw 0.64  no counterpart: 10/13 apm   9.6 mw 0.96  stratum+cp: 12/15 apm   8.0 mw 0.83  D8 FA 18 D9 FA 7 unlogged 12  FA/yr even 2.31
+r24 filtered (equal stratum+cp)    k= 3.4 matched 21/35 MW share 0.79 FA   25 apm   2.2  stratum: 12/19 apm   3.8 mw 0.73  rest: 9/16 apm   5.1 mw 0.83  counterpart: 14/22 apm   3.3 mw 0.78  no counterpart: 7/13 apm   6.6 mw 0.80  stratum+cp: 10/15 apm   4.6 mw 0.75  D8 FA 3 D9 FA 3 unlogged 5  FA/yr even 0.91
+    stratum+cp apm: plain 14.3 [8.6, 29.25], filtered 4.6 [2.875, 9.0]; ratio 0.32 [0.21333280922431863, 0.47049290105386404]
+    pooled apm: plain 6.0 [4.344827586206897, 8.352941176470589], filtered 2.2 [1.6538461538461537, 2.9444444444444446]; ratio 0.37 [0.26505743705218293, 0.49368491261535286]
+r24 theta0.10 (equal stratum+cp)   k= 3.4 matched 21/35 MW share 0.79 FA   22 apm   2.0  stratum: 12/19 apm   3.6 mw 0.73  rest: 9/16 apm   4.8 mw 0.83  counterpart: 14/22 apm   3.1 mw 0.78  no counterpart: 7/13 apm   6.1 mw 0.80  stratum+cp: 10/15 apm   4.3 mw 0.75  D8 FA 3 D9 FA 3 unlogged 5  FA/yr even 0.73
+r24 theta0.50 (equal stratum+cp)   k= 3.4 matched 21/35 MW share 0.79 FA   33 apm   2.6  stratum: 12/19 apm   4.5 mw 0.73  rest: 9/16 apm   6.0 mw 0.83  counterpart: 14/22 apm   3.9 mw 0.78  no counterpart: 7/13 apm   7.7 mw 0.80  stratum+cp: 10/15 apm   5.4 mw 0.75  D8 FA 3 D9 FA 3 unlogged 5  FA/yr even 0.97
+r24 drop_on_one (equal stratum+cp) k= 3.4 matched 19/35 MW share 0.68 FA   21 apm   2.1  stratum: 12/19 apm   3.3 mw 0.73  rest: 7/16 apm   5.7 mw 0.64  counterpart: 12/22 apm   3.3 mw 0.60  no counterpart: 7/13 apm   5.7 mw 0.80  stratum+cp: 10/15 apm   4.0 mw 0.75  D8 FA 3 D9 FA 3 unlogged 5  FA/yr even 0.79
+pit24 plain                        k= 2.4 matched 26/35 MW share 0.86 FA  141 apm   6.4  stratum: 15/19 apm  11.1 mw 0.80  rest: 11/16 apm  15.2 mw 0.91  counterpart: 17/22 apm   9.8 mw 0.85  no counterpart: 9/13 apm  18.6 mw 0.88  stratum+cp: 12/15 apm  13.9 mw 0.79  D8 FA 12 D9 FA 2 unlogged 5  FA/yr even 4.80
+pit24 filtered (equal all)         k= 2.3 matched 27/35 MW share 0.91 FA  101 apm   4.7  stratum: 16/19 apm   8.0 mw 0.90  rest: 11/16 apm  11.6 mw 0.91  counterpart: 18/22 apm   7.1 mw 0.92  no counterpart: 9/13 apm  14.2 mw 0.88  stratum+cp: 13/15 apm   9.8 mw 0.92  D8 FA 15 D9 FA 3 unlogged 7  FA/yr even 3.76
+    stratum+cp apm: plain 13.9 [8.647058823529411, 26.166666666666668], filtered 9.8 [6.315789473684211, 17.571428571428573]; ratio 0.71 [0.540900974025974, 0.8699186991869918]
+    pooled apm: plain 6.4 [4.62962962962963, 8.818379446640298], filtered 4.7 [3.5384615384615383, 6.3076923076923075]; ratio 0.74 [0.6036671714756363, 0.8806005123059555]
+pit24 filtered (equal stratum+cp)  k= 2.4 matched 25/35 MW share 0.84 FA   89 apm   4.6  stratum: 15/19 apm   7.6 mw 0.88  rest: 10/16 apm  11.4 mw 0.81  counterpart: 16/22 apm   7.1 mw 0.82  no counterpart: 9/13 apm  12.7 mw 0.88  stratum+cp: 12/15 apm   9.5 mw 0.89  D8 FA 10 D9 FA 2 unlogged 5  FA/yr even 3.52
+    stratum+cp apm: plain 13.9 [8.599705882352941, 25.571428571428573], filtered 9.5 [6.0, 17.33437499999991]; ratio 0.68 [0.5085467479674797, 0.9081660182058432]
+    pooled apm: plain 6.4 [4.62962962962963, 8.818181818181818], filtered 4.6 [3.3845238095238095, 6.190476190476191]; ratio 0.71 [0.5755429188415926, 0.8640276199479877]
+
+=== Alarms per match at fixed recall (pooled; largest k reaching the target) ===
+recall >= 0.5: r24 plain: k=3.7 matched 19 apm 2.4
+recall >= 0.5: r24 filtered: k=3.7 matched 19 apm 1.9
+recall >= 0.5: pit24 plain: k=3.0 matched 22 apm 2.4
+recall >= 0.5: pit24 filtered: k=3.0 matched 21 apm 1.8
+recall >= 0.5: carried LR_b20: matched 10 apm 4.0
+recall >= 0.5: carried RO_b80: matched 20 apm 7.3
+recall >= 0.33: r24 plain: k=4.3 matched 12 apm 2.2
+recall >= 0.33: r24 filtered: k=4.3 matched 12 apm 1.9
+recall >= 0.33: pit24 plain: k=3.1 matched 17 apm 2.2
+recall >= 0.33: pit24 filtered: k=3.1 matched 16 apm 1.9
+recall >= 0.33: carried LR_b20: matched 10 apm 4.0
+recall >= 0.33: carried RO_b80: matched 20 apm 7.3
+
+=== Filter firing on alarms (r24 at k=3.5) ===
+false alarms plain 35 -> filtered 22; matched 20 -> 20
