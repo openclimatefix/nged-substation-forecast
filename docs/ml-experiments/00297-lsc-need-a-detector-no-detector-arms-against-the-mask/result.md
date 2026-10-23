@@ -60,8 +60,36 @@ decision_rule: >-
   same no-detector arm, lies inside +/-0.05 points. The best no-detector arm is the one with the
   lowest pooled twCRPS in G5 on the same target; because it is chosen on the scored rows, this
   leans towards "no detector needed", and every no-detector arm is reported against the detector
-  separately. The rule is applied to the stand-in detector and to PERFECT; if PERFECT does not
-  beat the best no-detector arm, no detector can. Reported with and without D11 (experiment 283
+  separately. Amendments after the plan review, fixed before any score is read. (A1) Selection: the
+  44 worlds are split by seed parity into half A (even seeds) and half B (odd seeds); the best
+  no-detector arm is chosen on half A by pooled G5 twCRPS at the 95th percentile against the true
+  normal-arrangement series, and every detector contrast is read on half B only. (A2) The two
+  decision contrasts are fixed: DET_MASK against the best arm on twCRPS against the true series (all
+  leads, G5), and DET_ADD against the best arm on curtailment cost against observed power (12 to 36
+  hour leads, G5, limit 0.5); the same two contrasts are read for PERFECT and PERFECT_ADD, and all
+  other combinations are reported without a decision. No multiplicity correction is applied across
+  the four; the page says so. (A3) Every fitted table, head, and T is fitted on residuals against
+  observed power (the stream a no-detector forecaster sees), never against the true series. Fit rows
+  are all rows of the other parity in the stored row set; parity is the target month for ordinary
+  rows and the onset month of the shift for rows near a shift. (A4) LEAD_DECAY replaces the filter's
+  own projection: the correction is c0 * exp(-lead/T(u)), where c0 is K0's correction at the run's
+  first half-hour. u and the as-of usual level use site scales computed on the real record without
+  injected shifts. (A5) GAM_ONLY_K0SPREAD (no correction, experiment 115's K0 spread) is added, so
+  P1 separates the cost of dropping the correction from the cost of the new spread. (A6) Units: every
+  absolute difference is in points of effective capacity and every relative gain is a percentage of
+  the comparator's score; the bars in P1 to P3 and the G1 bars apply to the point estimate, the
+  interval is reported beside. P1's coverage bar applies to each tail separately, in the 48 hours
+  after a shift, against the true series. P3's recovery is (K0 - LEAD_DECAY) / (K0 - PERFECT) on G4
+  twCRPS against the true series, bootstrapped per draw. The 9.1% in the brief is not reproduced
+  here; K0's own share is recomputed and used as the baseline for P2. The rule is applied to the
+  stand-in detector and to PERFECT; if PERFECT does not
+  beat the best no-detector arm, no detector can. Every verdict on question 2 is labelled "against
+  RO-NC". If RO-NC beats the best no-detector arm, the conclusion is "a detector is needed". If
+  RO-NC does not, the page does not conclude "a detector is not needed": it says "not shown with
+  RO-NC" and names the next experiment as running LR_b20 on the injected worlds, after checking
+  whether the learned score needs retraining there (experiment 208 noted it was trained on the
+  real record). Only a PERFECT arm that fails to beat the best no-detector arm supports "no
+  detector can add value". Reported with and without D11 (experiment 283
   found one Primary supplies 106 of 267 shifts reaching the 48-hour group). Intervals: whole
   shifts resampled for shift groups, whole calendar months for ordinary rows, 95%, 20,000 draws.
   A Primary has no published limit and no known farm, so curtailment is a relative comparison
@@ -96,6 +124,12 @@ comparator arm.
 
 ## Plan notes
 
+- **Departures from the brief's step 5.** The forecasts are the GAM-K cached ensemble members of
+  experiments 111 and 115, which the injected worlds were built on, not arm D of experiment 155 or
+  the experiment 220 stack, because neither has forecasts on the injected worlds. The detector is
+  RO-NC (the `R0_M48` intervals in each world) instead of LR_b20, as above. BAND_TABLE_PLAIN,
+  DET_ADD, and GAM_ONLY_K0SPREAD are added to isolate effects. Cross-fitting replaces the odd-month
+  fit.
 - **Stand-in detector.** Experiment 141's worlds carry RO-NC alarm intervals and no other
   detector's alarms. The carried LR_b20 mask of experiments 227 and 258 was scored on the real
   record only, so applying it to the injected worlds would need a new reviewed pipeline. The page
