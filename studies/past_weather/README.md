@@ -5,8 +5,9 @@ weather products against metered solar and wind output on the same rows, folds, 
 published pages carry the design and the results. Every script's module docstring gives the command
 that runs it.
 
-**A script imports only from this folder, from `studies.*` (`packages/studies/`), and from the other
-reviewed packages in `packages/*`.** The code that two study folders share lives in
+**A script imports from this folder, from other study and experiment folders, from `studies.*`
+(`packages/studies/`), and from the other reviewed packages in `packages/*`.** The code that
+several study folders share lives in
 `packages/studies/src/studies/`: the solar and wind common rows (`studies.solar_product_frames`,
 `studies.wind_product_frames`, `studies.product_frames`), the PV dataset readers
 (`studies.pv_dataset`), the fit runner (`studies.arm_runner`), the data paths (`studies.sources`),
