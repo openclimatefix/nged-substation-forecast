@@ -20,7 +20,7 @@ from typing import Final
 import e00267_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache, default_input_paths, load_or_build_feature_cache
 from studies.dp_gam import (
     DEFAULT_MAX_ITERATIONS,
