@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import multiprocessing
 import os
-import sys
 from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -25,14 +24,63 @@ import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]
 from studies.dp_ens_weather import replace_site
-from studies.dp_features import FeatureCache, load_or_build_feature_cache, naive_utc
+from studies.dp_features import (
+    FeatureCache,
+    default_input_paths,
+    load_or_build_feature_cache,
+    naive_utc,
+)
+from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
-
-sys.path.insert(0, str(Path(__file__).parents[1] / "00274-lsc-long-arrangement-audit-gam-refit"))
-import e00274_fit as base
 
 EXPERIMENT_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00290-lsc-long-shift-cut-date-robustness"
 ROWS_DIR: Final[Path] = EXPERIMENT_DIR / "rows"
+CACHE_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00106-differentiable-physics-4-all-years-drift-and-recent-level"
+    / "cache"
+)
+SITES: Final[tuple[str, ...]] = ("D2", "D3", "D4", "D5", "D10", "D11", "D12", "D19", "D21", "D22")
+SEASON_YEARS: Final[range] = range(2019, 2027)
+RIDGE: Final[float] = 0.1
+"""Experiment 104's tuned ridge penalty, as in the GAM-K settings of experiments 252 and 274."""
+WINDOW: Final[TrainingWindow] = TrainingWindow(months=24)
+
+
+def add_months(*, moment: datetime, months: int) -> datetime:
+    """Return the first of the month `months` after (or before) `moment`'s month."""
+    index = moment.year * 12 + moment.month - 1 + months
+    return datetime(index // 12, index % 12 + 1, 1, tzinfo=UTC)
+
+
+def target_rows(*, cache: FeatureCache, site: str, cut: datetime, stop: datetime) -> np.ndarray:
+    """Return the scored grid rows from `cut` to `stop`: a reading and finite model inputs."""
+    features = cache.sites[site]
+    first, last = naive_utc(moment=cut), naive_utc(moment=stop)
+    keep = (
+        (cache.end_times > first)
+        & (cache.end_times <= last)
+        & features.present
+        & np.isfinite(features.y)
+        & np.isfinite(features.pv_unit_shape)
+        & np.isfinite(features.smoothed_temperature_c).all(axis=1)
+    )
+    return np.flatnonzero(keep)
+
+
+def forecast(*, cache: FeatureCache, site: str, cut: datetime, index: np.ndarray) -> np.ndarray:
+    """Fit GAM_ONLY with the cut's rows (24-month window) and predict the rows `index`."""
+    fit = fit_gam(
+        cache=cache,
+        site=site,
+        specs=[GamSpec(ridge=RIDGE, drift="none", capacity="fitted", final_knot="free")],
+        cut=cut,
+        window=WINDOW,
+        season_years=SEASON_YEARS,
+    )
+    return predict_gam(cache=cache, fit=fit, index=index)
+
+
 END_DATES: Final[tuple[datetime, ...]] = tuple(
     datetime(y, m, d, tzinfo=UTC)
     for y, m, d in (
@@ -70,7 +118,6 @@ def run_job(*, cache: FeatureCache, site: str, end: datetime) -> pl.DataFrame:
     active = (stamps > naive_utc(moment=onset)) & (stamps <= naive_utc(moment=end))
     delta = np.where(active, SIZE * features.y, 0.0)
     injected = replace_site(cache=cache, site=site, y=features.y + delta)
-    window = base.WINDOWS["24m"]
     mean_transfer = float(np.nanmean(delta[active & np.isfinite(delta)]))
     records: list[dict] = []
     for hours in CUT_OFFSET_HOURS:
@@ -80,7 +127,7 @@ def run_job(*, cache: FeatureCache, site: str, end: datetime) -> pl.DataFrame:
             targets["after_48h"] = AFTER_48H
         cut_forecasts: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         for name, (first_day, last_day) in targets.items():
-            index = base.target_rows(
+            index = target_rows(
                 cache=cache,
                 site=site,
                 cut=max(cut, end + timedelta(days=first_day)),
@@ -88,8 +135,8 @@ def run_job(*, cache: FeatureCache, site: str, end: datetime) -> pl.DataFrame:
             )
             if len(index) == 0:
                 continue
-            clean = base.forecast(cache=cache, site=site, cut=cut, window=window, index=index)
-            moved = base.forecast(cache=injected, site=site, cut=cut, window=window, index=index)
+            clean = forecast(cache=cache, site=site, cut=cut, index=index)
+            moved = forecast(cache=injected, site=site, cut=cut, index=index)
             cut_forecasts[name] = (clean, moved)
             truth = features.y[index]
             records.append(
@@ -106,7 +153,7 @@ def run_job(*, cache: FeatureCache, site: str, end: datetime) -> pl.DataFrame:
                     "n_train_rows": int(
                         (
                             (stamps <= naive_utc(moment=cut))
-                            & (stamps > naive_utc(moment=base.add_months(moment=cut, months=-24)))
+                            & (stamps > naive_utc(moment=add_months(moment=cut, months=-24)))
                             & features.present
                             & np.isfinite(features.y)
                         ).sum()
@@ -140,10 +187,8 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=3)
     args = parser.parse_args()
     ROWS_DIR.mkdir(parents=True, exist_ok=True)
-    from studies.dp_features import default_input_paths
-
-    _CACHE = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=base.CACHE_DIR)
-    jobs = [(site, end) for site in base.SITES for end in END_DATES]
+    _CACHE = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=CACHE_DIR)
+    jobs = [(site, end) for site in SITES for end in END_DATES]
     context = multiprocessing.get_context("fork")
     with ProcessPoolExecutor(max_workers=args.workers, mp_context=context) as pool:
         for line in pool.map(_job, jobs):
