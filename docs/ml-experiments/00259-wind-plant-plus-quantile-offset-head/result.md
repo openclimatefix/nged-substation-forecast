@@ -255,4 +255,3 @@ Intervals resample whole months and the five seeds; they are 98.75% for the plan
   offset table.
 - **Which months of ensemble forecasts does the offset table need?** The experiment trained on 15
   months and could not say whether a shorter or longer window gives a more stable table.
-
