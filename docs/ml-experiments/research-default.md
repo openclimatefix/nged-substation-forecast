@@ -40,7 +40,10 @@ score, the mean absolute error of the median, tail-weighted continuous ranked pr
 | Wind farms W1 to W3 and the public wind farms of experiment 288 | `fold_a_tuesdays_v1`, 53 Tuesday runs | To be named with the first default | Wind farms research default 1: to be named when the first default is chosen. No adoption until then | To be named with the first default |
 | Bulk and grid supply points | `fold_a_daily_gap_v1` | To be named with the first default | Bulk and grid supply points research default 1: to be named when the first default is chosen. No adoption until then | Weekly |
 
-**NGED care about the 1 day to 10 day horizon, so each family states its lead range, and a lead range shorter than that is a limit on every result.** The Primary-demand range stops at 7 days and the metered-farm range stops at 36 hours. A `change` result for such a family repeats its lead range in its headline caveat, for example "scored at 12 to 36 hour leads only".
+**NGED care about the 1 day to 10 day horizon, so each family states its lead range, and a lead
+range shorter than that is a limit on every result.** The Primary-demand range stops at 7 days and
+the metered-farm range stops at 36 hours. A `change` result for such a family repeats its lead range
+in its headline caveat, for example "scored at 12 to 36 hour leads only".
 
 **The headline metric for all four families is the quantile score over 11 levels, in points of
 effective capacity.** A point is 1% of a series' capacity.
@@ -158,7 +161,11 @@ detection or decision studies are `kind: other` and never adopt. The five items 
 - The pre-registered default-plus-x arm or arms.
 - The controls that apply: a known-answer test, a placebo, a leakage check.
 
-**An experiment that evaluates a blend reports each constituent model family alone beside the blend.** The single-family table comes first, and the page states the blend's added value over the best single family, with an interval. The first production update is a relatively simple model implemented as one model family, for example XGBoost only, while blends stay of interest. A blend is adopted into the research default only with that table present.
+**An experiment that evaluates a blend reports each constituent model family alone beside the
+blend.** The single-family table comes first, and the page states the blend's added value over the
+best single family, with an interval. The first production update is a relatively simple model
+implemented as one model family, for example XGBoost only, while blends stay of interest. A blend is
+adopted into the research default only with that table present.
 
 **The default plus x is produced on the research default's full row set.** Its stored forecasts then
 serve as the next version without a separate regeneration job.
@@ -317,7 +324,7 @@ of cadence is a `change` experiment.** The evidence differs by family.
 |---|---|---|
 | Primary demand, XGBoost benchmark BG2 | Weekly beats monthly by 0.123 (experiment 87) to 0.13 (experiment 48) points | Weekly, with a 12-month-window monthly refit as a research proxy ([experiment 85](00085-cheaper-retraining-schedules-rank-arms-like-weekly-demand/result.md)) |
 | Primary demand, GAM stack | Weekly minus monthly +0.001, quarterly minus monthly +0.010 (experiment 278) | Monthly |
-| Bulk and grid supply points | Weekly beats monthly by 0.160 points (0.066 to 0.247, experiment 87) | To be named with the first default | Weekly |
+| Bulk and grid supply points | Weekly beats monthly by 0.160 points (0.066 to 0.247, experiment 87) | Weekly |
 | Metered solar and wind farms | Monthly minus frozen -0.044 for solar and +0.007 for wind (experiment 48), inside a ±0.05 band | A single fit, or monthly, as the family's first version states |
 
 **Quarterly refits are not used for the XGBoost-based families.** Experiment 85 found that quarterly
