@@ -7,7 +7,8 @@ title: >-
 theme: metered-solar-farms
 also_relevant_to:
 - generator-forecasting
-status: planned
+status: finished
+date: 2026-10-23
 kind: other
 size: >-
   medium. Stored: private predictions and tables under
@@ -44,34 +45,193 @@ metric: >-
   Quantile score (twice the mean pinball loss over 11 levels, in points of capacity), and the
   pinball loss at 0.01 and 0.99
 code: ml-experiments/00313-metered-farm-pure-xgboost-and-mdn-vs-plant/
+verdict: partly supported
+best_arm: >-
+  Solar: the pure mixture-density network (MDN), which scores 5.34 points of capacity at day 1 in own
+  history and 5.45 in zero history, against 5.36 and 5.53 for the plant plus MDN head. Wind: the
+  pure MDN, which scores 5.69 with ERA5 as the weather (kept rows, own history), against 6.17 for
+  the physics core.
+headline: >-
+  A mixture-density network that sees only weather and the calendar scores within 0.5% of the same
+  network given the plant forecast at day 1 (98.75% interval -2.4% to +1.0%), and within 3.4% at
+  days 8 to 10 (-1.3% to +10.4%). With no history for the farm it scores 1.4% better, not 3% worse.
+lessons: >-
+  The plant adds 0.5% to 1.8% when XGBoost sees the same weather columns, and nothing we can
+  measure when the network is the mixture-density head. For wind the pure MDN matches the physics
+  core with a neural adapter.
+take_home_message: >-
+  A forecast that sees only weather and the calendar, with no physical plant model anywhere,
+  scores almost as well as the plant-based forecast for the six solar farms, up to 10 days ahead, even
+  when the farm has no history. The plant's added value is small, between 0% and 3.4%, and its
+  intervals include zero except for XGBoost. For wind, the same kind of network also matches the
+  best plant-based forecast, so the first production update does not need a plant model to be
+  competitive.
+advice:
+  - >-
+    Take the pure mixture-density network (weather and calendar inputs only) as the simple
+    single-family candidate for the first production update of the solar farms: it scores 5.34 at day
+    1, within 0.5% of the plant plus MDN head, and 7% below climatology at days 8 to 10 (the
+    single-family table).
+  - >-
+    Do not expect the plant to help a farm with no history more than a farm with history: the pure
+    MDN scored 1.4% better than the plant plus MDN head at day 1 in zero history (Figure 2).
+  - >-
+    Give an XGBoost model the plant's response as one more column when plants exist: it lowers the
+    quantile score by 1.8% at day 1 and 0.5% at days 8 to 10 in own history (Figure 2 and the
+    checks).
+  - >-
+    Do not rely on XGBoost alone for tails: the pure MDN's 0.99 pinball loss is 37% to 43% below the
+    pure XGBoost's at every lead, and the plant plus XGBoost is no better (Results).
+  - >-
+    Use a mixture-density network, not XGBoost, as the weather-only wind model: it scores 7.8% below
+    the physics core with ERA5 as the weather and 32.5% below the pure XGBoost model at the 0.99
+    pinball loss (wind results).
+production_status: candidate
+adopted_in: none
 ---
 
-## Plan
+---
 
-- **Question.** Does a predictor given weather and calendar inputs only match the plant-based
-  forecast? "Plant" means the physical solar power model of experiments 218 and 287 or the wind
-  physics core of experiment 230. A pure predictor has no plant output and no plant-derived column.
-- **What experiment 300's XGBoost used.** Its inputs were the plant forecast (`mu`), the spread of
-  the plant response (`plant_spread`), the plant's unit response (`unit_mean`), and the availability
-  ratio (lagged power divided by the plant forecast), as well as weather. It is therefore not pure,
-  and the pure arms below replace it.
-- **Pure arms.** `PURE_XGB` is XGBoost (depth 6, 300 rounds, 11 quantiles, no base margin). `PURE_MDN`
-  is a three-component Gaussian mixture (experiment 300's network) on the target directly, five seeds
-  averaged. `PURE_BLEND` averages their quantiles level by level with equal weights.
-- **Solar inputs.** The 20 weather, sun-geometry, and calendar columns of experiment 310's rung six
-  that do not depend on the plant: irradiance means and spread, temperature, sun elevation and
-  azimuth, humidity, longwave, precipitation, pressure, 10 m and 100 m wind, 500 hPa height, the
-  clear-sky index, lead hours, hour, and day of year. Lagged power is left out as well, because the
-  brief asks for weather and calendar only.
-- **Wind inputs.** The six wind columns of experiment 276's XGBoost, the 2 m temperature, the hour,
-  and the day of year. Experiment 276's own XGBoost starts from a binned power curve as a base
-  margin, so it is quoted as a comparator and is not the pure arm.
-- **Schedule.** Solar copies experiment 310's three-monthly refits, day bands, and zero-history
-  setting. Wind trains on ERA5 before 2025-06-17 as in experiment 285 (Part A, ERA5 as the weather,
-  a ceiling because ERA5 arrives about 5 days late) and applies the models to the 51 ensemble
-  members (the forecast-time weather), mixing the members as experiment 285 did.
-- **Zero history for wind.** The brief allows pooling the public wind farms of experiment 288. That
-  experiment never ran its fits, so zero history for wind trains on the other two metered farms,
-  which is a deviation.
-- **Past-weather caveat.** Solar uses only ensemble weather available at forecast time. Wind's ERA5
-  rows are a ceiling and the ensemble rows are the forecast-time figures.
+**A mixture-density network that sees only weather and the calendar forecasts almost as well as the
+plant-based forecasts, for the six metered solar farms and the three metered wind farms.** The plant
+adds between 0% and 3.4% to the solar quantile score, and adds nothing we can measure in zero
+history. This narrows the search: the first production update can be a single weather-only model,
+and the plant's value is in the tail and in the last third of the 10-day horizon, not at day 1.
+
+We asked whether predictors built from weather and calendar inputs only, with no plant model
+anywhere in the pipeline, match forecasts built on a plant model (a physical power model of the
+farm: the solar plant of experiments [218](../00218-metered-solar-farm-plant-fit/result.md) and
+[287](../00287-metered-farm-spread-binned-plant-heads/result.md), or the wind physics core of
+experiment [230](../00230-wind-physics-core-part-1/result.md)). We fitted XGBoost
+([Chen and Guestrin, 2016](https://doi.org/10.1145/2939672.2939785)) and a three-component Gaussian
+mixture-density network (MDN, as in experiment [300](../00300-metered-farm-best-guess-assembly/result.md))
+on the same rows as experiments [310](../00310-metered-farm-long-lead-scoring/result.md) (solar,
+leads of 1 to 10 days) and [285](../00285-wind-effective-wind-adapters/result.md) (wind). Scores are
+quantile scores in points of capacity (lower is better), and intervals resample the 12 scored months
+at 98.75%. "Own history" trains on the farm's earlier months and "zero history" on the other
+farms only.
+
+**The verdict is partly supported.** Three of the four predictions held in part. P1 held in own
+history and failed in zero history, P2 and P3 held, and P4 held for XGBoost and failed for the MDN
+(table below).
+
+## Single families alone, solar, own history, then zero history
+
+| Day band | Pure XGBoost | Pure MDN | Plant plus MDN head | Plant plus XGBoost | Plant-based blend | `climatology` |
+|---|---|---|---|---|---|---|
+| 1 | 5.60 / 5.65 | 5.34 / 5.45 | 5.36 / 5.53 | 5.50 / 5.58 | 5.30 / 5.45 | 8.64 |
+| 3 | 6.39 / 6.41 | 6.07 / 6.16 | 6.08 / 6.23 | 6.33 / 6.35 | 6.05 / 6.18 | 8.64 |
+| 6 to 7 | 8.06 / 7.93 | 7.48 / 7.53 | 7.35 / 7.48 | 7.99 / 7.87 | 7.35 / 7.45 | 8.64 |
+| 8 to 10 | 8.67 / 8.52 | 8.03 / 8.01 | 7.76 / 7.91 | 8.62 / 8.46 | 7.77 / 7.89 | 8.64 |
+
+The pure blend (equal weights of the pure XGBoost and the pure MDN) scores 5.38 / 5.48 at day 1 and
+8.19 / 8.13 at days 8 to 10, which is worse than the pure MDN alone, so the pure families are best
+used singly. The "plant plus" columns are experiment 310's stored arms: the MDN head sees seven
+inputs (the plant forecast, its spread, the lagged-power ratio, lagged power, the clear-sky index,
+lead), and the plant plus XGBoost sees the weather columns the pure XGBoost sees, plus the plant's
+response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at days 8 to 10.
+
+![Figure 1: quantile score by lead, solar](figure_1_solar_scores.svg)
+
+![Figure 2: the plant's added value, solar](figure_2_solar_plant_value.svg)
+
+![Figure 3: wind quantile score by arm](figure_3_wind_scores.svg)
+
+## Solar results
+
+- **Pre-registered predictions (98.75% intervals).**
+    - P1 partly failed. Pure MDN minus plant plus MDN head, own history: -0.5% (-2.4 to +1.0) at day
+      1, within the 2% bound. Zero history: -1.4% (-3.0 to +0.4) at day 1, so the pure MDN is not 3%
+      worse, and the bound fails.
+    - P2 held. The pure XGBoost scores 0.54 at the 0.99 pinball loss against 0.31 for the pure MDN
+      (-42.8%, -50.1 to -35.5, own history day 1), and the gap stays between -37% and -43% to days 8
+      to 10.
+    - P4 partly failed. The pure XGBoost against `climatology` at days 8 to 10 is +0.4% (-6.2 to
+      +8.0) in own history and -1.4% (-7.7 to +5.9) in zero history, so it shows no skill, as
+      predicted. The pure MDN against the plant-based blend is +3.4% (-0.6 to +8.9) in own history
+      and +1.5% (-1.6 to +6.1) in zero history, short of the predicted 5%.
+- **The plant's value, like for like.** Pure XGBoost minus plant plus XGBoost: +1.8% (0.7 to 3.1) at
+  day 1, +0.9% (0.3 to 1.6) at days 6 to 7, and +0.5% (-0.0 to +1.1) at days 8 to 10 in own history.
+  Zero history: +1.3% (0.6 to 2.0), +0.7% (0.2 to 1.4), +0.6% (0.1 to 1.2).
+- **The plant's value against the best blend.** Pure MDN minus plant-based blend, own history: +0.7%
+  (-0.6 to +1.8) at day 1, +1.8% (-1.0 to +4.7) at days 6 to 7, and +3.4% at days 8 to 10. Every
+  interval includes zero.
+- **The pure MDN keeps skill to day 10.** Against `climatology` it is -38.2% at day 1 and -7.0% at
+  days 8 to 10 in own history, and -36.9% and -7.2% in zero history. Against `manual_heuristic` it
+  is -38.6% (-41.6 to -35.6) at day 1 and -9.1% (-15.3 to +0.2) at days 8 to 10.
+- **Tails (own history, day 1 / days 8 to 10).** 0.99 pinball loss: pure MDN 0.31 / 0.33, pure
+  XGBoost 0.54 / 0.56, plant plus MDN head 0.30 / 0.34, `climatology` 0.43. Coverage of the 0.01
+  quantile: pure MDN 0.037 / 0.036, pure XGBoost 0.035 / 0.044. Coverage of the 0.99 quantile: pure MDN
+  0.985 / 0.987, pure XGBoost 0.990 / 0.989.
+- **Lead range.** The solar rows cover leads of 12 hours to 10 days, which is NGED's horizon.
+
+## Wind results (W1 to W3 pooled, kept rows, 53 Tuesday runs)
+
+| Arm | ERA5 weather, own | ERA5, zero history | Ensemble, own | Ensemble, zero history |
+|---|---|---|---|---|
+| Physics core | 6.17 | | | |
+| XGBoost on a binned power curve | 5.86 | | | |
+| Core with neural adapter | 5.72 | | | |
+| Pure XGBoost | 5.76 | 7.11 | 11.58 | 11.99 |
+| Pure MDN | 5.69 | 7.16 | 11.53 | 11.99 |
+
+- **P3 held.** Pure MDN minus pure XGBoost: -1.2% (-0.15 to +0.04 points) with ERA5 own history,
+  -0.4% (-0.13 to +0.01) on ensemble weather own history, and +0.8% (-0.05 to +0.15) with ERA5 in
+  zero history. All three are within the 2% bound.
+- **Against the physics core and the adapter (ERA5, own history).** The pure MDN is 0.48 points
+  (-0.71 to -0.27) below the physics core, matches the core with the neural adapter (-0.03, -0.18 to
+  +0.05), and the pure XGBoost is 0.41 below the core (-0.60 to -0.23). Experiment 276's XGBoost
+  with a binned-curve margin scores 5.86, 0.10 above the pure XGBoost (-0.28 to +0.07).
+- **Tails.** 0.99 pinball loss with ERA5, own history: pure MDN 0.34, pure XGBoost 0.50, physics core
+  0.36, adapter 0.35. The pure MDN's 0.99 loss is 32.5% below the pure XGBoost's (-0.20 to -0.13
+  points).
+- **Zero history costs 1.4 points for wind** (7.11 to 7.16 against 5.69 to 5.76) when the model
+  trains on the other two metered farms. Experiment 288's public wind farms were not used.
+- **Ensemble weather.** Experiment 285's physics core on raw members scored 11.82 and its XGBoost
+  11.70 on these rows, but those models trained to 2024-04-01 and these to 2025-06-17, so the
+  comparison is not like for like and no contrast is stated.
+
+## Checks
+
+- **Median forecast minus mean forecast (points of capacity, own history, solar day 1).** Pure MDN
+  +0.56, pure XGBoost -0.95, plant plus MDN head +0.42, plant plus XGBoost -0.91. Wind with
+  ensemble weather: -5.1 for the pure MDN and -5.3 for the pure XGBoost, the right skew of the
+  member mixture that experiment 285 also found.
+- **Error of the mean forecast beside each score contrast.** Pure MDN minus plant plus MDN head, own
+  history day 1: error of the mean forecast -0.5%, score -0.5%. Pure MDN minus pure XGBoost: -5.5%
+  against -4.7%. The directions agree, so trigger 3 did not fire.
+- **Audit triggers.** Trigger 2 fired: P1's zero-history bound failed and contradicts experiment
+  300's finding that the plant helps a farm without history. We tested part of an explanation. The
+  plant plus MDN head of experiment 310 sees 7 inputs and no raw weather, while the pure MDN sees 20
+  weather columns, so the contrast mixes the plant with the input list. The like-for-like contrast
+  (pure XGBoost against plant plus XGBoost, same weather columns) shows the plant adds 0.6% to 1.3% in
+  zero history. We did not run a pure-weather MDN with the plant forecast added. No audit ran,
+  because the brief said Sonnet only, so the maintainer or manager decides whether to run one.
+  Triggers 1, 4, 5, 6, and 7 did not fire.
+
+## Method and caveats
+
+- **Inputs.** Solar pure inputs are 20 columns: irradiance means and spread, 2 m temperature, sun
+  elevation and azimuth, humidity, longwave, precipitation, pressure, 10 m and 100 m wind, 500 hPa
+  height, the clear-sky index, lead, hour, and day of year. Lagged power and every plant-derived
+  column are absent. Experiment 300's XGBoost used the plant forecast, its spread, and the plant's
+  unit response, so it is not a pure comparator. Wind pure inputs are experiment 276's six wind
+  columns plus the 2 m temperature, hour, and day of year.
+- **Schedule.** Solar copies experiment 310's three-monthly refits (not weekly) on its day bands,
+  with five MDN seeds and one XGBoost fit. Wind trains once on ERA5 to 2025-06-17 as in experiment
+  285, applies the models to ERA5 (a ceiling, because ERA5 arrives about 5 days late) and to the 51
+  ensemble members, and mixes the members with equal weights and experiment 285's spread factor.
+- **Calendar inputs.** The hour and day of year are inputs, and no control without them was run, so
+  some of the pure models' skill may be calendar memorisation. Experiment 310 found that dropping
+  lagged power changed scores by under 0.6%.
+- **Wind intervals** resample the 12 months of the run with farms pooled, and the comparators
+  (physics core, adapter, binned-curve XGBoost) are stored from experiments 276 and 285.
+- **Not covered.** Weekly refits, a pure MDN with the plant added, the public wind farms, and the
+  curtailment-cost metric.
+
+## What to try next
+
+- **Run a pure-weather MDN with the plant forecast as one more input**, which separates the plant's
+  value from the input list, and test whether the plant helps more at the 0.99 tail.
+- **Rerun the best weather-only models with weekly refits and without hour and day of year**, which
+  tests the schedule and calendar-memorisation caveats.
