@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 284 | Does a network trained only for the tails beat XGBoost at the 0.01 and 0.99 quantiles? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
