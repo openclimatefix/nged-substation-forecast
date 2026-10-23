@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Audit checks for experiment 278: the head retrain, leave-one-site-out, and median minus mean.
 
 (1) `own_once`: the head fitted at 2025-07 with this experiment's pipeline, applied to every row of
