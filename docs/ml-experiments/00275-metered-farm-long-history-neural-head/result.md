@@ -208,3 +208,6 @@ prior on the power level.
 - [Experiment 257](../00257-metered-farm-fair-plant-arm/result.md) found a linear fit recovers 90%
   of the neural head's gain, so the next test is the linear fit that experiment 257 called P2, with
   the extra rows and the era flag.
+- The XGBoost versions train on the two validation months as well (about 17% more ensemble rows at
+  farm A), because XGBoost has no epoch to select, while the neural networks use those months only
+  to choose the epoch. C2 compares each version's own gain, so the difference should matter little.
