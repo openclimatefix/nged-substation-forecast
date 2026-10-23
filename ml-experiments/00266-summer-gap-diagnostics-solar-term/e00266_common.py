@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Constants and helpers shared by the scripts of experiment 266 (April to June gap diagnostics)."""
 
 import json
@@ -45,7 +46,9 @@ def qs_per_row(*, actual: np.ndarray, q: np.ndarray) -> np.ndarray:
     return 2.0 * pin.mean(axis=1)
 
 
-def mean_interval(*, values: np.ndarray, mask: np.ndarray, blocks: np.ndarray, seed: int = 0) -> dict:
+def mean_interval(
+    *, values: np.ndarray, mask: np.ndarray, blocks: np.ndarray, seed: int = 0
+) -> dict:
     """Mean of `values` over `mask`, with a 95% interval that resamples the `blocks` labels."""
     rng = np.random.default_rng(seed)
     keep = mask & np.isfinite(values)
@@ -58,7 +61,12 @@ def mean_interval(*, values: np.ndarray, mask: np.ndarray, blocks: np.ndarray, s
     draws = rng.integers(0, n, size=(N_RESAMPLES, n))
     res = sums[draws].sum(axis=1) / counts[draws].sum(axis=1)
     lo, hi = np.percentile(res, [2.5, 97.5])
-    return {"est": float(sums.sum() / counts.sum()), "lo": float(lo), "hi": float(hi), "n": int(keep.sum())}
+    return {
+        "est": float(sums.sum() / counts.sum()),
+        "lo": float(lo),
+        "hi": float(hi),
+        "n": int(keep.sum()),
+    }
 
 
 def write_json_atomic(*, path: Path, content: object) -> None:

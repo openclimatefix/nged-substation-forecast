@@ -9,7 +9,7 @@ also_relevant_to:
   - differentiable-physics-embedded-generation
   - differentiable-physics-forecast-engine
   - solar-disaggregation
-status: planned
+status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00266-summer-gap-diagnostics-solar-term/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one is
@@ -83,11 +83,67 @@ metric: >-
   points, and residual-implied capacity correction in points and in percent of the pinned
   capacity.
 code: ml-experiments/00266-summer-gap-diagnostics-solar-term/
+verdict: partly supported
+best_arm: >-
+  Not applicable: a diagnostic. The April to June gap of arm 1 minus BG2 is +0.150 points (95%
+  interval +0.074 to +0.230, 14 weeks), and 78% of it sits on daylight half-hours.
+headline: >-
+  The April to June gap is a solar-term gap at two substations, D5 and D9 (daylight gap +0.633 and
+  +0.499 points), plus a night-time gap at D10 (+0.776); it is not caused by the neural-network
+  head, the two-number summary, the Kalman filter, or the ensemble sunshine forecast.
+lessons:
+  - >-
+    The head and the summary lower the April to June gap (by 0.125 and 0.033 points), so the gap
+    starts in arm D, before either is added (arm D minus BG2 +0.319).
+  - >-
+    Where the ensemble-mean and realised clear-sky indices agree, the gap is as large as where they
+    disagree (+0.214 against +0.192), so the ensemble sunshine forecast is not the cause.
+  - >-
+    The pinned solar capacity looks too high in April to June at D5 (-41%), D9 (-14%), and D16
+    (-10%), the opposite of the "too low" prediction; at D5 the 60% export clip already removes
+    most of the April to June sunny-half-hour loss (+1.78 to +0.66).
+production_status: not-for-production
+adopted_in: none
+date: 2026-10-23
+take_home_message: >-
+  The best-guess stack trails BG2 in April to June because of the solar term at two of the six
+  substations (D5 and D9 on daylight half-hours) and a night-time error at a third (D10), not
+  because of the neural-network head, the two-number summary, the Kalman filter, or the ensemble
+  sunshine forecast; the head and summary actually reduce the gap. The pinned solar capacity looks
+  too high in those months, not too low, and clear mornings are forecast worse than clear
+  afternoons. The next work is to test the export clip at D9 and a morning-and-afternoon solar
+  shape, and to look at D10's night residuals, not to change the stack's added parts.
+advice:
+  - >-
+    Test the 60% export clip at D9 as well as D5 before changing any other part of the solar term;
+    D9's pinned capacity looks 14% too high in April to June (Diagnostic 3, figure 6).
+  - >-
+    Do not search for the April to June gap in the neural-network head, the two-number summary, the
+    Kalman filter, or the ensemble irradiance; each is cleared (figures 4, 5, and 8).
+  - >-
+    Give the solar shape a morning-and-afternoon asymmetry per substation: arm 1 forecasts clear
+    mornings 1.5 points too high relative to afternoons (Diagnostic 5, figure 7).
+  - >-
+    Look at D10's night-time residuals in April to June separately from the solar term: its night
+    gap is +0.776 points (Diagnostic 1, figure 2).
+  - >-
+    Judge any change to the solar term on April to June at D5, D9, and D10 as well as the
+    whole-year score, because the whole-year score hides this gap (figure 1).
 ---
 
-# Experiment 266: which part of the best-guess stack makes it worse than BG2 in April to June?
+**The best-guess stack trails BG2 in April to June because of the solar term at D5 and D9 on
+daylight half-hours and because of a night-time error at D10, and not because of the neural-network
+head, the two-number summary, the Kalman filter, or the ensemble sunshine forecast.** The pinned
+solar capacity looks too high in those months at D5, D9, and D16, the opposite of what we predicted.
+Clear mornings are forecast worse than clear afternoons. The next experiments are an export clip at
+D9, a morning-and-afternoon solar shape, and a look at D10's night residuals.
 
-**Planned.** This page holds the plan only; results are added when the diagnostics have run.
+**Verdict `partly supported`.** The hypothesis said the explicit solar term is the main cause.
+Daylight half-hours hold 78% of the April to June gap, which fits the solar term as the main cause,
+though a daylight gap could also come from the weather input or the demand terms. The hypothesis
+also implied a common cause, but the gap is not common to all substations: D5, D9, and D10 carry the
+gap, and the other three substations are level with or better than BG2. Four of the seven
+predictions held (P0, P1, P4, P7); P2, P3, P5 (for the head), and P6 failed.
 
 [Experiment 251](../00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) found
 that the best-guess demand stack beats BG2 over the year, but only through November to March. In
@@ -104,6 +160,109 @@ arm 1 without the head, **A+H** is arm 1 without the summary, and **arm D** has 
 and **gam0** is the same model without the filter. **Primaries** are primary substations, which feed
 homes and businesses. The **pin** is the solar capacity held fixed for each fit, and the **clear-sky
 index** is irradiance divided by clear-sky irradiance.
+
+![Figure 1. Quantile score of arm 1 minus BG2, by month](figure_1_gap_by_month.svg)
+
+![Figure 2. April to June gap by substation, daylight and night](figure_2_gap_by_site_and_daylight.svg)
+
+![Figure 3. Gap by hour of day](figure_3_gap_by_hour.svg)
+
+![Figure 4. Ablations in April to June](figure_4_ablations_april_to_june.svg)
+
+![Figure 5. The older model with and without a solar term, against BG2](figure_5_older_model_solar_term.svg)
+
+![Figure 6. Capacity correction the residual implies](figure_6_capacity_correction.svg)
+
+![Figure 7. Clear-midday residual, morning against afternoon](figure_7_clear_midday_residual.svg)
+
+![Figure 8. Gap by agreement of ensemble and realised sunshine](figure_8_ensemble_agreement.svg)
+
+## Results
+
+- **Gate (P0) held.** Arm 1 minus BG2 is +0.162, +0.220, and +0.054 in April, May, and June, the
+  numbers of experiment 251. Every arm has the 561,207 row keys, except the as-of and hindsight
+  arms of experiment 139, which have no D9 and so 464,233.
+- **Ranked causes, each with the cut that carries its gap per row.** The shares overlap and do not
+  add.
+    1. **Solar term at D5 and D9.** Daylight gap +0.633 (95% interval +0.343 to +0.894) at D5 and
+       +0.499 (+0.055 to +1.083) at D9, against +0.150 over all rows. D5, D9, and D10 together
+       average +0.364 (+0.193 to +0.552) and the other three substations -0.060 (-0.175 to +0.035).
+       At D5 the clip arm (arm 2c) lowers the April to June sunny-half-hour gap from +1.779 (+1.345
+       to +2.255) to +0.656 (+0.438 to +0.850). Cheapest fix experiment: the 60% export clip of
+       experiment 180 applied to D9.
+    2. **Solar shape.** The mean residual on clear midday half-hours is 1.5 points lower before
+       12:00 UTC than after it (-1.525, interval -2.390 to -0.779, pooled over six substations),
+       and the asymmetry of P6 is 0.11, 0.61, 0.77, 0.43, 1.81, and 0.64 at D10, D11, D14, D16, D5,
+       and D9, so P6 failed. D9 has the opposite sign. Cheapest fix experiment: refit arm D with a
+       per-substation morning-and-afternoon split of the solar shape and score April to June.
+    3. **Night-time error at D10 (post hoc).** D10's night gap is +0.776 (+0.381 to +1.116) and its
+       daylight gap +0.269 (+0.022 to +0.526). Cheapest fix experiment: inspect D10's night
+       residuals by month and half-hour.
+- **Cleared.** The neural-network head lowers the April to June score by 0.125 (arm 1 minus A+S
+  -0.125, -0.191 to -0.050), so P5 failed for the head and the head is not the cause. The
+  two-number summary lowers it by 0.033 (-0.050 to -0.019), so P5 held for the summary. The Kalman
+  filter lowers it by 0.157 (GAM-K minus gam0 -0.157, -0.368 to +0.017). The ensemble sunshine
+  forecast is cleared by P4: the gap is +0.214 (+0.074 to +0.366) where the ensemble-mean and
+  realised clear-sky indices agree and +0.192 (+0.082 to +0.302) where they disagree; the ratio is
+  1.12 (0.48 to 2.04). Pooled night half-hours give +0.087 (+0.016 to +0.145), below the +0.15
+  threshold for the heating and lighting terms.
+- **The gap starts in arm D.** Arm D minus BG2 in April to June is +0.319 (+0.197 to +0.434), and
+  the head and summary bring arm 1 to +0.150. By the plan's literal rule, a component that single
+  removal clears while arm D minus BG2 is at least +0.15 is reported as masked. Here the head and
+  summary reduce the gap and hide no defect, so the label does not describe them.
+- **Not a stack effect.** The older GAM-K model with the pinned capacity has the same seasonal
+  pattern against BG2: +0.417 (+0.280 to +0.533) in April to June, +0.151 in July to September,
+  and -0.188 in November to March. The ERA5-driven filter arm scores -0.015 (-0.077 to +0.046)
+  against the ensemble-driven one in April to June (descriptive only).
+- **P2 failed.** The solar term is worth more, not less, in April to June: the no-solar-term arm
+  minus the pinned arm is +0.694 (+0.497 to +0.923) in April to June and +0.394 (+0.297 to +0.490)
+  in July to September; the difference July to September minus April to June is -0.301 (-0.557 to
+  -0.070). The as-of capacity (+0.397) and the hindsight capacity (+0.367) score level with the pin
+  (+0.417) against BG2, so the accuracy of the capacity does not explain the gap.
+- **P3 failed, with the opposite sign.** The capacity correction implied by arm D's residual in
+  April to June is -40.8% at D5 (-48.9% to -33.0%), -14.3% at D9 (-25.1% to -4.0%), -10.2% at D16
+  (-19.5% to -1.2%), -6.7% at D10, -6.4% at D14, and +0.7% at D11. Negative means the pinned capacity
+  is too high. In July to September the same correction is positive at five of six substations
+  (+3.9% to +14.5%, except D5 at -33.2%). The estimate is measured after the Kalman filter, so it
+  is a pointer and not an independent capacity estimate; experiments 231 and 241 found the capacity
+  estimator recovers 0.83 of an injected farm.
+- **P7 held.** At D5 on sunny half-hours arm 1 is +1.298 (+0.980 to +1.633) over the year and
+  arm 2c +0.540 (+0.354 to +0.719), the numbers of experiment 251.
+- **Where in the day.** The April to June daylight gap is +0.398 (+0.241 to +0.552) from 08:00 to
+  12:00 UTC and +0.316 (+0.143 to +0.492) from 12:00 to 16:00 UTC (figure 3).
+- **Rows, schedule, and weather.** The 561,207 rows of experiment 251; the stored forecasts were
+  produced with monthly refits (stack) and weekly refits (BG2). Realised sunshine is CAMS
+  irradiance, which exists only after the fact; the ensemble-mean irradiance is available at
+  forecast time. Nothing was refitted and nothing was downloaded.
+- **Post hoc.** Diagnostic cuts by substation and daylight, the D10 night gap, the pooled
+  morning-minus-afternoon difference, the clip comparison in April to June, and every month of
+  capacity correction.
+- **What this cannot tell.** One year, and 14 weeks in April to June, so intervals are wide. The
+  stratification by ensemble agreement does not rule out a biased solar response of the ensemble
+  that a refit with realised irradiance as the driver would expose; no such refit was run.
+
+## Checks
+
+- **Median minus mean forecast.** Arm D's median and mean are identical at all six substations
+  (difference 0.0), because its quantiles are built symmetrically around the mean, so no spread
+  shifts the forecast. The mean forecast of arm 1 is not stored.
+- **Error of the median beside the quantile score.** The mean absolute error of the median, arm 1
+  minus BG2, is +0.311 (+0.141 to +0.474) in April to June, -0.084 (-0.151 to -0.015) in July to
+  September, and -0.648 (-0.840 to -0.426) in November to March, the same signs as the quantile
+  score.
+- **Triggers.** Trigger 1 did not fire (the gate passed). Trigger 2 fired: P2, P3, and P5 for the
+  head contradicted their predictions; the explanation tested for P3 is the D5 export clip above.
+  Trigger 3 did not fire. Trigger 4 did not fire: leaving out any one substation keeps the April
+  to June gap positive (+0.087 to +0.201, every interval above zero). Trigger 5, 6, and 7 did not
+  apply, except that later experiments will depend on this ranking and one year has not been
+  replicated.
+- **Audit.** A fresh Sonnet agent (not Opus, to save quota) re-derived the headline numbers from
+  the stored arrays with its own code and matched them: April to June gap +0.150 (+0.074 to
+  +0.231), daylight +0.189, night +0.087, arm 1 minus A+S -0.125, minus A+H -0.033, minus arm D
+  -0.169, arm D minus BG2 +0.319, agree +0.214 against disagree +0.192, and the no-solar-term arm
+  minus the pinned arm +0.695 and +0.394. It found no row misalignment, duplicate, crossing
+  quantile, or leakage through the unit solar shape, and could not check whether the stack's
+  settings saw April to June data. Experiments 220 and 251 describe that schedule.
 
 ## Plan
 
@@ -134,8 +293,3 @@ index** is irradiance divided by clear-sky irradiance.
   and after 12:00 UTC, and at D5 against arm 2c.
 - **Diagnostic 6, ablations in April to June.** Arm 1 against A+S, A+H, and arm D, from
   [experiment 220](../00220-dp-bg-stage4-assembly-with-drop-one/result.md)'s stored arms.
-
-## Checks
-
-To be written with the results: median minus mean forecast per substation, the error of the mean
-forecast beside each contrast, and which audit triggers fired.
