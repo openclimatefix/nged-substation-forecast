@@ -2,7 +2,8 @@
 """The mixture over 0 to 3 running engine units (arms 3 and 4).
 
 The reading is modelled as the reference forecast's distribution, its spread multiplied by a noise
-scale `c`, shifted by `delta - k * g`, where `delta` is the per-row `g * E[k]`, for `k` running units of size `g`. The probability of `k`
+scale `c`, shifted by `delta - k * g` for `k` running units of size `g`, where `delta` is the
+per-row `g * E[k]`. The probability of `k`
 follows a multinomial logistic model fitted by expectation-maximisation on residuals that were
 resolved at the fit time. The reference distribution is the piecewise-linear cumulative
 distribution through its 11 quantiles. Below q01 and above q99 the density decays exponentially,
@@ -43,6 +44,9 @@ def cdf_and_density(*, y: np.ndarray, quantiles: np.ndarray) -> tuple[np.ndarray
     Args:
         y: Points, shape (n, m).
         quantiles: Strictly increasing quantile rows, shape (n, 11).
+
+    Returns:
+        The cumulative distribution and the density at `y`, each of shape (n, m).
     """
     levels = common.LEVELS
     index = (y[:, :, None] >= quantiles[:, None, :]).sum(axis=-1)

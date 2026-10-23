@@ -255,8 +255,9 @@ of D8's tails and not from an engine.
   is 15.18 (D8), 5.54 (D10), and 4.70 (D16) points for all of them, and no contrast can disagree in
   direction with a mean-forecast contrast.
 - **Audit triggers 1, 2, and 5 of the seven in the `ml-experiment` skill fired.** A placebo failed
-  (D10, and the forced run at D16). Five predictions failed (P1, P2, P4, P5, and P6), and P3 failed on its score clause. The forced D16 control moved the score
-  by +0.089 points, more than the 0.083 half-width of its own interval.
+  (D10, and the forced run at D16). Five predictions failed (P1, P2, P4, P5, and P6), and P3 failed
+  on its score clause. The forced D16 control moved the score by +0.089 points, more than the 0.083
+  half-width of its own interval.
 - **Audit.** A fresh Sonnet agent ran the audit, because the maintainer's brief bars Opus. The audit
   re-ran arms 2b and 3 after shifting every actual after 2026-01-10 by -40 points, and found every
   row at earlier origins bit-identical, so the as-of rule leaks nothing. It also reproduced the D8
