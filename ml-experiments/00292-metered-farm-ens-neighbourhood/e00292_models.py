@@ -5,8 +5,8 @@ Every hybrid starts as the plant: its last layer is zero-initialised, so before 
 forecast equals the plant's forecast plus the tuning-month offsets. Powers are over capacity.
 """
 
-import torch
-from torch import nn
+import torch  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
 
 
 def mlp(*, n_in: int, n_out: int, hidden: int = 64, zero_last: bool = False) -> nn.Sequential:
