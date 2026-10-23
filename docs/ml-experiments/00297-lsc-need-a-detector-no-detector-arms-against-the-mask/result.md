@@ -256,6 +256,21 @@ Every cell is a percentage gain over K0 with a 95% interval.
   reweighted like near-shift rows is not in the printed report, and BAND_TABLE_PLAIN (+1.8%, 1.1 to
   2.6, the same arm without the filter level) is the printed control.
 
+## How BAND_HEAD was trained, and its real-record results (added by experiment 312)
+
+- **Training:** every head is fitted on the rows of all 44 worlds whose month has one parity and
+  scored on the other parity, then the roles swap. Rows near a shift take the parity of the shift's
+  onset month, and ordinary rows weigh 4. A world shares the injector, the real record, and the
+  months with the other worlds, so the held-out check above removes the scored worlds and seeds
+  from fitting but not the injector.
+- **Real record ([experiment
+  312](../00312-lsc-how-good-must-a-detector-be-against-the-band-head/result.md)):** against K0 the
+  head changes the quantile score on ordinary rows by +1.1% (-1.1 to +3.7), so it does no harm.
+  Readings fall below q01 in 0.9% of ordinary rows and above q99 in 0.9%, against 1.8% and 1.1% for
+  K0. In the 48 hours after a logged transfer the shares are 1.3% and 1.1%, against 2.4% and 1.0%.
+- **Not compared:** experiment 264's rows are at D8 and experiment 209's heads belong to arm D, so
+  neither shares rows with BAND_HEAD.
+
 ## Caveats
 
 - **RO-NC is a weak stand-in.** Its false alarms are the likely cause of the 35% loss, although the

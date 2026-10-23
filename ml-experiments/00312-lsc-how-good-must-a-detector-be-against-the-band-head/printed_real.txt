@@ -1,0 +1,49 @@
+rows 357636; logged transfers with rows: 190
+{'arm': 'K0', 'group': 'DURING', 'mean_qs': 2.986, 'below_q01': 0.03, 'below_q05': 0.075, 'above_q95': 0.0565, 'above_q99': 0.0234}
+{'arm': 'K0', 'group': 'AFTER', 'mean_qs': 2.8652, 'below_q01': 0.0241, 'below_q05': 0.0543, 'above_q95': 0.0428, 'above_q99': 0.0102}
+{'arm': 'K0', 'group': 'ORDINARY', 'mean_qs': 2.7971, 'below_q01': 0.0177, 'below_q05': 0.053, 'above_q95': 0.0413, 'above_q99': 0.0113}
+{'arm': 'GAM_ONLY', 'group': 'DURING', 'mean_qs': 3.476, 'below_q01': 0.0199, 'below_q05': 0.0468, 'above_q95': 0.117, 'above_q99': 0.0529}
+{'arm': 'GAM_ONLY', 'group': 'AFTER', 'mean_qs': 3.0776, 'below_q01': 0.0043, 'below_q05': 0.0252, 'above_q95': 0.1296, 'above_q99': 0.0367}
+{'arm': 'GAM_ONLY', 'group': 'ORDINARY', 'mean_qs': 3.1027, 'below_q01': 0.0028, 'below_q05': 0.0178, 'above_q95': 0.0931, 'above_q99': 0.0287}
+{'arm': 'HEAD_BASE', 'group': 'DURING', 'mean_qs': 3.0242, 'below_q01': 0.0092, 'below_q05': 0.0584, 'above_q95': 0.0629, 'above_q99': 0.0192}
+{'arm': 'HEAD_BASE', 'group': 'AFTER', 'mean_qs': 2.7296, 'below_q01': 0.0126, 'below_q05': 0.0566, 'above_q95': 0.0611, 'above_q99': 0.0105}
+{'arm': 'HEAD_BASE', 'group': 'ORDINARY', 'mean_qs': 2.7654, 'below_q01': 0.0094, 'below_q05': 0.0478, 'above_q95': 0.0524, 'above_q99': 0.0087}
+{'arm': 'HEAD_PIT', 'group': 'DURING', 'mean_qs': 3.0054, 'below_q01': 0.0093, 'below_q05': 0.0584, 'above_q95': 0.0631, 'above_q99': 0.0196}
+{'arm': 'HEAD_PIT', 'group': 'AFTER', 'mean_qs': 2.6922, 'below_q01': 0.0118, 'below_q05': 0.0581, 'above_q95': 0.0532, 'above_q99': 0.0098}
+{'arm': 'HEAD_PIT', 'group': 'ORDINARY', 'mean_qs': 2.7706, 'below_q01': 0.0096, 'below_q05': 0.0482, 'above_q95': 0.0531, 'above_q99': 0.0086}
+HEAD_BASE vs K0 qs DURING: n=191926 mean -0.0381 (-0.2936, +0.1496) pct -1.28 (-8.92, +4.43)
+HEAD_BASE vs K0 qs AFTER: n=59141 mean +0.1356 (-0.0709, +0.4125) pct +4.73 (-2.65, +13.14)
+HEAD_BASE vs K0 qs ORDINARY: n=426276 mean +0.0317 (-0.0289, +0.1034) pct +1.13 (-1.06, +3.67)
+HEAD_PIT vs K0 qs DURING: n=191926 mean -0.0194 (-0.2854, +0.1711) pct -0.65 (-8.67, +5.01)
+HEAD_PIT vs K0 qs AFTER: n=59141 mean +0.1730 (-0.0282, +0.4492) pct +6.04 (-1.04, +14.31)
+HEAD_PIT vs K0 qs ORDINARY: n=426276 mean +0.0265 (-0.0342, +0.0940) pct +0.95 (-1.26, +3.33)
+HEAD_PIT vs HEAD_BASE qs DURING: n=191926 mean +0.0188 (-0.0159, +0.0561) pct +0.62 (-0.50, +1.80)
+HEAD_PIT vs HEAD_BASE qs AFTER: n=59141 mean +0.0374 (-0.0086, +0.0895) pct +1.37 (-0.32, +3.24)
+HEAD_PIT vs HEAD_BASE qs ORDINARY: n=426276 mean -0.0052 (-0.0246, +0.0163) pct -0.19 (-0.91, +0.59)
+GAM_ONLY vs K0 qs DURING: n=191926 mean -0.4900 (-1.4385, +0.0925) pct -16.41 (-43.09, +2.83)
+GAM_ONLY vs K0 qs AFTER: n=59141 mean -0.2124 (-0.5487, +0.1647) pct -7.41 (-20.80, +5.19)
+GAM_ONLY vs K0 qs ORDINARY: n=426276 mean -0.3056 (-0.4201, -0.1501) pct -10.93 (-15.33, -5.38)
+{'site': 'D10', 'arm': 'K0', 'group': 'AFTER', 'below_q01': 0.007204822820173504, 'above_q99': 0.003455374209675048}
+{'site': 'D10', 'arm': 'K0', 'group': 'ORDINARY', 'below_q01': 0.003942921517085993, 'above_q99': 0.004005507572912755}
+{'site': 'D10', 'arm': 'HEAD_BASE', 'group': 'AFTER', 'below_q01': 0.01374797823849434, 'above_q99': 0.013821496838700192}
+{'site': 'D10', 'arm': 'HEAD_BASE', 'group': 'ORDINARY', 'below_q01': 0.007885843034171986, 'above_q99': 0.00801101514582551}
+{'site': 'D11', 'arm': 'K0', 'group': 'AFTER', 'below_q01': 0.007023998662095493, 'above_q99': 0.01580399698971486}
+{'site': 'D11', 'arm': 'K0', 'group': 'ORDINARY', 'below_q01': 0.03616002158807259, 'above_q99': 0.007960601767523444}
+{'site': 'D11', 'arm': 'HEAD_BASE', 'group': 'AFTER', 'below_q01': 0.004013713521197424, 'above_q99': 0.017309139560163892}
+{'site': 'D11', 'arm': 'HEAD_BASE', 'group': 'ORDINARY', 'below_q01': 0.022195237131484854, 'above_q99': 0.0064764217769682254}
+{'site': 'D14', 'arm': 'K0', 'group': 'AFTER', 'below_q01': 0.006157398499134116, 'above_q99': 0.039253415431979986}
+{'site': 'D14', 'arm': 'K0', 'group': 'ORDINARY', 'below_q01': 0.01638291037584324, 'above_q99': 0.01782846129135882}
+{'site': 'D14', 'arm': 'HEAD_BASE', 'group': 'AFTER', 'below_q01': 0.00173176832788147, 'above_q99': 0.02597652491822205}
+{'site': 'D14', 'arm': 'HEAD_BASE', 'group': 'ORDINARY', 'below_q01': 0.00915515579826534, 'above_q99': 0.00530035335689046}
+{'site': 'D16', 'arm': 'K0', 'group': 'AFTER', 'below_q01': 0.06140741565527224, 'above_q99': 0.005344616412426233}
+{'site': 'D16', 'arm': 'K0', 'group': 'ORDINARY', 'below_q01': 0.025798363684349433, 'above_q99': 0.028965426233834784}
+{'site': 'D16', 'arm': 'HEAD_BASE', 'group': 'AFTER', 'below_q01': 0.024663177819841887, 'above_q99': 0.0007237501391827191}
+{'site': 'D16', 'arm': 'HEAD_BASE', 'group': 'ORDINARY', 'below_q01': 0.008181578252837161, 'above_q99': 0.017154922143045658}
+{'site': 'D5', 'arm': 'K0', 'group': 'AFTER', 'below_q01': 0.009489916963226572, 'above_q99': 0.013444049031237644}
+{'site': 'D5', 'arm': 'K0', 'group': 'ORDINARY', 'below_q01': 0.015080657873995061, 'above_q99': 0.011927907098943829}
+{'site': 'D5', 'arm': 'HEAD_BASE', 'group': 'AFTER', 'below_q01': 0.0039541320680110716, 'above_q99': 0.015618821668643732}
+{'site': 'D5', 'arm': 'HEAD_BASE', 'group': 'ORDINARY', 'below_q01': 0.0059376806263464876, 'above_q99': 0.006830960012611003}
+{'site': 'D9', 'arm': 'K0', 'group': 'AFTER', 'below_q01': 0.011747156442289764, 'above_q99': 0.0}
+{'site': 'D9', 'arm': 'K0', 'group': 'ORDINARY', 'below_q01': 0.013972329980431871, 'above_q99': 0.0047032167255999175}
+{'site': 'D9', 'arm': 'HEAD_BASE', 'group': 'AFTER', 'below_q01': 0.007458512026850644, 'above_q99': 0.0}
+{'site': 'D9', 'arm': 'HEAD_BASE', 'group': 'ORDINARY', 'below_q01': 0.006728689622026159, 'above_q99': 0.008582512272992551}
