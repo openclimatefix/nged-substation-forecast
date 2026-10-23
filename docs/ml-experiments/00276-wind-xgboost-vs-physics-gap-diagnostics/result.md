@@ -223,8 +223,8 @@ curve, spread, scale, or wind speeds, and D9 varies the length of training.
 - **D8, slow change, is not the cause.** A per-year scale on the core worsened the score by 0.011
   (-0.127 to 0.138, a tie) and a per-month scale made it worse by 0.088 (0.032 to 0.142).
   XGBoost with the year as an input was worse than XGBoost with only the hour and day of year by
-  0.442 (0.235 to 0.697), and worse than XGBoost with no date column by 0.318 (0.106 to 0.561), on the kept rows
-  with ERA5 as the weather.
+  0.442 (0.235 to 0.697), and worse than XGBoost with no date column by 0.318 (0.106 to 0.561), on
+  the kept rows with ERA5 as the weather.
 - **D10, a farm-specific wind-speed scale, is not the cause.** The core gained 0.011 (0.005 to
   0.017) and XGBoost gained 0.001, because a tree model does not respond to a monotone rescaling
   of one input. The scale fitted a fixed generic power curve and is a weak stand-in for the weather
