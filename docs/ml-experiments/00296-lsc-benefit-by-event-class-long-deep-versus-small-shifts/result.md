@@ -266,7 +266,7 @@ depth](figure_2_ladder.svg)
   8.8%.
 - **Trigger that fired:** the long-and-deep detector experiments are designed on this result, which
   has not been replicated. A fresh Sonnet agent audited the method (Opus was not used, as the brief
-  required); see "Audit".
+  required); see "Audit". No Opus audit run.
 
 ## Audit
 
