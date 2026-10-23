@@ -17,7 +17,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 import e00298_common as common
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 _CACHE = None
 

@@ -31,7 +31,7 @@ import e00298_common as common
 import e00298_detect as dt
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from scipy.special import ndtri
 from studies.dp_ens_weather import replace_site
 from studies.dp_features import FeatureCache, naive_utc
