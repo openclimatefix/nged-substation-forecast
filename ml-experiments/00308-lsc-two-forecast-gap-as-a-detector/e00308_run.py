@@ -1,8 +1,8 @@
 # ruff: noqa: E501
 """Calibrate the gap detectors on odd months, score every detector, and store the tables.
 
-systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        env OMP_NUM_THREADS=1 uv run --no-sync python e00308_run.py
+Run as `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue` around
+`env OMP_NUM_THREADS=1 uv run --no-sync python e00308_run.py`.
 """
 
 from __future__ import annotations

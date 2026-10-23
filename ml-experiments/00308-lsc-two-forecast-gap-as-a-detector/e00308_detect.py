@@ -114,7 +114,10 @@ def episode_starts(*, flag: np.ndarray) -> np.ndarray:
 
 
 def neighbour_confirm(*, all_series: dict[int, Series], series: int, score: str) -> np.ndarray:
-    """True where a connected metered neighbour has an opposite gap at least 30% the size, and the sum is at most half the node's (MW)."""
+    """True where a connected metered neighbour has an opposite gap of at least 30% the size.
+
+    The node's gap plus the opposite neighbours' gaps must also sum to at most half the node's (MW).
+    """
     me = all_series[series]
     a = me.score[score] * me.cap / 100.0
     opp_sum = np.zeros(len(a))
@@ -171,7 +174,10 @@ def build_context() -> Context:
 
 
 def shift_weight(*, ctx: Context, row: dict) -> float:
-    """Absolute step in MW: median residual over the first 48 half-hours against the 7 days before, larger of the pair."""
+    """Absolute step in MW of the larger of the pair.
+
+    The step is the median residual over the first 48 half-hours against the 7 days before.
+    """
     best = 0.0
     for s in row["series"]:
         if s not in ctx.real:
