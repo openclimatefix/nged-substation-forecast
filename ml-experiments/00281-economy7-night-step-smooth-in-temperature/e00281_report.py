@@ -54,7 +54,10 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "R1": ("e1", "k0"),
     "R2": ("e2", "k0"),
     "R3": ("a0", "k0"),
-}
+    "P1": ("e1", "a0"),
+    "P2": ("e2", "a0"),
+    "P3": ("e2", "e1"),
+}  # P1 to P3 are post hoc: the in-model night terms without the offset, against A0.
 LEVEL_PERCENT: Final[float] = 99.0
 N_RESAMPLES: Final[int] = 20_000
 COLD_TEMPERATURE_C: Final[float] = 3.0
@@ -64,7 +67,7 @@ NIGHT_BANDS: Final[tuple[int, ...]] = (BAND_NAMES.index("night"), BAND_NAMES.ind
 CHRISTMAS_CODES: Final[tuple[int, ...]] = tuple(
     HOLIDAY_PERIODS.index(name) for name in ("Christmas Day", "Boxing Day", "Christmas run")
 )
-STEP_KEY: Final[str] = "step hours (00:30 to 02:00 UTC, December to February)"
+STEP_KEY: Final[str] = "step hours (half-hours starting 00:30 to 02:00 UTC, December to February)"
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time"]
 TAIL_QUANTILES: Final[tuple[tuple[str, float], ...]] = (
     ("q01", 0.01),
@@ -256,7 +259,7 @@ def subset_filters() -> dict[str, pl.Expr]:
     night = pl.col("hour_band").is_in(list(NIGHT_BANDS))
     winter = pl.col("valid_month").is_in(list(WINTER_MONTHS))
     return {
-        STEP_KEY: pl.col("valid_month").is_in([12, 1, 2]) & pl.col("utc_hh").is_between(1, 4),
+        STEP_KEY: pl.col("valid_month").is_in([12, 1, 2]) & pl.col("utc_hh").is_between(2, 5),
         "winter": winter,
         "winter nights": winter & night,
         "cold nights (day mean below 2 C)": winter & pl.col("cold2") & night,
