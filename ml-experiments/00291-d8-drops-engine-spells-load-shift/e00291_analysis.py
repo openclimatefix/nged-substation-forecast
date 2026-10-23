@@ -151,7 +151,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     controls = {c: np.load(p_run_path(site=c, arm="v1")) > OVERLAP_PROBABILITY for c in CONTROLS}
     night = night_mask(label="D8", n=n_grid)
     first = drops["first_stamp"].to_numpy()
-    last = drops["last_stamp"].to_numpy()
+    last = drops["last_stamp"].to_numpy() - 1
+    # Experiment 159 stores the exclusive end of a drop; `last` here is inclusive.
     scope = first >= visible
     say(
         f"Drops: {len(drops)}; in scope (start on or after 2023-08-15): {int(scope.sum())}; "
@@ -187,9 +188,8 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         length = b - a + 1
         shifts = np.arange(-200, 201) * WEEK
         starts = a + shifts
-        ok = (
-            (starts >= visible) & (starts + length <= last_grid) & ((starts < solar) == (a < solar))
-        )
+        same_side = (starts + length <= solar) if a < solar else (starts >= solar)
+        ok = (starts >= visible) & (starts + length <= last_grid) & same_side
         starts = starts[ok]
         starts = np.array([s for s in starts if not blocked[s : s + length].any()], dtype=int)
         candidates.append(starts)
@@ -398,13 +398,20 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     )
     within = np.array(
         [
-            np.nanmean(fifth(p_arr[a : b + 1])[p_arr[a : b + 1] > -1e9])
+            np.nanmean(fifth(p_arr[a : b + 1])[np.isfinite(p_arr[a : b + 1])])
             for a, b in zip(first[scope], last[scope], strict=True)
         ]
     )
     placebo_within = np.array(
         [
-            np.mean([np.nanmean(fifth(p_arr[s : s + (b - a) + 1])) for s in starts])
+            np.mean(
+                [
+                    np.nanmean(
+                        fifth(p_arr[s : s + (b - a) + 1])[np.isfinite(p_arr[s : s + (b - a) + 1])]
+                    )
+                    for s in starts
+                ]
+            )
             for (a, b), starts in zip(
                 zip(first[scope], last[scope], strict=True), candidates, strict=True
             )
@@ -501,11 +508,14 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             f"{k_edge} against {near_edge[elig].mean() * len(scoped):.1f} expected (p {p_edge:.3f}); inside a drop {int(in_drop[scoped].sum())} "
             f"against {in_drop[elig].mean() * len(scoped):.1f} expected"
         )
-    scoped = ron_unexplained[(ron_unexplained >= visible)]
-    k_expl = int(inside[ron_unexplained[(ron_unexplained >= visible)]].sum())
+    unexplained = np.unique(ron_unexplained)
+    scoped = unexplained[
+        (unexplained >= visible) & (unexplained < stamp(datetime(2026, 6, 25, tzinfo=UTC)))
+    ]
+    k_expl = int(inside[scoped].sum())
     k_excess = k_expl - inside[elig].mean() * len(scoped)
     say(
-        f"Unexplained RO-NC alarms on D8: 28; inside a widened engine spell: {k_expl}; left outside: {28 - k_expl}; "
+        f"Unexplained RO-NC alarms on D8: 28; inside a widened engine spell: {k_expl}; left outside, from 2023-08-15: {len(scoped) - k_expl}; "
         f"excess over the random-time expectation: {k_excess:.1f}"
     )
     say(

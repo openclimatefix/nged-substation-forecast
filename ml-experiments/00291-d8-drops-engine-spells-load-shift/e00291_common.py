@@ -14,8 +14,8 @@ import polars as pl
 from studies.power import scan_power
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-SLUG: Final[str] = "ps2b-engine-detector-v2-ramp-night-price"
-DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"00199-{SLUG}"
+SLUG: Final[str] = "d8-drops-engine-spells-load-shift"
+DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"00291-{SLUG}"
 ARRAYS_PATH: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR / "briefs" / "sw_false_alarms" / "work" / "arrays.pkl"
 )

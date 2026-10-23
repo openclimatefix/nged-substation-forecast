@@ -74,21 +74,22 @@ headline: >-
 lessons: >-
   D8's long drops coincide with the engine detector's running states, at three Primaries that the
   engine does not feed the same detector flags almost nothing on the same dates, and the drop depths
-  are too blurred by the residual's own noise (about 1 MW) to show whole units.
+  may be too blurred by the residual's own noise (about 1 MW) to show whole units.
 take_home_message: >-
-  D8's multi-day drops very probably are stretches in which the gas engine runs, because the engine
-  detector flags 27 of the 28 drops that began after the engine left D8's reading, against about 1 in
+  D8's multi-day drops coincide with the engine detector's running states, which is consistent with
+  the gas engine running: the detector flags 27 of the 28 drops that began after the engine left D8's reading, against about 1 in
   5 comparable stretches of D8, and it flags almost nothing at three other Primaries on the same
   dates. This cannot be called proved, because the drops and the detector both read D8's residual,
-  and the depths of the drops do not fall at whole multiples of the engine's 1.97 MW unit. D8's drops
-  should be treated as a generator regime, not as load shifts, and the next step is a forecast
-  model for D8 that includes the engine as a state.
+  and the depths of the drops do not fall at whole multiples of the engine's 1.97 MW unit. D8's
+  drops should be flagged as a probable generator regime and reported apart from the load-shift
+  scoring until NGED confirms the engine's running hours, and the next step is a forecast model for
+  D8 that includes the engine as a state.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    List D8's multi-day drops as a generator regime and keep them out of the load-shift scoring,
-    because the engine detector flags 27 of 28 of them against 0.19 of matched windows (Figure 1).
+    Flag D8's multi-day drops as a probable generator regime and report them apart from the
+    load-shift scoring until NGED confirms the engine's running hours, because the engine detector flags 27 of 28 of them against 0.19 of matched windows (Figure 1).
   - >-
     Do not test "is this an engine?" by overlap with a detector that reads the same residual as the
     event being tested; use a control Primary or the engine's own record, because the overlap is
@@ -107,8 +108,8 @@ advice:
 code: ml-experiments/00291-d8-drops-engine-spells-load-shift/
 ---
 
-**D8's multi-day drops very probably are stretches in which one gas engine runs, but this experiment
-cannot prove it.** The engine detector (experiment 196) flags at least half of the half-hours of 27
+**D8's multi-day drops coincide with the engine detector's running states, which is consistent with
+one gas engine running, but this experiment cannot prove it.** The engine detector (experiment 196) flags at least half of the half-hours of 27
 of the 28 drops that began after the engine left D8's reading. It flags the same share in only about
 1 in 5 matched windows of D8, and in none of the drops' dates at three other Primaries (D5, D10, and
 D11). The depths of the drops do not stand at whole multiples of one engine unit, so the second
@@ -146,10 +147,10 @@ to 48% of half-hours.*
 ## Results
 
 - **Overlap (arm v1, all half-hours of each drop):** 27 of 28 in-scope drops (0.96; 0.82 to 0.99).
-  Placebo: 0.19, so 5.3 drops expected (95% of draws 2 to 9), one-sided p 0.0002. Each drop has on
+  Placebo: 0.19, so 5.2 drops expected (95% of draws 2 to 9), one-sided p 0.0002. Each drop has on
   average 0.70 of its half-hours flagged.
 - **Two periods, which the detector treats differently:** from 2023-08-15 to 2025-02-28, 10 of 11
-  (placebo 0.12). From 2025-03-01, 17 of 17 (placebo 0.24). Experiment 196 found that the detector
+  (placebo 0.12). From 2025-03-01, 17 of 17 (placebo 0.23). Experiment 196 found that the detector
   over-flags D8 from March 2025, and outside the drops it flags 0.46 of those half-hours against
   0.31 before.
 - **Night half-hours only (arm N, which does not decide the verdict):** 14 of 28 (0.50; 0.33 to
@@ -161,19 +162,19 @@ to 48% of half-hours.*
   to 1.95); the plan fixed 1.97 MW. The mean distance of the 28 depths from the nearest multiple is
   0.287 units (0.233 to 0.342) at 1.97 MW, 0.277 at 1.93 MW, and 0.230 at 1.75 MW, against 0.25 for
   a uniform spread; the prediction needed the interval wholly below 0.25. The onset steps give 0.214
-  (0.159 to 0.273, p 0.046) at 1.97 MW but 0.222 at 1.75 MW (p 0.24), and the end steps give 0.264.
-  Depths in 2023 and 2024 (11 drops, median 3.6 MW) give 0.319; depths from 2025-03 (17 drops,
+  (0.159 to 0.273, p 0.046) at 1.97 MW but 0.222 at 1.75 MW (p 0.24), and the end steps give 0.258 (0.207 to 0.307).
+  Depths from 2023-08-15 to 2025-02-28 (11 drops, median 3.6 MW) give 0.319; depths from 2025-03 (17 drops,
   median 2.4 MW) give 0.266.
 - **Why the depths blur:** the 24-hour median of D8's residual outside the drops has a standard
-  deviation of 1.20 MW before March 2025 and 0.91 MW after, about half of one unit. The test cannot
-  resolve whole units at this noise, and so the failed clustering prediction does not refute the
-  engine.
+  deviation of 1.20 MW before March 2025 and 0.91 MW after, about half of one unit. The test may therefore
+  be unable to resolve whole units at this noise. We have not tested that explanation, so the
+  failed clustering prediction neither supports nor refutes the engine.
 - **Timing:** onsets fall in the 6-hour blocks 0 to 6, 6 to 12, 12 to 18, and 18 to 24 UTC 11, 3, 4,
   and 10 times (chi-squared p 0.067), and ends 6, 4, 6, and 12 times. No weekday stands out
-  (onsets p 0.48). The mean system-price fifth across a drop is 3.44, against 3.03 in matched
+  (onsets p 0.48). The mean system-price fifth across a drop is 3.45, against 3.03 in matched
   placebo windows (paired Wilcoxon p 0.001), so the drops sit in dearer half-hours, as the engine
-  does (experiment 194 found it runs in 26% of the dearest fifth and 9% of the cheapest). Onsets by
-  price fifth, cheapest to dearest: 6, 8, 7, 2, 5.
+  does (experiment 194 found it runs in 26% of the dearest fifth and 9% of the cheapest). The onsets
+  themselves do not rise with price: by fifth, cheapest to dearest, they number 6, 8, 7, 2, and 5.
 - **After March 2026:** none of the drops starts from 2026-03-01 to 2026-06-24, against 5.4 expected
   at the rate of the previous 12 months (17 drops; Poisson probability of none 0.0045). D8's share
   of half-hours 2.5 MW below expected falls from 0.17 in February 2026 to 0.008 in April, but the
@@ -183,8 +184,8 @@ to 48% of half-hours.*
   RO-NC alarms from that date lie inside a spell (expected 19.8, p 0.002); 21 lie within 3 hours of
   a spell's start or end (expected 13.8, p 0.004). The pair alarm, the learned score, and the
   re-ranker of experiment [195](../00195-switching-neural-plus-detector-features/result.md) have
-  every one of 60, 36, and 36 alarms inside a spell (expected 44.0, 26.4, and 26.4). Five of the 28
-  unexplained RO-NC alarms lie inside a drop (3.5 expected).
+  every one of 60, 36, and 36 alarms inside a spell (expected 44.0, 26.4, and 26.4). Five of the 27
+  unexplained RO-NC alarms from 2023-08-15 lie inside a drop (3.5 expected).
 - **False-alarm budget:** D8 and D9 supply 61 of the 148 unexplained alarms in the false-alarm
   analysis of the alarms of experiment
   [130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md) (0.41). The excess over the
@@ -208,7 +209,9 @@ to 48% of half-hours.*
 - **Circularity:** the drops and the detector both read D8's residual, so some overlap is built in.
   The controls rule out a shared regional cause, and the placebo rules out a detector that flags
   everything (0.19), but neither tests the engine directly. D8's own record of the engine after
-  2023-08-15 is zeros or absent (experiment 194), so no independent record exists.
+  2023-08-15 is zeros or absent (experiment 194), so no independent record exists. Experiment 196 also fitted D8's detector parameters and noise on
+  2023-09 to 2025-12, a window that contains most of the drops, whereas the three controls fit their
+  own noise on their own history.
 - **Detector reliability:** experiment 196 judged the detector `not supported` after March 2025, and
   17 of the 28 drops lie there. The pre-March-2025 stratum, where its known-answer gate applies,
   gives 10 of 11 against 0.12.
