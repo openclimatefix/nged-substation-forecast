@@ -218,3 +218,11 @@ scoring tables; the SVG files were optimised but
 - **Quantile score** is twice the mean pinball loss over the 11 levels of `studies.ens_members`, in
   points of capacity; MAE is of the median forecast; the mean forecast in the Checks is the 11-level
   weighted mean.
+
+## Data-processing note
+
+Experiment 268 reported crossing quantiles in 26,344 of its 77,897 stored farm-forecast rows (34%),
+which moved its curtailment cost by up to 3.7%. The stored forecasts on this page have none:
+[experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm, because the fit scripts sorted the 11 quantiles before writing them, so sorting does not
+change the scores here.
