@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Re-score the stored metered-farm predictions of experiments 224, 243, 248, 257, and 260 with and without sorting each row's 11 quantiles.
+"""Re-score experiments 224, 243, 248, 257, and 260 with and without sorted quantiles.
+
+Each stored row has 11 quantiles; the second score sorts them ascending.
 
 For every arm the script counts how often a row has crossing quantiles (a lower level above a higher
 one), then scores the stored rows as they are ("original") and with the quantiles sorted ascending
