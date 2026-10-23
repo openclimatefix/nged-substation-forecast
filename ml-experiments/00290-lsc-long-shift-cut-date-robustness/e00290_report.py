@@ -33,6 +33,12 @@ def main() -> None:
     )
     print("## 48 h after the end, fit cut at the end, by end date (mean over 10 substations)")
     print(summary)
+    shares = summary["share_pct"]
+    half = 2.201 * shares.std() / len(shares) ** 0.5  # t multiplier, 11 degrees of freedom
+    print(f"mean share over end dates (%): {shares.mean():.2f}, sd {shares.std():.2f}")
+    print(f"95% t interval (%): {shares.mean() - half:.2f} to {shares.mean() + half:.2f}")
+    print(f"mean bias over end dates: {summary['bias'].mean():.2f}")
+    print(f"mean transfer over end dates: {summary['transfer'].mean():.2f}")
     print("share range over end dates (%):", summary["share_pct"].min(), summary["share_pct"].max())
     print("bias range over end dates:", summary["bias"].min(), summary["bias"].max())
     for window in ("days_3_to_10", "days_10_to_17", "days_3_to_33"):
@@ -45,6 +51,13 @@ def main() -> None:
             .sort("cut_offset_hours")
             .with_columns(pl.exclude("cut_offset_hours").round(1))
         )
+    jobs = (
+        rows.filter(pl.col("window") == "days_10_to_17")
+        .pivot(on="cut_offset_hours", index=["site", "end"], values="mean_bias")
+        .with_columns(change_12h=(pl.col("12") - pl.col("0")).abs())
+    )
+    print(f"## largest change in bias from a 12-hour later cut, over {jobs.height} jobs (points)")
+    print(jobs["change_12h"].max())
     print("## mean share (%) over end dates, by cut offset and window")
     print(
         rows.filter(pl.col("window") != "after_48h")

@@ -1,0 +1,15 @@
+D3 transfer ending 2023-07-01, cut -24 h: 2.04
+D3 transfer ending 2023-07-01, cut +0 h: 2.13
+D3 transfer ending 2023-07-01, cut +6 h: 2.13
+D3 transfer ending 2023-07-01, cut +12 h: 0.88
+D3 transfer ending 2023-07-01, cut +24 h: 0.76
+D3 transfer ending 2023-07-02, cut -24 h: 2.01
+D3 transfer ending 2023-07-02, cut +0 h: 3.52
+D3 transfer ending 2023-07-02, cut +6 h: 3.45
+D3 transfer ending 2023-07-02, cut +12 h: 2.81
+D3 transfer ending 2023-07-02, cut +24 h: 2.95
+D3 transfer ending 2023-06-20, cut -24 h: 2.15
+D3 transfer ending 2023-06-20, cut +0 h: 2.25
+D3 transfer ending 2023-06-20, cut +6 h: 2.24
+D3 transfer ending 2023-06-20, cut +12 h: 2.24
+D3 transfer ending 2023-06-20, cut +24 h: 2.22
