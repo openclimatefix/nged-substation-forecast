@@ -24,8 +24,46 @@ ONSET: Final[datetime] = datetime(2023, 12, 1, tzinfo=UTC)
 DURATION: Final[timedelta] = timedelta(days=30)
 
 
+SUMMER_ONSET: Final[datetime] = datetime(2023, 6, 1, tzinfo=UTC)
+CUT_OFFSETS: Final[tuple[timedelta, ...]] = (
+    timedelta(days=-1),
+    timedelta(0),
+    timedelta(hours=6),
+    timedelta(hours=12),
+    timedelta(days=1),
+    timedelta(days=3),
+    timedelta(days=10),
+)
+
+
+def cut_position() -> None:
+    """Print the mean forecast difference over one fixed week for fits cut at different instants.
+
+    The transfer (25% of D3's power, 30 days from 1 June 2023) ends on 1 July. The target week
+    starts 10 days after the end, and every fit is cut before it.
+    """
+    cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=fit.CACHE_DIR)
+    end = SUMMER_ONSET + DURATION
+    stamps = cache.end_times
+    active = (stamps > naive_utc(moment=SUMMER_ONSET)) & (stamps <= naive_utc(moment=end))
+    features = cache.sites["D3"]
+    injected = replace_site(
+        cache=cache, site="D3", y=features.y + np.where(active, 0.25 * features.y, 0.0)
+    )
+    first = end + timedelta(days=10)
+    index = fit.target_rows(cache=cache, site="D3", cut=first, stop=first + timedelta(days=7))
+    window = fit.WINDOWS["24m"]
+    print("## D3, transfer ending 1 July: mean forecast difference over a fixed week, by cut")
+    for offset in CUT_OFFSETS:
+        cut = end + offset
+        moved = fit.forecast(cache=injected, site="D3", cut=cut, window=window, index=index)
+        clean = fit.forecast(cache=cache, site="D3", cut=cut, window=window, index=index)
+        print(f"cut at end {offset}: {float(np.mean(moved - clean)):.2f} points")
+
+
 def main() -> None:
     """Print the forecast difference by temperature band and by hour."""
+    cut_position()
     cache = load_or_build_feature_cache(paths=default_input_paths(), cache_dir=fit.CACHE_DIR)
     end = ONSET + DURATION
     stamps = cache.end_times

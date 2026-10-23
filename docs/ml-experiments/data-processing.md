@@ -785,6 +785,15 @@ and to production, for D8. The scope is one series and one residual model, the c
 count depends on the threshold (15 to 48 for -2.5 to -1.0 MW), and the entry is provisional until
 NGED has said what moved.
 
+**Mask the rows of every known load transfer out of the training window of a forecast that uses no
+recent power, whatever the transfer's length (provisional; medium confidence).** Injected
+transfers of 25% of a substation's power lasting 7, 30, and 90 days were learned by the 24-month
+monthly-refit GAM as 8%, 19%, and 32% of their size in the 48 hours after they ended, and a
+permanent step was half learned after about 12 months ([experiment
+274](00274-lsc-long-arrangement-audit-gam-refit/result.md); 10 Primary substations, 4 onset dates,
+actual weather). No tested duration kept the bias under 0.1 points. Applies to experiments and
+production.
+
 ## Forecast tails and curtailment cost
 
 **Count the half-hours beyond a limit before ranking forecasts on curtailment cost.** Two bulk
