@@ -152,3 +152,11 @@ than H5 (99% interval -0.25% to +1.96%).
 neighbouring farms' power.** P2 trails H5 by 0.45%, and the 99% interval (-2.2% to +0.6%) is wide
 enough that a gain of up to about 2% from a neural network cannot be ruled out, so the comparison is
 made against P2 and not against the plant alone.
+
+## Data-processing note
+
+Experiment 268 reported crossing quantiles in 26,344 of its 77,897 stored farm-forecast rows (34%),
+which moved its curtailment cost by up to 3.7%. The stored forecasts on this page have none:
+[experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm, because the fit scripts sorted the 11 quantiles before writing them, so sorting does not
+change the scores here.

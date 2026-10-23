@@ -31,6 +31,8 @@ E224_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00224-metered-farm-dayahead-t
 E243_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00243-metered-farm-architecture-comparison"
 E248_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00248-metered-farm-architecture-ukv-inputs"
 E257_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00257-metered-farm-fair-plant-arm"
+E229_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00229-metered-farm-ens-ukv-blend"
+E246_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00246-metered-farm-ens-ukv-icond2-blend"
 E260_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00260-metered-farm-quantile-combination"
 FARMS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "E", "F")
 LEVELS: Final[np.ndarray] = np.array(MIXTURE_LEVELS)
@@ -109,6 +111,18 @@ def on_keys(*, frame: pl.DataFrame, keys: pl.DataFrame) -> pl.DataFrame:
 def with_month(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Add the calendar month the bootstrap resamples."""
     return frame.with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
+
+
+def blend_units() -> list[Unit]:
+    """Return experiments 229 and 246 for the crossing count only, on their finite stored rows."""
+    units = []
+    for experiment, folder in (("229", E229_DIR), ("246", E246_DIR)):
+        for fold in ("scored", "replicate"):
+            frame = pl.read_parquet(folder / "predictions" / f"{fold}.parquet")
+            frame = frame.rename({"valid_time": "time"}) if "valid_time" in frame.columns else frame
+            finite = frame.filter(pl.all_horizontal([pl.col(c).is_finite() for c in QCOLS]))
+            units.append(Unit(experiment, fold, int(experiment), finite.select(COLUMNS)))
+    return units
 
 
 def build_units() -> list[Unit]:
@@ -451,6 +465,9 @@ def main() -> None:
         arm_scores += arm_rows
         contrasts += contrast_rows
         gains += gain_rows
+    for unit in blend_units():
+        print(f"counting crossings {unit.experiment} {unit.unit}: {unit.rows.height} rows")
+        crossing.append(crossing_table(unit=unit))
     tables = {
         "crossing": pl.concat(crossing),
         "arm_scores": pl.DataFrame(arm_scores),
