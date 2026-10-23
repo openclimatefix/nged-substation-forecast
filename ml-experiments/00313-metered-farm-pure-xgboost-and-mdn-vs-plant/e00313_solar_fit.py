@@ -25,7 +25,7 @@ import e00310_fit as f310  # ty: ignore[unresolved-import]
 import e00313_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 import xgboost as xgb
 from studies.tail_calibration import level_column
 

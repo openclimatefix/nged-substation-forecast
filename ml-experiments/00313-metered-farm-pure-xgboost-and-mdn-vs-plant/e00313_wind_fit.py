@@ -32,7 +32,7 @@ import e00310_fit as f310  # noqa: E402  # ty: ignore[unresolved-import]
 import e00313_common as common  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 import xgboost as xgb  # noqa: E402
 
 FARMS: Final[tuple[str, ...]] = ("W1", "W2", "W3")
