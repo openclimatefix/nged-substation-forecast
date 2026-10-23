@@ -1,12 +1,12 @@
 ---
 name: release-model
 description: >-
-  Load before choosing which ml-experiment winners go into the next numbered model release of the
-  Flexpectation production forecast, before writing a release plan, and before registering a
-  `model-release-N` cross-validation run. The routine: list the candidate experiments, test the
-  chosen winners together in one combination experiment, plan and implement the port, run the full
-  cross-validation gate, release, and watch the first runs. A change to production that no
-  experiment decided is an ordinary issue; use `plan-issue` for it.
+  Load before choosing what goes into the next numbered model release of the Flexpectation
+  production forecast, before writing a release plan, and before registering a `model-release-N`
+  cross-validation run. The routine: read the research-default log since the last release, test the
+  current research default against the production recipe in one experiment, plan and implement the
+  port, run the full cross-validation gate, release, and watch the first runs. A change to production
+  that no experiment decided is an ordinary issue; use `plan-issue` for it.
 ---
 
 # Cutting a model release
@@ -26,14 +26,22 @@ load before a fit.
 
 ## Step 0: write the agenda
 
-**List every experiment now in the "Candidates for the next release" table of
-`docs/ml-experiments/README.md`.** The table is generated from the experiments whose `result.md`
-front matter says `production_status: candidate`, and `grep -l "production_status: candidate"
-docs/ml-experiments/*/result.md` lists the same experiments. An adopted experiment leaves the table,
-so the table holds exactly the experiments not yet released, including winners that an earlier
-release deferred. For each candidate, give the verdict, the headline number with its interval, and
-the production setting it would change. Mark candidates that change the same setting, because only
-one of them can be ported. Step 1 tests them head to head and not in the same arm.
+**List every adoption in `docs/ml-experiments/research-default-log.md` since the last release.** The
+log holds each family's versions of the research default, and each row names the adopting
+experiment, its gains with intervals, and the stored forecasts. The release starts from the
+family's current research default (for example, Primary demand research default 3) and not from a
+list of separate winners. Also list the experiments in the "Candidates for the next release" table
+of `docs/ml-experiments/README.md` that no log row covers (`production_status: candidate`), because
+a candidate that was never adopted into the research default is a separate proposal. For each item,
+give the verdict, the headline number with its interval, and the production setting it would
+change. Mark items that change the same setting, because only one of them can be ported. Step 1
+tests the research default against the production recipe, with each component left out in turn.
+
+**For the first release, a single-family candidate is the default.** The first production update is
+a relatively simple model implemented as one model family, for example XGBoost only, while blends
+stay of interest. Take a blend into the first release only when its experiment's single-family table
+shows an added value over the best single family that the maintainer judges worth the extra
+complexity.
 
 **Exclude a candidate that needs a design production does not have yet.** The staged design of
 experiments 00001 and 00002 is an example. Such a candidate goes through `plan-issue` as its own
@@ -42,23 +50,25 @@ build, and it joins a later release.
 The maintainer picks the candidates for the release. The output is that list, written into the
 planned `result.md` of the combination experiment in step 1.
 
-## Step 1: test the winners together
+## Step 1: test the current research default against the production recipe
 
-**Run one ml-experiment that asks whether the chosen winners together beat the current production
-recipe.** Size the experiment and write its planned `result.md` first, as the `ml-experiment` skill
-says. Experiments test one idea against a fixed benchmark, and ideas that win alone can cancel each
-other out. Each candidate was measured against an older benchmark than the current production
-recipe, so the experiment re-measures every winner against the recipe production uses now.
+**Run one ml-experiment that asks whether the family's current research default, with leave-one-out
+arms, beats the production recipe.** Size the experiment and write its planned `result.md` first,
+as the `ml-experiment` skill says. The adoptions in the log each beat the previous version of the
+research default, and none was measured against the recipe production uses now, so the experiment
+re-measures the whole chain against that recipe.
 
-The arms are the current production recipe, all chosen winners together, and, for each winner, "all
-winners minus that one". **The one deciding contrast is all winners against production.** The
-minus-one arms are diagnostics: they estimate each winner's marginal effect in context, and they
-cannot say which pair of winners interferes. With k winners the experiment has k + 1 contrasts, so
-run at least three seeds, include the climatology row and the calendar-memorisation control, and
-expect little power on 12 validation months. Drop or defer a winner only when its marginal interval
-lies wholly on the harmful side, because a marginal effect smaller than the effect the winner showed
-alone is usually absence of evidence. Where two candidates change the same setting, add one arm per
-candidate and compare them head to head.
+The arms are the current production recipe, the current research default, and, for each component
+adopted since the last release, "the research default minus that component". **The one deciding
+contrast is the research default against production.** The leave-one-out arms are diagnostics: they
+estimate each component's marginal effect in context, and they cannot say which pair of components
+interferes. With k components the experiment has k + 1 contrasts, so run at least three seeds,
+include the `climatology` row and the calendar-memorisation control, and expect little power on 12
+validation months. Drop or defer a component only when its marginal interval lies wholly on the
+harmful side, because a marginal effect smaller than the effect the component showed alone is
+usually absence of evidence. A candidate in the agenda that the log does not cover joins as one more
+arm, and where two candidates change the same setting, add one arm per candidate and compare them
+head to head.
 
 **Build the training and scoring frames in the shape production uses,** so that the result predicts
 what cross-validation will show. Report the continuous ranked probability score (CRPS), the mean
@@ -68,7 +78,7 @@ farms, and wind farms. Primary substations are the headline for the substations.
 each winner is the series type that the winner was selected on, because the candidates so far are
 solar and wind results measured on 6 solar farms and 3 wind farms.
 
-**The validation year chose the winners, so it overstates their combined effect.** Treat the
+**The validation year chose the adopted components, so it overstates their combined effect.** Treat the
 validation-year effect as an upper bound. Score the final release set against the production recipe
 once more on months that no candidate and no earlier release was selected on: the untouched holdout
 from 2026-07-01 onward. The holdout is a check on the sign of the effect, not an estimate of its

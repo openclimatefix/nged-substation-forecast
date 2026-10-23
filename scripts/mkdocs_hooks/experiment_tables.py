@@ -48,6 +48,9 @@ PRODUCTION_STATUSES: Final[frozenset[str]] = frozenset(
 STATUSES: Final[frozenset[str]] = frozenset({"planned", "done", "finished"})
 FIRST_ID_NEEDING_TAKE_HOME_MESSAGE: Final[int] = 103
 """Older experiments show the first sentence of `headline` where `take_home_message` is absent."""
+KINDS: Final[frozenset[str]] = frozenset({"change", "other"})
+FIRST_ID_NEEDING_KIND: Final[int] = 320
+"""Experiments below this id were planned before the research default rule and may omit `kind`."""
 
 EXPERIMENTS_PLACEHOLDER: Final[str] = "<!-- experiments-table -->"
 PLANNED_PLACEHOLDER: Final[str] = "<!-- planned-table -->"
@@ -162,6 +165,13 @@ def validate_experiments(*, experiments: Sequence[Experiment], experiments_dir: 
                         f"{sorted(PRODUCTION_STATUSES)}",
                     )
                 )
+        kind = fields.get("kind")
+        if kind is not None and kind not in KINDS:
+            errors.append(_error(experiment, f"`kind` {kind!r} is not one of {sorted(KINDS)}"))
+        if kind is None and experiment.number >= FIRST_ID_NEEDING_KIND:
+            errors.append(_error(experiment, "missing `kind`"))
+        if fields.get("promoted_to") and kind != "change":
+            errors.append(_error(experiment, "`promoted_to` needs `kind: change`"))
         needs_take_home = experiment.number >= FIRST_ID_NEEDING_TAKE_HOME_MESSAGE
         if needs_take_home and status != "planned" and not fields.get("take_home_message"):
             errors.append(_error(experiment, "missing `take_home_message`"))
