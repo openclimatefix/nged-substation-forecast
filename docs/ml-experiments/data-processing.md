@@ -506,6 +506,18 @@ the first hindcast quarter, so the offsets correct a stable low bias in the ense
 median, whose cause the experiment did not identify. Evidence: [experiment
 259](00259-wind-plant-plus-quantile-offset-head/result.md), three farms, July 2025 to June 2026.
 
+**Do not fit a wind-forecast correction to the single year of ensemble hindcast runs without
+checking that the speed-to-power relation of the hindcast year matches the scored year
+(provisional, medium confidence).** *Applies to: experiments and production.* At the three metered
+wind farms, observed power at the same ensemble-mean 100 m wind speed was higher in the scored year
+(July 2025 to June 2026) than in the hindcast runs (April 2024 to June 2025) in most speed bins, and
+the mean observed fraction of capacity rose from 0.20 to 0.25 at W1, from 0.25 to 0.28 at W2, and
+from 0.21 to 0.25 at W3, while the ensemble-mean speed rose by 0.3 m/s. A neural adapter fitted to
+the hindcast runs scored 0.21 to 1.04 points worse than the same adapter fitted to ERA5 and then
+given an offset table, and an offset table fitted to the hindcast runs still helped. Evidence:
+[experiment 303](00303-wind-adapter-in-production-setting/result.md), three farms, July 2025 to
+June 2026; the cause of the shift is not identified.
+
 **Correct the ECMWF ensemble's 10 m and 100 m wind speeds before a wind-power model fitted to ERA5
 reads them, and expect the uncorrected input to lower the median forecast by about 10 points of
 capacity (provisional, medium confidence).** *Applies to: experiments and production.* At the three
