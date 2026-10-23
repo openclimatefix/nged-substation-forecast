@@ -22,9 +22,9 @@ from typing import Final
 import e00259_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 import xgboost as xgb
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 BASE_DIR: Final = common.WORK_DIR / "base"
 OUT_DIR: Final = common.WORK_DIR / "heads"
