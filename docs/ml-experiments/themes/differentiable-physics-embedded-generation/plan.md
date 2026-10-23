@@ -2,6 +2,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| Gas engine bands at D8 | [Experiment 264](../../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md): can an as-of spread that widens in the direction the engine pushes give D8 honest q05 to q95 bands? | High | Nothing | Planned |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
