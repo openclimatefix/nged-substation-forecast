@@ -237,8 +237,8 @@ MW, and every value stays inside the 80% range of experiment 129.**
 
 - **Does the empirical shape lower the sunny-half-hour error of the forecast?** A test would port
   the pooled table into the ensemble weather path in `packages/studies` and score
-  arm D at D5, D9, D10, D11, D14, and D16 on the sunny-daylight rows of experiment 178. A candidate prediction that could fail
-  is a
-  change of under 0.02 MW at the five other substations.
+  arm D at D5, D9, D10, D11, D14, and D16 on the sunny-daylight rows of
+  experiment 178. A candidate prediction that could fail is a change of under 0.02 MW at the five
+  other substations.
 - **Is the plant shape of an unseen farm predictable?** Leave each farm out of the pool and also
   leave out its nearest neighbour, then repeat arm 4.
