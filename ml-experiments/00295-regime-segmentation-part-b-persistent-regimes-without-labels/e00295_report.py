@@ -145,6 +145,40 @@ def d8_section(*, config: tuple[float, int]) -> None:
     )
 
 
+def sweep_section(*, hold: list[str]) -> None:
+    """Print the held-out recall and the regime changes per Primary-year at every penalty."""
+    clean_all, injections = load("clean_break"), load("injection")
+    years = sum(site_years()[s] for s in hold)
+    print(
+        "\n== Held-out sweep (7-day minimum segment): penalty, regime changes per Primary-year, recall =="
+    )
+    inj = injections.filter(
+        pl.col("site").is_in(hold)
+        & (pl.col("parity") == "even")
+        & (pl.col("absorption") == "fit")
+        & (pl.col("min_length") == 7)
+    )
+    clean = clean_all.filter(
+        pl.col("site").is_in(hold) & (pl.col("min_length") == 7) & (pl.col("label") != "temporary")
+    )
+    for beta in c.BETAS:
+        rate = clean.filter(pl.col("beta") == beta).height / years
+        g = inj.filter(pl.col("beta") == beta)
+
+        def recall(
+            family: str, expected: str, size: float | None = None, g: pl.DataFrame = g
+        ) -> float:
+            rows = g.filter(pl.col("family") == family)
+            if size is not None:
+                rows = rows.filter(pl.col("size") == size)
+            return float((rows["label"] == expected).to_numpy().mean())
+
+        print(
+            f"penalty {beta:>5}: {rate:.2f} per Primary-year; persistent 25% {recall('persistent', 'persistent', 0.25):.2f}, "
+            f"10% {recall('persistent', 'persistent', 0.10):.2f}, temporary {recall('temporary', 'temporary'):.2f}"
+        )
+
+
 def main() -> None:
     """Print the report."""
     chosen = json.loads((c.EXPERIMENT_DIR / "chosen_config.json").read_text())
@@ -191,6 +225,7 @@ def main() -> None:
         f"labels of held-out clean breaks: {rows.group_by('label').agg(n=pl.len()).sort('label').rows()}"
     )
 
+    sweep_section(hold=hold)
     print("\n== Injection recall at the chosen config (held-out Primaries, even-month onsets) ==")
     inj = injections.filter(at & pl.col("site").is_in(hold) & (pl.col("parity") == "even"))
     for absorption in ("fit", "residual"):
@@ -245,8 +280,8 @@ def main() -> None:
         .sort("family", "absorption")
     )
     print(
-        "dating error of found injections (days): median absolute",
-        float(np.median(np.abs(inj.filter(pl.col("found"))["dating_error_days"].to_numpy()))),
+        "dating error of found injections (days; the stored error is relative to the day after the onset date, so 1 is added): median absolute",
+        float(np.median(np.abs(inj.filter(pl.col("found"))["dating_error_days"].to_numpy() + 1))),
     )
 
     gain_files = sorted((c.EXPERIMENT_DIR / "gain").glob("*.parquet"))
@@ -262,15 +297,17 @@ def main() -> None:
                 "cut",
                 "mae_none",
                 "mae_segment",
+                "mae_regime",
                 "mae_trailing",
                 "bias_none",
                 "offset_segment",
+                "offset_regime",
                 "offset_trailing",
                 "latest_boundary",
             )
         )
         injected = gain.filter(pl.col("scenario") != "real_d8")
-        key = injected["site"] + injected["scenario"] + injected["onset"]
+        key = injected["site"]
         for name, frame, clusters in (
             ("injected persistent steps", injected, key.to_numpy()),
             ("D8", real, real["cut"].to_numpy()),
@@ -279,6 +316,8 @@ def main() -> None:
             for arm_a, arm_b in (
                 ("mae_segment", "mae_none"),
                 ("mae_segment", "mae_trailing"),
+                ("mae_regime", "mae_none"),
+                ("mae_regime", "mae_trailing"),
                 ("mae_trailing", "mae_none"),
             ):
                 diff = (frame[arm_a] - frame[arm_b]).to_numpy()
@@ -286,7 +325,7 @@ def main() -> None:
                     f"{name}: {arm_a} - {arm_b}: {fmt(cluster_interval(values=diff, clusters=clusters))}"
                 )
             print(
-                f"{name}: mean absolute error none {frame['mae_none'].mean():.3f}, segment {frame['mae_segment'].mean():.3f}, trailing {frame['mae_trailing'].mean():.3f}"
+                f"{name}: mean absolute error none {frame['mae_none'].mean():.3f}, latest boundary {frame['mae_segment'].mean():.3f}, latest regime {frame['mae_regime'].mean():.3f}, trailing {frame['mae_trailing'].mean():.3f}"
             )
             del weights
         print("by month after the onset (injected):")
@@ -295,6 +334,7 @@ def main() -> None:
             .agg(
                 none=pl.col("mae_none").mean(),
                 segment=pl.col("mae_segment").mean(),
+                regime=pl.col("mae_regime").mean(),
                 trailing=pl.col("mae_trailing").mean(),
                 n=pl.len(),
             )
@@ -306,6 +346,7 @@ def main() -> None:
             .agg(
                 none=pl.col("mae_none").mean(),
                 segment=pl.col("mae_segment").mean(),
+                regime=pl.col("mae_regime").mean(),
                 trailing=pl.col("mae_trailing").mean(),
                 n=pl.len(),
             )

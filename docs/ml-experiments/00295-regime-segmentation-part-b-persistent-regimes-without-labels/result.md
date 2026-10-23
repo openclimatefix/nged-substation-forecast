@@ -83,34 +83,37 @@ lessons:
     verdict is not supported. The edge part holds only because the chosen penalty leaves 3
     boundaries after D8's break.
   - >-
-    The penalty trades false regime changes against recall. Recall of temporary shifts is 0.92 at
-    penalty 4 and 0.42 at penalty 64, while regime changes per Primary-year fall from 6.5 to 0.9.
+    The penalty trades false regime changes against recall. At the 7 held-out Primaries, recall of
+    temporary shifts is 0.92 at penalty 4 and 0.42 at penalty 64, while regime changes per
+    Primary-year fall from 6.5 to 0.9 (held-out sweep in `printed_report.txt`).
   - >-
-    The first design, which segmented the daily mean level, gave the same recall as the final design
-    on the 5 Primaries both ran, so reading the distribution did not change what the method can
-    find.
+    The first design, which segmented the daily mean level, gave about the same recall as the final
+    design at a matched rate of false regime changes on the 5 Primaries both ran, so reading the
+    distribution did not change what the method can find.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   Looking only at the residual of a forecast that uses no recent power, a segmentation finds a
   lasting change of 25% of a Primary's load and dates it within a day or two, but it misses about
   half of 10% changes and cannot reliably tell a 14 to 60 day load shift from a lasting change.
-  At D8 it finds the 2023-08-15 break exactly, but only at a penalty that also finds 2 to 3 false
-  changes per Primary-year. An offset for the latest regime lowers the forecast error after a step
-  by 2.2 points of capacity, but a plain 60-day mean residual does slightly better, so the
-  segmentation is not worth adding for that purpose.
+  At D8 it finds the 2023-08-15 break exactly, but only at penalties that also find 2.5 or more
+  regime changes per Primary-year at the other Primaries. An offset for the latest regime
+  lowers the forecast error after a step by 2.2 points of capacity, but a plain 60-day mean
+  residual does as well, so the segmentation is not worth adding for that purpose.
 advice:
   - >-
     Do not expect a residual-only segmentation to find a step under about 15% of a Primary's load:
-    it labelled 45% to 50% of 10% steps correctly and 89% to 95% of 25% steps (Figure 1).
+    it labelled 45% to 50% of 10% steps correctly and 89% to 95% of 25% steps (persistent
+    steps bullet).
   - >-
     Try a trailing 60-day mean residual as the offset after a step before building a segmentation,
-    because the latest-regime offset was 0.15 points worse (0.03 to 0.27) than the trailing offset
-    (Figure 3).
+    because the latest-regime offset was no better (0.20 points worse, interval -0.07 to 0.47) than
+    the trailing offset (Figure 3).
   - >-
     Do not take a boundary in D8's residual as a change of regime without a second source, because
     at penalties of 16 or less the segmentation puts 19 or more regime-change boundaries inside the
-    regime that follows 2023-08-15, at about the rate expected from random dates (Figure 2).
+    regime that follows 2023-08-15, and the share of engine spell edges they fall near is only 0.03
+    to 0.10 above the share at random dates (D8 bullets).
   - >-
     Check a segmentation's penalty against the known break as well as against injections, because
     the penalty tuned on injections (64) dated D8's break 15 days late while penalties of 16 or
@@ -139,12 +142,13 @@ the minimum segment length (7 days) were chosen on injections in odd months at 7
 Every number below is from the 7 held-out Primaries and even-month injections, except D8.
 
 - **D8's break (failed, narrowly).** The nearest boundary is 2023-08-30, 15 days late. Penalties
-  of 16 or less place it on 2023-08-15 exactly (Figure 2).
+  of 16 or less place it on 2023-08-15 exactly, at 2.5 or more regime changes per Primary-year at
+  the held-out Primaries (Figure 2).
 - **False regime changes (held).** 0.87 per Primary-year (98.75% interval 0.46 to 1.39). Of 33
   regime changes, 8 look like solar capacity steps (a day shift at least twice the night shift)
   and 15 fall in April to August.
 - **Persistent steps (failed).** 70% labelled persistent (0.58 to 0.85): 25% steps 89% to 95%, 10%
-  steps 45% to 50% (Figure 1). Found steps are dated to a median of 1 day.
+  steps 45% to 50% (Figure 1). Found steps are dated to a median of 0 days.
 - **Temporary shifts (failed).** 42% labelled as states (0.21 to 0.64): 27% at 14 days, 45% at 30,
   55% at 60. A permanent transfer between two Primaries is labelled a state 73% of the time, as
   predicted.
@@ -172,20 +176,26 @@ penalties 16 and 64 and the known break.*
 
 ![Forecast error after an injected step by arm](figure_3.svg)
 
-*Figure 3. Forecast error after an injected step with no offset, with a trailing 60-day offset, and
-with the latest-regime offset.*
+*Figure 3. Forecast error after an injected step with no offset, with a trailing 60-day offset,
+with the latest-boundary offset, and with the latest-regime offset.*
 
 ## Forecast gain from an offset for the latest regime
 
 - **Setup.** At each monthly cut (24-month window), the GAM's in-sample residual is segmented using
-  days before the cut only, and the offset is the mean residual since the latest boundary. Scored
-  over the month after the cut, for 6 months after each injected persistent step (14 Primaries, 8
-  even-month onsets, 4 step types).
-- **Injected steps.** Mean absolute error 9.79 points with no offset, 7.60 with the latest-regime
-  offset (difference -2.20, 98.75% interval -2.57 to -1.83), and 7.45 with the trailing 60-day
-  offset. The latest-regime offset is 0.15 worse than the trailing offset (0.03 to 0.27).
-- **D8's real break.** No offset 16.94, latest-regime 16.93, trailing 16.09. The differences have
-  intervals that include zero (6 cuts).
+  days before the cut only. The latest-boundary offset is the mean residual since the latest
+  boundary of any kind. The latest-regime offset skips boundaries labelled as states (by the
+  return rule alone, with no neighbours) and the boundary that ends each state, and uses the mean
+  residual since the latest remaining boundary. Scored over the month after the cut, for 6 months
+  after each injected persistent step (14 Primaries pooled, 8 even-month onsets, 4 step types).
+  Intervals resample whole Primaries.
+- **Injected steps.** Mean absolute error 9.81 points with no offset, 7.59 with the
+  latest-boundary offset, 7.64 with the latest-regime offset, and 7.44 with the trailing 60-day
+  offset. The latest-regime offset beats no offset by 2.17 points (98.75% interval -2.87 to -1.46)
+  and is 0.20 points worse than the trailing offset (-0.07 to 0.47). The latest-boundary offset is
+  0.15 worse than the trailing offset (-0.12 to 0.40). Neither difference from the trailing offset
+  is clear of zero.
+- **D8's real break.** No offset 16.94, latest-boundary and latest-regime 16.93, trailing 16.09.
+  The differences have intervals that include zero (6 cuts).
 
 ## Checks
 
@@ -197,12 +207,18 @@ with the latest-regime offset.*
   merge. No other trigger fired, with trigger 7 unchecked because the dependants of this result
   are not known to this session.
 - **Comparison with the first design.** The first design segmented the daily mean level. On the 5
-  Primaries both designs ran (D10, D11, D12, D14, D16, 14-day minimum segment), recall of 25%
-  steps was 0.66 to 0.73 for the level design and 0.65 to 0.71 for the distribution features, at
-  similar regime changes per Primary-year (`printed_level_only.txt`).
+  Primaries both designs ran (D10, D11, D12, D14, D16, 14-day minimum segment), at the same
+  penalty the level design finds more 10% steps and temporary shifts but also more regime changes
+  per Primary-year. At a matched rate the two agree: the level design at penalty 64 (1.18 per
+  Primary-year) has recall 0.73 for 25% steps, 0.34 for 10% steps, and 0.57 for temporary shifts,
+  and the distribution features at penalty 32 (1.38) have 0.69, 0.34, and 0.57
+  (`printed_level_only.txt`).
 
 ## Caveats
 
+- **Injection dating.** The injected step begins at the first half-hour after midnight on the onset
+  date, and the match window runs from 13 days before to 15 days after that date. The stored
+  dating error is relative to the following day, so the printed median adds 1 day.
 - **The injected steps are easier and harder than real ones.** They are added to the recorded
   power at a fixed date with no change to the weather, and the GAM is fitted on the injected
   series, so month and weather terms absorb part of the step (a median of 2% for persistent steps

@@ -79,6 +79,19 @@ def one_cut(
         since = stamps[insample] >= latest.astype("datetime64[us]")
         offset_segment = float(residual[since].mean()) if since.any() else 0.0
         boundary_date = str(latest)
+    offset_regime, regime_date = 0.0, ""
+    labelled = c.label_boundaries(
+        boundaries=boundaries, neighbours=[], sigma=sigma, last_day=series.days[-1]
+    )
+    skipped: set[int] = set()
+    for k, b in enumerate(labelled):
+        if b.label == "temporary":
+            skipped.update({k, k + 1})  # a state spell and the boundary that ends it
+    kept = [b for k, b in enumerate(labelled) if k not in skipped]
+    if kept:
+        since = stamps[insample] >= kept[-1].date.astype("datetime64[us]")
+        offset_regime = float(residual[since].mean()) if since.any() else 0.0
+        regime_date = str(kept[-1].date)
     recent = stamps[insample] > cut64 - np.timedelta64(TRAILING_DAYS, "D")
     offset_trailing = float(residual[recent].mean()) if recent.any() else 0.0
     truth = y[target]
@@ -86,9 +99,12 @@ def one_cut(
         "n_rows": len(target),
         "mae_none": float(np.mean(np.abs(pred - truth))),
         "mae_segment": float(np.mean(np.abs(pred + offset_segment - truth))),
+        "mae_regime": float(np.mean(np.abs(pred + offset_regime - truth))),
         "mae_trailing": float(np.mean(np.abs(pred + offset_trailing - truth))),
         "bias_none": float(np.mean(pred - truth)),
         "offset_segment": offset_segment,
+        "offset_regime": offset_regime,
+        "regime_boundary": regime_date,
         "offset_trailing": offset_trailing,
         "latest_boundary": boundary_date,
     }

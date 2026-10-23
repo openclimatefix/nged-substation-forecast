@@ -52,6 +52,14 @@ tuning: 1.02 per Primary-year, 98.75% interval [0.78, 1.36]; per site {'D10': 11
 PV-like (day shift at least twice night shift, approximate): 8 of 33; April to August: 15 of 33
 labels of held-out clean breaks: [('persistent', 32), ('unconfirmed', 1)]
 
+== Held-out sweep (7-day minimum segment): penalty, regime changes per Primary-year, recall ==
+penalty   4.0: 6.53 per Primary-year; persistent 25% 0.86, 10% 0.70, temporary 0.92
+penalty   8.0: 4.35 per Primary-year; persistent 25% 0.89, 10% 0.70, temporary 0.89
+penalty  16.0: 2.49 per Primary-year; persistent 25% 0.84, 10% 0.48, temporary 0.79
+penalty  32.0: 1.36 per Primary-year; persistent 25% 0.91, 10% 0.53, temporary 0.61
+penalty  64.0: 0.87 per Primary-year; persistent 25% 0.92, 10% 0.48, temporary 0.42
+penalty 128.0: 0.63 per Primary-year; persistent 25% 0.81, 10% 0.32, temporary 0.17
+
 == Injection recall at the chosen config (held-out Primaries, even-month onsets) ==
      fit persistent: recall 0.699 [0.577, 0.847]; found 0.699; n=176
      fit  temporary: recall 0.424 [0.208, 0.642]; found 0.530; n=132
@@ -110,64 +118,68 @@ shape: (6, 4)
 │ transfer   ┆ fit        ┆ 0.879299 ┆ 39  │
 │ transfer   ┆ residual   ┆ 1.059738 ┆ 41  │
 └────────────┴────────────┴──────────┴─────┘
-dating error of found injections (days): median absolute 1.0
+dating error of found injections (days; the stored error is relative to the day after the onset date, so 1 is added): median absolute 0.0
 
 == Forecast gain: mean absolute error over the month after each cut, points of effective capacity ==
 D8 (real break):
-shape: (6, 8)
-┌────────────┬───────────┬────────────┬────────────┬───────────┬───────────┬───────────┬───────────┐
-│ cut        ┆ mae_none  ┆ mae_segmen ┆ mae_traili ┆ bias_none ┆ offset_se ┆ offset_tr ┆ latest_bo │
-│ ---        ┆ ---       ┆ t          ┆ ng         ┆ ---       ┆ gment     ┆ ailing    ┆ undary    │
-│ str        ┆ f64       ┆ ---        ┆ ---        ┆ f64       ┆ ---       ┆ ---       ┆ ---       │
-│            ┆           ┆ f64        ┆ f64        ┆           ┆ f64       ┆ f64       ┆ str       │
-╞════════════╪═══════════╪════════════╪════════════╪═══════════╪═══════════╪═══════════╪═══════════╡
-│ 2023-09-01 ┆ 21.901139 ┆ 21.887053  ┆ 21.963074  ┆ 11.989567 ┆ -4.5408   ┆ 0.937957  ┆ 2023-08-1 │
-│            ┆           ┆            ┆            ┆           ┆           ┆           ┆ 5         │
-│ 2023-10-01 ┆ 20.690732 ┆ 20.81738   ┆ 20.53165   ┆ 14.956056 ┆ -6.796237 ┆ -3.333977 ┆ 2023-08-1 │
-│            ┆           ┆            ┆            ┆           ┆           ┆           ┆ 5         │
-│ 2023-11-01 ┆ 15.506613 ┆ 20.796218  ┆ 14.86862   ┆ 12.419766 ┆ -22.41546 ┆ -7.900168 ┆ 2023-10-2 │
-│            ┆           ┆            ┆            ┆           ┆ 1         ┆           ┆ 1         │
-│ 2023-12-01 ┆ 14.963637 ┆ 11.889147  ┆ 12.164363  ┆ 14.238009 ┆ -6.391007 ┆ -8.540575 ┆ 2023-08-1 │
-│            ┆           ┆            ┆            ┆           ┆           ┆           ┆ 5         │
-│ 2024-01-01 ┆ 18.020963 ┆ 15.013132  ┆ 15.269126  ┆ 17.741286 ┆ -6.214886 ┆ -9.617842 ┆ 2023-12-0 │
-│            ┆           ┆            ┆            ┆           ┆           ┆           ┆ 7         │
-│ 2024-02-01 ┆ 10.552504 ┆ 11.173627  ┆ 11.739408  ┆ 8.827961  ┆ -9.046754 ┆ -10.03618 ┆ 2023-10-2 │
-│            ┆           ┆            ┆            ┆           ┆           ┆ 2         ┆ 9         │
-└────────────┴───────────┴────────────┴────────────┴───────────┴───────────┴───────────┴───────────┘
-injected persistent steps: mae_segment - mae_none: -2.196 [-2.570, -1.826]
-injected persistent steps: mae_segment - mae_trailing: 0.150 [0.029, 0.265]
-injected persistent steps: mae_trailing - mae_none: -2.347 [-2.690, -2.007]
-injected persistent steps: mean absolute error none 9.792, segment 7.596, trailing 7.446
+shape: (6, 10)
+┌───────────┬───────────┬───────────┬───────────┬───┬───────────┬───────────┬───────────┬──────────┐
+│ cut       ┆ mae_none  ┆ mae_segme ┆ mae_regim ┆ … ┆ offset_se ┆ offset_re ┆ offset_tr ┆ latest_b │
+│ ---       ┆ ---       ┆ nt        ┆ e         ┆   ┆ gment     ┆ gime      ┆ ailing    ┆ oundary  │
+│ str       ┆ f64       ┆ ---       ┆ ---       ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---      │
+│           ┆           ┆ f64       ┆ f64       ┆   ┆ f64       ┆ f64       ┆ f64       ┆ str      │
+╞═══════════╪═══════════╪═══════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪══════════╡
+│ 2023-09-0 ┆ 21.901139 ┆ 21.887053 ┆ 21.887053 ┆ … ┆ -4.5408   ┆ -4.5408   ┆ 0.937957  ┆ 2023-08- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 15       │
+│ 2023-10-0 ┆ 20.690732 ┆ 20.81738  ┆ 20.81738  ┆ … ┆ -6.796237 ┆ -6.796237 ┆ -3.333977 ┆ 2023-08- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 15       │
+│ 2023-11-0 ┆ 15.506613 ┆ 20.796218 ┆ 20.796218 ┆ … ┆ -22.41546 ┆ -22.41546 ┆ -7.900168 ┆ 2023-10- │
+│ 1         ┆           ┆           ┆           ┆   ┆ 1         ┆ 1         ┆           ┆ 21       │
+│ 2023-12-0 ┆ 14.963637 ┆ 11.889147 ┆ 11.889147 ┆ … ┆ -6.391007 ┆ -6.391007 ┆ -8.540575 ┆ 2023-08- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 15       │
+│ 2024-01-0 ┆ 18.020963 ┆ 15.013132 ┆ 15.013132 ┆ … ┆ -6.214886 ┆ -6.214886 ┆ -9.617842 ┆ 2023-12- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 07       │
+│ 2024-02-0 ┆ 10.552504 ┆ 11.173627 ┆ 11.173627 ┆ … ┆ -9.046754 ┆ -9.046754 ┆ -10.03618 ┆ 2023-10- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆ 2         ┆ 29       │
+└───────────┴───────────┴───────────┴───────────┴───┴───────────┴───────────┴───────────┴──────────┘
+injected persistent steps: mae_segment - mae_none: -2.218 [-2.884, -1.541]
+injected persistent steps: mae_segment - mae_trailing: 0.151 [-0.124, 0.404]
+injected persistent steps: mae_regime - mae_none: -2.166 [-2.872, -1.456]
+injected persistent steps: mae_regime - mae_trailing: 0.203 [-0.074, 0.468]
+injected persistent steps: mae_trailing - mae_none: -2.369 [-2.962, -1.802]
+injected persistent steps: mean absolute error none 9.809, latest boundary 7.591, latest regime 7.643, trailing 7.439
 D8: mae_segment - mae_none: -0.010 [-2.519, 3.012]
 D8: mae_segment - mae_trailing: 0.840 [-0.411, 3.860]
+D8: mae_regime - mae_none: -0.010 [-2.519, 3.012]
+D8: mae_regime - mae_trailing: 0.840 [-0.411, 3.860]
 D8: mae_trailing - mae_none: -0.850 [-2.351, 0.551]
-D8: mean absolute error none 16.939, segment 16.929, trailing 16.089
+D8: mean absolute error none 16.939, latest boundary 16.929, latest regime 16.929, trailing 16.089
 by month after the onset (injected):
-shape: (6, 5)
-┌─────────────┬───────────┬──────────┬──────────┬─────┐
-│ month_after ┆ none      ┆ segment  ┆ trailing ┆ n   │
-│ ---         ┆ ---       ┆ ---      ┆ ---      ┆ --- │
-│ i64         ┆ f64       ┆ f64      ┆ f64      ┆ u32 │
-╞═════════════╪═══════════╪══════════╪══════════╪═════╡
-│ 1           ┆ 10.366699 ┆ 8.386633 ┆ 8.941593 ┆ 404 │
-│ 2           ┆ 10.063955 ┆ 7.779677 ┆ 7.332552 ┆ 404 │
-│ 3           ┆ 10.574667 ┆ 8.421115 ┆ 8.248661 ┆ 404 │
-│ 4           ┆ 9.739015  ┆ 7.366851 ┆ 6.958884 ┆ 404 │
-│ 5           ┆ 9.13318   ┆ 6.842324 ┆ 6.613079 ┆ 404 │
-│ 6           ┆ 8.876824  ┆ 6.778966 ┆ 6.57936  ┆ 404 │
-└─────────────┴───────────┴──────────┴──────────┴─────┘
+shape: (6, 6)
+┌─────────────┬───────────┬──────────┬──────────┬──────────┬─────┐
+│ month_after ┆ none      ┆ segment  ┆ regime   ┆ trailing ┆ n   │
+│ ---         ┆ ---       ┆ ---      ┆ ---      ┆ ---      ┆ --- │
+│ i64         ┆ f64       ┆ f64      ┆ f64      ┆ f64      ┆ u32 │
+╞═════════════╪═══════════╪══════════╪══════════╪══════════╪═════╡
+│ 1           ┆ 10.40146  ┆ 8.402019 ┆ 8.409085 ┆ 8.962277 ┆ 400 │
+│ 2           ┆ 10.052444 ┆ 7.749443 ┆ 7.88032  ┆ 7.29976  ┆ 400 │
+│ 3           ┆ 10.510623 ┆ 8.339171 ┆ 8.457049 ┆ 8.157659 ┆ 400 │
+│ 4           ┆ 9.795794  ┆ 7.398863 ┆ 7.42193  ┆ 6.985946 ┆ 400 │
+│ 5           ┆ 9.168055  ┆ 6.851789 ┆ 6.871515 ┆ 6.627138 ┆ 400 │
+│ 6           ┆ 8.922836  ┆ 6.801819 ┆ 6.815677 ┆ 6.602069 ┆ 400 │
+└─────────────┴───────────┴──────────┴──────────┴──────────┴─────┘
 injected, by size and shape:
-shape: (4, 5)
-┌───────────────────────┬───────────┬──────────┬──────────┬─────┐
-│ scenario              ┆ none      ┆ segment  ┆ trailing ┆ n   │
-│ ---                   ┆ ---       ┆ ---      ┆ ---      ┆ --- │
-│ str                   ┆ f64       ┆ f64      ┆ f64      ┆ u32 │
-╞═══════════════════════╪═══════════╪══════════╪══════════╪═════╡
-│ persistent_flat_0.10  ┆ 7.071096  ┆ 6.411093 ┆ 6.073079 ┆ 606 │
-│ persistent_flat_0.25  ┆ 11.875272 ┆ 7.948272 ┆ 7.947359 ┆ 606 │
-│ persistent_share_0.10 ┆ 7.540166  ┆ 6.873609 ┆ 6.592455 ┆ 606 │
-│ persistent_share_0.25 ┆ 12.683027 ┆ 9.150736 ┆ 9.16986  ┆ 606 │
-└───────────────────────┴───────────┴──────────┴──────────┴─────┘
+shape: (4, 6)
+┌───────────────────────┬───────────┬──────────┬──────────┬──────────┬─────┐
+│ scenario              ┆ none      ┆ segment  ┆ regime   ┆ trailing ┆ n   │
+│ ---                   ┆ ---       ┆ ---      ┆ ---      ┆ ---      ┆ --- │
+│ str                   ┆ f64       ┆ f64      ┆ f64      ┆ f64      ┆ u32 │
+╞═══════════════════════╪═══════════╪══════════╪══════════╪══════════╪═════╡
+│ persistent_flat_0.10  ┆ 7.073736  ┆ 6.408516 ┆ 6.47956  ┆ 6.066096 ┆ 600 │
+│ persistent_flat_0.25  ┆ 11.903098 ┆ 7.9358   ┆ 7.963906 ┆ 7.937096 ┆ 600 │
+│ persistent_share_0.10 ┆ 7.545245  ┆ 6.872917 ┆ 6.923241 ┆ 6.588447 ┆ 600 │
+│ persistent_share_0.25 ┆ 12.712063 ┆ 9.144836 ┆ 9.203678 ┆ 9.164929 ┆ 600 │
+└───────────────────────┴───────────┴──────────┴──────────┴──────────┴─────┘
 
 == Checks ==
 median forecast minus mean forecast: zero by construction (GAM_ONLY is a point forecast).

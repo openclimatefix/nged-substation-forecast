@@ -209,7 +209,8 @@ def fig_gain() -> None:
         for arm, column in (
             ("no offset", "mae_none"),
             ("trailing 60-day offset", "mae_trailing"),
-            ("latest-regime offset", "mae_segment"),
+            ("latest-boundary offset", "mae_segment"),
+            ("latest-regime offset", "mae_regime"),
         ):
             rows.append({"month": k[0], "arm": arm, "mae": float(group[column].to_numpy().mean())})
     frame = pl.DataFrame(rows).to_pandas()
@@ -226,8 +227,13 @@ def fig_gain() -> None:
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(
-                    domain=["no offset", "trailing 60-day offset", "latest-regime offset"],
-                    range=[ocf.DATA_SKY, ocf.DATA_BLUE, ocf.BRAND_ORANGE],
+                    domain=[
+                        "no offset",
+                        "trailing 60-day offset",
+                        "latest-boundary offset",
+                        "latest-regime offset",
+                    ],
+                    range=[ocf.DATA_SKY, ocf.DATA_BLUE, ocf.BRAND_ORANGE, ocf.DATA_PURPLE],
                 ),
                 legend=alt.Legend(title=None, orient="top"),
             ),
@@ -236,7 +242,7 @@ def fig_gain() -> None:
             width=WIDTH,
             height=190,
             title=alt.TitleParams(
-                "An offset from the latest regime helps, but a plain 60-day offset helps as much",
+                "Offsets help after a step, and a plain 60-day offset helps as much as any",
                 subtitle=[
                     "Injected persistent steps (even-month onsets) at 14 Primaries, 24-month window, monthly refit. Smaller is better."
                 ],
