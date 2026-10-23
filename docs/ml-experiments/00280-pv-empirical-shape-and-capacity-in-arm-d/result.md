@@ -112,7 +112,7 @@ D14 are the out-of-selection check: the real fit did not pick a capacity cut the
 
 The shape comes from [experiment 269](../00269-pv-capacity-gain-decomposition/result.md). Earlier
 shape experiments ([73](../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) and
-[77](../00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md)) found no score gain from a different shape, which is
-why P1 predicts none for e0 and e1. Earlier `advice` items followed: score on identical rows, report
+[77](../00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md)) found no score gain from a
+different shape, which is why P1 predicts none for e0 and e1. Earlier `advice` items followed: score on identical rows, report
 absolute error beside every contrast, and fix the row set from a shape no arm changes. No earlier
 item is departed from.
