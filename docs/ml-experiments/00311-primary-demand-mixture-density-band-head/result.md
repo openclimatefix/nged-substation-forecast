@@ -154,9 +154,9 @@ rule](../research-default.md).**
 ![Figure 7. Mean bands by local half-hour in winter at D10](figure_7_economy7_profile.svg)
 
 **Verdict `partly supported`.** Conditions 1 (gain), 3 (replication), and 5 (serving) hold.
-Condition 2 (no harm) fails on sunny daylight half-hours. Condition 4 (controls, with no audit
-trigger open) is also not met, because trigger 4 fired and no Opus audit was run, so no arm is
-adopted. The
+Condition 2 (no harm) fails on sunny daylight half-hours. Condition 4 (controls, with every audit
+trigger resolved) is resolved by a Sonnet audit that found no calculation error, but trigger 4 shows
+that the gain depends on D10. No arm is adopted, and the verdict is `partly supported`. The
 plan's verdict rule named no wording for this case, so `partly supported` is the closest of the six
 verdict words. Nothing is added to the [log of versions](../research-default-log.md).
 
@@ -282,8 +282,10 @@ verdict words. Nothing is added to the [log of versions](../research-default-log
   at or above 2 C, and the median
   of arm M equals the default's on every row.
 - **Triggers.** Trigger 4 fired: leaving D10 out moves the interval of arm M minus default across
-  zero (-0.012, -0.028 to +0.005). No Opus audit was run, by the maintainer's instruction on
-  2026-10-23; a fresh Sonnet reviewer re-derived the headline contrasts from the stored arrays and
-  found no difference. Trigger 5 did not fire (arm M differs from its nested arm MW by 0.001, and
+  zero (-0.012, -0.028 to +0.005). The audit was run by a fresh Sonnet agent and not by Opus, by the
+  maintainer's standing instruction. The agent re-derived the headline contrasts from the stored
+  arrays and found no difference above 0.002 points. Leaving D10 out gives an interval that spans
+  zero, so the gain depends on one Primary. Trigger 5 did not fire (arm M differs from its nested
+  arm MW by 0.001, and
   the interval includes zero).
   Triggers 1, 2, 6, and 7 did not fire.
