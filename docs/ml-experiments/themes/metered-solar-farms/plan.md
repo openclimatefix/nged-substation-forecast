@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 272 | Does a learned correction to the plant's weather inputs help, and does a neural network beat additive curves? | 2 | nothing | Planned |
 
 ## Planned experiments
 
