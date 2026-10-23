@@ -5,89 +5,89 @@ size-0 rows: 1920 groups, max |bias| = 0.0
 
 ## Headline: share transfer, receiver, 24-month window
   7 d  size 0.10  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 5.57
-  7 d  size 0.10  AFTER_48H    bias +0.484 (+0.289 to +0.700)  share +0.085 (+0.064 to +0.110)  mean transfer 5.57
+  7 d  size 0.10  AFTER_48H    bias +0.484 (+0.290 to +0.704)  share +0.085 (+0.064 to +0.111)  mean transfer 5.57
   7 d  size 0.10  LATER_3M     bias +0.037 (-0.028 to +0.085)  share +0.008 (-0.003 to +0.015)  mean transfer 5.57
-  7 d  size 0.10  LATER_4_12M  bias +0.060 (+0.046 to +0.076)  share +0.011 (+0.009 to +0.012)  mean transfer 5.57
+  7 d  size 0.10  LATER_4_12M  bias +0.060 (+0.046 to +0.077)  share +0.011 (+0.009 to +0.012)  mean transfer 5.57
   7 d  size 0.25  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 13.92
-  7 d  size 0.25  AFTER_48H    bias +1.211 (+0.725 to +1.754)  share +0.085 (+0.064 to +0.110)  mean transfer 13.92
-  7 d  size 0.25  LATER_3M     bias +0.092 (-0.069 to +0.212)  share +0.008 (-0.003 to +0.015)  mean transfer 13.92
-  7 d  size 0.25  LATER_4_12M  bias +0.150 (+0.115 to +0.191)  share +0.011 (+0.009 to +0.012)  mean transfer 13.92
+  7 d  size 0.25  AFTER_48H    bias +1.211 (+0.724 to +1.761)  share +0.085 (+0.064 to +0.111)  mean transfer 13.92
+  7 d  size 0.25  LATER_3M     bias +0.092 (-0.072 to +0.213)  share +0.008 (-0.003 to +0.015)  mean transfer 13.92
+  7 d  size 0.25  LATER_4_12M  bias +0.150 (+0.115 to +0.192)  share +0.011 (+0.009 to +0.012)  mean transfer 13.92
   7 d  size 0.40  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 22.27
-  7 d  size 0.40  AFTER_48H    bias +1.940 (+1.159 to +2.794)  share +0.085 (+0.064 to +0.110)  mean transfer 22.27
-  7 d  size 0.40  LATER_3M     bias +0.145 (-0.123 to +0.338)  share +0.008 (-0.004 to +0.015)  mean transfer 22.27
+  7 d  size 0.40  AFTER_48H    bias +1.940 (+1.159 to +2.825)  share +0.085 (+0.064 to +0.111)  mean transfer 22.27
+  7 d  size 0.40  LATER_3M     bias +0.145 (-0.123 to +0.340)  share +0.008 (-0.003 to +0.015)  mean transfer 22.27
   7 d  size 0.40  LATER_4_12M  bias +0.238 (+0.182 to +0.307)  share +0.011 (+0.009 to +0.012)  mean transfer 22.27
  14 d  size 0.10  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 5.57
- 14 d  size 0.10  AFTER_48H    bias +1.070 (+0.458 to +2.206)  share +0.180 (+0.087 to +0.336)  mean transfer 5.57
+ 14 d  size 0.10  AFTER_48H    bias +1.070 (+0.461 to +2.223)  share +0.180 (+0.088 to +0.336)  mean transfer 5.57
  14 d  size 0.10  LATER_3M     bias +0.096 (+0.036 to +0.151)  share +0.018 (+0.007 to +0.026)  mean transfer 5.57
- 14 d  size 0.10  LATER_4_12M  bias +0.122 (+0.089 to +0.160)  share +0.022 (+0.019 to +0.024)  mean transfer 5.57
+ 14 d  size 0.10  LATER_4_12M  bias +0.122 (+0.089 to +0.161)  share +0.022 (+0.019 to +0.024)  mean transfer 5.57
  14 d  size 0.25  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 13.92
- 14 d  size 0.25  AFTER_48H    bias +2.665 (+1.135 to +5.544)  share +0.180 (+0.086 to +0.336)  mean transfer 13.92
+ 14 d  size 0.25  AFTER_48H    bias +2.665 (+1.135 to +5.557)  share +0.180 (+0.086 to +0.336)  mean transfer 13.92
  14 d  size 0.25  LATER_3M     bias +0.237 (+0.083 to +0.377)  share +0.018 (+0.007 to +0.026)  mean transfer 13.92
- 14 d  size 0.25  LATER_4_12M  bias +0.303 (+0.218 to +0.399)  share +0.022 (+0.019 to +0.024)  mean transfer 13.92
+ 14 d  size 0.25  LATER_4_12M  bias +0.303 (+0.219 to +0.402)  share +0.022 (+0.019 to +0.024)  mean transfer 13.92
  14 d  size 0.40  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 22.28
- 14 d  size 0.40  AFTER_48H    bias +4.245 (+1.793 to +8.773)  share +0.179 (+0.084 to +0.335)  mean transfer 22.28
- 14 d  size 0.40  LATER_3M     bias +0.371 (+0.122 to +0.598)  share +0.018 (+0.006 to +0.025)  mean transfer 22.28
- 14 d  size 0.40  LATER_4_12M  bias +0.480 (+0.345 to +0.638)  share +0.022 (+0.019 to +0.024)  mean transfer 22.28
+ 14 d  size 0.40  AFTER_48H    bias +4.245 (+1.797 to +8.881)  share +0.179 (+0.084 to +0.336)  mean transfer 22.28
+ 14 d  size 0.40  LATER_3M     bias +0.371 (+0.117 to +0.599)  share +0.018 (+0.006 to +0.025)  mean transfer 22.28
+ 14 d  size 0.40  LATER_4_12M  bias +0.480 (+0.345 to +0.640)  share +0.022 (+0.019 to +0.024)  mean transfer 22.28
  30 d  size 0.10  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 5.31
- 30 d  size 0.10  AFTER_48H    bias +0.997 (+0.818 to +1.212)  share +0.191 (+0.155 to +0.219)  mean transfer 5.31
- 30 d  size 0.10  LATER_3M     bias +0.154 (+0.129 to +0.182)  share +0.030 (+0.025 to +0.035)  mean transfer 5.31
- 30 d  size 0.10  LATER_4_12M  bias +0.269 (+0.200 to +0.346)  share +0.050 (+0.046 to +0.055)  mean transfer 5.31
+ 30 d  size 0.10  AFTER_48H    bias +0.997 (+0.818 to +1.220)  share +0.191 (+0.156 to +0.219)  mean transfer 5.31
+ 30 d  size 0.10  LATER_3M     bias +0.154 (+0.129 to +0.183)  share +0.030 (+0.025 to +0.035)  mean transfer 5.31
+ 30 d  size 0.10  LATER_4_12M  bias +0.269 (+0.200 to +0.348)  share +0.050 (+0.046 to +0.055)  mean transfer 5.31
  30 d  size 0.25  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 13.26
- 30 d  size 0.25  AFTER_48H    bias +2.487 (+2.038 to +3.039)  share +0.191 (+0.155 to +0.219)  mean transfer 13.26
- 30 d  size 0.25  LATER_3M     bias +0.369 (+0.310 to +0.438)  share +0.028 (+0.025 to +0.033)  mean transfer 13.26
- 30 d  size 0.25  LATER_4_12M  bias +0.661 (+0.480 to +0.863)  share +0.050 (+0.044 to +0.055)  mean transfer 13.26
+ 30 d  size 0.25  AFTER_48H    bias +2.487 (+2.037 to +3.048)  share +0.191 (+0.155 to +0.219)  mean transfer 13.26
+ 30 d  size 0.25  LATER_3M     bias +0.369 (+0.309 to +0.440)  share +0.028 (+0.025 to +0.033)  mean transfer 13.26
+ 30 d  size 0.25  LATER_4_12M  bias +0.661 (+0.480 to +0.867)  share +0.050 (+0.044 to +0.055)  mean transfer 13.26
  30 d  size 0.40  DURING       bias +0.000 (+0.000 to +0.000)  share +0.000 (+0.000 to +0.000)  mean transfer 21.22
- 30 d  size 0.40  AFTER_48H    bias +3.967 (+3.246 to +4.837)  share +0.190 (+0.154 to +0.218)  mean transfer 21.22
- 30 d  size 0.40  LATER_3M     bias +0.569 (+0.476 to +0.691)  share +0.027 (+0.024 to +0.031)  mean transfer 21.22
- 30 d  size 0.40  LATER_4_12M  bias +1.041 (+0.739 to +1.373)  share +0.049 (+0.043 to +0.054)  mean transfer 21.22
- 60 d  size 0.10  DURING       bias +0.304 (+0.196 to +0.406)  share +0.062 (+0.034 to +0.090)  mean transfer 5.30
- 60 d  size 0.10  AFTER_48H    bias +1.690 (+1.396 to +1.970)  share +0.330 (+0.260 to +0.401)  mean transfer 5.30
- 60 d  size 0.10  LATER_3M     bias +0.400 (+0.275 to +0.574)  share +0.079 (+0.049 to +0.120)  mean transfer 5.30
- 60 d  size 0.10  LATER_4_12M  bias +0.604 (+0.488 to +0.722)  share +0.115 (+0.107 to +0.126)  mean transfer 5.30
- 60 d  size 0.25  DURING       bias +0.755 (+0.485 to +1.011)  share +0.062 (+0.034 to +0.090)  mean transfer 13.25
- 60 d  size 0.25  AFTER_48H    bias +3.940 (+3.286 to +4.676)  share +0.304 (+0.255 to +0.350)  mean transfer 13.25
- 60 d  size 0.25  LATER_3M     bias +0.826 (+0.586 to +1.102)  share +0.065 (+0.044 to +0.093)  mean transfer 13.25
- 60 d  size 0.25  LATER_4_12M  bias +1.474 (+1.183 to +1.783)  share +0.112 (+0.105 to +0.121)  mean transfer 13.25
- 60 d  size 0.40  DURING       bias +1.196 (+0.777 to +1.597)  share +0.061 (+0.034 to +0.089)  mean transfer 21.20
- 60 d  size 0.40  AFTER_48H    bias +6.153 (+5.119 to +7.389)  share +0.296 (+0.252 to +0.334)  mean transfer 21.20
- 60 d  size 0.40  LATER_3M     bias +1.212 (+0.857 to +1.599)  share +0.059 (+0.041 to +0.083)  mean transfer 21.20
- 60 d  size 0.40  LATER_4_12M  bias +2.318 (+1.843 to +2.834)  share +0.110 (+0.103 to +0.117)  mean transfer 21.20
- 90 d  size 0.10  DURING       bias +0.631 (+0.479 to +0.805)  share +0.125 (+0.083 to +0.168)  mean transfer 5.31
- 90 d  size 0.10  AFTER_48H    bias +1.750 (+1.387 to +2.167)  share +0.333 (+0.287 to +0.387)  mean transfer 5.31
- 90 d  size 0.10  LATER_3M     bias +0.338 (+0.208 to +0.497)  share +0.063 (+0.043 to +0.085)  mean transfer 5.31
- 90 d  size 0.10  LATER_4_12M  bias +0.826 (+0.686 to +0.966)  share +0.157 (+0.149 to +0.170)  mean transfer 5.31
- 90 d  size 0.25  DURING       bias +1.452 (+1.157 to +1.757)  share +0.114 (+0.082 to +0.148)  mean transfer 13.26
- 90 d  size 0.25  AFTER_48H    bias +4.197 (+3.332 to +5.287)  share +0.319 (+0.281 to +0.362)  mean transfer 13.26
- 90 d  size 0.25  LATER_3M     bias +0.724 (+0.423 to +1.152)  share +0.053 (+0.035 to +0.076)  mean transfer 13.26
- 90 d  size 0.25  LATER_4_12M  bias +1.999 (+1.641 to +2.372)  share +0.152 (+0.146 to +0.161)  mean transfer 13.26
- 90 d  size 0.40  DURING       bias +2.244 (+1.801 to +2.671)  share +0.110 (+0.081 to +0.141)  mean transfer 21.22
- 90 d  size 0.40  AFTER_48H    bias +6.624 (+5.247 to +8.375)  share +0.314 (+0.279 to +0.354)  mean transfer 21.22
- 90 d  size 0.40  LATER_3M     bias +1.067 (+0.621 to +1.732)  share +0.049 (+0.032 to +0.071)  mean transfer 21.22
- 90 d  size 0.40  LATER_4_12M  bias +3.145 (+2.570 to +3.756)  share +0.149 (+0.144 to +0.157)  mean transfer 21.22
+ 30 d  size 0.40  AFTER_48H    bias +3.967 (+3.244 to +4.875)  share +0.190 (+0.155 to +0.218)  mean transfer 21.22
+ 30 d  size 0.40  LATER_3M     bias +0.569 (+0.474 to +0.693)  share +0.027 (+0.024 to +0.031)  mean transfer 21.22
+ 30 d  size 0.40  LATER_4_12M  bias +1.041 (+0.741 to +1.380)  share +0.049 (+0.043 to +0.054)  mean transfer 21.22
+ 60 d  size 0.10  DURING       bias +0.304 (+0.198 to +0.407)  share +0.062 (+0.034 to +0.090)  mean transfer 5.30
+ 60 d  size 0.10  AFTER_48H    bias +1.690 (+1.396 to +1.976)  share +0.330 (+0.262 to +0.402)  mean transfer 5.30
+ 60 d  size 0.10  LATER_3M     bias +0.400 (+0.274 to +0.576)  share +0.079 (+0.049 to +0.121)  mean transfer 5.30
+ 60 d  size 0.10  LATER_4_12M  bias +0.604 (+0.489 to +0.724)  share +0.115 (+0.107 to +0.126)  mean transfer 5.30
+ 60 d  size 0.25  DURING       bias +0.755 (+0.492 to +1.010)  share +0.062 (+0.034 to +0.090)  mean transfer 13.25
+ 60 d  size 0.25  AFTER_48H    bias +3.940 (+3.289 to +4.694)  share +0.304 (+0.256 to +0.350)  mean transfer 13.25
+ 60 d  size 0.25  LATER_3M     bias +0.826 (+0.582 to +1.100)  share +0.065 (+0.044 to +0.094)  mean transfer 13.25
+ 60 d  size 0.25  LATER_4_12M  bias +1.474 (+1.181 to +1.791)  share +0.112 (+0.105 to +0.121)  mean transfer 13.25
+ 60 d  size 0.40  DURING       bias +1.196 (+0.782 to +1.595)  share +0.061 (+0.034 to +0.088)  mean transfer 21.20
+ 60 d  size 0.40  AFTER_48H    bias +6.153 (+5.119 to +7.404)  share +0.296 (+0.252 to +0.334)  mean transfer 21.20
+ 60 d  size 0.40  LATER_3M     bias +1.212 (+0.851 to +1.604)  share +0.059 (+0.041 to +0.083)  mean transfer 21.20
+ 60 d  size 0.40  LATER_4_12M  bias +2.318 (+1.844 to +2.840)  share +0.110 (+0.103 to +0.117)  mean transfer 21.20
+ 90 d  size 0.10  DURING       bias +0.631 (+0.479 to +0.806)  share +0.125 (+0.084 to +0.168)  mean transfer 5.31
+ 90 d  size 0.10  AFTER_48H    bias +1.750 (+1.385 to +2.173)  share +0.333 (+0.286 to +0.387)  mean transfer 5.31
+ 90 d  size 0.10  LATER_3M     bias +0.338 (+0.207 to +0.499)  share +0.063 (+0.042 to +0.086)  mean transfer 5.31
+ 90 d  size 0.10  LATER_4_12M  bias +0.826 (+0.687 to +0.966)  share +0.157 (+0.149 to +0.170)  mean transfer 5.31
+ 90 d  size 0.25  DURING       bias +1.452 (+1.152 to +1.758)  share +0.114 (+0.083 to +0.149)  mean transfer 13.26
+ 90 d  size 0.25  AFTER_48H    bias +4.197 (+3.318 to +5.280)  share +0.319 (+0.281 to +0.362)  mean transfer 13.26
+ 90 d  size 0.25  LATER_3M     bias +0.724 (+0.424 to +1.157)  share +0.053 (+0.035 to +0.076)  mean transfer 13.26
+ 90 d  size 0.25  LATER_4_12M  bias +1.999 (+1.649 to +2.376)  share +0.152 (+0.146 to +0.161)  mean transfer 13.26
+ 90 d  size 0.40  DURING       bias +2.244 (+1.808 to +2.676)  share +0.110 (+0.082 to +0.142)  mean transfer 21.22
+ 90 d  size 0.40  AFTER_48H    bias +6.624 (+5.223 to +8.368)  share +0.314 (+0.279 to +0.354)  mean transfer 21.22
+ 90 d  size 0.40  LATER_3M     bias +1.067 (+0.618 to +1.746)  share +0.049 (+0.032 to +0.072)  mean transfer 21.22
+ 90 d  size 0.40  LATER_4_12M  bias +3.145 (+2.576 to +3.769)  share +0.149 (+0.144 to +0.157)  mean transfer 21.22
 
 ## Limit: longest duration with the AFTER_48H interval upper bound under the tolerance
-24m size 0.10: 7 d: up +0.700 pts (over), share up +0.110 (over); 14 d: up +2.206 pts (over), share up +0.336 (over); 30 d: up +1.212 pts (over), share up +0.219 (over); 60 d: up +1.970 pts (over), share up +0.401 (over); 90 d: up +2.167 pts (over), share up +0.387 (over)
-24m size 0.25: 7 d: up +1.754 pts (over), share up +0.110 (over); 14 d: up +5.544 pts (over), share up +0.336 (over); 30 d: up +3.039 pts (over), share up +0.219 (over); 60 d: up +4.676 pts (over), share up +0.350 (over); 90 d: up +5.287 pts (over), share up +0.362 (over)
-24m size 0.40: 7 d: up +2.794 pts (over), share up +0.110 (over); 14 d: up +8.773 pts (over), share up +0.335 (over); 30 d: up +4.837 pts (over), share up +0.218 (over); 60 d: up +7.389 pts (over), share up +0.334 (over); 90 d: up +8.375 pts (over), share up +0.354 (over)
-12m size 0.10: 7 d: up +1.232 pts (over), share up +0.194 (over); 14 d: up +3.078 pts (over), share up +0.463 (over); 30 d: up +1.863 pts (over), share up +0.380 (over); 60 d: up +3.123 pts (over), share up +0.628 (over); 90 d: up +3.454 pts (over), share up +0.574 (over)
-12m size 0.25: 7 d: up +3.090 pts (over), share up +0.194 (over); 14 d: up +7.757 pts (over), share up +0.471 (over); 30 d: up +4.655 pts (over), share up +0.380 (over); 60 d: up +7.724 pts (over), share up +0.615 (over); 90 d: up +8.628 pts (over), share up +0.571 (over)
-12m size 0.40: 7 d: up +4.987 pts (over), share up +0.195 (over); 14 d: up +12.539 pts (over), share up +0.474 (over); 30 d: up +7.466 pts (over), share up +0.380 (over); 60 d: up +12.356 pts (over), share up +0.609 (over); 90 d: up +13.773 pts (over), share up +0.569 (over)
-all size 0.10: 7 d: up +0.537 pts (over), share up +0.090 (over); 14 d: up +1.739 pts (over), share up +0.274 (over); 30 d: up +0.933 pts (over), share up +0.200 (over); 60 d: up +1.680 pts (over), share up +0.360 (over); 90 d: up +1.743 pts (over), share up +0.343 (over)
-all size 0.25: 7 d: up +1.346 pts (over), share up +0.090 (over); 14 d: up +4.353 pts (over), share up +0.274 (over); 30 d: up +2.330 pts (over), share up +0.200 (over); 60 d: up +3.790 pts (over), share up +0.309 (over); 90 d: up +3.971 pts (over), share up +0.296 (over)
-all size 0.40: 7 d: up +2.158 pts (over), share up +0.090 (over); 14 d: up +6.961 pts (over), share up +0.274 (over); 30 d: up +3.710 pts (over), share up +0.200 (over); 60 d: up +5.875 pts (over), share up +0.294 (over); 90 d: up +6.136 pts (over), share up +0.281 (over)
+24m size 0.10: 7 d: up +0.704 pts (over), share up +0.111 (over); 14 d: up +2.223 pts (over), share up +0.336 (over); 30 d: up +1.220 pts (over), share up +0.219 (over); 60 d: up +1.976 pts (over), share up +0.402 (over); 90 d: up +2.173 pts (over), share up +0.387 (over)
+24m size 0.25: 7 d: up +1.761 pts (over), share up +0.111 (over); 14 d: up +5.557 pts (over), share up +0.336 (over); 30 d: up +3.048 pts (over), share up +0.219 (over); 60 d: up +4.694 pts (over), share up +0.350 (over); 90 d: up +5.280 pts (over), share up +0.362 (over)
+24m size 0.40: 7 d: up +2.825 pts (over), share up +0.111 (over); 14 d: up +8.881 pts (over), share up +0.336 (over); 30 d: up +4.875 pts (over), share up +0.218 (over); 60 d: up +7.404 pts (over), share up +0.334 (over); 90 d: up +8.368 pts (over), share up +0.354 (over)
+12m size 0.10: 7 d: up +1.237 pts (over), share up +0.194 (over); 14 d: up +3.083 pts (over), share up +0.464 (over); 30 d: up +1.863 pts (over), share up +0.380 (over); 60 d: up +3.125 pts (over), share up +0.629 (over); 90 d: up +3.459 pts (over), share up +0.574 (over)
+12m size 0.25: 7 d: up +3.123 pts (over), share up +0.195 (over); 14 d: up +7.819 pts (over), share up +0.472 (over); 30 d: up +4.662 pts (over), share up +0.380 (over); 60 d: up +7.727 pts (over), share up +0.615 (over); 90 d: up +8.653 pts (over), share up +0.571 (over)
+12m size 0.40: 7 d: up +5.015 pts (over), share up +0.195 (over); 14 d: up +12.600 pts (over), share up +0.475 (over); 30 d: up +7.469 pts (over), share up +0.380 (over); 60 d: up +12.341 pts (over), share up +0.608 (over); 90 d: up +13.858 pts (over), share up +0.569 (over)
+all size 0.10: 7 d: up +0.541 pts (over), share up +0.090 (over); 14 d: up +1.745 pts (over), share up +0.275 (over); 30 d: up +0.931 pts (over), share up +0.200 (over); 60 d: up +1.683 pts (over), share up +0.360 (over); 90 d: up +1.748 pts (over), share up +0.343 (over)
+all size 0.25: 7 d: up +1.356 pts (over), share up +0.090 (over); 14 d: up +4.359 pts (over), share up +0.275 (over); 30 d: up +2.325 pts (over), share up +0.200 (over); 60 d: up +3.797 pts (over), share up +0.311 (over); 90 d: up +3.983 pts (over), share up +0.297 (over)
+all size 0.40: 7 d: up +2.172 pts (over), share up +0.090 (over); 14 d: up +6.977 pts (over), share up +0.275 (over); 30 d: up +3.711 pts (over), share up +0.199 (over); 60 d: up +5.889 pts (over), share up +0.294 (over); 90 d: up +6.179 pts (over), share up +0.282 (over)
 
 ## Splits at size 0.25, 30 d, AFTER_48H and DURING (share of transfer in brackets)
-AFTER_48H 24m sign +1 share: +2.487 (+2.038 to +3.039) share +0.191 (+0.155 to +0.219)
-AFTER_48H 24m sign -1 share: +2.466 (+2.053 to +2.964) share +0.190 (+0.155 to +0.219)
-AFTER_48H 24m sign +1 fixed: +2.715 (+2.191 to +3.244) share +0.203 (+0.172 to +0.229)
-AFTER_48H 12m sign +1 share: +4.059 (+3.457 to +4.655) share +0.316 (+0.250 to +0.380)
-AFTER_48H 12m sign -1 share: +4.057 (+3.466 to +4.627) share +0.316 (+0.249 to +0.380)
-AFTER_48H 12m sign +1 fixed: +4.500 (+3.698 to +5.297) share +0.336 (+0.292 to +0.378)
-AFTER_48H all sign +1 share: +1.879 (+1.473 to +2.330) share +0.150 (+0.106 to +0.200)
-AFTER_48H all sign -1 share: +1.883 (+1.486 to +2.330) share +0.150 (+0.107 to +0.200)
-AFTER_48H all sign +1 fixed: +2.105 (+1.572 to +2.732) share +0.159 (+0.121 to +0.205)
-AFTER_48H 24m winter onset: +2.647 (+1.878 to +3.478) share +0.168 (+0.128 to +0.209)
-AFTER_48H 24m summer onset: +2.328 (+1.957 to +2.690) share +0.214 (+0.198 to +0.231)
+AFTER_48H 24m sign +1 share: +2.487 (+2.037 to +3.048) share +0.191 (+0.155 to +0.219)
+AFTER_48H 24m sign -1 share: +2.466 (+2.050 to +2.973) share +0.190 (+0.155 to +0.219)
+AFTER_48H 24m sign +1 fixed: +2.715 (+2.192 to +3.235) share +0.203 (+0.173 to +0.229)
+AFTER_48H 12m sign +1 share: +4.059 (+3.465 to +4.662) share +0.316 (+0.250 to +0.380)
+AFTER_48H 12m sign -1 share: +4.057 (+3.482 to +4.630) share +0.316 (+0.250 to +0.380)
+AFTER_48H 12m sign +1 fixed: +4.500 (+3.683 to +5.281) share +0.336 (+0.293 to +0.378)
+AFTER_48H all sign +1 share: +1.879 (+1.474 to +2.325) share +0.150 (+0.106 to +0.200)
+AFTER_48H all sign -1 share: +1.883 (+1.483 to +2.319) share +0.150 (+0.106 to +0.199)
+AFTER_48H all sign +1 fixed: +2.105 (+1.575 to +2.727) share +0.159 (+0.121 to +0.204)
+AFTER_48H 24m winter onset: +2.647 (+1.888 to +3.469) share +0.168 (+0.128 to +0.209)
+AFTER_48H 24m summer onset: +2.328 (+1.954 to +2.691) share +0.214 (+0.197 to +0.230)
 AFTER_48H 24m D2: mean bias +3.040 share +0.202
 AFTER_48H 24m D3: mean bias +3.035 share +0.198
 AFTER_48H 24m D4: mean bias +2.325 share +0.207

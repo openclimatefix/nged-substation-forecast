@@ -64,7 +64,7 @@ verdict: not supported
 best_arm: >-
   Not applicable: one forecast (GAM_ONLY) was tested under many injections. Headline cell: a
   30-day transfer of 25% of load leaves the forecast 2.49 points of effective capacity too high
-  (95% interval 2.04 to 3.04) in the 48 hours after the transfer ends, which is 19% of the
+  (95% interval 2.04 to 3.05) in the 48 hours after the transfer ends, which is 19% of the
   transfer, against a tolerance of 0.1 points.
 headline: >-
   A monthly-refitted forecast with no lagged power learns 8.5% of a 7-day transfer, 19% of a
@@ -119,7 +119,7 @@ transfer was learned as normal.
 The prediction was that a 30-day transfer of 25% of load would bias the forecast by under 0.1 points
 of effective capacity (1 point is 1% of the substation's capacity). The prediction did not hold, so
 the verdict is `not supported`: in the 48 hours after the end the bias is 2.49 points (95% interval
-2.04 to 3.04), which is 19% of the transfer. Even a 7-day transfer, the shortest we tested, is
+2.04 to 3.05), which is 19% of the transfer. Even a 7-day transfer, the shortest we tested, is
 learned as 8.5% of its size, so any limit on how long an arrangement can last before it counts as
 normal is shorter than 7 days and is not located. The next experiment should test durations of 1 to
 6 days and a training mask. Two conditions limit the result: the weather inputs are the ERA5 and
@@ -148,17 +148,17 @@ loses load. A BEFORE row is a forecast row dated before the transfer began.
 - **Controls passed.** The bias in the 3,720 groups of BEFORE rows and in the 1,920 groups of rows
   with a transfer of size 0 is exactly 0.
 - **Headline (24-month window, 25% of load, receiver).** The bias in the 48 hours after the end is
-  1.21 points (0.73 to 1.75) at 7 days, 2.67 (1.14 to 5.54) at 14 days, 2.49 (2.04 to 3.04) at 30
-  days, 3.94 (3.29 to 4.68) at 60 days, and 4.20 (3.33 to 5.29) at 90 days. As shares of the
+  1.21 points (0.72 to 1.76) at 7 days, 2.67 (1.14 to 5.56) at 14 days, 2.49 (2.04 to 3.05) at 30
+  days, 3.94 (3.29 to 4.69) at 60 days, and 4.20 (3.32 to 5.28) at 90 days. As shares of the
   transfer these are 8.5%, 18.0%, 19.1%, 30.4%, and 31.9%. The bias grows less than in proportion
   to the duration, so the prediction of proportional growth to 90 days did not hold. The bias is
   also not monotone: 2.67 at 14 days has a wide interval.
 - **The bias scales with the size of the transfer.** The share learned at 30 days is 19% at 10%,
-  25%, and 40% of load, and a transfer of 10% of load gives 1.00 points (0.82 to 1.21).
+  25%, and 40% of load, and a transfer of 10% of load gives 1.00 points (0.82 to 1.22).
 - **Training window (30 days, 25% of load).** The share learned is 32% (25% to 38%) with a 12-month
   window, 19% (16% to 22%) with a 24-month window, and 15% (11% to 20%) with the whole history.
 - **Decay after the end (30 days, 25% of load).** The share learned is 2.8% in months 1 to 3 after
-  the end (bias 0.37 points, 0.31 to 0.44) and 5.0% in months 4 to 12 (0.66 points, 0.48 to 0.86).
+  the end (bias 0.37 points, 0.31 to 0.44) and 5.0% in months 4 to 12 (0.66 points, 0.48 to 0.87).
   For 90 days the shares are 5.3% and 15.2%. The share in months 4 to 12 is larger than in months 1
   to 3, and no season-by-season breakdown was run to say why.
 - **Rows inside the transfer.** The learned share is 0% at 7, 14, and 30 days, 6.2% at 60 days, and
@@ -172,11 +172,11 @@ loses load. A BEFORE row is a forecast row dated before the transfer began.
   months (24-month window) failed, because half was reached at month 13. The prediction of half
   learned within 6 months (12-month window) failed, because half was reached at month 11.
 - **Sign and shape (30 days, 25% of load, 24-month window).** When the transfer removes load from a
-  donor substation, the bias is 2.47 points (2.05 to 2.96) and the share learned is 19.0%. When the
+  donor substation, the bias is 2.47 points (2.05 to 2.97) and the share learned is 19.0%. When the
   transfer is a fixed block of MW with a flat shape, the bias is 2.72 points (2.19 to 3.24) and the
   share is 20.3%. The share for a share-of-load transfer is 19.1%, so the three are similar.
-- **Season and substation.** A transfer beginning in winter gives a bias of 2.65 points (1.88 to
-  3.48) and one beginning in summer gives 2.33 (1.96 to 2.69). Across substations the bias ranges
+- **Season and substation.** A transfer beginning in winter gives a bias of 2.65 points (1.89 to
+  3.47) and one beginning in summer gives 2.33 (1.95 to 2.69). Across substations the bias ranges
   from 1.47 points (D12) to 3.04 (D2), and the share learned from 17% to 21%.
 - **The limit for NGED.** No tested duration, including 7 days, has an interval upper bound below
   0.1 points or below 5% of the transfer, for any size or window. The limit, if it exists, is below

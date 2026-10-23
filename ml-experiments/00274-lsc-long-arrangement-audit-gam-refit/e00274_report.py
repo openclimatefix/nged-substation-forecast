@@ -6,6 +6,7 @@ uv run --no-sync python e00274_report.py > printed_report.txt
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from typing import Final
 
 import e00274_fit as fit
@@ -84,8 +85,8 @@ def two_way_interval(*, units: pl.DataFrame, column: str) -> tuple[float, float,
     Returns:
         (mean, lower, upper); NaN when no unit has a value.
     """
-    table = units.pivot(on="onset", index="site", values=column)
-    grid = table.drop("site").to_numpy()
+    table = units.pivot(on="onset", index="site", values=column).sort("site")
+    grid = table.select(sorted(c for c in table.columns if c != "site")).to_numpy()
     if grid.size == 0 or not np.isfinite(grid).any():
         return math.nan, math.nan, math.nan
     rng = np.random.default_rng(SEED)
@@ -97,8 +98,10 @@ def two_way_interval(*, units: pl.DataFrame, column: str) -> tuple[float, float,
     return float(np.nanmean(grid)), *np.quantile(draws, [0.025, 0.975])
 
 
-def cell(*, units: pl.DataFrame, column: str = "bias", **where: object) -> tuple[float, ...]:
-    """Return (mean, lower, upper) of one scenario cell."""
+def cell(
+    *, units: pl.DataFrame, where: Mapping[str, object], column: str = "bias"
+) -> tuple[float, ...]:
+    """Return (mean, lower, upper) of the scenario cell whose columns equal `where`."""
     selected = units.filter(*[pl.col(k) == v for k, v in where.items()])
     return two_way_interval(units=selected, column=column)
 
@@ -131,9 +134,9 @@ def headline(*, units: pl.DataFrame) -> None:
                     "duration_days": days,
                     "phase_group": phase,
                 }
-                mean = cell(units=units, **where)
-                share = cell(units=units, column="share", **where)
-                transfer = cell(units=units, column="transfer", **where)
+                mean = cell(units=units, where=where)
+                share = cell(units=units, column="share", where=where)
+                transfer = cell(units=units, column="transfer", where=where)
                 print(
                     f"{days:>3} d  size {size:.2f}  {phase:<12} bias {fmt(mean)}  "
                     f"share {fmt(share)}  mean transfer {transfer[0]:.2f}"
@@ -157,8 +160,8 @@ def limits(*, units: pl.DataFrame) -> None:
                     "duration_days": days,
                     "phase_group": "AFTER_48H",
                 }
-                _, _, upper_points = cell(units=units, **where)
-                _, _, upper_share = cell(units=units, column="share", **where)
+                _, _, upper_points = cell(units=units, where=where)
+                _, _, upper_share = cell(units=units, column="share", where=where)
                 rows.append(
                     f"{days} d: up {upper_points:+.3f} pts "
                     f"({'ok' if upper_points < TOLERANCE_POINTS else 'over'}), "
@@ -184,8 +187,8 @@ def splits(*, units: pl.DataFrame) -> None:
                 }
                 print(
                     f"{phase} {window} sign {sign:+d} {shape}: "
-                    f"{fmt(cell(units=units, **where))} "
-                    f"share {fmt(cell(units=units, column='share', **where))}"
+                    f"{fmt(cell(units=units, where=where))} "
+                    f"share {fmt(cell(units=units, column='share', where=where))}"
                 )
         season_units = units.filter(
             pl.col("window") == "24m", pl.col("sign") == 1, pl.col("shape") == "share"

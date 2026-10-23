@@ -37,7 +37,7 @@ def band(
     *, rows: list[dict], x: str, color: str, color_domain: list[str], y_title: str
 ) -> alt.Chart:
     """Return points with 95% interval bars from rows holding x, color, mean, low, high."""
-    frame = pl.DataFrame(rows).to_pandas()  # ty: ignore[unresolved-attribute]
+    frame = pl.DataFrame(rows).to_pandas()
     encode = {
         "x": alt.X(
             f"{x}:O",
@@ -55,9 +55,13 @@ def band(
     bars = (
         alt.Chart(frame)
         .mark_rule(strokeWidth=2)
-        .encode(y=alt.Y("low:Q", title=y_title), y2="high:Q", **encode)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y("low:Q", title=y_title), y2="high:Q", **encode
+        )
     )
-    points = alt.Chart(frame).mark_point(filled=True, size=70).encode(y="mean:Q", **encode)
+    points = (
+        alt.Chart(frame).mark_point(filled=True, size=70).encode(y="mean:Q", **encode)  # ty: ignore[unresolved-attribute]
+    )
     return bars + points
 
 
@@ -68,11 +72,13 @@ def fig_after_end(*, units: pl.DataFrame) -> None:
         for days in DURATIONS:
             mean, low, high = rep.cell(
                 units=units,
-                window="24m",
-                size=size,
-                duration_days=days,
-                phase_group="AFTER_48H",
-                **BASE,
+                where={
+                    "window": "24m",
+                    "size": size,
+                    "duration_days": days,
+                    "phase_group": "AFTER_48H",
+                    **BASE,
+                },
             )
             rows.append(
                 {
@@ -92,10 +98,8 @@ def fig_after_end(*, units: pl.DataFrame) -> None:
     )
     rule = (
         alt.Chart(pl.DataFrame({"y": [rep.TOLERANCE_POINTS]}).to_pandas())
-        .mark_rule(  # ty: ignore[unresolved-attribute]
-            color="#5F6368", strokeDash=[4, 3]
-        )
-        .encode(y="y:Q")
+        .mark_rule(color="#5F6368", strokeDash=[4, 3])
+        .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     )
     save(
         (chart + rule).properties(
@@ -127,11 +131,13 @@ def fig_window(*, units: pl.DataFrame) -> None:
             mean, low, high = rep.cell(
                 units=units,
                 column="share",
-                window=window,
-                size=0.25,
-                duration_days=days,
-                phase_group="AFTER_48H",
-                **BASE,
+                where={
+                    "window": window,
+                    "size": 0.25,
+                    "duration_days": days,
+                    "phase_group": "AFTER_48H",
+                    **BASE,
+                },
             )
             rows.append(
                 {"days": str(days), "window": label, "mean": mean, "low": low, "high": high}
@@ -177,11 +183,13 @@ def fig_phases(*, units: pl.DataFrame) -> None:
             mean, low, high = rep.cell(
                 units=units,
                 column="share",
-                window="24m",
-                size=0.25,
-                duration_days=days,
-                phase_group=phase,
-                **BASE,
+                where={
+                    "window": "24m",
+                    "size": 0.25,
+                    "duration_days": days,
+                    "phase_group": phase,
+                    **BASE,
+                },
             )
             rows.append(
                 {
@@ -259,8 +267,8 @@ def fig_permanent(*, rows: pl.DataFrame) -> None:
     half = (
         alt.Chart(pl.DataFrame({"y": [0.5]}).to_pandas())
         .mark_rule(color="#5F6368", strokeDash=[4, 3])
-        .encode(y="y:Q")
-    )  # ty: ignore[unresolved-attribute]
+        .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
+    )
     save(
         (chart + half).properties(
             width=WIDTH,

@@ -90,7 +90,7 @@ def main() -> None:
         )
         print(f"## {site}: mean transfer {float(np.mean(delta[active])):.2f} points")
         print(
-            frame.with_columns(band=pl.col("temperature_c").cut([0, 5, 10, 15, 20]))
+            frame.with_columns(band=(pl.col("temperature_c") // 5 * 5).cast(pl.Int32))
             .group_by("band")
             .agg(n=pl.len(), mean_difference=pl.col("difference").mean())
             .sort("band")

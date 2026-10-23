@@ -25,7 +25,7 @@ from typing import Final, Literal
 
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_ens_weather import replace_site
 from studies.dp_features import (
     FeatureCache,
@@ -142,6 +142,11 @@ def cuts_of(*, onset: datetime, end: datetime | None) -> list[datetime]:
 
 def phases_of(*, times: np.ndarray, onset: datetime, end: datetime | None) -> np.ndarray:
     """Label each target row (by the UTC end of its half-hour) with its phase.
+
+    Args:
+        times: The UTC end of each target half-hour.
+        onset: The first instant of the transfer.
+        end: The first instant after the transfer, or `None` for a permanent step.
 
     Returns:
         Strings `BEFORE`, `DURING`, `AFTER_48H`, or `LATER`, one per row.
