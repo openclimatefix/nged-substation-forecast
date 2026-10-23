@@ -1,5 +1,5 @@
 # ruff: noqa: E501
-"""Audit checks for experiment 278: why a retrained head is not better, leave-one-site-out, median minus mean.
+"""Audit checks for experiment 278: the head retrain, leave-one-site-out, and median minus mean.
 
 (1) `own_once`: the head fitted at 2025-07 with this experiment's pipeline, applied to every row of
 the scored year with no retrain; its difference from the quarterly head isolates the effect of

@@ -13,8 +13,8 @@ from typing import Final
 import e00278_h_common as common
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
-from torch import nn  # ty: ignore[unresolved-import]
+import torch
+from torch import nn
 
 LEVELS: Final[np.ndarray] = np.array([0.01, 0.05, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 0.95, 0.99])
 MEDIAN_INDEX: Final[int] = 5

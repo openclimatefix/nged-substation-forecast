@@ -22,7 +22,7 @@ import e00278_h_data as data
 import e00278_h_nn as nn_
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 ARM: Final[int] = 2
