@@ -1,0 +1,20 @@
+Running as unit: run-p418335-i88478674.scope; invocation ID: ec20914718c346d0bd8577e511a82330
+D5 ('L0', 0) done at 6 s
+D5 ('L0', 1) done at 8 s
+D5 ('L0', 2) done at 10 s
+D5 ('L1', 0) done at 13 s
+D5 ('L1', 1) done at 16 s
+D5 ('L1', 2) done at 19 s
+D5 ('L2', 0) done at 22 s
+D5 ('L2', 1) done at 25 s
+D5 ('L2', 2) done at 27 s
+D5 ('L3', 0) done at 29 s
+D5 ('L3', 1) done at 31 s
+D5 ('L3', 2) done at 33 s
+D5 ('L3_5', 0) done at 35 s
+D5 ('L3_5', 1) done at 38 s
+D5 ('L3_5', 2) done at 41 s
+D5 ('L3_2', 0) done at 43 s
+D5 ('L3_2', 1) done at 44 s
+D5 ('L3_2', 2) done at 46 s
+D5: 251286 ordinary rows, 6 arms, 205 s

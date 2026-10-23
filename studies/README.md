@@ -13,12 +13,12 @@ pipeline over the cross-validation folds is a cross-validation run (CV run), eve
 forecasts Delta table is partitioned by `experiment_name`. A study of whether a weather product's
 published field carries information is a different kind of thing from both.
 
-**A script under `studies/` may import from its own folder, from `studies.*` (`packages/studies`),
-and from the other reviewed packages in `packages/*`.** `src/` and every package under `packages/`
-except `packages/studies` must never import `studies` or a study script, because humans review that
-code and the study code is fast-moving and agent-written. Code that two study folders need lives in
-`packages/studies/src/studies/`. `packages/studies/tests/test_study_boundaries.py` enforces both
-halves.
+**A script under `studies/` may import from its own folder, from the folder of another study or
+experiment, from `studies.*` (`packages/studies`), and from the other reviewed packages in
+`packages/*`.** `src/` and every package under `packages/` except `packages/studies` must never
+import `studies` or a script, because humans review that code and the study code is fast-moving and
+agent-written. Code that production or a package needs lives in `packages/studies/src/studies/`.
+`packages/studies/tests/test_study_boundaries.py` enforces that rule.
 
 ## What this tier promises, and what it does not
 
@@ -79,8 +79,8 @@ cleaned reading, including the whole validation year.
   any of that has stopped being a study. The one route from a study to the leaderboard is
   `scripts/forecasting/score_study.py`, described above.
 - **Each folder holds the scripts of one family of pages, and its README maps every script to the
-  page it feeds.** A script runs with only its own folder on `sys.path`: it never reaches into
-  another folder, and code that two folders share is in `packages/studies/src/studies/`.
+  page it feeds.** A script runs with only its own folder on `sys.path`: a script that imports
+  from another folder is run with that folder on `PYTHONPATH`, and the script never edits `sys.path`.
 - **Paths may have rotted.** Every study's data lives under `data/studies/`, in the directory
   `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. Downloads sit in
   `downloads/`, filed by what the data is, so that a later study can reuse them; what one study

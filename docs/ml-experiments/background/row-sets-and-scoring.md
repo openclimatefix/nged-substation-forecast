@@ -108,9 +108,11 @@ and terms are in the [glossary](../glossary.md).
   average.** Cold-night q95 coverage was 0.846 under experiment 160's smooth spread table and 0.896
   with widening of the upper quantiles only, while ensemble spread added nothing over all rows (exp
   160, 164, 169; DP Primaries; provisional).
-- **Score a new model component on top of the best-guess arm, not on a partial stack.** The drift
-  term improved the score by 0.40 on the bare GAM-K and worsened arm D by 0.03 once the filter, the
-  winter night offset, and recipe R were in (exp 167, 170; DP Primaries; provisional).
+- **Score a new model component on top of the family's research default, not on a partial stack.**
+  The drift term improved the score by 0.40 on the bare GAM-K and worsened arm D by 0.03 once the
+  filter, the winter night offset, and recipe R were in (exp 167, 170; DP Primaries; provisional).
+  The [research default rule](../research-default.md) names the default and says when a win is
+  adopted.
 - **Gains do not always remove the same error: the correction network and the two-number solar
   summary added on arm A.** Together they scored 0.136 below arm A, 99% of the sum of their single
   gains of 0.099 and 0.038 (exp 220; 5 Primaries, one year; provisional).

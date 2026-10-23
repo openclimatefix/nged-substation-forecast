@@ -70,15 +70,17 @@ minutes. Run them before pushing any change to `packages/studies/` or `studies/`
 feedback than the `studies_tests.yml` workflow gives. `test_study_boundaries.py` is the one
 exception and always runs.
 
-**Import rules: a study script imports only from its own folder, from `studies.*`
-(`packages/studies`), and from the other reviewed packages in `packages/*`.** The rule for
-production code is the other half: `src/` and every package under `packages/` except
-`packages/studies` must never import `studies` or a study script, because humans review that code
-and the study code is fast-moving and agent-written. A name that a second study folder needs
-therefore moves into `packages/studies/src/studies/`, and a name imported from a package is public,
-so it loses its leading underscore on the way. A script never mutates `sys.path` and never loads
-another script by path. No two scripts under `studies/` share a basename, because every study folder
-is on pytest's path. `packages/studies/tests/test_study_boundaries.py` enforces all of this.
+**Import rules: a study script may import from its own folder, from the folder of another study or
+experiment, from `studies.*` (`packages/studies`), and from the other reviewed packages in
+`packages/*`.** The rule for production code is the other half: `src/` and every package under
+`packages/` except `packages/studies` must never import `studies` or a script, because humans review
+that code and the study code is fast-moving and agent-written. A name that production or a package
+needs moves into `packages/studies/src/studies/`, and a name imported from a package is public, so
+it loses its leading underscore on the way. A script never mutates `sys.path` and never loads
+another script by path. A script that imports from another folder is run with that folder on
+`PYTHONPATH`, because only the script's own folder is on `sys.path` otherwise. No two scripts under
+`studies/` or `ml-experiments/` share a basename, so a bare-name import names one script.
+`packages/studies/tests/test_study_boundaries.py` enforces all of this.
 
 **A study's leaderboard number comes only from `scripts/forecasting/score_study.py`.** Run the
 script on the study's predictions file (a parquet file of `PowerForecast` rows) and quote the number
@@ -176,6 +178,14 @@ cost, so the maintainer can start it or decline it.
 Never publish a study with fewer than two scientific-validity reviews. If the process is shortened
 anywhere, for example one plan review instead of two, say so in the PR body and in the final report,
 with the reason.
+
+**A study never adopts a change into a research default.** The adoption rule in
+`docs/ml-experiments/research-default.md` applies to `ml-experiment`s of kind `change` only. A study
+that finds a change worth adopting says so on its page, and an ml-experiment of kind `change`
+tests it against the family's current research default, named by version, for example "Primary
+demand research default 1". A study that scores a forecast of one of those families reports the
+research default's absolute score against BG2, `manual_heuristic`, and `climatology`, and says that
+production does not run BG2.
 
 ## Design rules that keep a comparison fair
 

@@ -1,0 +1,22 @@
+== Even months (held-out for L1 to L3): quantile-score harm and mean-forecast absolute-error contrast ==
+L1    harm +0.0056  mean-forecast MAE minus K0 +0.0138
+L2    harm +0.0089  mean-forecast MAE minus K0 -0.0052
+L3    harm +0.0172  mean-forecast MAE minus K0 +0.0028
+L3_5  harm +0.0294  mean-forecast MAE minus K0 +0.0275
+L3_2  harm +0.0193  mean-forecast MAE minus K0 +0.0069
+
+== Median forecast minus mean forecast (MW), per site, for L3 and for K0 ==
+D5 L3: -0.1773
+D9 L3: -0.0170
+D10 L3: -0.0573
+D11 L3: -0.0247
+D14 L3: +0.0440
+D16 L3: +0.0255
+
+== Leave one site out: harm on even months ==
+L1 without D5 +0.001; without D9 +0.007; without D10 +0.006; without D11 +0.007; without D14 +0.006; without D16 +0.007
+L3 without D5 +0.018; without D9 +0.017; without D10 +0.016; without D11 +0.011; without D14 +0.020; without D16 +0.022
+
+== Where L2 loses matches (L1 found, L2 not) by whether the shift starts in an odd (training) month ==
+start in odd (L2 training) month: 15 shifts; L1 found 7, L2 found 0, L3 found 0, L0 found 8
+start in even (not trained on) month: 20 shifts; L1 found 13, L2 found 13, L3 found 14, L0 found 13
