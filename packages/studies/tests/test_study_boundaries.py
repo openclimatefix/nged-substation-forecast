@@ -1,18 +1,19 @@
 """Enforce the import rules between study scripts, the `studies` package, and production code.
 
-**The rules.** A study script under `studies/` may import from its own folder, from `studies.*`
-(`packages/studies`), and from the other reviewed packages in `packages/*`. `src/` and every
-package under `packages/` except `packages/studies` must never import `studies` or a study script,
-because humans review that code and the study code is fast-moving and agent-written.
+**The rules.** A script under `studies/` or `ml-experiments/` may import from its own folder, from
+the folder of another study or experiment, from `studies.*` (`packages/studies`), and from the
+other reviewed packages in `packages/*`. `src/` and every package under `packages/` except
+`packages/studies` must never import `studies` or a script, because humans review that code and the
+study code is fast-moving and agent-written.
 
 **What the tests check, over every script under `studies/` (except those in `era_fold_design`) and
 under `ml-experiments/`:**
 
-- no import of a module that lives in a different `studies/` folder;
 - no use of `sys.path`, `site.addsitedir`, `spec_from_file_location`, `SourceFileLoader`,
   `importlib.import_module`, `__import__`, or `runpy`, however the name is imported or aliased;
 - no Python file directly under `studies/`, because no check would scan it;
-- no basename shared by two scripts, because every study folder is on pytest's path;
+- no basename shared by two scripts, because a bare-name import of a script from another folder
+  could resolve to the wrong script;
 - no module under `packages/studies/src` that imports the basename of a script;
 - no import of `studies` or of a script from `src/`, the root `tests/` and `scripts/` folders, or a
   package other than `packages/studies`.
@@ -41,7 +42,7 @@ def _scripts_by_folder(
     """Return each study folder's scripts, nested folders included, skipping the frozen folder.
 
     A folder of an `extra_dirs` tree, such as `ml-experiments/`, is keyed `<tree>/<folder>`, so two
-    trees that hold a folder of one name cannot hide a crossing import between them. A tree that
+    trees that hold a folder of one name stay distinct in a report. A tree that
     does not exist holds no scripts.
     """
     folders = {
@@ -142,24 +143,6 @@ def _path_mutations(*, source_path: Path) -> list[str]:
     return found
 
 
-def crossing_imports(*, studies_dir: Path, extra_dirs: Sequence[Path] = ()) -> dict[str, list[str]]:
-    """Return, for each script, the modules it imports from a different study folder."""
-    scripts = _scripts_by_folder(studies_dir=studies_dir, extra_dirs=extra_dirs)
-    folder_of = {path.stem: folder for folder, paths in scripts.items() for path in paths}
-    crossings: dict[str, list[str]] = {}
-    for folder, paths in scripts.items():
-        for path in paths:
-            foreign = sorted(
-                module
-                for module in _imported_modules(source_path=path)
-                if module in folder_of and folder_of[module] != folder
-            )
-            if foreign:
-                name = _reported_name(path=path, studies_dir=studies_dir, extra_dirs=extra_dirs)
-                crossings[name] = foreign
-    return crossings
-
-
 def path_mutations(*, studies_dir: Path, extra_dirs: Sequence[Path] = ()) -> dict[str, list[str]]:
     """Return, for each script, its uses of `sys.path`, `site.addsitedir` and path loaders."""
     return {
@@ -236,10 +219,6 @@ def _write(*, root: Path, files: dict[str, str]) -> None:
         path.write_text(source)
 
 
-def test_no_study_script_imports_a_script_of_another_folder():
-    assert crossing_imports(studies_dir=REPO_ROOT / "studies", extra_dirs=EXPERIMENT_TREES) == {}
-
-
 def test_no_study_script_touches_sys_path_or_loads_a_script_by_path():
     assert path_mutations(studies_dir=REPO_ROOT / "studies", extra_dirs=EXPERIMENT_TREES) == {}
 
@@ -264,28 +243,6 @@ def test_no_package_module_imports_a_study_script_by_its_bare_name():
 
 def test_production_does_not_import_studies():
     assert production_imports_of_studies(repo_root=REPO_ROOT) == {}
-
-
-def test_an_import_of_a_script_in_another_folder_is_a_crossing_and_one_in_the_same_folder_is_not(
-    tmp_path: Path,
-):
-    _write(
-        root=tmp_path,
-        files={
-            "alpha/one.py": "import two\nimport sibling\nimport numpy\n",
-            "alpha/sibling.py": "",
-            "beta/two.py": "from sibling import x\n",
-            "beta/three.py": "import numpy, _private\nimport two.sub\n",
-            "alpha/_private.py": "",
-            "era_fold_design/frozen.py": "import one\n",
-        },
-    )
-
-    assert crossing_imports(studies_dir=tmp_path) == {
-        "alpha/one.py": ["two"],
-        "beta/three.py": ["_private"],
-        "beta/two.py": ["sibling"],
-    }
 
 
 def test_every_form_of_path_mutation_and_path_loading_is_found(tmp_path: Path):
@@ -334,15 +291,27 @@ def test_a_script_in_a_nested_folder_is_scanned_by_every_check(tmp_path: Path):
     _write(
         root=tmp_path,
         files={
-            "alpha/deep/down/one.py": "import two\nimport sys\nsys.path.append('.')\n",
+            "alpha/deep/down/one.py": "import sys\nsys.path.append('.')\n",
             "beta/two.py": "",
             "beta/sub/two.py": "",
         },
     )
 
-    assert crossing_imports(studies_dir=tmp_path) == {"alpha/deep/down/one.py": ["two"]}
     assert path_mutations(studies_dir=tmp_path) == {"alpha/deep/down/one.py": ["sys.path"]}
     assert shared_basenames(studies_dir=tmp_path) == {"two": ["beta", "beta"]}
+
+
+def test_the_frozen_folder_is_skipped_by_every_check(tmp_path: Path):
+    _write(
+        root=tmp_path,
+        files={
+            "era_fold_design/frozen.py": "import sys\nsys.path.append('.')\n",
+            "alpha/frozen.py": "",
+        },
+    )
+
+    assert path_mutations(studies_dir=tmp_path) == {}
+    assert shared_basenames(studies_dir=tmp_path) == {}
 
 
 def test_a_python_file_directly_under_studies_is_reported(tmp_path: Path):
@@ -398,23 +367,6 @@ def test_production_code_importing_studies_or_a_script_is_reported(tmp_path: Pat
         "scripts/lint/y.py": ["one"],
         "src/app/c.py": ["studies"],
         "tests/test_x.py": ["studies"],
-    }
-
-
-def test_an_experiment_script_importing_a_study_script_by_bare_name_is_a_crossing(tmp_path: Path):
-    studies = tmp_path / "studies"
-    experiments = tmp_path / "ml-experiments"
-    _write(root=studies, files={"quick_wins/inputs.py": "", "quick_wins/other.py": ""})
-    _write(
-        root=experiments,
-        files={
-            "e00001-demo/e00001_fit.py": "import inputs\nimport e00001_report\n",
-            "e00001-demo/e00001_report.py": "",
-        },
-    )
-
-    assert crossing_imports(studies_dir=studies, extra_dirs=[experiments]) == {
-        "ml-experiments/e00001-demo/e00001_fit.py": ["inputs"]
     }
 
 
@@ -505,14 +457,3 @@ def test_the_raw_power_table_is_found_in_each_of_the_three_places_scripts_live(t
         "packages/studies/src/studies/a.py",
         "studies/alpha/b.py",
     ]
-
-
-def test_a_script_nested_in_an_experiment_folder_is_scanned(tmp_path: Path):
-    studies = tmp_path / "studies"
-    experiments = tmp_path / "ml-experiments"
-    _write(root=studies, files={"alpha/one.py": ""})
-    _write(root=experiments, files={"e00001-demo/deep/e00001_x.py": "import one\n"})
-
-    assert crossing_imports(studies_dir=studies, extra_dirs=[experiments]) == {
-        "ml-experiments/e00001-demo/deep/e00001_x.py": ["one"]
-    }
