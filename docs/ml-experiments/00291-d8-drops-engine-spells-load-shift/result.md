@@ -234,9 +234,11 @@ units.*
 - **Circularity:** the drops and the detector both read D8's residual, so some overlap is built in.
   The controls rule out a shared regional cause, and the placebo rules out a detector that flags
   everything (0.19), but neither tests the engine directly. D8's own record of the engine after
-  2023-08-15 is zeros or absent (experiment 194), so we found no independent record. Experiment 196
-  also fitted D8's detector parameters and noise on 2023-09 to 2025-12, a window that contains most
-  of the drops, whereas the three controls fit their own noise on their own history.
+  2023-08-15 is zeros or absent (experiment 194), so we found no independent record. The engine's
+  recorded output exists only for the 44 days from 2023-07-03 to 2023-08-15, and no drop falls in
+  them (the first drop after the 2022 one starts on 2023-10-21), so that check cannot be run.
+  Experiment 196 also fitted D8's detector parameters and noise on 2023-09 to 2025-12, a window that
+  contains most of the drops, whereas the three controls fit their own noise on their own history.
 - **Detector reliability:** experiment 196 judged the detector `not supported` after March 2025,
   and 17 of the 28 drops lie there. The period before March 2025, where the detector's
   known-answer test applies, gives 10 of 11 against 0.12.
