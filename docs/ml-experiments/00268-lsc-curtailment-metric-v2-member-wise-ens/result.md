@@ -123,7 +123,8 @@ row. The metric now sorts each row's quantiles by default.
 - **Reproduction check.** Pre-registered in the plan: tolerance 0.01% for the quantile path and 1%
   per arm for the member path, contrasts within 1 point, same sign, same 95% interval verdict. The
   script draws 101 members (probabilities 0, 0.01, ..., 1), because only then does linear
-  interpolation between sorted members return the stored quantile at every whole-percent level. Post hoc: the quantile path with sorting off, and the member path on sorted quantiles.
+  interpolation between sorted members return the stored quantile at every whole-percent level.
+  Post hoc: the quantile path with sorting off, and the member path on sorted quantiles.
 
 ## Numbers
 
