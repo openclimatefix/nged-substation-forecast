@@ -1,0 +1,791 @@
+cost check: {'library_gbp': 32468687.882036727, 'per_row_gbp': 32468688.0, 'relative_gap': 3.63313951912009e-09}
+=== gain over K0 by group (positive is better)
+GAM_ONLY             nra tw95     G0 all rows     : n=22910908 mean -0.0758 (-0.1992, +0.0640) pct -8.87 (-21.93, +6.90)
+GAM_ONLY             nra tw95     G1 ordinary     : n=21374852 mean -0.0820 (-0.2133, +0.0688) pct -9.33 (-22.92, +7.09)
+GAM_ONLY             nra tw95     G2 before alarm : n=86116 mean +0.0784 (+0.0071, +0.1899) pct +17.29 (+1.87, +32.48)
+GAM_ONLY             nra tw95     G3 during       : n=35765 mean +0.0774 (+0.0555, +0.0999) pct +21.17 (+16.39, +25.43)
+GAM_ONLY             nra tw95     G4 after        : n=38486 mean +0.1180 (+0.0698, +0.1753) pct +18.36 (+9.76, +29.95)
+GAM_ONLY             nra tw95     G5 near         : n=1536056 mean +0.0113 (-0.0121, +0.0377) pct +2.26 (-2.45, +7.45)
+GAM_ONLY             nra tw95     Gs shift rows   : n=160367 mean +0.0877 (+0.0398, +0.1596) pct +18.29 (+8.89, +28.93)
+GAM_ONLY             nra qs       G0 all rows     : n=22910908 mean -0.2762 (-0.4011, -0.1223) pct -10.14 (-15.30, -4.21)
+GAM_ONLY             nra qs       G1 ordinary     : n=21374852 mean -0.2854 (-0.4209, -0.1211) pct -10.54 (-16.26, -4.17)
+GAM_ONLY             nra qs       G2 before alarm : n=86116 mean +0.1019 (-0.0826, +0.3121) pct +3.36 (-2.86, +9.69)
+GAM_ONLY             nra qs       G3 during       : n=35765 mean +1.7324 (+0.8160, +2.6996) pct +37.52 (+21.05, +49.24)
+GAM_ONLY             nra qs       G4 after        : n=38486 mean +1.0863 (+0.7109, +1.4938) pct +26.21 (+18.26, +33.73)
+GAM_ONLY             nra qs       G5 near         : n=1536056 mean -0.1486 (-0.2511, -0.0405) pct -5.02 (-8.67, -1.33)
+GAM_ONLY             nra qs       Gs shift rows   : n=160367 mean +0.7018 (+0.3674, +1.0602) pct +19.22 (+10.88, +26.82)
+GAM_ONLY             obs tw95     G0 all rows     : n=22910908 mean -0.0743 (-0.1947, +0.0663) pct -8.64 (-21.59, +6.90)
+GAM_ONLY             obs tw95     G1 ordinary     : n=21374852 mean -0.0820 (-0.2124, +0.0648) pct -9.33 (-22.84, +6.85)
+GAM_ONLY             obs tw95     G2 before alarm : n=86116 mean +0.0402 (-0.0388, +0.1295) pct +7.45 (-7.68, +20.96)
+GAM_ONLY             obs tw95     G3 during       : n=35765 mean -0.0378 (-0.0590, -0.0198) pct -40.65 (-76.61, -16.56)
+GAM_ONLY             obs tw95     G4 after        : n=38486 mean +0.0776 (-0.0002, +0.1445) pct +12.19 (-0.03, +25.35)
+GAM_ONLY             obs tw95     G5 near         : n=1536056 mean +0.0328 (+0.0138, +0.0548) pct +5.47 (+2.35, +8.81)
+GAM_ONLY             obs tw95     Gs shift rows   : n=160367 mean +0.0318 (-0.0294, +0.0961) pct +6.86 (-6.67, +18.59)
+GAM_ONLY             obs cost0.5  G0 all rows     : n=3396302 mean -368.7824 (-466.7679, -273.5386) pct -13.65 (-17.50, -10.12)
+GAM_ONLY             obs cost0.5  G1 ordinary     : n=3173076 mean -379.7084 (-484.5109, -276.7867) pct -14.11 (-18.28, -10.27)
+GAM_ONLY             obs cost0.5  G2 before alarm : n=26191 mean -193.9668 (-448.8002, +57.8762) pct -6.74 (-15.54, +1.98)
+GAM_ONLY             obs cost0.5  G3 during       : n=8605 mean -435.3748 (-636.5510, -263.9241) pct -20.76 (-31.06, -12.31)
+GAM_ONLY             obs cost0.5  G4 after        : n=12918 mean +834.2701 (+426.8267, +1224.7144) pct +23.00 (+12.46, +31.42)
+GAM_ONLY             obs cost0.5  G5 near         : n=223226 mean -213.4738 (-309.2031, -130.3998) pct -7.51 (-10.78, -4.60)
+GAM_ONLY             obs cost0.5  Gs shift rows   : n=47714 mean +40.8794 (-201.2979, +236.6674) pct +1.39 (-6.84, +7.95)
+GAM_ONLY_K0SPREAD    nra tw95     G0 all rows     : n=22910908 mean -0.0688 (-0.1913, +0.0709) pct -8.06 (-21.26, +7.67)
+GAM_ONLY_K0SPREAD    nra tw95     G1 ordinary     : n=21374852 mean -0.0753 (-0.2063, +0.0733) pct -8.56 (-22.21, +7.70)
+GAM_ONLY_K0SPREAD    nra tw95     G2 before alarm : n=86116 mean +0.0895 (+0.0168, +0.2036) pct +19.74 (+4.34, +35.05)
+GAM_ONLY_K0SPREAD    nra tw95     G3 during       : n=35765 mean +0.0741 (+0.0525, +0.0972) pct +20.27 (+15.67, +24.45)
+GAM_ONLY_K0SPREAD    nra tw95     G4 after        : n=38486 mean +0.1323 (+0.0810, +0.1926) pct +20.58 (+11.21, +32.63)
+GAM_ONLY_K0SPREAD    nra tw95     G5 near         : n=1536056 mean +0.0214 (-0.0014, +0.0477) pct +4.29 (-0.28, +9.43)
+GAM_ONLY_K0SPREAD    nra tw95     Gs shift rows   : n=160367 mean +0.0963 (+0.0471, +0.1709) pct +20.10 (+10.70, +30.86)
+GAM_ONLY_K0SPREAD    nra qs       G0 all rows     : n=22910908 mean -0.2905 (-0.4196, -0.1361) pct -10.66 (-15.95, -4.75)
+GAM_ONLY_K0SPREAD    nra qs       G1 ordinary     : n=21374852 mean -0.2963 (-0.4332, -0.1312) pct -10.94 (-16.57, -4.55)
+GAM_ONLY_K0SPREAD    nra qs       G2 before alarm : n=86116 mean +0.0335 (-0.1603, +0.2542) pct +1.11 (-5.55, +7.95)
+GAM_ONLY_K0SPREAD    nra qs       G3 during       : n=35765 mean +1.6263 (+0.7153, +2.5828) pct +35.22 (+18.31, +47.29)
+GAM_ONLY_K0SPREAD    nra qs       G4 after        : n=38486 mean +1.0271 (+0.6540, +1.4463) pct +24.78 (+16.61, +32.66)
+GAM_ONLY_K0SPREAD    nra qs       G5 near         : n=1536056 mean -0.2097 (-0.3218, -0.0922) pct -7.09 (-11.07, -3.05)
+GAM_ONLY_K0SPREAD    nra qs       Gs shift rows   : n=160367 mean +0.6272 (+0.2842, +0.9967) pct +17.17 (+8.40, +25.25)
+GAM_ONLY_K0SPREAD    obs tw95     G0 all rows     : n=22910908 mean -0.0678 (-0.1908, +0.0713) pct -7.88 (-20.97, +7.70)
+GAM_ONLY_K0SPREAD    obs tw95     G1 ordinary     : n=21374852 mean -0.0753 (-0.2060, +0.0748) pct -8.56 (-22.34, +7.81)
+GAM_ONLY_K0SPREAD    obs tw95     G2 before alarm : n=86116 mean +0.0368 (-0.0483, +0.1332) pct +6.83 (-9.50, +21.18)
+GAM_ONLY_K0SPREAD    obs tw95     G3 during       : n=35765 mean -0.0367 (-0.0598, -0.0181) pct -39.51 (-74.14, -15.48)
+GAM_ONLY_K0SPREAD    obs tw95     G4 after        : n=38486 mean +0.0898 (+0.0079, +0.1623) pct +14.10 (+1.30, +28.13)
+GAM_ONLY_K0SPREAD    obs tw95     G5 near         : n=1536056 mean +0.0359 (+0.0174, +0.0577) pct +5.98 (+2.93, +9.38)
+GAM_ONLY_K0SPREAD    obs tw95     Gs shift rows   : n=160367 mean +0.0331 (-0.0332, +0.1003) pct +7.16 (-7.51, +19.48)
+GAM_ONLY_K0SPREAD    obs cost0.5  G0 all rows     : n=3396302 mean -511.2315 (-698.6130, -338.0130) pct -18.92 (-26.66, -12.17)
+GAM_ONLY_K0SPREAD    obs cost0.5  G1 ordinary     : n=3173076 mean -513.2001 (-715.5890, -326.2771) pct -19.07 (-27.52, -11.82)
+GAM_ONLY_K0SPREAD    obs cost0.5  G2 before alarm : n=26191 mean -407.7642 (-739.7488, -103.9823) pct -14.18 (-25.32, -3.58)
+GAM_ONLY_K0SPREAD    obs cost0.5  G3 during       : n=8605 mean -428.0066 (-669.1345, -230.1277) pct -20.41 (-32.67, -10.79)
+GAM_ONLY_K0SPREAD    obs cost0.5  G4 after        : n=12918 mean +650.7760 (+215.3664, +1041.6189) pct +17.94 (+6.25, +26.79)
+GAM_ONLY_K0SPREAD    obs cost0.5  G5 near         : n=223226 mean -483.2489 (-617.0423, -363.6456) pct -17.01 (-21.59, -12.77)
+GAM_ONLY_K0SPREAD    obs cost0.5  Gs shift rows   : n=47714 mean -124.8276 (-410.4777, +111.9913) pct -4.25 (-14.10, +3.75)
+BAND_TABLE_PLAIN     nra tw95     G0 all rows     : n=22910908 mean -0.0106 (-0.0243, +0.0027) pct -1.24 (-2.69, +0.33)
+BAND_TABLE_PLAIN     nra tw95     G1 ordinary     : n=21374852 mean -0.0120 (-0.0268, +0.0020) pct -1.37 (-2.89, +0.26)
+BAND_TABLE_PLAIN     nra tw95     G2 before alarm : n=86116 mean +0.0001 (-0.0061, +0.0062) pct +0.02 (-1.22, +1.52)
+BAND_TABLE_PLAIN     nra tw95     G3 during       : n=35765 mean -0.0024 (-0.0089, +0.0028) pct -0.66 (-2.36, +0.78)
+BAND_TABLE_PLAIN     nra tw95     G4 after        : n=38486 mean -0.0051 (-0.0294, +0.0256) pct -0.79 (-4.94, +3.06)
+BAND_TABLE_PLAIN     nra tw95     G5 near         : n=1536056 mean +0.0091 (+0.0058, +0.0125) pct +1.82 (+1.11, +2.60)
+BAND_TABLE_PLAIN     nra tw95     Gs shift rows   : n=160367 mean -0.0017 (-0.0095, +0.0064) pct -0.35 (-1.92, +1.29)
+BAND_TABLE_PLAIN     nra qs       G0 all rows     : n=22910908 mean -0.0391 (-0.0669, -0.0116) pct -1.44 (-2.54, -0.41)
+BAND_TABLE_PLAIN     nra qs       G1 ordinary     : n=21374852 mean -0.0407 (-0.0708, -0.0108) pct -1.50 (-2.72, -0.38)
+BAND_TABLE_PLAIN     nra qs       G2 before alarm : n=86116 mean -0.0306 (-0.0492, -0.0121) pct -1.01 (-1.62, -0.40)
+BAND_TABLE_PLAIN     nra qs       G3 during       : n=35765 mean -0.0044 (-0.0716, +0.0858) pct -0.10 (-1.67, +1.68)
+BAND_TABLE_PLAIN     nra qs       G4 after        : n=38486 mean -0.0042 (-0.0491, +0.0393) pct -0.10 (-1.18, +0.95)
+BAND_TABLE_PLAIN     nra qs       G5 near         : n=1536056 mean -0.0178 (-0.0297, -0.0060) pct -0.60 (-1.01, -0.20)
+BAND_TABLE_PLAIN     nra qs       Gs shift rows   : n=160367 mean -0.0185 (-0.0443, +0.0091) pct -0.51 (-1.23, +0.24)
+BAND_TABLE_PLAIN     obs tw95     G0 all rows     : n=22910908 mean -0.0105 (-0.0242, +0.0026) pct -1.22 (-2.66, +0.32)
+BAND_TABLE_PLAIN     obs tw95     G1 ordinary     : n=21374852 mean -0.0120 (-0.0267, +0.0022) pct -1.37 (-2.90, +0.26)
+BAND_TABLE_PLAIN     obs tw95     G2 before alarm : n=86116 mean +0.0063 (+0.0004, +0.0117) pct +1.18 (+0.07, +2.49)
+BAND_TABLE_PLAIN     obs tw95     G3 during       : n=35765 mean +0.0081 (+0.0023, +0.0132) pct +8.74 (+1.99, +16.31)
+BAND_TABLE_PLAIN     obs tw95     G4 after        : n=38486 mean -0.0078 (-0.0321, +0.0230) pct -1.22 (-5.35, +2.73)
+BAND_TABLE_PLAIN     obs tw95     G5 near         : n=1536056 mean +0.0106 (+0.0071, +0.0141) pct +1.77 (+1.14, +2.46)
+BAND_TABLE_PLAIN     obs tw95     Gs shift rows   : n=160367 mean +0.0033 (-0.0034, +0.0106) pct +0.72 (-0.68, +2.28)
+BAND_TABLE_PLAIN     obs cost0.5  G0 all rows     : n=3396302 mean -18.6634 (-39.9301, +1.9437) pct -0.69 (-1.47, +0.07)
+BAND_TABLE_PLAIN     obs cost0.5  G1 ordinary     : n=3173076 mean -20.5425 (-43.8153, +1.5581) pct -0.76 (-1.62, +0.06)
+BAND_TABLE_PLAIN     obs cost0.5  G2 before alarm : n=26191 mean +48.1686 (+13.5737, +81.9534) pct +1.67 (+0.45, +2.89)
+BAND_TABLE_PLAIN     obs cost0.5  G3 during       : n=8605 mean -3.7653 (-35.7480, +26.4873) pct -0.18 (-1.70, +1.28)
+BAND_TABLE_PLAIN     obs cost0.5  G4 after        : n=12918 mean +57.6573 (-56.9248, +163.9501) pct +1.59 (-1.56, +4.50)
+BAND_TABLE_PLAIN     obs cost0.5  G5 near         : n=223226 mean +8.0479 (-5.6108, +21.4292) pct +0.28 (-0.20, +0.76)
+BAND_TABLE_PLAIN     obs cost0.5  Gs shift rows   : n=47714 mean +41.3715 (+6.0853, +73.6633) pct +1.41 (+0.21, +2.56)
+BAND_TABLE_DISAGREE  nra tw95     G0 all rows     : n=22910908 mean -0.0011 (-0.0192, +0.0187) pct -0.12 (-2.24, +2.26)
+BAND_TABLE_DISAGREE  nra tw95     G1 ordinary     : n=21374852 mean -0.0035 (-0.0226, +0.0177) pct -0.40 (-2.59, +2.03)
+BAND_TABLE_DISAGREE  nra tw95     G2 before alarm : n=86116 mean +0.0021 (-0.0105, +0.0172) pct +0.47 (-2.41, +3.85)
+BAND_TABLE_DISAGREE  nra tw95     G3 during       : n=35765 mean +0.0224 (+0.0035, +0.0372) pct +6.12 (+0.96, +9.97)
+BAND_TABLE_DISAGREE  nra tw95     G4 after        : n=38486 mean +0.0101 (-0.0295, +0.0604) pct +1.56 (-5.39, +7.22)
+BAND_TABLE_DISAGREE  nra tw95     G5 near         : n=1536056 mean +0.0334 (+0.0244, +0.0435) pct +6.71 (+4.98, +8.65)
+BAND_TABLE_DISAGREE  nra tw95     Gs shift rows   : n=160367 mean +0.0085 (-0.0059, +0.0243) pct +1.78 (-1.30, +4.88)
+BAND_TABLE_DISAGREE  nra qs       G0 all rows     : n=22910908 mean -0.0722 (-0.1046, -0.0376) pct -2.65 (-3.99, -1.32)
+BAND_TABLE_DISAGREE  nra qs       G1 ordinary     : n=21374852 mean -0.0769 (-0.1121, -0.0400) pct -2.84 (-4.32, -1.41)
+BAND_TABLE_DISAGREE  nra qs       G2 before alarm : n=86116 mean -0.1038 (-0.1615, -0.0443) pct -3.43 (-5.41, -1.44)
+BAND_TABLE_DISAGREE  nra qs       G3 during       : n=35765 mean +0.4584 (-0.0245, +0.9428) pct +9.93 (-0.62, +17.45)
+BAND_TABLE_DISAGREE  nra qs       G4 after        : n=38486 mean +0.1798 (-0.0257, +0.3976) pct +4.34 (-0.67, +8.98)
+BAND_TABLE_DISAGREE  nra qs       G5 near         : n=1536056 mean -0.0068 (-0.0403, +0.0305) pct -0.23 (-1.39, +1.01)
+BAND_TABLE_DISAGREE  nra qs       Gs shift rows   : n=160367 mean +0.0896 (-0.0659, +0.2622) pct +2.45 (-1.94, +6.66)
+BAND_TABLE_DISAGREE  obs tw95     G0 all rows     : n=22910908 mean -0.0013 (-0.0192, +0.0185) pct -0.15 (-2.22, +2.22)
+BAND_TABLE_DISAGREE  obs tw95     G1 ordinary     : n=21374852 mean -0.0035 (-0.0226, +0.0176) pct -0.40 (-2.61, +2.06)
+BAND_TABLE_DISAGREE  obs tw95     G2 before alarm : n=86116 mean -0.0110 (-0.0347, +0.0062) pct -2.04 (-6.55, +1.15)
+BAND_TABLE_DISAGREE  obs tw95     G3 during       : n=35765 mean -0.0255 (-0.0416, -0.0093) pct -27.47 (-56.90, -8.02)
+BAND_TABLE_DISAGREE  obs tw95     G4 after        : n=38486 mean -0.0079 (-0.0532, +0.0451) pct -1.24 (-9.75, +5.39)
+BAND_TABLE_DISAGREE  obs tw95     G5 near         : n=1536056 mean +0.0302 (+0.0220, +0.0390) pct +5.04 (+3.65, +6.55)
+BAND_TABLE_DISAGREE  obs tw95     Gs shift rows   : n=160367 mean -0.0135 (-0.0339, +0.0038) pct -2.92 (-7.58, +0.77)
+BAND_TABLE_DISAGREE  obs cost0.5  G0 all rows     : n=3396302 mean -92.9624 (-153.4053, -38.6064) pct -3.44 (-5.69, -1.42)
+BAND_TABLE_DISAGREE  obs cost0.5  G1 ordinary     : n=3173076 mean -97.6878 (-161.8466, -38.9001) pct -3.63 (-6.04, -1.44)
+BAND_TABLE_DISAGREE  obs cost0.5  G2 before alarm : n=26191 mean +39.7417 (-51.7146, +121.3364) pct +1.38 (-1.83, +4.06)
+BAND_TABLE_DISAGREE  obs cost0.5  G3 during       : n=8605 mean -163.5099 (-242.8401, -89.0752) pct -7.80 (-11.83, -4.19)
+BAND_TABLE_DISAGREE  obs cost0.5  G4 after        : n=12918 mean +154.7357 (-82.2869, +389.5362) pct +4.27 (-2.34, +10.31)
+BAND_TABLE_DISAGREE  obs cost0.5  G5 near         : n=223226 mean -25.7921 (-55.7442, +1.1469) pct -0.91 (-1.96, +0.04)
+BAND_TABLE_DISAGREE  obs cost0.5  Gs shift rows   : n=47714 mean +34.2195 (-54.2155, +110.4655) pct +1.16 (-1.86, +3.70)
+BAND_HEAD            nra tw95     G0 all rows     : n=22910908 mean +0.0406 (-0.0094, +0.1352) pct +4.76 (-1.16, +12.86)
+BAND_HEAD            nra tw95     G1 ordinary     : n=21374852 mean +0.0394 (-0.0137, +0.1386) pct +4.48 (-1.69, +12.83)
+BAND_HEAD            nra tw95     G2 before alarm : n=86116 mean +0.0431 (+0.0204, +0.0709) pct +9.51 (+5.29, +13.19)
+BAND_HEAD            nra tw95     G3 during       : n=35765 mean +0.0486 (+0.0293, +0.0659) pct +13.30 (+8.45, +17.23)
+BAND_HEAD            nra tw95     G4 after        : n=38486 mean +0.0943 (+0.0329, +0.1866) pct +14.67 (+6.71, +20.87)
+BAND_HEAD            nra tw95     G5 near         : n=1536056 mean +0.0573 (+0.0465, +0.0692) pct +11.49 (+9.67, +13.43)
+BAND_HEAD            nra tw95     Gs shift rows   : n=160367 mean +0.0566 (+0.0327, +0.0864) pct +11.82 (+7.85, +15.34)
+BAND_HEAD            nra qs       G0 all rows     : n=22910908 mean +0.0574 (-0.0077, +0.1541) pct +2.11 (-0.30, +5.30)
+BAND_HEAD            nra qs       G1 ordinary     : n=21374852 mean +0.0455 (-0.0233, +0.1501) pct +1.68 (-0.91, +5.18)
+BAND_HEAD            nra qs       G2 before alarm : n=86116 mean +0.2546 (+0.1753, +0.3399) pct +8.40 (+6.05, +10.69)
+BAND_HEAD            nra qs       G3 during       : n=35765 mean +0.9590 (+0.4335, +1.4103) pct +20.77 (+10.96, +27.19)
+BAND_HEAD            nra qs       G4 after        : n=38486 mean +0.7131 (+0.5160, +0.9299) pct +17.21 (+13.67, +20.49)
+BAND_HEAD            nra qs       G5 near         : n=1536056 mean +0.2239 (+0.1819, +0.2701) pct +7.57 (+6.30, +8.88)
+BAND_HEAD            nra qs       Gs shift rows   : n=160367 mean +0.5217 (+0.3521, +0.6974) pct +14.29 (+10.39, +17.86)
+BAND_HEAD            obs tw95     G0 all rows     : n=22910908 mean +0.0405 (-0.0095, +0.1345) pct +4.70 (-1.16, +12.66)
+BAND_HEAD            obs tw95     G1 ordinary     : n=21374852 mean +0.0394 (-0.0143, +0.1433) pct +4.48 (-1.71, +12.82)
+BAND_HEAD            obs tw95     G2 before alarm : n=86116 mean +0.0209 (-0.0021, +0.0438) pct +3.88 (-0.41, +7.45)
+BAND_HEAD            obs tw95     G3 during       : n=35765 mean -0.0115 (-0.0206, -0.0032) pct -12.40 (-24.45, -2.97)
+BAND_HEAD            obs tw95     G4 after        : n=38486 mean +0.0791 (+0.0170, +0.1741) pct +12.43 (+3.45, +19.44)
+BAND_HEAD            obs tw95     G5 near         : n=1536056 mean +0.0550 (+0.0457, +0.0650) pct +9.17 (+7.84, +10.59)
+BAND_HEAD            obs tw95     Gs shift rows   : n=160367 mean +0.0277 (+0.0040, +0.0560) pct +5.97 (+0.95, +10.34)
+BAND_HEAD            obs cost0.5  G0 all rows     : n=3396302 mean -69.9253 (-128.5608, -13.3693) pct -2.59 (-5.03, -0.48)
+BAND_HEAD            obs cost0.5  G1 ordinary     : n=3173076 mean -78.8403 (-144.0570, -19.5624) pct -2.93 (-5.71, -0.68)
+BAND_HEAD            obs cost0.5  G2 before alarm : n=26191 mean +45.0488 (-18.1580, +109.4449) pct +1.57 (-0.64, +3.70)
+BAND_HEAD            obs cost0.5  G3 during       : n=8605 mean -228.8675 (-307.8790, -144.1318) pct -10.91 (-14.97, -6.83)
+BAND_HEAD            obs cost0.5  G4 after        : n=12918 mean +805.9033 (+536.0448, +1118.1127) pct +22.21 (+16.10, +28.04)
+BAND_HEAD            obs cost0.5  G5 near         : n=223226 mean +56.7985 (+26.7126, +87.8048) pct +2.00 (+0.95, +3.06)
+BAND_HEAD            obs cost0.5  Gs shift rows   : n=47714 mean +201.6416 (+128.9269, +276.8264) pct +6.86 (+4.48, +9.16)
+ASOF_WIDEN           nra tw95     G0 all rows     : n=22910908 mean -0.0677 (-0.1846, +0.0732) pct -7.93 (-20.44, +7.70)
+ASOF_WIDEN           nra tw95     G1 ordinary     : n=21374852 mean -0.0724 (-0.1970, +0.0790) pct -8.24 (-21.27, +7.98)
+ASOF_WIDEN           nra tw95     G2 before alarm : n=86116 mean +0.0669 (-0.0043, +0.1785) pct +14.76 (-1.11, +30.90)
+ASOF_WIDEN           nra tw95     G3 during       : n=35765 mean +0.0493 (+0.0165, +0.0800) pct +13.48 (+4.64, +20.61)
+ASOF_WIDEN           nra tw95     G4 after        : n=38486 mean +0.0915 (+0.0411, +0.1509) pct +14.24 (+6.30, +24.60)
+ASOF_WIDEN           nra tw95     G5 near         : n=1536056 mean -0.0017 (-0.0232, +0.0225) pct -0.33 (-4.61, +4.47)
+ASOF_WIDEN           nra tw95     Gs shift rows   : n=160367 mean +0.0689 (+0.0201, +0.1435) pct +14.37 (+4.59, +25.71)
+ASOF_WIDEN           nra qs       G0 all rows     : n=22910908 mean -0.2847 (-0.4079, -0.1351) pct -10.45 (-15.58, -4.67)
+ASOF_WIDEN           nra qs       G1 ordinary     : n=21374852 mean -0.2906 (-0.4241, -0.1314) pct -10.73 (-16.35, -4.54)
+ASOF_WIDEN           nra qs       G2 before alarm : n=86116 mean +0.0434 (-0.1244, +0.2426) pct +1.43 (-4.31, +7.49)
+ASOF_WIDEN           nra qs       G3 during       : n=35765 mean +1.6336 (+0.7954, +2.4670) pct +35.38 (+20.44, +45.19)
+ASOF_WIDEN           nra qs       G4 after        : n=38486 mean +0.9683 (+0.6184, +1.3526) pct +23.36 (+15.94, +30.53)
+ASOF_WIDEN           nra qs       G5 near         : n=1536056 mean -0.2029 (-0.2976, -0.1047) pct -6.86 (-10.28, -3.46)
+ASOF_WIDEN           nra qs       Gs shift rows   : n=160367 mean +0.6200 (+0.3070, +0.9522) pct +16.98 (+9.04, +24.10)
+ASOF_WIDEN           obs tw95     G0 all rows     : n=22910908 mean -0.0658 (-0.1810, +0.0762) pct -7.64 (-20.01, +7.90)
+ASOF_WIDEN           obs tw95     G1 ordinary     : n=21374852 mean -0.0724 (-0.1956, +0.0789) pct -8.24 (-21.23, +8.10)
+ASOF_WIDEN           obs tw95     G2 before alarm : n=86116 mean +0.0578 (-0.0087, +0.1504) pct +10.72 (-1.85, +23.22)
+ASOF_WIDEN           obs tw95     G3 during       : n=35765 mean -0.0803 (-0.1406, -0.0341) pct -86.37 (-186.85, -28.44)
+ASOF_WIDEN           obs tw95     G4 after        : n=38486 mean +0.0650 (+0.0071, +0.1261) pct +10.21 (+1.16, +20.77)
+ASOF_WIDEN           obs tw95     G5 near         : n=1536056 mean +0.0268 (+0.0084, +0.0484) pct +4.48 (+1.45, +7.74)
+ASOF_WIDEN           obs tw95     Gs shift rows   : n=160367 mean +0.0287 (-0.0215, +0.0938) pct +6.21 (-5.13, +17.70)
+ASOF_WIDEN           obs cost0.5  G0 all rows     : n=3396302 mean -267.9595 (-330.1617, -203.6221) pct -9.92 (-12.67, -7.36)
+ASOF_WIDEN           obs cost0.5  G1 ordinary     : n=3173076 mean -278.8207 (-344.8624, -208.9089) pct -10.36 (-13.29, -7.56)
+ASOF_WIDEN           obs cost0.5  G2 before alarm : n=26191 mean +28.0599 (-117.3116, +220.4115) pct +0.98 (-4.21, +7.21)
+ASOF_WIDEN           obs cost0.5  G3 during       : n=8605 mean -541.9500 (-801.7564, -306.9397) pct -25.84 (-39.09, -14.29)
+ASOF_WIDEN           obs cost0.5  G4 after        : n=12918 mean +879.1186 (+581.8959, +1203.7336) pct +24.23 (+17.59, +30.45)
+ASOF_WIDEN           obs cost0.5  G5 near         : n=223226 mean -113.5717 (-158.5961, -66.7272) pct -4.00 (-5.67, -2.32)
+ASOF_WIDEN           obs cost0.5  Gs shift rows   : n=47714 mean +155.6753 (+44.6784, +288.5349) pct +5.30 (+1.57, +9.49)
+LEAD_DECAY           nra tw95     G0 all rows     : n=22910908 mean +0.0500 (-0.0176, +0.1686) pct +5.86 (-2.17, +16.22)
+LEAD_DECAY           nra tw95     G1 ordinary     : n=21374852 mean +0.0502 (-0.0226, +0.1778) pct +5.71 (-2.69, +16.52)
+LEAD_DECAY           nra tw95     G2 before alarm : n=86116 mean +0.0418 (-0.0027, +0.1022) pct +9.23 (-0.72, +17.81)
+LEAD_DECAY           nra tw95     G3 during       : n=35765 mean -0.0013 (-0.0144, +0.0120) pct -0.36 (-3.86, +3.33)
+LEAD_DECAY           nra tw95     G4 after        : n=38486 mean +0.0086 (-0.0172, +0.0369) pct +1.34 (-2.64, +6.58)
+LEAD_DECAY           nra tw95     G5 near         : n=1536056 mean +0.0479 (+0.0326, +0.0655) pct +9.61 (+6.66, +12.92)
+LEAD_DECAY           nra tw95     Gs shift rows   : n=160367 mean +0.0243 (-0.0027, +0.0589) pct +5.06 (-0.61, +10.86)
+LEAD_DECAY           nra qs       G0 all rows     : n=22910908 mean +0.0161 (-0.0732, +0.1501) pct +0.59 (-2.82, +5.15)
+LEAD_DECAY           nra qs       G1 ordinary     : n=21374852 mean +0.0126 (-0.0839, +0.1560) pct +0.47 (-3.26, +5.36)
+LEAD_DECAY           nra qs       G2 before alarm : n=86116 mean -0.3036 (-0.4830, -0.1076) pct -10.02 (-16.79, -3.35)
+LEAD_DECAY           nra qs       G3 during       : n=35765 mean +0.0065 (-0.4549, +0.6125) pct +0.14 (-11.71, +11.29)
+LEAD_DECAY           nra qs       G4 after        : n=38486 mean +0.2222 (-0.0114, +0.4895) pct +5.36 (-0.28, +11.06)
+LEAD_DECAY           nra qs       G5 near         : n=1536056 mean +0.0638 (-0.0003, +0.1353) pct +2.16 (-0.01, +4.44)
+LEAD_DECAY           nra qs       Gs shift rows   : n=160367 mean -0.1082 (-0.2946, +0.1007) pct -2.96 (-8.66, +2.58)
+LEAD_DECAY           obs tw95     G0 all rows     : n=22910908 mean +0.0503 (-0.0177, +0.1677) pct +5.84 (-2.10, +16.09)
+LEAD_DECAY           obs tw95     G1 ordinary     : n=21374852 mean +0.0502 (-0.0228, +0.1767) pct +5.71 (-2.67, +16.51)
+LEAD_DECAY           obs tw95     G2 before alarm : n=86116 mean +0.0428 (+0.0001, +0.0929) pct +7.95 (+0.01, +15.05)
+LEAD_DECAY           obs tw95     G3 during       : n=35765 mean +0.0090 (+0.0006, +0.0201) pct +9.63 (+0.74, +18.10)
+LEAD_DECAY           obs tw95     G4 after        : n=38486 mean -0.0122 (-0.0463, +0.0151) pct -1.92 (-7.55, +2.76)
+LEAD_DECAY           obs tw95     G5 near         : n=1536056 mean +0.0517 (+0.0402, +0.0650) pct +8.62 (+6.72, +10.66)
+LEAD_DECAY           obs tw95     Gs shift rows   : n=160367 mean +0.0221 (-0.0065, +0.0512) pct +4.77 (-1.45, +10.42)
+LEAD_DECAY           obs cost0.5  G0 all rows     : n=3396302 mean -88.5603 (-137.3498, -46.6034) pct -3.28 (-5.17, -1.71)
+LEAD_DECAY           obs cost0.5  G1 ordinary     : n=3173076 mean -87.7939 (-139.4439, -41.9467) pct -3.26 (-5.30, -1.56)
+LEAD_DECAY           obs cost0.5  G2 before alarm : n=26191 mean -42.0308 (-161.8695, +82.5889) pct -1.46 (-5.80, +2.76)
+LEAD_DECAY           obs cost0.5  G3 during       : n=8605 mean +84.3009 (+27.6703, +139.5052) pct +4.02 (+1.35, +6.59)
+LEAD_DECAY           obs cost0.5  G4 after        : n=12918 mean -139.3575 (-312.2861, +36.3050) pct -3.84 (-8.79, +0.98)
+LEAD_DECAY           obs cost0.5  G5 near         : n=223226 mean -99.4537 (-173.0998, -44.6849) pct -3.50 (-6.03, -1.58)
+LEAD_DECAY           obs cost0.5  Gs shift rows   : n=47714 mean -45.5975 (-131.9265, +38.4133) pct -1.55 (-4.55, +1.27)
+BAND_HEAD_HELDOUT    nra tw95     G0 all rows     : n=11535551 mean +0.0398 (-0.0084, +0.1307) pct +4.64 (-1.05, +12.48)
+BAND_HEAD_HELDOUT    nra tw95     G1 ordinary     : n=10788596 mean +0.0392 (-0.0122, +0.1363) pct +4.43 (-1.48, +12.53)
+BAND_HEAD_HELDOUT    nra tw95     G2 before alarm : n=40960 mean +0.0189 (+0.0052, +0.0330) pct +4.66 (+1.40, +7.69)
+BAND_HEAD_HELDOUT    nra tw95     G3 during       : n=12276 mean +0.0394 (+0.0111, +0.0788) pct +9.13 (+2.77, +16.01)
+BAND_HEAD_HELDOUT    nra tw95     G4 after        : n=17059 mean +0.1189 (+0.0026, +0.3153) pct +13.63 (+0.43, +22.52)
+BAND_HEAD_HELDOUT    nra tw95     G5 near         : n=746955 mean +0.0483 (+0.0385, +0.0587) pct +10.11 (+8.16, +12.36)
+BAND_HEAD_HELDOUT    nra tw95     Gs shift rows   : n=70295 mean +0.0468 (+0.0146, +0.0971) pct +8.93 (+3.35, +14.36)
+BAND_HEAD_HELDOUT    nra qs       G0 all rows     : n=11535551 mean +0.0528 (-0.0101, +0.1486) pct +1.94 (-0.39, +5.13)
+BAND_HEAD_HELDOUT    nra qs       G1 ordinary     : n=10788596 mean +0.0437 (-0.0234, +0.1453) pct +1.62 (-0.90, +5.05)
+BAND_HEAD_HELDOUT    nra qs       G2 before alarm : n=40960 mean +0.2042 (+0.1322, +0.2813) pct +6.75 (+4.59, +9.00)
+BAND_HEAD_HELDOUT    nra qs       G3 during       : n=12276 mean +0.4353 (+0.0486, +0.8882) pct +10.85 (+1.30, +20.59)
+BAND_HEAD_HELDOUT    nra qs       G4 after        : n=17059 mean +0.6462 (+0.3885, +0.9445) pct +14.94 (+10.19, +19.06)
+BAND_HEAD_HELDOUT    nra qs       G5 near         : n=746955 mean +0.1844 (+0.1460, +0.2258) pct +6.28 (+5.08, +7.54)
+BAND_HEAD_HELDOUT    nra qs       Gs shift rows   : n=70295 mean +0.3518 (+0.2316, +0.4861) pct +10.02 (+6.94, +13.36)
+BAND_HEAD_HELDOUT    obs tw95     G0 all rows     : n=11535551 mean +0.0398 (-0.0084, +0.1297) pct +4.61 (-1.02, +12.27)
+BAND_HEAD_HELDOUT    obs tw95     G1 ordinary     : n=10788596 mean +0.0392 (-0.0126, +0.1369) pct +4.43 (-1.51, +12.52)
+BAND_HEAD_HELDOUT    obs tw95     G2 before alarm : n=40960 mean +0.0112 (-0.0030, +0.0256) pct +2.27 (-0.60, +5.18)
+BAND_HEAD_HELDOUT    obs tw95     G3 during       : n=12276 mean -0.0046 (-0.0247, +0.0109) pct -3.07 (-15.56, +7.31)
+BAND_HEAD_HELDOUT    obs tw95     G4 after        : n=17059 mean +0.1189 (+0.0028, +0.3132) pct +13.63 (+0.46, +22.35)
+BAND_HEAD_HELDOUT    obs tw95     G5 near         : n=746955 mean +0.0494 (+0.0393, +0.0602) pct +8.32 (+6.47, +10.55)
+BAND_HEAD_HELDOUT    obs tw95     Gs shift rows   : n=70295 mean +0.0346 (+0.0060, +0.0832) pct +6.59 (+1.40, +12.56)
+BAND_HEAD_HELDOUT    obs cost0.5  G0 all rows     : n=1709740 mean -67.9397 (-128.8355, -10.4825) pct -2.50 (-5.03, -0.37)
+BAND_HEAD_HELDOUT    obs cost0.5  G1 ordinary     : n=1601144 mean -76.9645 (-140.9238, -17.2278) pct -2.85 (-5.56, -0.60)
+BAND_HEAD_HELDOUT    obs cost0.5  G2 before alarm : n=12656 mean +27.2967 (-50.5448, +101.7266) pct +0.96 (-1.79, +3.55)
+BAND_HEAD_HELDOUT    obs cost0.5  G3 during       : n=3307 mean -185.6916 (-284.5483, -99.7357) pct -8.42 (-13.34, -4.42)
+BAND_HEAD_HELDOUT    obs cost0.5  G4 after        : n=5844 mean +890.3227 (+481.1984, +1400.2129) pct +23.23 (+13.97, +31.98)
+BAND_HEAD_HELDOUT    obs cost0.5  G5 near         : n=108596 mean +65.1227 (+24.6327, +109.4448) pct +2.24 (+0.86, +3.73)
+BAND_HEAD_HELDOUT    obs cost0.5  Gs shift rows   : n=21807 mean +226.2774 (+118.1021, +347.3254) pct +7.53 (+3.97, +11.15)
+PERFECT              nra tw95     G0 all rows     : n=22910908 mean +0.0019 (+0.0004, +0.0037) pct +0.22 (+0.04, +0.49)
+PERFECT              nra tw95     G1 ordinary     : n=21374852 mean -0.0003 (-0.0011, +0.0005) pct -0.03 (-0.14, +0.06)
+PERFECT              nra tw95     G2 before alarm : n=86116 mean +0.1146 (+0.0336, +0.2343) pct +25.27 (+8.87, +39.77)
+PERFECT              nra tw95     G3 during       : n=35765 mean +0.0526 (+0.0132, +0.0931) pct +14.39 (+3.83, +23.53)
+PERFECT              nra tw95     G4 after        : n=38486 mean +0.1484 (+0.0616, +0.2456) pct +23.08 (+8.71, +39.10)
+PERFECT              nra tw95     G5 near         : n=1536056 mean +0.0313 (+0.0133, +0.0533) pct +6.28 (+2.81, +10.04)
+PERFECT              nra tw95     Gs shift rows   : n=160367 mean +0.1089 (+0.0472, +0.1928) pct +22.72 (+10.75, +34.68)
+PERFECT              nra qs       G0 all rows     : n=22910908 mean +0.0217 (+0.0150, +0.0311) pct +0.80 (+0.55, +1.13)
+PERFECT              nra qs       G1 ordinary     : n=21374852 mean +0.0003 (-0.0013, +0.0017) pct +0.01 (-0.05, +0.06)
+PERFECT              nra qs       G2 before alarm : n=86116 mean +0.6103 (+0.4250, +0.8262) pct +20.14 (+14.81, +25.54)
+PERFECT              nra qs       G3 during       : n=35765 mean +2.0521 (+1.0560, +2.9968) pct +44.44 (+26.70, +55.14)
+PERFECT              nra qs       G4 after        : n=38486 mean +1.4565 (+1.0198, +1.9157) pct +35.14 (+24.84, +43.84)
+PERFECT              nra qs       G5 near         : n=1536056 mean +0.3191 (+0.2392, +0.4080) pct +10.78 (+8.26, +13.46)
+PERFECT              nra qs       Gs shift rows   : n=160367 mean +1.1350 (+0.7785, +1.4968) pct +31.08 (+22.90, +38.15)
+PERFECT              obs tw95     G0 all rows     : n=22910908 mean -0.0000 (-0.0013, +0.0014) pct -0.01 (-0.16, +0.16)
+PERFECT              obs tw95     G1 ordinary     : n=21374852 mean -0.0003 (-0.0011, +0.0005) pct -0.03 (-0.14, +0.06)
+PERFECT              obs tw95     G2 before alarm : n=86116 mean -0.0401 (-0.1228, +0.0586) pct -7.44 (-24.68, +9.30)
+PERFECT              obs tw95     G3 during       : n=35765 mean -0.2051 (-0.2764, -0.1506) pct -220.73 (-349.43, -136.53)
+PERFECT              obs tw95     G4 after        : n=38486 mean +0.1078 (+0.0066, +0.2129) pct +16.93 (+1.00, +35.11)
+PERFECT              obs tw95     G5 near         : n=1536056 mean +0.0028 (-0.0115, +0.0196) pct +0.47 (-2.01, +3.09)
+PERFECT              obs tw95     Gs shift rows   : n=160367 mean -0.0414 (-0.1089, +0.0323) pct -8.94 (-25.94, +6.13)
+PERFECT              obs cost0.5  G0 all rows     : n=3396302 mean -2.6229 (-9.5623, +2.8786) pct -0.10 (-0.35, +0.11)
+PERFECT              obs cost0.5  G1 ordinary     : n=3173076 mean -0.0811 (-0.5292, +0.3025) pct -0.00 (-0.02, +0.01)
+PERFECT              obs cost0.5  G2 before alarm : n=26191 mean -209.2085 (-462.9467, +38.1978) pct -7.27 (-15.97, +1.33)
+PERFECT              obs cost0.5  G3 during       : n=8605 mean -737.5607 (-965.3773, -542.5066) pct -35.17 (-47.15, -25.37)
+PERFECT              obs cost0.5  G4 after        : n=12918 mean +914.9071 (+489.6979, +1322.2155) pct +25.22 (+14.21, +34.32)
+PERFECT              obs cost0.5  G5 near         : n=223226 mean -38.7533 (-139.2341, +45.3239) pct -1.36 (-4.85, +1.61)
+PERFECT              obs cost0.5  Gs shift rows   : n=47714 mean -0.1534 (-229.0130, +197.0896) pct -0.01 (-7.89, +6.63)
+PERFECT_ADD          obs tw95     G0 all rows     : n=22910908 mean +0.0022 (+0.0004, +0.0043) pct +0.25 (+0.04, +0.57)
+PERFECT_ADD          obs tw95     G1 ordinary     : n=21374852 mean -0.0005 (-0.0016, +0.0004) pct -0.06 (-0.19, +0.04)
+PERFECT_ADD          obs tw95     G2 before alarm : n=86116 mean +0.2234 (+0.1145, +0.3582) pct +41.43 (+26.03, +53.05)
+PERFECT_ADD          obs tw95     G3 during       : n=35765 mean +0.0240 (+0.0077, +0.0473) pct +25.85 (+8.30, +45.04)
+PERFECT_ADD          obs tw95     G4 after        : n=38486 mean +0.1155 (+0.0329, +0.2106) pct +18.13 (+6.01, +31.49)
+PERFECT_ADD          obs tw95     G5 near         : n=1536056 mean +0.0395 (+0.0179, +0.0639) pct +6.58 (+3.27, +9.70)
+PERFECT_ADD          obs tw95     Gs shift rows   : n=160367 mean +0.1530 (+0.0802, +0.2463) pct +33.04 (+19.85, +44.76)
+PERFECT_ADD          obs cost0.5  G0 all rows     : n=3396302 mean +14.9826 (+10.7531, +20.3811) pct +0.55 (+0.39, +0.76)
+PERFECT_ADD          obs cost0.5  G1 ordinary     : n=3173076 mean -0.2320 (-0.7384, +0.2061) pct -0.01 (-0.03, +0.01)
+PERFECT_ADD          obs cost0.5  G2 before alarm : n=26191 mean +618.1698 (+381.4640, +904.4103) pct +21.49 (+14.18, +28.83)
+PERFECT_ADD          obs cost0.5  G3 during       : n=8605 mean +192.9942 (+63.4700, +317.8452) pct +9.20 (+3.07, +15.06)
+PERFECT_ADD          obs cost0.5  G4 after        : n=12918 mean +1026.6900 (+717.1438, +1364.3836) pct +28.30 (+21.46, +34.69)
+PERFECT_ADD          obs cost0.5  G5 near         : n=223226 mean +231.2529 (+176.9158, +290.4507) pct +8.14 (+6.36, +10.02)
+PERFECT_ADD          obs cost0.5  Gs shift rows   : n=47714 mean +652.0933 (+483.4484, +842.2624) pct +22.19 (+17.19, +27.22)
+DET                  nra tw95     G0 all rows     : n=22910908 mean -0.0465 (-0.1096, +0.0122) pct -5.45 (-13.57, +1.29)
+DET                  nra tw95     G1 ordinary     : n=21374852 mean -0.0373 (-0.1036, +0.0276) pct -4.24 (-12.29, +2.75)
+DET                  nra tw95     G2 before alarm : n=86116 mean -0.0496 (-0.1616, +0.0725) pct -10.95 (-40.78, +12.82)
+DET                  nra tw95     G3 during       : n=35765 mean +0.0231 (+0.0026, +0.0554) pct +6.31 (+0.76, +13.91)
+DET                  nra tw95     G4 after        : n=38486 mean +0.0891 (+0.0049, +0.1772) pct +13.86 (+0.87, +26.47)
+DET                  nra tw95     G5 near         : n=1536056 mean -0.1745 (-0.2406, -0.1159) pct -34.99 (-48.80, -23.03)
+DET                  nra tw95     Gs shift rows   : n=160367 mean -0.0001 (-0.0770, +0.0826) pct -0.03 (-17.75, +14.86)
+DET                  nra qs       G0 all rows     : n=22910908 mean -0.1207 (-0.2112, -0.0338) pct -4.43 (-7.92, -1.20)
+DET                  nra qs       G1 ordinary     : n=21374852 mean -0.1066 (-0.2039, -0.0128) pct -3.94 (-7.69, -0.46)
+DET                  nra qs       G2 before alarm : n=86116 mean -0.0414 (-0.2984, +0.2122) pct -1.37 (-10.21, +6.66)
+DET                  nra qs       G3 during       : n=35765 mean +0.6063 (+0.1047, +1.3938) pct +13.13 (+2.38, +28.49)
+DET                  nra qs       G4 after        : n=38486 mean +0.7067 (+0.3961, +1.0728) pct +17.05 (+9.99, +24.74)
+DET                  nra qs       G5 near         : n=1536056 mean -0.3175 (-0.4688, -0.1724) pct -10.73 (-15.99, -5.78)
+DET                  nra qs       Gs shift rows   : n=160367 mean +0.2826 (+0.0253, +0.5728) pct +7.74 (+0.72, +15.09)
+DET                  obs tw95     G0 all rows     : n=22910908 mean -0.0469 (-0.1099, +0.0124) pct -5.45 (-13.36, +1.28)
+DET                  obs tw95     G1 ordinary     : n=21374852 mean -0.0373 (-0.1036, +0.0276) pct -4.24 (-12.34, +2.81)
+DET                  obs tw95     G2 before alarm : n=86116 mean -0.0993 (-0.2053, -0.0038) pct -18.42 (-41.01, -0.65)
+DET                  obs tw95     G3 during       : n=35765 mean -0.0624 (-0.1240, -0.0221) pct -67.17 (-145.62, -22.70)
+DET                  obs tw95     G4 after        : n=38486 mean +0.0496 (-0.0494, +0.1456) pct +7.78 (-9.25, +21.88)
+DET                  obs tw95     G5 near         : n=1536056 mean -0.1806 (-0.2476, -0.1215) pct -30.13 (-42.28, -19.96)
+DET                  obs tw95     Gs shift rows   : n=160367 mean -0.0554 (-0.1331, +0.0131) pct -11.95 (-30.79, +2.52)
+DET                  obs cost0.5  G0 all rows     : n=3396302 mean -37.8000 (-62.0830, -15.3859) pct -1.40 (-2.26, -0.58)
+DET                  obs cost0.5  G1 ordinary     : n=3173076 mean -28.2293 (-53.2476, -5.2377) pct -1.05 (-1.95, -0.20)
+DET                  obs cost0.5  G2 before alarm : n=26191 mean -160.1771 (-418.3538, +83.4915) pct -5.57 (-14.57, +2.88)
+DET                  obs cost0.5  G3 during       : n=8605 mean -266.4913 (-486.8292, -104.1632) pct -12.71 (-23.91, -4.86)
+DET                  obs cost0.5  G4 after        : n=12918 mean +408.5536 (+44.2744, +756.2812) pct +11.26 (+1.27, +19.79)
+DET                  obs cost0.5  G5 near         : n=223226 mean -173.8436 (-284.1648, -75.8020) pct -6.12 (-9.86, -2.69)
+DET                  obs cost0.5  Gs shift rows   : n=47714 mean -25.3733 (-259.5950, +161.6924) pct -0.86 (-8.76, +5.45)
+DET_ADD              obs tw95     G0 all rows     : n=22910908 mean +0.0351 (-0.0430, +0.1771) pct +4.08 (-5.35, +16.99)
+DET_ADD              obs tw95     G1 ordinary     : n=21374852 mean +0.0495 (-0.0344, +0.2022) pct +5.63 (-4.06, +18.72)
+DET_ADD              obs tw95     G2 before alarm : n=86116 mean -0.0549 (-0.1256, +0.0062) pct -10.18 (-24.68, +1.14)
+DET_ADD              obs tw95     G3 during       : n=35765 mean +0.0106 (-0.0023, +0.0285) pct +11.44 (-2.56, +26.97)
+DET_ADD              obs tw95     G4 after        : n=38486 mean -0.0057 (-0.1072, +0.0949) pct -0.90 (-21.49, +13.38)
+DET_ADD              obs tw95     G5 near         : n=1536056 mean -0.1657 (-0.2157, -0.1183) pct -27.65 (-37.94, -18.87)
+DET_ADD              obs tw95     Gs shift rows   : n=160367 mean -0.0285 (-0.0792, +0.0184) pct -6.15 (-18.64, +3.76)
+DET_ADD              obs cost0.5  G0 all rows     : n=3396302 mean -16.1922 (-53.2035, +17.5273) pct -0.60 (-2.07, +0.63)
+DET_ADD              obs cost0.5  G1 ordinary     : n=3173076 mean -13.4648 (-52.7824, +22.2887) pct -0.50 (-2.05, +0.80)
+DET_ADD              obs cost0.5  G2 before alarm : n=26191 mean -268.9757 (-573.6048, -45.0045) pct -9.35 (-19.86, -1.58)
+DET_ADD              obs cost0.5  G3 during       : n=8605 mean +38.6580 (-20.7357, +99.9624) pct +1.84 (-1.00, +4.78)
+DET_ADD              obs cost0.5  G4 after        : n=12918 mean +388.5180 (+105.0891, +688.7695) pct +10.71 (+3.07, +17.81)
+DET_ADD              obs cost0.5  G5 near         : n=223226 mean -54.9605 (-133.9572, +9.8914) pct -1.93 (-4.71, +0.34)
+DET_ADD              obs cost0.5  Gs shift rows   : n=47714 mean -35.4868 (-236.4681, +125.5940) pct -1.21 (-8.08, +4.22)
+=== absolute mean scores (points; cost in GBP per scored half-hour)
+K0 G0 all rows {'qs_nra': 2.7242, 'ae_median_nra': 4.7251, 'ae_mean_nra': 4.7243, 'tw95_nra': 0.8538, 'cost0.5_nra': 2701.8383, 'qs_obs': 2.7698, 'ae_median_obs': 4.7904, 'ae_mean_obs': 4.7899, 'tw95_obs': 0.8606, 'cost0.5_obs': 2701.6127}
+K0 G1 ordinary {'qs_nra': 2.7073, 'ae_median_nra': 4.6947, 'ae_mean_nra': 4.6936, 'tw95_nra': 0.8793, 'cost0.5_nra': 2691.8063, 'qs_obs': 2.7073, 'ae_median_obs': 4.6947, 'ae_mean_obs': 4.6936, 'tw95_obs': 0.8793, 'cost0.5_obs': 2691.8063}
+K0 G2 before alarm {'qs_nra': 3.0306, 'ae_median_nra': 5.2477, 'ae_mean_nra': 5.2468, 'tw95_nra': 0.4534, 'cost0.5_nra': 2833.4346, 'qs_obs': 4.2113, 'ae_median_obs': 7.02, 'ae_mean_obs': 7.0241, 'tw95_obs': 0.5392, 'cost0.5_obs': 2876.3719}
+K0 G3 during {'qs_nra': 4.6179, 'ae_median_nra': 7.5206, 'ae_mean_nra': 7.4823, 'tw95_nra': 0.3654, 'cost0.5_nra': 5498.0497, 'qs_obs': 3.3536, 'ae_median_obs': 5.9234, 'ae_mean_obs': 5.9396, 'tw95_obs': 0.0929, 'cost0.5_obs': 2096.952}
+K0 G4 after {'qs_nra': 4.1445, 'ae_median_nra': 6.8851, 'ae_mean_nra': 6.8744, 'tw95_nra': 0.6427, 'cost0.5_nra': 3695.3757, 'qs_obs': 4.0663, 'ae_median_obs': 6.7654, 'ae_mean_obs': 6.7537, 'tw95_obs': 0.6369, 'cost0.5_obs': 3627.882}
+K0 G5 near {'qs_nra': 2.9593, 'ae_median_nra': 5.1479, 'ae_mean_nra': 5.1512, 'tw95_nra': 0.4986, 'cost0.5_nra': 2844.4386, 'qs_obs': 3.6392, 'ae_median_obs': 6.1222, 'ae_mean_obs': 6.1292, 'tw95_obs': 0.5994, 'cost0.5_obs': 2841.006}
+K0 Gs shift rows {'qs_nra': 3.6519, 'ae_median_nra': 6.1476, 'ae_mean_nra': 6.136, 'tw95_nra': 0.4792, 'cost0.5_nra': 3547.346, 'qs_obs': 3.9852, 'ae_median_obs': 6.7143, 'ae_mean_obs': 6.7173, 'tw95_obs': 0.4631, 'cost0.5_obs': 2939.2696}
+GAM_ONLY G0 all rows {'qs_nra': 3.0005, 'ae_median_nra': 5.3132, 'ae_mean_nra': 5.3012, 'tw95_nra': 0.9296, 'cost0.5_nra': 3055.3661, 'qs_obs': 3.0352, 'ae_median_obs': 5.3634, 'ae_mean_obs': 5.3518, 'tw95_obs': 0.9349, 'cost0.5_obs': 3070.3951}
+GAM_ONLY G1 ordinary {'qs_nra': 2.9927, 'ae_median_nra': 5.2976, 'ae_mean_nra': 5.286, 'tw95_nra': 0.9613, 'cost0.5_nra': 3071.5147, 'qs_obs': 2.9927, 'ae_median_obs': 5.2976, 'ae_mean_obs': 5.286, 'tw95_obs': 0.9613, 'cost0.5_obs': 3071.5147}
+GAM_ONLY G2 before alarm {'qs_nra': 2.9287, 'ae_median_nra': 5.266, 'ae_mean_nra': 5.2549, 'tw95_nra': 0.375, 'cost0.5_nra': 2611.1434, 'qs_obs': 4.0503, 'ae_median_obs': 6.8858, 'ae_mean_obs': 6.8827, 'tw95_obs': 0.499, 'cost0.5_obs': 3070.3387}
+GAM_ONLY G3 during {'qs_nra': 2.8855, 'ae_median_nra': 5.2322, 'ae_mean_nra': 5.23, 'tw95_nra': 0.2881, 'cost0.5_nra': 2824.6175, 'qs_obs': 4.8583, 'ae_median_obs': 8.2526, 'ae_mean_obs': 8.2835, 'tw95_obs': 0.1307, 'cost0.5_obs': 2532.3268}
+GAM_ONLY G4 after {'qs_nra': 3.0582, 'ae_median_nra': 5.3977, 'ae_mean_nra': 5.3846, 'tw95_nra': 0.5248, 'cost0.5_nra': 2668.6428, 'qs_obs': 3.1177, 'ae_median_obs': 5.4748, 'ae_mean_obs': 5.4616, 'tw95_obs': 0.5592, 'cost0.5_obs': 2793.612}
+GAM_ONLY G5 near {'qs_nra': 3.108, 'ae_median_nra': 5.5297, 'ae_mean_nra': 5.5123, 'tw95_nra': 0.4873, 'cost0.5_nra': 2825.8189, 'qs_obs': 3.6261, 'ae_median_obs': 6.2786, 'ae_mean_obs': 6.2673, 'tw95_obs': 0.5667, 'cost0.5_obs': 3054.4798}
+GAM_ONLY Gs shift rows {'qs_nra': 2.9501, 'ae_median_nra': 5.2901, 'ae_mean_nra': 5.2805, 'tw95_nra': 0.3916, 'cost0.5_nra': 2665.2097, 'qs_obs': 4.0067, 'ae_median_obs': 6.852, 'ae_mean_obs': 6.854, 'tw95_obs': 0.4313, 'cost0.5_obs': 2898.3902}
+GAM_ONLY_K0SPREAD G0 all rows {'qs_nra': 3.0147, 'ae_median_nra': 5.3146, 'ae_mean_nra': 5.3012, 'tw95_nra': 0.9226, 'cost0.5_nra': 3198.3057, 'qs_obs': 3.051, 'ae_median_obs': 5.3649, 'ae_mean_obs': 5.3518, 'tw95_obs': 0.9284, 'cost0.5_obs': 3212.8442}
+GAM_ONLY_K0SPREAD G1 ordinary {'qs_nra': 3.0036, 'ae_median_nra': 5.299, 'ae_mean_nra': 5.286, 'tw95_nra': 0.9546, 'cost0.5_nra': 3205.0064, 'qs_obs': 3.0036, 'ae_median_obs': 5.299, 'ae_mean_obs': 5.286, 'tw95_obs': 0.9546, 'cost0.5_obs': 3205.0064}
+GAM_ONLY_K0SPREAD G2 before alarm {'qs_nra': 2.9971, 'ae_median_nra': 5.2744, 'ae_mean_nra': 5.2549, 'tw95_nra': 0.3639, 'cost0.5_nra': 2883.74, 'qs_obs': 4.167, 'ae_median_obs': 6.8948, 'ae_mean_obs': 6.8827, 'tw95_obs': 0.5024, 'cost0.5_obs': 3284.1361}
+GAM_ONLY_K0SPREAD G3 during {'qs_nra': 2.9915, 'ae_median_nra': 5.2488, 'ae_mean_nra': 5.23, 'tw95_nra': 0.2914, 'cost0.5_nra': 3170.0239, 'qs_obs': 4.959, 'ae_median_obs': 8.2612, 'ae_mean_obs': 8.2835, 'tw95_obs': 0.1296, 'cost0.5_obs': 2524.9586}
+GAM_ONLY_K0SPREAD G4 after {'qs_nra': 3.1174, 'ae_median_nra': 5.3996, 'ae_mean_nra': 5.3846, 'tw95_nra': 0.5104, 'cost0.5_nra': 2841.5436, 'qs_obs': 3.182, 'ae_median_obs': 5.4766, 'ae_mean_obs': 5.4616, 'tw95_obs': 0.547, 'cost0.5_obs': 2977.1061}
+GAM_ONLY_K0SPREAD G5 near {'qs_nra': 3.169, 'ae_median_nra': 5.5322, 'ae_mean_nra': 5.5123, 'tw95_nra': 0.4772, 'cost0.5_nra': 3103.0572, 'qs_obs': 3.7094, 'ae_median_obs': 6.2816, 'ae_mean_obs': 6.2673, 'tw95_obs': 0.5636, 'cost0.5_obs': 3324.2548}
+GAM_ONLY_K0SPREAD Gs shift rows {'qs_nra': 3.0247, 'ae_median_nra': 5.2987, 'ae_mean_nra': 5.2805, 'tw95_nra': 0.3829, 'cost0.5_nra': 2923.9458, 'qs_obs': 4.1073, 'ae_median_obs': 6.8592, 'ae_mean_obs': 6.854, 'tw95_obs': 0.43, 'cost0.5_obs': 3064.0972}
+BAND_TABLE_PLAIN G0 all rows {'qs_nra': 2.7634, 'ae_median_nra': 4.7729, 'ae_mean_nra': 4.7243, 'tw95_nra': 0.8644, 'cost0.5_nra': 2718.0913, 'qs_obs': 2.8062, 'ae_median_obs': 4.8354, 'ae_mean_obs': 4.7899, 'tw95_obs': 0.8711, 'cost0.5_obs': 2720.276}
+BAND_TABLE_PLAIN G1 ordinary {'qs_nra': 2.748, 'ae_median_nra': 4.7421, 'ae_mean_nra': 4.6936, 'tw95_nra': 0.8913, 'cost0.5_nra': 2712.3489, 'qs_obs': 2.748, 'ae_median_obs': 4.7421, 'ae_mean_obs': 4.6936, 'tw95_obs': 0.8913, 'cost0.5_obs': 2712.3489}
+BAND_TABLE_PLAIN G2 before alarm {'qs_nra': 3.0612, 'ae_median_nra': 5.3074, 'ae_mean_nra': 5.2468, 'tw95_nra': 0.4533, 'cost0.5_nra': 2734.2859, 'qs_obs': 4.1944, 'ae_median_obs': 7.0163, 'ae_mean_obs': 7.0241, 'tw95_obs': 0.5329, 'cost0.5_obs': 2828.2033}
+BAND_TABLE_PLAIN G3 during {'qs_nra': 4.6223, 'ae_median_nra': 7.7701, 'ae_mean_nra': 7.4823, 'tw95_nra': 0.3678, 'cost0.5_nra': 4851.0391, 'qs_obs': 3.2867, 'ae_median_obs': 5.8062, 'ae_mean_obs': 5.9396, 'tw95_obs': 0.0848, 'cost0.5_obs': 2100.7173}
+BAND_TABLE_PLAIN G4 after {'qs_nra': 4.1487, 'ae_median_nra': 6.9658, 'ae_mean_nra': 6.8744, 'tw95_nra': 0.6478, 'cost0.5_nra': 3610.4551, 'qs_obs': 4.076, 'ae_median_obs': 6.8529, 'ae_mean_obs': 6.7537, 'tw95_obs': 0.6447, 'cost0.5_obs': 3570.2248}
+BAND_TABLE_PLAIN G5 near {'qs_nra': 2.9771, 'ae_median_nra': 5.202, 'ae_mean_nra': 5.1512, 'tw95_nra': 0.4895, 'cost0.5_nra': 2799.7174, 'qs_obs': 3.6162, 'ae_median_obs': 6.1337, 'ae_mean_obs': 6.1292, 'tw95_obs': 0.5888, 'cost0.5_obs': 2832.9581}
+BAND_TABLE_PLAIN Gs shift rows {'qs_nra': 3.6703, 'ae_median_nra': 6.2546, 'ae_mean_nra': 6.136, 'tw95_nra': 0.4809, 'cost0.5_nra': 3353.245, 'qs_obs': 3.9636, 'ae_median_obs': 6.7072, 'ae_mean_obs': 6.7173, 'tw95_obs': 0.4598, 'cost0.5_obs': 2897.8981}
+BAND_TABLE_DISAGREE G0 all rows {'qs_nra': 2.7965, 'ae_median_nra': 4.7475, 'ae_mean_nra': 4.7243, 'tw95_nra': 0.8549, 'cost0.5_nra': 2789.6633, 'qs_obs': 2.8405, 'ae_median_obs': 4.8134, 'ae_mean_obs': 4.7899, 'tw95_obs': 0.8618, 'cost0.5_obs': 2794.5751}
+BAND_TABLE_DISAGREE G1 ordinary {'qs_nra': 2.7843, 'ae_median_nra': 4.7216, 'ae_mean_nra': 4.6936, 'tw95_nra': 0.8829, 'cost0.5_nra': 2789.4942, 'qs_obs': 2.7843, 'ae_median_obs': 4.7216, 'ae_mean_obs': 4.6936, 'tw95_obs': 0.8829, 'cost0.5_obs': 2789.4942}
+BAND_TABLE_DISAGREE G2 before alarm {'qs_nra': 3.1344, 'ae_median_nra': 5.3852, 'ae_mean_nra': 5.2468, 'tw95_nra': 0.4513, 'cost0.5_nra': 2718.3788, 'qs_obs': 4.2871, 'ae_median_obs': 7.1046, 'ae_mean_obs': 7.0241, 'tw95_obs': 0.5502, 'cost0.5_obs': 2836.6303}
+BAND_TABLE_DISAGREE G3 during {'qs_nra': 4.1594, 'ae_median_nra': 7.2933, 'ae_mean_nra': 7.4823, 'tw95_nra': 0.343, 'cost0.5_nra': 4171.9259, 'qs_obs': 3.8838, 'ae_median_obs': 6.9859, 'ae_mean_obs': 5.9396, 'tw95_obs': 0.1184, 'cost0.5_obs': 2260.4619}
+BAND_TABLE_DISAGREE G4 after {'qs_nra': 3.9646, 'ae_median_nra': 6.8081, 'ae_mean_nra': 6.8744, 'tw95_nra': 0.6327, 'cost0.5_nra': 3467.0217, 'qs_obs': 3.9122, 'ae_median_obs': 6.7105, 'ae_mean_obs': 6.7537, 'tw95_obs': 0.6448, 'cost0.5_obs': 3473.1463}
+BAND_TABLE_DISAGREE G5 near {'qs_nra': 2.9661, 'ae_median_nra': 5.1086, 'ae_mean_nra': 5.1512, 'tw95_nra': 0.4652, 'cost0.5_nra': 2792.0665, 'qs_obs': 3.6225, 'ae_median_obs': 6.0919, 'ae_mean_obs': 6.1292, 'tw95_obs': 0.5692, 'cost0.5_obs': 2866.7981}
+BAND_TABLE_DISAGREE Gs shift rows {'qs_nra': 3.5622, 'ae_median_nra': 6.1522, 'ae_mean_nra': 6.136, 'tw95_nra': 0.4707, 'cost0.5_nra': 3183.2055, 'qs_obs': 4.1072, 'ae_median_obs': 6.9835, 'ae_mean_obs': 6.7173, 'tw95_obs': 0.4766, 'cost0.5_obs': 2905.0501}
+BAND_HEAD G0 all rows {'qs_nra': 2.6668, 'ae_median_nra': 4.6142, 'ae_mean_nra': 4.7243, 'tw95_nra': 0.8132, 'cost0.5_nra': 2762.2045, 'qs_obs': 2.7124, 'ae_median_obs': 4.6823, 'ae_mean_obs': 4.7899, 'tw95_obs': 0.8201, 'cost0.5_obs': 2771.538}
+BAND_HEAD G1 ordinary {'qs_nra': 2.6619, 'ae_median_nra': 4.5996, 'ae_mean_nra': 4.6936, 'tw95_nra': 0.8399, 'cost0.5_nra': 2770.6467, 'qs_obs': 2.6619, 'ae_median_obs': 4.5996, 'ae_mean_obs': 4.6936, 'tw95_obs': 0.8399, 'cost0.5_obs': 2770.6467}
+BAND_HEAD G2 before alarm {'qs_nra': 2.7759, 'ae_median_nra': 4.8702, 'ae_mean_nra': 5.2468, 'tw95_nra': 0.4103, 'cost0.5_nra': 2595.7014, 'qs_obs': 3.992, 'ae_median_obs': 6.7894, 'ae_mean_obs': 7.0241, 'tw95_obs': 0.5183, 'cost0.5_obs': 2831.3231}
+BAND_HEAD G3 during {'qs_nra': 3.6589, 'ae_median_nra': 6.5898, 'ae_mean_nra': 7.4823, 'tw95_nra': 0.3168, 'cost0.5_nra': 3149.3326, 'qs_obs': 3.7416, 'ae_median_obs': 6.8388, 'ae_mean_obs': 5.9396, 'tw95_obs': 0.1044, 'cost0.5_obs': 2325.8195}
+BAND_HEAD G4 after {'qs_nra': 3.4313, 'ae_median_nra': 6.0907, 'ae_mean_nra': 6.8744, 'tw95_nra': 0.5484, 'cost0.5_nra': 2799.2547, 'qs_obs': 3.4025, 'ae_median_obs': 6.0371, 'ae_mean_obs': 6.7537, 'tw95_obs': 0.5577, 'cost0.5_obs': 2821.9788}
+BAND_HEAD G5 near {'qs_nra': 2.7354, 'ae_median_nra': 4.8181, 'ae_mean_nra': 5.1512, 'tw95_nra': 0.4413, 'cost0.5_nra': 2642.2025, 'qs_obs': 3.4156, 'ae_median_obs': 5.8331, 'ae_mean_obs': 6.1292, 'tw95_obs': 0.5445, 'cost0.5_obs': 2784.2075}
+BAND_HEAD Gs shift rows {'qs_nra': 3.1301, 'ae_median_nra': 5.5466, 'ae_mean_nra': 6.136, 'tw95_nra': 0.4226, 'cost0.5_nra': 2750.6559, 'qs_obs': 3.7947, 'ae_median_obs': 6.6199, 'ae_mean_obs': 6.7173, 'tw95_obs': 0.4354, 'cost0.5_obs': 2737.628}
+ASOF_WIDEN G0 all rows {'qs_nra': 3.009, 'ae_median_nra': 5.3129, 'ae_mean_nra': 5.3012, 'tw95_nra': 0.9215, 'cost0.5_nra': 2960.1502, 'qs_obs': 3.0411, 'ae_median_obs': 5.3631, 'ae_mean_obs': 5.3518, 'tw95_obs': 0.9263, 'cost0.5_obs': 2969.5722}
+ASOF_WIDEN G1 ordinary {'qs_nra': 2.998, 'ae_median_nra': 5.2973, 'ae_mean_nra': 5.286, 'tw95_nra': 0.9518, 'cost0.5_nra': 2970.627, 'qs_obs': 2.998, 'ae_median_obs': 5.2973, 'ae_mean_obs': 5.286, 'tw95_obs': 0.9518, 'cost0.5_obs': 2970.627}
+ASOF_WIDEN G2 before alarm {'qs_nra': 2.9872, 'ae_median_nra': 5.2666, 'ae_mean_nra': 5.2549, 'tw95_nra': 0.3865, 'cost0.5_nra': 2625.6787, 'qs_obs': 3.9974, 'ae_median_obs': 6.8861, 'ae_mean_obs': 6.8827, 'tw95_obs': 0.4814, 'cost0.5_obs': 2848.312}
+ASOF_WIDEN G3 during {'qs_nra': 2.9843, 'ae_median_nra': 5.2313, 'ae_mean_nra': 5.23, 'tw95_nra': 0.3161, 'cost0.5_nra': 2882.5738, 'qs_obs': 4.5104, 'ae_median_obs': 8.2522, 'ae_mean_obs': 8.2835, 'tw95_obs': 0.1732, 'cost0.5_obs': 2638.9021}
+ASOF_WIDEN G4 after {'qs_nra': 3.1762, 'ae_median_nra': 5.3995, 'ae_mean_nra': 5.3846, 'tw95_nra': 0.5512, 'cost0.5_nra': 2741.0834, 'qs_obs': 3.2076, 'ae_median_obs': 5.4766, 'ae_mean_obs': 5.4616, 'tw95_obs': 0.5718, 'cost0.5_obs': 2748.7634}
+ASOF_WIDEN G5 near {'qs_nra': 3.1622, 'ae_median_nra': 5.5297, 'ae_mean_nra': 5.5123, 'tw95_nra': 0.5003, 'cost0.5_nra': 2811.2253, 'qs_obs': 3.6413, 'ae_median_obs': 6.2785, 'ae_mean_obs': 6.2673, 'tw95_obs': 0.5726, 'cost0.5_obs': 2954.5777}
+ASOF_WIDEN Gs shift rows {'qs_nra': 3.0319, 'ae_median_nra': 5.2906, 'ae_mean_nra': 5.2805, 'tw95_nra': 0.4104, 'cost0.5_nra': 2703.253, 'qs_obs': 3.9223, 'ae_median_obs': 6.8525, 'ae_mean_obs': 6.854, 'tw95_obs': 0.4344, 'cost0.5_obs': 2783.5943}
+LEAD_DECAY G0 all rows {'qs_nra': 2.7082, 'ae_median_nra': 4.7639, 'ae_mean_nra': 4.7551, 'tw95_nra': 0.8038, 'cost0.5_nra': 2796.0835, 'qs_obs': 2.7454, 'ae_median_obs': 4.8174, 'ae_mean_obs': 4.809, 'tw95_obs': 0.8103, 'cost0.5_obs': 2790.1729}
+LEAD_DECAY G1 ordinary {'qs_nra': 2.6947, 'ae_median_nra': 4.7443, 'ae_mean_nra': 4.7356, 'tw95_nra': 0.8291, 'cost0.5_nra': 2779.6003, 'qs_obs': 2.6947, 'ae_median_obs': 4.7443, 'ae_mean_obs': 4.7356, 'tw95_obs': 0.8291, 'cost0.5_obs': 2779.6003}
+LEAD_DECAY G2 before alarm {'qs_nra': 3.3341, 'ae_median_nra': 5.7506, 'ae_mean_nra': 5.7356, 'tw95_nra': 0.4116, 'cost0.5_nra': 3401.9731, 'qs_obs': 3.8293, 'ae_median_obs': 6.4512, 'ae_mean_obs': 6.4455, 'tw95_obs': 0.4964, 'cost0.5_obs': 2918.4028}
+LEAD_DECAY G3 during {'qs_nra': 4.6114, 'ae_median_nra': 7.5507, 'ae_mean_nra': 7.5125, 'tw95_nra': 0.3667, 'cost0.5_nra': 6419.7051, 'qs_obs': 3.3099, 'ae_median_obs': 5.8272, 'ae_mean_obs': 5.8414, 'tw95_obs': 0.084, 'cost0.5_obs': 2012.6511}
+LEAD_DECAY G4 after {'qs_nra': 3.9223, 'ae_median_nra': 6.5579, 'ae_mean_nra': 6.5472, 'tw95_nra': 0.6341, 'cost0.5_nra': 3821.5115, 'qs_obs': 3.8777, 'ae_median_obs': 6.4847, 'ae_mean_obs': 6.4731, 'tw95_obs': 0.6491, 'cost0.5_obs': 3767.2395}
+LEAD_DECAY G5 near {'qs_nra': 2.8955, 'ae_median_nra': 5.0354, 'ae_mean_nra': 5.0272, 'tw95_nra': 0.4507, 'cost0.5_nra': 3030.3863, 'qs_obs': 3.4511, 'ae_median_obs': 5.8341, 'ae_mean_obs': 5.8307, 'tw95_obs': 0.5477, 'cost0.5_obs': 2940.4597}
+LEAD_DECAY Gs shift rows {'qs_nra': 3.7601, 'ae_median_nra': 6.3458, 'ae_mean_nra': 6.3266, 'tw95_nra': 0.455, 'cost0.5_nra': 4059.7922, 'qs_obs': 3.7251, 'ae_median_obs': 6.3201, 'ae_mean_obs': 6.3174, 'tw95_obs': 0.441, 'cost0.5_obs': 2984.8671}
+BAND_HEAD_HELDOUT G0 all rows {'qs_nra': 2.67, 'ae_median_nra': 4.6262, 'ae_mean_nra': 4.7183, 'tw95_nra': 0.8177, 'cost0.5_nra': 2767.4104, 'qs_obs': 2.7157, 'ae_median_obs': 4.695, 'ae_mean_obs': 4.7869, 'tw95_obs': 0.8251, 'cost0.5_obs': 2780.4268}
+BAND_HEAD_HELDOUT G1 ordinary {'qs_nra': 2.6641, 'ae_median_nra': 4.6129, 'ae_mean_nra': 4.6909, 'tw95_nra': 0.8445, 'cost0.5_nra': 2776.4937, 'qs_obs': 2.6641, 'ae_median_obs': 4.6129, 'ae_mean_obs': 4.6909, 'tw95_obs': 0.8445, 'cost0.5_obs': 2776.4937}
+BAND_HEAD_HELDOUT G2 before alarm {'qs_nra': 2.8192, 'ae_median_nra': 4.8772, 'ae_mean_nra': 5.2187, 'tw95_nra': 0.3871, 'cost0.5_nra': 2580.154, 'qs_obs': 4.0271, 'ae_median_obs': 6.8674, 'ae_mean_obs': 7.0397, 'tw95_obs': 0.481, 'cost0.5_obs': 2805.6485}
+BAND_HEAD_HELDOUT G3 during {'qs_nra': 3.5757, 'ae_median_nra': 6.2592, 'ae_mean_nra': 6.7733, 'tw95_nra': 0.3923, 'cost0.5_nra': 3116.9666, 'qs_obs': 4.0266, 'ae_median_obs': 7.5253, 'ae_mean_obs': 6.7054, 'tw95_obs': 0.153, 'cost0.5_obs': 2391.1741}
+BAND_HEAD_HELDOUT G4 after {'qs_nra': 3.6792, 'ae_median_nra': 6.4545, 'ae_mean_nra': 7.1733, 'tw95_nra': 0.7536, 'cost0.5_nra': 2941.6007, 'qs_obs': 3.6792, 'ae_median_obs': 6.4545, 'ae_mean_obs': 7.1733, 'tw95_obs': 0.7536, 'cost0.5_obs': 2941.6007}
+BAND_HEAD_HELDOUT G5 near {'qs_nra': 2.7544, 'ae_median_nra': 4.8181, 'ae_mean_nra': 5.1137, 'tw95_nra': 0.4298, 'cost0.5_nra': 2633.4853, 'qs_obs': 3.4615, 'ae_median_obs': 5.8804, 'ae_mean_obs': 6.1724, 'tw95_obs': 0.5443, 'cost0.5_obs': 2838.4159}
+BAND_HEAD_HELDOUT Gs shift rows {'qs_nra': 3.16, 'ae_median_nra': 5.5013, 'ae_mean_nra': 5.9645, 'tw95_nra': 0.4769, 'cost0.5_nra': 2758.424, 'qs_obs': 3.9426, 'ae_median_obs': 6.8821, 'ae_mean_obs': 7.0137, 'tw95_obs': 0.4899, 'cost0.5_obs': 2779.2275}
+PERFECT G0 all rows {'qs_nra': 2.7026, 'ae_median_nra': 4.6913, 'ae_mean_nra': 4.691, 'tw95_nra': 0.8519, 'cost0.5_nra': 2685.1595, 'qs_obs': 2.7672, 'ae_median_obs': 4.7832, 'ae_mean_obs': 4.783, 'tw95_obs': 0.8606, 'cost0.5_obs': 2704.2355}
+PERFECT G1 ordinary {'qs_nra': 2.707, 'ae_median_nra': 4.6944, 'ae_mean_nra': 4.6934, 'tw95_nra': 0.8796, 'cost0.5_nra': 2691.8874, 'qs_obs': 2.707, 'ae_median_obs': 4.6944, 'ae_mean_obs': 4.6934, 'tw95_obs': 0.8796, 'cost0.5_obs': 2691.8874}
+PERFECT G2 before alarm {'qs_nra': 2.4202, 'ae_median_nra': 4.2575, 'ae_mean_nra': 4.2629, 'tw95_nra': 0.3388, 'cost0.5_nra': 2479.0611, 'qs_obs': 4.6439, 'ae_median_obs': 7.4362, 'ae_mean_obs': 7.4444, 'tw95_obs': 0.5793, 'cost0.5_obs': 3085.5804}
+PERFECT G3 during {'qs_nra': 2.5658, 'ae_median_nra': 4.5464, 'ae_mean_nra': 4.5533, 'tw95_nra': 0.3128, 'cost0.5_nra': 2869.3284, 'qs_obs': 6.9556, 'ae_median_obs': 10.9306, 'ae_mean_obs': 10.9614, 'tw95_obs': 0.298, 'cost0.5_obs': 2834.5127}
+PERFECT G4 after {'qs_nra': 2.6879, 'ae_median_nra': 4.6157, 'ae_mean_nra': 4.6099, 'tw95_nra': 0.4944, 'cost0.5_nra': 2579.9563, 'qs_obs': 2.7582, 'ae_median_obs': 4.7071, 'ae_mean_obs': 4.7011, 'tw95_obs': 0.529, 'cost0.5_obs': 2712.975}
+PERFECT G5 near {'qs_nra': 2.6402, 'ae_median_nra': 4.648, 'ae_mean_nra': 4.6577, 'tw95_nra': 0.4673, 'cost0.5_nra': 2589.5237, 'qs_obs': 3.6047, 'ae_median_obs': 6.018, 'ae_mean_obs': 6.0302, 'tw95_obs': 0.5966, 'cost0.5_obs': 2879.7592}
+PERFECT Gs shift rows {'qs_nra': 2.5169, 'ae_median_nra': 4.4079, 'ae_mean_nra': 4.4109, 'tw95_nra': 0.3704, 'cost0.5_nra': 2576.7602, 'qs_obs': 4.7069, 'ae_median_obs': 7.5606, 'ae_mean_obs': 7.5704, 'tw95_obs': 0.5045, 'cost0.5_obs': 2939.423}
+PERFECT_ADD G0 all rows {'qs_nra': 2.7268, 'ae_median_nra': 4.7249, 'ae_mean_nra': 4.7246, 'tw95_nra': 0.8551, 'cost0.5_nra': 2727.0064, 'qs_obs': 2.7477, 'ae_median_obs': 4.7559, 'ae_mean_obs': 4.7558, 'tw95_obs': 0.8584, 'cost0.5_obs': 2686.6301}
+PERFECT_ADD G1 ordinary {'qs_nra': 2.7078, 'ae_median_nra': 4.6958, 'ae_mean_nra': 4.6947, 'tw95_nra': 0.8798, 'cost0.5_nra': 2692.0384, 'qs_obs': 2.7078, 'ae_median_obs': 4.6958, 'ae_mean_obs': 4.6947, 'tw95_obs': 0.8798, 'cost0.5_obs': 2692.0384}
+PERFECT_ADD G2 before alarm {'qs_nra': 4.5857, 'ae_median_nra': 7.2782, 'ae_mean_nra': 7.28, 'tw95_nra': 0.6487, 'cost0.5_nra': 4843.7524, 'qs_obs': 2.727, 'ae_median_obs': 4.713, 'ae_mean_obs': 4.7239, 'tw95_obs': 0.3158, 'cost0.5_obs': 2258.2022}
+PERFECT_ADD G3 during {'qs_nra': 6.6041, 'ae_median_nra': 9.9604, 'ae_mean_nra': 9.9223, 'tw95_nra': 0.4533, 'cost0.5_nra': 8699.7998, 'qs_obs': 2.4578, 'ae_median_obs': 4.3344, 'ae_mean_obs': 4.3481, 'tw95_obs': 0.0689, 'cost0.5_obs': 1903.9579}
+PERFECT_ADD G4 after {'qs_nra': 2.6922, 'ae_median_nra': 4.6522, 'ae_mean_nra': 4.6572, 'tw95_nra': 0.5075, 'cost0.5_nra': 2599.2532, 'qs_obs': 2.6922, 'ae_median_obs': 4.6512, 'ae_mean_obs': 4.6554, 'tw95_obs': 0.5214, 'cost0.5_obs': 2601.192}
+PERFECT_ADD G5 near {'qs_nra': 2.9911, 'ae_median_nra': 5.1302, 'ae_mean_nra': 5.1396, 'tw95_nra': 0.5116, 'cost0.5_nra': 3224.0645, 'qs_obs': 3.3035, 'ae_median_obs': 5.5925, 'ae_mean_obs': 5.6058, 'tw95_obs': 0.56, 'cost0.5_obs': 2609.7531}
+PERFECT_ADD Gs shift rows {'qs_nra': 4.5814, 'ae_median_nra': 7.2462, 'ae_mean_nra': 7.2399, 'tw95_nra': 0.5712, 'cost0.5_nra': 4931.5012, 'qs_obs': 2.6586, 'ae_median_obs': 4.6137, 'ae_mean_obs': 4.6236, 'tw95_obs': 0.3101, 'cost0.5_obs': 2287.1763}
+DET G0 all rows {'qs_nra': 2.8449, 'ae_median_nra': 4.9305, 'ae_mean_nra': 4.93, 'tw95_nra': 0.9003, 'cost0.5_nra': 2730.9506, 'qs_obs': 2.8987, 'ae_median_obs': 5.0048, 'ae_mean_obs': 5.0045, 'tw95_obs': 0.9075, 'cost0.5_obs': 2739.4127}
+DET G1 ordinary {'qs_nra': 2.8139, 'ae_median_nra': 4.8862, 'ae_mean_nra': 4.8853, 'tw95_nra': 0.9166, 'cost0.5_nra': 2720.0357, 'qs_obs': 2.8139, 'ae_median_obs': 4.8862, 'ae_mean_obs': 4.8853, 'tw95_obs': 0.9166, 'cost0.5_obs': 2720.0357}
+DET G2 before alarm {'qs_nra': 3.072, 'ae_median_nra': 5.2798, 'ae_mean_nra': 5.2806, 'tw95_nra': 0.5031, 'cost0.5_nra': 2768.8605, 'qs_obs': 4.5058, 'ae_median_obs': 7.3207, 'ae_mean_obs': 7.3254, 'tw95_obs': 0.6385, 'cost0.5_obs': 3036.5491}
+DET G3 during {'qs_nra': 4.0116, 'ae_median_nra': 6.6789, 'ae_mean_nra': 6.6495, 'tw95_nra': 0.3423, 'cost0.5_nra': 4639.2938, 'qs_obs': 4.5877, 'ae_median_obs': 7.4868, 'ae_mean_obs': 7.5031, 'tw95_obs': 0.1553, 'cost0.5_obs': 2363.4434}
+DET G4 after {'qs_nra': 3.4378, 'ae_median_nra': 5.7985, 'ae_mean_nra': 5.7863, 'tw95_nra': 0.5536, 'cost0.5_nra': 3134.7357, 'qs_obs': 3.4854, 'ae_median_obs': 5.8563, 'ae_mean_obs': 5.8435, 'tw95_obs': 0.5873, 'cost0.5_obs': 3219.3284}
+DET G5 near {'qs_nra': 3.2768, 'ae_median_nra': 5.5465, 'ae_mean_nra': 5.5526, 'tw95_nra': 0.6731, 'cost0.5_nra': 2886.1021, 'qs_obs': 4.0781, 'ae_median_obs': 6.6538, 'ae_mean_obs': 6.6628, 'tw95_obs': 0.7801, 'cost0.5_obs': 3014.8495}
+DET Gs shift rows {'qs_nra': 3.3693, 'ae_median_nra': 5.7163, 'ae_mean_nra': 5.7073, 'tw95_nra': 0.4794, 'cost0.5_nra': 3205.2409, 'qs_obs': 4.2792, 'ae_median_obs': 7.0063, 'ae_mean_obs': 7.0094, 'tw95_obs': 0.5185, 'cost0.5_obs': 2964.6429}
+DET_ADD G0 all rows {'qs_nra': 2.734, 'ae_median_nra': 4.766, 'ae_mean_nra': 4.765, 'tw95_nra': 0.8208, 'cost0.5_nra': 2726.4138, 'qs_obs': 2.7758, 'ae_median_obs': 4.8247, 'ae_mean_obs': 4.8239, 'tw95_obs': 0.8255, 'cost0.5_obs': 2717.8049}
+DET_ADD G1 ordinary {'qs_nra': 2.6804, 'ae_median_nra': 4.6868, 'ae_mean_nra': 4.6852, 'tw95_nra': 0.8298, 'cost0.5_nra': 2705.2712, 'qs_obs': 2.6804, 'ae_median_obs': 4.6868, 'ae_mean_obs': 4.6852, 'tw95_obs': 0.8298, 'cost0.5_obs': 2705.2712}
+DET_ADD G2 before alarm {'qs_nra': 3.4615, 'ae_median_nra': 5.8156, 'ae_mean_nra': 5.8176, 'tw95_nra': 0.593, 'cost0.5_nra': 3438.1677, 'qs_obs': 4.3776, 'ae_median_obs': 7.2098, 'ae_mean_obs': 7.2156, 'tw95_obs': 0.5941, 'cost0.5_obs': 3145.3477}
+DET_ADD G3 during {'qs_nra': 5.089, 'ae_median_nra': 8.1434, 'ae_mean_nra': 8.1059, 'tw95_nra': 0.3964, 'cost0.5_nra': 6369.2215, 'qs_obs': 3.1695, 'ae_median_obs': 5.5612, 'ae_mean_obs': 5.5757, 'tw95_obs': 0.0823, 'cost0.5_obs': 2058.294}
+DET_ADD G4 after {'qs_nra': 3.843, 'ae_median_nra': 6.3943, 'ae_mean_nra': 6.3851, 'tw95_nra': 0.656, 'cost0.5_nra': 3318.1376, 'qs_obs': 3.7455, 'ae_median_obs': 6.2485, 'ae_mean_obs': 6.2384, 'tw95_obs': 0.6426, 'cost0.5_obs': 3239.364}
+DET_ADD G5 near {'qs_nra': 3.4784, 'ae_median_nra': 5.8675, 'ae_mean_nra': 5.8746, 'tw95_nra': 0.6964, 'cost0.5_nra': 3026.9481, 'qs_obs': 4.1022, 'ae_median_obs': 6.7439, 'ae_mean_obs': 6.7542, 'tw95_obs': 0.7652, 'cost0.5_obs': 2895.9664}
+DET_ADD Gs shift rows {'qs_nra': 3.916, 'ae_median_nra': 6.4736, 'ae_mean_nra': 6.4641, 'tw95_nra': 0.5643, 'cost0.5_nra': 3934.273, 'qs_obs': 3.9564, 'ae_median_obs': 6.6114, 'ae_mean_obs': 6.6154, 'tw95_obs': 0.4916, 'cost0.5_obs': 2974.7564}
+=== decision contrasts (half B), best no-detector arm chosen on half A
+best no-detector arm on half A for tw95 nra: BAND_HEAD {'K0': 0.518, 'GAM_ONLY': 0.5044, 'GAM_ONLY_K0SPREAD': 0.4936, 'BAND_TABLE_PLAIN': 0.5095, 'BAND_TABLE_DISAGREE': 0.4849, 'BAND_HEAD': 0.46, 'ASOF_WIDEN': 0.5174, 'LEAD_DECAY': 0.4705}
+PERFECT      vs BAND_HEAD      G5 near       tw95 all substations : n=746955 mean -0.0241 (-0.0429, -0.0050) pct -5.71 (-10.90, -1.13)
+PERFECT      vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.0478 (-0.1490, +0.0187) pct -1.80 (-5.46, +0.72)
+PERFECT      vs BAND_HEAD      G1 cost all substations : n=1601144 mean +75.8642 (+14.4904, +139.6698) pct +2.73 (+0.51, +5.22)
+PERFECT      vs BAND_HEAD      G5 near       tw95 without D11     : n=441023 mean -0.0364 (-0.0653, -0.0087) pct -10.58 (-19.32, -2.49)
+PERFECT      vs BAND_HEAD      G1 qs without D11     : n=7791300 mean -0.0484 (-0.1862, +0.0365) pct -1.77 (-6.57, +1.38)
+PERFECT      vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +91.5305 (+27.7806, +163.5497) pct +3.76 (+1.08, +7.15)
+PERFECT      vs BAND_HEAD      G5 near       tw95 without D16     : n=525401 mean +0.0018 (-0.0193, +0.0252) pct +0.44 (-5.11, +5.64)
+PERFECT      vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.0163 (-0.0558, +0.0206) pct -0.60 (-2.02, +0.77)
+PERFECT      vs BAND_HEAD      G1 cost without D16     : n=1187620 mean +36.9061 (-22.8149, +100.1115) pct +1.44 (-0.90, +3.95)
+PERFECT      vs BAND_HEAD      G5 near       tw95 only D10        : n=29136 mean -0.0192 (-0.0394, +0.0030) pct -28.67 (-64.75, +3.37)
+PERFECT      vs BAND_HEAD      G5 near       tw95 only D11        : n=305932 mean -0.0063 (-0.0277, +0.0177) pct -1.17 (-6.34, +2.78)
+PERFECT      vs BAND_HEAD      G5 near       tw95 only D14        : n=34302 mean +0.1224 (+0.0206, +0.2725) pct +44.06 (+10.22, +69.23)
+PERFECT      vs BAND_HEAD      G5 near       tw95 only D16        : n=221554 mean -0.0855 (-0.1269, -0.0529) pct -20.14 (-31.45, -11.90)
+PERFECT      vs BAND_HEAD      G5 near       tw95 only D5         : n=70016 mean -0.0191 (-0.0871, +0.0211) pct -8.26 (-26.30, +10.63)
+PERFECT      vs BAND_HEAD      G5 near       tw95 only D9         : n=86015 mean +0.0068 (-0.0555, +0.0989) pct +1.95 (-20.09, +22.97)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 all substations : n=70295 mean +0.0473 (-0.0359, +0.1214) pct +10.21 (-6.99, +25.03)
+PERFECT      vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.0478 (-0.1497, +0.0190) pct -1.80 (-5.45, +0.73)
+PERFECT      vs BAND_HEAD      G1 cost all substations : n=1601144 mean +75.8642 (+14.9112, +139.8595) pct +2.73 (+0.52, +5.25)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 without D11     : n=35420 mean +0.0309 (-0.1195, +0.1418) pct +7.44 (-20.76, +38.84)
+PERFECT      vs BAND_HEAD      G1 qs without D11     : n=7791300 mean -0.0484 (-0.1835, +0.0367) pct -1.77 (-6.49, +1.38)
+PERFECT      vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +91.5305 (+25.9384, +161.7261) pct +3.76 (+1.02, +7.04)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 without D16     : n=52188 mean +0.0975 (+0.0350, +0.1757) pct +21.61 (+10.00, +30.82)
+PERFECT      vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.0163 (-0.0546, +0.0215) pct -0.60 (-1.97, +0.80)
+PERFECT      vs BAND_HEAD      G1 cost without D16     : n=1187620 mean +36.9061 (-22.4067, +98.6693) pct +1.44 (-0.88, +3.91)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 only D10        : n=1538 mean +0.0978 (+0.0005, +0.2469) pct +78.13 (+2.12, +95.22)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 only D11        : n=34875 mean +0.0639 (-0.0041, +0.1629) pct +12.50 (-1.11, +22.43)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 only D14        : n=2918 mean +0.4068 (+0.0973, +0.6202) pct +86.06 (+58.33, +92.28)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 only D16        : n=18107 mean -0.0975 (-0.3435, +0.0597) pct -19.64 (-40.60, +15.15)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 only D5         : n=7204 mean +0.1119 (+0.0037, +0.3168) pct +30.57 (+2.09, +45.02)
+PERFECT      vs BAND_HEAD      Gs shift rows tw95 only D9         : n=5653 mean +0.1269 (-0.0341, +0.3559) pct +47.28 (-42.29, +65.62)
+DET          vs BAND_HEAD      G5 near       tw95 all substations : n=746955 mean -0.2440 (-0.3556, -0.1505) pct -57.88 (-88.84, -34.10)
+DET          vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.1781 (-0.2975, -0.0702) pct -6.69 (-11.01, -2.68)
+DET          vs BAND_HEAD      G1 cost all substations : n=1601144 mean +46.6591 (-21.8546, +121.8393) pct +1.68 (-0.77, +4.55)
+DET          vs BAND_HEAD      G5 near       tw95 without D11     : n=441023 mean -0.3691 (-0.5414, -0.2229) pct -107.18 (-171.45, -60.61)
+DET          vs BAND_HEAD      G1 qs without D11     : n=7791300 mean -0.1963 (-0.3586, -0.0547) pct -7.20 (-12.95, -2.03)
+DET          vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +78.2294 (+0.6476, +160.2703) pct +3.21 (+0.03, +6.83)
+DET          vs BAND_HEAD      G5 near       tw95 without D16     : n=525401 mean -0.0303 (-0.0863, +0.0075) pct -7.22 (-19.71, +1.73)
+DET          vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.2513 (-0.4160, -0.1090) pct -9.26 (-15.07, -4.07)
+DET          vs BAND_HEAD      G1 cost without D16     : n=1187620 mean -8.1548 (-75.3015, +64.3042) pct -0.32 (-2.93, +2.56)
+DET          vs BAND_HEAD      G5 near       tw95 only D10        : n=29136 mean -0.0302 (-0.0408, -0.0222) pct -44.98 (-62.82, -32.72)
+DET          vs BAND_HEAD      G5 near       tw95 only D11        : n=305932 mean -0.0636 (-0.1539, -0.0101) pct -11.93 (-28.12, -1.83)
+DET          vs BAND_HEAD      G5 near       tw95 only D14        : n=34302 mean +0.0971 (-0.0097, +0.2535) pct +34.95 (-4.87, +64.41)
+DET          vs BAND_HEAD      G5 near       tw95 only D16        : n=221554 mean -0.7507 (-1.0781, -0.4739) pct -176.77 (-297.08, -97.80)
+DET          vs BAND_HEAD      G5 near       tw95 only D5         : n=70016 mean +0.0088 (-0.0038, +0.0269) pct +3.79 (-2.05, +10.87)
+DET          vs BAND_HEAD      G5 near       tw95 only D9         : n=86015 mean +0.0052 (-0.0559, +0.0916) pct +1.47 (-19.77, +21.07)
+DET          vs BAND_HEAD      Gs shift rows tw95 all substations : n=70295 mean -0.1015 (-0.2323, +0.0015) pct -21.92 (-53.15, +0.34)
+DET          vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.1781 (-0.2976, -0.0727) pct -6.69 (-10.99, -2.77)
+DET          vs BAND_HEAD      G1 cost all substations : n=1601144 mean +46.6591 (-21.0354, +124.5574) pct +1.68 (-0.73, +4.67)
+DET          vs BAND_HEAD      Gs shift rows tw95 without D11     : n=35420 mean -0.1969 (-0.4428, -0.0102) pct -47.40 (-126.01, -2.77)
+DET          vs BAND_HEAD      G1 qs without D11     : n=7791300 mean -0.1963 (-0.3611, -0.0569) pct -7.20 (-13.03, -2.13)
+DET          vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +78.2294 (+2.4825, +160.8986) pct +3.21 (+0.10, +6.84)
+DET          vs BAND_HEAD      Gs shift rows tw95 without D16     : n=52188 mean +0.0378 (-0.0225, +0.1011) pct +8.37 (-5.60, +19.38)
+DET          vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.2513 (-0.4154, -0.1065) pct -9.26 (-15.03, -3.99)
+DET          vs BAND_HEAD      G1 cost without D16     : n=1187620 mean -8.1548 (-75.9957, +62.5188) pct -0.32 (-2.96, +2.49)
+DET          vs BAND_HEAD      Gs shift rows tw95 only D10        : n=1538 mean +0.0115 (-0.0028, +0.0360) pct +9.18 (-1.36, +57.55)
+DET          vs BAND_HEAD      Gs shift rows tw95 only D11        : n=34875 mean -0.0046 (-0.0817, +0.0714) pct -0.90 (-18.04, +10.79)
+DET          vs BAND_HEAD      Gs shift rows tw95 only D14        : n=2918 mean +0.3399 (-0.0328, +0.5996) pct +71.90 (-19.71, +88.24)
+DET          vs BAND_HEAD      Gs shift rows tw95 only D16        : n=18107 mean -0.5029 (-0.9863, -0.1549) pct -101.30 (-313.92, -33.77)
+DET          vs BAND_HEAD      Gs shift rows tw95 only D5         : n=7204 mean +0.0638 (+0.0054, +0.1551) pct +17.44 (+3.29, +30.60)
+DET          vs BAND_HEAD      Gs shift rows tw95 only D9         : n=5653 mean +0.1171 (-0.0446, +0.3499) pct +43.62 (-54.54, +64.38)
+best no-detector arm on half A for cost0.5 obs: BAND_HEAD {'K0': 2781.765, 'GAM_ONLY': 2962.0855, 'GAM_ONLY_K0SPREAD': 3213.7497, 'BAND_TABLE_PLAIN': 2772.8459, 'BAND_TABLE_DISAGREE': 2818.3114, 'BAND_HEAD': 2732.2007, 'ASOF_WIDEN': 2902.1675, 'LEAD_DECAY': 2837.6905}
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 all substations : n=108596 mean +183.5471 (+107.1560, +269.4097) pct +6.46 (+3.90, +9.16)
+PERFECT_ADD  vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.0483 (-0.1484, +0.0187) pct -1.81 (-5.44, +0.72)
+PERFECT_ADD  vs BAND_HEAD      G1 cost all substations : n=1601144 mean +75.7334 (+14.8529, +139.7761) pct +2.73 (+0.52, +5.24)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 without D11     : n=63970 mean +242.5346 (+119.3580, +380.0588) pct +9.97 (+5.28, +14.49)
+PERFECT_ADD  vs BAND_HEAD      G1 qs without D11     : n=7791300 mean -0.0490 (-0.1889, +0.0353) pct -1.80 (-6.69, +1.33)
+PERFECT_ADD  vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +91.4253 (+27.3705, +163.4903) pct +3.76 (+1.08, +7.13)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 without D16     : n=76845 mean +218.3521 (+116.2651, +344.7280) pct +7.54 (+4.24, +11.21)
+PERFECT_ADD  vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.0169 (-0.0557, +0.0204) pct -0.62 (-2.02, +0.76)
+PERFECT_ADD  vs BAND_HEAD      G1 cost without D16     : n=1187620 mean +36.7255 (-23.1951, +98.4050) pct +1.43 (-0.91, +3.89)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 only D10        : n=4164 mean -14.8915 (-70.6790, +46.4902) pct -2.35 (-17.00, +4.77)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 only D11        : n=44626 mean +98.9903 (+40.9370, +158.9926) pct +2.89 (+1.22, +4.55)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 only D14        : n=4913 mean +1441.6950 (+415.8188, +2744.7212) pct +27.74 (+11.89, +38.11)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 only D16        : n=31751 mean +99.3108 (+16.8503, +178.1148) pct +3.68 (+0.62, +6.59)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 only D5         : n=10500 mean +111.7540 (-2.3662, +242.6827) pct +9.37 (-0.21, +17.34)
+PERFECT_ADD  vs BAND_HEAD      G5 near       cost0.5 only D9         : n=12642 mean +329.6367 (+62.9546, +717.4091) pct +14.28 (+3.41, +25.23)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 all substations : n=21807 mean +414.7370 (+164.2025, +703.8586) pct +14.93 (+6.26, +23.39)
+PERFECT_ADD  vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.0483 (-0.1496, +0.0187) pct -1.81 (-5.46, +0.72)
+PERFECT_ADD  vs BAND_HEAD      G1 cost all substations : n=1601144 mean +75.7334 (+15.9094, +140.5020) pct +2.73 (+0.55, +5.27)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 without D11     : n=11714 mean +363.4662 (-68.1153, +880.1266) pct +15.71 (-3.23, +32.67)
+PERFECT_ADD  vs BAND_HEAD      G1 qs without D11     : n=7791300 mean -0.0490 (-0.1882, +0.0368) pct -1.80 (-6.65, +1.39)
+PERFECT_ADD  vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +91.4253 (+26.0331, +163.8721) pct +3.76 (+1.01, +7.13)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 without D16     : n=16052 mean +472.7770 (+162.5423, +839.3559) pct +16.56 (+6.15, +26.52)
+PERFECT_ADD  vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.0169 (-0.0557, +0.0208) pct -0.62 (-2.02, +0.77)
+PERFECT_ADD  vs BAND_HEAD      G1 cost without D16     : n=1187620 mean +36.7255 (-22.5691, +99.7715) pct +1.43 (-0.90, +3.94)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 only D10        : n=614 mean +107.8662 (-73.1234, +346.0602) pct +18.47 (-19.37, +39.58)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 only D11        : n=10093 mean +474.2422 (+317.7890, +640.6802) pct +14.30 (+9.91, +18.41)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 only D14        : n=957 mean +324.4817 (-933.1704, +1995.9009) pct +9.48 (-33.69, +45.33)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 only D16        : n=5755 mean +252.8502 (-149.5133, +545.7604) pct +9.87 (-5.48, +21.33)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 only D5         : n=2354 mean +442.5701 (+111.9166, +951.0042) pct +30.81 (+10.38, +48.17)
+PERFECT_ADD  vs BAND_HEAD      Gs shift rows cost0.5 only D9         : n=2034 mean +680.3940 (-1322.0947, +3052.7467) pct +25.92 (-79.61, +65.46)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 all substations : n=108596 mean -111.4748 (-258.6923, -3.3014) pct -3.93 (-9.08, -0.11)
+DET_ADD      vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.0290 (-0.1013, +0.0482) pct -1.09 (-3.81, +1.80)
+DET_ADD      vs BAND_HEAD      G1 cost all substations : n=1601144 mean +58.8865 (-4.2493, +131.7104) pct +2.12 (-0.15, +4.86)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 without D11     : n=63970 mean +33.3808 (-56.0490, +132.4582) pct +1.37 (-2.36, +5.23)
+DET_ADD      vs BAND_HEAD      G1 qs without D11     : n=7791300 mean +0.0060 (-0.0861, +0.1122) pct +0.22 (-3.15, +4.01)
+DET_ADD      vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +79.9056 (+14.3327, +153.4871) pct +3.28 (+0.59, +6.32)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 without D16     : n=76845 mean -143.0154 (-340.5494, -3.5256) pct -4.94 (-11.72, -0.12)
+DET_ADD      vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.0402 (-0.1209, +0.0474) pct -1.48 (-4.47, +1.73)
+DET_ADD      vs BAND_HEAD      G1 cost without D16     : n=1187620 mean +27.9562 (-39.2465, +99.1410) pct +1.09 (-1.55, +3.89)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 only D10        : n=4164 mean -60.6909 (-88.0833, -33.3497) pct -9.59 (-21.15, -3.96)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 only D11        : n=44626 mean -319.1209 (-639.2084, -113.6585) pct -9.33 (-18.49, -3.26)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 only D14        : n=4913 mean +564.0899 (+140.9796, +1318.2474) pct +10.85 (+3.36, +19.21)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 only D16        : n=31751 mean -35.1391 (-165.1497, +101.4186) pct -1.30 (-6.31, +3.62)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 only D5         : n=10500 mean -49.1803 (-149.9973, +28.7405) pct -4.13 (-11.85, +2.63)
+DET_ADD      vs BAND_HEAD      G5 near       cost0.5 only D9         : n=12642 mean +98.7823 (-40.4876, +318.8764) pct +4.28 (-1.73, +12.21)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 all substations : n=21807 mean -253.1681 (-619.5046, +2.3758) pct -9.11 (-22.38, +0.09)
+DET_ADD      vs BAND_HEAD      G1 qs all substations : n=10788596 mean -0.0290 (-0.1000, +0.0485) pct -1.09 (-3.76, +1.81)
+DET_ADD      vs BAND_HEAD      G1 cost all substations : n=1601144 mean +58.8865 (-4.4841, +130.8653) pct +2.12 (-0.16, +4.81)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 without D11     : n=11714 mean +44.2010 (-101.0998, +178.8062) pct +1.91 (-4.37, +7.64)
+DET_ADD      vs BAND_HEAD      G1 qs without D11     : n=7791300 mean +0.0060 (-0.0865, +0.1128) pct +0.22 (-3.18, +4.06)
+DET_ADD      vs BAND_HEAD      G1 cost without D11     : n=1153680 mean +79.9056 (+13.3140, +154.9819) pct +3.28 (+0.55, +6.36)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 without D16     : n=16052 mean -347.1295 (-837.1999, -15.0258) pct -12.16 (-29.48, -0.51)
+DET_ADD      vs BAND_HEAD      G1 qs without D16     : n=7987996 mean -0.0402 (-0.1232, +0.0457) pct -1.48 (-4.54, +1.66)
+DET_ADD      vs BAND_HEAD      G1 cost without D16     : n=1187620 mean +27.9562 (-38.8287, +98.9662) pct +1.09 (-1.53, +3.88)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 only D10        : n=614 mean +120.6650 (-33.9064, +349.5378) pct +20.66 (-8.21, +39.67)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 only D11        : n=10093 mean -598.2965 (-1385.2234, -83.4336) pct -18.05 (-41.49, -2.44)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 only D14        : n=957 mean +170.0428 (-177.3098, +473.3762) pct +4.97 (-4.16, +16.21)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 only D16        : n=5755 mean +8.9118 (-252.7696, +250.2156) pct +0.35 (-9.50, +9.68)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 only D5         : n=2354 mean -63.3310 (-243.0277, +71.7684) pct -4.41 (-13.34, +6.15)
+DET_ADD      vs BAND_HEAD      Gs shift rows cost0.5 only D9         : n=2034 mean +186.2069 (-55.4863, +484.3593) pct +7.09 (-4.36, +12.95)
+=== detector against every no-detector arm, all worlds, G5 and G1
+PERFECT      vs K0                   tw95 G5 near     : n=1536056 mean +0.0313 (+0.0130, +0.0531) pct +6.28 (+2.73, +10.06)
+PERFECT      vs K0                   tw95 G4 after    : n=38486 mean +0.1484 (+0.0617, +0.2450) pct +23.08 (+8.77, +39.02)
+PERFECT      vs K0                   tw95 G1 ordinary : n=21374852 mean -0.0003 (-0.0011, +0.0005) pct -0.03 (-0.13, +0.06)
+PERFECT      vs GAM_ONLY             tw95 G5 near     : n=1536056 mean +0.0201 (+0.0020, +0.0392) pct +4.12 (+0.44, +7.38)
+PERFECT      vs GAM_ONLY             tw95 G4 after    : n=38486 mean +0.0304 (-0.0240, +0.0920) pct +5.79 (-4.36, +18.48)
+PERFECT      vs GAM_ONLY             tw95 G1 ordinary : n=21374852 mean +0.0818 (-0.0676, +0.2106) pct +8.50 (-7.66, +18.60)
+PERFECT      vs GAM_ONLY_K0SPREAD    tw95 G5 near     : n=1536056 mean +0.0099 (-0.0072, +0.0276) pct +2.08 (-1.66, +5.29)
+PERFECT      vs GAM_ONLY_K0SPREAD    tw95 G4 after    : n=38486 mean +0.0161 (-0.0338, +0.0709) pct +3.15 (-6.63, +14.81)
+PERFECT      vs GAM_ONLY_K0SPREAD    tw95 G1 ordinary : n=21374852 mean +0.0750 (-0.0746, +0.2048) pct +7.86 (-8.50, +18.10)
+PERFECT      vs BAND_TABLE_PLAIN     tw95 G5 near     : n=1536056 mean +0.0222 (+0.0043, +0.0438) pct +4.54 (+0.92, +8.41)
+PERFECT      vs BAND_TABLE_PLAIN     tw95 G4 after    : n=38486 mean +0.1534 (+0.0477, +0.2668) pct +23.69 (+6.48, +41.10)
+PERFECT      vs BAND_TABLE_PLAIN     tw95 G1 ordinary : n=21374852 mean +0.0118 (-0.0020, +0.0258) pct +1.32 (-0.25, +2.71)
+PERFECT      vs BAND_TABLE_DISAGREE  tw95 G5 near     : n=1536056 mean -0.0021 (-0.0175, +0.0147) pct -0.46 (-3.97, +2.97)
+PERFECT      vs BAND_TABLE_DISAGREE  tw95 G4 after    : n=38486 mean +0.1383 (+0.0185, +0.2549) pct +21.86 (+2.55, +40.10)
+PERFECT      vs BAND_TABLE_DISAGREE  tw95 G1 ordinary : n=21374852 mean +0.0033 (-0.0177, +0.0222) pct +0.37 (-2.08, +2.49)
+PERFECT      vs BAND_HEAD            tw95 G5 near     : n=1536056 mean -0.0260 (-0.0399, -0.0111) pct -5.88 (-9.41, -2.41)
+PERFECT      vs BAND_HEAD            tw95 G4 after    : n=38486 mean +0.0541 (-0.0880, +0.1689) pct +9.86 (-13.31, +31.04)
+PERFECT      vs BAND_HEAD            tw95 G1 ordinary : n=21374852 mean -0.0397 (-0.1388, +0.0133) pct -4.72 (-14.49, +1.58)
+PERFECT      vs ASOF_WIDEN           tw95 G5 near     : n=1536056 mean +0.0330 (+0.0155, +0.0515) pct +6.59 (+3.37, +9.51)
+PERFECT      vs ASOF_WIDEN           tw95 G4 after    : n=38486 mean +0.0569 (+0.0044, +0.1146) pct +10.32 (+0.68, +22.64)
+PERFECT      vs ASOF_WIDEN           tw95 G1 ordinary : n=21374852 mean +0.0722 (-0.0833, +0.1967) pct +7.58 (-9.15, +17.56)
+PERFECT      vs LEAD_DECAY           tw95 G5 near     : n=1536056 mean -0.0166 (-0.0296, -0.0032) pct -3.68 (-7.01, -0.67)
+PERFECT      vs LEAD_DECAY           tw95 G4 after    : n=38486 mean +0.1397 (+0.0504, +0.2422) pct +22.04 (+7.58, +38.27)
+PERFECT      vs LEAD_DECAY           tw95 G1 ordinary : n=21374852 mean -0.0504 (-0.1766, +0.0218) pct -6.08 (-19.80, +2.50)
+PERFECT_ADD  vs K0                   cost0.5 G5 near     : n=223226 mean +231.2529 (+176.7590, +290.5787) pct +8.14 (+6.36, +10.00)
+PERFECT_ADD  vs K0                   cost0.5 G4 after    : n=12918 mean +1026.6900 (+717.8236, +1365.8486) pct +28.30 (+21.48, +34.65)
+PERFECT_ADD  vs K0                   cost0.5 G1 ordinary : n=3173076 mean -0.2320 (-0.7412, +0.2038) pct -0.01 (-0.03, +0.01)
+PERFECT_ADD  vs GAM_ONLY             cost0.5 G5 near     : n=223226 mean +444.7267 (+343.8648, +566.5656) pct +14.56 (+11.69, +17.76)
+PERFECT_ADD  vs GAM_ONLY             cost0.5 G4 after    : n=12918 mean +192.4199 (+12.9082, +441.7949) pct +6.89 (+0.49, +14.33)
+PERFECT_ADD  vs GAM_ONLY             cost0.5 G1 ordinary : n=3173076 mean +379.4763 (+275.5857, +484.2233) pct +12.35 (+9.26, +15.46)
+PERFECT_ADD  vs GAM_ONLY_K0SPREAD    cost0.5 G5 near     : n=223226 mean +714.5018 (+576.6834, +873.3438) pct +21.49 (+18.07, +24.99)
+PERFECT_ADD  vs GAM_ONLY_K0SPREAD    cost0.5 G4 after    : n=12918 mean +375.9140 (+180.6316, +657.1000) pct +12.63 (+6.49, +19.84)
+PERFECT_ADD  vs GAM_ONLY_K0SPREAD    cost0.5 G1 ordinary : n=3173076 mean +512.9681 (+326.5021, +714.6881) pct +16.01 (+10.54, +21.54)
+PERFECT_ADD  vs BAND_TABLE_PLAIN     cost0.5 G5 near     : n=223226 mean +223.2050 (+168.5656, +284.3239) pct +7.88 (+6.08, +9.81)
+PERFECT_ADD  vs BAND_TABLE_PLAIN     cost0.5 G4 after    : n=12918 mean +969.0327 (+660.3912, +1308.4515) pct +27.14 (+20.29, +33.43)
+PERFECT_ADD  vs BAND_TABLE_PLAIN     cost0.5 G1 ordinary : n=3173076 mean +20.3105 (-1.3895, +42.8746) pct +0.75 (-0.05, +1.56)
+PERFECT_ADD  vs BAND_TABLE_DISAGREE  cost0.5 G5 near     : n=223226 mean +257.0450 (+199.2282, +320.6981) pct +8.97 (+7.10, +10.93)
+PERFECT_ADD  vs BAND_TABLE_DISAGREE  cost0.5 G4 after    : n=12918 mean +871.9543 (+596.5085, +1177.0576) pct +25.11 (+18.76, +31.09)
+PERFECT_ADD  vs BAND_TABLE_DISAGREE  cost0.5 G1 ordinary : n=3173076 mean +97.4558 (+39.9838, +161.9972) pct +3.49 (+1.46, +5.69)
+PERFECT_ADD  vs BAND_HEAD            cost0.5 G5 near     : n=223226 mean +174.4544 (+123.9922, +230.3908) pct +6.27 (+4.52, +8.12)
+PERFECT_ADD  vs BAND_HEAD            cost0.5 G4 after    : n=12918 mean +220.7867 (-7.0691, +427.7384) pct +7.82 (-0.26, +14.39)
+PERFECT_ADD  vs BAND_HEAD            cost0.5 G1 ordinary : n=3173076 mean +78.6083 (+17.7291, +142.5782) pct +2.84 (+0.62, +5.35)
+PERFECT_ADD  vs ASOF_WIDEN           cost0.5 G5 near     : n=223226 mean +344.8246 (+287.3072, +407.9985) pct +11.67 (+9.88, +13.52)
+PERFECT_ADD  vs ASOF_WIDEN           cost0.5 G4 after    : n=12918 mean +147.5714 (+53.8503, +249.7837) pct +5.37 (+1.96, +8.89)
+PERFECT_ADD  vs ASOF_WIDEN           cost0.5 G1 ordinary : n=3173076 mean +278.5887 (+208.7041, +344.7793) pct +9.38 (+7.03, +11.74)
+PERFECT_ADD  vs LEAD_DECAY           cost0.5 G5 near     : n=223226 mean +330.7066 (+253.0873, +425.4029) pct +11.25 (+8.92, +13.89)
+PERFECT_ADD  vs LEAD_DECAY           cost0.5 G4 after    : n=12918 mean +1166.0475 (+869.4689, +1482.1312) pct +30.95 (+25.02, +36.40)
+PERFECT_ADD  vs LEAD_DECAY           cost0.5 G1 ordinary : n=3173076 mean +87.5619 (+42.6547, +139.3689) pct +3.15 (+1.54, +5.03)
+DET          vs K0                   tw95 G5 near     : n=1536056 mean -0.1745 (-0.2392, -0.1148) pct -34.99 (-48.87, -22.82)
+DET          vs K0                   tw95 G4 after    : n=38486 mean +0.0891 (+0.0056, +0.1790) pct +13.86 (+1.07, +26.71)
+DET          vs K0                   tw95 G1 ordinary : n=21374852 mean -0.0373 (-0.1039, +0.0277) pct -4.24 (-12.28, +2.82)
+DET          vs GAM_ONLY             tw95 G5 near     : n=1536056 mean -0.1858 (-0.2616, -0.1176) pct -38.11 (-55.79, -23.18)
+DET          vs GAM_ONLY             tw95 G4 after    : n=38486 mean -0.0289 (-0.0954, +0.0346) pct -5.50 (-25.03, +5.62)
+DET          vs GAM_ONLY             tw95 G1 ordinary : n=21374852 mean +0.0447 (-0.0575, +0.1378) pct +4.65 (-6.69, +12.70)
+DET          vs GAM_ONLY_K0SPREAD    tw95 G5 near     : n=1536056 mean -0.1959 (-0.2729, -0.1296) pct -41.04 (-59.26, -26.18)
+DET          vs GAM_ONLY_K0SPREAD    tw95 G4 after    : n=38486 mean -0.0432 (-0.1066, +0.0152) pct -8.46 (-29.10, +2.40)
+DET          vs GAM_ONLY_K0SPREAD    tw95 G1 ordinary : n=21374852 mean +0.0380 (-0.0603, +0.1307) pct +3.98 (-7.16, +11.95)
+DET          vs BAND_TABLE_PLAIN     tw95 G5 near     : n=1536056 mean -0.1836 (-0.2503, -0.1246) pct -37.50 (-51.89, -25.13)
+DET          vs BAND_TABLE_PLAIN     tw95 G4 after    : n=38486 mean +0.0942 (+0.0049, +0.1942) pct +14.54 (+0.85, +28.81)
+DET          vs BAND_TABLE_PLAIN     tw95 G1 ordinary : n=21374852 mean -0.0253 (-0.0851, +0.0314) pct -2.84 (-10.26, +3.11)
+DET          vs BAND_TABLE_DISAGREE  tw95 G5 near     : n=1536056 mean -0.2079 (-0.2783, -0.1465) pct -44.70 (-60.96, -31.09)
+DET          vs BAND_TABLE_DISAGREE  tw95 G4 after    : n=38486 mean +0.0791 (-0.0140, +0.1797) pct +12.49 (-2.28, +28.20)
+DET          vs BAND_TABLE_DISAGREE  tw95 G1 ordinary : n=21374852 mean -0.0338 (-0.0925, +0.0210) pct -3.83 (-11.40, +2.11)
+DET          vs BAND_HEAD            tw95 G5 near     : n=1536056 mean -0.2318 (-0.3006, -0.1715) pct -52.52 (-69.09, -38.29)
+DET          vs BAND_HEAD            tw95 G4 after    : n=38486 mean -0.0052 (-0.1150, +0.0912) pct -0.95 (-18.48, +17.00)
+DET          vs BAND_HEAD            tw95 G1 ordinary : n=21374852 mean -0.0767 (-0.1539, -0.0161) pct -9.14 (-16.18, -2.20)
+DET          vs ASOF_WIDEN           tw95 G5 near     : n=1536056 mean -0.1728 (-0.2477, -0.1057) pct -34.54 (-51.25, -20.43)
+DET          vs ASOF_WIDEN           tw95 G4 after    : n=38486 mean -0.0024 (-0.0685, +0.0595) pct -0.43 (-15.78, +10.06)
+DET          vs ASOF_WIDEN           tw95 G1 ordinary : n=21374852 mean +0.0351 (-0.0690, +0.1245) pct +3.69 (-7.82, +11.58)
+DET          vs LEAD_DECAY           tw95 G5 near     : n=1536056 mean -0.2224 (-0.2937, -0.1612) pct -49.34 (-66.59, -34.98)
+DET          vs LEAD_DECAY           tw95 G4 after    : n=38486 mean +0.0805 (-0.0044, +0.1748) pct +12.69 (-0.84, +25.48)
+DET          vs LEAD_DECAY           tw95 G1 ordinary : n=21374852 mean -0.0875 (-0.1765, -0.0256) pct -10.55 (-19.25, -3.38)
+DET_ADD      vs K0                   cost0.5 G5 near     : n=223226 mean -54.9605 (-132.9985, +9.8635) pct -1.93 (-4.68, +0.34)
+DET_ADD      vs K0                   cost0.5 G4 after    : n=12918 mean +388.5180 (+104.8797, +699.0043) pct +10.71 (+3.07, +18.00)
+DET_ADD      vs K0                   cost0.5 G1 ordinary : n=3173076 mean -13.4648 (-53.1575, +22.7775) pct -0.50 (-2.08, +0.81)
+DET_ADD      vs GAM_ONLY             cost0.5 G5 near     : n=223226 mean +158.5133 (+41.8015, +280.9463) pct +5.19 (+1.40, +8.85)
+DET_ADD      vs GAM_ONLY             cost0.5 G4 after    : n=12918 mean -445.7520 (-790.8029, -67.3445) pct -15.96 (-30.08, -2.21)
+DET_ADD      vs GAM_ONLY             cost0.5 G1 ordinary : n=3173076 mean +366.2435 (+257.5469, +479.0399) pct +11.92 (+8.77, +15.08)
+DET_ADD      vs GAM_ONLY_K0SPREAD    cost0.5 G5 near     : n=223226 mean +428.2884 (+278.6342, +589.4974) pct +12.88 (+8.65, +17.04)
+DET_ADD      vs GAM_ONLY_K0SPREAD    cost0.5 G4 after    : n=12918 mean -262.2579 (-611.2680, +148.3082) pct -8.81 (-21.66, +4.55)
+DET_ADD      vs GAM_ONLY_K0SPREAD    cost0.5 G1 ordinary : n=3173076 mean +499.7353 (+304.8004, +711.5470) pct +15.59 (+9.92, +21.26)
+DET_ADD      vs BAND_TABLE_PLAIN     cost0.5 G5 near     : n=223226 mean -63.0084 (-141.7896, +0.6796) pct -2.22 (-5.02, +0.02)
+DET_ADD      vs BAND_TABLE_PLAIN     cost0.5 G4 after    : n=12918 mean +330.8608 (+24.9452, +665.8541) pct +9.27 (+0.77, +17.32)
+DET_ADD      vs BAND_TABLE_PLAIN     cost0.5 G1 ordinary : n=3173076 mean +7.0777 (-39.7081, +52.8823) pct +0.26 (-1.52, +1.87)
+DET_ADD      vs BAND_TABLE_DISAGREE  cost0.5 G5 near     : n=223226 mean -29.1683 (-111.7701, +42.2840) pct -1.02 (-3.91, +1.45)
+DET_ADD      vs BAND_TABLE_DISAGREE  cost0.5 G4 after    : n=12918 mean +233.7823 (-91.4624, +583.6692) pct +6.73 (-2.77, +15.64)
+DET_ADD      vs BAND_TABLE_DISAGREE  cost0.5 G1 ordinary : n=3173076 mean +84.2230 (+10.4986, +160.5076) pct +3.02 (+0.40, +5.58)
+DET_ADD      vs BAND_HEAD            cost0.5 G5 near     : n=223226 mean -111.7590 (-190.6870, -46.5816) pct -4.01 (-6.83, -1.67)
+DET_ADD      vs BAND_HEAD            cost0.5 G4 after    : n=12918 mean -417.3852 (-715.6383, -144.2024) pct -14.79 (-25.49, -4.98)
+DET_ADD      vs BAND_HEAD            cost0.5 G1 ordinary : n=3173076 mean +65.3755 (+3.9568, +135.9360) pct +2.36 (+0.14, +4.97)
+DET_ADD      vs ASOF_WIDEN           cost0.5 G5 near     : n=223226 mean +58.6113 (-27.3385, +133.3164) pct +1.98 (-0.92, +4.49)
+DET_ADD      vs ASOF_WIDEN           cost0.5 G4 after    : n=12918 mean -490.6006 (-774.3940, -238.2025) pct -17.85 (-28.67, -8.53)
+DET_ADD      vs ASOF_WIDEN           cost0.5 G1 ordinary : n=3173076 mean +265.3559 (+195.6457, +335.6894) pct +8.93 (+6.73, +11.20)
+DET_ADD      vs LEAD_DECAY           cost0.5 G5 near     : n=223226 mean +44.4932 (-57.9720, +153.1491) pct +1.51 (-2.01, +5.06)
+DET_ADD      vs LEAD_DECAY           cost0.5 G4 after    : n=12918 mean +527.8755 (+234.0831, +835.0950) pct +14.01 (+6.57, +20.90)
+DET_ADD      vs LEAD_DECAY           cost0.5 G1 ordinary : n=3173076 mean +74.3291 (+15.4943, +143.5204) pct +2.67 (+0.58, +5.02)
+=== P1
+GAM_ONLY vs K0 qs nra G1 24-168 h (gain = K0 minus arm): n=18247248 mean -0.2223 (-0.3743, -0.0290) pct -7.97 (-14.11, -0.96)
+GAM_ONLY_K0SPREAD vs K0 qs nra G1 24-168 h (gain = K0 minus arm): n=18247248 mean -0.2265 (-0.3787, -0.0312) pct -8.12 (-14.19, -1.04)
+=== tail coverage in G4 against the true series (share of readings outside the band)
+K0                   nra below q01: share 2.24% (1.14, 3.55)
+K0                   nra above q99: share 14.23% (10.92, 17.74)
+K0                   obs below q01: share 1.82% (0.96, 2.81)
+K0                   obs above q99: share 13.83% (10.52, 17.39)
+GAM_ONLY             nra below q01: share 0.16% (0.07, 0.28)
+GAM_ONLY             nra above q99: share 3.97% (2.46, 6.25)
+GAM_ONLY             obs below q01: share 0.19% (0.08, 0.33)
+GAM_ONLY             obs above q99: share 4.32% (2.60, 6.72)
+GAM_ONLY_K0SPREAD    nra below q01: share 0.12% (0.04, 0.24)
+GAM_ONLY_K0SPREAD    nra above q99: share 8.15% (6.38, 10.47)
+GAM_ONLY_K0SPREAD    obs below q01: share 0.16% (0.05, 0.30)
+GAM_ONLY_K0SPREAD    obs above q99: share 8.52% (6.50, 11.04)
+BAND_TABLE_PLAIN     nra below q01: share 2.54% (1.27, 4.04)
+BAND_TABLE_PLAIN     nra above q99: share 11.07% (7.97, 14.61)
+BAND_TABLE_PLAIN     obs below q01: share 2.12% (1.09, 3.34)
+BAND_TABLE_PLAIN     obs above q99: share 10.89% (7.76, 14.37)
+BAND_TABLE_DISAGREE  nra below q01: share 2.09% (1.08, 3.35)
+BAND_TABLE_DISAGREE  nra above q99: share 6.71% (5.09, 8.48)
+BAND_TABLE_DISAGREE  obs below q01: share 1.73% (0.92, 2.71)
+BAND_TABLE_DISAGREE  obs above q99: share 6.89% (5.25, 8.71)
+BAND_HEAD            nra below q01: share 0.71% (0.33, 1.18)
+BAND_HEAD            nra above q99: share 3.54% (2.22, 5.05)
+BAND_HEAD            obs below q01: share 0.60% (0.28, 1.00)
+BAND_HEAD            obs above q99: share 3.54% (2.25, 5.02)
+ASOF_WIDEN           nra below q01: share 0.12% (0.04, 0.24)
+ASOF_WIDEN           nra above q99: share 2.67% (1.28, 4.91)
+ASOF_WIDEN           obs below q01: share 0.12% (0.05, 0.24)
+ASOF_WIDEN           obs above q99: share 2.64% (1.25, 4.89)
+LEAD_DECAY           nra below q01: share 1.24% (0.60, 2.06)
+LEAD_DECAY           nra above q99: share 14.47% (11.71, 17.42)
+LEAD_DECAY           obs below q01: share 1.02% (0.49, 1.69)
+LEAD_DECAY           obs above q99: share 14.26% (11.54, 17.20)
+BAND_HEAD_HELDOUT    nra below q01: share 0.39% (0.10, 0.80)
+BAND_HEAD_HELDOUT    nra above q99: share 1.81% (1.00, 2.79)
+BAND_HEAD_HELDOUT    obs below q01: share 0.39% (0.10, 0.79)
+BAND_HEAD_HELDOUT    obs above q99: share 1.81% (1.00, 2.81)
+PERFECT              nra below q01: share 1.26% (0.85, 1.72)
+PERFECT              nra above q99: share 1.84% (0.66, 3.90)
+PERFECT              obs below q01: share 1.34% (0.91, 1.81)
+PERFECT              obs above q99: share 2.36% (0.76, 4.72)
+PERFECT_ADD          obs below q01: share 2.07% (1.37, 2.95)
+PERFECT_ADD          obs above q99: share 1.70% (0.50, 3.65)
+DET                  nra below q01: share 2.07% (1.35, 2.92)
+DET                  nra above q99: share 9.04% (6.11, 12.38)
+DET                  obs below q01: share 2.15% (1.41, 3.01)
+DET                  obs above q99: share 9.22% (6.18, 12.60)
+DET_ADD              obs below q01: share 3.57% (2.57, 4.72)
+DET_ADD              obs above q99: share 9.49% (6.50, 12.79)
+=== P2 G1 change of the band arms against K0 (mean qs nra, gain = K0 minus arm)
+BAND_TABLE_PLAIN: n=21374852 mean -0.0407 (-0.0706, -0.0112) pct -1.50 (-2.71, -0.39)
+BAND_TABLE_DISAGREE: n=21374852 mean -0.0769 (-0.1118, -0.0402) pct -2.84 (-4.32, -1.42)
+BAND_HEAD: n=21374852 mean +0.0455 (-0.0236, +0.1493) pct +1.68 (-0.92, +5.15)
+ASOF_WIDEN: n=21374852 mean -0.2906 (-0.4239, -0.1292) pct -10.73 (-16.28, -4.48)
+LEAD_DECAY: n=21374852 mean +0.0126 (-0.0835, +0.1561) pct +0.47 (-3.24, +5.37)
+=== P3 recovery ratio, G4 tw95 nra, (K0 - arm) / (K0 - PERFECT)
+GAM_ONLY             recovery 0.795 (0.572, 1.341)
+GAM_ONLY_K0SPREAD    recovery 0.892 (0.675, 1.502)
+BAND_TABLE_PLAIN     recovery -0.034 (-0.170, 0.314)
+BAND_TABLE_DISAGREE  recovery 0.068 (-0.184, 0.686)
+BAND_HEAD            recovery 0.636 (0.224, 2.106)
+ASOF_WIDEN           recovery 0.617 (0.415, 0.934)
+LEAD_DECAY           recovery 0.058 (-0.119, 0.300)
+=== held-out head against the cross-fitted head, odd-seed worlds only
+BAND_HEAD          vs K0 tw95 nra G4 after: n=17059 mean +0.1263 (+0.0101, +0.3189) pct +14.48 (+1.76, +23.05)
+BAND_HEAD          vs K0 tw95 nra G5 near: n=746955 mean +0.0566 (+0.0430, +0.0722) pct +11.83 (+9.17, +14.92)
+BAND_HEAD          vs K0 qs nra G1 ordinary: n=10788596 mean +0.0479 (-0.0188, +0.1521) pct +1.77 (-0.73, +5.27)
+BAND_HEAD          vs K0 cost0.5 obs G5 near: n=108596 mean +64.4346 (+23.7997, +108.6993) pct +2.22 (+0.83, +3.70)
+BAND_HEAD          G4 below q01: share 0.84% (0.23, 1.67)
+BAND_HEAD          G4 above q99: share 3.85% (2.30, 5.68)
+BAND_HEAD_HELDOUT  vs K0 tw95 nra G4 after: n=17059 mean +0.1189 (+0.0030, +0.3145) pct +13.63 (+0.52, +22.48)
+BAND_HEAD_HELDOUT  vs K0 tw95 nra G5 near: n=746955 mean +0.0483 (+0.0384, +0.0589) pct +10.11 (+8.15, +12.31)
+BAND_HEAD_HELDOUT  vs K0 qs nra G1 ordinary: n=10788596 mean +0.0437 (-0.0229, +0.1451) pct +1.62 (-0.89, +5.03)
+BAND_HEAD_HELDOUT  vs K0 cost0.5 obs G5 near: n=108596 mean +65.1227 (+23.5630, +109.2866) pct +2.24 (+0.82, +3.72)
+BAND_HEAD_HELDOUT  G4 below q01: share 0.89% (0.25, 1.74)
+BAND_HEAD_HELDOUT  G4 above q99: share 4.07% (2.44, 5.94)
+=== median-forecast error minus mean-forecast error, per site (points)
+D10  K0                   -0.0068
+D10  GAM_ONLY             -0.0045
+D10  GAM_ONLY_K0SPREAD    +0.0008
+D10  BAND_TABLE_PLAIN     -0.0114
+D10  BAND_TABLE_DISAGREE  -0.0183
+D10  BAND_HEAD            -0.0747
+D10  ASOF_WIDEN           -0.0009
+D10  LEAD_DECAY           +0.0007
+D10  BAND_HEAD_HELDOUT    +0.0053
+D10  PERFECT              -0.0079
+D10  PERFECT_ADD          -0.0076
+D10  DET                  -0.0121
+D10  DET_ADD              -0.0083
+D11  K0                   +0.0017
+D11  GAM_ONLY             +0.0117
+D11  GAM_ONLY_K0SPREAD    +0.0130
+D11  BAND_TABLE_PLAIN     +0.0881
+D11  BAND_TABLE_DISAGREE  +0.0635
+D11  BAND_HEAD            -0.1407
+D11  ASOF_WIDEN           +0.0114
+D11  LEAD_DECAY           +0.0091
+D11  BAND_HEAD_HELDOUT    -0.1177
+D11  PERFECT              -0.0026
+D11  PERFECT_ADD          -0.0018
+D11  DET                  +0.0016
+D11  DET_ADD              +0.0004
+D14  K0                   +0.0077
+D14  GAM_ONLY             +0.0019
+D14  GAM_ONLY_K0SPREAD    +0.0050
+D14  BAND_TABLE_PLAIN     +0.0121
+D14  BAND_TABLE_DISAGREE  +0.0508
+D14  BAND_HEAD            -0.0243
+D14  ASOF_WIDEN           +0.0025
+D14  LEAD_DECAY           +0.0079
+D14  BAND_HEAD_HELDOUT    +0.0163
+D14  PERFECT              +0.0068
+D14  PERFECT_ADD          +0.0060
+D14  DET                  +0.0073
+D14  DET_ADD              +0.0072
+D16  K0                   +0.0045
+D16  GAM_ONLY             +0.0155
+D16  GAM_ONLY_K0SPREAD    +0.0067
+D16  BAND_TABLE_PLAIN     +0.0444
+D16  BAND_TABLE_DISAGREE  -0.0428
+D16  BAND_HEAD            -0.2740
+D16  ASOF_WIDEN           +0.0155
+D16  LEAD_DECAY           +0.0059
+D16  BAND_HEAD_HELDOUT    -0.2724
+D16  PERFECT              +0.0047
+D16  PERFECT_ADD          +0.0048
+D16  DET                  +0.0018
+D16  DET_ADD              +0.0042
+D5   K0                   -0.0174
+D5   GAM_ONLY             +0.0337
+D5   GAM_ONLY_K0SPREAD    +0.0549
+D5   BAND_TABLE_PLAIN     +0.0414
+D5   BAND_TABLE_DISAGREE  +0.0107
+D5   BAND_HEAD            +0.0055
+D5   ASOF_WIDEN           +0.0305
+D5   LEAD_DECAY           +0.0217
+D5   BAND_HEAD_HELDOUT    -0.0008
+D5   PERFECT              -0.0177
+D5   PERFECT_ADD          -0.0182
+D5   DET                  -0.0158
+D5   DET_ADD              -0.0166
+D9   K0                   +0.0041
+D9   GAM_ONLY             +0.0077
+D9   GAM_ONLY_K0SPREAD    +0.0099
+D9   BAND_TABLE_PLAIN     +0.0329
+D9   BAND_TABLE_DISAGREE  +0.0099
+D9   BAND_HEAD            -0.1506
+D9   ASOF_WIDEN           +0.0069
+D9   LEAD_DECAY           +0.0068
+D9   BAND_HEAD_HELDOUT    -0.1413
+D9   PERFECT              +0.0041
+D9   PERFECT_ADD          +0.0033
+D9   DET                  +0.0063
+D9   DET_ADD              +0.0048
+{
+  "worlds": 44,
+  "shifts": 411,
+  "rows_by_phase": {
+    "AFTER": 38486,
+    "BEFORE_ALARM": 86116,
+    "DURING": 35765,
+    "MARGIN": 1375689,
+    "ORDINARY": 5343713
+  }
+}
