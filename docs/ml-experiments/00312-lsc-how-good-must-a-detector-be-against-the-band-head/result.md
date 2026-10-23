@@ -99,8 +99,34 @@ decision_rule: >-
   transfers' windows and on ordinary rows, with coverage at q01, q05, q95, and q99. Where BAND_HEAD
   sits against experiment 264's as-of widening and experiment 209's heads is stated from those
   pages' printed numbers where they share rows, and otherwise as a statement of what was not
-  compared. No multiplicity correction is applied across the contrasts; the page says so. Verdict:
-  `supported` when P1 to P5 all hold, `partly supported` when at least one holds, `not supported`
+  compared. No multiplicity correction is applied across the contrasts; the page says so.
+  Amendments after the plan review, fixed before any score is read. (A1) Headline cell: curtailment
+  cost at limit 0.5, G5, against the cross-fitted BAND_HEAD, observed power; the break-even of an
+  axis is the weakest level such that it and every better level have intervals above zero, and every
+  other cell (twCRPS, shift rows, phases, limits 0.75 and 0.9, the held-out check on odd-seed
+  worlds) is reported but cannot flip a verdict. (A2) Delays 96, 144, and 192 half-hours are added
+  to the grid, because delays of 6 to 48 half-hours end before the during and after rows begin; the
+  page says which phase each delay moves. (A3) Precision is true kept spans over all spans, false
+  spans are counted from the kept spans and drawn over the scored period only, and the realised
+  precision of each arm is reported. (A4) Ordinary-row harm of a degraded arm is read as its
+  quantile score and cost minus the perfect arm's on G1 rows, with K0 beside as a control, because
+  K0 plus spread alone is within 3% of BAND_HEAD on G1; harm is a higher score. (A5) Band position's
+  detector rule: RO-NC is re-scored with the same match rule (an alarm known between the onset and
+  the end), the alarms per match RO-NC shows on these worlds is the rate P4 uses, recall is reported
+  at all four rates, and the real transfers inside the stream count as false alarms. (A6) P5's
+  primary reading is the even-month rows, which band position's quantile function never saw;
+  all-month rows are secondary, and cost is a secondary reading beside twCRPS. (A7) The three
+  indicators and the added-back megawatts are oracle inputs: heads (b) to (d) are upper bounds, not
+  a detector design, and the small-against-large shift control tests extrapolation only. (A8) The
+  real record is scored with the head fitted on the other month parity; its rows overlap the
+  training rows (the real record is the background of every world), and the 7 logged transfers are
+  descriptive with coverage given per substation. (A9) Experiment 264's rows are at D8, outside the
+  six Primaries, and experiment 209's heads are arm D's; unless the rows overlap, the page says no
+  placement is possible and gives experiment 297's as-of widening arm as the nearest comparison.
+  (A10) Each clause of P1 to P5 is scored separately; `partly supported` needs at least two of the
+  five predictions to hold. (A11) The brief's stop condition was checked: PERFECT_ADD beats
+  BAND_HEAD on cost in experiment 297, so the experiment runs.
+  Verdict: `supported` when P1 to P5 all hold, `partly supported` when at least two hold, `not supported`
   when none holds.
 benchmark: >-
   Experiment 297's BAND_HEAD (and BAND_HEAD_HELDOUT for the held-out contrasts) and its
