@@ -151,7 +151,7 @@ will flow while an abnormal arrangement lasts. A rule that switches to K0 when a
 "abnormal" and back to GAM_ONLY otherwise recovered **none** of the gain that choosing correctly
 would give, in the injected worlds and in the real record. The real record and the injected worlds
 use different weather inputs. The real record uses the frozen past-weather forecast of [experiment
-130](../00130-ml-experiment-convex-model/result.md) (ERA5 and CAMS estimates of past weather)
+130](../00130-ro-nc-detector-on-the-gam-k-residual/result.md) (ERA5 and CAMS estimates of past weather)
 through [experiment 258](../00258-lsc-mask-out-of-sample-all-primaries-whole-history/result.md)'s
 harness, scored against observed power only. The injected worlds use the cached ensemble-weather
 member forecasts (ENS, the ECMWF ensemble) of [experiment
