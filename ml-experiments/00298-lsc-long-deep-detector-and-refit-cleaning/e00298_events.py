@@ -58,7 +58,8 @@ def load_events() -> list[dict]:
         sites = [common.SERIES_TO_SITE[int(s)] for s in (row["side_a"], row["side_b"]) if s is not None]
         events.append(
             {"cls": "transfer", "sites": sites, "start": _day(moment=row["onset_utc"]),
-             "end": _day(moment=row["end_utc"]), "moved_mw": row["moved_mw_p50"]}  # fmt: skip
+             "end": _day(moment=row["end_utc"]), "moved_mw": row["moved_mw_p50"],
+             "card_id": row["card_id"]}  # fmt: skip
         )
     return events
 
