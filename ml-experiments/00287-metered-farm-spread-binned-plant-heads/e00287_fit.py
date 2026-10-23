@@ -299,7 +299,7 @@ def train_neural(*, arm: str, st: Setting, seed: int) -> np.ndarray:
     model.load_state_dict(best_state)
     model.eval()
     if mixture:
-        return mixture_quantiles(model=model, batch=test_b, ceiling=st.ceiling)  # ty: ignore[invalid-argument-type]
+        return mixture_quantiles(model=model, batch=test_b, ceiling=st.ceiling)
     with torch.no_grad():
         return np.sort(model(test_b).numpy().astype(np.float64), axis=1)
 
