@@ -228,6 +228,16 @@ whether it applies to production awaits NGED's answer. Evidence:
 [experiment
 194](00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md).
 
+**Give a forecast the engine state it will have at forecast time, and train the engine term on that
+same lagged state (provisional, medium confidence).** *Applies to: experiments.* D8's engine
+detector gives a state for each half-hour that is built from that half-hour's own reading. A
+coefficient fitted on that contemporaneous state is 3.6 MW per half-hour with one or more units
+running, but the state of the last settled day is worth 0.15 MW (interval -0.06 to 0.32) out of sample,
+so applying the contemporaneous coefficient to the lagged state makes the quantile score 10% worse.
+Trained on the lagged state, the coefficient is 0.9 to 1.0 MW and the score is 3% better than a
+model without the term ([experiment
+294](00294-regime-aware-model-at-d8-engine-state-term/result.md)).
+
 **Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
 coefficients exactly at each step) to a window of three months or shorter.** An exact
 least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
@@ -453,7 +463,11 @@ which total 160 hours at W1, 428 at W2, and 2,742 at W3. W3's idle share at wind
 6.2% over all years and 1.5% from 2021, so its first 2 years differ from the later ones. Evidence:
 [experiment 210](00210-wind-idle-noise-mva-artefact/result.md), three farms, 2019-09 to 2026-09.
 The mask is built on ERA5, which arrives about 5 days late, so it is for training and evaluation
-rows and not for live use.
+rows and not for live use. Removing the mask's rows from training lowered the quantile score of
+both the physics core and the XGBoost model when the weather was the 51 ensemble members (by 0.075
+and 0.062 points on the kept rows, intervals excluding zero), and worsened it by under 0.015 points
+when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
+three farms, July 2025 to June 2026).
 
 **Build the ensemble hindcast member rows with the production feature engineer, and expect a table
 of offsets per lead day, quantile, and farm to lower the wind forecast's quantile score

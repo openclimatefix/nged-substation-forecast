@@ -1,0 +1,117 @@
+D8: 97,012 rows; twCRPS threshold 14.29, Brier threshold 5.94
+
+--- D8 subset all: 97,012 rows
+arm1            qs=9.0862 tw=0.8941 mae=16.285 err=-1.914 cov90=0.827 med-mean=+0.000 brier=0.0466 q01:b=0.029,p=0.605 q05:b=0.065,p=2.255 q95:b=0.893,p=2.197 q99:b=0.946,p=0.751
+arm2            qs=10.9516 tw=0.5453 mae=15.178 err=+0.110 cov90=0.423 med-mean=+0.000 brier=0.0262 q01:b=0.206,p=2.407 q05:b=0.308,p=4.123 q95:b=0.731,p=4.308 q99:b=0.839,p=2.385
+arm3            qs=10.0210 tw=0.8998 mae=17.375 err=-1.354 cov90=0.894 med-mean=+0.000 brier=0.0446 q01:b=0.019,p=0.602 q05:b=0.062,p=2.591 q95:b=0.956,p=2.405 q99:b=0.985,p=0.587
+arm3_hindsight  qs=6.8706 tw=0.5580 mae=11.814 err=-1.364 cov90=0.833 med-mean=+0.000 brier=0.0317 q01:b=0.026,p=0.556 q05:b=0.108,p=1.793 q95:b=0.941,p=1.929 q99:b=0.988,p=0.493
+arm3_indicator  qs=8.8881 tw=0.7465 mae=15.883 err=-1.813 cov90=0.825 med-mean=+0.000 brier=0.0394 q01:b=0.032,p=0.612 q05:b=0.071,p=2.230 q95:b=0.896,p=2.120 q99:b=0.946,p=0.713
+arm3_window     qs=11.8388 tw=0.5149 mae=16.005 err=-0.109 cov90=0.432 med-mean=+0.000 brier=0.0255 q01:b=0.208,p=2.983 q05:b=0.301,p=4.679 q95:b=0.733,p=4.736 q99:b=0.822,p=2.665
+arm3_units      qs=9.9556 tw=0.9804 mae=17.230 err=-1.436 cov90=0.897 med-mean=+0.000 brier=0.0488 q01:b=0.016,p=0.576 q05:b=0.056,p=2.508 q95:b=0.952,p=2.614 q99:b=0.987,p=0.626
+arm3_matched    qs=8.8282 tw=0.7556 mae=15.783 err=-0.990 cov90=0.852 med-mean=+0.000 brier=0.0398 q01:b=0.021,p=0.548 q05:b=0.061,p=2.216 q95:b=0.913,p=2.126 q99:b=0.961,p=0.630
+arm4_emp        qs=8.8764 tw=0.6146 mae=15.178 err=+0.110 cov90=0.847 med-mean=-0.960 brier=0.0326 q01:b=0.036,p=0.806 q05:b=0.076,p=2.278 q95:b=0.923,p=2.443 q99:b=0.968,p=0.827
+arm4_2b         qs=9.1379 tw=0.7184 mae=15.178 err=+0.110 cov90=0.874 med-mean=+0.000 brier=0.0364 q01:b=0.036,p=0.869 q05:b=0.065,p=2.464 q95:b=0.939,p=2.701 q99:b=0.966,p=0.968
+
+--- D8 subset ordinary: 47,591 rows
+arm1            qs=7.9828 tw=0.6116 mae=13.036 err=+7.875 cov90=0.814 med-mean=+0.000 brier=0.0322 q01:b=0.006,p=0.548 q05:b=0.017,p=2.101 q95:b=0.831,p=2.049 q99:b=0.914,p=0.862
+arm2            qs=10.5911 tw=0.3389 mae=14.599 err=+7.923 cov90=0.457 med-mean=+0.000 brier=0.0177 q01:b=0.087,p=1.028 q05:b=0.147,p=2.196 q95:b=0.604,p=5.989 q99:b=0.758,p=3.640
+arm3            qs=8.8836 tw=0.6523 mae=15.536 err=+7.594 cov90=0.907 med-mean=+0.000 brier=0.0322 q01:b=0.003,p=0.583 q05:b=0.019,p=2.266 q95:b=0.927,p=2.073 q99:b=0.974,p=0.543
+arm3_hindsight  qs=6.0918 tw=0.2325 mae=10.131 err=-1.483 cov90=0.843 med-mean=+0.000 brier=0.0128 q01:b=0.039,p=0.648 q05:b=0.123,p=2.045 q95:b=0.966,p=1.589 q99:b=0.994,p=0.423
+arm3_indicator  qs=7.9338 tw=0.5057 mae=13.154 err=+8.113 cov90=0.807 med-mean=+0.000 brier=0.0271 q01:b=0.007,p=0.539 q05:b=0.021,p=2.077 q95:b=0.828,p=2.019 q99:b=0.909,p=0.854
+arm3_window     qs=11.1901 tw=0.2799 mae=15.209 err=+7.395 cov90=0.445 med-mean=+0.000 brier=0.0152 q01:b=0.096,p=1.116 q05:b=0.173,p=2.365 q95:b=0.619,p=6.501 q99:b=0.736,p=3.953
+arm3_units      qs=8.7763 tw=0.7109 mae=14.911 err=+7.593 cov90=0.904 med-mean=+0.000 brier=0.0351 q01:b=0.003,p=0.578 q05:b=0.016,p=2.252 q95:b=0.920,p=2.353 q99:b=0.977,p=0.582
+arm3_matched    qs=8.0324 tw=0.5114 mae=13.689 err=+8.461 cov90=0.839 med-mean=+0.000 brier=0.0271 q01:b=0.004,p=0.542 q05:b=0.018,p=2.088 q95:b=0.857,p=1.991 q99:b=0.934,p=0.696
+arm4_emp        qs=8.8541 tw=0.4160 mae=14.599 err=+7.923 cov90=0.859 med-mean=-0.938 brier=0.0227 q01:b=0.015,p=0.659 q05:b=0.027,p=2.197 q95:b=0.886,p=2.599 q99:b=0.952,p=0.995
+arm4_2b         qs=8.8686 tw=0.5225 mae=14.599 err=+7.923 cov90=0.882 med-mean=+0.000 brier=0.0262 q01:b=0.015,p=0.748 q05:b=0.025,p=2.481 q95:b=0.907,p=2.633 q99:b=0.947,p=1.120
+
+--- D8 subset running: 49,421 rows
+arm1            qs=10.1487 tw=1.1660 mae=19.415 err=-11.342 cov90=0.840 med-mean=+0.000 brier=0.0604 q01:b=0.052,p=0.660 q05:b=0.112,p=2.403 q95:b=0.952,p=2.340 q99:b=0.977,p=0.643
+arm2            qs=11.2987 tw=0.7442 mae=15.735 err=-7.415 cov90=0.390 med-mean=+0.000 brier=0.0343 q01:b=0.320,p=3.735 q05:b=0.463,p=5.979 q95:b=0.852,p=2.689 q99:b=0.917,p=1.176
+arm3            qs=11.1163 tw=1.1380 mae=19.147 err=-9.970 cov90=0.882 med-mean=+0.000 brier=0.0564 q01:b=0.035,p=0.621 q05:b=0.103,p=2.904 q95:b=0.985,p=2.726 q99:b=0.996,p=0.630
+arm3_hindsight  qs=7.6207 tw=0.8715 mae=13.434 err=-1.250 cov90=0.823 med-mean=+0.000 brier=0.0500 q01:b=0.014,p=0.467 q05:b=0.093,p=1.550 q95:b=0.916,p=2.257 q99:b=0.982,p=0.561
+arm3_indicator  qs=9.8070 tw=0.9783 mae=18.512 err=-11.371 cov90=0.843 med-mean=+0.000 brier=0.0513 q01:b=0.056,p=0.682 q05:b=0.119,p=2.379 q95:b=0.962,p=2.217 q99:b=0.983,p=0.576
+arm3_window     qs=12.4635 tw=0.7412 mae=16.771 err=-7.335 cov90=0.418 med-mean=+0.000 brier=0.0354 q01:b=0.316,p=4.781 q05:b=0.425,p=6.907 q95:b=0.843,p=3.036 q99:b=0.905,p=1.424
+arm3_units      qs=11.0912 tw=1.2399 mae=19.464 err=-10.130 cov90=0.889 med-mean=+0.000 brier=0.0620 q01:b=0.029,p=0.574 q05:b=0.094,p=2.754 q95:b=0.983,p=2.866 q99:b=0.996,p=0.669
+arm3_matched    qs=9.5945 tw=0.9908 mae=17.800 err=-10.092 cov90=0.864 med-mean=+0.000 brier=0.0520 q01:b=0.038,p=0.553 q05:b=0.103,p=2.340 q95:b=0.967,p=2.256 q99:b=0.987,p=0.567
+arm4_emp        qs=8.8978 tw=0.8059 mae=15.735 err=-7.415 cov90=0.835 med-mean=-0.982 brier=0.0420 q01:b=0.056,p=0.948 q05:b=0.124,p=2.357 q95:b=0.959,p=2.293 q99:b=0.983,p=0.666
+arm4_2b         qs=9.3971 tw=0.9071 mae=15.735 err=-7.415 cov90=0.866 med-mean=+0.000 brier=0.0463 q01:b=0.055,p=0.984 q05:b=0.103,p=2.448 q95:b=0.969,p=2.767 q99:b=0.985,p=0.822
+
+--- D8 subset winter: 24,192 rows
+arm1            qs=9.8621 tw=0.5499 mae=18.023 err=-1.191 cov90=0.794 med-mean=+0.000 brier=0.0276 q01:b=0.011,p=0.490 q05:b=0.042,p=2.364 q95:b=0.837,p=2.482 q99:b=0.915,p=0.898
+arm2            qs=11.5489 tw=0.0937 mae=16.096 err=+2.147 cov90=0.402 med-mean=+0.000 brier=0.0037 q01:b=0.176,p=2.234 q05:b=0.271,p=3.974 q95:b=0.673,p=4.914 q99:b=0.831,p=2.461
+arm3            qs=10.5914 tw=0.5357 mae=17.902 err=-0.600 cov90=0.879 med-mean=+0.000 brier=0.0233 q01:b=0.030,p=0.674 q05:b=0.071,p=2.985 q95:b=0.950,p=2.390 q99:b=0.985,p=0.555
+arm3_hindsight  qs=5.8010 tw=0.1659 mae=9.805 err=-0.787 cov90=0.854 med-mean=+0.000 brier=0.0086 q01:b=0.016,p=0.423 q05:b=0.088,p=1.407 q95:b=0.942,p=1.875 q99:b=0.990,p=0.458
+arm3_indicator  qs=9.6980 tw=0.4883 mae=17.655 err=-0.994 cov90=0.795 med-mean=+0.000 brier=0.0248 q01:b=0.012,p=0.497 q05:b=0.042,p=2.345 q95:b=0.837,p=2.417 q99:b=0.912,p=0.866
+arm3_window     qs=12.6595 tw=0.0868 mae=16.983 err=+1.837 cov90=0.443 med-mean=+0.000 brier=0.0035 q01:b=0.177,p=3.025 q05:b=0.260,p=4.682 q95:b=0.704,p=5.546 q99:b=0.812,p=2.963
+arm3_units      qs=10.6748 tw=0.6506 mae=17.903 err=-0.303 cov90=0.864 med-mean=+0.000 brier=0.0288 q01:b=0.026,p=0.636 q05:b=0.068,p=2.939 q95:b=0.932,p=2.790 q99:b=0.986,p=0.591
+arm3_matched    qs=9.6064 tw=0.5088 mae=17.110 err=-0.111 cov90=0.817 med-mean=+0.000 brier=0.0253 q01:b=0.018,p=0.557 q05:b=0.052,p=2.487 q95:b=0.869,p=2.337 q99:b=0.940,p=0.687
+arm4_emp        qs=9.0248 tw=0.2171 mae=16.096 err=+2.147 cov90=0.890 med-mean=-1.154 brier=0.0089 q01:b=0.005,p=0.496 q05:b=0.042,p=2.014 q95:b=0.932,p=2.348 q99:b=0.974,p=0.654
+arm4_2b         qs=9.3587 tw=0.3027 mae=16.096 err=+2.147 cov90=0.921 med-mean=+0.000 brier=0.0128 q01:b=0.009,p=0.590 q05:b=0.036,p=2.209 q95:b=0.957,p=2.653 q99:b=0.984,p=0.770
+
+--- D8 subset winter_running: 13,695 rows
+arm1            qs=9.7196 tw=0.6384 mae=19.476 err=-12.838 cov90=0.878 med-mean=+0.000 brier=0.0323 q01:b=0.019,p=0.408 q05:b=0.070,p=2.309 q95:b=0.947,p=2.150 q99:b=0.977,p=0.562
+arm2            qs=10.8125 tw=0.1410 mae=15.170 err=-7.331 cov90=0.418 med-mean=+0.000 brier=0.0062 q01:b=0.289,p=3.514 q05:b=0.435,p=5.717 q95:b=0.854,p=2.533 q99:b=0.934,p=0.926
+arm3            qs=11.3157 tw=0.6245 mae=18.617 err=-10.638 cov90=0.872 med-mean=+0.000 brier=0.0273 q01:b=0.051,p=0.713 q05:b=0.117,p=3.399 q95:b=0.989,p=2.715 q99:b=0.999,p=0.607
+arm3_hindsight  qs=6.7169 tw=0.2724 mae=11.664 err=-2.488 cov90=0.823 med-mean=+0.000 brier=0.0147 q01:b=0.013,p=0.395 q05:b=0.103,p=1.349 q95:b=0.926,p=2.215 q99:b=0.986,p=0.513
+arm3_indicator  qs=9.5258 tw=0.5738 mae=18.814 err=-12.504 cov90=0.883 med-mean=+0.000 brier=0.0297 q01:b=0.021,p=0.426 q05:b=0.070,p=2.290 q95:b=0.952,p=2.081 q99:b=0.979,p=0.522
+arm3_window     qs=12.2054 tw=0.1297 mae=16.318 err=-6.960 cov90=0.465 med-mean=+0.000 brier=0.0059 q01:b=0.283,p=4.798 q05:b=0.384,p=6.823 q95:b=0.849,p=3.026 q99:b=0.916,p=1.301
+arm3_units      qs=11.3311 tw=0.7612 mae=18.899 err=-10.325 cov90=0.865 med-mean=+0.000 brier=0.0341 q01:b=0.044,p=0.645 q05:b=0.114,p=3.297 q95:b=0.979,p=2.927 q99:b=0.998,p=0.644
+arm3_matched    qs=9.6063 tw=0.6043 mae=17.820 err=-10.772 cov90=0.870 med-mean=+0.000 brier=0.0305 q01:b=0.031,p=0.528 q05:b=0.087,p=2.572 q95:b=0.957,p=2.149 q99:b=0.986,p=0.516
+arm4_emp        qs=8.2420 tw=0.2930 mae=15.170 err=-7.331 cov90=0.912 med-mean=-1.211 brier=0.0129 q01:b=0.008,p=0.416 q05:b=0.070,p=1.725 q95:b=0.982,p=2.188 q99:b=0.997,p=0.553
+arm4_2b         qs=8.9960 tw=0.3860 mae=15.170 err=-7.331 cov90=0.932 med-mean=+0.000 brier=0.0178 q01:b=0.015,p=0.518 q05:b=0.059,p=1.864 q95:b=0.991,p=2.757 q99:b=0.998,p=0.738
+
+=== D8 contrasts (relative to the reference, 98.75% interval)
+C1_arm3_vs_arm1_qs               all: +10.29% [+8.00, +12.82] | ordinary: +11.28% [+2.32, +21.87] | running: +9.53% [+2.96, +15.61] | winter: +7.40% [+4.06, +8.81]
+C2_arm3_vs_arm4_emp_qs           all: +12.90% [+1.16, +25.03] | ordinary: +0.33% [-18.40, +18.58] | running: +24.93% [+11.89, +37.24] | winter: +17.36% [+11.03, +28.54]
+C2b_arm3_vs_arm4_2b_qs           all: +9.67% [-0.74, +21.03] | ordinary: +0.17% [-18.07, +18.26] | running: +18.30% [+8.15, +29.41] | winter: +13.17% [+11.14, +15.90]
+C4_arm3_vs_arm1_tw               all: +0.64% [-10.90, +14.03] | ordinary: +6.65% [-9.39, +26.74] | running: -2.40% [-12.39, +8.99] | winter: -2.58% [-10.50, +10.42]
+arm2_vs_arm1_qs                  all: +20.53% [+6.54, +36.69] | ordinary: +32.67% [+5.65, +75.94] | running: +11.33% [-2.10, +25.56] | winter: +17.10% [+2.02, +30.94]
+arm3_indicator_vs_arm1_qs        all: -2.18% [-4.23, -0.46] | ordinary: -0.61% [-2.55, +1.27] | running: -3.37% [-5.82, -1.38] | winter: -1.66% [-2.63, -1.19]
+arm3_hindsight_vs_arm1_qs        all: -24.38% [-34.06, -12.78] | ordinary: -23.69% [-41.47, -0.74] | running: -24.91% [-30.23, -19.80] | winter: -41.18% [-43.26, -38.94]
+arm3_window_vs_arm2_qs           all: +8.10% [-0.22, +17.25] | ordinary: +5.66% [-7.31, +20.79] | running: +10.31% [+5.16, +16.64] | winter: +9.62% [+7.44, +13.85]
+arm3_units_vs_arm1_qs            all: +9.57% [+7.16, +12.09] | ordinary: +9.94% [+2.51, +18.28] | running: +9.29% [+2.31, +15.28] | winter: +8.24% [+4.23, +11.40]
+arm3_matched_vs_arm1_qs          all: -2.84% [-5.32, -0.76] | ordinary: +0.62% [-3.57, +4.52] | running: -5.46% [-9.27, -2.26] | winter: -2.59% [-6.49, -0.55]
+arm3_matched_vs_arm4_emp_qs      all: -0.54% [-11.11, +9.47] | ordinary: -9.28% [-27.10, +6.35] | running: +7.83% [-3.16, +18.49] | winter: +6.44% [+1.60, +16.25]
+arm3_matched_vs_arm1_tw          all: -15.48% [-24.52, -5.53] | ordinary: -16.39% [-25.11, -5.59] | running: -15.03% [-25.15, -5.24] | winter: -7.48% [-23.43, -1.70]
+arm3_matched_vs_arm3_indicator_qs all: -0.67% [-1.69, +0.06] | ordinary: +1.24% [-1.83, +4.26] | running: -2.17% [-4.25, +0.37] | winter: -0.94% [-3.96, +0.80]
+arm3_vs_arm3_indicator_qs        all: +12.75% [+10.08, +15.85] | ordinary: +11.97% [+2.60, +23.39] | running: +13.35% [+8.43, +19.16] | winter: +9.21% [+6.87, +10.15]
+
+C1 leave-one-month-out range: +9.81% to +10.81%
+Persisted-state flag vs target flag: P(state flag | running) = 0.651, P(state flag | ordinary) = 0.370
+
+Term out of sample (MW per unit of state):  {'slope_error_on_persisted_state_mw': [0.15459411509212148, -0.05511862816727728, 0.32418934200051047], 'slope_error_on_target_state_mw': [2.2048711418959344, 1.7159619265963422, 2.6473516346928907], 'persisted_state_mean': 0.515110621411228, 'persisted_state_agreement_with_target_flag': 0.6407351667834907}
+Engine coefficient on the lagged (matched) state, MW: [1.0, 1.01, 1.02, 0.97, 0.96, 0.95, 0.95, 0.94, 0.95, 0.94, 0.94, 0.91]
+
+Engine coefficient per monthly refit, scored year, MW (P(1+ unit) column): [3.63, 3.62, 3.59, 3.57, 3.59, 3.59, 3.61, 3.6, 3.6, 3.57, 3.53, 3.47]
+Engine coefficient per running unit (expected-units column), MW: [1.46, 1.45, 1.44, 1.43, 1.43, 1.43, 1.43, 1.43, 1.43, 1.42, 1.41, 1.39]
+break coefficient D8 (points): [4.63, 4.85, 5.47, 5.72, 5.77, 5.86, 5.87, 5.79, 5.83, 5.89, 6.03, 6.3]
+
+=== D5: 84,137 rows, engine-flag share (filtered, target) 0.033
+arm1            qs=3.6406 tw=0.3459 mae=6.353 cov90=0.852 med-mean=+0.000 brier=0.0260
+arm3            qs=3.6088 tw=0.3465 mae=6.294 cov90=0.852 med-mean=+0.000 brier=0.0260
+arm3_indicator  qs=3.6296 tw=0.3479 mae=6.330 cov90=0.853 med-mean=+0.000 brier=0.0262
+arm3_matched    qs=3.6147 tw=0.3478 mae=6.304 cov90=0.852 med-mean=+0.000 brier=0.0262
+arm3_vs_arm1               -0.874% [-2.455, +0.081]
+arm3_indicator_vs_arm1     -0.304% [-0.456, -0.166]
+arm3_vs_arm3_indicator     -0.571% [-2.227, +0.418]
+arm3_matched_vs_arm1       -0.712% [-1.393, -0.293]
+
+=== D10: 96,370 rows, engine-flag share (filtered, target) 0.021
+arm1            qs=3.3274 tw=0.3562 mae=5.552 cov90=0.926 med-mean=+0.000 brier=0.0128
+arm3            qs=3.3421 tw=0.3634 mae=5.572 cov90=0.928 med-mean=+0.000 brier=0.0129
+arm3_indicator  qs=3.3421 tw=0.3634 mae=5.572 cov90=0.928 med-mean=+0.000 brier=0.0129
+arm3_matched    qs=3.3391 tw=0.3630 mae=5.566 cov90=0.928 med-mean=+0.000 brier=0.0129
+arm3_vs_arm1               +0.441% [-0.603, +1.530]
+arm3_indicator_vs_arm1     +0.441% [-0.603, +1.530]
+arm3_vs_arm3_indicator     +0.000% [+0.000, +0.000]
+arm3_matched_vs_arm1       +0.351% [-0.698, +1.424]
+
+=== D11: 97,046 rows, engine-flag share (filtered, target) 0.006
+arm1            qs=2.4289 tw=0.2586 mae=4.377 cov90=0.883 med-mean=+0.000 brier=0.0114
+arm3            qs=2.4775 tw=0.2699 mae=4.450 cov90=0.876 med-mean=+0.000 brier=0.0119
+arm3_indicator  qs=2.4400 tw=0.2615 mae=4.400 cov90=0.883 med-mean=+0.000 brier=0.0114
+arm3_matched    qs=2.4448 tw=0.2599 mae=4.407 cov90=0.882 med-mean=+0.000 brier=0.0113
+arm3_vs_arm1               +1.998% [-0.244, +6.118]
+arm3_indicator_vs_arm1     +0.456% [-0.017, +1.004]
+arm3_vs_arm3_indicator     +1.535% [-0.480, +5.597]
+arm3_matched_vs_arm1       +0.654% [-0.173, +1.642]
