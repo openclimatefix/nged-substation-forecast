@@ -44,20 +44,15 @@ HERE: Final[Path] = Path(__file__).resolve().parent
 
 def base_spec(*, arm: str, site: str, levels: dict) -> dict:
     """Return a base arm's solar-term spec at a substation, empty for the control."""
-    if arm == "e0":
-        return {"empirical": True}
-    if arm == "e1":
-        return {"empirical": True, "level": levels[site]["shape_swap"]}
-    if arm == "e2":
-        return {"empirical": True, "level": levels[site]["fitted"]}
-    if arm == "f1":
-        return {"level": levels[site]["fleet_fitted"]}
-    if arm == "s1":
-        return {"april_june": levels[site]["aj_april_june"]}
-    if arm == "s2":
-        factor = ORACLE_APRIL_JUNE.get(site)
-        return {} if factor is None else {"april_june": factor}
-    return {}
+    specs = {
+        "e0": {"empirical": True},
+        "e1": {"empirical": True, "level": levels[site]["shape_swap"]},
+        "e2": {"empirical": True, "level": levels[site]["fitted"]},
+        "f1": {"level": levels[site]["fleet_fitted"]},
+        "s1": {"april_june": levels[site]["aj_april_june"]},
+        "s2": {"april_june": ORACLE_APRIL_JUNE[site]} if site in ORACLE_APRIL_JUNE else {},
+    }
+    return specs.get(arm, {})
 
 
 def all_specs() -> dict[str, dict[str, dict]]:

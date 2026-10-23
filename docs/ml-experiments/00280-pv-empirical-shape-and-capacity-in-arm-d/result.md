@@ -5,7 +5,7 @@ theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - production-reference-and-best-guess
   - solar-disaggregation
-status: planned
+status: finished
 size: >-
   medium. Stored: private files under data/ml-experiments/00280-<slug>/ only. Serving path: not
   touched. Degradation rule: not touched. Designs: more than one way to put a new shape and
@@ -60,59 +60,118 @@ row_set_id: fold_a_daily_gap_v1
 metric: >-
   Mean absolute error of the median forecast (q50) in MW and pinball loss averaged over the 11
   quantiles in MW, on experiment 178's rows and on the April to June 2026 daylight slice.
-verdict: planned
+verdict: not supported
 production_status: not-for-production
 adopted_in: none
+date: 2026-10-23
+headline: >-
+  April to June daylight at D9 and D16 (mean absolute error of the median forecast, equal
+  substation weights): the control 0.528 MW; the empirical shape at its fitted capacity (e2) changes
+  it by -0.009 MW (99% interval -0.041 to +0.024), the oracle capacity cut (s2) by -0.003 MW
+  (-0.014 to +0.008). At D5, s2 raises it by +0.081 MW (+0.053 to +0.115).
+best_arm: >-
+  none; the empirical shape at the pinned capacity (e0) is nearest, at -0.010 MW (-0.022 to +0.001)
+  on April to June daylight at D9 and D16 and +0.006 MW (+0.002 to +0.009) on all half-hours
+take_home_message: >-
+  Putting the empirical solar shape into the forecast, at the pinned capacity or at the lower
+  capacity the real series supports, does not lower the April to June error at the substations where
+  the pinned capacity looked too high. The change is under 0.01 MW against an error of about 0.5 MW,
+  and the intervals are wide. A capacity cut that is correct for the whole of April to June is not
+  the fix either: at D5 it raises the error. The summer gap to BG2 does not come from the solar
+  shape or the solar capacity of the monthly-refit model.
+lessons:
+  - >-
+    The shape does not move the score. e0 and e1 change April to June daylight error at D9 and D16
+    by -0.010 and -0.006 MW, inside intervals that include zero, and raise the error on all
+    half-hours at D9 and D16 by 0.006 and 0.007 MW.
+  - >-
+    The capacity does not move it either. At D9 and D16 the oracle cut (s2) changes the error by
+    -0.003 MW, and at D5 it raises it by 0.081 MW, so a single April to June factor is wrong for at
+    least one substation.
+  - >-
+    The seasonal factor calibrated on April to June 2025 (s1, factors above 1) changes the error by
+    +0.004 MW at D9 and D16 and -0.002 MW at D5. The 2025 and 2026 April to June capacities do not
+    point the same way.
+advice:
+  - >-
+    Do not put the pooled empirical solar shape into arm D to close the April to June gap to BG2: at
+    D9 and D16 it changes daylight error by under 0.01 MW and raises error on all half-hours (C1,
+    C4).
+  - >-
+    Do not apply a single April to June capacity factor across substations: the factor that fits D9
+    and D16 raises D5's error by 0.08 MW (C5 and the oracle arm).
 code: ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/
 ---
 
 # PV capacity: does the empirical solar shape lower arm D's April to June error?
 
-**Plan only; the write-up replaces this page after the forecasts.** Experiment 269 found that a
-table learned from the metered farms' output recovers an injected farm better than the physical
-fleet shape does. This experiment puts that table into arm D and scores the forecasts. Experiment
-266 had found that arm D trails BG2 in April to June because of its solar term at D5 and D9, and
-that the pinned capacity looks too high there.
+**Take-home message: no. Neither the empirical solar shape nor a lower solar capacity changes arm D's
+April to June error by more than 0.01 MW at D9 and D16.** Arm D is the monthly-refit generalised
+additive model of experiments
+[155](../00155-dp-bg-stage2-assembly-night-offset-and-error-correction/result.md) and
+[220](../00220-dp-bg-stage4-assembly-with-drop-one/result.md), scored on [experiment
+178](../00178-dp-sunny-daylight-gap-diagnosis/result.md)'s rows. [Experiment
+266](../00266-summer-gap-diagnostics-solar-term/result.md) put the April to June gap to BG2 in its
+solar term. [Experiment 269](../00269-pv-capacity-gain-decomposition/result.md) found a pooled
+empirical shape that recovers an injected farm better than the physical fleet shape, with real
+capacities 0.2 to 0.4 MW lower. This experiment puts that shape and those capacities into arm D.
 
-## Arms
+**Verdict: not supported.** C1 (e2 minus the control, April to June daylight, D9 and D16) is -0.009
+MW with a 99% interval of -0.041 to +0.024, so the interval contains zero and the point estimate is
+above -0.01 MW. The control's April to June daylight error at D9 and D16 is 0.528 MW, and its gap to
+BG2 there is +0.044 MW, so the largest gain any arm showed (0.010 MW) closes under a quarter of the
+gap. Every level, table, and factor uses data before 2025-07-01 only, and the control reproduces
+experiment 180's control bit-for-bit.
 
-Every arm refits arm D's monthly fits and rebuilds its forecasts from the same stored ensemble
-weather, so only the solar term differs. **No level, table, or factor reads data from 2025-07-01
-onward**: the pooled tables use each farm's rows before that date, the capacities that set the
-levels are refits that stop at that date, and the factor of s1 uses only April to June 2025. The
-rows are fixed by the fleet shape on CAMS irradiance, so every arm is scored on identical rows.
-The control c0 must be bit-identical to experiment 180's control; if it is not, the run aborts.
+![Change in error by arm](result_effect.svg)
 
-- **c0, control:** the fleet shape at the pinned capacity.
-- **e0, empirical shape at the pinned capacity:** the pooled empirical table, level 1.
-- **e1, empirical shape at the swapped level:** level equal to the capacity fitted under the
-  empirical shape over the capacity fitted under the fleet shape (1.07 to 1.11), so swapping the
-  shape leaves the solar output level unchanged.
-- **e2, empirical shape at its fitted capacity:** level equal to the capacity fitted under the
-  empirical shape over the pinned capacity (0.69 at D16, 0.76 at D9, 0.94 to 1.17 elsewhere).
-- **f1, fleet shape at the real-fit capacity:** level equal to the capacity fitted under the fleet
-  shape over the pinned capacity (0.63 at D16, 0.69 at D9, 0.87 to 1.09 elsewhere). Comparing f1
-  with e2 separates the shape from the capacity.
-- **s1, seasonal capacity-bias check:** the fleet shape times a factor in April, May, and June,
-  calibrated on the control's April to June 2025 forecasts only (1.02 to 1.13).
-- **s2, oracle bound (not a forecast):** the fleet shape times the April to June factors that
-  [experiment 266](../00266-summer-gap-diagnostics-solar-term/result.md) measured on the scored
-  year (0.59 at D5, 0.86 at D9, 0.90 at D16, 1 elsewhere). It uses scored-year information and
-  shows how much a capacity fix could gain at best.
-- **Export clip:** the assembly configuration has the 60% clip at D5 only (as in
-  [experiment 180](../00180-dp-sunny-daylight-fix-d5-solar-shape/result.md)). A second
-  configuration clips at D9 too, and a third has no clip. Only the assembly configuration decides
-  the verdict.
+**Figure 1. Arms are inside zero, except the oracle cut at D5, which raises the error.** Week-block
+intervals are wide (about 13 weeks of April to June, 4,000 resamples).
 
-D9 and D16 are the primary pair because their real-fit levels are far below the pinned capacity.
-D5 is read separately, because the level there is about 1.0 and the clip dominates. D10, D11, and
-D14 are the out-of-selection check: the real fit did not pick a capacity cut there.
+## Results
 
-## Sources and checks
+**The shape alone changes the error by about 0.01 MW, and the all-half-hours error rises.** At D9
+and D16, April to June daylight, e0 (the empirical shape at the pinned capacity) is -0.010 MW (-0.022
+to +0.001), e1 (swapped level) -0.006 MW (-0.014 to +0.002), and C4 is therefore small. On all
+half-hours at D9 and D16, e0 is +0.006 MW (+0.002 to +0.009), e1 +0.007 MW (+0.003 to +0.010), and
+e2 +0.008 MW (0.000 to +0.014). The empirical shape raises the error outside April to June daylight.
 
-The shape comes from [experiment 269](../00269-pv-capacity-gain-decomposition/result.md). Earlier
-shape experiments ([73](../00073-pvdis-6-orientation-mix-and-dc-ac-ratio/result.md) and
-[77](../00077-pvdis-6b-fitted-solar-shape-in-arm-am/result.md)) found no score gain from a
-different shape, which is why P1 predicts none for e0 and e1. Earlier `advice` items followed:
-score on identical rows, report absolute error beside every contrast, and fix the row set from a
-shape no arm changes. No earlier item is departed from.
+**The lower capacity helps D9 and does nothing at D16.** e2 at D9 alone is -0.022 MW (-0.060 to
++0.010) and at D16 alone +0.005 MW (-0.028 to +0.040), so the pooled C1 is a D9 result. With a 60%
+export clip at D9 as well, e2 at D9 is -0.004 MW (-0.010 to +0.001): the clip already removes most
+of what the capacity cut offers. f1 (the fleet shape at the real-fit capacity) is -0.002 MW at D9
+and D16 (-0.035 to +0.029), so the capacity gives no more than the shape did (C3).
+
+**The capacity bias in April to June does not generalise.** s1 (a factor of 1.02 to 1.13 from April
+to June 2025) is +0.004 MW at D9 and D16 (-0.004 to +0.011), as P3 predicted. s2 (the oracle factors
+of experiment 266, which read the scored year) is -0.003 MW at D9 and D16 (-0.014 to +0.008) and
++0.081 MW at D5 (+0.053 to +0.115): the capacity cut experiment 266 measured at D5 is already
+supplied by the 60% clip, and cutting it again overshoots.
+
+**The other substations and the night-time error do not move.** At D10, D11, and D14, April to June
+daylight changes by at most +0.003 MW in any arm, and the April to June night-time error of the five
+decision substations changes by at most +0.004 MW (P4 holds). On sunny half-hours, e2 is +0.007 MW
+over the five decision substations (-0.009 to +0.030), so the no-harm margin of 0.02 MW holds.
+
+## Predictions
+
+- **P1 (e0 and e1 change sunny-daylight error by under 0.02 MW at each of D9, D10, D11, D14, D16):**
+  met; the largest is e0 at D9 on sunny half-hours, -0.016 MW (the group means for D16 and the
+  others are within 0.004 MW).
+- **P2 (e2 lowers April to June daylight error by at least 0.02 MW over D9 and D16):** not met;
+  -0.009 MW.
+- **P3 (s1 is above -0.01 MW at D9 and D16):** met; +0.004 MW.
+- **P4 (night-time error at D10 does not move by more than 0.02 MW in any arm):** met for the group
+  D10, D11, and D14, which moves by at most +0.004 MW.
+
+## Caveats
+
+- **The intervals are wide.** About 13 weeks of April to June fall in the scored year, so a gain of
+  0.02 MW would not show unless it sat in most weeks.
+- **s2 is a bound, not a forecast,** because it reads the scored year.
+- **D9 and D16 are two substations.** C1 is a mean over two, and D9 carries it.
+
+## What the next experiment should answer
+
+The solar term's shape and capacity are not the April to June gap. Experiment 266's remaining
+candidates are the demand term and the night-time error at D10.

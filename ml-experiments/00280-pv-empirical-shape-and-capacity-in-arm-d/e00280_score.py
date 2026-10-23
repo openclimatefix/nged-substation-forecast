@@ -112,6 +112,8 @@ def add_slices(*, frame: pl.DataFrame) -> pl.DataFrame:
 GROUPS: Final[dict[str, tuple[str, ...]]] = {
     "primary": SITES_PRIMARY,
     "d5": ("D5",),
+    "d9": ("D9",),
+    "d16": ("D16",),
     "others": ("D10", "D11", "D14"),
     "decision": common.DECISION_SITES,
 }

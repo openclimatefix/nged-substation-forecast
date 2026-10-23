@@ -268,7 +268,7 @@ def _pv_shape_and_ghi(
     return site_shape(sun=self, ghi_w_m2=ghi_w_m2, fleet=fleet, plant=plant)
 
 
-SunGeometry.pv_shape_and_ghi = _pv_shape_and_ghi  # ty: ignore[invalid-assignment]
+SunGeometry.pv_shape_and_ghi = _pv_shape_and_ghi
 
 
 def plant_of(*, site: str) -> PlantParameters:
@@ -280,16 +280,22 @@ def plant_of(*, site: str) -> PlantParameters:
     """
     spec = arm_spec(site=site)
     scale = float(spec.get("scale", 1.0))
-    plain = {
-        "tilt_deg": float(spec.get("tilt_deg", FLEET.tilt_deg)),
-        "azimuth_deg": float(spec.get("azimuth_deg", FLEET.azimuth_deg)),
-        "dc_capacity_mw": FLEET.dc_capacity_mw * scale,
-        "ac_capacity_mw": FLEET.ac_capacity_mw * scale,
-    }
+    tilt_deg = float(spec.get("tilt_deg", FLEET.tilt_deg))
+    azimuth_deg = float(spec.get("azimuth_deg", FLEET.azimuth_deg))
+    dc_capacity_mw = FLEET.dc_capacity_mw * scale
+    ac_capacity_mw = FLEET.ac_capacity_mw * scale
     if not {"empirical", "level", "april_june"} & spec.keys():
-        return PlantParameters(**plain)
+        return PlantParameters(
+            tilt_deg=tilt_deg,
+            azimuth_deg=azimuth_deg,
+            dc_capacity_mw=dc_capacity_mw,
+            ac_capacity_mw=ac_capacity_mw,
+        )
     return SiteShape(
-        **plain,
+        tilt_deg=tilt_deg,
+        azimuth_deg=azimuth_deg,
+        dc_capacity_mw=dc_capacity_mw,
+        ac_capacity_mw=ac_capacity_mw,
         site=site,
         empirical=bool(spec.get("empirical", False)),
         level=float(spec.get("level", 1.0)),
