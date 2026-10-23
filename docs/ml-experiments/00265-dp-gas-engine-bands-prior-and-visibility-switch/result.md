@@ -17,15 +17,14 @@ size: >-
   fixed below before any score is read; callers are this folder's scripts, which read experiment
   191's stored forecasts. Sonnet only, as the maintainer's brief requires.
 hypothesis: >-
-  Widening a Primary's forecast bands from its own past residuals ([experiment
-  264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md), arm 2b) has coverage far from
-  nominal in the first quarter, when there is no history, and after a change in the site's
-  behaviour. A prior taken from the other Primaries' residuals, shrunk towards the site's own
-  trailing residuals as they accrue, fixes the first quarter. A causal switch on the share of large
-  drops in the trailing 30 days returns the widening to normal when D8's engine becomes visible in
-  the readings (around April 2026). Together they hold D8's q05-to-q95 coverage within 5 points of
-  0.90 in every quarter, without raising the cost in quantile score, and without harming Primaries
-  that have no engine.
+  Widening a Primary's forecast bands from its own past residuals (experiment 264, arm 2b) has
+  coverage far from nominal in the first quarter, when there is no history, and after a change in
+  the site's behaviour. A prior taken from the other Primaries' residuals, shrunk towards the site's
+  own trailing residuals as they accrue, fixes the first quarter. A causal switch on the share of
+  large drops in the trailing 30 days returns the widening to normal when D8's engine becomes
+  visible in the readings (around April 2026). Together they hold D8's q05-to-q95 coverage within 5
+  points of 0.90 in every quarter, without raising the cost in quantile score, and without harming
+  Primaries that have no engine.
 prediction: >-
   Written before any new score is read. The descriptive table of 264 (reference coverage by month at
   D8) was read, so P1 and P3 are not blind. (P1) The control (264's arm 2b, own history only) holds
