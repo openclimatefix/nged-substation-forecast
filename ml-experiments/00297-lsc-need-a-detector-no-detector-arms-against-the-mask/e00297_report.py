@@ -28,6 +28,7 @@ from studies.node_curtailment import (
 SCORES: Final[Path] = WORK_DIR / "scores"
 RESULTS: Final[Path] = WORK_DIR / "results"
 SCORES2: Final[Path] = WORK_DIR / "scores2"
+SCORES3: Final[Path] = WORK_DIR / "scores3"
 NO_DETECTOR: Final[tuple[str, ...]] = (
     "K0",
     "GAM_ONLY",
@@ -38,8 +39,9 @@ NO_DETECTOR: Final[tuple[str, ...]] = (
     "ASOF_WIDEN",
     "LEAD_DECAY",
 )
+HELDOUT: Final[str] = "BAND_HEAD_HELDOUT"
 DETECTOR: Final[tuple[str, ...]] = ("PERFECT", "PERFECT_ADD", "DET", "DET_ADD")
-ARMS: Final[tuple[str, ...]] = (*NO_DETECTOR, *DETECTOR)
+ARMS: Final[tuple[str, ...]] = (*NO_DETECTOR, HELDOUT, *DETECTOR)
 """The `_ADD` arms (post hoc) forecast observed power, so they are scored on that target only."""
 KEEP: Final[tuple[str, ...]] = (
     "qs_nra",
@@ -105,7 +107,12 @@ def load_wide() -> tuple[pl.DataFrame, dict[str, Any]]:
         "actual_obs",
     ]
     long1 = pl.concat([pl.read_parquet(p) for p in sorted(SCORES.glob("D*_*.parquet"))])
-    long2 = pl.concat([pl.read_parquet(p) for p in sorted(SCORES2.glob("D*_*.parquet"))])
+    long2 = pl.concat(
+        [
+            pl.read_parquet(p)
+            for p in [*sorted(SCORES2.glob("D*_*.parquet")), *sorted(SCORES3.glob("D*_*.parquet"))]
+        ]
+    )
     wide = long1.filter(pl.col("arm") == "K0").select(meta_cols)
     for long in (long1, long2):
         for arm in sorted(long["arm"].unique().to_list()):
@@ -431,7 +438,7 @@ def main() -> None:
             v = col(wide, metric, target, arm)
             m = g5 & half_a & np.isfinite(v)
             scores[arm] = float(np.sum(v[m] * weight[m]) / np.sum(weight[m]))
-        best = min(scores, key=scores.get)
+        best = min(scores, key=lambda name: scores[name])
         print(
             f"best no-detector arm on half A for {metric} {target}: {best}",
             {k: round(v, 4) for k, v in scores.items()},
@@ -552,6 +559,38 @@ def main() -> None:
         recovery.append({"arm": arm, **res})
         print(f"{arm:20s} recovery {res['ratio']:.3f} ({res['lo']:.3f}, {res['hi']:.3f})")
     out["recovery"] = recovery
+    # 7b. Held-out head: fitted on even-seed worlds only, scored on odd-seed worlds only.
+    print("=== held-out head against the cross-fitted head, odd-seed worlds only")
+    odd = ~half_a
+    for arm in ("BAND_HEAD", HELDOUT):
+        for metric, target, gname in (
+            ("tw95", "nra", "G4 after"),
+            ("tw95", "nra", "G5 near"),
+            ("qs", "nra", "G1 ordinary"),
+            ("cost0.5", "obs", "G5 near"),
+        ):
+            show(
+                f"{arm:18s} vs K0 {metric} {target} {gname}",
+                gain_of(
+                    base_arm="K0", arm=arm, metric=metric, target=target, mask=groups[gname] & odd
+                ),
+            )
+        actual = wide["actual_nra"].to_numpy().astype(np.float64)
+        for side, ind in (
+            ("below q01", actual < wide[f"q01__{arm}"].to_numpy()),
+            ("above q99", actual > wide[f"q99__{arm}"].to_numpy()),
+        ):
+            m = g4 & odd
+            res = interval(
+                gain=ind[m].astype(np.float64),
+                base=np.ones(m.sum()),
+                weight=weight[m],
+                units=units[m],
+                rng=rng,
+            )
+            print(
+                f"{arm:18s} G4 {side}: share {100 * res['mean']:.2f}% ({100 * res['mean_lo']:.2f}, {100 * res['mean_hi']:.2f})"
+            )
     # 8. Checks: median minus mean forecast error per site.
     print("=== median-forecast error minus mean-forecast error, per site (points)")
     checks = []

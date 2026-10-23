@@ -171,6 +171,9 @@ def score_arms(
         data: The site data.
         delta_points: The injected points per grid position.
         edges: The 95th and 99th percentile of earlier power.
+
+    Returns:
+        The long score table.
     """
     actual_nra = data.actual[rows]
     actual_obs = actual_nra + delta_points[data.position[rows]]

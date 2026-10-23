@@ -117,21 +117,22 @@ best_arm: >-
   of a shift, and the share of readings above q99 in the 48 hours after a shift falls from 14.2% to
   3.5%.
 headline: >-
-  A small quantile model that reads the filter's recent correction beats the RO-NC mask, and in the
-  7-day window beats the perfect mask on the upper-tail score. Only perfect knowledge with the true
-  megawatts added back beats it on curtailment cost, by 6.5% (3.9 to 9.3).
+  A quantile model that reads the Kalman filter's recent correction beats the RO-NC mask. Within 7
+  days of a shift it beats the perfect mask on the upper-tail score, but leaving out one Primary
+  substation (D16) removes that margin. Only perfect knowledge with the true megawatts added back
+  beats it on curtailment cost, by 6.5% (3.9 to 9.2).
 lessons: >-
-  Most of what the best no-detector model gains is better calibrated bands, not a response to the
-  shift itself, so a detector has to be compared with a forecast whose bands are already recalibrated.
-  The RO-NC mask loses 35% of the upper-tail score within 7 days of a shift because its false alarms
-  cost more than its true alarms gain.
+  Under half of what the best no-detector model gains survives reweighting ordinary rows like the
+  near-shift rows, so part of its gain is better calibrated bands and the rest is a response to the
+  filter's correction. RO-NC loses 35% of the upper-tail score within 7 days of a shift, and false
+  alarms are the likely cause.
 take_home_message: >-
-  A forecast with no detector that simply recalibrates its bands and reads how far the recent-power
+  A forecast with no detector that recalibrates its bands and reads how far the recent-power
   correction has moved scores better than the RO-NC detector near load shifts, so with RO-NC a
   detector is not shown to be needed. Perfect knowledge with the true megawatts added back still
-  lowers curtailment cost by 6.5% (3.9% to 9.3%) against that forecast, so the next step is to run
-  the better LSC detector (LR_b20) on the same simulated shifts and judge it against a forecast
-  that has the recalibrated bands.
+  lowers curtailment cost by 6.5% (3.9 to 9.2) against that forecast, so the next step is to run the
+  better LSC detector (LR_b20) on the same simulated shifts and judge it against a forecast that has
+  the recalibrated bands.
 advice:
   - >-
     Compare any load shift detector with the band quantile head, not with K0: K0's bands are too
@@ -139,16 +140,16 @@ advice:
   - >-
     Judge a detector's near-shift effect on the rows where a shift acts (before the alarm, during,
     and 48 hours after), not on the whole 7-day window: 90% of the window's rows are margin rows
-    where the detector does nothing (Decision contrasts).
+    where a detector does nothing (Decision contrasts).
   - >-
-    Run LR_b20 on the injected worlds before concluding that no detector is needed: RO-NC's false
-    alarms lose 35% (23 to 49) of the upper-tail score within 7 days of a shift (figure 1).
+    Run LR_b20 on the injected worlds before concluding that no detector is needed: RO-NC loses 35%
+    (23 to 49) of the upper-tail score within 7 days of a shift (figure 1).
   - >-
     Give a detector's perfect-knowledge ceiling the same recalibrated bands as the best no-detector
-    arm before ranking them, because the perfect mask keeps K0's bands and loses ordinary-row
-    score by 1.8% to the head (Decision contrasts).
+    arm before ranking them, because the perfect mask keeps K0's bands and scores 0.048 points
+    worse than the head on ordinary rows (Decision contrasts).
   - >-
-    Report each Primary substation: D16 alone moves the perfect mask against the head from -5.9% to
+    Report each Primary substation: D16 alone moves the perfect mask against the head from -5.7% to
     +0.4%, and D11 alone moves the RO-NC megawatts-added-back arm from -3.9% to +1.4% (Decision
     contrasts).
 production_status: not-for-production
@@ -156,20 +157,26 @@ adopted_in: none
 date: 2026-10-23
 ---
 
-**Experiment 297 asks whether a forecast needs a load shift detector at all.** A load shift moves
-demand from one Primary substation to its neighbours for hours or days. We simulated 411 such shifts
-(44 copies of the real power record, six Primary substations, from [experiment
-141](../00141-switching-detector-fed-into-gam-k/result.md)) and compared a forecast that has a
-detector with seven forecasts that have none, scored as in [experiment
+**This experiment asks whether a forecast needs a load shift detector at all.** A load shift moves
+demand from one Primary substation to its neighbours for
+hours or days. A detector finds those shifts in the power readings, and the forecast then sets aside
+the readings inside each detected shift (a "mask"). We simulated 411 load shifts (44 copies of the
+real power record, six Primary substations labelled D5, D9, D10, D11, D14, and D16, from [experiment
+141](../00141-switching-detector-fed-into-gam-k/result.md)). We compared forecasts that use a
+detector with seven forecasts that use none, scored as in [experiment
 283](../00283-lsc-perfect-knowledge-value-to-forecast-and-curtailment/result.md). The detector is
-RO-NC, because the carried LR_b20 mask was never run on the simulated shifts. **Against RO-NC, a
-detector is not shown to be needed.** The page does not conclude that no detector is needed, because
-RO-NC is the weaker detector.
+RO-NC (the refit-offset neighbour-count detector), because LR_b20 (a learned detector built on RO-NC's
+alarms) was never run on the simulated shifts. **Against RO-NC, a detector is not shown to be
+needed.** The page does not conclude that no detector is needed, because RO-NC is the weaker of the
+two detectors.
 
-**Primary substations have no published export limit, so curtailment figures compare forecasts and
-state no money saved.** Gains are percentages of K0's score (K0 is the Kalman filter on recent power
-with no knowledge of shifts); positive is better. Intervals resample whole shifts, or whole calendar
-months for ordinary rows.
+**K0 is the Kalman filter on recent power with no knowledge of shifts; every gain is a percentage of
+K0's score, and positive is better.** The "upper-tail score" is the continuous ranked probability
+score weighted towards values above the 95th percentile of earlier power (twCRPS). G1 is ordinary
+rows, G4 is the 48 hours after a shift ends, G5 is the 7 days either side of a shift and the shift
+itself, and "shift rows" are the before-alarm, during, and after rows of G5. Primary substations have
+no published export limit, so curtailment figures compare forecasts and state no money saved.
+Intervals resample whole shifts, or whole calendar months for ordinary rows.
 
 ![Gain in the upper-tail score over K0 by row group](figure_1_upper_tail_gain_over_k0.svg)
 
@@ -177,91 +184,110 @@ months for ordinary rows.
 
 ![Share of readings outside the 1% to 99% band after a shift](figure_3_tail_coverage_after_a_shift.svg)
 
-## Results
-
-- **Decision rule against RO-NC (half B of the worlds; the best no-detector arm was the band
-  quantile head, chosen on half A).** The RO-NC mask loses 57.9% (33.7 to 88.6) of the upper-tail
-  score within 7 days of a shift (G5), and loses on ordinary rows (-0.178 points, -0.299 to -0.071).
-  RO-NC with megawatts added back loses 3.9% (0.1 to 9.0) of curtailment cost. The rule is not met.
-- **Perfect knowledge against the same head.** On the upper-tail score within 7 days it loses 5.7%
-  (1.1 to 10.8); on the 10.4% of those rows where a shift acts it gains 10.2% (-7.0 to +25.4), which
-  does not resolve. On curtailment cost, with the true megawatts added back, it gains 6.5% (3.9 to
-  9.3) in G5 and 14.9% (6.3 to 23.4) on shift rows. The ordinary-row clause fails: the head scores
-  0.048 points better (-0.148 to +0.019) and costs 2.7% (0.5 to 5.3) more than K0 on ordinary rows.
-- **The decision contrasts are not robust to one Primary substation.** Without D16 the perfect mask
-  against the head moves from -5.7% to +0.4% (-5.1 to +5.5) on score in G5. Without D11 the RO-NC
-  megawatts-added-back arm moves from -3.9% to +1.4% (-2.4 to +5.3) on cost.
-- **P1 failed.** The forecast with no correction (GAM_ONLY) loses 0.222 points (0.021 to 0.374) of
-  CRPS on ordinary rows at leads of 24 to 168 hours, against the bar of 0.10. In the 48 hours after
-  a shift 0.16% (0.07 to 0.28) of true readings fall below its q01 and 3.97% (2.45 to 6.25) rise
-  above its q99, and the upper tail is outside the 2-point bar.
-- **P2 failed as written.** K0's share below q01 after a shift is 2.24% (1.14 to 3.58), not the
-  brief's 9.1%, so the 3% bar is met by K0 itself. The share above q99 is the real fault: 14.23%
-  (10.85 to 17.84) for K0, 3.54% (2.26 to 5.02) for the head. The head changes ordinary-row CRPS by
-  +0.046 points (-0.024 to +0.151), above the 0.01 bar.
-- **P3 failed.** The lead-decay filter recovers 5.8% (-11.7 to 29.6) of the perfect mask's gain in
-  the 48 hours after a shift, against 60%. The recovery by GAM_ONLY is 79.5% (57.1 to 132.7) and by
-  the head 63.6% (22.6 to 218.7), but those arms were not the ones predicted.
-- **The head's edge is mostly calibration (audit estimate).** Its 1% to 99% band is about 20%
-  wider than K0's on every row group. Weighting ordinary rows like the near-shift rows gives the head
-  +4.9% over K0, against +11.5% near shifts. The band table without the filter level (BAND_TABLE_PLAIN)
-  gains 1.8% (1.1 to 2.6) near shifts, so the filter level carries the rest.
-
 ## Gains over K0 near a shift
 
-| Arm | Upper-tail score, 48 h after (G4) | Upper-tail score, within 7 days (G5) | Cost, within 7 days (G5) |
+| Arm | Upper-tail score, 48 h after (G4) | Upper-tail score, within 7 days (G5) | Curtailment cost, within 7 days (G5) |
 |---|---|---|---|
-| GAM_ONLY (no correction) | +18.4 (9.8 to 30.0) | +2.3 (-2.5 to 7.5) | -7.5 (-10.7 to -4.6) |
+| GAM_ONLY (no correction) | +18.4 (9.8 to 30.0) | +2.3 (-2.5 to 7.5) | -7.5 (-10.8 to -4.6) |
 | Band table by disagreement | +1.6 (-5.4 to 7.2) | +6.7 (5.0 to 8.7) | -0.9 (-2.0 to +0.0) |
-| Band quantile head | +14.7 (6.7 to 21.1) | +11.5 (9.7 to 13.4) | +2.0 (1.0 to 3.1) |
-| As-of widening | +14.2 (6.3 to 24.6) | -0.3 (-4.7 to 4.4) | -4.0 (-5.7 to -2.3) |
-| Lead-decay filter | +1.3 (-2.6 to 6.7) | +9.6 (6.6 to 12.9) | -3.5 (-6.1 to -1.6) |
-| RO-NC mask | +13.9 (0.6 to 26.5) | -35.0 (-48.8 to -22.9) | -6.1 (-9.9 to -2.7) |
-| Perfect mask | +23.1 (8.6 to 39.0) | +6.3 (2.8 to 10.0) | -1.4 (-4.9 to +1.6) |
-| Perfect, megawatts added back (post hoc) | not scored | not scored | +8.1 (6.4 to 10.0) |
+| Band quantile head | +14.7 (6.7 to 20.9) | +11.5 (9.7 to 13.4) | +2.0 (1.0 to 3.1) |
+| As-of widening | +14.2 (6.3 to 24.6) | -0.3 (-4.6 to 4.5) | -4.0 (-5.7 to -2.3) |
+| Lead-decay filter | +1.3 (-2.6 to 6.6) | +9.6 (6.7 to 12.9) | -3.5 (-6.0 to -1.6) |
+| RO-NC mask | +13.9 (0.9 to 26.5) | -35.0 (-48.8 to -23.0) | -6.1 (-9.9 to -2.7) |
+| Perfect mask | +23.1 (8.7 to 39.1) | +6.3 (2.8 to 10.0) | -1.4 (-4.9 to +1.6) |
+| Perfect, megawatts added back (post hoc, scored against observed power) | +18.1 (6.0 to 31.5) | +6.6 (3.3 to 9.7) | +8.1 (6.4 to 10.0) |
+
+Every cell is a percentage gain over K0 with a 95% interval.
+
+## Decision contrasts
+
+- **Decision rule against RO-NC (half B of the worlds; the best no-detector arm, the band quantile
+  head, was chosen on half A).** The RO-NC mask loses 57.9% (34.1 to 88.8) of the upper-tail score
+  against the head within 7 days of a shift, and scores 0.178 points (0.070 to 0.298) worse on
+  ordinary rows. RO-NC with megawatts added back loses 3.9% (0.1 to 9.1) of curtailment cost. The
+  decision rule is not met.
+- **Perfect knowledge against the same head.** On the upper-tail score within 7 days it loses 5.7%
+  (1.1 to 10.9). On the 10.4% of those rows where a shift acts it gains 10.2% (-7.0 to +25.0), so
+  the interval spans zero. On curtailment cost, with the true megawatts added back, it gains 6.5%
+  (3.9 to 9.2) in G5 and 14.9% (6.3 to 23.4) on shift rows. The ordinary-row clause fails: the
+  perfect mask scores 0.048 points worse than the head on ordinary rows (interval for perfect minus
+  head: -0.149 to +0.019). The head also costs 2.9% (0.7 to 5.7) more curtailment than K0 on
+  ordinary rows.
+- **Leaving out one Primary substation changes the contrasts.** Without D16, the perfect mask
+  against the head moves from -5.7% to +0.4% (-5.1 to +5.6) on the upper-tail score in G5. Without
+  D11, RO-NC with megawatts added back moves from -3.9% to +1.4% (-2.4 to +5.2) on cost.
+- **Held-out check of the head (post hoc).** The head's fit used the same worlds as its scoring, on
+  the other month parity. Refitting it on even-seed worlds only and scoring odd-seed worlds only
+  keeps the gain: +10.1% (8.2 to 12.3) within 7 days against +11.8% (9.2 to 14.9) for the
+  cross-fitted head on the same worlds, and 4.07% (2.44 to 5.94) of readings above q99 after a
+  shift against 3.85% (2.30 to 5.68). The injector and the real record are shared, so a leak
+  through either is not removed.
+
+## Predictions
+
+- **P1 failed.** GAM_ONLY loses 0.222 points (0.029 to 0.374) of CRPS on ordinary rows at leads of
+  24 to 168 hours, against the bar of 0.10. In the 48 hours after a shift 0.16% (0.07 to 0.28) of
+  true readings fall below its q01 and 3.97% (2.46 to 6.25) rise above its q99, outside the
+  2-percentage-point bar.
+- **P2 failed as written.** K0's share below q01 after a shift is 2.24% (1.14 to 3.55), not the
+  brief's 9.1%, so K0 meets the 3% bar. The share above q99 is the real fault: 14.23% (10.92 to
+  17.74) for K0 and 3.54% (2.22 to 5.05) for the head. The head lowers ordinary-row CRPS by 0.046
+  points (-0.023 to +0.150), more than the 0.01 bar allows.
+- **P3 failed.** The lead-decay filter recovers 5.8% (-11.9 to 30.0) of the perfect mask's gain in
+  the 48 hours after a shift, against 60%. Arms outside the prediction recover more: GAM_ONLY 79.5%
+  (57.2 to 134.1), as-of widening 61.7% (41.5 to 93.4), and the head 63.6% (22.4 to 210.6).
 
 ## Checks
 
-- **Median minus mean forecast, per site:** the mean absolute error of the median minus that of the
-  mean forecast lies between -0.274 (band head) and +0.088 (band table, plain) points. The band
-  arms keep K0's mean forecast, so their mean error equals K0's by construction, and the head moves
-  the median by design.
-- **Absolute scores (points of effective capacity, K0 / head / perfect mask):** CRPS against the
-  true series is 2.71 / 2.66 / 2.71 on ordinary rows, 4.14 / 3.43 / n.a. 48 hours after a shift
-  (G4), and 2.96 / 2.74 / n.a. within 7 days (G5). The full table is in the printed report.
-- **Triggers that fired:** trigger 2 (all three predictions failed; the tested explanation is K0's
-  measured 2.24% below q01 against the brief's 9.1%), trigger 4 (leaving out D16 or D11 flips
-  decision contrasts), and trigger 7 (step 6 of the program builds its bar on the best no-detector
-  arm). A Sonnet audit re-derived the headline contrasts from the stored scores and reproduced them.
-  We accepted its findings 1 to 4 (report shift rows apart from margin rows, report per-site
-  contrasts, add the ordinary-row cost clause, state that the head's edge is mostly calibration) and
-  documented findings 5 and 6 without refitting, because the clean-series spread in GAM_ONLY and
-  ASOF_WIDEN flatters two arms that are not the best arm. Its finding 2 asked for a control with no
-  filter input; BAND_TABLE_PLAIN is that control.
+- **Median minus mean forecast, per site:** the mean absolute error of the median forecast minus
+  that of the mean forecast lies between -0.274 (band head) and +0.088 (band table, plain) points.
+  The band arms keep K0's mean forecast, so their mean-forecast error equals K0's by construction,
+  and the head moves the median by design.
+- **Absolute CRPS against the true series (points of effective capacity, K0 / head / perfect
+  mask):** 2.71 / 2.66 / 2.71 on ordinary rows, 4.14 / 3.43 / 2.69 in G4, and 2.96 / 2.74 / 2.64 in
+  G5. The printed report holds every arm.
+- **Triggers that fired:** the prediction-contradiction trigger (all three predictions failed; the
+  tested explanation is K0's measured 2.24% below q01 against the brief's 9.1%), the
+  leave-one-site-out trigger (D16 and D11 flip contrasts), and the replication trigger (the next
+  program step builds its bar on the best no-detector arm). An audit by a fresh Sonnet reviewer
+  reproduced the headline contrasts from the stored scores. Its main finding, that the head's
+  advantage over the perfect mask in G5 sits in margin rows (89.6% of G5), is in the contrasts
+  above. Its estimate that the head's gain falls from +11.5% to +4.9% when ordinary rows are
+  reweighted like near-shift rows is not in the printed report, and BAND_TABLE_PLAIN (+1.8%, 1.1 to
+  2.6, the same arm without the filter level) is the printed control.
 
 ## Caveats
 
-- **RO-NC is a weak stand-in.** Its false alarms cause the 35% loss; LR_b20 may behave differently,
-  and experiment 208 noted the learned score was trained on the real record.
+- **RO-NC is a weak stand-in.** Its false alarms are the likely cause of the 35% loss, although the
+  report does not separate them from late ends. LR_b20 may behave differently, and experiment 208
+  noted that its learned score was trained on the real record.
 - **The comparison is not like for like on bands.** The detector arms keep K0's bands, and the head
-  has refitted bands, so the head's lead is partly a calibration gain a detector forecast could
-  also have.
-- **Lab conditions.** The megawatts-added-back arms use the true megawatts and the true end of the
+  has refitted bands, so part of the head's lead is a calibration gain that a detector forecast
+  could also have.
+- **Lab conditions.** The megawatts-added-back arms use the true megawatts and the true end of each
   shift, and the detector arms use hindsight ends.
-- **Simulated shifts are all 25% of load or more and last over a day.** The 144 half-hours after the
-  end and 7-day margins give 89.6% margin rows in G5.
-- **Cross-fitting folds rows near a shift by onset month**, so a few target timestamps fall in the
-  other parity's months. The effect is probably small and was not quantified.
+- **The simulated shifts are all 25% of load or more and last over a day.**
+- **Not done.** The head was not scored on the real record (7 logged transfers), which resolves no
+  curtailment difference ([experiment
+  277](../00277-lsc-curtailment-metric-on-existing-forecasts/result.md)). The as-of widening arm is
+  a simplified port of [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md)'s
+  idea, and no comparison with experiment 209's heads was made.
+- **Spreads and folds.** GAM_ONLY and as-of widening fit their spreads on the clean series, which
+  flatters both arms slightly. Rows near a shift are folded by onset month, so a few target
+  timestamps fall in the other parity's months.
 
 ## Arms and rows
 
-- **Arms:** K0; GAM_ONLY (no correction, spread fitted on the other month parity); GAM_ONLY_K0SPREAD;
-  band table (lead band by hour band); band table by disagreement; band quantile head (XGBoost, 11
-  quantiles, depth 3, 100 rounds); as-of widening; lead-decay filter; RO-NC mask and RO-NC with
-  megawatts added back; perfect mask and perfect with megawatts added back.
+- **Arms:** K0; GAM_ONLY (no correction, spread fitted on the other month parity); the same with
+  K0's bands; a band table (lead band by hour band); a band table by disagreement (also binned by the
+  filter's correction in units of its own history); the band quantile head (XGBoost, 11 quantiles,
+  depth 3, 100 rounds, trained on residuals against observed power); as-of widening; the lead-decay
+  filter; RO-NC with and without megawatts added back; perfect knowledge with and without megawatts
+  added back.
+- **Training:** every fitted arm is trained on all worlds' rows of one month parity and scored on the
+  other parity, then the roles swap. Rows near a shift take the parity of the shift's onset month.
 - **Rows and schedule:** experiment 283's rows (22.9 million weighted rows, 411 shifts); no
-  retraining, the forecasts are cached member forecasts of experiments 111 and 115; the fitted arms
-  are cross-fitted by month parity, so the contrast does not depend on a retraining schedule.
+  retraining, the forecasts are cached member forecasts of experiments 111 and 115.
 - **Weather:** the cached ensemble member forecasts; the readings are the real residual stream plus
   injected megawatts.
 

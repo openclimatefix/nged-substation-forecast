@@ -31,6 +31,7 @@ LABELS: Final[dict[str, str]] = {
     "BAND_TABLE_PLAIN": "Band table",
     "BAND_TABLE_DISAGREE": "Band table by disagreement",
     "BAND_HEAD": "Band quantile head",
+    "BAND_HEAD_HELDOUT": "Band head, held-out worlds",
     "ASOF_WIDEN": "As-of widening",
     "LEAD_DECAY": "Lead-decay filter",
     "K0": "K0 (filter, no knowledge)",
@@ -110,22 +111,24 @@ def gain_chart(
         rule = (
             alt.Chart(sub)
             .mark_rule(strokeWidth=2)
-            .encode(x=alt.X("lo:Q", title=x_title), x2="hi:Q", y=y, color=colour)
-        )  # ty: ignore[unresolved-attribute]
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("lo:Q", title=x_title), x2="hi:Q", y=y, color=colour
+            )
+        )
         dot = (
             alt.Chart(sub)
             .mark_point(filled=True, size=45, opacity=1)
-            .encode(x="est:Q", y=y, color=colour)
-        )  # ty: ignore[unresolved-attribute]
+            .encode(x="est:Q", y=y, color=colour)  # ty: ignore[unresolved-attribute]
+        )
         zero = (
             alt.Chart(pl.DataFrame({"x": [0.0]}))
             .mark_rule(color="#888888", strokeDash=[4, 3])
-            .encode(x="x:Q")
-        )  # ty: ignore[unresolved-attribute]
+            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        )
         panels.append(
             alt.layer(zero, rule, dot).properties(width=WIDTH, height=22 * len(order), title=group)
         )
-    return alt.vconcat(*panels).properties(title=_title(text=title, line=line))  # ty: ignore[invalid-return-type]
+    return alt.vconcat(*panels).properties(title=_title(text=title, line=line))
 
 
 def coverage_chart(*, rows: list[dict[str, Any]]) -> alt.VConcatChart:
@@ -156,29 +159,29 @@ def coverage_chart(*, rows: list[dict[str, Any]]) -> alt.VConcatChart:
         rule = (
             alt.Chart(sub)
             .mark_rule(strokeWidth=2)
-            .encode(
+            .encode(  # ty: ignore[unresolved-attribute]
                 x=alt.X("lo:Q", title="Readings outside the band (% of readings)"),
                 x2="hi:Q",
                 y=y,
                 color=colour,
             )
-        )  # ty: ignore[unresolved-attribute]
+        )
         dot = (
             alt.Chart(sub)
             .mark_point(filled=True, size=45, opacity=1)
-            .encode(x="est:Q", y=y, color=colour)
-        )  # ty: ignore[unresolved-attribute]
+            .encode(x="est:Q", y=y, color=colour)  # ty: ignore[unresolved-attribute]
+        )
         nominal = (
             alt.Chart(pl.DataFrame({"x": [1.0]}))
             .mark_rule(color="#888888", strokeDash=[4, 3])
-            .encode(x="x:Q")
-        )  # ty: ignore[unresolved-attribute]
+            .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+        )
         panels.append(
             alt.layer(nominal, rule, dot).properties(
                 width=WIDTH, height=22 * len(order), title=f"Reading {side} (nominal 1%)"
             )
         )
-    return alt.vconcat(*panels).properties(  # ty: ignore[invalid-return-type]
+    return alt.vconcat(*panels).properties(
         title=_title(
             text="After a shift, the lead-decay filter and the RO-NC mask miss the upper tail most",
             line="Share of true normal-arrangement readings in the 48 hours after a shift that fall outside the 1% to 99% band. Dot: estimate. Line: 95% interval from resampling whole shifts. Dashed line: nominal 1%. Closer to the dashed line is better.",

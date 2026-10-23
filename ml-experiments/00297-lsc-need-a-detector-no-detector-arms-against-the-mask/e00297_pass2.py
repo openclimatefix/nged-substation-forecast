@@ -31,6 +31,7 @@ import numpy as np
 import polars as pl
 import xgboost as xgb
 from e00297_common import WORK_DIR
+from studies.dp_ens import LeadHourSpread
 from studies.dp_ens_weather import lead_band_of_hours
 from studies.ens_members import mixture_quantiles
 
@@ -172,7 +173,7 @@ def asof_quantiles(
     site: str,
     rows: np.ndarray,
     ratio: np.ndarray,
-    spreads: dict[int, object],
+    spreads: dict[int, LeadHourSpread],
 ) -> np.ndarray:
     """GAM_ONLY's quantiles with each row's spread offsets multiplied by its as-of ratio."""
     month = score.row_month(data=data, rows=rows)
