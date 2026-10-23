@@ -3,6 +3,7 @@
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | 252 | Does the best-guess stack score within 0.05 points of BG2 at the eight Primaries with no stack forecast? | High (cards) | Nothing | Planned |
+| 306 | Do solar-times-temperature and solar-times-day-type columns close the April-to-June excess over BG2 at D5 and D9? | High | Nothing | Planned |
 
 ## Planned experiments
 
