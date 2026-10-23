@@ -97,7 +97,9 @@ def gam_only_spreads(site: str) -> dict[int, LeadHourSpread]:
     return out
 
 
-def gam_only_quantiles(*, data: fed.site_module.SiteData, site: str, rows: np.ndarray) -> np.ndarray:
+def gam_only_quantiles(
+    *, data: fed.site_module.SiteData, site: str, rows: np.ndarray
+) -> np.ndarray:
     """GAM_ONLY's 11 quantiles at `rows`, each from the spread fitted on the other month parity."""
     spreads = gam_only_spreads(site)
     month = row_month(data=data, rows=rows)
@@ -122,7 +124,9 @@ def site_scales(site: str) -> dict[str, float]:
     """
     data = fed.get_site(site)
     n = len(data.stream)
-    correction = fed.correction_for(data=data, stream=data.stream, prior=np.zeros(n), multiplier=1.0)
+    correction = fed.correction_for(
+        data=data, stream=data.stream, prior=np.zeros(n), multiplier=1.0
+    )
     c0 = correction[data.offsets[:-1]]
     c0 = c0[np.isfinite(c0)]
     month = (data.month_code % 100).astype(np.int64)
@@ -276,13 +280,19 @@ def job(args: tuple[str, int]) -> str:
         k = near[pos_rows]
         has_event = k >= 0
         kk = np.where(has_event, k, 0)
-        in_shift = has_event & (pos_rows >= onset_pos[kk]) & (pos_rows < end_pos[kk] + ORDINARY_TAIL_STAMPS)
+        in_shift = (
+            has_event
+            & (pos_rows >= onset_pos[kk])
+            & (pos_rows < end_pos[kk] + ORDINARY_TAIL_STAMPS)
+        )
         phase = np.where(
             has_event
             & (cutoffs[rows] >= onset_pos[kk])
             & (pos_rows >= onset_pos[kk])
             & (pos_rows < end_pos[kk] + inj.AFTER_STAMPS),
-            inj.phase_of(cutoff=cutoffs[rows], target=pos_rows, onset=onset_pos[kk], end=end_pos[kk]),
+            inj.phase_of(
+                cutoff=cutoffs[rows], target=pos_rows, onset=onset_pos[kk], end=end_pos[kk]
+            ),
             np.where(has_event, "MARGIN", "ORDINARY"),
         )
         origin = data.run_origins[data.run_of_row[rows]]
@@ -333,7 +343,9 @@ def job(args: tuple[str, int]) -> str:
             )
         )
         feature_frames.append(
-            feature.join(meta.select("row", "phase", "in_shift", "lead_hours"), on="row").with_columns(
+            feature.join(
+                meta.select("row", "phase", "in_shift", "lead_hours"), on="row"
+            ).with_columns(
                 site=pl.lit(site), world=pl.lit(seed, dtype=pl.Int32), period=pl.lit(period)
             )
         )
@@ -341,7 +353,10 @@ def job(args: tuple[str, int]) -> str:
         return ""
     OUT.mkdir(parents=True, exist_ok=True)
     FEATURES.mkdir(parents=True, exist_ok=True)
-    for frames, target in ((feature_frames, FEATURES / f"{site}_{seed}.parquet"), (score_frames, path)):
+    for frames, target in (
+        (feature_frames, FEATURES / f"{site}_{seed}.parquet"),
+        (score_frames, path),
+    ):
         tmp = target.with_suffix(".tmp")
         pl.concat(frames).with_columns(pl.col(pl.Float64).cast(pl.Float32)).write_parquet(tmp)
         tmp.rename(target)
