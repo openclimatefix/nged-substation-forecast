@@ -579,20 +579,20 @@ in
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
 | `baseline_forecasters` | Naive baseline `BaseForecaster` implementations the trained forecasting models must beat, currently `manual_heuristic` and `climatology` |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
-| `studies` | The tested machinery the one-off studies under `studies/` and the experiments under `ml-experiments/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score, the data paths, and the common rows the past-weather studies share. Study scripts import only their own folder, `studies.*`, and the other reviewed packages, and nothing in `src/` or any other package imports `studies` (see "Import rules for studies") |
+| `studies` | The tested machinery the one-off studies under `studies/` and the experiments under `ml-experiments/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score, the data paths, and the common rows the past-weather studies share. Study scripts import their own folder, other study and experiment folders, `studies.*`, and the other reviewed packages, and nothing in `src/` or any other package imports `studies` (see "Import rules for studies") |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
 | `notebooks` | Marimo exploration notebooks |
 
 ### Import rules for studies
 
-**A study script under `studies/` may import from its own folder, from `studies.*`
-(`packages/studies`), and from the other reviewed packages in `packages/*`.** `src/` and every
-package under `packages/` except `packages/studies` must never import `studies` or a study script,
-because humans review that code and the study code is fast-moving and agent-written. Code that two
-study folders need moves into `packages/studies/src/studies/` with its tests.
-`packages/studies/tests/test_study_boundaries.py` enforces both halves, and the `study` skill's
-"Where a study's pieces live" section says how to apply them. A script under `ml-experiments/`
-follows the same rules, and the same test covers it.
+**A script under `studies/` or `ml-experiments/` may import from its own folder, from the folder of
+another study or experiment, from `studies.*` (`packages/studies`), and from the other reviewed
+packages in `packages/*`.** `src/` and every package under `packages/` except `packages/studies`
+must never import `studies` or a script, because humans review that code and the study code is
+fast-moving and agent-written. Code that several folders need, or that production might one day
+need, moves into `packages/studies/src/studies/` with its tests.
+`packages/studies/tests/test_study_boundaries.py` enforces the rule about production code, and the `study`
+skill's "Where a study's pieces live" section says how to apply the rules.
 
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
 

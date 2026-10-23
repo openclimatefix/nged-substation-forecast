@@ -6,7 +6,8 @@ The study describes Elexon's indicated demand (INDDEM) and indicated generation 
 the settled energy that each Grid Supply Point (GSP) group takes from the transmission system (AGV).
 Every script's module docstring gives the command that runs it.
 
-**A script imports only from this folder, from `studies.*`, and from the other reviewed packages.**
+**A script imports from this folder, from other study and experiment folders, from `studies.*`,
+and from the other reviewed packages.**
 
 **The downloads live in `studies/market_downloads/` and run first.**
 

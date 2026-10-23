@@ -85,10 +85,19 @@ review as `implement-issue` does.
   the only entry to write.
 - **The code:** `ml-experiments/<id>-<slug>/`. Name every script with the id in a valid module form,
   such as `e00012_fit.py` and `e00012_report.py`, because no two scripts under `studies/` or
-  `ml-experiments/` may share a basename. A script imports its own folder, `studies.*`, and the
-  other reviewed packages, and nothing in `src/` or any other package imports it
-  (`packages/studies/tests/test_study_boundaries.py` enforces this). An experiment has no tests of
-  its own scripts; the machinery it calls is tested in `packages/studies/`.
+  `ml-experiments/` may share a basename. A script may import its own folder, the folder of an
+  earlier experiment or study, `studies.*`, and the other reviewed packages, and nothing in `src/`
+  or any other package imports it (`packages/studies/tests/test_study_boundaries.py` enforces
+  this). Run a script that imports from another folder with that folder on `PYTHONPATH`, because
+  only the script's own folder is on `sys.path` otherwise. An example is
+  `PYTHONPATH=ml-experiments/<earlier-folder> uv run --no-sync python <script>`. An experiment has
+  no tests of its own scripts; the machinery it calls is tested in `packages/studies/`.
+- **Reuse of an earlier experiment's code:** when a script imports another experiment's module,
+  name that experiment's folder in the `result.md` bullets. Never edit an earlier experiment's
+  script after its PR merged, except to fix a bug, and record that fix in the later experiment's PR
+  and `result.md`. The earlier result is immutable, so a fix that would change its numbers is
+  made only together with a correction to the earlier `result.md`; otherwise copy the code into the
+  new folder.
 - **The predictions:** `data/ml-experiments/<id>-<slug>/predictions/<name>/`, written with
   `experiment_store.write_predictions`. The folder is private and never committed.
 

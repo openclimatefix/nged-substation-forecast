@@ -4,7 +4,8 @@ This is study 2a of the staged probabilistic forecast plan ([PR #1183 (Plan: doc
 probabilistic forecast, and schedule the studies that test it)](https://github.com/openclimatefix/nged-substation-forecast/pull/1183)).
 It runs on the nine metered generator series only (6 solar farms, 3 wind farms), because ERA5 and
 CAMS are on disk only for them. It is exploratory and autonomous: it changes no production code and
-imports only from this folder, `studies.*`, and the reviewed packages in `packages/*`.
+imports from this folder, other study and experiment folders, `studies.*`, and the reviewed
+packages in `packages/*`.
 
 ## What changed after the first run
 
