@@ -440,6 +440,23 @@ the run at those substations; the ensemble mixture then pools the remaining 50 m
 ([experiment 111](00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)).
 Applies to experiments and production.
 
+**Treat the ECMWF ensemble's shortwave radiation as a 6-hour mean after lead 144 hours.** *Applies
+to: experiments and production.* "Lead" is the hours after the ensemble run's start time. The
+ensemble store's stamps are 3-hourly up to lead 144 hours and 6-hourly from lead 150 to 360 hours,
+and each downward shortwave value is a mean over the period that ends at the stamp. A pipeline that
+assumes 3-hour periods misplaces the daily peak after lead 144 hours
+([experiment 310](00310-metered-farm-long-lead-scoring/result.md)). The evidence is a build for six
+solar farms in the trial area at leads of 12 to 252 hours. The confidence is moderate, and the entry
+is provisional until the experiment has had its reviews.
+
+**Drop observations that were not known at run time when building the `manual_heuristic` and
+climatology references.** *Applies to: experiments and production.* `manual_heuristic` takes the
+quantiles of 13 earlier observed powers, 1 to 6 weeks and 49 to 55 weeks before the half-hour. When
+the lead exceeds 7 days, the observation 1 week before the half-hour is not yet known at run time.
+Drop that observation at those leads ([experiment
+310](00310-metered-farm-long-lead-scoring/result.md)). The confidence is moderate, and the entry is
+provisional until the experiment has had its reviews.
+
 **Do not assume the unit PV shape rises with irradiance at low sun.** *Applies to: experiments.*
 `SunGeometry.pv_shape_and_ghi` returned a unit PV shape that fell from 0.124 to 0.090 as
 half-hourly irradiance rose from 150 to 227 W/m2 at an elevation of about 14 degrees, in a fake
@@ -488,6 +505,18 @@ below the physics-core forecast's median on 31% to 40% of rows in every scored q
 the first hindcast quarter, so the offsets correct a stable low bias in the ensemble mixture's
 median, whose cause the experiment did not identify. Evidence: [experiment
 259](00259-wind-plant-plus-quantile-offset-head/result.md), three farms, July 2025 to June 2026.
+
+**Do not fit a wind-forecast correction to the single year of ensemble hindcast runs without
+checking that the speed-to-power relation of the hindcast year matches the scored year
+(provisional, medium confidence).** *Applies to: experiments and production.* At the three metered
+wind farms, observed power at the same ensemble-mean 100 m wind speed was higher in the scored year
+(July 2025 to June 2026) than in the hindcast runs (April 2024 to June 2025) in most speed bins, and
+the mean observed fraction of capacity rose from 0.20 to 0.25 at W1, from 0.25 to 0.28 at W2, and
+from 0.21 to 0.25 at W3, while the ensemble-mean speed rose by 0.3 m/s. A neural adapter fitted to
+the hindcast runs scored 0.21 to 1.04 points worse than the same adapter fitted to ERA5 and then
+given an offset table, and an offset table fitted to the hindcast runs still helped. Evidence:
+[experiment 303](00303-wind-adapter-in-production-setting/result.md), three farms, July 2025 to
+June 2026; the cause of the shift is not identified.
 
 **Correct the ECMWF ensemble's 10 m and 100 m wind speeds before a wind-power model fitted to ERA5
 reads them, and expect the uncorrected input to lower the median forecast by about 10 points of

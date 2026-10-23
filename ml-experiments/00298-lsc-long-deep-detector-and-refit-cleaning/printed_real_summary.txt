@@ -1,0 +1,70 @@
+transfers with two metered sides: 22 of 35
+== Tuned thresholds (2 false alarms per Primary-year in odd months) ==
+shape: (13, 10)
+┌────────┬──────┬──────────┬──────────┬───┬────────────┬───────┬──────┬──────────┐
+│ family ┆ k    ┆ fa_odd   ┆ fa_even  ┆ … ┆ fa_d9_even ┆ block ┆ drop ┆ transfer │
+│ ---    ┆ ---  ┆ ---      ┆ ---      ┆   ┆ ---        ┆ ---   ┆ ---  ┆ ---      │
+│ str    ┆ f64  ┆ f64      ┆ f64      ┆   ┆ f64        ┆ i64   ┆ i64  ┆ i64      │
+╞════════╪══════╪══════════╪══════════╪═══╪════════════╪═══════╪══════╪══════════╡
+│ A2     ┆ 2.5  ┆ 1.833768 ┆ 1.808168 ┆ … ┆ 0.92703    ┆ 0     ┆ 19   ┆ 15       │
+│ A3     ┆ 2.5  ┆ 1.430339 ┆ 1.365352 ┆ … ┆ 0.92703    ┆ 0     ┆ 15   ┆ 14       │
+│ A7     ┆ 2.0  ┆ 1.393664 ┆ 1.180845 ┆ … ┆ 0.92703    ┆ 0     ┆ 15   ┆ 14       │
+│ B      ┆ 15.0 ┆ 1.687067 ┆ 1.58676  ┆ … ┆ 0.0        ┆ 1     ┆ 27   ┆ 13       │
+│ C      ┆ 2.0  ┆ 1.283638 ┆ 1.476056 ┆ … ┆ 0.92703    ┆ 0     ┆ 11   ┆ 16       │
+│ D-A3   ┆ 1.25 ┆ 1.613716 ┆ 2.177182 ┆ … ┆ 0.0        ┆ 1     ┆ 6    ┆ 12       │
+│ D-A7   ┆ 0.75 ┆ 1.98047  ┆ 2.250985 ┆ … ┆ 0.0        ┆ 0     ┆ 4    ┆ 10       │
+│ D-C    ┆ 0.75 ┆ 1.943795 ┆ 2.841407 ┆ … ┆ 0.0        ┆ 1     ┆ 2    ┆ 12       │
+│ E3     ┆ 2.5  ┆ 1.833768 ┆ 1.697464 ┆ … ┆ 0.0        ┆ 1     ┆ 7    ┆ 14       │
+│ E7     ┆ 2.0  ┆ 1.723742 ┆ 1.217746 ┆ … ┆ 0.0        ┆ 0     ┆ 10   ┆ 14       │
+│ F-A3   ┆ 1.25 ┆ 1.613716 ┆ 2.361689 ┆ … ┆ 0.0        ┆ 1     ┆ 6    ┆ 13       │
+│ F-A7   ┆ 1.0  ┆ 1.650392 ┆ 1.549859 ┆ … ┆ 0.0        ┆ 1     ┆ 6    ┆ 12       │
+│ F-C    ┆ 1.0  ┆ 1.687067 ┆ 1.84507  ┆ … ┆ 0.0        ┆ 3     ┆ 1    ┆ 13       │
+└────────┴──────┴──────────┴──────────┴───┴────────────┴───────┴──────┴──────────┘
+== Same threshold: base variant against its neighbour-confirmed wrapper ==
+k=2.50 A3    FA all  76 even  37 partnered 9/22 transfers 14/35 | D-A3  FA all  24 even  12 partnered 5/22 transfers 8/35 | FA ratio 0.32, partnered recall loss 0.44
+k=2.50 A3    FA all  76 even  37 partnered 9/22 transfers 14/35 | F-A3  FA all  23 even  12 partnered 6/22 transfers 9/35 | FA ratio 0.30, partnered recall loss 0.33
+k=2.00 A7    FA all  70 even  32 partnered 9/22 transfers 14/35 | D-A7  FA all  20 even   8 partnered 4/22 transfers 6/35 | FA ratio 0.29, partnered recall loss 0.56
+k=2.00 A7    FA all  70 even  32 partnered 9/22 transfers 14/35 | F-A7  FA all  21 even   9 partnered 6/22 transfers 8/35 | FA ratio 0.30, partnered recall loss 0.33
+k=2.00 C     FA all  75 even  40 partnered 11/22 transfers 16/35 | D-C   FA all  20 even  12 partnered 7/22 transfers 9/35 | FA ratio 0.27, partnered recall loss 0.36
+k=2.00 C     FA all  75 even  40 partnered 11/22 transfers 16/35 | F-C   FA all  20 even  11 partnered 8/22 transfers 10/35 | FA ratio 0.27, partnered recall loss 0.27
+== Timing among found events (median hours): onset error, end error, alarm lag ==
+shape: (33, 6)
+┌────────┬──────────┬─────┬────────┬───────┬───────┐
+│ family ┆ cls      ┆ n   ┆ onset  ┆ end   ┆ lag   │
+│ ---    ┆ ---      ┆ --- ┆ ---    ┆ ---   ┆ ---   │
+│ str    ┆ str      ┆ u32 ┆ f64    ┆ f64   ┆ f64   │
+╞════════╪══════════╪═════╪════════╪═══════╪═══════╡
+│ B      ┆ block    ┆ 1   ┆ 0.0    ┆ 576.0 ┆ 480.0 │
+│ D-A3   ┆ block    ┆ 1   ┆ 0.0    ┆ 48.0  ┆ 48.0  │
+│ D-C    ┆ block    ┆ 1   ┆ 0.0    ┆ 48.0  ┆ 48.0  │
+│ E3     ┆ block    ┆ 1   ┆ 0.0    ┆ 48.0  ┆ 48.0  │
+│ F-A3   ┆ block    ┆ 1   ┆ 0.0    ┆ 48.0  ┆ 48.0  │
+│ F-A7   ┆ block    ┆ 1   ┆ 0.0    ┆ 120.0 ┆ 120.0 │
+│ F-C    ┆ block    ┆ 3   ┆ 0.0    ┆ 48.0  ┆ 48.0  │
+│ A2     ┆ drop     ┆ 19  ┆ 0.0    ┆ 0.0   ┆ 24.0  │
+│ A3     ┆ drop     ┆ 15  ┆ -24.0  ┆ 0.0   ┆ 24.0  │
+│ A7     ┆ drop     ┆ 15  ┆ -72.0  ┆ 24.0  ┆ 24.0  │
+│ B      ┆ drop     ┆ 27  ┆ -216.0 ┆ 48.0  ┆ 48.0  │
+│ C      ┆ drop     ┆ 11  ┆ 0.0    ┆ 0.0   ┆ 24.0  │
+│ D-A3   ┆ drop     ┆ 6   ┆ -12.0  ┆ 0.0   ┆ 12.0  │
+│ D-A7   ┆ drop     ┆ 4   ┆ 0.0    ┆ 24.0  ┆ 96.0  │
+│ D-C    ┆ drop     ┆ 2   ┆ -36.0  ┆ -60.0 ┆ 12.0  │
+│ E3     ┆ drop     ┆ 7   ┆ 0.0    ┆ 0.0   ┆ 48.0  │
+│ E7     ┆ drop     ┆ 10  ┆ -60.0  ┆ 24.0  ┆ 48.0  │
+│ F-A3   ┆ drop     ┆ 6   ┆ -24.0  ┆ 0.0   ┆ 12.0  │
+│ F-A7   ┆ drop     ┆ 6   ┆ -12.0  ┆ 24.0  ┆ 84.0  │
+│ F-C    ┆ drop     ┆ 1   ┆ -24.0  ┆ 0.0   ┆ 24.0  │
+│ A2     ┆ transfer ┆ 15  ┆ 0.0    ┆ -24.0 ┆ 24.0  │
+│ A3     ┆ transfer ┆ 14  ┆ 0.0    ┆ -12.0 ┆ 36.0  │
+│ A7     ┆ transfer ┆ 14  ┆ -24.0  ┆ 0.0   ┆ 72.0  │
+│ B      ┆ transfer ┆ 13  ┆ 0.0    ┆ 0.0   ┆ 192.0 │
+│ C      ┆ transfer ┆ 16  ┆ 0.0    ┆ -12.0 ┆ 48.0  │
+│ D-A3   ┆ transfer ┆ 12  ┆ 0.0    ┆ -24.0 ┆ 48.0  │
+│ D-A7   ┆ transfer ┆ 10  ┆ 0.0    ┆ -24.0 ┆ 84.0  │
+│ D-C    ┆ transfer ┆ 12  ┆ 0.0    ┆ -12.0 ┆ 48.0  │
+│ E3     ┆ transfer ┆ 14  ┆ 0.0    ┆ -12.0 ┆ 48.0  │
+│ E7     ┆ transfer ┆ 14  ┆ -12.0  ┆ -12.0 ┆ 72.0  │
+│ F-A3   ┆ transfer ┆ 13  ┆ 0.0    ┆ 0.0   ┆ 48.0  │
+│ F-A7   ┆ transfer ┆ 12  ┆ 0.0    ┆ -12.0 ┆ 96.0  │
+│ F-C    ┆ transfer ┆ 13  ┆ 0.0    ┆ 0.0   ┆ 24.0  │
+└────────┴──────────┴─────┴────────┴───────┴───────┘
