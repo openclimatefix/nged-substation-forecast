@@ -455,6 +455,18 @@ which total 160 hours at W1, 428 at W2, and 2,742 at W3. W3's idle share at wind
 The mask is built on ERA5, which arrives about 5 days late, so it is for training and evaluation
 rows and not for live use.
 
+**Build the ensemble hindcast member rows with the production feature engineer, and expect a table
+of offsets per lead day, quantile, and farm to lower the wind forecast's quantile score
+(provisional, low confidence).** *Applies to: experiments.* The production `TabularFeatureEngineer`
+reproduced the stored scored-year frames of experiment 230 exactly and built 442 daily runs (April
+2024 to June 2025) for the three metered wind farms in a few minutes. On the scored year, a table of
+offsets fitted on those runs lowered the quantile score of the physics-core forecast by 0.60
+points, and a neural head given the ensemble's wind summaries did no better. The observed power was
+below the physics-core forecast's median on 31% to 40% of rows in every scored quarter and 33% in
+the first hindcast quarter, so the offsets correct a stable low bias in the ensemble mixture's
+median, whose cause the experiment did not identify. Evidence: [experiment
+259](00259-wind-plant-plus-quantile-offset-head/result.md), three farms, July 2025 to June 2026.
+
 ## Embedded solar capacity
 
 **Hold embedded-solar capacity as one value per Primary per season-year, and do not estimate it
