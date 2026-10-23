@@ -113,9 +113,10 @@ onshore wind farms and asks whether a head trained on the pool transfers to W1 t
   linear fit over the training-fold farms' REPD rows that have both; W1 to W3 take the pool's median
   hub height because their real values are private, so only capacity and turbine rating tell the
   three farms apart. The head's base-quantile inputs are R0's (experiment 259's H5c corrected R1).
-- **Arms:** T1 (an offset table per lead day and quantile, fitted on W1 to W3's own training runs, as
-  experiment 259's T5 was, added after plan review), P0 (R0 alone), P1 (H trained on W1 to W3), P2 (H trained on the public farms, zero
-  shot), P3 (P2 fine-tuned on W1 to W3's training runs, at most 3 epochs at a tenth of the learning
+- **Arms:** T1 (an offset table per lead day and quantile, fitted on W1 to W3's own training runs,
+  as experiment 259's T5 was, added after plan review), P0 (R0 alone), P1 (H trained on W1 to W3),
+  P2 (H trained on the public farms, zero shot), P3 (P2 fine-tuned on W1 to W3's training runs, at
+  most 3 epochs at a tenth of the learning
   rate), X2 (non-neural XGBoost stage, `colsample_bytree` 1, trained on the pool), BL2 (pooled head
   with lead, capacity, hub height and calendar columns only), and X3 (X2 refitted on the pool plus
   W1 to W3's training runs, added after plan review so that the non-neural stage has a fine-tuned
