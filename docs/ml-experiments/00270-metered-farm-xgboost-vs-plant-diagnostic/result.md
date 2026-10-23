@@ -256,4 +256,3 @@ weather variables of L5 and L6 add under 1% beyond the plant's inputs, but in ze
 1.9% better than X1, so a weather-adapter experiment should expect little from more variables for a
 farm with its own history. A small neural network could replace the additive terms of G, with G and
 the spread-binned plant as the arms to beat.
-
