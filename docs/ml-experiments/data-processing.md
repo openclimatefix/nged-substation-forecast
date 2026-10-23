@@ -440,16 +440,22 @@ the run at those substations; the ensemble mixture then pools the remaining 50 m
 ([experiment 111](00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)).
 Applies to experiments and production.
 
-**Treat the ECMWF ensemble's shortwave radiation as a 6-hour mean after lead 144 hours, and drop
-analogue observations that were not known at run time when building the `manual_heuristic` and
-`climatology` references.** The ensemble store's stamps are 3-hourly up to lead 144 hours and
-6-hourly from lead 150 to 360 hours, and each downward shortwave value is a mean over the period
-that ends at the stamp. A pipeline that assumes 3-hour periods misplaces the sun's path after lead
-144 hours. For the `manual_heuristic` reference, the analogue 1 week before the half-hour is
-unknown at run time when the lead exceeds 7 days, so it must be dropped at those leads
-([experiment 310](00310-metered-farm-long-lead-scoring/result.md)). Applies to experiments and
-production. The evidence is a build for six solar farms in the trial area at leads of 12 to 252
-hours, and the entry is provisional until the experiment has had its reviews.
+**Treat the ECMWF ensemble's shortwave radiation as a 6-hour mean after lead 144 hours.** *Applies
+to: experiments and production.* "Lead" is the hours after the ensemble run's start time. The
+ensemble store's stamps are 3-hourly up to lead 144 hours and 6-hourly from lead 150 to 360 hours,
+and each downward shortwave value is a mean over the period that ends at the stamp. A pipeline that
+assumes 3-hour periods misplaces the daily peak after lead 144 hours
+([experiment 310](00310-metered-farm-long-lead-scoring/result.md)). The evidence is a build for six
+solar farms in the trial area at leads of 12 to 252 hours. The confidence is moderate, and the entry
+is provisional until the experiment has had its reviews.
+
+**Drop observations that were not known at run time when building the `manual_heuristic` and
+climatology references.** *Applies to: experiments and production.* `manual_heuristic` takes the
+quantiles of 13 earlier observed powers, 1 to 6 weeks and 49 to 55 weeks before the half-hour. When
+the lead exceeds 7 days, the observation 1 week before the half-hour is not yet known at run time.
+Drop that observation at those leads ([experiment
+310](00310-metered-farm-long-lead-scoring/result.md)). The confidence is moderate, and the entry is
+provisional until the experiment has had its reviews.
 
 **Do not assume the unit PV shape rises with irradiance at low sun.** *Applies to: experiments.*
 `SunGeometry.pv_shape_and_ghi` returned a unit PV shape that fell from 0.124 to 0.090 as
