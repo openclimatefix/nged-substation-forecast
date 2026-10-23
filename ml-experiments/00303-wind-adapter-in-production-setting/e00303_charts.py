@@ -94,9 +94,7 @@ def figure_1(*, score: dict) -> alt.TopLevelMixin:
     points = base.mark_point(filled=True, size=55).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "estimate:Q",
-            title=(  # ty: ignore[unresolved-attribute]
-                "Arm's score minus P1's (points of capacity; more negative is better)"
-            ),
+            title=("Arm's score minus P1's (points of capacity; more negative is better)"),
         )
     )
     bars = base.mark_rule().encode(x="lower:Q", x2="upper:Q")  # ty: ignore[unresolved-attribute]
