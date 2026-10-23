@@ -467,6 +467,18 @@ the first hindcast quarter, so the offsets correct a stable low bias in the ense
 median, whose cause the experiment did not identify. Evidence: [experiment
 259](00259-wind-plant-plus-quantile-offset-head/result.md), three farms, July 2025 to June 2026.
 
+**Correct the ECMWF ensemble's 10 m and 100 m wind speeds before a wind-power model fitted to ERA5
+reads them, and expect the uncorrected input to lower the median forecast by about 10 points of
+capacity (provisional, medium confidence).** *Applies to: experiments and production.* At the three
+metered wind farms the ensemble-mean 100 m wind was 1.0 m/s slower than ERA5's in July 2025 to June
+2026 (0.7 m/s in the hindcast), growing from 0.4 m/s at days 0 to 2 to 1.3 m/s from day 7, and 1.5
+m/s slower at ERA5 speeds of 8 to 12 m/s. The 10 m wind was 1.3 m/s slower at those speeds. A
+physics-based wind-power model fitted to ERA5 had 52.8% of rows below its median when fed ERA5 wind
+(after dropping the idle rows of experiment 210's mask), and 36.6% when fed the ensemble-mean wind.
+The swap lowered the median by 10.2 points of capacity (1 point is 1% of a farm's capacity), and the
+10 m and 100 m speeds each explained about 7 points alone. Evidence: [experiment
+261](00261-wind-low-bias-decomposition/result.md), three farms, July 2025 to June 2026.
+
 ## Embedded solar capacity
 
 **Hold embedded-solar capacity as one value per Primary per season-year, and do not estimate it
