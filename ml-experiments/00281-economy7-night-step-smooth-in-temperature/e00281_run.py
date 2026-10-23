@@ -31,7 +31,7 @@ import e00281_filters as filters
 import e00281_tall as tall
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens_weather import Calibration, proxy_cache
 from studies.dp_features import FeatureCache, naive_utc
