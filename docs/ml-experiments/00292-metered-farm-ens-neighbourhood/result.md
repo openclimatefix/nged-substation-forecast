@@ -31,7 +31,9 @@ decision_rule: >-
   per farm, on experiment 243's scored rows, with 98.75% intervals from resampling the 12 scored
   months 20,000 times (Bonferroni over four contrasts). C1 N1 minus N0. C2 N1 minus the placebo.
   C3 best of N1 and N2 minus X1. C4 N2 minus N0. Supported when C1 and C2 are each at least 2%
-  below zero with intervals wholly below zero. The 2% threshold is the smallest gain that justifies extracting 19 cells instead of one and adding 11 more neural-network inputs in the retraining pipeline. Stop
+  below zero with intervals wholly below zero. The 2% threshold is the smallest gain that justifies
+  extracting 19 cells instead of one and adding 11 more neural-network inputs in the retraining
+  pipeline. Stop
   rule: if N1 gains under 1% over N0 at 4 or more of the 6 farms, report that the neighbourhood
   adds nothing detectable at 12 to 36 hours and skip N2.
 benchmark: >-
