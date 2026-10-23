@@ -1,9 +1,6 @@
 # Curtailment cost: research plan
 
-## Priority
-
-| Id | Question | Priority | Waits for | State |
-|---|---|---|---|---|
+**No proposal in this theme is waiting.**
 
 ## Planned experiments
 
