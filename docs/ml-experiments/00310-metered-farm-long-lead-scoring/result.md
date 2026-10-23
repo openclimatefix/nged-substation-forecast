@@ -258,6 +258,16 @@ Zero history:
 - **Not covered.** Weekly refits, leads under 12 hours or over 252 hours, the curtailment value
   (the farms are single series and the node metric needs a substation with its generators), and the
   GAM, MDN, and XGBoost without lagged power in zero history.
+- **Climatology uses older history.** `climatology` is frozen at the data before 2025-09, while the
+  forecasts refit each quarter on all earlier months. The margins over `climatology` in later
+  quarters therefore include the forecasts' use of newer history.
+- **Intervals.** Only the four planned contrasts per band are at the 98.75% level. The per-farm,
+  per-day, and extra contrasts use the same interval width and are descriptive. Every arm holds the
+  same row count in each band and setting, the `_nolag` arms included.
+- **Ensemble fields after lead 144 hours.** The shortwave value is treated as a 6-hour mean there.
+  The eight extra ensemble fields (humidity, longwave, precipitation, pressure, wind, and
+  500 hPa height) come from experiment 270's extraction, and we did not check that their period
+  meaning is the same across lead 144 hours.
 - **Lower tail.** Actual output falls below the 0.01 quantile 3.2 to 3.5 times too often for the
   blend, and up to 4.4 times too often for XGBoost, at every lead, as in experiment 300.
 - **Next.** Weekly refits of the MDN alone at days 1 to 10 would give the absolute scores for a
