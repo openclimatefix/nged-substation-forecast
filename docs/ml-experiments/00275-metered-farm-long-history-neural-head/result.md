@@ -142,9 +142,11 @@ prior on the power level.
   many), and 1,660 validation rows (2025-07 to 2025-08, ensemble only). Farm E has 4,685
   past-weather rows because its history starts in 2024-10.
 - **Quantile order.** H5 sorts its outputs before scoring. Before sorting, the 11 offsets give
-  quantiles out of order in 31% of scored rows for L0, 33% for L2, and 31% for L3. Experiment 268
-  re-scores earlier metered-farm results with sorted quantiles; the scores here are already sorted,
-  so that re-score would change nothing.
+  quantiles out of order in 31% of scored rows for L0, 33% for L2, and 31% for L3. [Experiment
+  273](../00273-metered-farm-sorted-quantile-rescore/result.md) found 0 crossing rows in the stored
+  files of experiment 243, because the fit scripts sort the 11 quantiles before writing them; the
+  files here are written the same way, so the scores are sorted-quantile scores and the crossing
+  rate above is a property of the unsorted network output.
 
 ## Numbers
 
