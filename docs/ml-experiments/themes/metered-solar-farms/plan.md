@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [300](../../00300-metered-farm-best-guess-assembly/result.md) | How good is the assembled best-guess day-ahead forecast for the six metered farms, and what does a new farm with no history get? | 1 | Nothing | Planned |
+| [318](../../00318-metered-farm-mdn-head-more-features/result.md) | Does giving the mixture-density head more inputs, especially the forecast lead, or one head for all leads, lower its quantile score? | 2 | Nothing | Running |
 
 ## Planned experiments
 
