@@ -1,7 +1,6 @@
 """Part 1 of experiment 299: when does arm D fall behind BG2, by week, lead, hour, and sunshine?
 
-OMP_NUM_THREADS=1 POLARS_MAX_THREADS=1 systemd-run --user --scope -p MemoryMax=8G \
-        -p OOMPolicy=continue uv run --no-sync python ml-experiments/00299-*/e00299_timing.py
+uv run --no-sync python ml-experiments/00299-*/e00299_timing.py
 """
 
 import e00299_common as common  # isort: skip
