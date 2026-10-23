@@ -128,6 +128,7 @@ Figures are means over 10 substations. `e00290_report.py` prints every number in
   start of July and in none of the 120 jobs here, which avoid the first of a month. We did not find
   its mechanism, so we cannot say whether other substations show it at those dates.
 - **Median minus mean.** GAM_ONLY forecasts the mean, so there is no median-minus-mean gap to report.
+- **Audit.** No Opus audit run; trigger 2 fired (agreed with the ML manager, to save quota).
 - **Audit triggers.** One of the seven fired: the result contradicts the prediction written here
   (a share within 15% to 25% at every date). The explanation we tested, the position of the
   transfer in the training window, is excluded by the design, and the cause remains open. No Opus
