@@ -5,7 +5,7 @@ leads up to 168 hours. A sunny daylight half-hour is in the top third of its sub
 half-hours (fleet unit shape above 0.01), ranked by the fixed fleet shape on CAMS irradiance, so
 every arm is scored on identical rows. Writes `work/scores.json`.
 
-    uv run --no-sync python ml-experiments/00180-*/e00280_score.py --arms c p k
+    uv run --no-sync python ml-experiments/00280-*/e00280_score.py
 """
 
 import argparse
@@ -114,6 +114,7 @@ GROUPS: Final[dict[str, tuple[str, ...]]] = {
     "d5": ("D5",),
     "d9": ("D9",),
     "d16": ("D16",),
+    "d10": ("D10",),
     "others": ("D10", "D11", "D14"),
     "decision": common.DECISION_SITES,
 }
@@ -192,8 +193,9 @@ def main() -> None:
                     key = f"{configuration}|{arm}|{group}|{slice_name}"
                     diffs = {}
                     for s in members:
-                        if by_site[s].height != control[s].height:
-                            msg = f"{arm} and c0 differ in row count at {s}"
+                        keys = ["power_fcst_init_time", "valid_time"]
+                        if not by_site[s].select(keys).equals(control[s].select(keys)):
+                            msg = f"{arm} and c0 differ in rows at {s}"
                             raise ValueError(msg)
                         diffs[s] = control[s].select(
                             "power_fcst_init_time",

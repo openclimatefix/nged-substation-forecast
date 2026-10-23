@@ -77,8 +77,8 @@ take_home_message: >-
   capacity the real series supports, does not lower the April to June error at the substations where
   the pinned capacity looked too high. The change is under 0.01 MW against an error of about 0.5 MW,
   and the intervals are wide. A capacity cut that is correct for the whole of April to June is not
-  the fix either: at D5 it raises the error. The summer gap to BG2 does not come from the solar
-  shape or the solar capacity of the monthly-refit model.
+  the fix either: at D5 it raises the error. This experiment finds no sign that the shape or the
+  capacity of the solar term closes the summer gap to BG2.
 lessons:
   - >-
     The shape does not move the score. e0 and e1 change April to June daylight error at D9 and D16
@@ -86,8 +86,8 @@ lessons:
     half-hours at D9 and D16 by 0.006 and 0.007 MW.
   - >-
     The capacity does not move it either. At D9 and D16 the oracle cut (s2) changes the error by
-    -0.003 MW, and at D5 it raises it by 0.081 MW, so a single April to June factor is wrong for at
-    least one substation.
+    -0.003 MW, and at D5 it raises it by 0.081 MW, so a capacity cut that suits D9 and D16 is not
+    safe at D5.
   - >-
     The seasonal factor calibrated on April to June 2025 (s1, factors above 1) changes the error by
     +0.004 MW at D9 and D16 and -0.002 MW at D5. The 2025 and 2026 April to June capacities do not
@@ -98,8 +98,8 @@ advice:
     D9 and D16 it changes daylight error by under 0.01 MW and raises error on all half-hours (C1,
     C4).
   - >-
-    Do not apply a single April to June capacity factor across substations: the factor that fits D9
-    and D16 raises D5's error by 0.08 MW (C5 and the oracle arm).
+    Do not cut the solar capacity by the oracle April to June factor at D5 on top of the 60% export
+    clip: it raises D5's April to June daylight error by 0.081 MW (the oracle arm s2).
 code: ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/
 ---
 
@@ -119,13 +119,14 @@ capacities 0.2 to 0.4 MW lower. This experiment puts that shape and those capaci
 **Verdict: not supported.** C1 (e2 minus the control, April to June daylight, D9 and D16) is -0.009
 MW with a 99% interval of -0.041 to +0.024, so the interval contains zero and the point estimate is
 above -0.01 MW. The control's April to June daylight error at D9 and D16 is 0.528 MW, and its gap to
-BG2 there is +0.044 MW, so the largest gain any arm showed (0.010 MW) closes under a quarter of the
-gap. Every level, table, and factor uses data before 2025-07-01 only, and the control reproduces
-experiment 180's control bit-for-bit.
+BG2 there is +0.044 MW (-0.018 to +0.103), so the largest gain any arm showed (0.010 MW) closes under
+a quarter of the
+gap. Every level, table, and factor except the oracle arm s2 uses data before 2025-07-01 only, and
+all 36 stored control frames equal experiment 180's control frames (`e00280_check_control.py`).
 
 ![Change in error by arm](result_effect.svg)
 
-**Figure 1. Arms are inside zero, except the oracle cut at D5, which raises the error.** Week-block
+**Figure 1. Almost every interval contains zero; the oracle cut at D5 stands clear of it, upward.** Week-block
 intervals are wide (about 13 weeks of April to June, 4,000 resamples).
 
 ## Results
@@ -151,21 +152,23 @@ supplied by the 60% clip, and cutting it again overshoots.
 **The other substations and the night-time error do not move.** At D10, D11, and D14, April to June
 daylight changes by at most +0.003 MW in any arm, and the April to June night-time error of the five
 decision substations changes by at most +0.004 MW (P4 holds). On sunny half-hours, e2 is +0.007 MW
-over the five decision substations (-0.009 to +0.030), so the no-harm margin of 0.02 MW holds.
+over the five decision substations (-0.009 to +0.030), but it raises D16's sunny-half-hour error by
++0.020 MW, which reaches the 0.02 MW no-harm limit. The verdict does not change, because C1 fails first.
 
 ## Predictions
 
 - **P1 (e0 and e1 change sunny-daylight error by under 0.02 MW at each of D9, D10, D11, D14, D16):**
   met; the largest is e0 at D9 on sunny half-hours, -0.016 MW (the group means for D16 and the
   others are within 0.004 MW).
-- **P2 (e2 lowers April to June daylight error by at least 0.02 MW over D9 and D16):** not met;
-  -0.009 MW.
+- **P2 (e2 lowers April to June daylight error by at least 0.02 MW over D9 and D16, and moves D5 by
+  under 0.02 MW):** the first part is not met (-0.009 MW); the D5 part is met (-0.003 MW).
 - **P3 (s1 is above -0.01 MW at D9 and D16):** met; +0.004 MW.
-- **P4 (night-time error at D10 does not move by more than 0.02 MW in any arm):** met for the group
-  D10, D11, and D14, which moves by at most +0.004 MW.
+- **P4 (night-time error at D10 does not move by more than 0.02 MW in any arm):** met; D10 moves by
+  at most +0.004 MW.
 
 ## Caveats
 
+- **Pinball loss agrees.** C1 in pinball loss is -0.001 MW (-0.011 to +0.008).
 - **The intervals are wide.** About 13 weeks of April to June fall in the scored year, so a gain of
   0.02 MW would not show unless it sat in most weeks.
 - **s2 is a bound, not a forecast,** because it reads the scored year.
@@ -173,5 +176,6 @@ over the five decision substations (-0.009 to +0.030), so the no-harm margin of 
 
 ## What the next experiment should answer
 
-The solar term's shape and capacity are not the April to June gap. Experiment 266's remaining
-candidates are the demand term and the night-time error at D10.
+Neither the shape nor the capacity of the solar term closes the April to June gap in this test. The
+next experiment should test the parts of arm D outside the solar term, and should score D9 alone,
+where e2 gains 0.022 MW (-0.060 to +0.010) but the interval includes zero.
