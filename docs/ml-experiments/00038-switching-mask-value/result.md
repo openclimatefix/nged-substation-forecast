@@ -1,7 +1,7 @@
 ---
 id: "00038"
 slug: switching-mask-value
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: medium
@@ -86,7 +86,7 @@ adopted_in: none
 code: ml-experiments/00038-switching-mask-value/
 ---
 
-# Experiment 38: is detecting a switching event worth anything to the forecast?
+# Experiment 38: is detecting a load shift worth anything to the forecast?
 
 We asked whether a switching detector improves a demand forecast when the half-hours it flags are
 left out of the correction that uses recent forecast errors. We compared the forecast error with and

@@ -27,8 +27,11 @@ from studies.node_curtailment import (
     capacity_forecast,
     event_census,
     month_total_arrays,
+    net_flow_members,
     node_curtailment,
     node_table_pilot,
+    quantiles_from_members,
+    rearrange_quantiles,
     scale_to_megawatts,
     scaled_limits,
     table_with_scaled_limits,
@@ -180,7 +183,12 @@ def _generator_row(
     *, series: int = GENERATOR_SERIES, output: float, forecast: float, month: int = 1
 ) -> pl.DataFrame:
     return _forecast(
-        series=series, valid_times=[_valid(month=month)], actual=[output], q50=[forecast]
+        series=series,
+        valid_times=[_valid(month=month)],
+        actual=[output],
+        q05=[forecast],
+        q50=[forecast],
+        q95=[forecast],
     )
 
 
@@ -1224,7 +1232,7 @@ MARCH_FIRST = dt.datetime(2026, 3, 1, 0, 30, tzinfo=UTC)
 def _series_rows(
     *, series: int, entries: Sequence[tuple[dt.datetime, int, float, float]]
 ) -> pl.DataFrame:
-    """A frame of one series from `(valid_time, seed, actual, q50)`; q05 and q95 equal `actual`."""
+    """A frame of one series from `(valid_time, seed, actual, q50)`; q05 and q95 equal `q50`."""
     return pl.DataFrame(
         {
             "time_series_id": pl.Series([series] * len(entries), dtype=pl.Int64),
@@ -1232,9 +1240,9 @@ def _series_rows(
             "valid_time": [v for v, _, _, _ in entries],
             "seed": [seed for _, seed, _, _ in entries],
             "actual": [a for _, _, a, _ in entries],
-            "q05": [a for _, _, a, _ in entries],
+            "q05": [q for _, _, _, q in entries],
             "q50": [q for _, _, _, q in entries],
-            "q95": [a for _, _, a, _ in entries],
+            "q95": [q for _, _, _, q in entries],
         }
     )
 
@@ -1801,3 +1809,246 @@ def test_avoidable_cost_subtracts_the_perfect_arm_price_by_price() -> None:
     assert _headline(avoidable, arm="perfect", column="energy_proxy_gbp") == pytest.approx(0.0)
     with pytest.raises(ValueError, match="not in per_arm"):
         avoidable_cost(per_arm=result.per_arm, perfect_arm="missing")
+
+
+# --- ensemble members ---------------------------------------------------------------------------
+
+
+def _members(
+    *, series: int, values: Sequence[float | None], column: str, valid: dt.datetime | None = None
+) -> pl.DataFrame:
+    """One row per member, member numbers 1 to n, one node row (24 h lead, seed 0)."""
+    valid_time = valid or _valid()
+    return pl.DataFrame(
+        {
+            "time_series_id": [series] * len(values),
+            "power_fcst_init_time": [valid_time - dt.timedelta(hours=24)] * len(values),
+            "valid_time": [valid_time] * len(values),
+            "seed": [0] * len(values),
+            "member": list(range(1, len(values) + 1)),
+            column: list(values),
+        },
+        schema={
+            "time_series_id": pl.Int64,
+            "power_fcst_init_time": pl.Datetime("us", "UTC"),
+            "valid_time": pl.Datetime("us", "UTC"),
+            "seed": pl.Int64,
+            "member": pl.Int64,
+            column: pl.Float64,
+        },
+    )
+
+
+def test_quantiles_from_members_interpolate_linearly_between_sorted_members() -> None:
+    """Members 1 to 100: median 50.5; q95 at position 0.95 x 99 = 94.05, so 95.05; q05 is 5.95."""
+    members = _members(series=NODE_SERIES, values=list(range(100, 0, -1)), column="flow_mw")
+    row = quantiles_from_members(members=members, value_column="flow_mw").row(0, named=True)
+    assert row["n_members"] == 100
+    assert row["q50"] == pytest.approx(50.5)
+    assert row["q95"] == pytest.approx(95.05)
+    assert row["q05"] == pytest.approx(5.95)
+
+
+def test_quantiles_from_members_ignore_null_and_nan_members() -> None:
+    """Members 10, 20, 30 plus a null and a NaN: three finite members, so the median is 20."""
+    members = _members(
+        series=NODE_SERIES, values=[10.0, 20.0, 30.0, None, float("nan")], column="flow_mw"
+    )
+    row = quantiles_from_members(members=members, value_column="flow_mw").row(0, named=True)
+    assert row["n_members"] == 3
+    assert row["q50"] == pytest.approx(20.0)
+
+
+def test_a_row_with_no_finite_member_has_no_output_row() -> None:
+    members = _members(series=NODE_SERIES, values=[None, float("nan")], column="flow_mw")
+    assert quantiles_from_members(members=members, value_column="flow_mw").height == 0
+
+
+def test_net_flow_pairs_demand_and_generation_by_member_number_not_row_order() -> None:
+    """Demand 10 and 20 MW, generation 3 and 4 MW in members 1 and 2, sign +1.
+
+    Flow is generation minus demand: 3 - 10 = -7 and 4 - 20 = -16. The generator rows are given
+    in reverse order, so a positional pairing would give 4 - 10 and 3 - 20.
+    """
+    demand = _members(series=NODE_SERIES, values=[10.0, 20.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0, 4.0], column="output_mw").reverse()
+    flows = net_flow_members(
+        demand_members=demand,
+        generator_members=generation,
+        table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+    )
+    assert flows["member"].to_list() == [1, 2]
+    assert flows["flow_mw"].to_list() == pytest.approx([-7.0, -16.0])
+
+
+def test_net_flow_takes_the_metered_flow_sign_of_the_node() -> None:
+    """Sign -1: a metered flow of +7 MW is an import, so export of -7 MW is flow +7 MW."""
+    demand = _members(series=NODE_SERIES, values=[10.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    flows = net_flow_members(
+        demand_members=demand,
+        generator_members=generation,
+        table=_table(sign=-1, generators=[(GENERATOR_SERIES, 30.0)]),
+    )
+    assert flows["flow_mw"].to_list() == pytest.approx([7.0])
+
+
+def test_net_flow_drops_only_the_member_where_a_generator_is_missing() -> None:
+    """Two generators, the second without a value in member 2: member 2 is dropped, member 1 stays.
+
+    Member 1: 3 + 5 - 10 = -2 MW. Member 3: 1 + 2 - 30 = -27 MW.
+    """
+    demand = _members(series=NODE_SERIES, values=[10.0, 20.0, 30.0], column="demand_mw")
+    first = _members(series=GENERATOR_SERIES, values=[3.0, 4.0, 1.0], column="output_mw")
+    second = _members(series=SECOND_GENERATOR_SERIES, values=[5.0, None, 2.0], column="output_mw")
+    flows = net_flow_members(
+        demand_members=demand,
+        generator_members=pl.concat([first, second]),
+        table=_table(generators=[(GENERATOR_SERIES, 30.0), (SECOND_GENERATOR_SERIES, 30.0)]),
+    )
+    assert flows["member"].to_list() == [1, 3]
+    assert flows["flow_mw"].to_list() == pytest.approx([-2.0, -27.0])
+
+
+def test_net_flow_of_a_node_with_no_generator_is_minus_the_demand() -> None:
+    demand = _members(series=NODE_SERIES, values=[10.0, 20.0], column="demand_mw")
+    empty_generation = _members(series=GENERATOR_SERIES, values=[], column="output_mw")
+    flows = net_flow_members(
+        demand_members=demand, generator_members=empty_generation, table=_table()
+    )
+    assert flows["flow_mw"].to_list() == pytest.approx([-10.0, -20.0])
+
+
+def test_net_flow_leaves_out_a_generator_not_yet_connected() -> None:
+    """A generator connecting on 2026-02-01 adds nothing to a 2026-01-15 valid time: flow = -10."""
+    demand = _members(series=NODE_SERIES, values=[10.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    table = _table(generators=[(GENERATOR_SERIES, 30.0)])
+    table = NodeTable(
+        nodes=table.nodes,
+        limits=table.limits,
+        generators=table.generators.with_columns(connection_date=pl.lit(dt.date(2026, 2, 1))),
+    )
+    flows = net_flow_members(demand_members=demand, generator_members=generation, table=table)
+    assert flows["flow_mw"].to_list() == pytest.approx([-10.0])
+
+
+def test_members_scored_end_to_end_give_the_hand_worked_curtailment() -> None:
+    """20 members with zero demand; one generator at 50 MW in 19 members and 80 MW in one.
+
+    Node export quantile q95: position 0.95 x 19 = 18.05, so 50 + 0.05 x (80 - 50) = 51.5 MW.
+    Planned node curtailment (51.5 - 45) x 0.5 = 3.25 MWh. The generator's median forecast is 50 MW
+    (25 MWh, enough to take the whole share). Cap = 50 - 3.25 / 0.5 = 43.5 MW. The generator runs at
+    its median, 50 MW, so it loses (50 - 43.5) x 0.5 = 3.25 MWh. The metered export is 50 MW, so
+    the need is (50 - 45) x 0.5 = 2.5 MWh and the breach is max(0, 50 - 6.5 - 45) = 0. The energy
+    proxy at 2,000 GBP per MWh is 2,000 x 3.25 = 6,500 GBP.
+    """
+    table = _table(generators=[(GENERATOR_SERIES, 100.0)])
+    demand = _members(series=NODE_SERIES, values=[0.0] * 20, column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[50.0] * 19 + [80.0], column="output_mw")
+    flows = net_flow_members(demand_members=demand, generator_members=generation, table=table)
+    node = quantiles_from_members(members=flows, value_column="flow_mw").with_columns(
+        actual=pl.lit(50.0)
+    )
+    generator = quantiles_from_members(members=generation, value_column="output_mw").with_columns(
+        actual=pl.lit(50.0)
+    )
+    result = _score(table=table, node=node, generators=generator)
+    assert _headline(result.per_arm, column="planned_mwh") == pytest.approx(3.25)
+    assert _headline(result.per_arm, column="curtailed_mwh") == pytest.approx(3.25)
+    assert _headline(result.per_arm, column="needed_mwh") == pytest.approx(2.5)
+    assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(0.0)
+    assert _headline(result.per_arm, column="energy_proxy_gbp") == pytest.approx(6_500.0)
+
+
+# --- crossing quantiles -------------------------------------------------------------------------
+
+
+def test_rearranging_sorts_a_crossing_row_and_leaves_a_monotone_row_alone() -> None:
+    """Row 1 stores q05 = 80, q50 = 70, q95 = 50, so it becomes 50, 70, 80. Row 2 is monotone."""
+    frame = _forecast(
+        series=NODE_SERIES,
+        valid_times=[_valid(), _valid(step=1)],
+        actual=[70.0, 70.0],
+        q05=[80.0, 60.0],
+        q50=[70.0, 70.0],
+        q95=[50.0, 90.0],
+    )
+    sorted_frame, n_crossed = rearrange_quantiles(frame=frame)
+    assert n_crossed == 1
+    assert sorted_frame.select("q05", "q50", "q95").rows() == [
+        (50.0, 70.0, 80.0),
+        (60.0, 70.0, 90.0),
+    ]
+
+
+def test_rearranging_leaves_a_row_with_a_missing_quantile_as_stored() -> None:
+    frame = _forecast(
+        series=NODE_SERIES, valid_times=[_valid()], actual=[70.0], q05=[80.0], q95=[float("nan")]
+    )
+    sorted_frame, n_crossed = rearrange_quantiles(frame=frame)
+    assert n_crossed == 0
+    assert sorted_frame["q05"].to_list() == [80.0]
+
+
+def test_a_crossing_node_row_is_scored_as_its_sorted_quantile_function() -> None:
+    """Flow 70 MW against 45 MW with q05 = 80 and q95 = 50 stored (crossing).
+
+    Sorted, q95 is 80 MW, so the planned node curtailment is (80 - 45) x 0.5 = 17.5 MWh. As stored,
+    q95 is 50 MW and it is (50 - 45) x 0.5 = 2.5 MWh. One node row crossed.
+    """
+    node = _one_row(flow=70.0, q05=80.0, q95=50.0)
+    sorted_result = _score(table=_table(), node=node)
+    stored_result = _score(
+        table=_table(),
+        node=node,
+        assumptions=_assumptions(use_generators=False, rearrange_quantiles=False),
+    )
+    assert _headline(sorted_result.per_arm, column="planned_mwh") == pytest.approx(17.5)
+    assert sorted_result.n_node_rows_rearranged == 1
+    assert _headline(stored_result.per_arm, column="planned_mwh") == pytest.approx(2.5)
+    assert stored_result.n_node_rows_rearranged == 0
+
+
+def test_net_flow_counts_a_generator_that_connects_on_the_valid_date() -> None:
+    """A generator connecting on 2026-01-15, the valid date, is included: flow = 3 - 10 = -7."""
+    demand = _members(series=NODE_SERIES, values=[10.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    table = _table(generators=[(GENERATOR_SERIES, 30.0)])
+    table = NodeTable(
+        nodes=table.nodes,
+        limits=table.limits,
+        generators=table.generators.with_columns(connection_date=pl.lit(dt.date(2026, 1, 15))),
+    )
+    flows = net_flow_members(demand_members=demand, generator_members=generation, table=table)
+    assert flows["flow_mw"].to_list() == pytest.approx([-7.0])
+
+
+def test_net_flow_ignores_a_generator_without_a_forecast_and_a_node_without_a_sign() -> None:
+    """A generator with `is_forecast` false adds nothing (flow -10); a null-sign node has no row."""
+    demand = _members(series=NODE_SERIES, values=[10.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    table = _table(generators=[(GENERATOR_SERIES, 30.0)])
+    no_forecast = NodeTable(
+        nodes=table.nodes,
+        limits=table.limits,
+        generators=table.generators.with_columns(is_forecast=pl.lit(value=False)),
+    )
+    flows = net_flow_members(demand_members=demand, generator_members=generation, table=no_forecast)
+    assert flows["flow_mw"].to_list() == pytest.approx([-10.0])
+    no_sign = _table(sign=None, generators=[(GENERATOR_SERIES, 30.0)])
+    assert (
+        net_flow_members(demand_members=demand, generator_members=generation, table=no_sign).height
+        == 0
+    )
+
+
+def test_net_flow_refuses_a_repeated_member_row() -> None:
+    demand = _members(series=NODE_SERIES, values=[10.0, 20.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    with pytest.raises(ValueError, match="repeats"):
+        net_flow_members(
+            demand_members=pl.concat([demand, demand]),
+            generator_members=generation,
+            table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+        )

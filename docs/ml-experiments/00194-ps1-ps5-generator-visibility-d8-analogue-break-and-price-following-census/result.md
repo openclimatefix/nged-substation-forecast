@@ -1,7 +1,7 @@
 ---
 id: "00194"
 slug: ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to:
   - differentiable-physics-embedded-generation
 status: done

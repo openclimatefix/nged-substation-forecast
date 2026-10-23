@@ -7,7 +7,7 @@ title: >-
   smooth offset, a ramp, or a spike?
 theme: differentiable-physics-forecast-engine
 also_relevant_to:
-- switching-detectors
+- lsc-detectors
 - switching-labels-in-the-forecast
 status: done
 size: >-

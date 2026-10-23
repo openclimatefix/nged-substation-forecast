@@ -228,6 +228,16 @@ whether it applies to production awaits NGED's answer. Evidence:
 [experiment
 194](00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md).
 
+**Give a forecast the engine state it will have at forecast time, and train the engine term on that
+same lagged state (provisional, medium confidence).** *Applies to: experiments.* D8's engine
+detector gives a state for each half-hour that is built from that half-hour's own reading. A
+coefficient fitted on that contemporaneous state is 3.6 MW per half-hour with one or more units
+running, but the state of the last settled day is worth 0.15 MW (interval -0.06 to 0.32) out of sample,
+so applying the contemporaneous coefficient to the lagged state makes the quantile score 10% worse.
+Trained on the lagged state, the coefficient is 0.9 to 1.0 MW and the score is 3% better than a
+model without the term ([experiment
+294](00294-regime-aware-model-at-d8-engine-state-term/result.md)).
+
 **Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
 coefficients exactly at each step) to a window of three months or shorter.** An exact
 least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
@@ -434,6 +444,14 @@ provisional until the experiment has had its reviews.
 
 ## Wind farms
 
+**Do not compute air density from the ECMWF ensemble's surface pressure for a model trained on ERA5
+surface pressure (provisional, medium confidence).** *Applies to: experiments and production.* The
+ensemble's surface pressure at the three metered wind farms is 0.7 to 7.0 hPa above ERA5's in the
+monthly mean (about +2.7 hPa on average, because the two products use different terrain heights),
+and a density column built from the ensemble pressure scored 0.049 points worse than temperature
+alone (95% interval 0.015 to 0.091). Evidence: [experiment
+256](00256-wind-temperature-density-shear-columns/result.md), three farms, July 2025 to June 2026.
+
 **Drop the rows in `mask.parquet` of experiment 210 before training or scoring on the three metered
 wind farms, and do not expect ERA5 wind speed alone to find idle rows (provisional, medium
 confidence).** *Applies to: experiments.* The idle floor is a set of near-zero readings with
@@ -445,7 +463,35 @@ which total 160 hours at W1, 428 at W2, and 2,742 at W3. W3's idle share at wind
 6.2% over all years and 1.5% from 2021, so its first 2 years differ from the later ones. Evidence:
 [experiment 210](00210-wind-idle-noise-mva-artefact/result.md), three farms, 2019-09 to 2026-09.
 The mask is built on ERA5, which arrives about 5 days late, so it is for training and evaluation
-rows and not for live use.
+rows and not for live use. Removing the mask's rows from training lowered the quantile score of
+both the physics core and the XGBoost model when the weather was the 51 ensemble members (by 0.075
+and 0.062 points on the kept rows, intervals excluding zero), and worsened it by under 0.015 points
+when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
+three farms, July 2025 to June 2026).
+
+**Build the ensemble hindcast member rows with the production feature engineer, and expect a table
+of offsets per lead day, quantile, and farm to lower the wind forecast's quantile score
+(provisional, low confidence).** *Applies to: experiments.* The production `TabularFeatureEngineer`
+reproduced the stored scored-year frames of experiment 230 exactly and built 442 daily runs (April
+2024 to June 2025) for the three metered wind farms in a few minutes. On the scored year, a table of
+offsets fitted on those runs lowered the quantile score of the physics-core forecast by 0.60
+points, and a neural head given the ensemble's wind summaries did no better. The observed power was
+below the physics-core forecast's median on 31% to 40% of rows in every scored quarter and 33% in
+the first hindcast quarter, so the offsets correct a stable low bias in the ensemble mixture's
+median, whose cause the experiment did not identify. Evidence: [experiment
+259](00259-wind-plant-plus-quantile-offset-head/result.md), three farms, July 2025 to June 2026.
+
+**Correct the ECMWF ensemble's 10 m and 100 m wind speeds before a wind-power model fitted to ERA5
+reads them, and expect the uncorrected input to lower the median forecast by about 10 points of
+capacity (provisional, medium confidence).** *Applies to: experiments and production.* At the three
+metered wind farms the ensemble-mean 100 m wind was 1.0 m/s slower than ERA5's in July 2025 to June
+2026 (0.7 m/s in the hindcast), growing from 0.4 m/s at days 0 to 2 to 1.3 m/s from day 7, and 1.5
+m/s slower at ERA5 speeds of 8 to 12 m/s. The 10 m wind was 1.3 m/s slower at those speeds. A
+physics-based wind-power model fitted to ERA5 had 52.8% of rows below its median when fed ERA5 wind
+(after dropping the idle rows of experiment 210's mask), and 36.6% when fed the ensemble-mean wind.
+The swap lowered the median by 10.2 points of capacity (1 point is 1% of a farm's capacity), and the
+10 m and 100 m speeds each explained about 7 points alone. Evidence: [experiment
+261](00261-wind-low-bias-decomposition/result.md), three farms, July 2025 to June 2026.
 
 ## Embedded solar capacity
 
@@ -640,6 +686,14 @@ run from January 2022, and the raw log holds many events too small to matter ([e
 set of [experiment 41](00041-sw2-0a-labeller-gate/result.md)). Applies to experiments, and to
 production once a detector runs there.
 
+**Do not rely on a training mask for switching transfers to improve the convex GAM.** Training
+the 24-month convex GAM with no mask worsened the score by 0.002 points on clean rows and 0.003
+points after a logged transfer, and 476 simulated transfers worsened it by 0.009 points, because the
+hand mask is at most 7% of the training half-hours ([experiment
+212](00212-switching-detector-masks-in-gam-training/result.md)). Applies to experiments and
+production at D5, D10, D11, D14, and D16. Confidence: moderate, with a provisional status until the
+experiment's review is merged.
+
 **Expect D10 to carry unlabelled jumps of 15 to 20 points.** D10's night-time floor rose from 25 to
 45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to 20
 points from 17 November to 14 December 2025. Neither window is in the hand-filtered labels, and both
@@ -745,6 +799,17 @@ and to production, for D8. The scope is one series and one residual model, the c
 count depends on the threshold (15 to 48 for -2.5 to -1.0 MW), and the entry is provisional until
 NGED has said what moved.
 
+**Mask the rows of every known load transfer out of the training data of a forecast that uses no
+recent power.** The evidence is provisional and the confidence medium, and masking itself was not
+tested. A generalised additive model (GAM) with a 24-month training window, refitted every month,
+learned injected transfers of 25% of a substation's power lasting 7, 30, and 90 days as 8.5%, 19%,
+and 32% of their size in the 48 hours after each transfer ended, and learned a permanent step
+to one half after about 12 months ([experiment
+274](00274-lsc-long-arrangement-audit-gam-refit/result.md); 10 Primary substations, 4 onset dates,
+the ERA5 and CAMS estimates of past weather). No tested duration kept the bias under 0.1 points of
+effective capacity (1 point is 1% of the substation's capacity). Applies to experiments and
+production.
+
 ## Forecast tails and curtailment cost
 
 **Count the half-hours beyond a limit before ranking forecasts on curtailment cost.** Two bulk
@@ -775,6 +840,40 @@ flags are not solar noise alone: the same detector flags 29% to 36% of D8's nigh
 ([experiment 199](00199-ps2b-engine-detector-v2-ramp-night-price/result.md)). The
 scope is one Primary; the confidence is moderate, and the entry is provisional until the experiment
 has had its reviews.
+
+**Sort the stored quantiles of a farm forecast before reading its median (provisional).** *Applies
+to: experiments, and production if a stored quantile set is ever read column by column.* In the
+stored solar-farm forecasts that [experiment
+255](00255-metered-farm-node-curtailment-value/result.md) read from experiments 224 and 243, 26,344
+of 77,897 rows (34%) had quantile columns that were not in increasing order, in every forecast arm,
+so `q50` is not always the middle value of the forecast's own quantiles. Scoring the curtailment cost
+with the quantiles sorted per row moved the avoidable cost of the forecast arms by up to 3.7% and
+left every contrast's sign and 95% interval verdict unchanged ([experiment
+268](00268-lsc-curtailment-metric-v2-member-wise-ens/result.md)). `studies.node_curtailment` sorts
+each row by default and counts the rows that crossed. The scope is the six trial solar farms
+(labelled A to F) in experiments 224 and 243; the confidence is high for the count and moderate for
+the size of the effect.
+
+**Do not read a metered solar farm's coverage at the 0.01 quantile as calibration without checking
+for exact zeros (provisional, medium confidence).** *Applies to: experiments.* Coverage at the 0.01
+quantile is the share of half-hours with output at or below that quantile. Farm D's metered output
+is exactly zero in 11.7% of the half-hours scored in 2025-09 to 2026-08 (7% in September, 24% to 26%
+in October and November, 44% in December, 49% in January, 0% from April), so the 0.01 quantile of
+every arm tested sits at about zero and its coverage equals the zero share. The pinball loss on
+those rows is about zero for every arm, so they add nothing to any contrast but dilute the
+percentage differences; report 0.01 contrasts with and without farm D. The cause of the zeros
+(outage, curtailment, or an export limit) is not established. Evidence: [experiment
+284](00284-metered-farm-tail-head-past-weather/result.md), farm D, 2025-09 to 2026-08.
+
+**Take climatology and the manual heuristic from experiment 87's stored references when a scorer
+needs eleven quantiles (provisional).** *Applies to: experiments.* The stored climatology and
+manual-heuristic forecasts of experiment 48 hold nine quantiles (q05 to q95), so code that pads the
+missing q01 and q99 fills them with either the capacity or a copy of q05 and q95, and the padded
+tails are wrong. The versions in experiment 87's `ref_climatology` and `ref_manual_heuristic` hold
+all eleven. Both experiments store power as a fraction of capacity, not in percentage points of
+capacity ([experiment 277](00277-lsc-curtailment-metric-on-existing-forecasts/result.md)). The scope
+is the six Primary substations (which step 33 kV down to 11 kV) and the two bulk supply points D13
+and D17 (which step 132 kV down to 33 kV); the confidence is high, because we read the stored files.
 
 ## Privacy and anonymisation
 

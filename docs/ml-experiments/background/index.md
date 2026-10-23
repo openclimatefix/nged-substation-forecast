@@ -16,8 +16,11 @@ the planner did not open.
 6. **[Metered generators and anonymisation](metered-generators-and-anonymisation.md)**: farms, caps,
    labels.
 7. **[Market and other data](market-and-other-data.md)**: prices, PV_Live, DFS, null results.
-8. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
-9. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
+8. **[Problems and the best forecast](problems-and-current-best-forecast.md)**: baselines, best
+   guess, scores.
+9. **[Adopted and open questions](adopted-and-open-questions.md)**: what is settled, who owns the rest.
+10. **[Data processing](../data-processing.md)**: steps every experiment applies to the data.
+11. **[Glossary](../glossary.md)**: terms the experiment pages use without defining.
 
 The reference page [What is on disk](what-is-on-disk.md) says where each data set sits under
 `data/` and how to read it.

@@ -1,0 +1,147 @@
+== Positive control: arm B against experiment 203's K0 scores ==
+D5: 251286 of 251286 rows matched, max |score difference| 0.000e+00 PASS
+D10: 263669 of 263669 rows matched, max |score difference| 0.000e+00 PASS
+D11: 271649 of 271649 rows matched, max |score difference| 0.000e+00 PASS
+D14: 266161 of 266161 rows matched, max |score difference| 0.000e+00 PASS
+D16: 255360 of 255360 rows matched, max |score difference| 0.000e+00 PASS
+rows 1308125; sites ('D5', 'D10', 'D11', 'D14', 'D16')
+
+== POST counts ==
+POST-OLD transfers (clusters): 17 rows 1130781 months 27
+POST-NEW rows 14895 months 4
+
+== Mean score per arm (points) ==
+CLEAN {'A': 2.7913, 'B': 2.789, 'C': 2.7955, 'C0': 2.7947, 'C1': 2.796, 'C2': 2.7958}
+POST-OLD {'A': 2.8215, 'B': 2.8191, 'C': 2.821, 'C0': 2.8225, 'C1': 2.8174, 'C2': 2.823}
+POST-NEW {'A': 3.5462, 'B': 3.6304, 'C': 3.5452, 'C0': 3.5493, 'C1': 3.5418, 'C2': 3.5444}
+ALL ordinary {'A': 2.7725, 'B': 2.7713, 'C': 2.7743, 'C0': 2.7755, 'C1': 2.7711, 'C2': 2.7762}
+
+== Headline contrasts ==
+CLEAN: C-B +0.0065 (-0.0069 to +0.0246) n=462137 groups=12
+CLEAN: A-B +0.0023 (-0.0031 to +0.0074) n=462137 groups=12
+CLEAN: A-C -0.0042 (-0.0268 to +0.0126) n=462137 groups=12
+POST-OLD: A-C +0.0005 (-0.0077 to +0.0072) n=1130781 groups=17
+POST-OLD: A-B +0.0025 (-0.0002 to +0.0056) n=1130781 groups=17
+POST-OLD: C-B +0.0019 (-0.0032 to +0.0091) n=1130781 groups=17
+POST-NEW: A-C +0.0010 (-0.0013 to +0.0113) n=14895 groups=4
+POST-NEW: A-B -0.0842 (-0.2209 to -0.0064) n=14895 groups=4 NOT RESOLVED
+POST-NEW: C-B -0.0852 (-0.2236 to -0.0048) n=14895 groups=4 NOT RESOLVED
+
+== Winter (Nov to Mar) CLEAN ==
+CLEAN winter: C-B +0.0267 (-0.0015 to +0.0632) n=182832 groups=5
+CLEAN winter: A-B -0.0029 (-0.0128 to +0.0039) n=182832 groups=5
+CLEAN winter: A-C -0.0296 (-0.0742 to +0.0022) n=182832 groups=5
+
+== Each fold separately, CLEAN ==
+CLEAN: C0-B +0.0057 (-0.0085 to +0.0245) n=462137 groups=12
+CLEAN: C1-B +0.0070 (-0.0053 to +0.0238) n=462137 groups=12
+CLEAN: C2-B +0.0068 (-0.0070 to +0.0254) n=462137 groups=12
+
+== Odd and even months of the learned score's training, CLEAN, C-B ==
+CLEAN odd: C-B +0.0167 (-0.0047 to +0.0483) n=229658 groups=6
+CLEAN even: C-B -0.0036 (-0.0153 to +0.0102) n=232479 groups=6
+
+== Mean-forecast absolute error, CLEAN (points of capacity; positive = first worse) ==
+CLEAN MAE: C-B +0.0061 (-0.0198 to +0.0382) n=462137 groups=12
+CLEAN MAE: A-B +0.0053 (-0.0034 to +0.0135) n=462137 groups=12
+CLEAN MAE: A-C -0.0008 (-0.0404 to +0.0312) n=462137 groups=12
+
+== Leave one substation out, CLEAN, C-B and A-B ==
+without D5: C-B +0.0105 (-0.0076 to +0.0368) n=378627 groups=12
+without D5: A-B +0.0035 (-0.0011 to +0.0086) n=378627 groups=12
+without D10: C-B +0.0057 (-0.0068 to +0.0265) n=365985 groups=12
+without D10: A-B +0.0028 (-0.0033 to +0.0086) n=365985 groups=12
+without D11: C-B +0.0006 (-0.0105 to +0.0129) n=365091 groups=12
+without D11: A-B +0.0029 (-0.0040 to +0.0093) n=365091 groups=12
+without D14: C-B +0.0063 (-0.0118 to +0.0302) n=367811 groups=12
+without D14: A-B +0.0028 (-0.0042 to +0.0092) n=367811 groups=12
+without D16: C-B +0.0091 (-0.0066 to +0.0297) n=371034 groups=12
+without D16: A-B -0.0005 (-0.0082 to +0.0052) n=371034 groups=12
+
+== Leave one substation out, POST-OLD, A-C ==
+without D5: A-C -0.0018 (-0.0102 to +0.0075) n=885056 groups=15
+without D10: A-C +0.0006 (-0.0099 to +0.0086) n=867112 groups=14
+without D11: A-C +0.0037 (-0.0013 to +0.0086) n=1021581 groups=16
+without D14: A-C +0.0020 (-0.0088 to +0.0112) n=864620 groups=12
+without D16: A-C -0.0024 (-0.0121 to +0.0058) n=884755 groups=14
+
+== Tail coverage (share of CLEAN readings below each quantile; nominal 0.01, 0.05, 0.95, 0.99) and median-mean ==
+A {'q01': 0.015, 'q05': 0.0484, 'q95': 0.9564, 'q99': 0.9873}
+B {'q01': 0.0148, 'q05': 0.0478, 'q95': 0.9564, 'q99': 0.9872}
+C0 {'q01': 0.015, 'q05': 0.048, 'q95': 0.9555, 'q99': 0.9865}
+D5 median-mean B -0.1345 A -0.1339
+D10 median-mean B -0.0639 A -0.064
+D11 median-mean B -0.0266 A -0.0266
+D14 median-mean B 0.0331 A 0.0333
+D16 median-mean B 0.0144 A 0.015
+
+== Training rows per arm (fits at the last cut) ==
+D5 {'A': 34839, 'B': 32433, 'C0': 30470, 'C1': 32833, 'C2': 32656}
+D10 {'A': 35038, 'B': 33994, 'C0': 31938, 'C1': 32069, 'C2': 32181}
+D11 {'A': 35039, 'B': 35039, 'C0': 34162, 'C1': 34102, 'C2': 34061}
+D14 {'A': 35038, 'B': 34446, 'C0': 31788, 'C1': 32298, 'C2': 32623}
+D16 {'A': 35034, 'B': 32949, 'C0': 30097, 'C1': 30576, 'C2': 30490}
+
+== Injected worlds ==
+world-site cells: 47 events: 476 found by the re-ranker: 125
+worlds A-B net of real: +0.0091 (+0.00395 to +0.01501) cells-groups=12 n=4311823
+worlds A-C net of real: +0.0040 (+0.00003 to +0.00933) cells-groups=12 n=4311823
+worlds C-B net of real: +0.0051 (+0.00131 to +0.01009) cells-groups=12 n=4311823
+worlds A-B raw: +0.0112 (+0.00599 to +0.01708) cells-groups=12 n=4311823
+worlds A-C raw: +0.0017 (-0.00363 to +0.00743) cells-groups=12 n=4311823
+worlds C-B raw: +0.0094 (+0.00466 to +0.01512) cells-groups=12 n=4311823
+per world cell (A-B net of real, C-B net of real):
+  f0 w0 D10: events 6 found 1 A-B +0.0037 C-B +0.0023
+  f0 w0 D11: events 19 found 4 A-B -0.0007 C-B +0.0024
+  f0 w0 D14: events 1 found 1 A-B +0.0000 C-B +0.0000
+  f0 w0 D5: events 16 found 3 A-B +0.0469 C-B +0.0491
+  f0 w1 D10: events 8 found 2 A-B -0.0006 C-B +0.0002
+  f0 w1 D11: events 23 found 3 A-B +0.0155 C-B +0.0177
+  f0 w1 D5: events 16 found 5 A-B +0.0153 C-B +0.0273
+  f0 w2 D10: events 6 found 2 A-B -0.0018 C-B -0.0017
+  f0 w2 D11: events 21 found 2 A-B +0.0050 C-B +0.0090
+  f0 w2 D5: events 17 found 3 A-B -0.0020 C-B -0.0008
+  f0 w3 D10: events 5 found 1 A-B +0.0015 C-B +0.0010
+  f0 w3 D11: events 19 found 4 A-B +0.0146 C-B +0.0106
+  f0 w3 D16: events 1 found 1 A-B +0.0000 C-B +0.0000
+  f0 w3 D5: events 17 found 2 A-B +0.0977 C-B +0.1015
+  f1 w0 D10: events 1 found 0 A-B +0.0002 C-B +0.0002
+  f1 w0 D14: events 6 found 2 A-B -0.0000 C-B -0.0000
+  f1 w0 D16: events 21 found 7 A-B +0.0420 C-B -0.0012
+  f1 w0 D5: events 2 found 0 A-B +0.0005 C-B +0.0004
+  f1 w1 D10: events 2 found 0 A-B +0.0000 C-B +0.0000
+  f1 w1 D11: events 1 found 0 A-B +0.0000 C-B +0.0000
+  f1 w1 D14: events 4 found 2 A-B -0.0001 C-B -0.0001
+  f1 w1 D16: events 21 found 4 A-B +0.0031 C-B +0.0001
+  f1 w1 D5: events 6 found 1 A-B -0.0013 C-B -0.0010
+  f1 w2 D14: events 4 found 3 A-B +0.0003 C-B +0.0003
+  f1 w2 D16: events 21 found 4 A-B -0.0073 C-B -0.0024
+  f1 w2 D5: events 5 found 1 A-B +0.0207 C-B +0.0003
+  f1 w3 D11: events 2 found 0 A-B -0.0001 C-B -0.0001
+  f1 w3 D14: events 5 found 3 A-B +0.0001 C-B +0.0001
+  f1 w3 D16: events 21 found 6 A-B +0.0117 C-B -0.0022
+  f1 w3 D5: events 5 found 2 A-B +0.0009 C-B +0.0000
+  f2 w0 D10: events 7 found 2 A-B -0.0013 C-B -0.0009
+  f2 w0 D14: events 7 found 4 A-B -0.0001 C-B -0.0002
+  f2 w0 D16: events 5 found 1 A-B +0.0000 C-B -0.0002
+  f2 w0 D5: events 23 found 4 A-B +0.0100 C-B +0.0049
+  f2 w1 D10: events 11 found 7 A-B +0.0026 C-B +0.0004
+  f2 w1 D14: events 5 found 2 A-B -0.0020 C-B -0.0014
+  f2 w1 D16: events 6 found 2 A-B +0.0074 C-B +0.0019
+  f2 w1 D5: events 25 found 8 A-B +0.0038 C-B +0.0020
+  f2 w2 D10: events 9 found 5 A-B +0.0016 C-B -0.0003
+  f2 w2 D14: events 7 found 4 A-B -0.0033 C-B -0.0013
+  f2 w2 D16: events 5 found 1 A-B +0.0094 C-B +0.0099
+  f2 w2 D5: events 22 found 3 A-B +0.0156 C-B +0.0166
+  f2 w3 D10: events 12 found 2 A-B +0.0124 C-B +0.0106
+  f2 w3 D11: events 1 found 0 A-B +0.0000 C-B +0.0000
+  f2 w3 D14: events 5 found 2 A-B +0.0013 C-B -0.0009
+  f2 w3 D16: events 5 found 2 A-B +0.0016 C-B +0.0002
+  f2 w3 D5: events 19 found 7 A-B +0.1325 C-B +0.0019
+
+== Detector alarms against the hand mask at the last cut (2026-06-01), half-hours in the 24-month window ==
+D5 hand-mask half-hours 2406 | per fold (detector half-hours, share of hand mask covered, share of detector outside hand mask): [(4369, 0.414, 0.772), (2006, 0.414, 0.504), (2183, 0.414, 0.544)]
+D10 hand-mask half-hours 1044 | per fold (detector half-hours, share of hand mask covered, share of detector outside hand mask): [(3100, 0.521, 0.825), (2969, 0.476, 0.833), (2857, 0.476, 0.826)]
+D11 hand-mask half-hours 0 | per fold (detector half-hours, share of hand mask covered, share of detector outside hand mask): [(877, 0.0, 1.0), (937, 0.0, 1.0), (978, 0.0, 1.0)]
+D14 hand-mask half-hours 592 | per fold (detector half-hours, share of hand mask covered, share of detector outside hand mask): [(3250, 0.431, 0.922), (2740, 0.324, 0.93), (2415, 0.324, 0.92)]
+D16 hand-mask half-hours 2085 | per fold (detector half-hours, share of hand mask covered, share of detector outside hand mask): [(4937, 0.668, 0.718), (4458, 0.668, 0.688), (4544, 0.668, 0.694)]

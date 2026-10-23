@@ -74,7 +74,7 @@ adopted_in: none
 code: ml-experiments/00075-sw2-11-nra-forecast-with-labelled-switching-masks/
 ---
 
-# Experiment 75: can a Primary demand forecast learn the normal running arrangement from labelled switching?
+# Experiment 75: can a Primary demand forecast learn the normal running arrangement from labelled load shifts?
 
 **Take-home message: outside switching, the Primary substation demand forecast was already close to
 the normal running arrangement, so neither removing the labelled switching from training nor

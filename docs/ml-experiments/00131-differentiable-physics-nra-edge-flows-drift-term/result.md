@@ -4,7 +4,7 @@ slug: differentiable-physics-nra-edge-flows-drift-term
 title: "Differentiable physics, NRA: edge flows with a per-node drift term"
 part: NRA-A2
 theme: differentiable-physics-network
-also_relevant_to: [switching-detectors]
+also_relevant_to: [lsc-detectors]
 status: done
 size: >-
   medium. Stored: private files only. Serving path: untouched. Degradation rules: untouched. One

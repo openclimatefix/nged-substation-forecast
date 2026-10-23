@@ -1,4 +1,4 @@
-# Switching labels in the forecast: research plan
+# Load-shift labels in the forecast: research plan
 
 **No proposal in this theme is waiting.**
 
