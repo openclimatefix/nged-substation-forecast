@@ -25,7 +25,7 @@ import e00307_common as common  # noqa: E402
 import e00307_core as core_module  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 from studies.power import scan_power  # noqa: E402
 
 BASE_END: Final = datetime(2024, 4, 1, tzinfo=UTC)
@@ -36,6 +36,16 @@ OUTAGE_RUN: Final[int] = 48
 OUTAGE_FRACTION: Final[float] = 0.01
 GRID_STEP_M_S: Final[float] = 0.01
 SPEED_BINS: Final[np.ndarray] = np.array([0, 3, 5, 7, 9, 11, 14, 18, 40], dtype=float)
+BIN_LABELS: Final[list[str]] = [
+    "[-inf, 3)",
+    "[3, 5)",
+    "[5, 7)",
+    "[7, 9)",
+    "[9, 11)",
+    "[11, 14)",
+    "[14, 18)",
+    "[18, inf)",
+]
 SECTOR_WIDTH_DEG: Final[float] = 45.0
 
 
@@ -149,6 +159,11 @@ def hub_factor(*, core: core_module.WindCore, frame: pl.DataFrame) -> tuple[np.n
     return hub / np.maximum(arrays.speed_100m, 1e-3), hub
 
 
+def speed_bin(column: str) -> pl.Expr:
+    """Return the label of the 100 m speed bin of `column` (left-closed bins of `SPEED_BINS`)."""
+    return pl.col(column).bin_intervals(list(SPEED_BINS[1:-1]), labels=BIN_LABELS).cast(pl.String)
+
+
 def direction_sector(*, sin: np.ndarray, cos: np.ndarray) -> np.ndarray:
     """Return the 45-degree sector (0 to 7) of the direction whose sine and cosine are given."""
     degrees = np.degrees(np.arctan2(sin, cos)) % 360.0
@@ -166,9 +181,7 @@ def summarise(*, frame: pl.DataFrame, reference: str) -> dict:
         "correlation": float(np.corrcoef(inv["implied_100m"], inv[reference])[0, 1]),
     }
     binned = (
-        inv.with_columns(
-            bin=pl.col(reference).cut(list(SPEED_BINS[1:-1]), left_closed=True).cast(pl.String)
-        )
+        inv.with_columns(bin=speed_bin(reference))
         .group_by("bin")
         .agg(
             n=pl.len(),
@@ -302,11 +315,7 @@ def main() -> None:
         # Share of rows invertible by ERA5 speed bin.
         shares = (
             part.filter(~pl.col("masked"))
-            .with_columns(
-                bin=pl.col("era5_100m")
-                .cut(list(SPEED_BINS[1:-1]), left_closed=True)
-                .cast(pl.String)
-            )
+            .with_columns(bin=speed_bin("era5_100m"))
             .group_by("bin")
             .agg(
                 ref_mean=pl.col("era5_100m").mean(),

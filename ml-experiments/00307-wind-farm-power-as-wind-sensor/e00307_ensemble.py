@@ -17,7 +17,7 @@ from typing import Final
 import e00307_common as common
 import numpy as np
 import polars as pl
-from e00307_implied import SPEED_BINS, direction_sector
+from e00307_implied import direction_sector, speed_bin
 
 PRIOR_261: Final[Path] = (
     common.ML_EXPERIMENTS_DATA_DIR / "00261-wind-low-bias-decomposition" / "work"
@@ -37,12 +37,8 @@ def load(*, name: str) -> pl.DataFrame:
     return (
         cases.join(implied, on=["time_series_id", "valid_time"], how="left", validate="m:1")
         .with_columns(
-            era5_bin=pl.col("era5_speed_100m")
-            .cut(list(SPEED_BINS[1:-1]), left_closed=True)
-            .cast(pl.String),
-            ens_bin=pl.col("ens_speed_100m")
-            .cut(list(SPEED_BINS[1:-1]), left_closed=True)
-            .cast(pl.String),
+            era5_bin=speed_bin("era5_speed_100m"),
+            ens_bin=speed_bin("ens_speed_100m"),
             spread=(pl.col("ens_speed_100m_p90") - pl.col("ens_speed_100m_p10")) / Z_90,
         )
         .with_columns(

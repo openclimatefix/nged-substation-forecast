@@ -14,8 +14,8 @@ from typing import Final, Self
 
 import e00307_common as common
 import numpy as np
-import torch
-from torch import nn
+import torch  # ty: ignore[unresolved-import]
+from torch import nn  # ty: ignore[unresolved-import]
 
 GAUSS_HERMITE_POINTS: Final[int] = 7
 HUB_HEIGHT_PRIOR_M: Final[float] = 65.0
