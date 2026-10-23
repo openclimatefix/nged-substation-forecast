@@ -5,7 +5,7 @@ theme: hierarchy-and-pooling
 also_relevant_to:
 - generator-forecasting
 - differentiable-physics-network
-status: planned
+status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00223-dp-bsp-generators-as-children-and-double-count-test/ only. Serving path:
@@ -67,11 +67,114 @@ metric: >-
   the BSP's effective capacity over leads 0.5 to 168 hours; the mean absolute error of the mean
   forecast; coverage at the 0.01, 0.05, 0.95, and 0.99 quantiles
 code: ml-experiments/00223-dp-bsp-generators-as-children-and-double-count-test/
+verdict: inconclusive
+best_arm: none; Row B was not run
+headline: >-
+  Row A: all 7 tested units have a remainder coefficient different from 0, and none is classified
+  `carried by the BSP` or `inside a Primary` (the interval excludes both -1 and 0 for all 7), so Row
+  B did not run.
+lessons: >-
+  The remainder of each bulk supply point moves with the metered generators, so the generators are
+  not wholly inside a Primary's reading. The size of the coefficient is not -1 for most units, and
+  unmetered solar that shares the sun with the metered farms biases the solar coefficients.
+production_status: not-for-production
+adopted_in: none
+take_home_message: >-
+  The two bulk supply points' readings move with the metered generators that NGED lists under them,
+  and no generator's output looks to be hidden inside a Primary's reading. The size of the movement
+  is not the clean one-for-one that adding the generator to the sum needs, so the experiment did not
+  test whether adding the generators improves the bulk supply point forecast. A better test is to
+  separate the unmetered solar and the battery's price-driven dispatch first.
+advice:
+- >-
+  Do not add the metered generators to a bulk supply point's bottom-up sum until the unmetered solar
+  is modelled, because the remainder's solar coefficients are biased by 0.1 to 0.3 (Row A, figure
+  1).
+- >-
+  Test a generator's connection point on a series where the generator's outage or step is known,
+  because a regression on smooth output cannot separate a farm from the sun (Row A, solar rows).
+- >-
+  Treat the battery as unreadable by regression on the remainder, because its coefficient of -3 is
+  far outside any physical value (Row A, battery row).
 ---
 
 # Experiment 223: are the metered generators under a bulk supply point children of the sum?
 
-This page is the plan. Results are added after the run.
+**Take-home.** The bulk supply points' remainders move with the metered generators, so the
+generators are not simply hidden inside a Primary's reading. No unit's coefficient is a clean -1,
+so the pre-registered rule classifies all 7 as `cannot tell`, and Row B did not run.
+
+## Results
+
+**The generator child table.** NGED lists 13 metered generators under D13 and D17. The labels are
+private. Generation is positive for every kind, the battery's sign is as stored, and the two wind
+readings in MVA are multiplied by 0.97 to give MW.
+
+| Label | BSP | Kind | Unit | Voltage | History (years) |
+|---|---|---|---|---|---|
+| G1 | D13 | wind | MW | EHV | 6.7 |
+| G2 | D13 | wind | MVA | EHV | 6.7 |
+| G3 | D17 | wind | MVA | EHV | 6.7 |
+| G4 | D17 | biomass | MW | EHV | 6.7 |
+| G5 | D17 | battery | MW | EHV | 4.9 |
+| G6 | D17 | solar | MW | EHV | 6.2 |
+| G7 | D17 | solar | MW | EHV | 6.4 |
+| G8 | D13 | solar | MW | EHV | 1.8 |
+| G9 | D17 | solar | MW | EHV | 5.4 |
+| G10 | D13 | solar | MW | EHV | 6.2 |
+| G11 | D13 | solar | MW | EHV | 6.1 |
+| G12 | D17 | solar | MW | HV | under 0.01 (1 reading) |
+| G13 | D17 | other | MW | HV | 0.3 |
+
+**Row A: every coefficient excludes 0, and few are near -1.** Figure 1 shows each coefficient, its
+99.3% interval (Bonferroni across 7 units), and a placebo (the same regression on the generator's
+output shifted by 364 days).
+
+![Coefficient of each bulk supply point's remainder on each generator](figure_1_coefficients.svg)
+
+- **Wind G3 and both solar groups sit near -1.** The coefficients are -1.23 for G3, -1.12 for the
+  D13 solar group, and -1.31 for the D17 solar group. The shifted copy of the D17 solar group
+  already gives -0.26, so the unmetered solar that shares the sun biases the solar coefficients by
+  about that much. Subtracting the placebo gives -1.16 and -1.05 for the two solar groups.
+- **Wind G1 (-0.60), wind G2 (-1.90, wide), and biomass G4 (-0.29) sit between 0 and -1.** The
+  pre-registered rule classifies them `cannot tell`. A partial carry, a metering mismatch, or
+  stepped
+  biomass dispatch could each produce them, and this regression cannot separate those causes.
+- **The battery G5 coefficient of -3.1 is not physical.** Battery dispatch follows price and demand,
+  so the regression picks up demand that the profile removal leaves in.
+- **The Primary check agrees where it is readable.** Each child Primary's coefficient on a wind,
+  biomass, or battery generator lies within -0.3 to +0.03 (largest at D9 and D10 for the D13 wind
+  farms). The solar groups give -0.03 to -0.47 for each Primary, and that range reflects the
+  Primaries' own embedded solar, so the check cannot separate solar.
+- **The 2 HV generators cannot be tested.** G12 has 1 reading and G13 has 0.3 years. Both stay
+  Primary-side by their voltage.
+- **Row B did not run.** The pre-registered rule runs Row B only for generators classified `carried
+  by the BSP`, and none was.
+
+## Checks
+
+- **Known-answer check:** a real generator's output shifted by 364 days, planted in the remainder
+  or behind a Primary, was classified correctly for 6 of 7 units in both placements. The D17 solar
+  group came out `cannot tell` in both placements, because the planted copy correlates with the
+  unmetered solar at about -0.26. The plan required at least 4 of 5 of each kind, and the solar
+  kind has 1 of 2, so both rows are capped at `inconclusive`.
+- **Median minus mean forecast and mean-forecast error:** not applicable, because Row B did not
+  forecast.
+- **Joint regression (not pre-registered):** regressing the remainder on all of a bulk supply
+  point's units at once changes the coefficients by 0.0 to 0.14 for solar, biomass, and G3, and moves
+  G1 from -0.60 to -0.74. G2 moves to +0.10 (interval -0.24 to +0.46), which says its MVA series
+  adds nothing once the other wind farm is in. The battery stays at -3.2.
+- **Audit triggers:** no Opus audit ran, as the ML manager asked. The serving path, the degradation
+  rules, and the stored data are not touched.
+- **The connection file does not settle the question.** The MPAN file lists each generator's own
+  substation number, and its circuit identifiers for three wind farms match no Primary or BSP in
+  the hierarchy files.
+
+## What the next experiment should answer
+
+Whether a regression on a known outage or step, with the unmetered solar modelled first, shows
+where each generator connects. Only after that is it worth forecasting the generators and adding
+them to the sum.
 
 ## Question
 
