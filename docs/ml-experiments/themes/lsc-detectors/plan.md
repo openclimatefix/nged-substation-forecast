@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [SW2](#sw2-switching-event-detection) | Which change to the switching detector raises the share of moved MW found at an acceptable alarm rate? | Not set | Nothing | Iterations SW2-5 to SW2-9 are done (experiments 68, 61, 60, 55, and 62); further iterations are proposals; experiment 181 found that a block detector finds 0 of 17 unlabelled block days at RO-NC's alarm budget, and the candidate label table awaits NGED review |
+| 308 | Is the gap between a no-lag forecast and a forecast with lags a detector of LSC events? | High (maintainer, 2026-10-23) | Nothing | Planned |
 | 186 | Are D8's multi-day drops an embedded gas peaker running (spark spread, triads, flat blocks)? | High (NGED answer relayed 2026-10-22) | Nothing | Planned |
 
 **Experiment 00116 (differentiable physics, NRA) also bears on this theme.** It fits flows on the
