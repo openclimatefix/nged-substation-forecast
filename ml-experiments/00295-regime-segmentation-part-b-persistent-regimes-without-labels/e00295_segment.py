@@ -1,5 +1,5 @@
 # ruff: noqa: PERF401, PLR0912, PLR0915, B007
-"""Segment every Primary's residual, inject known steps, and record how each is found and labelled.
+r"""Segment every Primary's residual, inject known steps, and record how each is found and labelled.
 
 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         env OMP_NUM_THREADS=1 CUDA_VISIBLE_DEVICES= \

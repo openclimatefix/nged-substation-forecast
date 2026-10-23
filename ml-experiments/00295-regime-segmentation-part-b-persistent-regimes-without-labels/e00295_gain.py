@@ -1,4 +1,4 @@
-"""Forecast gain from an offset for the latest regime, found by segmenting data before each cut.
+r"""Forecast gain from an offset for the latest regime, found by segmenting data before each cut.
 
 Needs `chosen_config.json` (written by `e00295_tune.py`) in the experiment's data folder.
 
