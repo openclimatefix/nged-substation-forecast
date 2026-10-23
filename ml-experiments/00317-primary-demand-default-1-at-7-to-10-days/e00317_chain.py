@@ -30,7 +30,7 @@ import e00317_common as common
 import numpy as np
 import polars as pl
 import studies.dp_ens_weather as weather
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_gam import ResidualSpread
 
