@@ -22,6 +22,8 @@ SEED = 0
 CSI_EDGES = (0.4, 0.75)
 """Clear-sky index band edges: overcast below 0.4, broken cloud to 0.75, clear above."""
 CSI_BANDS = ("overcast", "broken", "clear")
+MIN_FIT_ROWS = 50
+"""Fewest rows a (held-out month, band) fit needs; fewer use the all-row correlation."""
 LEAD_EDGES_HOURS = (24.0,)
 FORMS = ("a_sum_of_quantiles", "b_independent", "c_member_wise", "c_shuffled", "d_copula")
 
@@ -51,6 +53,9 @@ def fitted_correlations(*, scores: np.ndarray, band: np.ndarray, month: np.ndarr
     for m in np.unique(month):
         for b in range(len(CSI_BANDS)):
             use = (month != m) & (band == b)
+            if use.sum() < MIN_FIT_ROWS:
+                out[(int(m), b)] = np.corrcoef(scores.T)
+                continue
             corr = np.corrcoef(scores[use].T)
             values, vectors = np.linalg.eigh(corr)
             values = np.clip(values, 1e-3, None)

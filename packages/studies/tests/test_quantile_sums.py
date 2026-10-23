@@ -5,6 +5,7 @@ from studies.quantile_sums import (
     copula_sum_quantiles,
     independent_sum_quantiles,
     inverse_cdf,
+    member_rank_levels,
     member_wise_sum_quantiles,
     pit_normal_scores,
     sum_of_quantiles,
@@ -135,3 +136,33 @@ def test_parts_with_different_shapes_are_rejected() -> None:
         sum_of_quantiles(
             parts=[np.zeros((2, 11)), np.zeros((3, 11))], part_levels=LEVELS, levels=OUTPUT_LEVELS
         )
+
+
+def test_member_rank_levels_cover_the_unit_interval_evenly() -> None:
+    rng = np.random.default_rng(0)
+    members = rng.normal(size=(200, 51))
+
+    levels = member_rank_levels(member_values=members, rng=rng, n_draws=40)
+
+    assert levels.mean() == pytest.approx(0.5, abs=0.002)
+    assert levels.min() < 0.005
+    assert levels.max() > 0.995
+
+
+def test_member_rank_levels_of_tied_members_still_cover_the_unit_interval() -> None:
+    rng = np.random.default_rng(0)
+
+    levels = member_rank_levels(member_values=np.zeros((10, 51)), rng=rng, n_draws=40)
+
+    assert levels.mean() == pytest.approx(0.5, abs=0.01)
+    assert levels.std() == pytest.approx(np.sqrt(1 / 12), abs=0.01)
+
+
+def test_pit_normal_scores_of_a_top_plateau_reach_the_upper_tail() -> None:
+    quantiles = np.tile(np.concatenate([np.arange(5.0), np.full(6, 10.0)]), (2_000, 1))
+
+    scores = pit_normal_scores(
+        quantiles=quantiles, levels=LEVELS, actual=np.full(2_000, 10.0), seed=0
+    )
+
+    assert scores.max() > norm.ppf(0.995)

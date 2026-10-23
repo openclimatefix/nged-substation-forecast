@@ -51,28 +51,32 @@ metric: >-
 code: ml-experiments/00304-metered-farm-node-sum-tail/
 verdict: not supported
 verdict_note: >-
-  The member-wise sum (c) over-covers at 0.95 by 2.6 points (plant) and 3.3 points (blend), so it
-  misses the 0.5-point bar. The fitted Gaussian copula (d) is the closest form to nominal.
+  The member-wise sum (c) over-covers at 0.95 by 1.8 points (plant) and 2.5 points (blend), so it
+  misses the 0.5-point bar, and at 0.99 it is within the bar for the plant only. It differs from the
+  sum of quantiles (a) by under 1 point. The fitted Gaussian copula (d) is the closest form.
 best_arm: >-
-  The Gaussian copula with a correlation fitted on the other 11 months (d), blend marginals: 0.9648
-  coverage at the 0.95 quantile (98.75% interval 0.956 to 0.9724) and 0.9938 at the 0.99 quantile
-  (0.9904 to 0.9967), pooled over both nodes, 2025-09 to 2026-08.
+  The Gaussian copula with a correlation fitted on the other 11 months (d), blend marginals, which has
+  the lowest pinball loss at 0.99 of the arms (the plant marginals sit closer to nominal at both
+  levels): 0.9648 coverage at the 0.95 quantile (98.75% interval 0.956 to 0.9724) and 0.9938 at the
+  0.99 quantile (0.9904 to 0.9967), pooled over both nodes, 2025-09 to 2026-08.
 headline: >-
-  Summing the 51 ensemble members farm by farm gives a 0.95 quantile that covers 97.6% (plant) to
-  98.3% (blend) of half-hours, because the ensemble treats the three farms as almost one farm
-  (correlation 0.95 to 0.96) while their forecast errors correlate 0.54 to 0.78.
+  Summing the 51 ensemble members farm by farm gives almost the same band as adding the farms'
+  quantiles, because the ensemble treats the three farms as nearly one farm (correlation 0.95 to
+  0.97) while their forecast errors correlate 0.54 to 0.78. Its 0.95 quantile covers 96.8% (plant) to
+  97.9% (XGBoost) of half-hours.
 lessons: >-
   The ensemble's ranks overstate how closely the farms' errors move together, so the member-wise sum
-  is too wide. Independent bands are too narrow by 5 to 6 points at 0.95. A correlation fitted on
-  past errors is the best of the four forms tried, and a farm's own band already over-covers a
-  little, which every sum inherits.
+  is as wide as assuming perfect dependence. Independent bands are too narrow by 2 to 5 points at
+  0.95. A correlation fitted on past errors is the closest of the four forms tried, and a farm's own
+  band already over-covers a little, which every sum inherits.
 take_home_message: >-
   The band for the combined output of the three farms beneath one substation comes out too wide if
   the weather forecast's 51 members are summed member by member, because the weather forecast treats
-  the farms as nearly one farm and their forecast errors are not that closely tied. Adding each
-  farm's quantiles is too wide, assuming the farms' errors are unrelated is too narrow, and a
-  correlation fitted on past errors comes closest to the nominal level. The window holds too few
-  half-hours beyond a substation's limit to say what any of this means for curtailment cost.
+  the farms as nearly one farm and their forecast errors are not that closely tied. The result is
+  almost the same as adding each farm's quantiles. Assuming the farms' errors are unrelated is too
+  narrow, and a correlation fitted on past errors comes closest to the nominal level. The window
+  holds too few half-hours beyond a substation's limit to say what any of this means for curtailment
+  cost.
 production_status: not-for-production
 adopted_in: none
 advice:
@@ -96,9 +100,7 @@ advice:
     of half-hours and the sum inherits the excess (One-farm control).
 ---
 
-**The band for the summed output of the farms beneath one substation comes out too wide when the
-weather forecast's 51 members are summed member by member, and a correlation fitted on past forecast
-errors gives a band closest to the nominal level.** National Grid Electricity Distribution (NGED)
+**Summing the weather forecast's 51 members farm by farm gives a band almost as wide as adding the farms' quantiles, which is too wide, and a correlation fitted on past forecast errors gives the band closest to the nominal level.** National Grid Electricity Distribution (NGED)
 meters six solar farms, labelled A to F on this page, beneath two bulk supply points (132 kV to 33 kV
 substations): farms A, C, and E beneath "node 1" and B, D, and F beneath "node 2". Curtailment acts at
 the substation, so the tail of the farms' summed output matters more than each farm's tail. Each farm
@@ -112,13 +114,14 @@ sum the 51 ensemble members' farm forecasts member by member (c), and draw the l
 copula whose correlation is fitted on past errors (d).
 
 **Verdict: not supported.** The prediction was that (c) lands within 0.5 points of the nominal level
-at 0.95 and 0.99. It does not. In the pooled rows, the 0.95 quantile of (c) covers 97.61% of
-half-hours for P2 (98.75% interval from resampling whole months, 96.80% to 98.33%) and 98.31% for
-the blend (97.70% to 98.87%). The 0.99 quantile of (c) covers 99.50% for P2 (99.17% to 99.77%) and
-99.78% for the blend (99.61% to 99.92%). Adding independent bands (b) is too narrow, as predicted:
-90.10% (P2) and 90.78% (blend) at 0.95, and 95.97% and 96.62% at 0.99. Adding each farm's quantiles
-(a) is too wide at 0.99 only for the blend (99.70%) and XGBoost (99.82%), not for P2 (99.34%), so
-that part of the prediction held for two of three arms.
+at 0.95 and 0.99. It does not at 0.95. In the pooled rows, the 0.95 quantile of (c) covers 96.79% of
+half-hours for P2 (98.75% interval from resampling whole months, 95.85% to 97.60%), 97.50% for the
+blend (96.76% to 98.14%), and 97.89% for XGBoost (97.14% to 98.53%). The 0.99 quantile of (c) covers
+99.27% for P2 (98.90% to 99.59%), within 0.5 points, and 99.64% for the blend (99.42% to 99.84%) and
+99.75% for XGBoost, outside it. Adding independent bands (b) is too narrow, as predicted: 90.10%
+(P2), 90.78% (blend), and 92.66% (XGBoost) at 0.95, and 95.97%, 96.62%, and 97.90% at 0.99. Adding
+each farm's quantiles (a) is above 99.5% at 0.99 for the blend (99.70%) and XGBoost (99.82%), not for
+P2 (99.34%), so that part of the prediction held for two of three arms.
 
 ![Figure 1: coverage of the node sum, every form and arm](figure_1_coverage.svg)
 
@@ -129,33 +132,38 @@ that part of the prediction held for two of three arms.
 - **Rows.** 5,569 half-hours at node 1 and 6,536 at node 2 hold all three farms (daylight, sun more
   than 5 degrees above the horizon, 12 to 36 hours ahead, 2025-09 to 2026-08). The stop rule
   (under 2,000) did not fire. Node 2 holds a farm of 1.19 MW beside farms of 6.03 and 7.80 MW.
-- **Why (c) is too wide (tested explanation).** The ensemble's ranks imply a mean correlation of 0.95
-  to 0.96 between the node's farms in every clear-sky band, while the farms' forecast errors
+- **Why (c) is as wide as (a) (tested explanation).** The ensemble's ranks imply a mean correlation
+  of 0.95 to 0.97 between the node's farms in every clear-sky band, while the farms' forecast errors
   correlate 0.54 to 0.78 (Figure 2; blend arm). Summing members therefore treats the three farms
-  as nearly one farm. The control agrees: shuffling the members across days (breaking the
-  dependence) gives 91.35% at 0.95 and 96.14% at 0.99 for P2, close to the independent form (b).
+  as nearly one farm, which is the perfect dependence that (a) assumes. The control agrees:
+  shuffling the members across days (breaking the dependence) gives 90.02% at 0.95 and 95.35% at
+  0.99 for P2, close to the independent form (b).
 - **The fitted copula (d) is the closest form.** Coverage of (d) at 0.95 is 95.84% for P2 (94.94% to
-  96.78%), 96.48% for the blend (95.60% to 97.24%), and 97.36% for XGBoost. At 0.99 it is 98.90%
-  (P2), 99.38% (blend), and 99.56% (XGBoost). (d) scores lower pinball loss at 0.99 than (c) for the
-  blend by 10.6% (interval -0.0113 to -0.0040 MW per half-hour, excluding zero) and for XGBoost by
-  23.9%, and 3.6% for P2 (interval includes zero).
-- **Lower tail.** At the 0.01 quantile the forms cover 0.3% (a), 5.6% (b), 0.7% to 0.9% (c), and 1.0%
-  to 1.2% (d) of half-hours, nominal 1.0%. The sum of quantiles (a) is far too wide below, as it is
-  above.
+  96.78%), 96.48% for the blend (95.60% to 97.24%), and 97.36% for XGBoost (96.48% to 98.12%). At 0.99
+  it is 98.90% (P2), 99.38% (blend), and 99.56% (XGBoost). (d) scores lower pinball loss at 0.99 than
+  (c) for the blend by 6.5% (interval -0.0070 to -0.0020 MW per half-hour, excluding zero) and for
+  XGBoost by 15.6% (-0.0214 to -0.0122), and by 1.6% for P2 (-0.0034 to +0.0011, includes zero).
+- **Lower tail.** At the 0.01 quantile the forms cover 0.3% (a), 5.5% to 5.9% (b), 0.4% to 0.5% (c),
+  and 1.0% to 1.2% (d) of half-hours, nominal 1.0%. The sum of quantiles (a) and the member-wise
+  sum (c) are far too wide below, as above.
 - **Planned contrasts on pinball loss at 0.99 (MW per half-hour, 98.75% intervals).** (c) minus (a):
-  P2 +0.0013 (+1.9%, 0.0002 to 0.0026), blend +0.0027 (+3.9%, 0.0015 to 0.0042). (c) minus (b): P2
-  -0.0252 (-25.6%, -0.0415 to -0.0085), blend -0.0131 (-15.5%, -0.0283 to +0.0008). The member-wise
-  sum has a higher loss than the sum of quantiles, because the band is already too wide, and a
-  lower loss than the independent sum, because that band is too narrow.
-- **Both nodes agree.** Coverage of (c) at 0.95 is 97.6% and 97.6% (P2), and 98.4% and 98.2%
-  (blend), at node 1 and node 2. No form changes its ranking between the nodes.
+  P2 -0.0002 (-0.3%, -0.0009 to +0.0010), blend -0.0004 (-0.6%, -0.0011 to +0.0007), so the two
+  forms score alike; for XGBoost -0.0037 (-3.5%, -0.0045 to -0.0027). (c) minus (b): P2 -0.0268
+  (-27.2%, -0.0421 to -0.0107) and blend -0.0162 (-19.2%, -0.0306 to -0.0032), lower because the
+  independent band is too narrow; for XGBoost +0.0116 (+12.6%, -0.0070 to +0.0304, includes zero).
+- **Both nodes agree.** Coverage of (c) at 0.95 is 97.0% and 96.6% (P2), 97.7% and 97.4% (blend),
+  and 98.0% and 97.8% (XGBoost), at node 1 and node 2. No form changes its ranking between the
+  nodes.
 - **Residual correlations** (blend arm, pairs of farms beneath one node, all bands): 0.45 to 0.83 at
   node 1 and 0.64 to 0.68 at node 2. Correlation is higher under overcast skies (0.68 to 0.95) than
-  under clear skies (0.33 to 0.78), and differs by at most 0.08 between 12 to 24 and 24 to 36 hours ahead.
+  under clear skies (0.33 to 0.78), and differs by at most 0.08 between 12 to 24 and 24 to 36 hours
+  ahead.
 - **One-farm control** (blend arm, a farm's own band): the 0.95 quantile covers 94.6% to 97.3% and the
   0.99 quantile 98.8% to 99.6% of half-hours, so the marginals already over-cover a little, and
-  every sum inherits that. The 0.01 quantile of the 1.19 MW farm covers 12.1%, which is too narrow
-  below, and its small share of the node keeps that from reaching node 2's sum.
+  every sum inherits that. The 0.01 quantile of the 1.19 MW farm D covers 12.1% and that of the
+  17.6 MW farm E covers 5.6%, both too narrow below. Farm D's small share keeps its excess from
+  reaching node 2's sum, whereas farm E's share is large and is consistent with the node 1 lower tail
+  of the independent form (5.5% to 5.6%).
 - **Curtailment cost not scored.** The event census of [experiment
   255](../00255-metered-farm-node-curtailment-value/result.md) holds 5 half-hours beyond 0.75 times
   each node's maximum export and 2 beyond 0.9, under the 20 the plan required, so the coverage
@@ -168,7 +176,7 @@ that part of the prediction held for two of three arms.
   F +0.030, against capacities of 5.96, 7.88, 17.6, 7.80, 1.19, and 6.03 MW. The largest is 0.6% of
   capacity, so no spread shifts a forecast.
 - **Error of the median forecast beside the pinball contrasts.** The mean absolute error of the sum's
-  median is 2.088 (a), 2.079 (b), 2.091 (c), and 2.078 (d) MW for P2, with overlapping intervals,
+  median is 2.088 (a), 2.079 (b), 2.090 (c), and 2.078 (d) MW for P2, with overlapping intervals,
   so the contrasts on the tail do not come from a shifted median.
 - **Audit triggers.** Trigger 2 fired once: (c) over-covers against the prediction. The explanation
   above (Figure 2) was tested in this session, so no audit ran. Triggers 1, 3, 4, 5, 6, and 7 did not

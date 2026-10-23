@@ -105,7 +105,7 @@ def pit_normal_scores(
     The level is found by interpolating between the stored quantiles. Where several stored
     quantiles tie at the observation (a plateau at zero or at a cap), the level is drawn uniformly
     across the plateau, so that a calibrated forecast gives uniform levels. Levels beyond the
-    outermost stored quantiles are set to 0.001 or 0.999 of the way to the end.
+    outermost stored quantiles are set half way between the end level and 0 or 1.
 
     Args:
         quantiles: `(n, n_levels)` quantiles per row.
@@ -127,10 +127,8 @@ def pit_normal_scores(
     rows = np.arange(n_rows)
     tie = n_at_most > n_below
     low_tie = np.where(n_below > 0, grid[np.maximum(n_below - 1, 0)], 0.0)
-    pit[tie] = (
-        low_tie[tie]
-        + rng.uniform(size=n_rows)[tie] * (grid[np.maximum(n_at_most - 1, 0)] - low_tie)[tie]
-    )
+    high_tie = np.where(n_at_most < n_levels, grid[np.maximum(n_at_most - 1, 0)], 1.0)
+    pit[tie] = low_tie[tie] + (rng.uniform(size=n_rows) * (high_tie - low_tie))[tie]
     outside_low = (n_below == 0) & ~tie
     outside_high = (n_below == n_levels) & ~tie
     inner = ~tie & ~outside_low & ~outside_high
@@ -216,8 +214,9 @@ def member_rank_levels(
     """Turn each row's ensemble members into levels, `n_draws` per member.
 
     A member's level is drawn uniformly inside the interval `(rank - 1, rank) / n_members` of its
-    rank among the row's members (ties share the average rank), so that the levels of one row
-    cover (0, 1) evenly and keep the members' order.
+    rank among the row's members, so that the levels of one row cover (0, 1) evenly and keep the
+    members' order. Members with equal values are ranked in a random order, so that a row whose
+    members all tie still covers (0, 1).
 
     Args:
         member_values: `(n, n_members)` ensemble members' values.
@@ -228,10 +227,11 @@ def member_rank_levels(
         An `(n, n_members * n_draws)` array of levels in (0, 1).
     """
     n_members = member_values.shape[1]
-    ranks = rankdata(member_values, axis=1, method="average")
-    centre = np.repeat(ranks, n_draws, axis=1)
-    jitter = rng.uniform(-0.5, 0.5, size=centre.shape)
-    return np.clip((centre + jitter) / n_members, 1e-6, 1.0 - 1e-6)
+    tie_break = rng.uniform(-1e-9, 1e-9, size=member_values.shape)
+    ranks = rankdata(member_values + tie_break, axis=1, method="ordinal")
+    lower_edge = np.repeat(ranks - 1, n_draws, axis=1)
+    jitter = rng.uniform(size=lower_edge.shape)
+    return np.clip((lower_edge + jitter) / n_members, 1e-6, 1.0 - 1e-6)
 
 
 def member_wise_sum_quantiles(
