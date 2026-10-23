@@ -312,5 +312,6 @@ and triage:
   `studies.tail_calibration`, the crossing rate of the unsorted quantiles per arm, the fitted curves
   of A3 beside the neural network's factor on the same variable, and the Checks bullets of the
   `ml-experiment` skill.
-- **Reviews.** Sonnet reviews the code and the write-up, and a Sonnet prose review runs before the
-  merge. No Opus unless a result contradicts a prediction in a way that changes the next step.
+- **Reviews.** A Sonnet plan review before any fit, a Sonnet audit of the results and the method
+  (which read the code for leakage; there was no separate code review), and a Sonnet prose review
+  before the merge. No Opus was used.
