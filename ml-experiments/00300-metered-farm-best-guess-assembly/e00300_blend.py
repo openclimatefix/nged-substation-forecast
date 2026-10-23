@@ -143,11 +143,16 @@ def combine(*, stack: np.ndarray, weights: np.ndarray) -> np.ndarray:
 
 
 def rolling(
-    *, base: pl.DataFrame, stack: np.ndarray, components: tuple[str, ...]
+    *, base: pl.DataFrame, stack: np.ndarray, components: tuple[str, ...], leave_farm_out: bool
 ) -> tuple[np.ndarray, list[dict[str, object]]]:
-    """Return the rolling-origin blend's quantiles and the weight records, fitted month by month."""
+    """Return the rolling-origin blend's quantiles and the weight records, fitted month by month.
+
+    With `leave_farm_out`, each farm's weights are fitted on the other farms' earlier rows only, so a
+    farm with no history never contributes its own outcomes to its blend.
+    """
     months = sorted(base["month"].unique().to_list())
     month_col = base["month"].to_numpy()
+    farm_col = base["time_series_id"].to_numpy()
     time = base["time"].dt.epoch("us").to_numpy()
     init = base["init_time"].dt.epoch("us").to_numpy()
     blend = np.empty((base.height, len(common.LEVELS)))
@@ -156,16 +161,27 @@ def rolling(
     for i, month in enumerate(months):
         in_month = month_col == month
         earlier = time < init[in_month].min()
-        weights = equal if i < BURN_IN_MONTHS else fit_weights(base=base, stack=stack, rows=earlier)
-        blend[in_month] = combine(stack=stack[:, in_month, :], weights=weights)
-        for k, level in enumerate(common.LEVELS):
-            records.append(
-                {
-                    "month": month,
-                    "level": float(level),
-                    **{a: float(weights[k, j]) for j, a in enumerate(components)},
-                }
+        groups = (
+            [(farm, farm_col == farm) for farm in common.FARMS]
+            if leave_farm_out
+            else [("all", np.ones(base.height, dtype=bool))]
+        )
+        for farm, farm_rows in groups:
+            target = in_month & farm_rows
+            fit_rows = earlier & ~farm_rows if leave_farm_out else earlier
+            weights = (
+                equal if i < BURN_IN_MONTHS else fit_weights(base=base, stack=stack, rows=fit_rows)
             )
+            blend[target] = combine(stack=stack[:, target, :], weights=weights)
+            for k, level in enumerate(common.LEVELS):
+                records.append(
+                    {
+                        "month": month,
+                        "farm": farm,
+                        "level": float(level),
+                        **{a: float(weights[k, j]) for j, a in enumerate(components)},
+                    }
+                )
     return blend, records
 
 
@@ -207,15 +223,21 @@ def main() -> None:
     for setting in common.SETTINGS:
         for name, components in BLENDS.items():
             base, stack = common_rows(setting=setting, components=components)
-            blend, rec = rolling(base=base, stack=stack, components=components)
+            blend, rec = rolling(
+                base=base,
+                stack=stack,
+                components=components,
+                leave_farm_out=setting == "zero_history",
+            )
             write(base=base, setting=setting, arm=name, quantiles=blend)
             records += [{"setting": setting, "blend": name, **r} for r in rec]
             print(setting, name, base.height, flush=True)
+        ens_base, _ = common_rows(setting=setting, components=BLENDS["blend"])
         ens = load_component(setting=setting, arm="mdn")
-        ens = base.select("time_series_id", "time").join(
+        ens = ens_base.select("time_series_id", "time").join(
             ens, on=["time_series_id", "time"], how="left"
         )
-        write(base=base, setting=setting, arm="mdn_ens", quantiles=ens.select(QCOLS).to_numpy())
+        write(base=ens_base, setting=setting, arm="mdn_ens", quantiles=ens.select(QCOLS).to_numpy())
     pl.DataFrame(records).write_csv(common.DATA_DIR / "weights.csv")
 
 
