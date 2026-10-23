@@ -51,6 +51,8 @@ def repd_wind() -> pl.DataFrame:
         .select(
             repd_ref=pl.col("Ref ID"),
             repd_name=pl.col("Site Name"),
+            country=pl.col("Country"),
+            region=pl.col("Region"),
             capacity_mw=pl.col("Installed Capacity (MWelec)")
             .str.replace_all(",", "")
             .cast(pl.Float64, strict=False),

@@ -5,8 +5,9 @@ span (the 53 Tuesday runs from 2025-07-01 to 2026-06-30), reads the ENS Delta ta
 H3 resolution-5 cells that contain the candidate farms and keeps the native 3-hourly and 6-hourly
 valid times after the forecast's publication delay (9 hours) up to 351 hours after it, the lead
 range experiment 259's rows cover. The columns match experiment 259's member rows: wind speed at
-10 m and 100 m, the sine and cosine of the direction the wind blows from at both heights, and the 2 m
-temperature in degrees Celsius. `power_fcst_init_time` is the run time plus the publication delay.
+10 m and 100 m, the sine and cosine of the direction the wind blows from at both heights, and the
+2 m temperature in degrees Celsius. `power_fcst_init_time` is the run time plus the publication
+delay.
 
 Output: `work/ens/<set>/init=<date>.parquet` (`set` is `hindcast` or `scored`) and
 `work/farm_h3.parquet`, which maps each BMU to its cell.
