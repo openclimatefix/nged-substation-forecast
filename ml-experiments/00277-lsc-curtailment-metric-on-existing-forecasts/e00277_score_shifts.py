@@ -1,8 +1,8 @@
 # ruff: noqa: E501
 """Score the bulk supply points (part B) and the load-shift row groups (part C).
 
-Part B scores D13 and D17 with climatology and the manual heuristic (experiment 87's stored references) and the
-top-down and bottom-up GAM forecasts (experiment 204). Part C re-scores experiment 163's rows,
+Part B scores D13 and D17 with climatology and the manual heuristic (experiment 87's stored
+references) and the top-down and bottom-up GAM forecasts (experiment 204). Part C re-scores experiment 163's rows,
 which include the logged transfers, for climatology, the manual heuristic, BG2 and the unmasked
 GAM-K stack (K0), split into the decision program's row groups. K0 stores five quantiles
 (q01, q05, q50, q95, q99), so its CRPS is the stored 11-quantile score and its tail measures are
