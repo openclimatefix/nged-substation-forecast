@@ -20,9 +20,9 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from scipy.special import ndtr
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 import e00311_common as common  # isort: skip
 
