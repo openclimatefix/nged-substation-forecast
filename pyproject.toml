@@ -389,6 +389,7 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 # enforces that production never imports a script.
 extra-paths = [
     "tests",
+    "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
     "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
     "studies/embedded_battery_forecast",
@@ -710,6 +711,7 @@ python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_d
 # tests import helpers from a sibling test module by bare name.
 pythonpath = [
     "tests",
+    "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
     "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
     "studies/embedded_battery_forecast",

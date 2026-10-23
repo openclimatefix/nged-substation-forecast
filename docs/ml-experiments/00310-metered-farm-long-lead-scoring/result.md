@@ -50,23 +50,24 @@ best_arm: >-
 headline: >-
   The blend beats XGBoost at every day band (3.7% lower quantile score at day 1 to 10.0% at days 8
   to 10, own history) and beats climatology by 38.7% at day 1 and 10.1% at days 8 to 10, so the
-  forecast still adds skill at day 10. XGBoost alone is no better than climatology from day 8.
+  forecast still adds skill at day 10. Plant-fed XGBoost is no better than climatology from day 8.
 lessons: >-
-  The plant carries the forecast out to day 10, and XGBoost alone loses all of its skill by day 8.
-  Lagged power adds no measurable skill at any lead. The blend adds over the best single family (the
-  MDN) only at days 1 and 2.
+  The plant's outputs carry the forecast out to day 10, and plant-fed XGBoost (XGBoost on the plant
+  forecast, its ensemble spread, the unit mean, and the availability ratio, with no weather features
+  of its own) loses all of its skill by day 8. Lagged power adds no measurable skill at any lead.
+  The blend adds over the best single family (the MDN) only at days 1 and 2.
 take_home_message: >-
   The assembled solar-farm forecast still beats the seasonal-average forecast (climatology) at every
   lead up to 10 days, by 39% at day 1 and 10% at days 8 to 10, so NGED can use it across its whole
-  horizon of 1 to 10 days ahead. An XGBoost model on its own loses its skill by day 8, so a simple
+  horizon of 1 to 10 days ahead. A plant-fed XGBoost model loses its skill by day 8, so a simple
   first production forecast should be the mixture-density neural network on the plant, which is the
   best single family at every lead, and the blend of the GAM, MDN, and XGBoost adds more than 1%
   only at days 1 and 2.
 advice:
 - >-
   Build the first production solar-farm forecast on the physical plant plus one band model (the
-  GAM or the MDN), not on XGBoost alone: XGBoost scores no better than climatology at days 8 to 10,
-  while the plant-based models stay 8% to 10% better (Figure 2, single-family tables).
+  GAM or the MDN), not on plant-fed XGBoost: plant-fed XGBoost scores no better than climatology at
+  days 8 to 10, while the plant-based models stay 8% to 10% better (Figure 2, single-family tables).
 - >-
   Use the mixture-density network on the plant as the single model family: it has the lowest
   quantile score of the three families at every day band, in both history settings (single-family
@@ -86,7 +87,7 @@ adopted_in: none
 ---
 
 **The assembled forecast still beats climatology at day 10, so it can serve forecasts of
-solar-farm power from 1 to 10 days ahead; XGBoost alone cannot.** National Grid Electricity
+solar-farm power from 1 to 10 days ahead; plant-fed XGBoost cannot.** National Grid Electricity
 Distribution (NGED) meters six solar farms, labelled A to F here. [Experiment
 300](../00300-metered-farm-best-guess-assembly/result.md) scored a forecast of each farm's power
 at leads of 12 to 36 hours. The forecast starts from a physics model of the farm's output (the
@@ -95,7 +96,7 @@ mixture-density neural network (MDN), and blends those two with XGBoost. We refi
 forecast at leads of 12 to 252 hours (day 1 to day 10), in six groups of lead times (day 1, day 2,
 day 3, days 4 to 5, days 6 to 7, and days 8 to 10). We scored it against `climatology` (the farm's
 power for the same month and half-hour of day in earlier history), `manual_heuristic` (quantiles
-of 13 earlier observed powers), and the GAM, the MDN, and XGBoost alone. "Own history" means the
+of 13 earlier observed powers), and the GAM, the MDN, and plant-fed XGBoost. "Own history" means the
 forecast trains on the farm's earlier months, and "zero history" means it trains on the other five
 farms only. The quantile score is twice the mean pinball loss over the 11 quantiles, in points of
 capacity (1 point is 1% of the farm's capacity), and lower is better.
@@ -143,10 +144,10 @@ Zero history:
   at days 1 and 2 (intervals below zero in both settings), 0.4% to 0.9% below it at days 3 to 5, and
   0.0% to 0.3% below it at days 6 to 10, where every interval includes zero. The 1% threshold in the
   decision rule is met at days 1 and 2 only.
-- **XGBoost alone.** Its change against `climatology` is -36.3% at day 1 in own history. At days 8
-  to 10 the change is -0.1% (-6.7% to +7.5%) in own history and -2.0% (-8.1% to +5.1%) in zero
-  history, so both intervals include zero. XGBoost alone shows no skill over `climatology` from day
-  8.
+- **Plant-fed XGBoost.** Its change against `climatology` is -36.3% at day 1 in own history. At days
+  8 to 10 the change is -0.1% (-6.7% to +7.5%) in own history and -2.0% (-8.1% to +5.1%) in zero
+  history, so both intervals include zero. Plant-fed XGBoost shows no skill over `climatology` from
+  day 8.
 
 ![Figure 1: quantile score against lead for every arm](figure_1_score_by_lead.svg)
 
