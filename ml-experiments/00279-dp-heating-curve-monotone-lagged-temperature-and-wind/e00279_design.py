@@ -27,7 +27,7 @@ import e00279_common as common
 import e00279_nn as nn_module
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_calendar import SMOOTHING_HOURS
 from studies.dp_features import FeatureCache
 from studies.dp_gam import (

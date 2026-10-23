@@ -101,7 +101,7 @@ def configure_threads(*, threads: int = 1) -> None:
     """
     import os
 
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(threads)
     for name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
