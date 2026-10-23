@@ -100,7 +100,7 @@ def figure_d10_hours(*, report: dict) -> None:
         .encode(x=alt.X("hour:Q", title="Hour of day (UTC)", axis=alt.Axis(values=[0, 6, 12, 18, 24])),
                 y=alt.Y("value:Q", title="Mean actual minus median (points)"))
         .properties(width=WIDTH, height=140, title=_title(
-            title="The default forecast sits about 1 to 2 points above the actual demand at D10, at every hour",
+            title="The default forecast sits above the actual demand at D10 at every hour, by 0.2 to 2.0 points",
             subtitle="Mean of actual minus Primary demand research default 1's median at D10, by UTC hour, scored year.",  # fmt: skip
         ))
     )  # fmt: skip
@@ -129,7 +129,7 @@ def figure_grafts(*, report: dict) -> None:
     rows = [
         {"group": g, "graft": k, **v}
         for g, entry in report.items()
-        for k, v in entry["S"].items()
+        for k, v in entry["S_level_matched"].items()
         if g in ("D5+D9 worst quarter", "D5+D9 all daylight", "D10 worst quarter")
     ]
     data = (
@@ -137,7 +137,7 @@ def figure_grafts(*, report: dict) -> None:
         .select("group", "graft", "est", "lo", "hi")
         .with_columns(pl.col("lo", "hi", "est").clip(-2.0, 2.0))
     )
-    order = list(next(iter(report.values()))["S"])
+    order = list(next(iter(report.values()))["S_level_matched"])
     base = _chart(data).encode(
         y=alt.Y("graft:N", sort=order, title=None),
         color=alt.Color(
@@ -155,8 +155,8 @@ def figure_grafts(*, report: dict) -> None:
             _chart(pl.DataFrame({"z": [0.0, 1.0]})).mark_rule(color="#888", strokeDash=[3, 3]).encode(x="z:Q"),
         )
         .properties(width=WIDTH, height=260, title=_title(
-            title="The emulated graft recovers little of the refit's advantage, even with all five families",
-            subtitle="Share S of the depth-1 refit's advantage over arm D recovered by shifting arm D's quantiles by the refit's family contribution minus a surrogate's. Line: 95% interval from resampling ISO weeks, clipped at -2 and 2.",  # fmt: skip
+            title="On the worst April-to-June half-hours, grafting the sunshine response recovers the most of any family",
+            subtitle="Share S of the depth-1 refit's advantage over arm D recovered by shifting arm D's quantiles by the refit's family contribution minus a surrogate's, each averaged to zero. Line: 95% interval from resampling ISO weeks, clipped at -2 and 2.",  # fmt: skip
         ))
     )  # fmt: skip
     _save(chart, name="figure_3_graft_shares")

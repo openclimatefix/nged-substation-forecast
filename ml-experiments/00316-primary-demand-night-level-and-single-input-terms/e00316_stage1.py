@@ -100,6 +100,9 @@ def contributions(*, frame: pl.DataFrame) -> pl.DataFrame:
             idx = [columns.index(c) for c in cols]
             data[f"cr_{name}"] = cr[:, idx].sum(axis=1)
             data[f"cs_{name}"] = cs[:, idx].sum(axis=1)
+        for name in an.FAMILIES:
+            data[f"crc_{name}"] = data[f"cr_{name}"] - data[f"cr_{name}"].mean()
+            data[f"csc_{name}"] = data[f"cs_{name}"] - data[f"cs_{name}"].mean()
         data["cr_bias"], data["cs_bias"] = cr[:, -1], cs[:, -1]
         data["s_fit"] = fitted
         pieces.append(group.with_columns(*[pl.Series(k, v) for k, v in data.items()]))
@@ -141,15 +144,22 @@ def main() -> None:
             "qs_bg2_stored": float(np.mean(rows["qs_bg2"].to_numpy())),
             "gap_med_refit_minus_d": float(np.mean((rows["r_q50"] - rows["med_d"]).to_numpy())),
             "S": {},
+            "S_level_matched": {},
         }
         for graft, families in GRAFTS.items():
-            delta = sum(rows[f"cr_{f}"].to_numpy() - rows[f"cs_{f}"].to_numpy() for f in families)
-            qs_g = common.qs_per_row(actual=actual, q=q_d + delta[:, None])
-            entry["S"][graft] = {
-                **common.ratio_interval(num=qs_d - qs_g, den=qs_d - qs_r, blocks=blocks, seed=11),
-                "qs_graft": float(qs_g.mean()),
-                "mean_delta": float(np.mean(delta)),
-            }
+            for key, prefix in (("S", ""), ("S_level_matched", "c")):
+                delta = sum(
+                    rows[f"cr{prefix}_{f}"].to_numpy() - rows[f"cs{prefix}_{f}"].to_numpy()
+                    for f in families
+                )
+                qs_g = common.qs_per_row(actual=actual, q=q_d + delta[:, None])
+                entry[key][graft] = {
+                    **common.ratio_interval(
+                        num=qs_d - qs_g, den=qs_d - qs_r, blocks=blocks, seed=11
+                    ),
+                    "qs_graft": float(qs_g.mean()),
+                    "mean_delta": float(np.mean(delta)),
+                }
         med_d, s_fit = rows["med_d"].to_numpy(), rows["s_fit"].to_numpy()
         entry["surrogate_r2_rows"] = float(
             1.0 - ((med_d - s_fit) ** 2).sum() / ((med_d - med_d.mean()) ** 2).sum()
