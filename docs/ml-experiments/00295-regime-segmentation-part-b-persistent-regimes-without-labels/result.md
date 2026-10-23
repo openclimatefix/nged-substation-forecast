@@ -15,32 +15,43 @@ size: >-
   read. Callers: this folder's scripts, which call the reviewed `studies.dp_gam` fit and predict
   functions unchanged. Asset graph: not touched.
 hypothesis: >-
-  A segmentation of a Primary's whole history with hindsight, using only the residual of a
-  lagless convex additive model (GAM), dates a persistent change of level to within 14 days and
-  tells a persistent step from a temporary one, without labels. A step is persistent when the
-  level does not return and no neighbouring Primary shows the opposite step, and temporary
-  otherwise.
+  A segmentation of a Primary's whole history with hindsight, using only changes in the
+  distribution of the residual of a lagless convex additive model (GAM), finds regime changes
+  without labels. A regime is the whole period, without gaps, during which one configuration
+  holds. For D8's gas engine, the regime is the whole period in which the engine is installed
+  and included in the meter, including the spells when the engine is off. Whether the engine
+  is running, and whether a load shift is in force, are states inside a regime. A boundary is
+  a regime change when the distribution does not return to its earlier form and no neighbouring
+  Primary shows the opposite change, and a state change otherwise.
 prediction: >-
-  Written before any fit. On the known answer, D8's break on 2023-08-15, the segmentation places
-  the break within 14 days. At the 15 Primaries with no injection, it finds under 1 false break
-  per Primary-year. On injected steps in held-out Primaries and even-numbered months, it labels at
-  least 80% of persistent steps as persistent and at least 80% of temporary shifts as temporary.
-  It is expected to fail on two counts. The PV capacity steps of experiment 207 may produce false
-  breaks in summer, and a permanent transfer that moves load between two Primaries is expected to
-  be called temporary, because the neighbour rule reads any mirrored step as a load shift.
+  Written before any fit. The segmentation places D8's break on 2023-08-15 within 14 days. At the
+  14 Primaries with no injection, it finds under 1 regime change per Primary-year (a boundary not
+  labelled as a state change). On injected steps in held-out Primaries and even-numbered months,
+  it labels at least 80% of persistent steps as regime changes and at least 80% of temporary
+  shifts as states. Inside D8's regime after 2023-08-15, at most 20% of the engine's on and off
+  spell edges have a boundary labelled as a regime change within 3 days. It is expected to fail
+  in two ways. The PV capacity steps of experiment 207 may produce false regime changes in
+  summer, and a permanent transfer that moves load between two Primaries is expected to be
+  labelled a state, because the neighbour rule reads any mirrored change as a load shift. The
+  fade of D8's dips from March 2026 is expected to appear as a boundary, and the experiment
+  cannot say from the residual alone whether it is a regime change or the engine not running.
 decision_rule: >-
-  Verdict `supported` when all three parts of the prediction hold: D8 dated within 14 days, under 1
-  false break per Primary-year (point estimate, with the upper end of the 98.75% bootstrap
-  interval over Primaries under 1.5), and both the persistent recall and the temporary recall at
-  least 80% on the held-out injections, with each 98.75% interval lower bound above 70%. A
-  classifier that labels everything persistent therefore fails on temporary recall. `partly
-  supported` when two parts hold. `not supported` otherwise. Steps within 150 days of the end of
-  the data are not injected, because they cannot show a return. Every interval is 98.75% (the
-  Bonferroni level for four contrasts). The forecast gain is reported and does not set the verdict.
-  The offset is a candidate for production at any gain whose paired interval excludes zero, since
-  it costs one extra number per series (threshold zero), and only if it also beats the trailing
-  60-day mean residual that needs no segmentation. Tuning uses odd calendar months and tuning
-  Primaries; reporting uses even calendar months and held-out Primaries (below).
+  Verdict `supported` when all four parts of the prediction hold: D8 dated within 14 days; under
+  1 regime change per Primary-year (point estimate, with the upper end of the 98.75% bootstrap
+  interval over Primaries under 1.5); both the persistent recall and the temporary recall at least
+  80% on the held-out injections, with each 98.75% interval lower bound above 70%; and the share
+  of engine spell edges with a boundary labelled as a regime change within 3 days at most 20%. A
+  classifier that labels everything persistent fails on temporary recall, and a segmentation that
+  splits D8's regime at the engine's spells fails the last part. `partly supported` when three
+  parts hold. `not supported` otherwise. Steps within 150 days of the end of the data are not
+  injected, because they cannot show a return. Every interval is 98.75% (the Bonferroni level for
+  four contrasts). The engine's on and off spells come from the night-only detector of experiment
+  199 (`v1`), which did not pass its own gate, so the spell-edge share is reported with that
+  caveat and beside the share expected for boundaries at random dates. The forecast gain does not
+  set the verdict. The offset is a candidate for production at any gain whose paired interval
+  excludes zero, since it costs one extra number per series (threshold zero), and only if it also
+  beats the trailing 60-day mean residual that needs no segmentation. Tuning uses odd calendar
+  months and tuning Primaries; reporting uses even calendar months and held-out Primaries.
 benchmark: >-
   No forecast benchmark. For the forecast gain: the same monthly-refitted GAM_ONLY without an
   offset, and with a trailing 60-day mean residual as the offset (no segmentation).
@@ -49,7 +60,7 @@ row_set_id: >-
   Primary in the 16-Primary cache of experiment 106, 2019-09-17 to 2026-06-30. Forecast gain: the
   six monthly forecast periods that follow each regime's confirmation date.
 metric: >-
-  Break dating error in days; false breaks per Primary-year at the Primaries without injection;
+  Break dating error in days; regime changes per Primary-year at the Primaries without injection;
   classification accuracy of injected persistent and temporary steps; mean absolute error change
   from the latest-regime offset in points of effective capacity.
 code: ml-experiments/00295-regime-segmentation-part-b-persistent-regimes-without-labels/
@@ -78,13 +89,18 @@ partitioning of a multivariate series, as in [Killick et al.
 **Design.**
 
 - **Residual.** One GAM_ONLY fit (the settings of experiment 274) per Primary on all rows to
-  2026-06-30; the residual is the reading minus the fit. Two daily series per Primary: the mean
-  residual over the day, and the mean residual over 00:00 to 06:00 minus the mean over 10:00 to
-  16:00 (a change of daily shape). Both are divided by the Primary's robust noise (1.4826 times the
-  median absolute deviation of day-to-day changes, over the square root of 2).
+  2026-06-30; the residual is the reading minus the fit. The segmentation reads the distribution
+  of each day's residual, not its mean. Four daily features per Primary: the share of the day's
+  half-hours more than 2.5 noise units below zero (the dip rate, with the noise unit the
+  Primary's half-hour residual scale from the median absolute deviation), the day's 5% quantile
+  (the depth of the dips), the day's 95% quantile (the height of the top), and the 00:00 to 06:00
+  mean minus the 10:00 to 16:00 mean (the daily shape). Each feature is divided by a robust noise
+  scale from day-to-day changes, floored at a quarter of its standard deviation. A step in level
+  moves both quantiles, so an injected step is visible in these features, but the day's mean level
+  is not a feature.
 - **Segmentation.** Optimal partitioning by dynamic programming with an L2 cost on the two series,
-  a penalty per break `beta` times the log of the number of days, and a minimum segment length of
-  `m` days. The grid is `beta` in {2, 4, 8, 16, 32, 64} and `m` in {7, 14, 30}.
+  a penalty per break `beta` times the log of the number of days times half the number of
+  features, and a minimum segment length of `m` days. The grid is `beta` in {4, 8, 16, 32, 64, 128} and `m` in {7, 14, 30}.
 - **Tuning and reporting split.** The 15 Primaries other than D8 are split by sorted label into
   tuning Primaries (odd positions) and held-out Primaries (even positions). The pair (`beta`, `m`)
   is chosen on injections with onsets in odd calendar months at the tuning Primaries: it
@@ -93,13 +109,14 @@ partitioning of a multivariate series, as in [Killick et al.
   with onsets in even months at the held-out Primaries, and false breaks at the held-out
   Primaries' unmodified series (the unmodified series may hold real regimes, which count as false
   breaks, so the false-break rate is an upper bound).
-- **Labelling a segment boundary.** *Temporary* when the level after the next boundary returns
-  within 0.5 noise units of the level before it, within 120 days; or when a neighbouring Primary
-  (the five Primaries with the highest residual correlation) shows a boundary within 3 days with
-  the opposite sign and at least half the size. *Persistent* when neither holds and the boundary
-  is at least 150 days before the end of the data. *Measurement* only for a boundary within 3
-  days of a date on a supplied list; the list is empty, since no meter-change dates are on file,
-  so that class is not scored.
+- **Labelling a segment boundary.** *State change* (label `temporary`) when the four features
+  after the next boundary return to within 1 noise unit of their values before this boundary,
+  within 120 days; or when a neighbouring Primary (the five with the highest residual correlation)
+  shows a boundary within 3 days whose centre shift (the mean of the 5% and 95% quantile shifts)
+  has the opposite sign and at least half the size. *Regime change* (label `persistent`) when
+  neither holds and the boundary is at least 150 days before the end of the data. A boundary
+  closer to the end is `unconfirmed`. A measurement change would be a third label, but no
+  meter-change dates are on file, so that class is not scored.
 - **Injections.** Onsets are the first of a month from 2021 to 2025, at least 150 days before the
   end of the data and at least 90 days from 2023-08-15. Persistent steps of 10% and 25% of the
   Primary's load, flat (the same MW at every half-hour) and with a profile (a share of the
@@ -114,10 +131,18 @@ partitioning of a multivariate series, as in [Killick et al.
 - **Scoring an injection.** The boundary within 14 days of the onset with the largest level shift
   is the injection's boundary. A missing boundary counts as a wrong label. Recall is the share of
   injections given the correct label; the confusion matrix is printed.
-- **PV check.** The experiment 207 step path is not refitted. A false break at a control is called
-  PV-like when its shift in the 10:00 to 16:00 residual is at least twice its shift in the
-  00:00 to 06:00 residual and the night shift is under 0.5 noise units; counts of PV-like and
-  other false breaks are reported, and the verdict counts both.
+- **PV check.** The experiment 207 step path is not refitted. A false regime change at a control
+  is called PV-like when its daytime shift is at least twice its night shift, approximated from the
+  centre and shape shifts; counts of PV-like and other false changes are reported, and the verdict
+  counts both.
+- **D8's regime.** D8's boundaries are printed for every configuration. The tests are (a) the
+  nearest boundary to 2023-08-15; (b) the share of engine spell edges after 2023-08-15 that have
+  a boundary within 3 days, for all boundaries and for boundaries labelled as regime changes,
+  beside the share for the same number of boundaries at random dates; (c) the boundary nearest
+  the fade in March 2026 and its shifts, with the engine's spell fraction before and after it
+  (the share of days the night-only detector flags). A spell is a run of at least 3 days with at
+  least 30% of half-hours flagged, or without. The residual-only boundary cannot tell a regime
+  change from an engine that is off, and the page says so.
 - **Forecast gain.** At each monthly cut (the first of a month, 24-month window) from the month
   after a step's onset to 6 months after, for D8 after 2023-08-15 and for all injected persistent
   steps at the held-out Primaries, the GAM_ONLY fit gives in-sample residuals, the segmentation
@@ -131,7 +156,7 @@ partitioning of a multivariate series, as in [Killick et al.
 **Planned contrasts (Bonferroni across the four, level 98.75%).**
 
 - C1: D8 dating error against 14 days.
-- C2: false breaks per Primary-year at the held-out controls against 1.
+- C2: regime changes per Primary-year at the held-out controls against 1.
 - C3: persistent and temporary recall of the injections, each against 0.8.
 - C4: forecast error with the latest-regime offset minus without it, and minus the trailing
   60-day offset, on rows after the step.
