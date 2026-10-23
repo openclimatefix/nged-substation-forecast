@@ -228,7 +228,8 @@ def tails() -> None:
         title=_title(
             [
                 "Pinball loss at the two tails, with and without the neighbourhood summaries, equal weight per farm.",
-                "Dot: estimate. Line: 95% interval from resampling whole months. Grey rule: no change.",
+                "Dot: estimate. Line: interval from resampling whole months (98.75% for N1 against N0, 95% for X1 against X0).",
+                "Grey rule: no change.",
             ]
         ),
     )
