@@ -205,9 +205,10 @@ three arms. The table gives coverage pooled over both nodes, as a percentage of 
   so the contrasts on the tail do not come from a shifted median.
 - **Audit triggers.** Audit trigger 2 (a result that contradicts its prediction) applied once: (c)
   over-covers. The comparison of correlations in Results (Figure 2) tests the explanation, so no
-  audit ran. Triggers 1, 3, 4, 5, 6, and 7 did not apply: the shuffled-members control behaves as a control should, the quantile and median errors do
-  not disagree, neither node flips a verdict, no nested arm beats its container, there is no sister
-  experiment on the same rows, and no later experiment depends on this result yet.
+  audit ran. Triggers 1, 3, 4, 5, 6, and 7 did not apply: the shuffled-members control behaves as a
+  control should, the quantile and median errors do not disagree, neither node flips a verdict, no
+  nested arm beats its container, there is no sister experiment on the same rows, and no later
+  experiment depends on this result yet.
 
 ## Caveats
 
