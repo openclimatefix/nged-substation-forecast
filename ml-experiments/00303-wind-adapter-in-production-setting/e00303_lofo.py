@@ -51,9 +51,7 @@ def fixed_spread(
     factors = {}
     for short in (True, False):
         chosen = ((lead_hours < common.SHORT_BAND_HOURS) == short) & scorable(mixture=mixture)
-        factors[short] = common.fit_spread_factor(
-            quantiles=mixture[chosen], actual=actual[chosen]
-        )
+        factors[short] = common.fit_spread_factor(quantiles=mixture[chosen], actual=actual[chosen])
     return factors
 
 
@@ -69,7 +67,9 @@ def apply_fixed_spread(
     return out
 
 
-def pooled_offsets(*, quantiles: np.ndarray, actual: np.ndarray, lead_day: np.ndarray) -> np.ndarray:
+def pooled_offsets(
+    *, quantiles: np.ndarray, actual: np.ndarray, lead_day: np.ndarray
+) -> np.ndarray:
     """Return the pinball-optimal offsets per lead day (0 to 15) pooled over the cases."""
     table = np.zeros((ens_final.ens.MAX_LEAD_DAY + 1, 11))
     for day in range(ens_final.ens.MAX_LEAD_DAY + 1):
@@ -87,7 +87,7 @@ def pooled_train(*, data: list[fit.Hindcast]) -> pl.DataFrame:
     return pl.concat([d.train for d in data])
 
 
-def main() -> None:  # noqa: PLR0915
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Run both arms for each held-out farm and write the stored quantiles."""
     out_dir = common.WORK_DIR / "final"
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -104,7 +104,6 @@ def main() -> None:  # noqa: PLR0915
                 train=train, adapter="net", seed=seed, with_idle_layer=False
             )
             mixtures: dict[str, dict[str, np.ndarray]] = {"P3_LOFO": {}, "P5_LOFO": {}}
-            hindcast_mixtures: dict[str, dict[str, np.ndarray]] = {"P3_LOFO": {}, "P5_LOFO": {}}
             for farm in FARMS:
                 for set_name, columns in (
                     ("hindcast", data[farm].hind_columns),
@@ -174,8 +173,7 @@ def main() -> None:  # noqa: PLR0915
                 )
                 lead = np.concatenate(
                     [
-                        (data[f].valid[rows[f]] - data[f].init[rows[f]])
-                        / np.timedelta64(1, "h")
+                        (data[f].valid[rows[f]] - data[f].init[rows[f]]) / np.timedelta64(1, "h")
                         for f in others
                     ]
                 )
@@ -208,17 +206,19 @@ def main() -> None:  # noqa: PLR0915
                     factors=factors,
                 )
                 if arm == "P3_LOFO":
-                    adjusted_pool = apply_fixed_spread(mixture=mix.astype(np.float64), lead_hours=lead, factors=factors)
-                    table = pooled_offsets(quantiles=adjusted_pool, actual=actual, lead_day=lead_day)
+                    adjusted_pool = apply_fixed_spread(
+                        mixture=mix.astype(np.float64), lead_hours=lead, factors=factors
+                    )
+                    table = pooled_offsets(
+                        quantiles=adjusted_pool, actual=actual, lead_day=lead_day
+                    )
                     adjusted_scored = np.sort(
                         np.clip(adjusted_scored + table[scored_day], 0.0, 1.0), axis=1
                     )
                 results[arm].setdefault(seed, {})[held_out] = adjusted_scored.astype(np.float32)
                 print(held_out, arm, "seed", seed, "spread factors", factors, flush=True)
     for arm, by_seed in results.items():
-        stacked = np.stack(
-            [np.concatenate([by_seed[s][farm] for farm in FARMS]) for s in SEEDS]
-        )
+        stacked = np.stack([np.concatenate([by_seed[s][farm] for farm in FARMS]) for s in SEEDS])
         np.save(out_dir / f"{arm}.npy", stacked)
 
 

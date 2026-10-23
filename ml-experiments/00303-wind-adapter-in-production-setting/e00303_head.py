@@ -1,4 +1,4 @@
-# ruff: noqa: D102, D107
+# ruff: noqa: D101, D102, D107
 """P6 of experiment 00303: experiment 00259's neural head on the best adapter arm's quantiles.
 
 The base is the post-spread-factor quantiles of the plain arm (P2, P4, or P5) with the lowest

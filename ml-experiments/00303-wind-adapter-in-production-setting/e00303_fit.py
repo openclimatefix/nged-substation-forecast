@@ -20,7 +20,6 @@ in-sample prediction. The scored mixture comes from a model fitted on the whole 
 import argparse
 import os
 import time
-from datetime import timedelta
 from typing import Final
 
 for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
@@ -48,7 +47,19 @@ FINE_TUNE_RATE_FACTOR: Final[float] = 0.1
 EVAL_EVERY: Final[int] = 25
 PREDICT_CHUNK: Final[int] = 2_000_000
 CASE_CHUNK: Final[int] = 20_000
-ARMS: Final[tuple[str, ...]] = ("P2", "P8", "P4", "P5", "P7", "P4m", "P5m", "P7m")
+ARMS: Final[tuple[str, ...]] = (
+    "P2",
+    "P8",
+    "P4",
+    "P5",
+    "P7",
+    "P4m",
+    "P5m",
+    "P7m",
+    "P4c",
+    "P5c",
+    "P7c",
+)
 
 
 def member_columns(*, rows: pl.DataFrame) -> dict[str, np.ndarray]:
@@ -107,7 +118,7 @@ def predict_columns(
 def mixture_of_expected(
     *, expected: np.ndarray, residuals: core_module.ResidualQuantiles
 ) -> np.ndarray:
-    """Return the equal-weight member mixtures (cases, 11) of expected power plus residual offsets."""
+    """Return the equal-weight member mixtures (cases, 11) of expected power plus offsets."""
     pieces = []
     step = CASE_CHUNK * common.MEMBERS
     for start in range(0, expected.size, step):
@@ -177,7 +188,9 @@ def transfer(*, source: core_module.WindCore, target: core_module.WindCore) -> N
     target.load_state_dict(state)
 
 
-def l1(*, core: core_module.WindCore, weather: core_module.WeatherArrays, goal: torch.Tensor):
+def l1(
+    *, core: core_module.WindCore, weather: core_module.WeatherArrays, goal: torch.Tensor
+) -> torch.Tensor:
     """Return the mean absolute error of the core's expected power."""
     return (core(weather=weather) - goal).abs().mean()
 
@@ -211,7 +224,11 @@ def train_core(
     steps = SCRATCH_STEPS if scratch else FINE_TUNE_STEPS
     optimiser = torch.optim.AdamW(
         [
-            {"params": other_parameters, "lr": core_module.LEARNING_RATE * factor, "weight_decay": 0},
+            {
+                "params": other_parameters,
+                "lr": core_module.LEARNING_RATE * factor,
+                "weight_decay": 0,
+            },
             {
                 "params": adapter_parameters,
                 "lr": core_module.ADAPTER_LEARNING_RATE * factor,
@@ -296,7 +313,11 @@ def train_core_mean(
     steps = SCRATCH_STEPS if scratch else FINE_TUNE_STEPS
     optimiser = torch.optim.AdamW(
         [
-            {"params": other_parameters, "lr": core_module.LEARNING_RATE * factor, "weight_decay": 0},
+            {
+                "params": other_parameters,
+                "lr": core_module.LEARNING_RATE * factor,
+                "weight_decay": 0,
+            },
             {
                 "params": adapter_parameters,
                 "lr": core_module.ADAPTER_LEARNING_RATE * factor,
@@ -439,8 +460,8 @@ def run_era5_arms(*, data: Hindcast, arms: list[str]) -> dict[str, dict[int, cor
     farm = data.farm
     cores: dict[str, dict[int, core_module.WindCore]] = {"net": {}, "blind": {}}
     residuals_by: dict[tuple[str, int], core_module.ResidualQuantiles] = {}
-    need_net = any(a in arms for a in ("P2", "P8", "P5", "P5m"))
-    need_blind = "P7" in arms or "P7m" in arms
+    need_net = any(a in arms for a in ("P2", "P8", "P5", "P5m", "P5c"))
+    need_blind = any(a in arms for a in ("P7", "P7m", "P7c"))
     for seed in SEEDS:
         for adapter, wanted in (("net", need_net), ("blind", need_blind)):
             if not wanted:
@@ -457,7 +478,10 @@ def run_era5_arms(*, data: Hindcast, arms: list[str]) -> dict[str, dict[int, cor
             print(f"{farm} ERA5 {adapter} seed {seed}: {time.time() - started:.0f} s", flush=True)
     if "P2" in arms and not done(arm="P2", farm=farm):
         for seed in SEEDS:
-            for set_name, columns in (("hindcast", data.hind_columns), ("scored", data.scored_columns)):
+            for set_name, columns in (
+                ("hindcast", data.hind_columns),
+                ("scored", data.scored_columns),
+            ):
                 expected = predict_columns(core=cores["net"][seed], columns=columns)
                 store(
                     arm="P2",
@@ -566,9 +590,11 @@ def run_hindcast_arm(
 ) -> None:
     """Fit P4, P5, or P7 with a three-fold cross-fit, and store both mixtures per seed."""
     farm = data.farm
-    mean_loss = arm.endswith("m")
-    adapter = {"P4": "net_ens", "P5": "net_ens", "P7": "blind"}[arm.removesuffix("m")]
-    pretrained = {"P4": None, "P5": "net", "P7": "blind"}[arm.removesuffix("m")]
+    mean_loss = arm.endswith(("m", "c"))
+    case_quantiles = arm.endswith("c")
+    family = arm.removesuffix("m").removesuffix("c")
+    adapter = {"P4": "net_ens", "P5": "net_ens", "P7": "blind"}[family]
+    pretrained = {"P4": None, "P5": "net", "P7": "blind"}[family]
     idle_start = core_module.idle_floor_start(
         speed_100m=data.train["wind_speed_100m"].to_numpy(), target=data.train["target"].to_numpy()
     )
@@ -620,7 +646,11 @@ def run_hindcast_arm(
             seed=seed,
             set_name="hindcast",
             farm=farm,
-            mixture=mixture_of_expected(expected=expected_oof, residuals=residuals),
+            mixture=(
+                residuals.quantiles(expected=mean_expected)
+                if case_quantiles
+                else mixture_of_expected(expected=expected_oof, residuals=residuals)
+            ),
         )
         expected_scored = predict_columns(core=final_core, columns=data.scored_columns)
         store(
@@ -628,7 +658,13 @@ def run_hindcast_arm(
             seed=seed,
             set_name="scored",
             farm=farm,
-            mixture=mixture_of_expected(expected=expected_scored, residuals=residuals),
+            mixture=(
+                residuals.quantiles(
+                    expected=expected_scored.reshape(-1, common.MEMBERS).mean(axis=1)
+                )
+                if case_quantiles
+                else mixture_of_expected(expected=expected_scored, residuals=residuals)
+            ),
         )
         print(f"{farm} {arm} seed {seed}: {time.time() - started:.0f} s", flush=True)
 
@@ -646,7 +682,7 @@ def main() -> None:
             continue
         data = Hindcast(farm=farm)
         cores = run_era5_arms(data=data, arms=[a for a in pending if a in ARMS])
-        for arm in ("P4", "P5", "P7", "P4m", "P5m", "P7m"):
+        for arm in ("P4", "P5", "P7", "P4m", "P5m", "P7m", "P4c", "P5c", "P7c"):
             if arm in pending:
                 run_hindcast_arm(data=data, arm=arm, cores=cores)
 

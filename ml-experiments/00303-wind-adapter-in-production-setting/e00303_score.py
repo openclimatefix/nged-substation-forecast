@@ -42,6 +42,16 @@ ARM_ORDER: Final[tuple[str, ...]] = (
     "P4T",
     "P5T",
     "P7T",
+    "P4m",
+    "P5m",
+    "P7m",
+    "P4mT",
+    "P5mT",
+    "P4c",
+    "P5c",
+    "P7c",
+    "P4cT",
+    "P5cT",
     "P3_LOFO",
     "P5_LOFO",
 )
@@ -66,6 +76,22 @@ EXTRA_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
     ("x8", "P3_LOFO", "P3"),
     ("x9", "P5_LOFO", "P5"),
     ("x10", "P5_LOFO", "P3_LOFO"),
+    ("m1", "P5m", "P3"),
+    ("m2", "P5m", "P1"),
+    ("m3", "P5m", "P5"),
+    ("m4", "P4m", "P5m"),
+    ("m5", "P7m", "P5m"),
+    ("m6", "P5mT", "P1"),
+    ("m7", "P5mT", "P5m"),
+    ("m8", "P4m", "P4"),
+    ("c1", "P5c", "P3"),
+    ("c2", "P5c", "P1"),
+    ("c3", "P5c", "P5m"),
+    ("c4", "P5c", "P2"),
+    ("c5", "P7c", "P5c"),
+    ("c6", "P4c", "P5c"),
+    ("c7", "P5cT", "P1"),
+    ("c8", "P5cT", "P3"),
 )
 
 
@@ -153,7 +179,7 @@ def share_closed(
     return out
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912
     """Score every stored arm and the planned contrasts, and write the report."""
     cases = ordered_cases()
     actual = cases["actual_norm"].to_numpy().astype(np.float64)
@@ -182,10 +208,13 @@ def main() -> None:
             farm: float(metrics["qs"][:, flags["kept"] & (cases["site"] == farm).to_numpy()].mean())
             for farm in FARMS
         }
-    for label, first, second in (*CONTRASTS, *EXTRA_CONTRASTS):
+    against_p1 = tuple(("vsP1", name, "P1") for name in arms if name != "P1")
+    for label, first, second in (*CONTRASTS, *EXTRA_CONTRASTS, *against_p1):
         if first not in arms or second not in arms:
             continue
         key = f"{label}: {first} - {second}"
+        if key in report["contrasts"]:
+            continue
         report["contrasts"][key] = {}
         for metric in (*METRICS, "below_median", "covered"):
             difference = arms[first][metric] - arms[second][metric]
@@ -204,7 +233,9 @@ def main() -> None:
             )
     if all(a in arms for a in ("P3", "P5", "P7")):
         report["contrasts"]["C7: share of the P3 - P5 gap that P7 closes"] = share_closed(
-            resampler=resampler, qs={a: arms[a]["qs"] for a in ("P3", "P5", "P7")}, keep=flags["kept"]
+            resampler=resampler,
+            qs={a: arms[a]["qs"] for a in ("P3", "P5", "P7")},
+            keep=flags["kept"],
         )
     columns = {
         "site": cases["site"],

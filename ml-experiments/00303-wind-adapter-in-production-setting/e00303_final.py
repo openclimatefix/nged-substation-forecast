@@ -30,17 +30,46 @@ OUT_DIR: Final[Path] = common.WORK_DIR / "final"
 HINDCAST_DIR: Final[Path] = common.WORK_DIR / "final_hindcast"
 FARMS: Final[tuple[str, ...]] = ens_final.FARMS
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
-MIXTURE_ARMS: Final[tuple[str, ...]] = ("P0", "P2", "P4", "P5", "P7", "P8")
+MIXTURE_ARMS: Final[tuple[str, ...]] = (
+    "P0",
+    "P2",
+    "P4",
+    "P5",
+    "P7",
+    "P8",
+    "P4m",
+    "P5m",
+    "P7m",
+    "P4c",
+    "P5c",
+    "P7c",
+)
 TABLE_ARMS: Final[dict[str, str]] = {
     "P1": "P0",
     "P3": "P2",
     "P4T": "P4",
     "P5T": "P5",
     "P7T": "P7",
+    "P4mT": "P4m",
+    "P5mT": "P5m",
+    "P4cT": "P4c",
+    "P5cT": "P5c",
     "P8": "P8",
 }
 """Arms that apply the offset table after the spread factor: name -> the mixture arm it adds to."""
-PLAIN_ARMS: Final[tuple[str, ...]] = ("P0", "P2", "P4", "P5", "P7")
+PLAIN_ARMS: Final[tuple[str, ...]] = (
+    "P0",
+    "P2",
+    "P4",
+    "P5",
+    "P7",
+    "P4m",
+    "P5m",
+    "P7m",
+    "P4c",
+    "P5c",
+    "P7c",
+)
 """Arms stored without the table. P8 is stored with the table only (the plan's definition)."""
 
 
@@ -62,13 +91,13 @@ def available(*, arm: str) -> bool:
         for seed in SEEDS:
             for name in ("hindcast", "scored"):
                 base = common.ENS_MIX_285_DIR if arm == "P0" else common.MIX_DIR
-                prefix = f"xgb_B0" if arm == "P0" else arm
+                prefix = "xgb_B0" if arm == "P0" else arm
                 if not (base / f"{prefix}_s{seed}_{name}_{farm}.npy").exists():
                     return False
     return True
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912
     """Write the scored (and hindcast) quantiles of every arm that is stored."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     HINDCAST_DIR.mkdir(parents=True, exist_ok=True)
@@ -94,7 +123,7 @@ def main() -> None:
     hindcast_results: dict[str, list[np.ndarray]] = {}
     hindcast_scores: dict[str, float] = {}
     for arm in MIXTURE_ARMS:
-        if not available(arm=arm):
+        if (OUT_DIR / f"{arm}.npy").exists() or not available(arm=arm):
             print("skipping", arm, "(not all stored)", flush=True)
             continue
         for seed in SEEDS:
@@ -129,14 +158,22 @@ def main() -> None:
                 )
             print(arm, "seed", seed, flush=True)
     for name, seeds in results.items():
+        if (OUT_DIR / f"{name}.npy").exists():
+            continue
         np.save(OUT_DIR / f"{name}.npy", np.stack(seeds))
     for name, seeds in hindcast_results.items():
         np.save(HINDCAST_DIR / f"{name}.npy", np.stack(seeds))
-    (OUT_DIR / "hindcast_scores.json").write_text(json.dumps(hindcast_scores, indent=1))
+    scores_path = OUT_DIR / "hindcast_scores.json"
+    previous = json.loads(scores_path.read_text()) if scores_path.exists() else {}
+    scores_path.write_text(json.dumps({**previous, **hindcast_scores}, indent=1))
     if (common.FINAL_285_DIR / "xgb_B0.npy").exists() and "P0" in results:
         for mine, theirs in (("P0", "xgb_B0"), ("P1", "xgb_B4")):
-            difference = np.abs(np.stack(results[mine]) - np.load(common.FINAL_285_DIR / f"{theirs}.npy"))
-            print(f"reproduction check {mine} vs 285 {theirs}: max abs difference", difference.max())
+            difference = np.abs(
+                np.stack(results[mine]) - np.load(common.FINAL_285_DIR / f"{theirs}.npy")
+            )
+            print(
+                f"reproduction check {mine} vs 285 {theirs}: max abs difference", difference.max()
+            )
 
 
 if __name__ == "__main__":

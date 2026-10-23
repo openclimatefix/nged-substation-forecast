@@ -58,7 +58,7 @@ ADAPTERS: Final[tuple[str, ...]] = (
 NET_INPUT_COUNT: Final[dict[str, int]] = {"net": 7, "net_no_hour": 5, "blind": 1, "net_ens": 9}
 
 
-def _t(array: "np.ndarray | torch.Tensor | None") -> torch.Tensor:
+def _t(array: np.ndarray | torch.Tensor | None) -> torch.Tensor:
     """Return `array` as a float32 tensor, leaving a tensor (possibly on the GPU) as it is."""
     if isinstance(array, torch.Tensor):
         return array
@@ -108,6 +108,10 @@ class CoreOptions:
 DEFAULT_OPTIONS: Final[CoreOptions] = CoreOptions()
 
 
+Array = np.ndarray | torch.Tensor
+"""A weather column as a NumPy array, or as a tensor (possibly on the GPU) while fitting."""
+
+
 @dataclass(frozen=True)
 class WeatherArrays:
     """Weather columns of equal length, as NumPy arrays.
@@ -125,20 +129,20 @@ class WeatherArrays:
             (`net_ens` only).
     """
 
-    speed_10m: np.ndarray
-    speed_100m: np.ndarray
-    temperature_c: np.ndarray
-    direction_sin: np.ndarray | None = None
-    direction_cos: np.ndarray | None = None
-    group: np.ndarray | None = None
-    hour: np.ndarray | None = None
-    lead_day: np.ndarray | None = None
-    spread: np.ndarray | None = None
+    speed_10m: Array
+    speed_100m: Array
+    temperature_c: Array
+    direction_sin: Array | None = None
+    direction_cos: Array | None = None
+    group: Array | None = None
+    hour: Array | None = None
+    lead_day: Array | None = None
+    spread: Array | None = None
 
-    def take(self, index: slice) -> Self:
+    def take(self, index: slice | torch.Tensor) -> Self:
         """Return the rows in `index`."""
 
-        def cut(column: np.ndarray | None) -> np.ndarray | None:
+        def cut(column: Array | None) -> Array | None:
             return None if column is None else column[index]
 
         return type(self)(
@@ -313,9 +317,7 @@ class WindCore(nn.Module):
             else:
                 sin1 = _t(weather.direction_sin)
                 cos1 = _t(weather.direction_cos)
-                temperature = (
-                    _t(weather.temperature_c) - 10.0
-                ) / 10.0
+                temperature = (_t(weather.temperature_c) - 10.0) / 10.0
                 columns = [sin1, cos1, ratio, temperature, (speed_100m / 15.0)]
                 if adapter in ("net", "net_ens"):
                     angle = _t(weather.hour) * (2 * np.pi / 24.0)
@@ -393,7 +395,7 @@ def fit_core(
     torch.set_num_threads(THREADS)
     core = WindCore(
         with_idle_layer=with_idle_layer,
-        idle_floor=idle_floor_start(speed_100m=weather.speed_100m, target=target),
+        idle_floor=idle_floor_start(speed_100m=np.asarray(weather.speed_100m), target=target),
         options=options,
     )
     goal = torch.as_tensor(target, dtype=torch.float32)
@@ -444,7 +446,7 @@ def predict_expected_power(
     with torch.no_grad():
         pieces = [
             core(weather=weather.take(slice(start, start + chunk))).numpy()
-            for start in range(0, weather.speed_100m.size, chunk)
+            for start in range(0, int(weather.speed_100m.shape[0]), chunk)
         ]
     return np.concatenate(pieces)
 
@@ -456,7 +458,7 @@ def predict_hub_speed(
     with torch.no_grad():
         pieces = [
             core.hub_height_speed(weather=weather.take(slice(start, start + chunk))).numpy()
-            for start in range(0, weather.speed_100m.size, chunk)
+            for start in range(0, int(weather.speed_100m.shape[0]), chunk)
         ]
     return np.concatenate(pieces)
 
@@ -547,7 +549,7 @@ class PinballCore:
         """Return shape (rows, 11) sorted quantiles clipped to 0 to 1."""
         pieces = []
         with torch.no_grad():
-            for start in range(0, weather.speed_100m.size, chunk):
+            for start in range(0, int(weather.speed_100m.shape[0]), chunk):
                 part = weather.take(slice(start, start + chunk))
                 mu = self.core(weather=part)
                 speed = self.core.hub_height_speed(weather=part)
