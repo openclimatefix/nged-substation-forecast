@@ -80,9 +80,16 @@ def load_reference(*, site: str) -> pl.DataFrame:
             & (pl.col("time_series_id") == SITE_IDS[site])
         )
         .select(
-            "run", "power_fcst_init_time", "valid_time", "lead_hours",
-            *QUANTILES, "mean", "actual", "spread_positive", "price_p75",
-        )  # fmt: skip
+            "run",
+            "power_fcst_init_time",
+            "valid_time",
+            "lead_hours",
+            *QUANTILES,
+            "mean",
+            "actual",
+            "spread_positive",
+            "price_p75",
+        )
         .sort("power_fcst_init_time", "valid_time")
     )
 

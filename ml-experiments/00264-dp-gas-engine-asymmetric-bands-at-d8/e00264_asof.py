@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """As-of resolved residuals and the recalibration of the lower and upper quantiles (arms 2 and 2b).
 
 A residual is `actual - q50` of the reference forecast with the shortest lead at that valid time, so
@@ -56,8 +55,7 @@ class Resolved:
         count = hi - lo
         drops = self.cumulative_drops[hi] - self.cumulative_drops[lo]
         with np.errstate(invalid="ignore", divide="ignore"):
-            share = np.where(count >= 48, drops / np.maximum(count, 1), np.nan)
-        return share
+            return np.where(count >= 48, drops / np.maximum(count, 1), np.nan)
 
 
 def resolved_from_reference(*, reference: pl.DataFrame) -> Resolved:
@@ -103,7 +101,9 @@ def blocks(*, origins_ns: np.ndarray) -> list[tuple[int, np.ndarray]]:
 def fit_rows(*, resolved: Resolved, fit_ns: int) -> np.ndarray:
     """Return the indices of rows resolved at `fit_ns` within the trailing fit window."""
     known_ns = fit_ns - LATENCY_NS
-    return resolved.rows_between(first_ns=known_ns - common.FIT_WINDOW_DAYS * NS_PER_DAY, last_ns=known_ns)
+    return resolved.rows_between(
+        first_ns=known_ns - common.FIT_WINDOW_DAYS * NS_PER_DAY, last_ns=known_ns
+    )
 
 
 def _cell_quantiles(
@@ -119,10 +119,16 @@ def _cell_quantiles(
     for h in range(4):
         in_hour = hours == h
         hour_values = ratio[in_hour]
-        hour_q = np.quantile(hour_values, probabilities) if len(hour_values) >= common.MIN_CELL_ROWS else overall
+        hour_q = (
+            np.quantile(hour_values, probabilities)
+            if len(hour_values) >= common.MIN_CELL_ROWS
+            else overall
+        )
         for s in range(4):
             cell = ratio[in_hour & (seasons == s)]
-            table[h, s] = np.quantile(cell, probabilities) if len(cell) >= common.MIN_CELL_ROWS else hour_q
+            table[h, s] = (
+                np.quantile(cell, probabilities) if len(cell) >= common.MIN_CELL_ROWS else hour_q
+            )
     return table
 
 
@@ -162,8 +168,12 @@ def recalibrate(*, reference: pl.DataFrame, sides: tuple[str, ...]) -> pl.DataFr
         if "lower" in sides:
             shortfall = (-res / np.where(ok, half_lower, np.nan))[ok]
             probs = np.array([1 - common.LEVELS[column[n]] for n in common.LOWER_TAILS])
-            table = _cell_quantiles(ratio=shortfall, hours=r_hours[ok], seasons=r_seasons[ok], probabilities=probs)
-            base = np.maximum(target[:, column["q50"]] - target[:, column["q05"]], common.HALF_WIDTH_FLOOR)
+            table = _cell_quantiles(
+                ratio=shortfall, hours=r_hours[ok], seasons=r_seasons[ok], probabilities=probs
+            )
+            base = np.maximum(
+                target[:, column["q50"]] - target[:, column["q05"]], common.HALF_WIDTH_FLOOR
+            )
             for j, name in enumerate(common.LOWER_TAILS):
                 own = (target[:, column["q50"]] - target[:, column[name]]) / base
                 needed = table[a_hours, a_seasons, j]
@@ -174,8 +184,12 @@ def recalibrate(*, reference: pl.DataFrame, sides: tuple[str, ...]) -> pl.DataFr
         if "upper" in sides:
             overshoot = (res / np.where(ok, half_upper, np.nan))[ok]
             probs = np.array([common.LEVELS[column[n]] for n in common.UPPER_TAILS])
-            table = _cell_quantiles(ratio=overshoot, hours=r_hours[ok], seasons=r_seasons[ok], probabilities=probs)
-            base = np.maximum(target[:, column["q95"]] - target[:, column["q50"]], common.HALF_WIDTH_FLOOR)
+            table = _cell_quantiles(
+                ratio=overshoot, hours=r_hours[ok], seasons=r_seasons[ok], probabilities=probs
+            )
+            base = np.maximum(
+                target[:, column["q95"]] - target[:, column["q50"]], common.HALF_WIDTH_FLOOR
+            )
             for j, name in enumerate(common.UPPER_TAILS):
                 own = (target[:, column[name]] - target[:, column["q50"]]) / base
                 needed = table[a_hours, a_seasons, j]
@@ -206,3 +220,29 @@ def switch_states(*, resolved: Resolved, origins_ns: np.ndarray) -> dict[int, bo
                 state = False
         out[origin] = state
     return out
+
+
+def empirical_residual_quantiles(*, reference: pl.DataFrame) -> pl.DataFrame:
+    """Return the reference with each quantile at q50 plus the as-of empirical residual quantile.
+
+    Post hoc baseline with no cells, no mixture, and no engine: at each refit block, the quantile
+    at level tau is `q50 + quantile(actual - q50, tau)` over the resolved rows of the trailing
+    window, so the whole predictive distribution is the reference's median shifted by the
+    empirical distribution of past residuals. Blocks with fewer than `MIN_FIT_ROWS` resolved rows
+    keep the reference.
+    """
+    resolved = resolved_from_reference(reference=reference)
+    quantiles = reference.select(list(common.QUANTILES)).to_numpy().astype(np.float64)
+    origin_ns = reference["power_fcst_init_time"].dt.epoch("ns").to_numpy()
+    out = quantiles.copy()
+    median = quantiles[:, common.QUANTILES.index("q50")]
+    for fit_ns, origins in blocks(origins_ns=np.unique(origin_ns)):
+        rows = fit_rows(resolved=resolved, fit_ns=fit_ns)
+        if len(rows) < common.MIN_FIT_ROWS:
+            continue
+        shifts = np.quantile(resolved.residual[rows], common.LEVELS)
+        applies = np.isin(origin_ns, origins)
+        out[applies] = median[applies, None] + shifts[None, :]
+    return reference.with_columns(
+        [pl.Series(name, out[:, i].astype(np.float32)) for i, name in enumerate(common.QUANTILES)]
+    )

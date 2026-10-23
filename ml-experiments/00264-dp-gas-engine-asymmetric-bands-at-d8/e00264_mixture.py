@@ -59,7 +59,9 @@ def cdf_and_density(*, y: np.ndarray, quantiles: np.ndarray) -> tuple[np.ndarray
     lower_cdf = TAIL_MASS * np.exp(np.minimum((y - quantiles[:, [0]]) * lower_rate, 0.0))
     upper_cdf = 1.0 - TAIL_MASS * np.exp(np.minimum(-(y - quantiles[:, [10]]) * upper_rate, 0.0))
     cdf = np.where(below, lower_cdf, np.where(above, upper_cdf, cdf))
-    density = np.where(below, lower_cdf * lower_rate, np.where(above, (1.0 - upper_cdf) * upper_rate, density))
+    density = np.where(
+        below, lower_cdf * lower_rate, np.where(above, (1.0 - upper_cdf) * upper_rate, density)
+    )
     return cdf, density
 
 
@@ -92,7 +94,9 @@ def softmax_probabilities(*, features: np.ndarray, weights: np.ndarray) -> np.nd
     return exp / exp.sum(axis=1, keepdims=True)
 
 
-def _fit_weights(*, features: np.ndarray, responsibilities: np.ndarray, start: np.ndarray) -> np.ndarray:
+def _fit_weights(
+    *, features: np.ndarray, responsibilities: np.ndarray, start: np.ndarray
+) -> np.ndarray:
     """Minimise the ridge-penalised cross-entropy against soft labels; return weights (3, p)."""
     p = features.shape[1]
 
@@ -102,10 +106,17 @@ def _fit_weights(*, features: np.ndarray, responsibilities: np.ndarray, start: n
         loss = -(responsibilities * np.log(np.maximum(probs, 1e-300))).sum() / len(features)
         penalty = common.RIDGE * (weights[:, 1:] ** 2).sum() / len(features)
         grad = ((probs - responsibilities).T @ features)[1:] / len(features)
-        grad_penalty = 2.0 * common.RIDGE * np.concatenate([np.zeros((3, 1)), weights[:, 1:]], axis=1) / len(features)
+        grad_penalty = (
+            2.0
+            * common.RIDGE
+            * np.concatenate([np.zeros((3, 1)), weights[:, 1:]], axis=1)
+            / len(features)
+        )
         return loss + penalty, (grad + grad_penalty).ravel()
 
-    result = minimize(objective, start.ravel(), jac=True, method="L-BFGS-B", options={"maxiter": 60})
+    result = minimize(
+        objective, start.ravel(), jac=True, method="L-BFGS-B", options={"maxiter": 60}
+    )
     return result.x.reshape(3, p)
 
 
@@ -118,12 +129,10 @@ class MixtureFit:
     log_likelihood: float
 
 
-def fit_mixture(
-    *, y: np.ndarray, quantiles: np.ndarray, features: np.ndarray
-) -> MixtureFit:
+def fit_mixture(*, y: np.ndarray, quantiles: np.ndarray, features: np.ndarray) -> MixtureFit:
     """Fit the mixture by expectation-maximisation, keeping the noise scale with the best likelihood."""
     best: MixtureFit | None = None
-    n, p = features.shape
+    p = features.shape[1]
     for scale in common.NOISE_SCALES:
         weights = np.zeros((3, p))
         weights[:, 0] = np.log(0.1 / 0.7)
@@ -133,13 +142,17 @@ def fit_mixture(
             densities = component_densities(y=y, quantiles=quantiles, scale=scale, delta=delta)
             joint = probs * densities
             responsibilities = joint / joint.sum(axis=1, keepdims=True)
-            weights = _fit_weights(features=features, responsibilities=responsibilities, start=weights)
+            weights = _fit_weights(
+                features=features, responsibilities=responsibilities, start=weights
+            )
         probs = softmax_probabilities(features=features, weights=weights)
-        densities = component_densities(y=y, quantiles=quantiles, scale=scale, delta=row_delta(probs=probs))
+        densities = component_densities(
+            y=y, quantiles=quantiles, scale=scale, delta=row_delta(probs=probs)
+        )
         log_likelihood = float(np.log((probs * densities).sum(axis=1)).sum())
         if best is None or log_likelihood > best.log_likelihood:
             best = MixtureFit(weights=weights, scale=scale, log_likelihood=log_likelihood)
-    assert best is not None  # noqa: S101
+    assert best is not None
     return best
 
 
@@ -170,13 +183,18 @@ def mixture_quantiles(*, quantiles: np.ndarray, probs: np.ndarray, scale: float)
         weights = probs[part]
         delta = row_delta(probs=weights)[:, None]
         span = base[:, [10]] - base[:, [0]]
-        low = np.repeat(base[:, [0]] + delta - 3 * common.UNIT_POINTS - 5 * span, len(common.LEVELS), axis=1)
+        low = np.repeat(
+            base[:, [0]] + delta - 3 * common.UNIT_POINTS - 5 * span, len(common.LEVELS), axis=1
+        )
         high = np.repeat(base[:, [10]] + delta + 5 * span, len(common.LEVELS), axis=1)
         for _ in range(36):
             middle = 0.5 * (low + high)
             total = np.zeros_like(middle)
             for k in range(common.N_UNITS):
-                total += weights[:, [k]] * cdf_and_density(y=middle - delta + k * common.UNIT_POINTS, quantiles=base)[0]
+                total += (
+                    weights[:, [k]]
+                    * cdf_and_density(y=middle - delta + k * common.UNIT_POINTS, quantiles=base)[0]
+                )
             go_up = total < common.LEVELS[None, :]
             low = np.where(go_up, middle, low)
             high = np.where(go_up, high, middle)
@@ -205,7 +223,13 @@ def mixture_arm(
     origin_ns = reference["power_fcst_init_time"].dt.epoch("ns").to_numpy()
     valid_ns = reference["valid_time"].dt.epoch("ns").to_numpy()
     price_all = (
-        np.stack([reference[name].to_numpy().astype(np.float64) for name in ("spread_positive", "price_p75")], axis=1)
+        np.stack(
+            [
+                reference[name].to_numpy().astype(np.float64)
+                for name in ("spread_positive", "price_p75")
+            ],
+            axis=1,
+        )
         if use_price
         else None
     )
@@ -231,24 +255,44 @@ def mixture_arm(
         if len(rows) < common.MIN_FIT_ROWS:
             out[applies] = quantiles[applies]
             continue
-        row_share = resolved.drop_share(at_ns=resolved.origin_ns[rows], window_days=common.SHARE_WINDOW_DAYS)
-        keep = np.ones(len(rows), dtype=bool) if force_visible else row_state(resolved.origin_ns[rows])
+        row_share = resolved.drop_share(
+            at_ns=resolved.origin_ns[rows], window_days=common.SHARE_WINDOW_DAYS
+        )
+        keep = (
+            np.ones(len(rows), dtype=bool) if force_visible else row_state(resolved.origin_ns[rows])
+        )
         if keep.sum() < common.MIN_FIT_ROWS:
             continue
-        share_fill = float(np.nanmean(row_share[keep])) if np.isfinite(row_share[keep]).any() else 0.0
+        share_fill = (
+            float(np.nanmean(row_share[keep])) if np.isfinite(row_share[keep]).any() else 0.0
+        )
         fit_valid = resolved.valid_ns[rows][keep]
         fit_price = (
-            np.stack([_price_flags(reference=reference, name=name, valid_ns=fit_valid) for name in ("spread_positive", "price_p75")], axis=1)
+            np.stack(
+                [
+                    _price_flags(reference=reference, name=name, valid_ns=fit_valid)
+                    for name in ("spread_positive", "price_p75")
+                ],
+                axis=1,
+            )
             if use_price
             else None
         )
-        features = design_matrix(valid_ns=fit_valid, share=row_share[keep], share_fill=share_fill, price=fit_price)
-        fit = fit_mixture(y=resolved.actual[rows][keep], quantiles=resolved.quantiles[rows][keep], features=features)
+        features = design_matrix(
+            valid_ns=fit_valid, share=row_share[keep], share_fill=share_fill, price=fit_price
+        )
+        fit = fit_mixture(
+            y=resolved.actual[rows][keep],
+            quantiles=resolved.quantiles[rows][keep],
+            features=features,
+        )
         entry.update(rows=int(keep.sum()), scale=fit.scale)
         live = applies & switch_all
         if live.any():
             pf = None if price_all is None else price_all[live]
-            x = design_matrix(valid_ns=valid_ns[live], share=share14_all[live], share_fill=share_fill, price=pf)
+            x = design_matrix(
+                valid_ns=valid_ns[live], share=share14_all[live], share_fill=share_fill, price=pf
+            )
             probs = softmax_probabilities(features=x, weights=fit.weights)
             out[live] = mixture_quantiles(quantiles=quantiles[live], probs=probs, scale=fit.scale)
             switch_on[live] = True
@@ -256,7 +300,11 @@ def mixture_arm(
             entry["p_any_mean"] = float(p_any[live].mean())
     frame = reference.with_columns(
         [pl.Series(name, out[:, i].astype(np.float32)) for i, name in enumerate(common.QUANTILES)]
-        + [pl.Series("mean", mean.astype(np.float32)), pl.Series("switch_on", switch_on), pl.Series("p_any", p_any)]
+        + [
+            pl.Series("mean", mean.astype(np.float32)),
+            pl.Series("switch_on", switch_on),
+            pl.Series("p_any", p_any),
+        ]
     )
     return frame, pl.DataFrame(log, infer_schema_length=None)
 

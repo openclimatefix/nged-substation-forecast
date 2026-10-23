@@ -8,7 +8,7 @@ theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - calibration-and-uncertainty
   - curtailment-cost
-status: planned
+status: done
 size: >-
   complex, by one trigger: more than one design would defensibly test the hypothesis (a lower-tail
   recalibration, a two-sided recalibration, and a mixture over running engine units, each with
@@ -76,22 +76,208 @@ metric: >-
   q95, and q99; mean absolute error of the mean forecast; the placebo sites D10 and D16 on the same
   columns.
 code: ml-experiments/00264-dp-gas-engine-asymmetric-bands-at-d8/
+verdict: not supported
+best_arm: >-
+  None met the pre-registered rule. Arm 2b (both sides widened) lowers D8's quantile score by
+  16.6% (95% interval -23.3% to -10.5%), and the post hoc baseline (the median plus the past
+  residuals' quantiles) by 18.9% (-25.4% to -13.1%).
+headline: >-
+  Widening D8's bands as-of, from residuals already seen, lowers its quantile score by 9% to 19% and
+  lifts the share of readings inside q05 to q95 from 0.42 to between 0.80 and 0.87 for the four
+  widest arms. No arm holds that share within 5 points of 0.90 in every quarter, and a mixture that
+  models running engine units does no better than a baseline with no engine.
+lessons:
+  - >-
+    D8's reference band is too narrow in both directions (31% of readings below q05 and 27% above
+    q95), so widening only the lower quantiles (arm 2) reaches q05-to-q95 coverage of 0.57 to 0.80
+    across the four quarters.
+  - >-
+    The mixture over 0 to 3 running units scores 2.5% better than widening both sides, but a
+    baseline built from past residuals scores 0.4% better than the mixture, a difference smaller than
+    its uncertainty, and the mixture fits an average 0.27 and 0.46 chance that an engine unit is
+    running at D10 and D16, which have no engine.
+  - >-
+    Adding price flags known only in hindsight did not improve the mixture (the quantile score rose
+    0.95%, interval -0.1% to +2.1%), so the absence of a price forecast does not limit it here.
+take_home_message: >-
+  A forecast band that learns from the residuals it has already seen narrows most of the gap at D8:
+  the quantile score falls by 9% to 19% and the share of readings inside the 90% band rises from 42%
+  to between 80% and 87%. The extra gain of the engine mixture over simple widening is not evidence
+  of an engine, because the mixture fits a running engine at two substations that have none. Plain
+  two-sided widening with an earlier residual history is the option these results support, and
+  NGED's own output for the engine would be the data to test an engine model.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Widen D8's bands from the trailing 365 days of resolved residuals on both sides, not the lower
+    tail only, because 27% of D8 readings lie above the reference's q95 (arm 2 against arm 2b,
+    Results).
+  - >-
+    Do not use a mixture over running engine units as evidence of an engine: the mixture fits an
+    average chance of 0.27 and 0.46 that an engine unit is running at D10 and D16, which have no
+    engine (placebo bullet under Results).
+  - >-
+    Give the as-of fit at least one earlier quarter of residuals before the scored year starts,
+    since coverage in the first quarter stays between 0.29 and 0.80 for every arm (coverage table,
+    Results).
+  - >-
+    Check a widening method at sites with no engine before adopting it: arm 2b raises the quantile
+    score by 0.5% at D10, the mixture forced on raises it by 3.2% at D16, and a baseline built from
+    past residuals raises it by 2.4% at D16 (placebo bullet, Results).
 date: 2026-10-23
 ---
 
-**This experiment asks whether D8's forecast bands can carry the uncertainty that an undetectable
-gas engine adds.** D8 is a primary substation of National Grid Electricity Distribution (NGED).
-Its reading appears to include the output of one 6 MW gas engine, probably three units of about 2
-MW each, whose own meter reading stopped arriving in August 2023 (the design is in the private
-brief `price_sensitive_generation_design.md`). Three attempts to detect the engine from D8's readings
-failed ([experiment 191](../00191-dp-price-sensitive-assets-in-the-history/result.md), [experiment
+**Widening the forecast band with residuals already seen narrows most of the gap at D8, but the
+gain from modelling a gas engine, beyond simple widening, is not shown.** D8 is a primary substation
+of National Grid Electricity Distribution (NGED). D8's half-hourly power readings appear to include
+the output of a 6 MW gas engine, probably three units of about 2 MW each, which [experiment
+191](../00191-dp-price-sensitive-assets-in-the-history/result.md), [experiment
 198](../00198-d8-summer-spikes-cooling-load-and-residual-test/result.md), and [experiment
-199](../00199-ps2b-engine-detector-v2-ramp-night-price/result.md)). So this experiment does not
-detect the engine. The experiment asks whether the forecast's bands can carry the uncertainty that
-the engine adds, by widening as-of: using only the residuals that are already known when each
-forecast is made.
+199](../00199-ps2b-engine-detector-v2-ramp-night-price/result.md) could not detect. This experiment
+does not try to detect the engine. It asks whether the forecast's q05-to-q95 band, the range meant to
+hold 90% of readings, can carry the uncertainty that the engine adds. A residual is the actual
+reading minus the forecast median, and every arm uses only residuals known when the forecast is
+made. The unchanged forecast (arm 1) is experiment 191's reference, a generalised additive model
+with a Kalman filter on recent errors (GAM-K) and no price input. We tested five ways of widening
+its band. Arm 2 widens only the lower quantiles, arm 2b widens both sides, arm 3 is a mixture that
+assumes 0 to 3 engine units are running, arm 4 is arm 3 plus a price known only in hindsight, and
+a post hoc baseline adds the quantiles of the past 365 days of residuals to the reference median.
 
-## Plan
+Widening the band raised the share of readings inside it from 0.42 (arm 1) to between 0.80 and 0.87
+(arms 2b, 3, 4, and the baseline), and lowered the quantile score by 9% to 19% against arm 1. The
+quantile score is a score for the whole set of 11 forecast quantiles (smaller is better), and one
+point is 1% of the substation's effective capacity (0.1 MW at D8). By the pre-registered rule the
+verdict is `not supported`: no arm holds the share within 5 points of 0.90 in every quarter of the 12
+months from 2025-07-02 to 2026-06-30, the July to September 2025 quarter has only weeks of residual
+history to learn from, and arm 2b raises the quantile score by 0.5% at D10, a substation with no
+engine. Arm 3 scores 2.5% better than arm 2b, yet the post hoc baseline, which has no engine in it,
+scores 0.4% better than arm 3, a difference smaller than its uncertainty. With the engine model
+forced on, arm 3 also fits an average 0.27 and 0.46 chance that an engine unit is running at D10
+and D16, which have no engine. Arm 3's gain over arm 2b may therefore come from fitting the shape
+of D8's tails and not from an engine.
+
+![Figure 1. Quantile score of each arm minus arm 1's, at D8 and the two substations with no engine](figure_1_score_against_reference.svg)
+
+![Figure 2. Share of D8 readings inside q05 to q95, by month](figure_2_coverage_by_month.svg)
+
+![Figure 3. Share of D8 readings below q01, q05, q95, and q99, by arm](figure_3_tail_shares.svg)
+
+## Arms and rows
+
+- **Rows.** Experiment 191's stored reference forecast (arm a0, the GAM-K engine of [experiment
+  152](../00152-dp-mva-fold-aware-gam-k-at-mva-only-primaries/result.md)), `fold_a_daily_gap_v1`,
+  seed 0, scored year 2025-07-02 to 2026-06-30, leads 0.5 to 168 hours, outside the hand-filtered
+  events: 97,012 rows at D8, 96,370 at D10, and 91,754 at D16. The reference reproduces experiment
+  191's D8 scores (quantile score 10.95, mean absolute error 15.18 points, coverage 0.42).
+- **Arm 1** is the reference.
+- **Arm 2** recalibrates the lower quantiles q01 to q25, with a separate correction for each
+  combination of four six-hour blocks of the day and four seasons.
+- **Arm 2b** widens both sides by the same method.
+- **Arm 3** is the mixture over 0 to 3 running units of 19.7 points (1.97 MW). Where the visibility
+  switch is off, arm 3 uses the arm 2b band. The switch turns the engine model on when 5% or more of
+  the last 30 days' half-hours had a residual below -25 points (-2.5 MW), and off when the share
+  falls below 3%.
+- **Arm 4** is arm 3 plus two price flags known only in hindsight.
+- **Post hoc baseline** is the reference median plus the quantiles of the trailing 365 days of
+  residuals, with no cells and no engine.
+- **Schedule.** Each arm refits every 7 daily forecast origins (the moment a forecast is made) on the
+  trailing 365 days of residuals that were known at the block's first origin minus 6 hours. The
+  reference's own refits are monthly, as in experiment 191.
+
+## Results
+
+- **Quantile score at D8 (points of capacity; smaller is better).** Arm 1 10.95; arm 2 10.00; arm 2b
+  9.14; arm 3 8.91; arm 4 9.00; post hoc baseline 8.88. Against arm 1: arm 2 -8.7% (interval -13.5%
+  to -4.9%), arm 2b -16.6% (-23.3% to -10.5%), arm 3 -18.6% (-24.7% to -12.9%), arm 4 -17.9%
+  (-23.2% to -12.8%), post hoc baseline -18.9% (-25.4% to -13.1%). Every contrast keeps its sign
+  when any one month is left out.
+- **Coverage of q05 to q95 at D8, all 12 months.** Arm 1 0.42; arm 2 0.67; arm 2b 0.87; arm 3 0.82;
+  arm 4 0.80; post hoc baseline 0.85.
+- **Coverage of q05 to q95 at D8 by quarter** (2025Q3 excludes July; the target band is 0.85 to 0.95):
+
+    | Arm | 2025Q3 | 2025Q4 | 2026Q1 | 2026Q2 |
+    |---|---|---|---|---|
+    | Arm 1 | 0.29 | 0.48 | 0.40 | 0.52 |
+    | Arm 2 | 0.57 | 0.80 | 0.61 | 0.75 |
+    | Arm 2b | 0.80 | 0.99 | 0.92 | 0.94 |
+    | Arm 3 | 0.72 | 0.91 | 0.85 | 0.92 |
+    | Arm 4 | 0.69 | 0.90 | 0.83 | 0.91 |
+    | Post hoc baseline | 0.76 | 0.91 | 0.89 | 0.96 |
+
+  With July included, 2025Q3 holds 0.30 (arm 1), 0.64 (arm 2b), and 0.60 (arm 3).
+- **Tails at D8.** Arm 1 puts 20.6% of readings below q01 and 30.8% below q05, and 26.9% above q95 and
+  16.1% above q99. Arm 2b gives 3.6%, 6.5%, 6.1%, and 3.4%. Arm 3 gives 4.2%, 9.2%, 8.7%, and 4.0%.
+  Pinball loss at q05 falls from 4.12 (arm 1) to 2.46 (arm 2b) and 2.33 (arm 3), and at q95 from
+  4.31 to 2.70 and 2.56.
+- **Leads at D8.** Coverage of arm 3 is 0.80, 0.83, and 0.82 at 0 to 24, 24 to 72, and 72 to 168
+  hours, against 0.39, 0.43, and 0.43 for arm 1. The fit uses the shortest-lead residuals, and the
+  coverage at long leads is not gated.
+- **Mixture against widening both sides.** Arm 3 minus arm 2b is -2.5% (interval -4.5% to -0.6%, and
+  the 99.2% interval stays below zero), with every leave-one-month-out sign negative. The gain sits
+  in October to December. The noise scale, a multiplier on the reference's spread, sits at the
+  largest value the fit allows (2.0) in every block, and the fitted chance that at least one unit
+  is running averages 0.75 at D8.
+- **Post hoc baseline against the mixture.** Arm 3 minus the baseline is +0.4% (interval -0.8% to
+  +1.7%), so the engine mixture is no better than a band built from past residuals.
+- **Placebo: quantile score against arm 1 at D10 and D16, with the upper end of the 95% interval in
+  brackets.** Arm 2: +0.26% (+0.82%) and -0.98% (+0.11%). Arm 2b, which arm 3 equals while its switch
+  is off at both sites: +0.53% (+1.15%) and -0.89% (+0.14%). Arm 3 with the switch forced on: +0.75%
+  (+1.11%) and +3.20% (+6.24%), with an average fitted chance that a unit is running of 0.27 and
+  0.46. Post hoc baseline: -0.59% (+2.53%) and +2.36% (+3.96%). The rule needed +0.1% or less and
+  an upper end of +0.5% or less, so D10 fails for arms 2, 2b, and 3, and for the forced run, and D16
+  fails for the forced run and the baseline.
+- **Visibility switch.** At the pre-registered settings (on at 5%, off at 3%) the switch turns on at
+  D8 on 2025-07-04 and never turns off, and it never turns on at D10 or D16. At on 7% and off 4%
+  (post hoc) it also turns off at D8 on 2026-04-23, the only date in the scored year on which the
+  engine's footprint drops out of D8's residuals. At on 3% and off 2% it behaves as at 5% and 3%.
+  No NGED data change was tested against these dates.
+- **Price.** Arm 4 minus arm 3 is +0.95% (interval -0.1% to +2.1%). A price known only in hindsight
+  does not help, so the missing price forecast does not limit arm 3 here.
+- **Curtailment.** `studies.node_curtailment` needs a bulk supply point forecast and its generators'
+  forecasts, so no curtailment cost was computed. The stand-in Brier score of "reading below D8's 2nd
+  percentile of the scored year" is 0.026 for arm 1 and rises to between 0.031 and 0.038 for the
+  widened arms, so widening does not help that rare-event score.
+- **Predictions.** P1 (arm 2 coverage at most 0.80 in every quarter) failed narrowly, at 0.803 in
+  2025Q4. P2 (arm 2b within 5 points of 0.90 in three of four quarters) failed, with two of four.
+  P3 (arm 3 in band in three quarters and within 1% of arm 2b) held on coverage and failed on score,
+  at -2.5%. P4 (arm 4 lowers the score against arm 3 by under 1%) failed, because the score rose
+  0.95%. P5 (the switch turns off at D8 between 2026-03-01 and 2026-05-15) failed at the
+  pre-registered settings, and held at D10 and D16. P6 (forced-on mixture below 0.05 at D10 and
+  D16) failed, at 0.27 and 0.46.
+
+## Checks
+
+- **Median minus mean forecast.** Zero for arms 1, 2, and 2b. For arm 3, +0.14 points at D8, and 0.00
+  at D10 and D16 where the switch is off. For the forced run, +0.16 at D8, -0.04 at D10, and +0.15
+  at D16. For the post hoc baseline, -0.96, -0.54, and -0.26.
+- **Mean-forecast error.** Every arm keeps the reference's mean forecast, so the mean absolute error
+  is 15.18 (D8), 5.54 (D10), and 4.70 (D16) points for all of them, and no contrast can disagree in
+  direction with a mean-forecast contrast.
+- **Audit triggers 1, 2, and 5 of the seven in the `ml-experiment` skill fired.** A placebo failed
+  (D10, and the forced run at D16). Five predictions failed (P1, P2, P4, P5, and P6), and P3 failed on its score clause. The forced D16 control moved the score
+  by +0.089 points, more than the 0.083 half-width of its own interval.
+- **Audit.** A fresh Sonnet agent ran the audit, because the maintainer's brief bars Opus. The audit
+  re-ran arms 2b and 3 after shifting every actual after 2026-01-10 by -40 points, and found every
+  row at earlier origins bit-identical, so the as-of rule leaks nothing. It also reproduced the D8
+  numbers, found no bug in the distribution helpers, and found the post hoc baseline. The audit
+  added the baseline arm and the noise-scale-limit caveat, and changed the interpretation of arm 3.
+  It did not change the stored reference's median or the removal of hand-filtered events before
+  fitting.
+
+## Caveats and what to try next
+
+- **Fit to the year.** The descriptive table that chose arm 2b and the switch thresholds came from the
+  scored year, and no second year of D8 forecasts is stored, so every verdict is exploratory.
+- **Little residual history in 2025Q3.** The earliest D8 forecasts are stored from 2025-07-02, so
+  the first quarter, and the cells of the first seasons, rest on weeks of residuals.
+- **Next.** Candidates for further work are to store D8 reference forecasts for an earlier period so
+  the fit starts with residuals, and to carry plain two-sided widening (arm 2b) and the
+  past-residual baseline forward after a check at substations with no engine. Do not extend the
+  mixture, or add a neural network to predict its unit probabilities, until NGED can supply the
+  engine's own output, because the mixture has not been shown to measure an engine.
+
+## Plan (as pre-registered)
 
 ### What was seen first
 

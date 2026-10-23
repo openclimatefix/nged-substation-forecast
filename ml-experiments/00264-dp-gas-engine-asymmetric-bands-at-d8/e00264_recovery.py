@@ -25,7 +25,11 @@ def simulate(*, engine: bool, seed: int) -> tuple[np.ndarray, np.ndarray, np.nda
     quantiles = np.tile(norm.ppf(common.LEVELS) * sigma, (N_ROWS, 1))
     p_run = np.where(hours == 3, 0.5, 0.1) if engine else np.zeros(N_ROWS)
     k = np.where(rng.random(N_ROWS) < p_run, rng.integers(1, 4, size=N_ROWS), 0)
-    delta = common.UNIT_POINTS * np.where(hours == 3, 0.5 * 2.0, 0.1 * 2.0) if engine else np.zeros(N_ROWS)
+    delta = (
+        common.UNIT_POINTS * np.where(hours == 3, 0.5 * 2.0, 0.1 * 2.0)
+        if engine
+        else np.zeros(N_ROWS)
+    )
     y = rng.normal(0.0, sigma, size=N_ROWS) - k * common.UNIT_POINTS + delta
     features = np.zeros((N_ROWS, 9))
     features[:, 0] = 1.0
@@ -41,8 +45,12 @@ def main() -> None:
         probs = mixture.softmax_probabilities(features=features, weights=fit.weights)
         evening = features[:, 3] == 1
         print(f"engine={engine}: noise scale {fit.scale} (truth 1.0)")
-        print(f"  true P(k>=1): evening {(k[evening] > 0).mean():.3f}, other {(k[~evening] > 0).mean():.3f}")
-        print(f"  fitted P(k>=1): evening {(1 - probs[evening, 0]).mean():.3f}, other {(1 - probs[~evening, 0]).mean():.3f}")
+        print(
+            f"  true P(k>=1): evening {(k[evening] > 0).mean():.3f}, other {(k[~evening] > 0).mean():.3f}"
+        )
+        print(
+            f"  fitted P(k>=1): evening {(1 - probs[evening, 0]).mean():.3f}, other {(1 - probs[~evening, 0]).mean():.3f}"
+        )
 
 
 if __name__ == "__main__":
