@@ -120,10 +120,11 @@ def _train(
     epochs: int,
     seed: int,
     keep_best: bool,
+    learning_rate: float,
 ) -> None:
     """Train `model` on the first `split` rows for `epochs`, early-stopping on the rest."""
     x, group, target = tensors
-    optimiser = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    optimiser = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=WEIGHT_DECAY)
     generator = torch.Generator().manual_seed(seed)
 
     def validation() -> float:
@@ -152,7 +153,15 @@ def _train(
 
 
 def fit_network(
-    *, x: np.ndarray, group: np.ndarray, own_heating: np.ndarray, target: np.ndarray, use_wind: bool
+    *,
+    x: np.ndarray,
+    group: np.ndarray,
+    own_heating: np.ndarray,
+    target: np.ndarray,
+    use_wind: bool,
+    distil_epochs: int = DISTIL_EPOCHS,
+    epochs: int = MAX_EPOCHS,
+    learning_rate: float = LEARNING_RATE,
 ) -> Fitted:
     """Train one network per seed: first on `own_heating`, then on `target`.
 
@@ -163,6 +172,9 @@ def fit_network(
             target).
         target: The target minus the model's non-heating terms, in points.
         use_wind: Whether the last column of `x` is the wind speed.
+        distil_epochs: Epochs spent reproducing `own_heating`.
+        epochs: Maximum epochs spent on `target`.
+        learning_rate: The Adam learning rate.
 
     Returns:
         The trained networks.
@@ -178,14 +190,18 @@ def fit_network(
     for seed in SEEDS:
         torch.manual_seed(seed)
         model = MonotoneHeating(n_temperatures=n_temperatures, use_wind=use_wind)
-        for goal, epochs, keep in ((own_heating, DISTIL_EPOCHS, False), (target, MAX_EPOCHS, True)):
+        for goal, n_epochs, keep in (
+            (own_heating, distil_epochs, False),
+            (target, epochs, True),
+        ):
             _train(
                 model=model,
                 tensors=(x_t, group_t, torch.as_tensor(goal / scale, dtype=torch.float32)),
                 split=split,
-                epochs=epochs,
+                epochs=n_epochs,
                 seed=seed,
                 keep_best=keep,
+                learning_rate=learning_rate,
             )
         models.append(model.eval())
     return Fitted(models=tuple(models), scale=scale)

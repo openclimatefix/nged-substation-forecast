@@ -47,11 +47,16 @@ FactorType = Literal["daytype", "subband", "parity_halfhour", "parity_day"]
 """How rows are split into two groups: weekday against other days, the first against the second
 half of the hour band, or (as placebos with no time-of-day or weekly structure) even against odd
 local half-hours of the day, or even against odd days of the year."""
-ExtraType = Literal["a1", "a2", "a2w", "a3", "a3nw"]
+ExtraType = Literal["a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw"]
 """The change an arm makes to T-all."""
-EXTRA_TYPES: Final[tuple[ExtraType, ...]] = ("a1", "a2", "a2w", "a3", "a3nw")
+EXTRA_TYPES: Final[tuple[ExtraType, ...]] = ("a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw")
 LINEAR_EXTRAS: Final[tuple[str, ...]] = ("a1", "a2", "a2w")
-NETWORK_EXTRAS: Final[tuple[str, ...]] = ("a3", "a3nw")
+NETWORK_EXTRAS: Final[tuple[str, ...]] = ("a3", "a3nw", "a3b", "a3bnw")
+WIND_NETWORKS: Final[tuple[str, ...]] = ("a3", "a3b")
+FULL_INPUT_NETWORKS: Final[tuple[str, ...]] = ("a3b", "a3bnw")
+"""The post hoc networks, which also read A0's four trailing-mean temperatures and train longer."""
+POST_HOC_EPOCHS: Final[int] = 200
+POST_HOC_LEARNING_RATE: Final[float] = 1e-2
 SUBBAND_SECOND_HALF_START: Final[tuple[int, ...]] = (6, 17, 27, 40)
 """The local half-hour of day (0 to 47) at which each hour band's second half starts."""
 N_HEATING_COLUMNS: Final[int] = len(SMOOTHING_HOURS) * N_BANDS
@@ -589,7 +594,7 @@ def heating_piece_columns(*, layout: GamLayout, arm: ArmSpec) -> np.ndarray:
 
 
 def network_inputs(
-    *, cache: FeatureCache, site: str, index: np.ndarray, context: ArmContext, use_wind: bool
+    *, cache: FeatureCache, site: str, index: np.ndarray, context: ArmContext, extra: str
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return the network's input matrix and group of each row at the grid rows `index`.
 
@@ -598,16 +603,32 @@ def network_inputs(
     the hour band, as T-all splits its heating columns.
     """
     features = cache.sites[site]
-    temperatures = np.column_stack(
-        [features.smoothed_temperature_c[index, 1], context.aux.previous_days[index]]
-    )
-    wind = context.aux.wind[index, 0] if use_wind else None
+    if extra in FULL_INPUT_NETWORKS:
+        temperatures = np.column_stack(
+            [features.smoothed_temperature_c[index], context.aux.previous_days[index]]
+        )
+    else:
+        temperatures = np.column_stack(
+            [features.smoothed_temperature_c[index, 1], context.aux.previous_days[index]]
+        )
+    wind = context.aux.wind[index, 0] if extra in WIND_NETWORKS else None
     group = (
         cache.calendar.band[index].astype(np.int64) * 4
         + 2 * factor_group(cache=cache, index=index, factor="daytype")
         + factor_group(cache=cache, index=index, factor="subband")
     )
     return nn_module.inputs(temperatures_c=temperatures, wind_m_s=wind), group
+
+
+def network_training(*, extra: str | None) -> dict[str, float | int]:
+    """Return a network arm's training settings: the pre-registered or the post hoc ones."""
+    if extra in FULL_INPUT_NETWORKS:
+        return {
+            "distil_epochs": POST_HOC_EPOCHS,
+            "epochs": POST_HOC_EPOCHS,
+            "learning_rate": POST_HOC_LEARNING_RATE,
+        }
+    return {}
 
 
 def fit_arm(
@@ -657,7 +678,7 @@ def fit_arm(
         theta[heating] = 0.0
         rows = base.index[ok]
         inputs, group = network_inputs(
-            cache=cache, site=base.site, index=rows, context=context, use_wind=arm.extra == "a3"
+            cache=cache, site=base.site, index=rows, context=context, extra=arm.extra
         )
         finite = np.isfinite(inputs).all(axis=1)
         network = nn_module.fit_network(
@@ -665,7 +686,8 @@ def fit_arm(
             group=group[finite],
             own_heating=own[finite],
             target=(y - x @ theta)[finite],
-            use_wind=arm.extra == "a3",
+            use_wind=arm.extra in WIND_NETWORKS,
+            **network_training(extra=arm.extra),
         )
     residual = y - x @ theta
     if network is not None:
@@ -674,7 +696,7 @@ def fit_arm(
             site=base.site,
             index=base.index[ok],
             context=context,
-            use_wind=arm.extra == "a3",
+            extra=arm.extra,
         )
         residual = residual - network.predict(x=inputs, group=group)
     unpenalised = float(residual @ residual)
@@ -729,7 +751,7 @@ def predict_arm(
             site=base.site,
             index=index,
             context=fit.context,
-            use_wind=fit.arm.extra == "a3",
+            extra=str(fit.arm.extra),
         )
         if not np.isfinite(inputs).all():
             msg = f"{base.site} has a non-finite network input among the rows to predict"

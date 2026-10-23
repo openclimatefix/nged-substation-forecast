@@ -57,7 +57,7 @@ def verified_decisions() -> dict[str, Any]:
 def network_curves(*, run: pipeline.YearRun, cache: FeatureCache) -> dict[str, list[float]]:
     """Return a network arm's heating power (points) against temperature, by group, at mean wind.
 
-    Every one of the three temperatures is set to the grid value, the wind to the training mean.
+    Every temperature input is set to the grid value, the wind to the training mean.
     Groups are the hour band times 4 plus twice the day type plus the half of the band.
     """
     network = run.fit.network
@@ -65,11 +65,12 @@ def network_curves(*, run: pipeline.YearRun, cache: FeatureCache) -> dict[str, l
         return {}
     import e00279_nn as nn_module
 
-    uses_wind = run.arm_name == "a3"
+    uses_wind = run.arm_name in design.WIND_NETWORKS
     wind = float(np.nanmean(design.site_aux(cache=cache, site=run.site).wind[run.index, 0]))
     out: dict[str, list[float]] = {}
     for group in range(nn_module.N_GROUPS):
-        temperatures = np.repeat(CURVE_GRID_C[:, None], 3, axis=1)
+        n_temperatures = 6 if run.arm_name in design.FULL_INPUT_NETWORKS else 3
+        temperatures = np.repeat(CURVE_GRID_C[:, None], n_temperatures, axis=1)
         x = nn_module.inputs(
             temperatures_c=temperatures,
             wind_m_s=np.full(len(CURVE_GRID_C), wind) if uses_wind else None,
@@ -79,7 +80,7 @@ def network_curves(*, run: pipeline.YearRun, cache: FeatureCache) -> dict[str, l
     return out
 
 
-def fit_site(job: tuple[str, dict[str, Any], tuple[str, ...]]) -> dict[str, Any]:
+def fit_site(job: tuple[str, dict[str, Any], tuple[str, ...], tuple[str, ...]]) -> dict[str, Any]:
     """Fit every arm of one substation and return its prediction frames.
 
     Args:
@@ -88,7 +89,7 @@ def fit_site(job: tuple[str, dict[str, Any], tuple[str, ...]]) -> dict[str, Any]
     Returns:
         A dict with `frames` (set name to predictions), `cards` (coefficients), and `curves`.
     """
-    site, decisions, years = job
+    site, decisions, years, arms = job
     cache: FeatureCache = _STATE["cache"]
     vintages = _STATE["vintages"]
     weight = float(decisions["lambda"]["t_all"])
@@ -97,7 +98,7 @@ def fit_site(job: tuple[str, dict[str, Any], tuple[str, ...]]) -> dict[str, Any]
     )
     needed = {pipeline.PREVIOUS_LABEL[y] for y in years} | set(years)
     runs: dict[str, dict[str, pipeline.YearRun]] = {}
-    for arm_name in pipeline.ARM_NAMES:
+    for arm_name in arms:
         runs[arm_name] = {}
         for label in FIT_LABELS:
             if label not in needed:
@@ -115,7 +116,7 @@ def fit_site(job: tuple[str, dict[str, Any], tuple[str, ...]]) -> dict[str, Any]
             print(f"{site} {arm_name} {label} fitted", flush=True)
     frames: dict[str, pl.DataFrame] = {}
     for label in years:
-        for arm_name in pipeline.ARM_NAMES:
+        for arm_name in arms:
             arm_runs = runs[arm_name]
             if label not in arm_runs or pipeline.PREVIOUS_LABEL[label] not in arm_runs:
                 continue
@@ -143,11 +144,14 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--years", nargs="+", default=list(SCORED_LABELS), choices=SCORED_LABELS)
     parser.add_argument("--sites", nargs="+", default=list(common.SCORED_SITES))
+    parser.add_argument(
+        "--arms", nargs="+", default=list(pipeline.ARM_NAMES), choices=pipeline.ARM_NAMES
+    )
     arguments = parser.parse_args()
     decisions = verified_decisions()
     common.load_cache()
     years = tuple(arguments.years)
-    jobs = [(site, decisions, years) for site in arguments.sites]
+    jobs = [(site, decisions, years, tuple(arguments.arms)) for site in arguments.sites]
     with ProcessPoolExecutor(max_workers=arguments.workers, initializer=_init_worker) as pool:
         results = list(pool.map(fit_site, jobs))
     names = dict.fromkeys(name for result in results for name in result["frames"])
@@ -155,7 +159,9 @@ def main() -> None:
         frame = pl.concat([r["frames"][name] for r in results if name in r["frames"]])
         common.store_arm(name=name, frame=frame)
     common.WORK_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = "_".join(years)
+    suffix = "_".join(years) + (
+        "" if len(arguments.arms) == len(pipeline.ARM_NAMES) else "_" + "_".join(arguments.arms)
+    )
     cards = {site: r["cards"] for site, r in zip(arguments.sites, results, strict=True)}
     (common.WORK_DIR / f"coefficients_{suffix}.pkl").write_bytes(pickle.dumps(cards))
     curves = {site: r["curves"] for site, r in zip(arguments.sites, results, strict=True)}
