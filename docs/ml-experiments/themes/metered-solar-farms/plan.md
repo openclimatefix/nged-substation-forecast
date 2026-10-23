@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [300](../../00300-metered-farm-best-guess-assembly/result.md) | How good is the assembled best-guess day-ahead forecast for the six metered farms, and what does a new farm with no history get? | 1 | Nothing | Planned |
+| [313](../../00313-metered-farm-pure-xgboost-and-mdn-vs-plant/result.md) | Do an XGBoost model and a mixture-density neural network that see only weather and the calendar match the plant-based forecast, for solar and wind farms? | 2 | Nothing | Planned |
 
 ## Planned experiments
 
