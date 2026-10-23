@@ -167,14 +167,13 @@ lessons: >-
   match, against RO-NC's 25% on the same months, but as a head input it gives under 2.5%.
 take_home_message: >-
   A load shift detector does not need to be near-perfect to improve on the best forecast that uses
-  no
-  detector: with the true megawatts added back, finding half the shifts, learning of each up to 3
-  days
-  late, or misjudging the megawatts by half still lowers curtailment cost against that forecast. The
-  detector tested earlier (RO-NC) finds only a third of the shifts, which is below the break-even of
-  one half (measured with every other property perfect), so the next step is a detector that finds
-  more shifts, and the surprise of recent readings
-  against the forecast's bands (band position) is not that detector.
+  no detector: with the true megawatts added back, finding half the shifts, learning of each up to 3
+  days late, or misjudging the megawatts by half still lowers curtailment cost against that
+  forecast. The detector tested earlier (RO-NC) finds only a third of the shifts, below the
+  break-even of one half (measured with every other property perfect). The surprise of recent
+  readings against the forecast's bands (band position) found more, 37% of shifts on even months,
+  but still under one half and with about 90% of its alarms false, so the next step is a detector
+  that finds more shifts.
 advice:
   - >-
     Aim a load shift detector at finding at least half of the shifts, and judge it on curtailment
