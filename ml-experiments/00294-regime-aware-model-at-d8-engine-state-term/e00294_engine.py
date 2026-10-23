@@ -43,7 +43,7 @@ import e00294_common as common
 import e00294_inputs as inputs
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00294_detcommon import DATA_DIR as STATE_DIR
 from studies.dp_assimilation import (
     DEFAULT_DELAY_HOURS,
