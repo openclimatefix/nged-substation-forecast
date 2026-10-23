@@ -90,7 +90,7 @@ def fig_per_shift() -> None:
     )
     zero = (
         alt.Chart(pl.DataFrame({"y": [0.0]}).to_pandas()).mark_rule(color="#5F6368").encode(y="y:Q")  # ty: ignore[unresolved-attribute]
-    )  # ty: ignore[unresolved-attribute]
+    )
     save(
         (zero + chart).properties(
             width=W + 140,
@@ -132,7 +132,7 @@ def fig_harm_by_primary() -> None:
     order = [dat.label_of(series=s) for s in h.SERIES]
     colours = [ocf.DATA_BLUE, "#9AA0A6"]
     domain = ["odd months (out of sample)", "even months (in sample)"]
-    base = alt.Chart(t.to_pandas())  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(t.to_pandas())
     y = alt.Y("primary:N", sort=order, title=None)
     color = alt.Color(
         "months:N",
@@ -154,7 +154,7 @@ def fig_harm_by_primary() -> None:
     dot = base.mark_point(filled=True, size=60).encode(y=y, x="harm:Q", color=color, yOffset=off)  # ty: ignore[unresolved-attribute]
     zero = (
         alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas()).mark_rule(color="#5F6368").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
-    )  # ty: ignore[unresolved-attribute]
+    )
     save(
         (zero + rule + dot).properties(
             width=W,
@@ -201,7 +201,7 @@ def fig_arms() -> None:
         ref_label: str,
         ticks: list[float],
     ) -> alt.Chart:
-        base = alt.Chart(pl.DataFrame(rows).to_pandas())  # ty: ignore[unresolved-attribute]
+        base = alt.Chart(pl.DataFrame(rows).to_pandas())
         scale = alt.Scale(domain=domain) if domain else alt.Scale()
         xe = alt.X("lo:Q", title=title, scale=scale, axis=alt.Axis(values=ticks))
         rule = base.mark_rule(strokeWidth=2, color=ocf.DATA_BLUE).encode(y=y, x=xe, x2="hi:Q")  # ty: ignore[unresolved-attribute]
@@ -212,7 +212,7 @@ def fig_arms() -> None:
             alt.Chart(pl.DataFrame({"x": [ref]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#5F6368", strokeDash=[4, 3])
             .encode(x="x:Q")
-        )  # ty: ignore[unresolved-attribute]
+        )
         return (line + rule + dot).properties(width=W, height=170, title=ref_label)
 
     top = panel(
@@ -261,7 +261,7 @@ def fig_net_annual() -> None:
             alt.Chart(pl.DataFrame({"x": [0.0]}).to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#5F6368")
             .encode(x="x:Q")
-        )  # ty: ignore[unresolved-attribute]
+        )
         dots = (
             alt.Chart(t.to_pandas())  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=60, opacity=0.9)
