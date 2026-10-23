@@ -99,6 +99,42 @@ def test_check_fails_on_bad_front_matter(experiments_dir: Path) -> None:
         assert any(f"{experiment_id}-slug-{experiment_id}" in error for error in errors)
 
 
+def test_kind_is_optional_below_the_cut_off_and_required_from_it(experiments_dir: Path) -> None:
+    _write_experiment(experiments_dir, "00319")
+    _write_experiment(experiments_dir, "00320", kind=None)
+    _write_experiment(
+        experiments_dir, "00321", kind="change", promoted_to="Alpha research default 2"
+    )
+    _write_experiment(experiments_dir, "00322", kind="other")
+
+    errors = experiment_tables.validate_experiments(
+        experiments=experiment_tables.load_experiments(experiments_dir=experiments_dir),
+        experiments_dir=experiments_dir,
+    )
+
+    assert len(errors) == 1
+    assert "00320-slug-00320" in errors[0]
+    assert "missing `kind`" in errors[0]
+
+
+def test_kind_must_be_a_known_value_and_promoted_to_needs_kind_change(
+    experiments_dir: Path,
+) -> None:
+    _write_experiment(experiments_dir, "00330", kind="diagnostic")
+    _write_experiment(
+        experiments_dir, "00331", kind="other", promoted_to="Alpha research default 2"
+    )
+
+    errors = experiment_tables.validate_experiments(
+        experiments=experiment_tables.load_experiments(experiments_dir=experiments_dir),
+        experiments_dir=experiments_dir,
+    )
+
+    assert len(errors) == 2
+    assert any("00330-slug-00330" in error and "`kind`" in error for error in errors)
+    assert any("00331-slug-00331" in error and "promoted_to" in error for error in errors)
+
+
 def test_check_mode_exits_non_zero_and_names_the_file(
     experiments_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

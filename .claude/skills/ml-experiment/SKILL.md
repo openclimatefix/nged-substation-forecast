@@ -4,7 +4,8 @@ description: >-
   How to run a small, focused ML experiment that tests one hypothesis about improving the
   Flexpectation production forecast, and keep its result where a later experiment can find it, as a
   one-screen `result.md` and an immutable set of predictions. Load before planning, running, or
-  writing up an experiment under `ml-experiments/`, and before an overnight session. A question that
+  writing up an experiment under `ml-experiments/`, before adopting a change into a family's research
+  default, and before an overnight session. A question that
   needs a long report, several scientific questions, or a new dataset as its main subject is a
   study; use the `study` skill for it.
 ---
@@ -109,8 +110,12 @@ experiment's own branch, and do not open a pull request for it. Its front matter
 `invalid`, or `failed`), `best_arm` with its headline number, `headline`, `lessons`,
 `take_home_message`, and `advice` (below). A finished experiment also has `production_status`
 (`candidate`, `adopted`, `superseded`, or `not-for-production`) and `adopted_in` (the model release
-number, or `none`). Every result has the same front matter, so a later session finds results with
-`grep` over `docs/ml-experiments/*/result.md`.
+number, or `none`). `kind` is `change` (the experiment asks whether a research default plus x
+beats the research default) or `other`, and it is required from id 320 up. `promoted_to` is always
+optional, needs `kind: change`, and names the version of the research default that the
+experiment created, such as "Primary demand research default 2". The field name keeps the word
+"promoted" although the rule avoids it. Every result has the same front matter, so a later session
+finds results with `grep` over `docs/ml-experiments/*/result.md`.
 
 **`theme` names exactly one theme folder under `docs/ml-experiments/themes/`, and `also_relevant_to`
 lists the other themes the result bears on (an empty list if none).** The experiment appears in the
@@ -269,17 +274,43 @@ parts, in this order:
 Keep the report short, link every experiment to its `result.md`, and use the figures already
 committed. A Sonnet agent writes it from the write-ups and one Sonnet agent reviews it against them.
 
-## Small gains and stacking
+## Adopting a change into the research default
+
+**Each target family has a research default, and a change to it is adopted one change at a time.**
+`docs/ml-experiments/research-default.md` defines the families, the headline metric, the tolerances,
+the minimum gain by tier, the five adoption conditions, and the cadence, and
+`docs/ml-experiments/research-default-log.md` lists each family's versions. Read the rule page before
+planning any experiment that could improve a family's forecast. Do not write a metric, a tolerance,
+or a minimum gain into the plan for a `change` experiment, because the family definition owns them.
+
+**Naming checklist for a `change` experiment.**
+
+- Set `kind: change` in the front matter, and `kind: other` for a diagnostic, an audit, a data check,
+  or a detection or decision study.
+- Cite the version by its full name in the plan, in every `result.md`, and in the pull-request body,
+  for example "default plus x versus Primary demand research default 1". Never write "default 3" or
+  "v3" alone.
+- Name the two arms "default" and "default plus x", and report the research default's absolute score
+  against BG2, `manual_heuristic`, and `climatology`.
+- Say whether the change is tier 1 (acts on stored forecasts) or tier 2 (acts inside a fitted stage,
+  with the default's code imported from the folder of the experiment that holds it), and which
+  complexity tier sets the minimum gain.
+- State the family's lead range in the headline caveat. NGED care about the 1 day to 10 day horizon,
+  so a shorter range, such as 12 to 36 hours for metered solar farms, is a limit on the result.
+- If the experiment evaluates a blend, report each constituent model family alone beside the blend.
+  The single-family table comes first, and the page states the blend's added value over the best
+  single family, with an interval.
+- If the five conditions hold, set `promoted_to` to the new version's name, and add a row to the log
+  in the same pull request. If they do not, the verdict stays and the result is a candidate.
 
 **`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls
 under the stated threshold.** It is not `inconclusive`, because the direction is established. The
 write-up says how large the gain is and what the change costs, and the experiment is flagged
-`candidate`.
-
-**Gains from different experiments may not add, so test them together.** Two changes can act on the
-same error. When several `candidate` and `small gain` results exist for one target (solar and wind,
-or Primary demand), run one stacking experiment that combines all of them against the production
-recipe. It reports the combined gain, and the loss in score when each component is dropped in turn.
+`candidate`. A change that wins on the gain condition but is not adopted is also a "candidate" in
+the research-default rule's sense, which is separate from `production_status: candidate` and from
+`production_status: adopted`, which mean production. The rule's rebase section says how a candidate
+is retested against the current research default, and a candidate is not stacked with other
+candidates in a combination experiment.
 
 ## When a winner reaches production
 
