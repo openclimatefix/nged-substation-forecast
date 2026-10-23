@@ -28,8 +28,13 @@ CONTRASTS: Final[dict[str, tuple[str, str, str]]] = {
     "X1": ("c1", "h5_quantile", "own_history"),
     "X2": ("c2_lomo", "h5_quantile", "own_history"),
     "X3": ("c2", "xgboost", "own_history"),
+    "X4": ("h5_mean", "h5_quantile", "own_history"),
+    "M1": ("c2", "h5_mean", "own_history"),
+    "M2": ("c2", "nn_mean", "own_history"),
+    "M3": ("c2", "xgb_mean", "own_history"),
+    "M4": ("c2", "h5_mean", "zero_history"),
 }
-"""Planned contrasts C1, C3, C4 (arm, reference, setting); C2 is read on `pin99`, and X1 to X3 are exploratory."""
+"""Planned contrasts C1, C3, C4 (arm, reference, setting); C2 is read on `pin99`, and X1 to X4 are exploratory, and M1 to M4 repeat C1, C2, X3, and C4 against the references whose seeds are averaged in quantile space, like C2's inputs."""
 NEAR_ZERO: Final[float] = 0.03
 """Actual output under this share of capacity counts as near zero."""
 
@@ -65,10 +70,10 @@ def row_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
         ae_median=pl.Series(100.0 * np.abs(error[:, 5])),
         pin01=pl.Series(100.0 * pin[:, 0]),
         pin99=pl.Series(100.0 * pin[:, 10]),
-        cover01=pl.Series((actual <= q[:, 0]).astype(float)),
+        cover01=pl.Series((actual < q[:, 0]).astype(float)),
         cover99=pl.Series((actual <= q[:, 10]).astype(float)),
-        miss01_near_zero=pl.Series(((actual <= q[:, 0]) & (actual < NEAR_ZERO)).astype(float)),
-        miss01=pl.Series((actual <= q[:, 0]).astype(float)),
+        miss01_near_zero=pl.Series(((actual < q[:, 0]) & (actual < NEAR_ZERO)).astype(float)),
+        miss01=pl.Series((actual < q[:, 0]).astype(float)),
     )
 
 

@@ -17,6 +17,7 @@ ARMS: Final[dict[str, str]] = {
     "c2": "C2: per-level weights fitted on earlier months",
     "c1": "C1: equal weights (seen before the plan)",
     "c3": "C3: C2 plus adaptive tail adjustment",
+    "h5_mean": "H5 with its seeds averaged (like for like with C2)",
     "h5_quantile": "H5: plant + neural network offsets",
     "xgboost": "XGBoost",
     "nn_pure": "Neural network, no plant",
@@ -31,6 +32,7 @@ SETTING_LABELS: Final[dict[str, str]] = {
 SETTING_COLOURS: Final[list[str]] = [ocf.DATA_BLUE, ocf.BRAND_ORANGE]
 CONTRAST_LABELS: Final[dict[str, str]] = {
     "C1": "C1: C2 minus H5 (own history)",
+    "M1": "M1: C2 minus H5 with seeds averaged (own history)",
     "C2": "C2: C2 minus neural network, pinball loss at 0.99 (own history)",
     "C3": "C3: C3 minus C2 (own history)",
     "C4": "C4: C2 minus H5 (zero history)",
@@ -131,7 +133,7 @@ def contrasts() -> None:
             [
                 "Planned contrasts in quantile score (C2 in pinball loss at the 0.99 quantile), mean over six farms,",
                 "12 to 36 h, 2025-09 to 2026-08. Dot: estimate. Line: 99% interval from resampling whole months",
-                "(Bonferroni over four contrasts). Grey rule: no change.",
+                "(Bonferroni over four contrasts). M1 is a post hoc check. Grey rule: no change.",
             ]
         ),
     )

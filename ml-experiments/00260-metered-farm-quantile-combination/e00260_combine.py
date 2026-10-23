@@ -161,6 +161,8 @@ def rolling_and_lomo(
     """Return c2 and c2_lomo quantiles and the weight records, fitted month by month."""
     months = sorted(base["month"].unique().to_list())
     month_col = base["month"].to_numpy()
+    time = base["time"].dt.epoch("us").to_numpy()
+    init = base["init_time"].dt.epoch("us").to_numpy()
     n_rows = base.height
     c2 = np.empty((n_rows, len(common.LEVELS)))
     lomo = np.empty_like(c2)
@@ -168,7 +170,8 @@ def rolling_and_lomo(
     equal = np.full((len(common.LEVELS), stack.shape[0]), 1.0 / stack.shape[0])
     for i, month in enumerate(months):
         in_month = month_col == month
-        earlier = np.isin(month_col, months[:i])
+        first_run = init[in_month].min()
+        earlier = time < first_run
         weights = equal if i < BURN_IN_MONTHS else fit_weights(base=base, stack=stack, rows=earlier)
         c2[in_month] = combine(stack=stack[:, in_month, :], weights=weights)
         lomo_weights = fit_weights(base=base, stack=stack, rows=~in_month)
@@ -254,6 +257,8 @@ def main() -> None:
     for setting in common.SETTINGS:
         base, stack = common_rows(setting=setting)
         write(base=base, setting=setting, arm="c1", quantiles=np.sort(stack.mean(axis=0), axis=1))
+        for j, name in enumerate(("h5_mean", "nn_mean", "xgb_mean")):
+            write(base=base, setting=setting, arm=name, quantiles=stack[j])
         c2, lomo, records = rolling_and_lomo(base=base, stack=stack)
         write(base=base, setting=setting, arm="c2", quantiles=c2)
         write(base=base, setting=setting, arm="c2_lomo", quantiles=lomo)
