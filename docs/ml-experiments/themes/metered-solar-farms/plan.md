@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 287 | Which head (additive, neural, mixture-density, blend) gives the best band on the spread-binned plant? | 1 | - | Planned |
 
 ## Planned experiments
 
