@@ -1,0 +1,338 @@
+Logged operations: 4.22 years, 16 series
+shape: (6, 3)
+┌──────────────┬──────────────┬─────────────────┐
+│ duration_bin ┆ logged_sides ┆ per_series_year │
+│ ---          ┆ ---          ┆ ---             │
+│ str          ┆ i64          ┆ f64             │
+╞══════════════╪══════════════╪═════════════════╡
+│ 2-6 h        ┆ 423          ┆ 6.268227        │
+│ 6-24 h       ┆ 246          ┆ 3.645352        │
+│ 1-3 d        ┆ 104          ┆ 1.541124        │
+│ 3-7 d        ┆ 87           ┆ 1.28921         │
+│ 7-30 d       ┆ 57           ┆ 0.844655        │
+│ over 30 d    ┆ 9            ┆ 0.133367        │
+└──────────────┴──────────────┴─────────────────┘
+Shifts scored: 1079 ; per cell: 37 to 48 ; cells: 24
+low      MASK G2 before alarm  tw95_nra       LD  73.8% ( 63.9 to  82.7) | OTHER  26.2% ( 17.3 to  36.1) | SHORT_OR_SMALL   2.9% (  0.1 to   6.0)
+low      MASK G2 before alarm  tw99_nra       LD  70.8% ( 58.8 to  81.9) | OTHER  29.2% ( 18.1 to  41.2) | SHORT_OR_SMALL   3.0% ( -0.5 to   6.9)
+low      MASK G2 before alarm  qs_nra         LD  79.5% ( 73.9 to  84.5) | OTHER  20.5% ( 15.5 to  26.1) | SHORT_OR_SMALL   3.6% (  1.7 to   5.6)
+low      MASK G2 before alarm  ae_median_nra  LD  78.2% ( 72.8 to  83.0) | OTHER  21.8% ( 17.0 to  27.2) | SHORT_OR_SMALL   4.1% (  1.8 to   6.5)
+low      MASK G2 before alarm  ae_mean_nra    LD  78.2% ( 72.8 to  83.0) | OTHER  21.8% ( 17.0 to  27.2) | SHORT_OR_SMALL   4.1% (  1.8 to   6.5)
+low      MASK G2 before alarm  cost0.5        LD 113.2% (104.1 to 129.1) | OTHER -13.2% (-29.1 to  -4.1) | SHORT_OR_SMALL  -1.0% ( -4.3 to   1.7)
+low      MASK G3 during        tw95_nra       LD  99.9% ( 99.8 to 100.1) | OTHER   0.1% ( -0.1 to   0.2) | SHORT_OR_SMALL   0.1% ( -0.1 to   0.2)
+low      MASK G3 during        tw99_nra       LD 100.0% ( 99.9 to 100.1) | OTHER   0.0% ( -0.1 to   0.1) | SHORT_OR_SMALL   0.0% ( -0.1 to   0.1)
+low      MASK G3 during        qs_nra         LD  99.9% ( 99.8 to 100.0) | OTHER   0.1% ( -0.0 to   0.2) | SHORT_OR_SMALL   0.1% ( -0.0 to   0.2)
+low      MASK G3 during        ae_median_nra  LD  99.9% ( 99.7 to 100.1) | OTHER   0.1% ( -0.1 to   0.3) | SHORT_OR_SMALL   0.1% ( -0.1 to   0.3)
+low      MASK G3 during        ae_mean_nra    LD  99.9% ( 99.7 to 100.1) | OTHER   0.1% ( -0.1 to   0.3) | SHORT_OR_SMALL   0.1% ( -0.1 to   0.3)
+low      MASK G3 during        cost0.5        LD  99.5% ( 99.2 to  99.7) | OTHER   0.5% (  0.3 to   0.8) | SHORT_OR_SMALL   0.5% (  0.3 to   0.8)
+low      MASK G4 after         tw95_nra       LD  98.5% ( 96.9 to  99.7) | OTHER   1.5% (  0.3 to   3.1) | SHORT_OR_SMALL  -0.1% ( -0.4 to   0.2)
+low      MASK G4 after         tw99_nra       LD  98.6% ( 96.6 to 100.0) | OTHER   1.4% (  0.0 to   3.4) | SHORT_OR_SMALL  -0.2% ( -0.7 to   0.2)
+low      MASK G4 after         qs_nra         LD  98.8% ( 97.8 to  99.6) | OTHER   1.2% (  0.4 to   2.2) | SHORT_OR_SMALL  -0.0% ( -0.2 to   0.2)
+low      MASK G4 after         ae_median_nra  LD  98.6% ( 97.5 to  99.6) | OTHER   1.4% (  0.4 to   2.5) | SHORT_OR_SMALL  -0.1% ( -0.4 to   0.3)
+low      MASK G4 after         ae_mean_nra    LD  98.6% ( 97.6 to  99.6) | OTHER   1.4% (  0.4 to   2.4) | SHORT_OR_SMALL  -0.1% ( -0.4 to   0.3)
+low      MASK G4 after         cost0.5        LD  96.8% ( 93.8 to  99.1) | OTHER   3.2% (  0.9 to   6.2) | SHORT_OR_SMALL  -0.0% ( -0.2 to   0.2)
+low      MASK G5 near          tw95_nra       LD  96.9% ( 95.4 to  98.0) | OTHER   3.1% (  2.0 to   4.6) | SHORT_OR_SMALL   0.6% (  0.3 to   1.1)
+low      MASK G5 near          tw99_nra       LD  97.3% ( 95.6 to  98.6) | OTHER   2.7% (  1.4 to   4.4) | SHORT_OR_SMALL   0.5% (  0.1 to   0.9)
+low      MASK G5 near          qs_nra         LD  96.6% ( 95.7 to  97.4) | OTHER   3.4% (  2.6 to   4.3) | SHORT_OR_SMALL   1.1% (  0.7 to   1.6)
+low      MASK G5 near          ae_median_nra  LD  95.6% ( 94.4 to  96.6) | OTHER   4.4% (  3.4 to   5.6) | SHORT_OR_SMALL   1.4% (  0.9 to   2.1)
+low      MASK G5 near          ae_mean_nra    LD  95.6% ( 94.4 to  96.6) | OTHER   4.4% (  3.4 to   5.6) | SHORT_OR_SMALL   1.4% (  0.9 to   2.1)
+low      MASK G5 near          cost0.5        LD 101.6% (100.4 to 103.6) | OTHER  -1.6% ( -3.6 to  -0.4) | SHORT_OR_SMALL   0.3% ( -0.1 to   0.7)
+low      ADD  G2 before alarm  cost0.5        LD  85.4% ( 79.0 to  90.9) | OTHER  14.6% (  9.1 to  21.0) | SHORT_OR_SMALL   1.1% ( -0.1 to   2.5)
+low      ADD  G2 before alarm  cost0.75       LD  88.3% ( 81.9 to  93.5) | OTHER  11.7% (  6.5 to  18.1) | SHORT_OR_SMALL   0.3% ( -0.9 to   1.2)
+low      ADD  G2 before alarm  cost0.9        LD  91.2% ( 84.2 to  96.6) | OTHER   8.8% (  3.4 to  15.8) | SHORT_OR_SMALL  -0.2% ( -1.7 to   1.0)
+low      ADD  G2 before alarm  tw95_obs       LD  89.1% ( 84.9 to  92.7) | OTHER  10.9% (  7.3 to  15.1) | SHORT_OR_SMALL   1.4% (  0.6 to   2.4)
+low      ADD  G2 before alarm  qs_obs         LD  88.9% ( 86.5 to  91.0) | OTHER  11.1% (  9.0 to  13.5) | SHORT_OR_SMALL   1.8% (  1.2 to   2.5)
+low      ADD  G3 during        cost0.5        LD  99.7% ( 99.3 to  99.9) | OTHER   0.3% (  0.1 to   0.7) | SHORT_OR_SMALL   0.3% (  0.1 to   0.7)
+low      ADD  G3 during        cost0.75       LD  99.7% ( 99.4 to  99.9) | OTHER   0.3% (  0.1 to   0.6) | SHORT_OR_SMALL   0.3% (  0.1 to   0.6)
+low      ADD  G3 during        cost0.9        LD  99.9% ( 99.8 to 100.0) | OTHER   0.1% ( -0.0 to   0.2) | SHORT_OR_SMALL   0.1% ( -0.0 to   0.2)
+low      ADD  G3 during        tw95_obs       LD  99.6% ( 99.3 to  99.8) | OTHER   0.4% (  0.2 to   0.7) | SHORT_OR_SMALL   0.4% (  0.2 to   0.7)
+low      ADD  G3 during        qs_obs         LD  99.4% ( 98.8 to  99.8) | OTHER   0.6% (  0.2 to   1.2) | SHORT_OR_SMALL   0.6% (  0.2 to   1.2)
+low      ADD  G4 after         cost0.5        LD  96.7% ( 93.8 to  99.0) | OTHER   3.3% (  1.0 to   6.2) | SHORT_OR_SMALL   0.1% (  0.0 to   0.3)
+low      ADD  G4 after         cost0.75       LD  96.2% ( 91.9 to  99.4) | OTHER   3.8% (  0.6 to   8.1) | SHORT_OR_SMALL   0.1% ( -0.1 to   0.4)
+low      ADD  G4 after         cost0.9        LD  95.3% ( 88.2 to  99.7) | OTHER   4.7% (  0.3 to  11.8) | SHORT_OR_SMALL   0.4% (  0.1 to   0.7)
+low      ADD  G4 after         tw95_obs       LD  98.2% ( 96.6 to  99.4) | OTHER   1.8% (  0.6 to   3.4) | SHORT_OR_SMALL   0.1% ( -0.0 to   0.3)
+low      ADD  G4 after         qs_obs         LD  98.5% ( 97.5 to  99.3) | OTHER   1.5% (  0.7 to   2.5) | SHORT_OR_SMALL   0.3% (  0.2 to   0.4)
+low      ADD  G5 near          cost0.5        LD  91.4% ( 87.6 to  94.6) | OTHER   8.6% (  5.4 to  12.4) | SHORT_OR_SMALL   0.9% (  0.3 to   1.6)
+low      ADD  G5 near          cost0.75       LD  92.2% ( 87.9 to  95.7) | OTHER   7.8% (  4.3 to  12.1) | SHORT_OR_SMALL   0.3% ( -0.4 to   1.0)
+low      ADD  G5 near          cost0.9        LD  93.7% ( 89.1 to  97.3) | OTHER   6.3% (  2.7 to  10.9) | SHORT_OR_SMALL   0.0% ( -0.8 to   0.7)
+low      ADD  G5 near          tw95_obs       LD  92.7% ( 89.8 to  95.1) | OTHER   7.3% (  4.9 to  10.2) | SHORT_OR_SMALL   1.4% (  0.7 to   2.2)
+low      ADD  G5 near          qs_obs         LD  91.9% ( 90.0 to  93.7) | OTHER   8.1% (  6.3 to  10.0) | SHORT_OR_SMALL   2.5% (  1.7 to   3.5)
+central  MASK G2 before alarm  tw95_nra       LD  73.8% ( 64.5 to  82.3) | OTHER  26.2% ( 17.7 to  35.5) | SHORT_OR_SMALL   2.9% ( -1.1 to   7.2)
+central  MASK G2 before alarm  tw99_nra       LD  71.0% ( 59.6 to  81.7) | OTHER  29.0% ( 18.3 to  40.4) | SHORT_OR_SMALL   3.1% ( -1.9 to   8.4)
+central  MASK G2 before alarm  qs_nra         LD  79.2% ( 73.6 to  84.3) | OTHER  20.8% ( 15.7 to  26.4) | SHORT_OR_SMALL   4.1% (  1.2 to   7.2)
+central  MASK G2 before alarm  ae_median_nra  LD  77.9% ( 72.4 to  83.1) | OTHER  22.1% ( 16.9 to  27.6) | SHORT_OR_SMALL   4.6% (  1.2 to   8.1)
+central  MASK G2 before alarm  ae_mean_nra    LD  77.9% ( 72.4 to  83.1) | OTHER  22.1% ( 16.9 to  27.6) | SHORT_OR_SMALL   4.6% (  1.2 to   8.2)
+central  MASK G2 before alarm  cost0.5        LD 108.8% (100.9 to 121.0) | OTHER  -8.8% (-21.0 to  -0.9) | SHORT_OR_SMALL   1.8% ( -1.7 to   5.1)
+central  MASK G3 during        tw95_nra       LD  99.8% ( 99.2 to 100.3) | OTHER   0.2% ( -0.3 to   0.8) | SHORT_OR_SMALL   0.2% ( -0.3 to   0.8)
+central  MASK G3 during        tw99_nra       LD  99.9% ( 99.4 to 100.5) | OTHER   0.1% ( -0.5 to   0.6) | SHORT_OR_SMALL   0.1% ( -0.5 to   0.6)
+central  MASK G3 during        qs_nra         LD  99.5% ( 99.0 to 100.1) | OTHER   0.5% ( -0.1 to   1.0) | SHORT_OR_SMALL   0.5% ( -0.1 to   1.0)
+central  MASK G3 during        ae_median_nra  LD  99.5% ( 98.7 to 100.3) | OTHER   0.5% ( -0.3 to   1.3) | SHORT_OR_SMALL   0.5% ( -0.3 to   1.3)
+central  MASK G3 during        ae_mean_nra    LD  99.5% ( 98.7 to 100.3) | OTHER   0.5% ( -0.3 to   1.3) | SHORT_OR_SMALL   0.5% ( -0.3 to   1.3)
+central  MASK G3 during        cost0.5        LD  97.8% ( 96.8 to  98.6) | OTHER   2.2% (  1.4 to   3.2) | SHORT_OR_SMALL   2.2% (  1.4 to   3.2)
+central  MASK G4 after         tw95_nra       LD  98.5% ( 96.5 to 100.3) | OTHER   1.5% ( -0.3 to   3.5) | SHORT_OR_SMALL  -0.1% ( -1.6 to   1.3)
+central  MASK G4 after         tw99_nra       LD  98.9% ( 96.3 to 101.4) | OTHER   1.1% ( -1.4 to   3.7) | SHORT_OR_SMALL  -0.6% ( -2.8 to   1.3)
+central  MASK G4 after         qs_nra         LD  98.8% ( 97.6 to 100.0) | OTHER   1.2% ( -0.0 to   2.4) | SHORT_OR_SMALL  -0.0% ( -1.0 to   0.9)
+central  MASK G4 after         ae_median_nra  LD  98.9% ( 97.2 to 100.6) | OTHER   1.1% ( -0.6 to   2.8) | SHORT_OR_SMALL  -0.3% ( -1.8 to   1.1)
+central  MASK G4 after         ae_mean_nra    LD  98.9% ( 97.3 to 100.6) | OTHER   1.1% ( -0.6 to   2.7) | SHORT_OR_SMALL  -0.3% ( -1.8 to   1.0)
+central  MASK G4 after         cost0.5        LD  97.1% ( 94.4 to  99.3) | OTHER   2.9% (  0.7 to   5.6) | SHORT_OR_SMALL  -0.0% ( -0.8 to   0.9)
+central  MASK G5 near          tw95_nra       LD  95.9% ( 94.3 to  97.2) | OTHER   4.1% (  2.8 to   5.7) | SHORT_OR_SMALL   1.6% (  0.8 to   2.6)
+central  MASK G5 near          tw99_nra       LD  96.7% ( 94.9 to  98.1) | OTHER   3.3% (  1.9 to   5.1) | SHORT_OR_SMALL   1.2% (  0.4 to   2.1)
+central  MASK G5 near          qs_nra         LD  95.0% ( 93.7 to  96.2) | OTHER   5.0% (  3.8 to   6.3) | SHORT_OR_SMALL   2.5% (  1.6 to   3.6)
+central  MASK G5 near          ae_median_nra  LD  93.9% ( 92.3 to  95.3) | OTHER   6.1% (  4.7 to   7.7) | SHORT_OR_SMALL   3.0% (  1.9 to   4.3)
+central  MASK G5 near          ae_mean_nra    LD  93.9% ( 92.4 to  95.3) | OTHER   6.1% (  4.7 to   7.6) | SHORT_OR_SMALL   3.0% (  1.9 to   4.3)
+central  MASK G5 near          cost0.5        LD  99.8% ( 98.2 to 101.5) | OTHER   0.2% ( -1.5 to   1.8) | SHORT_OR_SMALL   2.0% (  1.0 to   3.3)
+central  ADD  G2 before alarm  cost0.5        LD  84.6% ( 78.8 to  89.7) | OTHER  15.4% ( 10.3 to  21.2) | SHORT_OR_SMALL   2.1% (  0.7 to   3.7)
+central  ADD  G2 before alarm  cost0.75       LD  87.4% ( 81.6 to  92.4) | OTHER  12.6% (  7.6 to  18.4) | SHORT_OR_SMALL   1.1% ( -0.3 to   2.6)
+central  ADD  G2 before alarm  cost0.9        LD  90.9% ( 84.6 to  96.1) | OTHER   9.1% (  3.9 to  15.4) | SHORT_OR_SMALL   0.3% ( -1.5 to   2.0)
+central  ADD  G2 before alarm  tw95_obs       LD  87.9% ( 83.9 to  91.2) | OTHER  12.1% (  8.8 to  16.1) | SHORT_OR_SMALL   2.6% (  1.4 to   3.9)
+central  ADD  G2 before alarm  qs_obs         LD  87.4% ( 85.2 to  89.5) | OTHER  12.6% ( 10.5 to  14.8) | SHORT_OR_SMALL   3.4% (  2.5 to   4.5)
+central  ADD  G3 during        cost0.5        LD  98.6% ( 97.2 to  99.6) | OTHER   1.4% (  0.4 to   2.8) | SHORT_OR_SMALL   1.4% (  0.4 to   2.8)
+central  ADD  G3 during        cost0.75       LD  98.8% ( 97.5 to  99.7) | OTHER   1.2% (  0.3 to   2.5) | SHORT_OR_SMALL   1.2% (  0.3 to   2.5)
+central  ADD  G3 during        cost0.9        LD  99.6% ( 99.0 to 100.1) | OTHER   0.4% ( -0.1 to   1.0) | SHORT_OR_SMALL   0.4% ( -0.1 to   1.0)
+central  ADD  G3 during        tw95_obs       LD  98.2% ( 97.2 to  99.0) | OTHER   1.8% (  1.0 to   2.8) | SHORT_OR_SMALL   1.8% (  1.0 to   2.8)
+central  ADD  G3 during        qs_obs         LD  97.4% ( 95.3 to  99.0) | OTHER   2.6% (  1.0 to   4.7) | SHORT_OR_SMALL   2.6% (  1.0 to   4.7)
+central  ADD  G4 after         cost0.5        LD  96.7% ( 94.2 to  98.7) | OTHER   3.3% (  1.3 to   5.8) | SHORT_OR_SMALL   0.6% (  0.0 to   1.2)
+central  ADD  G4 after         cost0.75       LD  96.1% ( 92.2 to  99.1) | OTHER   3.9% (  0.9 to   7.8) | SHORT_OR_SMALL   0.6% ( -0.3 to   1.6)
+central  ADD  G4 after         cost0.9        LD  94.2% ( 87.7 to  98.9) | OTHER   5.8% (  1.1 to  12.3) | SHORT_OR_SMALL   1.5% (  0.4 to   3.1)
+central  ADD  G4 after         tw95_obs       LD  97.6% ( 95.8 to  99.0) | OTHER   2.4% (  1.0 to   4.2) | SHORT_OR_SMALL   0.8% ( -0.0 to   1.6)
+central  ADD  G4 after         qs_obs         LD  97.7% ( 96.6 to  98.6) | OTHER   2.3% (  1.4 to   3.4) | SHORT_OR_SMALL   1.2% (  0.6 to   1.8)
+central  ADD  G5 near          cost0.5        LD  90.3% ( 86.8 to  93.3) | OTHER   9.7% (  6.7 to  13.2) | SHORT_OR_SMALL   2.4% (  1.3 to   3.6)
+central  ADD  G5 near          cost0.75       LD  91.2% ( 87.3 to  94.5) | OTHER   8.8% (  5.5 to  12.7) | SHORT_OR_SMALL   1.5% (  0.4 to   2.9)
+central  ADD  G5 near          cost0.9        LD  93.1% ( 89.0 to  96.5) | OTHER   6.9% (  3.5 to  11.0) | SHORT_OR_SMALL   0.8% ( -0.3 to   2.0)
+central  ADD  G5 near          tw95_obs       LD  90.7% ( 87.7 to  93.2) | OTHER   9.3% (  6.8 to  12.3) | SHORT_OR_SMALL   3.6% (  2.2 to   5.3)
+central  ADD  G5 near          qs_obs         LD  88.7% ( 86.2 to  91.0) | OTHER  11.3% (  9.0 to  13.8) | SHORT_OR_SMALL   5.9% (  4.1 to   7.9)
+high     MASK G2 before alarm  tw95_nra       LD  53.9% ( 42.6 to  68.1) | OTHER  46.1% ( 31.9 to  57.4) | SHORT_OR_SMALL   8.5% ( -5.8 to  20.8)
+high     MASK G2 before alarm  tw99_nra       LD  51.9% ( 38.5 to  70.1) | OTHER  48.1% ( 29.9 to  61.5) | SHORT_OR_SMALL   8.6% (-10.9 to  24.0)
+high     MASK G2 before alarm  qs_nra         LD  62.4% ( 54.1 to  71.7) | OTHER  37.6% ( 28.3 to  45.9) | SHORT_OR_SMALL  12.3% (  3.0 to  20.9)
+high     MASK G2 before alarm  ae_median_nra  LD  60.1% ( 51.6 to  69.9) | OTHER  39.9% ( 30.1 to  48.4) | SHORT_OR_SMALL  13.6% (  2.9 to  23.0)
+high     MASK G2 before alarm  ae_mean_nra    LD  60.1% ( 51.6 to  69.9) | OTHER  39.9% ( 30.1 to  48.4) | SHORT_OR_SMALL  13.7% (  3.0 to  23.2)
+high     MASK G2 before alarm  cost0.5        LD 116.1% ( 95.2 to 156.6) | OTHER -16.1% (-56.6 to   4.8) | SHORT_OR_SMALL   8.7% ( -7.4 to  21.6)
+high     MASK G3 during        tw95_nra       LD  99.0% ( 96.7 to 101.4) | OTHER   1.0% ( -1.4 to   3.3) | SHORT_OR_SMALL   1.0% ( -1.4 to   3.3)
+high     MASK G3 during        tw99_nra       LD  99.7% ( 97.4 to 102.1) | OTHER   0.3% ( -2.1 to   2.6) | SHORT_OR_SMALL   0.3% ( -2.1 to   2.6)
+high     MASK G3 during        qs_nra         LD  98.2% ( 96.1 to 100.4) | OTHER   1.8% ( -0.4 to   3.9) | SHORT_OR_SMALL   1.8% ( -0.4 to   3.9)
+high     MASK G3 during        ae_median_nra  LD  98.1% ( 95.4 to 101.0) | OTHER   1.9% ( -1.0 to   4.6) | SHORT_OR_SMALL   1.9% ( -1.0 to   4.6)
+high     MASK G3 during        ae_mean_nra    LD  98.1% ( 95.3 to 101.0) | OTHER   1.9% ( -1.0 to   4.7) | SHORT_OR_SMALL   1.9% ( -1.0 to   4.7)
+high     MASK G3 during        cost0.5        LD  92.0% ( 88.7 to  94.8) | OTHER   8.0% (  5.2 to  11.3) | SHORT_OR_SMALL   8.0% (  5.2 to  11.3)
+high     MASK G4 after         tw95_nra       LD  97.1% ( 91.2 to 103.8) | OTHER   2.9% ( -3.8 to   8.8) | SHORT_OR_SMALL   0.2% ( -6.5 to   5.8)
+high     MASK G4 after         tw99_nra       LD  98.9% ( 90.4 to 109.6) | OTHER   1.1% ( -9.6 to   9.6) | SHORT_OR_SMALL  -1.8% (-12.6 to   6.2)
+high     MASK G4 after         qs_nra         LD  98.6% ( 94.8 to 102.6) | OTHER   1.4% ( -2.6 to   5.2) | SHORT_OR_SMALL   0.1% ( -3.9 to   3.7)
+high     MASK G4 after         ae_median_nra  LD  99.1% ( 93.7 to 105.3) | OTHER   0.9% ( -5.3 to   6.3) | SHORT_OR_SMALL  -0.8% ( -6.9 to   4.5)
+high     MASK G4 after         ae_mean_nra    LD  99.2% ( 93.9 to 105.4) | OTHER   0.8% ( -5.4 to   6.1) | SHORT_OR_SMALL  -0.9% ( -7.0 to   4.3)
+high     MASK G4 after         cost0.5        LD  97.6% ( 93.6 to 101.4) | OTHER   2.4% ( -1.4 to   6.4) | SHORT_OR_SMALL   0.1% ( -3.3 to   3.7)
+high     MASK G5 near          tw95_nra       LD  87.9% ( 83.0 to  92.2) | OTHER  12.1% (  7.8 to  17.0) | SHORT_OR_SMALL   7.3% (  3.4 to  11.7)
+high     MASK G5 near          tw99_nra       LD  91.1% ( 86.5 to  95.2) | OTHER   8.9% (  4.8 to  13.5) | SHORT_OR_SMALL   5.0% (  1.4 to   8.9)
+high     MASK G5 near          qs_nra         LD  84.3% ( 79.5 to  88.9) | OTHER  15.7% ( 11.1 to  20.5) | SHORT_OR_SMALL  10.6% (  6.1 to  15.5)
+high     MASK G5 near          ae_median_nra  LD  82.0% ( 76.8 to  87.3) | OTHER  18.0% ( 12.7 to  23.2) | SHORT_OR_SMALL  11.9% (  6.7 to  17.2)
+high     MASK G5 near          ae_mean_nra    LD  82.0% ( 76.7 to  87.3) | OTHER  18.0% ( 12.7 to  23.3) | SHORT_OR_SMALL  12.0% (  6.7 to  17.3)
+high     MASK G5 near          cost0.5        LD  96.4% ( 91.7 to 101.2) | OTHER   3.6% ( -1.2 to   8.3) | SHORT_OR_SMALL   7.3% (  3.6 to  11.7)
+high     ADD  G2 before alarm  cost0.5        LD  75.3% ( 67.0 to  83.3) | OTHER  24.7% ( 16.7 to  33.0) | SHORT_OR_SMALL   6.9% (  1.7 to  12.1)
+high     ADD  G2 before alarm  cost0.75       LD  79.8% ( 71.3 to  88.0) | OTHER  20.2% ( 12.0 to  28.7) | SHORT_OR_SMALL   4.2% ( -1.8 to  10.0)
+high     ADD  G2 before alarm  cost0.9        LD  85.3% ( 75.6 to  95.0) | OTHER  14.7% (  5.0 to  24.4) | SHORT_OR_SMALL   1.6% ( -6.8 to   8.9)
+high     ADD  G2 before alarm  tw95_obs       LD  74.4% ( 67.9 to  80.5) | OTHER  25.6% ( 19.5 to  32.1) | SHORT_OR_SMALL   9.0% (  5.2 to  12.9)
+high     ADD  G2 before alarm  qs_obs         LD  75.0% ( 71.3 to  78.6) | OTHER  25.0% ( 21.4 to  28.7) | SHORT_OR_SMALL  11.0% (  8.1 to  14.1)
+high     ADD  G3 during        cost0.5        LD  94.5% ( 89.7 to  98.3) | OTHER   5.5% (  1.7 to  10.3) | SHORT_OR_SMALL   5.5% (  1.7 to  10.3)
+high     ADD  G3 during        cost0.75       LD  95.3% ( 90.5 to  98.9) | OTHER   4.7% (  1.1 to   9.5) | SHORT_OR_SMALL   4.7% (  1.1 to   9.5)
+high     ADD  G3 during        cost0.9        LD  98.2% ( 95.8 to 100.3) | OTHER   1.8% ( -0.3 to   4.2) | SHORT_OR_SMALL   1.8% ( -0.3 to   4.2)
+high     ADD  G3 during        tw95_obs       LD  93.2% ( 89.7 to  96.2) | OTHER   6.8% (  3.8 to  10.3) | SHORT_OR_SMALL   6.8% (  3.8 to  10.3)
+high     ADD  G3 during        qs_obs         LD  90.4% ( 83.5 to  96.3) | OTHER   9.6% (  3.7 to  16.5) | SHORT_OR_SMALL   9.6% (  3.7 to  16.5)
+high     ADD  G4 after         cost0.5        LD  95.6% ( 92.6 to  98.2) | OTHER   4.4% (  1.8 to   7.4) | SHORT_OR_SMALL   2.2% (  0.2 to   4.6)
+high     ADD  G4 after         cost0.75       LD  95.0% ( 90.2 to  99.2) | OTHER   5.0% (  0.8 to   9.8) | SHORT_OR_SMALL   2.3% ( -1.0 to   6.1)
+high     ADD  G4 after         cost0.9        LD  90.5% ( 83.2 to  96.6) | OTHER   9.5% (  3.4 to  16.8) | SHORT_OR_SMALL   5.6% (  1.5 to  10.8)
+high     ADD  G4 after         tw95_obs       LD  94.1% ( 90.0 to  97.9) | OTHER   5.9% (  2.1 to  10.0) | SHORT_OR_SMALL   3.3% ( -0.0 to   6.6)
+high     ADD  G4 after         qs_obs         LD  94.3% ( 92.0 to  96.6) | OTHER   5.7% (  3.4 to   8.0) | SHORT_OR_SMALL   4.5% (  2.5 to   6.6)
+high     ADD  G5 near          cost0.5        LD  80.8% ( 74.7 to  86.5) | OTHER  19.2% ( 13.5 to  25.3) | SHORT_OR_SMALL   9.0% (  5.0 to  13.2)
+high     ADD  G5 near          cost0.75       LD  83.5% ( 76.6 to  90.0) | OTHER  16.5% ( 10.0 to  23.4) | SHORT_OR_SMALL   6.1% (  1.7 to  11.0)
+high     ADD  G5 near          cost0.9        LD  87.5% ( 80.5 to  94.2) | OTHER  12.5% (  5.8 to  19.5) | SHORT_OR_SMALL   3.1% ( -1.8 to   7.9)
+high     ADD  G5 near          tw95_obs       LD  76.5% ( 70.0 to  83.0) | OTHER  23.5% ( 17.0 to  30.0) | SHORT_OR_SMALL  14.5% (  8.5 to  20.8)
+high     ADD  G5 near          qs_obs         LD  70.8% ( 64.6 to  77.2) | OTHER  29.2% ( 22.8 to  35.4) | SHORT_OR_SMALL  21.1% ( 14.5 to  27.6)
+
+Ladder (MASK, tw95_nra, central, G5): share of PERFECT benefit by minimum duration and depth
+  min 2 h, 5%                  100.0% (100.0 to 100.0)
+  min 2 h, 10%                  98.8% ( 98.0 to  99.5)
+  min 2 h, 25%                  94.7% ( 92.9 to  96.2)
+  min 2 h, 50%                  71.7% ( 63.6 to  78.8)
+  min 6 h, 5%                   99.7% ( 99.3 to 100.0)
+  min 6 h, 10%                  98.6% ( 97.7 to  99.3)
+  min 6 h, 25%                  94.6% ( 92.8 to  96.1)
+  min 6 h, 50%                  71.6% ( 63.5 to  78.8)
+  min 12 h, 5%                  99.5% ( 99.1 to  99.9)
+  min 12 h, 10%                 98.4% ( 97.4 to  99.2)
+  min 12 h, 25%                 94.4% ( 92.5 to  96.0)
+  min 12 h, 50%                 71.5% ( 63.4 to  78.7)
+  min 24 h, 5%                  98.2% ( 97.3 to  98.9)
+  min 24 h, 10%                 97.1% ( 95.9 to  98.1)
+  min 24 h, 25%                 93.3% ( 91.2 to  95.0)
+  min 24 h, 50%                 70.6% ( 62.5 to  77.8)
+  min 48 h, 5%                  96.7% ( 95.3 to  97.9)
+  min 48 h, 10%                 95.9% ( 94.2 to  97.2)
+  min 48 h, 25%                 92.1% ( 89.7 to  94.0)
+  min 48 h, 50%                 69.6% ( 61.5 to  76.9)
+  min 168 h, 5%                 80.8% ( 75.5 to  85.1)
+  min 168 h, 10%                80.3% ( 74.9 to  84.6)
+  min 168 h, 25%                77.1% ( 71.2 to  81.7)
+  min 168 h, 50%                57.5% ( 48.4 to  65.6)
+  min 720 h, 5%                 19.1% ( 14.0 to  24.9)
+  min 720 h, 10%                19.1% ( 14.1 to  24.9)
+  min 720 h, 25%                18.7% ( 13.6 to  24.4)
+  min 720 h, 50%                14.0% (  9.3 to  19.2)
+  depth 5% added to LD           0.8% (  0.3 to   1.5)
+  duration 6 h added to LD       2.7% (  1.7 to   4.0)
+  duration 12 h added to LD      2.5% (  1.5 to   3.7)
+
+Ladder (ADD, cost0.5, central, G5): share of PERFECT benefit by minimum duration and depth
+  min 2 h, 5%                  100.0% (100.0 to 100.0)
+  min 2 h, 10%                  98.1% ( 97.1 to  99.0)
+  min 2 h, 25%                  94.4% ( 92.6 to  95.9)
+  min 2 h, 50%                  66.1% ( 60.9 to  70.8)
+  min 6 h, 5%                   99.8% ( 99.3 to 100.3)
+  min 6 h, 10%                  98.0% ( 96.8 to  99.0)
+  min 6 h, 25%                  94.2% ( 92.4 to  95.8)
+  min 6 h, 50%                  66.0% ( 60.9 to  70.8)
+  min 12 h, 5%                  99.4% ( 98.8 to 100.1)
+  min 12 h, 10%                 97.6% ( 96.4 to  98.7)
+  min 12 h, 25%                 93.8% ( 91.9 to  95.5)
+  min 12 h, 50%                 65.8% ( 60.7 to  70.6)
+  min 24 h, 5%                  97.0% ( 94.5 to  98.8)
+  min 24 h, 10%                 95.3% ( 92.7 to  97.4)
+  min 24 h, 25%                 91.7% ( 88.7 to  94.1)
+  min 24 h, 50%                 64.0% ( 58.7 to  69.0)
+  min 48 h, 5%                  92.0% ( 88.7 to  94.9)
+  min 48 h, 10%                 90.3% ( 86.8 to  93.3)
+  min 48 h, 25%                 86.7% ( 83.0 to  90.0)
+  min 48 h, 50%                 60.6% ( 55.0 to  65.8)
+  min 168 h, 5%                 44.9% ( 39.2 to  50.4)
+  min 168 h, 10%                44.2% ( 38.5 to  49.8)
+  min 168 h, 25%                42.8% ( 37.1 to  48.4)
+  min 168 h, 50%                27.3% ( 21.8 to  32.7)
+  min 720 h, 5%                  5.0% (  4.0 to   6.2)
+  min 720 h, 10%                 5.0% (  4.0 to   6.2)
+  min 720 h, 25%                 4.8% (  3.8 to   5.9)
+  min 720 h, 50%                 3.3% (  2.4 to   4.3)
+  depth 5% added to LD           1.7% (  0.9 to   2.8)
+  duration 6 h added to LD       7.7% (  4.9 to  11.0)
+  duration 12 h added to LD      7.3% (  4.5 to  10.6)
+
+Cells carrying at least 5% of the ceiling on their own (central, both shapes):
+shape: (9, 9)
+┌──────┬──────────┬─────────────┬───────┬───┬─────────────┬─────────────┬─────────────┬────────────┐
+│ arms ┆ metric   ┆ duration_bi ┆ depth ┆ … ┆ mean_benefi ┆ relative_ga ┆ share_of_ce ┆ frequency_ │
+│ ---  ┆ ---      ┆ n           ┆ ---   ┆   ┆ t           ┆ in_pct      ┆ iling_pct   ┆ per_series │
+│ str  ┆ str      ┆ ---         ┆ f64   ┆   ┆ ---         ┆ ---         ┆ ---         ┆ _year      │
+│      ┆          ┆ str         ┆       ┆   ┆ f64         ┆ f64         ┆ f64         ┆ ---        │
+│      ┆          ┆             ┆       ┆   ┆             ┆             ┆             ┆ f64        │
+╞══════╪══════════╪═════════════╪═══════╪═══╪═════════════╪═════════════╪═════════════╪════════════╡
+│ ADD  ┆ cost0.5  ┆ 3-7 d       ┆ 0.5   ┆ … ┆ 1.7668e6    ┆ 44.911213   ┆ 25.517518   ┆ 0.257842   │
+│ ADD  ┆ cost0.5  ┆ 7-30 d      ┆ 0.5   ┆ … ┆ 2.5444e6    ┆ 39.86337    ┆ 24.076828   ┆ 0.168931   │
+│ ADD  ┆ cost0.5  ┆ 7-30 d      ┆ 0.25  ┆ … ┆ 982381.4518 ┆ 26.518674   ┆ 13.943916   ┆ 0.253396   │
+│      ┆          ┆             ┆       ┆   ┆ 14          ┆             ┆             ┆            │
+│ ADD  ┆ cost0.5  ┆ 1-3 d       ┆ 0.5   ┆ … ┆ 644658.8724 ┆ 25.799023   ┆ 11.13017    ┆ 0.308225   │
+│      ┆          ┆             ┆       ┆   ┆ 03          ┆             ┆             ┆            │
+│ ADD  ┆ cost0.5  ┆ 3-7 d       ┆ 0.25  ┆ … ┆ 359787.9905 ┆ 21.660907   ┆ 7.794633    ┆ 0.386763   │
+│      ┆          ┆             ┆       ┆   ┆ 37          ┆             ┆             ┆            │
+│ MASK ┆ tw95_nra ┆ 7-30 d      ┆ 0.5   ┆ … ┆ 29973.64648 ┆ 81.995082   ┆ 43.526695   ┆ 0.168931   │
+│      ┆          ┆             ┆       ┆   ┆ 4           ┆             ┆             ┆            │
+│ MASK ┆ tw95_nra ┆ 7-30 d      ┆ 0.25  ┆ … ┆ 6819.248047 ┆ 53.337908   ┆ 14.854015   ┆ 0.253396   │
+│ MASK ┆ tw95_nra ┆ over 30 d   ┆ 0.5   ┆ … ┆ 61083.76953 ┆ 90.447909   ┆ 14.005855   ┆ 0.026673   │
+│      ┆          ┆             ┆       ┆   ┆ 1           ┆             ┆             ┆            │
+│ MASK ┆ tw95_nra ┆ 3-7 d       ┆ 0.5   ┆ … ┆ 4620.384766 ┆ 58.408403   ┆ 10.240913   ┆ 0.257842   │
+└──────┴──────────┴─────────────┴───────┴───┴─────────────┴─────────────┴─────────────┴────────────┘
+
+Explicit arm against selection (central, G5): share of PERFECT benefit
+  MASK tw95_nra: selection LD 95.9%, explicit LD 96.6%, explicit SMALL 3.0% (sum 99.7%)
+  ADD cost0.5: selection LD 90.3%, explicit LD 91.1%, explicit SMALL 8.8% (sum 99.9%)
+
+Multiplier on the frequency of every non-LD cell that brings the LD share down to 70% (central, G5):
+  MASK tw95_nra: 10.0x (LD 1.12e+04, other 477)
+  ADD cost0.5: 4.0x (LD 1.61e+06, other 1.74e+05)
+
+Long-and-deep share with one site left out (central, G5):
+  MASK tw95_nra without D10: LD  96.8% ( 95.4 to  97.9), short or small   1.5% (  0.7 to   2.4)
+  MASK tw95_nra without D11: LD  94.6% ( 92.3 to  96.5), short or small   2.0% (  0.9 to   3.3)
+  MASK tw95_nra without D14: LD  95.8% ( 93.9 to  97.3), short or small   1.6% (  0.7 to   2.8)
+  MASK tw95_nra without D16: LD  95.9% ( 94.0 to  97.4), short or small   1.7% (  0.7 to   2.8)
+  MASK tw95_nra without D5: LD  95.9% ( 94.3 to  97.3), short or small   1.5% (  0.8 to   2.3)
+  MASK tw95_nra without D9: LD  96.0% ( 94.2 to  97.4), short or small   1.6% (  0.7 to   2.6)
+  ADD cost0.5 without D10: LD  90.8% ( 87.4 to  93.7), short or small   2.4% (  1.3 to   3.6)
+  ADD cost0.5 without D11: LD  88.1% ( 83.6 to  91.9), short or small   2.2% (  1.0 to   3.7)
+  ADD cost0.5 without D14: LD  91.9% ( 88.6 to  94.7), short or small   2.1% (  1.0 to   3.2)
+  ADD cost0.5 without D16: LD  90.9% ( 87.1 to  94.1), short or small   2.6% (  1.4 to   4.0)
+  ADD cost0.5 without D5: LD  89.9% ( 85.9 to  93.1), short or small   2.4% (  1.3 to   3.8)
+  ADD cost0.5 without D9: LD  89.8% ( 86.0 to  93.1), short or small   2.6% (  1.4 to   3.9)
+
+Relative gain of PERFECT over K0, all scored shifts, by row group (percent of K0 score):
+  MASK tw95_nra G2 before alarm: 32.28%
+  MASK tw95_nra G3 during: 76.40%
+  MASK tw95_nra G4 after: 77.22%
+  MASK tw95_nra G5 near: 59.51%
+  ADD cost0.5 G2 before alarm: 53.99%
+  ADD cost0.5 G3 during: 11.08%
+  ADD cost0.5 G4 after: 58.48%
+  ADD cost0.5 G5 near: 17.28%
+  MASK qs_nra G2 before alarm: 25.37%
+  MASK qs_nra G3 during: 64.11%
+  MASK qs_nra G4 after: 63.04%
+  MASK qs_nra G5 near: 49.98%
+  MASK cost0.5 G2 before alarm: -29.95%
+  MASK cost0.5 G3 during: -230.11%
+  MASK cost0.5 G4 after: 56.47%
+  MASK cost0.5 G5 near: -87.45%
+  ADD tw95_obs G2 before alarm: 68.21%
+  ADD tw95_obs G3 during: 21.84%
+  ADD tw95_obs G4 after: 78.32%
+  ADD tw95_obs G5 near: 23.68%
+
+Long-and-deep share by shape of the shift (central, G5):
+  MASK tw95_nra constant: LD  97.2% ( 95.7 to  98.4), short or small   0.9% (  0.2 to   1.8)
+  MASK tw95_nra demand-shaped: LD  94.4% ( 91.0 to  96.8), short or small   2.4% (  0.9 to   4.3)
+  ADD cost0.5 constant: LD  92.5% ( 89.1 to  95.2), short or small   2.3% (  1.3 to   3.5)
+  ADD cost0.5 demand-shaped: LD  88.2% ( 82.3 to  93.3), short or small   2.5% (  0.7 to   4.6)
+
+Absolute scores per row (points of effective capacity) and tail coverage, all shifts, by row group:
+  G2 before alarm  K0             CRPS  3.719 MAE-median  6.291 tw95  0.938 below q05  10.6% above q95  10.4% pinball05  1.033 pinball95  1.026 (nra)
+  G2 before alarm  PERFECT        CRPS  2.776 MAE-median  4.880 tw95  0.635 below q05   5.1% above q95   5.6% pinball05  0.690 pinball95  0.716 (nra)
+  G2 before alarm  PERFECT_ADD    CRPS  2.695 MAE-median  4.723 tw95  0.729 below q05   4.7% above q95   4.9% pinball05  0.673 pinball95  0.702 (obs)
+  G2 before alarm  PERFECT_LD     CRPS  2.822 MAE-median  4.947 tw95  0.662 below q05   5.4% above q95   5.7% pinball05  0.705 pinball95  0.733 (nra)
+  G2 before alarm  PERFECT_SMALL  CRPS  3.680 MAE-median  6.233 tw95  0.911 below q05  10.2% above q95  10.3% pinball05  1.020 pinball95  1.012 (nra)
+  G3 during        K0             CRPS  8.969 MAE-median 12.875 tw95  2.405 below q05  23.8% above q95  23.2% pinball05  3.335 pinball95  3.214 (nra)
+  G3 during        PERFECT        CRPS  3.219 MAE-median  5.634 tw95  0.568 below q05   6.8% above q95   7.0% pinball05  0.772 pinball95  0.887 (nra)
+  G3 during        PERFECT_ADD    CRPS  2.934 MAE-median  5.089 tw95  0.732 below q05   5.5% above q95   4.6% pinball05  0.726 pinball95  0.805 (obs)
+  G3 during        PERFECT_LD     CRPS  3.234 MAE-median  5.650 tw95  0.565 below q05   7.1% above q95   7.2% pinball05  0.782 pinball95  0.892 (nra)
+  G3 during        PERFECT_SMALL  CRPS  8.980 MAE-median 12.899 tw95  2.411 below q05  23.7% above q95  23.1% pinball05  3.338 pinball95  3.214 (nra)
+  G4 after         K0             CRPS  8.293 MAE-median 11.995 tw95  2.436 below q05  22.5% above q95  21.4% pinball05  3.077 pinball95  2.907 (nra)
+  G4 after         PERFECT        CRPS  3.065 MAE-median  5.422 tw95  0.555 below q05   6.1% above q95   7.1% pinball05  0.761 pinball95  0.779 (nra)
+  G4 after         PERFECT_ADD    CRPS  2.760 MAE-median  4.797 tw95  0.528 below q05   5.6% above q95   4.4% pinball05  0.698 pinball95  0.725 (obs)
+  G4 after         PERFECT_LD     CRPS  3.084 MAE-median  5.430 tw95  0.571 below q05   6.5% above q95   7.0% pinball05  0.773 pinball95  0.794 (nra)
+  G4 after         PERFECT_SMALL  CRPS  8.284 MAE-median 12.006 tw95  2.420 below q05  22.1% above q95  21.5% pinball05  3.069 pinball95  2.894 (nra)
+  G5 near          K0             CRPS  6.098 MAE-median  9.194 tw95  1.672 below q05  15.8% above q95  14.8% pinball05  2.131 pinball95  2.017 (nra)
+  G5 near          PERFECT        CRPS  3.050 MAE-median  5.312 tw95  0.677 below q05   6.3% above q95   5.9% pinball05  0.782 pinball95  0.804 (nra)
+  G5 near          PERFECT_ADD    CRPS  3.648 MAE-median  5.959 tw95  1.062 below q05   7.7% above q95   6.7% pinball05  1.066 pinball95  1.092 (obs)
+  G5 near          PERFECT_LD     CRPS  3.070 MAE-median  5.340 tw95  0.683 below q05   6.6% above q95   6.1% pinball05  0.790 pinball95  0.810 (nra)
+  G5 near          PERFECT_SMALL  CRPS  6.091 MAE-median  9.186 tw95  1.669 below q05  15.7% above q95  14.7% pinball05  2.129 pinball95  2.014 (nra)
+
+Cost0.5 benefit of PERFECT_ADD by sign of the shift (all shifts, percent of K0 score, G5):
+  sign +1: 16.87% (n=543)
+  sign -1: 18.08% (n=536)
+
+Ordinary rows (G1), qs_nra: PERFECT gain 0.409% (0.226 to 0.645); months 23; rows 3565197
+
+Ordinary rows (G1), tw95_nra: PERFECT gain 0.469% (0.218 to 0.849); months 23; rows 3565197
+
+MAE of the median minus MAE of the mean forecast, per site, K0 and PERFECT (all event rows, points):
+  D10 K0: -0.0060
+  D10 PERFECT: -0.0018
+  D11 K0: -0.0004
+  D11 PERFECT: -0.0017
+  D14 K0: +0.0038
+  D14 PERFECT: +0.0068
+  D16 K0: +0.0064
+  D16 PERFECT: +0.0112
+  D5 K0: -0.0346
+  D5 PERFECT: -0.0484
+  D9 K0: +0.0099
+  D9 PERFECT: +0.0068
+
+PERFECT gain over K0 on the MAE of the mean and of the median, by row group (percent, all shifts):
+  G2 before alarm: qs_nra 25.37%, ae_mean_nra 22.37%, ae_median_nra 22.43%
+  G3 during: qs_nra 64.11%, ae_mean_nra 56.23%, ae_median_nra 56.24%
+  G4 after: qs_nra 63.04%, ae_mean_nra 54.76%, ae_median_nra 54.80%
+  G5 near: qs_nra 49.98%, ae_mean_nra 42.20%, ae_median_nra 42.23%
