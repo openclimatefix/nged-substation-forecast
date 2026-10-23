@@ -103,8 +103,7 @@ pairs it holds out.
   folds. Also reported: MW-weighted recall, median onset error, alarms per Primary-year by Primary
   (D8 and D9 shown separately), and recall on injected load shifts of held-out pairs (swapped months).
 - **Strata.** Long-and-deep load shifts (at least 2 days and at least 10% of load) are the primary
-  stratum, since they carry about 88% of the curtailment benefit ([experiment
-  296](../00296-lsc-benefit-by-event-class-long-deep-versus-small-shifts/result.md)). The neighbour-
+  stratum, since they carry about 88% of the curtailment benefit (experiment 296). The neighbour-
   confirmed variant keeps only alarms with at least one opposite step at a metered neighbour.
 - **Harm.** Experiment 227's harness (cached daily runs, six Primaries, experiment 171's ordinary
   rows) on the months an arm did not train on: odd months for L0, even months for the others, with
