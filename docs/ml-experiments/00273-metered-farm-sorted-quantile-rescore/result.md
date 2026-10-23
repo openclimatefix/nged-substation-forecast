@@ -53,9 +53,9 @@ headline: >-
 take_home_message: >-
   The stored forecasts of seven metered-farm experiments have no crossing quantiles, because
   every fit script already sorted the 11 quantiles before writing them. Sorting the quantiles again
-  therefore changes no score and no verdict. The 26,344 crossing rows reported for experiment 268
-  probably come from that experiment's own quantile output layer, which was not checked. Future
-  heads should still be monotone by construction.
+  therefore changes no score and no verdict. The 26,344 crossing rows found in experiment 268 are not
+  farm forecasts: they belong to three generators that are not solar farms. Future heads should
+  still be monotone by construction.
 production_status: not-for-production
 adopted_in: none
 advice:
@@ -69,7 +69,7 @@ advice:
   - >-
     Count crossing rows in the stored predictions of any new quantile head before scoring it, and
     report the rate beside the score, because experiment 268 found 26,344 crossing rows among
-    77,897 (Figure 1).
+    77,897 after a padding step created them (the Numbers bullet on experiment 268).
 ---
 **The stored forecasts of seven metered-farm experiments have no crossing quantiles, because their
 fit scripts already sorted the 11 quantiles, so sorting again changes nothing and no verdict
@@ -82,7 +82,7 @@ Experiments [224](../00224-metered-farm-dayahead-two-number/result.md),
 [257](../00257-metered-farm-fair-plant-arm/result.md), and
 [260](../00260-metered-farm-quantile-combination/result.md) each forecast a farm's output 12 to 36
 hours ahead as 11 quantiles per half-hour. A pair of quantiles crosses when a lower level is above a
-higher one. Experiment 268 reported 26,344 crossing rows among its 77,897 stored farm-forecast rows.
+higher one. Experiment 268 reported 26,344 crossing rows among its 77,897 generator-forecast rows.
 Sorting the 11 quantiles of a row never raises its pinball loss (the quantile loss the scores are
 built from), so crossing would make a stored score too high. We therefore asked whether the seven
 earlier experiments' scores were too high for the same reason. We counted the crossing rows in every
@@ -125,9 +125,13 @@ refitting, and no refit was run.
 - **The H5 against XGBoost comparison (5.48 against 5.49) is unchanged.** The scores are 5.475 and
   5.490 in both columns, and H5's pinball loss at the 0.01 and 0.99 quantiles is 9.5% and 29.1%
   lower.
-- **Experiment 268's crossing rows are unchecked here.** Its predictions are not in this checkout,
-  and the 26,344 and 77,897 are as its session reported them. Its quantile output layer is the
-  probable source and needs a monotone output or a sort before it is scored.
+- **Experiment 268's crossing rows come from three generators that are not solar farms.** Their
+  stored forecasts hold 9 quantiles (0.05 to 0.95). [Experiment
+  255](../00255-metered-farm-node-curtailment-value/result.md) padded the missing 0.01 and 0.99
+  quantiles with nulls, and its cap at each generator's capacity (`pl.min_horizontal`) turned each
+  null into the capacity, so the 0.01 quantile sat above the 0.05 quantile in all 26,344 rows of those
+  generators. The 51,553 solar-farm rows have none. We rebuilt experiment 268's generator frames to
+  trace this.
 
 ## Checks
 
@@ -146,5 +150,5 @@ refitting, and no refit was run.
 - **Constrain the quantiles of every new farm head to be monotone** with cumulative non-negative
   offsets from the median, so that no sort is needed. This applies to future briefs for the metered
   farms.
-- **Count experiment 268's crossing rows by pair, farm, and lead** to see whether cumulative offsets
-  would remove them.
+- **Fill a missing 0.01 or 0.99 quantile from the 0.05 or 0.95 quantile** before capping, instead of
+  padding with nulls, in any scorer that reads the three non-farm generators' forecasts.

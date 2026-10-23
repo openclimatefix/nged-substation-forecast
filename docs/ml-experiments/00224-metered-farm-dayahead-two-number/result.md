@@ -221,8 +221,8 @@ scoring tables; the SVG files were optimised but
 
 ## Data-processing note
 
-Experiment 268 reported crossing quantiles in 26,344 of its 77,897 stored farm-forecast rows (34%),
-which moved its curtailment cost by up to 3.7%. The stored forecasts on this page have none:
-[experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
-every arm, because the fit scripts sorted the 11 quantiles before writing them, so sorting does not
-change the scores here.
+Experiment 268 found crossing quantiles in 26,344 of its 77,897 generator-forecast rows (34%), but
+all of them belong to three generators that are not solar farms, so none is on this page.
+[Experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm here, because the fit scripts sorted the 11 quantiles before writing them, so sorting does
+not change the scores on this page.

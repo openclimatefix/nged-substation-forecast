@@ -14,7 +14,7 @@ DOCS_DIR: Final[Path] = Path("docs/ml-experiments") / rescore.SLUG
 PLOT_WIDTH: Final[int] = CONTENT_WIDTH_PX - 300
 REPORTED_CROSSING_ROWS: Final[int] = 26_344
 REPORTED_ROWS: Final[int] = 77_897
-"""Experiment 268's farm-forecast rows with crossing quantiles and all its stored rows, as its session reported them."""
+"""Experiment 268's farm-forecast rows with crossing quantiles and all its stored rows, as counted in experiment 268's generator frames."""
 
 
 def crossing() -> None:
@@ -41,8 +41,10 @@ def crossing() -> None:
         {
             "experiment": [268],
             "rate": [REPORTED_CROSSING_ROWS / REPORTED_ROWS],
-            "label": ["Experiment 268: farm-forecast head, as reported by its session"],
-            "source": ["Reported, not re-counted here"],
+            "label": [
+                "Experiment 268: generator rows (three non-farm generators cross in every row)"
+            ],
+            "source": ["Re-counted for experiment 268"],
         }
     )
     data = pl.concat([per_experiment.select(reference.columns), reference]).with_columns(
@@ -64,7 +66,7 @@ def crossing() -> None:
                 scale=alt.Scale(
                     domain=[
                         "This page, from the stored predictions",
-                        "Reported, not re-counted here",
+                        "Re-counted for experiment 268",
                     ],
                     range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE],
                 ),
