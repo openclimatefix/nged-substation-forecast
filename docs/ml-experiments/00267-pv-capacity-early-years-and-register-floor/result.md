@@ -82,6 +82,7 @@ advice:
     Do not switch the cards to a nearby metered farm's output as the sunshine shape on this
     evidence: it lowers every 2021 estimate by 7% to 22% and clears the register floor in fewer
     season-years, but its divisor is not comparable with the card's (Findings, A2).
+pr: 1576
 code: ml-experiments/00267-pv-capacity-early-years-and-register-floor/
 ---
 
