@@ -1,7 +1,7 @@
 ---
 id: "00043"
 slug: sw2-1-detector-scoreboard
-theme: switching-detectors
+theme: lsc-detectors
 also_relevant_to: []
 status: done
 size: complex
@@ -61,7 +61,7 @@ adopted_in: none
 code: ml-experiments/00043-sw2-1-detector-scoreboard/
 ---
 
-# Experiment 43: how well do the two existing switching detectors find transfers?
+# Experiment 43: how well do the two existing LSC detectors find transfers?
 
 We asked how well two simple detectors, built in an earlier experiment, find a transfer of load
 between two substations when we know it happened. A detector compares the weather model's forecast

@@ -30,7 +30,7 @@ started. A folder holds `result.md` and its figures.
   to refit the XGBoost models, and how much training history to give them.
 - **[Solar disaggregation](themes/solar-disaggregation/index.md):** Separating embedded solar from
   substation demand.
-- **[Switching detectors](themes/switching-detectors/index.md):** Detecting load transfers between
+- **[Switching detectors](themes/lsc-detectors/index.md):** Detecting load transfers between
   substations, called switching events, from power data alone.
 - **[Switching labels in the forecast](themes/switching-labels-in-the-forecast/index.md):** Using
   switching labels to forecast the demand under the normal running arrangement.
@@ -55,6 +55,11 @@ markdown.
 
 **The [data-processing page](data-processing.md) lists the processing that the experiments showed
 the data needs.** Each entry says whether it applies to experiments, to production, or to both.
+
+## Background
+
+**The [background pages](background/index.md) state what earlier experiments established about the
+data sets and the scoring rules, and a planner reads them before planning an experiment.**
 
 ## Glossary
 
@@ -87,13 +92,17 @@ The [release log](../live_service/model-releases.md) records which experiments e
 
 ## What the experiments taught us so far
 
-- **A 14-day error correction put N1 below `manual_heuristic` for Primary demand.** The correction
-  lowered the quantile score by 0.99 points on N1, a model frozen at its training end, and the
-  0.5-year half-life added nothing to that frozen model (00019).
-- **Use the 14-day additive error correction for Primary demand, with power 2 days old, and do not
-  yet use it for BSP and GSP.** It scored the same with 2-day-old power as with 3.5-hour-old power,
-  a 7-day window and a ratio form were worse, and on 4 BSP and GSP series it did not lower the
-  quantile score (00021).
+- **Retrain the Primary demand model weekly, and do not add a 14-day error correction.** Weekly
+  retraining without the correction scored 0.20 points of capacity below the best-guess stack, whose
+  frozen model has the correction (99.44% interval -0.40 to -0.035), and a 7-day correction on the
+  weekly model raised the score by 0.16 (-0.06 to +0.36), unresolved (00048). Experiment 34 found the
+  14-day correction stops helping once the model is retrained, and hurts at weekly and daily cadence.
+  The 14-day correction (00019, 00021) was measured on a frozen model, and the retraining results
+  supersede it for Primary demand.
+- **The 14-day correction on a frozen model is a historical result.** It lowered the quantile score
+  of N1, a model frozen at its training end, by 0.99 points (00019). At 4 bulk and grid supply point
+  series it did not lower the score (00021), and at the supply points in experiment 87 adding it
+  raised the score by 0.305 points.
 - **A weather product as accurate as ERA5 would lower the Primary demand score by 1.9%.** ERA5
   weather in place of ENS weather lowered the quantile score by 0.10 points, nearly all from
   shortwave radiation and none up to 2 days ahead (00022).

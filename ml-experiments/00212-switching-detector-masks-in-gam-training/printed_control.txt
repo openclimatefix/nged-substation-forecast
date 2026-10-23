@@ -1,0 +1,5 @@
+control D5: 27 cuts, max relative theta diff 0.000e+00 PASS, 6 s
+control D10: 27 cuts, max relative theta diff 0.000e+00 PASS, 6 s
+control D11: 27 cuts, max relative theta diff 0.000e+00 PASS, 6 s
+control D14: 27 cuts, max relative theta diff 0.000e+00 PASS, 6 s
+control D16: 27 cuts, max relative theta diff 0.000e+00 PASS, 6 s

@@ -1,4 +1,4 @@
-# Experiment 41, part 2 (SW2-0b): which logged switching jobs show up in the power readings?
+# Experiment 41, part 2 (SW2-0b): which logged load-shift jobs show up in the power readings?
 
 We asked which of the electricity network's logged switching jobs since January 2022 really moved
 load from one substation to a neighbour, so that later experiments have a list of real events to

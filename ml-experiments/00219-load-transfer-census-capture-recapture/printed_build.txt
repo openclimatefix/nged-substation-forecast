@@ -1,0 +1,17 @@
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01EPTuYvu2tCmPQFmUq7JxVF/.venv/lib/python3.14/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01EPTuYvu2tCmPQFmUq7JxVF/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01EPTuYvu2tCmPQFmUq7JxVF/ml-experiments/00219-load-transfer-census-capture-recapture/e00219_intervals.py:45: RuntimeWarning: All-NaN slice encountered
+  floor = EXPECTED_FLOOR_SHARE * np.nanmedian(expected)
+RO-NC L6_M48 228 alarm intervals
+RO-NC L6 292 alarm intervals
+pair L6_M48 219 alarm intervals
+pair L6 281 alarm intervals
+learned_f0 L6_M48 239 intervals from 276 alarms
+learned_f0 L6 276 intervals from 276 alarms
+learned_f1 L6_M48 254 intervals from 279 alarms
+learned_f1 L6 279 intervals from 279 alarms
+learned_f2 L6_M48 216 intervals from 244 alarms
+learned_f2 L6 244 intervals from 244 alarms
+p99 MW by series: {12: 1.83, 3: 12.62, 9: 5.09, 24: 5.42, 18: 9.2, 15: 3.11, 16: 11.44, 10: 5.19, 13: 3.96, 7: 7.2, 25: 17.87, 8: 10.57, 14: 4.84, 11: 9.4, 17: 5.63, 26: 9.96}

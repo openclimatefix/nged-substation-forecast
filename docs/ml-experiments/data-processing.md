@@ -434,6 +434,14 @@ provisional until the experiment has had its reviews.
 
 ## Wind farms
 
+**Do not compute air density from the ECMWF ensemble's surface pressure for a model trained on ERA5
+surface pressure (provisional, medium confidence).** *Applies to: experiments and production.* The
+ensemble's surface pressure at the three metered wind farms is 0.7 to 7.0 hPa above ERA5's in the
+monthly mean (about +2.7 hPa on average, because the two products use different terrain heights),
+and a density column built from the ensemble pressure scored 0.049 points worse than temperature
+alone (95% interval 0.015 to 0.091). Evidence: [experiment
+256](00256-wind-temperature-density-shear-columns/result.md), three farms, July 2025 to June 2026.
+
 **Drop the rows in `mask.parquet` of experiment 210 before training or scoring on the three metered
 wind farms, and do not expect ERA5 wind speed alone to find idle rows (provisional, medium
 confidence).** *Applies to: experiments.* The idle floor is a set of near-zero readings with
@@ -446,6 +454,30 @@ which total 160 hours at W1, 428 at W2, and 2,742 at W3. W3's idle share at wind
 [experiment 210](00210-wind-idle-noise-mva-artefact/result.md), three farms, 2019-09 to 2026-09.
 The mask is built on ERA5, which arrives about 5 days late, so it is for training and evaluation
 rows and not for live use.
+
+**Build the ensemble hindcast member rows with the production feature engineer, and expect a table
+of offsets per lead day, quantile, and farm to lower the wind forecast's quantile score
+(provisional, low confidence).** *Applies to: experiments.* The production `TabularFeatureEngineer`
+reproduced the stored scored-year frames of experiment 230 exactly and built 442 daily runs (April
+2024 to June 2025) for the three metered wind farms in a few minutes. On the scored year, a table of
+offsets fitted on those runs lowered the quantile score of the physics-core forecast by 0.60
+points, and a neural head given the ensemble's wind summaries did no better. The observed power was
+below the physics-core forecast's median on 31% to 40% of rows in every scored quarter and 33% in
+the first hindcast quarter, so the offsets correct a stable low bias in the ensemble mixture's
+median, whose cause the experiment did not identify. Evidence: [experiment
+259](00259-wind-plant-plus-quantile-offset-head/result.md), three farms, July 2025 to June 2026.
+
+**Correct the ECMWF ensemble's 10 m and 100 m wind speeds before a wind-power model fitted to ERA5
+reads them, and expect the uncorrected input to lower the median forecast by about 10 points of
+capacity (provisional, medium confidence).** *Applies to: experiments and production.* At the three
+metered wind farms the ensemble-mean 100 m wind was 1.0 m/s slower than ERA5's in July 2025 to June
+2026 (0.7 m/s in the hindcast), growing from 0.4 m/s at days 0 to 2 to 1.3 m/s from day 7, and 1.5
+m/s slower at ERA5 speeds of 8 to 12 m/s. The 10 m wind was 1.3 m/s slower at those speeds. A
+physics-based wind-power model fitted to ERA5 had 52.8% of rows below its median when fed ERA5 wind
+(after dropping the idle rows of experiment 210's mask), and 36.6% when fed the ensemble-mean wind.
+The swap lowered the median by 10.2 points of capacity (1 point is 1% of a farm's capacity), and the
+10 m and 100 m speeds each explained about 7 points alone. Evidence: [experiment
+261](00261-wind-low-bias-decomposition/result.md), three farms, July 2025 to June 2026.
 
 ## Embedded solar capacity
 
@@ -639,6 +671,14 @@ run from January 2022, and the raw log holds many events too small to matter ([e
 101](00101-ro-nc-detector-on-real-hand-filtered-switching-events/result.md), filtering the labelled
 set of [experiment 41](00041-sw2-0a-labeller-gate/result.md)). Applies to experiments, and to
 production once a detector runs there.
+
+**Do not rely on a training mask for switching transfers to improve the convex GAM.** Training
+the 24-month convex GAM with no mask worsened the score by 0.002 points on clean rows and 0.003
+points after a logged transfer, and 476 simulated transfers worsened it by 0.009 points, because the
+hand mask is at most 7% of the training half-hours ([experiment
+212](00212-switching-detector-masks-in-gam-training/result.md)). Applies to experiments and
+production at D5, D10, D11, D14, and D16. Confidence: moderate, with a provisional status until the
+experiment's review is merged.
 
 **Expect D10 to carry unlabelled jumps of 15 to 20 points.** D10's night-time floor rose from 25 to
 45 points on 8 November 2024 and stayed high to about 1 December, and its residuals rose by 15 to 20
