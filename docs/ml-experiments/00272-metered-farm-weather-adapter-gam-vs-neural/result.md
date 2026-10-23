@@ -24,7 +24,7 @@ hypothesis: >-
   and the plant driven by observed weather (0.973), and a small neural network does this better
   than additive curves.
 prediction: >-
-  The additive-curve correction (GAM-style) on all variables closes at most a quarter of the 0.91
+  The additive-curve correction (additive curves) on all variables closes at most a quarter of the 0.91
   to 0.973 gap and lowers the quantile score by 1% to 2% against the plant alone (the prediction
   that could fail). The neural correction beats the additive one by under 1%. Experiment 248's UKV
   columns lowered the neural head by 1.1% and XGBoost by 1.4%.
@@ -46,7 +46,7 @@ decision_rule: >-
   network beside additive curves). An extra variable set is kept only when its contrast (C2 or C4)
   is at least 0.5% below zero with an interval wholly below zero and the matching placebo contrast
   (C6 or C7) is also wholly below zero. Stop rule: if A3 minus A1' is under 0.5% below zero (a
-  worsening counts as under 0.5%) at 4 or more of the 6 farms in own history, stop before the
+  worsening counts as under 0.5%) at four or more of the six farms in own history, stop before the
   neural arms and report that the extra variables carry no usable information through the plant.
 benchmark: >-
   The plant alone (A1), stored H5 and XGBoost of experiment 243, the linear quantile regression P2
@@ -78,54 +78,59 @@ take_home_message: >-
   wind, and 500 hPa height) showed no usable information for the solar-farm power model at these
   six farms, whether they enter through additive curves or a small neural network, and the real
   variables do no better than placebo copies. A neural network with no plant, given the lagged power
-  and the ensemble spread, beats the plant by 2.7%, so the way to improve the forecast is better
-  inputs of that kind, not a correction to the plant's weather.
+  and the ensemble spread, scores 2.7% better than the plant but not better than the linear fit of
+  experiment 257, so a correction to the plant's weather is not the route to a better forecast.
 production_status: not-for-production
 adopted_in: none
 advice:
   - >-
-    Do not add a learned correction from ensemble longwave, humidity, precipitation, pressure, wind
+    Do not add a learned correction from ensemble longwave, humidity, precipitation, pressure, wind,
     or 500 hPa height to the metered-farm plant, because it gave no gain and scored no better than
-    placebo copies (C1, C6, C7).
+    placebo copies (contrasts C1, C6, and C7).
   - >-
-    Keep the correction to irradiance, spread and temperature if any correction is tried: it gained
-    0.2% to 0.3% in own history, inside its interval, so it is at most a small gain (post hoc X1,
-    X2).
+    Keep the correction to irradiance, spread, and temperature if any correction is tried: it gained
+    0.2% to 0.3% in own history, inside its interval, so it is at most a small gain (post hoc
+    contrasts X1 and X2).
   - >-
     Run a placebo control that permutes the extra variables within month and cloud band whenever an
     experiment adds weather variables to the metered farms, because the real variables scored worse
     than their placebo in the neural arm (C7).
   - >-
-    Judge any new solar-farm model against a network with no plant and the lagged power, because
-    that network beat the plant by 2.7% here (X3).
+    Judge any new solar-farm model against the linear fit of experiment 257 and a neural network
+    with no plant (the blind network), because the blind network beat the plant by 2.7% here (X3).
 ---
 **Extra ensemble weather variables gave no detectable gain in the solar-farm power forecast when
-they entered as a learned correction to the plant, so the limit looks to be the plant's inputs and
-not the variables the plant ignores.** The National Grid Electricity Distribution (NGED) meters six
-solar farms, labelled A to F. The plant is a physical model that turns the ensemble weather forecast
-into farm power. We added a learned correction in front of the plant that scales the forecast
-irradiance and shifts the cell temperature, using eight further variables from the same forecast
-(downward longwave radiation, relative humidity, precipitation, surface pressure, mean-sea-level
-pressure, 10 m and 100 m wind speed, and 500 hPa geopotential height). The correction starts as the
-identity, so it can only help if the variables carry information. We tried two forms of the
-correction: summed one-variable curves (an additive model, like a generalised additive model, GAM)
-and a small neural network. The design follows the [plant of experiment
-218](../00218-metered-solar-farm-plant-fit/result.md) and the folds of [experiment
+they entered as a learned correction to the plant (the physical model that turns a weather forecast
+into farm power).** The National Grid Electricity Distribution (NGED) meters six solar farms,
+labelled A to F. The plant takes the ensemble weather forecast (51 members from the European Centre
+for Medium-Range Weather Forecasts) and returns the farm's power. We added a learned correction in
+front of the plant that scales the forecast irradiance and shifts the cell temperature, using eight
+further variables from the same forecast (downward longwave radiation, relative humidity,
+precipitation, surface pressure, mean-sea-level pressure, 10 m and 100 m wind speed, and 500 hPa
+geopotential height). The correction starts at no change, so it can improve the forecast only if the
+variables carry information. We tried two forms: summed one-variable curves (an additive model, in
+effect a generalised additive model, GAM) and a small neural network. The design follows the [plant
+of experiment 218](../00218-metered-solar-farm-plant-fit/result.md) and the folds of [experiment
 243](../00243-metered-farm-architecture-comparison/result.md) and [experiment
-257](../00257-metered-farm-fair-plant-arm/result.md), which found that a linear fit on the lagged
-power and the ensemble spread recovers 90% of a neural head's gain.
+257](../00257-metered-farm-fair-plant-arm/result.md), which found that a linear fit on the farm's
+power one day earlier (the lagged power) and the spread of the ensemble members recovers 90% of the
+gain of a neural head.
 
-**The prediction (a 1% to 2% gain) failed, and the pre-registered stop rule fired; no contrast shows
-the extra variables helping or hurting.** In own history (fitted on each farm's own earlier months),
-the additive curves on all variables (A3) score 5.765 points of capacity against 5.726 for the plant
-at identity (A1'), which is 0.67% worse (95% interval -1.2% to +2.1%). A3 is no better than the
-plant by 0.5% at any of the 6 farms, so we stopped before the neural arms; the neural arms were then
-run post hoc, because they cost little. The neural network on all variables (A5) scores 1.06% worse
-than the plant. A placebo copy of the extra variables (the same values taken from another day of the
-same month and cloud band) scores as well as the real variables for the additive curves and 1.4%
-better for the neural network (C7, 95% interval +0.2% to +2.4%). Curves and network on the three
-minimal inputs (clear-sky index, relative spread, temperature) score 0.33% and 0.19% better than the
-plant, and both intervals include zero.
+**The prediction (a 1% to 2% gain) failed, and the pre-registered stop rule fired: the extra
+variables did not improve the forecast at the 99.4% familywise level.** The score is the quantile
+score, twice the mean pinball loss over 11 quantile levels, in points of capacity (smaller is
+better). In own history (each farm fitted on its own earlier months), the additive curves on all
+variables (A3) score 5.765 against 5.726 for the plant with the correction at no change (A1'), which
+is 0.67% higher (95% interval -1.2% to +2.1%). At none of the six farms does A3 score at least 0.5%
+below the plant, so we stopped before the neural arms. The neural arms ran afterwards, labelled post
+hoc, because they take little computing time. The neural network on all variables (A5) scores 1.06%
+higher than the plant. A placebo copy of the extra variables (the values from another day of the
+same month and cloud band) scores about the same as the real variables for the additive curves (C6
++0.54%, interval -0.34% to +1.40%). For the neural network, the placebo scores 1.4% lower than the
+real variables (C7 +1.37%, 95% interval +0.23% to +2.44%), and that interval includes zero at the
+99.4% level. Curves and network on the three minimal inputs (clear-sky index, relative spread of the
+ensemble members, and temperature) score 0.33% and 0.19% lower than the plant, and both intervals
+include zero.
 
 ![Figure 1: quantile score per arm](figure_1_headline.svg)
 
@@ -149,8 +154,9 @@ plant, and both intervals include zero.
 - **Decision rule.** C3 is not below zero, so the neural network is not preferred. C2 and C4 are
   above zero, so neither extra variable set is kept. C8: the share of the gap from the plant
   (fraction of sunny-half-hour output fitted by the median, mean over farms 0.9276) to experiment
-  218's 0.973 that A3 closes is -6% (A3 0.9247) and A5's is -9% (0.9222). These fractions come from
-  these rows and a different definition of sunny, so they are indicative only.
+  218's 0.973 that A3 closes is -6% (A3 0.9247) and A5's is -12% (0.9222). The plant's fraction is
+  0.9276 on these rows against 0.91 in experiment 218, because the definition of sunny differs, so
+  the shares are indicative only.
 - **Post hoc contrasts, own history:** A2 minus A1' -0.33% (-1.8 to +0.6); A4 minus A1' -0.19% (-1.7
   to +0.8); the blind network (no plant; the raw inputs, lagged power and the extra variables) minus
   A1' -2.72% (-4.8 to -1.1), with the 0.99-quantile pinball loss 16.0% lower (-19.6 to -12.8) and
@@ -184,9 +190,8 @@ plant, and both intervals include zero.
   quantile offsets is fitted on the plant's own residual spread.
 - **Triggers that fired.** Trigger 1 (a control moves the wrong way: the placebo of the neural
   network beats the real variables, C7). Trigger 2 (the result contradicts its prediction). Trigger
-  3 (above). Trigger 5 (A2 beats A3 although A3 holds A2's inputs). A fresh Sonnet auditor, not
-  Opus, because the manager's rule is Sonnet by default, re-derived the scores and checked the
-  method; its findings follow in "Audit".
+  3 (above). Trigger 5 (A2 beats A3 although A3 holds A2's inputs). A fresh Sonnet auditor
+  re-derived the scores and checked the method; its findings follow in "Audit".
 - **The row set** is experiment 257's, and every half-hour of it has all extra variables, so no row
   was dropped. A1' reproduces experiment 243's plant to the digit (5.7263), which confirms that the
   torch plant, the table, and the pairing match.
@@ -198,7 +203,7 @@ found no leakage in the join, standardisation, offset-table refit, or placebo pe
 and triage:
 
 - **"Worse" overstated the result** (accepted). No contrast excludes zero (C1 95% interval -1.2% to
-  +2.1%), so the page now says no detectable gain.
+  +2.1%), so the page says no detectable gain.
 - **Averaging order** (accepted, noted). Averaging quantiles over seeds before scoring gives A5
   +0.37% and A3 +0.58% against A1'; this page averages per-row losses over seeds (A3 +0.67%, A5
   +1.06%). A5's seeds range from 5.756 to 5.837, so part of its 1.06% is seed noise.
@@ -230,8 +235,8 @@ and triage:
 
 ## What the next experiment should answer
 
-- **The blind network beats the plant by 2.7% and the plant-plus-offsets of experiment 257 by
-  nothing, so test the blind network and P2 together.** The blind network gains most at the 0.99
+- **The blind network beats the plant by 2.7% but does not beat P2, the linear fit of experiment
+  257, so test the blind network and P2 together.** The blind network gains most at the 0.99
   quantile (-16%), the tail that matters for curtailment, and it loses at the 0.01 quantile. A
   blend of the two by quantile could take both gains.
 - **The extras may still help through a different route**, such as the farm's availability, but the
