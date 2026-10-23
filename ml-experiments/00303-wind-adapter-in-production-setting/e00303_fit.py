@@ -48,7 +48,7 @@ FINE_TUNE_RATE_FACTOR: Final[float] = 0.1
 EVAL_EVERY: Final[int] = 25
 PREDICT_CHUNK: Final[int] = 2_000_000
 CASE_CHUNK: Final[int] = 20_000
-ARMS: Final[tuple[str, ...]] = ("P2", "P8", "P4", "P5", "P7")
+ARMS: Final[tuple[str, ...]] = ("P2", "P8", "P4", "P5", "P7", "P4m", "P5m", "P7m")
 
 
 def member_columns(*, rows: pl.DataFrame) -> dict[str, np.ndarray]:
@@ -252,6 +252,102 @@ def train_core(
     return core.eval()
 
 
+CASES_PER_STEP: Final[int] = 6_000
+"""Cases (each with all 51 members) per optimiser step of the case-mean loss."""
+VALIDATION_CASES: Final[int] = 8_000
+
+
+def case_rows(*, cases: np.ndarray) -> np.ndarray:
+    """Return the row indices of all 51 members of each case."""
+    return (cases[:, None] * common.MEMBERS + np.arange(common.MEMBERS)).reshape(-1)
+
+
+def train_core_mean(
+    *,
+    adapter: str,
+    start: core_module.WindCore | None,
+    idle_start: float,
+    with_idle_layer: bool,
+    train_columns: dict[str, np.ndarray],
+    train_target: np.ndarray,
+    validation_columns: dict[str, np.ndarray],
+    validation_target: np.ndarray,
+    seed: int,
+) -> core_module.WindCore:
+    """Like `train_core`, but the loss is the L1 error of the members' mean expected power.
+
+    Post hoc (plan, "Post hoc arms"): the columns hold all 51 members of each case in order, and
+    `*_target` holds one observed fraction per case. The case-mean expected power is what the
+    residual quantiles are fitted to, so the training loss and the residual table agree.
+    """
+    torch.manual_seed(seed)
+    options = core_module.CoreOptions(adapter=adapter)
+    core = core_module.WindCore(
+        with_idle_layer=with_idle_layer, idle_floor=idle_start, options=options
+    )
+    scratch = start is None
+    if start is not None:
+        transfer(source=start.cpu(), target=core)
+    core = core.to(DEVICE)
+    adapter_names = ("adapter_net", "sector_log", "shear_adapter")
+    adapter_parameters = [p for n, p in core.named_parameters() if n.startswith(adapter_names)]
+    other_parameters = [p for n, p in core.named_parameters() if not n.startswith(adapter_names)]
+    factor = 1.0 if scratch else FINE_TUNE_RATE_FACTOR
+    steps = SCRATCH_STEPS if scratch else FINE_TUNE_STEPS
+    optimiser = torch.optim.AdamW(
+        [
+            {"params": other_parameters, "lr": core_module.LEARNING_RATE * factor, "weight_decay": 0},
+            {
+                "params": adapter_parameters,
+                "lr": core_module.ADAPTER_LEARNING_RATE * factor,
+                "weight_decay": core_module.ADAPTER_WEIGHT_DECAY,
+            },
+        ]
+    )
+    schedule = torch.optim.lr_scheduler.CosineAnnealingLR(optimiser, T_max=steps)
+    all_weather = weather_on_device(columns=train_columns, index=slice(None))
+    goal_all = torch.as_tensor(train_target, dtype=torch.float32, device=DEVICE)
+    cases = goal_all.numel()
+    val_weather = weather_on_device(columns=validation_columns, index=slice(None))
+    val_goal = torch.as_tensor(validation_target, dtype=torch.float32, device=DEVICE)
+    generator = torch.Generator(device="cpu").manual_seed(seed)
+    log_prior = np.log(core_module.HUB_HEIGHT_PRIOR_M)
+    arange = torch.arange(common.MEMBERS, device=DEVICE)
+    best, best_state = float("inf"), None
+
+    def mean_error(weather: core_module.WeatherArrays, goal: torch.Tensor) -> torch.Tensor:
+        expected = core(weather=weather).reshape(-1, common.MEMBERS).mean(dim=1)
+        return (expected - goal).abs().mean()
+
+    for step in range(steps + 1):
+        if step % EVAL_EVERY == 0:
+            with torch.no_grad():
+                held = float(mean_error(val_weather, val_goal))
+            if held < best:
+                best = held
+                best_state = {k: v.detach().clone() for k, v in core.state_dict().items()}
+        if step == steps:
+            break
+        chosen = torch.randperm(cases, generator=generator)[:CASES_PER_STEP].to(DEVICE)
+        rows = (chosen[:, None] * common.MEMBERS + arange).reshape(-1)
+        batch = all_weather.take(rows)
+        optimiser.zero_grad()
+        loss = mean_error(batch, goal_all[chosen])
+        penalty = (
+            (torch.log(core.hub_height_m) - log_prior) ** 2
+            / (2 * core_module.HUB_HEIGHT_PRIOR_LOG_STANDARD_DEVIATION**2)
+            / cases
+        )
+        (loss + penalty).backward()
+        optimiser.step()
+        schedule.step()
+    if best_state is None:
+        msg = "no step produced a finite validation loss"
+        raise RuntimeError(msg)
+    core.load_state_dict(best_state)
+    return core.eval()
+
+
 class Hindcast:
     """One farm's hindcast and scored member weather, with the case arrays that split it."""
 
@@ -306,6 +402,18 @@ class Hindcast:
         columns = {name: values[rows] for name, values in self.hind_columns.items()}
         return columns, np.repeat(self.hind_actual[cases], MEMBERS_PER_CASE)
 
+    def subset_cases(
+        self, *, cases: np.ndarray, limit: int | None, seed: int
+    ) -> tuple[dict[str, np.ndarray], np.ndarray]:
+        """Return all members' columns of (up to `limit` seeded) `cases` and one target per case."""
+        if limit is not None and cases.size > limit:
+            cases = np.sort(np.random.default_rng(seed).choice(cases, size=limit, replace=False))
+        rows = case_rows(cases=cases)
+        return (
+            {name: values[rows] for name, values in self.hind_columns.items()},
+            self.hind_actual[cases],
+        )
+
     def blocks(self) -> np.ndarray:
         """Return the block (0 to FOLDS - 1) of each hindcast case, contiguous in run date."""
         days = np.unique(self.init)
@@ -331,8 +439,8 @@ def run_era5_arms(*, data: Hindcast, arms: list[str]) -> dict[str, dict[int, cor
     farm = data.farm
     cores: dict[str, dict[int, core_module.WindCore]] = {"net": {}, "blind": {}}
     residuals_by: dict[tuple[str, int], core_module.ResidualQuantiles] = {}
-    need_net = any(a in arms for a in ("P2", "P8", "P5"))
-    need_blind = "P7" in arms
+    need_net = any(a in arms for a in ("P2", "P8", "P5", "P5m"))
+    need_blind = "P7" in arms or "P7m" in arms
     for seed in SEEDS:
         for adapter, wanted in (("net", need_net), ("blind", need_blind)):
             if not wanted:
@@ -458,8 +566,9 @@ def run_hindcast_arm(
 ) -> None:
     """Fit P4, P5, or P7 with a three-fold cross-fit, and store both mixtures per seed."""
     farm = data.farm
-    adapter = {"P4": "net_ens", "P5": "net_ens", "P7": "blind"}[arm]
-    pretrained = {"P4": None, "P5": "net", "P7": "blind"}[arm]
+    mean_loss = arm.endswith("m")
+    adapter = {"P4": "net_ens", "P5": "net_ens", "P7": "blind"}[arm.removesuffix("m")]
+    pretrained = {"P4": None, "P5": "net", "P7": "blind"}[arm.removesuffix("m")]
     idle_start = core_module.idle_floor_start(
         speed_100m=data.train["wind_speed_100m"].to_numpy(), target=data.train["target"].to_numpy()
     )
@@ -470,9 +579,17 @@ def run_hindcast_arm(
         final_core = None
         for held_out in (*range(FOLDS), None):
             training, validation = data.split(held_out=held_out)
-            train_columns, train_target = data.subset(cases=training, seed=seed)
-            val_columns, val_target = data.subset(cases=validation, seed=seed + 100)
-            core = train_core(
+            if mean_loss:
+                train_columns, train_target = data.subset_cases(
+                    cases=training, limit=None, seed=seed
+                )
+                val_columns, val_target = data.subset_cases(
+                    cases=validation, limit=VALIDATION_CASES, seed=seed + 100
+                )
+            else:
+                train_columns, train_target = data.subset(cases=training, seed=seed)
+                val_columns, val_target = data.subset(cases=validation, seed=seed + 100)
+            core = (train_core_mean if mean_loss else train_core)(
                 adapter=adapter,
                 start=None if pretrained is None else cores[pretrained][seed],
                 idle_start=idle_start,
@@ -529,7 +646,7 @@ def main() -> None:
             continue
         data = Hindcast(farm=farm)
         cores = run_era5_arms(data=data, arms=[a for a in pending if a in ARMS])
-        for arm in ("P4", "P5", "P7"):
+        for arm in ("P4", "P5", "P7", "P4m", "P5m", "P7m"):
             if arm in pending:
                 run_hindcast_arm(data=data, arm=arm, cores=cores)
 

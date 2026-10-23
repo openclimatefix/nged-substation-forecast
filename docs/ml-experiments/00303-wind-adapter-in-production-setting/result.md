@@ -103,6 +103,15 @@ members, in the scored year, against XGBoost plus the offset table.
   tested on wind; P6 uses experiment 259's head, which was tested on these farms. The curtailment
   cost metric of experiment 277 is not used unless its code is ready.
 
+## Post hoc arms (added after the pre-registered arms were scored; the contrasts and verdict above are unchanged)
+
+The pre-registered P4, P5, and P7 scored worse than P2 on the cross-fitted hindcast and on the scored year,
+which contradicts the prediction. A likely cause is that the L1 loss on single members pulls each
+member's expected power towards the conditional median, while the residual quantiles then add the full
+error again before the 51 members are mixed. The post hoc arms P4m, P5m, and P7m repeat P4, P5, and P7
+with the loss changed to the L1 error of the members' mean expected power per case (all 51 members of
+each case in each step), which is also what the residual quantiles are fitted to. Nothing else changes.
+
 ## Earlier advice followed and departed from
 
 - Followed: offset table first as the benchmark (experiment 259, D3), and the stack of a
