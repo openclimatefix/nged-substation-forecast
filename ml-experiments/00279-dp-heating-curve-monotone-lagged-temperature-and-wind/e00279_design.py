@@ -570,6 +570,7 @@ class ArmFit:
         penalised_loss: The squared error plus the penalty at the solution.
         unpenalised_loss: The squared error alone.
         n_rows: The number of rows the fit used.
+        network: The trained heating networks, for the network arms only.
     """
 
     arm: ArmSpec
