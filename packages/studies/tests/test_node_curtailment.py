@@ -31,6 +31,7 @@ from studies.node_curtailment import (
     node_curtailment,
     node_table_pilot,
     quantiles_from_members,
+    rearrange_quantiles,
     scale_to_megawatts,
     scaled_limits,
     table_with_scaled_limits,
@@ -182,7 +183,12 @@ def _generator_row(
     *, series: int = GENERATOR_SERIES, output: float, forecast: float, month: int = 1
 ) -> pl.DataFrame:
     return _forecast(
-        series=series, valid_times=[_valid(month=month)], actual=[output], q50=[forecast]
+        series=series,
+        valid_times=[_valid(month=month)],
+        actual=[output],
+        q05=[forecast],
+        q50=[forecast],
+        q95=[forecast],
     )
 
 
@@ -1226,7 +1232,7 @@ MARCH_FIRST = dt.datetime(2026, 3, 1, 0, 30, tzinfo=UTC)
 def _series_rows(
     *, series: int, entries: Sequence[tuple[dt.datetime, int, float, float]]
 ) -> pl.DataFrame:
-    """A frame of one series from `(valid_time, seed, actual, q50)`; q05 and q95 equal `actual`."""
+    """A frame of one series from `(valid_time, seed, actual, q50)`; q05 and q95 equal `q50`."""
     return pl.DataFrame(
         {
             "time_series_id": pl.Series([series] * len(entries), dtype=pl.Int64),
@@ -1234,9 +1240,9 @@ def _series_rows(
             "valid_time": [v for v, _, _, _ in entries],
             "seed": [seed for _, seed, _, _ in entries],
             "actual": [a for _, _, a, _ in entries],
-            "q05": [a for _, _, a, _ in entries],
+            "q05": [q for _, _, _, q in entries],
             "q50": [q for _, _, _, q in entries],
-            "q95": [a for _, _, a, _ in entries],
+            "q95": [q for _, _, _, q in entries],
         }
     )
 
@@ -1953,3 +1959,52 @@ def test_members_scored_end_to_end_give_the_hand_worked_curtailment() -> None:
     assert _headline(result.per_arm, column="needed_mwh") == pytest.approx(2.5)
     assert _headline(result.per_arm, column="breach_mwh") == pytest.approx(0.0)
     assert _headline(result.per_arm, column="energy_proxy_gbp") == pytest.approx(6_500.0)
+
+
+# --- crossing quantiles -------------------------------------------------------------------------
+
+
+def test_rearranging_sorts_a_crossing_row_and_leaves_a_monotone_row_alone() -> None:
+    """Row 1 stores q05 = 80, q50 = 70, q95 = 50, so it becomes 50, 70, 80. Row 2 is monotone."""
+    frame = _forecast(
+        series=NODE_SERIES,
+        valid_times=[_valid(), _valid(step=1)],
+        actual=[70.0, 70.0],
+        q05=[80.0, 60.0],
+        q50=[70.0, 70.0],
+        q95=[50.0, 90.0],
+    )
+    sorted_frame, n_crossed = rearrange_quantiles(frame=frame)
+    assert n_crossed == 1
+    assert sorted_frame.select("q05", "q50", "q95").rows() == [
+        (50.0, 70.0, 80.0),
+        (60.0, 70.0, 90.0),
+    ]
+
+
+def test_rearranging_leaves_a_row_with_a_missing_quantile_as_stored() -> None:
+    frame = _forecast(
+        series=NODE_SERIES, valid_times=[_valid()], actual=[70.0], q05=[80.0], q95=[float("nan")]
+    )
+    sorted_frame, n_crossed = rearrange_quantiles(frame=frame)
+    assert n_crossed == 0
+    assert sorted_frame["q05"].to_list() == [80.0]
+
+
+def test_a_crossing_node_row_is_scored_as_its_sorted_quantile_function() -> None:
+    """Flow 70 MW against 45 MW with q05 = 80 and q95 = 50 stored (crossing).
+
+    Sorted, q95 is 80 MW, so the planned node curtailment is (80 - 45) x 0.5 = 17.5 MWh. As stored,
+    q95 is 50 MW and it is (50 - 45) x 0.5 = 2.5 MWh. One node row crossed.
+    """
+    node = _one_row(flow=70.0, q05=80.0, q95=50.0)
+    sorted_result = _score(table=_table(), node=node)
+    stored_result = _score(
+        table=_table(),
+        node=node,
+        assumptions=_assumptions(use_generators=False, rearrange_quantiles=False),
+    )
+    assert _headline(sorted_result.per_arm, column="planned_mwh") == pytest.approx(17.5)
+    assert sorted_result.n_node_rows_rearranged == 1
+    assert _headline(stored_result.per_arm, column="planned_mwh") == pytest.approx(2.5)
+    assert stored_result.n_node_rows_rearranged == 0

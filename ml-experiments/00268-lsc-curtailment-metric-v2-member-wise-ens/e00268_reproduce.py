@@ -27,6 +27,7 @@ from studies.node_curtailment import (
     NodeCurtailmentResult,
     node_curtailment,
     quantiles_from_members,
+    rearrange_quantiles,
     scaled_limits,
     table_with_scaled_limits,
 )
@@ -87,25 +88,12 @@ def through_members(*, frame: pl.DataFrame) -> pl.DataFrame:
     return frame.drop(quantile_columns).join(reduced, on=list(MEMBER_ROW_KEYS), how="left")
 
 
-def sorted_quantiles(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Sort each row's stored quantile columns into increasing order (the rearrangement).
-
-    A set of members cannot have crossing quantiles, so this is the quantile path's equivalent of
-    the member path for rows whose stored quantiles cross.
-    """
-    columns = sorted(c for c in frame.columns if len(c) == 3 and c[0] == "q" and c[1:].isdigit())
-    ordered = np.sort(frame.select(columns).to_numpy(), axis=1)
-    return frame.with_columns(
-        **{c: pl.Series(ordered[:, i], dtype=frame.schema[c]) for i, c in enumerate(columns)}
-    )
-
-
-def _score(*, arms: arms_module.Arms, table: object) -> NodeCurtailmentResult:
+def _score(*, arms: arms_module.Arms, table: object, rearrange: bool) -> NodeCurtailmentResult:
     return node_curtailment(
         table=table,  # ty: ignore[invalid-argument-type]
         node_forecasts=arms.node_frames,
         generator_forecasts=arms.generator_frames,
-        assumptions=NodeCurtailmentAssumptions(),
+        assumptions=NodeCurtailmentAssumptions(rearrange_quantiles=rearrange),
     )
 
 
@@ -116,7 +104,7 @@ def _tables(*, result: NodeCurtailmentResult) -> tuple[pl.DataFrame, pl.DataFram
 
 
 def _compare(
-    *, name: str, intervals: pl.DataFrame, contrasts: pl.DataFrame, tolerance_percent: float
+    *, name: str, intervals: pl.DataFrame, contrasts: pl.DataFrame, tolerance_percent: float | None
 ) -> tuple[dict[str, object], list[str]]:
     stored_intervals = pl.read_parquet(STORED_DIR / "causal_intervals_scaled_f0.5.parquet")
     stored_contrasts = pl.read_parquet(STORED_DIR / "causal_contrasts_scaled_f0.5.parquet")
@@ -147,8 +135,8 @@ def _compare(
         same_interval_verdict=((pl.col("low95_gbp") <= 0) & (pl.col("high95_gbp") >= 0))
         == ((pl.col("stored_low95") <= 0) & (pl.col("stored_high95") >= 0)),
     )
-    worst_arm = float(arms["percent_difference"].abs().max())
-    worst_contrast = float(both["points_of_baseline"].abs().max())
+    worst_arm = arms.select(pl.col("percent_difference").abs().max()).item()
+    worst_contrast = both.select(pl.col("points_of_baseline").abs().max()).item()
     lines = [
         f"## {name}",
         "",
@@ -167,7 +155,7 @@ def _compare(
             )
         ),
         "",
-        f"Largest arm difference: {worst_arm:.4f}% (tolerance {tolerance_percent}%).",
+        f"Largest arm difference: {worst_arm:.4f}% (tolerance {tolerance_percent}%; none means informational).",
         (
             f"Largest contrast difference: {worst_contrast:.4f} points of the baseline's avoidable cost "
             f"(tolerance {CONTRAST_TOLERANCE_PERCENT_POINTS})."
@@ -179,10 +167,14 @@ def _compare(
         "",
     ]
     passed = (
-        worst_arm <= tolerance_percent
-        and worst_contrast <= CONTRAST_TOLERANCE_PERCENT_POINTS
-        and bool(both["same_sign"].all())
-        and bool(both["same_interval_verdict"].all())
+        None
+        if tolerance_percent is None
+        else (
+            worst_arm <= tolerance_percent
+            and worst_contrast <= CONTRAST_TOLERANCE_PERCENT_POINTS
+            and bool(both["same_sign"].all())
+            and bool(both["same_interval_verdict"].all())
+        )
     )
     return {
         "name": name,
@@ -225,8 +217,10 @@ def main() -> None:
         farm_frames_mw={},
     )
     sorted_arms = arms_module.Arms(
-        node_frames={k: sorted_quantiles(frame=v) for k, v in arms.node_frames.items()},
-        generator_frames={k: sorted_quantiles(frame=v) for k, v in arms.generator_frames.items()},
+        node_frames={k: rearrange_quantiles(frame=v)[0] for k, v in arms.node_frames.items()},
+        generator_frames={
+            k: rearrange_quantiles(frame=v)[0] for k, v in arms.generator_frames.items()
+        },
         n_node_keys_before=arms.n_node_keys_before,
         n_node_keys_after=arms.n_node_keys_after,
         farm_frames_mw={},
@@ -252,22 +246,30 @@ def main() -> None:
         for arm, frame in arms.generator_frames.items()
     }
     lines = ["# Experiment 268 reproduction of experiment 255 at f = 0.5, causal rows", ""]
-    for name, path_arms, tolerance in (
-        ("Quantile path", arms, QUANTILE_PATH_TOLERANCE_PERCENT),
-        ("Member path (101 members per row)", member_arms, ARM_TOLERANCE_PERCENT),
-        ("Sorted-quantile path (post hoc)", sorted_arms, ARM_TOLERANCE_PERCENT),
-        ("Member path on sorted quantiles (post hoc)", member_sorted_arms, ARM_TOLERANCE_PERCENT),
+    for name, path_arms, rearrange, tolerance in (
+        ("Quantile path, rearrangement off", arms, False, QUANTILE_PATH_TOLERANCE_PERCENT),
+        ("Quantile path, rearrangement on (the default)", arms, True, None),
+        (
+            "Member path, members drawn from the stored quantiles",
+            member_arms,
+            True,
+            ARM_TOLERANCE_PERCENT,
+        ),
+        ("Member path on sorted quantiles (post hoc)", member_sorted_arms, True, None),
     ):
-        intervals, contrasts = _tables(result=_score(arms=path_arms, table=table))
+        scored = _score(arms=path_arms, table=table, rearrange=rearrange)
+        intervals, contrasts = _tables(result=scored)
         outcome, block = _compare(
             name=name, intervals=intervals, contrasts=contrasts, tolerance_percent=tolerance
         )
+        outcome["n_node_rows_rearranged"] = scored.n_node_rows_rearranged
+        outcome["n_generator_rows_rearranged"] = scored.n_generator_rows_rearranged
         outcomes.append(outcome)
         lines += block
         results[name] = intervals
     gap = (
         results["Member path on sorted quantiles (post hoc)"]
-        .join(results["Sorted-quantile path (post hoc)"], on="arm", suffix="_sorted")
+        .join(results["Quantile path, rearrangement on (the default)"], on="arm", suffix="_sorted")
         .with_columns(
             percent_difference=100.0
             * (pl.col("avoidable_gbp") - pl.col("avoidable_gbp_sorted"))
@@ -275,7 +277,7 @@ def main() -> None:
         )
         .filter(pl.col("arm") != PERFECT)
     )
-    explained = float(gap["percent_difference"].abs().max())
+    explained = gap.select(pl.col("percent_difference").abs().max()).item()
     lines += [
         "## Do crossing stored quantiles explain the member path's difference?",
         "",

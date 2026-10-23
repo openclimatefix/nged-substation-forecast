@@ -55,6 +55,16 @@ Decisions the numbers rest on, stated here because nothing in the output shows t
   count). It is null in node-only mode.
 - The module does not compute avoidable cost. `avoidable_cost` subtracts a perfect arm's figures,
   which the caller must have scored in the same call so that all arms share their rows.
+- By default each forecast row's `q<percent>` columns are sorted into increasing order before
+  scoring (`rearrange_quantiles` in the assumptions), because stored forecasts can cross. In
+  experiments 224 and 243, 26,344 of the 77,897 farm-forecast rows used by experiment 255 had
+  crossing quantiles, and the generators' median `q50` was read from a column that could sit above
+  the 0.75 quantile. The result counts the rows that crossed. Setting `rearrange_quantiles` false
+  scores the columns as stored.
+- Ensemble members enter through `net_flow_members`, which pairs the demand's and the generators'
+  members by member number and returns the node's metered flow per member, and
+  `quantiles_from_members`, which reduces members to the `q<percent>` columns above. A set of
+  members cannot cross, so the member path needs no rearrangement.
 - A node row present in one arm and absent from another is dropped from every arm.
 - Every arm must hold the same seeds, because `align_arms` intersects on the seed and an arm with
   fewer seeds would trim every other arm; `node_curtailment` raises instead.
@@ -286,6 +296,9 @@ class NodeCurtailmentAssumptions:
         lead_max_hours: The longest forecast lead scored, exclusive.
         use_generators: True to cap generators; false for the node-only variant, in which the
             planned node curtailment is assumed delivered exactly.
+        rearrange_quantiles: True to sort each forecast row's `q<percent>` columns into increasing
+            order before scoring, so that a stored forecast whose quantiles cross is scored as the
+            quantile function it implies. False scores the columns as stored.
     """
 
     prices_gbp_per_mwh: tuple[float, ...] = PRICES_GBP_PER_MWH
@@ -295,6 +308,7 @@ class NodeCurtailmentAssumptions:
     lead_min_hours: float = 12.0
     lead_max_hours: float = 36.0
     use_generators: bool = True
+    rearrange_quantiles: bool = True
 
     @property
     def tau(self) -> float:
@@ -333,6 +347,9 @@ class NodeCurtailmentResult:
         n_generator_rows_missing_actual: The same count where the forecast is finite and the actual
             output is missing or not finite. Such a generator is instructed, and its loss counts as
             0 MWh, so a missing actual can understate the curtailed energy.
+        n_node_rows_rearranged: Node forecast rows, summed over arms, whose stored quantiles
+            crossed and were sorted. Zero when `rearrange_quantiles` is false.
+        n_generator_rows_rearranged: The same count for generator forecast rows.
     """
 
     per_arm: pl.DataFrame
@@ -345,6 +362,8 @@ class NodeCurtailmentResult:
     n_rows_dropped_not_in_every_arm: int
     n_generator_rows_missing_forecast: int
     n_generator_rows_missing_actual: int
+    n_node_rows_rearranged: int = 0
+    n_generator_rows_rearranged: int = 0
 
 
 def season_expression(*, time_column: str) -> pl.Expr:
@@ -558,6 +577,71 @@ def capacity_forecast(*, generator_frame: pl.DataFrame, table: NodeTable) -> pl.
         generator_frame.join(capacities, on="time_series_id", how="inner", maintain_order="left")
         .with_columns(**{c: pl.col("capacity_mw") for c in quantiles})
         .drop("capacity_mw")
+    )
+
+
+def rearrange_quantiles(*, frame: pl.DataFrame) -> tuple[pl.DataFrame, int]:
+    """Sort each row's `q<percent>` columns into increasing order.
+
+    A forecast whose stored quantiles cross (for example a median above the 0.75 quantile) is not a
+    quantile function. Sorting the values across the levels is the standard rearrangement, and it
+    leaves a monotone row unchanged. A row with a null or non-finite quantile is left as stored, so
+    that `node_curtailment` drops it as it would otherwise.
+
+    Args:
+        frame: A forecast frame with `q<percent>` columns.
+
+    Returns:
+        The frame with sorted quantile columns, and the number of rows that crossed.
+    """
+    columns = sorted(c for c in frame.columns if _is_quantile_column(c))
+    if not columns or frame.height == 0:
+        return frame, 0
+    stored = frame.select(columns).to_numpy()
+    complete = np.isfinite(stored).all(axis=1)
+    ordered = np.sort(stored, axis=1)
+    crossed = complete & (ordered != stored).any(axis=1)
+    if not crossed.any():
+        return frame, 0
+    result = np.where(complete[:, None], ordered, stored)
+    return (
+        frame.with_columns(
+            **{c: pl.Series(result[:, i], dtype=frame.schema[c]) for i, c in enumerate(columns)}
+        ),
+        int(crossed.sum()),
+    )
+
+
+def _rearranged_inputs(
+    *,
+    node_forecasts: Mapping[str, pl.DataFrame],
+    generator_forecasts: Mapping[str, pl.DataFrame],
+    assumptions: NodeCurtailmentAssumptions,
+) -> tuple[dict[str, pl.DataFrame], dict[str, pl.DataFrame], int, int]:
+    """Sort the quantile columns of every arm's frames, unless the assumptions switch it off.
+
+    Args:
+        node_forecasts: Each arm's node forecast frame.
+        generator_forecasts: Each arm's generator forecast frame.
+        assumptions: Supplies `rearrange_quantiles` and `use_generators`.
+
+    Returns:
+        The node frames, the generator frames, and the numbers of node and generator rows, summed
+        over arms, that crossed. Generator frames are untouched in node-only mode.
+    """
+    if not assumptions.rearrange_quantiles:
+        return dict(node_forecasts), dict(generator_forecasts), 0, 0
+    nodes = {arm: rearrange_quantiles(frame=frame) for arm, frame in node_forecasts.items()}
+    generators = (
+        {arm: rearrange_quantiles(frame=frame) for arm, frame in generator_forecasts.items()}
+        if assumptions.use_generators
+        else {arm: (frame, 0) for arm, frame in generator_forecasts.items()}
+    )
+    return (
+        {arm: frame for arm, (frame, _) in nodes.items()},
+        {arm: frame for arm, (frame, _) in generators.items()},
+        sum(n for _, n in nodes.values()),
+        sum(n for _, n in generators.values()),
     )
 
 
@@ -1069,6 +1153,13 @@ def node_curtailment(
     _require_unique_row_keys(inputs=inputs)
     _require_same_seeds(inputs=inputs)
     arms = sorted(node_forecasts)
+    node_forecasts, generator_forecasts, n_node_rearranged, n_generator_rearranged = (
+        _rearranged_inputs(
+            node_forecasts=node_forecasts,
+            generator_forecasts=generator_forecasts,
+            assumptions=assumptions,
+        )
+    )
     series_without_capacity = {
         int(s)
         for frame in node_forecasts.values()
@@ -1170,6 +1261,8 @@ def node_curtailment(
         n_rows_dropped_not_in_every_arm=n_dropped_arms,
         n_generator_rows_missing_forecast=n_missing_forecast,
         n_generator_rows_missing_actual=n_missing_actual,
+        n_node_rows_rearranged=n_node_rearranged,
+        n_generator_rows_rearranged=n_generator_rearranged,
     )
 
 
