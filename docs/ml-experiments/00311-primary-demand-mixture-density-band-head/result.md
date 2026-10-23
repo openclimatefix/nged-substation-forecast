@@ -110,10 +110,10 @@ date: 2026-10-23
 lowers the quantile score by 0.037 points of capacity over the scored year, but the gain comes
 almost entirely from one Primary, D10, and the new bands are worse on sunny daylight half-hours, so
 we do not adopt them.** A similar gain, 0.034 points, appears in the even months of 2024-25,
-measured against the stored bands of experiment 169 and not against Primary demand research default
-1. The next test should keep the
-current bands on sunny daylight half-hours, or train the head on the quantile score itself, because
-the head's gain sits in the 0.05 to 0.25 quantiles and not in the extreme tails.
+measured against the stored bands of experiment 169 and not against the default itself. The next
+test should keep the current bands on sunny daylight half-hours, or train the head on the quantile
+score itself, because the head's gain sits in the 0.05 to 0.25 quantiles and not in the extreme
+tails.
 
 A band is the range between two quantile levels of the forecast, and a forecast here is 11 quantile
 levels from 0.01 to 0.99 for each half-hour. The quantile score is twice the mean pinball loss over
