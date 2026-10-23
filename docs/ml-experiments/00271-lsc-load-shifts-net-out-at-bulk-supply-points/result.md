@@ -58,38 +58,40 @@ verdict: partly supported
 best_arm: >-
   No arm is a winner. The no-knowledge filter (K0) changes by +0.71% (97.5% interval 0.34% to
   1.08%) when load shifts stay inside one BSP and by +5.50% (3.34% to 7.96%) when they cross, both
-  with the shifts placed before days with events, against thresholds of 1% and 5%.
+  with the shifts placed before curtailed days, against thresholds of 1% and 5%.
 headline: >-
   Load shifts inside one BSP move the avoidable cost by 0.2% to 0.7% and shifts across the boundary
-  by 1.4% to 5.5%, depending on whether the shifts fall at random or before event days; real load
-  shifts changes the cost at the two BSPs by under 0.1%.
+  by 1.4% to 5.5%, depending on whether the shifts fall at random or before curtailed days; knowing
+  about the real load shifts changes the cost at the two BSPs by under 0.1%.
 take_home_message: >-
-  A load shift between two Primary substations under the same bulk supply point barely changes the
-  curtailment cost at that bulk supply point (+0.71% when the shifts fall just before curtailed days, with
-  an interval up to 1.08%), because the two Primaries' forecast errors partly cancel. A load shift across the boundary between the two bulk supply points changes it by
-  about 5% when it falls just before days that would be curtailed, and only 1.4% at a random time.
-  Only 4 of the 54 hand-filtered real events that involve two Primaries cross the boundary, so the curtailment metric at bulk supply points
-  cannot say whether detecting load shifts is worth money, and that question has to be asked at
-  Primary substations.
+  A load shift between two Primary substations under the same bulk supply point changes the
+  curtailment cost at that bulk supply point by 0.2% at a random time and 0.7% just before days that
+  would be curtailed (interval up to 1.08%), because the two Primaries' forecast errors partly
+  cancel. A load shift across the boundary between the two bulk supply points changes it by 1.4% at
+  a random time and 5.5% just before curtailed days. Only 4 of the 54 hand-filtered real events that
+  involve two Primaries cross the boundary, so the curtailment metric at bulk supply points cannot
+  say whether detecting load shifts is worth money, and that question has to be asked at Primary
+  substations.
 lessons: >-
   Within-BSP shifts do not cancel exactly, because each Primary's filter learns at its own rate: the
-  summed forecast change is 20% to 65% of one Primary's. Perfect knowledge of the shifts is not
-  resolved by this metric (no row group's interval excludes zero for cost), and masking a shift
-  hurts the observed-power forecast across the boundary because the real flow does change.
+  summed forecast change is about 30% to 65% of one Primary's. This metric did not separate perfect
+  knowledge of the shifts from none (no row group's interval excludes zero for cost), and masking a
+  shift worsened the median forecast's error across the boundary in the one group checked, because
+  the real flow does change.
 advice:
   - >-
     Ask the money question about detecting load shifts at Primary substations, not at the two
     bulk supply points, because 1 of the 28 real two-Primary load shifts over 1 day crosses the
     boundary and the BSP cost differs by under 0.1% between the oracle mask and no mask on the real
-    record (Figure 1, real-record bullet).
+    record (Figure 1; the real-record bullet under Numbers).
   - >-
     Do not rank load shift detectors by curtailment cost at the bulk supply points until real shifts
-    that cross the boundary exist; 40 worlds of 8 shifts resolve differences of about 1% only (C1,
-    C2).
+    that cross the boundary exist; 40 worlds of 8 shifts resolve differences of about 1% only (C1, C2
+    under Numbers).
   - >-
     Forecast the observed power, not the normal running arrangement, when scoring curtailment across
     a bulk supply point boundary, because masking the shift leaves the forecast missing the real
-    flow of the shift (Checks).
+    flow of the shift, at least for the median forecast's error (Checks).
 production_status: not-for-production
 adopted_in: none
 ---
@@ -120,55 +122,62 @@ across +5.50% (3.34% to 7.96%, against 5%).
 
 ## Numbers
 
-- **Stage 1 count (D-labels).** 22 of the 31 logged load-shift pairs join Primaries under one BSP, 4
-  cross (D15-D2, D12-D2, D10-D12, D11-D12), and 5 have an unknown partner. Of the 66 hand-filtered
+- **Stage 1 count (D-labels).** Of the 31 logged load-shift pairs, 22 join Primaries under one BSP,
+  4 cross (D15-D2, D12-D2, D10-D12, D11-D12), and 5 have an unknown partner. Of the 66 hand-filtered
   real events, 54 involve two Primaries and 4 of those cross (all D10-D12); of the 28 over 1 day, 1
-  crosses. Of the 54 interconnections, 33 join Primaries under one BSP, 5 cross, and 16 touch a
+  crosses. Of the 54 interconnected pairs, 33 join Primaries under one BSP, 5 cross, and 16 touch a
   substation outside the 30 listed.
 - **Known-answer gate.** The real record reproduces experiment 255's avoidable cost for the plant
   forecast: GBP 1.876 million against its 1.88 million at 0.5 times the earlier maximum export.
-- **Worlds.** 40 worlds of 8 load shifts for each of two kinds (within one BSP, across) and two
-  placements (random, or ending 6 to 72 hours before a day with scored events). Shifts move 15%,
-  30%, or 45% of the donor's mean load for 1, 2, 4, or 8 days (mean 1.2 to 1.5 MW, at most 5.0 MW),
-  between interconnected or logged pairs. Event days: 21 at D17 and 15 at D13.
+- **Worlds.** The run holds 40 worlds of 8 load shifts for each of two kinds (within one BSP,
+  across) and two placements (random, or ending 6 to 72 hours before a day with scored events).
+  Shifts move 15%, 30%, or 45% of the donor's mean load for 1, 2, 4, or 8 days (mean 1.2 to 1.5 MW,
+  at most 5.0 MW), between interconnected or logged pairs. Event days: 21 at D17 and 15 at D13.
 - **C1 and C2 (K0, observed power, change in avoidable cost against the real record).** Within,
   targeted +0.71% (0.34% to 1.08%); across, targeted +5.50% (3.34% to 7.96%). Within, random +0.24%
-  (-0.01% to 0.55%); across, random +1.37% (0.47% to 2.35%). The largest single world moves by
-  3.0% (within) and 28% (across), so a mean under the threshold does not mean every world is.
-- **Why within-BSP shifts do not cancel.** A 2 MW shift held for 4 days moves the summed forecast
-  of the two Primaries by 0.41 to 1.31 MW, against 1.27 to 2.00 MW for the donor alone, because
-  each Primary's filter has its own hyperparameters.
+  (-0.01% to 0.55%); across, random +1.37% (0.47% to 2.35%). The largest single world moves by 3.0%
+  (within) and 28% (across), so a mean under the threshold does not mean every world is.
+- **Why within-BSP shifts do not cancel.** A 2 MW shift held for 4 days moves the summed forecast of
+  the two Primaries by 0.41 to 1.31 MW, against 1.27 to 2.00 MW for the donor alone, because each
+  Primary's filter has its own hyperparameters.
 - **Perfect knowledge (PERFECT minus K0, avoidable cost, targeted).** Across: 8% lower before the
   alarm (-65,000 to +3,000 GBP), 5% lower after (-62,000 to +16,000), 11% higher during (-3,000 to
   +45,000); within: under 3% in every group. No interval excludes zero for cost. The twCRPS after a
   shift is lower by 8% across (interval excludes zero) and 2% within.
-- **Real record at the two BSPs (descriptive).** The oracle mask, the carried LR_b20 mask, and no
-  mask have avoidable costs within GBP 600 of 1.876 million; 639 rows lie within 48 hours after a
-  labelled load shift, holding GBP 13,400.
-- **Schedule.** Filters refit on the real GAM of experiment 130 (past weather: ERA5 and CAMS, so
-  the numbers are a ceiling for a live service); node rows are experiment 48's ensemble-driven
-  forecast at 09 UTC, mapped to the filter's 06 UTC origin.
+- **Real record at the two BSPs (descriptive).** The oracle mask (the logged shifts, known at once),
+  the carried LR_b20 mask, and no mask have avoidable costs within GBP 600 of 1.876 million. The
+  record holds 639 rows within 48 hours after a labelled load shift, with GBP 13,400 of avoidable
+  cost.
+- **Schedule.** Filters refit on the real GAM of experiment 130 (past weather: ERA5 and CAMS, so the
+  numbers are a ceiling for a live service); node rows are experiment 48's ensemble-driven forecast
+  at 09 UTC, mapped to the filter's 06 UTC origin.
 
 ## Checks
 
-- **Median minus mean forecast.** Pooled over both BSPs: +0.11 MW for every arm of the real
-  record; no per-site figure, because the quality sums are pooled.
+- **Median minus mean forecast.** Pooled over both BSPs: +0.11 MW for every arm of the real record;
+  no per-site figure, because the quality sums are pooled.
 - **Error beside the quantile score.** Across, targeted, G0, PERFECT minus K0: MAE of the median
-  +0.009 MW (0.005 to 0.014), quantile score +0.007 (0.004 to 0.011), cost -0.6% (-3% to +2%).
-  The error is worse because the mask forecasts the normal arrangement and the observed flow does
+  +0.009 MW (0.005 to 0.014), quantile score +0.007 (0.004 to 0.011), cost -0.6% (-3% to +2%). The
+  error is worse because the mask forecasts the normal arrangement and the observed flow does
   contain the shift; the nra target is not worse (K0 +3.3%, PERFECT +0.8%).
-- **Triggers.** None fired on this page: the real record reproduces experiment 255, the observed
-  and nra targets agree within one BSP (as they must), and a within-BSP effect of 0.7% was traced
-  to differing filter gains. Trigger 7 is a judgement call: steps 4 to 6 of the program may choose
-  their curtailment nodes from this result, whose headline is the real-shift count and the
-  real-record row above, not the injected-world sign.
+- **Triggers.** None fired on this page: the real record reproduces experiment 255, the observed and
+  nra targets agree within one BSP, and a within-BSP effect of 0.7% was traced to differing filter
+  gains. Trigger 7 is a judgement call: steps 4 to 6 of the program may choose their curtailment
+  nodes from this result, whose headline is the real-shift count and the real-record row above, not
+  the injected-world sign.
 
 ## Caveats and next steps
 
+- **Arm names.** K0 is the filter on recent power with no knowledge of load shifts. GAM_ONLY is the
+  additive model alone. PERFECT masks each shift's readings from the filter, known at once;
+  PERFECT_LAG masks them after the live service's delays. The nra target is the real record without
+  the injected shifts. G1 to G5 are ordinary, before-alarm, during, after (48 hours), and near (7
+  days) rows, as in the plan. twCRPS is the threshold-weighted continuous ranked probability score
+  on the export tail.
 - **Reading of the arms.** The base is experiment 48's node forecast, standing for K0. The arms
   differ by the injected shifts' change in the filter. GAM_ONLY removes K0's real correction, so its
   cost is 13% higher in every world. LB20_LIKE is PERFECT_LAG on a random half of the shifts, a
   stand-in because the carried mask has no alarms on injected readings.
-- **Not tested.** Unmetered substations under the BSP, shifts to another BSP (D17 and D13 have
-  GSPs above), and the generators' forecasts changing with the shifts.
+- **Not tested.** Unmetered substations under the BSP, shifts to another BSP (D17 and D13 have GSPs
+  above), and the generators' forecasts changing with the shifts.
 - **Next.** A Primary-level curtailment metric (demand-only proxy) for step 4.
