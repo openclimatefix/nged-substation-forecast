@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [293](../../00293-metered-farm-plant-tilt-and-clip/result.md) | Does a 20 degree tilt and a higher, softer clip improve the spread-binned plant's band? | 2 | Nothing | Planned |
 
 ## Planned experiments
 
