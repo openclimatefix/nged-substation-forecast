@@ -158,7 +158,7 @@ def weights() -> None:
     chart = (
         alt.Chart(w)
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "level_label:O",
                 title="Quantile level",
