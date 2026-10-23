@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [304](../../00304-metered-farm-node-sum-tail/result.md) | Which way of summing the farms' bands under one bulk supply point gives calibrated 0.95 and 0.99 quantiles? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
