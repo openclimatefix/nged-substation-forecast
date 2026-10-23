@@ -1,0 +1,632 @@
+=== e00309_gap_vs_residual.py
+@LR_b20 r6_a   minus d_a, while on              : gap 11 other 14 diff +3 (-1 to +7); FA odd 1.17 vs 1.23, even 1.21 vs 1.03
+@LR_b20 r6_a   minus d_a, within 4 days of end  : gap 16 other 17 diff +1 (-3 to +5); FA odd 1.17 vs 1.23, even 1.21 vs 1.03
+@LR_b20 r24_a  minus d_a, while on              : gap 11 other 20 diff +9 (+4 to +14); FA odd 1.17 vs 1.23, even 1.21 vs 0.91
+@LR_b20 r24_a  minus d_a, within 4 days of end  : gap 16 other 20 diff +4 (+0 to +9); FA odd 1.17 vs 1.23, even 1.21 vs 0.91
+@LR_b20 r72_a  minus d_a, while on              : gap 11 other 17 diff +6 (+1 to +11); FA odd 1.17 vs 1.10, even 1.21 vs 1.28
+@LR_b20 r72_a  minus d_a, within 4 days of end  : gap 16 other 18 diff +2 (-2 to +6); FA odd 1.17 vs 1.10, even 1.21 vs 1.28
+@LR_b20 d24_a  minus d_a, while on              : gap 11 other 17 diff +6 (+2 to +11); FA odd 1.17 vs 1.23, even 1.21 vs 1.09
+@LR_b20 d24_a  minus d_a, within 4 days of end  : gap 16 other 19 diff +3 (+0 to +7); FA odd 1.17 vs 1.23, even 1.21 vs 1.09
+@RO_b80 r6_a   minus d_a, while on              : gap 21 other 23 diff +2 (-2 to +6); FA odd 3.93 vs 3.87, even 4.19 vs 3.70
+@RO_b80 r6_a   minus d_a, within 4 days of end  : gap 22 other 23 diff +1 (-2 to +4); FA odd 3.93 vs 3.87, even 4.19 vs 3.70
+@RO_b80 r24_a  minus d_a, while on              : gap 21 other 24 diff +3 (-1 to +7); FA odd 3.93 vs 3.74, even 4.19 vs 3.52
+@RO_b80 r24_a  minus d_a, within 4 days of end  : gap 22 other 24 diff +2 (-2 to +6); FA odd 3.93 vs 3.74, even 4.19 vs 3.52
+@RO_b80 r72_a  minus d_a, while on              : gap 21 other 22 diff +1 (-2 to +4); FA odd 3.93 vs 3.74, even 4.19 vs 3.16
+@RO_b80 r72_a  minus d_a, within 4 days of end  : gap 22 other 23 diff +1 (-2 to +5); FA odd 3.93 vs 3.74, even 4.19 vs 3.16
+@RO_b80 d24_a  minus d_a, while on              : gap 21 other 21 diff +0 (-3 to +3); FA odd 3.93 vs 3.68, even 4.19 vs 3.64
+@RO_b80 d24_a  minus d_a, within 4 days of end  : gap 22 other 22 diff +0 (+0 to +0); FA odd 3.93 vs 3.68, even 4.19 vs 3.64
+
+=== e00309_band.py
+@LR_b20 (odd rate 1.29) d      k=3.2 matched 11/35 late 16 FA odd 1.17 even 1.21 (0.66 to 1.79)
+@LR_b20 (odd rate 1.29) r24    k=3.5 matched 20/35 late 20 FA odd 1.23 even 0.91 (0.45 to 1.44)
+@LR_b20 (odd rate 1.29) pit24  k=2.8 matched 22/35 late 22 FA odd 1.17 even 2.13 (1.19 to 3.06)
+@LR_b20 (odd rate 1.29) ext24  k=2.1 matched 17/35 late 18 FA odd 1.10 even 1.82 (0.96 to 2.73)
+  pit24 minus r24, while on: +2 (+0 to +5)
+  pit24 minus r24, within 4 days: +2 (+0 to +5)
+  ext24 minus r24, while on: -3 (-8 to +2)
+  ext24 minus r24, within 4 days: -2 (-7 to +3)
+  d minus r24, while on: -9 (-14 to -4)
+  d minus r24, within 4 days: -4 (-9 to +0)
+@RO_b80 (odd rate 4.11) d      k=2.3 matched 21/35 late 22 FA odd 3.93 even 4.19 (3.08 to 5.37)
+@RO_b80 (odd rate 4.11) r24    k=2.6 matched 24/35 late 24 FA odd 3.74 even 3.52 (2.32 to 4.73)
+@RO_b80 (odd rate 4.11) pit24  k=2.4 matched 26/35 late 26 FA odd 3.80 even 4.80 (3.35 to 6.31)
+@RO_b80 (odd rate 4.11) ext24  k=1.8 matched 25/35 late 25 FA odd 3.37 even 3.70 (2.67 to 4.79)
+  pit24 minus r24, while on: +2 (-2 to +6)
+  pit24 minus r24, within 4 days: +2 (-2 to +6)
+  ext24 minus r24, while on: +1 (-3 to +6)
+  ext24 minus r24, within 4 days: +1 (-3 to +5)
+  d minus r24, while on: -3 (-7 to +1)
+  d minus r24, within 4 days: -2 (-6 to +2)
+
+=== e00309_real_report.py
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01VtLJkGFuTP88V8VJusmJNQ/ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth/e00309_real_report.py:51: RuntimeWarning: divide by zero encountered in divide
+  r = gain[idx].sum(axis=1) / denom[idx].sum(axis=1)
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01VtLJkGFuTP88V8VJusmJNQ/ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth/e00309_real_report.py:52: RuntimeWarning: divide by zero encountered in scalar divide
+  out |= {"ratio": float(gain.sum() / denom.sum()), "ratio_lo": float(np.quantile(r, 0.025)), "ratio_hi": float(np.quantile(r, 0.975))}
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01VtLJkGFuTP88V8VJusmJNQ/.venv/lib/python3.14/site-packages/numpy/lib/_function_base_impl.py:4609: RuntimeWarning: invalid value encountered in scalar subtract
+  diff_b_a = b - a
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01VtLJkGFuTP88V8VJusmJNQ/ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth/e00309_real_report.py:51: RuntimeWarning: invalid value encountered in divide
+  r = gain[idx].sum(axis=1) / denom[idx].sum(axis=1)
+r24: odd-month near pin95 by k {2.6: 2.773417635081621, 3.5: 2.6423450414468417, 4.5: 2.5610647171682555}; chosen 4.5
+d: odd-month near pin95 by k {2.3: 2.7727004395521533, 3.2: 2.829546138365779, 4.5: 3.267233319684646}; chosen 2.3
+=== pooled means, even months
+near pin95 {'GAM_ONLY': 2.256, 'K0': 1.8309, 'RULE_r24_4.5': 2.7129, 'RULE_d_2.3': 1.9411, 'ORACLE_ROW': 0.9959, 'ORACLE_STATE': 1.701}
+near qs {'GAM_ONLY': 5.9102, 'K0': 5.3656, 'RULE_r24_4.5': 6.4839, 'RULE_d_2.3': 5.679, 'ORACLE_ROW': 3.225, 'ORACLE_STATE': 5.1695}
+near abs_median {'GAM_ONLY': 9.3865, 'K0': 8.6543, 'RULE_r24_4.5': 10.0823, 'RULE_d_2.3': 9.0281, 'ORACLE_ROW': 5.3025, 'ORACLE_STATE': 8.3878}
+during pin95 {'GAM_ONLY': 2.4392, 'K0': 1.8136, 'RULE_r24_4.5': 2.8225, 'RULE_d_2.3': 1.938, 'ORACLE_ROW': 1.0416, 'ORACLE_STATE': 1.8136}
+during qs {'GAM_ONLY': 6.2421, 'K0': 5.4071, 'RULE_r24_4.5': 6.7257, 'RULE_d_2.3': 5.7629, 'ORACLE_ROW': 3.3463, 'ORACLE_STATE': 5.4071}
+during abs_median {'GAM_ONLY': 9.8485, 'K0': 8.7227, 'RULE_r24_4.5': 10.44, 'RULE_d_2.3': 9.1596, 'ORACLE_ROW': 5.5, 'ORACLE_STATE': 8.7227}
+after pin95 {'GAM_ONLY': 0.8252, 'K0': 1.9568, 'RULE_r24_4.5': 1.8401, 'RULE_d_2.3': 1.9558, 'ORACLE_ROW': 0.6493, 'ORACLE_STATE': 0.8299}
+after qs {'GAM_ONLY': 3.4433, 'K0': 5.2368, 'RULE_r24_4.5': 4.6982, 'RULE_d_2.3': 5.2196, 'ORACLE_ROW': 2.4301, 'ORACLE_STATE': 3.5347}
+after abs_median {'GAM_ONLY': 5.9566, 'K0': 8.3651, 'RULE_r24_4.5': 7.4398, 'RULE_d_2.3': 8.2472, 'ORACLE_ROW': 3.9876, 'ORACLE_STATE': 6.0516}
+ordinary pin95 {'GAM_ONLY': 0.858, 'K0': 0.7424, 'RULE_r24_4.5': 0.8514, 'RULE_d_2.3': 0.8147, 'ORACLE_ROW': 0.6524, 'ORACLE_STATE': 0.858}
+ordinary qs {'GAM_ONLY': 3.3214, 'K0': 2.8754, 'RULE_r24_4.5': 3.3085, 'RULE_d_2.3': 3.1776, 'ORACLE_ROW': 2.313, 'ORACLE_STATE': 3.3214}
+ordinary abs_median {'GAM_ONLY': 5.7887, 'K0': 5.0195, 'RULE_r24_4.5': 5.7661, 'RULE_d_2.3': 5.5653, 'ORACLE_ROW': 3.785, 'ORACLE_STATE': 5.7887}
+=== gains over the better fixed arm and recovery of ORACLE_STATE / ORACLE_ROW, even months
+near     pin95      fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -0.8821 (-1.8533, +0.0618) of base 1.831; recovery -6.795 (-131.528, +0.779) units=29
+near     pin95      fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -0.8821 (-1.8521, +0.0634) of base 1.831; recovery -1.056 (-6.635, +0.047) units=29
+near     pin95      fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.1102 (-0.3081, +0.1866) of base 1.831; recovery -0.849 (-28.599, +0.848) units=29
+near     pin95      fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.1102 (-0.3070, +0.1988) of base 1.831; recovery -0.132 (-1.388, +0.105) units=29
+near     qs         fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -1.1183 (-2.2078, -0.0116) of base 5.366; recovery -5.703 (-27.385, -0.019) units=29
+near     qs         fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -1.1183 (-2.1972, -0.0218) of base 5.366; recovery -0.522 (-1.334, -0.008) units=29
+near     qs         fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.3134 (-0.5380, +0.0055) of base 5.366; recovery -1.598 (-8.182, +0.019) units=29
+near     qs         fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.3134 (-0.5365, +0.0111) of base 5.366; recovery -0.146 (-0.325, +0.004) units=29
+near     abs_median fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -1.4280 (-2.9406, +0.2003) of base 8.654; recovery -5.358 (-24.732, +0.469) units=29
+near     abs_median fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -1.4280 (-2.9317, +0.2132) of base 8.654; recovery -0.426 (-1.144, +0.051) units=29
+near     abs_median fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.3738 (-0.7086, +0.1128) of base 8.654; recovery -1.403 (-6.833, +0.242) units=29
+near     abs_median fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.3738 (-0.7011, +0.1033) of base 8.654; recovery -0.112 (-0.259, +0.026) units=29
+during   pin95      fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -1.0089 (-2.0349, +0.0388) of base 1.814; recovery -inf (+nan, +nan) units=26
+during   pin95      fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -1.0089 (-2.0516, +0.0491) of base 1.814; recovery -1.307 (-7.571, +0.037) units=26
+during   pin95      fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.1244 (-0.3481, +0.2201) of base 1.814; recovery -inf (+nan, +nan) units=26
+during   pin95      fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.1244 (-0.3474, +0.2279) of base 1.814; recovery -0.161 (-1.599, +0.128) units=26
+during   qs         fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -1.3185 (-2.4371, -0.1522) of base 5.407; recovery -inf (+nan, +nan) units=26
+during   qs         fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -1.3185 (-2.4485, -0.1415) of base 5.407; recovery -0.640 (-1.549, -0.052) units=26
+during   qs         fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.3558 (-0.6017, -0.0017) of base 5.407; recovery -inf (+nan, +nan) units=26
+during   qs         fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.3558 (-0.5997, -0.0027) of base 5.407; recovery -0.173 (-0.375, -0.001) units=26
+during   abs_median fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -1.7173 (-3.2493, +0.0461) of base 8.723; recovery -inf (+nan, +nan) units=26
+during   abs_median fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -1.7173 (-3.2417, +0.0493) of base 8.723; recovery -0.533 (-1.347, +0.012) units=26
+during   abs_median fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.4369 (-0.7929, +0.1025) of base 8.723; recovery -inf (+nan, +nan) units=26
+during   abs_median fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.4369 (-0.7904, +0.0818) of base 8.723; recovery -0.136 (-0.303, +0.020) units=26
+after    pin95      fixed=GAM_ONLY RULE_r24_4.5   vs ORACLE_STATE: gain -1.0149 (-2.6490, -0.0113) of base 0.825; recovery +214.616 (+nan, +nan) units=26
+after    pin95      fixed=GAM_ONLY RULE_r24_4.5   vs ORACLE_ROW  : gain -1.0149 (-2.6694, -0.0112) of base 0.825; recovery -5.768 (-24.054, -0.063) units=26
+after    pin95      fixed=GAM_ONLY RULE_d_2.3     vs ORACLE_STATE: gain -1.1306 (-2.7784, -0.0374) of base 0.825; recovery +239.083 (+nan, +485.230) units=26
+after    pin95      fixed=GAM_ONLY RULE_d_2.3     vs ORACLE_ROW  : gain -1.1306 (-2.8040, -0.0391) of base 0.825; recovery -6.425 (-26.840, -0.179) units=26
+after    qs         fixed=GAM_ONLY RULE_r24_4.5   vs ORACLE_STATE: gain -1.2549 (-2.8436, -0.1316) of base 3.443; recovery +13.735 (+nan, +nan) units=26
+after    qs         fixed=GAM_ONLY RULE_r24_4.5   vs ORACLE_ROW  : gain -1.2549 (-2.8171, -0.1435) of base 3.443; recovery -1.239 (-3.027, -0.158) units=26
+after    qs         fixed=GAM_ONLY RULE_d_2.3     vs ORACLE_STATE: gain -1.7763 (-3.3865, -0.6072) of base 3.443; recovery +19.441 (+nan, +30.635) units=26
+after    qs         fixed=GAM_ONLY RULE_d_2.3     vs ORACLE_ROW  : gain -1.7763 (-3.4234, -0.6119) of base 3.443; recovery -1.753 (-3.953, -0.538) units=26
+after    abs_median fixed=GAM_ONLY RULE_r24_4.5   vs ORACLE_STATE: gain -1.4832 (-3.3199, -0.2152) of base 5.957; recovery +15.605 (+nan, +nan) units=26
+after    abs_median fixed=GAM_ONLY RULE_r24_4.5   vs ORACLE_ROW  : gain -1.4832 (-3.3076, -0.1853) of base 5.957; recovery -0.753 (-1.838, -0.102) units=26
+after    abs_median fixed=GAM_ONLY RULE_d_2.3     vs ORACLE_STATE: gain -2.2906 (-4.2107, -0.8290) of base 5.957; recovery +24.100 (+nan, +37.491) units=26
+after    abs_median fixed=GAM_ONLY RULE_d_2.3     vs ORACLE_ROW  : gain -2.2906 (-4.2078, -0.8314) of base 5.957; recovery -1.163 (-2.524, -0.359) units=26
+ordinary pin95      fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -0.1090 (-0.1501, -0.0650) of base 0.742; recovery +0.943 (+0.649, +1.333) units=53
+ordinary pin95      fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -0.1090 (-0.1500, -0.0648) of base 0.742; recovery -1.212 (-1.958, -0.639) units=53
+ordinary pin95      fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.0723 (-0.0951, -0.0481) of base 0.742; recovery +0.625 (+0.415, +1.049) units=53
+ordinary pin95      fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.0723 (-0.0950, -0.0479) of base 0.742; recovery -0.804 (-1.268, -0.473) units=53
+ordinary qs         fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -0.4331 (-0.6118, -0.2785) of base 2.875; recovery +0.971 (+0.820, +1.077) units=53
+ordinary qs         fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -0.4331 (-0.6072, -0.2731) of base 2.875; recovery -0.770 (-1.135, -0.469) units=53
+ordinary qs         fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.3022 (-0.4160, -0.1988) of base 2.875; recovery +0.677 (+0.543, +0.838) units=53
+ordinary qs         fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.3022 (-0.4144, -0.1977) of base 2.875; recovery -0.537 (-0.767, -0.346) units=53
+ordinary abs_median fixed=K0       RULE_r24_4.5   vs ORACLE_STATE: gain -0.7466 (-1.0655, -0.4724) of base 5.020; recovery +0.971 (+0.836, +1.054) units=53
+ordinary abs_median fixed=K0       RULE_r24_4.5   vs ORACLE_ROW  : gain -0.7466 (-1.0617, -0.4723) of base 5.020; recovery -0.605 (-0.894, -0.370) units=53
+ordinary abs_median fixed=K0       RULE_d_2.3     vs ORACLE_STATE: gain -0.5457 (-0.7584, -0.3600) of base 5.020; recovery +0.710 (+0.582, +0.855) units=53
+ordinary abs_median fixed=K0       RULE_d_2.3     vs ORACLE_ROW  : gain -0.5457 (-0.7569, -0.3583) of base 5.020; recovery -0.442 (-0.636, -0.283) units=53
+=== K0 minus GAM_ONLY (positive = GAM_ONLY better), even months
+near pin95 {'n': 298205.0, 'units': 29, 'gain': -0.4251, 'lo': -1.6281, 'hi': 1.2291, 'base': 1.8309}
+near qs {'n': 298205.0, 'units': 29, 'gain': -0.5446, 'lo': -1.8593, 'hi': 1.2052, 'base': 5.3656}
+during pin95 {'n': 264544.0, 'units': 26, 'gain': -0.6255, 'lo': -1.857, 'hi': 1.0749, 'base': 1.8136}
+during qs {'n': 264544.0, 'units': 26, 'gain': -0.835, 'lo': -2.1413, 'hi': 0.9781, 'base': 5.4071}
+after pin95 {'n': 34354.0, 'units': 26, 'gain': 1.1316, 'lo': 0.0288, 'hi': 2.8408, 'base': 1.9568}
+after qs {'n': 34354.0, 'units': 26, 'gain': 1.7935, 'lo': 0.6392, 'hi': 3.3869, 'base': 5.2368}
+ordinary pin95 {'n': 8242262.0, 'units': 53, 'gain': -0.1156, 'lo': -0.1711, 'hi': -0.0578, 'base': 0.7424}
+ordinary qs {'n': 8242262.0, 'units': 53, 'gain': -0.4461, 'lo': -0.6247, 'hi': -0.2836, 'base': 2.8754}
+
+=== e00309_inj.py r24
+Running as unit: run-p774601-i88783495.scope; invocation ID: c5de99e9eaa049368c78bcb99443da48
+rows 6879769 shift units 411
+share of rows in the abnormal state, by phase:
+RULE_r24_2.6 {'AFTER': 0.213, 'BEFORE_ALARM': 0.13, 'DURING': 0.192, 'MARGIN': 0.052, 'ORDINARY': 0.034}
+RULE_r24_3.5 {'AFTER': 0.087, 'BEFORE_ALARM': 0.08, 'DURING': 0.066, 'MARGIN': 0.03, 'ORDINARY': 0.011}
+RULE_r24_4.5 {'AFTER': 0.03, 'BEFORE_ALARM': 0.041, 'DURING': 0.002, 'MARGIN': 0.016, 'ORDINARY': 0.007}
+RULE_d_2.3 {'AFTER': 0.175, 'BEFORE_ALARM': 0.086, 'DURING': 0.094, 'MARGIN': 0.065, 'ORDINARY': 0.052}
+RULE_d_3.2 {'AFTER': 0.087, 'BEFORE_ALARM': 0.034, 'DURING': 0.026, 'MARGIN': 0.028, 'ORDINARY': 0.015}
+RULE_d_4.5 {'AFTER': 0.029, 'BEFORE_ALARM': 0.017, 'DURING': 0.005, 'MARGIN': 0.008, 'ORDINARY': 0.005}
+=== absolute mean scores, even months (points; cost GBP per scored half-hour)
+GAM_ONLY G0 all rows {'qs_nra': 2.9528, 'tw95_nra': 0.8603, 'ae_median_nra': 5.2211, 'ae_mean_nra': 5.2092, 'cost_nra': 2932.6038, 'qs_obs': 2.9794, 'tw95_obs': 0.8638, 'ae_median_obs': 5.2616, 'ae_mean_obs': 5.25, 'cost_obs': 2940.9857}
+GAM_ONLY G1 ordinary {'qs_nra': 2.9578, 'tw95_nra': 0.8888, 'ae_median_nra': 5.2321, 'ae_mean_nra': 5.2196, 'cost_nra': 2953.8198, 'qs_obs': 2.9578, 'tw95_obs': 0.8888, 'ae_median_obs': 5.2321, 'ae_mean_obs': 5.2196, 'cost_obs': 2953.8198}
+GAM_ONLY G2 before alarm {'qs_nra': 2.6344, 'tw95_nra': 0.2649, 'ae_median_nra': 4.656, 'ae_mean_nra': 4.6525, 'cost_nra': 2293.4814, 'qs_obs': 3.6732, 'tw95_obs': 0.3502, 'ae_median_obs': 6.2315, 'ae_mean_obs': 6.2372, 'cost_obs': 2605.6927}
+GAM_ONLY G3 during {'qs_nra': 2.7381, 'tw95_nra': 0.3134, 'ae_median_nra': 4.9205, 'ae_mean_nra': 4.9228, 'cost_nra': 2684.8821, 'qs_obs': 3.6312, 'tw95_obs': 0.1248, 'ae_median_obs': 6.2608, 'ae_mean_obs': 6.3204, 'cost_obs': 2483.0117}
+GAM_ONLY G4 after {'qs_nra': 2.5813, 'tw95_nra': 0.2534, 'ae_median_nra': 4.5667, 'ae_mean_nra': 4.5586, 'cost_nra': 2168.5484, 'qs_obs': 2.705, 'tw95_obs': 0.3285, 'ae_median_obs': 4.729, 'ae_mean_obs': 4.7206, 'cost_obs': 2416.7044}
+GAM_ONLY G5 near {'qs_nra': 2.861, 'tw95_nra': 0.3407, 'ae_median_nra': 5.0214, 'ae_mean_nra': 5.0191, 'cost_nra': 2531.7332, 'qs_obs': 3.3731, 'tw95_obs': 0.4083, 'ae_median_obs': 5.8013, 'ae_mean_obs': 5.8036, 'cost_obs': 2698.4879}
+GAM_ONLY Gs shift rows {'qs_nra': 2.6422, 'tw95_nra': 0.2716, 'ae_median_nra': 4.6864, 'ae_mean_nra': 4.683, 'cost_nra': 2315.0486, 'qs_obs': 3.4476, 'tw95_obs': 0.3023, 'ae_median_obs': 5.8994, 'ae_mean_obs': 5.9122, 'cost_obs': 2537.6312}
+K0 G0 all rows {'qs_nra': 2.607, 'tw95_nra': 0.7227, 'ae_median_nra': 4.543, 'ae_mean_nra': 4.5422, 'cost_nra': 2592.8608, 'qs_obs': 2.6389, 'tw95_obs': 0.7263, 'ae_median_obs': 4.5894, 'ae_mean_obs': 4.5887, 'cost_obs': 2593.2326}
+K0 G1 ordinary {'qs_nra': 2.5966, 'tw95_nra': 0.7437, 'ae_median_nra': 4.5243, 'ae_mean_nra': 4.523, 'cost_nra': 2598.8124, 'qs_obs': 2.5966, 'tw95_obs': 0.7437, 'ae_median_obs': 4.5243, 'ae_mean_obs': 4.523, 'cost_obs': 2598.8124}
+K0 G2 before alarm {'qs_nra': 2.8187, 'tw95_nra': 0.2896, 'ae_median_nra': 4.9213, 'ae_mean_nra': 4.9319, 'cost_nra': 2440.1284, 'qs_obs': 3.6848, 'tw95_obs': 0.307, 'ae_median_obs': 6.2712, 'ae_mean_obs': 6.2907, 'cost_obs': 2347.9228}
+K0 G3 during {'qs_nra': 4.1271, 'tw95_nra': 0.4037, 'ae_median_nra': 6.8966, 'ae_mean_nra': 6.8485, 'cost_nra': 4658.2178, 'qs_obs': 2.7387, 'tw95_obs': 0.0764, 'ae_median_obs': 4.7968, 'ae_mean_obs': 4.8342, 'cost_obs': 2009.7117}
+K0 G4 after {'qs_nra': 3.5318, 'tw95_nra': 0.3301, 'ae_median_nra': 6.069, 'ae_mean_nra': 6.0654, 'cost_nra': 2862.5568, 'qs_obs': 3.3809, 'tw95_obs': 0.3184, 'ae_median_obs': 5.8359, 'ae_mean_obs': 5.83, 'cost_obs': 2794.2952}
+K0 G5 near {'qs_nra': 2.7964, 'tw95_nra': 0.3397, 'ae_median_nra': 4.8838, 'ae_mean_nra': 4.8929, 'cost_nra': 2480.405, 'qs_obs': 3.4114, 'tw95_obs': 0.4097, 'ae_median_obs': 5.7756, 'ae_mean_obs': 5.7886, 'cost_obs': 2487.8018}
+K0 Gs shift rows {'qs_nra': 3.2285, 'tw95_nra': 0.3205, 'ae_median_nra': 5.5561, 'ae_mean_nra': 5.5523, 'cost_nra': 2866.0886, 'qs_obs': 3.436, 'tw95_obs': 0.2656, 'ae_median_obs': 5.8921, 'ae_mean_obs': 5.9093, 'cost_obs': 2420.2165}
+BAND_HEAD G0 all rows {'qs_nra': 2.5874, 'tw95_nra': 0.7197, 'ae_median_nra': 4.4962, 'ae_mean_nra': 4.5422, 'cost_nra': 2670.5442, 'qs_obs': 2.6194, 'tw95_obs': 0.7236, 'ae_median_obs': 4.5455, 'ae_mean_obs': 4.5887, 'cost_obs': 2676.6924}
+BAND_HEAD G1 ordinary {'qs_nra': 2.5877, 'tw95_nra': 0.7422, 'ae_median_nra': 4.4922, 'ae_mean_nra': 4.523, 'cost_nra': 2687.2186, 'qs_obs': 2.5877, 'tw95_obs': 0.7422, 'ae_median_obs': 4.4922, 'ae_mean_obs': 4.523, 'cost_obs': 2687.2186}
+BAND_HEAD G2 before alarm {'qs_nra': 2.5637, 'tw95_nra': 0.273, 'ae_median_nra': 4.541, 'ae_mean_nra': 4.9319, 'cost_nra': 2273.9341, 'qs_obs': 3.4758, 'tw95_obs': 0.3203, 'ae_median_obs': 6.0852, 'ae_mean_obs': 6.2907, 'cost_obs': 2429.0645}
+BAND_HEAD G3 during {'qs_nra': 3.1031, 'tw95_nra': 0.334, 'ae_median_nra': 5.5139, 'ae_mean_nra': 6.8485, 'cost_nra': 2664.2523, 'qs_obs': 3.0434, 'tw95_obs': 0.0955, 'ae_median_obs': 5.7713, 'ae_mean_obs': 4.8342, 'cost_obs': 2261.7605}
+BAND_HEAD G4 after {'qs_nra': 2.846, 'tw95_nra': 0.2948, 'ae_median_nra': 5.0037, 'ae_mean_nra': 6.0654, 'cost_nra': 2216.3828, 'qs_obs': 2.7852, 'tw95_obs': 0.3155, 'ae_median_obs': 4.8858, 'ae_mean_obs': 5.83, 'cost_obs': 2261.7952}
+BAND_HEAD G5 near {'qs_nra': 2.5806, 'tw95_nra': 0.3106, 'ae_median_nra': 4.5679, 'ae_mean_nra': 4.8929, 'cost_nra': 2355.4849, 'qs_obs': 3.1975, 'tw95_obs': 0.3854, 'ae_median_obs': 5.5164, 'ae_mean_obs': 5.7886, 'cost_obs': 2477.8017}
+BAND_HEAD Gs shift rows {'qs_nra': 2.73, 'tw95_nra': 0.2895, 'ae_median_nra': 4.8306, 'ae_mean_nra': 5.5523, 'cost_nra': 2313.4537, 'qs_obs': 3.2381, 'tw95_obs': 0.2764, 'ae_median_obs': 5.7558, 'ae_mean_obs': 5.9093, 'cost_obs': 2360.5528}
+RULE_r24_2.6 G0 all rows {'qs_nra': 2.9828, 'tw95_nra': 0.8452, 'ae_median_nra': 5.2282, 'ae_mean_nra': 5.216, 'cost_nra': 2884.702, 'qs_obs': 3.0043, 'tw95_obs': 0.8477, 'ae_median_obs': 5.2614, 'ae_mean_obs': 5.2494, 'cost_obs': 2887.6687}
+RULE_r24_2.6 G1 ordinary {'qs_nra': 2.9814, 'tw95_nra': 0.8718, 'ae_median_nra': 5.2271, 'ae_mean_nra': 5.2143, 'cost_nra': 2900.9962, 'qs_obs': 2.9814, 'tw95_obs': 0.8718, 'ae_median_obs': 5.2271, 'ae_mean_obs': 5.2143, 'cost_obs': 2900.9962}
+RULE_r24_2.6 G2 before alarm {'qs_nra': 2.8837, 'tw95_nra': 0.3017, 'ae_median_nra': 5.0964, 'ae_mean_nra': 5.0968, 'cost_nra': 2338.7004, 'qs_obs': 3.5444, 'tw95_obs': 0.3008, 'ae_median_obs': 6.121, 'ae_mean_obs': 6.1303, 'cost_obs': 2371.5698}
+RULE_r24_2.6 G3 during {'qs_nra': 2.9275, 'tw95_nra': 0.3292, 'ae_median_nra': 5.1787, 'ae_mean_nra': 5.1824, 'cost_nra': 3161.8563, 'qs_obs': 3.3663, 'tw95_obs': 0.0996, 'ae_median_obs': 5.8973, 'ae_mean_obs': 5.9575, 'cost_obs': 2203.8103}
+RULE_r24_2.6 G4 after {'qs_nra': 3.1705, 'tw95_nra': 0.3191, 'ae_median_nra': 5.5306, 'ae_mean_nra': 5.5259, 'cost_nra': 2561.1294, 'qs_obs': 3.0478, 'tw95_obs': 0.3082, 'ae_median_obs': 5.3321, 'ae_mean_obs': 5.3256, 'cost_obs': 2563.3169}
+RULE_r24_2.6 G5 near {'qs_nra': 3.0073, 'tw95_nra': 0.3596, 'ae_median_nra': 5.2484, 'ae_mean_nra': 5.2457, 'cost_nra': 2576.8259, 'qs_obs': 3.4211, 'tw95_obs': 0.4075, 'ae_median_obs': 5.8881, 'ae_mean_obs': 5.8901, 'cost_obs': 2635.8495}
+RULE_r24_2.6 Gs shift rows {'qs_nra': 2.9565, 'tw95_nra': 0.3109, 'ae_median_nra': 5.2097, 'ae_mean_nra': 5.2096, 'cost_nra': 2514.4214, 'qs_obs': 3.3988, 'tw95_obs': 0.2641, 'ae_median_obs': 5.901, 'ae_mean_obs': 5.9165, 'cost_obs': 2399.4588}
+RULE_r24_3.5 G0 all rows {'qs_nra': 2.9777, 'tw95_nra': 0.8681, 'ae_median_nra': 5.2568, 'ae_mean_nra': 5.2446, 'cost_nra': 2933.793, 'qs_obs': 3.0008, 'tw95_obs': 0.8708, 'ae_median_obs': 5.2925, 'ae_mean_obs': 5.2806, 'cost_obs': 2938.4183}
+RULE_r24_3.5 G1 ordinary {'qs_nra': 2.9793, 'tw95_nra': 0.8962, 'ae_median_nra': 5.2624, 'ae_mean_nra': 5.2497, 'cost_nra': 2954.4097, 'qs_obs': 2.9793, 'tw95_obs': 0.8962, 'ae_median_obs': 5.2624, 'ae_mean_obs': 5.2497, 'cost_obs': 2954.4097}
+RULE_r24_3.5 G2 before alarm {'qs_nra': 2.8069, 'tw95_nra': 0.2956, 'ae_median_nra': 4.9421, 'ae_mean_nra': 4.9406, 'cost_nra': 2322.4735, 'qs_obs': 3.6172, 'tw95_obs': 0.3092, 'ae_median_obs': 6.2083, 'ae_mean_obs': 6.2156, 'cost_obs': 2413.9286}
+RULE_r24_3.5 G3 during {'qs_nra': 2.7707, 'tw95_nra': 0.321, 'ae_median_nra': 4.9686, 'ae_mean_nra': 4.9708, 'cost_nra': 2686.8765, 'qs_obs': 3.5318, 'tw95_obs': 0.1092, 'ae_median_obs': 6.1395, 'ae_mean_obs': 6.1997, 'cost_obs': 2354.8431}
+RULE_r24_3.5 G4 after {'qs_nra': 2.8165, 'tw95_nra': 0.2957, 'ae_median_nra': 4.9754, 'ae_mean_nra': 4.9675, 'cost_nra': 2225.4035, 'qs_obs': 2.7852, 'tw95_obs': 0.2961, 'ae_median_obs': 4.9374, 'ae_mean_obs': 4.9285, 'cost_obs': 2238.7956}
+RULE_r24_3.5 G5 near {'qs_nra': 2.949, 'tw95_nra': 0.3558, 'ae_median_nra': 5.1544, 'ae_mean_nra': 5.1519, 'cost_nra': 2544.2431, 'qs_obs': 3.3933, 'tw95_obs': 0.4069, 'ae_median_obs': 5.843, 'ae_mean_obs': 5.8452, 'cost_obs': 2636.2631}
+RULE_r24_3.5 Gs shift rows {'qs_nra': 2.8022, 'tw95_nra': 0.3005, 'ae_median_nra': 4.9546, 'ae_mean_nra': 4.9524, 'cost_nra': 2347.7242, 'qs_obs': 3.414, 'tw95_obs': 0.2681, 'ae_median_obs': 5.9095, 'ae_mean_obs': 5.9233, 'cost_obs': 2358.5485}
+RULE_r24_4.5 G0 all rows {'qs_nra': 2.9754, 'tw95_nra': 0.8678, 'ae_median_nra': 5.2528, 'ae_mean_nra': 5.2407, 'cost_nra': 2933.3858, 'qs_obs': 2.9998, 'tw95_obs': 0.8709, 'ae_median_obs': 5.2903, 'ae_mean_obs': 5.2784, 'cost_obs': 2940.1173}
+RULE_r24_4.5 G1 ordinary {'qs_nra': 2.9793, 'tw95_nra': 0.8962, 'ae_median_nra': 5.2624, 'ae_mean_nra': 5.2497, 'cost_nra': 2954.4097, 'qs_obs': 2.9793, 'tw95_obs': 0.8962, 'ae_median_obs': 5.2624, 'ae_mean_obs': 5.2497, 'cost_obs': 2954.4097}
+RULE_r24_4.5 G2 before alarm {'qs_nra': 2.7084, 'tw95_nra': 0.2877, 'ae_median_nra': 4.7618, 'ae_mean_nra': 4.7599, 'cost_nra': 2303.3385, 'qs_obs': 3.6901, 'tw95_obs': 0.3578, 'ae_median_obs': 6.2625, 'ae_mean_obs': 6.2692, 'cost_obs': 2543.6818}
+RULE_r24_4.5 G3 during {'qs_nra': 2.7379, 'tw95_nra': 0.3134, 'ae_median_nra': 4.9202, 'ae_mean_nra': 4.9225, 'cost_nra': 2684.8821, 'qs_obs': 3.6306, 'tw95_obs': 0.1248, 'ae_median_obs': 6.2597, 'ae_mean_obs': 6.3193, 'cost_obs': 2483.0117}
+RULE_r24_4.5 G4 after {'qs_nra': 2.6198, 'tw95_nra': 0.2693, 'ae_median_nra': 4.6329, 'ae_mean_nra': 4.625, 'cost_nra': 2190.1925, 'qs_obs': 2.7435, 'tw95_obs': 0.3445, 'ae_median_obs': 4.7952, 'ae_mean_obs': 4.787, 'cost_obs': 2438.3485}
+RULE_r24_4.5 G5 near {'qs_nra': 2.9039, 'tw95_nra': 0.3504, 'ae_median_nra': 5.0791, 'ae_mean_nra': 5.0769, 'cost_nra': 2536.143, 'qs_obs': 3.3732, 'tw95_obs': 0.4088, 'ae_median_obs': 5.8006, 'ae_mean_obs': 5.8031, 'cost_obs': 2670.0646}
+RULE_r24_4.5 Gs shift rows {'qs_nra': 2.6941, 'tw95_nra': 0.2885, 'ae_median_nra': 4.7631, 'ae_mean_nra': 4.7606, 'cost_nra': 2326.6842, 'qs_obs': 3.466, 'tw95_obs': 0.3104, 'ae_median_obs': 5.9322, 'ae_mean_obs': 5.9457, 'cost_obs': 2506.8331}
+RULE_d_2.3 G0 all rows {'qs_nra': 2.9678, 'tw95_nra': 0.8387, 'ae_median_nra': 5.1952, 'ae_mean_nra': 5.1833, 'cost_nra': 2883.0884, 'qs_obs': 2.991, 'tw95_obs': 0.8414, 'ae_median_obs': 5.2308, 'ae_mean_obs': 5.2192, 'cost_obs': 2887.8643}
+RULE_d_2.3 G1 ordinary {'qs_nra': 2.9665, 'tw95_nra': 0.8648, 'ae_median_nra': 5.1938, 'ae_mean_nra': 5.1814, 'cost_nra': 2901.0834, 'qs_obs': 2.9665, 'tw95_obs': 0.8648, 'ae_median_obs': 5.1938, 'ae_mean_obs': 5.1814, 'cost_obs': 2901.0834}
+RULE_d_2.3 G2 before alarm {'qs_nra': 2.8136, 'tw95_nra': 0.2965, 'ae_median_nra': 4.9571, 'ae_mean_nra': 4.9576, 'cost_nra': 2318.851, 'qs_obs': 3.5815, 'tw95_obs': 0.3053, 'ae_median_obs': 6.1329, 'ae_mean_obs': 6.1432, 'cost_obs': 2403.7777}
+RULE_d_2.3 G3 during {'qs_nra': 2.7855, 'tw95_nra': 0.321, 'ae_median_nra': 4.9951, 'ae_mean_nra': 4.9978, 'cost_nra': 2679.1704, 'qs_obs': 3.5248, 'tw95_obs': 0.1086, 'ae_median_obs': 6.1248, 'ae_mean_obs': 6.1851, 'cost_obs': 2324.5183}
+RULE_d_2.3 G4 after {'qs_nra': 2.9235, 'tw95_nra': 0.2999, 'ae_median_nra': 5.1881, 'ae_mean_nra': 5.1817, 'cost_nra': 2231.4215, 'qs_obs': 2.8008, 'tw95_obs': 0.289, 'ae_median_obs': 4.9896, 'ae_mean_obs': 4.9814, 'cost_obs': 2233.609}
+RULE_d_2.3 G5 near {'qs_nra': 2.991, 'tw95_nra': 0.3625, 'ae_median_nra': 5.2212, 'ae_mean_nra': 5.2192, 'cost_nra': 2543.0755, 'qs_obs': 3.4373, 'tw95_obs': 0.4146, 'ae_median_obs': 5.9059, 'ae_mean_obs': 5.9087, 'cost_obs': 2638.0914}
+RULE_d_2.3 Gs shift rows {'qs_nra': 2.833, 'tw95_nra': 0.3019, 'ae_median_nra': 5.0162, 'ae_mean_nra': 5.0157, 'cost_nra': 2346.1168, 'qs_obs': 3.3952, 'tw95_obs': 0.2641, 'ae_median_obs': 5.8744, 'ae_mean_obs': 5.8901, 'cost_obs': 2346.8896}
+RULE_d_3.2 G0 all rows {'qs_nra': 2.9799, 'tw95_nra': 0.8692, 'ae_median_nra': 5.2623, 'ae_mean_nra': 5.2502, 'cost_nra': 2933.4972, 'qs_obs': 3.0041, 'tw95_obs': 0.8721, 'ae_median_obs': 5.2996, 'ae_mean_obs': 5.2878, 'cost_obs': 2939.3515}
+RULE_d_3.2 G1 ordinary {'qs_nra': 2.9826, 'tw95_nra': 0.8974, 'ae_median_nra': 5.2699, 'ae_mean_nra': 5.2573, 'cost_nra': 2954.4719, 'qs_obs': 2.9826, 'tw95_obs': 0.8974, 'ae_median_obs': 5.2699, 'ae_mean_obs': 5.2573, 'cost_obs': 2954.4719}
+RULE_d_3.2 G2 before alarm {'qs_nra': 2.7547, 'tw95_nra': 0.2861, 'ae_median_nra': 4.8444, 'ae_mean_nra': 4.8427, 'cost_nra': 2315.3223, 'qs_obs': 3.7191, 'tw95_obs': 0.3563, 'ae_median_obs': 6.3214, 'ae_mean_obs': 6.3284, 'cost_obs': 2554.6648}
+RULE_d_3.2 G3 during {'qs_nra': 2.7543, 'tw95_nra': 0.3178, 'ae_median_nra': 4.947, 'ae_mean_nra': 4.9497, 'cost_nra': 2687.005, 'qs_obs': 3.6022, 'tw95_obs': 0.1131, 'ae_median_obs': 6.2311, 'ae_mean_obs': 6.2907, 'cost_obs': 2360.7855}
+RULE_d_3.2 G4 after {'qs_nra': 2.7295, 'tw95_nra': 0.2827, 'ae_median_nra': 4.8454, 'ae_mean_nra': 4.8397, 'cost_nra': 2188.8332, 'qs_obs': 2.6522, 'tw95_obs': 0.2769, 'ae_median_obs': 4.7292, 'ae_mean_obs': 4.722, 'cost_obs': 2194.5839}
+RULE_d_3.2 G5 near {'qs_nra': 2.93, 'tw95_nra': 0.355, 'ae_median_nra': 5.1233, 'ae_mean_nra': 5.121, 'cost_nra': 2537.1849, 'qs_obs': 3.3955, 'tw95_obs': 0.4113, 'ae_median_obs': 5.8409, 'ae_mean_obs': 5.8432, 'cost_obs': 2653.6549}
+RULE_d_3.2 Gs shift rows {'qs_nra': 2.749, 'tw95_nra': 0.2914, 'ae_median_nra': 4.8642, 'ae_mean_nra': 4.8624, 'cost_nra': 2333.6937, 'qs_obs': 3.457, 'tw95_obs': 0.292, 'ae_median_obs': 5.9464, 'ae_mean_obs': 5.9602, 'cost_obs': 2430.6026}
+RULE_d_4.5 G0 all rows {'qs_nra': 2.9547, 'tw95_nra': 0.8607, 'ae_median_nra': 5.2237, 'ae_mean_nra': 5.2118, 'cost_nra': 2932.746, 'qs_obs': 2.9793, 'tw95_obs': 0.8638, 'ae_median_obs': 5.2615, 'ae_mean_obs': 5.2498, 'cost_obs': 2939.5627}
+RULE_d_4.5 G1 ordinary {'qs_nra': 2.9578, 'tw95_nra': 0.8888, 'ae_median_nra': 5.2321, 'ae_mean_nra': 5.2196, 'cost_nra': 2953.8198, 'qs_obs': 2.9578, 'tw95_obs': 0.8888, 'ae_median_obs': 5.2321, 'ae_mean_obs': 5.2196, 'cost_obs': 2953.8198}
+RULE_d_4.5 G2 before alarm {'qs_nra': 2.694, 'tw95_nra': 0.2809, 'ae_median_nra': 4.7387, 'ae_mean_nra': 4.7359, 'cost_nra': 2302.0922, 'qs_obs': 3.6914, 'tw95_obs': 0.3589, 'ae_median_obs': 6.2607, 'ae_mean_obs': 6.2669, 'cost_obs': 2559.0019}
+RULE_d_4.5 G3 during {'qs_nra': 2.7381, 'tw95_nra': 0.3134, 'ae_median_nra': 4.9205, 'ae_mean_nra': 4.9228, 'cost_nra': 2684.8821, 'qs_obs': 3.6312, 'tw95_obs': 0.1248, 'ae_median_obs': 6.2608, 'ae_mean_obs': 6.3204, 'cost_obs': 2483.0117}
+RULE_d_4.5 G4 after {'qs_nra': 2.6003, 'tw95_nra': 0.2542, 'ae_median_nra': 4.6063, 'ae_mean_nra': 4.5988, 'cost_nra': 2169.771, 'qs_obs': 2.724, 'tw95_obs': 0.3293, 'ae_median_obs': 4.7686, 'ae_mean_obs': 4.7608, 'cost_obs': 2417.927}
+RULE_d_4.5 G5 near {'qs_nra': 2.8981, 'tw95_nra': 0.3492, 'ae_median_nra': 5.0706, 'ae_mean_nra': 5.0683, 'cost_nra': 2534.561, 'qs_obs': 3.3715, 'tw95_obs': 0.4083, 'ae_median_obs': 5.7989, 'ae_mean_obs': 5.8014, 'cost_obs': 2670.1779}
+RULE_d_4.5 Gs shift rows {'qs_nra': 2.6814, 'tw95_nra': 0.2811, 'ae_median_nra': 4.7436, 'ae_mean_nra': 4.7407, 'cost_nra': 2320.4613, 'qs_obs': 3.4625, 'tw95_obs': 0.3076, 'ae_median_obs': 5.9254, 'ae_mean_obs': 5.9386, 'cost_obs': 2510.3916}
+ORACLE_NRA G0 all rows {'qs_nra': 2.1153, 'tw95_nra': 0.5845, 'ae_median_nra': 3.474, 'ae_mean_nra': 3.4762, 'cost_nra': 2503.3179, 'qs_obs': 2.1526, 'tw95_obs': 0.5892, 'ae_median_obs': 3.5334, 'ae_mean_obs': 3.5358, 'cost_obs': 2512.8716}
+ORACLE_NRA G1 ordinary {'qs_nra': 2.1115, 'tw95_nra': 0.6017, 'ae_median_nra': 3.4672, 'ae_mean_nra': 3.4689, 'cost_nra': 2516.0476, 'qs_obs': 2.1115, 'tw95_obs': 0.6017, 'ae_median_obs': 3.4672, 'ae_mean_obs': 3.4689, 'cost_obs': 2516.0476}
+ORACLE_NRA G2 before alarm {'qs_nra': 2.0875, 'tw95_nra': 0.2205, 'ae_median_nra': 3.4297, 'ae_mean_nra': 3.439, 'cost_nra': 2140.8409, 'qs_obs': 3.4448, 'tw95_obs': 0.3247, 'ae_median_obs': 5.6531, 'ae_mean_obs': 5.6701, 'cost_obs': 2461.5314}
+ORACLE_NRA G3 during {'qs_nra': 2.627, 'tw95_nra': 0.3067, 'ae_median_nra': 4.6136, 'ae_mean_nra': 4.6042, 'cost_nra': 2650.022, 'qs_obs': 3.435, 'tw95_obs': 0.115, 'ae_median_obs': 5.9222, 'ae_mean_obs': 5.9857, 'cost_obs': 2396.7492}
+ORACLE_NRA G4 after {'qs_nra': 2.2311, 'tw95_nra': 0.229, 'ae_median_nra': 3.7639, 'ae_mean_nra': 3.7672, 'cost_nra': 2077.71, 'qs_obs': 2.3284, 'tw95_obs': 0.2877, 'ae_median_obs': 3.8964, 'ae_mean_obs': 3.8986, 'cost_obs': 2292.2368}
+ORACLE_NRA G5 near {'qs_nra': 2.1838, 'tw95_nra': 0.2709, 'ae_median_nra': 3.5973, 'ae_mean_nra': 3.6104, 'cost_nra': 2262.7927, 'qs_obs': 2.903, 'tw95_obs': 0.36, 'ae_median_obs': 4.741, 'ae_mean_obs': 4.7573, 'cost_obs': 2452.8614}
+ORACLE_NRA Gs shift rows {'qs_nra': 2.2227, 'tw95_nra': 0.2388, 'ae_median_nra': 3.7307, 'ae_mean_nra': 3.735, 'cost_nra': 2195.6053, 'qs_obs': 3.192, 'tw95_obs': 0.2764, 'ae_median_obs': 5.3096, 'ae_mean_obs': 5.3322, 'cost_obs': 2406.9176}
+ORACLE_OBS G0 all rows {'qs_nra': 2.1234, 'tw95_nra': 0.5854, 'ae_median_nra': 3.4899, 'ae_mean_nra': 3.492, 'cost_nra': 2507.7896, 'qs_obs': 2.1406, 'tw95_obs': 0.5876, 'ae_median_obs': 3.5155, 'ae_mean_obs': 3.5179, 'cost_obs': 2506.5399}
+ORACLE_OBS G1 ordinary {'qs_nra': 2.1115, 'tw95_nra': 0.6017, 'ae_median_nra': 3.4672, 'ae_mean_nra': 3.4689, 'cost_nra': 2516.0476, 'qs_obs': 2.1115, 'tw95_obs': 0.6017, 'ae_median_obs': 3.4672, 'ae_mean_obs': 3.4689, 'cost_obs': 2516.0476}
+ORACLE_OBS G2 before alarm {'qs_nra': 2.4582, 'tw95_nra': 0.2641, 'ae_median_nra': 4.1785, 'ae_mean_nra': 4.1837, 'cost_nra': 2304.4574, 'qs_obs': 2.8778, 'tw95_obs': 0.2446, 'ae_median_obs': 4.7977, 'ae_mean_obs': 4.8147, 'cost_obs': 2159.6272}
+ORACLE_OBS G3 during {'qs_nra': 3.6557, 'tw95_nra': 0.3665, 'ae_median_nra': 6.2847, 'ae_mean_nra': 6.2382, 'cost_nra': 4165.797, 'qs_obs': 2.5019, 'tw95_obs': 0.0714, 'ae_median_obs': 4.2392, 'ae_mean_obs': 4.2926, 'cost_obs': 1937.9535}
+ORACLE_OBS G4 after {'qs_nra': 2.3266, 'tw95_nra': 0.2539, 'ae_median_nra': 3.9171, 'ae_mean_nra': 3.9214, 'cost_nra': 2102.3819, 'qs_obs': 2.2017, 'tw95_obs': 0.2429, 'ae_median_obs': 3.7026, 'ae_mean_obs': 3.705, 'cost_obs': 2093.5503}
+ORACLE_OBS G5 near {'qs_nra': 2.3411, 'tw95_nra': 0.2881, 'ae_median_nra': 3.9034, 'ae_mean_nra': 3.9132, 'cost_nra': 2351.7567, 'qs_obs': 2.672, 'tw95_obs': 0.3302, 'ae_median_obs': 4.3966, 'ae_mean_obs': 4.4131, 'cost_obs': 2326.8934}
+ORACLE_OBS Gs shift rows {'qs_nra': 2.6571, 'tw95_nra': 0.2814, 'ae_median_nra': 4.5216, 'ae_mean_nra': 4.5167, 'cost_nra': 2512.3639, 'qs_obs': 2.6542, 'tw95_obs': 0.2112, 'ae_median_obs': 4.445, 'ae_mean_obs': 4.4657, 'cost_obs': 2110.6462}
+ORACLE_STATE G0 all rows {'qs_nra': 2.9547, 'tw95_nra': 0.8604, 'ae_median_nra': 5.2237, 'ae_mean_nra': 5.2118, 'cost_nra': 2936.3757, 'qs_obs': 2.9786, 'tw95_obs': 0.8636, 'ae_median_obs': 5.2604, 'ae_mean_obs': 5.2487, 'cost_obs': 2938.7212}
+ORACLE_STATE G1 ordinary {'qs_nra': 2.9578, 'tw95_nra': 0.8888, 'ae_median_nra': 5.2321, 'ae_mean_nra': 5.2196, 'cost_nra': 2953.8198, 'qs_obs': 2.9578, 'tw95_obs': 0.8888, 'ae_median_obs': 5.2321, 'ae_mean_obs': 5.2196, 'cost_obs': 2953.8198}
+ORACLE_STATE G2 before alarm {'qs_nra': 2.8187, 'tw95_nra': 0.2896, 'ae_median_nra': 4.9213, 'ae_mean_nra': 4.9319, 'cost_nra': 2440.1284, 'qs_obs': 3.6848, 'tw95_obs': 0.307, 'ae_median_obs': 6.2712, 'ae_mean_obs': 6.2907, 'cost_obs': 2347.9228}
+ORACLE_STATE G3 during {'qs_nra': 4.1271, 'tw95_nra': 0.4037, 'ae_median_nra': 6.8966, 'ae_mean_nra': 6.8485, 'cost_nra': 4658.2178, 'qs_obs': 2.7387, 'tw95_obs': 0.0764, 'ae_median_obs': 4.7968, 'ae_mean_obs': 4.8342, 'cost_obs': 2009.7117}
+ORACLE_STATE G4 after {'qs_nra': 2.5813, 'tw95_nra': 0.2534, 'ae_median_nra': 4.5667, 'ae_mean_nra': 4.5586, 'cost_nra': 2168.5484, 'qs_obs': 2.705, 'tw95_obs': 0.3285, 'ae_median_obs': 4.729, 'ae_mean_obs': 4.7206, 'cost_obs': 2416.7044}
+ORACLE_STATE G5 near {'qs_nra': 2.8965, 'tw95_nra': 0.3437, 'ae_median_nra': 5.0721, 'ae_mean_nra': 5.0696, 'cost_nra': 2606.7731, 'qs_obs': 3.3575, 'tw95_obs': 0.405, 'ae_median_obs': 5.7769, 'ae_mean_obs': 5.7795, 'cost_obs': 2653.437}
+ORACLE_STATE Gs shift rows {'qs_nra': 3.0149, 'tw95_nra': 0.3032, 'ae_median_nra': 5.2184, 'ae_mean_nra': 5.2136, 'cost_nra': 2679.6141, 'qs_obs': 3.2841, 'tw95_obs': 0.2678, 'ae_median_obs': 5.6433, 'ae_mean_obs': 5.66, 'cost_obs': 2318.7609}
+odd-month G5 tw95 obs by k: {2.6: 0.8145, 3.5: 0.8082, 4.5: 0.8026} chosen 4.5
+=== recovery of ORACLE's gain over the better fixed choice (even months)
+obs G5 near          tw95  fixed=GAM_ONLY  recovery -0.005 (-0.042, +0.030); gain over fixed -0.0004 (-0.0032, +0.0024) -0.1% n=831107
+obs G5 near          qs    fixed=GAM_ONLY  recovery -0.000 (-0.023, +0.028); gain over fixed -0.0001 (-0.0155, +0.0205) -0.0% n=831107
+obs G5 near          cost  fixed=K0        recovery -1.133 (-2.021, -0.506); gain over fixed -182.2628 (-305.6374, -89.6690) -7.3% n=121054
+obs Gs shift rows    tw95  fixed=K0        recovery -0.823 (-2.940, +0.176); gain over fixed -0.0448 (-0.1406, +0.0101) -16.9% n=79164
+obs Gs shift rows    qs    fixed=K0        recovery -0.038 (-0.423, +0.222); gain over fixed -0.0300 (-0.3174, +0.1855) -0.9% n=79164
+obs Gs shift rows    cost  fixed=K0        recovery -0.280 (-1.707, +0.482); gain over fixed -86.6166 (-480.2714, +173.4746) -3.6% n=24917
+obs G2 before alarm  tw95  fixed=K0        recovery -0.814 (-2.901, +0.157); gain over fixed -0.0508 (-0.1511, +0.0108) -16.5% n=46271
+obs G2 before alarm  qs    fixed=GAM_ONLY  recovery -0.021 (-0.079, +0.027); gain over fixed -0.0170 (-0.0598, +0.0207) -0.5% n=46271
+obs G2 before alarm  cost  fixed=K0        recovery -1.040 (-3.092, +0.156); gain over fixed -195.7590 (-531.0368, +31.1679) -8.3% n=14712
+obs G3 during        tw95  fixed=K0        recovery -9.750 (-141.606, +114.713); gain over fixed -0.0484 (-0.1096, -0.0238) -63.4% n=15102
+obs G3 during        qs    fixed=K0        recovery -3.767 (-9.464, -1.410); gain over fixed -0.8919 (-1.5696, -0.4546) -32.6% n=15102
+obs G3 during        cost  fixed=K0        recovery -6.596 (-65.411, +9.421); gain over fixed -473.3000 (-949.8885, -176.5492) -23.6% n=3510
+obs G4 after         tw95  fixed=K0        recovery -0.345 (-2.900, +0.684); gain over fixed -0.0261 (-0.1683, +0.0605) -8.2% n=17791
+obs G4 after         qs    fixed=GAM_ONLY  recovery -0.076 (-0.239, -0.001); gain over fixed -0.0384 (-0.0971, -0.0004) -1.4% n=17791
+obs G4 after         cost  fixed=GAM_ONLY  recovery -0.067 (-0.509, +0.000); gain over fixed -21.6441 (-52.7716, +0.0000) -0.9% n=6695
+obs G0 all rows      tw95  fixed=K0        recovery -1.042 (-1.421, -0.472); gain over fixed -0.1446 (-0.2573, -0.0420) -19.9% n=15993395
+obs G0 all rows      qs    fixed=K0        recovery -0.724 (-0.987, -0.505); gain over fixed -0.3608 (-0.4519, -0.2699) -13.7% n=15993395
+obs G0 all rows      cost  fixed=K0        recovery -4.001 (-6.829, -2.059); gain over fixed -346.8848 (-473.1877, -213.1372) -13.4% n=2408346
+nra G5 near          tw95  fixed=K0        recovery -0.155 (-0.453, +0.096); gain over fixed -0.0106 (-0.0275, +0.0073) -3.1% n=831107
+nra G5 near          qs    fixed=K0        recovery -0.175 (-0.376, -0.007); gain over fixed -0.1074 (-0.2079, -0.0060) -3.8% n=831107
+nra Gs shift rows    tw95  fixed=GAM_ONLY  recovery -0.515 (-1.319, -0.049); gain over fixed -0.0169 (-0.0388, -0.0017) -6.2% n=79164
+nra Gs shift rows    qs    fixed=GAM_ONLY  recovery -0.124 (-0.277, -0.017); gain over fixed -0.0519 (-0.1203, -0.0071) -2.0% n=79164
+nra G2 before alarm  tw95  fixed=GAM_ONLY  recovery -0.512 (-1.371, -0.009); gain over fixed -0.0227 (-0.0575, -0.0004) -8.6% n=46271
+nra G2 before alarm  qs    fixed=GAM_ONLY  recovery -0.135 (-0.333, -0.001); gain over fixed -0.0741 (-0.1837, -0.0004) -2.8% n=46271
+nra G3 during        tw95  fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.003); gain over fixed +0.0000 (+0.0000, +0.0000) +0.0% n=15102
+nra G3 during        qs    fixed=GAM_ONLY  recovery +0.002 (+0.000, +0.007); gain over fixed +0.0002 (+0.0000, +0.0009) +0.0% n=15102
+nra G4 after         tw95  fixed=GAM_ONLY  recovery -0.652 (-2.548, +0.000); gain over fixed -0.0159 (-0.0435, +0.0000) -6.3% n=17791
+nra G4 after         qs    fixed=GAM_ONLY  recovery -0.110 (-0.280, -0.001); gain over fixed -0.0384 (-0.0973, -0.0004) -1.5% n=17791
+nra G0 all rows      tw95  fixed=K0        recovery -1.051 (-1.436, -0.485); gain over fixed -0.1452 (-0.2544, -0.0434) -20.1% n=15993395
+nra G0 all rows      qs    fixed=K0        recovery -0.749 (-1.022, -0.526); gain over fixed -0.3684 (-0.4592, -0.2768) -14.1% n=15993395
+=== G1 harm of RULE against each fixed arm (mean qs, gain = fixed minus RULE), even months
+nra qs G1 ordinary GAM_ONLY minus RULE_r24_4.5: n=15162288 mean -0.0215 (-0.0597, +0.0000) pct -0.73 (-2.03, +0.00)
+nra qs G1 ordinary K0 minus RULE_r24_4.5: n=15162288 mean -0.3827 (-0.4827, -0.2892) pct -14.74 (-18.89, -10.99)
+nra qs G1 ordinary BAND_HEAD minus RULE_r24_4.5: n=15162288 mean -0.3916 (-0.4935, -0.2916) pct -15.13 (-19.26, -11.30)
+obs qs G1 ordinary GAM_ONLY minus RULE_r24_4.5: n=15162288 mean -0.0215 (-0.0597, +0.0000) pct -0.73 (-2.02, +0.00)
+obs qs G1 ordinary K0 minus RULE_r24_4.5: n=15162288 mean -0.3827 (-0.4805, -0.2869) pct -14.74 (-18.92, -10.97)
+obs qs G1 ordinary BAND_HEAD minus RULE_r24_4.5: n=15162288 mean -0.3916 (-0.4913, -0.2910) pct -15.13 (-19.20, -11.27)
+=== gain of each arm over each fixed arm, even months
+=== strata inside G5, even months: tw95 obs gain of RULE over the better fixed arm of that stratum
+size       over 25%           fixed=GAM_ONLY  recovery -0.005 (-0.042, +0.029) rows=831107
+duration   over 1 day         fixed=GAM_ONLY  recovery -0.005 (-0.042, +0.030) rows=831107
+season     November to March  fixed=K0        recovery -0.034 (-0.363, +0.191) rows=95488
+season     April to October   fixed=GAM_ONLY  recovery +0.017 (-0.024, +0.066) rows=735619
+lead       0-12 h             fixed=K0        recovery -0.859 (-1.263, -0.536) rows=58410
+lead       12-36 h            fixed=K0        recovery -0.556 (-0.934, -0.260) rows=121054
+lead       36 h-7 d           fixed=GAM_ONLY  recovery -0.036 (-0.082, +0.001) rows=651643
+substation D10                fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000) rows=44790
+substation D11                fixed=K0        recovery -0.092 (-0.436, +0.199) rows=358315
+substation D14                fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000) rows=13129
+substation D16                fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000) rows=199414
+substation D5                 fixed=K0        recovery -0.530 (-2.281, -0.112) rows=42886
+substation D9                 fixed=GAM_ONLY  recovery -0.020 (-0.184, +0.091) rows=172573
+=== share of readings above q99 (G4 and G5), even months
+nra GAM_ONLY      G4 after     above q99 1.32% (0.86, 1.84)
+nra GAM_ONLY      G5 near      above q99 2.16% (1.87, 2.45)
+nra GAM_ONLY      G1 ordinary  above q99 2.98% (2.27, 3.77)
+nra K0            G4 after     above q99 9.99% (6.99, 13.14)
+nra K0            G5 near      above q99 3.14% (2.56, 3.77)
+nra K0            G1 ordinary  above q99 1.02% (0.68, 1.43)
+nra BAND_HEAD     G4 after     above q99 0.95% (0.61, 1.34)
+nra BAND_HEAD     G5 near      above q99 0.72% (0.63, 0.81)
+nra BAND_HEAD     G1 ordinary  above q99 0.73% (0.52, 0.96)
+nra RULE_r24_2.6  G4 after     above q99 4.91% (2.98, 7.00)
+nra RULE_r24_2.6  G5 near      above q99 2.68% (2.31, 3.06)
+nra RULE_r24_2.6  G1 ordinary  above q99 2.81% (2.24, 3.40)
+nra RULE_r24_3.5  G4 after     above q99 2.36% (1.41, 3.55)
+nra RULE_r24_3.5  G5 near      above q99 2.39% (2.06, 2.72)
+nra RULE_r24_3.5  G1 ordinary  above q99 2.98% (2.27, 3.76)
+nra RULE_r24_4.5  G4 after     above q99 1.52% (1.01, 2.10)
+nra RULE_r24_4.5  G5 near      above q99 2.18% (1.89, 2.47)
+nra RULE_r24_4.5  G1 ordinary  above q99 2.98% (2.25, 3.77)
+nra RULE_d_2.3    G4 after     above q99 2.39% (1.42, 3.58)
+nra RULE_d_2.3    G5 near      above q99 2.41% (2.09, 2.73)
+nra RULE_d_2.3    G1 ordinary  above q99 2.78% (2.23, 3.35)
+nra RULE_d_3.2    G4 after     above q99 1.63% (1.03, 2.33)
+nra RULE_d_3.2    G5 near      above q99 2.26% (1.96, 2.56)
+nra RULE_d_3.2    G1 ordinary  above q99 2.98% (2.26, 3.79)
+nra RULE_d_4.5    G4 after     above q99 1.41% (0.92, 1.96)
+nra RULE_d_4.5    G5 near      above q99 2.16% (1.88, 2.46)
+nra RULE_d_4.5    G1 ordinary  above q99 2.98% (2.27, 3.78)
+nra ORACLE_NRA    G4 after     above q99 1.24% (0.74, 1.82)
+nra ORACLE_NRA    G5 near      above q99 1.11% (0.91, 1.31)
+nra ORACLE_NRA    G1 ordinary  above q99 0.63% (0.42, 0.87)
+nra ORACLE_OBS    G4 after     above q99 1.38% (0.83, 2.02)
+nra ORACLE_OBS    G5 near      above q99 1.64% (1.31, 1.99)
+nra ORACLE_OBS    G1 ordinary  above q99 0.63% (0.42, 0.87)
+nra ORACLE_STATE  G4 after     above q99 1.32% (0.86, 1.83)
+nra ORACLE_STATE  G5 near      above q99 2.62% (2.23, 3.02)
+nra ORACLE_STATE  G1 ordinary  above q99 2.98% (2.27, 3.77)
+obs GAM_ONLY      G4 after     above q99 2.08% (0.87, 4.07)
+obs GAM_ONLY      G5 near      above q99 2.75% (2.11, 3.52)
+obs GAM_ONLY      G1 ordinary  above q99 2.98% (2.27, 3.77)
+obs K0            G4 after     above q99 9.38% (6.49, 12.45)
+obs K0            G5 near      above q99 3.33% (2.72, 4.00)
+obs K0            G1 ordinary  above q99 1.02% (0.67, 1.43)
+obs BAND_HEAD     G4 after     above q99 0.97% (0.62, 1.35)
+obs BAND_HEAD     G5 near      above q99 1.33% (0.92, 1.83)
+obs BAND_HEAD     G1 ordinary  above q99 0.73% (0.52, 0.96)
+obs RULE_r24_2.6  G4 after     above q99 4.90% (2.98, 6.99)
+obs RULE_r24_2.6  G5 near      above q99 3.09% (2.53, 3.69)
+obs RULE_r24_2.6  G1 ordinary  above q99 2.81% (2.24, 3.42)
+obs RULE_r24_3.5  G4 after     above q99 2.37% (1.42, 3.53)
+obs RULE_r24_3.5  G5 near      above q99 2.86% (2.31, 3.46)
+obs RULE_r24_3.5  G1 ordinary  above q99 2.98% (2.27, 3.78)
+obs RULE_r24_4.5  G4 after     above q99 2.29% (1.03, 4.33)
+obs RULE_r24_4.5  G5 near      above q99 2.73% (2.11, 3.46)
+obs RULE_r24_4.5  G1 ordinary  above q99 2.98% (2.26, 3.76)
+obs RULE_d_2.3    G4 after     above q99 2.38% (1.43, 3.57)
+obs RULE_d_2.3    G5 near      above q99 2.89% (2.34, 3.51)
+obs RULE_d_2.3    G1 ordinary  above q99 2.78% (2.23, 3.37)
+obs RULE_d_3.2    G4 after     above q99 1.63% (1.04, 2.33)
+obs RULE_d_3.2    G5 near      above q99 2.78% (2.20, 3.45)
+obs RULE_d_3.2    G1 ordinary  above q99 2.98% (2.26, 3.76)
+obs RULE_d_4.5    G4 after     above q99 2.17% (0.94, 4.20)
+obs RULE_d_4.5    G5 near      above q99 2.72% (2.12, 3.42)
+obs RULE_d_4.5    G1 ordinary  above q99 2.98% (2.27, 3.77)
+obs ORACLE_NRA    G4 after     above q99 1.91% (0.80, 3.65)
+obs ORACLE_NRA    G5 near      above q99 1.94% (1.32, 2.71)
+obs ORACLE_NRA    G1 ordinary  above q99 0.63% (0.41, 0.87)
+obs ORACLE_OBS    G4 after     above q99 1.20% (0.72, 1.77)
+obs ORACLE_OBS    G5 near      above q99 1.68% (1.20, 2.23)
+obs ORACLE_OBS    G1 ordinary  above q99 0.63% (0.42, 0.87)
+obs ORACLE_STATE  G4 after     above q99 2.08% (0.88, 4.12)
+obs ORACLE_STATE  G5 near      above q99 2.78% (2.18, 3.46)
+obs ORACLE_STATE  G1 ordinary  above q99 2.98% (2.26, 3.77)
+=== median-forecast error minus mean-forecast error, per site (points), target nra
+D10  GAM_ONLY      -0.0045
+D10  K0            -0.0068
+D10  BAND_HEAD     -0.0747
+D10  RULE_r24_4.5  -0.0044
+D11  GAM_ONLY      +0.0117
+D11  K0            +0.0017
+D11  BAND_HEAD     -0.1407
+D11  RULE_r24_4.5  +0.0117
+D14  GAM_ONLY      +0.0019
+D14  K0            +0.0077
+D14  BAND_HEAD     -0.0243
+D14  RULE_r24_4.5  +0.0021
+D16  GAM_ONLY      +0.0155
+D16  K0            +0.0045
+D16  BAND_HEAD     -0.2740
+D16  RULE_r24_4.5  +0.0143
+D5   GAM_ONLY      +0.0337
+D5   K0            -0.0174
+D5   BAND_HEAD     +0.0055
+D5   RULE_r24_4.5  +0.0327
+D9   GAM_ONLY      +0.0077
+D9   K0            +0.0041
+D9   BAND_HEAD     -0.1506
+D9   RULE_r24_4.5  +0.0076
+=== leave one site out: recovery, tw95 obs, G5, even months
+without D10: fixed=GAM_ONLY recovery -0.006 (-0.044, +0.031)
+without D11: fixed=GAM_ONLY recovery -0.012 (-0.101, +0.059)
+without D14: fixed=GAM_ONLY recovery -0.005 (-0.043, +0.030)
+without D16: fixed=GAM_ONLY recovery -0.006 (-0.047, +0.032)
+without D5: fixed=GAM_ONLY recovery -0.006 (-0.045, +0.032)
+without D9: fixed=K0 recovery -0.057 (-0.343, +0.180)
+
+=== e00309_inj.py d
+Running as unit: run-p810199-i88888037.scope; invocation ID: cf4b6234bf054449af26337a39a1dccd
+rows 6879769 shift units 411
+share of rows in the abnormal state, by phase:
+RULE_r24_2.6 {'AFTER': 0.213, 'BEFORE_ALARM': 0.13, 'DURING': 0.192, 'MARGIN': 0.052, 'ORDINARY': 0.034}
+RULE_r24_3.5 {'AFTER': 0.087, 'BEFORE_ALARM': 0.08, 'DURING': 0.066, 'MARGIN': 0.03, 'ORDINARY': 0.011}
+RULE_r24_4.5 {'AFTER': 0.03, 'BEFORE_ALARM': 0.041, 'DURING': 0.002, 'MARGIN': 0.016, 'ORDINARY': 0.007}
+RULE_d_2.3 {'AFTER': 0.175, 'BEFORE_ALARM': 0.086, 'DURING': 0.094, 'MARGIN': 0.065, 'ORDINARY': 0.052}
+RULE_d_3.2 {'AFTER': 0.087, 'BEFORE_ALARM': 0.034, 'DURING': 0.026, 'MARGIN': 0.028, 'ORDINARY': 0.015}
+RULE_d_4.5 {'AFTER': 0.029, 'BEFORE_ALARM': 0.017, 'DURING': 0.005, 'MARGIN': 0.008, 'ORDINARY': 0.005}
+=== absolute mean scores, even months (points; cost GBP per scored half-hour)
+GAM_ONLY G0 all rows {'qs_nra': 2.9528, 'tw95_nra': 0.8603, 'ae_median_nra': 5.2211, 'ae_mean_nra': 5.2092, 'cost_nra': 2932.6038, 'qs_obs': 2.9794, 'tw95_obs': 0.8638, 'ae_median_obs': 5.2616, 'ae_mean_obs': 5.25, 'cost_obs': 2940.9857}
+GAM_ONLY G1 ordinary {'qs_nra': 2.9578, 'tw95_nra': 0.8888, 'ae_median_nra': 5.2321, 'ae_mean_nra': 5.2196, 'cost_nra': 2953.8198, 'qs_obs': 2.9578, 'tw95_obs': 0.8888, 'ae_median_obs': 5.2321, 'ae_mean_obs': 5.2196, 'cost_obs': 2953.8198}
+GAM_ONLY G2 before alarm {'qs_nra': 2.6344, 'tw95_nra': 0.2649, 'ae_median_nra': 4.656, 'ae_mean_nra': 4.6525, 'cost_nra': 2293.4814, 'qs_obs': 3.6732, 'tw95_obs': 0.3502, 'ae_median_obs': 6.2315, 'ae_mean_obs': 6.2372, 'cost_obs': 2605.6927}
+GAM_ONLY G3 during {'qs_nra': 2.7381, 'tw95_nra': 0.3134, 'ae_median_nra': 4.9205, 'ae_mean_nra': 4.9228, 'cost_nra': 2684.8821, 'qs_obs': 3.6312, 'tw95_obs': 0.1248, 'ae_median_obs': 6.2608, 'ae_mean_obs': 6.3204, 'cost_obs': 2483.0117}
+GAM_ONLY G4 after {'qs_nra': 2.5813, 'tw95_nra': 0.2534, 'ae_median_nra': 4.5667, 'ae_mean_nra': 4.5586, 'cost_nra': 2168.5484, 'qs_obs': 2.705, 'tw95_obs': 0.3285, 'ae_median_obs': 4.729, 'ae_mean_obs': 4.7206, 'cost_obs': 2416.7044}
+GAM_ONLY G5 near {'qs_nra': 2.861, 'tw95_nra': 0.3407, 'ae_median_nra': 5.0214, 'ae_mean_nra': 5.0191, 'cost_nra': 2531.7332, 'qs_obs': 3.3731, 'tw95_obs': 0.4083, 'ae_median_obs': 5.8013, 'ae_mean_obs': 5.8036, 'cost_obs': 2698.4879}
+GAM_ONLY Gs shift rows {'qs_nra': 2.6422, 'tw95_nra': 0.2716, 'ae_median_nra': 4.6864, 'ae_mean_nra': 4.683, 'cost_nra': 2315.0486, 'qs_obs': 3.4476, 'tw95_obs': 0.3023, 'ae_median_obs': 5.8994, 'ae_mean_obs': 5.9122, 'cost_obs': 2537.6312}
+K0 G0 all rows {'qs_nra': 2.607, 'tw95_nra': 0.7227, 'ae_median_nra': 4.543, 'ae_mean_nra': 4.5422, 'cost_nra': 2592.8608, 'qs_obs': 2.6389, 'tw95_obs': 0.7263, 'ae_median_obs': 4.5894, 'ae_mean_obs': 4.5887, 'cost_obs': 2593.2326}
+K0 G1 ordinary {'qs_nra': 2.5966, 'tw95_nra': 0.7437, 'ae_median_nra': 4.5243, 'ae_mean_nra': 4.523, 'cost_nra': 2598.8124, 'qs_obs': 2.5966, 'tw95_obs': 0.7437, 'ae_median_obs': 4.5243, 'ae_mean_obs': 4.523, 'cost_obs': 2598.8124}
+K0 G2 before alarm {'qs_nra': 2.8187, 'tw95_nra': 0.2896, 'ae_median_nra': 4.9213, 'ae_mean_nra': 4.9319, 'cost_nra': 2440.1284, 'qs_obs': 3.6848, 'tw95_obs': 0.307, 'ae_median_obs': 6.2712, 'ae_mean_obs': 6.2907, 'cost_obs': 2347.9228}
+K0 G3 during {'qs_nra': 4.1271, 'tw95_nra': 0.4037, 'ae_median_nra': 6.8966, 'ae_mean_nra': 6.8485, 'cost_nra': 4658.2178, 'qs_obs': 2.7387, 'tw95_obs': 0.0764, 'ae_median_obs': 4.7968, 'ae_mean_obs': 4.8342, 'cost_obs': 2009.7117}
+K0 G4 after {'qs_nra': 3.5318, 'tw95_nra': 0.3301, 'ae_median_nra': 6.069, 'ae_mean_nra': 6.0654, 'cost_nra': 2862.5568, 'qs_obs': 3.3809, 'tw95_obs': 0.3184, 'ae_median_obs': 5.8359, 'ae_mean_obs': 5.83, 'cost_obs': 2794.2952}
+K0 G5 near {'qs_nra': 2.7964, 'tw95_nra': 0.3397, 'ae_median_nra': 4.8838, 'ae_mean_nra': 4.8929, 'cost_nra': 2480.405, 'qs_obs': 3.4114, 'tw95_obs': 0.4097, 'ae_median_obs': 5.7756, 'ae_mean_obs': 5.7886, 'cost_obs': 2487.8018}
+K0 Gs shift rows {'qs_nra': 3.2285, 'tw95_nra': 0.3205, 'ae_median_nra': 5.5561, 'ae_mean_nra': 5.5523, 'cost_nra': 2866.0886, 'qs_obs': 3.436, 'tw95_obs': 0.2656, 'ae_median_obs': 5.8921, 'ae_mean_obs': 5.9093, 'cost_obs': 2420.2165}
+BAND_HEAD G0 all rows {'qs_nra': 2.5874, 'tw95_nra': 0.7197, 'ae_median_nra': 4.4962, 'ae_mean_nra': 4.5422, 'cost_nra': 2670.5442, 'qs_obs': 2.6194, 'tw95_obs': 0.7236, 'ae_median_obs': 4.5455, 'ae_mean_obs': 4.5887, 'cost_obs': 2676.6924}
+BAND_HEAD G1 ordinary {'qs_nra': 2.5877, 'tw95_nra': 0.7422, 'ae_median_nra': 4.4922, 'ae_mean_nra': 4.523, 'cost_nra': 2687.2186, 'qs_obs': 2.5877, 'tw95_obs': 0.7422, 'ae_median_obs': 4.4922, 'ae_mean_obs': 4.523, 'cost_obs': 2687.2186}
+BAND_HEAD G2 before alarm {'qs_nra': 2.5637, 'tw95_nra': 0.273, 'ae_median_nra': 4.541, 'ae_mean_nra': 4.9319, 'cost_nra': 2273.9341, 'qs_obs': 3.4758, 'tw95_obs': 0.3203, 'ae_median_obs': 6.0852, 'ae_mean_obs': 6.2907, 'cost_obs': 2429.0645}
+BAND_HEAD G3 during {'qs_nra': 3.1031, 'tw95_nra': 0.334, 'ae_median_nra': 5.5139, 'ae_mean_nra': 6.8485, 'cost_nra': 2664.2523, 'qs_obs': 3.0434, 'tw95_obs': 0.0955, 'ae_median_obs': 5.7713, 'ae_mean_obs': 4.8342, 'cost_obs': 2261.7605}
+BAND_HEAD G4 after {'qs_nra': 2.846, 'tw95_nra': 0.2948, 'ae_median_nra': 5.0037, 'ae_mean_nra': 6.0654, 'cost_nra': 2216.3828, 'qs_obs': 2.7852, 'tw95_obs': 0.3155, 'ae_median_obs': 4.8858, 'ae_mean_obs': 5.83, 'cost_obs': 2261.7952}
+BAND_HEAD G5 near {'qs_nra': 2.5806, 'tw95_nra': 0.3106, 'ae_median_nra': 4.5679, 'ae_mean_nra': 4.8929, 'cost_nra': 2355.4849, 'qs_obs': 3.1975, 'tw95_obs': 0.3854, 'ae_median_obs': 5.5164, 'ae_mean_obs': 5.7886, 'cost_obs': 2477.8017}
+BAND_HEAD Gs shift rows {'qs_nra': 2.73, 'tw95_nra': 0.2895, 'ae_median_nra': 4.8306, 'ae_mean_nra': 5.5523, 'cost_nra': 2313.4537, 'qs_obs': 3.2381, 'tw95_obs': 0.2764, 'ae_median_obs': 5.7558, 'ae_mean_obs': 5.9093, 'cost_obs': 2360.5528}
+RULE_r24_2.6 G0 all rows {'qs_nra': 2.9828, 'tw95_nra': 0.8452, 'ae_median_nra': 5.2282, 'ae_mean_nra': 5.216, 'cost_nra': 2884.702, 'qs_obs': 3.0043, 'tw95_obs': 0.8477, 'ae_median_obs': 5.2614, 'ae_mean_obs': 5.2494, 'cost_obs': 2887.6687}
+RULE_r24_2.6 G1 ordinary {'qs_nra': 2.9814, 'tw95_nra': 0.8718, 'ae_median_nra': 5.2271, 'ae_mean_nra': 5.2143, 'cost_nra': 2900.9962, 'qs_obs': 2.9814, 'tw95_obs': 0.8718, 'ae_median_obs': 5.2271, 'ae_mean_obs': 5.2143, 'cost_obs': 2900.9962}
+RULE_r24_2.6 G2 before alarm {'qs_nra': 2.8837, 'tw95_nra': 0.3017, 'ae_median_nra': 5.0964, 'ae_mean_nra': 5.0968, 'cost_nra': 2338.7004, 'qs_obs': 3.5444, 'tw95_obs': 0.3008, 'ae_median_obs': 6.121, 'ae_mean_obs': 6.1303, 'cost_obs': 2371.5698}
+RULE_r24_2.6 G3 during {'qs_nra': 2.9275, 'tw95_nra': 0.3292, 'ae_median_nra': 5.1787, 'ae_mean_nra': 5.1824, 'cost_nra': 3161.8563, 'qs_obs': 3.3663, 'tw95_obs': 0.0996, 'ae_median_obs': 5.8973, 'ae_mean_obs': 5.9575, 'cost_obs': 2203.8103}
+RULE_r24_2.6 G4 after {'qs_nra': 3.1705, 'tw95_nra': 0.3191, 'ae_median_nra': 5.5306, 'ae_mean_nra': 5.5259, 'cost_nra': 2561.1294, 'qs_obs': 3.0478, 'tw95_obs': 0.3082, 'ae_median_obs': 5.3321, 'ae_mean_obs': 5.3256, 'cost_obs': 2563.3169}
+RULE_r24_2.6 G5 near {'qs_nra': 3.0073, 'tw95_nra': 0.3596, 'ae_median_nra': 5.2484, 'ae_mean_nra': 5.2457, 'cost_nra': 2576.8259, 'qs_obs': 3.4211, 'tw95_obs': 0.4075, 'ae_median_obs': 5.8881, 'ae_mean_obs': 5.8901, 'cost_obs': 2635.8495}
+RULE_r24_2.6 Gs shift rows {'qs_nra': 2.9565, 'tw95_nra': 0.3109, 'ae_median_nra': 5.2097, 'ae_mean_nra': 5.2096, 'cost_nra': 2514.4214, 'qs_obs': 3.3988, 'tw95_obs': 0.2641, 'ae_median_obs': 5.901, 'ae_mean_obs': 5.9165, 'cost_obs': 2399.4588}
+RULE_r24_3.5 G0 all rows {'qs_nra': 2.9777, 'tw95_nra': 0.8681, 'ae_median_nra': 5.2568, 'ae_mean_nra': 5.2446, 'cost_nra': 2933.793, 'qs_obs': 3.0008, 'tw95_obs': 0.8708, 'ae_median_obs': 5.2925, 'ae_mean_obs': 5.2806, 'cost_obs': 2938.4183}
+RULE_r24_3.5 G1 ordinary {'qs_nra': 2.9793, 'tw95_nra': 0.8962, 'ae_median_nra': 5.2624, 'ae_mean_nra': 5.2497, 'cost_nra': 2954.4097, 'qs_obs': 2.9793, 'tw95_obs': 0.8962, 'ae_median_obs': 5.2624, 'ae_mean_obs': 5.2497, 'cost_obs': 2954.4097}
+RULE_r24_3.5 G2 before alarm {'qs_nra': 2.8069, 'tw95_nra': 0.2956, 'ae_median_nra': 4.9421, 'ae_mean_nra': 4.9406, 'cost_nra': 2322.4735, 'qs_obs': 3.6172, 'tw95_obs': 0.3092, 'ae_median_obs': 6.2083, 'ae_mean_obs': 6.2156, 'cost_obs': 2413.9286}
+RULE_r24_3.5 G3 during {'qs_nra': 2.7707, 'tw95_nra': 0.321, 'ae_median_nra': 4.9686, 'ae_mean_nra': 4.9708, 'cost_nra': 2686.8765, 'qs_obs': 3.5318, 'tw95_obs': 0.1092, 'ae_median_obs': 6.1395, 'ae_mean_obs': 6.1997, 'cost_obs': 2354.8431}
+RULE_r24_3.5 G4 after {'qs_nra': 2.8165, 'tw95_nra': 0.2957, 'ae_median_nra': 4.9754, 'ae_mean_nra': 4.9675, 'cost_nra': 2225.4035, 'qs_obs': 2.7852, 'tw95_obs': 0.2961, 'ae_median_obs': 4.9374, 'ae_mean_obs': 4.9285, 'cost_obs': 2238.7956}
+RULE_r24_3.5 G5 near {'qs_nra': 2.949, 'tw95_nra': 0.3558, 'ae_median_nra': 5.1544, 'ae_mean_nra': 5.1519, 'cost_nra': 2544.2431, 'qs_obs': 3.3933, 'tw95_obs': 0.4069, 'ae_median_obs': 5.843, 'ae_mean_obs': 5.8452, 'cost_obs': 2636.2631}
+RULE_r24_3.5 Gs shift rows {'qs_nra': 2.8022, 'tw95_nra': 0.3005, 'ae_median_nra': 4.9546, 'ae_mean_nra': 4.9524, 'cost_nra': 2347.7242, 'qs_obs': 3.414, 'tw95_obs': 0.2681, 'ae_median_obs': 5.9095, 'ae_mean_obs': 5.9233, 'cost_obs': 2358.5485}
+RULE_r24_4.5 G0 all rows {'qs_nra': 2.9754, 'tw95_nra': 0.8678, 'ae_median_nra': 5.2528, 'ae_mean_nra': 5.2407, 'cost_nra': 2933.3858, 'qs_obs': 2.9998, 'tw95_obs': 0.8709, 'ae_median_obs': 5.2903, 'ae_mean_obs': 5.2784, 'cost_obs': 2940.1173}
+RULE_r24_4.5 G1 ordinary {'qs_nra': 2.9793, 'tw95_nra': 0.8962, 'ae_median_nra': 5.2624, 'ae_mean_nra': 5.2497, 'cost_nra': 2954.4097, 'qs_obs': 2.9793, 'tw95_obs': 0.8962, 'ae_median_obs': 5.2624, 'ae_mean_obs': 5.2497, 'cost_obs': 2954.4097}
+RULE_r24_4.5 G2 before alarm {'qs_nra': 2.7084, 'tw95_nra': 0.2877, 'ae_median_nra': 4.7618, 'ae_mean_nra': 4.7599, 'cost_nra': 2303.3385, 'qs_obs': 3.6901, 'tw95_obs': 0.3578, 'ae_median_obs': 6.2625, 'ae_mean_obs': 6.2692, 'cost_obs': 2543.6818}
+RULE_r24_4.5 G3 during {'qs_nra': 2.7379, 'tw95_nra': 0.3134, 'ae_median_nra': 4.9202, 'ae_mean_nra': 4.9225, 'cost_nra': 2684.8821, 'qs_obs': 3.6306, 'tw95_obs': 0.1248, 'ae_median_obs': 6.2597, 'ae_mean_obs': 6.3193, 'cost_obs': 2483.0117}
+RULE_r24_4.5 G4 after {'qs_nra': 2.6198, 'tw95_nra': 0.2693, 'ae_median_nra': 4.6329, 'ae_mean_nra': 4.625, 'cost_nra': 2190.1925, 'qs_obs': 2.7435, 'tw95_obs': 0.3445, 'ae_median_obs': 4.7952, 'ae_mean_obs': 4.787, 'cost_obs': 2438.3485}
+RULE_r24_4.5 G5 near {'qs_nra': 2.9039, 'tw95_nra': 0.3504, 'ae_median_nra': 5.0791, 'ae_mean_nra': 5.0769, 'cost_nra': 2536.143, 'qs_obs': 3.3732, 'tw95_obs': 0.4088, 'ae_median_obs': 5.8006, 'ae_mean_obs': 5.8031, 'cost_obs': 2670.0646}
+RULE_r24_4.5 Gs shift rows {'qs_nra': 2.6941, 'tw95_nra': 0.2885, 'ae_median_nra': 4.7631, 'ae_mean_nra': 4.7606, 'cost_nra': 2326.6842, 'qs_obs': 3.466, 'tw95_obs': 0.3104, 'ae_median_obs': 5.9322, 'ae_mean_obs': 5.9457, 'cost_obs': 2506.8331}
+RULE_d_2.3 G0 all rows {'qs_nra': 2.9678, 'tw95_nra': 0.8387, 'ae_median_nra': 5.1952, 'ae_mean_nra': 5.1833, 'cost_nra': 2883.0884, 'qs_obs': 2.991, 'tw95_obs': 0.8414, 'ae_median_obs': 5.2308, 'ae_mean_obs': 5.2192, 'cost_obs': 2887.8643}
+RULE_d_2.3 G1 ordinary {'qs_nra': 2.9665, 'tw95_nra': 0.8648, 'ae_median_nra': 5.1938, 'ae_mean_nra': 5.1814, 'cost_nra': 2901.0834, 'qs_obs': 2.9665, 'tw95_obs': 0.8648, 'ae_median_obs': 5.1938, 'ae_mean_obs': 5.1814, 'cost_obs': 2901.0834}
+RULE_d_2.3 G2 before alarm {'qs_nra': 2.8136, 'tw95_nra': 0.2965, 'ae_median_nra': 4.9571, 'ae_mean_nra': 4.9576, 'cost_nra': 2318.851, 'qs_obs': 3.5815, 'tw95_obs': 0.3053, 'ae_median_obs': 6.1329, 'ae_mean_obs': 6.1432, 'cost_obs': 2403.7777}
+RULE_d_2.3 G3 during {'qs_nra': 2.7855, 'tw95_nra': 0.321, 'ae_median_nra': 4.9951, 'ae_mean_nra': 4.9978, 'cost_nra': 2679.1704, 'qs_obs': 3.5248, 'tw95_obs': 0.1086, 'ae_median_obs': 6.1248, 'ae_mean_obs': 6.1851, 'cost_obs': 2324.5183}
+RULE_d_2.3 G4 after {'qs_nra': 2.9235, 'tw95_nra': 0.2999, 'ae_median_nra': 5.1881, 'ae_mean_nra': 5.1817, 'cost_nra': 2231.4215, 'qs_obs': 2.8008, 'tw95_obs': 0.289, 'ae_median_obs': 4.9896, 'ae_mean_obs': 4.9814, 'cost_obs': 2233.609}
+RULE_d_2.3 G5 near {'qs_nra': 2.991, 'tw95_nra': 0.3625, 'ae_median_nra': 5.2212, 'ae_mean_nra': 5.2192, 'cost_nra': 2543.0755, 'qs_obs': 3.4373, 'tw95_obs': 0.4146, 'ae_median_obs': 5.9059, 'ae_mean_obs': 5.9087, 'cost_obs': 2638.0914}
+RULE_d_2.3 Gs shift rows {'qs_nra': 2.833, 'tw95_nra': 0.3019, 'ae_median_nra': 5.0162, 'ae_mean_nra': 5.0157, 'cost_nra': 2346.1168, 'qs_obs': 3.3952, 'tw95_obs': 0.2641, 'ae_median_obs': 5.8744, 'ae_mean_obs': 5.8901, 'cost_obs': 2346.8896}
+RULE_d_3.2 G0 all rows {'qs_nra': 2.9799, 'tw95_nra': 0.8692, 'ae_median_nra': 5.2623, 'ae_mean_nra': 5.2502, 'cost_nra': 2933.4972, 'qs_obs': 3.0041, 'tw95_obs': 0.8721, 'ae_median_obs': 5.2996, 'ae_mean_obs': 5.2878, 'cost_obs': 2939.3515}
+RULE_d_3.2 G1 ordinary {'qs_nra': 2.9826, 'tw95_nra': 0.8974, 'ae_median_nra': 5.2699, 'ae_mean_nra': 5.2573, 'cost_nra': 2954.4719, 'qs_obs': 2.9826, 'tw95_obs': 0.8974, 'ae_median_obs': 5.2699, 'ae_mean_obs': 5.2573, 'cost_obs': 2954.4719}
+RULE_d_3.2 G2 before alarm {'qs_nra': 2.7547, 'tw95_nra': 0.2861, 'ae_median_nra': 4.8444, 'ae_mean_nra': 4.8427, 'cost_nra': 2315.3223, 'qs_obs': 3.7191, 'tw95_obs': 0.3563, 'ae_median_obs': 6.3214, 'ae_mean_obs': 6.3284, 'cost_obs': 2554.6648}
+RULE_d_3.2 G3 during {'qs_nra': 2.7543, 'tw95_nra': 0.3178, 'ae_median_nra': 4.947, 'ae_mean_nra': 4.9497, 'cost_nra': 2687.005, 'qs_obs': 3.6022, 'tw95_obs': 0.1131, 'ae_median_obs': 6.2311, 'ae_mean_obs': 6.2907, 'cost_obs': 2360.7855}
+RULE_d_3.2 G4 after {'qs_nra': 2.7295, 'tw95_nra': 0.2827, 'ae_median_nra': 4.8454, 'ae_mean_nra': 4.8397, 'cost_nra': 2188.8332, 'qs_obs': 2.6522, 'tw95_obs': 0.2769, 'ae_median_obs': 4.7292, 'ae_mean_obs': 4.722, 'cost_obs': 2194.5839}
+RULE_d_3.2 G5 near {'qs_nra': 2.93, 'tw95_nra': 0.355, 'ae_median_nra': 5.1233, 'ae_mean_nra': 5.121, 'cost_nra': 2537.1849, 'qs_obs': 3.3955, 'tw95_obs': 0.4113, 'ae_median_obs': 5.8409, 'ae_mean_obs': 5.8432, 'cost_obs': 2653.6549}
+RULE_d_3.2 Gs shift rows {'qs_nra': 2.749, 'tw95_nra': 0.2914, 'ae_median_nra': 4.8642, 'ae_mean_nra': 4.8624, 'cost_nra': 2333.6937, 'qs_obs': 3.457, 'tw95_obs': 0.292, 'ae_median_obs': 5.9464, 'ae_mean_obs': 5.9602, 'cost_obs': 2430.6026}
+RULE_d_4.5 G0 all rows {'qs_nra': 2.9547, 'tw95_nra': 0.8607, 'ae_median_nra': 5.2237, 'ae_mean_nra': 5.2118, 'cost_nra': 2932.746, 'qs_obs': 2.9793, 'tw95_obs': 0.8638, 'ae_median_obs': 5.2615, 'ae_mean_obs': 5.2498, 'cost_obs': 2939.5627}
+RULE_d_4.5 G1 ordinary {'qs_nra': 2.9578, 'tw95_nra': 0.8888, 'ae_median_nra': 5.2321, 'ae_mean_nra': 5.2196, 'cost_nra': 2953.8198, 'qs_obs': 2.9578, 'tw95_obs': 0.8888, 'ae_median_obs': 5.2321, 'ae_mean_obs': 5.2196, 'cost_obs': 2953.8198}
+RULE_d_4.5 G2 before alarm {'qs_nra': 2.694, 'tw95_nra': 0.2809, 'ae_median_nra': 4.7387, 'ae_mean_nra': 4.7359, 'cost_nra': 2302.0922, 'qs_obs': 3.6914, 'tw95_obs': 0.3589, 'ae_median_obs': 6.2607, 'ae_mean_obs': 6.2669, 'cost_obs': 2559.0019}
+RULE_d_4.5 G3 during {'qs_nra': 2.7381, 'tw95_nra': 0.3134, 'ae_median_nra': 4.9205, 'ae_mean_nra': 4.9228, 'cost_nra': 2684.8821, 'qs_obs': 3.6312, 'tw95_obs': 0.1248, 'ae_median_obs': 6.2608, 'ae_mean_obs': 6.3204, 'cost_obs': 2483.0117}
+RULE_d_4.5 G4 after {'qs_nra': 2.6003, 'tw95_nra': 0.2542, 'ae_median_nra': 4.6063, 'ae_mean_nra': 4.5988, 'cost_nra': 2169.771, 'qs_obs': 2.724, 'tw95_obs': 0.3293, 'ae_median_obs': 4.7686, 'ae_mean_obs': 4.7608, 'cost_obs': 2417.927}
+RULE_d_4.5 G5 near {'qs_nra': 2.8981, 'tw95_nra': 0.3492, 'ae_median_nra': 5.0706, 'ae_mean_nra': 5.0683, 'cost_nra': 2534.561, 'qs_obs': 3.3715, 'tw95_obs': 0.4083, 'ae_median_obs': 5.7989, 'ae_mean_obs': 5.8014, 'cost_obs': 2670.1779}
+RULE_d_4.5 Gs shift rows {'qs_nra': 2.6814, 'tw95_nra': 0.2811, 'ae_median_nra': 4.7436, 'ae_mean_nra': 4.7407, 'cost_nra': 2320.4613, 'qs_obs': 3.4625, 'tw95_obs': 0.3076, 'ae_median_obs': 5.9254, 'ae_mean_obs': 5.9386, 'cost_obs': 2510.3916}
+ORACLE_NRA G0 all rows {'qs_nra': 2.1153, 'tw95_nra': 0.5845, 'ae_median_nra': 3.474, 'ae_mean_nra': 3.4762, 'cost_nra': 2503.3179, 'qs_obs': 2.1526, 'tw95_obs': 0.5892, 'ae_median_obs': 3.5334, 'ae_mean_obs': 3.5358, 'cost_obs': 2512.8716}
+ORACLE_NRA G1 ordinary {'qs_nra': 2.1115, 'tw95_nra': 0.6017, 'ae_median_nra': 3.4672, 'ae_mean_nra': 3.4689, 'cost_nra': 2516.0476, 'qs_obs': 2.1115, 'tw95_obs': 0.6017, 'ae_median_obs': 3.4672, 'ae_mean_obs': 3.4689, 'cost_obs': 2516.0476}
+ORACLE_NRA G2 before alarm {'qs_nra': 2.0875, 'tw95_nra': 0.2205, 'ae_median_nra': 3.4297, 'ae_mean_nra': 3.439, 'cost_nra': 2140.8409, 'qs_obs': 3.4448, 'tw95_obs': 0.3247, 'ae_median_obs': 5.6531, 'ae_mean_obs': 5.6701, 'cost_obs': 2461.5314}
+ORACLE_NRA G3 during {'qs_nra': 2.627, 'tw95_nra': 0.3067, 'ae_median_nra': 4.6136, 'ae_mean_nra': 4.6042, 'cost_nra': 2650.022, 'qs_obs': 3.435, 'tw95_obs': 0.115, 'ae_median_obs': 5.9222, 'ae_mean_obs': 5.9857, 'cost_obs': 2396.7492}
+ORACLE_NRA G4 after {'qs_nra': 2.2311, 'tw95_nra': 0.229, 'ae_median_nra': 3.7639, 'ae_mean_nra': 3.7672, 'cost_nra': 2077.71, 'qs_obs': 2.3284, 'tw95_obs': 0.2877, 'ae_median_obs': 3.8964, 'ae_mean_obs': 3.8986, 'cost_obs': 2292.2368}
+ORACLE_NRA G5 near {'qs_nra': 2.1838, 'tw95_nra': 0.2709, 'ae_median_nra': 3.5973, 'ae_mean_nra': 3.6104, 'cost_nra': 2262.7927, 'qs_obs': 2.903, 'tw95_obs': 0.36, 'ae_median_obs': 4.741, 'ae_mean_obs': 4.7573, 'cost_obs': 2452.8614}
+ORACLE_NRA Gs shift rows {'qs_nra': 2.2227, 'tw95_nra': 0.2388, 'ae_median_nra': 3.7307, 'ae_mean_nra': 3.735, 'cost_nra': 2195.6053, 'qs_obs': 3.192, 'tw95_obs': 0.2764, 'ae_median_obs': 5.3096, 'ae_mean_obs': 5.3322, 'cost_obs': 2406.9176}
+ORACLE_OBS G0 all rows {'qs_nra': 2.1234, 'tw95_nra': 0.5854, 'ae_median_nra': 3.4899, 'ae_mean_nra': 3.492, 'cost_nra': 2507.7896, 'qs_obs': 2.1406, 'tw95_obs': 0.5876, 'ae_median_obs': 3.5155, 'ae_mean_obs': 3.5179, 'cost_obs': 2506.5399}
+ORACLE_OBS G1 ordinary {'qs_nra': 2.1115, 'tw95_nra': 0.6017, 'ae_median_nra': 3.4672, 'ae_mean_nra': 3.4689, 'cost_nra': 2516.0476, 'qs_obs': 2.1115, 'tw95_obs': 0.6017, 'ae_median_obs': 3.4672, 'ae_mean_obs': 3.4689, 'cost_obs': 2516.0476}
+ORACLE_OBS G2 before alarm {'qs_nra': 2.4582, 'tw95_nra': 0.2641, 'ae_median_nra': 4.1785, 'ae_mean_nra': 4.1837, 'cost_nra': 2304.4574, 'qs_obs': 2.8778, 'tw95_obs': 0.2446, 'ae_median_obs': 4.7977, 'ae_mean_obs': 4.8147, 'cost_obs': 2159.6272}
+ORACLE_OBS G3 during {'qs_nra': 3.6557, 'tw95_nra': 0.3665, 'ae_median_nra': 6.2847, 'ae_mean_nra': 6.2382, 'cost_nra': 4165.797, 'qs_obs': 2.5019, 'tw95_obs': 0.0714, 'ae_median_obs': 4.2392, 'ae_mean_obs': 4.2926, 'cost_obs': 1937.9535}
+ORACLE_OBS G4 after {'qs_nra': 2.3266, 'tw95_nra': 0.2539, 'ae_median_nra': 3.9171, 'ae_mean_nra': 3.9214, 'cost_nra': 2102.3819, 'qs_obs': 2.2017, 'tw95_obs': 0.2429, 'ae_median_obs': 3.7026, 'ae_mean_obs': 3.705, 'cost_obs': 2093.5503}
+ORACLE_OBS G5 near {'qs_nra': 2.3411, 'tw95_nra': 0.2881, 'ae_median_nra': 3.9034, 'ae_mean_nra': 3.9132, 'cost_nra': 2351.7567, 'qs_obs': 2.672, 'tw95_obs': 0.3302, 'ae_median_obs': 4.3966, 'ae_mean_obs': 4.4131, 'cost_obs': 2326.8934}
+ORACLE_OBS Gs shift rows {'qs_nra': 2.6571, 'tw95_nra': 0.2814, 'ae_median_nra': 4.5216, 'ae_mean_nra': 4.5167, 'cost_nra': 2512.3639, 'qs_obs': 2.6542, 'tw95_obs': 0.2112, 'ae_median_obs': 4.445, 'ae_mean_obs': 4.4657, 'cost_obs': 2110.6462}
+ORACLE_STATE G0 all rows {'qs_nra': 2.9547, 'tw95_nra': 0.8604, 'ae_median_nra': 5.2237, 'ae_mean_nra': 5.2118, 'cost_nra': 2936.3757, 'qs_obs': 2.9786, 'tw95_obs': 0.8636, 'ae_median_obs': 5.2604, 'ae_mean_obs': 5.2487, 'cost_obs': 2938.7212}
+ORACLE_STATE G1 ordinary {'qs_nra': 2.9578, 'tw95_nra': 0.8888, 'ae_median_nra': 5.2321, 'ae_mean_nra': 5.2196, 'cost_nra': 2953.8198, 'qs_obs': 2.9578, 'tw95_obs': 0.8888, 'ae_median_obs': 5.2321, 'ae_mean_obs': 5.2196, 'cost_obs': 2953.8198}
+ORACLE_STATE G2 before alarm {'qs_nra': 2.8187, 'tw95_nra': 0.2896, 'ae_median_nra': 4.9213, 'ae_mean_nra': 4.9319, 'cost_nra': 2440.1284, 'qs_obs': 3.6848, 'tw95_obs': 0.307, 'ae_median_obs': 6.2712, 'ae_mean_obs': 6.2907, 'cost_obs': 2347.9228}
+ORACLE_STATE G3 during {'qs_nra': 4.1271, 'tw95_nra': 0.4037, 'ae_median_nra': 6.8966, 'ae_mean_nra': 6.8485, 'cost_nra': 4658.2178, 'qs_obs': 2.7387, 'tw95_obs': 0.0764, 'ae_median_obs': 4.7968, 'ae_mean_obs': 4.8342, 'cost_obs': 2009.7117}
+ORACLE_STATE G4 after {'qs_nra': 2.5813, 'tw95_nra': 0.2534, 'ae_median_nra': 4.5667, 'ae_mean_nra': 4.5586, 'cost_nra': 2168.5484, 'qs_obs': 2.705, 'tw95_obs': 0.3285, 'ae_median_obs': 4.729, 'ae_mean_obs': 4.7206, 'cost_obs': 2416.7044}
+ORACLE_STATE G5 near {'qs_nra': 2.8965, 'tw95_nra': 0.3437, 'ae_median_nra': 5.0721, 'ae_mean_nra': 5.0696, 'cost_nra': 2606.7731, 'qs_obs': 3.3575, 'tw95_obs': 0.405, 'ae_median_obs': 5.7769, 'ae_mean_obs': 5.7795, 'cost_obs': 2653.437}
+ORACLE_STATE Gs shift rows {'qs_nra': 3.0149, 'tw95_nra': 0.3032, 'ae_median_nra': 5.2184, 'ae_mean_nra': 5.2136, 'cost_nra': 2679.6141, 'qs_obs': 3.2841, 'tw95_obs': 0.2678, 'ae_median_obs': 5.6433, 'ae_mean_obs': 5.66, 'cost_obs': 2318.7609}
+odd-month G5 tw95 obs by k: {2.3: 0.8175, 3.2: 0.7927, 4.5: 0.7653} chosen 4.5
+=== recovery of ORACLE's gain over the better fixed choice (even months)
+obs G5 near          tw95  fixed=GAM_ONLY  recovery -0.000 (-0.028, +0.029); gain over fixed -0.0000 (-0.0021, +0.0024) -0.0% n=831107
+obs G5 near          qs    fixed=GAM_ONLY  recovery +0.002 (-0.013, +0.023); gain over fixed +0.0015 (-0.0091, +0.0172) +0.0% n=831107
+obs G5 near          cost  fixed=K0        recovery -1.133 (-2.028, -0.502); gain over fixed -182.3760 (-306.3116, -88.7130) -7.3% n=121054
+obs Gs shift rows    tw95  fixed=K0        recovery -0.772 (-2.879, +0.237); gain over fixed -0.0420 (-0.1378, +0.0140) -15.8% n=79164
+obs Gs shift rows    qs    fixed=K0        recovery -0.034 (-0.417, +0.226); gain over fixed -0.0265 (-0.3135, +0.1898) -0.8% n=79164
+obs Gs shift rows    cost  fixed=K0        recovery -0.291 (-1.716, +0.475); gain over fixed -90.1751 (-483.4814, +170.5341) -3.7% n=24917
+obs G2 before alarm  tw95  fixed=K0        recovery -0.831 (-2.909, +0.143); gain over fixed -0.0519 (-0.1521, +0.0097) -16.9% n=46271
+obs G2 before alarm  qs    fixed=GAM_ONLY  recovery -0.023 (-0.062, +0.003); gain over fixed -0.0182 (-0.0477, +0.0019) -0.5% n=46271
+obs G2 before alarm  cost  fixed=K0        recovery -1.121 (-3.181, +0.098); gain over fixed -211.0791 (-548.8506, +18.4898) -9.0% n=14712
+obs G3 during        tw95  fixed=K0        recovery -9.750 (-141.606, +114.714); gain over fixed -0.0484 (-0.1096, -0.0238) -63.4% n=15102
+obs G3 during        qs    fixed=K0        recovery -3.769 (-9.468, -1.413); gain over fixed -0.8925 (-1.5712, -0.4552) -32.6% n=15102
+obs G3 during        cost  fixed=K0        recovery -6.596 (-65.411, +9.421); gain over fixed -473.3000 (-949.8885, -176.5492) -23.6% n=3510
+obs G4 after         tw95  fixed=K0        recovery -0.144 (-2.756, +0.822); gain over fixed -0.0109 (-0.1575, +0.0852) -3.4% n=17791
+obs G4 after         qs    fixed=GAM_ONLY  recovery -0.038 (-0.116, +0.000); gain over fixed -0.0190 (-0.0473, +0.0000) -0.7% n=17791
+obs G4 after         cost  fixed=GAM_ONLY  recovery -0.004 (-0.085, +0.045); gain over fixed -1.2226 (-10.2119, +5.8442) -0.1% n=6695
+obs G0 all rows      tw95  fixed=K0        recovery -0.991 (-1.406, -0.358); gain over fixed -0.1375 (-0.2531, -0.0314) -18.9% n=15993395
+obs G0 all rows      qs    fixed=K0        recovery -0.683 (-0.962, -0.454); gain over fixed -0.3404 (-0.4394, -0.2443) -12.9% n=15993395
+obs G0 all rows      cost  fixed=K0        recovery -3.995 (-6.821, -2.052); gain over fixed -346.3301 (-472.9807, -212.3894) -13.4% n=2408346
+nra G5 near          tw95  fixed=K0        recovery -0.138 (-0.438, +0.110); gain over fixed -0.0095 (-0.0264, +0.0084) -2.8% n=831107
+nra G5 near          qs    fixed=K0        recovery -0.166 (-0.368, +0.003); gain over fixed -0.1017 (-0.2023, +0.0000) -3.6% n=831107
+nra Gs shift rows    tw95  fixed=GAM_ONLY  recovery -0.291 (-0.852, -0.003); gain over fixed -0.0095 (-0.0253, -0.0001) -3.5% n=79164
+nra Gs shift rows    qs    fixed=GAM_ONLY  recovery -0.093 (-0.235, -0.007); gain over fixed -0.0391 (-0.1010, -0.0028) -1.5% n=79164
+nra G2 before alarm  tw95  fixed=GAM_ONLY  recovery -0.360 (-1.028, -0.005); gain over fixed -0.0160 (-0.0418, -0.0002) -6.0% n=46271
+nra G2 before alarm  qs    fixed=GAM_ONLY  recovery -0.109 (-0.290, -0.000); gain over fixed -0.0597 (-0.1609, -0.0002) -2.3% n=46271
+nra G3 during        tw95  fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000); gain over fixed +0.0000 (+0.0000, +0.0000) +0.0% n=15102
+nra G3 during        qs    fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000); gain over fixed +0.0000 (+0.0000, +0.0000) +0.0% n=15102
+nra G4 after         tw95  fixed=GAM_ONLY  recovery -0.031 (-0.266, +0.114); gain over fixed -0.0007 (-0.0045, +0.0023) -0.3% n=17791
+nra G4 after         qs    fixed=GAM_ONLY  recovery -0.054 (-0.136, +0.000); gain over fixed -0.0190 (-0.0470, +0.0000) -0.7% n=17791
+nra G0 all rows      tw95  fixed=K0        recovery -0.999 (-1.419, -0.362); gain over fixed -0.1381 (-0.2507, -0.0338) -19.1% n=15993395
+nra G0 all rows      qs    fixed=K0        recovery -0.707 (-0.997, -0.473); gain over fixed -0.3478 (-0.4474, -0.2504) -13.3% n=15993395
+=== G1 harm of RULE against each fixed arm (mean qs, gain = fixed minus RULE), even months
+nra qs G1 ordinary GAM_ONLY minus RULE_d_4.5: n=15162288 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+nra qs G1 ordinary K0 minus RULE_d_4.5: n=15162288 mean -0.3613 (-0.4699, -0.2604) pct -13.91 (-18.47, -9.93)
+nra qs G1 ordinary BAND_HEAD minus RULE_d_4.5: n=15162288 mean -0.3701 (-0.4781, -0.2701) pct -14.30 (-18.61, -10.43)
+obs qs G1 ordinary GAM_ONLY minus RULE_d_4.5: n=15162288 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+obs qs G1 ordinary K0 minus RULE_d_4.5: n=15162288 mean -0.3613 (-0.4689, -0.2596) pct -13.91 (-18.44, -9.86)
+obs qs G1 ordinary BAND_HEAD minus RULE_d_4.5: n=15162288 mean -0.3701 (-0.4775, -0.2688) pct -14.30 (-18.65, -10.38)
+=== gain of each arm over each fixed arm, even months
+=== strata inside G5, even months: tw95 obs gain of RULE over the better fixed arm of that stratum
+size       over 25%           fixed=GAM_ONLY  recovery -0.000 (-0.028, +0.029) rows=831107
+duration   over 1 day         fixed=GAM_ONLY  recovery -0.000 (-0.028, +0.029) rows=831107
+season     November to March  fixed=K0        recovery -0.023 (-0.352, +0.200) rows=95488
+season     April to October   fixed=GAM_ONLY  recovery +0.017 (-0.019, +0.061) rows=735619
+lead       0-12 h             fixed=K0        recovery -0.895 (-1.284, -0.574) rows=58410
+lead       12-36 h            fixed=K0        recovery -0.531 (-0.913, -0.232) rows=121054
+lead       36 h-7 d           fixed=GAM_ONLY  recovery -0.028 (-0.066, -0.002) rows=651643
+substation D10                fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000) rows=44790
+substation D11                fixed=K0        recovery -0.092 (-0.436, +0.199) rows=358315
+substation D14                fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000) rows=13129
+substation D16                fixed=GAM_ONLY  recovery +0.000 (+0.000, +0.000) rows=199414
+substation D5                 fixed=K0        recovery -0.542 (-2.439, -0.095) rows=42886
+substation D9                 fixed=GAM_ONLY  recovery +0.002 (-0.120, +0.090) rows=172573
+=== share of readings above q99 (G4 and G5), even months
+nra GAM_ONLY      G4 after     above q99 1.32% (0.86, 1.84)
+nra GAM_ONLY      G5 near      above q99 2.16% (1.87, 2.45)
+nra GAM_ONLY      G1 ordinary  above q99 2.98% (2.27, 3.77)
+nra K0            G4 after     above q99 9.99% (6.99, 13.14)
+nra K0            G5 near      above q99 3.14% (2.56, 3.77)
+nra K0            G1 ordinary  above q99 1.02% (0.68, 1.43)
+nra BAND_HEAD     G4 after     above q99 0.95% (0.61, 1.34)
+nra BAND_HEAD     G5 near      above q99 0.72% (0.63, 0.81)
+nra BAND_HEAD     G1 ordinary  above q99 0.73% (0.52, 0.96)
+nra RULE_r24_2.6  G4 after     above q99 4.91% (2.98, 7.00)
+nra RULE_r24_2.6  G5 near      above q99 2.68% (2.31, 3.06)
+nra RULE_r24_2.6  G1 ordinary  above q99 2.81% (2.24, 3.40)
+nra RULE_r24_3.5  G4 after     above q99 2.36% (1.41, 3.55)
+nra RULE_r24_3.5  G5 near      above q99 2.39% (2.06, 2.72)
+nra RULE_r24_3.5  G1 ordinary  above q99 2.98% (2.27, 3.76)
+nra RULE_r24_4.5  G4 after     above q99 1.52% (1.01, 2.10)
+nra RULE_r24_4.5  G5 near      above q99 2.18% (1.89, 2.47)
+nra RULE_r24_4.5  G1 ordinary  above q99 2.98% (2.25, 3.77)
+nra RULE_d_2.3    G4 after     above q99 2.39% (1.42, 3.58)
+nra RULE_d_2.3    G5 near      above q99 2.41% (2.09, 2.73)
+nra RULE_d_2.3    G1 ordinary  above q99 2.78% (2.23, 3.35)
+nra RULE_d_3.2    G4 after     above q99 1.63% (1.03, 2.33)
+nra RULE_d_3.2    G5 near      above q99 2.26% (1.96, 2.56)
+nra RULE_d_3.2    G1 ordinary  above q99 2.98% (2.26, 3.79)
+nra RULE_d_4.5    G4 after     above q99 1.41% (0.92, 1.96)
+nra RULE_d_4.5    G5 near      above q99 2.16% (1.88, 2.46)
+nra RULE_d_4.5    G1 ordinary  above q99 2.98% (2.27, 3.78)
+nra ORACLE_NRA    G4 after     above q99 1.24% (0.74, 1.82)
+nra ORACLE_NRA    G5 near      above q99 1.11% (0.91, 1.31)
+nra ORACLE_NRA    G1 ordinary  above q99 0.63% (0.42, 0.87)
+nra ORACLE_OBS    G4 after     above q99 1.38% (0.83, 2.02)
+nra ORACLE_OBS    G5 near      above q99 1.64% (1.31, 1.99)
+nra ORACLE_OBS    G1 ordinary  above q99 0.63% (0.42, 0.87)
+nra ORACLE_STATE  G4 after     above q99 1.32% (0.86, 1.83)
+nra ORACLE_STATE  G5 near      above q99 2.62% (2.23, 3.02)
+nra ORACLE_STATE  G1 ordinary  above q99 2.98% (2.27, 3.77)
+obs GAM_ONLY      G4 after     above q99 2.08% (0.87, 4.07)
+obs GAM_ONLY      G5 near      above q99 2.75% (2.11, 3.52)
+obs GAM_ONLY      G1 ordinary  above q99 2.98% (2.27, 3.77)
+obs K0            G4 after     above q99 9.38% (6.49, 12.45)
+obs K0            G5 near      above q99 3.33% (2.72, 4.00)
+obs K0            G1 ordinary  above q99 1.02% (0.67, 1.43)
+obs BAND_HEAD     G4 after     above q99 0.97% (0.62, 1.35)
+obs BAND_HEAD     G5 near      above q99 1.33% (0.92, 1.83)
+obs BAND_HEAD     G1 ordinary  above q99 0.73% (0.52, 0.96)
+obs RULE_r24_2.6  G4 after     above q99 4.90% (2.98, 6.99)
+obs RULE_r24_2.6  G5 near      above q99 3.09% (2.53, 3.69)
+obs RULE_r24_2.6  G1 ordinary  above q99 2.81% (2.24, 3.42)
+obs RULE_r24_3.5  G4 after     above q99 2.37% (1.42, 3.53)
+obs RULE_r24_3.5  G5 near      above q99 2.86% (2.31, 3.46)
+obs RULE_r24_3.5  G1 ordinary  above q99 2.98% (2.27, 3.78)
+obs RULE_r24_4.5  G4 after     above q99 2.29% (1.03, 4.33)
+obs RULE_r24_4.5  G5 near      above q99 2.73% (2.11, 3.46)
+obs RULE_r24_4.5  G1 ordinary  above q99 2.98% (2.26, 3.76)
+obs RULE_d_2.3    G4 after     above q99 2.38% (1.43, 3.57)
+obs RULE_d_2.3    G5 near      above q99 2.89% (2.34, 3.51)
+obs RULE_d_2.3    G1 ordinary  above q99 2.78% (2.23, 3.37)
+obs RULE_d_3.2    G4 after     above q99 1.63% (1.04, 2.33)
+obs RULE_d_3.2    G5 near      above q99 2.78% (2.20, 3.45)
+obs RULE_d_3.2    G1 ordinary  above q99 2.98% (2.26, 3.76)
+obs RULE_d_4.5    G4 after     above q99 2.17% (0.94, 4.20)
+obs RULE_d_4.5    G5 near      above q99 2.72% (2.12, 3.42)
+obs RULE_d_4.5    G1 ordinary  above q99 2.98% (2.27, 3.77)
+obs ORACLE_NRA    G4 after     above q99 1.91% (0.80, 3.65)
+obs ORACLE_NRA    G5 near      above q99 1.94% (1.32, 2.71)
+obs ORACLE_NRA    G1 ordinary  above q99 0.63% (0.41, 0.87)
+obs ORACLE_OBS    G4 after     above q99 1.20% (0.72, 1.77)
+obs ORACLE_OBS    G5 near      above q99 1.68% (1.20, 2.23)
+obs ORACLE_OBS    G1 ordinary  above q99 0.63% (0.42, 0.87)
+obs ORACLE_STATE  G4 after     above q99 2.08% (0.88, 4.12)
+obs ORACLE_STATE  G5 near      above q99 2.78% (2.18, 3.46)
+obs ORACLE_STATE  G1 ordinary  above q99 2.98% (2.26, 3.77)
+=== median-forecast error minus mean-forecast error, per site (points), target nra
+D10  GAM_ONLY      -0.0045
+D10  K0            -0.0068
+D10  BAND_HEAD     -0.0747
+D10  RULE_d_4.5    -0.0045
+D11  GAM_ONLY      +0.0117
+D11  K0            +0.0017
+D11  BAND_HEAD     -0.1407
+D11  RULE_d_4.5    +0.0117
+D14  GAM_ONLY      +0.0019
+D14  K0            +0.0077
+D14  BAND_HEAD     -0.0243
+D14  RULE_d_4.5    +0.0024
+D16  GAM_ONLY      +0.0155
+D16  K0            +0.0045
+D16  BAND_HEAD     -0.2740
+D16  RULE_d_4.5    +0.0158
+D5   GAM_ONLY      +0.0337
+D5   K0            -0.0174
+D5   BAND_HEAD     +0.0055
+D5   RULE_d_4.5    +0.0315
+D9   GAM_ONLY      +0.0077
+D9   K0            +0.0041
+D9   BAND_HEAD     -0.1506
+D9   RULE_d_4.5    +0.0076
+=== leave one site out: recovery, tw95 obs, G5, even months
+without D10: fixed=GAM_ONLY recovery -0.000 (-0.029, +0.031)
+without D11: fixed=GAM_ONLY recovery -0.001 (-0.067, +0.057)
+without D14: fixed=GAM_ONLY recovery -0.000 (-0.028, +0.029)
+without D16: fixed=GAM_ONLY recovery -0.000 (-0.031, +0.031)
+without D5: fixed=GAM_ONLY recovery +0.001 (-0.029, +0.032)
+without D9: fixed=K0 recovery -0.058 (-0.344, +0.180)

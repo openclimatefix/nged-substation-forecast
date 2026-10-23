@@ -829,6 +829,15 @@ the ERA5 and CAMS estimates of past weather). No tested duration kept the bias u
 effective capacity (1 point is 1% of the substation's capacity). Applies to experiments and
 production.
 
+**Treat the Kalman filter's correction as undefined, not zero, before a series' first reading.** The
+filter's correction of a series is exactly zero until its first reading, so the difference between
+the forecast with recent power and the forecast without it is zero there too. Series 13 has no
+reading for 67% of the grid and series 7 for 37%; their standard deviation of that difference
+was zero until those rows were set to missing ([experiment
+308](00308-lsc-two-forecast-gap-as-a-detector/result.md); 15 Primary series). Applies to experiments
+and to production, for any score built on the filter's correction. Provisional until the
+experiment's reviews are merged.
+
 ## Forecast tails and curtailment cost
 
 **Count the half-hours beyond a limit before ranking forecasts on curtailment cost.** Two bulk
