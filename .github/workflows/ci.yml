@@ -1,7 +1,9 @@
 name: CI
 
-# Per-PR quality gate: lint, format, types, markdown, and the offline test suite (which an
+# Per-PR quality gate: lint, format, types, markdown, docs, and the offline test suite (which an
 # experiment-only pull request replaces with the study boundaries test; see the scope step).
+# Three jobs (docs, lint, tests) run in parallel, so the wall time is that of the slowest job. The
+# final job, named `ci`, is the one required status check in the repository ruleset.
 # The network-gated tests are NOT run here — they run in nightly_network_tests.yml.
 # Design rationale (including why this is a bespoke workflow rather than OCF's reusable
 # branch_ci.yml template):
@@ -12,12 +14,90 @@ on:
   push:
     branches: [main]
 
+# A new push to a pull request cancels the run it supersedes. Runs on `main` are never cancelled,
+# because two merges landing minutes apart must each be checked.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  ci:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # Resolves and downloads an interpreter satisfying requires-python; no setup-python step needed.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      # --all-packages so that `ty check` can resolve imports for leaf workspace members
+      # (e.g. dashboard, notebooks) that nothing depends on and a plain sync would omit.
+      # --locked fails the build if uv.lock is out of date with the pyproject.toml files.
+      - name: Install workspace
+        run: uv sync --locked --all-packages
+
+      # mkdocs validates links within docs/; check_docs_links (in the lint job) validates links from
+      # anywhere else to the published site. Neither sees what the other does.
+      # Every step uses --no-sync so that it runs against exactly what the install step installed.
+      - name: Docs build (mkdocs --strict)
+        run: uv run --no-sync mkdocs build --strict --site-dir /tmp/ci-site
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      # Resolves and downloads an interpreter satisfying requires-python; no setup-python step needed.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      # --all-packages so that `ty check` can resolve imports for leaf workspace members
+      # (e.g. dashboard, notebooks) that nothing depends on and a plain sync would omit.
+      # --locked fails the build if uv.lock is out of date with the pyproject.toml files.
+      - name: Install workspace
+        run: uv sync --locked --all-packages
+
+      - name: Lint (ruff check)
+        run: uv run --no-sync ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run --no-sync ruff format --check .
+
+      # Ruff's D417 only catches an `Args:` section that is present and incomplete; pydoclint
+      # compares the whole of `Args:` and `Returns:` against the signature. See `[tool.pydoclint]`
+      # in pyproject.toml.
+      - name: Docstring lint (pydoclint)
+        run: uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google .
+
+      - name: Type-check (ty)
+        run: uv run --no-sync ty check
+
+      - name: Docs links (check_docs_links)
+        run: uv run --no-sync python scripts/lint/check_docs_links.py
+
+      # Every hook except the ones skipped below. Commit-time hooks are not enough on their own:
+      # both failures in #812 landed from commits where the hooks never ran, which is the state of
+      # a clone where `pre-commit install` was never run. The hooks that remain are
+      # trailing-whitespace, end-of-file-fixer, check-yaml, no-sphinx-roles,
+      # check-experiment-front-matter, check-marimo-notebooks, pymarkdown (which scans every
+      # tracked markdown file) and lint-docstring-markdown.
+      # SKIP lists the hooks that have a step above running the same command over the same files:
+      # ruff-check and ruff-check-marimo (`ruff check .`), ruff-format (`ruff format --check .`),
+      # ty, pydoclint, and check-docs-links. `check-added-large-files` stays commit-time-only:
+      # without `--enforce-all` it inspects only the files staged as additions, and
+      # `--enforce-all` would fail today on three tracked files that already exceed 500 KB.
+      - name: Pre-commit (every hook without a step above, every file)
+        env:
+          SKIP: ruff-check,ruff-check-marimo,ruff-format,ty,pydoclint,check-docs-links
+        run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+
+  tests:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -60,36 +140,6 @@ jobs:
       - name: Install workspace
         run: uv sync --locked --all-packages
 
-      # Every step below uses --no-sync so that each one runs against exactly what the step above
-      # installed. A bare `uv run` would re-resolve and re-sync per step, which takes time. It
-      # would not uninstall the --all-packages members: `uv run` syncs inexactly, and `--exact`
-      # is opt-in.
-      - name: Lint (ruff check)
-        run: uv run --no-sync ruff check .
-
-      - name: Format (ruff format --check)
-        run: uv run --no-sync ruff format --check .
-
-      # Ruff's D417 only catches an `Args:` section that is present and incomplete; pydoclint
-      # compares the whole of `Args:` and `Returns:` against the signature. See `[tool.pydoclint]`
-      # in pyproject.toml.
-      - name: Docstring lint (pydoclint)
-        run: uv run --isolated --no-project --with pydoclint==0.9.1 pydoclint --quiet --style=google .
-
-      - name: Type-check (ty)
-        run: uv run --no-sync ty check
-
-      - name: Markdown lint (pymarkdown)
-        run: uv run --no-sync pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
-
-      # Two halves of one job: mkdocs validates links within docs/, check_docs_links validates
-      # links from anywhere else to the published site. Neither sees what the other does.
-      - name: Docs build (mkdocs --strict)
-        run: uv run --no-sync mkdocs build --strict --site-dir /tmp/ci-site
-
-      - name: Docs links (check_docs_links)
-        run: uv run --no-sync python scripts/lint/check_docs_links.py
-
       - name: Test (pytest)
         if: steps.scope.outputs.experiment_only != 'true'
         run: uv run --no-sync pytest
@@ -100,14 +150,20 @@ jobs:
         if: steps.scope.outputs.experiment_only == 'true'
         run: uv run --no-sync pytest packages/studies/tests/test_study_boundaries.py
 
-      # Five hooks have no step above — trailing-whitespace, end-of-file-fixer, check-yaml,
-      # no-sphinx-roles, and lint-docstring-markdown — and the pymarkdown hook scans every tracked
-      # markdown file, not the narrower set the step above passes it. Commit-time hooks are not
-      # enough on their own: both failures in #812 landed from commits where the hooks never ran,
-      # which is the state of a clone where `pre-commit install` was never run.
-      # `check-added-large-files` stays commit-time-only: without `--enforce-all` it inspects only
-      # the files staged as additions, and `--enforce-all` would fail today on three tracked files
-      # that already exceed 500 KB. This step repeats ruff, ty, pydoclint, pymarkdown, and
-      # check_docs_links, each of which has a step above, and adds a few seconds.
-      - name: Pre-commit (every hook, every file)
-        run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
+  # The repository ruleset requires a check named exactly `ci`. This job passes only when all three
+  # jobs above passed. `if: always()` makes it run (and fail) when a job above failed or was
+  # cancelled, instead of being skipped, which a required check would treat as passing.
+  ci:
+    if: always()
+    needs: [docs, lint, tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless every job succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for result in $RESULTS; do
+            [ "$result" = "success" ] || exit 1
+          done
