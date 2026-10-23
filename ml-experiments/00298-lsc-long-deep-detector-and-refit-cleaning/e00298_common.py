@@ -23,7 +23,9 @@ from studies.dp_features import (
 from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-EXPERIMENT_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00298-lsc-long-deep-detector-and-refit-cleaning"
+EXPERIMENT_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00298-lsc-long-deep-detector-and-refit-cleaning"
+)
 PANEL_PATH: Final[Path] = EXPERIMENT_DIR / "clean_panel.parquet"
 WORLDS_DIR: Final[Path] = EXPERIMENT_DIR / "worlds"
 CACHE_DIR: Final[Path] = (
@@ -32,23 +34,72 @@ CACHE_DIR: Final[Path] = (
     / "cache"
 )
 SITES: Final[tuple[str, ...]] = (
-    "D2", "D3", "D4", "D5", "D8", "D9", "D10", "D11", "D12", "D14", "D15", "D16", "D18", "D19",
-    "D21", "D22",
-)  # fmt: skip
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D8",
+    "D9",
+    "D10",
+    "D11",
+    "D12",
+    "D14",
+    "D15",
+    "D16",
+    "D18",
+    "D19",
+    "D21",
+    "D22",
+)
 INJECT_SITES: Final[tuple[str, ...]] = (
-    "D2", "D3", "D4", "D5", "D10", "D11", "D12", "D19", "D21", "D22",
-)  # fmt: skip
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D10",
+    "D11",
+    "D12",
+    "D19",
+    "D21",
+    "D22",
+)
 """The 10 Primaries of experiments 274 and 290, which have long histories and no generator."""
 SERIES_TO_SITE: Final[dict[int, str]] = {
-    3: "D3", 7: "D9", 8: "D11", 9: "D19", 10: "D10", 11: "D4", 12: "D15", 13: "D18", 14: "D12",
-    15: "D22", 16: "D14", 17: "D5", 18: "D16", 24: "D21", 25: "D2", 26: "D8",
-}  # fmt: skip
+    3: "D3",
+    7: "D9",
+    8: "D11",
+    9: "D19",
+    10: "D10",
+    11: "D4",
+    12: "D15",
+    13: "D18",
+    14: "D12",
+    15: "D22",
+    16: "D14",
+    17: "D5",
+    18: "D16",
+    24: "D21",
+    25: "D2",
+    26: "D8",
+}
 ADJACENCY_SERIES: Final[dict[int, tuple[int, ...]]] = {
-    3: (15, 16, 26), 7: (24,), 8: (10, 14, 24), 9: (11, 24), 10: (8, 12, 13, 14, 24, 25),
-    11: (9, 25), 12: (10, 13, 14, 16, 25), 13: (10, 12, 14, 16, 25), 14: (8, 10, 12, 13, 15, 16),
-    15: (3, 14, 17, 18), 16: (3, 12, 13, 14, 26), 17: (15, 18, 26), 18: (15, 17),
-    24: (7, 8, 9, 10, 25), 25: (10, 11, 12, 13, 24), 26: (3, 16, 17),
-}  # fmt: skip
+    3: (15, 16, 26),
+    7: (24,),
+    8: (10, 14, 24),
+    9: (11, 24),
+    10: (8, 12, 13, 14, 24, 25),
+    11: (9, 25),
+    12: (10, 13, 14, 16, 25),
+    13: (10, 12, 14, 16, 25),
+    14: (8, 10, 12, 13, 15, 16),
+    15: (3, 14, 17, 18),
+    16: (3, 12, 13, 14, 26),
+    17: (15, 18, 26),
+    18: (15, 17),
+    24: (7, 8, 9, 10, 25),
+    25: (10, 11, 12, 13, 24),
+    26: (3, 16, 17),
+}
 """Experiment 43's adjacency of the 16 metered series, as series ids."""
 NEIGHBOURS: Final[dict[str, tuple[str, ...]]] = {
     SERIES_TO_SITE[a]: tuple(SERIES_TO_SITE[b] for b in bs) for a, bs in ADJACENCY_SERIES.items()
@@ -128,9 +179,7 @@ def utc_day_of(*, cache: FeatureCache, index: np.ndarray) -> np.ndarray:
     return start.astype("datetime64[D]")
 
 
-def daily_means(
-    *, days: np.ndarray, values: np.ndarray
-) -> tuple[np.ndarray, np.ndarray]:
+def daily_means(*, days: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return (unique days, mean of `values`) for days with at least `MIN_ROWS_PER_DAY` rows."""
     unique, inverse, counts = np.unique(days, return_inverse=True, return_counts=True)
     sums = np.bincount(inverse, weights=values)

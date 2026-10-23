@@ -7,7 +7,7 @@ title: >-
 theme: lsc-detectors
 also_relevant_to:
   - retraining-and-training-history
-status: planned
+status: done
 size: >-
   complex by the sizing triggers, run with the reviews the maintainer's brief allows (Sonnet only).
   Stored: private daily-residual panels, alarm tables and per-world bias tables under
@@ -61,66 +61,185 @@ metric: >-
   trained on the clean series, divided by the mean injected transfer, over the 48 hours after the
   end) and mean absolute error against the clean series.
 code: ml-experiments/00298-lsc-long-deep-detector-and-refit-cleaning/
+verdict: not supported
+best_arm: >-
+  Cleaning with the pair-test detector E3 for the 30-day, 25% case: share learned as normal 10.1%
+  (95% interval 7.0% to 13.5%), against 19.4% with no cleaning and 2.8% with the oracle.
+headline: >-
+  A detector on the daily mean residual matches 10 to 12 of the 19 long-and-deep real load shifts,
+  no more than LR_b20 (12), and excluding the days it flags from the refit cuts the share of a
+  30-day, 25% transfer learned as normal from 19.4% to 10% to 13%, against 2.8% for an oracle.
+lessons: >-
+  Excluding flagged days from the refit works only as far as the detector is early and complete.
+  The oracle shows the ceiling (2.8% learned), and the 6 to 9 points the detectors recover are about
+  a third to a half of the gap. The neighbour check cuts false alarms by 70% but loses 27% to 56% of
+  the transfers that have a metered partner.
+take_home_message: >-
+  A simple detector on the daily mean error of the no-lag forecast finds about as many of the long,
+  deep real load shifts as the learned score LR_b20 (10 to 12 of 19), and it finds D8's multi-day
+  drops that the hour-scale detectors miss (27 of 29). Leaving the days it flags out of the monthly
+  refit cuts what the forecast learns of a 30-day transfer from about a fifth to about a tenth, not
+  to the 3% that excluding the true days gives, because the detector needs one to three days to
+  fire and misses a third of transfers. Long transfers stay a stated limit: tell NGED that a
+  transfer of 14 days or more is partly learned as normal, and look next at a detector that fires
+  on the first day.
+advice:
+  - >-
+    Expect a daily-mean detector to fire 24 to 48 hours after a transfer starts, and budget for the
+    first one to three days of every transfer being learned (Part 1 timing table).
+  - >-
+    Cap the excluded run at more than 60 days, or exclude by rule until the detector returns inside
+    its band, when testing transfers of 90 days or longer; the 60-day cap alone leaves 27% learned
+    (Part 2, 90 days).
+  - >-
+    Do not use the pair test E3 as a neighbour check: its recall is the same with no metered
+    partner (73%) as with one (81%) and with shifted-week placebos (74%) (Part 1 neighbour table).
+  - >-
+    Use variants D and F, not E, when a neighbour confirmation is wanted, and expect to lose 27% to
+    56% of the transfers that have a metered partner at the same threshold (Part 1, same-threshold
+    table).
+  - >-
+    Judge a detector for long shifts on the long-and-deep stratum of the real transfers and on the
+    D8 drops, not on the block days: no daily-mean variant found more than 3 of 17 block days
+    (stratum table).
 production_status: not-for-production
 adopted_in: none
 ---
 
-**Plan only.** The write-up replaces this body once the run has finished. The plan is the brief at
-`data/ml-experiments/briefs/sw_lsc_long_deep_detector_and_refit_cleaning_brief.md` (Parts 1 and 2;
-Part 0 is [experiment 290](../00290-lsc-long-shift-cut-date-robustness/result.md)).
+**A simple detector on the daily mean error of the no-lag forecast finds as many long, deep real
+load shifts as the learned score LR_b20 does, and leaving its flagged days out of the monthly refit
+cuts what the forecast learns of a 30-day transfer by a third to a half, but does not reach the 5%
+the plan predicted.** A load shift (also called a transfer) is a spell in which an operator moves
+part of one Primary substation's demand onto a neighbour. We built six detectors (A to F) that read
+the daily mean of the forecast error of the generalised additive model with no lagged power
+(GAM_ONLY). We scored them on the real record and on shifts we added to the series. We then refitted
+GAM_ONLY every month with the days a detector had flagged left out of training. The verdict is `not
+supported`, because predictions 1 and 2 and the 5% target of prediction 3 all failed. The ceiling is
+visible, though: leaving out the true shift days cuts the share learned to 2.8%.
 
-## Sizing (the five triggers)
+## Long-and-deep stratum
 
-- **What gets stored:** private parquet tables only.
-- **Serving path:** not touched.
-- **Degradation rule:** not touched.
-- **More than one defensible design:** yes (statistic, depth rule, end rule, cleaning cap), so all
-  are fixed here.
-- **Callers not nameable without searching:** no; the scripts call `studies.dp_gam` unchanged.
+The headline comparison is on the 19 real load shifts that last at least 2 days and move at least
+10% of load, the stratum that [experiment
+302](../00302-lsc-learned-score-without-nged-labels/result.md) fixed before this experiment's
+results were read. "Matches" counts shifts with an alarm during them or within a day. "Alarms per
+match" is every alarm over the whole record divided by the matches. "MW-weighted" weights each match
+by the shift's recorded megawatts. `printed_stratum.txt` holds the full table.
 
-## Design
+| Detector | Matches, stratum (19) | Alarms per match | MW-weighted | Matches, other 16 | MW-weighted |
+|---|---|---|---|---|---|
+| LR_b20 (experiment 302) | 12 | 8.8 | 0.72 | 9 | 0.69 |
+| RO-NC, 2nd operating point | 12 | 10.8 | 0.71 | 10 | 0.80 |
+| RO-NC, carried operating point | 16 | 18.1 | 0.86 | 13 | 0.92 |
+| Learned re-ranker | 18 | 21.3 | 0.95 | 14 | 0.94 |
+| A3 (mean of 3 days) | 10 | 13.3 | 0.65 | 4 | 0.43 |
+| B (cumulative sum) | 10 | 15.0 | 0.66 | 3 | 0.18 |
+| C (3 days against 28) | 11 | 11.4 | 0.67 | 5 | 0.38 |
+| E3 (pair test) | 12 | 11.4 | 0.68 | 2 | 0.09 |
+| D-A3 (neighbour check) | 8 | 16.4 | 0.54 | 4 | 0.34 |
+| F-C (neighbour cover) | 9 | 13.8 | 0.58 | 4 | 0.22 |
 
-- **Residual.** GAM_ONLY (no lagged power, 24-month window, ridge 0.1, as in experiments 274 and
-  290) refitted at the first of each month, predicting the whole month with realised ERA5 and CAMS
-  weather (a lab shortcut). The fit is unmasked: the hand-filtered switching rows train too.
-  The daily mean residual is the mean over the UTC day, in MW. One noise unit is 1.4826 times the
-  median absolute deviation of the daily means over the previous 24 months (experiment 217).
-- **Depth rule.** The mean over the candidate window is at least 10% of the Primary's median power
-  over the previous 365 days. A span lasts at least 2 days and ends on the first day whose daily
-  mean is back inside 1.5 noise units for a day. The hindsight option moves the start back by up
-  to 2 days.
-- **Variants.** A: mean of the last W = 2, 3, 7 days against a threshold k. B: a CUSUM on the daily
-  mean z-score with allowance 0.5. C: the last 3 days minus the preceding 28. D: A or C confirmed
-  by a metered neighbour (the adjacency table of experiment 43) with the opposite sign and at least
-  30% of the size, whose summed mean with the node's is under 50% of the node's. E: the pair test,
-  where the difference of two connected residuals shifts while their sum stays within 1.5 noise
-  units. F: up to 3 neighbours whose summed mean cancels the node's, with the share explained.
-- **Tuning.** Thresholds are set on odd months only, to give 2 false alarms per Primary-year, and
-  scored on even months. A false alarm is a span with no known event within 3 days (a D8 drop, a
-  block day, or a logged real transfer); D8 and D9 are counted apart.
-- **Injected shifts.** Durations 1, 3, 6, 7, 14, 30 and 90 days, sizes 10%, 25% and 50% of load,
-  proportional to own power or a fixed block, at 10 Primaries and onsets in December 2022, June
-  2023, December 2023 and June 2024; permanent steps of 10% and 25% starting 3, 6 and 12 months
-  before the end of the window. The receiver is unmetered, or a metered neighbour (the injected
-  series of the neighbour is fitted too). Each world is refitted monthly with the injected series,
-  so the detector sees what the forecast learned.
-- **Cleaning arms.** (a) none; (b) oracle (true shift days excluded from the refit); (c) the best of
-  A to C; (d) the best of D to F. A day flagged by the end of the previous month is excluded from
-  the next refit, with the start moved back 2 days; a run of excluded days is capped at 60. Two
-  refit cycles are rerun to see whether the same days are flagged again.
-- **Real rows.** The 17 block days of experiment 175, the 29 drops of D8 (reported apart; they
-  are probably a gas engine, experiment 291), and the real transfers over 1 day in the labelled set
-  of experiment 41. RO-NC, the pair alarm and the learned score are read from the stored alarm
-  tables of experiments 195 and 217 at their stored operating points.
+**On the stratum the daily-mean detectors match 7 to 12 of 19, against 12 for LR_b20, with more
+alarms per match; on the other 16 shifts they are clearly worse.** RO-NC (the refit-offset
+neighbour-count detector) and the learned re-ranker match more at their carried operating points,
+but at 18 to 21 alarms per match.
 
-## Earlier advice followed
+![Real load shifts matched](real_matches_by_stratum.svg)
 
-- Quote the share learned as a range, not as 19% (experiment 290).
-- Use several end dates, not the first of a month (experiment 290).
-- Report the effect on separate row groups (decision program brief).
+The same split on the injected shifts (25% of load, no metered partner, even-month onsets, 2 or more
+days against 1 day): variant C finds 62% of 1,440 long shifts (3.2 alarms per match, MW-weighted
+0.85) and 13% of 240 one-day shifts; E3 finds 61% and 6%; F-C finds 55% and 8%.
 
-## Checks, to be filled in at write-up
+## Part 1: the detectors
 
-- Median minus mean forecast per site (not applicable: GAM_ONLY forecasts the mean).
-- Error of the mean forecast beside every contrast.
-- Which of the seven audit triggers fired.
+![Injected recall by length](injected_recall_by_duration.svg)
+
+- **Real record, tuned to 2 false alarms per Primary-year in odd months.** Variant C (the
+  pre-registered best any-alarm variant, chosen on odd-month injected shifts) found 0 of 17 block
+  days, 11 of 29 D8 drops and 16 of 35 real transfers, with 1.48 false alarms per Primary-year in
+  even months. Variant B found 27 of 29 D8 drops and 1 of 17 block days at 1.59 false alarms. The
+  block days are 12 hours or less, so a daily mean cannot see them. Prediction 1 fails on the block
+  days and holds on the drops and the false-alarm rate. The drops are probably a gas engine
+  ([experiment 291](../00291-d8-drops-engine-spells-load-shift/result.md)), so they are not counted
+  as load shifts.
+- **Neighbour checks at the same threshold** cut false alarms by 68% to 73% (D-A3 against A3: 76 to
+  24 over the record), but lose 27% to 56% of the 22 real transfers that have two metered sides.
+  Prediction 2's limit of a 20% recall loss fails.
+- **The pair test E3 does not check neighbours.** On injected shifts its recall is 73% with no
+  metered partner, 81% with one, and 74% with a shifted-week placebo. D and F separate better (F-C
+  at the same threshold: 65% with the partner, 42% with none, 39% with the placebo).
+- **Permanent steps are not rejected.** Variants D to F alarm on 50% to 99% of injected steps whose
+  receiver is unmetered, against the 20% or less the plan allowed.
+- **Timing.** For found injected shifts of 6 days or more, the median alarm comes 24 to 48 hours
+  after the start for A2, A3, C, E3 and F-C and 72 to 96 hours for A7 and B; the median start and
+  end errors are 0 hours at day resolution.
+- **Depth.** Recall for 7 to 90 days at 10% of load is 16% to 44%, at 25% it is 66% to 83%, and at
+  50% it is 66% to 92%.
+
+## Part 2: cleaning the refit
+
+![Share learned by length](share_learned_by_duration.svg)
+
+| 30 days, 25% of load | Share learned, 48 h after the end | 2 to 33 days after |
+|---|---|---|
+| No cleaning | 19.4% (18.2 to 20.5) | 12.0% |
+| Oracle | 2.8% (0.4 to 5.1) | 2.0% |
+| Detector C | 13.0% (10.4 to 15.6) | 6.0% |
+| Detector E3 | 10.1% (7.0 to 13.5) | 4.5% |
+| Detector F-C | 13.2% (10.4 to 15.9) | 5.9% |
+
+- **Paired difference from no cleaning:** oracle -16.6 points (-18.8 to -14.4), C -6.3 (-9.1 to
+  -3.5), E3 -9.3 (-12.8 to -6.2), F-C -6.1 (-9.1 to -3.5). Prediction 3's target of under 5% fails
+  for every detector.
+- **Short shifts.** Cleaning helps most for 3 to 14 days (14 days: 18.1% uncleaned, 3.9% oracle,
+  6.1% to 7.4% detectors). A shift of 25% and 7 days falls from 9.3% to 3.0% to 3.4%.
+- **Long shifts and steps.** A 90-day shift stays at 22% to 28% learned with any arm, because the
+  run of excluded days is capped at 60. A permanent step of 25% is 45% learned after 12 months with
+  no cleaning, 24% with the oracle, and 24% (E3) to 34% (F-C) with detectors.
+- **Clean rows.** On the 14 Primaries with no shift, cleaning changes the mean absolute error by
+  +0.013 (-0.029 to +0.070) points for C, +0.007 (-0.029 to +0.055) for E3, and -0.008 (-0.033 to
+  +0.021) for F-C. D8 (+0.31 for C) and D12 (+0.16 to +0.26 for E3 and F-C) carry the positive
+  values.
+- **Self-reinforcement.** Refitting without the flagged days and re-running the detector on the new
+  residuals flags 74% to 97% of the same days again, so the exclusion is stable. The recheck uses
+  in-sample residuals for the days that stayed in training.
+- **Wrong exclusions.** Over the whole run each detector flags 7 to 8 days per 30-day world, and 5
+  to 7 days per world of 1 to 7 days, outside the true shift.
+- **Near-a-shift scores** against the true normal-arrangement series (30 days, 25%): mean continuous
+  ranked probability score 4.66 points with no cleaning, 4.54 oracle, 4.61 to 4.59 detectors. The
+  threshold-weighted score is 0.63 for every arm. The spread is a fixed Gaussian width fitted to the
+  clean forecast's own error, so these scores rank the centres only.
+
+## Checks
+
+- **Median minus mean forecast.** GAM_ONLY forecasts the mean, so the gap does not exist.
+- **Error of the mean forecast beside the scores.** The mean absolute error against the true series
+  falls in step with the continuous ranked probability score (6.26 uncleaned, 6.11 oracle, 6.17 to
+  6.20 detectors).
+- **Audit triggers fired:** (1) a control: E3 does no neighbour check (73% unmetered, 81% metered,
+  74% placebo); (2) the result contradicts predictions 1, 2 and 3, and the explanation we tested
+  (the detector's delay of 1 to 3 days) fits but was not isolated; (5) the oracle, which should
+  contain every detector arm, scores 27.4% learned for a 90-day 25% shift against 22.3% for E3
+  (intervals 24.7 to 30.9 and 18.1 to 26.5), because the oracle run of excluded days is capped at 60
+  while the detectors' separate runs are not. No Opus audit was run, because this session was
+  limited to Sonnet models.
+- **Reviews.** One Sonnet code review found 12 issues. We fixed four (a pair-noise cache shared
+  between worlds, a placebo shifted by less than the transfer, hits that ignored the sign of the
+  alarm, and stored-alarm counts on a different basis) and documented the rest below.
+
+## Caveats and what to try next
+
+- Thresholds for D-A7, D-C and F-A7 reach the bottom of the grid, so they are not at equal
+  false-alarm rate with A to C. Recall on the real record is counted in all months, so it is partly
+  in the tuning months. Variant B's long spans count as hits on any overlap.
+- The hindsight start moves back by up to the window length minus one (6 days for A7 and E7), not
+  the planned 2. The partner in a metered world is refitted but never cleaned, and the load level
+  used by the depth rule is the clean level.
+- Permanent steps start at the four fixed onsets and run 15 months, not 3, 6 and 12 months before
+  the end of the data. The weather is ERA5 and CAMS, which arrive days late, so the numbers are a
+  ceiling.
+- D15 has no panel because its history starts in 2025, so 15 of the 16 Primaries are scored.
+- **Next.** The gap between the detectors (10% to 13%) and the oracle (2.8%) is mostly the 1 to 3
+  days before a detector fires and the third of transfers it misses. A detector that fires on the
+  first day, or a refit that downweights the most recent days when the residual is high, is the
+  experiment this result narrows the search to.

@@ -1,3 +1,4 @@
+# ruff: noqa: PERF401
 """The real record's events on the day grid: block days, D8 drops, real transfers, closures.
 
 Each event is a dict with `cls` (block, drop, transfer), `sites` (labels), `start` and `end`
@@ -9,7 +10,6 @@ experiment 159 (D8 drops), experiment 41 (the labelled real transfers over 1 day
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Final
 
 import e00298_common as common
@@ -40,14 +40,21 @@ def load_events() -> list[dict]:
     blocks = pl.read_parquet(root / "00175-dp-unlabelled-day-shapes/work/day_shapes.parquet")
     for row in blocks.filter(pl.col("shape") == "a_block").iter_rows(named=True):
         d = _day(moment=row["local_date"])
-        events.append({"cls": "block", "sites": [row["site"]], "start": d, "end": d, "moved_mw": np.nan})
+        events.append(
+            {"cls": "block", "sites": [row["site"]], "start": d, "end": d, "moved_mw": np.nan}
+        )
     drops = pl.read_parquet(
         root / "00159-switching-d8-multi-day-drops-recurrence-and-report/drops.parquet"
     )
     for row in drops.iter_rows(named=True):
         events.append(
-            {"cls": "drop", "sites": ["D8"], "start": _day(moment=row["start_date"]),
-             "end": _day(moment=row["end_date"]), "moved_mw": row["depth_mw"]}  # fmt: skip
+            {
+                "cls": "drop",
+                "sites": ["D8"],
+                "start": _day(moment=row["start_date"]),
+                "end": _day(moment=row["end_date"]),
+                "moved_mw": row["depth_mw"],
+            }
         )
     labelled = pl.read_parquet(root / "00041-sw2-0a-labeller-gate/real/labelled_set.parquet")
     labelled = labelled.filter(
@@ -55,11 +62,18 @@ def load_events() -> list[dict]:
         (pl.col("end_utc") - pl.col("onset_utc")).dt.total_seconds() > 86400,
     )
     for row in labelled.iter_rows(named=True):
-        sites = [common.SERIES_TO_SITE[int(s)] for s in (row["side_a"], row["side_b"]) if s is not None]
+        sites = [
+            common.SERIES_TO_SITE[int(s)] for s in (row["side_a"], row["side_b"]) if s is not None
+        ]
         events.append(
-            {"cls": "transfer", "sites": sites, "start": _day(moment=row["onset_utc"]),
-             "end": _day(moment=row["end_utc"]), "moved_mw": row["moved_mw_p50"],
-             "card_id": row["card_id"]}  # fmt: skip
+            {
+                "cls": "transfer",
+                "sites": sites,
+                "start": _day(moment=row["onset_utc"]),
+                "end": _day(moment=row["end_utc"]),
+                "moved_mw": row["moved_mw_p50"],
+                "card_id": row["card_id"],
+            }
         )
     return events
 
@@ -75,8 +89,11 @@ def load_closures() -> list[dict]:
             if s is not None and str(s).isdigit() and int(s) in common.SERIES_TO_SITE
         ]
         out.append(
-            {"sites": sites, "start": stamp_day(stamp=row["first_stamp"]),
-             "end": stamp_day(stamp=row["last_stamp_exclusive"] - 1)}  # fmt: skip
+            {
+                "sites": sites,
+                "start": stamp_day(stamp=row["first_stamp"]),
+                "end": stamp_day(stamp=row["last_stamp_exclusive"] - 1),
+            }
         )
     return out
 

@@ -1,3 +1,4 @@
+# ruff: noqa: ANN202
 """Causal detectors on the daily mean residual: variants A to F of experiment 298.
 
 Every array is on one day grid (`DAY0` plus the index). A detector run reads the days one by one
@@ -101,7 +102,9 @@ class Stream:
 
 def make_stream(*, residual: np.ndarray, level: np.ndarray, first: int = 0) -> Stream:
     """Build a stream from a residual and a load level on the grid."""
-    return Stream(residual=residual, noise=rolling_mad_noise(series=residual, first=first), level=level)
+    return Stream(
+        residual=residual, noise=rolling_mad_noise(series=residual, first=first), level=level
+    )
 
 
 @dataclass(frozen=True)
@@ -240,9 +243,14 @@ def _run_machine(
             hit = trigger(d, last_end)
             if hit is not None:
                 sign, start, extra = hit
-                active = {"start": start, "fire": d, "sign": sign,
-                          "size_mw": sign * float(np.nanmean(stream.residual[start : d + 1])),
-                          "peak": 0.0, **extra}  # fmt: skip
+                active = {
+                    "start": start,
+                    "fire": d,
+                    "sign": sign,
+                    "size_mw": sign * float(np.nanmean(stream.residual[start : d + 1])),
+                    "peak": 0.0,
+                    **extra,
+                }
     if active is not None:
         spans.append(Span(end=last, **{k: v for k, v in active.items() if k != "peak"}))
     return spans
@@ -269,10 +277,12 @@ def detect(
             to avoid recomputing them from the stream.
     """
     pair_stats = (
-        _pair_stats(stream=stream, others=others, pair_noise=pair_noise) if variant.kind == "E" else {}
+        _pair_stats(stream=stream, others=others, pair_noise=pair_noise)
+        if variant.kind == "E"
+        else {}
     )
 
-    def trigger(d: int, last_end: int):  # noqa: ANN202
+    def trigger(d: int, last_end: int):
         if variant.kind == "B":
             return _cusum_trigger(stream=stream, d=d, last_end=last_end, variant=variant)
         if variant.kind == "E":
@@ -300,9 +310,11 @@ def detect(
 _CUSUM_STATE: dict[int, dict] = {}
 
 
-def _cusum_trigger(*, stream: Stream, d: int, last_end: int, variant: Variant):  # noqa: ANN202
+def _cusum_trigger(*, stream: Stream, d: int, last_end: int, variant: Variant):
     """Variant B: a two-sided CUSUM on the daily z, restarted after each span."""
-    state = _CUSUM_STATE.setdefault(id(stream), {"last": -1, "pos": 0.0, "neg": 0.0, "p0": 0, "n0": 0})
+    state = _CUSUM_STATE.setdefault(
+        id(stream), {"last": -1, "pos": 0.0, "neg": 0.0, "p0": 0, "n0": 0}
+    )
     if state["last"] >= d:  # a new run over the same stream
         state.update(last=-1, pos=0.0, neg=0.0, p0=0, n0=0)
     z = stream.z[d]
@@ -342,13 +354,15 @@ def _pair_stats(
         diff = stream.residual - other.residual
         total = stream.residual + other.residual
         noise_diff, noise_sum = (
-            pair_noise[name] if pair_noise and name in pair_noise else pair_noise_of(a=stream.residual, b=other.residual)
+            pair_noise[name]
+            if pair_noise and name in pair_noise
+            else pair_noise_of(a=stream.residual, b=other.residual)
         )
         out[name] = (diff / noise_diff, total / noise_sum)
     return out
 
 
-def _pair_trigger(*, stream: Stream, pair_stats: dict, d: int, last_end: int, variant: Variant):  # noqa: ANN202
+def _pair_trigger(*, stream: Stream, pair_stats: dict, d: int, last_end: int, variant: Variant):
     """Variant E: the difference of a connected pair shifts while its sum stays flat."""
     w = variant.w
     if d - w + 1 <= last_end:
@@ -361,7 +375,9 @@ def _pair_trigger(*, stream: Stream, pair_stats: dict, d: int, last_end: int, va
         stat, flat = float(np.mean(a)), abs(float(np.mean(b)))
         if abs(stat) >= variant.k and flat <= PAIR_SUM_BAND:
             sign = 1 if stat > 0 else -1
-            if _depth_ok(stream=stream, d=d, w=w, sign=sign) and (best is None or abs(stat) > best[0]):
+            if _depth_ok(stream=stream, d=d, w=w, sign=sign) and (
+                best is None or abs(stat) > best[0]
+            ):
                 best = (abs(stat), sign, name)
     if best is None:
         return None
@@ -369,7 +385,9 @@ def _pair_trigger(*, stream: Stream, pair_stats: dict, d: int, last_end: int, va
     return sign, _hindsight_start(stream=stream, d=d, w=w, sign=sign), {"partners": (name,)}
 
 
-def flagged_days(*, spans: list[Span], cut_day: int, pre: int = 2, post: int = 1, cap: int = 60) -> np.ndarray:
+def flagged_days(
+    *, spans: list[Span], cut_day: int, pre: int = 2, post: int = 1, cap: int = 60
+) -> np.ndarray:
     """Return the grid days to exclude from the refit at `cut_day` (known before the cut).
 
     A span counts when its alarm fired before `cut_day`. It covers `pre` days before its start and

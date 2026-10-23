@@ -1,3 +1,4 @@
+# ruff: noqa: PLR0915, PLR0912, PERF401, D107
 """Injected worlds: add a load transfer to one Primary, refit monthly, and clean or not.
 
 A world is (site, onset, scenario). The node receives `size` times its own power (`share`) or its
@@ -30,9 +31,9 @@ import e00298_common as common
 import e00298_detect as dt
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
-from studies.dp_ens_weather import replace_site
+import torch
 from scipy.special import ndtri
+from studies.dp_ens_weather import replace_site
 from studies.dp_features import FeatureCache, naive_utc
 
 DURATIONS: Final[tuple[int, ...]] = (1, 3, 6, 7, 14, 30, 90)
@@ -48,8 +49,10 @@ MONTHS_AFTER_END: Final[int] = 4
 STEP_MONTHS: Final[int] = 15
 CAP_DAYS: Final[int] = 60
 AFTER_WINDOW: Final[tuple[tuple[str, float, float], ...]] = (
-    ("AFTER_0_2", 0.0, 2.0), ("AFTER_2_10", 2.0, 10.0), ("AFTER_2_33", 2.0, 33.0),
-)  # fmt: skip
+    ("AFTER_0_2", 0.0, 2.0),
+    ("AFTER_2_10", 2.0, 10.0),
+    ("AFTER_2_33", 2.0, 33.0),
+)
 
 
 @dataclass(frozen=True)
@@ -77,9 +80,7 @@ def scenarios(*, stage: str) -> list[Scenario]:
     return [*grid, *metered, *steps]
 
 
-def cut_schedule(
-    *, onset: datetime, end: datetime | None
-) -> tuple[list[datetime], list[datetime]]:
+def cut_schedule(*, onset: datetime, end: datetime | None) -> tuple[list[datetime], list[datetime]]:
     """Return (cuts, stops): monthly cuts from the onset plus a cut at the end of the transfer."""
     last = (
         common.add_months(moment=onset, months=STEP_MONTHS)
@@ -126,7 +127,9 @@ def gaussian_scores(
     return crps, tw
 
 
-def noise_after(*, residual: np.ndarray, base_noise: np.ndarray, start: int, stop: int) -> np.ndarray:
+def noise_after(
+    *, residual: np.ndarray, base_noise: np.ndarray, start: int, stop: int
+) -> np.ndarray:
     """Return `base_noise` with entries `start`..`stop - 1` recomputed from `residual`."""
     out = base_noise.copy()
     for d in range(start, stop):
@@ -162,19 +165,30 @@ class JobContext:
         options = [n for n in common.NEIGHBOURS.get(self.site, ()) if n in self.clean]
         if not options:
             return None
-        power = {n: float(np.nanmean(self.cache.sites[n].y) * self.cache.sites[n].table.effective_capacity_mw) for n in options}
-        return max(power, key=power.get)
+        power = {
+            n: float(
+                np.nanmean(self.cache.sites[n].y) * self.cache.sites[n].table.effective_capacity_mw
+            )
+            for n in options
+        }
+        return max(power, key=lambda name: power[name])
 
-    def clean_forecast(self, *, site: str, cut: datetime, stop: datetime, index: np.ndarray) -> np.ndarray:
+    def clean_forecast(
+        self, *, site: str, cut: datetime, stop: datetime, index: np.ndarray
+    ) -> np.ndarray:
         """The clean-trained forecast of `index` (cached across scenarios and modes)."""
         key = (site, cut, stop)
         if key not in self.clean_fits:
             predicted = common.forecast_month(cache=self.cache, site=site, cut=cut, index=index)
-            self.clean_fits[key] = predicted if predicted is not None else np.full(len(index), np.nan)
+            self.clean_fits[key] = (
+                predicted if predicted is not None else np.full(len(index), np.nan)
+            )
         return self.clean_fits[key]
 
 
-def delta_points(*, ctx: JobContext, site: str, scenario: Scenario, end: datetime | None, sign: float) -> np.ndarray:
+def delta_points(
+    *, ctx: JobContext, site: str, scenario: Scenario, end: datetime | None, sign: float
+) -> np.ndarray:
     """Return the injected change of `site`'s power in points, on the grid, for the node's MW."""
     features = ctx.cache.sites[ctx.site]
     stamps = ctx.cache.end_times
@@ -195,7 +209,9 @@ def delta_points(*, ctx: JobContext, site: str, scenario: Scenario, end: datetim
     return sign * megawatts / ctx.cache.sites[site].table.effective_capacity_mw * 100.0
 
 
-def window_labels(*, times: np.ndarray, onset: datetime, end: datetime | None) -> dict[str, np.ndarray]:
+def window_labels(
+    *, times: np.ndarray, onset: datetime, end: datetime | None
+) -> dict[str, np.ndarray]:
     """Row masks for each scoring label."""
     t0 = naive_utc(moment=onset)
     out = {"ALL": np.ones(len(times), dtype=bool), "BEFORE": times <= t0}
@@ -203,7 +219,7 @@ def window_labels(*, times: np.ndarray, onset: datetime, end: datetime | None) -
         month = np.timedelta64(30, "D")
         block = ((times - t0) // month).astype(int)
         out["DURING"] = times > t0
-        for b in range(0, STEP_MONTHS + 1):
+        for b in range(STEP_MONTHS + 1):
             out[f"STEP_B{b}"] = (times > t0) & (block == b)
         return out
     t1 = naive_utc(moment=end)
@@ -227,7 +243,9 @@ def run_world(
     """Run one world in one mode and return (per-window records, daily streams)."""
     cache, site, onset = ctx.cache, ctx.site, ctx.onset
     features = cache.sites[site]
-    end = None if control or scenario.duration is None else onset + timedelta(days=scenario.duration)
+    end = (
+        None if control or scenario.duration is None else onset + timedelta(days=scenario.duration)
+    )
     if control:
         cuts = common.month_starts(first=datetime(2022, 1, 1, tzinfo=UTC), last=common.LAST_CUT)
         stops = [*cuts[1:], common.add_months(moment=cuts[-1], months=1)]
@@ -236,20 +254,26 @@ def run_world(
         cuts, stops = cut_schedule(onset=onset, end=end)
         onset_eff = onset
     zero = np.zeros_like(features.y)
-    delta = zero if control else delta_points(ctx=ctx, site=site, scenario=scenario, end=end, sign=1.0)
+    delta = (
+        zero if control else delta_points(ctx=ctx, site=site, scenario=scenario, end=end, sign=1.0)
+    )
     y_node = features.y + delta
     partner = ctx.partner_name if (scenario.metered and not control) else None
     partner_stream = None
     if partner is not None:
-        partner_stream = _partner_stream(ctx=ctx, scenario=scenario, end=end, partner=partner, cuts=cuts, stops=stops)
+        partner_stream = _partner_stream(
+            ctx=ctx, scenario=scenario, end=end, partner=partner, cuts=cuts, stops=stops
+        )
     day0 = int((np.datetime64(onset_eff.replace(tzinfo=None), "D") - dt.DAY0).astype(int))
     resid = ctx.clean[site].residual.copy()
     resid[day0:] = np.nan
     base_noise = ctx.clean[site].noise
     level = ctx.clean[site].level
     others = {n: s for n, s in ctx.clean.items() if n in common.NEIGHBOURS.get(site, ())}
-    if partner_stream is not None:
-        others[partner] = dt.Stream(residual=partner_stream, noise=ctx.clean[partner].noise, level=ctx.clean[partner].level)
+    if partner_stream is not None and partner is not None:
+        others[partner] = dt.Stream(
+            residual=partner_stream, noise=ctx.clean[partner].noise, level=ctx.clean[partner].level
+        )
     true_first, true_last = (0, -1) if control else true_days(onset=onset, end=end)
     records: list[dict] = []
     flagged_total = flagged_true = flagged_outside = 0
@@ -262,12 +286,20 @@ def run_world(
         exclude_days = np.zeros(dt.N_DAYS, dtype=bool)
         if mode == "oracle" and not control:
             exclude_days[true_first : min(true_last, cut_day - 1) + 1] = True
-            run = np.cumsum(exclude_days) - np.maximum.accumulate(np.where(~exclude_days, np.cumsum(exclude_days), 0))
+            run = np.cumsum(exclude_days) - np.maximum.accumulate(
+                np.where(~exclude_days, np.cumsum(exclude_days), 0)
+            )
             exclude_days &= run <= CAP_DAYS
         elif variant is not None and cut_day > day0:
             noise = noise_after(residual=resid, base_noise=base_noise, start=day0, stop=cut_day)
             stream = dt.Stream(residual=resid, noise=noise, level=level)
-            spans = dt.detect(variant=variant, stream=stream, others=others, first=max(day0 - 35, 40), last=cut_day - 1)
+            spans = dt.detect(
+                variant=variant,
+                stream=stream,
+                others=others,
+                first=max(day0 - 35, 40),
+                last=cut_day - 1,
+            )
             exclude_days = dt.flagged_days(spans=spans, cut_day=cut_day, cap=CAP_DAYS)
         excluded_rows = exclude_days[ctx.row_day]
         if excluded_rows.any():
@@ -280,7 +312,9 @@ def run_world(
             if variant is not None and exclude_days.any() and cut_day > day0
             else np.zeros(0, dtype=int)
         )
-        both = common.forecast_many(cache=world_cache, site=site, cut=cut, indexes=[index, recheck_index])
+        both = common.forecast_many(
+            cache=world_cache, site=site, cut=cut, indexes=[index, recheck_index]
+        )
         if both is None:
             continue
         predicted = both[0]
@@ -288,20 +322,28 @@ def run_world(
         if len(recheck_index):
             days_r = common.utc_day_of(cache=cache, index=recheck_index)
             capacity = features.table.effective_capacity_mw / 100.0
-            day_r, resid_r = common.daily_means(days=days_r, values=(y_node[recheck_index] - both[1]) * capacity)
+            day_r, resid_r = common.daily_means(
+                days=days_r, values=(y_node[recheck_index] - both[1]) * capacity
+            )
             resid2 = resid.copy()
             resid2[dt.day_index(days=day_r)] = resid_r
             noise2 = noise_after(residual=resid2, base_noise=base_noise, start=day0, stop=cut_day)
+            assert variant is not None
             spans2 = dt.detect(
-                variant=variant, stream=dt.Stream(residual=resid2, noise=noise2, level=level),
-                others=others, first=max(day0 - 35, 40), last=cut_day - 1,
+                variant=variant,
+                stream=dt.Stream(residual=resid2, noise=noise2, level=level),
+                others=others,
+                first=max(day0 - 35, 40),
+                last=cut_day - 1,
             )
             flag2 = dt.flagged_days(spans=spans2, cut_day=cut_day, cap=CAP_DAYS)
             recheck_overlap = float((exclude_days & flag2).sum() / max(1, exclude_days.sum()))
         clean_pred = ctx.clean_forecast(site=site, cut=cut, stop=stop, index=index)
         truth = features.y[index]
         observed = y_node[index]
-        sd = 1.4826 * float(np.nanmedian(np.abs(truth - clean_pred - np.nanmedian(truth - clean_pred))))
+        sd = 1.4826 * float(
+            np.nanmedian(np.abs(truth - clean_pred - np.nanmedian(truth - clean_pred)))
+        )
         sd = max(sd, 1e-3)
         crps, tw = gaussian_scores(centre=predicted, sd=sd, actual=truth, threshold=ctx.threshold)
         days = common.utc_day_of(cache=cache, index=index)
@@ -314,18 +356,28 @@ def run_world(
             if not rows.any():
                 continue
             records.append(
-                {"label": label, "cut": cut, "n_rows": int(rows.sum()),
-                 "bias": float(np.mean(predicted[rows] - clean_pred[rows])),
-                 "transfer": float(np.mean(delta[index][rows])),
-                 "mae_vs_nra": float(np.mean(np.abs(predicted[rows] - truth[rows]))),
-                 "mae_clean_vs_nra": float(np.mean(np.abs(clean_pred[rows] - truth[rows]))),
-                 "mae_vs_observed": float(np.mean(np.abs(predicted[rows] - observed[rows]))),
-                 "mean_error_vs_nra": float(np.mean(predicted[rows] - truth[rows])),
-                 "crps_vs_nra": float(np.mean(crps[rows])), "twcrps_vs_nra": float(np.mean(tw[rows])),
-                 "n_flagged": int(exclude_days.sum()), "recheck_overlap": recheck_overlap}  # fmt: skip
+                {
+                    "label": label,
+                    "cut": cut,
+                    "n_rows": int(rows.sum()),
+                    "bias": float(np.mean(predicted[rows] - clean_pred[rows])),
+                    "transfer": float(np.mean(delta[index][rows])),
+                    "mae_vs_nra": float(np.mean(np.abs(predicted[rows] - truth[rows]))),
+                    "mae_clean_vs_nra": float(np.mean(np.abs(clean_pred[rows] - truth[rows]))),
+                    "mae_vs_observed": float(np.mean(np.abs(predicted[rows] - observed[rows]))),
+                    "mean_error_vs_nra": float(np.mean(predicted[rows] - truth[rows])),
+                    "crps_vs_nra": float(np.mean(crps[rows])),
+                    "twcrps_vs_nra": float(np.mean(tw[rows])),
+                    "n_flagged": int(exclude_days.sum()),
+                    "recheck_overlap": recheck_overlap,
+                }
             )
         flagged_total += int(exclude_days[cut_day - 31 : cut_day].sum()) if cut_day > 31 else 0
-    ever = dt.flagged_days(spans=spans, cut_day=dt.N_DAYS) if spans else np.zeros(dt.N_DAYS, dtype=bool)
+    ever = (
+        dt.flagged_days(spans=spans, cut_day=dt.N_DAYS)
+        if spans
+        else np.zeros(dt.N_DAYS, dtype=bool)
+    )
     near = np.zeros(dt.N_DAYS, dtype=bool)
     if true_last >= true_first:
         near[max(0, true_first - 3) : true_last + 4] = True
@@ -361,7 +413,8 @@ def _partner_stream(*, ctx, scenario, end, partner, cuts, stops) -> np.ndarray: 
         if predicted is None:
             continue
         days, values = common.daily_means(
-            days=common.utc_day_of(cache=ctx.cache, index=index), values=(y[index] - predicted) * capacity
+            days=common.utc_day_of(cache=ctx.cache, index=index),
+            values=(y[index] - predicted) * capacity,
         )
         resid[dt.day_index(days=days)] = values
     ctx.partner_cache[key] = resid
@@ -394,12 +447,26 @@ def _job(job: tuple[str, datetime]) -> str:
                 ctx=ctx, scenario=scenario, mode=mode, variant=variant, control=control
             )
             for r in records:
-                rows.append({"site": site, "onset": onset, "tag": scenario.tag, "mode": mode,
-                             "size": scenario.size, "shape": scenario.shape,
-                             "duration": -1 if scenario.duration is None else scenario.duration,
-                             "metered": scenario.metered, "partner": ctx.partner_name or "", **r})  # fmt: skip
+                rows.append(
+                    {
+                        "site": site,
+                        "onset": onset,
+                        "tag": scenario.tag,
+                        "mode": mode,
+                        "size": scenario.size,
+                        "shape": scenario.shape,
+                        "duration": -1 if scenario.duration is None else scenario.duration,
+                        "metered": scenario.metered,
+                        "partner": ctx.partner_name or "",
+                        **r,
+                    }
+                )
             if mode == "none":
-                streams.append(stream.with_columns(site=pl.lit(site), onset=pl.lit(onset), tag=pl.lit(scenario.tag)))
+                streams.append(
+                    stream.with_columns(
+                        site=pl.lit(site), onset=pl.lit(onset), tag=pl.lit(scenario.tag)
+                    )
+                )
     tmp = target.with_name(f"{target.name}.{os.getpid()}.tmp")
     pl.DataFrame(rows).write_parquet(tmp)
     if streams:
@@ -415,7 +482,9 @@ def main() -> None:
     parser.add_argument("--stage", choices=("detect", "clean", "control"), required=True)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--sites", nargs="+", default=list(common.INJECT_SITES))
-    parser.add_argument("--variants", default="", help="JSON list of {kind,k,w,base,label} for stage clean")
+    parser.add_argument(
+        "--variants", default="", help="JSON list of {kind,k,w,base,label} for stage clean"
+    )
     args = parser.parse_args()
     common.WORLDS_DIR.mkdir(parents=True, exist_ok=True)
     _CACHE = common.load_cache()
@@ -425,7 +494,13 @@ def main() -> None:
     else:
         specs = json.loads(args.variants)
         modes = [("none", None), ("oracle", None)]
-        modes += [(s["label"], dt.Variant(kind=s["kind"], k=s["k"], w=s.get("w", 3), base=s.get("base", "A"))) for s in specs]
+        modes += [
+            (
+                s["label"],
+                dt.Variant(kind=s["kind"], k=s["k"], w=s.get("w", 3), base=s.get("base", "A")),
+            )
+            for s in specs
+        ]
         if args.stage == "control":
             modes = [m for m in modes if m[0] != "oracle"]
         _ARGS.update(stage=args.stage, modes=modes)

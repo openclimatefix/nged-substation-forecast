@@ -17,7 +17,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 import e00298_common as common
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 
 _CACHE = None
 
@@ -45,9 +45,15 @@ def site_panel(site: str) -> pl.DataFrame:
         _, expected = common.daily_means(days=days, values=predicted * capacity)
         parts.append(
             pl.DataFrame(
-                {"site": site, "day": day, "residual_mw": resid, "power_mw": power,
-                 "expected_mw": expected, "cut": cut.date()}
-            )  # fmt: skip
+                {
+                    "site": site,
+                    "day": day,
+                    "residual_mw": resid,
+                    "power_mw": power,
+                    "expected_mw": expected,
+                    "cut": cut.date(),
+                }
+            )
         )
     return pl.concat(parts) if parts else pl.DataFrame()
 
@@ -65,7 +71,11 @@ def main() -> None:
         frames = list(pool.map(site_panel, common.SITES))
     panel = pl.concat([f for f in frames if f.height])
     panel.write_parquet(common.PANEL_PATH)
-    print(panel.group_by("site").agg(pl.len(), first=pl.col("day").min(), last=pl.col("day").max()).sort("site"))
+    print(
+        panel.group_by("site")
+        .agg(pl.len(), first=pl.col("day").min(), last=pl.col("day").max())
+        .sort("site")
+    )
 
 
 if __name__ == "__main__":

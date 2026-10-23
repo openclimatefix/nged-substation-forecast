@@ -1,3 +1,4 @@
+# ruff: noqa: PLW2901, PERF102, B007
 """Part 1 on injected shifts: run every variant at its tuned threshold on the uncleaned worlds.
 
 The worlds are those of `e00298_worlds.py --stage detect`: the node's daily residual after a
@@ -26,7 +27,14 @@ import polars as pl
 
 PLACEBO_EXTRA_WEEKS: Final[tuple[int, ...]] = (1, 2, 3, 4)
 """Placebo shifts are the transfer's length in whole weeks plus 1 to 4 weeks, either way."""
-SAME_K: Final[dict[str, str]] = {"D-A3": "A3", "D-A7": "A7", "D-C": "C", "F-A3": "A3", "F-A7": "A7", "F-C": "C"}
+SAME_K: Final[dict[str, str]] = {
+    "D-A3": "A3",
+    "D-A7": "A7",
+    "D-C": "C",
+    "F-A3": "A3",
+    "F-A7": "A7",
+    "F-C": "C",
+}
 
 _CLEAN: dict[str, dt.Stream] = {}
 _PAIR_NOISE: dict[tuple[str, str], tuple[np.ndarray, np.ndarray]] = {}
@@ -44,7 +52,9 @@ def variants_to_run() -> dict[str, dt.Variant]:
     return out
 
 
-def _pair_noise(*, site: str, others: dict[str, dt.Stream]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+def _pair_noise(
+    *, site: str, others: dict[str, dt.Stream]
+) -> dict[str, tuple[np.ndarray, np.ndarray]]:
     """Clean-history pair noise per neighbour, cached across worlds."""
     out = {}
     for name, other in others.items():
@@ -78,14 +88,15 @@ def world_rows(path: Path) -> list[dict]:
         duration = None if step else int(dur[:-1])
         last_known = int(days.max())
         first_true = day0
-        last_true = last_known if step else day0 + duration - 1
+        last_true = last_known if duration is None else day0 + duration - 1
         partner = None
         if met and "partner_mw" in group.columns:
             partner_resid = np.full(dt.N_DAYS, np.nan)
             clean_name = next(
-                n for n in common.NEIGHBOURS[site]
+                n
+                for n in common.NEIGHBOURS[site]
                 if n in _CLEAN and np.isfinite(group["partner_mw"].to_numpy()).any()
-            )  # noqa: E501
+            )
             partner = clean_name
             partner_resid[days] = group["partner_mw"].to_numpy()
             if frame.filter(pl.col("tag") == tag).height:
@@ -97,26 +108,53 @@ def world_rows(path: Path) -> list[dict]:
                 weeks_list = [sg * (base + e) for e in PLACEBO_EXTRA_WEEKS for sg in (-1, 1)]
                 runs += [(f"placebo{w}", _shift_others(others=others, weeks=w)) for w in weeks_list]
             for label, nb in runs:
-                if variant.kind in "DEF" and met and partner is not None and "partner_mw" in group.columns:
-                    nb = _with_partner(nb=nb, site=site, partner_resid=group, days=days, weeks=0 if label == "true" else int(label[7:]))
+                if (
+                    variant.kind in "DEF"
+                    and met
+                    and partner is not None
+                    and "partner_mw" in group.columns
+                ):
+                    nb = _with_partner(
+                        nb=nb,
+                        site=site,
+                        partner_resid=group,
+                        days=days,
+                        weeks=0 if label == "true" else int(label[7:]),
+                    )
                 spans = dt.detect(
-                    variant=variant, stream=stream, others=nb, first=max(day0 - 35, 40),
-                    last=last_known, pair_noise=_pair_noise(site=site, others=nb) if variant.kind == "E" else None,
+                    variant=variant,
+                    stream=stream,
+                    others=nb,
+                    first=max(day0 - 35, 40),
+                    last=last_known,
+                    pair_noise=_pair_noise(site=site, others=nb) if variant.kind == "E" else None,
                 )
                 hit = [
-                    s for s in spans
+                    s
+                    for s in spans
                     if s.sign == 1 and s.start <= last_true + 1 and s.end >= first_true - 1
                 ]
                 first = min(hit, key=lambda s: s.fire) if hit else None
                 rows.append(
-                    {"site": site, "onset": onset, "tag": tag, "size": size, "shape": shape,
-                     "duration": -1 if step else duration, "metered": met, "variant": name,
-                     "run": "true" if label == "true" else "placebo", "found": first is not None,
-                     "alarm_lag_h": (first.fire - first_true) * 24.0 if first else np.nan,
-                     "onset_err_h": (first.start - first_true) * 24.0 if first else np.nan,
-                     "end_err_h": (first.end - last_true) * 24.0 if first and not step else np.nan,
-                     "n_spans_outside": sum(1 for s in spans if s not in hit),
-                     "explained": first.explained if first else np.nan}  # fmt: skip
+                    {
+                        "site": site,
+                        "onset": onset,
+                        "tag": tag,
+                        "size": size,
+                        "shape": shape,
+                        "duration": -1 if step else duration,
+                        "metered": met,
+                        "variant": name,
+                        "run": "true" if label == "true" else "placebo",
+                        "found": first is not None,
+                        "alarm_lag_h": (first.fire - first_true) * 24.0 if first else np.nan,
+                        "onset_err_h": (first.start - first_true) * 24.0 if first else np.nan,
+                        "end_err_h": (first.end - last_true) * 24.0
+                        if first and not step
+                        else np.nan,
+                        "n_spans_outside": sum(1 for s in spans if s not in hit),
+                        "explained": first.explained if first else np.nan,
+                    }
                 )
     return rows
 
@@ -124,7 +162,11 @@ def world_rows(path: Path) -> list[dict]:
 def _shift_others(*, others: dict[str, dt.Stream], weeks: int) -> dict[str, dt.Stream]:
     """Return the neighbours' streams shifted by `weeks` whole weeks."""
     return {
-        n: dt.Stream(residual=np.roll(s.residual, 7 * weeks), noise=np.roll(s.noise, 7 * weeks), level=s.level)
+        n: dt.Stream(
+            residual=np.roll(s.residual, 7 * weeks),
+            noise=np.roll(s.noise, 7 * weeks),
+            level=s.level,
+        )
         for n, s in others.items()
     }
 
@@ -163,7 +205,7 @@ def _init() -> None:
                 n: float(np.nanmean(cache.sites[n].y) * cache.sites[n].table.effective_capacity_mw)
                 for n in options
             }
-            _PARTNER[site] = max(power, key=power.get)
+            _PARTNER[site] = max(power, key=lambda name: power[name])
 
 
 def main() -> None:

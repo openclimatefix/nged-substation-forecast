@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Score the stored alarms of RO-NC, the pair alarm and the learned score on experiment 298's events.
 
 The alarm tables are experiment 217's `R2` operating points and the carried `current` ones, and
@@ -49,13 +50,19 @@ def main() -> None:
             site = common.SERIES_TO_SITE.get(int(series))
             if site in streams:
                 days.setdefault(site, []).append(ev.stamp_day(stamp=stamp))
-        found = {c: 0 for c in totals}
+        found = dict.fromkeys(totals, 0)
         for e in events:
-            if any(e["start"] - 1 <= d <= e["end"] + 1 for s in e["sites"] for d in days.get(s, [])):
+            if any(
+                e["start"] - 1 <= d <= e["end"] + 1 for s in e["sites"] for d in days.get(s, [])
+            ):
                 found[e["cls"]] += 1
         # Merge consecutive alarm days into one span, as `e00298_real.py` counts spans.
-        runs = {s: [d for i, d in enumerate(sorted(set(ds))) if i == 0 or d - sorted(set(ds))[i - 1] > 1]
-                for s, ds in days.items()}  # fmt: skip
+        runs = {
+            s: [
+                d for i, d in enumerate(sorted(set(ds))) if i == 0 or d - sorted(set(ds))[i - 1] > 1
+            ]
+            for s, ds in days.items()
+        }
         false = {s: sum(not masks[s][d] for d in rs) for s, rs in runs.items()}
         pooled_false = sum(v for s, v in false.items() if s not in real.SPECIAL)
         print(

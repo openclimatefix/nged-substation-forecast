@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PERF401, B007
 """Part 1 on the real record: tune each variant on odd months, score on even months.
 
 For each variant family the threshold is the smallest `k` that gives at most 2 false alarms per
@@ -22,17 +23,39 @@ import polars as pl
 BUDGET: Final[float] = 2.0
 EXCLUDE_DAYS: Final[int] = 3
 K_GRID: Final[tuple[float, ...]] = (
-    0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 12.0, 15.0, 20.0
-)  # fmt: skip
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    1.75,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,
+    5.0,
+    6.0,
+    8.0,
+    10.0,
+    12.0,
+    15.0,
+    20.0,
+)
 FAMILIES: Final[tuple[tuple[str, dict], ...]] = (
-    ("A2", {"kind": "A", "w": 2}), ("A3", {"kind": "A", "w": 3}), ("A7", {"kind": "A", "w": 7}),
-    ("B", {"kind": "B"}), ("C", {"kind": "C"}),
-    ("D-A3", {"kind": "D", "w": 3, "base": "A"}), ("D-A7", {"kind": "D", "w": 7, "base": "A"}),
+    ("A2", {"kind": "A", "w": 2}),
+    ("A3", {"kind": "A", "w": 3}),
+    ("A7", {"kind": "A", "w": 7}),
+    ("B", {"kind": "B"}),
+    ("C", {"kind": "C"}),
+    ("D-A3", {"kind": "D", "w": 3, "base": "A"}),
+    ("D-A7", {"kind": "D", "w": 7, "base": "A"}),
     ("D-C", {"kind": "D", "base": "C"}),
-    ("E3", {"kind": "E", "w": 3}), ("E7", {"kind": "E", "w": 7}),
-    ("F-A3", {"kind": "F", "w": 3, "base": "A"}), ("F-A7", {"kind": "F", "w": 7, "base": "A"}),
+    ("E3", {"kind": "E", "w": 3}),
+    ("E7", {"kind": "E", "w": 7}),
+    ("F-A3", {"kind": "F", "w": 3, "base": "A"}),
+    ("F-A7", {"kind": "F", "w": 7, "base": "A"}),
     ("F-C", {"kind": "F", "base": "C"}),
-)  # fmt: skip
+)
 FIRST_EVAL: Final[int] = ev.stamp_day(stamp=0)
 LAST_EVAL: Final[int] = dt.N_DAYS - 1
 SPECIAL: Final[tuple[str, ...]] = ("D8", "D9")
@@ -62,7 +85,9 @@ def run_family(*, streams: dict[str, dt.Stream], variant: dt.Variant) -> dict[st
     out = {}
     for site, stream in streams.items():
         others = {n: streams[n] for n in common.NEIGHBOURS.get(site, ()) if n in streams}
-        out[site] = dt.detect(variant=variant, stream=stream, others=others, first=FIRST_EVAL, last=LAST_EVAL)
+        out[site] = dt.detect(
+            variant=variant, stream=stream, others=others, first=FIRST_EVAL, last=LAST_EVAL
+        )
     return out
 
 
@@ -81,14 +106,29 @@ def classify(
             near_event = bool(known[s.start : s.end + 1].any())
             near_log = bool(logged[s.start : s.end + 1].any())
             rows.append(
-                {"site": site, "start": s.start, "end": s.end, "fire": s.fire,
-                 "month": ev.month_of_day(day=s.fire), "false_strict": not near_event,
-                 "false_unlogged": (not near_event) and (not near_log),
-                 "explained": s.explained, "size_mw": s.size_mw}  # fmt: skip
+                {
+                    "site": site,
+                    "start": s.start,
+                    "end": s.end,
+                    "fire": s.fire,
+                    "month": ev.month_of_day(day=s.fire),
+                    "false_strict": not near_event,
+                    "false_unlogged": (not near_event) and (not near_log),
+                    "explained": s.explained,
+                    "size_mw": s.size_mw,
+                }
             )
-    schema = {"site": pl.String, "start": pl.Int64, "end": pl.Int64, "fire": pl.Int64,
-              "month": pl.Int64, "false_strict": pl.Boolean, "false_unlogged": pl.Boolean,
-              "explained": pl.Float64, "size_mw": pl.Float64}  # fmt: skip
+    schema = {
+        "site": pl.String,
+        "start": pl.Int64,
+        "end": pl.Int64,
+        "fire": pl.Int64,
+        "month": pl.Int64,
+        "false_strict": pl.Boolean,
+        "false_unlogged": pl.Boolean,
+        "explained": pl.Float64,
+        "size_mw": pl.Float64,
+    }
     return pl.DataFrame(rows, schema=schema)
 
 
@@ -104,7 +144,9 @@ def primary_years(*, streams: dict[str, dt.Stream], odd: bool, sites: list[str])
     return total / 365.25
 
 
-def recall(*, spans: dict[str, list[dt.Span]], events: list[dict], cls: str) -> tuple[int, int, list[dict]]:
+def recall(
+    *, spans: dict[str, list[dt.Span]], events: list[dict], cls: str
+) -> tuple[int, int, list[dict]]:
     """Return (found, total, per-event detail) for the events of class `cls`."""
     found, detail = 0, []
     items = [e for e in events if e["cls"] == cls]
@@ -115,12 +157,18 @@ def recall(*, spans: dict[str, list[dt.Span]], events: list[dict], cls: str) -> 
                 if s.start <= e["end"] + 1 and s.end >= e["start"] - 1:
                     hit = s if hit is None or s.fire < hit.fire else hit
         detail.append(
-            {"cls": cls, "site": e["sites"][0], "start": e["start"], "end": e["end"],
-             "found": hit is not None, "moved_mw": e["moved_mw"],
-             "onset_err_h": (hit.start - e["start"]) * 24.0 if hit else np.nan,
-             "end_err_h": (hit.end - e["end"]) * 24.0 if hit else np.nan,
-             "alarm_lag_h": (hit.fire - e["start"]) * 24.0 if hit else np.nan,
-             "partners": ",".join(hit.partners) if hit else ""}  # fmt: skip
+            {
+                "cls": cls,
+                "site": e["sites"][0],
+                "start": e["start"],
+                "end": e["end"],
+                "found": hit is not None,
+                "moved_mw": e["moved_mw"],
+                "onset_err_h": (hit.start - e["start"]) * 24.0 if hit else np.nan,
+                "end_err_h": (hit.end - e["end"]) * 24.0 if hit else np.nan,
+                "alarm_lag_h": (hit.fire - e["start"]) * 24.0 if hit else np.nan,
+                "partners": ",".join(hit.partners) if hit else "",
+            }
         )
         found += hit is not None
     return found, len(items), detail
@@ -141,24 +189,41 @@ def main() -> None:
             variant = dt.Variant(k=k, **kwargs)
             spans = run_family(streams=streams, variant=variant)
             table = classify(spans=spans, events=events, closures=closures)
-            fa = table.filter(pl.col("false_strict"), ~pl.col("site").is_in(SPECIAL)) 
+            fa = table.filter(pl.col("false_strict"), ~pl.col("site").is_in(SPECIAL))
             fa_odd = fa.filter(pl.col("month") % 2 == 1).height / years_odd
             fa_even = fa.filter(pl.col("month") % 2 == 0).height / years_even
             fa_unlogged_even = (
-                table.filter(pl.col("false_unlogged"), ~pl.col("site").is_in(SPECIAL), pl.col("month") % 2 == 0).height
+                table.filter(
+                    pl.col("false_unlogged"),
+                    ~pl.col("site").is_in(SPECIAL),
+                    pl.col("month") % 2 == 0,
+                ).height
                 / years_even
             )
             specials = {
-                s: table.filter(pl.col("false_strict"), pl.col("site") == s, pl.col("month") % 2 == 0).height
+                s: table.filter(
+                    pl.col("false_strict"), pl.col("site") == s, pl.col("month") % 2 == 0
+                ).height
                 / years_even_site[s]
                 for s in SPECIAL
             }
-            rec = {c: recall(spans=spans, events=events, cls=c) for c in ("block", "drop", "transfer")}
+            rec = {
+                c: recall(spans=spans, events=events, cls=c) for c in ("block", "drop", "transfer")
+            }
             curves.append(
-                {"family": family, "k": k, "fa_odd": fa_odd, "fa_even": fa_even,
-                 "fa_unlogged_even": fa_unlogged_even, "fa_d8_even": specials["D8"],
-                 "fa_d9_even": specials["D9"], "block": rec["block"][0], "drop": rec["drop"][0],
-                 "transfer": rec["transfer"][0], "n_spans": table.height}  # fmt: skip
+                {
+                    "family": family,
+                    "k": k,
+                    "fa_odd": fa_odd,
+                    "fa_even": fa_even,
+                    "fa_unlogged_even": fa_unlogged_even,
+                    "fa_d8_even": specials["D8"],
+                    "fa_d9_even": specials["D9"],
+                    "block": rec["block"][0],
+                    "drop": rec["drop"][0],
+                    "transfer": rec["transfer"][0],
+                    "n_spans": table.height,
+                }
             )
     curve = pl.DataFrame(curves)
     curve.write_parquet(common.EXPERIMENT_DIR / "real_curves.parquet")
@@ -171,7 +236,9 @@ def main() -> None:
         variant = dt.Variant(k=chosen[family], **kwargs)
         spans = run_family(streams=streams, variant=variant)
         table = classify(spans=spans, events=events, closures=closures)
-        row = curve.filter((pl.col("family") == family) & (pl.col("k") == chosen[family])).to_dicts()[0]
+        row = curve.filter(
+            (pl.col("family") == family) & (pl.col("k") == chosen[family])
+        ).to_dicts()[0]
         for cls in ("block", "drop", "transfer"):
             _, _, detail = recall(spans=spans, events=events, cls=cls)
             for d in detail:
