@@ -56,6 +56,7 @@ class AdditiveCurves(nn.Module):
 
     def __init__(self, knots: torch.Tensor) -> None:
         super().__init__()
+        self.knots: torch.Tensor
         self.register_buffer("knots", knots)  # (n_vars, N_KNOTS), increasing
         self.values = nn.Parameter(torch.zeros(knots.shape[0], knots.shape[1], 2))
 
@@ -69,7 +70,7 @@ class AdditiveCurves(nn.Module):
         return (1 - w)[:, None] * self.values[j, lo] + w[:, None] * self.values[j, hi]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return sum(self.curve(x, j) for j in range(x.shape[1]))
+        return torch.stack([self.curve(x, j) for j in range(x.shape[1])]).sum(dim=0)
 
     def penalty(self) -> torch.Tensor:
         """Return the squared second difference of every curve."""

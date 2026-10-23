@@ -12,12 +12,13 @@ skipped when it exists. Run, giving the arm group (`phase1` or `phase2`) and opt
 """
 
 import itertools
-from collections.abc import Callable
 import multiprocessing
 import os
 import sys
 import time
+from collections.abc import Callable
 from functools import cache
+from typing import Any, cast
 
 import e00272_common as common
 import e00272_models as models
@@ -240,7 +241,7 @@ def run_epochs(
             batch = {k: v[order[start : start + BATCH]] for k, v in train.items()}
             loss = pinball(q=model(batch), actual=batch["actual"])
             if penalty > 0.0:
-                loss = loss + penalty * model.correction.penalty()
+                loss = loss + penalty * cast(Any, model).correction.penalty()
             optimiser.zero_grad()
             loss.backward()
             optimiser.step()
@@ -400,7 +401,7 @@ def predict(
     """Return the scored farm's sorted (rows, 11) quantiles and the per-row crossing flag."""
     model.eval()
     with torch.no_grad():
-        q, crossed = model.quantiles(st.batch(split="test", columns=columns))
+        q, crossed = cast(Any, model).quantiles(st.batch(split="test", columns=columns))
     return q.numpy().astype(np.float64), crossed.numpy().astype(np.float64)
 
 
@@ -411,7 +412,8 @@ def shapes(*, model: models.PlantAdapter, st: Setting, arm: str, setting: str) -
     rows = []
     for j, name in enumerate(common.FULL_VARS):
         raw = st.train["x"][:, j]
-        grid_raw = np.linspace(*np.quantile(raw, [0.02, 0.98]), GRID_POINTS)
+        low, high = (float(v) for v in np.quantile(raw, [0.02, 0.98]))
+        grid_raw = np.linspace(low, high, GRID_POINTS)
         for value in grid_raw:
             x = train["x"].clone()
             x[:, j] = float((value - st.mean["x"][j]) / st.std["x"][j])

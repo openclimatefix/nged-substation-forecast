@@ -35,8 +35,12 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
     "C5": ("a6_head", "a1_head"),
     "C6": ("a3_gam_full", "a3_placebo"),
     "C7": ("a5_nn_full", "a5_placebo"),
+    "X1": ("a2_gam_min", "a1_identity"),
+    "X2": ("a4_nn_min", "a1_identity"),
+    "X3": ("blind", "a1_identity"),
+    "X4": ("a5_nn_full", "a1_identity"),
 }
-"""Planned contrasts (arm, reference), scored in own history; C8 is the share of the gap closed."""
+"""Contrasts (arm, reference): C1 to C7 planned, X1 to X4 post hoc. C8 (the share of the gap closed) is derived from `fractions.csv`."""
 REPORT_ARMS: Final[tuple[str, ...]] = (
     "a1_identity",
     "a2_gam_min",
