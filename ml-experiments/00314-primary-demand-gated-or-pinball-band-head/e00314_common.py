@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Paths shared by the scripts of experiment 314; every other constant comes from experiment 311.
 
 Run every script with experiments 278 and 311 on `PYTHONPATH`:

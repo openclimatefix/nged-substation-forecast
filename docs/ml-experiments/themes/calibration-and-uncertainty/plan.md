@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| [314](../../00314-primary-demand-gated-or-pinball-band-head/result.md) | Does a gated or pinball-trained band head pass the no-harm test that experiment 311's band head failed? | 1 | Experiment 311 (merged) | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments

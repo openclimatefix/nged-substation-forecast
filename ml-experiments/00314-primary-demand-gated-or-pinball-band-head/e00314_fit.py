@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Fit the pinball-loss quantile head at each monthly refit date and write its 11 quantiles.
 
 The cuts, pool, early-stopping split, inputs, and seeds are experiment 311's. The head outputs the
@@ -6,13 +7,13 @@ cumulative softplus gaps outwards) and is trained on the mean pinball loss of th
 
 For a refit at month start `c`, the pool is every row whose origin lies in the 24 months before `c`
 and whose longest target (origin plus 168 hours) lies before `c`. Every fourth month of the pool is
-held out for early stopping. The head is a three-component Gaussian mixture on
+held out for early stopping. The head is a monotone quantile network on
 `(actual - arm D mean) / scale`, where `scale` is the stored 5% to 95% width over 3.29. The test
 rows are those whose origin month is `c`. Output: `work/fits/cut<YYYY-MM>_seed<s>.parquet`.
 
     PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-primary-demand-mixture-density-band-head \
         systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00311-*/e00314_fit.py --cuts 2025-07 ... --workers 6
+        uv run --no-sync python ml-experiments/00314-*/e00314_fit.py --cuts 2025-07 ... --workers 6
 """
 
 import argparse
@@ -28,7 +29,7 @@ import torch  # ty: ignore[unresolved-import]
 from scipy.stats import norm
 from torch import nn  # ty: ignore[unresolved-import]
 
-import e00311_common as common  # isort: skip
+import e00311_common as common  # isort: skip  # ty: ignore[unresolved-import]
 import e00314_common as own  # isort: skip
 
 N_LEVELS: Final[int] = 11
