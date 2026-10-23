@@ -36,10 +36,10 @@ decision_rule: >-
   (8 planned contrasts, level 99.375%) wholly below zero (negative is better). The threshold is 0.10
   points because porting the adapter adds a neural network and a fine-tuning step to the weekly
   retraining, which a gain under 0.10 points does not justify. Partly supported if P5 or P8 beats
-  P1 with an interval below zero but under 0.10 points. Not supported if no arm beats P1. Stop and check the
-  ERA5-to-ensemble mismatch if P2 is worse than P0 by more than 0.3 points. Intervals resample
-  whole months of the ensemble run date and the three seeds (50,000 resamples); farms are not
-  resampled. Planned contrasts, each first arm minus second arm so that a negative number means the
+  P1 with an interval below zero but under 0.10 points. Not supported if no arm beats P1. Stop and
+  check the ERA5-to-ensemble mismatch if P2 is worse than P0 by more than 0.3 points. Intervals
+  resample whole months of the ensemble run date and the three seeds (50,000 resamples); farms are
+  not resampled. Planned contrasts, each first arm minus second arm so that a negative number means the
   first arm is better; C1 P2 - P0, C2 P3 - P1, C3 P5 - P3, C4 P4 - P5, C5 P6 - P3 (quantile score
   and 0.99 pinball loss), C6 P8 - P3, C7 P7 vs P5 as a share of the gap closed against P3, C8 P5 -
   P1. The 95% intervals the brief asks for are reported beside the Bonferroni ones.
