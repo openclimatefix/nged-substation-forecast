@@ -28,7 +28,8 @@ prediction: >-
   transfer ends (headline cell: mean over substations and onset dates, 95% interval upper bound
   below 0.1; the mean transfer is about 10 to 15 points). This is expected to fail: the 24-month
   window gives 30 days about 4% of the weight, so a bias of 0.5 to 1 points (about 5% of the
-  transfer) is expected right after the end, and more where a month or holiday term can absorb it. Further predictions: the bias in the 48 hours after the
+  transfer) is expected right after the end, and more where a month or holiday term can absorb it.
+  Further predictions: the bias in the 48 hours after the
   end grows roughly in proportion to the duration up to 90 days; a permanent step is learned to
   half of its size within 12 months with the 24-month window and within 6 months with the 12-month
   window; and the rows before the onset have a bias of exactly zero (positive control).
@@ -36,20 +37,19 @@ decision_rule: >-
   Pre-registered before any score is read. Bias is the signed mean of (forecast trained on the
   injected series minus forecast trained on the clean series) over the rows of a group, multiplied
   by the sign of the transfer, so that a positive bias means the transfer was learned as normal.
-  The two forecasts come from the same cut, weather, and settings, so the bias is exactly what
-  the injection changed, and the bias against the true NRA series equals it. A second
-  measure is the signed error of the injected-trained forecast against the true NRA series, beside
-  the clean-trained forecast's own signed error, because the clean forecast is not exact and the
-  second measure is what NGED would see. The tolerance for "learned as normal" is 0.1 points of
-  effective capacity (the brief's figure) and, because the bias scales with the transfer, 5% of the
-  mean transfer; 0.5 points is reported beside both. The limit for NGED is the longest tested duration whose bias in the 48 hours
-  after the end has a 95% interval upper bound under the tolerance, per size and window, with the
-  duration interpolated linearly in log duration between tested values. The threshold is a
-  statement to NGED, so no porting cost applies. Only the 30-day, 25%
-  headline cell sets the verdict; the other predictions are reported as findings. Verdict:
-  `supported` when the 30-day, 25% bias
-  after the end is under 0.1 with the interval upper bound under 0.1; `not supported` when the lower
-  bound is above 0.1; `partly supported` otherwise.
+  The two forecasts come from the same cut, weather, and settings, so the bias is exactly what the
+  injection changed, and the bias against the true NRA series equals it. A second measure is the
+  signed error of the injected-trained forecast against the true NRA series, beside the clean-
+  trained forecast's own signed error, because the clean forecast is not exact and the second
+  measure is what NGED would see. The tolerance for "learned as normal" is 0.1 points of effective
+  capacity (the brief's figure) and, because the bias scales with the transfer, 5% of the mean
+  transfer; 0.5 points is reported beside both. The limit for NGED is the longest tested duration
+  whose bias in the 48 hours after the end has a 95% interval upper bound under the tolerance, per
+  size and window, with the duration interpolated linearly in log duration between tested values.
+  The threshold is a statement to NGED, so no porting cost applies. Only the 30-day, 25% headline
+  cell sets the verdict; the other predictions are reported as findings. Verdict: `supported` when
+  the 30-day, 25% bias after the end is under 0.1 with the interval upper bound under 0.1; `not
+  supported` when the lower bound is above 0.1; `partly supported` otherwise.
 benchmark: >-
   The experiment's own zero-size control and the clean-trained forecast of each scenario. Reference
   for the setting: the GAM_ONLY arm of experiments 208 and 258 (a fixed fit, no refit).
