@@ -18,7 +18,7 @@ size: >-
 hypothesis: >-
   The assembled candidate (spread-binned plant P2, a generalised additive model (GAM) band on the
   plant's residuals, a mixture-density head (MDN), blended per quantile with XGBoost) scores better
-  than XGBoost alone on the quantile score and at the 0.99 quantile, and its advantage is larger
+  than plant-fed XGBoost on the quantile score and at the 0.99 quantile, and its advantage is larger
   for a farm with no history because the plant carries what the missing history cannot.
 prediction: >-
   Written before any score is read. On own history, the candidate beats XGBoost on the quantile
@@ -63,11 +63,12 @@ lessons: >-
   score by under 0.6%.
 take_home_message: >-
   The assembled solar-farm forecast (a physical power model, two correction stages, and a blend with
-  XGBoost) scores 3.3% better than XGBoost alone on the quantile score, which averages the pinball
-  loss over 11 quantile levels, when each farm trains on its own history. It is 43% better at the
-  0.99 quantile, which bounds how much output NGED may need to curtail. With no history for a farm,
-  the gain over XGBoost is smaller (2.0%) and below the 3% we predicted, so the physical model helps
-  less than we expected when a farm's history is missing.
+  XGBoost) scores 3.3% better than plant-fed XGBoost (XGBoost on the plant forecast, its ensemble
+  spread, the unit mean, and the availability ratio, with no weather features of its own) on the
+  quantile score, which averages the pinball loss over 11 quantile levels, when each farm trains on
+  its own history. It is 43% better at the 0.99 quantile, which bounds how much output NGED may need
+  to curtail. With no history for a farm, the gain over XGBoost is smaller (2.0%) and below the 3%
+  we predicted, so the physical model helps less than we expected when a farm's history is missing.
 advice:
 - >-
   Take the blend of the additive model, the mixture-density head, and XGBoost as the metered-farm
@@ -126,7 +127,7 @@ is an improvement. The best single family is chosen on the scored year, which fa
 |---|---|---|---|---|
 | GAM alone | 5.43 | 0.331 | 5.59 | 0.348 |
 | MDN alone (5 seeds averaged) | 5.34 | 0.300 | 5.55 | 0.321 |
-| XGBoost alone | 5.45 | 0.541 | 5.56 | 0.549 |
+| Plant-fed XGBoost | 5.45 | 0.541 | 5.56 | 0.549 |
 | Blend of the three | 5.27 | 0.310 | 5.45 | 0.327 |
 
 - **The MDN is the best single family** on the quantile score in both settings.
@@ -134,7 +135,7 @@ is an improvement. The best single family is chosen on the scored year, which fa
   zero history** (-2.5% to -0.6%).
 - **The blend adds nothing at the 0.99 quantile.** The blend's 0.99 pinball loss is 3.1% higher than
   the MDN's in own history (-0.5% to +8.5%) and 1.9% higher in zero history (-3.9% to +8.0%).
-- **XGBoost alone is the weakest family at the 0.99 quantile** (0.54, against 0.30 to 0.35 for the
+- **Plant-fed XGBoost is the weakest family at the 0.99 quantile** (0.54, against 0.30 to 0.35 for the
   other two) and scores within 0.4% of the GAM on the quantile score in own history.
 
 ![Figure 1: absolute quantile score of every arm](figure_1_scores.svg)
