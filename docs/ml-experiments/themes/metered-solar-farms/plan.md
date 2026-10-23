@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| 270 | Which inputs let XGBoost beat the plant on metered farms? | 1 | nothing | Planned |
 
 ## Planned experiments
 
