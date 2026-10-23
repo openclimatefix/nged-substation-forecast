@@ -1,0 +1,185 @@
+chosen config: beta=64.0, min_length=7, constraint met=True
+tuning Primaries: ['D10', 'D12', 'D16', 'D19', 'D21', 'D3', 'D5']
+held-out Primaries: ['D11', 'D14', 'D18', 'D2', 'D22', 'D4', 'D9']
+all boundaries at held-out Primaries, chosen config: 37; regime changes among them: 33
+
+== D8 known break 2023-08-15: nearest boundary, by configuration ==
+beta=  4.0 m= 7: 2023-08-15 (persistent) error +0 days, centre shift -13.62 points, n_boundaries=96
+beta=  4.0 m=14: 2023-08-15 (persistent) error +0 days, centre shift -13.62 points, n_boundaries=74
+beta=  4.0 m=30: 2023-08-15 (persistent) error +0 days, centre shift -17.37 points, n_boundaries=43
+beta=  8.0 m= 7: 2023-08-15 (persistent) error +0 days, centre shift -13.62 points, n_boundaries=62
+beta=  8.0 m=14: 2023-08-15 (persistent) error +0 days, centre shift -13.62 points, n_boundaries=48
+beta=  8.0 m=30: 2023-08-15 (persistent) error +0 days, centre shift -17.37 points, n_boundaries=35
+beta= 16.0 m= 7: 2023-08-15 (persistent) error +0 days, centre shift -13.62 points, n_boundaries=31
+beta= 16.0 m=14: 2023-08-15 (persistent) error +0 days, centre shift -13.62 points, n_boundaries=30
+beta= 16.0 m=30: 2023-08-15 (persistent) error +0 days, centre shift -17.37 points, n_boundaries=21
+beta= 32.0 m= 7: 2023-08-30 (persistent) error +15 days, centre shift -12.66 points, n_boundaries=15
+beta= 32.0 m=14: 2023-08-30 (persistent) error +15 days, centre shift -15.13 points, n_boundaries=6
+beta= 32.0 m=30: 2023-08-30 (persistent) error +15 days, centre shift -15.13 points, n_boundaries=6
+beta= 64.0 m= 7: 2023-08-30 (persistent) error +15 days, centre shift -18.45 points, n_boundaries=3 <- chosen
+beta= 64.0 m=14: 2023-08-30 (persistent) error +15 days, centre shift -18.45 points, n_boundaries=3
+beta= 64.0 m=30: 2023-08-30 (persistent) error +15 days, centre shift -18.45 points, n_boundaries=3
+beta=128.0 m= 7: 2023-08-30 (persistent) error +15 days, centre shift -18.45 points, n_boundaries=3
+beta=128.0 m=14: 2023-08-30 (persistent) error +15 days, centre shift -18.45 points, n_boundaries=3
+beta=128.0 m=30: 2023-08-30 (persistent) error +15 days, centre shift -18.45 points, n_boundaries=3
+
+== D8 engine spell edges after 2023-08-15 (runs of at least 3 days with share >= 0.3): 121 ==
+beta=4.0 m=7 all: 72 boundaries, share of edges with one within 3 days 0.51; at random dates 0.39
+beta=4.0 m=7 regime changes: 50 boundaries, share of edges with one within 3 days 0.39; at random dates 0.29
+beta=8.0 m=7 all: 50 boundaries, share of edges with one within 3 days 0.36; at random dates 0.29
+beta=8.0 m=7 regime changes: 38 boundaries, share of edges with one within 3 days 0.27; at random dates 0.23
+beta=16.0 m=7 all: 25 boundaries, share of edges with one within 3 days 0.19; at random dates 0.15
+beta=16.0 m=7 regime changes: 19 boundaries, share of edges with one within 3 days 0.15; at random dates 0.12
+beta=32.0 m=7 all: 12 boundaries, share of edges with one within 3 days 0.11; at random dates 0.08
+beta=32.0 m=7 regime changes: 12 boundaries, share of edges with one within 3 days 0.11; at random dates 0.08
+beta=64.0 m=7 all: 3 boundaries, share of edges with one within 3 days 0.02; at random dates 0.02
+beta=64.0 m=7 regime changes: 3 boundaries, share of edges with one within 3 days 0.02; at random dates 0.02
+beta=128.0 m=7 all: 3 boundaries, share of edges with one within 3 days 0.02; at random dates 0.02
+beta=128.0 m=7 regime changes: 3 boundaries, share of edges with one within 3 days 0.02; at random dates 0.02
+
+== D8's fade in 2026 ==
+beta=4.0 m=7: 2026-01-05 temporary centre -7.2 dip rate +0.323; 2026-01-19 persistent centre +24.0 dip rate -0.506; 2026-01-27 persistent centre -28.0 dip rate +0.548; 2026-02-03 unconfirmed centre +4.7 dip rate -0.247; 2026-02-12 unconfirmed centre +4.1 dip rate -0.139; 2026-03-10 unconfirmed centre +7.9 dip rate -0.086; 2026-04-03 unconfirmed centre +8.0 dip rate -0.079; 2026-04-23 unconfirmed centre +10.2 dip rate +0.003
+beta=8.0 m=7: 2026-01-05 temporary centre -7.2 dip rate +0.323; 2026-01-19 persistent centre +24.0 dip rate -0.506; 2026-01-27 persistent centre -28.0 dip rate +0.548; 2026-02-03 unconfirmed centre +4.7 dip rate -0.247; 2026-02-12 unconfirmed centre +4.1 dip rate -0.139; 2026-03-10 unconfirmed centre +11.0 dip rate -0.118; 2026-04-20 temporary centre +13.2 dip rate -0.048
+beta=16.0 m=7: 2026-01-05 temporary centre -7.2 dip rate +0.323; 2026-01-19 persistent centre +26.5 dip rate -0.530; 2026-01-26 persistent centre -27.5 dip rate +0.418; 2026-02-12 unconfirmed centre +9.5 dip rate -0.274; 2026-04-03 unconfirmed centre +14.0 dip rate -0.111
+beta=32.0 m=7: 2026-01-19 persistent centre +21.9 dip rate -0.397; 2026-01-27 persistent centre -26.7 dip rate +0.511; 2026-02-05 unconfirmed centre +6.6 dip rate -0.325; 2026-03-10 unconfirmed centre +14.0 dip rate -0.145
+beta=64.0 m=7: 2026-03-10 unconfirmed centre +15.3 dip rate -0.234
+beta=128.0 m=7: 2026-03-10 unconfirmed centre +15.3 dip rate -0.234
+engine detector flagged share of half-hours: 2025-10 to 2026-02 0.533; from 2026-03-15 0.429
+
+== Regime changes (boundaries not labelled temporary) per Primary-year at the unmodified series ==
+held-out: 0.87 per Primary-year, 98.75% interval [0.46, 1.39]; per site {'D11': 4, 'D14': 2, 'D18': 3, 'D2': 7, 'D22': 5, 'D4': 11, 'D9': 1}
+tuning: 1.02 per Primary-year, 98.75% interval [0.78, 1.36]; per site {'D10': 11, 'D12': 5, 'D16': 8, 'D19': 6, 'D21': 5, 'D3': 6, 'D5': 6}
+PV-like (day shift at least twice night shift, approximate): 8 of 33; April to August: 15 of 33
+labels of held-out clean breaks: [('persistent', 32), ('unconfirmed', 1)]
+
+== Held-out sweep (7-day minimum segment): penalty, regime changes per Primary-year, recall ==
+penalty   4.0: 6.53 per Primary-year; persistent 25% 0.86, 10% 0.70, temporary 0.92
+penalty   8.0: 4.35 per Primary-year; persistent 25% 0.89, 10% 0.70, temporary 0.89
+penalty  16.0: 2.49 per Primary-year; persistent 25% 0.84, 10% 0.48, temporary 0.79
+penalty  32.0: 1.36 per Primary-year; persistent 25% 0.91, 10% 0.53, temporary 0.61
+penalty  64.0: 0.87 per Primary-year; persistent 25% 0.92, 10% 0.48, temporary 0.42
+penalty 128.0: 0.63 per Primary-year; persistent 25% 0.81, 10% 0.32, temporary 0.17
+
+== Injection recall at the chosen config (held-out Primaries, even-month onsets) ==
+     fit persistent: recall 0.699 [0.577, 0.847]; found 0.699; n=176
+     fit  temporary: recall 0.424 [0.208, 0.642]; found 0.530; n=132
+residual persistent: recall 0.767 [0.648, 0.885]; found 0.773; n=176
+residual  temporary: recall 0.470 [0.278, 0.642]; found 0.598; n=132
+persistent recall by size and shape (fitted absorption):
+shape: (4, 6)
+┌──────┬───────┬──────────┬──────────┬──────────┬─────┐
+│ size ┆ shape ┆ recall   ┆ found    ┆ survive  ┆ n   │
+│ ---  ┆ ---   ┆ ---      ┆ ---      ┆ ---      ┆ --- │
+│ f64  ┆ str   ┆ f64      ┆ f64      ┆ f64      ┆ u32 │
+╞══════╪═══════╪══════════╪══════════╪══════════╪═════╡
+│ 0.1  ┆ flat  ┆ 0.5      ┆ 0.5      ┆ NaN      ┆ 44  │
+│ 0.1  ┆ share ┆ 0.454545 ┆ 0.454545 ┆ NaN      ┆ 44  │
+│ 0.25 ┆ flat  ┆ 0.954545 ┆ 0.954545 ┆ 0.942247 ┆ 44  │
+│ 0.25 ┆ share ┆ 0.886364 ┆ 0.886364 ┆ 0.883276 ┆ 44  │
+└──────┴───────┴──────────┴──────────┴──────────┴─────┘
+temporary recall by duration:
+shape: (3, 5)
+┌───────────────┬──────────┬──────────┬──────────┬─────┐
+│ duration_days ┆ recall   ┆ found    ┆ survive  ┆ n   │
+│ ---           ┆ ---      ┆ ---      ┆ ---      ┆ --- │
+│ i64           ┆ f64      ┆ f64      ┆ f64      ┆ u32 │
+╞═══════════════╪══════════╪══════════╪══════════╪═════╡
+│ 14            ┆ 0.272727 ┆ 0.363636 ┆ NaN      ┆ 44  │
+│ 30            ┆ 0.454545 ┆ 0.545455 ┆ 1.305428 ┆ 44  │
+│ 60            ┆ 0.545455 ┆ 0.681818 ┆ 1.015022 ┆ 44  │
+└───────────────┴──────────┴──────────┴──────────┴─────┘
+confusion (fitted absorption): expected x label
+shape: (8, 3)
+┌────────────┬────────────┬─────┐
+│ family     ┆ label      ┆ n   │
+│ ---        ┆ ---        ┆ --- │
+│ str        ┆ str        ┆ u32 │
+╞════════════╪════════════╪═════╡
+│ persistent ┆ missed     ┆ 53  │
+│ persistent ┆ persistent ┆ 123 │
+│ temporary  ┆ missed     ┆ 62  │
+│ temporary  ┆ persistent ┆ 14  │
+│ temporary  ┆ temporary  ┆ 56  │
+│ transfer   ┆ missed     ┆ 5   │
+│ transfer   ┆ persistent ┆ 7   │
+│ transfer   ┆ temporary  ┆ 32  │
+└────────────┴────────────┴─────┘
+survival of the injected step in the residual, median over found steps:
+shape: (6, 4)
+┌────────────┬────────────┬──────────┬─────┐
+│ family     ┆ absorption ┆ survive  ┆ n   │
+│ ---        ┆ ---        ┆ ---      ┆ --- │
+│ str        ┆ str        ┆ f64      ┆ u32 │
+╞════════════╪════════════╪══════════╪═════╡
+│ persistent ┆ fit        ┆ 0.975567 ┆ 123 │
+│ persistent ┆ residual   ┆ 1.084745 ┆ 136 │
+│ temporary  ┆ fit        ┆ 0.941824 ┆ 70  │
+│ temporary  ┆ residual   ┆ 1.058401 ┆ 79  │
+│ transfer   ┆ fit        ┆ 0.879299 ┆ 39  │
+│ transfer   ┆ residual   ┆ 1.059738 ┆ 41  │
+└────────────┴────────────┴──────────┴─────┘
+dating error of found injections (days; the stored error is relative to the day after the onset date, so 1 is added): median absolute 0.0
+
+== Forecast gain: mean absolute error over the month after each cut, points of effective capacity ==
+D8 (real break):
+shape: (6, 10)
+┌───────────┬───────────┬───────────┬───────────┬───┬───────────┬───────────┬───────────┬──────────┐
+│ cut       ┆ mae_none  ┆ mae_segme ┆ mae_regim ┆ … ┆ offset_se ┆ offset_re ┆ offset_tr ┆ latest_b │
+│ ---       ┆ ---       ┆ nt        ┆ e         ┆   ┆ gment     ┆ gime      ┆ ailing    ┆ oundary  │
+│ str       ┆ f64       ┆ ---       ┆ ---       ┆   ┆ ---       ┆ ---       ┆ ---       ┆ ---      │
+│           ┆           ┆ f64       ┆ f64       ┆   ┆ f64       ┆ f64       ┆ f64       ┆ str      │
+╞═══════════╪═══════════╪═══════════╪═══════════╪═══╪═══════════╪═══════════╪═══════════╪══════════╡
+│ 2023-09-0 ┆ 21.901139 ┆ 21.887053 ┆ 21.887053 ┆ … ┆ -4.5408   ┆ -4.5408   ┆ 0.937957  ┆ 2023-08- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 15       │
+│ 2023-10-0 ┆ 20.690732 ┆ 20.81738  ┆ 20.81738  ┆ … ┆ -6.796237 ┆ -6.796237 ┆ -3.333977 ┆ 2023-08- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 15       │
+│ 2023-11-0 ┆ 15.506613 ┆ 20.796218 ┆ 20.796218 ┆ … ┆ -22.41546 ┆ -22.41546 ┆ -7.900168 ┆ 2023-10- │
+│ 1         ┆           ┆           ┆           ┆   ┆ 1         ┆ 1         ┆           ┆ 21       │
+│ 2023-12-0 ┆ 14.963637 ┆ 11.889147 ┆ 11.889147 ┆ … ┆ -6.391007 ┆ -6.391007 ┆ -8.540575 ┆ 2023-08- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 15       │
+│ 2024-01-0 ┆ 18.020963 ┆ 15.013132 ┆ 15.013132 ┆ … ┆ -6.214886 ┆ -6.214886 ┆ -9.617842 ┆ 2023-12- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆           ┆ 07       │
+│ 2024-02-0 ┆ 10.552504 ┆ 11.173627 ┆ 11.173627 ┆ … ┆ -9.046754 ┆ -9.046754 ┆ -10.03618 ┆ 2023-10- │
+│ 1         ┆           ┆           ┆           ┆   ┆           ┆           ┆ 2         ┆ 29       │
+└───────────┴───────────┴───────────┴───────────┴───┴───────────┴───────────┴───────────┴──────────┘
+injected persistent steps: mae_segment - mae_none: -2.218 [-2.884, -1.541]
+injected persistent steps: mae_segment - mae_trailing: 0.151 [-0.124, 0.404]
+injected persistent steps: mae_regime - mae_none: -2.166 [-2.872, -1.456]
+injected persistent steps: mae_regime - mae_trailing: 0.203 [-0.074, 0.468]
+injected persistent steps: mae_trailing - mae_none: -2.369 [-2.962, -1.802]
+injected persistent steps: mean absolute error none 9.809, latest boundary 7.591, latest regime 7.643, trailing 7.439
+D8: mae_segment - mae_none: -0.010 [-2.519, 3.012]
+D8: mae_segment - mae_trailing: 0.840 [-0.411, 3.860]
+D8: mae_regime - mae_none: -0.010 [-2.519, 3.012]
+D8: mae_regime - mae_trailing: 0.840 [-0.411, 3.860]
+D8: mae_trailing - mae_none: -0.850 [-2.351, 0.551]
+D8: mean absolute error none 16.939, latest boundary 16.929, latest regime 16.929, trailing 16.089
+by month after the onset (injected):
+shape: (6, 6)
+┌─────────────┬───────────┬──────────┬──────────┬──────────┬─────┐
+│ month_after ┆ none      ┆ segment  ┆ regime   ┆ trailing ┆ n   │
+│ ---         ┆ ---       ┆ ---      ┆ ---      ┆ ---      ┆ --- │
+│ i64         ┆ f64       ┆ f64      ┆ f64      ┆ f64      ┆ u32 │
+╞═════════════╪═══════════╪══════════╪══════════╪══════════╪═════╡
+│ 1           ┆ 10.40146  ┆ 8.402019 ┆ 8.409085 ┆ 8.962277 ┆ 400 │
+│ 2           ┆ 10.052444 ┆ 7.749443 ┆ 7.88032  ┆ 7.29976  ┆ 400 │
+│ 3           ┆ 10.510623 ┆ 8.339171 ┆ 8.457049 ┆ 8.157659 ┆ 400 │
+│ 4           ┆ 9.795794  ┆ 7.398863 ┆ 7.42193  ┆ 6.985946 ┆ 400 │
+│ 5           ┆ 9.168055  ┆ 6.851789 ┆ 6.871515 ┆ 6.627138 ┆ 400 │
+│ 6           ┆ 8.922836  ┆ 6.801819 ┆ 6.815677 ┆ 6.602069 ┆ 400 │
+└─────────────┴───────────┴──────────┴──────────┴──────────┴─────┘
+injected, by size and shape:
+shape: (4, 6)
+┌───────────────────────┬───────────┬──────────┬──────────┬──────────┬─────┐
+│ scenario              ┆ none      ┆ segment  ┆ regime   ┆ trailing ┆ n   │
+│ ---                   ┆ ---       ┆ ---      ┆ ---      ┆ ---      ┆ --- │
+│ str                   ┆ f64       ┆ f64      ┆ f64      ┆ f64      ┆ u32 │
+╞═══════════════════════╪═══════════╪══════════╪══════════╪══════════╪═════╡
+│ persistent_flat_0.10  ┆ 7.073736  ┆ 6.408516 ┆ 6.47956  ┆ 6.066096 ┆ 600 │
+│ persistent_flat_0.25  ┆ 11.903098 ┆ 7.9358   ┆ 7.963906 ┆ 7.937096 ┆ 600 │
+│ persistent_share_0.10 ┆ 7.545245  ┆ 6.872917 ┆ 6.923241 ┆ 6.588447 ┆ 600 │
+│ persistent_share_0.25 ┆ 12.712063 ┆ 9.144836 ┆ 9.203678 ┆ 9.164929 ┆ 600 │
+└───────────────────────┴───────────┴──────────┴──────────┴──────────┴─────┘
+
+== Checks ==
+median forecast minus mean forecast: zero by construction (GAM_ONLY is a point forecast).
