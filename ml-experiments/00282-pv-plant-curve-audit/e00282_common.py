@@ -87,9 +87,10 @@ def build_frame() -> pl.DataFrame:
         )
         parts.append(frame.with_columns(stack_shape=shape, poa_fleet_w_m2=poa))
     joined = pl.concat(parts).join(predictions, on=["site", "time"], how="inner", validate="1:1")
-    tuning = ~joined["scored"] & (
-        joined["time"] < pl.lit(SCORED_START).str.to_datetime(time_zone="UTC")
+    joined = joined.with_columns(
+        tuning=pl.col("time") < pl.lit(SCORED_START).str.to_datetime(time_zone="UTC")
     )
+    tuning = joined["tuning"]
     capacity = (
         joined.filter(tuning)
         .group_by("site")

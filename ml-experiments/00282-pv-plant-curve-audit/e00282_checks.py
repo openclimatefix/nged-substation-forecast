@@ -46,7 +46,7 @@ def flat_top_table() -> pl.DataFrame:
 def _orientation_task(farm: str) -> list[dict[str, float | str]]:
     """Fit the plant at every tilt and azimuth for one farm and return the fit and its score."""
     frame = pl.read_parquet(common.FRAME_PATH).filter(pl.col("site") == farm).sort("time")
-    tuning = (~frame["scored"]).to_numpy()
+    tuning = frame["tuning"].to_numpy()
     scored = frame["scored"].to_numpy()
     sky = common.sky_of(frame)
     output = frame["output"].to_numpy()

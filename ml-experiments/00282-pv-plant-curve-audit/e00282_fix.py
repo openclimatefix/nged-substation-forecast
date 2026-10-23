@@ -31,7 +31,7 @@ GAIN_THRESHOLD: Final[float] = 0.02
 
 def pooled_prediction(*, frame: pl.DataFrame, farm: str) -> np.ndarray:
     """Return the pooled leave-one-farm-out shape's output for every row of `farm`, unscaled."""
-    others = frame.filter((pl.col("site") != farm) & ~pl.col("scored"))
+    others = frame.filter((pl.col("site") != farm) & pl.col("tuning"))
     ghi = others["ghi_w_m2"].to_numpy()
     elevation = others["elevation_deg"].to_numpy()
     output = others["output"].to_numpy()
@@ -86,7 +86,7 @@ def build_scored() -> pl.DataFrame:
     parts = []
     for farm in common.FARMS:
         own = frame.filter(pl.col("site") == farm)
-        tuning = (~own["scored"]).to_numpy()
+        tuning = own["tuning"].to_numpy()
         output = own["output"].to_numpy()
         pooled = pooled_prediction(frame=frame, farm=farm)
         scale = float(np.sum(pooled[tuning] * output[tuning]) / np.sum(pooled[tuning] ** 2))
