@@ -30,9 +30,9 @@ import e00285_core as core_module  # noqa: E402
 import e00285_models as models  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 import xgboost as xgb  # noqa: E402
-from torch import nn  # noqa: E402
+from torch import nn  # noqa: E402  # ty: ignore[unresolved-import]
 
 OUT_DIR: Final[Path] = common.WORK_DIR / "ens_mix"
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
