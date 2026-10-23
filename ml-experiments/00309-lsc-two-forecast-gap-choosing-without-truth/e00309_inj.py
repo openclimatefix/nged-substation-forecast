@@ -2,18 +2,20 @@
 """RULE, ORACLE, and the fixed forecasts on experiment 297's injected-world rows.
 
 Reads experiment 297's score rows (K0, GAM_ONLY with its own bands, BAND_HEAD; ensemble weather,
-44 worlds, six Primary substations), builds RULE (K0 while the gap says the arrangement is abnormal,
-GAM_ONLY otherwise), ORACLE (the arm with the lower quantile score on that row and target) and
+44 worlds, six Primary substations), builds RULE (K0 while the 24-hour mean residual of measured
+power against GAM_ONLY says the arrangement is abnormal, GAM_ONLY otherwise), RULE_GAP (the same
+rule on the plain gap of K0 minus GAM_ONLY, as the comparator), ORACLE (the arm with the lower quantile score on that row and target) and
 ORACLE_STATE (K0 while a shift is on, GAM_ONLY otherwise), scores everything by row group and
 target, and prints the numbers the page quotes. Intervals resample whole shifts (world and event)
 and whole calendar months for ordinary rows, 95%, 20,000 draws.
 
-    uv run --no-sync python e00309_inj.py
+    uv run --no-sync python e00309_inj.py r24   # the primary RULE; "d" runs the gap comparator
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any, Final
 
 import e00309_data as dat
@@ -30,7 +32,9 @@ KEEP: Final[tuple[str, ...]] = (
     "tw95_nra", "tw95_obs", "q01", "q05", "q50", "q95", "q99",
 )  # fmt: skip
 BASE_ARMS: Final[tuple[str, ...]] = ("K0", "GAM_ONLY", "BAND_HEAD")
-RULES: Final[tuple[str, ...]] = tuple(f"RULE_{k}" for k in st.THRESHOLDS)
+RULES: Final[tuple[str, ...]] = tuple(
+    f"RULE_{score}_{k}" for score, ks in st.THRESHOLDS.items() for k in ks
+)
 TARGETS: Final[tuple[str, ...]] = ("nra", "obs")
 PRICE_GBP_PER_MWH: Final[float] = 2000.0
 BREACH_RATIO: Final[int] = 20
@@ -68,15 +72,16 @@ def load_wide() -> tuple[pl.DataFrame, dict[str, Any]]:
 
 
 def add_states(*, wide: pl.DataFrame) -> pl.DataFrame:
-    """Add one boolean column per RULE threshold: is the row's forecast origin in the abnormal state."""
+    """Add one boolean column per RULE arm: is the row's forecast origin in the abnormal state."""
     stamp = (
-        (wide["power_fcst_init_time"].dt.replace_time_zone("UTC") - pl.datetime(2022, 1, 1, time_zone="UTC")).dt.total_seconds() // 1800
-    ).to_numpy() if False else (
-        wide.select(((pl.col("power_fcst_init_time").dt.replace_time_zone("UTC") - pl.lit(dat.GRID_START)).dt.total_seconds() // 1800).cast(pl.Int64)).to_series().to_numpy()
+        wide.select(
+            ((pl.col("power_fcst_init_time").dt.replace_time_zone("UTC") - pl.lit(dat.GRID_START)).dt.total_seconds() // 1800).cast(pl.Int64)
+        )
+        .to_series()
+        .to_numpy()
     )
-    site = wide["site"].to_numpy()
-    world = wide["world"].to_numpy()
-    out = {k: np.zeros(wide.height, dtype=bool) for k in st.THRESHOLDS}
+    site, world = wide["site"].to_numpy(), wide["world"].to_numpy()
+    out = {f"state_{score}_{k}": np.zeros(wide.height, dtype=bool) for score, ks in st.THRESHOLDS.items() for k in ks}
     for s_name, series in st.SITES.items():
         for seed in np.unique(world[site == s_name]):
             path = st.GAP_DIR / f"world_{seed}_{s_name}.npz"
@@ -84,11 +89,12 @@ def add_states(*, wide: pl.DataFrame) -> pl.DataFrame:
             if not path.exists():
                 continue
             z = np.load(path)
-            sigma = st.sigma_of(series=series)
-            for k in st.THRESHOLDS:
-                state = st.abnormal_state(gap=z["d"], sigma=sigma, k=k)
-                out[k][mask] = st.state_for_origin(state=state, stamp=stamp[mask])
-    return wide.with_columns([pl.Series(f"state_{k}", v) for k, v in out.items()])
+            for score, ks in st.THRESHOLDS.items():
+                sigma = st.sigma_of(series=series, score=score)
+                for k in ks:
+                    state = st.abnormal_state(gap=z[score], sigma=sigma, k=k)
+                    out[f"state_{score}_{k}"][mask] = st.state_for_origin(state=state, stamp=stamp[mask])
+    return wide.with_columns([pl.Series(name, v) for name, v in out.items()])
 
 
 def choose(*, wide: pl.DataFrame, name: str, use_k0: np.ndarray) -> list[pl.Series]:
@@ -103,8 +109,8 @@ def choose(*, wide: pl.DataFrame, name: str, use_k0: np.ndarray) -> list[pl.Seri
 def add_arms(*, wide: pl.DataFrame) -> pl.DataFrame:
     """RULE at each threshold, ORACLE for each target, and ORACLE_STATE."""
     new = []
-    for k in st.THRESHOLDS:
-        new += choose(wide=wide, name=f"RULE_{k}", use_k0=wide[f"state_{k}"].to_numpy())
+    for rule in RULES:
+        new += choose(wide=wide, name=rule, use_k0=wide[f"state_{rule.removeprefix('RULE_')}"].to_numpy())
     for target in TARGETS:
         better_k0 = wide[f"qs_{target}__K0"].to_numpy() < wide[f"qs_{target}__GAM_ONLY"].to_numpy()
         new += choose(wide=wide, name=f"ORACLE_{target.upper()}", use_k0=better_k0)
@@ -151,7 +157,7 @@ def units_of(*, wide: pl.DataFrame) -> np.ndarray:
     return np.where(ordinary, -valid_month, world * 100_000 + event)
 
 
-def draws_of(*, units: np.ndarray, rng: np.random.Generator, *arrays: np.ndarray) -> tuple[np.ndarray, ...]:
+def draws_of(*, units: np.ndarray, rng: np.random.Generator, arrays: tuple[np.ndarray, ...]) -> tuple[np.ndarray, ...]:
     """Bootstrap sums of each array over whole units, resampling ordinary-month and shift units apart."""
     labels, codes = np.unique(units, return_inverse=True)
     per_unit = [np.bincount(codes, weights=a, minlength=len(labels)) for a in arrays]
@@ -179,7 +185,7 @@ def gain_interval(*, base: np.ndarray, arm: np.ndarray, weight: np.ndarray, unit
     if not len(base):
         return dict.fromkeys(("n", "mean", "lo", "hi", "pct", "pct_lo", "pct_hi"), float("nan"))
     gain = base - arm
-    g, b, c = draws_of(units=units, rng=rng, gain * weight, base * weight, weight)
+    g, b, c = draws_of(units=units, rng=rng, arrays=(gain * weight, base * weight, weight))
     est_g, est_b, est_c = float((gain * weight).sum()), float((base * weight).sum()), float(weight.sum())
     mean_lo, mean_hi = np.percentile(g / c, [2.5, 97.5])
     pct_lo, pct_hi = np.percentile(100.0 * g / b, [2.5, 97.5])
@@ -193,7 +199,7 @@ def recovery_interval(*, fixed: np.ndarray, rule: np.ndarray, oracle: np.ndarray
     """(fixed minus RULE) / (fixed minus ORACLE) summed over rows, resampling whole units."""
     keep = np.isfinite(fixed) & np.isfinite(rule) & np.isfinite(oracle)
     fixed, rule, oracle, weight, units = fixed[keep], rule[keep], oracle[keep], weight[keep], units[keep]
-    num, den = draws_of(units=units, rng=rng, (fixed - rule) * weight, (fixed - oracle) * weight)
+    num, den = draws_of(units=units, rng=rng, arrays=((fixed - rule) * weight, (fixed - oracle) * weight))
     est = float(((fixed - rule) * weight).sum() / ((fixed - oracle) * weight).sum())
     lo, hi = np.percentile(num / den, [2.5, 97.5])
     return {"ratio": est, "lo": float(lo), "hi": float(hi), "n": float(weight.sum())}
@@ -232,8 +238,8 @@ def show(tag: str, res: dict[str, float]) -> None:
     print(f"{tag}: n={res['n']:.0f} mean {res['mean']:+.4f} ({res['lo']:+.4f}, {res['hi']:+.4f}) pct {res['pct']:+.2f} ({res['pct_lo']:+.2f}, {res['pct_hi']:+.2f})")
 
 
-def main() -> None:
-    """Compute and print every number the page quotes."""
+def main(*, score: str) -> None:
+    """Compute and print every number the page quotes, with RULE reading `score` (r24 or d)."""
     RESULTS.mkdir(parents=True, exist_ok=True)
     wide, constants = load_wide()
     wide = add_states(wide=wide)
@@ -250,9 +256,9 @@ def main() -> None:
     out: dict[str, Any] = {"n_rows": wide.height}
     print("rows", wide.height, "shift units", len(np.unique(units[units > 0])))
     print("share of rows in the abnormal state, by phase:")
-    for k in st.THRESHOLDS:
-        s = wide[f"state_{k}"].to_numpy()
-        print(k, {p: round(float(s[phase == p].mean()), 3) for p in sorted(set(phase))})
+    for name in RULES:
+        s = wide[f"state_{name.removeprefix('RULE_')}"].to_numpy()
+        print(name, {p: round(float(s[phase == p].mean()), 3) for p in sorted(set(phase))})
     # Absolute scores, even months.
     print("=== absolute mean scores, even months (points; cost GBP per scored half-hour)")
     absolute = []
@@ -271,15 +277,15 @@ def main() -> None:
     out["absolute_even"] = absolute
     # Select k on odd months: lowest pooled tw95 obs in G5.
     sel = {}
-    for k in st.THRESHOLDS:
-        v = col(wide, "tw95", "obs", f"RULE_{k}")
+    for k in st.THRESHOLDS[score]:
+        v = col(wide, "tw95", "obs", f"RULE_{score}_{k}")
         m = groups["G5 near"] & odd & np.isfinite(v)
         sel[k] = float(np.sum(v[m] * weight[m]) / np.sum(weight[m]))
     best_k = min(sel, key=lambda x: sel[x])
     print("odd-month G5 tw95 obs by k:", {k: round(v, 4) for k, v in sel.items()}, "chosen", best_k)
     out["selected_k"] = best_k
     out["selection"] = sel
-    rule = f"RULE_{best_k}"
+    rule = f"RULE_{score}_{best_k}"
     # Recovery and G1 harm, even months, both targets.
     print("=== recovery of ORACLE's gain over the better fixed choice (even months)")
     recovery = []
@@ -388,8 +394,8 @@ def main() -> None:
         loo.append({"left_out": site, "fixed": fixed, **rec})
         print(f"without {site}: fixed={fixed} recovery {rec['ratio']:+.3f} ({rec['lo']:+.3f}, {rec['hi']:+.3f})")
     out["leave_one_out"] = loo
-    (RESULTS / "injected.json").write_text(json.dumps(out, indent=2, default=float))
+    (RESULTS / f"injected_{score}.json").write_text(json.dumps(out, indent=2, default=float))
 
 
 if __name__ == "__main__":
-    main()
+    main(score=sys.argv[1])

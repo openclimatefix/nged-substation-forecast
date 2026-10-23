@@ -1,8 +1,9 @@
-"""The abnormal-arrangement state that RULE reads, from experiment 308's gap scores.
+"""The abnormal-arrangement state that RULE reads, from experiment 308's stored scores.
 
-The gap score is the mean of K0 minus GAM_ONLY over leads 0 to 6 hours at a 6-hourly origin, in
-units of the series' robust scale on odd-month ordinary rows. RULE enters the abnormal state when
-the absolute gap exceeds `k` at two consecutive origins, and leaves it when the absolute gap stays
+A score is either `r24` (the mean of measured power minus the GAM_ONLY forecast over the last 24
+hours before the origin) or `d` (the mean of K0 minus GAM_ONLY over leads 0 to 6 hours), in units
+of the series' robust scale on odd-month ordinary rows. RULE enters the abnormal state when the
+absolute score exceeds `k` at two consecutive origins, and leaves it when the absolute score stays
 under `k / 2` at two consecutive origins or after 14 days.
 """
 
@@ -18,11 +19,14 @@ import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 GAP_DIR: Final = ML_EXPERIMENTS_DATA_DIR / "00308-lsc-two-forecast-gap-as-a-detector" / "gap"
-THRESHOLDS: Final[tuple[float, ...]] = (2.3, 3.2, 4.5)
+THRESHOLDS: Final[dict[str, tuple[float, ...]]] = {"r24": (2.6, 3.5, 4.5), "d": (2.3, 3.2, 4.5)}
+"""Per score: the thresholds that match RO-NC's and the learned score's odd-month false alarm rates in
+experiment 308, and a stricter one."""
 ENTER_RUN: Final[int] = 2
 EXIT_RUN: Final[int] = 2
 MAX_ORIGINS: Final[int] = 56
 """14 days of 6-hourly origins."""
+D8: Final[int] = 26
 SITES: Final[dict[str, int]] = {"D5": 17, "D10": 10, "D11": 8, "D14": 16, "D16": 18, "D9": 7}
 
 
@@ -40,7 +44,7 @@ def closure_blocks(*, series: int) -> np.ndarray:
 def extra_blocks(*, series: int) -> np.ndarray:
     """True on D8's multi-day drops and the series' unlabelled block days."""
     out = np.zeros(h.N_GRID, dtype=bool)
-    if series == 26:
+    if series == D8:
         for r in pl.read_parquet(dat.D8_DROPS).iter_rows(named=True):
             out[int(r["first_stamp"]) : int(r["last_stamp"]) + 1] = True
     for lo, hi in dat.block_day_ranges().get(series, []):
@@ -49,13 +53,13 @@ def extra_blocks(*, series: int) -> np.ndarray:
 
 
 @lru_cache(maxsize=None)
-def sigma_of(*, series: int) -> float:
-    """1.4826 times the median absolute gap over odd-month ordinary rows with a reading."""
+def sigma_of(*, series: int, score: str) -> float:
+    """1.4826 times the median absolute score over odd-month ordinary rows with a reading."""
     z = np.load(GAP_DIR / f"real_{series}.npz")
     origin = z["origin"]
     ordinary = ~closure_blocks(series=series)[origin] & ~extra_blocks(series=series)[origin]
     odd = np.isin(h.utc_month_grid()[origin], list(h.TUNING_MONTHS))
-    d = z["d"]
+    d = z[score]
     keep = ordinary & odd & np.isfinite(d) & z["has_data"]
     return float(1.4826 * np.median(np.abs(d[keep])))
 
