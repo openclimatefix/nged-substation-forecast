@@ -28,10 +28,11 @@ prediction: >-
   fail. (P1) A1 minus T-all-K is within +/-0.02 points. (P2) A2 minus T-all-K is -0.01 to -0.04
   pooled and -0.05 to -0.15 on cold nights, with at least 4 of 5 sites better. (P3) A3 minus A2 is
   -0.01 to +0.01 pooled, and A3 beats A2 by 0.02 or more on cold nights only if the curve flattens
-  above about 12 C and steepens below 3 C at 3 or more sites. (P4) Wind adds less than 0.01 pooled.
-  Earlier experiments argue for ties: experiment 126 found its monotone temperature ramps (-0.007),
-  exponentially weighted temperatures (-0.002), and wind chill (-0.026, interval -0.056 to +0.018)
-  all within noise on winter rows, and experiment 121 found five heating hinges gained 0.016.
+  above about 12 C and steepens below 3 C at 3 or more sites. (P4) Wind adds less than 0.01 pooled
+  over all rows. Earlier experiments argue for ties: experiment 126 found its monotone temperature
+  ramps (-0.007), exponentially weighted temperatures (-0.002), and wind chill (-0.026, interval
+  -0.056 to +0.018) all within noise on winter rows, and experiment 121 found five heating hinges
+  gained 0.016.
 decision_rule: >-
   Paired month-resampled bootstrap on the scored year (2025-07 to 2026-06), 99% intervals
   (stricter than Bonferroni over the three planned contrasts C1 A1-A0, C2 A2-A0, C3 A3-A0). The
@@ -42,8 +43,8 @@ decision_rule: >-
   at least 4 of 5 decision sites improve on cold nights in the scored year, and the upper bound of
   its interval on all other rows is not above +0.02 (non-inferiority). The threshold is -0.02
   points for A1 and A2 and -0.04 points for A3, because the extra parameters, or a trained network
-  per site, must pay for the added complexity; the brief set both. A3 minus A2 (C4) and A2w minus
-  A2 (C5, the wind term) are secondary and read at the same level. A known-answer gate on
+  per site, must be justified by the added complexity; the brief set both. A3 minus A2 (C4) and A2w
+  minus A2 (C5, the wind term) are secondary and read at the same level. A known-answer gate on
   synthetic data (a curved and a straight heating truth) must show that A3 recovers a curved truth
   and ties a straight one, otherwise A3's label is capped at inconclusive. The curve on the card
   changes only for an arm that passes.
@@ -83,27 +84,28 @@ lessons:
     measures that defect, not the idea.
   - >-
     The properly trained network learns a heating curve that flattens above about 12 C and is
-    2 to 3 times steeper per degree below 3 C, but its cold-night gain does not replicate.
+    1.4 to 3 times steeper per degree below 3 C than from 6 to 12 C, but its cold-night gain does
+    not replicate.
 take_home_message: >-
   A smooth heating curve, a thermal lag, and wind each leave the day-ahead forecast within about
-  0.02 points of the straight-line heating response, so none of them is worth adding. A small
-  neural network learns a plausible curved heating response and lowers the error on cold nights by
-  0.13 points, but that gain comes from one cold spell in January 2026, did not appear in the
-  previous year, and the network failed a test on synthetic data, so the card keeps the straight
-  line for now.
+  0.02 points of the straight-line heating response, so the evidence does not justify adding any of
+  them. A small neural network learns a plausible curved heating response and lowers the error on
+  cold nights by 0.13 points, but that gain comes from one cold spell in January 2026, did not
+  appear in the previous year, and the network failed a test on synthetic data, so the substation
+  card keeps the straight line for now.
 advice:
   - >-
     Keep T-all's straight-line heating hinge on the four trailing means; a smooth monotone curve
     and lagged temperatures add nothing measurable on cold nights (C1, C2).
   - >-
-    Add the 24-hour and 72-hour wind speed times the cold hinge only if a gain of about 0.01 points
+    Add the 24-hour and 72-hour wind speed times the cold hinge only if a gain of about 0.016 points
     on November to March justifies four extra columns per hour band (C5).
   - >-
     Before training a neural network inside the convex model, check that it reproduces the convex
     model's own heating term on the training rows; a network that cannot is under-fitted and its
     contrast is uninformative (A3 against A3b).
   - >-
-    Retest a monotone heating network only with at least two winters of cold nights in the scoring
+    A retest of a monotone heating network needs at least two winters of cold nights in the scoring
     rows, because one winter gave about 1,200 cold-night rows at five Primaries and an interval of
     0.29 points (C7).
 ---
@@ -114,11 +116,11 @@ advice:
 curve.** Three changes to the heating term (a smooth monotone curve, lagged temperatures, and wind)
 each moved the day-ahead score by less than 0.02 points outside cold nights, and none beat the
 current model on cold nights. A small neural network learned a plausible curve, flat above about 12
-C and 2 to 3 times steeper per degree below 3 C. Trained longer, it lowered the cold-night score by
-0.13 points, but the interval includes zero, the gain reversed in the previous year, and the network
-failed a test on synthetic data. The audit traced the gain to one cold spell in January 2026. The
-card keeps the straight line. The next step is to repeat the network test when a second winter of
-scored cold nights exists.
+C and 1.4 to 3 times steeper per degree below 3 C than from 6 to 12 C. Trained longer, it lowered
+the cold-night score by 0.13 points, but the interval includes zero, the gain reversed in the
+previous year, and the network failed a test on synthetic data. The audit traced the gain to one
+cold spell in January 2026. The card keeps the straight line. A retest would need a second winter of
+scored cold nights.
 
 ## What was asked
 
@@ -186,16 +188,16 @@ measured.
     | A3c (post hoc) | 2.065 | 2.303 | 2.210 |
 
 - **C1, A1 minus A0:** cold nights +0.062 (99% interval -0.040 to +0.127), replicate year -0.001,
-  better at 2 of 5 Primaries. All rows -0.008 (-0.024 to +0.009). Label: tie.
-- **C2, A2 minus A0:** cold nights +0.047 (-0.048 to +0.124), replicate +0.004, better at 2 of 5.
+  better at 3 of 5 Primaries. All rows -0.008 (-0.024 to +0.009). Label: tie.
+- **C2, A2 minus A0:** cold nights +0.047 (-0.048 to +0.124), replicate +0.004, better at 3 of 5.
   All rows -0.010 (-0.026 to +0.006). Label: tie. The prediction of -0.05 to -0.15 on cold nights
   failed, and so did 4 of 5 Primaries improving.
 - **C3, A3 minus A0:** cold nights +0.616 (+0.353 to +1.320); all rows +0.147 (+0.044 to +0.275).
   The network fitted D10's training rows with squared error 66 to 78 per row against T-all's
   52.6, so the contrast measures under-fitting. Label: worse, and not a test of the idea.
 - **C5, wind (A2w minus A2):** all rows -0.008 (-0.015 to -0.001), November to March -0.016
-  (-0.024 to -0.003), cold nights -0.005 (-0.025 to +0.003). Wind adds less than 0.01 points pooled,
-  as predicted, and its interval excludes zero at 99%.
+  (-0.024 to -0.003), cold nights -0.005 (-0.025 to +0.003). Wind adds less than 0.01 points pooled
+  over all rows, as predicted, and its interval excludes zero at 99%.
 - **C7, A3b minus A0 (post hoc):** cold nights -0.131 (-0.237 to +0.050), replicate year +0.019,
   better at 3 of 5 Primaries (D10 -0.25, D11 -0.34, D16 -0.04; D5 +0.05, D14 +0.23). November to
   March -0.041 (-0.085 to +0.010); all rows -0.018 (-0.045 to +0.002); other rows' upper bound
@@ -212,8 +214,9 @@ measured.
 - **A3b's wind input:** A3b minus A3b without wind is +0.032 on cold nights (-0.015 to +0.057), so
   the network does not use wind to lower the cold-night score.
 - **Curves:** A3b's average curve flattens above 12 C (slope from 12 to 18 C under half the slope
-  from 6 to 12 C) at 4 of 6 Primaries and is more than 1.25 times steeper below 3 C at all 6. The
-  prediction that both hold at 3 or more Primaries is met.
+  from 6 to 12 C) at 4 of 6 Primaries and is at least 1.25 times steeper below 3 C at all 6 (D9, the
+  sixth site, is fitted but not scored). The prediction that both hold at 3 or more Primaries is
+  met.
 - **Economy 7 step hours (00:30 to 07:30 UTC, November to March):** A3b -0.025 (-0.077 to +0.033),
   A2 +0.007 (-0.028 to +0.046). No curve absorbs or worsens the step measurably.
 
@@ -236,7 +239,9 @@ quantile):**
 - **Curved truth:** on cold rows the root mean squared error falls from 1.06 to 0.93 (A2) at D10
   and from 0.98 to 0.72 (A2) at D14, so A1 and A2 can see a curve if one exists. A3b gets 1.28 at
   D10 (worse than T-all's 1.06) and 0.75 at D14 (23% better, short of the pre-registered 25%).
-- **Straight truth:** A3b is within the pre-registered tolerance of T-all at both sites.
+- **Straight truth:** A3b is within the pre-registered tolerance of T-all at both sites (error at
+  most 25% above T-all's plus 0.05 points on all rows), although at D10 its cold-row error is 30%
+  above T-all's.
 - **A3c** gets 1.20 at D10 and 0.79 at D14 on the curved truth, no better than A3b.
 - **Scope:** only the networks have a pass rule; A1 and A2 are in the gate only to show they can
   see a curve, and A3, A3 without wind, and A2w are not in it.
@@ -256,7 +261,7 @@ quantile):**
   of C1 and C2 on cold nights (trigger 4), which leaves both labelled tie; and the C3 result
   contradicting its prediction (trigger 2), which the training-fit check explains.
   A fresh Sonnet auditor (the brief set Sonnet only, so no Opus audit ran) re-derived C1, C2, and
-  C7 from the stored predictions and matched them. Its findings are triaged under "Reviews".
+  C7 from the stored predictions and matched them. The findings are triaged under "Reviews".
 
 ## Reviews
 
@@ -278,5 +283,5 @@ quantile):**
 - If the network is retested, give it the four trailing means and the previous-day means as in A3b,
   and compare against a plain gradient-boosted tree on the same inputs to separate "curved" from
   "flexible".
-- A wind term of -0.008 points on all rows is the only gain here whose interval excludes zero; it
-  is too small to port by itself.
+- A wind term of -0.008 points on all rows is the only contrast on all rows whose interval excludes
+  zero; it is too small to port by itself.

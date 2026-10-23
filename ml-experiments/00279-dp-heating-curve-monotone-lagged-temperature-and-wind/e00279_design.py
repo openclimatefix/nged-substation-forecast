@@ -20,7 +20,7 @@ by `studies.dp_gam.solve_bounded_quadratic`.
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import product
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 import e00279_aux as aux_module
 import e00279_common as common
@@ -622,7 +622,7 @@ def network_inputs(
     return nn_module.inputs(temperatures_c=temperatures, wind_m_s=wind), group
 
 
-def network_training(*, extra: str | None) -> dict[str, float | int]:
+def network_training(*, extra: str | None) -> dict[str, Any]:
     """Return a network arm's training settings: the pre-registered or the post hoc ones."""
     if extra in FULL_INPUT_NETWORKS:
         return {
@@ -696,6 +696,7 @@ def fit_arm(
         )
     residual = y - x @ theta
     if network is not None:
+        assert arm.extra is not None
         inputs, group = network_inputs(
             cache=cache,
             site=base.site,

@@ -47,6 +47,12 @@ WINTER_MONTHS: Final[tuple[int, ...]] = (11, 12, 1, 2, 3)
 LOCAL: Final[str] = "Europe/London"
 
 
+def as_float(value: object) -> float:
+    """Return `value`, a Polars aggregate known to be numeric, as a float."""
+    assert isinstance(value, (int, float)), value
+    return float(value)
+
+
 @cache
 def _cache() -> FeatureCache:
     return common.load_cache()
@@ -296,16 +302,16 @@ def absolute_scores() -> dict[str, Any]:
     for arm in (REFERENCE, *(f"{a}_k" for a in ARMS)):
         frame = load_arm(year="scored", arm=arm).filter(pl.col("site_name").is_in(DECISION))
         entry = {
-            "all": float(frame["qs"].mean()),
-            "nov_mar": float(frame.filter(pl.col("winter"))["qs"].mean()),
-            "cold_night": float(frame.filter(pl.col("cold_night"))["qs"].mean()),
-            "step_hours": float(frame.filter(pl.col("step"))["qs"].mean()),
-            "winter_mae_median": float(
+            "all": as_float(frame["qs"].mean()),
+            "nov_mar": as_float(frame.filter(pl.col("winter"))["qs"].mean()),
+            "cold_night": as_float(frame.filter(pl.col("cold_night"))["qs"].mean()),
+            "step_hours": as_float(frame.filter(pl.col("step"))["qs"].mean()),
+            "winter_mae_median": as_float(
                 (frame.filter(pl.col("winter"))["actual"] - frame.filter(pl.col("winter"))["q50"])
                 .abs()
                 .mean()
             ),
-            "cold_night_mae_median": float(
+            "cold_night_mae_median": as_float(
                 (
                     frame.filter(pl.col("cold_night"))["actual"]
                     - frame.filter(pl.col("cold_night"))["q50"]
@@ -350,7 +356,7 @@ def reproduction() -> dict[str, float]:
         f"reproduction: {joined.height} rows of {old.height}, max |mean difference| {gap}, "
         f"max |median difference| {gap_q}"
     )
-    return {"rows": joined.height, "max_mean_gap": float(gap), "max_median_gap": float(gap_q)}  # type: ignore[arg-type]
+    return {"rows": joined.height, "max_mean_gap": as_float(gap), "max_median_gap": as_float(gap_q)}
 
 
 def curve_slopes() -> dict[str, Any]:

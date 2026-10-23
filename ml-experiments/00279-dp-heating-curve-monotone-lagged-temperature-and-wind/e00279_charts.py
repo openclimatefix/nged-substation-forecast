@@ -130,7 +130,7 @@ def curves(*, numbers: dict) -> alt.TopLevelMixin:
         )
     frame = pl.DataFrame(rows)
     return (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=2)
         .encode(
             x=alt.X("temperature:Q", title="Temperature at every lag (C)"),
