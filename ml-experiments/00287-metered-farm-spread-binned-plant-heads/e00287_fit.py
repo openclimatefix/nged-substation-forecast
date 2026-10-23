@@ -298,7 +298,7 @@ def train_neural(*, arm: str, st: Setting, seed: int) -> np.ndarray:
     assert best_state is not None
     model.load_state_dict(best_state)
     model.eval()
-    if mixture:
+    if isinstance(model, MixtureHead):
         return mixture_quantiles(model=model, batch=test_b, ceiling=st.ceiling)
     with torch.no_grad():
         return np.sort(model(test_b).numpy().astype(np.float64), axis=1)
