@@ -56,7 +56,7 @@ def _half_rule() -> alt.Chart:
     return (
         alt.Chart(pl.DataFrame({"x": [0.5]}))
         .mark_rule(color="#666666", strokeDash=[4, 3])
-        .encode(x="x:Q")
+        .encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     )
 
 
@@ -73,7 +73,7 @@ def figure_1(*, report: dict) -> alt.TopLevelMixin:
     bars = (
         alt.Chart()
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("stage:N", sort=list(STAGE_ORDER), title=None, axis=None),
             x=alt.X(
                 "share:Q",
@@ -141,7 +141,7 @@ def figure_2(*, report: dict) -> alt.TopLevelMixin:
     rule = (
         alt.Chart(pl.DataFrame({"y": [0.5]}))
         .mark_rule(color="#666666", strokeDash=[4, 3])
-        .encode(y="y:Q")
+        .encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     )
     return (base.mark_line(point=True) + rule).properties(
         width=PLOT_WIDTH,
@@ -164,7 +164,7 @@ def figure_3(*, report: dict) -> alt.TopLevelMixin:
     bars = (
         alt.Chart(frame)
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("bin:N", sort=order, title="ERA5 100 m wind speed bin (m/s)"),
             y=alt.Y("bias:Q", title="Ensemble mean minus ERA5 (m/s; 0 is unbiased)"),
             xOffset="height:N",
@@ -177,7 +177,7 @@ def figure_3(*, report: dict) -> alt.TopLevelMixin:
             ),
         )
     )
-    zero = alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color="#666666").encode(y="y:Q")
+    zero = alt.Chart(pl.DataFrame({"y": [0.0]})).mark_rule(color="#666666").encode(y="y:Q")  # ty: ignore[unresolved-attribute]
     return (bars + zero).properties(
         width=PLOT_WIDTH,
         height=200,
@@ -203,7 +203,7 @@ def figure_4(*, sources: dict) -> alt.TopLevelMixin:
     bars = (
         alt.Chart(frame)
         .mark_bar(color=ocf.DATA_BLUE)
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y(
                 "arm:N",
                 sort=[label for _, label in arms],
@@ -253,7 +253,7 @@ def figure_5(*, sources: dict) -> alt.TopLevelMixin:
     bars = (
         alt.Chart()
         .mark_bar()
-        .encode(
+        .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("model:N", title=None),
             xOffset="training:N",
             y=alt.Y(
@@ -275,7 +275,7 @@ def figure_5(*, sources: dict) -> alt.TopLevelMixin:
     return (
         alt.layer(
             bars,
-            alt.Chart().mark_rule(color="#666666", strokeDash=[4, 3]).encode(y=alt.datum(0.5)),
+            alt.Chart().mark_rule(color="#666666", strokeDash=[4, 3]).encode(y=alt.datum(0.5)),  # ty: ignore[unresolved-attribute]
         )
         .facet(column=alt.Column("subset:N", title=None), data=frame)
         .properties(

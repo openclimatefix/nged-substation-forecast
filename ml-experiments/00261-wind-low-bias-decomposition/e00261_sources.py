@@ -295,7 +295,8 @@ def main() -> None:
                     for c in columns
                 },
                 "mean_q50_points": {
-                    c: float(kept[c].mean()) * common.POINTS_PER_FRACTION for c in columns
+                    c: float(np.mean(kept[c].to_numpy())) * common.POINTS_PER_FRACTION
+                    for c in columns
                 },
             }
     (common.WORK_DIR / "sources.json").write_text(json.dumps(out, indent=2))

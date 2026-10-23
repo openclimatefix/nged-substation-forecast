@@ -19,6 +19,7 @@ for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
 
 import e00261_common as common  # noqa: E402
 import e00261_core as core_module  # noqa: E402
+import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
 
 BASE_END: Final = datetime(2024, 4, 1, tzinfo=UTC)
@@ -32,7 +33,7 @@ def main() -> None:
     table = table.join(mask, on=["time_series_id", "valid_time"], how="left").with_columns(
         masked=pl.col("masked").fill_null(value=False)
     )
-    out: dict[str, dict[str, dict[str, float]]] = {}
+    out: dict = {}
     for row in sites.iter_rows(named=True):
         farm_rows = table.filter(pl.col("time_series_id") == row["time_series_id"])
         train = farm_rows.filter(pl.col("valid_time") < BASE_END)
@@ -72,10 +73,10 @@ def main() -> None:
                 .iter_rows(named=True)
             }
             out[row["site"]][f"{label}_in_sample"] = float(
-                subset.filter(pl.col("valid_time") < BASE_END)["below"].mean()
+                np.mean(subset.filter(pl.col("valid_time") < BASE_END)["below"].to_numpy())
             )
             out[row["site"]][f"{label}_out_of_sample"] = float(
-                subset.filter(pl.col("valid_time") >= BASE_END)["below"].mean()
+                np.mean(subset.filter(pl.col("valid_time") >= BASE_END)["below"].to_numpy())
             )
         print(
             row["site"],

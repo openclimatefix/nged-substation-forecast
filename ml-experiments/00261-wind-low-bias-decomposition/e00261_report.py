@@ -29,6 +29,7 @@ EXPECTED_STAGES: Final[tuple[tuple[str, str], ...]] = (
     ("Median of 51 members", "e_members_median"),
 )
 SPEED_EDGES: Final[tuple[float, ...]] = (0, 3, 5, 8, 12, 16, 20, 40)
+"""Edges of the ERA5 100 m speed bins in m/s; the first and last are not used as cut points."""
 SECTORS: Final[int] = 8
 RESAMPLES: Final[int] = 2000
 SEED: Final[int] = 0
@@ -39,13 +40,18 @@ def load(name: str) -> pl.DataFrame:
     """Return one set's stage table with the lead band, speed bin, and direction sector."""
     frame = pl.read_parquet(common.WORK_DIR / f"cases_{name}.parquet")
     angle = (pl.arctan2(pl.col("era5_dir_sin"), pl.col("era5_dir_cos")).degrees() + 360.0) % 360.0
+    edges = np.array(SPEED_EDGES[1:-1])
+    labels = np.array(
+        ["(-inf, 3]", "(3, 5]", "(5, 8]", "(8, 12]", "(12, 16]", "(16, 20]", "(20, inf]"]
+    )
+    bins = np.digitize(frame["era5_speed_100m"].to_numpy(), edges, right=True)
     return frame.with_columns(
+        speed_bin=pl.Series(labels[bins]),
         band=pl.when(pl.col("lead_day") <= 2)
         .then(pl.lit("days 0-2"))
         .when(pl.col("lead_day") <= 6)
         .then(pl.lit("days 3-6"))
         .otherwise(pl.lit("days 7+")),
-        speed_bin=pl.col("era5_speed_100m").cut(list(SPEED_EDGES[1:-1])).cast(pl.String),
         sector=((angle + 180.0 / SECTORS) // (360.0 / SECTORS)).cast(pl.Int32) % SECTORS,
         speed_bias_100m=pl.col("ens_speed_100m") - pl.col("era5_speed_100m"),
         speed_bias_10m=pl.col("ens_speed_10m") - pl.col("era5_speed_10m"),
@@ -53,9 +59,14 @@ def load(name: str) -> pl.DataFrame:
     )
 
 
+def mean_of(series: pl.Series) -> float:
+    """Return the mean of `series` as a float."""
+    return float(np.asarray(series.to_numpy(), dtype=np.float64).mean())
+
+
 def share(*, frame: pl.DataFrame, column: str) -> float:
     """Return the share of rows whose observed power is strictly below the column's median."""
-    return float((frame["actual_norm"] < frame[column]).mean())
+    return mean_of(frame["actual_norm"] < frame[column])
 
 
 def stage_shares(*, frame: pl.DataFrame) -> dict[str, float]:
@@ -85,10 +96,10 @@ def shifts(*, frame: pl.DataFrame) -> dict[str, float]:
     ensemble-mean-wind median, `mixing` the ensemble-mean-wind median minus the mixture median.
     `slope_implied` is the core curve's slope at the ERA5 wind times the 100 m speed bias.
     """
-    total = (frame["q50_oracle"] - frame["q50_stored_r1"]).mean()
-    weather = (frame["q50_oracle"] - frame["q50_mean_wind"]).mean()
-    mixing = (frame["q50_mean_wind"] - frame["q50_stored_r1"]).mean()
-    implied = -(frame["slope_per_m_s"] * frame["speed_bias_100m"]).mean()
+    total = mean_of(frame["q50_oracle"] - frame["q50_stored_r1"])
+    weather = mean_of(frame["q50_oracle"] - frame["q50_mean_wind"])
+    mixing = mean_of(frame["q50_mean_wind"] - frame["q50_stored_r1"])
+    implied = -mean_of(frame["slope_per_m_s"] * frame["speed_bias_100m"])
     return {
         "total": float(total) * SHIFT_POINTS,
         "weather": float(weather) * SHIFT_POINTS,
@@ -131,7 +142,7 @@ def main() -> None:
             for band in ("days 0-2", "days 3-6", "days 7+")
         }
         entry["expected_power_kept"] = {
-            label: float(kept[column].mean()) * SHIFT_POINTS for label, column in EXPECTED_STAGES
+            label: mean_of(kept[column]) * SHIFT_POINTS for label, column in EXPECTED_STAGES
         }
         entry["speed_bias_by_speed_bin"] = {
             row["speed_bin"]: {
@@ -161,7 +172,7 @@ def main() -> None:
             .agg(bias_100m=pl.col("speed_bias_100m").mean())
             .iter_rows(named=True)
         }
-        entry["speed_bias_mean"] = float(kept["speed_bias_100m"].mean())
+        entry["speed_bias_mean"] = mean_of(kept["speed_bias_100m"])
         if name == "scored":
             entry["interval_kept"] = {
                 label: month_bootstrap(
