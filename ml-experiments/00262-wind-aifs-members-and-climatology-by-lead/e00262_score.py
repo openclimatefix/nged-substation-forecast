@@ -106,7 +106,7 @@ def bootstrap(
     return out
 
 
-def main() -> None:  # noqa: PLR0912
+def main() -> None:  # noqa: PLR0912, PLR0915
     """Score every arm present and write the report."""
     sites = common.site_table()
     cases = (
@@ -214,6 +214,9 @@ def main() -> None:  # noqa: PLR0912
         frame_p, _ = arms["M3prev+T"]
         both = frame_p.select(SCORE_KEYS)
         frame_m = arms["M3+T"][0].join(both, on=list(SCORE_KEYS), how="semi")
+        if not frame_m.select(SCORE_KEYS).equals(both):
+            msg = "M3+T and M3prev+T rows are not in the same order"
+            raise ValueError(msg)
         sp, sm = arms["M3prev+T"][1], case_scores(frame=frame_m)
         keep = ~frame_p["masked"].to_numpy() & (frame_p["month"].to_numpy() >= FIRST_SCORED_MONTH)
         report["contrasts"]["D9"] = {

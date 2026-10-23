@@ -264,9 +264,18 @@ def lead_day_weights(
     return weights, table
 
 
+def ensemble_quantiles(*, data: Frame) -> np.ndarray:
+    """Return the ECMWF members' 11 quantiles by the path M0 uses, so M1q at weight 0 equals M0."""
+    return pool_quantiles(
+        atoms=[data.atoms_full[0]],
+        masses=[data.masses_full[0]],
+        weights=np.ones((data.actual.size, 1)),
+    )
+
+
 def quantile_average_weights(*, data: Frame, free_clim: bool) -> tuple[np.ndarray, dict]:
     """Return per-row climatology weights for M1q, by the lowest quantile score on the grid."""
-    q_ens = levels_from_fine(fine=data.fine["ens"])
+    q_ens = ensemble_quantiles(data=data)
     candidates = np.arange(0, 1 + 1e-9, WEIGHT_STEP)
     weights = np.zeros(data.actual.size)
     table: dict = {}
@@ -448,7 +457,7 @@ def main() -> None:
         raw["M1p"] = pooled(w=w, with_clim=True)
         weights_log[f"seed{seed}_M1p"] = table
         wq, table = quantile_average_weights(data=data, free_clim=True)
-        q_ens = levels_from_fine(fine=data.fine["ens"])
+        q_ens = ensemble_quantiles(data=data)
         raw["M1q"] = np.sort((1 - wq[:, None]) * q_ens + wq[:, None] * data.clim, axis=1).astype(
             np.float32
         )
