@@ -1,7 +1,8 @@
 # ruff: noqa: E501
 """Audit checks.
 
-Median minus mean forecast, mean-forecast error contrast, leave-one-site-out harm, and whether L2's loss of matches sits in the load shifts whose onset candidate L2 trained as a negative.
+Median minus mean forecast, mean-forecast error contrast, leave-one-site-out harm, and whether
+L2's loss of matches sits in the load shifts whose onset candidate L2 trained as a negative.
 
     OMP_NUM_THREADS=1 uv run --no-sync python e00302_checks.py | tee printed_checks.txt
 """

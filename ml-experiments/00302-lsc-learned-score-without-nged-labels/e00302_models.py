@@ -2,8 +2,8 @@
 """The learned scores: logistic regression, gradient-boosted tree, small neural network, re-ranker, stack.
 
 All are fitted on injected worlds only (positives) and the real record's unexplained candidates in
-odd months (negatives, inside the same worlds; experiment 195 used even months). Network sizes, stopping epochs, and the stack are
-chosen on separate validation worlds. Inputs are the columns of `FEATURE_NAMES`; no series identifier,
+odd months (negatives, inside the same worlds; experiment 195 used even months). Network sizes,
+stopping epochs, and the stack are chosen on separate validation worlds. Inputs are the columns of `FEATURE_NAMES`; no series identifier,
 no Primary.
 """
 
