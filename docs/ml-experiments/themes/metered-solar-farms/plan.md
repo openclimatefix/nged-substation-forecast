@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 275 | Does training H5 on years of past weather lower the day-ahead score? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
