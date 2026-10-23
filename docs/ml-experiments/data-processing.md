@@ -830,14 +830,15 @@ each row by default and counts the rows that crossed. The scope is the six trial
 the size of the effect.
 
 **Do not read a metered solar farm's coverage at the 0.01 quantile as calibration without checking
-for exact zeros (provisional, medium confidence).** *Applies to: experiments.* Farm D's output is
-exactly zero in 11.7% of the half-hours scored in 2025-09 to 2026-08 (7% in September, 24% to 26% in
-October and November, 44% in December, 49% in January, 0% from April), so every forecast's 0.01
-quantile sits at about zero and the share of half-hours at or below it equals the zero share. The
-pinball loss on those rows is about zero for every arm, so contrasts of pinball loss are not
-distorted. The cause of the zeros (outage, curtailment, or an export limit) is not established.
-Evidence: [experiment 284](00284-metered-farm-tail-head-past-weather/result.md), farm D, 2025-09 to
-2026-08.
+for exact zeros (provisional, medium confidence).** *Applies to: experiments.* Coverage at the 0.01
+quantile is the share of half-hours with output at or below that quantile. Farm D's metered output
+is exactly zero in 11.7% of the half-hours scored in 2025-09 to 2026-08 (7% in September, 24% to 26%
+in October and November, 44% in December, 49% in January, 0% from April), so the 0.01 quantile of
+every arm tested sits at about zero and its coverage equals the zero share. The pinball loss on
+those rows is about zero for every arm, so they add nothing to any contrast but dilute the
+percentage differences; report 0.01 contrasts with and without farm D. The cause of the zeros
+(outage, curtailment, or an export limit) is not established. Evidence: [experiment
+284](00284-metered-farm-tail-head-past-weather/result.md), farm D, 2025-09 to 2026-08.
 
 ## Privacy and anonymisation
 
