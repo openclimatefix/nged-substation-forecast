@@ -1,0 +1,183 @@
+"""T-all fits at monthly and weekly cuts, and their predictions, for experiment 136.
+
+T-all is experiment 114's interaction arm: the heating columns split by day type and by half of the
+hour band, and the lighting columns by day type, with the difference penalty at experiment 114's
+chosen weight. `e00306_design.py` is a copy of experiment 114's design code. A `TallFit` keeps what
+`predict_tall` needs and drops the training matrix, so a year of weekly fits fits in memory.
+"""
+
+import argparse
+import os
+import pickle
+import sys
+import time
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Final
+
+import e00306_common as common
+import e00306_design as design
+import numpy as np
+import polars as pl
+import torch  # ty: ignore[unresolved-import]
+from studies.dp_features import FeatureCache
+from studies.dp_gam import GamFit, GamLayout, design_matrix, pinned_solar_points
+from studies.dp_pinned_capacity import PinnedCapacity, read_vintages
+
+CADENCES: Final[tuple[str, ...]] = ("monthly", "weekly")
+WEEKLY_STEP: Final[timedelta] = timedelta(days=7)
+LAST_WEEKLY_CUT: Final[datetime] = datetime(2026, 6, 29, tzinfo=UTC)
+sys.modules.setdefault("e00136_tall", sys.modules[__name__])
+sys.modules.setdefault("e00136_design", design)
+# Experiment 136's pickled fits name these modules as `e00136_tall` and `e00136_design`.
+FITS_DIR: Final[Path] = common.E136_WORK_DIR / "tall_fits"
+NEW_FITS_DIR: Final[Path] = common.WORK_DIR / "solar_fits"
+
+
+@dataclass(frozen=True)
+class TallFit:
+    """A T-all fit at one site and cut.
+
+    Attributes:
+        site: The substation's label.
+        cut: The cut; no training row ends after it.
+        layout: B0's columns.
+        pinned: The pinned PV capacity.
+        arm: The arm that was fitted.
+        fit: The fitted coefficients.
+    """
+
+    site: str
+    cut: datetime
+    layout: GamLayout
+    pinned: PinnedCapacity
+    arm: design.ArmSpec
+    fit: design.ArmFit
+
+
+def fit_tall(
+    *,
+    cache: FeatureCache,
+    vintages: pl.DataFrame,
+    site: str,
+    cut: datetime,
+    penalty_weight: float,
+    arm_name: str = "t_all",
+) -> TallFit:
+    """Fit T-all, or T-all with solar interaction columns (`arm_name`), at one site and cut."""
+    base = design.build_base(cache=cache, vintages=vintages, site=site, cut=cut)
+    arm = design.SOLAR_ARMS[arm_name]
+    assert arm.penalty_weight == penalty_weight
+    assert base.pinned is not None
+    return TallFit(
+        site=site,
+        cut=cut,
+        layout=base.layout,
+        pinned=base.pinned,
+        arm=arm,
+        fit=design.fit_arm(cache=cache, base=base, arm=arm),
+    )
+
+
+def predict_tall(*, cache: FeatureCache, fit: TallFit, index: np.ndarray) -> np.ndarray:
+    """Predict net power in points at the grid rows `index`: the design times the coefficients.
+
+    Args:
+        cache: The cache whose weather drives the prediction.
+        fit: The T-all fit.
+        index: Grid rows.
+
+    Returns:
+        The predictions, one per row.
+
+    Raises:
+        ValueError: If a row has a non-finite input.
+    """
+    features = cache.sites[fit.site]
+    x0 = design_matrix(cache=cache, features=features, layout=fit.layout, index=index)
+    x = design.arm_matrix(
+        cache=cache, layout=fit.layout, site=fit.site, index=index, x0=x0, arm=fit.arm
+    )
+    if not np.isfinite(x).all():
+        msg = f"{fit.site} has a non-finite input among the rows to predict"
+        raise ValueError(msg)
+    return x @ fit.fit.theta - pinned_solar_points(
+        cache=cache, features=features, pinned=fit.pinned, index=index
+    )
+
+
+def monthly_cuts(*, site: str) -> list[datetime]:
+    """Return the cuts of experiment 111's stored `gamk` fits at a site."""
+    stored: list[GamFit] = pickle.loads((common.FITS_DIR / "gamk" / f"{site}.pkl").read_bytes())
+    return [fit.cut for fit in stored]
+
+
+def cuts_of(*, site: str, cadence: str) -> list[datetime]:
+    """Return a cadence's cuts at a site, starting at the site's first monthly cut."""
+    monthly = monthly_cuts(site=site)
+    if cadence == "monthly":
+        return monthly
+    cuts = []
+    cut = monthly[0]
+    while cut <= LAST_WEEKLY_CUT:
+        cuts.append(cut)
+        cut += WEEKLY_STEP
+    return cuts
+
+
+def fit_path(*, cadence: str, site: str, arm: str = "t_all") -> Path:
+    """Return the file that holds an arm's fits: experiment 136's or this experiment's."""
+    if arm == "t_all":
+        return FITS_DIR / cadence / f"{site}.pkl"
+    return NEW_FITS_DIR / arm / cadence / f"{site}.pkl"
+
+
+def load_fits(*, cadence: str, site: str, arm: str = "t_all") -> list[TallFit]:
+    """Return the stored fits of an arm and cadence at a site, ascending by cut."""
+    return pickle.loads(fit_path(cadence=cadence, site=site, arm=arm).read_bytes())
+
+
+def _job(job: tuple[str, str, str]) -> str:
+    torch.set_num_threads(1)
+    arm, cadence, site = job
+    started = time.monotonic()
+    cache = common.load_cache()
+    vintages = read_vintages()
+    fits = [
+        fit_tall(
+            cache=cache,
+            vintages=vintages,
+            site=site,
+            cut=cut,
+            penalty_weight=common.T_ALL_LAMBDA,
+            arm_name=arm,
+        )
+        for cut in cuts_of(site=site, cadence=cadence)
+    ]
+    target = fit_path(cadence=cadence, site=site, arm=arm)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp")
+    temporary.write_bytes(pickle.dumps(fits))
+    temporary.rename(target)
+    coefficients = [fit.fit.theta[-3:].round(3).tolist() for fit in fits[-1:]]
+    seconds = time.monotonic() - started
+    return f"{arm} {cadence} {site}: {len(fits)} fits, {seconds:.0f} s, last tail {coefficients}"
+
+
+def main() -> None:
+    """Fit the solar-interaction arms at every cut and site in parallel."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--arms", nargs="+", default=["s_both"])
+    parser.add_argument("--sites", nargs="+", default=list(common.SCORED_SITES))
+    args = parser.parse_args()
+    jobs = [(a, "monthly", s) for a in args.arms for s in args.sites]
+    with ProcessPoolExecutor(max_workers=args.workers) as pool:
+        for line in pool.map(_job, jobs):
+            print(line, flush=True)
+
+
+if __name__ == "__main__":
+    main()
