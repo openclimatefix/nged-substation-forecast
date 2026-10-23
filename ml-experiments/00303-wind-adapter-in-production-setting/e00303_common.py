@@ -434,3 +434,13 @@ HINDCAST_DIR: Final[Path] = (
 """Experiment 00259's daily ensemble hindcast member rows, 2024-04-01 to 2025-06-16 (read only)."""
 BASE_END: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
 """Part B's physics core and XGBoost train on ERA5 valid times before this."""
+
+
+ENS_MIX_285_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00285-wind-effective-wind-adapters" / "work" / "ens_mix"
+)
+"""Experiment 00285's member mixtures; P0 (XGBoost on members) is read from here, read only."""
+FINAL_285_DIR: Final[Path] = ENS_MIX_285_DIR.parent / "ens_final"
+"""Experiment 00285's scored quantiles, used only to check that this folder reproduces P0 and P1."""
+MIX_DIR: Final[Path] = WORK_DIR / "mix"
+"""This experiment's member mixtures, `<arm>_s<seed>_<hindcast|scored>_<farm>.npy`."""

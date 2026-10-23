@@ -53,8 +53,16 @@ ADAPTERS: Final[tuple[str, ...]] = (
     "net",
     "net_no_hour",
     "blind",
+    "net_ens",
 )
-NET_INPUT_COUNT: Final[dict[str, int]] = {"net": 7, "net_no_hour": 5, "blind": 1}
+NET_INPUT_COUNT: Final[dict[str, int]] = {"net": 7, "net_no_hour": 5, "blind": 1, "net_ens": 9}
+
+
+def _t(array: "np.ndarray | torch.Tensor | None") -> torch.Tensor:
+    """Return `array` as a float32 tensor, leaving a tensor (possibly on the GPU) as it is."""
+    if isinstance(array, torch.Tensor):
+        return array
+    return torch.as_tensor(array, dtype=torch.float32)
 
 
 def _sigmoid_range(raw: torch.Tensor, low: float, high: float) -> torch.Tensor:
@@ -111,7 +119,10 @@ class WeatherArrays:
         direction_sin: Sine of the 100 m wind direction (needed by `direction_terms`).
         direction_cos: Cosine of the 100 m wind direction.
         group: Integer group of each row (needed by `group_count`).
-        hour: Hour of day (0 to 24) of each row (needed by the `net` adapter).
+        hour: Hour of day (0 to 24) of each row (needed by the `net` and `net_ens` adapters).
+        lead_day: Calendar days from the run to the valid time, divided by 15 (`net_ens` only).
+        spread: The members' standard deviation of the 100 m speed in the row's case, divided by 5
+            (`net_ens` only).
     """
 
     speed_10m: np.ndarray
@@ -121,6 +132,8 @@ class WeatherArrays:
     direction_cos: np.ndarray | None = None
     group: np.ndarray | None = None
     hour: np.ndarray | None = None
+    lead_day: np.ndarray | None = None
+    spread: np.ndarray | None = None
 
     def take(self, index: slice) -> Self:
         """Return the rows in `index`."""
@@ -136,6 +149,8 @@ class WeatherArrays:
             direction_cos=cut(self.direction_cos),
             group=cut(self.group),
             hour=cut(self.hour),
+            lead_day=cut(self.lead_day),
+            spread=cut(self.spread),
         )
 
 
@@ -234,9 +249,9 @@ class WindCore(nn.Module):
 
     def hub_height_speed(self, *, weather: WeatherArrays) -> torch.Tensor:
         """Return the adjusted wind speed at the fitted hub height, in m/s."""
-        speed_10m = torch.as_tensor(weather.speed_10m, dtype=torch.float32)
-        speed_100m = torch.as_tensor(weather.speed_100m, dtype=torch.float32)
-        temperature_c = torch.as_tensor(weather.temperature_c, dtype=torch.float32)
+        speed_10m = _t(weather.speed_10m)
+        speed_100m = _t(weather.speed_100m)
+        temperature_c = _t(weather.temperature_c)
         if self.options.shear:
             usable = (speed_10m > MIN_SHEAR_SPEED_M_S) & (speed_100m > MIN_SHEAR_SPEED_M_S)
             safe_10m = torch.where(usable, speed_10m, torch.ones_like(speed_10m))
@@ -259,8 +274,8 @@ class WindCore(nn.Module):
         )
         speed = speed * (density / common.STANDARD_AIR_DENSITY_KG_M3) ** density_exponent
         if self.options.direction_terms:
-            sin1 = torch.as_tensor(weather.direction_sin, dtype=torch.float32)
-            cos1 = torch.as_tensor(weather.direction_cos, dtype=torch.float32)
+            sin1 = _t(weather.direction_sin)
+            cos1 = _t(weather.direction_cos)
             c = self.direction_coefficients
             harmonics = (
                 c[0] * sin1 + c[1] * cos1 + c[2] * 2 * sin1 * cos1 + c[3] * (cos1**2 - sin1**2)
@@ -273,8 +288,8 @@ class WindCore(nn.Module):
         adapter = self.options.adapter
         if adapter == "none":
             return speed
-        speed_10m = torch.as_tensor(weather.speed_10m, dtype=torch.float32)
-        speed_100m = torch.as_tensor(weather.speed_100m, dtype=torch.float32)
+        speed_10m = _t(weather.speed_10m)
+        speed_100m = _t(weather.speed_100m)
         usable = (speed_10m > MIN_SHEAR_SPEED_M_S) & (speed_100m > MIN_SHEAR_SPEED_M_S)
         ratio = torch.where(
             usable,
@@ -284,8 +299,8 @@ class WindCore(nn.Module):
         if adapter in ("shear_k", "shear_k_sectors"):
             speed = speed * ratio**self.shear_adapter_exponent
         if adapter in ("sectors", "shear_k_sectors"):
-            sin1 = torch.as_tensor(weather.direction_sin, dtype=torch.float32)
-            cos1 = torch.as_tensor(weather.direction_cos, dtype=torch.float32)
+            sin1 = _t(weather.direction_sin)
+            cos1 = _t(weather.direction_cos)
             degrees = torch.rad2deg(torch.atan2(sin1, cos1)) % 360.0
             sector = (
                 torch.floor((degrees + 180.0 / SECTOR_COUNT) / (360.0 / SECTOR_COUNT)).long()
@@ -296,15 +311,17 @@ class WindCore(nn.Module):
             if adapter == "blind":
                 inputs = (speed_100m / 15.0)[:, None]
             else:
-                sin1 = torch.as_tensor(weather.direction_sin, dtype=torch.float32)
-                cos1 = torch.as_tensor(weather.direction_cos, dtype=torch.float32)
+                sin1 = _t(weather.direction_sin)
+                cos1 = _t(weather.direction_cos)
                 temperature = (
-                    torch.as_tensor(weather.temperature_c, dtype=torch.float32) - 10.0
+                    _t(weather.temperature_c) - 10.0
                 ) / 10.0
                 columns = [sin1, cos1, ratio, temperature, (speed_100m / 15.0)]
-                if adapter == "net":
-                    angle = torch.as_tensor(weather.hour, dtype=torch.float32) * (2 * np.pi / 24.0)
+                if adapter in ("net", "net_ens"):
+                    angle = _t(weather.hour) * (2 * np.pi / 24.0)
                     columns += [torch.sin(angle), torch.cos(angle)]
+                if adapter == "net_ens":
+                    columns += [_t(weather.lead_day), _t(weather.spread)]
                 inputs = torch.stack(columns, dim=1)
             raw = self.adapter_net(inputs)
             scale = _sigmoid_range(raw[:, 0], *SCALE_RANGE)

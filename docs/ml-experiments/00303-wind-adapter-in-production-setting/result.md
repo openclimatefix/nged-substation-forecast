@@ -86,7 +86,7 @@ members, in the scored year, against XGBoost plus the offset table.
   lead, and farm) to the best of P2 to P5, chosen on the hindcast score and never on the scored
   year. P7 is P5 with the adapter given only the 100 m speed (experiment 285's blind adapter). P8 is
   XGBoost with the adapter's effective hub-height speed as an extra column, plus the offset table.
-- **Training rows for P4, P5, and P7.** Each hindcast case contributes 6 randomly chosen members, and
+- **Training rows for P4, P5, and P7.** Each hindcast case contributes 10 randomly chosen members (changed from 6 before any result was read, because GPU fits take seconds), and
   the loss is the L1 error of the core's expected power against the observed fraction. Because a
   fitted arm is in sample on the hindcast, P4, P5, and P7 are cross-fitted: three contiguous
   blocks of the hindcast each get predictions from a model fitted on the other two blocks, and the
