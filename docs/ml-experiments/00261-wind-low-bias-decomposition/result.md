@@ -182,9 +182,9 @@ points of the 16-point gap between 50% and 34%.
   farm carries the conclusion.
 - **No quantile-score contrast and no new forecast.** The mean-forecast-error check of experiment
   259 does not apply, and no tail-calibration table applies.
-- **Audit triggers.** None of the seven triggers in the `ml-experiment` skill fired. The planned bias range and the slope conversion missed their predictions, and the
-  input swap explains why (the 10 m wind enters through the shear exponent), so the
-  explanation is tested and recorded here.
+- **Audit triggers.** None of the seven triggers in the `ml-experiment` skill fired. The planned
+  bias range and the slope conversion missed their predictions, and the input swap explains why (the
+  10 m wind enters through the shear exponent), so the explanation is tested and recorded here.
 
 ## Caveats and departures from the plan
 
