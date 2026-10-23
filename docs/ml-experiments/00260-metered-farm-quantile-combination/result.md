@@ -184,3 +184,11 @@ smaller step, and a fit of C2's lower quantiles that does not miss at farms D an
 adjustment of the 0.99 quantile overshoots to 0.9948 coverage and raises the 0.99 pinball loss by
 27%. C2's excess below the 0.01 quantile at farms D and E is not isolated here, and C3 removes it
 only by moving the quantile to zero.
+
+## Data-processing note
+
+Experiment 268 found crossing quantiles in 26,344 of its 77,897 generator-forecast rows (34%), but
+all of them belong to three generators that are not solar farms, so none is on this page.
+[Experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm here, because the fit scripts sorted the 11 quantiles before writing them, so sorting does
+not change the scores on this page.

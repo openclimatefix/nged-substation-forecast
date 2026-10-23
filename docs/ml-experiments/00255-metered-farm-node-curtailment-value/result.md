@@ -201,3 +201,18 @@ a cap is a candidate, since the neural network's gain is in the upper tail that 
 Reproduce with `uv run --no-sync python ml-experiments/00255-*/e00255_report.py` and then
 `e00255_charts.py`. The printed report is in
 `data/ml-experiments/00255-metered-farm-node-curtailment-value/report.md`.
+
+## Data-processing note
+
+Crossing quantiles affected this experiment's scores, though not the six solar farms' forecasts.
+Three generators that are not solar farms store a forecast with 9 quantiles (0.05 to 0.95) and no
+0.01 or 0.99 quantile. The scorer padded the two missing columns with nulls, and the step that caps
+every quantile at the generator's capacity (`pl.min_horizontal`) turned each null into the capacity.
+The 0.01 quantile therefore sat at capacity, above the 0.05 quantile, in 26,344 of 77,897
+generator-forecast rows (34%), in every forecast arm, and the farms' own rows have none. [Experiment
+268](../00268-lsc-curtailment-metric-v2-member-wise-ens/result.md) re-scored with the quantiles
+sorted first: avoidable cost moves by -3.66% (climatology), -1.90% (manual heuristic), +1.08%
+(XGBoost), +0.72% (H5), +0.62% (plant), and -0.59% (H5 with zero history), and H5 minus XGBoost
+moves from GBP -62,407 to -69,766. Sorting only moves the capacity-valued 0.01 quantile to the top
+of the row, so filling the missing 0.01 and 0.99 quantiles from the 0.05 and 0.95 quantiles is the
+cleaner repair.
