@@ -1,9 +1,10 @@
 """Where the net annual loss of the LR_b20 mask comes from: the alarms that cost the most.
 
-For each series, scores K0 and the LR_b20 arm of every fold on every row, sums the score
-difference of that span's own fold (weighted 1/|folds|) over the rows whose target lies inside each LR_b20 span (from the step stamp to the
-end of the span's last known stamp plus 72 hours), and lists the spans with the largest total, with
-the length of the span and whether a labelled load shift or a logged closure overlaps it.
+For each series, scores K0 and the LR_b20 arm of every fold on every row. For each LR_b20 span it
+sums the score difference of that span's own fold (weighted 1/|folds|) over the rows whose target
+lies inside the span (from the step stamp to the end of the span's last known stamp plus 72 hours).
+It lists the spans with the largest total, with the length of the span and whether a labelled load
+shift or a logged closure overlaps it.
 
     uv run --no-sync python e00258_net_loss.py
 """

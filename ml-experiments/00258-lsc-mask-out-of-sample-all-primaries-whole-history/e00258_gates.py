@@ -76,14 +76,14 @@ def gate_g1() -> dict:
     def gain(frame: pl.DataFrame) -> float:
         k0 = frame.filter(pl.col("arm") == "K0")
         oracle = frame.filter(pl.col("arm") == "ORACLE")
-        return float(k0["qs"].sum() / k0["n"].sum() - oracle["qs"].sum() / oracle["n"].sum())
+        return float(k0["qs"].sum() / k0["n"].sum() - oracle["qs"].sum() / oracle["n"].sum())  # ty: ignore[unsupported-operator]
 
     out = {
         "pairs": pairs.height,
         "load_shifts": int(pairs["card"].n_unique()),
         "rows": int(sums.filter(pl.col("arm") == "K0")["n"].sum()),
         "k0_score": float(
-            sums.filter(pl.col("arm") == "K0")["qs"].sum()
+            sums.filter(pl.col("arm") == "K0")["qs"].sum()  # ty: ignore[unsupported-operator]
             / sums.filter(pl.col("arm") == "K0")["n"].sum()
         ),
         "gain_all_leads": gain(sums),
@@ -193,7 +193,7 @@ def diagnostic() -> None:
         "spread_x1.5": {"spread_scale": 1.5},
         "scored_year_only": {"first_stamp": SCORED_FIRST_STAMP},
     }.items():
-        results[name] = gate_g2(**kwargs)
+        results[name] = gate_g2(**kwargs)  # ty: ignore[invalid-argument-type]
         print("G2 diagnostic", name, json.dumps(results[name], indent=1), flush=True)
     (h.HARNESS_DIR / "g2_spread_diagnostic.json").write_text(json.dumps(results, indent=1))
 

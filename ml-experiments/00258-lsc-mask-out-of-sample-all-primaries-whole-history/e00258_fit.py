@@ -53,7 +53,7 @@ def main(series: int) -> None:
     offsets = h.fit_offsets(data=data, k0=arms["K0"], band=band)
     h.HARNESS_DIR.mkdir(parents=True, exist_ok=True)
     tmp = h.HARNESS_DIR / f"series_{series}.tmp.npz"
-    np.savez(tmp, origins=origins, offsets=offsets, folds=np.array(folds), **arms)
+    np.savez(tmp, origins=origins, offsets=offsets, folds=np.array(folds), **arms)  # ty: ignore[invalid-argument-type]
     tmp.rename(h.HARNESS_DIR / f"series_{series}.npz")
     pl.DataFrame(
         span_rows,

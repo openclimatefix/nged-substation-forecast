@@ -136,7 +136,7 @@ def month_bootstrap(*, cells: pl.DataFrame, n_draws: int, rng: np.random.Generat
     for base in BASES:
         diff = np.array(
             [
-                cells.filter((pl.col("year_month") == m) & (pl.col("base") == base))["qs"].sum()
+                cells.filter((pl.col("year_month") == m) & (pl.col("base") == base))["qs"].sum()  # ty: ignore[unsupported-operator]
                 - cells.filter((pl.col("year_month") == m) & (pl.col("base") == "K0"))["qs"].sum()
                 for m in months
             ]
@@ -212,7 +212,9 @@ def main() -> None:
     per_shift.write_parquet(OUT / "after_per_shift.parquet")
     positive = per_shift.filter(pl.col("gain_ORACLE") > 0)
     report["median_share"] = {
-        b: float(positive[f"share_{b}"].median()) for b in BASES if b != "ORACLE"
+        b: float(positive[f"share_{b}"].median())  # ty: ignore[invalid-argument-type]
+        for b in BASES
+        if b != "ORACLE"
     }
     print(
         f"median per-shift share (shifts where ORACLE gains, n={positive.height}):",
@@ -304,7 +306,7 @@ def main() -> None:
     print(pooled)
     report["net_annual"] = pooled.to_dicts()
     overall = {
-        b: float((net[b] - net["K0"]).sum() / net["n"].sum())
+        b: float((net[b] - net["K0"]).sum() / net["n"].sum())  # ty: ignore[unsupported-operator]
         for b in ("LR_b20", "LR_b80", "RO_b80", "HALF", "GAM_ONLY", "ORACLE")
     }
     report["net_overall"] = overall
@@ -347,18 +349,18 @@ def main() -> None:
                 "arm": base,
                 "n": int(n),
                 **{
-                    f"below_q{h.LEVELS[i]:.2f}": float(arm_rows[f"below_{i}"].sum() / n)
+                    f"below_q{h.LEVELS[i]:.2f}": float(arm_rows[f"below_{i}"].sum() / n)  # ty: ignore[unsupported-operator]
                     for i in sc.TAIL_LEVELS
                 },
                 **{
-                    f"pin_q{h.LEVELS[i]:.2f}": float(arm_rows[f"pin_{i}"].sum() / n)
+                    f"pin_q{h.LEVELS[i]:.2f}": float(arm_rows[f"pin_{i}"].sum() / n)  # ty: ignore[unsupported-operator]
                     for i in sc.TAIL_LEVELS
                 },
-                "err_mean": float(arm_rows["err_mean"].sum() / n),
-                "err_median": float(arm_rows["err_median"].sum() / n),
-                "abs_mean": float(arm_rows["abs_mean"].sum() / n),
-                "abs_median": float(arm_rows["abs_median"].sum() / n),
-                "qs": float(arm_rows["qs"].sum() / n),
+                "err_mean": float(arm_rows["err_mean"].sum() / n),  # ty: ignore[unsupported-operator]
+                "err_median": float(arm_rows["err_median"].sum() / n),  # ty: ignore[unsupported-operator]
+                "abs_mean": float(arm_rows["abs_mean"].sum() / n),  # ty: ignore[unsupported-operator]
+                "abs_median": float(arm_rows["abs_median"].sum() / n),  # ty: ignore[unsupported-operator]
+                "qs": float(arm_rows["qs"].sum() / n),  # ty: ignore[unsupported-operator]
             }
         )
     odd = ordinary.filter((pl.col("variant") == "ordinary") & pl.col("odd"))
@@ -371,18 +373,18 @@ def main() -> None:
                 "arm": base,
                 "n": int(n),
                 **{
-                    f"below_q{h.LEVELS[i]:.2f}": float(arm_rows[f"below_{i}"].sum() / n)
+                    f"below_q{h.LEVELS[i]:.2f}": float(arm_rows[f"below_{i}"].sum() / n)  # ty: ignore[unsupported-operator]
                     for i in sc.TAIL_LEVELS
                 },
                 **{
-                    f"pin_q{h.LEVELS[i]:.2f}": float(arm_rows[f"pin_{i}"].sum() / n)
+                    f"pin_q{h.LEVELS[i]:.2f}": float(arm_rows[f"pin_{i}"].sum() / n)  # ty: ignore[unsupported-operator]
                     for i in sc.TAIL_LEVELS
                 },
-                "err_mean": float(arm_rows["err_mean"].sum() / n),
-                "err_median": float(arm_rows["err_median"].sum() / n),
-                "abs_mean": float(arm_rows["abs_mean"].sum() / n),
-                "abs_median": float(arm_rows["abs_median"].sum() / n),
-                "qs": float(arm_rows["qs"].sum() / n),
+                "err_mean": float(arm_rows["err_mean"].sum() / n),  # ty: ignore[unsupported-operator]
+                "err_median": float(arm_rows["err_median"].sum() / n),  # ty: ignore[unsupported-operator]
+                "abs_mean": float(arm_rows["abs_mean"].sum() / n),  # ty: ignore[unsupported-operator]
+                "abs_median": float(arm_rows["abs_median"].sum() / n),  # ty: ignore[unsupported-operator]
+                "qs": float(arm_rows["qs"].sum() / n),  # ty: ignore[unsupported-operator]
             }
         )
     tail_frame = pl.DataFrame(tails)

@@ -279,6 +279,11 @@ def k0_correction(*, trace: CorrectionTrace, band: np.ndarray) -> np.ndarray:
 def fit_offsets(*, data: SeriesData, k0: np.ndarray, band: np.ndarray) -> np.ndarray:
     """The 11 quantile offsets of the no-mask residual per hour band and lead band, odd months only.
 
+    Args:
+        data: The series' readings and GAM forecast.
+        k0: The no-mask correction at every (origin, lead) pair.
+        band: The hour band of every grid half-hour.
+
     Returns:
         An array of shape (4, 3, 11): the residual's quantiles at `LEVELS`, in points.
     """

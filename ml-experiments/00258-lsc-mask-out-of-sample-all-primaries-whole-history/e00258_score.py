@@ -10,8 +10,10 @@ difference in the location of the forecast only. Sums are stored per group, not 
 - `after_<s>.parquet`: the same sums for the 72 hours of target time after each labelled load
   shift ends, per load shift, lead band, and arm.
 
+```bash
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         env OMP_NUM_THREADS=1 uv run --no-sync python e00258_score.py 10 3
+```
 """
 
 from __future__ import annotations
