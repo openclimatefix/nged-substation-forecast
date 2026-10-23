@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 import e00295_common as c
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from e00295_segment import STEP_SIZES, delta_of
 from studies.dp_ens_weather import replace_site
 from studies.dp_features import FeatureCache, naive_utc
@@ -28,7 +28,16 @@ from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
 WINDOW = TrainingWindow(months=24)
 MONTHS_AFTER = 6
 TRAILING_DAYS = 60
-EVEN_ONSETS = [(2021, 10), (2021, 12), (2022, 6), (2022, 12), (2024, 2), (2024, 8), (2025, 4), (2025, 10)]
+EVEN_ONSETS = [
+    (2021, 10),
+    (2021, 12),
+    (2022, 6),
+    (2022, 12),
+    (2024, 2),
+    (2024, 8),
+    (2025, 4),
+    (2025, 10),
+]
 _STATE: dict = {}
 
 
@@ -50,9 +59,12 @@ def one_cut(
     if len(target) == 0:
         return {}
     fit = fit_gam(
-        cache=cache, site=site,
+        cache=cache,
+        site=site,
         specs=[GamSpec(ridge=c.RIDGE, drift="none", capacity="fitted", final_knot="free")],
-        cut=cut, window=WINDOW, season_years=c.SEASON_YEARS,
+        cut=cut,
+        window=WINDOW,
+        season_years=c.SEASON_YEARS,
     )
     y = cache.sites[site].y
     residual = y[insample] - predict_gam(cache=cache, fit=fit, index=insample)
@@ -93,10 +105,21 @@ def scenario_rows(
         cut = add_months(moment=first, months=k)
         if cut >= c.END_OF_DATA:
             break
-        result = one_cut(cache=cache, site=site, cut=cut, config=config, rows=rows)
+        try:
+            result = one_cut(cache=cache, site=site, cut=cut, config=config, rows=rows)
+        except ValueError:  # the Primary has no training rows before this cut
+            continue
         if result:
-            out.append({"site": site, "scenario": label, "onset": str(onset.date()),
-                        "cut": str(cut.date()), "month_after": k + 1, **result})
+            out.append(
+                {
+                    "site": site,
+                    "scenario": label,
+                    "onset": str(onset.date()),
+                    "cut": str(cut.date()),
+                    "month_after": k + 1,
+                    **result,
+                }
+            )
     return out
 
 
@@ -110,19 +133,32 @@ def _job(site: str) -> str:
     rows: list[dict] = []
     if site == "D8":
         rows += scenario_rows(
-            cache=cache, site=site, label="real_d8", onset=datetime(2023, 8, 15, tzinfo=UTC),
+            cache=cache,
+            site=site,
+            label="real_d8",
+            onset=datetime(2023, 8, 15, tzinfo=UTC),
             config=config,
         )
     else:
         for year, month in EVEN_ONSETS:
             onset = datetime(year, month, 1, tzinfo=UTC)
+            year_before = (cache.end_times <= naive_utc(moment=onset)) & (
+                cache.end_times > naive_utc(moment=onset) - np.timedelta64(365, "D")
+            )
+            if np.isfinite(cache.sites[site].y[year_before]).sum() < 0.5 * 17520:
+                continue  # less than half a year of readings before this onset
             for size in STEP_SIZES:
                 for shape in ("flat", "share"):
-                    delta = delta_of(cache=cache, site=site, onset=onset, kind=shape, size=size, days=None)
+                    delta = delta_of(
+                        cache=cache, site=site, onset=onset, kind=shape, size=size, days=None
+                    )
                     injected = replace_site(cache=cache, site=site, y=cache.sites[site].y + delta)
                     rows += scenario_rows(
-                        cache=injected, site=site, label=f"persistent_{shape}_{size:.2f}",
-                        onset=onset, config=config,
+                        cache=injected,
+                        site=site,
+                        label=f"persistent_{shape}_{size:.2f}",
+                        onset=onset,
+                        config=config,
                     )
     frame = pl.DataFrame(rows, infer_schema_length=None)
     temporary = target.with_name(f"{target.name}.{os.getpid()}.tmp")
@@ -140,7 +176,7 @@ def main() -> None:
     (c.EXPERIMENT_DIR / "gain").mkdir(parents=True, exist_ok=True)
     chosen = json.loads((c.EXPERIMENT_DIR / "chosen_config.json").read_text())
     _STATE["config"] = (float(chosen["beta"]), int(chosen["min_length"]))
-    _STATE["cache"] = cache = c.load_cache()
+    _STATE["cache"] = c.load_cache()
     states = json.loads((c.EXPERIMENT_DIR / "usable_sites.json").read_text())
     sites = args.sites or states
     context = multiprocessing.get_context("fork")

@@ -1,8 +1,8 @@
-"""Residual, daily series, penalised segmentation, and boundary labelling for experiment 295."""
+"""Residual, daily distribution features, penalised segmentation, and boundary labelling."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -103,7 +103,9 @@ def daily_series(*, end_times: np.ndarray, residual: np.ndarray) -> DailySeries:
     n = len(unique)
     count = np.bincount(inverse, minlength=n)
     sigma_h = float(1.4826 * np.median(np.abs(residual - np.median(residual))))
-    dip = np.bincount(inverse, weights=(residual < -DIP_SIGMAS * sigma_h).astype(float), minlength=n)
+    dip = np.bincount(
+        inverse, weights=(residual < -DIP_SIGMAS * sigma_h).astype(float), minlength=n
+    )
     order = np.argsort(inverse, kind="stable")
     edges = np.concatenate([[0], np.cumsum(count)])
     p05 = np.full(n, np.nan)
@@ -268,7 +270,7 @@ def label_boundaries(
             label = "unconfirmed"
         else:
             label = "persistent"
-        out.append(Boundary(**{**b.__dict__, "label": label}))
+        out.append(replace(b, label=label))
     return out
 
 
