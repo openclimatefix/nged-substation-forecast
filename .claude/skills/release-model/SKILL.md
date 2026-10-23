@@ -48,7 +48,7 @@ experiments 00001 and 00002 is an example. Such a candidate goes through `plan-i
 build, and it joins a later release.
 
 The maintainer picks the candidates for the release. The output is that list, written into the
-planned `result.md` of the combination experiment in step 1.
+planned `result.md` of the research-default experiment in step 1.
 
 ## Step 1: test the current research default against the production recipe
 
@@ -87,9 +87,9 @@ release-log row which holdout months the decision read, and do not reuse a holdo
 selection: a month may confirm one release only. When the holdout is spent, roll it forward to the
 newest unseen months.
 
-**A winner that fails in combination is dropped from the release, or deferred.** The release plan
-lists each dropped winner with its reason, and the maintainer reviews that list when approving the
-plan. The combination experiment sets its own `production_status` to `not-for-production`, because
+**A component that fails against production is dropped from the release, or deferred.** The release plan
+lists each dropped component with its reason, and the maintainer reviews that list when approving the
+plan. The research-default experiment sets its own `production_status` to `not-for-production`, because
 the experiment is a diagnostic, so it never appears as a candidate. The output is the final release
 set and the combined effect size.
 
@@ -103,7 +103,7 @@ with the five triggers that `plan-issue` lists, and write one line for each. The
 - lists each PR's tests;
 - names every PR that changes a data contract or the serving path, because the maintainer approves
   those before any code is written;
-- records the dropped winners from step 1;
+- records the dropped components from step 1;
 - states the gate tolerances of step 4, the numeric coverage bounds, the rule for beating
   `climatology`, and the rollback trigger of step 7, and says whether the release retrains every
   series, which decides whether the release needs to be a release of its own.
@@ -169,4 +169,4 @@ scores on the same days, and check the degradation records.** Use a shadow run o
 release where one is available. The plan states the rollback trigger in advance, and
 `docs/live_service/operations.md` gives the rollback recipe and says where to read the live
 forecasts and the degradation records. Note any degradation record, or any forecast that differs
-from the combination experiment's predictions, in the tracking issue, which then closes.
+from the research-default experiment's predictions, in the tracking issue, which then closes.

@@ -101,7 +101,8 @@ absolute score against the three benchmarks, with intervals, because a chain of 
 hide a drift in absolute skill. Diagnostic pages need not report them.
 
 **For Primary demand the frozen reference is BG2.** BG2 is the stored arm `p_s6_bg2` of experiment
-87. It is a quantile blend of five forecasts, with an explicit solar offset at the 5 of 16 Primaries
+87. BG2 is a quantile blend of five forecasts, with an explicit solar offset at the 5 of 16
+    Primaries
 that have a clean solar capacity estimate. The five forecasts are a weekly-refitted XGBoost model, a
 monthly-refitted XGBoost model, an analogue model (the experiment 87 page does not state its type),
 an XGBoost model pooled by substation type, and the frozen stack of experiment 48. For the bulk and
@@ -141,9 +142,10 @@ single seed ([experiments 201 and 220](00220-dp-bg-stage4-assembly-with-drop-one
 "more seeds" would otherwise adopt as a change.
 
 **Each version's stored forecasts are written once and never overwritten.** Several worktrees share
-one `data/` folder, and an earlier re-run has already clobbered another session's evidence.
-Experiments in flight read Primary demand research default 3 while research default 4 is being
-built. Each version is written once with `experiment_store.write_predictions` under the adopting
+one `data/` folder,, and a re-run by one session would replace the evidence of another.
+Experiments in flight read Primary demand research default N while Primary demand research
+default N+1 is being built. Each version is written once with `experiment_store.write_predictions`
+under the adopting
 experiment's id and a fixed name. Where a refit is needed to reproduce the default, the reproduction
 uses the default's cadence exactly, because refit cadence is itself a contrast (experiment 278).
 
@@ -204,7 +206,7 @@ serve as the next version without a separate regeneration job.
 adopted.** Candidates are retested when the missing evidence arrives, or when a rebase run is
 available.
 
-**The 99% interval is closer to a 96% interval.** In a check run for this rule, a percentile
+**The nominal 99% interval covers less than 99% on short periods.** A percentile
 bootstrap that resampled independent normal months with a nominal 99% interval covered 96.5% of the
 time at 12 months, 92.0% at 6 months, and 83.7% at 4 months (1,500 trials of 2,000 resamples each).
 The real procedure also resamples seeds and has autocorrelated months, so the figures are
@@ -243,7 +245,8 @@ the holdout months' cumulative gain lies below half of the cumulative gain on th
 months. A month read for a decision, or for a pause investigation, joins the scored months, and the
 holdout rolls forward as new months arrive. In a simulation of a 12-month scored year and a 4-month
 holdout, the check paused the family after 29% of false adoptions, 7% of adoptions with a true gain
-of 2 standard errors, and 3% of adoptions with a true gain of 3 standard errors. It understates the
+of 2 standard errors, and 3% of adoptions with a true gain of 3 standard errors. The check
+understates the
 chance of a pause for a change whose effect is seasonal.
 
 ## Several arms, post hoc arms, and experiments planned before the rule
@@ -259,14 +262,17 @@ the best variant needs replication on its own after the Bonferroni read.
 
 **Experiments planned before the rule are grandfathered, and their winners reach the research
 default only through a rebase run.** Their front matter has no `kind`, and `experiment_tables.py
---check` accepts its absence for an experiment whose id is below the cut-off. A proposal with no
+--check` accepts its absence for an experiment whose id is below the cut-off id of 320. A proposal
+with no
 plan commit yet is re-planned as `kind: change` where it tests a change.
 
 ## The rebase rule for stale results
 
 **A result measured against an older version stays valid as an estimate of x on that version, but it
-answers a stale question.** The estimate (research default 3 plus x, minus research default 3) is
-still correct for research default 3. It is not an estimate of x on research default 4. Adoption one
+answers a stale question.** The estimate (Primary demand research default 3 plus x, minus Primary
+demand research default 3)
+is still correct for Primary demand research default 3. The estimate does not apply to x on Primary
+demand research default 4. Adoption one
 change at a time is path-dependent: a change that failed against one version may pass against a
 later one, and two changes that act on the same error can both win alone while only the first to
 merge adopts. The two gains of experiment 220 added to a stacking ratio of 0.99, while the drift
@@ -306,7 +312,7 @@ an upper bound". A result against an old version keeps its verdict with the stat
 superseded` on its experiment.
 
 **Adoption needs the maintainer's approval in four cases.** These are a new data source, a cost
-above 30 pounds sterling or a recurring cost in production, a change that would need a serving-path
+above £30 or a recurring cost in production, a change that would need a serving-path
 change to port, and a change whose code must enter `packages/studies`. Other adoptions run
 autonomously under the merge rules in the `ml-experiment` skill.
 

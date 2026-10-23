@@ -110,11 +110,11 @@ experiment's own branch, and do not open a pull request for it. Its front matter
 `invalid`, or `failed`), `best_arm` with its headline number, `headline`, `lessons`,
 `take_home_message`, and `advice` (below). A finished experiment also has `production_status`
 (`candidate`, `adopted`, `superseded`, or `not-for-production`) and `adopted_in` (the model release
-number, or `none`). The optional `kind` is `change` (the experiment asks whether a research default
-plus x beats the research default) or `other`, and the optional `promoted_to` names the version of the
-research default that the experiment created, such as "Primary demand research default 2".
-`experiment_tables.py --check` accepts both fields' absence for an experiment whose id is below 320,
-which was planned before the rule. Every result has the same front matter, so a later session finds
+number, or `none`). `kind` is `change` (the experiment asks whether a research default plus x
+beats the research default) or `other`, and it is required from id 320 up. `promoted_to` is always optional, needs
+`kind: change`, and names the version of the research default that the experiment created, such as
+"Primary demand research default 2". The field name keeps the word "promoted" although the rule
+avoids it. Every result has the same front matter, so a later session finds
 results with `grep` over `docs/ml-experiments/*/result.md`.
 
 **`theme` names exactly one theme folder under `docs/ml-experiments/themes/`, and `also_relevant_to`
@@ -306,8 +306,11 @@ or a minimum gain into the plan for a `change` experiment, because the family de
 **`small gain` is the verdict for an interval that excludes zero in the predicted direction but falls
 under the stated threshold.** It is not `inconclusive`, because the direction is established. The
 write-up says how large the gain is and what the change costs, and the experiment is flagged
-`candidate`. A candidate is retested against the current research default, as the rule's rebase
-section says, and is not stacked with other candidates in a combination experiment.
+`candidate`. A change that wins on the gain condition but is not adopted is also a "candidate" in
+the research-default rule's sense, which is separate from `production_status: candidate` and from
+`production_status: adopted`, which mean production. The rule's rebase section says how a candidate
+is retested against the current research default, and a candidate is not stacked with other
+candidates in a combination experiment.
 
 ## When a winner reaches production
 

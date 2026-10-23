@@ -166,7 +166,7 @@ def validate_experiments(*, experiments: Sequence[Experiment], experiments_dir: 
                     )
                 )
         kind = fields.get("kind")
-        if kind is not None and kind not in KINDS:
+        if kind is not None and (not isinstance(kind, str) or kind not in KINDS):
             errors.append(_error(experiment, f"`kind` {kind!r} is not one of {sorted(KINDS)}"))
         if kind is None and experiment.number >= FIRST_ID_NEEDING_KIND:
             errors.append(_error(experiment, "missing `kind`"))
