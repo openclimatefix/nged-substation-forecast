@@ -47,13 +47,15 @@ FactorType = Literal["daytype", "subband", "parity_halfhour", "parity_day"]
 """How rows are split into two groups: weekday against other days, the first against the second
 half of the hour band, or (as placebos with no time-of-day or weekly structure) even against odd
 local half-hours of the day, or even against odd days of the year."""
-ExtraType = Literal["a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw"]
+ExtraType = Literal["a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw", "a3c"]
 """The change an arm makes to T-all."""
-EXTRA_TYPES: Final[tuple[ExtraType, ...]] = ("a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw")
+EXTRA_TYPES: Final[tuple[ExtraType, ...]] = ("a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw", "a3c")
 LINEAR_EXTRAS: Final[tuple[str, ...]] = ("a1", "a2", "a2w")
-NETWORK_EXTRAS: Final[tuple[str, ...]] = ("a3", "a3nw", "a3b", "a3bnw")
-WIND_NETWORKS: Final[tuple[str, ...]] = ("a3", "a3b")
-FULL_INPUT_NETWORKS: Final[tuple[str, ...]] = ("a3b", "a3bnw")
+NETWORK_EXTRAS: Final[tuple[str, ...]] = ("a3", "a3nw", "a3b", "a3bnw", "a3c")
+WIND_NETWORKS: Final[tuple[str, ...]] = ("a3", "a3b", "a3c")
+FULL_INPUT_NETWORKS: Final[tuple[str, ...]] = ("a3b", "a3bnw", "a3c")
+BLOCK_VALIDATION_NETWORKS: Final[tuple[str, ...]] = ("a3c",)
+"""A3c validates on every fifth calendar month of the training window, not the last 15% of rows."""
 """The post hoc networks, which also read A0's four trailing-mean temperatures and train longer."""
 POST_HOC_EPOCHS: Final[int] = 200
 POST_HOC_LEARNING_RATE: Final[float] = 1e-2
@@ -687,6 +689,9 @@ def fit_arm(
             own_heating=own[finite],
             target=(y - x @ theta)[finite],
             use_wind=arm.extra in WIND_NETWORKS,
+            blocks=base.month_of_row[ok][finite]
+            if arm.extra in BLOCK_VALIDATION_NETWORKS
+            else None,
             **network_training(extra=arm.extra),
         )
     residual = y - x @ theta

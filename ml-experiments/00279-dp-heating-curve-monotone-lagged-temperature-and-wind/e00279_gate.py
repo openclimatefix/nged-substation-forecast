@@ -33,7 +33,7 @@ from studies.dp_features import FeatureCache
 from studies.dp_gam import pinned_solar_points
 
 GATE_SITES: Final[tuple[str, ...]] = ("D10", "D14")
-GATE_ARMS: Final[tuple[str, ...]] = ("t_all", "a1", "a2", "a3b")
+GATE_ARMS: Final[tuple[str, ...]] = ("t_all", "a1", "a2", "a3b", "a3c")
 LAG_WEIGHTS: Final[tuple[float, float, float]] = (0.5, 0.3, 0.2)
 CURVE_SLOPE: Final[float] = 3.0
 KNEE_COLD_C: Final[float] = 3.0

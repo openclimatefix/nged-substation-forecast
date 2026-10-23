@@ -33,6 +33,9 @@ PATIENCE: Final[int] = 8
 BATCH: Final[int] = 2048
 VALIDATION_SHARE: Final[float] = 0.15
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
+VALIDATION_BLOCK_PERIOD: Final[int] = 5
+VALIDATION_BLOCK_PHASE: Final[int] = 4
+"""With month blocks, every fifth calendar month of the training window is held out."""
 N_GROUPS: Final[int] = 16
 THRESHOLD_C: Final[float] = 15.5
 REFERENCE_C: Final[float] = 18.0
@@ -162,6 +165,7 @@ def fit_network(
     distil_epochs: int = DISTIL_EPOCHS,
     epochs: int = MAX_EPOCHS,
     learning_rate: float = LEARNING_RATE,
+    blocks: np.ndarray | None = None,
 ) -> Fitted:
     """Train one network per seed: first on `own_heating`, then on `target`.
 
@@ -175,13 +179,21 @@ def fit_network(
         distil_epochs: Epochs spent reproducing `own_heating`.
         epochs: Maximum epochs spent on `target`.
         learning_rate: The Adam learning rate.
+        blocks: The calendar-month index of each row; if given, rows whose block modulo
+            `VALIDATION_BLOCK_PERIOD` is `VALIDATION_BLOCK_PHASE` are the validation rows, so that
+            the validation rows span every season, and otherwise the last 15% of rows are.
 
     Returns:
         The trained networks.
     """
     torch.set_num_threads(1)
-    n = len(x)
-    split = int(n * (1.0 - VALIDATION_SHARE))
+    if blocks is not None:
+        held = blocks % VALIDATION_BLOCK_PERIOD == VALIDATION_BLOCK_PHASE
+        order = np.concatenate([np.flatnonzero(~held), np.flatnonzero(held)])
+        x, group, own_heating, target = x[order], group[order], own_heating[order], target[order]
+        split = int((~held).sum())
+    else:
+        split = int(len(x) * (1.0 - VALIDATION_SHARE))
     n_temperatures = x.shape[1] - int(use_wind)
     x_t = torch.as_tensor(x, dtype=torch.float32)
     group_t = torch.as_tensor(group, dtype=torch.int64)

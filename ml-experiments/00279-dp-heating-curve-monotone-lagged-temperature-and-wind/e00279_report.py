@@ -32,7 +32,7 @@ from studies.experiment_store import losses_for_bootstrap
 DECISION: Final[tuple[str, ...]] = common.DECISION_SITES
 KEYS: Final[list[str]] = ["time_series_id", "power_fcst_init_time", "valid_time", "seed"]
 REFERENCE: Final[str] = "t_all_k"
-ARMS: Final[tuple[str, ...]] = ("a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw")
+ARMS: Final[tuple[str, ...]] = ("a1", "a2", "a2w", "a3", "a3nw", "a3b", "a3bnw", "a3c")
 COLD_DAY_MEAN_C: Final[float] = 3.0
 NIGHT_START_HOUR: Final[int] = 22
 NIGHT_END_HOUR: Final[int] = 8
@@ -363,7 +363,7 @@ def curve_slopes() -> dict[str, Any]:
         return {}
     grid = np.arange(-4.0, 18.5, 1.0)
     out: dict[str, Any] = {}
-    for variant in ("a3", "a3nw", "a3b", "a3bnw"):
+    for variant in ("a3", "a3nw", "a3b", "a3bnw", "a3c"):
         for site, arms in curves.items():
             if variant not in arms:
                 continue
@@ -409,13 +409,25 @@ def main() -> None:
             name="C10 A3b-A3bnw (post hoc)", treatment="a3b_k", reference="a3bnw_k"
         ),
     }
+    contrasts["C11"] = contrast_line(name="C11 A3c-A0 (post hoc)", treatment="a3c_k")
+    contrasts["C12"] = contrast_line(
+        name="C12 A3c-A2 (post hoc)", treatment="a3c_k", reference="a2_k"
+    )
     numbers["contrasts"] = contrasts
     numbers["labels"] = {
         "C1": label_of(record=contrasts["C1"], threshold=THRESHOLD_A1_A2),
         "C2": label_of(record=contrasts["C2"], threshold=THRESHOLD_A1_A2),
         "C3": label_of(record=contrasts["C3"], threshold=THRESHOLD_A3),
         "C7": label_of(record=contrasts["C7"], threshold=THRESHOLD_A3),
+        "C11": label_of(record=contrasts["C11"], threshold=THRESHOLD_A3),
     }
+    gate = json.loads((common.WORK_DIR / "gate.json").read_text())["verdicts"]
+    numbers["gate"] = gate
+    if not all(v for k, v in gate.items() if k.endswith("_curved")):
+        numbers["labels_after_gate"] = {
+            k: ("inconclusive" if k in ("C7", "C11") else v) for k, v in numbers["labels"].items()
+        }
+        print("gate failed on a curved truth; network labels capped:", numbers["labels_after_gate"])
     print("labels:", numbers["labels"])
     numbers["tails"] = tails()
     numbers["median_minus_mean"] = median_minus_mean()
