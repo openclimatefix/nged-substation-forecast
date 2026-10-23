@@ -3,8 +3,8 @@
 
 Run every script with experiments 278 and 311 on `PYTHONPATH`:
 
-    PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-*:ml-experiments/00314-* \
-        uv run --no-sync python <script>
+    export PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-*:ml-experiments/00314-*
+    uv run --no-sync python <script>
 """
 
 from pathlib import Path

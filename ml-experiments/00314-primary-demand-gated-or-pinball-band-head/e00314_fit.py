@@ -11,8 +11,8 @@ held out for early stopping. The head is a monotone quantile network on
 `(actual - arm D mean) / scale`, where `scale` is the stored 5% to 95% width over 3.29. The test
 rows are those whose origin month is `c`. Output: `work/fits/cut<YYYY-MM>_seed<s>.parquet`.
 
-    PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-*:ml-experiments/00314-* \
-        systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
+    export PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-*:ml-experiments/00314-*
+    systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue  \
         uv run --no-sync python ml-experiments/00314-*/e00314_fit.py --cuts 2025-07 ... --workers 6
 """
 

@@ -12,8 +12,8 @@ status: done
 size: >-
   medium. Stored: private files under
   data/ml-experiments/00314-primary-demand-gated-or-pinball-band-head/ only. Serving path: not
-  touched. Degradation rule: not touched. Designs: more than one is defensible (gate or retrain;
-  the plan pre-registers both and their combination). Callers: this folder's scripts, which import
+  touched. Degradation rule: not touched. Designs: more than one is defensible (gate or retrain; the
+  plan pre-registers both and their combination). Callers: this folder's scripts, which import
   experiment 311's rows and fits and experiment 278's feature builder. Trains a small neural head on
   the CPU; no download.
 hypothesis: >-
@@ -24,32 +24,32 @@ hypothesis: >-
   Primary.
 prediction: >-
   Written before any score is read; each can fail. (P1) Arm G (gated mixture head) keeps at least
-  80% of experiment 311's pooled gain (-0.037 points), meaning a gain of at least 0.030 points.
-  (P2) Arm G passes the no-harm test on sunny daylight half-hours (one-sided 95% upper bound of the
-  harm at most 0.05 points). (P3) The gain of arm G without D10 is at least 0.02 points, with a 99%
-  interval wholly below zero. (P4) Arm P (pinball quantile network) matches experiment 311's
-  mixture head within 0.01 points of pooled quantile score. Stop rule: if no arm passes no-harm on
-  sunny daylight and P3 fails, report that the band head is a D10-specific fix and stop; no arm S.
+  80% of experiment 311's pooled gain (-0.037 points), meaning a gain of at least 0.030 points. (P2)
+  Arm G passes the no-harm test on sunny daylight half-hours (one-sided 95% upper bound of the harm
+  at most 0.05 points). (P3) The gain of arm G without D10 is at least 0.02 points, with a 99%
+  interval wholly below zero. (P4) Arm P (pinball quantile network) matches experiment 311's mixture
+  head within 0.01 points of pooled quantile score. Stop rule: if no arm passes no-harm on sunny
+  daylight and P3 fails, report that the band head is a D10-specific fix and stop; no arm S.
 decision_rule: >-
   Primary demand research default 1 is the default. Arms: R (the default), G (the experiment 311
-  mixture head, with the default's bands kept on sunny daylight half-hours), P (the pinball
-  quantile network), GP (P gated as G). Experiment 311's arm M is reported beside them from its
-  stored forecasts. The gate flag is experiment 311's protected group, `sunny & daylight` from the
-  stored rows of experiment 251, fixed before scoring. k = 3 contrasts (G, P, GP minus R), so each
-  gain interval is read at the level 1 - 0.01/3 (99.67%), with month-block resampling. At most one
-  arm is adopted. The change is a new head, so the minimum gain is 0.03 points by the research-default
-  rule page. Condition 1 (gain): the interval wholly below zero and the point estimate at most
-  -0.03. Condition 2 (no harm, one-sided 95% upper bound on the pooled six Primaries): at most 0.02
-  points on the headline; at most 0.05 on each of the 0.01 and 0.99 pinball tails, on cold winter
-  nights, and on sunny daylight half-hours; at most 2% relative on twCRPS at the 95th percentile.
-  Condition 3 (replication, replicate year 2024-25, the stored bands of experiment 169 as
-  reference): the same sign and an estimate of at least half of the smaller of the main estimate and
-  0.03. Condition 4 (controls): leaving out any single Primary keeps a point estimate of at most
-  -0.02 points and a one-sided 95% upper bound below zero; the reproduction gate and the median
-  check pass; no audit trigger is open. Condition 5 (serving): every input is available at forecast
-  time. Verdict `supported` if an arm meets conditions 1 to 5, `small gain` if the interval is below
-  zero but the estimate is under the threshold, `not supported` if the interval includes zero,
-  `refuted` if it lies wholly above zero.
+  mixture head, with the default's bands kept on sunny daylight half-hours), P (the pinball quantile
+  network), GP (P gated as G). Experiment 311's arm M is reported beside them from its stored
+  forecasts. The gate flag is experiment 311's protected group, `sunny & daylight` from the stored
+  rows of experiment 251, fixed before scoring. k = 3 contrasts (G, P, GP minus R), so each gain
+  interval is read at the level 1 - 0.01/3 (99.67%), with month-block resampling. At most one arm is
+  adopted. The change is a new head, so the minimum gain is 0.03 points by the research-default rule
+  page. Condition 1 (gain): the interval wholly below zero and the point estimate at most -0.03.
+  Condition 2 (no harm, one-sided 95% upper bound on the pooled six Primaries): at most 0.02 points
+  on the headline; at most 0.05 on each of the 0.01 and 0.99 pinball tails, on cold winter nights,
+  and on sunny daylight half-hours; at most 2% relative on twCRPS at the 95th percentile. Condition
+  3 (replication, replicate year 2024-25, the stored bands of experiment 169 as reference): the same
+  sign and an estimate of at least half of the smaller of the main estimate and 0.03. Condition 4
+  (controls): leaving out any single Primary keeps a point estimate of at most -0.02 points and a
+  one-sided 95% upper bound below zero; the reproduction gate and the median check pass; no audit
+  trigger is open. Condition 5 (serving): every input is available at forecast time. Verdict
+  `supported` if an arm meets conditions 1 to 5, `small gain` if the interval is below zero but the
+  estimate is under the threshold, `not supported` if the interval includes zero, `refuted` if it
+  lies wholly above zero.
 benchmark: >-
   Primary demand research default 1 (stored forecasts of experiments 220 and 251, arm 1), with
   `manual_heuristic`, `climatology`, and BG2 beside every table.
@@ -86,23 +86,22 @@ adopted_in: none
 take_home_message: >-
   Experiment 311's neural band head was stopped by harm on sunny daylight half-hours. Keeping the
   current bands on those half-hours fixes that harm, and the gated head scores 0.041 points better
-  than the current Primary demand forecast bands (research default 1, lower is better). The gain is still almost entirely one substation, D10: without it the gain is 0.015
-  points and its interval touches zero, so the gated head is a candidate and not an adoption.
-  Training the head on the quantile score directly gave no improvement.
+  than the current Primary demand forecast bands (research default 1, lower is better). The gain is
+  still almost entirely one substation, D10: without it the gain is 0.015 points and its interval
+  touches zero, so the gated head is a candidate and not an adoption. Training the head on the
+  quantile score directly gave no improvement.
 advice:
   - >-
-    Gate a band head off on sunny daylight half-hours instead of retraining the band head, because the gate
-    removes the harm there and leaves the pooled gain at -0.041 points (arm G, figure 1).
+    Gate a band head off on sunny daylight half-hours instead of retraining the band head, because
+    the gate removes the harm there and leaves the pooled gain at -0.041 points (arm G, figure 1).
   - >-
     Do not train a Primary-demand band head on the 11-level pinball loss instead of the likelihood:
     the pinball-trained head is 0.007 points worse than the mixture head here (P minus M row).
   - >-
     Look for what D10 has that the other five Primaries lack before testing another band head,
     because D10 gives -0.144 to -0.168 points under each of the four heads tested and the other five
-    Primaries give about -0.015
-    (figure 2).
+    Primaries give about -0.015 (figure 2).
 date: 2026-10-23
-
 ---
  **Caveat: only forecasts up to 7 days ahead (leads 0.5 to 168 hours) are scored, but NGED needs 1
 to 10 days ahead, so days 8 to 10 are not covered.** A neural network that sets the forecast bands
