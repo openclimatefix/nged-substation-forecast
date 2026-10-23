@@ -15,7 +15,6 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from scipy.optimize import minimize_scalar
 from studies.ens_members import MIXTURE_LEVELS
 from studies.pv_plant_fit import soft_minimum
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -54,21 +53,24 @@ SETTINGS: Final[tuple[str, ...]] = ("own_history", "zero_history")
 
 @dataclass(frozen=True)
 class Variant:
-    """One arm's plant: which unit response, which clip, and which settings it is scored in."""
+    """One arm's plant: which unit response, which clip, which cap level, and which settings."""
 
     name: str
     shape: str
     """`tilt35`, `tilt20`, or `pooled`."""
     soft: bool
+    cap_quantile: float
     settings: tuple[str, ...]
 
 
 VARIANTS: Final[tuple[Variant, ...]] = (
-    Variant("p2", "tilt35", soft=False, settings=SETTINGS),
-    Variant("a_tilt20", "tilt20", soft=False, settings=SETTINGS),
-    Variant("b_soft_clip", "tilt35", soft=True, settings=SETTINGS),
-    Variant("c_tilt20_soft_clip", "tilt20", soft=True, settings=SETTINGS),
-    Variant("d_pooled_shape", "pooled", soft=False, settings=("own_history",)),
+    Variant("p2", "tilt35", False, HARD_CAP_QUANTILE, SETTINGS),
+    Variant("a_tilt20", "tilt20", False, HARD_CAP_QUANTILE, SETTINGS),
+    Variant("b_soft_clip", "tilt35", True, SOFT_CAP_QUANTILE, SETTINGS),
+    Variant("c_tilt20_soft_clip", "tilt20", True, SOFT_CAP_QUANTILE, SETTINGS),
+    Variant("d_pooled_shape", "pooled", False, HARD_CAP_QUANTILE, ("own_history",)),
+    Variant("e_hard_cap_999", "tilt35", False, SOFT_CAP_QUANTILE, SETTINGS),
+    Variant("f_tilt20_hard_cap_999", "tilt20", False, SOFT_CAP_QUANTILE, SETTINGS),
 )
 
 
@@ -107,18 +109,9 @@ def clip(*, power: np.ndarray, cap: float, soft: bool) -> np.ndarray:
     return soft_minimum(power=power, limit=cap) if soft else np.minimum(power, cap)
 
 
-def fit_scale(*, unit: np.ndarray, output: np.ndarray, cap: float, soft: bool) -> float:
-    """Return the scale of the unit response: closed-form for a hard cap, fitted through a soft one."""
-    closed = float(np.sum(output * unit) / np.sum(unit**2))
-    if not soft:
-        return closed
-
-    def error(scale: float) -> float:
-        return float(np.sum((output - clip(power=scale * unit, cap=cap, soft=True)) ** 2))
-
-    return float(
-        minimize_scalar(error, bounds=(0.3 * closed, 3.0 * closed), method="bounded").x
-    )
+def fit_scale(*, unit: np.ndarray, output: np.ndarray) -> float:
+    """Return the least-squares scale of the unclipped unit response (the rule of experiment 270)."""
+    return float(np.sum(output * unit) / np.sum(unit**2))
 
 
 def bin_offsets(*, mu: np.ndarray, output: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

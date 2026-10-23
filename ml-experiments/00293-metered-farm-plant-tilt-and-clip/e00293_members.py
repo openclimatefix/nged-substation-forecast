@@ -144,9 +144,7 @@ def build_farm(site: str) -> str:
     keys, ghi_p, temp_p = read_members(cell=cell)
     grid = sun_grid(row=row)
     output = (
-        pl.read_parquet(common.FARM_ROWS)
-        .filter(pl.col("site") == site)
-        .select("time", "output")
+        pl.read_parquet(common.FARM_ROWS).filter(pl.col("site") == site).select("time", "output")
     )
     previous = keys.select(
         "init_time",
@@ -156,7 +154,9 @@ def build_farm(site: str) -> str:
     rows = (
         output.join(grid, on="time", how="inner")
         .with_columns(init_time=(pl.col("time") - timedelta(hours=12)).dt.truncate("1d"))
-        .join(keys.rename({"valid_time": "period_end"}), on=["init_time", "period_end"], how="inner")
+        .join(
+            keys.rename({"valid_time": "period_end"}), on=["init_time", "period_end"], how="inner"
+        )
         .join(previous, on=["init_time", "period_end"], how="left")
         .filter(pl.col("mean_cosine") > 0)
         .sort("time")
@@ -176,7 +176,12 @@ def build_farm(site: str) -> str:
     arrays: dict[str, np.ndarray] = {"ghi_members": ghi.astype(np.float32)}
     for tilt in TILTS_DEG:
         members = unit_response(
-            ghi=ghi, temperature_c=temperature, zenith=zenith, azimuth=azimuth, doy=doy, tilt_deg=tilt
+            ghi=ghi,
+            temperature_c=temperature,
+            zenith=zenith,
+            azimuth=azimuth,
+            doy=doy,
+            tilt_deg=tilt,
         )
         mean_weather = unit_response(
             ghi=ghi_mean[:, None],
@@ -202,7 +207,7 @@ def build_farm(site: str) -> str:
         raise ValueError(msg)
     common.SHAPES_DIR.mkdir(parents=True, exist_ok=True)
     path = common.SHAPES_DIR / f"{site}.npz"
-    np.savez(path.with_suffix(".tmp.npz"), **arrays)
+    np.savez(path.with_suffix(".tmp.npz"), **arrays)  # ty: ignore[invalid-argument-type]
     path.with_suffix(".tmp.npz").replace(path)
     return f"{site} rows={rows.height} max tilt-35 spread drift={drift:.2e}"
 
