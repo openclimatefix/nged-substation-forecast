@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Constants and loaders shared by the scripts of experiment 155 (best-guess stage 2 assembly).
 
 Arm A is experiment 136's A2, read from that experiment's private `dp_preds` folder. Every other

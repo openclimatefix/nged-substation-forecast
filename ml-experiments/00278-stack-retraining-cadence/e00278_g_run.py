@@ -1,10 +1,13 @@
-"""Forecast the convex-model cadence arms (copied from experiment 136): `a2` monthly, `a3` weekly, `a4` quarterly.
+# ruff: noqa: E501
+"""Forecast the convex-model cadence arms (copied from experiment 136).
 
-Every arm uses experiment 136 T-all fits with POOL filter noise. `a4` takes the monthly fits whose\ncut falls in January, April, July, or October, so a quarterly refit is the same fit as the monthly
-fit at that cut. Run with `systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue uv run
---no-sync python ml-experiments/00278-*/e00278_g_run.py [--workers 6] [--arms a2 a3 a4]`.
+Arms: `a2` monthly, `a3` weekly, `a4` quarterly. Every arm uses experiment 136's T-all fits with
+POOL filter noise. `a4` takes the monthly fits whose cut falls in January, April, July, or October,
+so a quarterly refit is the same fit as the monthly fit at that cut.
+
+    systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
+        uv run --no-sync python ml-experiments/00278-*/e00278_g_run.py [--workers 6] [--arms a2 a3 a4]
 """
-
 
 import argparse
 import json

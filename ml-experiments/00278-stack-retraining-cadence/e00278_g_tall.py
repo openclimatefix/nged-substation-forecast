@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """T-all fits at monthly and weekly cuts, and their predictions, for experiment 136.
 
 T-all is experiment 114's interaction arm: the heating columns split by day type and by half of the
@@ -9,6 +10,7 @@ chosen weight. `e00278_g_design.py` is a copy of experiment 114's design code. A
 import argparse
 import os
 import pickle
+import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
@@ -133,6 +135,9 @@ def fit_path(*, cadence: str, site: str) -> Path:
 
 def load_fits(*, cadence: str, site: str) -> list[TallFit]:
     """Return the stored T-all fits of a cadence at a site, ascending by cut."""
+    # Experiment 136 pickled these fits under its own module names; alias them to this copy.
+    sys.modules["e00136_tall"] = sys.modules[__name__]
+    sys.modules["e00136_design"] = design
     return pickle.loads(fit_path(cadence=cadence, site=site).read_bytes())
 
 
