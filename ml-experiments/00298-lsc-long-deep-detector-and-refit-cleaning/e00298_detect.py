@@ -275,6 +275,9 @@ def detect(
         last: The last day to read.
         pair_noise: Optional precomputed (difference, sum) noise units per neighbour for variant E,
             to avoid recomputing them from the stream.
+
+    Returns:
+        The alarm spans, in order of start day.
     """
     pair_stats = (
         _pair_stats(stream=stream, others=others, pair_noise=pair_noise)
