@@ -34,8 +34,8 @@ decision_rule: >-
   Supported when the own-history score interval is wholly below zero, the 0.99 gain is at least
   20%, and the zero-history gain is at least 3%. Partly supported when one or two of the three
   hold. The 1% score threshold is set by the effort of building and maintaining the extra stages
-  (a plant, a band model, a blend), which a gain under 1% would not justify. Stop rule: if the candidate's score interval
-  against XGBoost includes zero in both settings, report that the plant-plus-band and XGBoost are
+  (a plant, a band model, a blend), which a gain under 1% would not justify. Stop rule: if the candidate's score
+  interval against XGBoost includes zero in both settings, report that the plant-plus-band and XGBoost are
   equivalent for scoring and that the choice is explainability; add no arms.
 benchmark: >-
   XGBoost production-style (experiment 275's x2 in own history, experiment 270's l6 in zero
