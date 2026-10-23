@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 257 | Is the neural head needed once the plant sees the same inputs? | 2 | Nothing | Planned |
 
 ## Planned experiments
 

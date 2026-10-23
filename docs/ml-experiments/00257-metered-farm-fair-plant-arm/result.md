@@ -6,7 +6,7 @@ title: >-
 theme: metered-solar-farms
 also_relevant_to:
 - calibration-and-uncertainty
-status: planned
+status: finished
 size: >-
   medium. Stored: predictions and tables under data/ml-experiments/00257-metered-farm-fair-plant-arm/
   only. Serving path: not touched. Degradation rule: not touched. Designs: more than one defensible
@@ -44,57 +44,96 @@ metric: >-
   Quantile score, MAE of the median, MAE of the mean forecast, and pinball loss and coverage at
   0.01, 0.05, 0.95, and 0.99, per farm and arm
 code: ml-experiments/00257-metered-farm-fair-plant-arm/
+verdict: supported
+verdict_note: >-
+  The quantile regression P2 scores 5.500 against H5's 5.475 with own history (0.45% worse, 99%
+  interval -2.2% to +0.6%), so the network's 2% advantage in the prediction fails and the stop rule
+  fires. P2 recovers 90% of H5's 4.4% gain over the plant alone. H5 is 3.7% worse than P2 at the
+  0.99 quantile, with an interval that includes zero.
+best_arm: >-
+  H5 has the lowest quantile score with own history, 5.475 points of capacity (95% interval 4.95 to
+  5.93), and P2 follows at 5.500 (5.02 to 5.94)
+headline: >-
+  A linear quantile regression on the lagged power and ensemble spread scores within 0.5% of the
+  neural network (99% interval -2.2% to +0.6%) and 4.0% better than the plant alone.
+take_home_message: >-
+  The neural network was not needed. Giving the solar-farm power model the lagged power and the
+  spread of the ensemble members, through a plain linear fit, recovers about 90% of the neural
+  network's gain and scores within half a percent of it. The linear fit is also better at the
+  0.99 quantile, so it replaces the neural network as the metered-farm candidate.
+production_status: candidate
+adopted_in: none
+advice:
+  - >-
+    Fit the metered-farm quantiles with a linear quantile regression on the plant forecast, the
+    ensemble spread, the availability ratio, and lead, clear-sky, and elevation bands before adding
+    a neural network (C1, Figure 2).
+  - >-
+    Give the plant forecast the ensemble spread and the lagged-power availability ratio, because
+    the two-number plant scores 2.5% worse than the linear fit that has them (C3, Figure 2).
+  - >-
+    Do not credit the lagged power alone for the gain: the availability ratio is worth 0.3% with
+    an interval that includes zero (C5, Figure 2).
+  - >-
+    Judge any new network for metered solar farms against the linear fit and not against the plant
+    alone, because the plant alone overstates the network's gain by about 10% of it (Figure 1).
 ---
- **This page is the plan; the write-up replaces it when the experiment finishes.**
+**A linear quantile regression on the lagged power and the ensemble spread scores within 0.5% of
+the neural network of experiment 243, so the network was not needed.** National Grid Electricity
+Distribution (NGED) meters six solar farms, labelled A to F. [Experiment
+243](../00243-metered-farm-architecture-comparison/result.md) found that H5, the plant (a solar-farm
+power model) plus a neural network that outputs 11 quantile offsets, scores 4.4% better than the
+plant alone, but H5 saw the lagged power and the ensemble spread and the plant did not. We gave a
+linear quantile regression (P2) the same inputs, with no network. P2 scores 5.500 against H5's
+5.475 points of capacity with own history, so P2 is 0.45% worse (95% interval -1.7% to +0.4%; 99%
+interval -2.2% to +0.6%). P2 is 3.95% better than the plant alone, which is 90% of H5's gain.
+**The prediction fails and the stop rule fires.** The prediction was that H5 beats P2 by at least
+2% in quantile score and by at least 10% in pinball loss at the 0.99 quantile. The first gap is
+0.45%, and at the 0.99 quantile P2 is better, with H5 3.7% worse (99% interval -1.8% to +10.9%).
+**The ensemble spread and the availability ratio matter, and the ratio matters least.** P2 beats the
+two-number plant (P1) of experiment 224 by 2.5% (99% interval -3.8% to -1.2%). Removing the
+availability ratio costs 0.33% (99% interval -0.67% to +0.02%). With zero history, P2 is 0.63%
+worse than H5 (99% interval -0.25% to +1.96%).
 
-## Question
+![Figure 1: quantile score per arm](figure_1_headline.svg)
 
-**We ask whether a neural network is needed on top of the solar-farm power model once the power
-model sees the same inputs as the network.** [Experiment
-243](../00243-metered-farm-architecture-comparison/result.md) found that H5, the plant plus a neural
-network that outputs all 11 quantile offsets, scores 4.4% better than the plant alone. The plant arm
-saw neither the lagged power nor the ensemble spread, while H5 saw both, so the gain may belong to
-the inputs. A convex quantile regression ([Koenker and Bassett
-(1978)](https://doi.org/10.2307/1913643)) on the same inputs, with no network, tests that.
+![Figure 2: planned contrasts](figure_2_contrasts.svg)
 
-## Arms
+![Figure 3: pinball loss at the outer quantiles](figure_3_tails.svg)
 
-- **P0:** the plant alone, with experiment 224's offsets (experiment 243's `plant` arm, stored).
-- **P1:** the two-number plant (the mean and standard deviation of the 51 members' plant responses,
-  with the band scaled by a fitted spread factor per lead band; experiment 224 `a3_two_number`,
-  stored).
-- **P2:** P0's forecast plus a linear quantile regression of each of the 11 offsets on the plant
-  forecast, the 51 members' spread, the availability ratio, and dummies for the lead band, the
-  clear-sky-index band, and the sun-elevation band. The availability ratio is the farm's power one
-  day earlier (two days when the lead is over 24 hours) over the plant forecast at that earlier
-  half-hour, clipped to 0 to 1.5, with 1 and a missing-data flag when it cannot be formed. Each
-  level is a convex linear programme. The quantiles are sorted to remove crossing, then clamped to
-  zero and to the farm's ceiling, as in experiment 243.
-- **P3:** P2 fitted on the other five farms' tuning months only, with the plant scale and ceiling
-  the median over those five farms (experiment 243's zero-history setting), against H5 with zero
-  history.
-- **P2 without the availability ratio,** to show whether the lagged power carries the gain.
-- **H5 and XGBoost:** experiment 243's stored predictions, own and zero history, unchanged.
+## Numbers
 
-## Design
+- **Quantile score** (points of capacity, mean over six farms, own history): H5 5.475, XGBoost
+  5.490, P2 5.500, P2 without the ratio 5.518, P1 5.642, plant 5.726, climatology 8.638, manual
+  heuristic 8.687. Zero history: XGBoost 5.610, H5 5.610, P2 5.645, plant 5.871.
+- **Per farm, own history:** P2 is within 0.1 of H5 at five farms (A, B, C, D, F) and 0.09 better
+  at farm E (6.26 against 6.35).
+- **Median error** (MAE of the median, points of capacity, own history): H5 9.85, XGBoost 9.89, P2
+  9.89, plant 9.95.
+- **Outer quantiles, own history** (pinball loss at 0.01 and 0.99): H5 0.334 and 0.344, XGBoost
+  0.369 and 0.485, P2 0.349 and 0.331, plant 0.372 and 0.418. Coverage of the 0.01 and 0.99
+  quantiles: H5 0.033 and 0.985, P2 0.035 and 0.985, plant 0.034 and 0.984.
+- **Cloudy and clear half-hours** (clear-sky index under 0.5 and 0.5 or more): H5 minus P2 is -2.7%
+  when cloudy (99% interval -6.4% to +0.3%) and -0.15% when clear. P2 with the ratio is 0.48% worse
+  than P2 without it when cloudy (99% interval -0.8% to +2.3%) and 0.42% better when clear (99%
+  interval -0.8% to -0.1%).
 
-- **Rows and fit:** experiment 243's rows and one fit on the tuning months before 2025-09 (the
-  screening schedule), so that P2 compares like for like with the stored H5. The inner choice of the
-  regression's penalty is none: it is an unpenalised linear programme. Tuning rows are grouped by
-  valid time, never split by run, if any split is made.
-- **Calendar:** no calendar columns enter P2. The clear-sky index and elevation bands are weather
-  and sun position, as in experiment 243.
-- **Weather and forecast time:** ECMWF ensemble 00 UTC run at the nearest 0.25 degree cell, and farm
-  power one or two days earlier. Both exist at forecast time.
-- **Scoring:** copied from experiment 243's scorer, with the same month-resampling. The predictions
-  carry `q01`, `q05` to `q95`, `q99`, `actual`, `lead_hours`, and `time_series_id` (farm label), and
-  `studies.tail_calibration` reports coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99. The
-  quantile score, the MAE of the median, and the MAE of the mean forecast are reported for every
-  arm.
-- **Anonymisation:** farms A to F only.
+## Checks
 
-## Earlier advice followed
+- **Fitting fault.** P2 beats P1, which the plan named as the test of a fitting fault, so the fit
+  is sound.
+- **Member alignment.** The mean of the 51 members' responses differs from experiment 224's
+  `unit_mean` by under 0.02 on average, as expected from a non-linear plant, and the correlation
+  exceeds 0.99.
+- **Triggers.** Trigger 2 fires: the prediction that H5 beats P2 by 2% fails. No other trigger
+  fires. The stored H5, XGBoost, and plant predictions are unchanged from experiment 243, and the
+  rows are experiment 243's, so the contrasts pair on the same half-hours.
+- **Departures from the plan.** The MAE of the mean forecast is not reported, because P2 outputs
+  quantiles only.
 
-- Experiment 243: give the plant forecast the lagged power and the ensemble spread before crediting
-  physics for the gain, and use the same rows and the same scorer.
-- Experiment 224: the two-number plant is the stronger plant reference.
+## What the next experiment should answer
+
+**Whether a small neural network beats P2 once both see more than the inputs here, such as the
+neighbouring farms' power.** P2 leaves 0.45% unexplained against H5 with the window's uncertainty
+of about 1.4% either side, so a network with extra inputs is the next test, scored against P2 and
+not against the plant alone.
