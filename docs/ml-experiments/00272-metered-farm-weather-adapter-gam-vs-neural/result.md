@@ -31,16 +31,23 @@ prediction: >-
 decision_rule: >-
   Quantile score (twice the mean pinball loss over 11 levels, in points of capacity), equal weight
   per farm, on experiment 257's rows (daylight half-hours, 12 to 36 hours ahead, 2025-09 to
-  2026-08), 99% intervals from resampling the 12 scored months 20,000 times (Bonferroni over five
-  planned contrasts). C1: additive curves on all variables (A3) minus the plant alone (A1). C2: A3
-  minus additive curves on the minimal inputs (A2). C3: neural network on all variables (A5) minus
-  A3. C4: A5 minus the neural network on the minimal inputs (A4). C5: adapter plus quantile head
-  (A6) minus the stored H5 head on the plant alone. The neural network is preferred only when C3 is
-  at least 1.5% below zero with an interval wholly below zero (the cost of serving and retraining
-  a neural network beside additive curves). An extra variable set is worth keeping when C2 or C4
-  is below zero with an interval wholly below zero. Stop rule: if A3 minus A1 is under 0.5% at 4
-  or more of the 6 farms (own-history fits), stop before the neural arms and report that the
-  extra variables carry no usable information through the plant.
+  2026-08), own-history fits as the primary setting (zero-history is reported beside it), losses
+  averaged over seeds per row, 99.4% intervals from resampling the 12 scored months 20,000 times
+  (Bonferroni over eight planned contrasts). A1' is the plant with the adapter held at identity and
+  the same offset table fitted the same way as every adapter arm; A1' and not the stored plant is
+  the reference for C1 and the stop rule. C1: additive curves on all variables (A3) minus A1'. C2:
+  A3 minus additive curves on the minimal inputs (A2). C3: neural network on all variables (A5)
+  minus A3. C4: A5 minus the neural network on the minimal inputs (A4). C5: adapter plus H5 head
+  (A6) minus the identity adapter plus the same head (A6 reference). C6: A3 minus its own placebo.
+  C7: A5 minus its own placebo. C8: share of the gap from A1' to the 0.973 reference of experiment
+  218 that A3 and A5 close, on sunny half-hours (point estimate and range over farms, no interval,
+  so it is reported and does not decide). The neural network is preferred only when C3 is at least
+  1.5% below zero with an interval wholly below zero (the cost of serving and retraining a neural
+  network beside additive curves). An extra variable set is kept only when its contrast (C2 or C4)
+  is at least 0.5% below zero with an interval wholly below zero and the matching placebo contrast
+  (C6 or C7) is also wholly below zero. Stop rule: if A3 minus A1' is under 0.5% below zero (a
+  worsening counts as under 0.5%) at 4 or more of the 6 farms in own history, stop before the
+  neural arms and report that the extra variables carry no usable information through the plant.
 benchmark: >-
   The plant alone (A1), stored H5 and XGBoost of experiment 243, the linear quantile regression P2
   of experiment 257, and experiment 224's manual_heuristic and climatology floors
@@ -80,26 +87,45 @@ code: ml-experiments/00272-metered-farm-weather-adapter-gam-vs-neural/
   experiment 270). The store serves no cloud layers or visibility, so the brief's cloud-layer
   variables are not run. No UKV variable is used.
 - **The plant and the correction.** The plant is experiment 243's fleet-shape plant in torch with
-  the per-farm scale and ceiling, frozen. Effective beam and diffuse irradiance equal the ensemble
-  values times exp(g(x)), and cell temperature is raised by h(x), with g bounded to +-0.4 and h to
-  +-4 K. Both are zero at initialisation, so the adapter starts as the plant. The 11 quantiles are
-  the plant output plus a table of 11 offsets for each of 4 bins of the plant forecast, learned
-  jointly with the adapter from the tuning-month offsets of experiment 243, then sorted.
-- **Arms.** A1 plant alone (stored, own and zero history). A2 additive curves on the minimal
-  inputs. A3 additive curves on the full list: one piecewise-linear curve with 8 knots per
-  variable for g and another for h, summed, with a second-difference penalty and an L2 pull to
-  zero, strength chosen on the 2025-07 to 2025-08 validation months from two values. A4 neural
-  network on the minimal inputs. A5 neural network on the full list: two hidden layers of 32
-  units, zero-initialised last layer, weight decay as the pull to identity, 5 seeds. A6 the best
-  of A3 and A5 plus a quantile head of experiment 243's H5 form on the adapted plant. Controls:
-  shuffled (full list permuted across rows within each farm), placebo (full list permuted within
-  lead and clear-sky-index bands, so other days with the same lead and cloud class), and blind (the
-  same network with no plant, on the raw inputs plus the full list). An alternating-update check
-  (the plant's scale unfrozen for two rounds) on the best arm.
+  the per-farm scale and ceiling (the median of the other five farms' values in zero history),
+  frozen. Effective beam and diffuse irradiance equal the ensemble values times exp(g(x)), and
+  cell temperature is raised by h(x), with g bounded to +-0.4 and h to +-4 K. Both are zero at
+  initialisation, so every adapter starts as the plant. The adapter's quantiles are its power plus
+  a table of 11 offsets per bin of the unadapted plant forecast. The table is trained jointly with
+  the adapter so the training loss is the quantile loss, and then replaced for every arm, by the
+  same code, with the per-bin residual quantiles of the frozen arm on the validation months (2025-07
+  and 2025-08), so that a more flexible arm cannot get narrower bands by overfitting its tuning
+  rows. Quantiles are sorted, and the crossing rate before sorting is reported per arm.
+- **Selection and tuning.** Every choice (epoch, penalty strength, which of A3 and A5 goes into A6,
+  which arm gets the alternating and blind controls) is made on the validation months only, with
+  the same budget for every adapter: the same 60 epochs with early stopping on validation, and two
+  penalty strengths (a second-difference penalty of 1e-3 or 1e-2 for the curves, weight decay of 1e-4
+  or 1e-2 for the network). Input standardisation uses tuning rows only. The final fit includes the
+  validation months for no arm.
+- **Arms.** A1' plant at identity with the shared table (stored plant of experiment 243 kept as a
+  benchmark). A2 additive curves on the minimal inputs. A3 additive curves on the full list: one
+  piecewise-linear curve with 8 knots per variable for g and another for h, summed, 3 seeds. A4
+  neural network on the minimal inputs. A5 neural network on the full list, two hidden layers of 32
+  units, zero-initialised last layer, 5 seeds. A6 the better of A3 and A5 on validation, with
+  experiment 243's H5 head (11 corrections from the lagged power, ensemble spread and the other H5
+  inputs, with the adapted power in place of the plant forecast) on the frozen adapter, against
+  the same head on the identity adapter. Controls: shuffled (the extra variables, not the minimal
+  ones, permuted across rows within farm and split) and placebo (the extra variables permuted
+  within farm, split, calendar month, and clear-sky-index band, so other days of the same season and
+  cloud class), both with the arms retrained on the permuted columns; blind (the same network with
+  no plant, on the raw inputs plus the full list); an alternating-update check (the plant's scale
+  unfrozen for two rounds) on the better arm.
+- **Rows.** Every half-hour of experiment 257's rows has all extra variables (checked), so the row
+  set is unchanged. The observed-weather plant is not re-run, so the 0.973 reference in C8 is
+  experiment 218's, from other rows, and the share closed is indicative.
 - **Departures from the brief.** The additive curves are trained by gradient descent through the
   non-linear plant, so the fit is not convex and backfitting is not used. Monotonicity in
-  irradiance is checked after the fit (share of grid points where the output falls as irradiance
-  rises) and not imposed on the curves. Cloud layers and visibility are not served.
+  irradiance is measured after the fit, and passes if under 1% of grid steps fall as irradiance
+  rises. Quantiles are sorted after the fact, with the crossing rate reported, and not built from
+  cumulative non-negative offsets. The minimal inputs add temperature to irradiance and spread.
+  Cloud layers and visibility are not served. The interval level is 99.4%, not 98.75%, because
+  eight contrasts are planned. The extras are held from the store's 3-hourly step. One fit is made
+  on the tuning months (no weekly refits).
 - **Report.** Quantile score and MAE per arm with intervals, share of the 0.91 to 0.973 gap closed
   (fraction of sunny-half-hour output fitted by the median), tail calibration through
   `studies.tail_calibration`, the crossing rate of the unsorted quantiles per arm, the fitted
