@@ -117,7 +117,9 @@ def false_spans(
     if not perfect or n_false <= 0:
         return []
     lengths = np.array([s.end - s.onset for s in perfect])
-    sizes = np.array([float(np.nanmean(np.abs(s.amount[s.onset : s.end]))) for s in perfect])
+    sizes = np.array(
+        [float(np.nanmean(np.abs(np.asarray(s.amount)[s.onset : s.end]))) for s in perfect]
+    )
     busy = np.zeros(n, dtype=bool)
     for s in perfect:
         busy[max(s.onset - 1, 0) : min(s.end + TAIL_STAMPS, n)] = True

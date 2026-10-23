@@ -98,7 +98,7 @@ def dot_panel(
         .mark_rule(color="#888888", strokeDash=[4, 3])
         .encode(x=alt.X("x:Q", scale=alt.Scale(domain=domain)))  # ty: ignore[unresolved-attribute]
     )
-    return alt.layer(base, rule, dot).properties(
+    return alt.layer(base, rule, dot).properties(  # ty: ignore[invalid-return-type]
         width=WIDTH, height=height or 22 * len(order), title=title
     )
 
@@ -238,7 +238,7 @@ def detector_chart(*, band: dict[str, Any]) -> alt.LayerChart:
         .mark_point(filled=True, size=120)
         .encode(x="alarms:Q", y="recall:Q", color=colour)  # ty: ignore[unresolved-attribute]
     )
-    return alt.layer(lines, point).properties(
+    return alt.layer(lines, point).properties(  # ty: ignore[invalid-return-type]
         width=WIDTH,
         height=260,
         title=_title(
@@ -280,19 +280,19 @@ def real_chart(*, real: dict[str, Any]) -> alt.VConcatChart:
             legend=alt.Legend(title=None, orient="top"),
         )
         dots = (
-            alt.Chart(pl.DataFrame(data))
+            alt.Chart(pl.DataFrame(data))  # ty: ignore[unresolved-attribute]
             .mark_point(filled=True, size=60, opacity=1)
             .encode(
                 x=alt.X("est:Q", title="Readings outside the band (% of readings)"),
                 y=y,
                 color=colour,
             )
-        )  # ty: ignore[unresolved-attribute]
+        )
         base = (
-            alt.Chart(pl.DataFrame({"x": [nominal]}))
+            alt.Chart(pl.DataFrame({"x": [nominal]}))  # ty: ignore[unresolved-attribute]
             .mark_rule(color="#888888", strokeDash=[4, 3])
             .encode(x="x:Q")
-        )  # ty: ignore[unresolved-attribute]
+        )
         panels.append(
             alt.layer(base, dots).properties(
                 width=WIDTH,

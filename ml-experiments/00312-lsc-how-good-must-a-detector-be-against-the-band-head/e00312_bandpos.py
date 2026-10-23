@@ -19,7 +19,7 @@ match are read on even months. RO-NC is scored with the same match rule at its o
 from __future__ import annotations
 
 import json
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import polars as pl
@@ -63,7 +63,7 @@ def evaluate(
     opens_month: list[np.ndarray],
     events: list[pl.DataFrame],
     parity: int,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """Pooled recall, median delay (hours), and alarms per match on events of one month parity."""
     matched, delays, alarms, n_events = 0, [], 0, 0
     per_world: list = []
@@ -148,7 +148,7 @@ def main() -> None:
         ]
         cutoffs = [b["cutoff"].to_numpy() for b in bands]
         months = [b["month"].to_numpy() for b in bands]
-        table = []
+        table: list[dict[str, Any]] = []
         for k in grid:
             oc, om = [], []
             for v, c, m in zip(values, cutoffs, months, strict=True):
