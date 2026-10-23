@@ -228,6 +228,16 @@ whether it applies to production awaits NGED's answer. Evidence:
 [experiment
 194](00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md).
 
+**Give a forecast the engine state it will have at forecast time, and train the engine term on that
+same lagged state (provisional, medium confidence).** *Applies to: experiments.* D8's engine
+detector gives a state for each half-hour that is built from that half-hour's own reading. A
+coefficient fitted on that contemporaneous state is 3.6 MW per half-hour with one or more units
+running, but the state of the last settled day is worth 0.15 MW (interval -0.06 to 0.32) out of sample,
+so applying the contemporaneous coefficient to the lagged state makes the quantile score 10% worse.
+Trained on the lagged state, the coefficient is 0.9 to 1.0 MW and the score is 3% better than a
+model without the term ([experiment
+294](00294-regime-aware-model-at-d8-engine-state-term/result.md)).
+
 **Do not fit calendar and seasonal terms exactly (by variable projection, which solves the linear
 coefficients exactly at each step) to a window of three months or shorter.** An exact
 least-squares fit of a per-substation model with holiday, tent, harmonic, and profile terms to 4
