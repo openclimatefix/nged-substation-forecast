@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 260 | Does combining three solar-farm forecasters per quantile level beat the best one alone? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
