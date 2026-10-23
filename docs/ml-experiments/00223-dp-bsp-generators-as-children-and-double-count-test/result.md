@@ -81,15 +81,16 @@ production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   The two bulk supply points' readings move with the metered generators that NGED lists under them,
-  and no generator's output looks to be hidden inside a Primary's reading. The size of the movement
-  is not the clean one-for-one that adding the generator to the sum needs, so the experiment did not
+  and the Primaries' readings show only small coefficients on the same generators. The size of the
+  movement is not the clean one-for-one that adding the generator to the sum needs, so the
+  experiment did not
   test whether adding the generators improves the bulk supply point forecast. A better test is to
   separate the unmetered solar and the battery's price-driven dispatch first.
 advice:
 - >-
   Do not add the metered generators to a bulk supply point's bottom-up sum until the unmetered solar
-  is modelled, because the remainder's solar coefficients are biased by 0.1 to 0.3 (Row A, figure
-  1).
+  is modelled, because the remainder's solar coefficients are biased by up to 0.26 at D17 (Row A,
+  figure 1).
 - >-
   Test a generator's connection point on a series where the generator's outage or step is known,
   because a regression on smooth output cannot separate a farm from the sun (Row A, solar rows).
@@ -136,13 +137,14 @@ output shifted by 364 days).
   D13 solar group, and -1.31 for the D17 solar group. The shifted copy of the D17 solar group
   already gives -0.26, so the unmetered solar that shares the sun biases the solar coefficients by
   about that much. Subtracting the placebo gives -1.16 and -1.05 for the two solar groups.
-- **Wind G1 (-0.60), wind G2 (-1.90, wide), and biomass G4 (-0.29) sit between 0 and -1.** The
-  pre-registered rule classifies them `cannot tell`. A partial carry, a metering mismatch, or
-  stepped
-  biomass dispatch could each produce them, and this regression cannot separate those causes.
+- **Wind G1 (-0.60) and biomass G4 (-0.29) sit between 0 and -1, and wind G2 (-1.90, wide)
+  overshoots -1.** The pre-registered rule classifies all three `cannot tell`. A partial carry, a
+  metering mismatch, or stepped biomass dispatch could each produce them, and this regression
+  cannot separate those causes.
 - **The battery G5 coefficient of -3.1 is not physical.** Battery dispatch follows price and demand,
-  so the regression picks up demand that the profile removal leaves in.
-- **The Primary check agrees where it is readable.** Each child Primary's coefficient on a wind,
+  so the regression plausibly picks up demand that the profile removal leaves in.
+- **The Primary check is not classified and shows small coefficients.** Each child Primary's
+  coefficient on a wind,
   biomass, or battery generator lies within -0.3 to +0.03 (largest at D9 and D10 for the D13 wind
   farms). The solar groups give -0.03 to -0.47 for each Primary, and that range reflects the
   Primaries' own embedded solar, so the check cannot separate solar.
@@ -153,15 +155,24 @@ output shifted by 364 days).
 
 ## Checks
 
+- **Predictions against outcomes:** prediction (1) failed, because no interval for wind G3, biomass
+  G4, or the battery includes -1 (wind G1 and G2 also miss). Prediction (2) failed for both solar
+  groups for the same reason. Predictions (3) and (4) could not be tested, because Row B did not
+  run.
+
 - **Known-answer check:** a real generator's output shifted by 364 days, planted in the remainder
   or behind a Primary, was classified correctly for 6 of 7 units in both placements. The D17 solar
-  group came out `cannot tell` in both placements, because the planted copy correlates with the
-  unmetered solar at about -0.26. The plan required at least 4 of 5 of each kind, and the solar
+  group came out `cannot tell` in both placements, because the planted copy has a coefficient of
+  -0.26 on
+  the remainder, which carries the unmetered solar. The plan required at least 4 of 5 of each kind,
+  and the solar
   kind has 1 of 2, so both rows are capped at `inconclusive`.
-- **Median minus mean forecast and mean-forecast error:** not applicable, because Row B did not
+- **Median minus mean forecast, and the mean forecast's error beside each contrast:** not
+  applicable, because Row B did not
   forecast.
 - **Joint regression (not pre-registered):** regressing the remainder on all of a bulk supply
-  point's units at once changes the coefficients by 0.0 to 0.14 for solar, biomass, and G3, and moves
+  point's units at once changes the coefficients by 0.0 to 0.15 for solar, biomass, and G3, and
+  moves
   G1 from -0.60 to -0.74. G2 moves to +0.10 (interval -0.24 to +0.46), which says its MVA series
   adds nothing once the other wind farm is in. The battery stays at -3.2.
 - **Audit triggers:** no Opus audit ran, as the ML manager asked. The serving path, the degradation
@@ -190,16 +201,16 @@ adds those generators to the bottom-up sum.
 
 | Group | Count | Unit | Voltage evidence | Treated as |
 |---|---|---|---|---|
-| Wind | 3 (labels W1 to W3 in other pages) | 2 in MVA, 1 in MW | 33 kV (EHV) | tested |
+| Wind | 3  | 2 in MVA, 1 in MW | 33 kV (EHV) | tested |
 | Solar | 7 | MW | 6 at 33 kV, 1 at 11 kV | 6 tested as a group; the 11 kV one is Primary-side |
 | Biomass | 1 | MW | 33 kV | tested |
 | Battery | 1 | MW | 33 kV | tested |
 | Other generation | 1 | MW | 11 kV | Primary-side |
 
 The generators are labelled G1 to G13 in a private table; no page names one or gives an identifier.
-Of the 13, one 11 kV solar series holds no readings and the other 11 kV series has under 4 months,
-  so
-neither can be tested. The generators' readings are in the cleaned power table in MW (generation
+Of the 13, one 11 kV solar series holds a single reading and the other 11 kV series has under 4
+  months,
+so neither can be tested. The generators' readings are in the cleaned power table in MW (generation
 positive) except the two MVA wind series, which are magnitudes of apparent power. Those two are
 converted to MW with a power factor of 0.97, enter Row A as a check with the conversion error
 stated, and enter Row B only if classified `carried by the BSP`. A battery's reading is signed.
