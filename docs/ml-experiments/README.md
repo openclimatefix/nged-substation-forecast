@@ -44,12 +44,20 @@ status, and the theme pages build their tables from it.** The Experiments table 
 planned-experiments table of each Research plan, and the candidates table below are generated from
 the front matter when the documentation is built, so adding a finished experiment means writing its
 `result.md` and editing nothing else. The `ml-experiment` skill
-(`.claude/skills/ml-experiment/SKILL.md`) lists the front matter fields and their allowed values.
+(`.claude/skills/ml-experiment/SKILL.md`) lists the front matter fields and their allowed values,
+including the optional `kind` and `promoted_to` fields of the research default rule.
 
 `uv run python scripts/mkdocs_hooks/experiment_tables.py --check` validates every front matter
 block, and the documentation build runs the same check. `uv run python
 scripts/mkdocs_hooks/experiment_tables.py --theme <theme>` prints a theme's Experiments table as
 markdown.
+
+## The research default
+
+**The [research default rule](research-default.md) fixes one forecast per target family and one test
+for adding a change to it.** The [log of versions](research-default-log.md) lists each family's
+versions, for example "Primary demand research default 1". An experiment with `kind: change` in its
+front matter is measured against the current version, and the rule says when a win is adopted.
 
 ## Data processing
 

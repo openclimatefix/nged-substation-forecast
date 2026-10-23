@@ -161,6 +161,9 @@ nav:
           - Market and other data: ml-experiments/background/market-and-other-data.md
           - Problems and the current best forecast: ml-experiments/background/problems-and-current-best-forecast.md
           - Adopted and open questions: ml-experiments/background/adopted-and-open-questions.md
+      - Research default:
+          - Rule: ml-experiments/research-default.md
+          - Log of versions: ml-experiments/research-default-log.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
       - Calibration and uncertainty:

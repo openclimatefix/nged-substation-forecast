@@ -179,6 +179,14 @@ Never publish a study with fewer than two scientific-validity reviews. If the pr
 anywhere, for example one plan review instead of two, say so in the PR body and in the final report,
 with the reason.
 
+**A study never adopts a change into a research default.** The adoption rule in
+`docs/ml-experiments/research-default.md` applies to `ml-experiment`s of kind `change` only. A study
+that finds a change worth adopting says so on its page, and an ml-experiment of kind `change`
+tests it against the family's current research default, named by version, for example "Primary
+demand research default 1". A study that scores a forecast of one of those families reports the
+research default's absolute score against BG2, `manual_heuristic`, and `climatology`, and says that
+production does not run BG2.
+
 ## Design rules that keep a comparison fair
 
 **Score every arm on exactly the same rows.** Keep an hour only if every arm's input covers it, and
