@@ -453,7 +453,11 @@ which total 160 hours at W1, 428 at W2, and 2,742 at W3. W3's idle share at wind
 6.2% over all years and 1.5% from 2021, so its first 2 years differ from the later ones. Evidence:
 [experiment 210](00210-wind-idle-noise-mva-artefact/result.md), three farms, 2019-09 to 2026-09.
 The mask is built on ERA5, which arrives about 5 days late, so it is for training and evaluation
-rows and not for live use.
+rows and not for live use. Removing the mask's rows from training lowered the quantile score of
+both the physics core and the XGBoost model when the weather was the 51 ensemble members (by 0.075
+and 0.062 points on the kept rows, intervals excluding zero), and worsened it by under 0.015 points
+when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
+three farms, July 2025 to June 2026).
 
 **Build the ensemble hindcast member rows with the production feature engineer, and expect a table
 of offsets per lead day, quantile, and farm to lower the wind forecast's quantile score
@@ -785,6 +789,17 @@ and to production, for D8. The scope is one series and one residual model, the c
 count depends on the threshold (15 to 48 for -2.5 to -1.0 MW), and the entry is provisional until
 NGED has said what moved.
 
+**Mask the rows of every known load transfer out of the training data of a forecast that uses no
+recent power.** The evidence is provisional and the confidence medium, and masking itself was not
+tested. A generalised additive model (GAM) with a 24-month training window, refitted every month,
+learned injected transfers of 25% of a substation's power lasting 7, 30, and 90 days as 8.5%, 19%,
+and 32% of their size in the 48 hours after each transfer ended, and learned a permanent step
+to one half after about 12 months ([experiment
+274](00274-lsc-long-arrangement-audit-gam-refit/result.md); 10 Primary substations, 4 onset dates,
+the ERA5 and CAMS estimates of past weather). No tested duration kept the bias under 0.1 points of
+effective capacity (1 point is 1% of the substation's capacity). Applies to experiments and
+production.
+
 ## Forecast tails and curtailment cost
 
 **Count the half-hours beyond a limit before ranking forecasts on curtailment cost.** Two bulk
@@ -828,6 +843,27 @@ left every contrast's sign and 95% interval verdict unchanged ([experiment
 each row by default and counts the rows that crossed. The scope is the six trial solar farms
 (labelled A to F) in experiments 224 and 243; the confidence is high for the count and moderate for
 the size of the effect.
+
+**Do not read a metered solar farm's coverage at the 0.01 quantile as calibration without checking
+for exact zeros (provisional, medium confidence).** *Applies to: experiments.* Coverage at the 0.01
+quantile is the share of half-hours with output at or below that quantile. Farm D's metered output
+is exactly zero in 11.7% of the half-hours scored in 2025-09 to 2026-08 (7% in September, 24% to 26%
+in October and November, 44% in December, 49% in January, 0% from April), so the 0.01 quantile of
+every arm tested sits at about zero and its coverage equals the zero share. The pinball loss on
+those rows is about zero for every arm, so they add nothing to any contrast but dilute the
+percentage differences; report 0.01 contrasts with and without farm D. The cause of the zeros
+(outage, curtailment, or an export limit) is not established. Evidence: [experiment
+284](00284-metered-farm-tail-head-past-weather/result.md), farm D, 2025-09 to 2026-08.
+
+**Take climatology and the manual heuristic from experiment 87's stored references when a scorer
+needs eleven quantiles (provisional).** *Applies to: experiments.* The stored climatology and
+manual-heuristic forecasts of experiment 48 hold nine quantiles (q05 to q95), so code that pads the
+missing q01 and q99 fills them with either the capacity or a copy of q05 and q95, and the padded
+tails are wrong. The versions in experiment 87's `ref_climatology` and `ref_manual_heuristic` hold
+all eleven. Both experiments store power as a fraction of capacity, not in percentage points of
+capacity ([experiment 277](00277-lsc-curtailment-metric-on-existing-forecasts/result.md)). The scope
+is the six Primary substations (which step 33 kV down to 11 kV) and the two bulk supply points D13
+and D17 (which step 132 kV down to 33 kV); the confidence is high, because we read the stored files.
 
 ## Privacy and anonymisation
 
