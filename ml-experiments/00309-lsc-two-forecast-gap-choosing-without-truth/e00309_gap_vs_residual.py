@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Paired comparison of the plain gap with the residual windows at equal false alarm rates.
 
 Reads experiment 308's stored per-shift match flags, so it fits nothing. The thresholds were set on
@@ -15,7 +16,9 @@ import e00309_data as dat
 import numpy as np
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-REPORT = ML_EXPERIMENTS_DATA_DIR / "00308-lsc-two-forecast-gap-as-a-detector" / "results" / "report.json"
+REPORT = (
+    ML_EXPERIMENTS_DATA_DIR / "00308-lsc-two-forecast-gap-as-a-detector" / "results" / "report.json"
+)
 N_DRAWS = 20_000
 
 
@@ -39,8 +42,25 @@ def main() -> None:
             row = gap[f"{other}_{src}"]
             for key, label in (("_matched", "while on"), ("_late", "within 4 days of end")):
                 d, lo, hi = paired(a=np.array(row[key]), b=np.array(base[key]), rng=rng)
-                out.append({"rate": src, "score": other, "rule": label, "gap": int(sum(base[key])), "other": int(sum(row[key])), "diff": d, "lo": lo, "hi": hi, "fa_odd_gap": base["fa_odd"], "fa_odd_other": row["fa_odd"], "fa_even_gap": base["fa_even"], "fa_even_other": row["fa_even"]})
-                print(f"@{src} {other:6s} minus d_a, {label:22s}: gap {sum(base[key])} other {sum(row[key])} diff {d:+d} ({lo:+.0f} to {hi:+.0f}); FA odd {base['fa_odd']:.2f} vs {row['fa_odd']:.2f}, even {base['fa_even']:.2f} vs {row['fa_even']:.2f}")
+                out.append(
+                    {
+                        "rate": src,
+                        "score": other,
+                        "rule": label,
+                        "gap": int(sum(base[key])),
+                        "other": int(sum(row[key])),
+                        "diff": d,
+                        "lo": lo,
+                        "hi": hi,
+                        "fa_odd_gap": base["fa_odd"],
+                        "fa_odd_other": row["fa_odd"],
+                        "fa_even_gap": base["fa_even"],
+                        "fa_even_other": row["fa_even"],
+                    }
+                )
+                print(
+                    f"@{src} {other:6s} minus d_a, {label:22s}: gap {sum(base[key])} other {sum(row[key])} diff {d:+d} ({lo:+.0f} to {hi:+.0f}); FA odd {base['fa_odd']:.2f} vs {row['fa_odd']:.2f}, even {base['fa_even']:.2f} vs {row['fa_even']:.2f}"
+                )
     (dat.WORK_DIR / "results").mkdir(parents=True, exist_ok=True)
     (dat.WORK_DIR / "results" / "gap_vs_residual.json").write_text(json.dumps(out, indent=2))
 

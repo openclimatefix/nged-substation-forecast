@@ -9,7 +9,7 @@ under `k / 2` at two consecutive origins or after 14 days.
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 from typing import Final
 
 import e00309_data as dat
@@ -20,7 +20,7 @@ from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 GAP_DIR: Final = ML_EXPERIMENTS_DATA_DIR / "00308-lsc-two-forecast-gap-as-a-detector" / "gap"
 THRESHOLDS: Final[dict[str, tuple[float, ...]]] = {"r24": (2.6, 3.5, 4.5), "d": (2.3, 3.2, 4.5)}
-"""Per score: the thresholds that match RO-NC's and the learned score's odd-month false alarm rates in
+"""Per score: the thresholds matching RO-NC's and the learned score's odd-month false alarm rates in
 experiment 308, and a stricter one."""
 ENTER_RUN: Final[int] = 2
 EXIT_RUN: Final[int] = 2
@@ -31,7 +31,7 @@ SITES: Final[dict[str, int]] = {"D5": 17, "D10": 10, "D11": 8, "D14": 16, "D16":
 
 
 def closure_blocks(*, series: int) -> np.ndarray:
-    """True inside a logged closure that touches the series or a neighbour, and 72 hours after it."""
+    """True inside a logged closure touching the series or a neighbour, and 72 hours after it."""
     wanted = {str(series)} | {str(s) for s in dat.ADJACENCY[series]}
     out = np.zeros(h.N_GRID + 144, dtype=bool)
     for r in dat.logged_closures().iter_rows(named=True):
@@ -52,7 +52,7 @@ def extra_blocks(*, series: int) -> np.ndarray:
     return out
 
 
-@lru_cache(maxsize=None)
+@cache
 def sigma_of(*, series: int, score: str) -> float:
     """1.4826 times the median absolute score over odd-month ordinary rows with a reading."""
     z = np.load(GAP_DIR / f"real_{series}.npz")

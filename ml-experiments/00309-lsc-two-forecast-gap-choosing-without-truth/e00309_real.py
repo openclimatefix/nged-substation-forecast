@@ -16,8 +16,7 @@ whole calendar months, 20,000 draws.
 
 from __future__ import annotations
 
-import json
-from typing import Any, Final
+from typing import Final
 
 import e00309_data as dat
 import e00309_harness as h
@@ -37,7 +36,9 @@ ARMS: Final[tuple[str, ...]] = (
 )  # fmt: skip
 
 
-def arm_metrics(*, data: h.SeriesData, correction: np.ndarray, offsets: np.ndarray, band: np.ndarray) -> dict[str, np.ndarray]:
+def arm_metrics(
+    *, data: h.SeriesData, correction: np.ndarray, offsets: np.ndarray, band: np.ndarray
+) -> dict[str, np.ndarray]:
     """Per (origin, lead) metrics of one location, NaN where the target has no reading."""
     _, _, targets = h.origin_grid()
     clipped = np.minimum(targets, h.N_GRID - 1)
@@ -47,20 +48,32 @@ def arm_metrics(*, data: h.SeriesData, correction: np.ndarray, offsets: np.ndarr
     bad = (targets >= h.N_GRID) | ~np.isfinite(actual)
     error = actual[..., None] - (location[..., None] + cell)
     pinball = np.maximum(h.LEVELS * error, (h.LEVELS - 1.0) * error)
-    out = {"qs": 2.0 * pinball.mean(axis=-1), "pin95": pinball[..., 9], "abs_median": np.abs(location + cell[..., 5] - actual)}
+    out = {
+        "qs": 2.0 * pinball.mean(axis=-1),
+        "pin95": pinball[..., 9],
+        "abs_median": np.abs(location + cell[..., 5] - actual),
+    }
     return {k: np.where(bad, np.nan, v) for k, v in out.items()}
 
 
-def group_masks(*, series: int, origins: np.ndarray, targets: np.ndarray, state: dict[str, np.ndarray]) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray]:
+def group_masks(
+    *, series: int, origins: np.ndarray, targets: np.ndarray, state: dict[str, np.ndarray]
+) -> tuple[dict[str, np.ndarray], np.ndarray, np.ndarray]:
     """Boolean masks (origins by leads) per row group, the shift label per row, and the in-shift flag per origin."""
-    all_shifts = dat.labelled_loads().filter(pl.col("series").list.eval(pl.element().is_in(list(h.SERIES))).list.any())
+    all_shifts = dat.labelled_loads().filter(
+        pl.col("series").list.eval(pl.element().is_in(list(h.SERIES))).list.any()
+    )
     shifts = all_shifts.with_row_index("shift_index").filter(pl.col("series").list.contains(series))
     clipped = np.minimum(targets, h.N_GRID - 1)
     own = np.zeros(h.N_GRID + AFTER_HALF_HOURS, dtype=bool)
     wanted = {str(series)} | {str(s) for s in dat.ADJACENCY[series]}
     for r in dat.logged_closures().iter_rows(named=True):
         if r["side_a"] in wanted or r["side_b"] in wanted:
-            own[max(int(r["first_stamp"]), 0) : min(int(r["last_stamp_exclusive"]) + AFTER_HALF_HOURS, h.N_GRID)] = True
+            own[
+                max(int(r["first_stamp"]), 0) : min(
+                    int(r["last_stamp_exclusive"]) + AFTER_HALF_HOURS, h.N_GRID
+                )
+            ] = True
     extra = np.zeros(h.N_GRID, dtype=bool)
     if series == st.D8:
         for r in pl.read_parquet(dat.D8_DROPS).iter_rows(named=True):
@@ -74,7 +87,11 @@ def group_masks(*, series: int, origins: np.ndarray, targets: np.ndarray, state:
     for r in shifts.iter_rows(named=True):
         i = r["shift_index"]
         d = (origins[:, None] >= r["onset"]) & (origins[:, None] < r["end"])
-        a = (origins[:, None] >= r["end"]) & (targets >= r["end"]) & (targets < r["end"] + AFTER_HALF_HOURS)
+        a = (
+            (origins[:, None] >= r["end"])
+            & (targets >= r["end"])
+            & (targets < r["end"] + AFTER_HALF_HOURS)
+        )
         during |= d
         after |= a
         label = np.where((d | a) & (label < 0), i, label)
@@ -100,17 +117,31 @@ def series_table(*, series: int) -> pl.DataFrame:
         sigma = st.sigma_of(series=series, score=score)
         for k in ks:
             state[f"RULE_{score}_{k}"] = st.abnormal_state(gap=z[score], sigma=sigma, k=k)
-    masks, label, in_shift_origin = group_masks(series=series, origins=origins, targets=targets, state=state)
+    masks, label, in_shift_origin = group_masks(
+        series=series, origins=origins, targets=targets, state=state
+    )
     year_month = dat.stamp_year_month()[clipped]
-    odd = np.isin(h.utc_month_grid()[origins], list(h.TUNING_MONTHS))[:, None] & np.ones(targets.shape, dtype=bool)
-    base = {arm: arm_metrics(data=data, correction=stored[arm].astype(np.float64), offsets=offsets, band=band) for arm in ("GAM_ONLY", "K0")}
+    odd = np.isin(h.utc_month_grid()[origins], list(h.TUNING_MONTHS))[:, None] & np.ones(
+        targets.shape, dtype=bool
+    )
+    base = {
+        arm: arm_metrics(
+            data=data, correction=stored[arm].astype(np.float64), offsets=offsets, band=band
+        )
+        for arm in ("GAM_ONLY", "K0")
+    }
     metrics = dict(base)
     for name, s in state.items():
         use = np.broadcast_to(s[:, None], targets.shape)
         metrics[name] = {m: np.where(use, base["K0"][m], base["GAM_ONLY"][m]) for m in METRICS}
-    metrics["ORACLE_ROW"] = {m: np.where(base["K0"]["qs"] < base["GAM_ONLY"]["qs"], base["K0"][m], base["GAM_ONLY"][m]) for m in METRICS}
+    metrics["ORACLE_ROW"] = {
+        m: np.where(base["K0"]["qs"] < base["GAM_ONLY"]["qs"], base["K0"][m], base["GAM_ONLY"][m])
+        for m in METRICS
+    }
     use = np.broadcast_to(in_shift_origin[:, None], targets.shape)
-    metrics["ORACLE_STATE"] = {m: np.where(use, base["K0"][m], base["GAM_ONLY"][m]) for m in METRICS}
+    metrics["ORACLE_STATE"] = {
+        m: np.where(use, base["K0"][m], base["GAM_ONLY"][m]) for m in METRICS
+    }
     rows = []
     for arm, met in metrics.items():
         for group in GROUPS:
@@ -124,8 +155,21 @@ def series_table(*, series: int) -> pl.DataFrame:
                     continue
                 u = unit[m2]
                 codes, inv = np.unique(u, return_inverse=True)
-                cols = {"n": np.bincount(inv).astype(float)} | {k: np.bincount(inv, weights=met[k][m2]) for k in METRICS}
-                rows.append(pl.DataFrame({"series": series, "arm": arm, "group": group, "odd": parity, "unit": codes.astype(np.int64), **cols}))
+                cols = {"n": np.bincount(inv).astype(float)} | {
+                    k: np.bincount(inv, weights=met[k][m2]) for k in METRICS
+                }
+                rows.append(
+                    pl.DataFrame(
+                        {
+                            "series": series,
+                            "arm": arm,
+                            "group": group,
+                            "odd": parity,
+                            "unit": codes.astype(np.int64),
+                            **cols,
+                        }
+                    )
+                )
     return pl.concat(rows)
 
 
