@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 292 | Do the ensemble's irradiance summaries over the cells around a farm lower the day-ahead quantile score? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
