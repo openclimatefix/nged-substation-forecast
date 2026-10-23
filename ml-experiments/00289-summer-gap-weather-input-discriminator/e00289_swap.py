@@ -9,7 +9,7 @@ valid time, the engine's mean forecast under three weather inputs:
 | `mean_ens_id` | the ensemble with the irradiance ratio and the solar shrink set to 1 |
 | `mean_cams` | realised CAMS irradiance at the target half-hours, ratio and shrink 1 |
 
-Temperature is the ensemble's, calibrated, in every column. Nothing is refitted.
+Temperature is the calibrated ensemble mean in every column. Nothing is refitted.
 
     systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00289-*/e00289_swap.py [--workers 3]
@@ -62,7 +62,7 @@ def cams_runs(*, setup: ens.SiteSetup, ghi_w_m2: np.ndarray) -> list[EnsSiteRun]
         runs.append(
             EnsSiteRun(
                 origin_position=item.origin_position,
-                temperature_c=item.temperature_c[:1],
+                temperature_c=item.temperature_c[item.usable_members()].mean(axis=0)[None, :],
                 shortwave_w_m2=padded[None, :],
             )
         )

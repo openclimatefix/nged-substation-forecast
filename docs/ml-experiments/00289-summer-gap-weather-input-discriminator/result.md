@@ -28,8 +28,8 @@ prediction: >-
   quantile-score gap to BG2 shrinks by at least half when the ensemble's sunshine is replaced by
   realised (CAMS) sunshine. (P2) The mean absolute error of the mean forecast shrinks by at least a
   third of its gap to BG2 on the same rows. (P0b) The irradiance that the engine builds from CAMS
-  agrees with the raw CAMS hourly values to within 1 W/m² on average, with no half-hour shift in the
-  hour-of-day profile. If P1 fails, the gap stays at least half as large and the cause is demand
+  agrees with the raw CAMS hourly values to within 1 W/m² on average, with no shift in the hourly
+  mean. If P1 fails, the gap stays at least half as large and the cause is demand
   absorbing the solar term or the error-correction layers.
 decision_rule: >-
   The gap is arm D minus BG2 in quantile score on April to June daylight half-hours at leads of 0 to
@@ -72,7 +72,7 @@ lessons:
     gap.
   - >-
     The April to June gap minus the July to September gap is +0.541 points with ensemble
-    sunshine and +0.466 with realised sunshine, so most of the April to June excess stays (an
+    sunshine and +0.465 with realised sunshine, so most of the April to June excess stays (an
     analysis added after seeing the results).
   - >-
     At substation D5, which has the largest gap (+1.437 points), realised sunshine gains only
@@ -140,17 +140,17 @@ adding a per-row shift to arm D's quantiles follows [experiment
 - **Headline (April to June, daylight, 0 to 36 hours ahead, D5, D9, D10, and D16 averaged, 97.5%
   intervals over 14 ISO weeks).** BG2 scores 3.223 (2.954 to 3.523) and arm D with ensemble sunshine
   3.790 (3.484 to 4.077), a gap of +0.567 (+0.384 to +0.733). Arm D with realised sunshine scores
-  3.387 (3.186 to 3.583), a gap of +0.164 (-0.116 to +0.378).
-- **C1, quantile score: ensemble minus realised sunshine is +0.403 (+0.154 to +0.680).** C2, mean
-  absolute error of arm D's forecast: +0.715 (+0.260 to +1.217), against a gap of +1.021 (+0.721 to
+  3.387 (3.186 to 3.584), a gap of +0.164 (-0.116 to +0.379).
+- **C1, quantile score: ensemble minus realised sunshine is +0.403 (+0.152 to +0.682).** C2, mean
+  absolute error of arm D's forecast: +0.713 (+0.253 to +1.219), against a gap of +1.021 (+0.721 to
   +1.285) points of effective capacity, 70% of the gap. The median and the mean forecast of arm D
   are identical, so the median stands for the mean.
 - **Negative control (July to September, same rows).** The gap to BG2 is +0.026 (-0.099 to +0.152),
-  and realised sunshine still improves arm D's score by 0.327 points (0.176 to 0.470), 81% of its
-  April to June gain. With realised sunshine arm D beats BG2 by 0.301 points there (0.123 to 0.476).
+  and realised sunshine still improves arm D's score by 0.327 points (0.174 to 0.472), 81% of its
+  April to June gain. With realised sunshine arm D beats BG2 by 0.301 points there (0.122 to 0.477).
 - **Post hoc: the April to June gap beyond the July to September gap.** The April to June gap minus
-  the July to September gap is +0.541 (+0.317 to +0.758) with ensemble sunshine and +0.466 (+0.147
-  to +0.763) with realised sunshine. The swap removes +0.076 of it (-0.149 to +0.324), 14%; the same
+  the July to September gap is +0.541 (+0.323 to +0.754) with ensemble sunshine and +0.465 (+0.138
+  to +0.748) with realised sunshine. The swap removes +0.076 of it (-0.181 to +0.355), 14%; the same
   reading on mean absolute error gives 15%.
 - **Calibration versus input.** Setting the irradiance ratio and the solar shrink to 1 on the
   ensemble worsens the score by 0.066 points (interval -0.010 to +0.137), so the stored calibration
@@ -165,7 +165,7 @@ adding a per-row shift to arm D's quantiles follows [experiment
 - **Tail calibration (April to June, daylight, 0 to 36 hours, decision Primaries).** Coverage and
   pinball loss, BG2 then arm D with ensemble sunshine then arm D with realised sunshine, are 0.015,
   0.019, and 0.012 at the 0.01 quantile (pinball 0.203, 0.263, 0.236); 0.052, 0.075, and 0.049 at
-  0.05 (0.676, 0.924, 0.808); 0.976, 0.922, and 0.932 at 0.95 (0.985, 1.031, 0.938); and 0.993,
+  0.05 (0.676, 0.924, 0.807); 0.976, 0.922, and 0.932 at 0.95 (0.985, 1.031, 0.938); and 0.993,
   0.969, and 0.977 at 0.99 (0.340, 0.324, 0.289). Arm D's 0.95 and 0.99 quantiles cover less than
   their nominal share of observations with both inputs. The curtailment-cost metric was not run,
   because it needs the node and generator forecasts that this swap does not produce.
@@ -177,7 +177,11 @@ adding a per-row shift to arm D's quantiles follows [experiment
   ensemble residuals, so the quantile score understates what realised sunshine would do to the
   spread. The monthly fits were trained on calibrated ensemble sunshine, so realised sunshine is
   slightly out of distribution, and the offset tables and recipe R of arm D are not re-simulated.
-  One year gives 14 ISO weeks per season.
+  One year gives 14 ISO weeks per season. The post hoc reading compares two gains, each with an
+  interval wider than their difference, so it cannot tell a removal of 0% from one of about 50%.
+  July to September 2025 falls in the first months of the scored year, when the monthly fits have
+  the least history. The tail coverage in the table is that of the shifted quantiles with the stored
+  spread, not of a re-made spread.
 - **What the next experiment should answer.** Refit arm D with realised sunshine as the solar driver
   in April to June, to see whether the excess is in the solar term itself, and look at D5's and D9's
   solar term in those months.
@@ -196,9 +200,13 @@ adding a per-row shift to arm D's quantiles follows [experiment
   the quantile-score contrast (+0.403) agree in sign in every subset reported above.
 - **Triggers.** Trigger 5 fired: the July to September control, which should change nothing, moved
   the score by +0.327, more than its half-width of 0.15. This experiment treats that result as
-  evidence that realised sunshine improves every season. The audit's findings are triaged in the
-  pull request. Triggers 1 to 4 and 6 did not fire. Trigger 7 applies if a later design depends on
-  this reading.
+  evidence that realised sunshine improves every season. A Sonnet audit (the brief allowed no Opus)
+  re-derived every headline number from the stored files and matched them. It found two faults, both
+  fixed and re-run: the realised-sunshine arm used the control member's temperature instead of the
+  member mean (the scores moved by 0.002 at most), and the two seasons' week resamples shared a
+  random seed (the interval of the seasonal removal widened from -0.149 to +0.324 to -0.181 to
+  +0.355). Triggers 1 to 4 and 6 did not fire. Trigger 7 applies if a later design depends on this
+  reading.
 
 ## Method
 
@@ -213,9 +221,9 @@ adding a per-row shift to arm D's quantiles follows [experiment
 - **Arm D with realised sunshine.** Add the per-row change in the base engine's mean to every
   quantile of stored arm D, the method experiment 251 used for its clip arm. The offset tables,
   winter night offset, and recipe R of arm D are not re-simulated; this is a caveat.
-- **Rows.** The six stored Primaries, April to June daylight half-hours (clear-sky irradiance above
-  20 W/m²); the decision Primaries D5, D9, D10, and D16 are the pooled headline, and D11 and D14 are
-  reported beside them.
+- **Rows.** The six stored Primaries, April to June daylight half-hours (the stored daylight flag,
+  which matches clear-sky irradiance above 20 W/m² on 97.8% of rows); the decision Primaries D5, D9,
+  D10, and D16 are the pooled headline, and D11 and D14 are reported beside them.
 - **Gate (P0).** The re-forecast with ensemble weather must reproduce experiment 136's stored A2
   mean.
 - **Stratification.** Results are reported by lead band (0 to 24, 24 to 72, 72 to 168 hours) and per

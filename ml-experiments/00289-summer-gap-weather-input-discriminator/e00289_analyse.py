@@ -48,6 +48,7 @@ def site_week_mean(
     sites: tuple[str, ...],
     level: float = 95.0,
     return_draws: bool = False,
+    seed: int = 0,
 ) -> dict:
     """Mean of `values` over `mask`, averaged over `sites`, with a week-block interval.
 
@@ -64,7 +65,7 @@ def site_week_mean(
         pick = site[keep] == s
         sums[k] = np.bincount(codes[pick], weights=values[keep][pick], minlength=len(weeks))
         counts[k] = np.bincount(codes[pick], minlength=len(weeks))
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(seed)
     draws = rng.integers(0, len(weeks), size=(N_RESAMPLES, len(weeks)))
     num = sums[:, draws].sum(axis=2)
     den = counts[:, draws].sum(axis=2)
@@ -195,6 +196,7 @@ def seasonal_excess(*, frame: pl.DataFrame) -> dict:
                 "week": frame["week"].to_numpy(),
                 "sites": DECISION,
                 "return_draws": True,
+                "seed": 1 if label == "amj" else 2,
             }
             draws[label] = (
                 site_week_mean(values=gap_ens, **args),
