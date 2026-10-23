@@ -248,6 +248,7 @@ def build_units() -> list[Unit]:
 def crossing_table(*, unit: Unit) -> pl.DataFrame:
     """Return, per arm, the share of stored rows with any crossing and the share crossing at each adjacent pair."""
     q = unit.rows.select(QCOLS).to_numpy()
+    assert np.isfinite(q).all(), "A NaN quantile would count as no crossing"
     crossed = q[:, :-1] > q[:, 1:]
     size = np.clip(q[:, :-1] - q[:, 1:], 0.0, None).sum(axis=1)
     table = unit.rows.select("arm").with_columns(
@@ -442,7 +443,8 @@ def main() -> None:
     crossing, arm_scores, contrasts, gains = [], [], [], []
     for unit in build_units():
         print(f"scoring {unit.experiment} {unit.unit}: {unit.rows.height} rows")
-        crossing.append(crossing_table(unit=unit))
+        if unit.unit != "both_folds":  # its rows are the two fold units' rows again
+            crossing.append(crossing_table(unit=unit))
         arm_rows, contrast_rows, gain_rows = score_unit(unit=unit)
         arm_scores += arm_rows
         contrasts += contrast_rows
