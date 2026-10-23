@@ -12,6 +12,7 @@ import json
 from typing import Any, Final
 
 import e00306_common as common
+import e00306_tall as tall
 import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
@@ -241,6 +242,33 @@ def tail_table(*, frame: pl.DataFrame, mask: np.ndarray, sites: tuple[str, ...])
     return out
 
 
+def stored_arm_d_differences(*, frame: pl.DataFrame) -> dict[str, float]:
+    """Return how far the control's per-row score is from stored arm D's."""
+    diff = frame["qs_a2"].to_numpy() - frame["qs_d"].to_numpy()
+    return {
+        "stored_arm_d_vs_control_max_abs_per_row_score_diff": float(np.abs(diff).max()),
+        "stored_arm_d_vs_control_mean_abs_per_row_score_diff": float(np.abs(diff).mean()),
+        "stored_arm_d_vs_control_mean_signed_score_diff": float(diff.mean()),
+    }
+
+
+def last_fit_coefficients() -> dict[str, dict[str, list[float]]]:
+    """Return each arm's solar interaction coefficients in its last monthly fit, by site."""
+    n_extra = {"s_both": 2, "s_heat": 1, "s_wknd": 1, "s_placebo": 1}
+    return {
+        arm: {
+            site: [
+                float(x)
+                for x in tall.load_fits(cadence="monthly", site=site, arm=arm)[-1].fit.theta[
+                    -n_extra[arm] :
+                ]
+            ]
+            for site in SITES_ALL
+        }
+        for arm in NEW_ARMS
+    }
+
+
 def main() -> None:
     """Write the report."""
     frame = add_shifted_stored_arm_d(frame=load())
@@ -256,12 +284,8 @@ def main() -> None:
             gate = max(gate, float(gap.max()))
     assert gate < GATE_TOLERANCE, f"control differs from experiment 136's stored A2: {gate}"
     report["gate_control_vs_experiment_136_a2_max_abs_quantile_diff"] = gate
-    report["stored_arm_d_vs_control_max_abs_per_row_score_diff"] = float(
-        np.abs(frame["qs_a2"].to_numpy() - frame["qs_d"].to_numpy()).max()
-    )
-    report["stored_arm_d_vs_control_mean_abs_per_row_score_diff"] = float(
-        np.abs(frame["qs_a2"].to_numpy() - frame["qs_d"].to_numpy()).mean()
-    )
+    report.update(stored_arm_d_differences(frame=frame))
+    report["last_fit_solar_interaction_coefficients"] = last_fit_coefficients()
     amj_day36 = subset(frame=frame, months=AMJ, lead=36.0, daylight=True)
     jas_day36 = subset(frame=frame, months=JAS, lead=36.0, daylight=True)
     report["headline"] = {}
