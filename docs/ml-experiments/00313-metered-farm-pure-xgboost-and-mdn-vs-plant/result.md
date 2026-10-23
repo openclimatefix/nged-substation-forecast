@@ -163,7 +163,8 @@ response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at d
       to 10.
     - P4 partly failed. The pure XGBoost against `climatology` at days 8 to 10 is +0.4% (-6.2 to
       +8.0) in own history and -1.4% (-7.7 to +5.9) in zero history, so it shows no skill (the
-      intervals straddle zero, so this is not a strict hold). The pure MDN against the plant-based blend is +3.4% (-0.6 to +8.9) in own history
+      intervals straddle zero, so this is not a strict hold). The pure MDN against the plant-based
+      blend is +3.4% (-0.6 to +8.9) in own history
       and +1.5% (-1.6 to +6.1) in zero history, short of the predicted 5%.
 - **The plant's value, like for like.** Pure XGBoost minus plant plus XGBoost: +1.8% (0.7 to 3.1) at
   day 1, +0.9% (0.3 to 1.6) at days 6 to 7, and +0.5% (-0.0 to +1.1) at days 8 to 10 in own history.
@@ -193,7 +194,8 @@ response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at d
 
 - **P3 held.** Pure MDN minus pure XGBoost: -1.2% (-0.15 to +0.04 points) with ERA5 own history,
   -0.4% (-0.13 to +0.01) on ensemble weather own history, and +0.8% (-0.05 to +0.15) with ERA5 in
-  zero history. All three point estimates are within the 2% bound. The intervals of the two ERA5 rows reach about -2.6% to +2.1% and cross the bound.
+  zero history. All three point estimates are within the 2% bound. The intervals of the two ERA5
+  rows reach about -2.6% to +2.1% and cross the bound.
 - **Against the physics core and the adapter (ERA5, own history).** The pure MDN is 0.48 points
   (-0.71 to -0.27) below the physics core, matches the core with the neural adapter (-0.03, -0.18 to
   +0.05), and the pure XGBoost is 0.41 below the core (-0.60 to -0.23). Experiment 276's XGBoost
