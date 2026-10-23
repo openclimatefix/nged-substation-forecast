@@ -248,3 +248,11 @@ seeds
   per neural arm; the last two tuning months select the training epoch. Pinball loss at the 11
   levels is the training loss; outputs are non-negative and capped at the farm's ceiling by
   construction, and the quantiles are non-crossing by construction.
+
+## Data-processing note
+
+Experiment 268 found crossing quantiles in 26,344 of its 77,897 generator-forecast rows (34%), but
+all of them belong to three generators that are not solar farms, so none is on this page.
+[Experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm here, because the fit scripts sorted the 11 quantiles before writing them, so sorting does
+not change the scores on this page.

@@ -170,3 +170,10 @@ row. The metric now sorts each row's quantiles by default.
   forecast (GBP 1,878,600 and 1,861,933 sorted; 1,865,144 and 1,872,880 stored).
 - **The metric reads each generator's median only**, so a better farm tail still does not show in
   its cost.
+
+## Data-processing note
+
+The crossing rows counted on this page belong to three generators that are not solar farms. Their stored
+forecasts have no 0.01 or 0.99 quantile, and experiment 255's capacity cap turned the null padding into
+the generator's capacity, so the 0.01 quantile sat above the 0.05 quantile in all 26,344 of their rows.
+The six solar farms' own 51,553 rows have none (see [experiment 255](../00255-metered-farm-node-curtailment-value/result.md)).

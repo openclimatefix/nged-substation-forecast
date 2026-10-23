@@ -205,3 +205,11 @@ about the day. The verdict is a small gain.
 - **What to try next.** A weather product of a different kind, such as the ICON-D2 regional weather
   model, for the same farms; irradiance and cloud variables only if UKV is kept; and a small learned
   irradiance-response component fed by both products, with A3 as the comparison arm.
+
+## Data-processing note
+
+Experiment 268 found crossing quantiles in 26,344 of its 77,897 generator-forecast rows (34%), but
+all of them belong to three generators that are not solar farms, so none is on this page.
+[Experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm here, because the fit scripts sorted the 11 quantiles before writing them, so sorting does
+not change the scores on this page.
