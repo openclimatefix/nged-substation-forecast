@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 import e00295_common as c
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_ens_weather import replace_site
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import TrainingWindow

@@ -19,7 +19,7 @@ from datetime import UTC, datetime
 import e00295_common as c
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from e00295_segment import STEP_SIZES, delta_of
 from studies.dp_ens_weather import replace_site
 from studies.dp_features import FeatureCache, naive_utc
