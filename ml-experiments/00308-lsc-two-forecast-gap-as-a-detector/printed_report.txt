@@ -1,0 +1,110 @@
+CARRIED DETECTORS (35 real shifts over 1 day)
+LR_b20: matched 10 (5 to 15); after-end rule 27; step rule 26; MW share 25% (11 to 43); FA odd 1.29, even 0.55 (0.18 to 1.02) per Primary-year; alarms/match 4.0; median lag 96.0 h; D8 drops 2/29, blocks 0/17; FA split {'all': 0.92, 'without_d8_d9': 0.96, 'd8': 0.75, 'd9': 0.54}; classes {'D8': 2, 'D9': 1, 'calendar day': 0, 'November to March': 11, 'other': 16}; alarms 126
+RO_b80: matched 20 (14 to 26); after-end rule 27; step rule 24; MW share 68% (48 to 85); FA odd 4.11, even 3.64 (2.62 to 4.72) per Primary-year; alarms/match 7.3; median lag 48.0 h; D8 drops 8/29, blocks 0/17; FA split {'all': 3.88, 'without_d8_d9': 2.76, 'd8': 9.75, 'd9': 12.45}; classes {'D8': 26, 'D9': 23, 'calendar day': 5, 'November to March': 33, 'other': 40}; alarms 296
+PG_g70: matched 4 (1 to 8); after-end rule 6; step rule 3; MW share 14% (1 to 30); FA odd 0.86, even 0.91 (0.41 to 1.48) per Primary-year; alarms/match 8.2; median lag 6.5 h; D8 drops 0/29, blocks 0/17; FA split {'all': 0.89, 'without_d8_d9': 0.96, 'd8': 0.75, 'd9': 0.0}; classes {'D8': 2, 'D9': 0, 'calendar day': 3, 'November to March': 10, 'other': 14}; alarms 85
+
+GAP DETECTORS AT LR_b20's FALSE ALARM RATE (odd 1.29 per Primary-year)
+detector | k | matched (95%) | vs carried | after-end rule vs carried | MW share | FA even | alarms/match | lag h | D8 drops | blocks | injected recall | inj FA/yr | even-onset
+gap, leads 0-6 h, plain | 3.2 | 11 (6 to 17); late 16 | +1 (-5 to 7) | -11 (-16 to -6) | 47% (25 to 67) | 1.21 (0.66 to 1.80) | 4.5 | 41.0 | 1/29 | 0/17 | 182/1063 (17%), MW 21%, FA 0.90 | 6/20
+    FA split per Primary-year: {'all': 1.19, 'without_d8_d9': 1.2, 'd8': 0.0, 'd9': 2.71}; classes {'D8': 0, 'D9': 5, 'calendar day': 3, 'November to March': 8, 'other': 23}
+gap, leads 0-6 h, neighbour check | 2.1 | 11 (6 to 17); late 15 | +1 (-6 to 7) | -12 (-18 to -7) | 35% (16 to 55) | 1.64 (0.87 to 2.43) | 5.0 | 83.0 | 0/29 | 0/17 | n/a | 7/20
+gap, leads 0-6 h, 6 h minimum | 2.9 | 15 (9 to 21); late 18 | +5 (-1 to 11) | -9 (-14 to -4) | 54% (32 to 73) | 1.09 (0.55 to 1.67) | 3.6 | 61.5 | 1/29 | 0/17 | 179/1063 (17%), MW 21%, FA 1.11 | 9/20
+gap, leads 0-6 h, 24 h minimum | 2.2 | 9 (4 to 14); late 15 | -1 (-8 to 5) | -12 (-18 to -7) | 40% (18 to 60) | 1.28 (0.77 to 1.78) | 5.4 | 47.0 | 1/29 | 0/17 | 158/1063 (15%), MW 19%, FA 1.02 | 5/20
+gap, leads 0-24 h (post hoc), plain | 2.8 | 17 (11 to 23); late 19 | +7 (1 to 13) | -8 (-13 to -3) | 59% (38 to 78) | 1.09 (0.59 to 1.61) | 3.2 | 41.0 | 0/29 | 0/17 | 216/1063 (20%), MW 26%, FA 1.01 | 12/20
+gap, leads 0-24 h (post hoc), neighbour check | 1.7 | 11 (6 to 17); late 13 | +1 (-6 to 8) | -14 (-20 to -8) | 40% (19 to 60) | 1.94 (1.22 to 2.69) | 5.3 | 52.0 | 1/29 | 0/17 | n/a | 6/20
+residual mean 6 h, plain | 4.3 | 14 (8 to 20); late 17 | +4 (-3 to 11) | -10 (-15 to -5) | 65% (45 to 80) | 1.03 (0.60 to 1.53) | 3.6 | 11.0 | 11/29 | 0/17 | 176/1063 (17%), MW 23%, FA 0.56 | 7/20
+residual mean 24 h, plain | 3.5 | 20 (14 to 26); late 20 | +10 (3 to 17) | -7 (-13 to -2) | 78% (62 to 89) | 0.91 (0.45 to 1.44) | 2.8 | 28.5 | 7/29 | 0/17 | 243/1063 (23%), MW 30%, FA 0.81 | 11/20
+residual mean 24 h, neighbour check | 2.1 | 17 (11 to 23); late 18 | +7 (0 to 14) | -9 (-14 to -4) | 53% (33 to 73) | 2.25 (1.24 to 3.30) | 4.4 | 29.0 | 2/29 | 0/17 | n/a | 12/20
+residual mean 72 h, plain | 2.9 | 17 (11 to 23); late 18 | +7 (0 to 14) | -9 (-14 to -4) | 59% (38 to 77) | 1.28 (0.66 to 1.94) | 3.3 | 53.0 | 6/29 | 0/17 | 225/1063 (21%), MW 27%, FA 0.81 | 11/20
+
+GAP DETECTORS AT RO_b80's FALSE ALARM RATE (odd 4.11 per Primary-year)
+detector | k | matched (95%) | vs carried | after-end rule vs carried | MW share | FA even | alarms/match | lag h | D8 drops | blocks | injected recall | inj FA/yr | even-onset
+gap, leads 0-6 h, plain | 2.3 | 21 (15 to 27); late 22 | +1 (-6 to 7) | -5 (-11 to 1) | 76% (58 to 89) | 4.19 (3.10 to 5.33) | 7.3 | 47.0 | 5/29 | 0/17 | 215/1063 (20%), MW 22%, FA 3.68 | 13/20
+    FA split per Primary-year: {'all': 4.06, 'without_d8_d9': 4.07, 'd8': 1.5, 'd9': 7.58}; classes {'D8': 4, 'D9': 14, 'calendar day': 8, 'November to March': 46, 'other': 61}
+gap, leads 0-6 h, neighbour check | 1.5 | 15 (9 to 21); late 18 | -5 (-12 to 2) | -9 (-15 to -3) | 43% (24 to 64) | 4.68 (3.35 to 5.93) | 10.4 | 48.5 | 2/29 | 0/17 | n/a | 10/20
+gap, leads 0-6 h, 6 h minimum | 2.1 | 18 (12 to 24); late 23 | -2 (-9 to 5) | -4 (-10 to 2) | 60% (38 to 79) | 3.52 (2.54 to 4.54) | 7.2 | 38.0 | 7/29 | 0/17 | 220/1063 (21%), MW 23%, FA 3.33 | 11/20
+gap, leads 0-6 h, 24 h minimum | 1.5 | 16 (10 to 22); late 21 | -4 (-11 to 3) | -6 (-12 to 0) | 56% (35 to 75) | 3.40 (2.21 to 4.76) | 8.6 | 59.5 | 3/29 | 0/17 | 226/1063 (21%), MW 24%, FA 4.21 | 10/20
+gap, leads 0-24 h (post hoc), plain | 2.0 | 21 (15 to 27); late 22 | +1 (-6 to 8) | -5 (-11 to 0) | 72% (53 to 88) | 3.64 (2.55 to 4.75) | 6.7 | 35.0 | 5/29 | 0/17 | 259/1063 (24%), MW 27%, FA 3.18 | 12/20
+gap, leads 0-24 h (post hoc), neighbour check | 1.2 | 15 (9 to 21); late 19 | -5 (-12 to 2) | -8 (-14 to -2) | 50% (29 to 70) | 3.83 (2.81 to 4.80) | 9.6 | 40.5 | 3/29 | 0/17 | n/a | 9/20
+residual mean 6 h, plain | 3.6 | 23 (17 to 28); late 23 | +3 (-3 to 9) | -4 (-9 to 0) | 84% (70 to 93) | 3.70 (2.64 to 4.83) | 6.4 | 17.5 | 17/29 | 0/17 | 263/1063 (25%), MW 31%, FA 1.44 | 13/20
+residual mean 24 h, plain | 2.6 | 24 (19 to 29); late 24 | +4 (-3 to 11) | -3 (-8 to 2) | 83% (68 to 93) | 3.52 (2.33 to 4.75) | 6.0 | 24.75 | 18/29 | 0/17 | 378/1063 (36%), MW 42%, FA 2.83 | 14/20
+residual mean 24 h, neighbour check | 1.7 | 19 (13 to 25); late 21 | -1 (-8 to 6) | -6 (-12 to 0) | 56% (35 to 76) | 4.43 (3.08 to 5.77) | 7.7 | 24.5 | 3/29 | 0/17 | n/a | 14/20
+residual mean 72 h, plain | 2.2 | 22 (16 to 27); late 23 | +2 (-3 to 7) | -4 (-9 to 1) | 76% (59 to 89) | 3.16 (2.22 to 4.13) | 6.1 | 46.25 | 13/29 | 0/17 | 275/1063 (26%), MW 30%, FA 3.32 | 14/20
+
+GAP DETECTORS AT PG_g70's FALSE ALARM RATE (odd 0.86 per Primary-year)
+detector | k | matched (95%) | vs carried | after-end rule vs carried | MW share | FA even | alarms/match | lag h | D8 drops | blocks | injected recall | inj FA/yr | even-onset
+gap, leads 0-6 h, plain | 3.4 | 11 (6 to 16); late 16 | +7 (1 to 13) | +10 (3 to 17) | 47% (25 to 67) | 0.91 (0.38 to 1.57) | 3.6 | 41.0 | 0/29 | 0/17 | 166/1063 (16%), MW 20%, FA 0.69 | 6/20
+    FA split per Primary-year: {'all': 0.89, 'without_d8_d9': 0.92, 'd8': 0.0, 'd9': 1.62}; classes {'D8': 0, 'D9': 3, 'calendar day': 1, 'November to March': 10, 'other': 15}
+gap, leads 0-6 h, neighbour check | 2.3 | 10 (5 to 15); late 12 | +6 (0 to 12) | +6 (-1 to 12) | 32% (14 to 53) | 1.52 (0.78 to 2.34) | 4.7 | 65.0 | 0/29 | 0/17 | n/a | 6/20
+gap, leads 0-6 h, 6 h minimum | 3.3 | 10 (5 to 15); late 12 | +6 (0 to 12) | +6 (0 to 12) | 46% (24 to 65) | 0.67 (0.30 to 1.13) | 3.3 | 40.5 | 0/29 | 0/17 | 129/1063 (12%), MW 16%, FA 0.68 | 5/20
+gap, leads 0-6 h, 24 h minimum | 2.4 | 9 (4 to 14); late 13 | +5 (0 to 10) | +7 (0 to 14) | 40% (18 to 60) | 0.85 (0.38 to 1.37) | 4.0 | 47.0 | 0/29 | 0/17 | 131/1063 (12%), MW 16%, FA 0.77 | 5/20
+gap, leads 0-24 h (post hoc), plain | 3.3 | 13 (8 to 19); late 15 | +9 (3 to 15) | +9 (2 to 16) | 50% (29 to 70) | 0.79 (0.31 to 1.36) | 3.1 | 50.5 | 0/29 | 0/17 | 159/1063 (15%), MW 19%, FA 0.56 | 8/20
+gap, leads 0-24 h (post hoc), neighbour check | 1.8 | 10 (5 to 15); late 12 | +6 (0 to 12) | +6 (-1 to 12) | 34% (15 to 54) | 1.52 (0.93 to 2.12) | 4.8 | 44.25 | 0/29 | 0/17 | n/a | 6/20
+residual mean 6 h, plain | 4.7 | 13 (8 to 19); late 15 | +9 (3 to 15) | +9 (2 to 16) | 58% (37 to 76) | 0.73 (0.37 to 1.15) | 3.0 | 17.0 | 8/29 | 0/17 | 136/1063 (13%), MW 18%, FA 0.46 | 7/20
+residual mean 24 h, plain | 3.7 | 19 (13 to 25); late 19 | +15 (9 to 21) | +13 (6 to 20) | 76% (58 to 88) | 0.91 (0.43 to 1.48) | 2.4 | 28.0 | 5/29 | 0/17 | 222/1063 (21%), MW 28%, FA 0.65 | 10/20
+residual mean 24 h, neighbour check | 2.3 | 16 (10 to 22); late 16 | +12 (7 to 18) | +10 (4 to 16) | 51% (30 to 71) | 1.70 (0.91 to 2.51) | 3.6 | 31.0 | 1/29 | 0/17 | n/a | 11/20
+residual mean 72 h, plain | 3.4 | 14 (8 to 20); late 15 | +10 (4 to 16) | +9 (2 to 16) | 54% (33 to 73) | 0.79 (0.36 to 1.30) | 2.8 | 53.0 | 1/29 | 0/17 | 167/1063 (16%), MW 21%, FA 0.65 | 8/20
+
+INJECTED RECALL, plain gap (0-6 h) at LR_b20's rate
+shape: (4, 5)
+┌────────────────┬────────┬─────────┬──────────┬───────┐
+│ size           ┆ events ┆ matched ┆ recall   ┆ lag   │
+│ ---            ┆ ---    ┆ ---     ┆ ---      ┆ ---   │
+│ str            ┆ u32    ┆ u32     ┆ f64      ┆ f64   │
+╞════════════════╪════════╪═════════╪══════════╪═══════╡
+│ 0.25 to 0.5 MW ┆ 127    ┆ 27      ┆ 0.212598 ┆ 68.5  │
+│ 0.5 to 1 MW    ┆ 435    ┆ 48      ┆ 0.110345 ┆ 45.75 │
+│ 1 MW or more   ┆ 403    ┆ 99      ┆ 0.245658 ┆ 38.0  │
+│ under 0.25 MW  ┆ 98     ┆ 8       ┆ 0.081633 ┆ 41.0  │
+└────────────────┴────────┴─────────┴──────────┴───────┘
+shape: (3, 5)
+┌──────────────┬────────┬─────────┬──────────┬────────┐
+│ duration     ┆ events ┆ matched ┆ recall   ┆ lag    │
+│ ---          ┆ ---    ┆ ---     ┆ ---      ┆ ---    │
+│ str          ┆ u32    ┆ u32     ┆ f64      ┆ f64    │
+╞══════════════╪════════╪═════════╪══════════╪════════╡
+│ 2 to 5 days  ┆ 600    ┆ 131     ┆ 0.218333 ┆ 42.5   │
+│ over 5 days  ┆ 83     ┆ 32      ┆ 0.385542 ┆ 100.25 │
+│ up to 2 days ┆ 380    ┆ 19      ┆ 0.05     ┆ 26.5   │
+└──────────────┴────────┴─────────┴──────────┴────────┘
+shape: (2, 5)
+┌────────┬────────┬─────────┬──────────┬──────┐
+│ winter ┆ events ┆ matched ┆ recall   ┆ lag  │
+│ ---    ┆ ---    ┆ ---     ┆ ---      ┆ ---  │
+│ bool   ┆ u32    ┆ u32     ┆ f64      ┆ f64  │
+╞════════╪════════╪═════════╪══════════╪══════╡
+│ false  ┆ 768    ┆ 93      ┆ 0.121094 ┆ 50.0 │
+│ true   ┆ 295    ┆ 89      ┆ 0.301695 ┆ 39.0 │
+└────────┴────────┴─────────┴──────────┴──────┘
+
+INJECTED RECALL, plain gap (0-6 h) at RO_b80's rate
+shape: (4, 5)
+┌────────────────┬────────┬─────────┬──────────┬───────┐
+│ size           ┆ events ┆ matched ┆ recall   ┆ lag   │
+│ ---            ┆ ---    ┆ ---     ┆ ---      ┆ ---   │
+│ str            ┆ u32    ┆ u32     ┆ f64      ┆ f64   │
+╞════════════════╪════════╪═════════╪══════════╪═══════╡
+│ 0.25 to 0.5 MW ┆ 127    ┆ 32      ┆ 0.251969 ┆ 47.25 │
+│ 0.5 to 1 MW    ┆ 435    ┆ 69      ┆ 0.158621 ┆ 34.0  │
+│ 1 MW or more   ┆ 403    ┆ 95      ┆ 0.235732 ┆ 30.0  │
+│ under 0.25 MW  ┆ 98     ┆ 19      ┆ 0.193878 ┆ 41.0  │
+└────────────────┴────────┴─────────┴──────────┴───────┘
+shape: (3, 5)
+┌──────────────┬────────┬─────────┬──────────┬──────┐
+│ duration     ┆ events ┆ matched ┆ recall   ┆ lag  │
+│ ---          ┆ ---    ┆ ---     ┆ ---      ┆ ---  │
+│ str          ┆ u32    ┆ u32     ┆ f64      ┆ f64  │
+╞══════════════╪════════╪═════════╪══════════╪══════╡
+│ 2 to 5 days  ┆ 600    ┆ 148     ┆ 0.246667 ┆ 33.5 │
+│ over 5 days  ┆ 83     ┆ 42      ┆ 0.506024 ┆ 69.0 │
+│ up to 2 days ┆ 380    ┆ 25      ┆ 0.065789 ┆ 22.5 │
+└──────────────┴────────┴─────────┴──────────┴──────┘
+shape: (2, 5)
+┌────────┬────────┬─────────┬──────────┬──────┐
+│ winter ┆ events ┆ matched ┆ recall   ┆ lag  │
+│ ---    ┆ ---    ┆ ---     ┆ ---      ┆ ---  │
+│ bool   ┆ u32    ┆ u32     ┆ f64      ┆ f64  │
+╞════════╪════════╪═════════╪══════════╪══════╡
+│ false  ┆ 768    ┆ 147     ┆ 0.191406 ┆ 38.5 │
+│ true   ┆ 295    ┆ 68      ┆ 0.230508 ┆ 28.5 │
+└────────┴────────┴─────────┴──────────┴──────┘
