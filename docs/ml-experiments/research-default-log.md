@@ -19,8 +19,9 @@ afterwards except to change its status.
 
 **Single-family scores of Metered solar farms research default 1** (quantile score in points of
 capacity, own history then zero history): the mixture-density neural network alone 5.34 and 5.55,
-the additive model alone 5.43 and 5.59, and XGBoost alone 5.45 and 5.56. The first production update
-uses one model family, so these rows show what each family scores without the blend.
+the additive model alone 5.43 and 5.59, and plant-fed XGBoost (XGBoost on the plant forecast, its
+ensemble spread, the unit mean, and the availability ratio) 5.45 and 5.56. The first production
+update uses one model family, so these rows show what each family scores without the blend.
 
 **The scored lead range of this row is 12 to 36 hours, and NGED's range is 1 to 10 days.**
 Experiment 310 scores the row from 1 to 10 days. The frozen XGBoost reference is the XGBoost forecast
