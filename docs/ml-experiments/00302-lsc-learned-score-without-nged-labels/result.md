@@ -69,8 +69,8 @@ lessons: >-
   its training months are not load shifts. Whether this loss matters for version 2 depends on whether
   the score is applied to months it never trained on, where no loss was visible (post hoc, 20 load
   shifts). A label-free per-Primary alarm rate brings more Primaries within a factor of 2 of the
-  median alarm rate (11 of 15, against 7 of 15 for the labelled arms), and adds 0.012 points of ordinary-day harm
-  against L1, not resolved from zero.
+  median alarm rate (11 of 15, against 7 of 15 for the labelled arms), and adds 0.012 points of
+  ordinary-day harm against L1, not resolved from zero.
 take_home_message: >-
   A learned load-shift alarm trained without NGED labels matched 14 of the 35 logged load shifts,
   against 20 to 21 with labels, so the pre-registered test failed. The whole loss sits (post hoc) in
