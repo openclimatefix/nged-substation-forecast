@@ -31,6 +31,8 @@ METRICS: Final[tuple[str, ...]] = (
     "qs",
     "err_mean",
     "err_median",
+    "abs_mean",
+    "abs_median",
     *[f"below_{i}" for i in TAIL_LEVELS],
     *[f"pin_{i}" for i in TAIL_LEVELS],
 )
@@ -40,11 +42,13 @@ VARIANTS: Final[tuple[str, ...]] = (
     "ordinary_clean",
     "ordinary_no_d8_d9",
     "ordinary_wide",
+    "ordinary_no_balanced",
 )
 """Row sets. `ordinary` is outside every logged closure that touches the series and the 72 hours
 after it. `ordinary_clean` also drops D8's multi-day drops and the 17 block days.
 `ordinary_no_d8_d9` drops series 26 and 7 entirely. `ordinary_wide` also drops closures of a
-connected neighbour."""
+connected neighbour. `ordinary_no_balanced` also drops the span (and 72 hours after it) of every
+LR_b20 alarm that is a balanced-opposite candidate (experiment 254's rule)."""
 D8_SERIES: Final[int] = 26
 D9_SERIES: Final[int] = 7
 
@@ -60,6 +64,28 @@ def closure_blocks(*, series: int, neighbours: bool) -> np.ndarray:
             lo = max(int(r["first_stamp"]), 0)
             hi = min(int(r["last_stamp_exclusive"]) + AFTER_HALF_HOURS, h.N_GRID)
             out[lo:hi] = True
+    return out[: h.N_GRID]
+
+
+BALANCED_RANGE: Final[tuple[float, float]] = (0.4, 2.5)
+"""Opposite steps with a size ratio in this range make an alarm a balanced-opposite candidate."""
+
+
+def balanced_blocks(*, series: int) -> np.ndarray:
+    """True within every LR_b20 balanced-opposite alarm of the series, and 72 hours after it."""
+    out = np.zeros(h.N_GRID + AFTER_HALF_HOURS, dtype=bool)
+    for table in dat.alarm_tables(source="LR_b20").values():
+        for r in table.filter(pl.col("series") == series).iter_rows(named=True):
+            ratio, n_opposite = r.get("opp_ratio"), r.get("n_opposite")
+            if (
+                ratio is not None
+                and n_opposite is not None
+                and n_opposite >= 1
+                and BALANCED_RANGE[0] <= ratio <= BALANCED_RANGE[1]
+            ):
+                out[max(int(r["onset"]), 0) : min(int(r["end"]) + AFTER_HALF_HOURS, h.N_GRID)] = (
+                    True
+                )
     return out[: h.N_GRID]
 
 
@@ -90,6 +116,8 @@ def row_metrics(
         "qs": 2.0 * pinball.mean(axis=-1),
         "err_mean": location - actual,
         "err_median": location + cell[..., 5] - actual,
+        "abs_mean": np.abs(location - actual),
+        "abs_median": np.abs(location + cell[..., 5] - actual),
     }
     for i in TAIL_LEVELS:
         out[f"below_{i}"] = (error[..., i] < 0).astype(np.float64)
@@ -103,7 +131,7 @@ def _sums(*, metrics: dict[str, np.ndarray], mask: np.ndarray, code: np.ndarray,
     group = code[keep]
     out = {"n": np.bincount(group, minlength=size)}
     for name in METRICS:
-        out[name] = np.bincount(group, weights=metrics[name][keep], minlength=size)
+        out[name] = np.bincount(group, weights=metrics[name][keep], minlength=size).astype(float)
     return out
 
 
@@ -122,12 +150,14 @@ def main(series: int) -> None:
     own = closure_blocks(series=series, neighbours=False)[clipped]
     wide = closure_blocks(series=series, neighbours=True)[clipped]
     extra = extra_blocks(series=series)[clipped]
+    balanced = balanced_blocks(series=series)[clipped]
     masks = {
         "all_rows": np.ones(targets.shape, dtype=bool),
         "ordinary": ~own,
         "ordinary_clean": ~own & ~extra,
         "ordinary_no_d8_d9": ~own & (series not in (D8_SERIES, D9_SERIES)),
         "ordinary_wide": ~wide,
+        "ordinary_no_balanced": ~own & ~balanced,
     }
     events = h.labelled_events().filter(pl.col("series").list.contains(series))
     after_masks = {}
@@ -164,7 +194,19 @@ def main(series: int) -> None:
                 )
             )
     pl.concat(ordinary_rows).write_parquet(h.HARNESS_DIR / f"ordinary_{series}.parquet")
-    pl.concat(after_rows).write_parquet(h.HARNESS_DIR / f"after_{series}.parquet")
+    empty_after = pl.DataFrame(
+        schema={
+            "lead_band": pl.Int64,
+            "n": pl.Int64,
+            **dict.fromkeys(METRICS, pl.Float64),
+            "series": pl.Int32,
+            "arm": pl.String,
+            "card": pl.String,
+        }
+    )
+    (pl.concat(after_rows) if after_rows else empty_after).write_parquet(
+        h.HARNESS_DIR / f"after_{series}.parquet"
+    )
     print(f"series {series}: scored {len(arm_names)} arms", flush=True)
 
 

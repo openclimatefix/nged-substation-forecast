@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Final
 
@@ -99,9 +100,22 @@ SOURCES: Final[tuple[str, ...]] = ("LR_b20", "LR_b80", "RO_b80", "PG_g70")
 """The frozen sources: experiment 227's headline learned source, its high-budget twin, RO-NC, and the gated pair alarm."""
 
 
+SERIES_TABLE: Final[Path] = (
+    DATA.parent / "studies" / "per_study" / "stage1_pilot" / "demand" / "inputs" / "series.parquet"
+)
+"""The stage 1 pilot's series table, which carries every series' anonymised site label."""
+
+
+@lru_cache(maxsize=1)
+def site_labels() -> dict[int, str]:
+    """The anonymised site label (such as D8) of every series in the series table."""
+    table = pl.read_parquet(SERIES_TABLE)
+    return {int(r["time_series_id"]): str(r["site"]) for r in table.iter_rows(named=True)}
+
+
 def label_of(*, series: int) -> str:
-    """The published label of a Primary substation, or `series <number>` for an unlabelled one."""
-    return SITE_LABEL.get(series, f"series {series}")
+    """The anonymised label of a Primary substation, from the series table."""
+    return site_labels().get(series, f"series {series}")
 
 
 def end_tolerance(*, onset: int, end: int) -> float:
