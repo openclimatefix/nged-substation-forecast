@@ -212,3 +212,11 @@ fixed by recalibrating the offsets on recent months.
   2025-08, tuned on 2024-04 to 2025-02. The last two tuning months of each fold select the training
   epoch. Both folds lie in the second UKV era, so no fit and score straddle a UKV physics change.
   Own-history setting only; the zero-history setting is not repeated.
+
+## Data-processing note
+
+Experiment 268 reported crossing quantiles in 26,344 of its 77,897 stored farm-forecast rows (34%),
+which moved its curtailment cost by up to 3.7%. The stored forecasts on this page have none:
+[experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm, because the fit scripts sorted the 11 quantiles before writing them, so sorting does not
+change the scores here.
