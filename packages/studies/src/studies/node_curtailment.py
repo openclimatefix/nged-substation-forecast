@@ -55,6 +55,15 @@ Decisions the numbers rest on, stated here because nothing in the output shows t
   count). It is null in node-only mode.
 - The module does not compute avoidable cost. `avoidable_cost` subtracts a perfect arm's figures,
   which the caller must have scored in the same call so that all arms share their rows.
+- By default each forecast row's `q<percent>` columns are sorted into increasing order before
+  scoring (`rearrange_quantiles` in the assumptions), because stored forecasts can cross: a stored
+  median can sit above the 0.75 quantile. The result counts the rows that crossed. Setting
+  `rearrange_quantiles` false scores the columns as stored. A row with a null or non-finite
+  quantile is left as stored.
+- Ensemble members enter through `net_flow_members`, which pairs the demand's and the generators'
+  members by member number and returns the node's metered flow per member, and
+  `quantiles_from_members`, which reduces members to the `q<percent>` columns above. A set of
+  members cannot cross, so the member path needs no rearrangement.
 - A node row present in one arm and absent from another is dropped from every arm.
 - Every arm must hold the same seeds, because `align_arms` intersects on the seed and an arm with
   fewer seeds would trim every other arm; `node_curtailment` raises instead.
@@ -144,6 +153,29 @@ SCALED_LIMIT_FRACTIONS: Final[tuple[float, ...]] = (0.9, 0.75, 0.5)
 
 DEFAULT_SCALED_LIMIT_FRACTION: Final[float] = 0.9
 """The default fraction. A scaled limit of 0.9 is 0.9 times the maximum, never a percentile."""
+
+MEMBER_ROW_KEYS: Final[tuple[str, ...]] = (
+    "time_series_id",
+    "power_fcst_init_time",
+    "valid_time",
+    "seed",
+)
+"""The columns that identify one forecast row of a series, before its members are reduced."""
+
+MEMBER_QUANTILE_LEVELS: Final[tuple[float, ...]] = (
+    0.01,
+    0.05,
+    0.10,
+    0.25,
+    0.40,
+    0.50,
+    0.60,
+    0.75,
+    0.90,
+    0.95,
+    0.99,
+)
+"""The quantile levels `quantiles_from_members` writes: the levels of the stored quantile sets."""
 
 KEY_COLUMNS: Final[tuple[str, ...]] = ("node_id", "power_fcst_init_time", "valid_time", "seed")
 """The columns that identify one forecast row of one node."""
@@ -263,6 +295,9 @@ class NodeCurtailmentAssumptions:
         lead_max_hours: The longest forecast lead scored, exclusive.
         use_generators: True to cap generators; false for the node-only variant, in which the
             planned node curtailment is assumed delivered exactly.
+        rearrange_quantiles: True to sort each forecast row's `q<percent>` columns into increasing
+            order before scoring, so that a stored forecast whose quantiles cross is scored as the
+            quantile function it implies. False scores the columns as stored.
     """
 
     prices_gbp_per_mwh: tuple[float, ...] = PRICES_GBP_PER_MWH
@@ -272,6 +307,7 @@ class NodeCurtailmentAssumptions:
     lead_min_hours: float = 12.0
     lead_max_hours: float = 36.0
     use_generators: bool = True
+    rearrange_quantiles: bool = True
 
     @property
     def tau(self) -> float:
@@ -310,6 +346,9 @@ class NodeCurtailmentResult:
         n_generator_rows_missing_actual: The same count where the forecast is finite and the actual
             output is missing or not finite. Such a generator is instructed, and its loss counts as
             0 MWh, so a missing actual can understate the curtailed energy.
+        n_node_rows_rearranged: Node forecast rows, summed over arms, whose stored quantiles
+            crossed and were sorted. Zero when `rearrange_quantiles` is false.
+        n_generator_rows_rearranged: The same count for generator forecast rows.
     """
 
     per_arm: pl.DataFrame
@@ -322,6 +361,8 @@ class NodeCurtailmentResult:
     n_rows_dropped_not_in_every_arm: int
     n_generator_rows_missing_forecast: int
     n_generator_rows_missing_actual: int
+    n_node_rows_rearranged: int = 0
+    n_generator_rows_rearranged: int = 0
 
 
 def season_expression(*, time_column: str) -> pl.Expr:
@@ -535,6 +576,189 @@ def capacity_forecast(*, generator_frame: pl.DataFrame, table: NodeTable) -> pl.
         generator_frame.join(capacities, on="time_series_id", how="inner", maintain_order="left")
         .with_columns(**{c: pl.col("capacity_mw") for c in quantiles})
         .drop("capacity_mw")
+    )
+
+
+def rearrange_quantiles(*, frame: pl.DataFrame) -> tuple[pl.DataFrame, int]:
+    """Sort each row's `q<percent>` columns into increasing order.
+
+    A forecast whose stored quantiles cross (for example a median above the 0.75 quantile) is not a
+    quantile function. Sorting the values across the levels is the standard rearrangement, and it
+    leaves a monotone row unchanged. A row with a null or non-finite quantile is left as stored, so
+    that `node_curtailment` drops it as it would otherwise.
+
+    Args:
+        frame: A forecast frame with `q<percent>` columns.
+
+    Returns:
+        The frame with sorted quantile columns, and the number of rows that crossed.
+    """
+    columns = sorted(c for c in frame.columns if _is_quantile_column(c))
+    if not columns or frame.height == 0:
+        return frame, 0
+    stored = frame.select(columns).to_numpy()
+    complete = np.isfinite(stored).all(axis=1)
+    ordered = np.sort(stored, axis=1)
+    crossed = complete & (ordered != stored).any(axis=1)
+    if not crossed.any():
+        return frame, 0
+    result = np.where(complete[:, None], ordered, stored)
+    return (
+        frame.with_columns(
+            **{c: pl.Series(result[:, i], dtype=frame.schema[c]) for i, c in enumerate(columns)}
+        ),
+        int(crossed.sum()),
+    )
+
+
+def _rearranged_inputs(
+    *,
+    node_forecasts: Mapping[str, pl.DataFrame],
+    generator_forecasts: Mapping[str, pl.DataFrame],
+    assumptions: NodeCurtailmentAssumptions,
+) -> tuple[dict[str, pl.DataFrame], dict[str, pl.DataFrame], int, int]:
+    """Sort the quantile columns of every arm's frames, unless the assumptions switch it off.
+
+    Args:
+        node_forecasts: Each arm's node forecast frame.
+        generator_forecasts: Each arm's generator forecast frame.
+        assumptions: Supplies `rearrange_quantiles` and `use_generators`.
+
+    Returns:
+        The node frames, the generator frames, and the numbers of node and generator rows, summed
+        over arms, that crossed. Generator frames are untouched in node-only mode.
+    """
+    if not assumptions.rearrange_quantiles:
+        return dict(node_forecasts), dict(generator_forecasts), 0, 0
+    nodes = {arm: rearrange_quantiles(frame=frame) for arm, frame in node_forecasts.items()}
+    generators = (
+        {arm: rearrange_quantiles(frame=frame) for arm, frame in generator_forecasts.items()}
+        if assumptions.use_generators
+        else {arm: (frame, 0) for arm, frame in generator_forecasts.items()}
+    )
+    return (
+        {arm: frame for arm, (frame, _) in nodes.items()},
+        {arm: frame for arm, (frame, _) in generators.items()},
+        sum(n for _, n in nodes.values()),
+        sum(n for _, n in generators.values()),
+    )
+
+
+def quantiles_from_members(
+    *,
+    members: pl.DataFrame,
+    value_column: str,
+    levels: Sequence[float] = MEMBER_QUANTILE_LEVELS,
+) -> pl.DataFrame:
+    """Reduce ensemble members to the `q<percent>` columns that `node_curtailment` reads.
+
+    Args:
+        members: One row per forecast row and ensemble member: `MEMBER_ROW_KEYS`, `member`, and
+            `value_column`. A member whose value is null or not finite is left out of its row.
+        value_column: The column holding the member's value in MW.
+        levels: The quantile levels to write, each a whole percent.
+
+    Returns:
+        One row per distinct `MEMBER_ROW_KEYS`, sorted by them, with `n_members` (the members that
+        were finite) and one `q<percent>` column per level. Each quantile interpolates linearly
+        between the sorted members, so 100 members drawn from a quantile function return that
+        function's quantiles to within the spacing of the members. A row with no finite member has
+        no output row.
+    """
+    return (
+        members.filter(pl.col(value_column).is_finite())
+        .group_by(MEMBER_ROW_KEYS)
+        .agg(
+            n_members=pl.len(),
+            **{
+                level_column(level=level): pl.col(value_column).quantile(
+                    level, interpolation="linear"
+                )
+                for level in levels
+            },
+        )
+        .sort(MEMBER_ROW_KEYS)
+    )
+
+
+def net_flow_members(
+    *, demand_members: pl.DataFrame, generator_members: pl.DataFrame, table: NodeTable
+) -> pl.DataFrame:
+    """Combine each ensemble member's demand and generation into the node's metered flow, in MW.
+
+    Members are paired by member number, so member 7 of the demand is combined with member 7 of
+    every generator and the correlation between weather-driven demand and generation inside one
+    ensemble member is kept. The node's net export in a member is the sum of its generators' output
+    minus its demand, and the metered flow is `export_sign` times that export, the convention of
+    the quantile columns that `node_curtailment` reads.
+
+    Only generators with `is_forecast` true and a `connection_date` on or before the valid time
+    are summed. If any of those generators has no finite value in a member, that member is left out
+    of the node row, because its net export is unknown. A node with no such generator takes zero
+    generation. A node with a null `export_sign` is left out.
+
+    Args:
+        demand_members: One row per node row and member: `MEMBER_ROW_KEYS` with the node's
+            `time_series_id`, `member`, and `demand_mw` (the load drawn from the node, positive).
+        generator_members: One row per generator, node row, and member: `MEMBER_ROW_KEYS` with the
+            generator's `time_series_id`, `member`, and `output_mw`.
+        table: The node and generator tables; `generators.node_id` links each generator to its
+            node.
+
+    Returns:
+        One row per node row and surviving member: `MEMBER_ROW_KEYS`, `member`, and `flow_mw`.
+
+    Raises:
+        ValueError: If either members frame repeats a row key and member number.
+    """
+    for name, frame in (
+        ("demand_members", demand_members),
+        ("generator_members", generator_members),
+    ):
+        if frame.select(pl.struct([*MEMBER_ROW_KEYS, "member"]).is_duplicated().any()).item():
+            msg = f"{name} repeats a (time_series_id, init time, valid time, seed, member) row"
+            raise ValueError(msg)
+    keys = [c for c in MEMBER_ROW_KEYS if c != "time_series_id"]
+    node_dtype = demand_members.schema["time_series_id"]
+    generator_dtype = generator_members.schema["time_series_id"]
+    nodes = table.nodes.filter(pl.col("export_sign").is_not_null()).select(
+        "node_id", pl.col("time_series_id").cast(node_dtype), "export_sign"
+    )
+    generators = table.generators.filter(pl.col("is_forecast")).select(
+        pl.col("generator_id").cast(generator_dtype).alias("generator_id"),
+        "node_id",
+        "connection_date",
+    )
+    outputs = generator_members.select(
+        *keys,
+        "member",
+        generator_id="time_series_id",
+        output_mw=pl.when(pl.col("output_mw").is_finite()).then(pl.col("output_mw")),
+    )
+    return (
+        demand_members.join(nodes, on="time_series_id", how="inner")
+        .join(generators, on="node_id", how="left")
+        .with_columns(
+            generator_id=pl.when(
+                pl.col("connection_date").is_null()
+                | (pl.col("connection_date") <= pl.col("valid_time").dt.date())
+            ).then(pl.col("generator_id"))
+        )
+        .join(outputs, on=["generator_id", *keys, "member"], how="left")
+        .group_by([*MEMBER_ROW_KEYS, "member"])
+        .agg(
+            demand_mw=pl.col("demand_mw").first(),
+            export_sign=pl.col("export_sign").first(),
+            generation_mw=pl.col("output_mw").sum(),
+            n_unknown=(pl.col("generator_id").is_not_null() & pl.col("output_mw").is_null()).sum(),
+        )
+        .filter(pl.col("n_unknown") == 0, pl.col("demand_mw").is_finite())
+        .select(
+            *MEMBER_ROW_KEYS,
+            "member",
+            flow_mw=pl.col("export_sign") * (pl.col("generation_mw") - pl.col("demand_mw")),
+        )
+        .sort([*MEMBER_ROW_KEYS, "member"])
     )
 
 
@@ -938,6 +1162,13 @@ def node_curtailment(
     _require_unique_row_keys(inputs=inputs)
     _require_same_seeds(inputs=inputs)
     arms = sorted(node_forecasts)
+    node_forecasts, generator_forecasts, n_node_rearranged, n_generator_rearranged = (
+        _rearranged_inputs(
+            node_forecasts=node_forecasts,
+            generator_forecasts=generator_forecasts,
+            assumptions=assumptions,
+        )
+    )
     series_without_capacity = {
         int(s)
         for frame in node_forecasts.values()
@@ -1039,6 +1270,8 @@ def node_curtailment(
         n_rows_dropped_not_in_every_arm=n_dropped_arms,
         n_generator_rows_missing_forecast=n_missing_forecast,
         n_generator_rows_missing_actual=n_missing_actual,
+        n_node_rows_rearranged=n_node_rearranged,
+        n_generator_rows_rearranged=n_generator_rearranged,
     )
 
 

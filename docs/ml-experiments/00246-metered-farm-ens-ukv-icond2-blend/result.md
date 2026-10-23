@@ -193,3 +193,11 @@ interval including zero; the B3 interval excludes zero by a small margin (-1.8% 
 - **What to try next.** A weather product of a different kind from a regional deterministic
   forecast, such as a satellite-derived cloud nowcast for the early hours of the day, and a small
   learned irradiance-response component fed by the three products.
+
+## Data-processing note
+
+Experiment 268 found crossing quantiles in 26,344 of its 77,897 generator-forecast rows (34%), but
+all of them belong to three generators that are not solar farms, so none is on this page.
+[Experiment 273](../00273-metered-farm-sorted-quantile-rescore/result.md) counted 0 crossing rows in
+every arm here, because the fit scripts sorted the 11 quantiles before writing them, so sorting does
+not change the scores on this page.
