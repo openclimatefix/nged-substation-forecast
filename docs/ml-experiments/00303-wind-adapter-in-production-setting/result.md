@@ -35,8 +35,8 @@ decision_rule: >-
   Supported if P5 beats P1 by at least 0.10 points on the kept rows, with the Bonferroni interval
   (8 planned contrasts, level 99.375%) wholly below zero (negative is better). The threshold is 0.10
   points because porting the adapter adds a neural network and a fine-tuning step to the weekly
-  retraining, which a gain under 0.10 points does not justify. Partly supported if P5 or P8 beats P1 with an interval
-  below zero but under 0.10 points. Not supported if no arm beats P1. Stop and check the
+  retraining, which a gain under 0.10 points does not justify. Partly supported if P5 or P8 beats
+  P1 with an interval below zero but under 0.10 points. Not supported if no arm beats P1. Stop and check the
   ERA5-to-ensemble mismatch if P2 is worse than P0 by more than 0.3 points. Intervals resample
   whole months of the ensemble run date and the three seeds (50,000 resamples); farms are not
   resampled. Planned contrasts, each first arm minus second arm so that a negative number means the
