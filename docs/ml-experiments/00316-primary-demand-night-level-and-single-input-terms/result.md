@@ -77,7 +77,8 @@ take_home_message: >-
   correcting a level error: a night level offset reproduces only 14% of the gain, with a wide
   interval. For the April-to-June gap to BG2, a post hoc test points at the sunshine response of the
   best-guess model (0.36 of the gap recovered on the worst half-hours, but only 0.19 at one of the two
-  Primaries), so the result is a lead and not a finding.
+  Primaries), and a differently fitted surrogate in the audit did not reproduce it, so the ranking
+  of the families is unreliable.
 advice:
   - >-
     Test a band-width correction for D10's night half-hours before building another band head,
@@ -92,8 +93,9 @@ advice:
     because the unaveraged graft moved arm D's level by about 10 points and failed its own gate
     (figure 3).
   - >-
-    Replicate the sunshine-response lead at D9 and on more April-to-June weeks before building a
-    solar-term correction, because it recovers 0.48 of the gap at D5 and 0.19 at D9 (figure 3).
+    Replicate the sunshine-response lead at D9, on more weeks, and with a differently fitted
+    surrogate before building a solar-term correction, because it recovers 0.48 of the gap at D5
+    and 0.19 at D9, and an audit refit put it near zero (figure 3, Checks).
   - >-
     Report each band head's gain at D10 and at the other five Primaries separately, because the
     other five together gain 0.007 points (-0.014 to 0.026) under the pinball head (Results).
@@ -106,9 +108,9 @@ night-time level correction to that forecast, with no head, reproduces only 14% 
 (95% interval -16% to 99%). The heads narrow D10's night-time 5% to 95% band by 7.5 points on
 average, and applying only that narrowing scores 63% of the gain (42% to 116%). The second question,
 which family of single-input terms of the best-guess forecast trails BG2 in April to June, has a
-post hoc lead: the sunshine response recovers 0.36 of the gap on the worst half-hours (0.30 to
-0.44), but only 0.19 at one of the two Primaries. The verdict is inconclusive, and stage 2 was not
-run.
+post hoc ranking that is not reliable: the sunshine response recovers 0.36 of the gap on the worst
+half-hours (0.30 to 0.44), but only 0.19 at one of the two Primaries, and an audit refit of the
+surrogate put sunshine near zero. The verdict is inconclusive, and stage 2 was not run.
 
 **Terms.** The default is the stack of additive terms and neural-network layers that forecasts
 Primary substation demand. A band head is an extra neural-network layer that reshapes the default's
@@ -187,8 +189,9 @@ with ISO-week blocks (14 weeks), because three month blocks are too few.
 - **Stage 1: the curves.** Figure 4 shows the refit's recent-power response is steeper than the
   surrogate's (about -13 to +12 points against -3 to +8). Arm D carries recent power through its own
   filter, which the surrogate cannot see.
-- **Stage 2 was not run.** The pre-registered analysis failed its gate, and the post hoc lead rests
-  on one Primary. A stage 2 correction head would first need the lead replicated.
+- **Stage 2 was not run.** The pre-registered analysis failed its gate, and the post hoc ranking
+  rests on one surrogate fit and one Primary. A stage 2 correction head would first need the lead
+  replicated.
 
 ## Checks
 
@@ -203,7 +206,16 @@ with ISO-week blocks (14 weeks), because three month blocks are too few.
   were sorted where the raw outputs cross. This was not examined.
 - **Triggers that fired:** a control failed (the stage 1 gate), a result contradicted its
   prediction (the night offset), and later experiments depend on the result (the ranked list's
-  night-level and pooled-solar-term experiments). No Opus audit was run.
+  night-level and pooled-solar-term experiments).
+- **Audit (one fresh Sonnet agent, no Opus).** It re-derived the headline numbers from the stored
+  files with its own code. The night share (0.883), the offset share (0.143), the pre-registered
+  all-five S (0.018), the post hoc all-five S (0.592), and the sunshine S (0.363) all matched to
+  within 0.003; interval ends differed by up to 0.045 (resampling noise). It found no leakage in the
+  offset. It also refitted the surrogate as one pooled depth-1 model over D5 and D9 and, with its
+  own averaging, got sunshine near 0.00 and only temperature and other weather positive, so the
+  family ranking depends on the surrogate. This is why the ranking is labelled post hoc and
+  unreliable above. The audit's input-column mapping was a guess and its surrogate differs from the
+  experiment's (one model per site and month).
 
 ## Caveats and next steps
 
@@ -212,6 +224,8 @@ with ISO-week blocks (14 weeks), because three month blocks are too few.
   temperature-smooth offset was not tried.
 - The level-matched graft was chosen after seeing the failed one, so it is post hoc. It is an
   emulation, and the true graft needs arm D's own term contributions.
+- Stage 2 was not run because the brief's gate was not met: the pre-registered graft recovered under
+  0.30 for every family, and the post hoc ranking did not survive the audit refit.
 - The narrowing of D10's bands is the measured change. No coverage of the default's night bands is
   reported, so "too wide" is not established.
 - Candidate follow-ups: a band-width correction for D10's night half-hours without a neural head;
