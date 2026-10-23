@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Draw the figures of experiment 314 from `work/report/report_scored.json` and the stored arms.
 
-PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-primary-demand-mixture-density-band-head:ml-experiments/00314-primary-demand-gated-or-pinball-band-head \
+PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-*:ml-experiments/00314-* \
         uv run --no-sync python ml-experiments/00314-*/e00314_charts.py
 """
 

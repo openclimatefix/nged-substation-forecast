@@ -8,7 +8,7 @@ quantile network around the default's median), GP (P gated the same way). The ga
 contrasts (G, P, GP minus R) are read at 99.667% (k = 3). The replicate year has no sunny flag, so
 only the ungated arms M and P can be scored there.
 
-    PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-primary-demand-mixture-density-band-head:ml-experiments/00314-primary-demand-gated-or-pinball-band-head \
+    PYTHONPATH=ml-experiments/00278-stack-retraining-cadence:ml-experiments/00311-*:ml-experiments/00314-* \
         uv run --no-sync python ml-experiments/00314-*/e00314_score.py
 """
 
