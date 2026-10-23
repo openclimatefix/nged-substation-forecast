@@ -1,13 +1,13 @@
 # ruff: noqa: E501, PLR0912, PLR0915
 """RULE, ORACLE, and the fixed forecasts on experiment 297's injected-world rows.
 
-Reads experiment 297's score rows (K0, GAM_ONLY with its own bands, BAND_HEAD; ensemble weather,
-44 worlds, six Primary substations), builds RULE (K0 while the 24-hour mean residual of measured
-power against GAM_ONLY says the arrangement is abnormal, GAM_ONLY otherwise), RULE_GAP (the same
-rule on the plain gap of K0 minus GAM_ONLY, as the comparator), ORACLE (the arm with the lower
-quantile score on that row and target) and ORACLE_STATE (K0 while a shift is on, GAM_ONLY
-otherwise), scores everything by row group and target, and prints the numbers the page quotes. Intervals resample whole shifts (world and event)
-and whole calendar months for ordinary rows, 95%, 20,000 draws.
+Reads experiment 297's score rows (K0, GAM_ONLY with its own bands, BAND_HEAD; ensemble weather, 44
+worlds, six Primary substations), builds RULE (K0 while the 24-hour mean residual of measured power
+against GAM_ONLY says the arrangement is abnormal, GAM_ONLY otherwise), RULE_GAP (the same rule on
+the plain gap of K0 minus GAM_ONLY, as the comparator), ORACLE (the arm with the lower quantile
+score on that row and target) and ORACLE_STATE (K0 while a shift is on, GAM_ONLY otherwise), scores
+everything by row group and target, and prints the numbers the page quotes. Intervals resample whole
+shifts (world and event) and whole calendar months for ordinary rows, 95%, 20,000 draws.
 
     uv run --no-sync python e00309_inj.py r24   # the primary RULE; "d" runs the gap comparator
 """
