@@ -94,22 +94,39 @@ onshore wind farms and asks whether a head trained on the pool transfers to W1 t
 - **Base model (R0):** experiment 230's A0r recipe fitted per farm on ERA5 before 2024-04-01, run on
   the 51 members, mixed, and spread-adjusted as in experiment 259. The brief allowed R0 or R1; R0 is
   used because experiment 259 stored R0 for W1 to W3 and R0 fits quickly for dozens of farms.
-- **Farm selection:** keep a BMU if, after the curtailment drop, it has at least 2 years of clean
-  output before 2024-04-01 and at least 12 months of clean output after, a share of exact zeros
-  under 0.3, and a mean capacity factor between 0.10 and 0.50. Capacity is the 99.5th percentile of
-  the farm's clean output. Negative readings (station load) are set to zero.
+- **Farm selection:** every test uses output before 2024-04-01 only. Keep a BMU if, after the
+  curtailment drop, it has at least 2 years of clean output, a share of exact zeros under 0.3, and
+  a mean capacity factor between 0.10 and 0.50. Capacity is the 99.5th percentile of the farm's
+  clean output before 2024-04-01. Negative readings (station load) are set to zero. A BMU with no
+  output after 2025-06-17 is also dropped, as an availability check. If more than 40 farms
+  qualify, the 40 with the longest clean history are kept. The farm list is the experiment's own
+  (name match at similarity 0.85), not a W-D list, because no W-D experiment exists; the write-up
+  reports how many kept BMUs are extensions or share an REPD row with another BMU.
 - **Curtailment drop:** drop a half-hour that overlaps any BOALF acceptance for the BMU, and a
   half-hour whose PN exceeds the metered output by more than 5% of capacity. The share dropped is
-  reported per farm.
+  reported per farm. BOALF and PN select rows only and are never head inputs. The same drop applies
+  to the pool's training and scored rows. Because the drop removes low outputs, a no-drop
+  sensitivity run (P2 trained and scored on the pool without the drop) is reported.
 - **Head (H):** experiment 259's H5c network with the same 11 base quantiles, 7 member summaries and
   lead; the one-hot farm columns are replaced by the farm's capacity (log MW), turbine rating, and
   hub height. Hub height is REPD's where present and otherwise predicted from turbine rating by a
-  linear fit over the REPD rows that have both; W1 to W3 take the pool's median hub height because
-  their real values are private.
-- **Arms:** P0 (R0 alone), P1 (H trained on W1 to W3), P2 (H trained on the public farms, zero
+  linear fit over the training-fold farms' REPD rows that have both; W1 to W3 take the pool's median
+  hub height because their real values are private, so only capacity and turbine rating tell the
+  three farms apart. The head's base-quantile inputs are R0's (experiment 259's H5c corrected R1).
+- **Arms:** T1 (an offset table per lead day and quantile, fitted on W1 to W3's own training runs, as
+  experiment 259's T5 was, added after plan review), P0 (R0 alone), P1 (H trained on W1 to W3), P2 (H trained on the public farms, zero
   shot), P3 (P2 fine-tuned on W1 to W3's training runs, at most 3 epochs at a tenth of the learning
   rate), X2 (non-neural XGBoost stage, `colsample_bytree` 1, trained on the pool), BL2 (pooled head
-  with lead, capacity, hub height and calendar columns only).
+  with lead, capacity, hub height and calendar columns only), and X3 (X2 refitted on the pool plus
+  W1 to W3's training runs, added after plan review so that the non-neural stage has a fine-tuned
+  counterpart of P3).
+- **Region check:** the write-up tabulates the kept farms by REPD country and region, capacity, and
+  turbine rating, and says whether W1 to W3's capacities and ratings lie inside the pool's range.
+  If at least 3 kept farms are in England or Wales, one fold holds them out beside the spatial
+  blocks and a descriptive arm trains on them alone. If fewer, the write-up says C1 to C3 test
+  transfer from the public farms' regions. A diagnostic compares the pool's mean offset per
+  quantile and lead day with W1 to W3's own offset table (T1): a P2 failure with a P3 success means
+  the bias is specific to the farm, not that pooling does not help.
 - **Folds inside the pool:** five spatial blocks (k-means of farm cell positions), because farms in
   one ERA5 cell see identical weather and would leak across a random split. Each fold's farms are
   scored by a head trained on the other four blocks and compared with the same farms scored by the
@@ -119,11 +136,40 @@ onshore wind farms and asks whether a head trained on the pool transfers to W1 t
   physics core (experiment 230's B1, with standard air density at the public farms) on the same
   windows for W1 to W3; and an XGBoost base model trained on the public farms alone, applied to W1
   to W3.
+- **Training split:** training rows have both run start and valid time before 2025-04-16; early
+  stopping (and the choice of P3's epoch count, for P1, P2, and P3 alike) uses runs from 2025-04-16
+  to 2025-06-16. The spread factor is fitted on earlier cases only, as in experiment 259, pooled
+  over the pool's farms. Spatial blocks still share synoptic weather on the same days, so the
+  held-out-farm check is optimistic; the temporal gap between training and the scored year is the
+  guard for the headline contrasts.
 - **Seeds and rows:** three seeds on W1 to W3 (R0 seeds 0 to 2 and head seeds 0 to 2); five head
   seeds in the pool. Training runs start 2024-04-01 to 2025-04-15, early stopping uses runs from
   2025-04-16 to 2025-06-16, and no valid time on or after 2025-06-17 enters training.
   The public farms' scored rows are the same 53 Tuesday runs, at the ensemble's native 3-hourly and
   6-hourly valid times (descriptive).
+
+## Reading the results
+
+- **C2 alone does not license a port.** Experiment 259 found that a lookup table recovered 92% of
+  its head's gain, so P3 minus P0 can fall below zero for any correction that learns the bias. The
+  write-up therefore also reports P3 and P2 minus the better of P1 and T1 (a labelled addition, not
+  one of the three decisive contrasts) and says plainly if the pool adds nothing over the offset
+  table.
+- **C1 is a strong prediction:** P1 may already gain over P0, as experiment 259's head did, so
+  P2 minus P1 at -0.10 or lower means the pool adds to that gain. P2 minus P0 and P3 minus P0 are
+  reported at every lead band.
+- **C3 decides the zero-shot stage** (P2 against X2). X3 against P3 is reported beside it. Interval
+  half-widths are reported beside every contrast, and `inconclusive` is a possible verdict.
+- **Reporting:** quantile score, pinball losses, T, and coverage for every arm, absolute and as
+  contrasts, by lead band (12 to 36 hours, days 1 and 2, days 3 to 6, day 7 and later, all leads).
+  W1 to W3 must hold 48 months of ERA5-aligned power before 2024-04-01 for the 48-month
+  learning-curve point; otherwise that point is dropped.
+- **Compute:** CPU for the base fits, GPU for the heads, about 2 to 4 GPU hours. The manager is
+  asked before 4 GPU hours are exceeded, and 10 are never exceeded. The ERA5 read is free.
+- **Lead values:** the pool's rows sit at the ensemble's 3-hourly and 6-hourly valid times, and W1
+  to W3 rows at half-hourly times; the head takes lead as a number, so it applies to both.
+- **Learning-curve claim:** "the pool replaces missing history" is descriptive. An extra arm
+  fine-tunes the public-farm base on the farm's own last 12 months.
 
 ## Stop rules
 
