@@ -41,8 +41,8 @@ decision_rule: >-
   stage 1 names a family, or if no single family reaches 0.30 but the graft of solar, lags, and
   calendar together reaches 0.50 (the brief's two rules for that case disagree, and this plan
   resolves them that way). A stage 2 addendum with its arms, cut protocol, and minimum gain (0.03
-  points, a new head) would be committed before stage 2 runs; stage 2 was not run. Nothing is ported by stages 0 and 1, so no
-  porting threshold applies to them.
+  points, a new head) would be committed before stage 2 runs; stage 2 was not run. Nothing is ported by stages 0 and 1,
+  so no porting threshold applies to them.
 benchmark: >-
   Primary demand research default 1 (experiment 251's arm 1) on row set fold_a_daily_gap_v1; BG2,
   `manual_heuristic`, and `climatology` beside it.
