@@ -63,7 +63,8 @@ regime. This experiment asks whether a persistent regime can be found in a Prima
 the residual of a lagless GAM alone.
 
 **Prior work taken forward.** Part A of the brief (another session) tests a regime-aware forecast at
-D8 given a known break date. [Experiment 194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)
+D8 given a known break date. [Experiment
+194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)
 dated D8's break in the week of 2023-08-14, and is the known answer. [Experiment
 207](../00207-dp-meter-regime-steps-e2-step-capacity-known-answer/result.md) found that a
 step-capable solar path invents steps unless penalised, so false breaks from PV are the known risk.
@@ -132,7 +133,8 @@ partitioning of a multivariate series, as in [Killick et al.
 - C1: D8 dating error against 14 days.
 - C2: false breaks per Primary-year at the held-out controls against 1.
 - C3: persistent and temporary recall of the injections, each against 0.8.
-- C4: forecast error with the latest-regime offset minus without it, and minus the trailing 60-day offset, on rows after the step.
+- C4: forecast error with the latest-regime offset minus without it, and minus the trailing
+  60-day offset, on rows after the step.
 
 **Checks to report.** The median forecast minus the mean forecast per site (the GAM_ONLY fit has no
 spread, so this is zero by construction and stated as such); the mean-forecast error beside the C4
