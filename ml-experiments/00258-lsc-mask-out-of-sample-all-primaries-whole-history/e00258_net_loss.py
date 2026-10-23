@@ -1,7 +1,7 @@
 """Where the net annual loss of the LR_b20 mask comes from: the alarms that cost the most.
 
 For each series, scores K0 and the LR_b20 arm of every fold on every row, sums the score
-difference over the rows whose target lies inside each LR_b20 span (from the step stamp to the
+difference of that span's own fold (weighted 1/|folds|) over the rows whose target lies inside each LR_b20 span (from the step stamp to the
 end of the span's last known stamp plus 72 hours), and lists the spans with the largest total, with
 the length of the span and whether a labelled load shift or a logged closure overlaps it.
 
@@ -31,7 +31,7 @@ def main() -> None:
         k0 = sc.row_metrics(
             data=data, correction=stored["K0"].astype(float), offsets=offsets, band=band
         )["qs"]
-        diff = np.zeros_like(k0)
+        diff_of_fold = {}
         for fold in folds:
             arm = sc.row_metrics(
                 data=data,
@@ -39,13 +39,14 @@ def main() -> None:
                 offsets=offsets,
                 band=band,
             )["qs"]
-            diff += (arm - k0) / len(folds)
+            diff_of_fold[fold] = (arm - k0) / len(folds)
         own = sc.closure_blocks(series=series, neighbours=False)
         spans = pl.read_parquet(h.HARNESS_DIR / f"spans_{series}.parquet").filter(
             pl.col("arm").str.starts_with("LR_b20")
         )
         mine = events.filter(pl.col("series").list.contains(series))
         for r in spans.iter_rows(named=True):
+            diff = diff_of_fold[int(r["arm"].rsplit("_f", 1)[1])]
             lo, hi = r["onset"], r["known"] + sc.AFTER_HALF_HOURS
             inside = (targets >= lo) & (targets < hi) & np.isfinite(diff)
             labelled = any(e["onset"] < hi and e["end"] > lo for e in mine.iter_rows(named=True))
