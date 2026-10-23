@@ -22,25 +22,28 @@ hypothesis: >-
   otherwise.
 prediction: >-
   Written before any fit. On the known answer, D8's break on 2023-08-15, the segmentation places
-  the break within 14 days. At the 14 Primaries with no injection, it finds under 1 false break
-  per Primary-year. It labels at least 80% of injected persistent steps as persistent. It is
-  expected to fail on two counts. The PV capacity steps of experiment 207 (the PV term of the GAM
-  explains these in part) may produce false breaks in summer, and a persistent step shorter than
-  about 60 days before the end of the data is expected to be called temporary.
+  the break within 14 days. At the 15 Primaries with no injection, it finds under 1 false break
+  per Primary-year. On injected steps in held-out Primaries and even-numbered months, it labels at
+  least 80% of persistent steps as persistent and at least 80% of temporary shifts as temporary.
+  It is expected to fail on two counts. The PV capacity steps of experiment 207 may produce false
+  breaks in summer, and a permanent transfer that moves load between two Primaries is expected to
+  be called temporary, because the neighbour rule reads any mirrored step as a load shift.
 decision_rule: >-
   Verdict `supported` when all three parts of the prediction hold: D8 dated within 14 days, under 1
-  false break per Primary-year (point estimate, and the upper end of a 95% bootstrap interval over
-  Primaries under 1.5), and a persistent-step classification accuracy of at least 80% on the
-  held-out (even-month) onsets with a 95% interval lower bound above 70%. `partly supported` when
-  two hold. `not supported` otherwise. The forecast gain from the latest-regime offset is reported
-  and does not set the verdict. The offset is a candidate for production at any gain whose
-  paired interval excludes zero, since it costs one extra number per series (threshold zero). The
-  penalty and the minimum segment length are chosen on the odd calendar months and every reported
-  figure uses the even calendar months, as the brief requires.
+  false break per Primary-year (point estimate, with the upper end of the 98.75% bootstrap
+  interval over Primaries under 1.5), and both the persistent recall and the temporary recall at
+  least 80% on the held-out injections, with each 98.75% interval lower bound above 70%. A
+  classifier that labels everything persistent therefore fails on temporary recall. `partly
+  supported` when two parts hold. `not supported` otherwise. Steps within 150 days of the end of
+  the data are not injected, because they cannot show a return. Every interval is 98.75% (the
+  Bonferroni level for four contrasts). The forecast gain is reported and does not set the verdict.
+  The offset is a candidate for production at any gain whose paired interval excludes zero, since
+  it costs one extra number per series (threshold zero), and only if it also beats the trailing
+  60-day mean residual that needs no segmentation. Tuning uses odd calendar months and tuning
+  Primaries; reporting uses even calendar months and held-out Primaries (below).
 benchmark: >-
-  No forecast benchmark. For the forecast gain: the same monthly-refitted GAM_ONLY without the
-  offset, on the same rows. Reference runs: a segmentation of the residual with the penalty set to
-  infinity (no breaks) and a random-date control with the same number of breaks.
+  No forecast benchmark. For the forecast gain: the same monthly-refitted GAM_ONLY without an
+  offset, and with a trailing 60-day mean residual as the offset (no segmentation).
 row_set_id: >-
   Own rows (not comparable with the leaderboard). Segmentation: the daily mean residual of every
   Primary in the 16-Primary cache of experiment 106, 2019-09-17 to 2026-06-30. Forecast gain: the
@@ -77,44 +80,59 @@ partitioning of a multivariate series, as in [Killick et al.
   2026-06-30; the residual is the reading minus the fit. Two daily series per Primary: the mean
   residual over the day, and the mean residual over 00:00 to 06:00 minus the mean over 10:00 to
   16:00 (a change of daily shape). Both are divided by the Primary's robust noise (1.4826 times the
-  median absolute deviation of day-to-day changes) and by the Primary's capacity unit for reporting.
+  median absolute deviation of day-to-day changes, over the square root of 2).
 - **Segmentation.** Optimal partitioning by dynamic programming with an L2 cost on the two series,
   a penalty per break `beta` times the log of the number of days, and a minimum segment length of
-  `m` days. The grid is `beta` in {2, 4, 8, 16, 32} and `m` in {14, 30, 60}.
-- **Choosing the penalty.** The pair (`beta`, `m`) is chosen on the odd calendar months: it
-  maximises the persistent classification accuracy on injections with onsets in odd months,
-  subject to under 1 false break per Primary-year counting only the breaks dated in odd months
-  (doubled to annualise) at the 14 Primaries that have no injection. All reported figures use
-  onsets and breaks in even months.
+  `m` days. The grid is `beta` in {2, 4, 8, 16, 32, 64} and `m` in {7, 14, 30}.
+- **Tuning and reporting split.** The 15 Primaries other than D8 are split by sorted label into
+  tuning Primaries (odd positions) and held-out Primaries (even positions). The pair (`beta`, `m`)
+  is chosen on injections with onsets in odd calendar months at the tuning Primaries: it
+  maximises the mean of persistent and temporary recall, subject to under 1 false break per
+  Primary-year at the tuning Primaries' unmodified series. Every reported figure uses injections
+  with onsets in even months at the held-out Primaries, and false breaks at the held-out
+  Primaries' unmodified series (the unmodified series may hold real regimes, which count as false
+  breaks, so the false-break rate is an upper bound).
 - **Labelling a segment boundary.** *Temporary* when the level after the next boundary returns
   within 0.5 noise units of the level before it, within 120 days; or when a neighbouring Primary
   (the five Primaries with the highest residual correlation) shows a boundary within 3 days with
-  the opposite sign and at least half the size. *Persistent* otherwise. *Measurement* only for a
-  boundary within 3 days of a date on a supplied list; the list is empty, since no meter-change
-  dates are on file, so that class is not scored.
-- **Tests.** (a) D8 known break. (b) Injections at Primaries with the receiver set: persistent
-  steps of 10% and 25% of the Primary's load, flat (the same MW at every half-hour) and with a
-  profile (the Primary's own load shape, so the step scales with demand), onset on the first of an
-  even or odd month in 2022 to 2024; temporary shifts of 25% for 14, 30, and 60 days, injected
-  with the donor's mirror at the Primary with the highest correlation (the receiver gets +x, the
-  donor -x). Controls: zero-size injections and the unmodified series. (c) The PV capacity steps of
-  experiment 207: a boundary within 14 days of a month where experiment 207's step path at weight 3
-  moves capacity by 0.5 MW or more is counted as explained by PV, and the count of such boundaries
-  and of unexplained ones is reported.
-- **Forecast gain.** For D8 after 2023-08-15 and for every correctly dated injected persistent step,
-  a monthly refit of GAM_ONLY (the cut at the first of each month, 24-month window), with and
-  without the offset: the mean in-sample residual over the days since the start of the latest
-  regime, as of the cut. The break must have been confirmed by the cut, meaning at least `m` days
-  have passed. Scored over the next month, for the six months after confirmation.
+  the opposite sign and at least half the size. *Persistent* when neither holds and the boundary
+  is at least 150 days before the end of the data. *Measurement* only for a boundary within 3
+  days of a date on a supplied list; the list is empty, since no meter-change dates are on file,
+  so that class is not scored.
+- **Injections.** Onsets are the first of a month from 2021 to 2025, at least 150 days before the
+  end of the data and at least 90 days from 2023-08-15. Persistent steps of 10% and 25% of the
+  Primary's load, flat (the same MW at every half-hour) and with a profile (a share of the
+  Primary's own power, so the step follows demand), at the receiver only. Temporary shifts of 25%
+  for 14, 30, and 60 days, with the mirror (-x) at the Primary of highest residual correlation. A
+  persistent transfer arm (a permanent +25% at the receiver and a permanent -25% at its mirror)
+  has no correct label under the rule and is reported as the share called temporary. The GAM is
+  fitted on the injected series, so the month, holiday, and weather terms absorb part of the step.
+  A no-absorption arm fits on the clean series and adds the injection to the residual afterwards.
+  The share of each step that survives in the residual (the shift in segment level over the
+  injected step) is reported.
+- **Scoring an injection.** The boundary within 14 days of the onset with the largest level shift
+  is the injection's boundary. A missing boundary counts as a wrong label. Recall is the share of
+  injections given the correct label; the confusion matrix is printed.
+- **PV check.** The experiment 207 step path is not refitted. A false break at a control is called
+  PV-like when its shift in the 10:00 to 16:00 residual is at least twice its shift in the
+  00:00 to 06:00 residual and the night shift is under 0.5 noise units; counts of PV-like and
+  other false breaks are reported, and the verdict counts both.
+- **Forecast gain.** At each monthly cut (the first of a month, 24-month window) from the month
+  after a step's onset to 6 months after, for D8 after 2023-08-15 and for all injected persistent
+  steps at the held-out Primaries, the GAM_ONLY fit gives in-sample residuals, the segmentation
+  runs on the days before the cut only, and the offset is the mean residual since the latest
+  boundary (none if there is no boundary). The two comparison arms are no offset and the trailing
+  60-day mean residual. The score is the mean absolute error over the month after the cut, in
+  points of effective capacity, over all injected steps whether or not they were found.
 - **Compute.** CPU only, 4 cores, 16 GB memory cap, `OMP_NUM_THREADS=1` per worker. One fit takes
   about 0.3 seconds, so the whole experiment is a few hours at most.
 
 **Planned contrasts (Bonferroni across the four, level 98.75%).**
 
 - C1: D8 dating error against 14 days.
-- C2: false breaks per Primary-year at the 14 controls against 1.
-- C3: injected persistent-step accuracy against 0.8.
-- C4: forecast error with the latest-regime offset minus without it, on rows after the break.
+- C2: false breaks per Primary-year at the held-out controls against 1.
+- C3: persistent and temporary recall of the injections, each against 0.8.
+- C4: forecast error with the latest-regime offset minus without it, and minus the trailing 60-day offset, on rows after the step.
 
 **Checks to report.** The median forecast minus the mean forecast per site (the GAM_ONLY fit has no
 spread, so this is zero by construction and stated as such); the mean-forecast error beside the C4
