@@ -32,12 +32,13 @@ prediction: >-
   mixture-density network with lead features, trained on all lead bands) closes experiment 313's
   gap to the plant-based head at days 8 to 10 to under 1.5%. P6 (the pure network given the plant
   forecast as an extra column) beats both the pure network and the default by under 0.5%, so the
-  plant is redundant. Each can fail.
+  plant is redundant. Each can fail. "Beyond 36 hours" means the bands day 3, days 4 to 5, days 6 to 7, and days 8 to 10; P1, P2, and P4 hold when
+  the point estimate meets the stated size in every one of those four bands (P2 and P4: pooled over them).
 decision_rule: >-
   Quantile score in points of capacity, equal weight per farm, month-block resampling of the 12
   scored months, at 99.17% (Bonferroni across six planned contrasts per band: lead minus default,
   full minus default, full pooled minus default, full pooled minus full, pure with lead (pooled)
-  minus pure, and the pure network with the plant column minus pure). The research-default rule sets
+  minus pure pooled, and the pure network with the plant column minus pure). The research-default rule sets
   the tier: a new input, so a minimum gain of 0.02 points, a no-harm tolerance of 0.02 points on the
   pooled headline and 0.05 on the 0.01 and 0.99 pinball tails, and a replicate on the scored year's
   second half. At most one arm is adopted. The adoption test is on the mixture-density head alone;

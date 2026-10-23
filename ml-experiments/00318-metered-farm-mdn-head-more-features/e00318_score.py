@@ -27,12 +27,13 @@ PLANNED: Final[tuple[tuple[str, str], ...]] = (
     ("full", "default"),
     ("full_pooled", "default"),
     ("full_pooled", "full"),
-    ("pure_lead_pooled", "ref_pure_mdn313"),
+    ("pure_lead_pooled", "pure_pooled"),
     ("pure_plant", "ref_pure_mdn313"),
 )
 EXTRA: Final[tuple[tuple[str, str], ...]] = (
     ("pure_plant", "default"),
-    ("pure_lead_pooled", "pure_pooled"),
+    ("pure_lead_pooled", "ref_pure_mdn313"),
+    ("full", "lead"),
     ("pure_pooled", "ref_pure_mdn313"),
     ("pure_lead_pooled", "full_pooled"),
     ("pure_lead_pooled", "default"),
@@ -88,6 +89,15 @@ def load_band(*, band: str) -> pl.DataFrame:
     pieces = []
     for setting in c310.SETTINGS:
         mine = sorted((common.PRED_DIR / band / setting).glob("*.parquet"))
+        per_arm = {}
+        for f in mine:
+            arm = f.name.split("_s")[0] if "_s" in f.name else f.name
+            per_arm[arm] = per_arm.get(arm, 0) + 1
+        for arm, n_files in per_arm.items():
+            seeds = common.OWN_SEEDS if setting == "own_history" else common.ZERO_SEEDS
+            if n_files != len(seeds) * len(c310.FARMS) * 4:
+                msg = f"{band} {setting} {arm}: {n_files} files, expected {len(seeds) * 24}"
+                raise ValueError(msg)
         parts = [seed_average(files=mine)]
         parts.append(
             seed_average(
