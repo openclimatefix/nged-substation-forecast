@@ -145,6 +145,29 @@ SCALED_LIMIT_FRACTIONS: Final[tuple[float, ...]] = (0.9, 0.75, 0.5)
 DEFAULT_SCALED_LIMIT_FRACTION: Final[float] = 0.9
 """The default fraction. A scaled limit of 0.9 is 0.9 times the maximum, never a percentile."""
 
+MEMBER_ROW_KEYS: Final[tuple[str, ...]] = (
+    "time_series_id",
+    "power_fcst_init_time",
+    "valid_time",
+    "seed",
+)
+"""The columns that identify one forecast row of a series, before its members are reduced."""
+
+MEMBER_QUANTILE_LEVELS: Final[tuple[float, ...]] = (
+    0.01,
+    0.05,
+    0.10,
+    0.25,
+    0.40,
+    0.50,
+    0.60,
+    0.75,
+    0.90,
+    0.95,
+    0.99,
+)
+"""The quantile levels `quantiles_from_members` writes: the levels of the stored quantile sets."""
+
 KEY_COLUMNS: Final[tuple[str, ...]] = ("node_id", "power_fcst_init_time", "valid_time", "seed")
 """The columns that identify one forecast row of one node."""
 
@@ -535,6 +558,114 @@ def capacity_forecast(*, generator_frame: pl.DataFrame, table: NodeTable) -> pl.
         generator_frame.join(capacities, on="time_series_id", how="inner", maintain_order="left")
         .with_columns(**{c: pl.col("capacity_mw") for c in quantiles})
         .drop("capacity_mw")
+    )
+
+
+def quantiles_from_members(
+    *,
+    members: pl.DataFrame,
+    value_column: str,
+    levels: Sequence[float] = MEMBER_QUANTILE_LEVELS,
+) -> pl.DataFrame:
+    """Reduce ensemble members to the `q<percent>` columns that `node_curtailment` reads.
+
+    Args:
+        members: One row per forecast row and ensemble member: `MEMBER_ROW_KEYS`, `member`, and
+            `value_column`. A member whose value is null or not finite is left out of its row.
+        value_column: The column holding the member's value in MW.
+        levels: The quantile levels to write, each a whole percent.
+
+    Returns:
+        One row per distinct `MEMBER_ROW_KEYS`, sorted by them, with `n_members` (the members that
+        were finite) and one `q<percent>` column per level. Each quantile interpolates linearly
+        between the sorted members, so 100 members drawn from a quantile function return that
+        function's quantiles to within the spacing of the members. A row with no finite member has
+        no output row.
+    """
+    return (
+        members.filter(pl.col(value_column).is_finite())
+        .group_by(MEMBER_ROW_KEYS)
+        .agg(
+            n_members=pl.len(),
+            **{
+                level_column(level=level): pl.col(value_column).quantile(
+                    level, interpolation="linear"
+                )
+                for level in levels
+            },
+        )
+        .sort(MEMBER_ROW_KEYS)
+    )
+
+
+def net_flow_members(
+    *, demand_members: pl.DataFrame, generator_members: pl.DataFrame, table: NodeTable
+) -> pl.DataFrame:
+    """Combine each ensemble member's demand and generation into the node's metered flow, in MW.
+
+    Members are paired by member number, so member 7 of the demand is combined with member 7 of
+    every generator and the correlation between weather-driven demand and generation inside one
+    ensemble member is kept. The node's net export in a member is the sum of its generators' output
+    minus its demand, and the metered flow is `export_sign` times that export, the convention of
+    the quantile columns that `node_curtailment` reads.
+
+    Only generators with `is_forecast` true and a `connection_date` on or before the valid time
+    are summed. If any of those generators has no finite value in a member, that member is left out
+    of the node row, because its net export is unknown. A node with no such generator takes zero
+    generation. A node with a null `export_sign` is left out.
+
+    Args:
+        demand_members: One row per node row and member: `MEMBER_ROW_KEYS` with the node's
+            `time_series_id`, `member`, and `demand_mw` (the load drawn from the node, positive).
+        generator_members: One row per generator, node row, and member: `MEMBER_ROW_KEYS` with the
+            generator's `time_series_id`, `member`, and `output_mw`.
+        table: The node and generator tables; `generators.node_id` links each generator to its
+            node.
+
+    Returns:
+        One row per node row and surviving member: `MEMBER_ROW_KEYS`, `member`, and `flow_mw`.
+    """
+    keys = [c for c in MEMBER_ROW_KEYS if c != "time_series_id"]
+    node_dtype = demand_members.schema["time_series_id"]
+    generator_dtype = generator_members.schema["time_series_id"]
+    nodes = table.nodes.filter(pl.col("export_sign").is_not_null()).select(
+        "node_id", pl.col("time_series_id").cast(node_dtype), "export_sign"
+    )
+    generators = table.generators.filter(pl.col("is_forecast")).select(
+        pl.col("generator_id").cast(generator_dtype).alias("generator_id"),
+        "node_id",
+        "connection_date",
+    )
+    outputs = generator_members.select(
+        *keys,
+        "member",
+        generator_id="time_series_id",
+        output_mw=pl.when(pl.col("output_mw").is_finite()).then(pl.col("output_mw")),
+    )
+    return (
+        demand_members.join(nodes, on="time_series_id", how="inner")
+        .join(generators, on="node_id", how="left")
+        .with_columns(
+            generator_id=pl.when(
+                pl.col("connection_date").is_null()
+                | (pl.col("connection_date") <= pl.col("valid_time").dt.date())
+            ).then(pl.col("generator_id"))
+        )
+        .join(outputs, on=["generator_id", *keys, "member"], how="left")
+        .group_by([*MEMBER_ROW_KEYS, "member"])
+        .agg(
+            demand_mw=pl.col("demand_mw").first(),
+            export_sign=pl.col("export_sign").first(),
+            generation_mw=pl.col("output_mw").sum(),
+            n_unknown=(pl.col("generator_id").is_not_null() & pl.col("output_mw").is_null()).sum(),
+        )
+        .filter(pl.col("n_unknown") == 0, pl.col("demand_mw").is_finite())
+        .select(
+            *MEMBER_ROW_KEYS,
+            "member",
+            flow_mw=pl.col("export_sign") * (pl.col("generation_mw") - pl.col("demand_mw")),
+        )
+        .sort([*MEMBER_ROW_KEYS, "member"])
     )
 
 
