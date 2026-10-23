@@ -62,38 +62,41 @@ metric: >-
 code: ml-experiments/00274-lsc-long-arrangement-audit-gam-refit/
 verdict: not supported
 best_arm: >-
-  Not applicable (one forecast, GAM_ONLY, tested under many injections). Headline cell: a 30-day
-  transfer of 25% of load leaves the forecast 2.49 points of effective capacity too high (95%
-  interval 2.04 to 3.04) in the 48 hours after the transfer ends, 19% of the transfer, against a
-  tolerance of 0.1 points.
+  Not applicable: one forecast (GAM_ONLY) was tested under many injections. Headline cell: a
+  30-day transfer of 25% of load leaves the forecast 2.49 points of effective capacity too high
+  (95% interval 2.04 to 3.04) in the 48 hours after the transfer ends, which is 19% of the
+  transfer, against a tolerance of 0.1 points.
 headline: >-
-  A monthly-refitted forecast with no lagged power learns 8% of a 7-day transfer, 19% of a 30-day
-  transfer, and 32% of a 90-day transfer as normal in the 48 hours after the transfer ends (24-month
-  window, transfer of 25% of load). A permanent step is half learned after about 12 months.
+  A monthly-refitted forecast with no lagged power learns 8.5% of a 7-day transfer, 19% of a
+  30-day transfer, and 32% of a 90-day transfer as normal in the 48 hours after the transfer ends
+  (24-month training window, transfer of 25% of load). A permanent step is half learned after
+  about 12 months.
 lessons: >-
-  No tested duration, down to 7 days, keeps the bias in the 48 hours after the end under 0.1 points,
-  so the limit for NGED is shorter than 7 days. The bias is the same for a transfer that adds load
-  and one that removes it, and for a share of load and a fixed block of MW. A shorter training window
-  learns faster and the whole history learns slower.
+  No tested duration, down to 7 days, keeps the bias in the 48 hours after the end under 0.1
+  points, so any limit for NGED is shorter than 7 days and is not yet located. The bias is similar
+  for a transfer that adds load and a transfer that removes load, and for a share of load and a
+  fixed block of MW. A 12-month training window learns a transfer faster than a 24-month window,
+  and training on the whole history learns it slowest.
 take_home_message: >-
-  A forecast that uses no recent power still learns a load transfer as normal, and it does so
-  quickly: a transfer lasting only 7 days leaves the forecast 1.2 points too high for the next 2
-  days, and one lasting 30 days leaves it 2.5 points too high (about a fifth of the transfer). The
-  limit on how long an arrangement can last before it counts as normal is therefore shorter than 7
-  days, so NGED should not rely on this forecast as the normal-arrangement forecast for any
-  arrangement longer than a few days unless the transfer's rows are masked out of training. The next
-  experiment should test 1 to 6 days and a training mask.
+  A forecast that uses no recent power still learns a load transfer as normal, and the forecast
+  learns the transfer quickly: a transfer lasting only 7 days leaves the forecast 1.2 points of
+  effective capacity too high for the next 2 days, and a transfer lasting 30 days leaves it 2.5
+  points too high (about a fifth of the transfer). No tested duration, down to 7 days, was short
+  enough to avoid this. Masking known transfers out of training is the obvious remedy, but this
+  experiment did not test it, and the next experiment should test it together with transfers of 1
+  to 6 days.
 advice:
   - >-
-    Mask the rows of every known load transfer out of the training window of the GAM, whatever its
-    length, because a 7-day transfer is already learned as 8% of its size (Results, figure 1).
+    Test masking known load transfers out of the training window of the GAM before relying on a
+    no-lag forecast as the normal-arrangement forecast, because a 7-day transfer is already
+    learned as 8.5% of its size (Results, figure 1).
   - >-
-    Do not tell NGED that arrangements shorter than a week are safe: the 48-hour bias is above the
-    0.1-point tolerance at 7 days, and the tolerance is not reached in the tested range (Results).
+    Do not tell NGED that arrangements shorter than a week are safe: no tested duration, including
+    7 days, brought the 48-hour bias below the 0.1-point tolerance (Results).
   - >-
-    Use a 24-month or longer training window when load transfers cannot be masked, because a
-    12-month window learns a 30-day transfer at 32% against 19% (24 months) and 15% (whole history)
-    (figure 2).
+    Expect a 12-month training window to learn a 30-day transfer faster (32%) than a 24-month
+    window (19%) or the whole history (15%) when comparing windows for transfer robustness (figure
+    2).
   - >-
     Score a no-lag forecast's bias after a transfer from refits cut at the end date and at later
     months, not only at the first of a month, because the 48-hour figure changed from 2.1 to 0.9
@@ -102,22 +105,29 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-**A forecast that uses no recent power still learns a load transfer as normal, and the limit on how
-long an arrangement can last before it counts as normal is shorter than the shortest transfer we
-tested, 7 days.** We took 10 Primary substations, added a transfer of 25% of each substation's own
-power to its recorded power for 7 to 90 days (or for good), refitted the lagless convex additive
-forecast (GAM_ONLY) at the start of every month, and compared each forecast with the forecast
-trained on the unaltered series, which is the normal running arrangement (NRA). Verdict:
-`not supported`.
+**A forecast that uses no recent power still learns a load transfer as normal.** A load transfer is a
+spell in which an operator moves part of one substation's demand onto a neighbouring substation by
+changing how the electricity network is connected. The way the network is normally connected is the
+normal running arrangement (NRA). We took 10 Primary substations (substations that step 33 kV down
+to 11 kV) and added a transfer of 25% of each substation's own power to its recorded power, for 7 to
+90 days or for good. We refitted the forecast at the start of every month. The forecast, called
+GAM_ONLY, is a generalised additive model fitted by convex least squares, with no lagged power
+among its inputs. We compared each forecast with the forecast trained on the unaltered series, which
+stands for the NRA. The difference between the two forecasts is the bias: a positive bias means the
+transfer was learned as normal.
 
-The prediction that a 30-day transfer of 25% of load biases the forecast by under 0.1 points did
-not hold: the bias in the 48 hours after the end is 2.49 points (95% interval 2.04 to 3.04), 19% of
-the transfer. The experiment narrows the search to the shortest durations (1 to 6 days) and to a
-training mask, which are the next tests. Everything here is a lab condition: the weather is actual
-ERA5 and CAMS, not ensemble weather, and the result does not apply to a forecast with lagged power.
-The method of the injection is the share-of-load shape of [experiment
-141](../00141-switching-detector-fed-into-gam-k/result.md), and the forecast is the GAM-K recipe of
-[experiment 252](../00252-gam-stack-at-eight-more-primaries/result.md).
+The prediction was that a 30-day transfer of 25% of load would bias the forecast by under 0.1 points
+of effective capacity (1 point is 1% of the substation's capacity). The prediction did not hold, so
+the verdict is `not supported`: in the 48 hours after the end the bias is 2.49 points (95% interval
+2.04 to 3.04), which is 19% of the transfer. Even a 7-day transfer, the shortest we tested, is
+learned as 8.5% of its size, so any limit on how long an arrangement can last before it counts as
+normal is shorter than 7 days and is not located. The next experiment should test durations of 1 to
+6 days and a training mask. Two conditions limit the result: the weather inputs are the ERA5 and
+CAMS estimates of past weather (the European Centre for Medium-Range Weather Forecasts' reanalysis
+and the Copernicus Atmosphere Monitoring Service's irradiance), not ensemble forecasts, and the
+forecast has no lagged power. The share-of-load injection is the one of [experiment
+141](../00141-switching-detector-fed-into-gam-k/result.md), and the forecast settings are the GAM-K
+settings of [experiment 252](../00252-gam-stack-at-eight-more-primaries/result.md).
 
 ![After the transfer ends](after_end_bias.svg)
 
@@ -129,78 +139,87 @@ The method of the injection is the share-of-load shape of [experiment
 
 ## Results
 
-All figures are in points of effective capacity (1 point is 1% of the substation's capacity), means
-over 10 substations and 4 onset dates, with 95% intervals from resampling substations and onset
-dates independently. A positive bias means the transfer was learned as normal. The mean transfer
-was 13.3 points for the 25% size. The numbers are printed by `e00274_report.py`
-(`printed_report.txt`).
+Every figure is in points of effective capacity unless it is a percentage, a mean over 10
+substations and 4 onset dates, with a 95% interval from resampling substations and onset dates
+independently. The mean transfer for the 25% size was 13.3 points. `e00274_report.py` prints every
+number in `printed_report.txt`. A receiver is a substation that gains load and a donor is one that
+loses load. A BEFORE row is a forecast row dated before the transfer began.
 
-- **Controls passed.** The bias in the 3,720 groups of BEFORE rows and in the 1,920 groups of
-  size-0 rows is exactly 0.
-- **Headline (24-month window, 25% share, receiver):** bias in the 48 hours after the end is 1.21
-  (0.73 to 1.75) at 7 days, 2.67 (1.14 to 5.54) at 14, 2.49 (2.04 to 3.04) at 30, 3.94 (3.29 to
-  4.68) at 60, and 4.20 (3.33 to 5.29) at 90 days. As a share of the transfer: 8.5%, 18.0%, 19.1%,
-  30.4%, and 31.9%. The bias grows less than in proportion to the duration (the prediction of
-  proportional growth to 90 days did not hold).
-- **The bias scales with the transfer:** the 30-day share is 19% at 10%, 25%, and 40% of load, and
-  a transfer of 10% of load gives 1.0 points (0.82 to 1.21) at 30 days.
-- **Training window (30 days, 25%):** 12-month window 32% (25% to 38%), 24-month window 19% (16% to
-  22%), whole history 15% (11% to 20%).
-- **Decay after the end (30 days, 25%):** 2.8% of the transfer in months 1 to 3 (bias 0.37, 0.31
-  to 0.44) and 5.0% in months 4 to 12 (0.66, 0.48 to 0.86). For 90 days the shares are 5.3% and
-  15.2%: the bias comes back in the same season of the following year.
-- **During the transfer:** learned share 6.2% at 60 days and 11.4% at 90 days. The during rows are
-  lagged by up to a month, because a fit at a cut has seen only the earlier part of the transfer,
-  and for transfers of 30 days or shorter every during row precedes the second refit, so the
-  during bias is 0 by construction.
-- **Permanent step (25%):** the share learned is about 0.2 from month 2 to month 10, 0.48 at month
-  12 (24-month window) and 0.61 at month 13, and 1.0 from month 24. The 12-month window reaches
-  0.55 at month 11 and 0.97 at month 12. The whole history reaches 0.54 at month 24 and 0.7 at
-  month 36. The predictions were half learned within 12 months (24-month window; reached at month
-  13, so borderline) and within 6 months (12-month window; not met, reached at month 11).
-- **Sign and shape (30 days, 25%, 24-month window):** a donor (load removed) 2.47 (2.05 to 2.96)
-  points; a fixed block of MW (flat shape) 2.72 (2.19 to 3.24) points. The learned share does not
-  depend on whether the series gains or loses load, or on the shape.
-- **Season and substation:** winter onset 2.65 (1.88 to 3.48), summer onset 2.33 (1.96 to 2.69).
-  The substations range from 1.47 (D12) to 3.04 (D2) points; the share ranges from 17% to 21%.
-- **The limit for NGED:** no tested duration, including 7 days, has an interval upper bound below
-  0.1 points or below 5% of the transfer, for any size or window. The limit is therefore below 7
-  days and is not located.
-- **Signed error against the NRA series (30 days, 25%):** the clean-trained forecast is 2.8 points
-  too high in the 48 hours after the end and the injected-trained forecast 5.3 points, so the
-  figure NGED would see is larger than the learned bias alone (the 48-hour rows are few, 48 to 96
-  per cell).
+- **Controls passed.** The bias in the 3,720 groups of BEFORE rows and in the 1,920 groups of rows
+  with a transfer of size 0 is exactly 0.
+- **Headline (24-month window, 25% of load, receiver).** The bias in the 48 hours after the end is
+  1.21 points (0.73 to 1.75) at 7 days, 2.67 (1.14 to 5.54) at 14 days, 2.49 (2.04 to 3.04) at 30
+  days, 3.94 (3.29 to 4.68) at 60 days, and 4.20 (3.33 to 5.29) at 90 days. As shares of the
+  transfer these are 8.5%, 18.0%, 19.1%, 30.4%, and 31.9%. The bias grows less than in proportion
+  to the duration, so the prediction of proportional growth to 90 days did not hold. The bias is
+  also not monotone: 2.67 at 14 days has a wide interval.
+- **The bias scales with the size of the transfer.** The share learned at 30 days is 19% at 10%,
+  25%, and 40% of load, and a transfer of 10% of load gives 1.00 points (0.82 to 1.21).
+- **Training window (30 days, 25% of load).** The share learned is 32% (25% to 38%) with a 12-month
+  window, 19% (16% to 22%) with a 24-month window, and 15% (11% to 20%) with the whole history.
+- **Decay after the end (30 days, 25% of load).** The share learned is 2.8% in months 1 to 3 after
+  the end (bias 0.37 points, 0.31 to 0.44) and 5.0% in months 4 to 12 (0.66 points, 0.48 to 0.86).
+  For 90 days the shares are 5.3% and 15.2%. The share in months 4 to 12 is larger than in months 1
+  to 3, and no season-by-season breakdown was run to say why.
+- **Rows inside the transfer.** The learned share is 0% at 7, 14, and 30 days, 6.2% at 60 days, and
+  11.4% at 90 days. A fit at a cut has seen only the earlier part of the transfer, so these rows
+  lag by up to a month. A transfer of 30 days or shorter has its inside rows forecast by the fit
+  cut at the onset, which has seen none of the transfer, so the bias there is 0 by design.
+- **Permanent step (25% of load).** The share learned is about 20% from month 2 to month 10 after
+  the step begins. With a 24-month window it is 48% at month 12, 61% at month 13, and 100% from
+  month 24. With a 12-month window it is 55% at month 11 and 97% at month 12. With the whole
+  history it is 54% at month 24 and 70% at month 36. The prediction of half learned within 12
+  months (24-month window) failed, because half was reached at month 13. The prediction of half
+  learned within 6 months (12-month window) failed, because half was reached at month 11.
+- **Sign and shape (30 days, 25% of load, 24-month window).** When the transfer removes load from a
+  donor substation, the bias is 2.47 points (2.05 to 2.96) and the share learned is 19.0%. When the
+  transfer is a fixed block of MW with a flat shape, the bias is 2.72 points (2.19 to 3.24) and the
+  share is 20.3%. The share for a share-of-load transfer is 19.1%, so the three are similar.
+- **Season and substation.** A transfer beginning in winter gives a bias of 2.65 points (1.88 to
+  3.48) and one beginning in summer gives 2.33 (1.96 to 2.69). Across substations the bias ranges
+  from 1.47 points (D12) to 3.04 (D2), and the share learned from 17% to 21%.
+- **The limit for NGED.** No tested duration, including 7 days, has an interval upper bound below
+  0.1 points or below 5% of the transfer, for any size or window. The limit, if it exists, is below
+  7 days and is not located.
+- **Signed error against the NRA series (30 days, 25% of load).** In the 48 hours after the end, the
+  clean-trained forecast is 2.8 points too high and the injected-trained forecast is 5.3 points too
+  high. The error NGED would see is therefore larger than the learned bias alone. The 48-hour group
+  is small.
 
 ## Checks
 
 - **The 48-hour figure depends on where the fit is cut.** For D3 with a transfer ending on 1 July,
   the mean forecast difference over one fixed week was 2.13 points for a fit cut at the end of the
-  transfer, 0.88 for a fit cut 12 hours later, 0.76 a day later, and about 1.0 for fits cut 3 and
-  10 days later (`diagnose_report.txt`). Why one half-day of extra clean data lowers the bias by
-  60% was not found (the season-year of the solar capacity runs September to August, so it is not
-  that boundary). Treat the 48-hour figure as an upper bound that holds right at the cut and the
-  months 1 to 3 figure (2.8% at 30 days) as the steadier measure.
-- **Where the bias sits:** for D3 and D11 after a 30-day winter transfer, the forecast difference
-  is about the same in every temperature band and at every time of day, so the transfer is not
-  being learned as a temperature response. For D3 it stays at 1.2 to 1.5 points in weeks 1 to 4.
-- The median forecast minus the mean forecast does not apply: GAM_ONLY is a least-squares mean
-  forecast. The signed error of the forecast against the NRA series is in the Results.
-- **Audit triggers.** Trigger 2 (a result contradicting its own prediction) fired in size: the
-  prediction expected 0.5 to 1 points and the experiment measured 2.5. The explanation tested is
-  the sensitivity to the cut above, which does not remove the result (the bias at 12 hours later
-  is 0.9 and at 3 months is 0.4, both above 0.1). Trigger 7 holds, because the statement to NGED
-  rests on this result and no other experiment has replicated it. No Opus audit was run, because
-  the brief limits the session to Sonnet; the manager is told so.
+  transfer, 0.88 for a fit cut 12 hours later, 0.76 for a fit cut a day later, and about 1.0 for
+  fits cut 3 and 10 days later (`diagnose_report.txt`). We did not find why 12 hours of extra clean
+  data lowers the bias by 60%. The solar-capacity season year runs from September to August, so the
+  cause is not that year boundary. The 48-hour figure is therefore an upper bound that holds at the
+  cut, and the months 1 to 3 figure (2.8% at 30 days) is the steadier measure.
+- **Where the bias sits.** For D3 and D11 after a 30-day winter transfer, the forecast difference
+  is similar in every temperature band below 15 C (D3: 1.1 to 1.3 points; D11: 0.7 to 1.5), so the
+  transfer is not learned mainly as a temperature response. The difference varies by time of day
+  (D3: 0.8 to 1.7 points over four 6-hour blocks). For D3 it is 0.5 points in the first week after
+  the end and 1.3 to 1.5 points in weeks 2 to 5.
+- **Median minus mean.** GAM_ONLY is a least-squares forecast of the mean, so it has no
+  median-minus-mean gap to report. The signed error against the NRA series is in the Results.
+- **Audit triggers.** Two of the seven audit triggers of the `ml-experiment` skill fired. The result
+  contradicted its own prediction in size: the prediction expected 0.5 to 1 points and the
+  experiment measured 2.5. The explanation we tested is the cut sensitivity above, and it does not
+  remove the result, because the bias is still 0.9 points 12 hours later and 0.4 points in months 1
+  to 3, both above 0.1. The second trigger is that the statement to NGED rests on this result and
+  no other experiment has replicated it. No Opus audit was run, because this session was limited to
+  Sonnet models.
 
 ## Caveats and what to try next
 
-- The forecast has no drift term and no lagged power (GAM-K settings); the production GAM stack with
-  the Kalman filter correction would behave differently.
-- The weather is actual ERA5 and CAMS, not ensemble weather.
-- The transfer is injected as a share of the receiver's own power or a fixed block, so it follows
-  the receiver's daily shape or is flat. Real transfers have shapes of their own.
-- The existing masks (lockdown and hand-filtered events) remove some rows from both the clean and
-  the injected training sets; real arrangements in the unmasked history are in both.
-- Only monthly refits were tested; weekly refits would learn a transfer sooner.
-- Next: transfers of 1 to 6 days, a training mask that removes known transfers (the bias should
-  then be 0 during the mask), and the cause of the cut sensitivity.
+- The forecast has no drift term and no lagged power (the GAM-K settings), so the production GAM
+  stack with the Kalman filter correction would behave differently.
+- The weather inputs are the ERA5 and CAMS estimates of past weather, not ensemble forecasts.
+- The transfer is injected as a share of the receiver's own power or as a flat block, so it follows
+  the receiver's daily shape or has none. Real transfers have shapes of their own.
+- The existing masks (the lockdown window and the hand-filtered events) remove some rows from both
+  the clean and the injected training sets. Real arrangements in the unmasked history sit in both.
+- Only monthly refits were tested. Weekly refits are expected to learn a transfer sooner, but this
+  experiment did not test them.
+- The next experiment should test transfers of 1 to 6 days and a training mask that removes known
+  transfers, and should look for the cause of the cut sensitivity.

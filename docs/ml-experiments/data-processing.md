@@ -785,13 +785,15 @@ and to production, for D8. The scope is one series and one residual model, the c
 count depends on the threshold (15 to 48 for -2.5 to -1.0 MW), and the entry is provisional until
 NGED has said what moved.
 
-**Mask the rows of every known load transfer out of the training window of a forecast that uses no
-recent power, whatever the transfer's length (provisional; medium confidence).** Injected
-transfers of 25% of a substation's power lasting 7, 30, and 90 days were learned by the 24-month
-monthly-refit GAM as 8%, 19%, and 32% of their size in the 48 hours after they ended, and a
-permanent step was half learned after about 12 months ([experiment
+**Mask the rows of every known load transfer out of the training data of a forecast that uses no
+recent power.** The evidence is provisional and the confidence medium, and masking itself was not
+tested. A generalised additive model (GAM) with a 24-month training window, refitted every month,
+learned injected transfers of 25% of a substation's power lasting 7, 30, and 90 days as 8.5%, 19%,
+and 32% of their size in the 48 hours after each transfer ended, and learned a permanent step
+to one half after about 12 months ([experiment
 274](00274-lsc-long-arrangement-audit-gam-refit/result.md); 10 Primary substations, 4 onset dates,
-actual weather). No tested duration kept the bias under 0.1 points. Applies to experiments and
+the ERA5 and CAMS estimates of past weather). No tested duration kept the bias under 0.1 points of
+effective capacity (1 point is 1% of the substation's capacity). Applies to experiments and
 production.
 
 ## Forecast tails and curtailment cost
