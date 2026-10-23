@@ -228,12 +228,12 @@ def figure_2(*, tables: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
     )
     return alt.vconcat(cells, line).properties(
         title=_title(
-            text="The gap sits at 9 to 13 m/s, where the power curve is steep",
+            text="The gap sits at 9 to 14 m/s, where the core's power curve is steep",
             lines=[
                 (
                     "Heat map: share of the physics core's total excess over XGBoost in each cell "
                     "(orange: larger). Line: mean excess per half-hour in each speed bin. Every "
-                    "half-hour of September 2019 to June 2025 scored out of sample, with each "
+                    "half-hour of November 2019 to June 2025 scored out of sample, with each "
                     "July-to-June year held out in turn. Excess is the core's quantile score minus "
                     "XGBoost's; positive means XGBoost is better. W1 to W3."
                 )
@@ -249,7 +249,7 @@ def figure_3(*, tables: dict[str, pl.DataFrame]) -> alt.TopLevelMixin:
         ("site", "Farm", None),
         ("season", "Season", ["Dec-Feb", "Mar-May", "Jun-Aug", "Sep-Nov"]),
         ("hour_block", "Hour of day (UTC, 4-hour blocks starting at)", None),
-        ("block", "July-to-June year (0: Sep 2019 to Jun 2020, 5: Jul 2024 to Jun 2025)", None),
+        ("block", "July-to-June year (0: Nov 2019 to Jun 2020, 5: Jul 2024 to Jun 2025)", None),
         (
             "lead_day_ens",
             "Lead day, ensemble members as the weather (July 2025 to June 2026)",

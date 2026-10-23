@@ -1,6 +1,6 @@
 """Leave-one-year-out fits of the core and XGBoost with ERA5 as the weather, for D3's year table.
 
-For each July-to-June block of the training period (block 0 is September 2019 to June 2020, block 5
+For each July-to-June block of the training period (block 0 is November 2019 to June 2020, block 5
 is July 2024 to 16 June 2025), fits the core (P) and XGBoost (X) on the other blocks of the same
 farm and scores every half-hour of the held-out block that has an observation. The scored rows are
 every half-hour, not experiment 33's 53 Tuesday runs, so this table is labelled as a different row

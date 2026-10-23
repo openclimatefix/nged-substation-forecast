@@ -436,7 +436,7 @@ def fit_core_pinball(
 
     The core starts from its L1 fit, the spread from the empirical residual quantiles in 2 m/s
     windows of hub speed, and both are then refitted on the mass-weighted pinball loss at the 11
-    levels, which is the loss the quantile score measures.
+    levels, which is close to the nine-level loss the quantile score measures.
     """
     core = fit_core(weather=weather, target=target, with_idle_layer=with_idle_layer, seed=seed)
     mu = predict_expected_power(core=core, weather=weather)

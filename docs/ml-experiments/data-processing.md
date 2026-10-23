@@ -455,7 +455,7 @@ which total 160 hours at W1, 428 at W2, and 2,742 at W3. W3's idle share at wind
 The mask is built on ERA5, which arrives about 5 days late, so it is for training and evaluation
 rows and not for live use. Removing the mask's rows from training lowered the quantile score of
 both the physics core and the XGBoost model when the weather was the 51 ensemble members (by 0.075
-and 0.062 points on the kept rows, intervals excluding zero), and changed it by under 0.015 points
+and 0.062 points on the kept rows, intervals excluding zero), and worsened it by under 0.015 points
 when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
 three farms, July 2025 to June 2026).
 
