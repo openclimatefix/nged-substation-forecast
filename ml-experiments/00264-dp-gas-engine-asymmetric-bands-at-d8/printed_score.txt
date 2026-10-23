@@ -1,0 +1,96 @@
+
+=== D8: 97,012 rows
+arm1        qs=10.9516 mae=15.178 cov90=0.423 (after burn-in 0.432) quarters 2025Q3=0.291 2025Q4=0.477 2026Q1=0.395 2026Q2=0.518 med-mean=+0.000
+            tails q01: below=0.206 pin=2.407 q05: below=0.308 pin=4.123 q95: below=0.731 pin=4.308 q99: below=0.839 pin=2.385
+            leads 0.0-24.0h cov=0.388 24.0-72.0h cov=0.425 72.0-168.0h cov=0.430
+arm2        qs=10.0040 mae=15.178 cov90=0.666 (after burn-in 0.695) quarters 2025Q3=0.567 2025Q4=0.803 2026Q1=0.612 2026Q2=0.753 med-mean=+0.000
+            tails q01: below=0.036 pin=0.869 q05: below=0.065 pin=2.464 q95: below=0.731 pin=4.308 q99: below=0.839 pin=2.385
+            leads 0.0-24.0h cov=0.619 24.0-72.0h cov=0.668 72.0-168.0h cov=0.677
+arm2b       qs=9.1379 mae=15.178 cov90=0.874 (after burn-in 0.920) quarters 2025Q3=0.796 2025Q4=0.988 2026Q1=0.915 2026Q2=0.940 med-mean=+0.000
+            tails q01: below=0.036 pin=0.869 q05: below=0.065 pin=2.464 q95: below=0.939 pin=2.701 q99: below=0.966 pin=0.968
+            leads 0.0-24.0h cov=0.848 24.0-72.0h cov=0.884 72.0-168.0h cov=0.875
+arm3        qs=8.9108 mae=15.178 cov90=0.821 (after burn-in 0.863) quarters 2025Q3=0.724 2025Q4=0.907 2026Q1=0.854 2026Q2=0.920 med-mean=+0.144
+            tails q01: below=0.042 pin=0.866 q05: below=0.092 pin=2.328 q95: below=0.913 pin=2.564 q99: below=0.960 pin=0.933
+            leads 0.0-24.0h cov=0.796 24.0-72.0h cov=0.833 72.0-168.0h cov=0.821
+arm4        qs=8.9954 mae=15.178 cov90=0.803 (after burn-in 0.843) quarters 2025Q3=0.685 2025Q4=0.896 2026Q1=0.832 2026Q2=0.907 med-mean=-0.196
+            tails q01: below=0.052 pin=0.940 q05: below=0.106 pin=2.457 q95: below=0.909 pin=2.631 q99: below=0.960 pin=0.963
+            leads 0.0-24.0h cov=0.781 24.0-72.0h cov=0.812 72.0-168.0h cov=0.803
+arm3_forced qs=8.9061 mae=15.178 cov90=0.822 (after burn-in 0.864) quarters 2025Q3=0.729 2025Q4=0.907 2026Q1=0.854 2026Q2=0.921 med-mean=+0.158
+            tails q01: below=0.042 pin=0.866 q05: below=0.091 pin=2.328 q95: below=0.913 pin=2.560 q99: below=0.960 pin=0.930
+            leads 0.0-24.0h cov=0.796 24.0-72.0h cov=0.834 72.0-168.0h cov=0.822
+arm_emp     qs=8.8764 mae=15.178 cov90=0.847 (after burn-in 0.891) quarters 2025Q3=0.760 2025Q4=0.911 2026Q1=0.894 2026Q2=0.956 med-mean=-0.960
+            tails q01: below=0.036 pin=0.806 q05: below=0.076 pin=2.278 q95: below=0.923 pin=2.443 q99: below=0.968 pin=0.827
+            leads 0.0-24.0h cov=0.849 24.0-72.0h cov=0.858 72.0-168.0h cov=0.841
+  arm2-arm1 qs -0.9476 [-1.4758, -0.5312] 99.2%[-1.6946, -0.4197] = -8.65% (upper -4.85%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm2b-arm1 qs -1.8137 [-2.5570, -1.1446] 99.2%[-2.8297, -0.9596] = -16.56% (upper -10.45%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm3-arm1 qs -2.0408 [-2.7052, -1.4170] 99.2%[-2.9433, -1.2182] = -18.63% (upper -12.94%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm4-arm1 qs -1.9561 [-2.5416, -1.4035] 99.2%[-2.7464, -1.2287] = -17.86% (upper -12.82%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm3_forced-arm1 qs -2.0455 [-2.7137, -1.4190] 99.2%[-2.9538, -1.2200] = -18.68% (upper -12.96%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm_emp-arm1 qs -2.0752 [-2.7773, -1.4323] 99.2%[-3.0366, -1.2297] = -18.95% (upper -13.08%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm3-arm2b qs -0.2271 [-0.4096, -0.0583] 99.2%[-0.4776, -0.0061] = -2.48% (upper -0.64%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm4-arm3 qs +0.0847 [-0.0085, +0.1875] 99.2%[-0.0361, +0.2263] = +0.95% (upper +2.10%); leave-one-month-out signs [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+  arm3-arm_emp qs +0.0344 [-0.0713, +0.1465] 99.2%[-0.1035, +0.1863] = +0.39% (upper +1.65%); leave-one-month-out signs [1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+  arm_emp-arm2b qs -0.2615 [-0.4833, -0.0646] 99.2%[-0.5692, -0.0152] = -2.86% (upper -0.71%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  low-flow Brier (event: reading < 5.9 points, the 2nd percentile of the scored year): arm1=0.02629 arm2=0.03750 arm2b=0.03648 arm3=0.03144 arm4=0.03111 arm3_forced=0.03147 arm_emp=0.03261
+  coverage by month (arm1/arm2b/arm3): 202507: 0.31/0.31/0.31; 202508: 0.34/0.73/0.70; 202509: 0.24/0.86/0.75; 202510: 0.45/0.99/0.89; 202511: 0.48/0.98/0.89; 202512: 0.50/0.99/0.95; 202601: 0.30/0.83/0.80; 202602: 0.40/0.95/0.88; 202603: 0.48/0.97/0.88; 202604: 0.52/0.92/0.93; 202605: 0.51/0.92/0.91; 202606: 0.52/0.98/0.92
+
+=== D10: 96,370 rows
+arm1        qs=3.3142 mae=5.535 cov90=0.931 (after burn-in 0.931) quarters 2025Q3=0.967 2025Q4=0.925 2026Q1=0.921 2026Q2=0.923 med-mean=+0.000
+            tails q01: below=0.009 pin=0.219 q05: below=0.037 pin=0.824 q95: below=0.968 pin=0.942 q99: below=0.989 pin=0.263
+            leads 0.0-24.0h cov=0.916 24.0-72.0h cov=0.939 72.0-168.0h cov=0.932
+arm2        qs=3.3228 mae=5.535 cov90=0.942 (after burn-in 0.943) quarters 2025Q3=0.980 2025Q4=0.926 2026Q1=0.930 2026Q2=0.947 med-mean=+0.000
+            tails q01: below=0.005 pin=0.230 q05: below=0.026 pin=0.836 q95: below=0.968 pin=0.942 q99: below=0.989 pin=0.263
+            leads 0.0-24.0h cov=0.927 24.0-72.0h cov=0.948 72.0-168.0h cov=0.943
+arm2b       qs=3.3318 mae=5.535 cov90=0.944 (after burn-in 0.945) quarters 2025Q3=0.980 2025Q4=0.929 2026Q1=0.934 2026Q2=0.948 med-mean=+0.000
+            tails q01: below=0.005 pin=0.230 q05: below=0.026 pin=0.836 q95: below=0.971 pin=0.952 q99: below=0.992 pin=0.269
+            leads 0.0-24.0h cov=0.929 24.0-72.0h cov=0.950 72.0-168.0h cov=0.945
+arm3        qs=3.3318 mae=5.535 cov90=0.944 (after burn-in 0.945) quarters 2025Q3=0.980 2025Q4=0.929 2026Q1=0.934 2026Q2=0.948 med-mean=+0.000
+            tails q01: below=0.005 pin=0.230 q05: below=0.026 pin=0.836 q95: below=0.971 pin=0.952 q99: below=0.992 pin=0.269
+            leads 0.0-24.0h cov=0.929 24.0-72.0h cov=0.950 72.0-168.0h cov=0.945
+arm3_forced qs=3.3391 mae=5.535 cov90=0.943 (after burn-in 0.944) quarters 2025Q3=0.973 2025Q4=0.933 2026Q1=0.938 2026Q2=0.939 med-mean=-0.035
+            tails q01: below=0.006 pin=0.232 q05: below=0.030 pin=0.843 q95: below=0.973 pin=0.959 q99: below=0.991 pin=0.268
+            leads 0.0-24.0h cov=0.930 24.0-72.0h cov=0.949 72.0-168.0h cov=0.943
+arm_emp     qs=3.2948 mae=5.535 cov90=0.840 (after burn-in 0.833) quarters 2025Q3=0.894 2025Q4=0.771 2026Q1=0.870 2026Q2=0.815 med-mean=-0.537
+            tails q01: below=0.025 pin=0.252 q05: below=0.081 pin=0.871 q95: below=0.921 pin=0.971 q99: below=0.981 pin=0.271
+            leads 0.0-24.0h cov=0.884 24.0-72.0h cov=0.859 72.0-168.0h cov=0.820
+  arm2-arm1 qs +0.0086 [-0.0103, +0.0273] 99.2%[-0.0174, +0.0343] = +0.26% (upper +0.82%); leave-one-month-out signs [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+  arm2b-arm1 qs +0.0176 [-0.0037, +0.0380] 99.2%[-0.0118, +0.0447] = +0.53% (upper +1.15%); leave-one-month-out signs [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+  arm3-arm1 qs +0.0176 [-0.0037, +0.0380] 99.2%[-0.0118, +0.0447] = +0.53% (upper +1.15%); leave-one-month-out signs [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+  arm3_forced-arm1 qs +0.0249 [+0.0138, +0.0369] 99.2%[+0.0103, +0.0410] = +0.75% (upper +1.11%); leave-one-month-out signs [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+  arm_emp-arm1 qs -0.0194 [-0.1850, +0.0838] 99.2%[-0.2594, +0.0965] = -0.59% (upper +2.53%); leave-one-month-out signs [-1, -1, -1, 1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+
+=== D16: 91,754 rows
+arm1        qs=2.7800 mae=4.700 cov90=0.833 (after burn-in 0.835) quarters 2025Q3=0.877 2025Q4=0.899 2026Q1=0.788 2026Q2=0.782 med-mean=+0.000
+            tails q01: below=0.049 pin=0.335 q05: below=0.098 pin=0.842 q95: below=0.931 pin=0.697 q99: below=0.971 pin=0.265
+            leads 0.0-24.0h cov=0.857 24.0-72.0h cov=0.844 72.0-168.0h cov=0.822
+arm2        qs=2.7527 mae=4.700 cov90=0.864 (after burn-in 0.869) quarters 2025Q3=0.915 2025Q4=0.911 2026Q1=0.831 2026Q2=0.829 med-mean=+0.000
+            tails q01: below=0.030 pin=0.286 q05: below=0.067 pin=0.797 q95: below=0.931 pin=0.697 q99: below=0.971 pin=0.265
+            leads 0.0-24.0h cov=0.887 24.0-72.0h cov=0.874 72.0-168.0h cov=0.854
+arm2b       qs=2.7553 mae=4.700 cov90=0.875 (after burn-in 0.881) quarters 2025Q3=0.923 2025Q4=0.923 2026Q1=0.841 2026Q2=0.842 med-mean=+0.000
+            tails q01: below=0.030 pin=0.286 q05: below=0.067 pin=0.797 q95: below=0.942 pin=0.697 q99: below=0.979 pin=0.263
+            leads 0.0-24.0h cov=0.897 24.0-72.0h cov=0.884 72.0-168.0h cov=0.865
+arm3        qs=2.7553 mae=4.700 cov90=0.875 (after burn-in 0.881) quarters 2025Q3=0.923 2025Q4=0.923 2026Q1=0.841 2026Q2=0.842 med-mean=+0.000
+            tails q01: below=0.030 pin=0.286 q05: below=0.067 pin=0.797 q95: below=0.942 pin=0.697 q99: below=0.979 pin=0.263
+            leads 0.0-24.0h cov=0.897 24.0-72.0h cov=0.884 72.0-168.0h cov=0.865
+arm3_forced qs=2.8690 mae=4.700 cov90=0.906 (after burn-in 0.915) quarters 2025Q3=0.909 2025Q4=0.952 2026Q1=0.892 2026Q2=0.900 med-mean=+0.154
+            tails q01: below=0.023 pin=0.290 q05: below=0.058 pin=0.853 q95: below=0.964 pin=0.768 q99: below=0.988 pin=0.254
+            leads 0.0-24.0h cov=0.926 24.0-72.0h cov=0.913 72.0-168.0h cov=0.898
+arm_emp     qs=2.8457 mae=4.700 cov90=0.826 (after burn-in 0.828) quarters 2025Q3=0.885 2025Q4=0.890 2026Q1=0.794 2026Q2=0.755 med-mean=-0.257
+            tails q01: below=0.038 pin=0.297 q05: below=0.092 pin=0.893 q95: below=0.918 pin=0.737 q99: below=0.976 pin=0.266
+            leads 0.0-24.0h cov=0.870 24.0-72.0h cov=0.845 72.0-168.0h cov=0.805
+  arm2-arm1 qs -0.0272 [-0.0658, +0.0032] 99.2%[-0.0804, +0.0117] = -0.98% (upper +0.11%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm2b-arm1 qs -0.0246 [-0.0568, +0.0040] 99.2%[-0.0698, +0.0134] = -0.89% (upper +0.14%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm3-arm1 qs -0.0246 [-0.0568, +0.0040] 99.2%[-0.0698, +0.0134] = -0.89% (upper +0.14%); leave-one-month-out signs [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]; mean-forecast MAE diff +0.0000
+  arm3_forced-arm1 qs +0.0891 [+0.0079, +0.1734] 99.2%[-0.0198, +0.2061] = +3.20% (upper +6.24%); leave-one-month-out signs [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+  arm_emp-arm1 qs +0.0657 [+0.0185, +0.1100] 99.2%[+0.0004, +0.1266] = +2.36% (upper +3.96%); leave-one-month-out signs [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; mean-forecast MAE diff +0.0000
+
+=== visibility switch changes
+D8 on 0.05 off 0.03: 1 flips ['2025-07-04 -> on']
+D8 on 0.07 off 0.04: 2 flips ['2025-07-04 -> on', '2026-04-23 -> off']
+D8 on 0.03 off 0.02: 1 flips ['2025-07-04 -> on']
+D10 on 0.05 off 0.03: 0 flips []
+D10 on 0.07 off 0.04: 0 flips []
+D10 on 0.03 off 0.02: 0 flips []
+D16 on 0.05 off 0.03: 0 flips []
+D16 on 0.07 off 0.04: 0 flips []
+D16 on 0.03 off 0.02: 0 flips []
