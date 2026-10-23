@@ -79,11 +79,11 @@ take_home_message: >-
   D8's multi-day drops coincide with the engine detector's running states, which is consistent with
   the gas engine running: the detector flags 27 of the 28 drops that began after the engine left
   D8's reading, against about 1 in 5 comparable stretches of D8, and it flags almost nothing at
-  three other Primaries on the same dates. This cannot be called proved, because the drops and the detector both read D8's residual,
-  and the depths of the drops do not fall at whole multiples of the engine's 1.97 MW unit. D8's
-  drops should be flagged as a probable generator regime and reported apart from the load-shift
-  scoring until NGED confirms the engine's running hours, and the next step is a forecast model for
-  D8 that includes the engine as a state.
+  three other Primaries on the same dates. This cannot be called proved, because the drops and the
+  detector both read D8's residual, and the depths of the drops do not fall at whole multiples of
+  the engine's 1.97 MW unit. D8's drops should be flagged as a probable generator regime and
+  reported apart from the load-shift scoring until NGED confirms the engine's running hours, and the
+  next step is a forecast model for D8 that includes the engine as a state.
 production_status: not-for-production
 adopted_in: none
 advice:
