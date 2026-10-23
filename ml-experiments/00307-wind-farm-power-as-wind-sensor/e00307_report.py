@@ -99,6 +99,7 @@ def main() -> None:
             for a, b in (
                 ("a_mean", "a_mean_era5"),
                 ("e_lead", "e_lead_era5"),
+                ("a_mean_era5_all", "a_mean_era5"),
                 ("a_mean", "e_lead"),
                 ("d_direction", "a_mean"),
             )

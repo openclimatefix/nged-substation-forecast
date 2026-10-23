@@ -51,6 +51,8 @@ ARMS: Final[tuple[str, ...]] = (
     "b_spread",
     "a_mean_era5",
     "e_lead_era5",
+    "a_mean_era5_all",
+    "e_lead_era5_all",
     *(f"c_shift_{h:+d}h" for h in SHIFT_HOURS),
     "all_edb",
 )
@@ -93,8 +95,12 @@ def fit_corrections(*, hindcast: pl.DataFrame) -> dict:
         "d_direction": fit_factor(fit=fit, by="ens_sector"),
     }
     everything = hindcast.filter(~pl.col("masked") & pl.col("era5_speed_100m").is_not_null())
-    out["a_mean_era5"] = fit_factor(fit=everything, by=None, target="era5_speed_100m")
-    out["e_lead_era5"] = fit_factor(fit=everything, by="lead_day_capped", target="era5_speed_100m")
+    out["a_mean_era5"] = fit_factor(fit=fit, by=None, target="era5_speed_100m")
+    out["e_lead_era5"] = fit_factor(fit=fit, by="lead_day_capped", target="era5_speed_100m")
+    out["a_mean_era5_all"] = fit_factor(fit=everything, by=None, target="era5_speed_100m")
+    out["e_lead_era5_all"] = fit_factor(
+        fit=everything, by="lead_day_capped", target="era5_speed_100m"
+    )
     # Sequential: e, then d on the residual ratio, then b on what is left.
     lead_factor = fit["lead_day_capped"].replace_strict(
         {int(k): v for k, v in out["e_lead"].items()}, default=1.0, return_dtype=pl.Float64
@@ -107,12 +113,14 @@ def fit_corrections(*, hindcast: pl.DataFrame) -> dict:
     mean_after = after_e["ens_speed_100m"] * sector_factor
     spread_fit = fit.with_columns(
         residual=pl.col("implied_100m") - mean_after,
-        member_sd=((pl.col("ens_speed_100m_p90") - pl.col("ens_speed_100m_p10")) / 2.5631),
+        member_sd=((pl.col("ens_speed_100m_p90") - pl.col("ens_speed_100m_p10")) / 2.5631)
+        * lead_factor
+        * sector_factor,
     )
     out["b_spread"] = spread_gain(
         fit=fit.with_columns(
             residual=pl.col("implied_100m") - pl.col("ens_speed_100m"),
-            member_sd=spread_fit["member_sd"],
+            member_sd=(pl.col("ens_speed_100m_p90") - pl.col("ens_speed_100m_p10")) / 2.5631,
         )
     )
     out["all_b_spread"] = spread_gain(fit=spread_fit)
@@ -156,10 +164,10 @@ def corrected_members(
     sector = cases["ens_sector"].to_numpy()
     factor = np.ones(len(cases), dtype=np.float32)
     gain = np.ones(len(cases), dtype=np.float32)
-    if arm == "a_mean_era5":
-        factor = np.full(len(cases), fitted["a_mean_era5"]["all"], dtype=np.float32)
-    if arm == "e_lead_era5":
-        factor = lookup(values=lead, table=fitted["e_lead_era5"], default=1.0)
+    if arm in ("a_mean_era5", "a_mean_era5_all"):
+        factor = np.full(len(cases), fitted[arm]["all"], dtype=np.float32)
+    if arm in ("e_lead_era5", "e_lead_era5_all"):
+        factor = lookup(values=lead, table=fitted[arm], default=1.0)
     if arm == "a_mean":
         factor = np.full(len(cases), fitted["a_mean"]["all"], dtype=np.float32)
     if arm == "e_lead":

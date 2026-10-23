@@ -255,13 +255,15 @@ def main() -> None:
             },
         }
     # Distance to the implied wind by ERA5 speed bin, same rows for every product.
-    inv = complete.filter(pl.col("implied_100m").is_not_null() & ~pl.col("masked"))
+    inv = complete.filter(pl.col("implied_100m").is_not_null() & ~pl.col("masked")).with_columns(
+        neutral_100m=(pl.col("era5_100m") + pl.col("icon_d2_100m") + pl.col("ukv_lead0_100m")) / 3
+    )
     distance: dict = {"rows": inv.height, "bins": {}}
     labels = ["<5", "5-7", "7-9", "9-11", "11-14", ">=14"]
     edges = [-1.0, *SPEED_BINS, 99.0]
     for index, label in enumerate(labels):
         part = inv.filter(
-            (pl.col("era5_100m") >= edges[index]) & (pl.col("era5_100m") < edges[index + 1])
+            (pl.col("neutral_100m") >= edges[index]) & (pl.col("neutral_100m") < edges[index + 1])
         )
         if part.height == 0:
             continue

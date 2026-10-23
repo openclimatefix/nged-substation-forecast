@@ -46,6 +46,7 @@ ARM_LABELS: Final[dict[str, str]] = {
     "d_direction": "Speed factor per direction sector",
     "a_mean_era5": "One speed factor, fitted to ERA5 (control)",
     "e_lead_era5": "Speed factor per lead day, fitted to ERA5 (control)",
+    "a_mean_era5_all": "One speed factor, fitted to ERA5 on all rows (control)",
     "b_spread": "Spread of members widened per lead day",
     "c_shift_-3h": "Members read 3 h earlier",
     "c_shift_+3h": "Members read 3 h later",
@@ -296,7 +297,7 @@ def figure_5(*, highres: dict) -> alt.TopLevelMixin:
             x=alt.X(
                 "bin:N",
                 sort=order,
-                title="ERA5 100 m wind speed bin (m/s)",
+                title="Mean 100 m speed of ERA5, ICON-D2, and UKV, bin (m/s)",
                 axis=alt.Axis(labelAngle=0),
             ),
             y=alt.Y("rmse:Q", title="RMSE against the implied wind (m/s)"),
@@ -312,7 +313,7 @@ def figure_5(*, highres: dict) -> alt.TopLevelMixin:
             width=WIDTH,
             height=220,
             title=_title(
-                text="UKV's first hour is closer to the implied wind than ERA5 is; ICON-D2's is not",  # noqa: E501
+                text="UKV's first hour is closer to the implied wind than ERA5 is at 7 to 14 m/s; ICON-D2's is about as close as ERA5",  # noqa: E501
                 lines=[
                     "3 wind farms (W1 to W3), July 2025 to June 2026, half-hours with an implied wind. Smaller is better."  # noqa: E501
                 ],
