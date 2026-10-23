@@ -265,7 +265,6 @@ def harm() -> None:
                 draws.append(s[pick].sum() / n[pick].sum())
             lo, hi = pct(np.array(draws))
             wlo, whi = pct(np.array(draws), wide=True)
-            dm = float((sub["mean_forecast"] - 0).abs().mean()) if False else float("nan")
             print(
                 f"{arm:5s} {label:16s} harm {point:+.3f} [{lo:+.3f}, {hi:+.3f}] (98.3%: [{wlo:+.3f}, {whi:+.3f}]) rows {sub.height}, months {len(s)}"
             )
@@ -278,7 +277,6 @@ def harm() -> None:
                     "s": s.tolist(),
                     "n": n.tolist(),
                 }
-            del dm
     print(
         "\n-- paired differences on the same held-out months (even months: L1, L2, L3 variants) --"
     )

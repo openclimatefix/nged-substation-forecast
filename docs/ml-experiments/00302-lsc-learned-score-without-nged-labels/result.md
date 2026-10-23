@@ -12,7 +12,7 @@ size: >-
   Degradation rule: not touched. Designs: more than one is defensible for a label-free threshold
   (a global alarm rate, or a per-Primary rate), so both are pre-registered arms. Callers: this
   folder's scripts only, which copy the modules of experiments 195 and 227 and read the stored
-  scores of experiment 227 and the Primary statistics of experiment 217. No Opus review (credits).
+  scores of experiment 227 and the Primary statistics of experiment 217. No independent review of the plan was run.
 hypothesis: >-
   Experiment 227's carried alarm source (the re-ranker of experiment 195 at a budget of 20
   unexplained odd-month candidates, "LR_b20") uses NGED labels twice: its training negatives drop
@@ -41,8 +41,8 @@ decision_rule: >-
   shifts (at least 2 days and at least 10% of load) with the whole 35 as the second row.
 benchmark: >-
   L0: the stored re-ranker of experiment 195 at a budget of 20 unexplained odd-month candidates
-  (experiment 227: 21 of 35 matched at 5.0 alarms per match, harm -0.007 with interval -0.039 to
-  +0.014 points). Reproducing 21 matches is the positive control.
+  (experiment 227: 21 of 35 matched at 5.0 alarms per match, harm -0.007 over all months, with interval
+  -0.039 to +0.014 points). Reproducing 21 matches is the positive control.
 row_set_id: >-
   Experiment 227's real-record rows (ordinary rows, cached daily 09:00 UTC forecasts, six Primaries)
   restricted to the months each arm did not train on; not comparable with the leaderboard
@@ -60,29 +60,29 @@ best_arm: >-
 headline: >-
   Training with every real candidate as a negative lowers the matches of the 35 logged load shifts
   from 20 to 13 (L2 against L1), and a label-free alarm rate adds one match back (14, L3). All of
-  the loss sits in the 15 load shifts that start in a month the model trained on, where L1 finds 7
-  and L2 finds 0. In the 20 load shifts that start in months the model never saw, L1, L2, and L3
-  find 13, 13, and 14.
+  the loss sits in the 15 load shifts that start in a month the score trained on (post hoc), where
+  L1 finds 7 and L2 finds 0. In the 20 load shifts that start in months the score never saw, L1,
+  L2, and L3 find 13, 13, and 14.
 lessons: >-
   A learned score trained with real candidates as negatives learns that the real load shifts inside
-  its training months are not load shifts. Whether that matters for version 2 depends on whether
+  its training months are not load shifts. Whether this loss matters for version 2 depends on whether
   the score is applied to months it never trained on, where no loss was visible (post hoc, 20 load
-  shifts). A label-free per-Primary alarm rate evens out the alarm rate across Primaries (11 of 15
-  Primaries within a factor of 2 of the median, against 7 of 15 for the labelled arms), and costs
-  0.012 points of ordinary-day harm against L1, not resolved from zero.
+  shifts). A label-free per-Primary alarm rate brings more Primaries within a factor of 2 of the
+  median alarm rate (11 of 15, against 7 of 15 for the labelled arms), and adds 0.012 points of ordinary-day harm against L1, not resolved from zero.
 take_home_message: >-
   A learned load-shift alarm trained without NGED labels matched 14 of the 35 logged load shifts,
-  against 20 to 21 with labels, so the pre-registered test failed. The whole loss sits in load
-  shifts that start in the months the score trained on, because every real candidate there, real
+  against 20 to 21 with labels, so the pre-registered test failed. The whole loss sits (post hoc) in
+  load shifts that start in the months the score trained on, because every real candidate there, real
   load shifts included, was taught as a negative. On the 20 load shifts in months the score never
-  saw, the label-free score found 13 to 14, the same as the labelled one (post hoc). The next test
+  saw, the label-free score found 13 to 14, against 13 for the labelled one, a difference too small to
+  resolve with 20 load shifts. The next test
   should score a label-free score only on months it never trained on, with more than 20 load
   shifts.
 advice:
   - >-
     Score a label-free alarm source on load shifts in months it never trained on and not on the
-    whole record, because real load shifts inside the training months are taught as negatives
-    and then missed (15 shifts: L1 found 7, L2 found 0; Checks).
+    whole record, because real load shifts inside the training months may be taught as negatives
+    and then missed (post hoc: 15 shifts, L1 found 7, L2 found 0; Checks).
   - >-
     Do not read the 20 load shifts in unseen months as proof that labels are unnecessary: the
     split is post hoc and the labelled and label-free scores differ by one match there (Checks).
@@ -98,34 +98,37 @@ adopted_in: none
 date: 2026-10-23
 ---
 
-**A learned load-shift score trained and thresholded without NGED labels matched 14 of the 35
-logged load shifts, against 20 to 21 with labels, and the loss comes from the training negatives,
-not the threshold.** A load shift is demand that the electricity network operator moves between
-neighbouring Primary substations for hours or days. The score is the re-ranker of [experiment
-195](../00195-switching-neural-plus-detector-features/result.md), a small neural network that
-re-scores the candidate alarms of the refit-offset neighbour-count detector (RO-NC). The carried
-setting of [experiment 227](../00227-lsc-fewer-false-alarms-and-softer-use-part-2/result.md)
-(LR_b20, here L0) uses NGED labels twice: it drops every logged or labelled span, every D8
-multi-day drop, and the 17 block days from its training negatives, and it sets its threshold by
-counting candidates that no logged closure explains. Version 2 of Flexpectation will have no such
-labels. We trained the same network with every real candidate as a negative and set the threshold
-from a rate that reads no label, and counted the logged load shifts it matched.
+**A learned load-shift score trained without NGED labels in its negatives, with an alarm count taken
+from the labelled score, matched 14 of the 35 logged load shifts, against 20 to 21 with labels. The
+loss comes from the training negatives, not from the threshold.** A load shift is demand that the
+electricity network operator moves between neighbouring Primary substations for hours or days. The
+35 are the load shifts lasting over 1 day in NGED's switching log and hand labels. The score is the
+re-ranker of [experiment 195](../00195-switching-neural-plus-detector-features/result.md), a small
+neural network that re-scores the candidate alarms of the refit-offset neighbour-count detector
+(RO-NC). A training negative is a candidate alarm that the network is taught is not a load shift.
 
-**The prediction failed.** We predicted that the label-free score with a per-Primary alarm rate
-(L3) would match at least 18 of the 35 at no more than 6.5 alarms per match. It matched 14 at 7.5.
-Its ordinary-day harm stayed inside the limit of 0.05 points (+0.017, 95% interval -0.006 to
-+0.043). Against the labelled score trained on the same months (L1), L3 lost 6 matches. The label-free
-negatives cost 7 matches (L2 against L1), and the label-free threshold gave 1 back (L3 against
-L2). The
-verdict is `not supported`. Points are percentages of a substation's effective capacity, and a lower
-score is better.
+**Two arms use NGED labels and four do not.** L0 is the carried setting of [experiment
+227](../00227-lsc-fewer-false-alarms-and-softer-use-part-2/result.md) (LR_b20). It drops every
+logged or labelled span, every multi-day drop of the Primary substation named D8, and the 17 block
+days from its training negatives, and it sets its alarm threshold by counting candidates that no
+logged closure explains. L1 repeats L0 with the months swapped. L2 keeps every real candidate as a
+negative, and L3 adds an alarm rate per Primary. Terms defines the arms and a match. Flexpectation
+version 2 will have no NGED labels, so we asked whether L3 still matches about as many load shifts.
 
-**The whole loss sits in the load shifts that start in a month the score trained on (post hoc).**
-In those 15 load shifts the labelled score L1 finds 7 and the label-free score L2 finds 0, because
-L2 was taught the real candidate at each load shift's onset as a negative (12 of the 15). In the 20
-load shifts that start in months the score never saw, L1, L2, and L3 find 13, 13, and 14. A
-version-2 service scores future months, so this split is the reading that matters, but 20 load
-shifts cannot separate a difference of one or two.
+**The prediction failed.** We predicted that L3 would match at least 18 of the 35 at no more than
+6.5 alarms per match. It matched 14 at 7.5. Its ordinary-day harm point estimate and 95% interval
+stayed inside the limit of 0.05 points (+0.017, -0.006 to +0.043). Points are percentages of a
+substation's effective capacity, and a lower score is better. Against the labelled score trained on
+the same months (L1), L3 lost 6 matches. The label-free negatives lowered matches by 7 (L2 against
+L1), and the label-free threshold raised them by 1 (L3 against L2). The verdict is `not supported`.
+
+**The whole loss sits in the load shifts that start in a month the score trained on (post hoc).** In
+those 15 load shifts the labelled score L1 finds 7 and the label-free scores L2 and L3 find 0. Of
+the 15, 12 have a real onset candidate that L2 trains as a negative and L1 drops, which is a
+plausible mechanism that this page did not test. In the 20 load shifts that start in months the
+score never saw, L1, L2, and L3 find 13, 13, and 14. A service for future months resembles this
+split more than the whole 35, although the unseen months lie between trained months. Twenty load
+shifts cannot separate a difference of one or two matches.
 
 ![Figure 1: logged load shifts matched, by arm and by the month the load shift starts in](figure_1_matches.svg)
 
@@ -144,7 +147,7 @@ shifts cannot separate a difference of one or two.
   and its threshold leaves as many merged alarms over the whole record as L0 raises in the same
   fold. L3 uses L2's score with one threshold per Primary: the fold's total alarm count is shared in
   proportion to each Primary's predicted RO-NC alarm rate times its years of residual. L3_5 and
-  L3_2 pin the total at 5 and at 2 merged alarms per Primary-year, so they read no label at all.
+  L3_2 pin the total at 5 and at 2 merged alarms per Primary-year, so they read no label in their alarm count.
 - **The predicted rate.** For Primary p, the base-2 logarithm of RO-NC's alarm rate at 4.35 noise
   units ([experiment 217](../00217-switching-label-free-thresholds-in-noise-units/result.md)) is
   fitted on the base-2 logarithm of the share of days on which the demand model's daily mean error
@@ -162,8 +165,8 @@ shifts cannot separate a difference of one or two.
 - **Verdict: `not supported`.** L3 matches 14 of 35, below the bar of 18, and at 7.5 alarms per
   match, above 6.5. The harm bar holds.
 - **Positive control reproduced.** L0 recomputed from experiment 227's stored scores matches 21 of
-  35 at 5.0 alarms per match, and its harm on odd months is -0.015, as in experiment 227.
-- **Arms, all 35 load shifts (alarms are the mean over folds, over 15 Primaries and 4.5 years):**
+  35 at 5.0 alarms per match, and its harm on odd months is -0.015, as in experiment 227's odd-month figure (its all-month figure is -0.007).
+- **Arms, all 35 load shifts (alarms are the mean over folds, over 15 Primaries and 61.8 Primary-years):**
 
 | Arm | Matched | Alarms | Alarms per match | MW-weighted recall |
 |---|---|---|---|---|
@@ -186,7 +189,7 @@ shifts cannot separate a difference of one or two.
   matches from label-free training (L1 minus L3 is 4 against 6) but match half as many load shifts.
 - **Alarm rates (merged alarms per Primary-year).** The overall rate is 1.7 for L0, 1.6 for L1, 1.7
   for L2, and 1.7 for L3: the labelled budget of 20 is about 1.7 alarms per Primary-year, a third
-  of the 5 per Primary-year that the brief fixed in advance. The number of Primaries within a
+  of the 5 per Primary-year chosen before the run. The number of Primaries within a
   factor of 2 of the median rate is 7 of 15 for L0 and L1, 8 for L2, and 11 for L3, L3_2, and L3_5.
   The per-Primary rule moves D10 from 2.4 (L2) to 4.5 (L3) alarms per Primary-year and D2 from 0.15
   to 1.4. Leave-one-Primary-out predictions of RO-NC's rate run from 1.35 (D12) to 16.3 (D18).
@@ -199,7 +202,8 @@ shifts cannot separate a difference of one or two.
   did not train on).** L0 -0.015 (-0.078 to +0.021, 13 odd months), L1 +0.006 (-0.010 to +0.024,
   14 even months), L2 +0.009 (-0.006 to +0.024), L3 +0.017 (-0.006 to +0.043), L3 at 2 per
   Primary-year +0.019 (-0.004 to +0.045), L3 at 5 per Primary-year +0.029 (-0.005 to +0.068). All
-  are inside +/-0.05. Paired on the same months: L3 minus L1 +0.012 (-0.017 to +0.041), L2 minus L1
+  point estimates are inside +/-0.05. The 95% intervals of L0 to L3 and L3 at 2 per Primary-year
+  are inside it too; the interval of L3 at 5 per Primary-year (to +0.068) is not. Paired on the same months: L3 minus L1 +0.012 (-0.017 to +0.041), L2 minus L1
   +0.003 (-0.019 to +0.024), L3 minus L2 +0.008 (-0.005 to +0.029).
 - **Label contamination of L2's training negatives.** Of 913 odd-month RO-NC candidates, 364 lie
   inside a logged or labelled span, 93 inside a D8 drop, and 2 on a block day (416, or 45.6%, in
@@ -220,9 +224,9 @@ shifts cannot separate a difference of one or two.
   and L3_5, and disagrees for L2 (-0.005 against +0.009), where both are inside 0.01 points and
   inside the intervals. Trigger 4: leaving out any one Primary keeps L3's harm between +0.011
   and +0.022 and L1's between +0.001 and +0.007. Trigger 5: L2 finds more injected load shifts than
-  L1 (0.274 against 0.248) while matching fewer real ones, which this page reads as injected recall
-  failing to rank arms. Triggers 6 and 7 do not apply. No Opus audit was run: the verdict rests on
-  a count of matches, which the L0 control reproduces exactly, and credits are low.
+  L1 (0.274 against 0.248) while matching fewer real ones, a pattern that this page reads as injected
+  recall failing to rank arms. Triggers 6 and 7 do not apply. No Opus audit was run: the verdict rests on
+  a count of matches, which the L0 control reproduces exactly.
 - **Median minus mean forecast for L3 (megawatts, per Primary).** D5 -0.177, D9 -0.017, D10
   -0.057, D11 -0.025, D14 +0.044, D16 +0.026.
 - **Tail calibration and curtailment cost** are not reported: the harm harness stores no quantile
@@ -231,13 +235,16 @@ shifts cannot separate a difference of one or two.
 
 ## Caveats
 
-- **The odd and even month split is post hoc and small.** It uses 15 and 20 load shifts. The
+- **The odd and even month split is post hoc and small, and the threshold may add to it.** L2 and L3
+  set their alarm count on scores over the whole record, and in the training months those scores
+  are in-sample, so the shared alarm count falls mostly on the months the score never saw. It uses 15 and 20 load shifts. The
   pre-registered contrast is on all 35.
-- **Matches are scored in every month,** as in experiment 195, so L0 and L1 are partly in-sample
-  in the months they trained on. L1's thresholds use even-month labels, L0's use odd-month labels.
+- **Matches are scored in every month,** as in experiment 195, so every arm is partly in-sample
+  in the months it trained on. L1's thresholds use even-month labels, L0's use odd-month labels.
 - **Label uses that remain.** The demand model behind the residuals was trained with the labelled
-  load shifts masked. The injector places positives only in stretches with no logged or labelled
-  event within 7 days. Experiment 212's unmasked fits cover 5 of the 15 Primaries and a 15-series
+  load shifts masked. The injector is fitted on the 66 labelled load shifts, the logged closures, and D8's drops
+  (leaving out the held-out fold's pairs), and places positives only in stretches with no logged
+  or labelled event within 7 days. Version 2 could not copy either step without labels. Experiment 212's unmasked fits cover 5 of the 15 Primaries and a 15-series
   residual panel is not stored, so L4 (the unmasked demand model) was not run.
 - **Pins use one labelled number.** L2 and L3 take their alarm count from L0. L3 at 2 and 5 alarms
   per Primary-year do not. L3 at 2 per Primary-year was added to the plan before any match was
@@ -250,13 +257,13 @@ shifts cannot separate a difference of one or two.
 ## What to try next
 
 - **Re-run the comparison on months the score never trained on,** with L1 and L2 trained on a
-  block of months and every load shift scored in later months. Twenty load shifts decide
-  nothing, so the test needs the other Primaries' logged load shifts or a longer record.
+  block of months and every load shift scored in later months. Twenty load shifts cannot separate a
+  difference of one or two matches, so the test needs the other Primaries' logged load shifts or a longer record.
 - **Test a negative-cleaning rule that needs no log.** Logged or labelled spans hold 364 of L2's 913
   negatives. Dropping negatives that sit within 4 days of a high-scoring candidate is one rule to
   try, scored on months the score never trained on.
-- **Leave the threshold alone for now:** the per-Primary rate costs no matches and makes alarm rates
-  more even (11 of 15 Primaries within a factor of 2), and its harm is inside the limit.
+- **Keep the per-Primary alarm rate unchanged for now:** the per-Primary rate loses no matches and brings more Primaries
+  within a factor of 2 of the median alarm rate (11 of 15), and its harm is inside the limit.
 
 Code: `ml-experiments/00302-lsc-learned-score-without-nged-labels/`; the printed numbers are in
 `printed_score.txt`, `printed_inj.txt`, `printed_report.txt`, and `printed_checks.txt` in that
