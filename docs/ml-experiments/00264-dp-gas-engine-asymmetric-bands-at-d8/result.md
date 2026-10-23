@@ -27,40 +27,49 @@ hypothesis: >-
 prediction: >-
   Written before any forecast is scored, but after the descriptive table of experiment 191's stored
   reference forecasts was read (monthly coverage and tail shares, see Plan, "What was seen first"),
-  so P1 and P2 are not blind. Each prediction can fail. (P1) Arm 2, which widens only the lower
-  quantiles, does not bring the q05-to-q95 coverage within 5 points of 0.90 in any quarter, because
-  22% to 44% of D8 readings in the scored year lie above the reference's q95. (P2) Arm 2b, which
-  widens both sides by the same as-of method, brings the coverage within 5 points of 0.90 in at
-  least 3 of the 4 quarters. (P3) Arm 3, the mixture over 0 to 3 running units, does the same in at
-  least 3 quarters, and its quantile score is within 2% of arm 2b's, so the mixture does not repay
-  its added complexity. (P4) Arm 4 (arm 3 with a price known only in hindsight) lowers the quantile
+  so P1 and P5 are not blind. Each prediction can fail. (P1) Arm 2, which widens only the lower
+  quantiles, reaches a q05-to-q95 coverage of at most 0.80 in every quarter, because 22% to 44% of
+  D8 readings in the scored year lie above the reference's q95. (P2) Arm 2b, which widens both
+  sides by the same as-of method, brings the coverage within 5 points of 0.90 in at least three of
+  the four quarters. (P3) Arm 3, the mixture over 0 to 3 running units, does the same in at least
+  three quarters, and its quantile score is within 1% of arm 2b's, so the mixture does not repay its
+  added complexity. (P4) Arm 4 (arm 3 with a price known only in hindsight) lowers the quantile
   score by under 1% against arm 3, because the engine's chance of running rose only from 9% to 27%
-  across price fifths in the one summer we hold its output for. (P5) The "engine visible" switch
-  turns off at D8 between 2026-03-01 and 2026-05-15, and stays on at D8 before then; it is off at
-  D10 and D16 throughout. (P6) With the switch forced on, the mixture's fitted chance of at least
-  one running unit averages under 0.05 at D10 and at D16.
+  across price fifths in the one summer we hold its output for. (P5) The visibility switch is on at
+  D8 on every origin from 2025-08-01 to 2026-02-28 apart from at most 2 flips, is off on every
+  origin from 2026-06-01, and never turns on at D10 or D16. (P6) With the switch forced on, the
+  mixture's fitted chance of at least one running unit averages under 0.05 at D10 and at D16, the
+  level that the known-answer test (`e00264_recovery.py`, no engine simulated) reaches.
 decision_rule: >-
-  Reference: arm 1, experiment 191's reference forecast (arm a0, the GAM-K engine of experiment
-  152, no price input) with its residual-table spread, on `fold_a_daily_gap_v1`, seed 0, scored
-  year 2025-07-02 to 2026-06-30, leads 0.5 to 168 hours, outside the hand-filtered switching events.
-  The quantile score is twice the mean pinball loss over 11 quantiles, in points of effective
-  capacity. `supported`: arm 2 or arm 3 has q05-to-q95 coverage in [0.85, 0.95] in each of the four
-  quarters of the scored year (valid times before 2025-08-01 are excluded from the first quarter, as
-  a 30-day burn-in while the as-of fit gathers its first residuals, and the full-quarter value is
-  reported beside it), at D8; and its D8 quantile score is at most 0.5% above arm 1's; and at D10
-  and at D16 its quantile score is at most 0.1% above arm 1's and its q05-to-q95 coverage is no
-  more than 1 point below arm 1's, in both the free-switch and the forced-switch runs. `partly
-  supported`: only arm 2b passes, or a candidate passes the coverage test and misses the score
-  limit. `not supported`: otherwise. The mixture earns its place over the plain widening only if
-  arm 3's D8 quantile score is at least 1% below arm 2b's with the 95% month-block interval wholly
-  below zero; if not, the recommendation is arm 2b. The 1% threshold is set by cost: arm 3 adds an
-  expectation-maximisation fit and a visibility switch to the forecast, and arm 2b adds a
-  rolling table of quantile ratios.
+  Exploratory: the scored year also supplied the descriptive table that chose arm 2b and the
+  switch thresholds, and no second year of D8 forecasts exists, so a verdict is a fit-to-the-year
+  check and the write-up says so. Reference: arm 1, experiment 191's reference forecast (arm a0,
+  the GAM-K engine of experiment 152, no price input) with its residual-table spread, on
+  `fold_a_daily_gap_v1`, seed 0, scored year 2025-07-02 to 2026-06-30, leads 0.5 to 168 hours,
+  outside the hand-filtered switching events. The quantile score is twice the mean pinball loss
+  over 11 quantiles, in points of effective capacity. A candidate arm passes at D8 when (a) its
+  q05-to-q95 coverage lies in [0.85, 0.95] in each of the four quarters of the scored year (valid
+  times before 2025-08-01 are excluded from the first quarter, as a 30-day burn-in while the as-of
+  fit gathers its first residuals, and the full-quarter value is reported beside it); (b) its D8
+  quantile score is at most 0.5% above arm 1's, judged on the point estimate; and (c) at D10 and D16
+  its quantile score is no worse than arm 1's, meaning the point estimate is at most +0.1% and the
+  upper end of the 95% month-block interval is at most +0.5%, in both the free-switch and the
+  forced-switch runs. Outcomes: `supported` when arm 2 or arm 3 passes (the brief's candidates);
+  `partly supported` when only arm 2b passes, or when a candidate passes (a) but not (b) or (c);
+  `not supported` otherwise. When arm 3 passes and arm 2b does too, arm 3 is recommended only if its
+  D8 quantile score is at least 1% below arm 2b's with the 95% month-block interval wholly below
+  zero and the sign unchanged when any one month is left out; otherwise arm 2b is recommended. When
+  arm 3 passes and arm 2b fails, arm 3 is recommended and the write-up says the mixture's gain over
+  the plain widening is untested. The 1% threshold is set by cost: arm 3 adds an
+  expectation-maximisation fit and a visibility switch to the forecast, and arm 2b adds a rolling
+  table of quantile ratios. The 95% interval gates every rule above, and the Bonferroni-corrected
+  99.2% interval is reported beside it.
 benchmark: >-
   Arm 1 at the same site, rows and leads; experiment 191's reference forecast is the stored
   prediction. Experiment 251's best-guess stack does not cover D8 (its six substations are D5, D9,
-  D10, D11, D14, and D16), so the median here is the GAM-K reference and not the stack. This is a
-  departure from the brief and the plan says so.
+  D10, D11, D14, and D16), so the median here is the GAM-K reference and not the stack. Using the
+  reference as the median is a departure from the brief, and so are the added arm 2b, the Brier
+  stand-in for the curtailment cost, and the placebo rule in (c) above.
 row_set_id: fold_a_daily_gap_v1
 metric: >-
   Quantile score and q05-to-q95 coverage by quarter at D8; coverage and pinball loss at q01, q05,
@@ -78,8 +87,9 @@ brief `price_sensitive_generation_design.md`). Three attempts to detect the engi
 failed ([experiment 191](../00191-dp-price-sensitive-assets-in-the-history/result.md), [experiment
 198](../00198-d8-summer-spikes-cooling-load-and-residual-test/result.md), and [experiment
 199](../00199-ps2b-engine-detector-v2-ramp-night-price/result.md)). So this experiment does not
-detect the engine. It asks whether the forecast's bands can carry the uncertainty that the engine
-adds, by widening as-of: using only the residuals that are already known when each forecast is made.
+detect the engine. The experiment asks whether the forecast's bands can carry the uncertainty that
+the engine adds, by widening as-of: using only the residuals that are already known when each
+forecast is made.
 
 ## Plan
 
@@ -96,9 +106,16 @@ adds, by widening as-of: using only the residuals that are already known when ea
   The lower-tail-only widening that the maintainer's brief names as arm 2 therefore cannot be
   enough on its own, and we added arm 2b, which widens both sides, to separate "the band is too
   narrow" from "the band is too narrow in the direction the engine pushes".
-- **These numbers are descriptive, were read before the arms were fixed, and fix the thresholds
-  below only where this plan says so.** The visibility threshold of arm 3 (4%) was chosen after
-  seeing that table, and the plan reports the result at 2% and 6% as well.
+- **The table of coverage and tail shares is descriptive, was read before the arms were fixed, and
+  chose arm 2b and the switch thresholds.** The switch thresholds (on at 5%, off at 3%) sit between
+  the placebo sites' share of about 0.1% and D8's share of 5% to 16% in July to March, and the
+  write-up reports the switch at two other settings as a sensitivity check.
+- **Limits of the design.** Arms 2 and 2b move only the tails, so a bias in the median that the
+  engine causes stays in place. Arm 1 is the stored output of experiment 191, whose monthly refits
+  use only data before each month and whose spread was fitted on tuning months, so the bands being
+  widened carry no information from the scored year beyond the stored forecast itself. No D8
+  forecast before 2025-07-02 is stored, so the first weeks of the first quarter have no resolved
+  residuals.
 
 ### Inputs
 
@@ -128,41 +145,50 @@ decision rule handles that quarter.
 
 1. **Control.** Arm 1, as above.
 2. **Lower-tail widening** (the maintainer's arm 2). For each row, the normalised shortfall is
-   `s = (q50 - actual) / (q50 - q05)`. In each cell of hour-of-day block (00-06, 06-12, 12-18, and
-   18-24 UTC) by season (December-February, March-May, June-August, September-November), and
-   with the cell falling back to the hour block alone when it holds under 300 resolved rows, let
-   `S_tau` be the empirical `1 - tau` quantile of `s` for tau in {0.01, 0.05, 0.10, 0.25}. The new
-   lower quantile is `q50 - max(r_tau, S_tau) * (q50 - q05)`, where `r_tau` is the reference's own
-   ratio `(q50 - q_tau) / (q50 - q05)`. The widening never narrows a band, and the upper quantiles
-   and the mean are unchanged.
+   `s = (q50 - actual) / (q50 - q05)`, with the denominator floored at 1 point. In each cell of
+   hour-of-day block (00-06, 06-12, 12-18, and 18-24 UTC) by season (December-February,
+   March-May, June-August, September-November), and with the cell falling back to the hour block
+   alone, then to all rows, when it holds under 300 resolved rows, let `S_tau` be the empirical `1 -
+   tau` quantile of `s` for tau in {0.01, 0.05, 0.10, 0.25}. The new lower quantile is `q50 -
+   max(r_tau, S_tau) * (q50 - q05)`, where `r_tau` is the reference's own ratio `(q50 - q_tau) /
+   (q50 - q05)`. The widening never narrows a band, and the upper quantiles and the mean are
+   unchanged.
 3. **Arm 2b (added by this plan).** The same method applied to both sides: the upper quantiles
    `q75`, `q90`, `q95`, and `q99` are recalibrated the same way from the normalised overshoot
    `(actual - q50) / (q95 - q50)`.
-4. **Mixture over running units (arm 3).** The reading is modelled as the reference's distribution
-   shifted by `delta - k * g`, where `k` is the number of running units (0, 1, 2, or 3) and `g` is
-   1.97 MW (19.7 points), and with the reference's own spread multiplied by a noise scale `c`. The
-   reference distribution is the piecewise-linear cumulative distribution through its 11 quantiles
-   with exponential tails. The probability of `k` follows a multinomial logistic model of five
-   inputs: hour block, season, weekend, the share of half-hours in the 14 days before the origin
-   with a residual below -25 points, and the visibility switch below. The model is fitted by
-   expectation-maximisation on the resolved residuals, with `c` on the grid {1, 1.5, 2, 3, 4, 6}
-   and the likelihood-maximising `c` kept, and with `delta` set so that the mixture's mean equals the
-   reference's mean on the training rows (the reference was trained on readings that include the
-   engine, so its mean already sits at the average engine effect). The forecast quantiles come from
-   inverting the mixture's cumulative distribution. Ridge penalty 1.0 on the logistic weights,
-   30 expectation-maximisation iterations.
-   **The engine visibility switch** is on when the share of half-hours in the 30 days before the
-   origin with a residual below -25 points is at least 4%. When it is off, `pi_0 = 1`, `delta = 0`,
-   and `c = 1`, so arm 3 equals arm 1. This protects against the April 2026 change. Report every
-   date the switch changes state at each site, and the sensitivity at 2% and 6% (post hoc).
+4. **Mixture over running units (arm 3).** The reading is modelled as the reference's distribution,
+   with its spread multiplied by a noise scale `c`, shifted by `delta - k * g`, where `k` is the
+   number of running units (0, 1, 2, or 3), `g` is 1.97 MW (19.7 points), and `delta = g * E[k]`
+   is set per row so that the mixture's mean equals the reference's mean (the reference was trained
+   on readings that include the engine). The reference distribution is the piecewise-linear
+   cumulative distribution through its 11 quantiles, with an exponential tail beyond q01 and q99
+   whose density is continuous at those quantiles. The probability of `k` follows a multinomial
+   logistic model of the hour block, the season, a weekend flag, and the share of half-hours in
+   the 14 days before the origin with a residual below -25 points. The logistic model is fitted
+   by expectation-maximisation on resolved residuals, with `c` on the grid {1, 1.5, 2} (capped
+   at 2 so that one wide component cannot imitate the mixture) and the likelihood-maximising `c`
+   kept, a ridge penalty of 1.0 on the logistic weights, and 30 expectation-maximisation
+   iterations. The forecast quantiles come from inverting the mixture's cumulative distribution.
+   A known-answer test on simulated readings (`e00264_recovery.py`) checks that the fit recovers
+   the noise scale and the unit probabilities before the real run.
+   **The engine visibility switch** turns on when the share of half-hours in the 30 days before the
+   origin with a residual below -25 points reaches 5%, and turns off when the share falls below
+   3%. The mixture is fitted only on rows whose own origin had the switch on. Where the switch is
+   off the forecast is arm 2b, not arm 1, because the upper-side miss is not caused by the engine.
 5. **Arm 4.** Arm 3 with `spread_positive` and `price_p75` at the valid time added to the logistic
-   model. It is a hindsight upper bound for the value of a price forecast.
+   model. These binary flags are a hindsight upper bound for the value of a price forecast, and
+   they are coarser than the spark-spread level that the brief names.
 6. **Placebo (arm 5).** Arms 2, 2b, and 3 at D10 and D16, with the switch free, and with the switch
    forced on (a stress test that is the real placebo for the mixture, because the free switch is
    off at both sites).
 7. **Not run.** The small neural network for the mixture probabilities. The brief welcomes it only if
-   it beats arm 3 by a pre-registered margin, and the plan sets none, so it is listed under "What
-   to try next" in the write-up.
+   it beats arm 3 by a pre-registered margin, and the plan sets none, so the write-up lists it
+   under "what to try next".
+
+**The as-of rule has a reporting latency.** A reading counts as known 6 hours after its valid time,
+because NGED's delivery lag is unknown. A fit at origin T therefore uses valid times at or before T
+minus 6 hours, and so do the 14-day and 30-day drop shares. A fit is frozen at its block's first
+origin, so residuals that resolve during the block do not enter its fit.
 
 ### Contrasts and scoring
 
@@ -170,19 +196,20 @@ decision rule handles that quarter.
   2b, and arm 4 minus arm 3. Each is a mean paired difference with a 95% interval from 20,000
   resamples of the 12 calendar months of the scored year, and a Bonferroni-corrected 99.2% interval
   (6 contrasts) beside it.
-- **Cuts.** All rows; the four quarters; leads 0 to 24, 24 to 72, and 72 to 168 hours; months with the
-  switch on and off; winter (November to March) evenings (16:00 to 20:00 UTC).
-- **Tail table.** Coverage and pinball loss at q01, q05, q95, and q99 per arm, with
-  `studies.tail_calibration`.
+- **Cuts.** All rows; the four quarters; q05-to-q95 coverage and the quantile score at leads 0 to 24,
+  24 to 72, and 72 to 168 hours (the fit uses shortest-lead residuals, so long-lead coverage is
+  reported but not gated); the share of cells that fell back to the hour block, per quarter; months
+  with the switch on and off; winter (November to March) evenings (16:00 to 20:00 UTC).
+- **Tail table.** Coverage and pinball loss at q01, q05, q95, and q99 per arm.
 - **Checks.** The median forecast minus the mean forecast, per site and arm. The error of the mean
-  forecast beside each quantile-score contrast. The leave-one-month-out sign of each D8 contrast. The
-  audit triggers, listed in the write-up.
+  forecast beside each quantile-score contrast. The leave-one-month-out sign of each D8 contrast.
+  Which of the seven audit triggers of the `ml-experiment` skill fired.
 - **Curtailment.** `studies.node_curtailment` needs a bulk supply point's forecast and its generators'
   forecasts, and this experiment forecasts a single Primary, so the metric cannot be run. The
   stand-in is the Brier score of the event "the reading falls below D8's 2nd percentile of readings
-  in the 12 months before 2025-07-02", computed from each arm's mixture of quantiles by linear
-  interpolation of its cumulative distribution. The write-up labels it a stand-in and does not call
-  it a curtailment cost.
+  in the 12 months before 2025-07-02", computed from each arm's 11 quantiles by linear
+  interpolation of its cumulative distribution. The write-up labels the Brier score a stand-in and
+  does not call it a curtailment cost.
 
 ### Compute
 
