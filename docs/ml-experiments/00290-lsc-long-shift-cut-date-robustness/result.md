@@ -2,7 +2,8 @@
 id: '00290'
 slug: lsc-long-shift-cut-date-robustness
 title: >-
-  Does the share of a 30-day load transfer that a forecast learns as normal depend on the date the forecast is fitted?
+  Does the share of a 30-day load transfer that a forecast learns as normal depend on the date
+  the forecast is fitted?
 theme: lsc-detectors
 also_relevant_to:
   - retraining-and-training-history
@@ -103,13 +104,14 @@ Figures are means over 10 substations. `e00290_report.py` prints every number in
 - **Season.** A seasonal shape explains the spread only weakly. The lowest share is in mid-January
   (8.6%) and the highest in late April (29.2%), but the same calendar month differs by up to 7.4
   points between years: April is 29.2% in 2023 and 21.8% in 2024, and June is 24.5% in 2023 and
-  20.0% in 2024. The two extreme dates have mean transfers of 14.8 and 13.7 points, near the middle of the
-  10.9 to 16.1 range, so the size of the transfer is unlikely to explain them. The cause is not
-  located.
+  20.0% in 2024. The two extreme dates have mean transfers of 14.8 and 13.7 points, near the middle
+  of the 10.9 to 16.1 range, so the size of the transfer is unlikely to explain them. The cause is
+  not located.
 - **Winter.** The 2023-12-20 end date has a normal 48-hour share (21.8%), but the share over days 3
   to 10 after the end is 2.0% and over days 10 to 17 is -8.6%. Christmas and the New Year fall in
   those windows. We did not test whether the holidays cause this.
-- **Substations.** The share, with the fit cut at the end of the transfer, runs from 19.9% (D12) to 24.0% (D10), and the bias
+- **Substations.** The share, with the fit cut at the end of the transfer, runs from 19.9% (D12)
+  to 24.0% (D10), and the bias
   from 1.51 (D12) to 3.48 (D11) points.
 - **Later windows.** Over days 3 to 10 the mean share is 19.3%, over days 10 to 17 it is 16.7%, and
   over days 3 to 33 it is 16.6%.
