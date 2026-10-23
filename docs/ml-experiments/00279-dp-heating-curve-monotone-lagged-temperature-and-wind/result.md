@@ -33,16 +33,20 @@ prediction: >-
   exponentially weighted temperatures (-0.002), and wind chill (-0.026, interval -0.056 to +0.018)
   all within noise on winter rows, and experiment 121 found five heating hinges gained 0.016.
 decision_rule: >-
-  Paired month-resampled bootstrap on the scored year (2025-07 to 2026-06), 99.17% intervals
-  (Bonferroni over the three planned contrasts C1 A1-A0, C2 A2-A0, C3 A3-A0). The arm is supported
-  when its scored-year interval on its primary rows (cold nights for the cold-night contrast,
-  November to March otherwise) is wholly below zero, its point estimate on the replicate year
-  (2024-07 to 2025-06) is below zero, and at least 4 of 5 decision sites improve. The threshold is
-  -0.02 points for A2 (two extra fitted weights per hour band) and -0.04 points for A3 (a network
-  per site), because those arms add parameters or a trained component to the serving path; A1 has
-  no threshold beyond an interval below zero, because it replaces columns with columns. A3 minus A2
-  (C4) and A2w minus A2 (C5, the wind term) are secondary and read at the same level. The curve on
-  the card changes only for an arm that passes.
+  Paired month-resampled bootstrap on the scored year (2025-07 to 2026-06), 99% intervals
+  (stricter than Bonferroni over the three planned contrasts C1 A1-A0, C2 A2-A0, C3 A3-A0). The
+  primary rows are cold nights, because the card's cold-night bar is the panel this experiment
+  exists to improve; all rows outside the events, November to March, and the other rows are
+  secondary. An arm is supported when its scored-year interval on cold nights is wholly below zero
+  and at or below the threshold, its replicate-year point estimate on cold nights is below zero,
+  at least 4 of 5 decision sites improve on cold nights in the scored year, and the upper bound of
+  its interval on all other rows is not above +0.02 (non-inferiority). The threshold is -0.02
+  points for A1 and A2 and -0.04 points for A3, because the extra parameters, or a trained network
+  per site, must pay for the added complexity; the brief set both. A3 minus A2 (C4) and A2w minus
+  A2 (C5, the wind term) are secondary and read at the same level. A known-answer gate on
+  synthetic data (a curved and a straight heating truth) must show that A3 recovers a curved truth
+  and ties a straight one, otherwise A3's label is capped at inconclusive. The curve on the card
+  changes only for an arm that passes.
 benchmark: >-
   T-all-K (experiment 114's day-type split, tuned penalty weight 1.0, with the Kalman filter whose
   hyperparameters experiment 126 tuned for it), refitted here and checked against experiment 126's
