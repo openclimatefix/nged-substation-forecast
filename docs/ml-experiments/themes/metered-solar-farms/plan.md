@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 286 | How small a yearly drift or soiling loss can the six farms' output show, with and without a neighbour-relative index? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
