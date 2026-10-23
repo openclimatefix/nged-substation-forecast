@@ -80,7 +80,7 @@ def write_json_atomic(*, path: Path, content: object) -> None:
 
 def read_master() -> pl.DataFrame:
     """Return experiment 266's master frame with the week blocks and local hour added."""
-    local = pl.col("valid_time").dt.convert_time_zone("Europe/London")
+    local = (pl.col("valid_time") - pl.duration(minutes=30)).dt.convert_time_zone("Europe/London")
     return pl.read_parquet(common_master_path()).with_columns(
         gap=pl.col("qs_d") - pl.col("qs_bg2"),
         day=(pl.col("clear") > 20.0) & pl.col("csi").is_finite(),

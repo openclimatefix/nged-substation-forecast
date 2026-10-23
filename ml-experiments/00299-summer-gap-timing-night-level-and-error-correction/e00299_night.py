@@ -60,7 +60,7 @@ def load_rows(*, scale: float) -> pl.DataFrame:
             night_date=(start - pl.duration(hours=12)).dt.date(),
             resid_mean=(pl.col("actual") - pl.col("mean")) / scale,
             resid_median=(pl.col("actual") - pl.col("q50")) / scale,
-            weekday=pl.col("valid_time").dt.weekday(),
+            weekday=(start - pl.duration(hours=12)).dt.weekday(),
             month=pl.col("valid_time").dt.strftime("%Y-%m"),
         )
         .filter(pl.col("utc_hour").is_in(list(NIGHT_UTC_HOURS)))
@@ -86,6 +86,11 @@ def best_step(*, y: np.ndarray) -> tuple[int, float]:
         if left + right < best:
             best, best_k = left + right, k
     return best_k, float(1.0 - best / total)
+
+
+def adjusted_r_squared(*, r2: float, n: int, parameters: int) -> float:
+    """Return R squared adjusted for the number of fitted parameters (excluding the intercept)."""
+    return 1.0 - (1.0 - r2) * (n - 1) / (n - parameters - 1)
 
 
 def r_squared_on_groups(*, y: np.ndarray, groups: list[np.ndarray]) -> float:
@@ -181,6 +186,13 @@ def main() -> None:
             "nights": nightly.height,
             "r2_weekday": r_squared_on_groups(y=y, groups=[wd]),
             "r2_month": r_squared_on_groups(y=y, groups=[mo]),
+            "adj_r2_month": adjusted_r_squared(
+                r2=r_squared_on_groups(y=y, groups=[mo]),
+                n=len(y),
+                parameters=len(np.unique(mo)) - 1,
+            ),
+            "adj_r2_step": adjusted_r_squared(r2=r2_step, n=len(y), parameters=2),
+            "month_levels": len(np.unique(mo)),
             "r2_month_and_weekday": r_squared_on_groups(y=y, groups=[mo, wd]),
             "r2_temperature_band_month_weekday": r_squared_on_groups(y=y, groups=[tb, mo, wd]),
             "step_date": str(dates[k]),

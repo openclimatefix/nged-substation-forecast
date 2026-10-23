@@ -55,11 +55,11 @@ def load_heads() -> pl.DataFrame:
                     ML_EXPERIMENTS_DATA_DIR
                     / "00201-dp-gam-residual-mlp" / "work" / "preds" / f"{arm}_seed{s}.parquet"
                 ),
-                name=f"qs_{arm}",
+                name=f"qs_head_{arm}",
             )
             for s in SEEDS
         ]  # fmt: skip
-        mean = pl.concat(seeds).group_by(KEYS).agg(pl.col(f"qs_{arm}").mean())
+        mean = pl.concat(seeds).group_by(KEYS).agg(pl.col(f"qs_head_{arm}").mean())
         joined = mean if joined is None else joined.join(mean, on=KEYS, how="inner")
     assert joined is not None
     return joined
@@ -84,10 +84,12 @@ def main() -> None:
     """Write `work/correction.json` and print the headline numbers."""
     m = common.read_master()
     m = m.join(load_older_gamk(), on=KEYS, how="left").join(load_heads(), on=KEYS, how="left")
+    for name in ("qs_gamk", "qs_gam0", *(f"qs_head_{a}" for a in HEAD_ARMS)):
+        assert m[name].null_count() == 0, f"{name} lost rows in the key join"
     out: dict = {
         "rows": m.height,
         "gamk_rows": int(m["qs_gamk"].is_not_null().sum()),
-        "head_rows": int(m["qs_arm1"].is_not_null().sum()),
+        "head_rows": int(m["qs_head_arm1"].is_not_null().sum()),
     }
     print(out)
     site = m["site"].to_numpy()
@@ -96,7 +98,7 @@ def main() -> None:
     blocks = m["init_week"].to_numpy()
     col = {
         k: m[k].to_numpy()
-        for k in ("qs_d", "qs_bg2", "qs_gamk", "qs_gam0", *(f"qs_{a}" for a in HEAD_ARMS))
+        for k in ("qs_d", "qs_bg2", "qs_gamk", "qs_gam0", *(f"qs_head_{a}" for a in HEAD_ARMS))
     }
     windows = {"AMJ": np.isin(month, common.AMJ), "JAS": np.isin(month, common.JAS)}
     contrasts = {
@@ -104,7 +106,7 @@ def main() -> None:
         "gam0_minus_bg2": col["qs_gam0"] - col["qs_bg2"],
         "gamk_minus_gam0": col["qs_gamk"] - col["qs_gam0"],
         "armD_minus_bg2": col["qs_d"] - col["qs_bg2"],
-        **{f"{a}_minus_armD": col[f"qs_{a}"] - col["qs_d"] for a in HEAD_ARMS},
+        **{f"{a}_minus_armD": col[f"qs_head_{a}"] - col["qs_d"] for a in HEAD_ARMS},
     }
     out["contrasts"] = {}
     for s in (*common.SITES, "all"):

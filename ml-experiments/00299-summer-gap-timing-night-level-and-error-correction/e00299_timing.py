@@ -16,7 +16,7 @@ def main() -> None:
     blocks = m["init_week"].to_numpy()
     daylight = m["day"].to_numpy()
     month = m["init_month"].to_numpy()
-    vdate = m["init_day"].to_numpy()
+    init_day = m["init_day"].to_numpy()
     lead = m["lead_hours"].to_numpy()
     out: dict = {"rows": m.height}
     # Reproduction gate: arm D minus BG2 in April to June (experiment 266: +0.319).
@@ -46,7 +46,7 @@ def main() -> None:
         # and its share of rows, so a flat excess scores its row share.
         sel = s & amj & daylight & np.isfinite(gap)
         total = gap[sel].sum()
-        early = sel & (vdate >= "2026-04-01") & (vdate < "2026-04-26")
+        early = sel & (init_day >= "2026-04-01") & (init_day < "2026-04-26")
         short = sel & (lead < 24)
         r["share_excess_first_4_weeks"] = float(gap[early].sum() / total) if total else None
         r["share_rows_first_4_weeks"] = float(early.sum() / sel.sum())
@@ -60,8 +60,8 @@ def main() -> None:
             lo = str(np.datetime64(day) - np.timedelta64(28, "D"))
             hi = str(np.datetime64(day) + np.timedelta64(28, "D"))
             for label, mask in (("daylight", daylight), ("night", ~daylight)):
-                before = s & mask & (vdate >= lo) & (vdate < day)
-                after = s & mask & (vdate >= day) & (vdate < hi)
+                before = s & mask & (init_day >= lo) & (init_day < day)
+                after = s & mask & (init_day >= day) & (init_day < hi)
                 r[f"{name}_{label}_before"] = common.block_mean_interval(
                     values=gap, mask=before, blocks=blocks
                 )
@@ -96,6 +96,17 @@ def main() -> None:
         .sort("lead_band")
         .to_dicts()
     )
+    out["checks"] = (
+        m.group_by("site")
+        .agg(
+            (pl.col("med_d") - pl.col("mean_d")).mean().alias("median_minus_mean"),
+            (pl.col("mean_d") - pl.col("actual")).abs().mean().alias("mean_forecast_mae_mw"),
+            (pl.col("med_d") - pl.col("actual")).abs().mean().alias("median_forecast_mae_mw"),
+        )
+        .sort("site")
+        .to_dicts()
+    )
+    print(out["checks"])
     common.write_json_atomic(path=common.WORK_DIR / "timing.json", content=out)
     print(out["gate_amj_all"])
     for site, r in out["by_site"].items():
