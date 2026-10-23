@@ -109,7 +109,7 @@ def load_band(*, band: str) -> pl.DataFrame:
     return pl.concat(pieces).with_columns(
         month=pl.col("init_time").dt.strftime("%Y-%m"),
         farm=pl.col("time_series_id"),
-        day=(pl.col("lead_hours") / 24.0).ceil().cast(pl.Int64),
+        day=((pl.col("lead_hours") - 12.0) / 24.0).floor().cast(pl.Int64) + 1,
     )
 
 
@@ -185,7 +185,20 @@ def main() -> None:
             ]
             for kind, name, part in slices:
                 for metric in (
-                    METRICS if kind == "all" else ("score", "ae_median", "pin99", "cover99")
+                    METRICS
+                    if kind == "all"
+                    else (
+                        "score",
+                        "ae_median",
+                        "pin01",
+                        "pin05",
+                        "pin95",
+                        "pin99",
+                        "cover01",
+                        "cover05",
+                        "cover95",
+                        "cover99",
+                    )
                 ):
                     sums, counts_a, arms = farm_sums(rows=part, value=metric)
                     point, draws = boot(sums=sums, counts=counts_a)

@@ -9,6 +9,7 @@ models fitted without lagged power (own history only).
     uv run --no-sync python ml-experiments/00310-*/e00310_blend.py
 """
 
+import multiprocessing
 from typing import Final
 
 import e00310_common as common
@@ -24,6 +25,7 @@ QCOLS: Final[list[str]] = [level_column(level=lv) for lv in common.LEVELS]
 GRID_STEPS: Final[tuple[float, ...]] = (0.05, 0.01, 0.002)
 REFINE_STEPS: Final[int] = 5
 BURN_IN_MONTHS: Final[int] = 3
+N_PROCESSES: Final[int] = 4
 KEYS: Final[list[str]] = ["time_series_id", "time", "init_time"]
 
 
@@ -179,33 +181,39 @@ def write(*, base: pl.DataFrame, band: str, setting: str, arm: str, quantiles: n
         tmp.replace(path)
 
 
-def main() -> None:
-    """Build each blend and the seed-averaged mixture head, for every band and both settings."""
+def run_band(band: str) -> str:
+    """Build each blend and the seed-averaged mixture head for one band, both settings."""
     records: list[dict[str, object]] = []
-    for band in common.BAND_ORDER:
-        for setting in common.SETTINGS:
-            for name, components in BLENDS.items():
-                if name == "blend_nolag" and setting != "own_history":
-                    continue
-                base, stack = common_rows(band=band, setting=setting, components=components)
-                blend, rec = rolling(base=base, stack=stack, components=components)
-                write(base=base, band=band, setting=setting, arm=name, quantiles=blend)
-                records += [{"band": band, "setting": setting, "blend": name, **r} for r in rec]
-                print(band, setting, name, base.height, flush=True)
-            for arm, out in (("mdn", "mdn_ens"), ("mdn_nolag", "mdn_nolag_ens")):
-                if arm == "mdn_nolag" and setting != "own_history":
-                    continue
-                ens = load_component(band=band, setting=setting, arm=arm)
-                base, _ = common_rows(band=band, setting=setting, components=("gam", arm))
-                ens = base.select(KEYS).join(ens, on=KEYS, how="left")
-                write(
-                    base=base,
-                    band=band,
-                    setting=setting,
-                    arm=out,
-                    quantiles=ens.select(QCOLS).to_numpy(),
-                )
-    pl.DataFrame(records).write_csv(common.DATA_DIR / "weights.csv")
+    for setting in common.SETTINGS:
+        for name, components in BLENDS.items():
+            if name == "blend_nolag" and setting != "own_history":
+                continue
+            base, stack = common_rows(band=band, setting=setting, components=components)
+            blend, rec = rolling(base=base, stack=stack, components=components)
+            write(base=base, band=band, setting=setting, arm=name, quantiles=blend)
+            records += [{"band": band, "setting": setting, "blend": name, **r} for r in rec]
+        for arm, out in (("mdn", "mdn_ens"), ("mdn_nolag", "mdn_nolag_ens")):
+            if arm == "mdn_nolag" and setting != "own_history":
+                continue
+            ens = load_component(band=band, setting=setting, arm=arm)
+            base, _ = common_rows(band=band, setting=setting, components=("gam", arm))
+            ens = base.select(KEYS).join(ens, on=KEYS, how="left")
+            write(
+                base=base,
+                band=band,
+                setting=setting,
+                arm=out,
+                quantiles=ens.select(QCOLS).to_numpy(),
+            )
+    pl.DataFrame(records).write_csv(common.DATA_DIR / f"weights_{band}.csv")
+    return band
+
+
+def main() -> None:
+    """Blend the bands in parallel."""
+    with multiprocessing.get_context("spawn").Pool(N_PROCESSES) as pool:
+        for band in pool.imap_unordered(run_band, reversed(common.BAND_ORDER)):
+            print("blended", band, flush=True)
 
 
 if __name__ == "__main__":

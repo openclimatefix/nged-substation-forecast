@@ -72,6 +72,11 @@ ARMS: Final[tuple[str, ...]] = (
 )
 
 
+def level_columns() -> list[str]:
+    """Return the 11 quantile column names."""
+    return [level_column(level=lv) for lv in common.LEVELS]
+
+
 def month_add(*, start: datetime, months: int) -> datetime:
     """Return the first day of the month `months` after `start`."""
     index = start.year * 12 + start.month - 1 + months
