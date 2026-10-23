@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [311](../../00311-primary-demand-mixture-density-band-head/result.md) | Does a mixture-density band head lower the Primary demand research default 1 quantile score? | 1 | Nothing | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
