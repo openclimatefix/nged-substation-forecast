@@ -840,6 +840,17 @@ each row by default and counts the rows that crossed. The scope is the six trial
 (labelled A to F) in experiments 224 and 243; the confidence is high for the count and moderate for
 the size of the effect.
 
+**Do not read a metered solar farm's coverage at the 0.01 quantile as calibration without checking
+for exact zeros (provisional, medium confidence).** *Applies to: experiments.* Coverage at the 0.01
+quantile is the share of half-hours with output at or below that quantile. Farm D's metered output
+is exactly zero in 11.7% of the half-hours scored in 2025-09 to 2026-08 (7% in September, 24% to 26%
+in October and November, 44% in December, 49% in January, 0% from April), so the 0.01 quantile of
+every arm tested sits at about zero and its coverage equals the zero share. The pinball loss on
+those rows is about zero for every arm, so they add nothing to any contrast but dilute the
+percentage differences; report 0.01 contrasts with and without farm D. The cause of the zeros
+(outage, curtailment, or an export limit) is not established. Evidence: [experiment
+284](00284-metered-farm-tail-head-past-weather/result.md), farm D, 2025-09 to 2026-08.
+
 **Take climatology and the manual heuristic from experiment 87's stored references when a scorer
 needs eleven quantiles (provisional).** *Applies to: experiments.* The stored climatology and
 manual-heuristic forecasts of experiment 48 hold nine quantiles (q05 to q95), so code that pads the
