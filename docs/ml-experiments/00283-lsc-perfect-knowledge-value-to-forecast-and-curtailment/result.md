@@ -108,7 +108,8 @@ advice:
     8.1% (6.4 to 10.0) within 7 days of a shift, against -1.4% (-4.9 to +1.5) for readings set
     aside (figure 2).
   - >-
-    Expect the gain in the 48 hours after a shift ends and almost none over a year: the upper-tail twCRPS gain is 23.1% (8.8 to 39.1) after a shift and 0.22% (0.04 to 0.50) pooled (figure 1).
+    Expect the gain in the 48 hours after a shift ends and almost none over a year: the upper-tail
+    twCRPS gain is 23.1% (8.8 to 39.1) after a shift and 0.22% (0.04 to 0.50) pooled (figure 1).
   - >-
     Check each Primary substation before pooling: the upper-tail gain is 37% and 44% at D10 and D14
     and -11% and -1% at D5 and D16 (figure 4).
