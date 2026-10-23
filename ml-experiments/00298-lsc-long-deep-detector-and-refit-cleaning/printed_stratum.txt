@@ -1,0 +1,20 @@
+transfers: 35; stratum (experiment 302's): 19 cards, 19 among these events
+A2                     alarms= 169.0  stratum: 10/19 apm= 16.9 mw=0.646  rest: 5/16 apm= 33.8 mw=0.468
+A3                     alarms= 133.0  stratum: 10/19 apm= 13.3 mw=0.646  rest: 4/16 apm= 33.2 mw=0.430
+A7                     alarms= 119.0  stratum: 10/19 apm= 11.9 mw=0.646  rest: 4/16 apm= 29.8 mw=0.430
+B                      alarms= 150.0  stratum: 10/19 apm= 15.0 mw=0.660  rest: 3/16 apm= 50.0 mw=0.181
+C                      alarms= 125.0  stratum: 11/19 apm= 11.4 mw=0.674  rest: 5/16 apm= 25.0 mw=0.377
+D-A3                   alarms= 131.0  stratum: 8/19 apm= 16.4 mw=0.540  rest: 4/16 apm= 32.8 mw=0.339
+D-A7                   alarms= 145.0  stratum: 7/19 apm= 20.7 mw=0.457  rest: 3/16 apm= 48.3 mw=0.296
+D-C                    alarms= 158.0  stratum: 8/19 apm= 19.8 mw=0.540  rest: 4/16 apm= 39.5 mw=0.222
+E3                     alarms= 137.0  stratum: 12/19 apm= 11.4 mw=0.680  rest: 2/16 apm= 68.5 mw=0.091
+E7                     alarms= 115.0  stratum: 11/19 apm= 10.5 mw=0.674  rest: 3/16 apm= 38.3 mw=0.291
+F-A3                   alarms= 138.0  stratum: 9/19 apm= 15.3 mw=0.582  rest: 4/16 apm= 34.5 mw=0.339
+F-A7                   alarms= 113.0  stratum: 7/19 apm= 16.1 mw=0.494  rest: 5/16 apm= 22.6 mw=0.477
+F-C                    alarms= 124.0  stratum: 9/19 apm= 13.8 mw=0.575  rest: 4/16 apm= 31.0 mw=0.222
+RO-NC R2               alarms= 129.0  stratum: 12/19 apm= 10.8 mw=0.710  rest: 10/16 apm= 12.9 mw=0.804
+RO-NC current          alarms= 289.0  stratum: 16/19 apm= 18.1 mw=0.860  rest: 13/16 apm= 22.2 mw=0.924
+pair R2                alarms=  67.0  stratum: 7/19 apm=  9.6 mw=0.398  rest: 5/16 apm= 13.4 mw=0.437
+pair current           alarms= 226.0  stratum: 8/19 apm= 28.2 mw=0.421  rest: 8/16 apm= 28.2 mw=0.623
+learned re-ranker      alarms= 384.0  stratum: 18/19 apm= 21.3 mw=0.949  rest: 14/16 apm= 27.4 mw=0.943
+LR_b20 (302 L0)        alarms= 105.0  stratum: 12/19 apm=  8.8 mw=0.724  rest: 9/16 apm= 11.7 mw=0.690
