@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Shared constants for experiment 310 (the farm forecast at leads of 1 to 10 days).
 
 Farms appear only as labels A to F. Every table written here lives under `data/ml-experiments/`.
