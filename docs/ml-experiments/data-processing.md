@@ -821,13 +821,13 @@ to: experiments, and production if a stored quantile set is ever read column by 
 stored solar-farm forecasts that [experiment
 255](00255-metered-farm-node-curtailment-value/result.md) read from experiments 224 and 243, 26,344
 of 77,897 rows (34%) had quantile columns that were not in increasing order, in every forecast arm,
-so the stored `q50` is not the median of the stored quantile function. Scoring the curtailment cost
+so `q50` is not always the middle value of the forecast's own quantiles. Scoring the curtailment cost
 with the quantiles sorted per row moved the avoidable cost of the forecast arms by up to 3.7% and
 left every contrast's sign and 95% interval verdict unchanged ([experiment
 268](00268-lsc-curtailment-metric-v2-member-wise-ens/result.md)). `studies.node_curtailment` sorts
 each row by default and counts the rows that crossed. The scope is the six trial solar farms
 (labelled A to F) in experiments 224 and 243; the confidence is high for the count and moderate for
-the size of the effect, and the entry is provisional until the experiment has had its reviews.
+the size of the effect.
 
 ## Privacy and anonymisation
 

@@ -2008,3 +2008,47 @@ def test_a_crossing_node_row_is_scored_as_its_sorted_quantile_function() -> None
     assert sorted_result.n_node_rows_rearranged == 1
     assert _headline(stored_result.per_arm, column="planned_mwh") == pytest.approx(2.5)
     assert stored_result.n_node_rows_rearranged == 0
+
+
+def test_net_flow_counts_a_generator_that_connects_on_the_valid_date() -> None:
+    """A generator connecting on 2026-01-15, the valid date, is included: flow = 3 - 10 = -7."""
+    demand = _members(series=NODE_SERIES, values=[10.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    table = _table(generators=[(GENERATOR_SERIES, 30.0)])
+    table = NodeTable(
+        nodes=table.nodes,
+        limits=table.limits,
+        generators=table.generators.with_columns(connection_date=pl.lit(dt.date(2026, 1, 15))),
+    )
+    flows = net_flow_members(demand_members=demand, generator_members=generation, table=table)
+    assert flows["flow_mw"].to_list() == pytest.approx([-7.0])
+
+
+def test_net_flow_ignores_a_generator_without_a_forecast_and_a_node_without_a_sign() -> None:
+    """A generator with `is_forecast` false adds nothing (flow -10); a null-sign node has no row."""
+    demand = _members(series=NODE_SERIES, values=[10.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    table = _table(generators=[(GENERATOR_SERIES, 30.0)])
+    no_forecast = NodeTable(
+        nodes=table.nodes,
+        limits=table.limits,
+        generators=table.generators.with_columns(is_forecast=pl.lit(value=False)),
+    )
+    flows = net_flow_members(demand_members=demand, generator_members=generation, table=no_forecast)
+    assert flows["flow_mw"].to_list() == pytest.approx([-10.0])
+    no_sign = _table(sign=None, generators=[(GENERATOR_SERIES, 30.0)])
+    assert (
+        net_flow_members(demand_members=demand, generator_members=generation, table=no_sign).height
+        == 0
+    )
+
+
+def test_net_flow_refuses_a_repeated_member_row() -> None:
+    demand = _members(series=NODE_SERIES, values=[10.0, 20.0], column="demand_mw")
+    generation = _members(series=GENERATOR_SERIES, values=[3.0], column="output_mw")
+    with pytest.raises(ValueError, match="repeats"):
+        net_flow_members(
+            demand_members=pl.concat([demand, demand]),
+            generator_members=generation,
+            table=_table(generators=[(GENERATOR_SERIES, 30.0)]),
+        )

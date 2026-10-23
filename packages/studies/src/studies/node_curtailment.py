@@ -56,11 +56,10 @@ Decisions the numbers rest on, stated here because nothing in the output shows t
 - The module does not compute avoidable cost. `avoidable_cost` subtracts a perfect arm's figures,
   which the caller must have scored in the same call so that all arms share their rows.
 - By default each forecast row's `q<percent>` columns are sorted into increasing order before
-  scoring (`rearrange_quantiles` in the assumptions), because stored forecasts can cross. In
-  experiments 224 and 243, 26,344 of the 77,897 farm-forecast rows used by experiment 255 had
-  crossing quantiles, and the generators' median `q50` was read from a column that could sit above
-  the 0.75 quantile. The result counts the rows that crossed. Setting `rearrange_quantiles` false
-  scores the columns as stored.
+  scoring (`rearrange_quantiles` in the assumptions), because stored forecasts can cross: a stored
+  median can sit above the 0.75 quantile. The result counts the rows that crossed. Setting
+  `rearrange_quantiles` false scores the columns as stored. A row with a null or non-finite
+  quantile is left as stored.
 - Ensemble members enter through `net_flow_members`, which pairs the demand's and the generators'
   members by member number and returns the node's metered flow per member, and
   `quantiles_from_members`, which reduces members to the `q<percent>` columns above. A set of
@@ -708,7 +707,17 @@ def net_flow_members(
 
     Returns:
         One row per node row and surviving member: `MEMBER_ROW_KEYS`, `member`, and `flow_mw`.
+
+    Raises:
+        ValueError: If either members frame repeats a row key and member number.
     """
+    for name, frame in (
+        ("demand_members", demand_members),
+        ("generator_members", generator_members),
+    ):
+        if frame.select(pl.struct([*MEMBER_ROW_KEYS, "member"]).is_duplicated().any()).item():
+            msg = f"{name} repeats a (time_series_id, init time, valid time, seed, member) row"
+            raise ValueError(msg)
     keys = [c for c in MEMBER_ROW_KEYS if c != "time_series_id"]
     node_dtype = demand_members.schema["time_series_id"]
     generator_dtype = generator_members.schema["time_series_id"]

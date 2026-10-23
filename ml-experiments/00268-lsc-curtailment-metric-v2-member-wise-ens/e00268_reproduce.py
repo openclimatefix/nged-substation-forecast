@@ -281,6 +281,7 @@ def main() -> None:
     lines += [
         "## Do crossing stored quantiles explain the member path's difference?",
         "",
+        f"Generator rows per forecast arm: {arms.generator_frames[H5].height}.",
         f"Generator rows with crossing stored quantiles, by arm: {crossing_rows}.",
         f"Largest percent difference between the member path and the quantile path when both start from sorted quantiles (no crossing rows): {explained:.4f}%.",
         "",
