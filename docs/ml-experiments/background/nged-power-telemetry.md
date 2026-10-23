@@ -82,6 +82,11 @@ page](../../background/network.md).
   windows](../data-processing.md#fixed-windows) (exp 6, 102, 103, 173; established).
 - **Some series changed regime.** D8's weekday daytime demand fell from about 9 MW to about 3 MW
   between 2023-10 and 2025 (exp 103; D8; provisional).
+- **A residual-only segmentation dates D8's break exactly but finds only about half of 10% steps.**
+  At a penalty low enough to date the 2023-08-15 break it also finds 2 to 3 false regime changes per
+  Primary-year, and a penalty that keeps false changes under 1 labels 42% of 14 to 60 day load
+  shifts as states ([experiment 295](../00295-regime-segmentation-part-b-persistent-regimes-without-labels/result.md);
+  14 Primaries, injected steps; provisional).
 - **A metered solar farm can climb to its rated output in stages over months.** One farm took eight
   months ([network page](../../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months)).
   The metered farms miss 7.6% to 27.6% of their half-hours, so check coverage before comparing
