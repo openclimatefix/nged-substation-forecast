@@ -179,6 +179,14 @@ D10. Of those, 1.58 lie inside the two D10 windows described under "Expect D10 t
 jumps" below. Applies to experiments. Evidence: [experiment
 131](00131-differentiable-physics-nra-edge-flows-drift-term/result.md).
 
+**Do not train a learned load-shift score with every real candidate as a negative and then score
+it on the months it trained on (medium confidence).** Real load shifts that start in the training
+months are then taught as negatives: the score trained that way found 0 of the 15 logged load
+shifts that start in training months, against 7 for the same score with logged and labelled spans
+removed from its negatives. In the 20 load shifts that start in other months both found 13
+(post hoc, [experiment 302](00302-lsc-learned-score-without-nged-labels/result.md)). Applies to
+experiments; provisional.
+
 ## Fixed windows
 
 **Use the fixed lockdown window, 2020-03-23 to 2021-07-19, and do not detect the window from the
@@ -809,6 +817,15 @@ to one half after about 12 months ([experiment
 the ERA5 and CAMS estimates of past weather). No tested duration kept the bias under 0.1 points of
 effective capacity (1 point is 1% of the substation's capacity). Applies to experiments and
 production.
+
+**Treat the Kalman filter's correction as undefined, not zero, before a series' first reading.** The
+filter's correction of a series is exactly zero until its first reading, so the difference between
+the forecast with recent power and the forecast without it is zero there too. Series 13 has no
+reading for 67% of the grid and series 7 for 37%; their standard deviation of that difference
+was zero until those rows were set to missing ([experiment
+308](00308-lsc-two-forecast-gap-as-a-detector/result.md); 15 Primary series). Applies to experiments
+and to production, for any score built on the filter's correction. Provisional until the
+experiment's reviews are merged.
 
 ## Forecast tails and curtailment cost
 

@@ -57,11 +57,11 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
   sit in `packages/studies/tests/<folder>/`, where `<folder>` is the study folder under `studies/`.
   Each study folder is listed once in pytest's `pythonpath` and once in `ty`'s `extra-paths` in the
   root `pyproject.toml`, so a test imports a script by its bare name (`import wind_products`).
-  Listing every folder hides a script that imports another folder's script: the import passes under
-  pytest, where every folder is on the path, and fails under `uv run python studies/<folder>/<script>.py`,
-  where only the script's own folder is. `test_study_boundaries` forbids that import, and also
-  `sys.path` changes, path-based module loading, a script basename shared by two folders, and any
-  import of `studies` or of a script by production code.
+  A script that imports another folder's script passes under pytest, where every listed folder is
+  on the path, and fails under `uv run python studies/<folder>/<script>.py` unless the other folder
+  is on `PYTHONPATH`. `test_study_boundaries` forbids `sys.path` changes, path-based module loading,
+  a script basename shared by two folders, and any import of `studies` or of a script by production
+  code.
 
 ## Fixtures and mocking
 
@@ -291,21 +291,32 @@ cannot override it. A run that names a path under `packages/studies/tests` still
 
 Three GitHub workflows in `.github/workflows/` run the checks described on this page:
 
-- **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`: `ruff
-  check`, `ruff format --check`, `ty check`, the `pymarkdown scan` command from CLAUDE.md, `mkdocs
-  build --strict`, `check_docs_links.py` (see below), and the offline test suite (plain `uv run
-  pytest` — the network gate above keeps CI off the network, and the studies gate skips the slow
-  studies tests). The job installs with `uv sync --locked --all-packages`: `--all-packages` because
-  `ty` type-checks the source of every workspace member, including leaf packages that a plain sync
-  would omit, and `--locked` so the build fails loudly when `uv.lock` is stale. Every subsequent
-  step passes `uv run --no-sync`, because a bare `uv run` re-syncs to the root environment and would
-  silently uninstall those extra workspace members. The job also sets dummy values for the three
-  required `NGED_S3_*` `Settings` fields, a `Settings` object being what carries the S3 credentials
-  and bucket names that production reads from the environment; NGED is National Grid Electricity
-  Distribution, the network operator whose telemetry this project forecasts. Most tests monkeypatch
-  those fields, but a few construct `Settings()` directly and locally rely on the developer's
-  `.env`, which CI doesn't have. The `ci` job is a required status check on `main` (configured in a
-  GitHub repository ruleset, not in the workflow file).
+- **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`, as
+  three parallel jobs plus an aggregate job. The wall time of a run is that of the slowest job, and
+  each job has its own 15-minute limit.
+    - The `docs` job runs `mkdocs build --strict`.
+    - The `lint` job runs `ruff check`, `ruff format --check`, `pydoclint`, `ty check`, and
+      `check_docs_links.py` (see below). It then runs `pre-commit run --all-files` with `SKIP`
+      naming the six hooks that repeat one of those steps: `ruff-check`, `ruff-check-marimo`,
+      `ruff-format`, `ty`, `pydoclint`, and `check-docs-links`. Nine hooks remain:
+      `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-added-large-files` (which
+      inspects nothing in CI, since it looks only at staged additions), `check-marimo-notebooks`,
+      `pymarkdown` (every tracked markdown file), `lint-docstring-markdown`, `no-sphinx-roles`, and
+      `check-experiment-front-matter`.
+    - The `tests` job runs the offline test suite (plain `uv run pytest` — the network gate above
+      keeps CI off the network, and the studies gate skips the slow studies tests).
+    - The final job, named `ci`, needs the other three and fails unless all of them succeeded. Its
+      condition is `!cancelled()` so that a failed job fails `ci` rather than leaving it skipped,
+      which a required check would treat as a pass.
+  Every job installs with `uv sync --locked --all-packages`: `--all-packages` because `ty`
+  type-checks the source of every workspace member, including leaf packages that a plain sync would
+  omit, and `--locked` so the build fails loudly when `uv.lock` is stale. Every subsequent step
+  passes `uv run --no-sync`, because a bare `uv run` re-syncs to the root environment and would
+  silently uninstall those extra workspace members. The `ci` job is the required status check on
+  `main` (configured in a GitHub repository ruleset, not in the workflow file). A pull request
+  cancels the run it supersedes. A push to `main` runs in a concurrency group named by its commit
+  SHA, because GitHub cancels an older queued run in a shared group even when
+  `cancel-in-progress` is false.
 - **`studies_tests.yml` — the studies tests.** Runs `pytest -n auto --run-studies packages/studies`
   on every push to `main`, and on a pull request only when the pull request changes
   `packages/studies/`, `studies/`, or `docs/studies/`. A pull request that changes only

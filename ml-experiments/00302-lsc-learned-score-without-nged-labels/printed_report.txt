@@ -1,0 +1,136 @@
+
+== Label contamination of L2's real training negatives (odd-month RO-NC candidates) ==
+candidates 913; inside logged or labelled spans 364; in D8 drops 93; on block days 2; any of the three 416 (45.6%)
+of the 35 logged load shifts, 15 start in an odd month, the months L1 to L3 train on
+of those, 12 have a real candidate at the onset that L2 trains as a negative (L1 drops it)
+
+== Matches of the logged load shifts (found / total), alarms per match ==
+-- variant all, stratum all 35
+L0    found 21/35  start-only 24  alarms (mean over folds)  105.0  alarms/match   5.0  MW-weighted recall 0.707  median onset error 0.5 h
+L1    found 20/35  start-only 22  alarms (mean over folds)  101.0  alarms/match   5.0  MW-weighted recall 0.662  median onset error 0.5 h
+L2    found 13/35  start-only 13  alarms (mean over folds)  105.0  alarms/match   8.1  MW-weighted recall 0.413  median onset error 0.5 h
+L3    found 14/35  start-only 14  alarms (mean over folds)  104.7  alarms/match   7.5  MW-weighted recall 0.444  median onset error 0.5 h
+L3_5  found 18/35  start-only 20  alarms (mean over folds)  311.0  alarms/match  17.3  MW-weighted recall 0.537  median onset error 0.5 h
+L3_2  found 14/35  start-only 14  alarms (mean over folds)  123.0  alarms/match   8.8  MW-weighted recall 0.444  median onset error 0.5 h
+-- variant all, stratum long and deep (>=2 d, >=10% of load)
+L0    found 12/19  start-only 14  alarms (mean over folds)  105.0  alarms/match   8.8  MW-weighted recall 0.724  median onset error 0.5 h
+L1    found 10/19  start-only 11  alarms (mean over folds)  101.0  alarms/match  10.1  MW-weighted recall 0.634  median onset error 0.5 h
+L2    found  8/19  start-only  8  alarms (mean over folds)  105.0  alarms/match  13.1  MW-weighted recall 0.469  median onset error 0.25 h
+L3    found  8/19  start-only  8  alarms (mean over folds)  104.7  alarms/match  13.1  MW-weighted recall 0.469  median onset error 0.25 h
+L3_5  found 10/19  start-only 11  alarms (mean over folds)  311.0  alarms/match  31.1  MW-weighted recall 0.575  median onset error 0.5 h
+L3_2  found  8/19  start-only  8  alarms (mean over folds)  123.0  alarms/match  15.4  MW-weighted recall 0.469  median onset error 0.25 h
+-- variant all, stratum long (>=2 d), depth unknown included
+L0    found 16/27  start-only 19  alarms (mean over folds)  105.0  alarms/match   6.6  MW-weighted recall 0.716  median onset error 0.5 h
+L1    found 15/27  start-only 17  alarms (mean over folds)  101.0  alarms/match   6.7  MW-weighted recall 0.685  median onset error 0.5 h
+L2    found 11/27  start-only 11  alarms (mean over folds)  105.0  alarms/match   9.5  MW-weighted recall 0.436  median onset error 0.5 h
+L3    found 11/27  start-only 11  alarms (mean over folds)  104.7  alarms/match   9.5  MW-weighted recall 0.436  median onset error 0.5 h
+L3_5  found 13/27  start-only 15  alarms (mean over folds)  311.0  alarms/match  23.9  MW-weighted recall 0.504  median onset error 0.5 h
+L3_2  found 11/27  start-only 11  alarms (mean over folds)  123.0  alarms/match  11.2  MW-weighted recall 0.436  median onset error 0.5 h
+-- variant confirmed, stratum all 35
+L0    found  9/35  start-only 11  alarms (mean over folds)   43.3  alarms/match   4.8  MW-weighted recall 0.233  median onset error 0.5 h
+L1    found 11/35  start-only 12  alarms (mean over folds)   53.3  alarms/match   4.8  MW-weighted recall 0.256  median onset error 0.5 h
+L2    found  7/35  start-only  7  alarms (mean over folds)   41.0  alarms/match   5.9  MW-weighted recall 0.149  median onset error 0.5 h
+L3    found  7/35  start-only  7  alarms (mean over folds)   39.3  alarms/match   5.6  MW-weighted recall 0.149  median onset error 0.5 h
+L3_5  found  9/35  start-only 10  alarms (mean over folds)   72.3  alarms/match   8.0  MW-weighted recall 0.189  median onset error 0.5 h
+L3_2  found  7/35  start-only  7  alarms (mean over folds)   44.3  alarms/match   6.3  MW-weighted recall 0.149  median onset error 0.5 h
+-- variant confirmed, stratum long and deep (>=2 d, >=10% of load)
+L0    found  6/19  start-only  8  alarms (mean over folds)   43.3  alarms/match   7.2  MW-weighted recall 0.354  median onset error 0.5 h
+L1    found  7/19  start-only  8  alarms (mean over folds)   53.3  alarms/match   7.6  MW-weighted recall 0.382  median onset error 0.5 h
+L2    found  6/19  start-only  6  alarms (mean over folds)   41.0  alarms/match   6.8  MW-weighted recall 0.267  median onset error 0.25 h
+L3    found  6/19  start-only  6  alarms (mean over folds)   39.3  alarms/match   6.6  MW-weighted recall 0.267  median onset error 0.25 h
+L3_5  found  6/19  start-only  7  alarms (mean over folds)   72.3  alarms/match  12.1  MW-weighted recall 0.267  median onset error 0.25 h
+L3_2  found  6/19  start-only  6  alarms (mean over folds)   44.3  alarms/match   7.4  MW-weighted recall 0.267  median onset error 0.25 h
+-- variant confirmed, stratum long (>=2 d), depth unknown included
+L0    found  6/27  start-only  8  alarms (mean over folds)   43.3  alarms/match   7.2  MW-weighted recall 0.225  median onset error 0.5 h
+L1    found  7/27  start-only  8  alarms (mean over folds)   53.3  alarms/match   7.6  MW-weighted recall 0.243  median onset error 0.5 h
+L2    found  6/27  start-only  6  alarms (mean over folds)   41.0  alarms/match   6.8  MW-weighted recall 0.170  median onset error 0.25 h
+L3    found  6/27  start-only  6  alarms (mean over folds)   39.3  alarms/match   6.6  MW-weighted recall 0.170  median onset error 0.25 h
+L3_5  found  6/27  start-only  7  alarms (mean over folds)   72.3  alarms/match  12.1  MW-weighted recall 0.170  median onset error 0.25 h
+L3_2  found  6/27  start-only  6  alarms (mean over folds)   44.3  alarms/match   7.4  MW-weighted recall 0.170  median onset error 0.25 h
+
+== Contrasts in matches (pairs resampled; difference scaled to the stratum's shifts) ==
+all 35         C1 L3 minus L1 (decisive)                -6 [-10.0, -2.6] (98.3%: [-11.2, -2.1]) gained 1 lost 7 of 35
+all 35         C2 L2 minus L1 (negatives)               -7 [-10.9, -2.8] (98.3%: [-11.7, -2.1]) gained 0 lost 7 of 35
+all 35         C3 L3 minus L2 (threshold)               +1 [+0.0, +2.6] (98.3%: [+0.0, +3.0]) gained 1 lost 0 of 35
+all 35         reference L1 minus L0                    -1 [-5.5, +3.3] (98.3%: [-6.4, +4.2]) gained 3 lost 4 of 35
+all 35         L3 at 5 per Primary-year minus L1        -2 [-5.2, +2.3] (98.3%: [-6.2, +3.3]) gained 2 lost 4 of 35
+long and deep  C1 L3 minus L1 (decisive)                -2 [-5.6, +0.0] (98.3%: [-6.3, +0.0]) gained 0 lost 2 of 19
+long and deep  C2 L2 minus L1 (negatives)               -2 [-5.4, +0.0] (98.3%: [-6.0, +0.0]) gained 0 lost 2 of 19
+long and deep  C3 L3 minus L2 (threshold)               +0 [+0.0, +0.0] (98.3%: [+0.0, +0.0]) gained 0 lost 0 of 19
+long and deep  reference L1 minus L0                    -2 [-5.5, +1.9] (98.3%: [-6.0, +2.4]) gained 1 lost 3 of 19
+long and deep  L3 at 5 per Primary-year minus L1        +0 [-3.2, +3.2] (98.3%: [-3.8, +3.8]) gained 1 lost 1 of 19
+
+== Alarms per Primary-year, mean over folds ==
+shape: (15, 7)
+┌──────┬──────┬──────┬──────┬──────┬───────┬──────┐
+│ site ┆ L0   ┆ L1   ┆ L2   ┆ L3   ┆ L3_5  ┆ L3_2 │
+│ ---  ┆ ---  ┆ ---  ┆ ---  ┆ ---  ┆ ---   ┆ ---  │
+│ str  ┆ f64  ┆ f64  ┆ f64  ┆ f64  ┆ f64   ┆ f64  │
+╞══════╪══════╪══════╪══════╪══════╪═══════╪══════╡
+│ D3   ┆ 0.67 ┆ 1.41 ┆ 1.86 ┆ 1.78 ┆ 5.34  ┆ 2.0  │
+│ D9   ┆ 0.54 ┆ 0.13 ┆ 0.54 ┆ 1.2  ┆ 4.01  ┆ 1.61 │
+│ D11  ┆ 0.37 ┆ 0.3  ┆ 0.96 ┆ 1.19 ┆ 3.34  ┆ 1.34 │
+│ D19  ┆ 1.71 ┆ 1.86 ┆ 2.67 ┆ 1.41 ┆ 4.01  ┆ 1.56 │
+│ D10  ┆ 1.26 ┆ 1.93 ┆ 2.37 ┆ 4.45 ┆ 13.36 ┆ 5.34 │
+│ …    ┆ …    ┆ …    ┆ …    ┆ …    ┆ …     ┆ …    │
+│ D5   ┆ 2.16 ┆ 2.68 ┆ 2.38 ┆ 0.89 ┆ 2.46  ┆ 0.89 │
+│ D16  ┆ 3.12 ┆ 2.89 ┆ 2.82 ┆ 1.71 ┆ 5.12  ┆ 2.0  │
+│ D21  ┆ 2.53 ┆ 1.93 ┆ 1.86 ┆ 1.34 ┆ 3.79  ┆ 1.56 │
+│ D2   ┆ 0.07 ┆ 0.07 ┆ 0.15 ┆ 1.41 ┆ 4.23  ┆ 1.56 │
+│ D8   ┆ 1.48 ┆ 0.45 ┆ 0.52 ┆ 1.19 ┆ 3.56  ┆ 1.34 │
+└──────┴──────┴──────┴──────┴──────┴───────┴──────┘
+L0    overall 1.70, median 1.48, within a factor 2 of median 7 of 15
+L1    overall 1.63, median 1.41, within a factor 2 of median 7 of 15
+L2    overall 1.70, median 1.86, within a factor 2 of median 8 of 15
+L3    overall 1.69, median 1.41, within a factor 2 of median 11 of 15
+L3_5  overall 5.03, median 4.01, within a factor 2 of median 11 of 15
+L3_2  overall 1.99, median 1.56, within a factor 2 of median 11 of 15
+Leave-one-Primary-out predicted RO-NC rate (alarms per Primary-year): {'D3': 4.78, 'D9': 3.53, 'D11': 3.13, 'D19': 3.71, 'D10': 12.08, 'D4': 4.31, 'D18': 16.32, 'D12': 1.35, 'D22': 8.09, 'D14': 2.38, 'D5': 2.21, 'D16': 4.63, 'D21': 3.47, 'D2': 3.79, 'D8': 3.22}
+
+== Injected load shifts: recall (start and end found) and start found ==
+shape: (10, 5)
+┌─────────────┬──────┬────────┬───────┬──────┐
+│ kind        ┆ arm  ┆ recall ┆ onset ┆ n    │
+│ ---         ┆ ---  ┆ ---    ┆ ---   ┆ ---  │
+│ str         ┆ str  ┆ f64    ┆ f64   ┆ u32  │
+╞═════════════╪══════╪════════╪═══════╪══════╡
+│ eval_fitted ┆ L1   ┆ 0.224  ┆ 0.287 ┆ 661  │
+│ eval_fitted ┆ L2   ┆ 0.253  ┆ 0.33  ┆ 661  │
+│ eval_fitted ┆ L3   ┆ 0.234  ┆ 0.303 ┆ 661  │
+│ eval_fitted ┆ L3_2 ┆ 0.241  ┆ 0.312 ┆ 661  │
+│ eval_fitted ┆ L3_5 ┆ 0.268  ┆ 0.359 ┆ 661  │
+│ eval_held   ┆ L1   ┆ 0.248  ┆ 0.32  ┆ 1009 │
+│ eval_held   ┆ L2   ┆ 0.274  ┆ 0.368 ┆ 1009 │
+│ eval_held   ┆ L3   ┆ 0.27   ┆ 0.359 ┆ 1009 │
+│ eval_held   ┆ L3_2 ┆ 0.272  ┆ 0.362 ┆ 1009 │
+│ eval_held   ┆ L3_5 ┆ 0.289  ┆ 0.397 ┆ 1009 │
+└─────────────┴──────┴────────┴───────┴──────┘
+Reference: experiment 195's stored re-ranker (L0 model) at budget 80, odd-month injections:
+shape: (2, 3)
+┌─────────────┬──────────┬─────┐
+│ kind        ┆ recall   ┆ n   │
+│ ---         ┆ ---      ┆ --- │
+│ str         ┆ f64      ┆ u32 │
+╞═════════════╪══════════╪═════╡
+│ eval_held   ┆ 0.264529 ┆ 998 │
+│ eval_fitted ┆ 0.276995 ┆ 639 │
+└─────────────┴──────────┴─────┘
+
+== Ordinary-day harm (arm minus K0 mean quantile score, points of effective capacity); 6 sites ==
+L0    held-out months  harm -0.015 [-0.078, +0.021] (98.3%: [-0.101, +0.024]) rows 780941, months 13
+L0    in-sample months harm +0.001 [-0.014, +0.018] (98.3%: [-0.015, +0.019]) rows 798770, months 14
+L1    held-out months  harm +0.006 [-0.010, +0.024] (98.3%: [-0.014, +0.028]) rows 798770, months 14
+L1    in-sample months harm -0.022 [-0.081, +0.011] (98.3%: [-0.107, +0.013]) rows 780941, months 13
+L2    held-out months  harm +0.009 [-0.006, +0.024] (98.3%: [-0.008, +0.027]) rows 798770, months 14
+L2    in-sample months harm -0.019 [-0.083, +0.025] (98.3%: [-0.109, +0.029]) rows 780941, months 13
+L3    held-out months  harm +0.017 [-0.006, +0.043] (98.3%: [-0.011, +0.049]) rows 798770, months 14
+L3    in-sample months harm -0.010 [-0.079, +0.047] (98.3%: [-0.097, +0.060]) rows 780941, months 13
+L3_5  held-out months  harm +0.029 [-0.005, +0.068] (98.3%: [-0.010, +0.075]) rows 798770, months 14
+L3_5  in-sample months harm +0.042 [-0.055, +0.152] (98.3%: [-0.074, +0.179]) rows 780941, months 13
+L3_2  held-out months  harm +0.019 [-0.004, +0.045] (98.3%: [-0.008, +0.051]) rows 798770, months 14
+L3_2  in-sample months harm -0.008 [-0.080, +0.048] (98.3%: [-0.098, +0.058]) rows 780941, months 13
+
+-- paired differences on the same held-out months (even months: L1, L2, L3 variants) --
+L3 minus L1: +0.012 [-0.017, +0.041] (98.3%: [-0.025, +0.047])
+L2 minus L1: +0.003 [-0.019, +0.024] (98.3%: [-0.024, +0.028])
+L3 minus L2: +0.008 [-0.005, +0.029] (98.3%: [-0.007, +0.035])
