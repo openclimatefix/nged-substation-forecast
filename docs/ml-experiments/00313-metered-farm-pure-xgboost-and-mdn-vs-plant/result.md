@@ -22,7 +22,8 @@ hypothesis: >-
   pipeline (not even as an input column), scores close to the plant-based forecast in own history
   and falls behind it where the plant carries what missing history or a long lead cannot.
 prediction: >-
-  Written before any score is read. P1 (solar, 12 to 36 h): the pure mixture-density network (PURE_MDN)
+  Written before any score is read. P1 (solar, 12 to 36 h): the pure mixture-density network
+  (PURE_MDN)
   scores within 2% of the plant-plus-MDN head in own history and at least 3% worse in zero history.
   P2 (solar): the pure XGBoost model (PURE_XGB) is no better than PURE_MDN at the 0.99 pinball loss.
   P3 (wind): PURE_MDN scores within 2% of PURE_XGB. P4 (solar, days 8 to 10): PURE_XGB is no
@@ -47,7 +48,8 @@ metric: >-
 code: ml-experiments/00313-metered-farm-pure-xgboost-and-mdn-vs-plant/
 verdict: partly supported
 best_arm: >-
-  Solar: the pure mixture-density network (MDN), which scores 5.34 points of capacity at day 1 in own
+  Solar: the pure mixture-density network (MDN), which scores 5.34 points of capacity at day 1 in
+  own
   history and 5.45 in zero history, against 5.36 and 5.53 for the plant plus MDN head. Wind: the
   pure MDN, which scores 5.69 with ERA5 as the weather (kept rows, own history), against 6.17 for
   the physics core.
@@ -61,7 +63,8 @@ lessons: >-
   core with a neural adapter.
 take_home_message: >-
   A forecast that sees only weather and the calendar, with no physical plant model anywhere,
-  scores almost as well as the plant-based forecast for the six solar farms, up to 10 days ahead, even
+  scores almost as well as the plant-based forecast for the six solar farms, up to 10 days ahead,
+  even
   when the farm has no history. The plant's added value is small, between 0% and 3.4%, and its
   intervals include zero except for XGBoost. For wind, the same kind of network also matches the
   best plant-based forecast, so a plant model is not needed to be competitive on these farms.
@@ -97,7 +100,9 @@ adds between 0% and 3.4% to the solar quantile score, and adds nothing we can me
 history. These results do not rule out a single weather-only model for the first production
 update.
 
-In this page, "the plant" is a physical power model of one farm, "points of capacity" are percentages of the farm's capacity, and ERA5 is the ECMWF reanalysis of past weather, which arrives about 5 days late.
+In this page, "the plant" is a physical power model of one farm, "points of capacity" are
+percentages of the farm's capacity, and ERA5 is the ECMWF reanalysis of past weather, which arrives
+about 5 days late.
 
 We asked whether predictors built from weather and calendar inputs only, with no plant model
 anywhere in the pipeline, match forecasts built on a plant model (a physical power model of the
@@ -105,7 +110,8 @@ farm: the solar plant of experiments [218](../00218-metered-solar-farm-plant-fit
 [287](../00287-metered-farm-spread-binned-plant-heads/result.md), or the wind physics core of
 experiment [230](../00230-wind-physics-core-part-1/result.md)). We fitted XGBoost
 ([Chen and Guestrin, 2016](https://doi.org/10.1145/2939672.2939785)) and a three-component Gaussian
-mixture-density network (MDN, as in experiment [300](../00300-metered-farm-best-guess-assembly/result.md))
+mixture-density network (MDN, as in experiment
+[300](../00300-metered-farm-best-guess-assembly/result.md))
 on the same rows as experiments [310](../00310-metered-farm-long-lead-scoring/result.md) (solar,
 leads of 1 to 10 days) and [285](../00285-wind-effective-wind-adapters/result.md) (wind). Scores are
 quantile scores in points of capacity (lower is better), and intervals resample the 12 scored months
@@ -115,7 +121,8 @@ farms only.
 **The verdict is partly supported.** The plan made four predictions (full text and bounds in the
 front matter). P1: the pure MDN scores within 2% of the plant plus MDN head in own history and at
 least 3% worse in zero history (solar, 12 to 36 hours). P2: the pure XGBoost is no better than the
-pure MDN at the 0.99 pinball loss (solar). P3: for wind, the pure MDN is within 2% of the pure XGBoost.
+pure MDN at the 0.99 pinball loss (solar). P3: for wind, the pure MDN is within 2% of the pure
+XGBoost.
 P4: at days 8 to 10 the pure XGBoost is no better than `climatology` and the pure MDN is at least 5%
 worse than the plant-based blend (solar). P2 and P3 held, and P1 and P4 held in part. We read each
 bound on the point estimate and report the 98.75% interval beside it, so a bound can hold on the
@@ -123,7 +130,8 @@ point estimate while its interval crosses the bound.
 
 ## Weather-only models against plant-based models, solar (own history / zero history)
 
-| Day band | Pure XGBoost | Pure MDN | Plant plus MDN head | Plant plus XGBoost | Plant-based blend | `climatology` |
+| Day band | Pure XGBoost | Pure MDN | Plant plus MDN head | Plant plus XGBoost | Plant-based blend
+  | `climatology` |
 |---|---|---|---|---|---|---|
 | 1 | 5.60 / 5.65 | 5.34 / 5.45 | 5.36 / 5.53 | 5.50 / 5.58 | 5.30 / 5.45 | 8.64 |
 | 3 | 6.39 / 6.41 | 6.07 / 6.16 | 6.08 / 6.23 | 6.33 / 6.35 | 6.05 / 6.18 | 8.64 |
@@ -134,7 +142,8 @@ The pure blend (equal weights of the pure XGBoost and the pure MDN) scores 5.38 
 8.19 / 8.13 at days 8 to 10, which is worse than the pure MDN alone, so the pure families are best
 used singly. The "plant plus" columns are experiment 310's stored arms: the MDN head sees seven
 inputs (the plant forecast, its spread, the lagged-power ratio, lagged power, a flag for missing
-lagged power, the clear-sky index, and lead), and the plant plus XGBoost sees the weather columns the pure XGBoost sees, plus the plant's
+lagged power, the clear-sky index, and lead), and the plant plus XGBoost sees the weather columns
+the pure XGBoost sees, plus the plant's
 response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at days 8 to 10.
 
 ![Figure 1: quantile score by lead, solar](figure_1_solar_scores.svg)
@@ -153,8 +162,8 @@ response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at d
       (-42.8%, -50.1 to -35.5, own history day 1), and the gap stays between -37% and -43% to days 8
       to 10.
     - P4 partly failed. The pure XGBoost against `climatology` at days 8 to 10 is +0.4% (-6.2 to
-      +8.0) in own history and -1.4% (-7.7 to +5.9) in zero history, so it shows no skill, as
-      predicted. The pure MDN against the plant-based blend is +3.4% (-0.6 to +8.9) in own history
+      +8.0) in own history and -1.4% (-7.7 to +5.9) in zero history, so it shows no skill (the
+      intervals straddle zero, so this is not a strict hold). The pure MDN against the plant-based blend is +3.4% (-0.6 to +8.9) in own history
       and +1.5% (-1.6 to +6.1) in zero history, short of the predicted 5%.
 - **The plant's value, like for like.** Pure XGBoost minus plant plus XGBoost: +1.8% (0.7 to 3.1) at
   day 1, +0.9% (0.3 to 1.6) at days 6 to 7, and +0.5% (-0.0 to +1.1) at days 8 to 10 in own history.
@@ -167,7 +176,8 @@ response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at d
   is -38.6% (-41.6 to -35.6) at day 1 and -9.1% (-15.3 to +0.2) at days 8 to 10.
 - **Tails (own history, day 1 / days 8 to 10).** 0.99 pinball loss: pure MDN 0.31 / 0.33, pure
   XGBoost 0.54 / 0.56, plant plus MDN head 0.30 / 0.34, `climatology` 0.43. Coverage of the 0.01
-  quantile: pure MDN 0.037 / 0.036, pure XGBoost 0.035 / 0.044. Coverage of the 0.99 quantile: pure MDN
+  quantile: pure MDN 0.037 / 0.036, pure XGBoost 0.035 / 0.044. Coverage of the 0.99 quantile: pure
+  MDN
   0.985 / 0.987, pure XGBoost 0.990 / 0.989.
 - **Lead range.** The solar rows cover leads of 12 hours to 10 days, which is NGED's horizon.
 
@@ -183,12 +193,14 @@ response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at d
 
 - **P3 held.** Pure MDN minus pure XGBoost: -1.2% (-0.15 to +0.04 points) with ERA5 own history,
   -0.4% (-0.13 to +0.01) on ensemble weather own history, and +0.8% (-0.05 to +0.15) with ERA5 in
-  zero history. All three are within the 2% bound.
+  zero history. All three point estimates are within the 2% bound. The intervals of the two ERA5 rows reach about -2.6% to +2.1% and cross the bound.
 - **Against the physics core and the adapter (ERA5, own history).** The pure MDN is 0.48 points
   (-0.71 to -0.27) below the physics core, matches the core with the neural adapter (-0.03, -0.18 to
   +0.05), and the pure XGBoost is 0.41 below the core (-0.60 to -0.23). Experiment 276's XGBoost
-  with a binned-curve margin scores 5.86, 0.10 above the pure XGBoost's 5.76 (pure XGBoost minus binned-curve XGBoost: -0.10, -0.28 to +0.07).
-- **Tails.** 0.99 pinball loss with ERA5, own history: pure MDN 0.34, pure XGBoost 0.50, physics core
+  with a binned-curve margin scores 5.86, 0.10 above the pure XGBoost's 5.76 (pure XGBoost minus
+  binned-curve XGBoost: -0.10, -0.28 to +0.07).
+- **Tails.** 0.99 pinball loss with ERA5, own history: pure MDN 0.34, pure XGBoost 0.50, physics
+  core
   0.36, adapter 0.35. The pure MDN's 0.99 loss is 32.5% below the pure XGBoost's (-0.20 to -0.13
   points).
 - **Zero history is 1.4 points worse for wind** (7.11 to 7.16 against 5.69 to 5.76) when the
@@ -210,10 +222,21 @@ response and lagged power. `manual_heuristic` scores 8.69 at day 1 and 8.83 at d
   before merge" section. Trigger 2 (a result contradicts its own prediction or an earlier
   experiment's finding) fired: P1's zero-history bound failed and contradicts experiment
   300's finding that the plant helps a farm without history. We tested part of an explanation. The
-  plant plus MDN head of experiment 310 sees seven inputs and no raw weather, while the pure MDN sees 20
+  plant plus MDN head of experiment 310 sees seven inputs and no raw weather, while the pure MDN
+  sees 20
   weather columns, so the contrast mixes the plant with the input list. The like-for-like contrast
-  (pure XGBoost against plant plus XGBoost, same weather columns) shows the plant adds 0.6% to 1.3% in
-  zero history. We did not run a pure-weather MDN with the plant forecast added. A fresh Sonnet agent (not Opus, by instruction) then ran the audit: it re-derived the headline contrasts from the raw stored predictions with its own code and matched every point estimate to within 0.01 points or 0.05 percentage points. Its interval endpoints differ by up to 0.3 percentage points (own history day 1, -2.7 against -2.4), because its resampling used different draws, and no verdict changes. It confirmed that the P1 zero-history bound failed, and it found that the pure XGBoost against `climatology` intervals straddle zero, so that part of P4 is "no skill shown" and not a strict hold. It also confirmed that no pure column carries the plant or the farm's past power. The `csi` column divides the ensemble irradiance by the clear-sky irradiance of the farm's location, which is no plant output.
+  (pure XGBoost against plant plus XGBoost, same weather columns) shows the plant adds 0.6% to 1.3%
+  in
+  zero history. We did not run a pure-weather MDN with the plant forecast added. A fresh Sonnet
+  agent (not Opus, by instruction) then ran the audit: it re-derived the headline contrasts from the
+  raw stored predictions with its own code and matched every point estimate to within 0.01 points or
+  0.05 percentage points. Its interval endpoints differ by up to 0.3 percentage points (own history
+  day 1, -2.7 against -2.4), because its resampling used different draws, and no verdict changes. It
+  confirmed that the P1 zero-history bound failed, and it found that the pure XGBoost against
+  `climatology` intervals straddle zero, so that part of P4 is "no skill shown" and not a strict
+  hold. It also confirmed that no pure column carries the plant or the farm's past power. The `csi`
+  column divides the ensemble irradiance by the clear-sky irradiance of the farm's location, which
+  is no plant output.
   Triggers 1, 4, 5, 6, and 7 did not fire.
 
 ## Method and caveats
