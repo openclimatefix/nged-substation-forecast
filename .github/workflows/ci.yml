@@ -14,10 +14,12 @@ on:
   push:
     branches: [main]
 
-# A new push to a pull request cancels the run it supersedes. Runs on `main` are never cancelled,
-# because two merges landing minutes apart must each be checked.
+# A new push to a pull request cancels the run it supersedes. A push to `main` gets a group of its
+# own (named by commit SHA), so two merges landing minutes apart are each checked: with a shared
+# group GitHub would cancel the older run while it waits in the queue, even without
+# cancel-in-progress.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -151,10 +153,11 @@ jobs:
         run: uv run --no-sync pytest packages/studies/tests/test_study_boundaries.py
 
   # The repository ruleset requires a check named exactly `ci`. This job passes only when all three
-  # jobs above passed. `if: always()` makes it run (and fail) when a job above failed or was
-  # cancelled, instead of being skipped, which a required check would treat as passing.
+  # jobs above passed. `if: '!cancelled()'` makes it run (and fail) when a job above failed,
+  # instead of being skipped, which a required check would treat as passing. It does not run when
+  # the whole workflow run was cancelled by a newer push, so a superseded run leaves no red `ci`.
   ci:
-    if: always()
+    if: '!cancelled()'
     needs: [docs, lint, tests]
     runs-on: ubuntu-latest
     timeout-minutes: 5
