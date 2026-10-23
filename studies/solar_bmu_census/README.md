@@ -7,7 +7,8 @@ Installed Generation Capacity per Unit report (IGCPU) types as Solar, and sets t
 capacity values for them side by side, with the 99th percentile of each BMU's own output. Every
 script's module docstring gives the command that runs it.
 
-**A script imports only from this folder, from `studies.*`, and from the other reviewed packages.**
+**A script imports from this folder, from other study and experiment folders, from `studies.*`,
+and from the other reviewed packages.**
 
 **The scripts run in the order of the table below, and each script reads files that earlier scripts
 wrote.**
