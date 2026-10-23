@@ -13,8 +13,18 @@ afterwards except to change its status.
 
 ## Metered solar farms
 
-No version exists. Metered solar farms research default 1 is the best guess assembled by experiment
-300, and the family accepts no adoption until experiment 300 reports.
+| Version | Change | Adopting experiment | Scored-year gain | Replicate gain | Absolute headline score | Benchmarks (`manual_heuristic`, `climatology`, XGBoost reference) | Stored forecasts | Code commit | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| Metered solar farms research default 1 | The spread-binned plant P2 with an additive band, a mixture-density neural network (five seeds averaged), and XGBoost, blended per quantile with sorted quantiles | [300](00300-metered-farm-best-guess-assembly/result.md) | First version | First version | Blend 5.27 points of capacity with each farm's own history and 5.45 with none (zero history) | 8.69, 8.64, and 5.45 (own history) and 5.56 (zero history) | The predictions of experiment 300, written once under its id | `d59e93445` | First version, set by the rule |
+
+**Single-family scores of Metered solar farms research default 1** (quantile score in points of
+capacity, own history then zero history): the mixture-density neural network alone 5.34 and 5.55,
+the additive model alone 5.43 and 5.59, and XGBoost alone 5.45 and 5.56. The first production update
+uses one model family, so these rows show what each family scores without the blend.
+
+**The scored lead range of this row is 12 to 36 hours, and NGED's range is 1 to 10 days.**
+Experiment 310 scores the row from 1 to 10 days. The frozen XGBoost reference is the XGBoost forecast
+of experiment 243 with the floors of experiment 224.
 
 ## Wind farms
 
