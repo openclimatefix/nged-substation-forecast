@@ -7,7 +7,7 @@ theme: differentiable-physics-embedded-generation
 also_relevant_to:
   - lsc-detectors
   - calibration-and-uncertainty
-status: planned
+status: done
 size: >-
   medium. Stored: private prediction files under
   data/ml-experiments/00294-regime-aware-model-at-d8-engine-state-term/ only. Serving path: not
@@ -67,93 +67,179 @@ metric: >-
   stand-in for the curtailment proxy, each for all rows, ordinary rows, and engine-running rows, with
   winter separately.
 code: ml-experiments/00294-regime-aware-model-at-d8-engine-state-term/
+verdict: not supported
+best_arm: >-
+  None met the pre-registered rule. Arm 3 (the engine state of the last settled day) scores 10.3%
+  worse than the single model (interval 8.0% to 12.8% worse). The post hoc arm trained on the
+  lagged state scores 2.8% better (interval 5.3% to 0.8% better; quantile score 8.83 against 9.09)
+  and 15.5% better on the lower-tail twCRPS (24.5% to 5.5% better).
+headline: >-
+  A regime-aware model helps D8's forecast only if the engine state is known at the target
+  half-hour, which makes the forecast 24% better but uses the reading being forecast. With the state
+  of the last settled day the fitted offset is 12 times too large and the forecast gets 10% worse;
+  trained on that stale state, it gains 3%.
+lessons:
+  - >-
+    The engine's offset is stable across the 12 monthly refits (3.5 to 3.6 MW per half-hour with one
+    or more units running, 1.4 to 1.5 MW per running unit), but the last settled day's state is worth
+    only 0.3 MW out of sample, so a coefficient fitted on the contemporaneous state overshoots.
+  - >-
+    Training D8 on its whole history, with its own spread, scores 17% better than experiment 191's
+    reference rows, and about the same as widening the bands from past residuals (experiment 264).
+  - >-
+    The break indicator alone lowers D8's quantile score by 2.2% (interval 4.2% to 0.5%) and
+    raises it by 0.4% at D10 and 0.5% at D11.
+take_home_message: >-
+  Telling the forecast when D8's gas engine is running would make it much better, but only if the
+  state is known for the half-hour being forecast, and the detector builds that state from the very
+  reading being forecast. With only the state of the last settled day, the engine term made the
+  forecast 10% worse; trained on that stale state, it gained only 3%, no better than widening the
+  bands from past residuals. The next step is a forecast of whether the engine runs, or NGED's own
+  record of its running hours.
+production_status: not-for-production
+adopted_in: none
+advice:
+  - >-
+    Train an engine-state coefficient on the state a forecast will actually see, not on the
+    contemporaneous state, because the last settled day's state is worth 0.3 MW per unit of
+    probability and the contemporaneous fit gives 3.6 MW (Results, term out of sample).
+  - >-
+    Do not score a regime term with the detector's state at the target half-hour as a forecast
+    gain: that state is built from the reading being forecast, and it lowers the quantile score
+    by 24% (Figure 1, state-at-the-target arm).
+  - >-
+    Train D8 on its whole history with its own spread, not on experiment 191's rows with donor
+    spreads, when comparing band methods: the two differ by 17% in quantile score, with the source
+    of the spread confounded with the history (Figure 1, arm 2).
+  - >-
+    Test a break indicator at Primaries without an engine before using it: it raised the score by
+    0.4% at D10 and 0.5% at D11 (Figure 5).
+date: 2026-10-23
 ---
 
-**This page is the plan; the write-up replaces it when the run finishes.**
+**Telling the forecast when D8's gas engine runs would help a lot, but the only version that does is
+one that already knows the answer.** D8 is a Primary substation of National Grid Electricity
+Distribution (NGED). Its readings exclude the output of a gas engine of up to three units of about 2
+MW each, so the engine's running spells appear as multi-day shortfalls ([experiment
+194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md),
+[experiment 291](../00291-d8-drops-engine-spells-load-shift/result.md)). We asked whether a forecast
+model that keeps its calendar, weather, and solar shapes across D8's whole history, and adds an
+offset for the half-hours when the engine runs, forecasts D8 better than one model that does not
+know. We fitted the offset from the data and tested five ways of telling the model the engine's
+state. The offset that can be used at forecast time did not help: the state of the last settled day
+made the quantile score 10.3% worse.
 
-**The question.** D8's metered power excludes the output of a gas engine of up to three units, so
-the engine's running spells appear as multi-day shortfalls (experiments
-[194](../00194-ps1-ps5-generator-visibility-d8-analogue-break-and-price-following-census/result.md)
-and [291](../00291-d8-drops-engine-spells-load-shift/result.md)). We ask whether a model that knows
-when the engine ran forecasts D8 better than a single model that does not.
+**The engine term comes from the same residual as the drops.** The engine states are the
+probabilities of experiment
+[196](../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md)'s detector, as
+run in experiment 291 ([PR
+1594](https://github.com/openclimatefix/nged-substation-forecast/pull/1594)). Experiment 291 found
+D8's multi-day drops in the residual that this detector reads. The states therefore cannot confirm
+that the drops are an engine, and the term's gain on D8 is partly circular. The out-of-sample test
+below uses only states from before each forecast origin.
 
-**Where the engine states come from.** The engine-state term uses the running-state probabilities
-of the detector of experiments
-[196](../00196-ps2-quantised-engine-detector-on-d8-with-known-answer-gate/result.md) and 291. That
-detector reads the same residual in which the multi-day drops of experiment 291 were found. The term
-therefore does not confirm that the drops are an engine, because the states and the drops share
-one source. They test only whether the states are useful to a forecast, on readings the states were
-not fitted to.
+## Figures
 
-## Departures from the brief
+![Quantile score and lower-tail score of each arm against the single model](figure_1_relative_score.svg)
 
-- **The brief's single model on the whole history is run twice, because D8's usable history starts
-  at two different dates.** Experiments 152 and 191 fit D8 only from 2025-04-01, after 8.91 MW of
-  11 kV solar connected on 2025-03-24 and the series changed meaning (see
-  [`data-processing.md`](../data-processing.md)). Every row from 2025-04-01 is already after the
-  break of 2023-08-15, so a post-break indicator on those rows is constant. Arms 1 and 3 therefore
-  train on the whole history (all of D8's rows, with a post-break indicator that does vary), and
-  arm 2 is experiment 191's reference on rows from 2025-04-01. Whether the earlier rows help or
-  harm is part of the answer, and the page reports arm 1 against arm 2 for that reason.
-- **The brief's "arm D / the experiment 220 stack at D8" does not exist.** Experiment 220's stack
-  covers five other Primaries and D8 has no such stack. The engine is experiment 152's GAM-K
-  (generalised additive model with a Kalman filter on recent errors), run at D8 by experiment 191,
-  and every arm here is built from it.
+*Figure 1. Only the arm that sees the state at the target half-hour (24% better) gains more than the
+post hoc arm trained on the lagged state (3% better). The last-day state, arm 3, is 10% worse.*
 
-## Plan
+![The fitted engine offset of each monthly refit](figure_2_engine_offset.svg)
 
-- **Rows.** The 292 daily runs of experiment 191, forecast origin 09 UTC, scored runs from
-  2025-07-01 (not the every-fifth-day stride runs), 11 quantiles, as experiment 264 scored them.
-- **Arm 1, single model, whole history.** Experiment 191's GAM-K engine with its price columns
-  removed, trained on all of D8's rows from the first usable instant to each monthly cut (no
-  24-month window, no mask).
-- **Arm 2, experiment 191's reference.** The same engine on rows from 2025-04-01 with a 24-month
-  window. It is rebuilt here and must reproduce experiment 191's stored scores.
-- **Arm 3, regime-aware model.** Arm 1 plus two columns: an indicator that is 1 from 2023-08-15
-  (free sign), and an engine-state column, `-P(one or more units run)` at the row, with a
-  non-negative coefficient so the term can only take power off net load. The Kalman filter's
-  residual stream subtracts both terms at the training state. At forecast time the engine state is
-  the **filtered** probability (using readings up to that half-hour only) at the same half-hour of
-  the last day settled at the forecast origin, which is how experiment 191's arm `p` read prices.
-- **Arm 3-hindsight (not deciding).** The same fit, with the engine state at the target half-hour
-  itself. The state is built from the reading being forecast, so this arm is a leaky ceiling that
-  shows how much of arm 3's gap to arm 4 is the unknown future state.
-- **Arm 3-indicator (not deciding).** Arm 3 without the engine column, to separate the break
-  indicator from the engine term.
-- **Arm 3-window (not deciding).** Arm 3's two columns on arm 2's rows. The break indicator drops
-  out there (constant), so this arm shows the engine term alone.
-- **Arm 4, bands widened from past residuals.** Experiment 264's stored arms `arm_emp` (the post
-  hoc baseline) and `arm2b`, on experiment 191's reference median. These cover D8 only.
-- **Controls.** Arms 1 and 3 at D5, D10, and D11, with the engine states that experiment 291's
-  detector gives there (it flags almost nothing on those dates). The break indicator and the engine
-  column enter in the same way. The term should fit near zero.
-- **Engine states.** Experiment 196's frozen detector, copied with experiment 291's code, run on
-  the stored residual panel at all four Primaries. Lab shortcuts, named here because they are not
-  available live: the detector's parameters were fitted on 2023-09 to 2026-01, and the expected
-  power it subtracts comes from a model fitted with hindsight. The filtered probability removes
-  only the smoothing's use of later readings.
-- **The term's value out of sample.** Three numbers. (a) The coefficient of each monthly refit,
-  in MW per running engine, against the engine's recorded unit of 1.97 MW. (b) The slope of the
-  forecast error of arm 1 on the persisted state across the scored year, which is the term's value
-  on readings the fit never saw, with a month-resampled interval. (c) Arm 1's and arm 3's mean
-  absolute error of the mean forecast on engine-running half-hours (filtered probability above
-  0.5) and on the others.
-- **Metrics.** For every arm, separately for all rows, ordinary rows (filtered probability of
-  0.5 or less at the target), and engine-running rows, and with December to February reported on its
-  own: the quantile score, the twCRPS, mean absolute error, q05-to-q95 coverage, tail calibration
-  at q01, q05, q95, and q99, and the Brier score of "the reading falls below D8's 2nd percentile",
-  the stand-in experiment 264 used for the curtailment proxy of experiment
-  [268](../00268-lsc-curtailment-metric-v2-member-wise-ens/result.md). Experiment 268's metric
-  scores nodes with generators and does not cover D8, so the stand-in is not a cost in pounds.
-- **Schedule.** Monthly refits, as in experiment 191, so a contrast of 0.05 points or more is
-  safe from the cadence; the page says whether any contrast could depend on it.
-- **Compute.** CPU only, 4 cores, each run under `systemd-run --user --scope -p MemoryMax=16G -p
-  OOMPolicy=continue`.
-- **Advice followed and departed from.** Follows 264's advice to check a widening method at sites
-  with no engine, and to give the as-of fit an earlier quarter of residuals. Departs from
-  experiment 191's choice of masking D8 before 2025-04-01, in arms 1 and 3 only, because the brief
-  asks for the whole history.
+*Figure 2. The offset per half-hour with the engine on is 3.5 to 3.6 MW at every refit; per running
+unit it is 1.4 to 1.5 MW, against the recorded unit of 1.97 MW. Trained on a day-old state, the
+offset is 0.9 to 1.0 MW.*
+
+![The mean error of each arm on engine-running half-hours and on other half-hours](figure_3_shortfall_by_state.svg)
+
+*Figure 3. The single model reads 1.1 MW below its forecast while the engine runs and 0.8 MW above
+it otherwise. Only the target-state arm removes both gaps.*
+
+![Three weeks of D8 readings against forecasts](figure_4_example_weeks.svg)
+
+*Figure 4. In December 2025 the forecast that sees the engine state at the target follows the
+readings down during the shaded spells; the others barely move.*
+
+![The engine term against the single model at D5, D10, and D11](figure_5_controls.svg)
+
+*Figure 5. At the three Primaries without an engine, the arms move the quantile score by -0.9% to
++2.0%.*
+
+## Arms and rows
+
+- **Rows.** The 292 daily runs of experiment 191, scored from 2025-07-02 to 2026-06-30, leads 0.5 to
+  168 hours, outside the hand-filtered events, seed 0: 97,012 rows at D8, 84,137 at D5, 96,370 at
+  D10, 97,046 at D11. Monthly refits, as in experiment 191, so no contrast depends on a cadence of
+  weekly refits.
+- **Arm 1, single model.** Experiment 191's generalised additive model with a Kalman filter (GAM-K),
+  no 24-month window, D8's whole history, its own tuning months for the spread.
+- **Arm 2.** Experiment 191's reference rows (D8 from 2025-04-01, donor spread). It reproduces
+  experiment 191's stored forecasts exactly (largest difference 0.0). It differs from arm 1 in both
+  the history and the source of the spread.
+- **Arm 3, deciding.** Arm 1 plus a break indicator (1 from 2023-08-15) and the filtered probability
+  of one or more running units, with a non-negative coefficient, read from the same half-hour of the
+  last settled day at forecast time.
+- **Other arms.** Break indicator only. Engine state at the target half-hour from the smoothed
+  posterior, which uses the reading (leaky ceiling). Post hoc: expected number of units (arm
+  3-units), and arm 3 trained on the filtered probability lagged 1 to 7 days (matched). Arm 3-window
+  is arm 3's engine term on arm 2's rows.
+- **Arm 4.** Experiment 264's stored `arm_emp` (the median plus the past 365 days' residual
+  quantiles) and `arm2b`.
+- **Lab shortcuts.** The detector's parameters were fitted on 2023-09 to 2026-01 and its expected
+  power comes from a model fitted with hindsight. The filtered probability uses only readings up to
+  the half-hour.
+
+## Results
+
+- **Quantile score at D8 (points; smaller is better; one point is 0.1 MW).** Arm 1 9.09; arm 2
+  10.95; arm 3 10.02; break indicator only 8.89; matched 8.83; units 9.96; target state 6.87; arm 4
+  `arm_emp` 8.88, `arm2b` 9.14.
+- **C1, arm 3 against arm 1:** +10.3% (98.75% interval +8.0% to +12.8%). Leaving out any one month
+  keeps the sign (+9.8% to +10.8%).
+- **C2, arm 3 against arm 4:** +12.9% (+1.2% to +25.0%).
+- **C4, lower-tail twCRPS, arm 3 against arm 1:** +0.6% (-10.9% to +14.0%).
+- **C3, controls, arm 3 against arm 1:** D5 -0.9% (-2.5% to +0.1%); D10 +0.4% (-0.6% to +1.5%); D11
+  +2.0% (-0.2% to +6.1%). D10 and D11 exceed the 0.5% limit.
+- **Post hoc matched arm against arm 1:** quantile score -2.8% (-5.3% to -0.8%), twCRPS -15.5%
+  (-24.5% to -5.5%), and against arm 4 -0.5% (-11.1% to +9.5%). It is post hoc, so its verdict does
+  not enter the decision.
+- **Break indicator only, against arm 1:** -2.2% (-4.2% to -0.5%).
+- **Prediction P4, offset 1 to 3 MW:** it fails. The offset is 3.5 to 3.6 MW per half-hour with one
+  or more units running (0 of 12 refits in range), and 1.4 to 1.5 MW per running unit.
+- **The term's value out of sample.** The slope of arm 1's error on the state of the last settled
+  day is 0.27 MW per unit of probability (95% interval 0.08 to 0.46), against 3.6 MW fitted. On the
+  state at the target it is 1.20 MW (0.97 to 1.38), which is circular. The last-day flag
+  (probability above 0.5) is set in 65% of engine-running half-hours and 37% of other half-hours.
+- **Arm 1 against arm 2.** Arm 1 scores 17% better, but its spread comes from D8's own tuning months
+  and arm 2's from donor Primaries.
+
+| Quantile | Arm 1 below / pinball | Arm 3 | Matched | Arm 4 `arm_emp` |
+|---|---|---|---|---|
+| q01 | 0.029 / 0.605 | 0.019 / 0.602 | 0.021 / 0.548 | 0.036 / 0.806 |
+| q05 | 0.065 / 2.255 | 0.062 / 2.591 | 0.061 / 2.216 | 0.076 / 2.278 |
+| q95 | 0.893 / 2.197 | 0.956 / 2.405 | 0.913 / 2.126 | 0.923 / 2.443 |
+| q99 | 0.946 / 0.751 | 0.985 / 0.587 | 0.961 / 0.630 | 0.968 / 0.827 |
+
+*Share of readings below each quantile (the target is the level) and the pinball loss in points, at
+D8, all rows.*
+
+## Checks
+
+- **Median minus mean forecast,** per arm: 0.00 points for every arm built here, and -0.96 for arm 4
+  `arm_emp`.
+- **Error of the mean forecast beside the quantile score.** Arm 3's mean absolute error is 17.38
+  against arm 1's 16.29 (worse, as is its quantile score); the matched arm's is 15.78 (better, as is
+  its score). The two metrics agree.
+- **Triggers that fired.** Trigger 5 fired: arm 3 contains arm 1 and the indicator-only arm, and
+  both score better than it. The explanation was tested and recorded: the matched arm, trained on
+  the lagged state, removes the loss. No Opus audit was run, because the brief limits this
+  experiment to Sonnet. Triggers 1 to 4, 6, and 7 did not fire.
+- **Row set.** All arms share the same 97,012 D8 rows (keys joined across arms).
 
 ## What the next experiment should answer
 
-Written after the results are read.
+Part A shows that the engine's state is worth having only at the target half-hour. The next
+experiment should test whether the state can be forecast: from the days already settled, from the
+gas price, or from NGED's own record of the engine's running hours. It should score the term with a
+state that no reading of the target half-hour enters.
