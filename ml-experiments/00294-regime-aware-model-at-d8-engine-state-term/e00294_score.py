@@ -229,15 +229,25 @@ def persisted_state(*, frame: pl.DataFrame, site: str) -> np.ndarray:
 def slope_interval(
     *, x: np.ndarray, y: np.ndarray, months: np.ndarray
 ) -> tuple[float, float, float]:
-    """Return the least-squares slope of y on x through the origin and a month-resampled interval."""
+    """Return the least-squares slope of y on x with an intercept and a month-resampled interval."""
     keys = np.unique(months)
+    n = np.array([(months == m).sum() for m in keys], dtype=np.float64)
+    sx = np.array([x[months == m].sum() for m in keys])
+    sy = np.array([y[months == m].sum() for m in keys])
     sxy = np.array([(x[months == m] * y[months == m]).sum() for m in keys])
     sxx = np.array([(x[months == m] ** 2).sum() for m in keys])
+
+    def slope(w: np.ndarray) -> np.ndarray:
+        """Return the slopes of resamples whose month counts are `w` (rows are resamples)."""
+        tn, tx, ty = w @ n, w @ sx, w @ sy
+        return (w @ sxy - tx * ty / tn) / (w @ sxx - tx**2 / tn)
+
     rng = np.random.default_rng(2940)
     draws = rng.integers(0, len(keys), size=(N_RESAMPLES, len(keys)))
-    stats = sxy[draws].sum(axis=1) / sxx[draws].sum(axis=1)
-    low, high = np.quantile(stats, [0.025, 0.975])
-    return float(sxy.sum() / sxx.sum()), float(low), float(high)
+    counts = np.stack([np.bincount(row, minlength=len(keys)) for row in draws]).astype(np.float64)
+    low, high = np.quantile(slope(counts), [0.025, 0.975])
+    point = float(slope(np.ones((1, len(keys))))[0])
+    return point, float(low), float(high)
 
 
 def cut_coefficients(*, site: str) -> list[dict]:
@@ -292,7 +302,7 @@ def main() -> None:
         for arm in frames:
             row = report["scores"][f"D8/{name}"][arm]
             print(
-                f"{arm:15s} qs={row['qs']:.4f} tw={row['tw']:.4f} mae={row['ae']:.3f} err={row['mean_error']:+.3f} cov90={row['in90']:.3f} brier={row['brier']:.4f} "
+                f"{arm:15s} qs={row['qs']:.4f} tw={row['tw']:.4f} mae={row['ae']:.3f} err={row['mean_error']:+.3f} cov90={row['in90']:.3f} med-mean={row['median_minus_mean']:+.3f} brier={row['brier']:.4f} "
                 + " ".join(
                     f"{n}:b={row[f'below_{n}']:.3f},p={row[f'pin_{n}']:.3f}" for n, _ in TAILS
                 )
@@ -429,7 +439,7 @@ def main() -> None:
         for arm in cf:
             row = report["scores"][f"{site}/all"][arm]
             print(
-                f"{arm:15s} qs={row['qs']:.4f} tw={row['tw']:.4f} mae={row['ae']:.3f} cov90={row['in90']:.3f} brier={row['brier']:.4f}"
+                f"{arm:15s} qs={row['qs']:.4f} tw={row['tw']:.4f} mae={row['ae']:.3f} cov90={row['in90']:.3f} med-mean={row['median_minus_mean']:+.3f} brier={row['brier']:.4f}"
             )
         for name, (arm, ref) in {
             "arm3_vs_arm1": ("arm3", "arm1"),
