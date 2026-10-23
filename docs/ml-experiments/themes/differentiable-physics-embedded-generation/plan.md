@@ -2,7 +2,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| PV gain decomposition | [Experiment 269](../../00269-pv-capacity-gain-decomposition/result.md): is the nearby-farm gain of experiment 238 sunshine, plant shape, or the capacity unit? | Approved | Nothing | In progress |
+| PV shape in the forecast | Does the pooled empirical solar shape of [experiment 269](../../00269-pv-capacity-gain-decomposition/result.md) lower the sunny-half-hour error of arm D at D5, D9, D10, D11, D14, and D16? | Proposed | A change to the ensemble weather path in `packages/studies` | Not started |
 | Wind node | A typed wind node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Dispatchable node | A typed dispatchable-generator node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
 | Solar node | A typed solar-farm node beside the flat generator node | Proposed | A flat node that stays off where no generator exists (experiment 110 found it reads 12 to 35 points at all five decision substations) | Not started |
