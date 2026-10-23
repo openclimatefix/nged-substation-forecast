@@ -4,7 +4,7 @@
 Rows are experiment 224's scored-year, 12 to 36 h rows that every arm holds, including its floors.
 The quantile score is twice the mean pinball loss over the 11 levels, in points of capacity.
 
-    uv run --no-sync python ml-experiments/00243-*/e00257_score.py
+    uv run --no-sync python ml-experiments/00257-*/e00257_score.py
 """
 
 from typing import Final
