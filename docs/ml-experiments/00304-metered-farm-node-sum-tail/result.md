@@ -100,18 +100,21 @@ advice:
     of half-hours and the sum inherits the excess (One-farm control).
 ---
 
-**Summing the weather forecast's 51 members farm by farm gives a band almost as wide as adding the farms' quantiles, which is too wide, and a correlation fitted on past forecast errors gives the band closest to the nominal level.** National Grid Electricity Distribution (NGED)
-meters six solar farms, labelled A to F on this page, beneath two bulk supply points (132 kV to 33 kV
-substations): farms A, C, and E beneath "node 1" and B, D, and F beneath "node 2". Curtailment acts at
-the substation, so the tail of the farms' summed output matters more than each farm's tail. Each farm
+**Summing the weather forecast's 51 members farm by farm gives a band almost as wide as adding the
+farms' quantiles, which is too wide, and a correlation fitted on past forecast errors gives the band
+closest to the nominal level.** National Grid Electricity Distribution (NGED) meters six solar
+farms, labelled A to F on this page, beneath two bulk supply points (132 kV to 33 kV substations):
+farms A, C, and E beneath "node 1" and B, D, and F beneath "node 2". Curtailment acts at the
+substation, so the tail of the farms' summed output matters more than each farm's tail. Each farm
 has a forecast band of 11 quantiles, from [experiment
 270](../00270-metered-farm-xgboost-vs-plant-diagnostic/result.md) (the spread-binned power model,
 "P2") and [experiment 287](../00287-metered-farm-spread-binned-plant-heads/result.md) (the
-per-quantile blend, and [XGBoost (Chen and Guestrin, 2016)](https://doi.org/10.1145/2939672.2939785)).
-We formed the substation's band four ways and counted how often the observed sum fell at or below
-each quantile. The four ways add the farms' quantiles (a), draw each farm's level independently (b),
-sum the 51 ensemble members' farm forecasts member by member (c), and draw the levels from a Gaussian
-copula whose correlation is fitted on past errors (d).
+per-quantile blend, and [XGBoost (Chen and Guestrin,
+2016)](https://doi.org/10.1145/2939672.2939785)). We formed the substation's band four ways and
+counted how often the observed sum fell at or below each quantile. The four ways add the farms'
+quantiles (a), draw each farm's level independently (b), sum the 51 ensemble members' farm forecasts
+member by member (c), and draw the levels from a Gaussian copula whose correlation is fitted on past
+errors (d).
 
 **Verdict: not supported.** The prediction was that (c) lands within 0.5 points of the nominal level
 at 0.95 and 0.99. It does not at 0.95. In the pooled rows, the 0.95 quantile of (c) covers 96.79% of
