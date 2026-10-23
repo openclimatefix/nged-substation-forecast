@@ -183,7 +183,7 @@ def injected(*, ctx: det.Context, score: str, variant: str, k: float) -> dict:
                 blocked[max(lo - 144, 0) : min(hi + 144, h.N_GRID)] = True
             clean = real.ordinary_stamp & ~blocked
             fa_count += int(clean[opens].sum())
-            fa_rows += float(clean[z["origin"]].sum())
+            fa_rows += float((clean[z["origin"]] & z["has_data"]).sum())
     table = pl.DataFrame(rows)
     return {
         "events": table.height,

@@ -24,7 +24,7 @@ prediction: >-
   neighbour check, matches at least as many of the 35 real load shifts over 1 day as the learned
   score (LR_b20) at LR_b20's false alarm rate, and at least as many as RO-NC at RO-NC's false
   alarm rate. The prediction fails if the gap is dominated by weather error or misfit days
-  (holidays, clock changes, D8 and D9), in which case the page names which.
+  (holidays, clock changes, D8, and D9), in which case the page names which.
 decision_rule: >-
   Fixed before any score is read. Rows: experiment 258's harness (15 Primary series, whole
   history from 2022-01 to 2026-06, an origin every 6 hours, the frozen past-weather GAM of
@@ -70,114 +70,151 @@ metric: >-
 code: ml-experiments/00308-lsc-two-forecast-gap-as-a-detector/
 verdict: supported
 verdict_note: >-
-  The point estimates meet the bar, but the intervals include zero: 11 of 35 shifts matched
-  (6 to 17) against 10 for the learned score at its false alarm rate, and 21 (15 to 27) against 20
-  for RO-NC at its rate. Under a rule that lets an alarm open up to 4 days after a shift ends, the
-  learned score matches 27 and the gap 16.
+  The point estimates meet the prediction, but the 95% intervals on the differences from the
+  benchmarks (-5 to 7 and -6 to 7 shifts) include zero. The plain gap matched 11 of 35 real shifts
+  while they were on, against 10 for the learned score at the learned score's odd-month false alarm
+  rate, and 21 against 20 for RO-NC at RO-NC's rate. On the held-out even months the gap raised 1.21
+  false alarms per Primary-year and the learned score 0.55. When an alarm may open up to 4 days
+  after a shift ends, the learned score matches 27 and the plain gap 16.
 best_arm: >-
-  Plain gap over leads 0 to 6 hours: 11 of 35 real shifts matched while the shift was on (6 to 17)
-  at 1.2 false alarms per Primary-year, with a median lag of 41 hours.
+  Plain gap over leads 0 to 6 hours: 11 of 35 real shifts matched while the shift was on (6 to 17),
+  with 1.21 false alarms per Primary-year (one Primary observed for one year) on even months and a
+  median alarm 41 hours after the onset.
 headline: >-
-  The gap between the forecast with lags and the forecast without lags works as an alarm for load
-  shifts about as well as the learned score and RO-NC. The 24-hour mean of the recent residual is
-  the better signal (20 of 35 at the learned score's false alarm rate).
+  The plain gap between the forecast with lags and the forecast without lags matched 11 of 35 real
+  load shifts while they were on, against 10 for the learned score and 21 against 20 for RO-NC,
+  with thresholds set on odd months to those detectors' false alarm rates. The 24-hour mean of
+  recent forecast error matched 20 of 35 in the point estimate.
 lessons: >-
-  The filter's own correction trails the recent residual by about a day, so a detector that reads
-  the residual directly finds more shifts at the same false alarm rate. The gap flags ordinary days
-  at D9 at 2.7 alarms per Primary-year against 1.2 overall, so the gap alone cannot say a shift
-  from a persistent change in demand. The neighbour check cost recall without cutting false alarms,
-  because the threshold had to be lowered to keep the same false alarm rate.
+  The 24-hour mean forecast error matched more shifts than the filter's correction at the same odd-
+  month false alarm rate, although the intervals overlap. The gap raised 2.7 false alarms per
+  Primary-year at D9, against 1.2 over all series. The neighbour check did not raise the matched
+  count at the learned score's rate (11 either way) and raised false alarms from 1.21 to 1.64 per
+  Primary-year. At RO-NC's rate it lowered the matched count from 21 to 15.
 take_home_message: >-
-  NGED can see load shifts in the gap between the two forecasts, without any switching log: set to
-  1.2 false alarms per Primary-year, the gap raises an alarm while the shift is still on for 11 of
-  35 real shifts, as many as the learned score does (10), and a median 41 hours after the onset. A
-  simple 24-hour mean of the recent residual finds more (20 of 35), so the next experiment should
-  test whether choosing between the two forecasts with the gap helps the forecast itself.
+  The gap between the two forecasts flagged 11 of 35 real load shifts while they were still on,
+  about as many as the learned score (10) when both thresholds are set to the same false alarm rate
+  on odd months. The median alarm came 41 hours after the onset. On the held-out even months the
+  gap raised about twice the learned score's false alarms (1.21 against 0.55 per Primary-year). A
+  24-hour mean of recent forecast error flagged 20 of 35. Experiment 309 tests whether the gap can
+  choose between the two forecasts.
 advice:
   - >-
-    Raise a load shift flag from the 24-hour mean residual against the no-lag forecast, not from
-    the filter's correction, when the flag must open while the shift is on (Part 1 table).
+    Raise a load shift flag from the 24-hour mean of recent forecast error against the no-lag
+    forecast, rather than from K0's correction, when the flag must open while the shift is on (table
+    of matched real shifts).
   - >-
-    Do not add the neighbour check to a gap alarm at a fixed false alarm rate: it matched no more
-    shifts than the plain gap and needed a lower threshold (Part 1 table, variant b).
+    Expect no gain from the per-origin neighbour check on a gap alarm at a fixed false alarm rate:
+    it matched 11 of 35 shifts either way at the learned score's rate and fewer at RO-NC's (checks
+    and caveats, neighbour check).
   - >-
-    Compare any new detector with the learned score under both match rules, because the learned
-    score opens its alarms about 4 days after the step and matches 10 shifts while the shift is on
-    but 27 within 4 days of its end (Part 1 table).
+    Score a new detector under both match rules, because the learned score opens its alarms about 4
+    days after the step and matches 10 shifts while the shift is on but 27 within 4 days of its end
+    (table of matched real shifts).
   - >-
-    Report false alarms per Primary-year for D9 and D8 separately, because one Primary can carry
-    3 times the alarms of the others (Part 1 table, false alarm split).
+    Report false alarms per Primary-year for D8 and D9 separately, because D9 carried about twice
+    the alarm rate of the whole set at the learned score's rate (checks and caveats, false alarms).
 production_status: not-for-production
 adopted_in: none
 date: 2026-10-23
 ---
 
 **This experiment asks whether the gap between two forecasts can find load shifts.** A load shift
-moves demand from one Primary substation to its neighbours for hours or days. NGED cannot see the
-true switching state, so the only signal it has is how far a forecast that uses recent power (K0,
-a Kalman filter on the recent readings) differs from a forecast that uses none (GAM_ONLY, which
-forecasts the normal running arrangement). We turned that gap, and simpler averages of the recent
-residual, into alarms, set each alarm's threshold on odd calendar months without using any label,
-and scored the alarms on the 35 real load shifts over 1 day, on 411 shifts injected into 44 copies
-of the record, and on false alarms in ordinary rows. **The gap finds as many real shifts as the
-learned score (LR_b20) and RO-NC do at their false alarm rates, with wide intervals.** The
-24-hour mean residual finds more.
+is a switching operation that moves part of one Primary substation's demand (a substation that steps
+33 kV down to 11 kV) onto neighbouring substations for hours or days. The network operator NGED has
+no access to the system that records these operations. The two forecasts it receives from us are K0
+(a Kalman filter on recent power readings, added to the generalised additive model forecast) and
+GAM_ONLY (the same model with no recent power, which forecasts how the network is normally
+switched). We turned the gap between them, and averages of recent forecast error over 6, 24, and 72
+hours (observed power minus GAM_ONLY), into alarms. We set each alarm threshold on odd calendar
+months, using no knowledge of where shifts happened, and scored the alarms on the other months and
+on all months. The scoring covered the 35 real load shifts lasting longer than 1 day, 411
+artificial shifts added to 44 simulated copies of the power history ([experiment
+141](../00141-switching-detector-fed-into-gam-k/result.md)), and false alarms in ordinary rows. A
+row is one Primary at one 6-hourly forecast origin, and it is ordinary when no logged switching
+touched the substation or a neighbour in the 72 hours before. An alarm "matches" a shift when it
+opens from 2 hours before the onset until the shift ends. **The plain gap matched 11 of 35 real
+shifts, the learned score LR_b20 10, and RO-NC 20 (the refit-offset neighbour-count detector), when
+each gap threshold reproduces the benchmark's false alarm rate on odd months.** The learned score
+([experiment 227](../00227-lsc-fewer-false-alarms-and-softer-use-part-2/result.md)) re-ranks RO-NC's
+candidate alarms. The 24-hour mean forecast error matched 20 of 35.
 
 ![Real shifts matched against false alarms](figure_1_matched_shifts_against_false_alarms.svg)
 
 ![Example gap and residual](figure_2_example_gap_and_residual.svg)
 
-## Matched real shifts (35 shifts over 1 day)
+## Matched real shifts (35 shifts lasting over 1 day)
 
 "While on" means an alarm episode opened from 2 hours before the onset to the end of the shift.
-"Within 4 days" (post hoc) also allows the 4 days by which the learned score trails a step. Each gap
-row uses the threshold that gives the carried detector's false alarm rate on odd months.
+"Within 4 days" (post hoc) counts an alarm that opens up to 4 days after the shift ends, because the
+learned score opens its alarms about 4 days after the step. "Share of moved MW" weights each
+shift by its size in megawatts. "Alarms per match" is all false alarms plus matched alarms divided
+by
+matched shifts. "Lag" is the forecast origin minus the onset. The threshold of each gap row
+reproduces the false alarm rate named in its row on odd months (1.29 per Primary-year for the
+learned score, 4.11 for RO-NC, and 0.86 for the pair alarm); the last column is read on even
+months.
 
-| Detector | Matched while on (95% interval) | Within 4 days (post hoc) | Share of moved MW | False alarms per Primary-year, even months | Alarms per match | Median lag (hours) |
+| Detector | Matched while on (95% interval) | Within 4 days | Share of moved MW | Alarms per match | Median lag (hours) | False alarms per Primary-year, odd then even months |
 |---|---|---|---|---|---|---|
-| LR_b20, learned score | 10 (5 to 15) | 27 | 25% | 0.55 | 4.0 | 96 |
-| Plain gap, leads 0 to 6 h, at LR_b20's rate | 11 (6 to 17) | 16 | 47% | 1.21 | 4.5 | 41 |
-| Gap with 6 hour minimum, at LR_b20's rate | 15 (9 to 21) | 18 | 54% | 1.09 | 3.6 | 62 |
-| Gap with neighbour check, at LR_b20's rate | 11 (6 to 17) | 15 | 35% | 1.64 | 5.0 | 83 |
-| 24 h mean residual, at LR_b20's rate | 20 (14 to 26) | 20 | 78% | 0.91 | 2.8 | 29 |
-| RO-NC (RO_b80) | 20 (14 to 26) | 27 | 68% | 3.64 | 7.3 | 48 |
-| Plain gap, leads 0 to 6 h, at RO-NC's rate | 21 (15 to 27) | 22 | 76% | 4.19 | 7.3 | 47 |
-| Gap with neighbour check, at RO-NC's rate | 15 (9 to 21) | 18 | 43% | 4.68 | 10.4 | 49 |
-| Pair alarm (PG_g70) | 4 (1 to 8) | 6 | 14% | 0.91 | 8.2 | 7 |
-| Plain gap, leads 0 to 6 h, at the pair alarm's rate | 11 (6 to 16) | 16 | 47% | 0.91 | 3.6 | 41 |
+| LR_b20, learned score | 10 (5 to 15) | 27 | 25% | 4.0 | 96 | 1.29, 0.55 |
+| Plain gap, leads 0 to 6 h, at the learned score's rate | 11 (6 to 17) | 16 | 47% | 4.5 | 41 | 1.17, 1.21 |
+| Gap with 6-hour minimum, at the learned score's rate | 15 (9 to 21) | 18 | 54% | 3.6 | 62 | 1.29, 1.09 |
+| Gap with neighbour check, at the learned score's rate | 11 (6 to 17) | 15 | 35% | 5.0 | 83 | 1.04, 1.64 |
+| 24 h mean forecast error, at the learned score's rate | 20 (14 to 26) | 20 | 78% | 2.8 | 29 | 1.23, 0.91 |
+| RO-NC (RO_b80) | 20 (14 to 26) | 27 | 68% | 7.3 | 48 | 4.11, 3.64 |
+| Plain gap, leads 0 to 6 h, at RO-NC's rate | 21 (15 to 27) | 22 | 76% | 7.3 | 47 | 3.93, 4.19 |
+| Gap with neighbour check, at RO-NC's rate | 15 (9 to 21) | 18 | 43% | 10.4 | 49 | 3.93, 4.68 |
+| Pair alarm (PG_g70) | 4 (1 to 8) | 6 | 14% | 8.2 | 7 | 0.86, 0.91 |
+| Plain gap, leads 0 to 6 h, at the pair alarm's rate | 11 (6 to 16) | 16 | 47% | 3.6 | 41 | 0.86, 0.91 |
 
 ## Checks and caveats
 
-- **Prediction (point estimates):** variant (a) matches 11 against LR_b20's 10, and 21 against
-  RO-NC's 20. The differences are +1 (-5 to 7) and +1 (-6 to 7) shifts. The prediction holds as
-  written but cannot rank the detectors.
-- **Where the false alarms fall (plain gap at LR_b20's rate, 39 episodes in 32.8 Primary-years of
-  ordinary rows):** D9 5 (2.7 per Primary-year, against 1.2 over all series), D8 0, calendar days 3,
-  November to March 8, other 23. Holidays, clock changes, D8, and D9 do not dominate. The report
-  cannot separate weather error from other causes inside the "other" group.
-- **Other row groups at LR_b20's rate:** D8's 29 multi-day drops, 1 matched; the 17 block days, 0
-  (the 24-hour mean residual on those days stays under 2 noise units, and no detector, carried or
-  gap, matches one). Injected shifts, 182 of 1,063 site events matched (17%), and only 5% of those
-  up to 2 days long, 39% of those over 5 days; the median injected step is under 1 MW.
-- **Neighbour check:** 29 of the 35 shifts have both Primaries metered. The check kept the matched
-  count at 11 and raised false alarms per Primary-year to 1.64, because its threshold had to fall
-  from 3.2 to 2.1 to hold the false alarm rate; it does not apply to injected shifts, whose
-  receivers are unmetered.
-- **Match rule changes the ranking:** the learned score trails a step by 4 days by design (its mask
-  reaches back to the step). Allowed to alarm up to 4 days after the shift ends, it matches 27 and
-  the gap 16.
-- **Data:** the filter's correction is zero before a series' first reading (series 13 and 7 start
-  late), so the gap is undefined there and those rows count for neither alarms nor exposure.
-- **Median minus mean forecast, per site, and quantile-score contrasts:** not applicable, because no
-  quantile forecast is scored. **Audit triggers that fired:** none of the seven fire on this result.
-  Trigger 7 applies to part 2 (experiment 309), which reads the gap, and the maintainer excluded an
-  Opus audit.
-- **Lab conditions:** the injected worlds, the GAM and the filter hyperparameters are those of
-  experiments 130, 141, and 258, with past weather, not ENS weather. The carried detectors' 4-day
-  delay and the thresholds' fit on the same real record are shared by every detector.
+- **Prediction (point estimates):** the plain gap matches 11 against the learned score's 10, and 21
+  against RO-NC's 20. The differences are +1 (-5 to 7) and +1 (-6 to 7) shifts, so the experiment
+  cannot rank the detectors. The learned score's false alarm rate was 1.29 on odd months and 0.55
+  on even months, while the gap's was 1.17 and 1.21, so on even months the gap raised about twice
+  the learned score's false alarms.
+- **Where the plain gap's false alarms fall (at the learned score's rate, 39 episodes in 32.8
+  Primary-years of ordinary rows):** 5 episodes in D9 rows (2.7 per Primary-year, against 1.2 over
+  all series), 0 in D8 rows, 3 on bank holidays or within a day of a clock change, 8 from November
+  to March, and 23 elsewhere. Holidays, clock changes, D8, and D9 do not hold most of the false
+  alarms. The page cannot say how many of the 23 unattributed episodes are weather error, so the
+  prediction's weather-error clause is undetermined.
+- **Other shift sets at the learned score's rate:** the plain gap matches 1 of D8's 29 multi-day
+  drops and none of the 17 unlabelled single days with block-shaped demand (the 24-hour mean error
+  on those days stays under 2 noise units, and no detector, carried or gap, matches any of them). A
+  noise unit is 1.4826 times the median absolute value of a score on odd-month ordinary rows. The
+  injected shifts add 1,063 events at the six substations, because one transfer moves power at the
+  donor and at each receiver. The plain gap matches 182 of them (17%): 5% of those lasting up to 2
+  days (380 events) and 39% of those lasting over 5 days (83 events). The median injected step is
+  0.87 MW.
+- **Neighbour check:** 22 of the 35 shifts name two Primaries that are both metered, so the check
+  can apply to those and not to the rest. It confirms an alarm origin when a connected metered
+  neighbour has an opposite-signed gap at least 30% the size and the two sum to at most half the
+  node's gap. The check is applied at each origin, so it removes alarm origins more strictly than a
+  rule that kept a whole episode when any origin was confirmed; the episode-level rule is untested.
+  The threshold had to fall from 3.2 to 2.1 to hold the false alarm rate, which explains the extra
+  false alarms. The check cannot apply to injected shifts, whose receivers are unmetered.
+- **Match rule changes the ranking:** the learned score's mask reaches back to the step stamp
+  after an alarm that opens about 4 days late. When an alarm may open up to 4 days after the shift
+  ends, the learned score matches 27 and the plain gap 16.
+- **Deviations from the plan:** a noise unit is the robust scale of each score, not of the
+  half-hourly forecast error; and the lag is measured from the forecast origin, which is 4 hours
+  after the last reading the filter used.
+- **Data:** K0 has no correction before a series' first reading (series 13 and 7 start late), so the
+  gap is not computed there and those rows count for neither alarms nor exposure.
+- **Audit rule:** none of the seven triggers in the `ml-experiment` skill fires on this result.
+  Experiment 309 reads the gap, and the maintainer excluded an Opus audit of this work. The median
+  minus mean forecast and quantile-score contrasts do not apply, because no quantile forecast is
+  scored here.
+- **Lab conditions:** the records, the generalised additive model, and the filter settings come
+  from experiments 130, 141, and 258, with estimates of past weather and not ECMWF ensemble (ENS)
+  forecasts. The thresholds of every detector were fitted on the same real record.
 
 ## What to try next
 
-- **Part 2 (experiment 309):** use the gap, and the 24-hour residual, to choose between the two
-  forecasts, scored against observed power and against the true normal running arrangement.
-- **Post hoc:** a detector that combines the 24-hour residual with the gap.
+- **Experiment 309** tests whether the gap, and the 24-hour mean forecast error, can choose between
+  the two forecasts, scored against observed power and against the normal running arrangement.
+- **Post hoc:** a detector that combines the 24-hour mean forecast error with the gap could be
+  tried.
