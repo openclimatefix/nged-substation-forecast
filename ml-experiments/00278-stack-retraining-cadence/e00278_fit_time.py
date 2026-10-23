@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 import e00278_g_common as common
 import e00278_g_tall as tall
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_pinned_capacity import read_vintages
 
 
