@@ -20,7 +20,7 @@ hypothesis: >-
   (GAM_ONLY) forecasts the normal running arrangement, and a forecast with lags (K0) forecasts what
   will flow while an abnormal arrangement lasts. A rule that reads only the gap between the two
   forecasts, how long it has lasted, and a neighbour check can choose between them nearly as well as
-  knowing the truth. This is part 2 of the brief
+  knowing the truth. This experiment is part 2 of the brief
   briefs/sw_lsc_two_forecasts_divergence_and_selection_brief.md, and it builds on experiment 308.
 prediction: >-
   Written before any score is read. RULE recovers at least 60% of ORACLE's gain over the better
@@ -96,34 +96,35 @@ metric: >-
 code: ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth/
 verdict: not supported
 verdict_note: >-
-  Neither rule chose between the two forecasts usefully. In the injected worlds, RULE recovered 0%
-  of the gain of an oracle that picks the better forecast per row (95% interval -4% to 3%) in the
-  rows near a shift, where the pre-registered threshold was 60%. In the real record, RULE scored
-  worse than always using the forecast with lags in every group except the 72 hours after a shift.
+  Neither rule chose between the two forecasts usefully. In the injected worlds, the rule on the
+  24-hour residual recovered -0.5% of the gain of an oracle that picks the better forecast per row
+  (95% interval -4% to 3%) in the rows near a shift, where the pre-registered threshold was 60%. In
+  the real record, the rule scored worse than always using the forecast with lags in every group
+  except the 72 hours after a shift.
 best_arm: >-
   Band head (BAND_HEAD) on the injected worlds, with a threshold-weighted CRPS against observed
   power of 0.385 in the rows within 7 days of a shift (the forecast with lags scored 0.410 and the
   forecast without lags 0.408).
 headline: >-
   A rule that switches between the forecast with lags and the forecast without lags, using only the
-  24-hour mean residual or the gap between the forecasts, recovered none of the gain of knowing
-  which one is better. Knowing the true state of the network gained little over always using one
-  forecast.
+  24-hour mean residual or the gap between the forecasts, recovered none of the gain of the oracle
+  that picks the better forecast per row. An oracle that knows the true switching state gained
+  little over always using the forecast with lags, except in the 72 hours after a real shift ended.
 lessons: >-
-  The forecast with lags beat the forecast without lags in ordinary rows, and in the real record
-  during a shift. The forecast without lags beat it only in the 72 hours after a real shift ended
-  (0.83 against 1.96 points of pinball loss). The thresholds chosen on odd months were the
-  strictest (the rule almost never switched), so the rule behaved as the forecast without lags.
-  The gap carries no information beyond the residual, and the residual matched more real shifts at
-  the learned score's false alarm rate.
+  The forecast with lags had the lower score in ordinary rows, and in the real record during a shift
+  (a point estimate, with an interval that includes zero). The forecast without lags had the lower
+  score in the 72 hours after a real shift ended (0.83 against 1.96 points of pinball loss). In the
+  injected worlds, the thresholds chosen on odd months were the strictest, so the rule rarely
+  switched and behaved as the forecast without lags. The residual matched more real shifts than the
+  gap at the learned score's false alarm rate, and the gap is built from the same residual.
 take_home_message: >-
   NGED cannot pick between the two forecasts from the gap alone. A rule on the gap, or on the
-  24-hour mean of measured power minus the no-lag forecast, did no better than always using the
-  no-lag forecast in the injected worlds, and worse than always using the forecast with lags in the
-  real record. Even knowing the true state of the network gained little, so what NGED needs is an
-  explicit flag that a shift has ended, which is when the forecast with lags is most wrong. The gap
-  is a filtered copy of the measured-power residual and carries no information the measured power
-  does not.
+  24-hour mean of measured power minus the no-lag forecast, did no better than always using the no-
+  lag forecast in the injected worlds, and worse than always using the forecast with lags in the
+  real record. An oracle that knows the true switching state gained little, except in the 72 hours
+  after a real shift ended, so the most promising signal to test next is a flag for the end of a
+  shift. The gap is a filtered copy of the measured-power residual, so it adds no information that
+  the measured power lacks.
 advice:
   - >-
     Use the forecast with lags as the default for observed power, and switch to the no-lag forecast
@@ -144,29 +145,33 @@ date: 2026-10-23
 
 **This experiment asks whether NGED, which cannot see which switching arrangement is in force, can
 choose between two forecasts using only the forecasts and recent power.** The forecast without lags
-(GAM_ONLY) predicts the normal running arrangement. The forecast with lags (K0) adds a Kalman filter
-on recent power readings to GAM_ONLY, so it predicts what will flow while an abnormal arrangement
-lasts. A rule that switches to K0 when a signal says "abnormal" and back to GAM_ONLY otherwise
-recovered **none** of the gain that choosing correctly would give, in the injected worlds and in the
-real record. Which weather feeds each part matters. The real record uses the frozen past-weather
-forecast of [experiment 130](../00130-ml-experiment-convex-model/result.md) (ERA5 and CAMS) through
-[experiment 258](../00258-lsc-mask-out-of-sample-all-primaries-whole-history/result.md)'s harness,
-scored against observed power only. The injected worlds use the cached ensemble-weather member
-forecasts (ENS) of [experiment
+(GAM_ONLY, from a generalised additive model) predicts the normal running arrangement (NRA). The
+forecast with lags (K0, a Kalman filter on recent power readings added to GAM_ONLY) predicts what
+will flow while an abnormal arrangement lasts. A rule that switches to K0 when a signal says
+"abnormal" and back to GAM_ONLY otherwise recovered **none** of the gain that choosing correctly
+would give, in the injected worlds and in the real record. The real record and the injected worlds
+use different weather inputs. The real record uses the frozen past-weather forecast of [experiment
+130](../00130-ml-experiment-convex-model/result.md) (ERA5 and CAMS estimates of past weather)
+through [experiment 258](../00258-lsc-mask-out-of-sample-all-primaries-whole-history/result.md)'s
+harness, scored against observed power only. The injected worlds use the cached ensemble-weather
+member forecasts (ENS, the ECMWF ensemble) of [experiment
 297](../00297-lsc-need-a-detector-no-detector-arms-against-the-mask/result.md), scored against both
-observed power and the true normal arrangement.
+observed power and the true normal arrangement. Experiment 308 defined the gap and the carried
+detectors RO-NC and LR_b20 (the learned score); the row groups G1 to G5 are ordinary rows, before
+the alarm, during a shift, 48 hours after, and within 7 days.
 
 ## Does the gap carry more than the residual? (maintainer's question)
 
 **The residual (measured power minus GAM_ONLY) flagged more real shifts than the gap, clearly at the
-learned score's false alarm rate.** K0 is GAM_ONLY plus a filter fitted to recent residuals, so the
-gap is a smoothed copy of the same residual, filtered through the Kalman filter's gain. It can add
-no information that the measured power lacks, and it loses some because the filter damps a step it
-takes to be noise. The differences below come from the stored per-shift flags of [experiment
-308](../00308-lsc-two-forecast-gap-as-a-detector/result.md), with whole shifts resampled; no model
-was refitted. In both rows the thresholds were set on odd months to the false alarm rate of the
-named detector, so each pair shares an operating point to within one threshold step (the odd-month
-rates sit within 0.2 per Primary-year of each other).
+learned score's false alarm rate only.** K0 is GAM_ONLY plus a filter fitted to recent residuals, so
+the gap is a filtered copy of the same residual. The gap can therefore add no information that the
+measured power lacks. The residual matched more shifts than the gap by a clear margin only for the
+24-hour window at LR_b20's rate (+9, 4 to 14); the other differences include zero, and the page did
+not test why the filter loses signal. The differences below come from the stored per-shift flags of
+[experiment 308](../00308-lsc-two-forecast-gap-as-a-detector/result.md), with whole shifts
+resampled; no GAM was refitted. In both rows the thresholds were set on odd months to the false
+alarm rate of the named detector, so each pair shares an operating point to within one threshold
+step (the odd-month rates sit within 0.2 per Primary-year of each other).
 
 | At the false alarm rate of | Signal | Matched while on, of 35 | Difference from the gap (95%) | Matched within 4 days of the end | Difference from the gap (95%) | False alarms per Primary-year, odd then even months |
 |---|---|---|---|---|---|---|
@@ -205,12 +210,13 @@ table above. Only the real record was scored.
 | RO-NC | Band position, signed (`pit24`) | 26 | +2 (-2 to 6) | 4.80 (3.35 to 6.31) |
 | RO-NC | Band position, absolute (`ext24`) | 25 | +1 (-3 to 6) | 3.70 (2.67 to 4.79) |
 
-The prediction holds in its point estimates: `pit24` matches 22 and 26 shifts against 20 and 24. The
-gain is small, and the interval at RO-NC's rate includes zero. On the even months the signal raised
-2.3 times the false alarms of the residual at the learned score's rate (2.13 against 0.91 per
-Primary-year), so the equal odd-month operating points do not carry over to the held-out months. The
-bands carry the hour of day in the scale, and the residual's noise in the odd months is not the
-noise in the even months.
+**The prediction holds in its point estimates for `pit24` and not for `ext24`.** The prediction
+named the band-position signal in general; `pit24` matches 22 and 26 shifts against 20 and 24, and
+`ext24` matches 17 and 25. The gain of `pit24` is small, and the interval at RO-NC's rate includes
+zero. On the even months `pit24` raised 2.3 times the false alarms of the residual at the learned
+score's rate (2.13 against 0.91 per Primary-year), so the equal odd-month operating points do not
+carry over to the held-out months. The page did not test why; one possible reason is that the
+odd-month noise differs from the even-month noise.
 
 ## Results
 
@@ -218,57 +224,66 @@ noise in the even months.
 
 ![Real record by row group](figure_2_real_record_by_row_group.svg)
 
-**In the injected worlds, the rules never beat the forecast without lags in the rows near a shift.**
-On even months, against observed power, the threshold-weighted CRPS at the 95th percentile
-(twCRPS95) in the rows within 7 days of a shift is 0.408 for GAM_ONLY, 0.410 for K0, 0.385 for
-BAND_HEAD, 0.409 for the rule on the 24-hour residual, 0.408 for the rule on the gap, and 0.405 for
-an oracle that knows the true state. The oracle that picks the better of the two forecasts on each
-row scores 0.330, but it gains in ordinary rows too (2.11 against 2.60 for K0 in quantile score), so
-it is picking noise, not the arrangement. Both thresholds chosen on odd months were the strictest on
-offer (4.5), where the rule almost never leaves GAM_ONLY. The recovery of the per-row oracle's gain
-in the rows within 7 days is 0.0% for the residual rule (-4% to 3%) and 0.0% for the gap rule (-3%
-to 3%), against the pre-registered 60%.
+**In the injected worlds, the rules chosen on odd months scored like the forecast without lags in
+the rows near a shift.** On even months, against observed power, the threshold-weighted CRPS at the
+95th percentile (twCRPS95) in the rows within 7 days of a shift is 0.408 for GAM_ONLY, 0.410 for K0,
+0.385 for BAND_HEAD (the quantile head of experiment 297), 0.409 for the rule on the 24-hour
+residual, 0.408 for the rule on the gap, and 0.405 for an oracle that knows the true state. The
+oracle that picks the better of the two forecasts on each row scores 0.330. It also gains in
+ordinary rows (2.11 against 2.60 for K0 in quantile score), where no shift exists, so most of its
+gain comes from selecting on the realised score and not from knowing the arrangement. Both
+thresholds chosen on odd months were the strictest on offer (4.5), where the rule rarely leaves
+GAM_ONLY; at the other two thresholds the residual rule scored 0.407 and 0.408. The recovery of the
+per-row oracle's gain in the rows within 7 days is -0.5% for the residual rule (-4% to 3%) and 0.0%
+for the gap rule (-3% to 3%), against the pre-registered 60%.
 
-**In ordinary rows, the forecast with lags is better than the forecast without lags, so falling back
-to GAM_ONLY costs score.** In injected ordinary rows the quantile score is 2.60 for K0 and 2.96 for
-GAM_ONLY, and the residual rule scores 2.98. The rule is 0.38 points worse than K0 (0.29 to 0.48)
-and 0.02 points worse than GAM_ONLY (0 to 0.06), so it fails the pre-registered limit of 0.02 points
-whichever forecast is the reference. The quantile score is twice the mean pinball loss over 11
-quantiles, which approximates the CRPS.
+**In ordinary rows, the forecast with lags scores better than the forecast without lags, so falling
+back to GAM_ONLY scores worse than staying on K0.** In injected ordinary rows the quantile score is
+2.60 for K0 and 2.96 for GAM_ONLY, and the residual rule scores 2.98. The rule is 0.38 points worse
+than K0 (0.29 to 0.48). Against GAM_ONLY the rule is 0.02 points worse (0 to 0.06), at the
+pre-registered limit of 0.02, and the gap rule is level with GAM_ONLY. The pre-registered limit was
+a harm against the better fixed forecast, which is K0 in ordinary rows, so the rule fails it. The
+quantile score is twice the mean pinball loss over 11 quantiles, which approximates the CRPS.
 
-**In the real record, the forecast without lags is better only in the 72 hours after a shift ends.**
-Pinball loss at the 95th percentile (points of capacity, even months, 29 shifts and 53 months
-resampled) is, for GAM_ONLY, K0, the rule on the 24-hour residual, the rule on the gap, and the
-oracle that knows the state: 2.44, 1.81, 2.82, 1.94, and 1.81 during a shift; 0.83, 1.96, 1.84,
-1.96, and 0.83 in the 72 hours after; and 0.86, 0.74, 0.85, 0.81, and 0.86 in ordinary rows. K0
-minus GAM_ONLY is +1.13 points after a shift (0.03 to 2.84) and -0.12 points in ordinary rows (-0.17
-to -0.06). During a shift the true-state oracle equals K0, so a perfect state flag helps only after
-the shift ends. The rules did not recover that gain: the residual rule scored 1.84 and the gap rule
-1.96 after a shift, because neither signal drops back below its exit threshold until days later.
+**In the real record, the forecast without lags had the lower score only in the 72 hours after a
+shift ends.** Pinball loss at the 95th percentile (points of capacity, even months, resampling 26 to
+29 shifts and 53 months) is, for GAM_ONLY, K0, the rule on the 24-hour residual, the rule on the
+gap, and the oracle that knows the state: 2.44, 1.81, 2.82, 1.94, and 1.81 during a shift; 0.83,
+1.96, 1.84, 1.96, and 0.83 in the 72 hours after; and 0.86, 0.74, 0.85, 0.81, and 0.86 in ordinary
+rows. K0 minus GAM_ONLY is +1.13 points after a shift (0.03 to 2.84) and -0.12 points in ordinary
+rows (-0.17 to -0.06). During a shift the interval of the same contrast includes zero (-1.86 to
+1.07), so K0's lead there is a point estimate. The true-state oracle equals K0 during a shift, so a
+perfect state flag helps only after the shift ends. The rules did not recover that gain: the
+residual rule scored 1.84 and the gap rule 1.96 after a shift. On the real record the residual rule
+chose the strictest threshold and the gap rule the loosest, so the two rules differ in how often
+they switch.
 
-**For curtailment cost, always using K0 or BAND_HEAD is better than any rule.** In the injected rows
-within 7 days at 12 to 36 hour leads, against observed power, the cost at the scaled limit 0.5 is
-2,488 for K0, 2,478 for BAND_HEAD, 2,698 for GAM_ONLY, and 2,670 for the residual rule (units of the
-cost model: pounds per scored half-hour at a price of 2,000 pounds per megawatt-hour and a 20-times
-breach penalty). The residual rule costs 7.3% more than K0 (3.6% to 12%). The cost was scored on the
-injected worlds only.
+**For curtailment cost, always using K0 or BAND_HEAD scored better than any rule.** In the injected
+rows within 7 days at 12 to 36 hour leads, against observed power, the cost at the scaled limit 0.5
+is 2,488 for K0, 2,478 for BAND_HEAD, 2,698 for GAM_ONLY, and 2,670 for the residual rule (pounds
+per scored half-hour at a price of 2,000 pounds per megawatt-hour and a 20-times breach penalty).
+The residual rule costs 7.3% more than K0 (3.6% to 12%). The cost was scored on the injected worlds
+only.
 
-**Against the true normal arrangement, no arm gained.** The target NGED wants for scenario studies
-is the true normal-arrangement series. GAM_ONLY is the arm built for it, and in the rows near a
-shift K0 scored about the same (twCRPS95 0.340 for both). The page does not recommend an arm for
-that target.
+**Against the true normal arrangement, neither rule gained over the better of the two fixed
+forecasts.** The target NGED wants for scenario studies is the true normal-arrangement series.
+GAM_ONLY is the arm built for it, and in the rows near a shift K0 scored about the same (twCRPS95
+0.340 for both). BAND_HEAD scored 0.311 and the per-row oracle 0.271. The page does not recommend an
+arm for that target.
 
 ## Checks and deviations
 
 - **Median against mean forecast error:** the absolute error of the median and of the mean forecast
-  differ by at most 0.03 points for GAM_ONLY and K0 at every substation, so no arm's median is
-  biased against its mean.
+  differ by at most 0.03 points for GAM_ONLY and K0 at every substation. BAND_HEAD's differ by up to
+  0.27 points (D16), 0.15 (D9), and 0.14 (D11), because its median and mean come from different
+  heads.
 - **Leave one substation out:** with any of the six injected substations removed, the residual
   rule's recovery in the rows near a shift stays between -0.06 and 0.00, so no one substation drives
   the result.
 - **The planned neighbour-check variant was not run.** The plan named a rule with the neighbour
-  check on the real record. Because the plain rules already failed at every threshold, the extra
-  variant could not change the verdict, and the check cannot apply in the injected worlds.
+  check on the real record. The plain rules did not beat the better fixed forecast at the thresholds
+  chosen on odd months, the real record printed only those thresholds, and the check cannot apply in
+  the injected worlds.
 - **The band-position signal was scored on the real record only.** GAM_ONLY's own bands exist on the
   injected rows only for 131 non-contiguous runs per world, with no trailing 24 hours, so the
   injected worlds were not scored for it. The real-record bands are a residual quantile function per
@@ -276,14 +291,33 @@ that target.
   have already happened.
 - **Not run:** the persistent-regime descriptive item (D8's engine spell and a permanent step), the
   BSP cost proxy, the real-record cost, the 24 hours to 10 days ensemble range, and the before-alarm
-  group on the real record. The real record has 29 even-month shifts, so its intervals are wide, and
-  the odd-month threshold choice on 35 shifts is noisy.
+  group on the real record. The real record has 26 to 29 even-month shifts per group, so its
+  intervals are wide, and the odd-month threshold choice on 35 shifts is noisy. The plan defined the
+  group after the end as 48 hours; the real record uses 72 hours, because that is how experiment 258
+  scored it.
+- **Definitions that differ between the records.** In the injected worlds the oracle that knows the
+  state takes its state from experiment 297's phase label, which uses the target time, so a row
+  whose origin is inside a shift and whose target is after its end counts as after the shift. On the
+  real record the state is read at the origin. The oracle that knows the state is defined for
+  observed power only. The better fixed forecast of each group is picked on the same even-month rows
+  that are then scored, and the bootstrap does not re-pick it. The recovery ratio is ill-conditioned
+  where the fixed forecast and the oracle score almost the same (during a shift in the injected
+  worlds), so the page quotes absolute gains there.
+- **The `ext24` signal is not centred.** The mean of absolute normal scores sits near 0.8 in
+  ordinary conditions, so its threshold tests a level, not a departure from a centre, and the
+  contrast with the residual does not test the idea of an extreme position. The `pit24` signal is
+  centred.
+- **Thresholds sit at the edge of the grid.** Both injected signals chose the strictest threshold
+  (4.5) on odd months, so no looser or tuned threshold was tested. The comparison of the gap with
+  the residual windows (`e00309_gap_vs_residual.py`) is post hoc and was not in the pre-registered
+  decision rule.
 - **Both ENS and past-weather scores are upper bounds** for a live service, because past weather is
   more accurate than a forecast and the injected worlds replay one ensemble run per day.
 
 ## What to try next
 
-**A flag for the end of a shift is what the data call for.** The only group where the forecast
-without lags won is the 72 hours after a shift ends, so a detector that opens its alarm at the
-shift's end, such as one reading the step back to the old level, would be tested directly against
-these rows. A selector built from the signals here does not do that.
+**A flag for the end of a shift is a possible next test.** In the groups scored here, the forecast
+without lags had the lower point estimate with an interval excluding zero only in the 72 hours after
+a shift ends. A detector that opens its alarm at the end of a shift, such as one reading the step
+back to the old level, could be scored directly against those rows. A selector built from the
+signals here does not do that.
