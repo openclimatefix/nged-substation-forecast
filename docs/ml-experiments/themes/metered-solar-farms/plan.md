@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 273 | Do the metered-farm conclusions survive sorting each forecast's quantiles? | 1 | nothing | Planned |
 
 ## Planned experiments
 
