@@ -130,6 +130,10 @@ lie partly after some even-month cuts (a lab convention shared with experiment 3
 **Deviations from the brief.**
 
 - The 95% pinball loss replaces twCRPS, and the 11-quantile score replaces CRPS.
+- The end rule is adapted from experiment 147's running-peak rule R2, which reads a step statistic
+  this level signal does not have. An alarm closes when the signed 12 hour mean falls below half the
+  threshold at two consecutive origins (known one origin later), or after 14 days. The mask starts
+  24 hours before the first flagged origin's data cutoff, because the filter re-runs from there.
 - The mixture density arm is dropped, which the brief allows as a second arm only.
 - The training stage is not rerun on the injected worlds, only the filter mask.
 - The real record is scored on even months, outside labelled spans, on rows no arm masks.
