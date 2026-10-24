@@ -1,4 +1,4 @@
-# ruff: noqa
+# ruff: noqa: ANN001, ANN201, D103, D208, RUF005
 """Print the tables whose numbers `result.md` quotes, from the score tables of experiment 321.
 
     PYTHONPATH=ml-experiments/00321-* \
