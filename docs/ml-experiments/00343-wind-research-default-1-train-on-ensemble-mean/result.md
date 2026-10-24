@@ -81,3 +81,28 @@ adopted_in: none
   designs: arms fixed by the brief; callers: this folder's scripts. Medium.
 - **Ensemble-mean training is a lab condition** for serving: the mean of 51 members is available
   at forecast time, so condition 5 holds.
+- **Triage of the plan review (all applied before any score).**
+    - The spread factor and the offset table are fitted only on out-of-fold hindcast quantiles
+      (held-out block, with training cases whose valid times fall inside the block's range
+      removed, asserted in the fit). They are then applied to the model fitted on all usable
+      hindcast cases, which has seen about 50% more rows than the fold models; this mismatch
+      biases against M and MS.
+    - The spread factor is experiment 33's rule applied to the model's own single set of quantiles
+      (no member mixture exists for M), fitted month by month on earlier cases.
+    - The replicate (2025-01 to 2025-06 runs) reuses the out-of-fold quantiles with the table
+      fitted on valid times before 2025-01. Those fold models were trained on later runs, so the
+      replicate favours M and MS; condition 3 is read with that caveat and cannot alone adopt an arm.
+    - P2 is |M0 - M| < |default without table - default| on the kept rows, with the default's
+      table-free score from experiment 340's `default_notable`. P3 reads "no better on the median"
+      as a median pinball difference above -0.02 points.
+    - All arms use `colsample` 1.0 (the settings of experiment 230); MS has eight columns against
+      six, which is part of the arm. The default trains on 4.4 years of ERA5 and M on 15 months of
+      ensemble runs; the history length is not separated, and the write-up says so.
+    - The default uses experiment 340's three seeds and their mean score; M and MS use seeds 0 to 2.
+    - The default's gains per column (seed 0, W1 to W3): the 10 m speed is the highest column other
+      than the 100 m speed (0.050, 0.051, 0.036 against 0.050, 0.054, 0.068 for the 100 m speed).
+    - MS is tested only if M fails a condition, and need not beat M. Level 99.5% for both.
+    - Controls: known-answer test (planted power curve recovered from synthetic members, mean
+      absolute error under 0.03), placebo Mpl (target permuted across cases within the month, must
+      not gain), leakage assertion in the fit (no training valid time inside a held-out block's
+      range; latest hindcast valid time before the earliest scored valid time).
