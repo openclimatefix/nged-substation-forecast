@@ -103,6 +103,23 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 - **UKV shortwave is instantaneous, whereas ENS and CAMS are means labelled at the period end.**
   Check the hour-of-day peak of every source (exp 53; UKV, ENS, CAMS; provisional).
 
+## Findings on the weather inputs of generator forecasts
+
+- **A UKV forecast adds 1.0% to 1.8% to the solar-farm score.** Experiment 229 found 1.8%, and
+  experiment 248 found 1.1% for the neural head and 1.4% for XGBoost. ICON-D2 adds 1.0% in a blend
+  at 12 to 29 hours only, and is not for production (exp 229, 246, 248; 6 farms, one year;
+  provisional).
+- **The ensemble's wind speeds are about 1.1 m/s too slow, which gives the low median.** Multiplying
+  every member's wind speed by a factor fitted on the 14 months before the scored year closed about
+  78% of the gap to the ERA5 oracle, and a lookup table of power offsets by lead day helped more than
+  mapping the members to ERA5 (exp 261, 285, 307; 3 wind farms; provisional).
+- **The 51 ensemble members give better wind tails than their mean.** Pooling AIFS lowers the wind
+  score at days 3 to 6 by about 5% and does not improve the high-power tail (exp 242, 262; 3 wind
+  farms; provisional).
+- **Extra ensemble variables and the cells around a farm add nothing for solar farms.** The
+  variables were longwave radiation, humidity, precipitation, pressure, wind, and 500 hPa height;
+  the neighbouring cells improved the score by 0.36% (exp 272, 292; 6 farms; provisional).
+
 ## Other products
 
 - **GEFS did not improve the sunshine anomaly**, and its raw anomaly was about 15% too large
@@ -121,4 +138,4 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 - **Feed the run the service would have.** Experiment 53 assumed a 3-hour UKV delivery time that no
   experiment has measured (exp 53; UKV; provisional).
 
-Last checked against experiment 183.
+Last checked against experiment 324.

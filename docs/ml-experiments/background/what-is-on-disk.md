@@ -57,7 +57,7 @@ These are written by the Dagster application, not by experiments.
 ## Experiments
 
 - **Each experiment writes to `data/ml-experiments/<id>-<slug>/`**, created by
-  `experiment_store.reserve_experiment`. About 200 folders exist (disk).
+  `experiment_store.reserve_experiment`. About 320 ids exist (disk).
 - **Predictions live at `predictions/<name>/` inside that folder**, as `predictions.parquet` and a
   `manifest.json`, written by `experiment_store.write_predictions` and read by
   `experiment_store.read_predictions`. The reader raises when the row set differs (disk).
@@ -72,4 +72,4 @@ These are written by the Dagster application, not by experiments.
 - **`data/` sits on the second SSD:** the main checkout's `data/` is a symbolic link to
   `/mnt/data/nged-substation-forecast/data` (disk)
 
-Last checked against experiment 183.
+Last checked against experiment 324.

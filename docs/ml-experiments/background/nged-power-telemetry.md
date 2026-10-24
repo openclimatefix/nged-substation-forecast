@@ -87,6 +87,16 @@ page](../../background/network.md).
   Primary-year, and a penalty that keeps false changes under 1 labels 42% of 14 to 60 day load
   shifts as states ([experiment 295](../00295-regime-segmentation-part-b-persistent-regimes-without-labels/result.md);
   14 Primaries, injected steps; provisional).
+- **D8's multi-day drops coincide with a gas-engine detector's running states.** The detector flags
+  27 of the 28 drops that began after the engine left D8's reading, against about 1 in 5 comparable
+  stretches. This is not proved, because the drops and the detector both read D8's residual
+  ([experiment 291](../00291-d8-drops-engine-spells-load-shift/result.md); D8; provisional).
+- **Solar-farm outages are too rare to test an availability state.** Five of the six farms have at
+  most 34 outage half-hours in the scored year, and the sixth has 165 (exp 301; 6 farms, one year;
+  provisional).
+- **About 3.0% of the farms' half-hours read exactly zero.** Count the zeros before reading
+  coverage at the 0.01 quantile: 1.2% to 1.4% of actual values fall strictly below it (exp 321; 6
+  farms; provisional).
 - **A metered solar farm can climb to its rated output in stages over months.** One farm took eight
   months ([network page](../../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months)).
   The metered farms miss 7.6% to 27.6% of their half-hours, so check coverage before comparing
@@ -105,4 +115,4 @@ page](../../background/network.md).
   over the series' whole observed history.** One point is 1% of that value. See the
   [glossary](../glossary.md#capacity-and-points-of-capacity) (code).
 
-Last checked against experiment 183.
+Last checked against experiment 324.

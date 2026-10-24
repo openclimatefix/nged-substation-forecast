@@ -78,9 +78,23 @@ and terms are in the [glossary](../glossary.md).
 - **Report the manual-heuristic baseline arm (`capacity_forecast`) as the maintainer's unconfirmed
   understanding of NGED's practice.** Experiment 84 is the pattern to copy (exp 84; 2 bulk supply
   points; provisional).
+- **Headline f = 0.5 when f = 0.9 gives only a handful of events.** At the Boston and Skegness bulk
+  supply points, experiment 255 found 5 event half-hours at f = 0.9, so it headlined f = 0.5, which
+  gives 72. Experiment 277 also headlines the 0.5 limit (exp 255, 277; 2 bulk supply points, 6
+  Primaries; provisional).
+- **Read the curtailment cost as a ranking, not as money saved.** BG2 costs GBP 7.35 million more
+  than the GAM stack on the six Primaries at the 0.5 limit, and the windows around the 7 logged load
+  transfers hold too few half-hours to separate the two (exp 277; 6 Primaries, one year; provisional).
+- **Pair a 00 UTC farm forecast with a 09 UTC node forecast only for valid times before 12 UTC the
+  next day.** Later valid times need a run made after the node forecast (exp 255; 2 bulk supply
+  points; provisional).
 - **The scored lead band for curtailment is 12 to 36 hours**, because scoring needs a stored forecast
   in that window ([curtailment theme](../themes/curtailment-cost/index.md); exp 84; curtailment;
   provisional).
+
+- **NGED's horizon is 1 to 10 days, so a result scored only at short leads carries that caveat.**
+  The assembled solar-farm forecast beats climatology at every lead up to 10 days, by 39% at day 1
+  and 10% at days 8 to 10 (exp 310; 6 farms; provisional).
 
 ## Retraining defaults in R&D
 
@@ -90,6 +104,11 @@ and terms are in the [glossary](../glossary.md).
   cadence, absolute scores, and tail scores with weekly refits.** The
   [rolling refit](../glossary.md#refit-and-rolling-refit) glossary entry gives the settings (exp 34,
   48, 81; Primary demand; established).
+- **Keep the convex demand model's monthly refits (0.4 s per substation), and give the small neural
+  network that corrects the median no retraining schedule.** Quarterly refits of the convex model
+  scored 0.010 points worse, weekly refits gained nothing, and retraining the network quarterly or
+  monthly scored no better than training it once before the scored year (exp 278; 5 Primaries, one
+  year; provisional).
 - **Say in each write-up which schedule was used and whether the contrast could depend on it**
   (exp 34, 85; refit schedules; established).
 
@@ -121,4 +140,4 @@ and terms are in the [glossary](../glossary.md).
   substations, against 0.104 for the mean of the single-seed scores (exp 201, 220; 6 substations,
   one year; provisional).
 
-Last checked against experiment 220.
+Last checked against experiment 324.
