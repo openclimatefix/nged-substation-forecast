@@ -220,9 +220,8 @@ default scores 6.568). The default beats climatology by 2.195 points (99.67% int
   -0.051 to +0.006).
 - **Prediction P3 (x3 and x2 differ by under 0.03) holds.** x3 minus x2 is -0.001 on the kept rows
   (99.67% interval -0.072 to +0.079).
-- **Prediction P4 (at least 60% of x2's gain comes from 8 to 15 m/s) fails.** the share of x2's kept-row gain from rows at 8 to 15 m/s is
-  0.081 (95% interval -5.8 to +7.4: a share of a gain this
-  small is not defined). The group gains are: below 5 m/s -0.041, 5 to 8 m/s -0.009, 8 to 15 m/s
+- **Prediction P4 (at least 60% of x2's gain comes from 8 to 15 m/s) fails.** The share of x2's kept-row gain from rows at 8 to 15 m/s is
+  0.081 (95% interval -5.8 to +7.4, because a share of a gain this small is not defined). The group gains are: below 5 m/s -0.041, 5 to 8 m/s -0.009, 8 to 15 m/s
   -0.021, and 15 m/s or more +0.878.
 - **Prediction P5 (no arm moves the 0.99 pinball loss by more than 0.05) holds.** The 0.99 pinball
   loss moves by -0.0004 (x2), -0.0001 (x1), and -0.0012 (x3).
