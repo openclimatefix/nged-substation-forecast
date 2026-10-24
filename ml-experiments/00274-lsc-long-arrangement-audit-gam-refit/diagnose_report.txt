@@ -1,0 +1,80 @@
+/home/jack/dev/nged-substation-forecast/.claude/worktrees/bridge-cse_01AqFq88k5go45rb7c7sC9xh/ml-experiments/00274-lsc-long-arrangement-audit-gam-refit/e00274_diagnose.py:93: DeprecationWarning: `cut` is deprecated; use `bin_intervals` instead
+  frame.with_columns(band=pl.col("temperature_c").cut([0, 5, 10, 15, 20]))
+## D3, transfer ending 1 July: mean forecast difference over a fixed week, by cut
+cut at end -1 day, 0:00:00: 2.04 points
+cut at end 0:00:00: 2.13 points
+cut at end 6:00:00: 2.13 points
+cut at end 12:00:00: 0.88 points
+cut at end 1 day, 0:00:00: 0.76 points
+cut at end 3 days, 0:00:00: 1.02 points
+cut at end 10 days, 0:00:00: 1.03 points
+## D3: mean transfer 17.75 points
+shape: (4, 3)
+┌───────────┬─────┬─────────────────┐
+│ band      ┆ n   ┆ mean_difference │
+│ ---       ┆ --- ┆ ---             │
+│ enum      ┆ u32 ┆ f64             │
+╞═══════════╪═════╪═════════════════╡
+│ (-inf, 0] ┆ 132 ┆ 1.113499        │
+│ (0, 5]    ┆ 581 ┆ 1.240521        │
+│ (5, 10]   ┆ 659 ┆ 1.181489        │
+│ (10, 15]  ┆ 164 ┆ 1.336007        │
+└───────────┴─────┴─────────────────┘
+shape: (4, 2)
+┌───────┬─────────────────┐
+│ block ┆ mean_difference │
+│ ---   ┆ ---             │
+│ i64   ┆ f64             │
+╞═══════╪═════════════════╡
+│ 0     ┆ 0.784691        │
+│ 6     ┆ 1.318787        │
+│ 12    ┆ 1.670984        │
+│ 18    ┆ 1.083429        │
+└───────┴─────────────────┘
+shape: (5, 2)
+┌──────┬─────────────────┐
+│ week ┆ mean_difference │
+│ ---  ┆ ---             │
+│ i32  ┆ f64             │
+╞══════╪═════════════════╡
+│ 0    ┆ 0.507869        │
+│ 1    ┆ 1.453621        │
+│ 2    ┆ 1.355052        │
+│ 3    ┆ 1.516856        │
+│ 4    ┆ 1.253454        │
+└──────┴─────────────────┘
+## D11: mean transfer 16.02 points
+shape: (4, 3)
+┌───────────┬─────┬─────────────────┐
+│ band      ┆ n   ┆ mean_difference │
+│ ---       ┆ --- ┆ ---             │
+│ enum      ┆ u32 ┆ f64             │
+╞═══════════╪═════╪═════════════════╡
+│ (-inf, 0] ┆ 143 ┆ 1.455249        │
+│ (0, 5]    ┆ 617 ┆ 1.178508        │
+│ (5, 10]   ┆ 621 ┆ 0.741497        │
+│ (10, 15]  ┆ 155 ┆ 1.4223          │
+└───────────┴─────┴─────────────────┘
+shape: (4, 2)
+┌───────┬─────────────────┐
+│ block ┆ mean_difference │
+│ ---   ┆ ---             │
+│ i64   ┆ f64             │
+╞═══════╪═════════════════╡
+│ 0     ┆ 0.887595        │
+│ 6     ┆ 1.088649        │
+│ 12    ┆ 1.195065        │
+│ 18    ┆ 1.037456        │
+└───────┴─────────────────┘
+shape: (5, 2)
+┌──────┬─────────────────┐
+│ week ┆ mean_difference │
+│ ---  ┆ ---             │
+│ i32  ┆ f64             │
+╞══════╪═════════════════╡
+│ 0    ┆ -0.386999       │
+│ 1    ┆ 1.508933        │
+│ 2    ┆ 1.540272        │
+│ 3    ┆ 1.464951        │
+│ 4    ┆ 1.186809        │
+└──────┴─────────────────┘

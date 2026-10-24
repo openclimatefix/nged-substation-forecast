@@ -51,7 +51,9 @@ Primaries that have a clean solar capacity estimate. The members are a weekly-re
 model, a monthly-refitted XGBoost model, an analogue model (the experiment's summary does not state
 its type), a model pooled by substation type, and the stack. For bulk and grid supply points it is
 the weekly-refitted XGBoost model with no correction. Experiment 97 recalibrates only the stored
-weekly-refitted forecast and calls it BG2.
+weekly-refitted forecast and calls it BG2. Production does not run BG2: it serves
+`xgboost_baseline`, which scored 10.536 points on the Primary quantile score in experiment 87,
+against 5.260 for BG2.
 
 ### Bulk supply point and grid supply point
 
@@ -279,6 +281,15 @@ the end within the larger of 6 hours and 10% of the transfer's duration
 monthly.** A rolling refit (P-roll) retrains monthly on a rolling 12-month window with 150 boosting
 rounds ([experiment 34](00034-retraining-cadence-and-cheap-proxies-demand/result.md)). Weekly refits
 are the cadence of BG2.
+
+### Research default
+
+**A research default is the fixed forecast of one target family, against which every `change`
+experiment is measured.** Each version has a name made of the family, the words "research default",
+and a number, such as "Primary demand research default 1" (the GAM stack A+H+S). An adopted change
+makes the next version. A research default is not what production serves: production serves
+`xgboost_baseline`, and "champion" and "promote" are production words ([rule](research-default.md),
+[log](research-default-log.md)).
 
 ### Residual
 

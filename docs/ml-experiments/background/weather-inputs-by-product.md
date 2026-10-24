@@ -23,21 +23,23 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
   ERA5 weather in place of ENS weather lowered the Primary demand quantile score by 0.10 points
   (exp 22; Primary demand, one validation year; provisional).
 - **Name the weather source used at lag times in every write-up, and say whether it exists at
-  forecast time** ([data-processing page](../data-processing.md#timestamps-and-availability); exp 33,
-  37; ERA5 as the lag-time source; established).
+  forecast time** ([data-processing page](../data-processing.md#timestamps-and-availability); exp
+  33, 37; ERA5 as the lag-time source; established).
 
 ## Training product: the rule
 
 - **Train each XGBoost model on the history of the weather product that will serve it.** The arms
   are ENS-trained, ENS plus the other product as columns, and the other product alone. An
-  ERA5-trained XGBoost model is only a reference ([weather theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details);
-  exp 22; XGBoost models on Primary demand; provisional).
+  ERA5-trained XGBoost model is only a reference ([weather
+  theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details); exp
+  22; XGBoost models on Primary demand; provisional).
 - **Pair a CAMS-trained XGBoost model with a stage 0 quantile mapping of ENS shortwave.** The
   pair scored 0.102 points better than the ERA5-trained arm for Primary demand, against 0.035
   without the mapping (exp 14; Primary demand; provisional, and it supersedes the advice of exp 9
   to keep ERA5).
 - **Calibrate ENS temperature and irradiance before they drive a model trained on past weather.**
-  Shifts of up to about 2 K and 20% were needed at five Primaries (exp 111; 5 Primaries; provisional).
+  Shifts of up to about 2 K and 20% were needed at five Primaries (exp 111; 5 Primaries;
+  provisional).
 - **"Better weather adds little" was measured only for an XGBoost model trained on ENS.** Do not
   read it as a result for an ERA5-trained XGBoost model ([weather
   theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details); exp
@@ -81,9 +83,9 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 
 ## CAMS
 
-- **Use the point time-series API, not the gridded product.** The gridded product lags years
-  behind ([data-sources page](../../roadmap/data-sources.md#cams-use-the-point-api-not-the-gridded-product))
-  (docs).
+- **Use the point time-series API, not the gridded product.** The gridded product lags years behind
+  ([data-sources
+  page](../../roadmap/data-sources.md#cams-use-the-point-api-not-the-gridded-product)) (docs).
 - **The latency is 1 day.** A forecast job at 09:00 UTC gets nothing about the day it forecasts, so
   no intraday correction rests on CAMS (docs).
 - **Values are accumulated irradiation in Wh/m²** and each is stamped at the end of its step. Set
@@ -103,22 +105,42 @@ issues](../../architecture/ecmwf-ens-known-issues.md).
 - **UKV shortwave is instantaneous, whereas ENS and CAMS are means labelled at the period end.**
   Check the hour-of-day peak of every source (exp 53; UKV, ENS, CAMS; provisional).
 
+## Findings on the weather inputs of generator forecasts
+
+- **A UKV forecast adds 1.1% to 1.8% to the solar-farm score.** Experiment 229 found 1.8%, and
+  experiment 248 found 1.1% for the neural head and 1.4% for XGBoost. These gains are upper limits,
+  because they use the research archive and the live UKV feed differs. ICON-D2 adds 1.0% in a blend
+  at 12 to 29 hours only, and experiment 246 advises against adding it (exp 229, 246, 248; 6 farms,
+  10 months; provisional).
+- **The ECMWF ensemble's wind speeds are about 1.1 m/s too slow, which gives the low median.**
+  Multiplying every member's wind speed by a factor fitted on the 14 months before the scored year
+  closed about 78% of the gap to the ERA5 oracle, which is the same physics core fed ERA5 wind as if
+  it were the forecast. A lookup table of power offsets by lead day helped more than
+  mapping the members to ERA5 (exp 261, 285, 307; 3 wind farms; provisional).
+- **The 51 ensemble members give better wind tails than their mean.** Pooling the AIFS ensemble
+  (ECMWF's machine-learned ensemble) lowers the wind score at days 3 to 6 by about 5% and does not
+  improve the high-power tail (exp 242, 262; 3 wind farms; provisional).
+- **Extra ECMWF ensemble variables and the cells around a farm add under 0.4% for solar farms.** The
+  variables were longwave radiation, humidity, precipitation, pressure, wind, and 500 hPa height;
+  the neighbouring cells improved the score by 0.36% (exp 272, 292; 6 farms; provisional).
+
 ## Other products
 
 - **GEFS did not improve the sunshine anomaly**, and its raw anomaly was about 15% too large
   (exp 50; sunshine anomaly; provisional).
 - **ICON-EU and IFS winds scored worse than the best guess** when fed alone, as raw winds with no
-  bias correction, to an ERA5-trained wind model: 2.5 and 1.3 points worse at days 1 and 2 (exp 52; 3
-  wind farms; provisional).
+  bias correction, to an ERA5-trained wind model: 2.5 and 1.3 points worse at days 1 and 2 (exp 52;
+  3 wind farms; provisional).
 - **CERRA runs about 3 months behind real time.** It is deprioritised
   ([data-sources page](../../roadmap/data-sources.md#weather-data)) (docs).
 
 ## Blending experiments
 
-- **Pass a shuffled-product placebo through every step**, and give a guard arm the variant it
-  guards ([weather theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details);
-  exp 52, 54; blending arms; provisional).
+- **Pass a shuffled-product placebo through every step**, and give a guard arm the variant it guards
+  ([weather
+  theme](../themes/weather-products-and-blending/index.md#gotchas-and-implementation-details); exp
+  52, 54; blending arms; provisional).
 - **Feed the run the service would have.** Experiment 53 assumed a 3-hour UKV delivery time that no
   experiment has measured (exp 53; UKV; provisional).
 
-Last checked against experiment 183.
+Last checked against experiment 321.

@@ -1,0 +1,6 @@
+events: {'block': 17, 'drop': 29, 'transfer': 35}; pooled Primary-years (excl. D8 and D9): 54.37
+RO-NC R2             alarms= 133 blocks=1/17 drops=2/29 transfers=22/35 false_per_primary_year=1.60
+RO-NC current        alarms= 302 blocks=2/17 drops=13/29 transfers=29/35 false_per_primary_year=3.48
+pair alarm R2        alarms=  69 blocks=2/17 drops=0/29 transfers=12/35 false_per_primary_year=0.92
+pair alarm current   alarms= 249 blocks=1/17 drops=6/29 transfers=16/35 false_per_primary_year=3.29
+learned re-ranker    alarms= 394 blocks=3/17 drops=9/29 transfers=32/35 false_per_primary_year=4.93

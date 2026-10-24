@@ -64,8 +64,8 @@ and terms are in the [glossary](../glossary.md).
 
 ## Tails and curtailment
 
-- **Every forecasting experiment reports tail calibration beside the headline score.** The tail table
-  gives coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99, through
+- **Every forecasting experiment reports tail calibration beside the headline score.** The tail
+  table gives coverage and pinball loss at 0.01, 0.05, 0.95, and 0.99, through
   `studies.tail_calibration` (code).
 - **Write `q01` to `q99`, `actual`, `lead_hours`, and `time_series_id` in the predictions**, so the
   tail and curtailment metrics can score them (code).
@@ -73,23 +73,42 @@ and terms are in the [glossary](../glossary.md).
   limit is a fraction f of the node's maximum observed export before the scored year, with f = 0.9
   by default and 0.75 and 0.5 as sweeps. The real published thermal limit appears only as a
   reference mark and in the event census, because NGED curtails so that one more fault still leaves
-  headroom. Metric details: [cost-savings metrics](../../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost)
-  (code).
+  headroom. Metric details: [cost-savings
+  metrics](../../roadmap/cost-savings-metrics.md#metric-2-curtailment-cost) (code).
 - **Report the manual-heuristic baseline arm (`capacity_forecast`) as the maintainer's unconfirmed
   understanding of NGED's practice.** Experiment 84 is the pattern to copy (exp 84; 2 bulk supply
   points; provisional).
-- **The scored lead band for curtailment is 12 to 36 hours**, because scoring needs a stored forecast
-  in that window ([curtailment theme](../themes/curtailment-cost/index.md); exp 84; curtailment;
+- **Headline f = 0.5, instead of the default 0.9, when f = 0.9 gives fewer than 20 event
+  half-hours.** At the Boston and Skegness bulk supply points, experiment 255 found 2 event
+  half-hours at f = 0.9 and 5 at f = 0.75, so it headlined f = 0.5, which gives 72. Experiment 277
+  also headlines the 0.5 limit (exp 255, 277; 2 bulk supply points, 6 Primaries; provisional).
+- **Read the curtailment cost as a ranking, not as money saved.** BG2 costs GBP 7.35 million more
+  than the GAM stack on the six Primaries at the 0.5 limit, and the windows around the seven logged
+  load transfers hold too few half-hours to separate the two (exp 277; 6 Primaries, one year;
   provisional).
+- **Pair a 00 UTC farm forecast with a 09 UTC node forecast only for valid times before 12 UTC the
+  next day.** Later valid times need a run made after the node forecast (exp 255; 2 bulk supply
+  points; provisional).
+- **The scored lead band for curtailment is 12 to 36 hours**, because scoring needs a stored
+  forecast in that window ([curtailment theme](../themes/curtailment-cost/index.md); exp 84;
+  curtailment; provisional).
+- **NGED's horizon is 1 to 10 days, so a result scored only at short leads carries that caveat.**
+  The assembled solar-farm forecast beats climatology at every lead up to 10 days, by 39% at day 1
+  and 10% at days 8 to 10 (exp 310; 6 farms; provisional).
 
 ## Retraining defaults in R&D
 
-- **Do not use quarterly refits, three refits a year, or warm-start boosting** as a proxy for monthly
-  retraining (exp 34, 85; XGBoost refit cadence, Primary demand; established).
+- **Do not use quarterly refits, three refits a year, or warm-start boosting** as a proxy for
+  monthly retraining (exp 34, 85; XGBoost refit cadence, Primary demand; established).
 - **Screen a demand-feature contrast with monthly refits on a rolling 12-month window, and judge
   cadence, absolute scores, and tail scores with weekly refits.** The
   [rolling refit](../glossary.md#refit-and-rolling-refit) glossary entry gives the settings (exp 34,
   48, 81; Primary demand; established).
+- **Keep the convex demand model's monthly refits (0.4 s per substation), and give the small neural
+  network that corrects the median no retraining schedule.** Quarterly refits of the convex model
+  scored 0.010 points worse than monthly refits (not shown to be acceptable), weekly refits gained
+  nothing, and retraining the neural network quarterly or monthly scored no better than training it
+  once before the scored year (exp 278; 6 Primaries, one year; provisional).
 - **Say in each write-up which schedule was used and whether the contrast could depend on it**
   (exp 34, 85; refit schedules; established).
 
@@ -108,9 +127,11 @@ and terms are in the [glossary](../glossary.md).
   average.** Cold-night q95 coverage was 0.846 under experiment 160's smooth spread table and 0.896
   with widening of the upper quantiles only, while ensemble spread added nothing over all rows (exp
   160, 164, 169; DP Primaries; provisional).
-- **Score a new model component on top of the best-guess arm, not on a partial stack.** The drift
-  term improved the score by 0.40 on the bare GAM-K and worsened arm D by 0.03 once the filter, the
-  winter night offset, and recipe R were in (exp 167, 170; DP Primaries; provisional).
+- **Score a new model component on top of the family's research default, not on a partial stack.**
+  The drift term improved the score by 0.40 on the bare GAM-K and worsened arm D by 0.03 once the
+  filter, the winter night offset, and recipe R were in (exp 167, 170; DP Primaries; provisional).
+  The [research default rule](../research-default.md) names the default and says when a win is
+  adopted.
 - **Gains do not always remove the same error: the correction network and the two-number solar
   summary added on arm A.** Together they scored 0.136 below arm A, 99% of the sum of their single
   gains of 0.099 and 0.038 (exp 220; 5 Primaries, one year; provisional).
@@ -119,4 +140,4 @@ and terms are in the [glossary](../glossary.md).
   substations, against 0.104 for the mean of the single-seed scores (exp 201, 220; 6 substations,
   one year; provisional).
 
-Last checked against experiment 220.
+Last checked against experiment 321.

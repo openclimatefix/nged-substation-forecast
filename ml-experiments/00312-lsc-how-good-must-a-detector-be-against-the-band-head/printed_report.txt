@@ -1,0 +1,694 @@
+Running as unit: run-p1903449-i89938554.scope; invocation ID: e2a82691e0ed43e4a00485fb784f9a4e
+rows 6879769
+=== checks: ADD_PERFECT against stored PERFECT_ADD; HEAD_BASE_cross against BAND_HEAD
+ADD_PERFECT {'max_abs_diff': 0.0, 'n': 6879769}
+HEAD_BASE_cross {'max_abs_diff': 0.0, 'n': 6879769}
+=== degraded arms against BAND_HEAD (gain = BAND_HEAD minus arm; positive is better for the arm)
+ADD_PERFECT  vs bar cost0.5 G5  : n=223226 mean +174.4544 (+123.9083, +229.8268) pct +6.27 (+4.53, +8.10)
+ADD_PERFECT  vs bar cost0.75 G5 : n=223226 mean +105.8710 (+61.9737, +154.9446) pct +11.19 (+6.90, +15.57)
+ADD_PERFECT  vs bar cost0.9 G5  : n=223226 mean +44.0878 (+16.6488, +74.8136) pct +15.93 (+6.68, +24.31)
+ADD_PERFECT  vs bar cost0.5 Gs  : n=47714 mean +450.4517 (+301.9066, +618.7982) pct +16.45 (+11.43, +21.45)
+ADD_PERFECT  vs bar cost0.5 G2  : n=26191 mean +573.1210 (+342.9244, +852.0319) pct +20.24 (+12.95, +27.56)
+ADD_PERFECT  vs bar cost0.5 G3  : n=8605 mean +421.8616 (+256.5466, +564.5123) pct +18.14 (+11.44, +23.99)
+ADD_PERFECT  vs bar cost0.5 G4  : n=12918 mean +220.7867 (-1.8835, +424.4275) pct +7.82 (-0.07, +14.33)
+ADD_PERFECT  vs bar tw95 G5     : n=1536056 mean -0.0155 (-0.0358, +0.0067) pct -2.84 (-7.17, +1.13)
+ADD_PERFECT  vs bar tw95 Gs     : n=160367 mean +0.1254 (+0.0562, +0.2096) pct +28.79 (+14.31, +41.26)
+ADD_PERFECT  vs bar tw95 G2     : n=86116 mean +0.2024 (+0.1023, +0.3253) pct +39.06 (+24.25, +50.51)
+ADD_PERFECT  vs bar tw95 G3     : n=35765 mean +0.0355 (+0.0202, +0.0571) pct +34.03 (+18.62, +50.93)
+ADD_PERFECT  vs bar tw95 G4     : n=38486 mean +0.0363 (-0.0757, +0.1389) pct +6.52 (-11.86, +24.75)
+ADD_PERFECT  vs bar cost0.5 G5 without D11 : n=133276 mean +208.8111 (+133.5287, +294.3087) pct +9.04 (+6.02, +12.20)
+ADD_PERFECT  vs bar cost0.5 G5 without D16 : n=157055 mean +202.8456 (+134.1581, +280.6745) pct +7.17 (+4.88, +9.61)
+ADD_PERFECT  vs held-out head cost0.5 G5 odd: n=108596 mean +182.8590 (+106.7693, +269.9600) pct +6.44 (+3.88, +9.17)
+ADD_PERFECT  vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_PERFECT  vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_R25      vs bar cost0.5 G5  : n=223226 mean +14.1555 (-24.2454, +56.2039) pct +0.51 (-0.88, +2.00)
+ADD_R25      vs bar cost0.75 G5 : n=223226 mean +16.2594 (-11.8236, +47.2864) pct +1.72 (-1.27, +4.87)
+ADD_R25      vs bar cost0.9 G5  : n=223226 mean +16.9370 (+1.2678, +35.4946) pct +6.12 (+0.49, +12.24)
+ADD_R25      vs bar cost0.5 Gs  : n=47714 mean +41.2354 (-84.3164, +197.0353) pct +1.51 (-3.17, +6.92)
+ADD_R25      vs bar cost0.5 G2  : n=26191 mean +238.4056 (+60.7392, +476.0251) pct +8.42 (+2.27, +15.65)
+ADD_R25      vs bar cost0.5 G3  : n=8605 mean +307.1267 (+227.3267, +375.9381) pct +13.21 (+10.13, +15.81)
+ADD_R25      vs bar cost0.5 G4  : n=12918 mean -535.6403 (-846.1869, -267.5797) pct -18.98 (-29.46, -9.57)
+ADD_R25      vs bar tw95 G5     : n=1536056 mean -0.0391 (-0.0516, -0.0254) pct -7.18 (-10.03, -4.37)
+ADD_R25      vs bar tw95 Gs     : n=160367 mean +0.0491 (-0.0043, +0.1211) pct +11.27 (-1.06, +24.29)
+ADD_R25      vs bar tw95 G2     : n=86116 mean +0.0968 (+0.0165, +0.2061) pct +18.67 (+3.90, +32.73)
+ADD_R25      vs bar tw95 G3     : n=35765 mean +0.0214 (+0.0134, +0.0320) pct +20.50 (+12.58, +29.09)
+ADD_R25      vs bar tw95 G4     : n=38486 mean -0.0320 (-0.1293, +0.0394) pct -5.74 (-18.26, +8.00)
+ADD_R25      vs bar cost0.5 G5 without D11 : n=133276 mean +71.0078 (+21.3049, +129.8374) pct +3.08 (+0.95, +5.52)
+ADD_R25      vs bar cost0.5 G5 without D16 : n=157055 mean -1.2000 (-49.1813, +52.3892) pct -0.04 (-1.76, +1.82)
+ADD_R25      vs held-out head cost0.5 G5 odd: n=108596 mean -4.7967 (-61.9185, +58.9014) pct -0.17 (-2.20, +2.04)
+ADD_R25      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0003 (-0.0007, +0.0015) pct +0.01 (-0.03, +0.06)
+ADD_R25      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.2287 (-0.1237, +0.6298) pct +0.01 (-0.00, +0.02)
+ADD_R50      vs bar cost0.5 G5  : n=223226 mean +96.1035 (+51.9524, +142.9780) pct +3.45 (+1.88, +5.07)
+ADD_R50      vs bar cost0.75 G5 : n=223226 mean +52.2441 (+18.5747, +89.2320) pct +5.52 (+2.00, +9.13)
+ADD_R50      vs bar cost0.9 G5  : n=223226 mean +22.9022 (+2.4159, +47.8907) pct +8.28 (+0.94, +16.17)
+ADD_R50      vs bar cost0.5 Gs  : n=47714 mean +208.4422 (+107.6728, +308.9048) pct +7.61 (+3.95, +11.15)
+ADD_R50      vs bar cost0.5 G2  : n=26191 mean +327.6464 (+220.6538, +448.2417) pct +11.57 (+7.95, +15.37)
+ADD_R50      vs bar cost0.5 G3  : n=8605 mean +381.7269 (+250.8318, +505.6628) pct +16.41 (+10.87, +21.76)
+ADD_R50      vs bar cost0.5 G4  : n=12918 mean -148.6712 (-392.3927, +64.5295) pct -5.27 (-13.94, +2.24)
+ADD_R50      vs bar tw95 G5     : n=1536056 mean -0.0337 (-0.0482, -0.0182) pct -6.20 (-9.14, -3.22)
+ADD_R50      vs bar tw95 Gs     : n=160367 mean +0.0454 (+0.0021, +0.0890) pct +10.43 (+0.43, +20.77)
+ADD_R50      vs bar tw95 G2     : n=86116 mean +0.0809 (+0.0250, +0.1394) pct +15.61 (+4.89, +26.37)
+ADD_R50      vs bar tw95 G3     : n=35765 mean +0.0267 (+0.0130, +0.0462) pct +25.59 (+12.09, +41.04)
+ADD_R50      vs bar tw95 G4     : n=38486 mean -0.0165 (-0.1192, +0.0669) pct -2.96 (-17.21, +13.03)
+ADD_R50      vs bar cost0.5 G5 without D11 : n=133276 mean +138.3438 (+81.0788, +202.8263) pct +5.99 (+3.61, +8.55)
+ADD_R50      vs bar cost0.5 G5 without D16 : n=157055 mean +102.7681 (+46.6500, +163.7600) pct +3.63 (+1.67, +5.68)
+ADD_R50      vs held-out head cost0.5 G5 odd: n=108596 mean +82.9449 (+27.7458, +145.0057) pct +2.92 (+1.00, +5.03)
+ADD_R50      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0004 (-0.0006, +0.0016) pct +0.02 (-0.02, +0.06)
+ADD_R50      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.1292 (-0.0813, +0.3954) pct +0.00 (-0.00, +0.01)
+ADD_R75      vs bar cost0.5 G5  : n=223226 mean +127.5591 (+87.5620, +172.0819) pct +4.58 (+3.17, +6.12)
+ADD_R75      vs bar cost0.75 G5 : n=223226 mean +66.0091 (+34.2129, +102.6271) pct +6.98 (+3.75, +10.49)
+ADD_R75      vs bar cost0.9 G5  : n=223226 mean +25.5932 (+5.4207, +49.7431) pct +9.25 (+2.15, +16.60)
+ADD_R75      vs bar cost0.5 Gs  : n=47714 mean +402.5219 (+270.9687, +552.3195) pct +14.70 (+10.22, +19.29)
+ADD_R75      vs bar cost0.5 G2  : n=26191 mean +534.9781 (+345.8911, +781.7927) pct +18.89 (+13.13, +25.40)
+ADD_R75      vs bar cost0.5 G3  : n=8605 mean +449.5070 (+316.3443, +573.0959) pct +19.33 (+13.99, +24.42)
+ADD_R75      vs bar cost0.5 G4  : n=12918 mean +102.6713 (-127.5742, +312.2569) pct +3.64 (-4.50, +10.69)
+ADD_R75      vs bar tw95 G5     : n=1536056 mean -0.0290 (-0.0423, -0.0140) pct -5.33 (-8.35, -2.40)
+ADD_R75      vs bar tw95 Gs     : n=160367 mean +0.0966 (+0.0369, +0.1742) pct +22.19 (+9.14, +34.78)
+ADD_R75      vs bar tw95 G2     : n=86116 mean +0.1631 (+0.0771, +0.2825) pct +31.48 (+17.87, +44.15)
+ADD_R75      vs bar tw95 G3     : n=35765 mean +0.0345 (+0.0229, +0.0531) pct +32.99 (+20.77, +47.88)
+ADD_R75      vs bar tw95 G4     : n=38486 mean +0.0056 (-0.1059, +0.1063) pct +1.00 (-16.41, +19.09)
+ADD_R75      vs bar cost0.5 G5 without D11 : n=133276 mean +163.0243 (+102.7658, +231.9008) pct +7.06 (+4.57, +9.78)
+ADD_R75      vs bar cost0.5 G5 without D16 : n=157055 mean +140.9362 (+90.6576, +199.0098) pct +4.98 (+3.25, +6.90)
+ADD_R75      vs held-out head cost0.5 G5 odd: n=108596 mean +114.1951 (+62.9454, +172.4267) pct +4.02 (+2.26, +5.91)
+ADD_R75      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (-0.0003, +0.0005) pct +0.00 (-0.01, +0.02)
+ADD_R75      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0091 (-0.1022, +0.1488) pct +0.00 (-0.00, +0.01)
+ADD_D6       vs bar cost0.5 G5  : n=223226 mean +169.6222 (+118.7158, +225.7780) pct +6.09 (+4.33, +7.95)
+ADD_D6       vs bar cost0.75 G5 : n=223226 mean +103.4332 (+58.9638, +153.1171) pct +10.93 (+6.54, +15.30)
+ADD_D6       vs bar cost0.9 G5  : n=223226 mean +43.7432 (+16.0493, +75.1204) pct +15.81 (+6.49, +24.27)
+ADD_D6       vs bar cost0.5 Gs  : n=47714 mean +433.4826 (+283.1365, +603.2301) pct +15.83 (+10.76, +20.93)
+ADD_D6       vs bar cost0.5 G2  : n=26191 mean +542.2071 (+313.4697, +812.1764) pct +19.15 (+11.82, +26.34)
+ADD_D6       vs bar cost0.5 G3  : n=8605 mean +421.8616 (+255.5565, +565.5133) pct +18.14 (+11.29, +24.01)
+ADD_D6       vs bar cost0.5 G4  : n=12918 mean +220.7867 (-1.5866, +425.7499) pct +7.82 (-0.06, +14.31)
+ADD_D6       vs bar tw95 G5     : n=1536056 mean -0.0162 (-0.0360, +0.0060) pct -2.97 (-7.20, +1.01)
+ADD_D6       vs bar tw95 Gs     : n=160367 mean +0.1197 (+0.0514, +0.2013) pct +27.49 (+13.32, +39.88)
+ADD_D6       vs bar tw95 G2     : n=86116 mean +0.1919 (+0.0915, +0.3148) pct +37.03 (+21.81, +48.83)
+ADD_D6       vs bar tw95 G3     : n=35765 mean +0.0355 (+0.0202, +0.0573) pct +34.03 (+18.91, +50.64)
+ADD_D6       vs bar tw95 G4     : n=38486 mean +0.0363 (-0.0766, +0.1394) pct +6.52 (-11.98, +24.64)
+ADD_D6       vs bar cost0.5 G5 without D11 : n=133276 mean +204.3952 (+128.9535, +289.4044) pct +8.85 (+5.81, +12.00)
+ADD_D6       vs bar cost0.5 G5 without D16 : n=157055 mean +197.3745 (+127.9855, +276.2073) pct +6.98 (+4.64, +9.45)
+ADD_D6       vs held-out head cost0.5 G5 odd: n=108596 mean +180.3182 (+104.3444, +268.4045) pct +6.35 (+3.79, +9.13)
+ADD_D6       vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D6       vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D12      vs bar cost0.5 G5  : n=223226 mean +148.6333 (+105.2234, +194.9147) pct +5.34 (+3.83, +6.87)
+ADD_D12      vs bar cost0.75 G5 : n=223226 mean +88.6395 (+50.0341, +129.4429) pct +9.37 (+5.53, +13.07)
+ADD_D12      vs bar cost0.9 G5  : n=223226 mean +36.7930 (+12.4184, +63.7823) pct +13.30 (+5.01, +20.87)
+ADD_D12      vs bar cost0.5 Gs  : n=47714 mean +408.7195 (+256.8189, +574.8248) pct +14.93 (+9.74, +20.00)
+ADD_D12      vs bar cost0.5 G2  : n=26191 mean +497.0943 (+267.2545, +769.1408) pct +17.56 (+10.10, +24.88)
+ADD_D12      vs bar cost0.5 G3  : n=8605 mean +421.8616 (+256.7334, +565.4245) pct +18.14 (+11.36, +24.02)
+ADD_D12      vs bar cost0.5 G4  : n=12918 mean +220.7867 (-2.7319, +422.9031) pct +7.82 (-0.10, +14.33)
+ADD_D12      vs bar tw95 G5     : n=1536056 mean -0.0204 (-0.0395, +0.0010) pct -3.74 (-7.91, +0.17)
+ADD_D12      vs bar tw95 Gs     : n=160367 mean +0.1067 (+0.0387, +0.1898) pct +24.50 (+9.79, +37.34)
+ADD_D12      vs bar tw95 G2     : n=86116 mean +0.1677 (+0.0699, +0.2890) pct +32.35 (+16.53, +44.97)
+ADD_D12      vs bar tw95 G3     : n=35765 mean +0.0355 (+0.0200, +0.0569) pct +34.03 (+18.67, +50.76)
+ADD_D12      vs bar tw95 G4     : n=38486 mean +0.0363 (-0.0763, +0.1395) pct +6.52 (-12.00, +24.75)
+ADD_D12      vs bar cost0.5 G5 without D11 : n=133276 mean +175.0689 (+113.3664, +243.5182) pct +7.58 (+5.10, +10.13)
+ADD_D12      vs bar cost0.5 G5 without D16 : n=157055 mean +168.4831 (+110.3620, +231.3684) pct +5.96 (+4.00, +7.97)
+ADD_D12      vs held-out head cost0.5 G5 odd: n=108596 mean +161.5654 (+97.5614, +232.6353) pct +5.69 (+3.54, +7.95)
+ADD_D12      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D12      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D24      vs bar cost0.5 G5  : n=223226 mean +130.8513 (+90.0603, +175.7125) pct +4.70 (+3.27, +6.21)
+ADD_D24      vs bar cost0.75 G5 : n=223226 mean +76.5608 (+40.4022, +116.5955) pct +8.09 (+4.45, +11.77)
+ADD_D24      vs bar cost0.9 G5  : n=223226 mean +32.1098 (+8.7273, +58.7171) pct +11.60 (+3.51, +19.26)
+ADD_D24      vs bar cost0.5 Gs  : n=47714 mean +381.8367 (+232.0810, +548.0601) pct +13.95 (+8.82, +19.07)
+ADD_D24      vs bar cost0.5 G2  : n=26191 mean +448.1201 (+219.9103, +722.8335) pct +15.83 (+8.30, +23.36)
+ADD_D24      vs bar cost0.5 G3  : n=8605 mean +421.8616 (+259.0752, +565.2289) pct +18.14 (+11.47, +24.02)
+ADD_D24      vs bar cost0.5 G4  : n=12918 mean +220.7867 (-2.2142, +421.2379) pct +7.82 (-0.08, +14.26)
+ADD_D24      vs bar tw95 G5     : n=1536056 mean -0.0224 (-0.0413, -0.0010) pct -4.11 (-8.28, -0.16)
+ADD_D24      vs bar tw95 Gs     : n=160367 mean +0.0992 (+0.0341, +0.1790) pct +22.77 (+8.74, +35.50)
+ADD_D24      vs bar tw95 G2     : n=86116 mean +0.1536 (+0.0562, +0.2726) pct +29.65 (+13.19, +42.52)
+ADD_D24      vs bar tw95 G3     : n=35765 mean +0.0355 (+0.0204, +0.0575) pct +34.03 (+18.88, +50.66)
+ADD_D24      vs bar tw95 G4     : n=38486 mean +0.0363 (-0.0760, +0.1370) pct +6.52 (-11.97, +24.52)
+ADD_D24      vs bar cost0.5 G5 without D11 : n=133276 mean +151.7818 (+95.8013, +215.8126) pct +6.57 (+4.28, +9.01)
+ADD_D24      vs bar cost0.5 G5 without D16 : n=157055 mean +146.0872 (+92.9635, +205.7793) pct +5.16 (+3.35, +7.09)
+ADD_D24      vs held-out head cost0.5 G5 odd: n=108596 mean +131.1016 (+72.9928, +196.8747) pct +4.62 (+2.64, +6.75)
+ADD_D24      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D24      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D48      vs bar cost0.5 G5  : n=223226 mean +102.9772 (+67.8219, +139.9018) pct +3.70 (+2.46, +4.95)
+ADD_D48      vs bar cost0.75 G5 : n=223226 mean +56.7372 (+23.7795, +91.3721) pct +6.00 (+2.61, +9.27)
+ADD_D48      vs bar cost0.9 G5  : n=223226 mean +23.8722 (+2.9770, +46.9109) pct +8.63 (+1.19, +15.29)
+ADD_D48      vs bar cost0.5 Gs  : n=47714 mean +298.9839 (+182.7351, +429.3378) pct +10.92 (+6.90, +15.00)
+ADD_D48      vs bar cost0.5 G2  : n=26191 mean +297.1812 (+139.7655, +490.5207) pct +10.50 (+5.22, +16.01)
+ADD_D48      vs bar cost0.5 G3  : n=8605 mean +421.8616 (+257.2172, +566.3466) pct +18.14 (+11.41, +24.03)
+ADD_D48      vs bar cost0.5 G4  : n=12918 mean +220.7867 (+0.2494, +423.1181) pct +7.82 (+0.01, +14.32)
+ADD_D48      vs bar tw95 G5     : n=1536056 mean -0.0293 (-0.0462, -0.0107) pct -5.38 (-9.20, -1.81)
+ADD_D48      vs bar tw95 Gs     : n=160367 mean +0.0580 (+0.0094, +0.1131) pct +13.32 (+2.32, +22.68)
+ADD_D48      vs bar tw95 G2     : n=86116 mean +0.0770 (+0.0132, +0.1512) pct +14.86 (+3.07, +24.00)
+ADD_D48      vs bar tw95 G3     : n=35765 mean +0.0355 (+0.0201, +0.0573) pct +34.03 (+18.53, +51.05)
+ADD_D48      vs bar tw95 G4     : n=38486 mean +0.0363 (-0.0777, +0.1378) pct +6.52 (-11.98, +24.61)
+ADD_D48      vs bar cost0.5 G5 without D11 : n=133276 mean +119.3700 (+71.6076, +170.9489) pct +5.17 (+3.19, +7.17)
+ADD_D48      vs bar cost0.5 G5 without D16 : n=157055 mean +109.8395 (+66.2248, +158.0624) pct +3.88 (+2.39, +5.46)
+ADD_D48      vs held-out head cost0.5 G5 odd: n=108596 mean +109.7250 (+59.2071, +162.0798) pct +3.87 (+2.14, +5.56)
+ADD_D48      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D48      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D96      vs bar cost0.5 G5  : n=223226 mean +58.4873 (+28.1502, +89.5892) pct +2.10 (+1.02, +3.19)
+ADD_D96      vs bar cost0.75 G5 : n=223226 mean +27.8595 (+0.8036, +56.7077) pct +2.94 (+0.09, +5.81)
+ADD_D96      vs bar cost0.9 G5  : n=223226 mean +10.6324 (-5.1937, +27.9694) pct +3.84 (-2.02, +9.44)
+ADD_D96      vs bar cost0.5 Gs  : n=47714 mean +141.9855 (+59.6294, +220.0281) pct +5.19 (+2.19, +7.95)
+ADD_D96      vs bar cost0.5 G2  : n=26191 mean +12.6708 (-63.5838, +90.3861) pct +0.45 (-2.23, +3.20)
+ADD_D96      vs bar cost0.5 G3  : n=8605 mean +421.8616 (+256.6555, +565.3190) pct +18.14 (+11.36, +23.98)
+ADD_D96      vs bar cost0.5 G4  : n=12918 mean +217.7361 (-5.3079, +423.8901) pct +7.72 (-0.20, +14.32)
+ADD_D96      vs bar tw95 G5     : n=1536056 mean -0.0379 (-0.0522, -0.0221) pct -6.95 (-10.19, -3.85)
+ADD_D96      vs bar tw95 Gs     : n=160367 mean +0.0183 (-0.0151, +0.0520) pct +4.21 (-3.48, +11.43)
+ADD_D96      vs bar tw95 G2     : n=86116 mean +0.0041 (-0.0335, +0.0466) pct +0.78 (-6.45, +8.95)
+ADD_D96      vs bar tw95 G3     : n=35765 mean +0.0355 (+0.0202, +0.0573) pct +34.03 (+18.99, +51.06)
+ADD_D96      vs bar tw95 G4     : n=38486 mean +0.0343 (-0.0776, +0.1353) pct +6.15 (-12.31, +24.07)
+ADD_D96      vs bar cost0.5 G5 without D11 : n=133276 mean +63.8196 (+24.3796, +107.1454) pct +2.76 (+1.08, +4.53)
+ADD_D96      vs bar cost0.5 G5 without D16 : n=157055 mean +53.4480 (+18.2179, +92.6686) pct +1.89 (+0.65, +3.22)
+ADD_D96      vs held-out head cost0.5 G5 odd: n=108596 mean +72.3089 (+27.3928, +120.6275) pct +2.55 (+0.99, +4.14)
+ADD_D96      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D96      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D144     vs bar cost0.5 G5  : n=223226 mean +38.6100 (+9.2204, +69.2701) pct +1.39 (+0.33, +2.46)
+ADD_D144     vs bar cost0.75 G5 : n=223226 mean +16.9839 (-8.3302, +43.3328) pct +1.80 (-0.90, +4.46)
+ADD_D144     vs bar cost0.9 G5  : n=223226 mean +5.6279 (-8.8360, +21.1284) pct +2.03 (-3.38, +7.19)
+ADD_D144     vs bar cost0.5 Gs  : n=47714 mean +78.2981 (-5.6296, +160.2345) pct +2.86 (-0.20, +5.83)
+ADD_D144     vs bar cost0.5 G2  : n=26191 mean -16.3453 (-92.4688, +61.8757) pct -0.58 (-3.25, +2.17)
+ADD_D144     vs bar cost0.5 G3  : n=8605 mean +319.7365 (+170.4009, +441.7822) pct +13.75 (+7.58, +18.70)
+ADD_D144     vs bar cost0.5 G4  : n=12918 mean +109.3577 (-111.8729, +308.0507) pct +3.88 (-4.01, +10.45)
+ADD_D144     vs bar tw95 G5     : n=1536056 mean -0.0433 (-0.0570, -0.0290) pct -7.95 (-10.88, -5.12)
+ADD_D144     vs bar tw95 Gs     : n=160367 mean -0.0009 (-0.0342, +0.0314) pct -0.20 (-7.49, +7.22)
+ADD_D144     vs bar tw95 G2     : n=86116 mean -0.0052 (-0.0388, +0.0336) pct -1.01 (-7.28, +6.42)
+ADD_D144     vs bar tw95 G3     : n=35765 mean +0.0190 (+0.0090, +0.0302) pct +18.24 (+7.70, +29.78)
+ADD_D144     vs bar tw95 G4     : n=38486 mean -0.0096 (-0.1119, +0.0745) pct -1.72 (-16.85, +13.78)
+ADD_D144     vs bar cost0.5 G5 without D11 : n=133276 mean +43.7975 (+5.0437, +84.9197) pct +1.90 (+0.22, +3.63)
+ADD_D144     vs bar cost0.5 G5 without D16 : n=157055 mean +29.5168 (-4.0985, +66.2504) pct +1.04 (-0.15, +2.31)
+ADD_D144     vs held-out head cost0.5 G5 odd: n=108596 mean +52.2127 (+9.6633, +96.0636) pct +1.84 (+0.35, +3.31)
+ADD_D144     vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D144     vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D192     vs bar cost0.5 G5  : n=223226 mean +19.2946 (-8.1741, +46.4220) pct +0.69 (-0.29, +1.66)
+ADD_D192     vs bar cost0.75 G5 : n=223226 mean +4.2915 (-18.2874, +27.2830) pct +0.45 (-1.96, +2.83)
+ADD_D192     vs bar cost0.9 G5  : n=223226 mean +2.8633 (-10.4098, +17.1859) pct +1.03 (-3.98, +5.86)
+ADD_D192     vs bar cost0.5 Gs  : n=47714 mean +10.8866 (-73.7201, +89.9602) pct +0.40 (-2.68, +3.28)
+ADD_D192     vs bar cost0.5 G2  : n=26191 mean -13.2382 (-86.1673, +62.3877) pct -0.47 (-3.03, +2.20)
+ADD_D192     vs bar cost0.5 G3  : n=8605 mean +305.2676 (+170.8922, +421.1494) pct +13.13 (+7.56, +17.82)
+ADD_D192     vs bar cost0.5 G4  : n=12918 mean -136.2953 (-351.1375, +46.7795) pct -4.83 (-12.48, +1.63)
+ADD_D192     vs bar tw95 G5     : n=1536056 mean -0.0462 (-0.0593, -0.0325) pct -8.48 (-11.21, -5.77)
+ADD_D192     vs bar tw95 Gs     : n=160367 mean -0.0128 (-0.0454, +0.0204) pct -2.94 (-9.61, +4.75)
+ADD_D192     vs bar tw95 G2     : n=86116 mean -0.0122 (-0.0456, +0.0264) pct -2.36 (-8.44, +5.09)
+ADD_D192     vs bar tw95 G3     : n=35765 mean +0.0161 (+0.0060, +0.0268) pct +15.39 (+5.20, +26.45)
+ADD_D192     vs bar tw95 G4     : n=38486 mean -0.0410 (-0.1386, +0.0313) pct -7.35 (-20.05, +6.09)
+ADD_D192     vs bar cost0.5 G5 without D11 : n=133276 mean +26.3908 (-7.8643, +61.5728) pct +1.14 (-0.35, +2.65)
+ADD_D192     vs bar cost0.5 G5 without D16 : n=157055 mean +12.5794 (-18.0045, +43.9256) pct +0.44 (-0.64, +1.53)
+ADD_D192     vs held-out head cost0.5 G5 odd: n=108596 mean +21.8219 (-13.8225, +57.7405) pct +0.77 (-0.50, +2.00)
+ADD_D192     vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_D192     vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.0000 (+0.0000, +0.0000) pct +0.00 (+0.00, +0.00)
+ADD_B25      vs bar cost0.5 G5  : n=223226 mean +164.0453 (+113.0930, +219.9758) pct +5.89 (+4.13, +7.74)
+ADD_B25      vs bar cost0.75 G5 : n=223226 mean +94.2360 (+52.5620, +139.3323) pct +9.96 (+5.80, +14.02)
+ADD_B25      vs bar cost0.9 G5  : n=223226 mean +38.6333 (+13.3155, +67.6143) pct +13.96 (+5.42, +21.97)
+ADD_B25      vs bar cost0.5 Gs  : n=47714 mean +451.3507 (+314.6479, +605.1768) pct +16.49 (+11.96, +21.02)
+ADD_B25      vs bar cost0.5 G2  : n=26191 mean +589.2970 (+387.0885, +835.6996) pct +20.81 (+14.73, +27.10)
+ADD_B25      vs bar cost0.5 G3  : n=8605 mean +430.4579 (+264.7110, +566.6352) pct +18.51 (+11.72, +24.18)
+ADD_B25      vs bar cost0.5 G4  : n=12918 mean +185.5841 (-38.0264, +390.2936) pct +6.58 (-1.38, +13.16)
+ADD_B25      vs bar tw95 G5     : n=1536056 mean -0.0272 (-0.0478, -0.0052) pct -4.99 (-9.55, -0.86)
+ADD_B25      vs bar tw95 Gs     : n=160367 mean +0.0926 (+0.0257, +0.1671) pct +21.27 (+6.59, +33.43)
+ADD_B25      vs bar tw95 G2     : n=86116 mean +0.1673 (+0.0732, +0.2743) pct +32.29 (+16.86, +43.33)
+ADD_B25      vs bar tw95 G3     : n=35765 mean +0.0320 (+0.0128, +0.0546) pct +30.65 (+11.66, +49.72)
+ADD_B25      vs bar tw95 G4     : n=38486 mean -0.0183 (-0.1356, +0.0925) pct -3.27 (-22.53, +16.29)
+ADD_B25      vs bar cost0.5 G5 without D11 : n=133276 mean +204.3733 (+127.7041, +293.2110) pct +8.85 (+5.77, +12.05)
+ADD_B25      vs bar cost0.5 G5 without D16 : n=157055 mean +193.0490 (+124.0869, +272.2316) pct +6.82 (+4.53, +9.30)
+ADD_B25      vs held-out head cost0.5 G5 odd: n=108596 mean +182.0659 (+102.7607, +274.2764) pct +6.41 (+3.74, +9.34)
+ADD_B25      vs ADD_PERFECT G1 qs_obs: n=21374852 mean -0.0002 (-0.0004, -0.0000) pct -0.01 (-0.01, -0.00)
+ADD_B25      vs ADD_PERFECT G1 cost0.5: n=3173076 mean -0.0343 (-0.0982, +0.0309) pct -0.00 (-0.00, +0.00)
+ADD_B50      vs bar cost0.5 G5  : n=223226 mean +102.5543 (+60.2635, +148.1419) pct +3.68 (+2.19, +5.24)
+ADD_B50      vs bar cost0.75 G5 : n=223226 mean +74.2215 (+38.9807, +113.1212) pct +7.85 (+4.27, +11.38)
+ADD_B50      vs bar cost0.9 G5  : n=223226 mean +29.4020 (+6.2289, +56.3113) pct +10.63 (+2.54, +18.33)
+ADD_B50      vs bar cost0.5 Gs  : n=47714 mean +271.5897 (+144.8619, +408.3224) pct +9.92 (+5.47, +14.30)
+ADD_B50      vs bar cost0.5 G2  : n=26191 mean +350.8665 (+176.3674, +560.4679) pct +12.39 (+6.68, +18.19)
+ADD_B50      vs bar cost0.5 G3  : n=8605 mean +304.9243 (+147.6460, +431.7243) pct +13.11 (+6.44, +18.40)
+ADD_B50      vs bar cost0.5 G4  : n=12918 mean +88.6524 (-136.4308, +290.4376) pct +3.14 (-4.91, +9.84)
+ADD_B50      vs bar tw95 G5     : n=1536056 mean -0.0432 (-0.0609, -0.0249) pct -7.93 (-12.04, -4.25)
+ADD_B50      vs bar tw95 Gs     : n=160367 mean +0.0367 (-0.0245, +0.0992) pct +8.42 (-6.06, +20.40)
+ADD_B50      vs bar tw95 G2     : n=86116 mean +0.0920 (+0.0078, +0.1775) pct +17.76 (+1.73, +29.05)
+ADD_B50      vs bar tw95 G3     : n=35765 mean +0.0306 (+0.0118, +0.0517) pct +29.35 (+10.20, +48.26)
+ADD_B50      vs bar tw95 G4     : n=38486 mean -0.0816 (-0.2047, +0.0358) pct -14.64 (-36.33, +6.37)
+ADD_B50      vs bar cost0.5 G5 without D11 : n=133276 mean +150.6691 (+83.6257, +222.9968) pct +6.52 (+3.75, +9.28)
+ADD_B50      vs bar cost0.5 G5 without D16 : n=157055 mean +111.8860 (+55.4916, +174.3444) pct +3.96 (+2.01, +5.99)
+ADD_B50      vs held-out head cost0.5 G5 odd: n=108596 mean +128.2698 (+61.2823, +203.2670) pct +4.52 (+2.23, +6.93)
+ADD_B50      vs ADD_PERFECT G1 qs_obs: n=21374852 mean -0.0006 (-0.0015, +0.0000) pct -0.02 (-0.05, +0.00)
+ADD_B50      vs ADD_PERFECT G1 cost0.5: n=3173076 mean -0.0945 (-0.3607, +0.0902) pct -0.00 (-0.01, +0.00)
+ADD_P25      vs bar cost0.5 G5  : n=223226 mean +131.1758 (+86.3248, +180.7642) pct +4.71 (+3.14, +6.37)
+ADD_P25      vs bar cost0.75 G5 : n=223226 mean +88.4604 (+45.1410, +136.4041) pct +9.35 (+4.98, +13.71)
+ADD_P25      vs bar cost0.9 G5  : n=223226 mean +36.4709 (+8.7111, +68.2803) pct +13.18 (+3.58, +21.99)
+ADD_P25      vs bar cost0.5 Gs  : n=47714 mean +348.7442 (+175.4148, +535.2461) pct +12.74 (+6.67, +18.64)
+ADD_P25      vs bar cost0.5 G2  : n=26191 mean +469.4954 (+210.5040, +760.4215) pct +16.58 (+7.96, +24.69)
+ADD_P25      vs bar cost0.5 G3  : n=8605 mean +350.9705 (+112.3856, +536.9124) pct +15.09 (+5.04, +22.83)
+ADD_P25      vs bar cost0.5 G4  : n=12918 mean +102.4403 (-137.4969, +324.1665) pct +3.63 (-4.92, +10.97)
+ADD_P25      vs bar tw95 G5     : n=1536056 mean -0.0454 (-0.0668, -0.0227) pct -8.33 (-13.47, -3.82)
+ADD_P25      vs bar tw95 Gs     : n=160367 mean +0.0612 (-0.0168, +0.1512) pct +14.06 (-4.28, +29.98)
+ADD_P25      vs bar tw95 G2     : n=86116 mean +0.1303 (+0.0153, +0.2642) pct +25.15 (+3.63, +41.52)
+ADD_P25      vs bar tw95 G3     : n=35765 mean +0.0283 (+0.0048, +0.0522) pct +27.10 (+4.21, +48.66)
+ADD_P25      vs bar tw95 G4     : n=38486 mean -0.0628 (-0.1848, +0.0561) pct -11.26 (-33.19, +9.58)
+ADD_P25      vs bar cost0.5 G5 without D11 : n=133276 mean +161.6861 (+94.7193, +235.5322) pct +7.00 (+4.25, +9.80)
+ADD_P25      vs bar cost0.5 G5 without D16 : n=157055 mean +152.2562 (+90.8011, +218.9423) pct +5.38 (+3.27, +7.53)
+ADD_P25      vs held-out head cost0.5 G5 odd: n=108596 mean +133.5341 (+67.0006, +206.7031) pct +4.70 (+2.41, +7.05)
+ADD_P25      vs ADD_PERFECT G1 qs_obs: n=21374852 mean -0.0008 (-0.0018, -0.0001) pct -0.03 (-0.06, -0.00)
+ADD_P25      vs ADD_PERFECT G1 cost0.5: n=3173076 mean -0.1608 (-0.3303, -0.0187) pct -0.01 (-0.01, -0.00)
+ADD_M25      vs bar cost0.5 G5  : n=223226 mean +181.7526 (+130.5012, +239.5241) pct +6.53 (+4.78, +8.43)
+ADD_M25      vs bar cost0.75 G5 : n=223226 mean +105.1077 (+64.3401, +150.4065) pct +11.11 (+7.14, +15.10)
+ADD_M25      vs bar cost0.9 G5  : n=223226 mean +42.2964 (+18.6033, +69.3503) pct +15.29 (+7.49, +22.54)
+ADD_M25      vs bar cost0.5 Gs  : n=47714 mean +464.7951 (+336.5962, +611.0234) pct +16.98 (+12.79, +21.20)
+ADD_M25      vs bar cost0.5 G2  : n=26191 mean +573.7627 (+379.3427, +815.6162) pct +20.26 (+14.46, +26.33)
+ADD_M25      vs bar cost0.5 G3  : n=8605 mean +426.8594 (+302.2328, +539.1599) pct +18.35 (+13.29, +22.93)
+ADD_M25      vs bar cost0.5 G4  : n=12918 mean +269.1353 (+52.0654, +459.7317) pct +9.54 (+1.88, +15.54)
+ADD_M25      vs bar tw95 G5     : n=1536056 mean -0.0056 (-0.0236, +0.0144) pct -1.03 (-4.72, +2.43)
+ADD_M25      vs bar tw95 Gs     : n=160367 mean +0.1375 (+0.0818, +0.2038) pct +31.57 (+20.18, +40.63)
+ADD_M25      vs bar tw95 G2     : n=86116 mean +0.2118 (+0.1346, +0.3066) pct +40.86 (+32.04, +47.48)
+ADD_M25      vs bar tw95 G3     : n=35765 mean +0.0382 (+0.0263, +0.0588) pct +36.60 (+25.46, +50.63)
+ADD_M25      vs bar tw95 G4     : n=38486 mean +0.0634 (-0.0427, +0.1524) pct +11.36 (-6.28, +26.97)
+ADD_M25      vs bar cost0.5 G5 without D11 : n=133276 mean +223.5789 (+146.3143, +310.1618) pct +9.68 (+6.62, +12.83)
+ADD_M25      vs bar cost0.5 G5 without D16 : n=157055 mean +207.2864 (+137.3080, +285.2713) pct +7.33 (+5.00, +9.77)
+ADD_M25      vs held-out head cost0.5 G5 odd: n=108596 mean +194.0571 (+113.8202, +286.6897) pct +6.84 (+4.15, +9.72)
+ADD_M25      vs ADD_PERFECT G1 qs_obs: n=21374852 mean +0.0005 (-0.0000, +0.0012) pct +0.02 (-0.00, +0.04)
+ADD_M25      vs ADD_PERFECT G1 cost0.5: n=3173076 mean +0.1066 (-0.0099, +0.2427) pct +0.00 (-0.00, +0.01)
+ADD_P75      vs bar cost0.5 G5  : n=223226 mean +168.8866 (+115.7418, +224.8327) pct +6.07 (+4.24, +7.93)
+ADD_P75      vs bar cost0.75 G5 : n=223226 mean +105.1616 (+60.7212, +153.9709) pct +11.12 (+6.71, +15.40)
+ADD_P75      vs bar cost0.9 G5  : n=223226 mean +43.9239 (+16.1629, +75.6420) pct +15.87 (+6.62, +24.40)
+ADD_P75      vs bar cost0.5 Gs  : n=47714 mean +450.8504 (+300.6183, +621.4412) pct +16.47 (+11.42, +21.56)
+ADD_P75      vs bar cost0.5 G2  : n=26191 mean +573.8062 (+340.3653, +848.9488) pct +20.27 (+12.86, +27.51)
+ADD_P75      vs bar cost0.5 G3  : n=8605 mean +421.7840 (+257.4914, +567.1484) pct +18.13 (+11.38, +24.06)
+ADD_P75      vs bar cost0.5 G4  : n=12918 mean +220.9218 (-0.2534, +422.9952) pct +7.83 (-0.01, +14.34)
+ADD_P75      vs bar tw95 G5     : n=1536056 mean -0.0164 (-0.0363, +0.0058) pct -3.01 (-7.31, +0.98)
+ADD_P75      vs bar tw95 Gs     : n=160367 mean +0.1257 (+0.0586, +0.2070) pct +28.86 (+14.96, +41.29)
+ADD_P75      vs bar tw95 G2     : n=86116 mean +0.2028 (+0.1026, +0.3261) pct +39.13 (+24.23, +50.43)
+ADD_P75      vs bar tw95 G3     : n=35765 mean +0.0356 (+0.0204, +0.0574) pct +34.06 (+18.97, +50.87)
+ADD_P75      vs bar tw95 G4     : n=38486 mean +0.0368 (-0.0755, +0.1407) pct +6.61 (-11.87, +24.87)
+ADD_P75      vs bar cost0.5 G5 without D11 : n=133276 mean +204.0222 (+126.9238, +292.1081) pct +8.84 (+5.70, +12.10)
+ADD_P75      vs bar cost0.5 G5 without D16 : n=157055 mean +195.2123 (+126.1686, +275.0513) pct +6.90 (+4.58, +9.40)
+ADD_P75      vs held-out head cost0.5 G5 odd: n=108596 mean +176.5624 (+99.7696, +266.3283) pct +6.22 (+3.62, +9.03)
+ADD_P75      vs ADD_PERFECT G1 qs_obs: n=21374852 mean -0.0232 (-0.0275, -0.0190) pct -0.86 (-1.05, -0.68)
+ADD_P75      vs ADD_PERFECT G1 cost0.5: n=3173076 mean -14.9412 (-18.7902, -11.4861) pct -0.56 (-0.72, -0.41)
+ADD_P50      vs bar cost0.5 G5  : n=223226 mean +162.0259 (+109.1983, +219.2670) pct +5.82 (+3.99, +7.72)
+ADD_P50      vs bar cost0.75 G5 : n=223226 mean +97.8151 (+52.3473, +147.7213) pct +10.34 (+5.81, +14.81)
+ADD_P50      vs bar cost0.9 G5  : n=223226 mean +40.2635 (+12.4937, +72.0999) pct +14.55 (+4.99, +23.47)
+ADD_P50      vs bar cost0.5 Gs  : n=47714 mean +451.1693 (+297.9885, +619.9228) pct +16.48 (+11.33, +21.52)
+ADD_P50      vs bar cost0.5 G2  : n=26191 mean +574.3179 (+341.5803, +857.6395) pct +20.28 (+12.96, +27.72)
+ADD_P50      vs bar cost0.5 G3  : n=8605 mean +423.0185 (+257.8197, +564.6995) pct +18.19 (+11.42, +24.03)
+ADD_P50      vs bar cost0.5 G4  : n=12918 mean +220.2399 (-5.3607, +421.9855) pct +7.80 (-0.20, +14.27)
+ADD_P50      vs bar tw95 G5     : n=1536056 mean -0.0304 (-0.0523, -0.0067) pct -5.58 (-10.36, -1.15)
+ADD_P50      vs bar tw95 Gs     : n=160367 mean +0.1245 (+0.0566, +0.2067) pct +28.60 (+14.52, +41.05)
+ADD_P50      vs bar tw95 G2     : n=86116 mean +0.2014 (+0.1020, +0.3261) pct +38.86 (+23.99, +50.39)
+ADD_P50      vs bar tw95 G3     : n=35765 mean +0.0355 (+0.0203, +0.0570) pct +33.95 (+18.70, +50.66)
+ADD_P50      vs bar tw95 G4     : n=38486 mean +0.0353 (-0.0772, +0.1394) pct +6.32 (-12.29, +24.56)
+ADD_P50      vs bar cost0.5 G5 without D11 : n=133276 mean +202.2007 (+126.0570, +290.0147) pct +8.76 (+5.68, +11.98)
+ADD_P50      vs bar cost0.5 G5 without D16 : n=157055 mean +187.5326 (+117.2954, +267.5591) pct +6.63 (+4.25, +9.17)
+ADD_P50      vs held-out head cost0.5 G5 odd: n=108596 mean +168.8607 (+92.2144, +257.2954) pct +5.95 (+3.35, +8.74)
+ADD_P50      vs ADD_PERFECT G1 qs_obs: n=21374852 mean -0.0688 (-0.0778, -0.0593) pct -2.54 (-2.99, -2.08)
+ADD_P50      vs ADD_PERFECT G1 cost0.5: n=3173076 mean -42.4014 (-49.5510, -35.1709) pct -1.58 (-2.00, -1.22)
+ADD_MIX      vs bar cost0.5 G5  : n=223226 mean +39.5807 (+1.7799, +77.5600) pct +1.42 (+0.06, +2.76)
+ADD_MIX      vs bar cost0.75 G5 : n=223226 mean +32.1803 (+2.8904, +63.6346) pct +3.40 (+0.31, +6.51)
+ADD_MIX      vs bar cost0.9 G5  : n=223226 mean +21.5980 (+2.9728, +42.7781) pct +7.81 (+1.15, +14.17)
+ADD_MIX      vs bar cost0.5 Gs  : n=47714 mean +84.7556 (-35.4512, +211.0587) pct +3.10 (-1.32, +7.48)
+ADD_MIX      vs bar cost0.5 G2  : n=26191 mean +229.6690 (+83.7933, +398.8913) pct +8.11 (+3.11, +13.25)
+ADD_MIX      vs bar cost0.5 G3  : n=8605 mean +308.6402 (+142.4387, +450.0428) pct +13.27 (+6.27, +19.15)
+ADD_MIX      vs bar cost0.5 G4  : n=12918 mean -358.1886 (-609.2251, -132.7147) pct -12.69 (-21.57, -4.69)
+ADD_MIX      vs bar tw95 G5     : n=1536056 mean -0.0313 (-0.0470, -0.0139) pct -5.76 (-9.18, -2.42)
+ADD_MIX      vs bar tw95 Gs     : n=160367 mean +0.0378 (-0.0125, +0.0959) pct +8.69 (-2.99, +19.77)
+ADD_MIX      vs bar tw95 G2     : n=86116 mean +0.0812 (+0.0126, +0.1640) pct +15.66 (+2.76, +26.81)
+ADD_MIX      vs bar tw95 G3     : n=35765 mean +0.0194 (+0.0044, +0.0346) pct +18.57 (+3.75, +33.84)
+ADD_MIX      vs bar tw95 G4     : n=38486 mean -0.0419 (-0.1393, +0.0331) pct -7.52 (-20.55, +6.54)
+ADD_MIX      vs bar cost0.5 G5 without D11 : n=133276 mean +72.3951 (+28.6884, +120.1822) pct +3.14 (+1.26, +5.11)
+ADD_MIX      vs bar cost0.5 G5 without D16 : n=157055 mean +35.2612 (-12.4325, +82.3009) pct +1.25 (-0.44, +2.87)
+ADD_MIX      vs held-out head cost0.5 G5 odd: n=108596 mean +19.5762 (-30.6334, +66.4051) pct +0.69 (-1.09, +2.31)
+ADD_MIX      vs ADD_PERFECT G1 qs_obs: n=21374852 mean -0.0125 (-0.0173, -0.0085) pct -0.46 (-0.64, -0.31)
+ADD_MIX      vs ADD_PERFECT G1 cost0.5: n=3173076 mean -5.8158 (-8.2556, -3.5009) pct -0.22 (-0.32, -0.13)
+=== reference arms against the bar
+K0           vs bar cost0.5 G5: n=223226 mean -56.7985 (-88.4758, -26.8290) pct -2.04 (-3.18, -0.96)
+K0           vs bar tw95 G5: n=1536056 mean -0.0550 (-0.0651, -0.0456) pct -10.09 (-11.81, -8.53)
+K0           vs bar cost0.5 Gs: n=47714 mean -201.6416 (-277.2653, -128.2174) pct -7.37 (-10.11, -4.67)
+K0           vs bar G1 qs_obs: n=21374852 mean -0.0455 (-0.1510, +0.0242) pct -1.71 (-5.49, +0.93)
+K0           vs bar G1 cost0.5: n=3173076 mean +78.8403 (+17.4773, +142.0046) pct +2.85 (+0.62, +5.34)
+ADD_PERFECT  vs bar cost0.5 G5: n=223226 mean +174.4544 (+123.3387, +230.9507) pct +6.27 (+4.51, +8.12)
+ADD_PERFECT  vs bar tw95 G5: n=1536056 mean -0.0155 (-0.0357, +0.0068) pct -2.84 (-7.21, +1.16)
+ADD_PERFECT  vs bar cost0.5 Gs: n=47714 mean +450.4517 (+298.8956, +619.0581) pct +16.45 (+11.35, +21.55)
+ADD_PERFECT  vs bar G1 qs_obs: n=21374852 mean -0.0459 (-0.1497, +0.0240) pct -1.72 (-5.46, +0.93)
+ADD_PERFECT  vs bar G1 cost0.5: n=3173076 mean +78.6083 (+18.8449, +142.3071) pct +2.84 (+0.66, +5.34)
+=== heads against the base head of the same mode (gain = base minus head)
+HEAD_PIT_cross       vs HEAD_BASE_cross [all months] tw95 G5: n=1536056 mean -0.0014 (-0.0044, +0.0013) pct -0.26 (-0.81, +0.24)
+HEAD_PIT_cross       vs HEAD_BASE_cross [all months] cost0.5 G5: n=223226 mean +25.3619 (+11.1964, +41.9258) pct +0.91 (+0.40, +1.49)
+HEAD_PIT_cross       vs HEAD_BASE_cross [all months] tw95 Gs: n=160367 mean +0.0023 (-0.0079, +0.0141) pct +0.54 (-1.91, +3.14)
+HEAD_PIT_cross       vs HEAD_BASE_cross [all months] tw95 G4: n=38486 mean -0.0064 (-0.0228, +0.0097) pct -1.16 (-4.16, +1.92)
+HEAD_PIT_cross       vs HEAD_BASE_cross [all months] cost0.5 Gs: n=47714 mean +43.9655 (+12.5515, +83.9087) pct +1.61 (+0.47, +2.97)
+HEAD_PIT_cross       vs HEAD_BASE_cross [all months] G1 qs: n=21374852 mean -0.0076 (-0.0237, +0.0093) pct -0.29 (-0.91, +0.34)
+HEAD_PIT_cross       vs HEAD_BASE_cross [even origin months] tw95 G5: n=831107 mean -0.0009 (-0.0057, +0.0036) pct -0.23 (-1.52, +0.89)
+HEAD_PIT_cross       vs HEAD_BASE_cross [even origin months] cost0.5 G5: n=121054 mean +40.7361 (+18.8510, +68.4176) pct +1.64 (+0.77, +2.69)
+HEAD_PIT_cross       vs HEAD_BASE_cross [even origin months] tw95 Gs: n=79164 mean +0.0045 (-0.0149, +0.0274) pct +1.64 (-5.64, +8.45)
+HEAD_PIT_cross       vs HEAD_BASE_cross [even origin months] tw95 G4: n=17791 mean -0.0138 (-0.0458, +0.0175) pct -4.38 (-15.90, +5.40)
+HEAD_PIT_cross       vs HEAD_BASE_cross [even origin months] cost0.5 Gs: n=24917 mean +69.3735 (+19.8897, +134.2492) pct +2.94 (+0.88, +5.45)
+HEAD_PIT_cross       vs HEAD_BASE_cross [even origin months] G1 qs: n=15162288 mean -0.0101 (-0.0337, +0.0140) pct -0.39 (-1.32, +0.53)
+HEAD_IND_cross       vs HEAD_BASE_cross [all months] tw95 G5: n=1536056 mean +0.0020 (+0.0005, +0.0033) pct +0.36 (+0.08, +0.60)
+HEAD_IND_cross       vs HEAD_BASE_cross [all months] cost0.5 G5: n=223226 mean +5.2717 (+0.5701, +11.6556) pct +0.19 (+0.02, +0.41)
+HEAD_IND_cross       vs HEAD_BASE_cross [all months] tw95 Gs: n=160367 mean +0.0146 (+0.0094, +0.0204) pct +3.36 (+2.11, +4.77)
+HEAD_IND_cross       vs HEAD_BASE_cross [all months] tw95 G4: n=38486 mean +0.0013 (-0.0021, +0.0047) pct +0.24 (-0.38, +0.94)
+HEAD_IND_cross       vs HEAD_BASE_cross [all months] cost0.5 Gs: n=47714 mean +24.8185 (+7.3628, +51.7799) pct +0.91 (+0.27, +1.83)
+HEAD_IND_cross       vs HEAD_BASE_cross [all months] G1 qs: n=21374852 mean -0.0006 (-0.0039, +0.0018) pct -0.02 (-0.14, +0.07)
+HEAD_IND_cross       vs HEAD_BASE_cross [even origin months] tw95 G5: n=831107 mean +0.0018 (-0.0009, +0.0041) pct +0.47 (-0.22, +1.07)
+HEAD_IND_cross       vs HEAD_BASE_cross [even origin months] cost0.5 G5: n=121054 mean +3.7011 (-0.7406, +8.8036) pct +0.15 (-0.03, +0.35)
+HEAD_IND_cross       vs HEAD_BASE_cross [even origin months] tw95 Gs: n=79164 mean +0.0140 (+0.0059, +0.0229) pct +5.08 (+1.81, +9.32)
+HEAD_IND_cross       vs HEAD_BASE_cross [even origin months] tw95 G4: n=17791 mean +0.0011 (-0.0052, +0.0067) pct +0.35 (-1.47, +2.56)
+HEAD_IND_cross       vs HEAD_BASE_cross [even origin months] cost0.5 Gs: n=24917 mean +19.2516 (+6.5372, +33.2270) pct +0.82 (+0.28, +1.39)
+HEAD_IND_cross       vs HEAD_BASE_cross [even origin months] G1 qs: n=15162288 mean -0.0005 (-0.0052, +0.0028) pct -0.02 (-0.20, +0.11)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [all months] tw95 G5: n=1536056 mean +0.0001 (-0.0024, +0.0024) pct +0.02 (-0.45, +0.44)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [all months] cost0.5 G5: n=223226 mean +35.8962 (+17.6825, +57.8209) pct +1.29 (+0.64, +2.06)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [all months] tw95 Gs: n=160367 mean +0.0146 (+0.0050, +0.0249) pct +3.36 (+1.18, +5.54)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [all months] tw95 G4: n=38486 mean -0.0067 (-0.0225, +0.0071) pct -1.20 (-4.14, +1.40)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [all months] cost0.5 Gs: n=47714 mean +71.5584 (+35.7140, +115.7535) pct +2.61 (+1.33, +4.10)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [all months] G1 qs: n=21374852 mean -0.0086 (-0.0246, +0.0076) pct -0.32 (-0.94, +0.28)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [even origin months] tw95 G5: n=831107 mean +0.0010 (-0.0030, +0.0044) pct +0.25 (-0.78, +1.10)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [even origin months] cost0.5 G5: n=121054 mean +55.6415 (+26.2014, +91.6008) pct +2.25 (+1.08, +3.59)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [even origin months] tw95 Gs: n=79164 mean +0.0190 (+0.0022, +0.0374) pct +6.87 (+0.79, +12.22)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [even origin months] tw95 G4: n=17791 mean -0.0157 (-0.0464, +0.0110) pct -4.98 (-16.16, +3.47)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [even origin months] cost0.5 Gs: n=24917 mean +102.4358 (+48.4649, +169.9032) pct +4.34 (+2.14, +6.86)
+HEAD_PIT_IND_cross   vs HEAD_BASE_cross [even origin months] G1 qs: n=15162288 mean -0.0112 (-0.0346, +0.0121) pct -0.43 (-1.36, +0.46)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [all months] tw95 G5: n=1536056 mean +0.0090 (+0.0053, +0.0148) pct +1.66 (+1.03, +2.59)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [all months] cost0.5 G5: n=223226 mean +25.6955 (+9.5856, +47.9223) pct +0.92 (+0.35, +1.69)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [all months] tw95 Gs: n=160367 mean +0.0491 (+0.0340, +0.0673) pct +11.28 (+8.18, +14.61)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [all months] tw95 G4: n=38486 mean +0.0077 (+0.0011, +0.0181) pct +1.38 (+0.20, +3.40)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [all months] cost0.5 Gs: n=47714 mean +56.6525 (+26.7613, +99.6834) pct +2.07 (+1.00, +3.51)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [all months] G1 qs: n=21374852 mean +0.0002 (-0.0030, +0.0029) pct +0.01 (-0.11, +0.11)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [even origin months] tw95 G5: n=831107 mean +0.0113 (+0.0048, +0.0217) pct +2.93 (+1.45, +4.95)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [even origin months] cost0.5 G5: n=121054 mean +37.4223 (+11.1074, +76.4884) pct +1.51 (+0.46, +3.00)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [even origin months] tw95 Gs: n=79164 mean +0.0454 (+0.0274, +0.0687) pct +16.41 (+11.20, +21.43)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [even origin months] tw95 G4: n=17791 mean +0.0130 (+0.0008, +0.0351) pct +4.13 (+0.29, +9.87)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [even origin months] cost0.5 Gs: n=24917 mean +64.6996 (+34.9300, +99.5747) pct +2.74 (+1.52, +4.13)
+HEAD_IND_MW_cross    vs HEAD_BASE_cross [even origin months] G1 qs: n=15162288 mean +0.0005 (-0.0043, +0.0041) pct +0.02 (-0.16, +0.16)
+HEAD_PIT_held        vs HEAD_BASE_held [all months] tw95 G5: n=746955 mean -0.0033 (-0.0073, +0.0002) pct -0.60 (-1.32, +0.03)
+HEAD_PIT_held        vs HEAD_BASE_held [all months] cost0.5 G5: n=108596 mean +19.7355 (+4.6813, +36.1476) pct +0.70 (+0.16, +1.27)
+HEAD_PIT_held        vs HEAD_BASE_held [all months] tw95 Gs: n=70295 mean -0.0105 (-0.0253, +0.0001) pct -2.13 (-5.41, +0.01)
+HEAD_PIT_held        vs HEAD_BASE_held [all months] tw95 G4: n=17059 mean -0.0187 (-0.0525, +0.0062) pct -2.48 (-8.16, +1.14)
+HEAD_PIT_held        vs HEAD_BASE_held [all months] cost0.5 Gs: n=21807 mean +17.0411 (-3.7562, +40.1711) pct +0.61 (-0.14, +1.41)
+HEAD_PIT_held        vs HEAD_BASE_held [all months] G1 qs: n=10788596 mean -0.0145 (-0.0380, +0.0102) pct -0.54 (-1.44, +0.37)
+HEAD_PIT_held        vs HEAD_BASE_held [even origin months] tw95 G5: n=406477 mean -0.0053 (-0.0118, -0.0000) pct -1.40 (-2.92, -0.02)
+HEAD_PIT_held        vs HEAD_BASE_held [even origin months] cost0.5 G5: n=59436 mean +33.7307 (+12.7547, +57.3647) pct +1.37 (+0.53, +2.27)
+HEAD_PIT_held        vs HEAD_BASE_held [even origin months] tw95 Gs: n=32067 mean -0.0177 (-0.0455, -0.0004) pct -6.64 (-16.87, -0.18)
+HEAD_PIT_held        vs HEAD_BASE_held [even origin months] tw95 G4: n=7691 mean -0.0410 (-0.1100, +0.0009) pct -12.47 (-44.09, +0.47)
+HEAD_PIT_held        vs HEAD_BASE_held [even origin months] cost0.5 Gs: n=10957 mean +24.5978 (-4.7179, +56.9185) pct +1.07 (-0.22, +2.42)
+HEAD_PIT_held        vs HEAD_BASE_held [even origin months] G1 qs: n=7645592 mean -0.0199 (-0.0531, +0.0152) pct -0.77 (-2.06, +0.58)
+HEAD_IND_held        vs HEAD_BASE_held [all months] tw95 G5: n=746955 mean +0.0015 (+0.0007, +0.0024) pct +0.28 (+0.13, +0.43)
+HEAD_IND_held        vs HEAD_BASE_held [all months] cost0.5 G5: n=108596 mean +3.2806 (-1.1575, +9.4333) pct +0.12 (-0.04, +0.33)
+HEAD_IND_held        vs HEAD_BASE_held [all months] tw95 Gs: n=70295 mean +0.0136 (+0.0072, +0.0217) pct +2.77 (+1.54, +4.48)
+HEAD_IND_held        vs HEAD_BASE_held [all months] tw95 G4: n=17059 mean +0.0003 (-0.0026, +0.0030) pct +0.04 (-0.41, +0.49)
+HEAD_IND_held        vs HEAD_BASE_held [all months] cost0.5 Gs: n=21807 mean +16.8326 (-0.7452, +47.4385) pct +0.61 (-0.03, +1.58)
+HEAD_IND_held        vs HEAD_BASE_held [all months] G1 qs: n=10788596 mean -0.0001 (-0.0049, +0.0038) pct -0.01 (-0.19, +0.14)
+HEAD_IND_held        vs HEAD_BASE_held [even origin months] tw95 G5: n=406477 mean +0.0016 (+0.0003, +0.0031) pct +0.42 (+0.09, +0.80)
+HEAD_IND_held        vs HEAD_BASE_held [even origin months] cost0.5 G5: n=59436 mean +1.3106 (-3.7165, +6.0569) pct +0.05 (-0.16, +0.24)
+HEAD_IND_held        vs HEAD_BASE_held [even origin months] tw95 Gs: n=32067 mean +0.0159 (+0.0053, +0.0300) pct +5.98 (+2.13, +10.82)
+HEAD_IND_held        vs HEAD_BASE_held [even origin months] tw95 G4: n=7691 mean -0.0000 (-0.0058, +0.0046) pct -0.01 (-2.34, +2.01)
+HEAD_IND_held        vs HEAD_BASE_held [even origin months] cost0.5 Gs: n=10957 mean +7.0715 (-5.7164, +20.4796) pct +0.31 (-0.25, +0.88)
+HEAD_IND_held        vs HEAD_BASE_held [even origin months] G1 qs: n=7645592 mean -0.0001 (-0.0068, +0.0055) pct -0.00 (-0.26, +0.21)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [all months] tw95 G5: n=746955 mean -0.0014 (-0.0051, +0.0018) pct -0.25 (-0.93, +0.34)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [all months] cost0.5 G5: n=108596 mean +23.0148 (+7.3159, +40.2859) pct +0.81 (+0.25, +1.42)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [all months] tw95 Gs: n=70295 mean +0.0025 (-0.0124, +0.0149) pct +0.51 (-2.69, +3.19)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [all months] tw95 G4: n=17059 mean -0.0167 (-0.0499, +0.0078) pct -2.22 (-7.69, +1.42)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [all months] cost0.5 Gs: n=21807 mean +30.4953 (+3.1369, +66.0836) pct +1.10 (+0.12, +2.23)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [all months] G1 qs: n=10788596 mean -0.0167 (-0.0373, +0.0034) pct -0.63 (-1.42, +0.13)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [even origin months] tw95 G5: n=406477 mean -0.0029 (-0.0087, +0.0015) pct -0.77 (-2.24, +0.47)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [even origin months] cost0.5 G5: n=59436 mean +35.8004 (+14.5923, +59.5504) pct +1.45 (+0.61, +2.35)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [even origin months] tw95 Gs: n=32067 mean +0.0009 (-0.0263, +0.0227) pct +0.34 (-9.88, +8.93)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [even origin months] tw95 G4: n=7691 mean -0.0393 (-0.1069, +0.0016) pct -11.95 (-41.88, +0.80)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [even origin months] cost0.5 Gs: n=10957 mean +37.4105 (+5.3931, +71.9748) pct +1.63 (+0.24, +3.06)
+HEAD_PIT_IND_held    vs HEAD_BASE_held [even origin months] G1 qs: n=7645592 mean -0.0229 (-0.0525, +0.0064) pct -0.88 (-2.03, +0.25)
+HEAD_IND_MW_held     vs HEAD_BASE_held [all months] tw95 G5: n=746955 mean +0.0047 (+0.0028, +0.0069) pct +0.86 (+0.56, +1.19)
+HEAD_IND_MW_held     vs HEAD_BASE_held [all months] cost0.5 G5: n=108596 mean +9.0374 (+2.2101, +18.7960) pct +0.32 (+0.08, +0.65)
+HEAD_IND_MW_held     vs HEAD_BASE_held [all months] tw95 Gs: n=70295 mean +0.0386 (+0.0221, +0.0607) pct +7.88 (+4.84, +11.72)
+HEAD_IND_MW_held     vs HEAD_BASE_held [all months] tw95 G4: n=17059 mean +0.0023 (-0.0010, +0.0061) pct +0.31 (-0.16, +0.90)
+HEAD_IND_MW_held     vs HEAD_BASE_held [all months] cost0.5 Gs: n=21807 mean +36.3756 (+9.3351, +83.8592) pct +1.31 (+0.35, +2.81)
+HEAD_IND_MW_held     vs HEAD_BASE_held [all months] G1 qs: n=10788596 mean -0.0007 (-0.0055, +0.0034) pct -0.03 (-0.21, +0.13)
+HEAD_IND_MW_held     vs HEAD_BASE_held [even origin months] tw95 G5: n=406477 mean +0.0035 (+0.0019, +0.0053) pct +0.94 (+0.56, +1.36)
+HEAD_IND_MW_held     vs HEAD_BASE_held [even origin months] cost0.5 G5: n=59436 mean +5.7692 (-0.9138, +13.1488) pct +0.23 (-0.04, +0.51)
+HEAD_IND_MW_held     vs HEAD_BASE_held [even origin months] tw95 Gs: n=32067 mean +0.0288 (+0.0145, +0.0488) pct +10.81 (+5.74, +17.43)
+HEAD_IND_MW_held     vs HEAD_BASE_held [even origin months] tw95 G4: n=7691 mean +0.0005 (-0.0046, +0.0049) pct +0.16 (-1.79, +2.18)
+HEAD_IND_MW_held     vs HEAD_BASE_held [even origin months] cost0.5 Gs: n=10957 mean +16.6074 (+0.7782, +34.0049) pct +0.72 (+0.03, +1.46)
+HEAD_IND_MW_held     vs HEAD_BASE_held [even origin months] G1 qs: n=7645592 mean -0.0009 (-0.0077, +0.0049) pct -0.03 (-0.30, +0.19)
+HEAD_PIT_size        vs HEAD_BASE_size [all months] tw95 G5: n=780249 mean -0.0013 (-0.0047, +0.0016) pct -0.21 (-0.74, +0.26)
+HEAD_PIT_size        vs HEAD_BASE_size [all months] cost0.5 G5: n=113229 mean +21.9495 (+5.5637, +39.3985) pct +0.74 (+0.18, +1.35)
+HEAD_PIT_size        vs HEAD_BASE_size [all months] tw95 Gs: n=78425 mean -0.0016 (-0.0136, +0.0086) pct -0.32 (-2.76, +1.77)
+HEAD_PIT_size        vs HEAD_BASE_size [all months] tw95 G4: n=19629 mean -0.0070 (-0.0339, +0.0142) pct -1.06 (-5.40, +2.94)
+HEAD_PIT_size        vs HEAD_BASE_size [all months] cost0.5 Gs: n=23777 mean +26.1120 (-11.7863, +77.7244) pct +0.89 (-0.40, +2.61)
+HEAD_PIT_size        vs HEAD_BASE_size [all months] G1 qs: n=21374852 mean -0.0043 (-0.0218, +0.0155) pct -0.16 (-0.83, +0.57)
+HEAD_PIT_size        vs HEAD_BASE_size [even origin months] tw95 G5: n=398214 mean -0.0020 (-0.0069, +0.0020) pct -0.49 (-1.70, +0.56)
+HEAD_PIT_size        vs HEAD_BASE_size [even origin months] cost0.5 G5: n=58148 mean +37.8749 (+14.5153, +63.7364) pct +1.51 (+0.58, +2.55)
+HEAD_PIT_size        vs HEAD_BASE_size [even origin months] tw95 Gs: n=36184 mean -0.0028 (-0.0231, +0.0132) pct -1.22 (-10.61, +5.12)
+HEAD_PIT_size        vs HEAD_BASE_size [even origin months] tw95 G4: n=8556 mean -0.0264 (-0.0772, +0.0062) pct -14.06 (-42.22, +3.23)
+HEAD_PIT_size        vs HEAD_BASE_size [even origin months] cost0.5 Gs: n=11749 mean +64.8401 (+3.8435, +154.9401) pct +2.73 (+0.17, +6.18)
+HEAD_PIT_size        vs HEAD_BASE_size [even origin months] G1 qs: n=15162288 mean -0.0069 (-0.0316, +0.0207) pct -0.26 (-1.23, +0.78)
+HEAD_IND_MW_size     vs HEAD_BASE_size [all months] tw95 G5: n=780249 mean +0.0032 (+0.0020, +0.0046) pct +0.51 (+0.34, +0.69)
+HEAD_IND_MW_size     vs HEAD_BASE_size [all months] cost0.5 G5: n=113229 mean +1.7375 (-2.8576, +9.2276) pct +0.06 (-0.10, +0.31)
+HEAD_IND_MW_size     vs HEAD_BASE_size [all months] tw95 Gs: n=78425 mean +0.0246 (+0.0145, +0.0375) pct +4.87 (+3.05, +7.01)
+HEAD_IND_MW_size     vs HEAD_BASE_size [all months] tw95 G4: n=19629 mean +0.0016 (+0.0001, +0.0031) pct +0.24 (+0.02, +0.62)
+HEAD_IND_MW_size     vs HEAD_BASE_size [all months] cost0.5 Gs: n=23777 mean +11.8162 (-6.7325, +47.0528) pct +0.40 (-0.24, +1.51)
+HEAD_IND_MW_size     vs HEAD_BASE_size [all months] G1 qs: n=21374852 mean -0.0000 (-0.0024, +0.0023) pct -0.00 (-0.09, +0.08)
+HEAD_IND_MW_size     vs HEAD_BASE_size [even origin months] tw95 G5: n=398214 mean +0.0023 (+0.0013, +0.0034) pct +0.57 (+0.32, +0.90)
+HEAD_IND_MW_size     vs HEAD_BASE_size [even origin months] cost0.5 G5: n=58148 mean -2.6351 (-6.1075, +0.0921) pct -0.10 (-0.25, +0.00)
+HEAD_IND_MW_size     vs HEAD_BASE_size [even origin months] tw95 Gs: n=36184 mean +0.0137 (+0.0067, +0.0233) pct +5.91 (+2.95, +9.78)
+HEAD_IND_MW_size     vs HEAD_BASE_size [even origin months] tw95 G4: n=8556 mean +0.0026 (-0.0005, +0.0061) pct +1.39 (-0.30, +2.84)
+HEAD_IND_MW_size     vs HEAD_BASE_size [even origin months] cost0.5 Gs: n=11749 mean -4.3888 (-13.7036, +3.5882) pct -0.18 (-0.57, +0.16)
+HEAD_IND_MW_size     vs HEAD_BASE_size [even origin months] G1 qs: n=15162288 mean +0.0001 (-0.0035, +0.0032) pct +0.00 (-0.13, +0.12)
+=== heads and base head against K0 (cross-fitted)
+BAND_HEAD            vs K0 tw95 G5: n=1536056 mean +0.0550 (+0.0457, +0.0650) pct +9.17 (+7.84, +10.58)
+BAND_HEAD            vs K0 cost0.5 G5: n=223226 mean +56.7985 (+26.6839, +88.0695) pct +2.00 (+0.95, +3.07)
+HEAD_BASE_cross      vs K0 tw95 G5: n=1536056 mean +0.0550 (+0.0457, +0.0650) pct +9.17 (+7.88, +10.56)
+HEAD_BASE_cross      vs K0 cost0.5 G5: n=223226 mean +56.7985 (+26.2732, +87.8500) pct +2.00 (+0.94, +3.06)
+HEAD_PIT_cross       vs K0 tw95 G5: n=1536056 mean +0.0535 (+0.0440, +0.0640) pct +8.93 (+7.58, +10.37)
+HEAD_PIT_cross       vs K0 cost0.5 G5: n=223226 mean +82.1604 (+55.2815, +110.7395) pct +2.89 (+1.97, +3.85)
+HEAD_IND_cross       vs K0 tw95 G5: n=1536056 mean +0.0569 (+0.0473, +0.0676) pct +9.50 (+8.12, +10.94)
+HEAD_IND_cross       vs K0 cost0.5 G5: n=223226 mean +62.0702 (+31.4301, +92.3484) pct +2.18 (+1.12, +3.22)
+HEAD_PIT_IND_cross   vs K0 tw95 G5: n=1536056 mean +0.0550 (+0.0455, +0.0654) pct +9.18 (+7.82, +10.64)
+HEAD_PIT_IND_cross   vs K0 cost0.5 G5: n=223226 mean +92.6947 (+63.7222, +123.3288) pct +3.26 (+2.27, +4.28)
+HEAD_IND_MW_cross    vs K0 tw95 G5: n=1536056 mean +0.0640 (+0.0533, +0.0761) pct +10.68 (+9.31, +12.10)
+HEAD_IND_MW_cross    vs K0 cost0.5 G5: n=223226 mean +82.4940 (+48.6613, +118.1294) pct +2.90 (+1.74, +4.09)
+=== tail coverage against observed power (share outside the band)
+K0               G4 after     below q01: 1.82% (0.97, 2.83) nominal 1%
+K0               G4 after     below q05: 3.85% (2.41, 5.48) nominal 5%
+K0               G4 after     above q95: 24.88% (20.74, 29.03) nominal 5%
+K0               G4 after     above q99: 13.83% (10.51, 17.42) nominal 1%
+K0               G1 ordinary  below q01: 2.08% (1.25, 3.13) nominal 1%
+K0               G1 ordinary  below q05: 5.48% (4.39, 6.76) nominal 5%
+K0               G1 ordinary  above q95: 4.38% (3.67, 5.19) nominal 5%
+K0               G1 ordinary  above q99: 1.14% (0.75, 1.63) nominal 1%
+BAND_HEAD        G4 after     below q01: 0.60% (0.28, 1.00) nominal 1%
+BAND_HEAD        G4 after     below q05: 3.08% (2.04, 4.26) nominal 5%
+BAND_HEAD        G4 after     above q95: 14.41% (11.25, 17.78) nominal 5%
+BAND_HEAD        G4 after     above q99: 3.54% (2.28, 5.05) nominal 1%
+BAND_HEAD        G1 ordinary  below q01: 0.96% (0.45, 1.63) nominal 1%
+BAND_HEAD        G1 ordinary  below q05: 4.40% (3.43, 5.52) nominal 5%
+BAND_HEAD        G1 ordinary  above q95: 5.84% (4.86, 6.86) nominal 5%
+BAND_HEAD        G1 ordinary  above q99: 1.00% (0.67, 1.46) nominal 1%
+ADD_PERFECT      G4 after     below q01: 2.07% (1.36, 2.96) nominal 1%
+ADD_PERFECT      G4 after     below q05: 6.46% (5.03, 8.04) nominal 5%
+ADD_PERFECT      G4 after     above q95: 4.27% (2.63, 6.53) nominal 5%
+ADD_PERFECT      G4 after     above q99: 1.70% (0.50, 3.68) nominal 1%
+ADD_PERFECT      G1 ordinary  below q01: 2.09% (1.25, 3.13) nominal 1%
+ADD_PERFECT      G1 ordinary  below q05: 5.51% (4.43, 6.76) nominal 5%
+ADD_PERFECT      G1 ordinary  above q95: 4.35% (3.66, 5.14) nominal 5%
+ADD_PERFECT      G1 ordinary  above q99: 1.13% (0.75, 1.61) nominal 1%
+ADD_R50          G4 after     below q01: 1.68% (1.01, 2.49) nominal 1%
+ADD_R50          G4 after     below q05: 4.69% (3.39, 6.15) nominal 5%
+ADD_R50          G4 after     above q95: 12.33% (9.26, 15.65) nominal 5%
+ADD_R50          G4 after     above q99: 6.13% (4.01, 8.54) nominal 1%
+ADD_R50          G1 ordinary  below q01: 2.08% (1.25, 3.16) nominal 1%
+ADD_R50          G1 ordinary  below q05: 5.49% (4.40, 6.76) nominal 5%
+ADD_R50          G1 ordinary  above q95: 4.37% (3.66, 5.16) nominal 5%
+ADD_R50          G1 ordinary  above q99: 1.13% (0.74, 1.62) nominal 1%
+ADD_P50          G4 after     below q01: 2.07% (1.37, 2.95) nominal 1%
+ADD_P50          G4 after     below q05: 6.47% (5.06, 8.04) nominal 5%
+ADD_P50          G4 after     above q95: 4.27% (2.62, 6.54) nominal 5%
+ADD_P50          G4 after     above q99: 1.71% (0.50, 3.67) nominal 1%
+ADD_P50          G1 ordinary  below q01: 2.34% (1.53, 3.39) nominal 1%
+ADD_P50          G1 ordinary  below q05: 5.93% (4.85, 7.18) nominal 5%
+ADD_P50          G1 ordinary  above q95: 4.79% (4.09, 5.59) nominal 5%
+ADD_P50          G1 ordinary  above q99: 1.36% (0.97, 1.83) nominal 1%
+ADD_B50          G4 after     below q01: 3.06% (2.16, 4.10) nominal 1%
+ADD_B50          G4 after     below q05: 10.01% (7.97, 12.23) nominal 5%
+ADD_B50          G4 after     above q95: 6.09% (3.92, 8.65) nominal 5%
+ADD_B50          G4 after     above q99: 2.92% (1.28, 5.05) nominal 1%
+ADD_B50          G1 ordinary  below q01: 2.09% (1.26, 3.17) nominal 1%
+ADD_B50          G1 ordinary  below q05: 5.51% (4.45, 6.78) nominal 5%
+ADD_B50          G1 ordinary  above q95: 4.36% (3.65, 5.15) nominal 5%
+ADD_B50          G1 ordinary  above q99: 1.13% (0.75, 1.60) nominal 1%
+HEAD_BASE_cross  G4 after     below q01: 0.60% (0.28, 1.00) nominal 1%
+HEAD_BASE_cross  G4 after     below q05: 3.08% (2.02, 4.27) nominal 5%
+HEAD_BASE_cross  G4 after     above q95: 14.41% (11.28, 17.78) nominal 5%
+HEAD_BASE_cross  G4 after     above q99: 3.54% (2.28, 5.03) nominal 1%
+HEAD_BASE_cross  G1 ordinary  below q01: 0.96% (0.46, 1.62) nominal 1%
+HEAD_BASE_cross  G1 ordinary  below q05: 4.40% (3.42, 5.53) nominal 5%
+HEAD_BASE_cross  G1 ordinary  above q95: 5.84% (4.86, 6.86) nominal 5%
+HEAD_BASE_cross  G1 ordinary  above q99: 1.00% (0.67, 1.46) nominal 1%
+HEAD_PIT_cross   G4 after     below q01: 0.54% (0.26, 0.86) nominal 1%
+HEAD_PIT_cross   G4 after     below q05: 3.13% (2.02, 4.35) nominal 5%
+HEAD_PIT_cross   G4 after     above q95: 14.41% (11.21, 17.82) nominal 5%
+HEAD_PIT_cross   G4 after     above q99: 3.49% (2.19, 4.97) nominal 1%
+HEAD_PIT_cross   G1 ordinary  below q01: 0.93% (0.47, 1.52) nominal 1%
+HEAD_PIT_cross   G1 ordinary  below q05: 4.46% (3.46, 5.59) nominal 5%
+HEAD_PIT_cross   G1 ordinary  above q95: 5.62% (4.73, 6.61) nominal 5%
+HEAD_PIT_cross   G1 ordinary  above q99: 0.97% (0.66, 1.42) nominal 1%
+HEAD_IND_cross   G4 after     below q01: 0.59% (0.28, 0.98) nominal 1%
+HEAD_IND_cross   G4 after     below q05: 3.16% (2.10, 4.37) nominal 5%
+HEAD_IND_cross   G4 after     above q95: 14.41% (11.24, 17.82) nominal 5%
+HEAD_IND_cross   G4 after     above q99: 3.50% (2.21, 4.99) nominal 1%
+HEAD_IND_cross   G1 ordinary  below q01: 0.96% (0.46, 1.63) nominal 1%
+HEAD_IND_cross   G1 ordinary  below q05: 4.41% (3.42, 5.55) nominal 5%
+HEAD_IND_cross   G1 ordinary  above q95: 5.82% (4.85, 6.85) nominal 5%
+HEAD_IND_cross   G1 ordinary  above q99: 1.00% (0.68, 1.46) nominal 1%
+HEAD_PIT_IND_cross G4 after     below q01: 0.55% (0.27, 0.89) nominal 1%
+HEAD_PIT_IND_cross G4 after     below q05: 3.19% (2.08, 4.45) nominal 5%
+HEAD_PIT_IND_cross G4 after     above q95: 14.31% (11.12, 17.73) nominal 5%
+HEAD_PIT_IND_cross G4 after     above q99: 3.44% (2.15, 4.94) nominal 1%
+HEAD_PIT_IND_cross G1 ordinary  below q01: 0.97% (0.47, 1.62) nominal 1%
+HEAD_PIT_IND_cross G1 ordinary  below q05: 4.50% (3.51, 5.61) nominal 5%
+HEAD_PIT_IND_cross G1 ordinary  above q95: 5.61% (4.71, 6.58) nominal 5%
+HEAD_PIT_IND_cross G1 ordinary  above q99: 0.98% (0.67, 1.43) nominal 1%
+HEAD_IND_MW_cross G4 after     below q01: 0.60% (0.28, 0.99) nominal 1%
+HEAD_IND_MW_cross G4 after     below q05: 3.19% (2.14, 4.37) nominal 5%
+HEAD_IND_MW_cross G4 after     above q95: 14.29% (11.17, 17.64) nominal 5%
+HEAD_IND_MW_cross G4 after     above q99: 3.50% (2.24, 5.00) nominal 1%
+HEAD_IND_MW_cross G1 ordinary  below q01: 0.96% (0.46, 1.64) nominal 1%
+HEAD_IND_MW_cross G1 ordinary  below q05: 4.42% (3.42, 5.54) nominal 5%
+HEAD_IND_MW_cross G1 ordinary  above q95: 5.81% (4.84, 6.82) nominal 5%
+HEAD_IND_MW_cross G1 ordinary  above q99: 1.01% (0.69, 1.48) nominal 1%
+=== absolute mean scores (points of effective capacity; cost in GBP per scored half-hour)
+ADD_B25 G1 ordinary {'qs_obs': 2.708, 'tw95_obs': 0.8799, 'cost0.5': 2692.0727}
+ADD_B25 G4 after {'qs_obs': 2.8525, 'tw95_obs': 0.576, 'cost0.5': 2636.3946}
+ADD_B25 G5 near {'qs_obs': 3.3367, 'tw95_obs': 0.5717, 'cost0.5': 2620.1622}
+ADD_B50 G1 ordinary {'qs_obs': 2.7084, 'tw95_obs': 0.88, 'cost0.5': 2692.1329}
+ADD_B50 G4 after {'qs_obs': 3.0693, 'tw95_obs': 0.6394, 'cost0.5': 2733.3264}
+ADD_B50 G5 near {'qs_obs': 3.4301, 'tw95_obs': 0.5877, 'cost0.5': 2681.6532}
+ADD_D12 G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_D12 G4 after {'qs_obs': 2.6922, 'tw95_obs': 0.5214, 'cost0.5': 2601.192}
+ADD_D12 G5 near {'qs_obs': 3.334, 'tw95_obs': 0.5648, 'cost0.5': 2635.5742}
+ADD_D144 G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_D144 G4 after {'qs_obs': 2.8851, 'tw95_obs': 0.5673, 'cost0.5': 2712.6211}
+ADD_D144 G5 near {'qs_obs': 3.4687, 'tw95_obs': 0.5878, 'cost0.5': 2745.5975}
+ADD_D192 G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_D192 G4 after {'qs_obs': 3.1729, 'tw95_obs': 0.5987, 'cost0.5': 2958.2741}
+ADD_D192 G5 near {'qs_obs': 3.5014, 'tw95_obs': 0.5906, 'cost0.5': 2764.9129}
+ADD_D24 G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_D24 G4 after {'qs_obs': 2.6922, 'tw95_obs': 0.5214, 'cost0.5': 2601.192}
+ADD_D24 G5 near {'qs_obs': 3.3519, 'tw95_obs': 0.5669, 'cost0.5': 2653.3562}
+ADD_D48 G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_D48 G4 after {'qs_obs': 2.6922, 'tw95_obs': 0.5214, 'cost0.5': 2601.192}
+ADD_D48 G5 near {'qs_obs': 3.3801, 'tw95_obs': 0.5738, 'cost0.5': 2681.2303}
+ADD_D6 G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_D6 G4 after {'qs_obs': 2.6922, 'tw95_obs': 0.5214, 'cost0.5': 2601.192}
+ADD_D6 G5 near {'qs_obs': 3.3127, 'tw95_obs': 0.5607, 'cost0.5': 2614.5852}
+ADD_D96 G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_D96 G4 after {'qs_obs': 2.7017, 'tw95_obs': 0.5234, 'cost0.5': 2604.2427}
+ADD_D96 G5 near {'qs_obs': 3.4269, 'tw95_obs': 0.5823, 'cost0.5': 2725.7202}
+ADD_M25 G1 ordinary {'qs_obs': 2.7072, 'tw95_obs': 0.8796, 'cost0.5': 2691.9317}
+ADD_M25 G4 after {'qs_obs': 2.6109, 'tw95_obs': 0.4944, 'cost0.5': 2552.8434}
+ADD_M25 G5 near {'qs_obs': 3.2571, 'tw95_obs': 0.5501, 'cost0.5': 2602.4549}
+ADD_MIX G1 ordinary {'qs_obs': 2.7203, 'tw95_obs': 0.8831, 'cost0.5': 2697.8542}
+ADD_MIX G4 after {'qs_obs': 3.3397, 'tw95_obs': 0.5997, 'cost0.5': 3180.1674}
+ADD_MIX G5 near {'qs_obs': 3.461, 'tw95_obs': 0.5758, 'cost0.5': 2744.6267}
+ADD_P25 G1 ordinary {'qs_obs': 2.7086, 'tw95_obs': 0.8801, 'cost0.5': 2692.1991}
+ADD_P25 G4 after {'qs_obs': 3.0678, 'tw95_obs': 0.6205, 'cost0.5': 2719.5385}
+ADD_P25 G5 near {'qs_obs': 3.4361, 'tw95_obs': 0.5899, 'cost0.5': 2653.0317}
+ADD_P50 G1 ordinary {'qs_obs': 2.7766, 'tw95_obs': 0.9042, 'cost0.5': 2734.4398}
+ADD_P50 G4 after {'qs_obs': 2.6937, 'tw95_obs': 0.5225, 'cost0.5': 2601.7389}
+ADD_P50 G5 near {'qs_obs': 3.3406, 'tw95_obs': 0.5749, 'cost0.5': 2622.1816}
+ADD_P75 G1 ordinary {'qs_obs': 2.731, 'tw95_obs': 0.8868, 'cost0.5': 2706.9796}
+ADD_P75 G4 after {'qs_obs': 2.6916, 'tw95_obs': 0.5209, 'cost0.5': 2601.057}
+ADD_P75 G5 near {'qs_obs': 3.311, 'tw95_obs': 0.5609, 'cost0.5': 2615.3209}
+ADD_PERFECT G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+ADD_PERFECT G4 after {'qs_obs': 2.6922, 'tw95_obs': 0.5214, 'cost0.5': 2601.192}
+ADD_PERFECT G5 near {'qs_obs': 3.3035, 'tw95_obs': 0.56, 'cost0.5': 2609.7531}
+ADD_R25 G1 ordinary {'qs_obs': 2.7075, 'tw95_obs': 0.8795, 'cost0.5': 2691.8097}
+ADD_R25 G4 after {'qs_obs': 3.6401, 'tw95_obs': 0.5898, 'cost0.5': 3357.6191}
+ADD_R25 G5 near {'qs_obs': 3.5283, 'tw95_obs': 0.5836, 'cost0.5': 2770.052}
+ADD_R50 G1 ordinary {'qs_obs': 2.7074, 'tw95_obs': 0.8795, 'cost0.5': 2691.9092}
+ADD_R50 G4 after {'qs_obs': 3.0986, 'tw95_obs': 0.5743, 'cost0.5': 2970.6499}
+ADD_R50 G5 near {'qs_obs': 3.4068, 'tw95_obs': 0.5782, 'cost0.5': 2688.104}
+ADD_R75 G1 ordinary {'qs_obs': 2.7077, 'tw95_obs': 0.8798, 'cost0.5': 2692.0293}
+ADD_R75 G4 after {'qs_obs': 2.8126, 'tw95_obs': 0.5521, 'cost0.5': 2719.3075}
+ADD_R75 G5 near {'qs_obs': 3.3497, 'tw95_obs': 0.5735, 'cost0.5': 2656.6484}
+BAND_HEAD G1 ordinary {'qs_obs': 2.6619, 'tw95_obs': 0.8399, 'cost0.5': 2770.6467}
+BAND_HEAD G4 after {'qs_obs': 3.4025, 'tw95_obs': 0.5577, 'cost0.5': 2821.9788}
+BAND_HEAD G5 near {'qs_obs': 3.4156, 'tw95_obs': 0.5445, 'cost0.5': 2784.2075}
+BAND_HEAD_HELDOUT G1 ordinary {'qs_obs': 2.6641, 'tw95_obs': 0.8445, 'cost0.5': 2776.4937}
+BAND_HEAD_HELDOUT G4 after {'qs_obs': 3.6792, 'tw95_obs': 0.7536, 'cost0.5': 2941.6007}
+BAND_HEAD_HELDOUT G5 near {'qs_obs': 3.4615, 'tw95_obs': 0.5443, 'cost0.5': 2838.4159}
+HEAD_BASE_cross G1 ordinary {'qs_obs': 2.6619, 'tw95_obs': 0.8399, 'cost0.5': 2770.6467}
+HEAD_BASE_cross G4 after {'qs_obs': 3.4025, 'tw95_obs': 0.5577, 'cost0.5': 2821.9788}
+HEAD_BASE_cross G5 near {'qs_obs': 3.4156, 'tw95_obs': 0.5445, 'cost0.5': 2784.2075}
+HEAD_BASE_held G1 ordinary {'qs_obs': 2.6641, 'tw95_obs': 0.8445, 'cost0.5': 2776.4937}
+HEAD_BASE_held G4 after {'qs_obs': 3.6792, 'tw95_obs': 0.7536, 'cost0.5': 2941.6007}
+HEAD_BASE_held G5 near {'qs_obs': 3.4615, 'tw95_obs': 0.5443, 'cost0.5': 2838.4159}
+HEAD_BASE_size G1 ordinary {'qs_obs': 2.6692, 'tw95_obs': 0.8412, 'cost0.5': 2776.9863}
+HEAD_BASE_size G4 after {'qs_obs': 3.9964, 'tw95_obs': 0.6628, 'cost0.5': 3051.0413}
+HEAD_BASE_size G5 near {'qs_obs': 3.7007, 'tw95_obs': 0.6313, 'cost0.5': 2959.39}
+HEAD_IND_MW_cross G1 ordinary {'qs_obs': 2.6617, 'tw95_obs': 0.8391, 'cost0.5': 2768.1111}
+HEAD_IND_MW_cross G4 after {'qs_obs': 3.283, 'tw95_obs': 0.55, 'cost0.5': 2817.771}
+HEAD_IND_MW_cross G5 near {'qs_obs': 3.3227, 'tw95_obs': 0.5354, 'cost0.5': 2758.512}
+HEAD_IND_MW_held G1 ordinary {'qs_obs': 2.6648, 'tw95_obs': 0.845, 'cost0.5': 2775.8839}
+HEAD_IND_MW_held G4 after {'qs_obs': 3.6012, 'tw95_obs': 0.7512, 'cost0.5': 2937.8143}
+HEAD_IND_MW_held G5 near {'qs_obs': 3.3848, 'tw95_obs': 0.5396, 'cost0.5': 2829.3785}
+HEAD_IND_MW_size G1 ordinary {'qs_obs': 2.6692, 'tw95_obs': 0.8406, 'cost0.5': 2776.8465}
+HEAD_IND_MW_size G4 after {'qs_obs': 3.9536, 'tw95_obs': 0.6612, 'cost0.5': 3053.4283}
+HEAD_IND_MW_size G5 near {'qs_obs': 3.6535, 'tw95_obs': 0.6281, 'cost0.5': 2957.6525}
+HEAD_IND_cross G1 ordinary {'qs_obs': 2.6625, 'tw95_obs': 0.8397, 'cost0.5': 2770.0808}
+HEAD_IND_cross G4 after {'qs_obs': 3.3049, 'tw95_obs': 0.5564, 'cost0.5': 2826.2465}
+HEAD_IND_cross G5 near {'qs_obs': 3.3721, 'tw95_obs': 0.5425, 'cost0.5': 2778.9358}
+HEAD_IND_held G1 ordinary {'qs_obs': 2.6642, 'tw95_obs': 0.8446, 'cost0.5': 2775.3426}
+HEAD_IND_held G4 after {'qs_obs': 3.6149, 'tw95_obs': 0.7533, 'cost0.5': 2940.5052}
+HEAD_IND_held G5 near {'qs_obs': 3.4187, 'tw95_obs': 0.5428, 'cost0.5': 2835.1353}
+HEAD_PIT_IND_cross G1 ordinary {'qs_obs': 2.6705, 'tw95_obs': 0.8402, 'cost0.5': 2745.4483}
+HEAD_PIT_IND_cross G4 after {'qs_obs': 3.4237, 'tw95_obs': 0.5644, 'cost0.5': 2810.5413}
+HEAD_PIT_IND_cross G5 near {'qs_obs': 3.4017, 'tw95_obs': 0.5444, 'cost0.5': 2748.3113}
+HEAD_PIT_IND_held G1 ordinary {'qs_obs': 2.6808, 'tw95_obs': 0.8489, 'cost0.5': 2757.335}
+HEAD_PIT_IND_held G4 after {'qs_obs': 3.7298, 'tw95_obs': 0.7703, 'cost0.5': 2966.1554}
+HEAD_PIT_IND_held G5 near {'qs_obs': 3.4534, 'tw95_obs': 0.5457, 'cost0.5': 2815.4011}
+HEAD_PIT_cross G1 ordinary {'qs_obs': 2.6695, 'tw95_obs': 0.8397, 'cost0.5': 2744.9881}
+HEAD_PIT_cross G4 after {'qs_obs': 3.4768, 'tw95_obs': 0.5642, 'cost0.5': 2812.1561}
+HEAD_PIT_cross G5 near {'qs_obs': 3.44, 'tw95_obs': 0.5459, 'cost0.5': 2758.8455}
+HEAD_PIT_held G1 ordinary {'qs_obs': 2.6786, 'tw95_obs': 0.8488, 'cost0.5': 2758.0214}
+HEAD_PIT_held G4 after {'qs_obs': 3.7934, 'tw95_obs': 0.7723, 'cost0.5': 2966.9093}
+HEAD_PIT_held G5 near {'qs_obs': 3.4967, 'tw95_obs': 0.5476, 'cost0.5': 2818.6804}
+HEAD_PIT_size G1 ordinary {'qs_obs': 2.6735, 'tw95_obs': 0.8387, 'cost0.5': 2756.669}
+HEAD_PIT_size G4 after {'qs_obs': 4.0713, 'tw95_obs': 0.6698, 'cost0.5': 3081.1624}
+HEAD_PIT_size G5 near {'qs_obs': 3.7317, 'tw95_obs': 0.6326, 'cost0.5': 2937.4405}
+K0 G1 ordinary {'qs_obs': 2.7073, 'tw95_obs': 0.8793, 'cost0.5': 2691.8063}
+K0 G4 after {'qs_obs': 4.0663, 'tw95_obs': 0.6369, 'cost0.5': 3627.882}
+K0 G5 near {'qs_obs': 3.6392, 'tw95_obs': 0.5994, 'cost0.5': 2841.006}
+PERFECT_ADD G1 ordinary {'qs_obs': 2.7078, 'tw95_obs': 0.8798, 'cost0.5': 2692.0384}
+PERFECT_ADD G4 after {'qs_obs': 2.6922, 'tw95_obs': 0.5214, 'cost0.5': 2601.192}
+PERFECT_ADD G5 near {'qs_obs': 3.3035, 'tw95_obs': 0.56, 'cost0.5': 2609.7531}
+=== median-forecast minus mean-forecast absolute error, per site (points)
+D10  K0                   -0.0063
+D10  BAND_HEAD            -0.0494
+D10  ADD_PERFECT          -0.0072
+D10  HEAD_PIT_cross       +0.1150
+D10  HEAD_IND_MW_cross    -0.0554
+D11  K0                   -0.0001
+D11  BAND_HEAD            -0.1132
+D11  ADD_PERFECT          -0.0038
+D11  HEAD_PIT_cross       -0.0932
+D11  HEAD_IND_MW_cross    -0.1977
+D14  K0                   +0.0072
+D14  BAND_HEAD            -0.0185
+D14  ADD_PERFECT          +0.0056
+D14  HEAD_PIT_cross       +0.0100
+D14  HEAD_IND_MW_cross    -0.0180
+D16  K0                   +0.0040
+D16  BAND_HEAD            -0.2936
+D16  ADD_PERFECT          +0.0044
+D16  HEAD_PIT_cross       -0.2904
+D16  HEAD_IND_MW_cross    -0.3128
+D5   K0                   -0.0187
+D5   BAND_HEAD            +0.0002
+D5   ADD_PERFECT          -0.0195
+D5   HEAD_PIT_cross       +0.1244
+D5   HEAD_IND_MW_cross    -0.0050
+D9   K0                   +0.0042
+D9   BAND_HEAD            -0.1273
+D9   ADD_PERFECT          +0.0034
+D9   HEAD_PIT_cross       -0.1654
+D9   HEAD_IND_MW_cross    -0.1754
+{
+  "worlds": 44,
+  "shifts": 411,
+  "rows_by_phase": {
+    "AFTER": 38486,
+    "BEFORE_ALARM": 86116,
+    "DURING": 35765,
+    "MARGIN": 1375689,
+    "ORDINARY": 5343713
+  }
+}
