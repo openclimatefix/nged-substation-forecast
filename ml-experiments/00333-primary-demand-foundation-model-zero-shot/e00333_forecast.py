@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 import e00333_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from chronos import Chronos2Pipeline  # ty: ignore[unresolved-import]
 from studies.dp_calendar import bank_holiday_names
 from studies.dp_features import default_input_paths
