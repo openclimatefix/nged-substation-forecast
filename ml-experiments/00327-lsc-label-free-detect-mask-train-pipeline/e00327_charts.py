@@ -26,12 +26,12 @@ OUT: Final[Path] = (
     / "00327-lsc-label-free-detect-mask-train-pipeline"
 )
 ARM_LABELS: Final[dict[str, str]] = {
-    "A": "A: unusualness detector, mask and retrain",
-    "B": "B: 24 h residual detector, mask and retrain",
-    "E": "E: arm A with two passes",
-    "AF": "AF (post hoc): arm A, filter mask only",
-    "D": "D: logged shifts masked (reference)",
-    "PERFECT": "D: true spans masked (reference)",
+    "A": "A: unusualness, mask + retrain",
+    "B": "B: 24 h residual, mask + retrain",
+    "E": "E: arm A, two passes",
+    "AF": "AF: arm A, filter mask only",
+    "D": "D: logged shifts masked",
+    "PERFECT": "D: true spans masked",
 }
 COLOURS: Final[dict[str, str]] = {
     "A": "#FF4901",
@@ -94,40 +94,33 @@ def contrast_rows() -> pl.DataFrame:
 def figure_headline() -> alt.TopLevelMixin:
     """Difference from no mask, with 95% intervals, in three stacked panels."""
     data = contrast_rows()
-    domain = list(dict.fromkeys(data["arm"].to_list()))
-    colour = alt.Color(
-        "arm:N",
-        scale=alt.Scale(
-            domain=domain, range=[COLOURS[k] for k in dict.fromkeys(data["key"].to_list())]
-        ),
-        legend=None,
-    )
-    base = alt.Chart(data)
-    rule = base.mark_rule(color="#888888").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
-    bars = base.mark_rule(size=3).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X(
-            "lo:Q",
-            title="Score of the arm minus score with no mask, points of capacity (below zero is better)",
-        ),
-        x2="hi:Q",
-        y=alt.Y("arm:N", title=None, sort=domain),
-        color=colour,
-    )
-    dots = base.mark_point(filled=True, size=90).encode(
-        x="diff:Q", y=alt.Y("arm:N", sort=domain), color=colour
-    )  # ty: ignore[unresolved-attribute]
-    return (
-        alt.layer(rule, bars, dots)
-        .properties(width=WIDTH - 260, height=140)
-        .facet(
-            row=alt.Row(
-                "panel:N",
-                title=None,
-                header=alt.Header(labelAngle=0, labelAlign="left", labelLimit=520),
+    charts = []
+    for panel in dict.fromkeys(data["panel"].to_list()):
+        part = data.filter(pl.col("panel") == panel)
+        domain = part["arm"].to_list()
+        colour = alt.Color(
+            "arm:N",
+            scale=alt.Scale(domain=domain, range=[COLOURS[k] for k in part["key"].to_list()]),
+            legend=None,
+        )
+        y = alt.Y("arm:N", title=None, sort=domain, axis=alt.Axis(labelLimit=260))
+        base = alt.Chart(part)
+        rule = base.mark_rule(color="#888888").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
+        bars = base.mark_rule(size=3).encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("lo:Q", title="Arm minus no mask, points of capacity (below zero is better)"),
+            x2="hi:Q",
+            y=y,
+            color=colour,
+        )
+        dots = base.mark_point(filled=True, size=90).encode(x="diff:Q", y=y, color=colour)  # ty: ignore[unresolved-attribute]
+        charts.append(
+            alt.layer(rule, bars, dots).properties(
+                width=WIDTH - 250,
+                height=30 * len(part) + 10,
+                title=alt.TitleParams(panel, anchor="start", fontSize=12),
             )
         )
-        .resolve_scale(x="independent")
-    )
+    return alt.vconcat(*charts).resolve_scale(x="independent", color="independent")
 
 
 def figure_per_series() -> alt.TopLevelMixin:
@@ -156,7 +149,7 @@ def figure_per_series() -> alt.TopLevelMixin:
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(domain=order, range=["#888888", "#FF4901", "#306BFF"]),
-                legend=alt.Legend(orient="top", title=None, columns=1),
+                legend=alt.Legend(orient="top", title=None, columns=1, labelLimit=400),
             ),
         )
         .properties(width=WIDTH, height=240)
@@ -198,7 +191,7 @@ def figure_short_history() -> alt.TopLevelMixin:
                 scale=alt.Scale(
                     domain=["C: no mask", ARM_LABELS["A"]], range=["#888888", "#FF4901"]
                 ),
-                legend=alt.Legend(orient="top", title=None, columns=1),
+                legend=alt.Legend(orient="top", title=None, columns=1, labelLimit=400),
             ),
         )
         .properties(width=WIDTH, height=220)
@@ -232,7 +225,7 @@ def figure_detector() -> alt.TopLevelMixin:
     bars = base.mark_rule(size=3, color="#306BFF").encode(
         x=alt.X(
             "lo:Q",
-            title="Real load shifts found, of 35 (dot: count; line: 95% interval from resampling whole shifts)",
+            title="Real load shifts found, of 35 (dot: count; line: 95% interval; number: false alarms)",
             scale=alt.Scale(domain=[0, 35]),
         ),
         x2="hi:Q",
