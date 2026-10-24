@@ -1,4 +1,4 @@
-# ruff: noqa: E501, ANN001, ANN201, PLR0912, PLR0915, PTH207, B007, C416, RUF059
+# ruff: noqa: E501, PLR0912, PTH207
 """Stage 2 report: quantile score, error of the median, and tail calibration by arm and row group.
 
 The quantile score is twice the mean pinball loss over 11 levels (0.01, 0.05, 0.10, 0.25, 0.40,
