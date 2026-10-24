@@ -124,7 +124,9 @@ def build_half_hours() -> pl.DataFrame:
     expected = (
         pl.read_parquet(E230_WORK / "b1_expected_power.parquet")
         .filter(pl.col("valid_time") < DATA_END)
-        .select("site", "valid_time", pl.col("expected_fraction").cast(pl.Float64), "wind_speed_100m")
+        .select(
+            "site", "valid_time", pl.col("expected_fraction").cast(pl.Float64), "wind_speed_100m"
+        )
     )
     observed = observed_power(sites=sites).join(
         sites.select("time_series_id", "site"), on="time_series_id"
@@ -137,7 +139,9 @@ def build_half_hours() -> pl.DataFrame:
     return rows
 
 
-def power_curve_lookup(*, speed: np.ndarray, exp: np.ndarray, cut_out: float) -> tuple[np.ndarray, np.ndarray]:
+def power_curve_lookup(
+    *, speed: np.ndarray, exp: np.ndarray, cut_out: float
+) -> tuple[np.ndarray, np.ndarray]:
     """Return (speed grid, expected share of scale) from the core's deterministic output.
 
     The expected power is a function of ERA5 speed alone (the core has no other input), so its
@@ -166,7 +170,7 @@ def load_farms() -> dict[str, Farm]:
         exp = part["expected_fraction"].to_numpy() / scale
         obs = part["target"].to_numpy() / scale
         hours = (
-            part.select(((pl.col("valid_time") - pl.lit(ERA5_START)).dt.total_minutes() // 30))
+            part.select((pl.col("valid_time") - pl.lit(ERA5_START)).dt.total_minutes() // 30)
             .to_series()
             .to_numpy()
         )

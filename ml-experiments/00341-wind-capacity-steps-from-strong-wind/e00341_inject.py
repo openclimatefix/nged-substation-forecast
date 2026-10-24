@@ -1,3 +1,4 @@
+# ruff: noqa: E501, PERF401
 """Experiment 00341, step 2: the known-answer test (calibration of the penalty, then the grid).
 
 Stage `calibrate` runs the unmodified series, the controls, and the 25% step over a grid of
@@ -47,7 +48,9 @@ _STATE: dict = {}
 def start_days() -> list[int]:
     """Return the 30 fixed start days, the same for every cell and farm."""
     rng = np.random.default_rng(SEED)
-    return sorted(rng.integers(common.START_FIRST_DAY, common.START_LAST_DAY + 1, N_STARTS).tolist())
+    return sorted(
+        rng.integers(common.START_FIRST_DAY, common.START_LAST_DAY + 1, N_STARTS).tolist()
+    )
 
 
 def init_worker() -> None:
@@ -115,11 +118,13 @@ def base_partitions(*, site: str, block: int, c: float) -> dict:
 def run_task(task: dict) -> list[tuple]:
     """Run one injected cell at one start day and return the result rows."""
     site, cell, effects = task["site"], task["cell"], task["effects"]
-    start, duration = task["start"], task["duration"]
+    start = task["start"]
     rows: list[tuple] = []
+    if task["mode"] == "hmm_only":
+        return hmm_rows(task=task)
     for block in BLOCKS:
-        arms, feats = arms_for(site=site, effects=effects, block=block)
-        base_arms, base_feats = arms_for(site=site, effects=(), block=block)
+        arms, _ = arms_for(site=site, effects=effects, block=block)
+        base_arms, _ = arms_for(site=site, effects=(), block=block)
         for c in task["cs"]:
             base = base_partitions(site=site, block=block, c=c)
             for arm, series in arms.items():
@@ -135,7 +140,11 @@ def run_task(task: dict) -> list[tuple]:
                     mine = lib.boundary_positions(series=series, last=last)
                     ref = lib.boundary_positions(series=base[arm][0], last=base[arm][1])
                     new = sum(1 for p in mine if not len(ref) or np.min(np.abs(ref - p)) > 2)
-                    cal = [p for p in mine if common.CAL_START_DAY // block <= p <= common.CAL_END_DAY // block]
+                    cal = [
+                        p
+                        for p in mine
+                        if common.CAL_START_DAY // block <= p <= common.CAL_END_DAY // block
+                    ]
                     rows.append((site, cell, start, "new_pelt", block, arm, c, float(new)))
                     rows.append((site, cell, start, "cal_pelt", block, arm, c, float(len(cal))))
                     rows.append((site, cell, start, "all_pelt", block, arm, c, float(len(mine))))
@@ -143,16 +152,28 @@ def run_task(task: dict) -> list[tuple]:
             for arm, series in arms.items():
                 if task["mode"] == "step":
                     delay = lib.cusum_delay(
-                        series_inj=series, series_base=base_arms[arm], start_day=start, block=block, h=h
+                        series_inj=series,
+                        series_base=base_arms[arm],
+                        start_day=start,
+                        block=block,
+                        h=h,
                     )
                     rows.append((site, cell, start, "cusum", block, arm, h, _enc(delay)))
                 elif task["mode"] == "control":
                     mine = [i for i, _ in lib.cusum_alarms(series=series, h=h, block=block)]
                     mine_pos = series.pos[mine] if mine else np.array([], dtype=int)
                     ref = lib.cusum_alarms(series=base_arms[arm], h=h, block=block)
-                    ref_pos = base_arms[arm].pos[[i for i, _ in ref]] if ref else np.array([], dtype=int)
-                    new = sum(1 for p in mine_pos if not len(ref_pos) or np.min(np.abs(ref_pos - p)) > 2)
-                    cal = [p for p in mine_pos if common.CAL_START_DAY // block <= p <= common.CAL_END_DAY // block]
+                    ref_pos = (
+                        base_arms[arm].pos[[i for i, _ in ref]] if ref else np.array([], dtype=int)
+                    )
+                    new = sum(
+                        1 for p in mine_pos if not len(ref_pos) or np.min(np.abs(ref_pos - p)) > 2
+                    )
+                    cal = [
+                        p
+                        for p in mine_pos
+                        if common.CAL_START_DAY // block <= p <= common.CAL_END_DAY // block
+                    ]
                     rows.append((site, cell, start, "new_cusum", block, arm, h, float(new)))
                     rows.append((site, cell, start, "cal_cusum", block, arm, h, float(len(cal))))
     if task.get("hmm"):
@@ -174,23 +195,55 @@ def hmm_rows(*, task: dict) -> list[tuple]:
     for block in HMM_BLOCKS:
         _, feats = arms_for(site=site, effects=task["effects"], block=block)
         _, base_feats = arms_for(site=site, effects=(), block=block)
-        noise = lib.feature_noise(feats=base_feats, prep=prep)
+        refs, noise = lib.feature_refs(feats=base_feats, block=block)
         bs, be = start // block, min(last_day // block, len(feats["p999"]) - 1)
         for variant, turbines_only in (("full", False), ("lattice", True)):
-            path, names = lib.viterbi(feats=feats, prep=prep, block=block, turbines_only=turbines_only, noise=noise)
+            path, names = lib.viterbi(
+                feats=feats,
+                prep=prep,
+                block=block,
+                turbines_only=turbines_only,
+                refs=refs,
+                noise=noise,
+            )
             window = path[bs : be + 1]
             window = window[window != 0]
             found = names[int(np.bincount(window).argmax())] if len(window) else "nameplate"
-            base_path, _ = lib.viterbi(feats=base_feats, prep=prep, block=block, turbines_only=turbines_only, noise=noise)
+            base_path, _ = lib.viterbi(
+                feats=base_feats,
+                prep=prep,
+                block=block,
+                turbines_only=turbines_only,
+                refs=refs,
+                noise=noise,
+            )
             excluded = bool((base_path[max(bs - 1, 0) : bs + 2] != 0).any())
             delay = -1.0
             for t in range(bs, min(bs + lib.HORIZON_DAYS // block + 1, len(path))):
                 cut = {k: v[: t + 1] for k, v in feats.items()}
-                p_t, _ = lib.viterbi(feats=cut, prep=prep, block=block, turbines_only=turbines_only, noise=noise)
+                p_t, _ = lib.viterbi(
+                    feats=cut,
+                    prep=prep,
+                    block=block,
+                    turbines_only=turbines_only,
+                    refs=refs,
+                    noise=noise,
+                )
                 if (p_t[bs : t + 1] != 0).any():
                     delay = float(max(0, lib.block_end_day(pos=t, block=block) - start))
                     break
-            rows.append((site, cell, start, f"hmm_{variant}", block, found, 0.0, float("nan") if excluded else delay))
+            rows.append(
+                (
+                    site,
+                    cell,
+                    start,
+                    f"hmm_{variant}",
+                    block,
+                    found,
+                    0.0,
+                    float("nan") if excluded else delay,
+                )
+            )
     return rows
 
 
@@ -210,25 +263,38 @@ def build_tasks(*, stage: str, cs: tuple[float, ...], hs: tuple[float, ...]) -> 
         for cell, effects in controls.items():
             if stage == "calibrate" and cell not in {"null", "swing9", "drift1"}:
                 continue
+            if stage in {"bias", "hmm"}:
+                continue
             tasks.append({"site": site, "cell": cell, "effects": effects, "start": 0,
                           "duration": 0, "mode": "control", **common_args})  # fmt: skip
         grid_cells = (
             [("p25", 90)]
             if stage == "calibrate"
-            else [(s, d) for s in SIZES for d in DURATIONS] + [(f"clip{c}", d) for c in CLIPS for d in DURATIONS]
+            else []
+            if stage == "bias"
+            else [(s, d) for s in ("t1", "t2", "half", "p25") for d in (3, 7, 14, 30, 60, 90)]
+            + [(f"clip{c}", d) for c in CLIPS for d in (3, 7, 14, 30, 60, 90)]
+            if stage == "hmm"
+            else [(s, d) for s in SIZES for d in DURATIONS]
+            + [(f"clip{c}", d) for c in CLIPS for d in DURATIONS]
         )
         for size, duration in grid_cells:
-            if site == "W3" and size in {"t2"}:
+            if site == "W3" and size == "t2":
                 continue
             for start in starts:
                 effects = effect_list(site=site, size=size, duration=duration, start=start)
-                hmm = stage == "grid" and duration <= 90 and (size.startswith("clip") or size in {"t1", "t2", "half", "p25"}) and duration >= 3
+                hmm = (
+                    stage == "hmm"
+                    and duration <= 90
+                    and (size.startswith("clip") or size in {"t1", "t2", "half", "p25"})
+                    and duration >= 3
+                )
                 tasks.append({"site": site, "cell": f"{size}_d{duration}", "effects": effects,
-                              "start": start, "duration": duration, "mode": "step",
+                              "start": start, "duration": duration, "mode": "hmm_only" if stage == "hmm" else "step",
                               "hmm": hmm, **common_args})  # fmt: skip
-        if stage == "grid":
+        if stage == "bias":
             for start in starts:
-                tasks.append({"site": site, "cell": "bias5_d30", "effects": (("bias", 0.05, start, start + 29),),
+                tasks.append({"site": site, "cell": "bias-5_d30", "effects": (("bias", -0.05, start, start + 29),),
                               "start": start, "duration": 30, "mode": "step", "hmm": False, **common_args})  # fmt: skip
     return tasks
 
@@ -270,11 +336,13 @@ def choose_settings(*, frame: pl.DataFrame) -> dict:
         chosen = grid[-1]
         table = {}
         for setting in grid:
-            worst = float(sub.filter(pl.col("setting") == setting)["value"].max()) / years
+            worst = (
+                float(sub.filter(pl.col("setting") == setting)["value"].to_numpy().max()) / years
+            )
             table[str(setting)] = worst
-            if worst <= 1.0 and chosen == grid[-1] and setting != grid[-1]:
-                chosen = setting
-            elif worst <= 1.0 and chosen == grid[-1]:
+            if (worst <= 1.0 and chosen == grid[-1] and setting != grid[-1]) or (
+                worst <= 1.0 and chosen == grid[-1]
+            ):
                 chosen = setting
             if worst <= 1.0:
                 break
@@ -295,10 +363,36 @@ def main() -> None:
         print(json.dumps(settings, indent=1))
     else:
         settings = json.loads((common.WORK_DIR / "penalty.json").read_text())
-        tasks = build_tasks(stage="grid", cs=(settings["c"],), hs=(settings["h"],))
+        cs = tuple(sorted(set(settings["c"].values())))
+        hs = tuple(sorted(set(settings["h"].values())))
+        tasks = build_tasks(stage=stage, cs=cs, hs=hs)
         print(len(tasks), "tasks", flush=True)
         frame = run_pool(tasks=tasks)
-        frame.write_parquet(common.WORK_DIR / "grid_rows.parquet")
+        group = (
+            pl.when(pl.col("arm").str.starts_with("A_")).then(pl.lit("A")).otherwise(pl.col("arm"))
+        )
+        chosen = pl.concat(
+            [
+                pl.DataFrame(
+                    {"group": list(settings[k]), "keep": list(settings[k].values())}
+                ).with_columns(kind=pl.lit(k))
+                for k in ("c", "h")
+            ]
+        )
+        frame = (
+            frame.with_columns(
+                group=group,
+                kind=pl.when(pl.col("detector").str.contains("pelt"))
+                .then(pl.lit("c"))
+                .when(pl.col("detector").str.contains("cusum"))
+                .then(pl.lit("h"))
+                .otherwise(pl.lit("none")),
+            )
+            .join(chosen, on=["group", "kind"], how="left")
+            .filter((pl.col("kind") == "none") | (pl.col("setting") == pl.col("keep")))
+            .drop("group", "kind", "keep")
+        )
+        frame.write_parquet(common.WORK_DIR / f"{stage}_rows.parquet")
         print(frame.shape)
 
 

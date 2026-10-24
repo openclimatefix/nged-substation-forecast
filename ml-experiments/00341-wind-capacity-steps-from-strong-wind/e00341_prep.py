@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Experiment 00341, step 1: build the half-hour table, describe the strong set, estimate the noise.
 
 Writes `work/prep.json` (per farm: saturation and cut-out speeds, strong-set shares by margin and
@@ -37,13 +38,17 @@ def estimate_noise(*, farm: common.Farm) -> dict:
     )
     s = lib.log_slope(speed=farm.speed[sel], curve_speed=grid, curve_exp=curve)
     y = np.clip(
-        np.log((np.maximum(farm.obs[sel], 0.0) + common.EPS_RATIO) / (farm.exp[sel] + common.EPS_RATIO)),
+        np.log(
+            (np.maximum(farm.obs[sel], 0.0) + common.EPS_RATIO) / (farm.exp[sel] + common.EPS_RATIO)
+        ),
         *common.LOG_RATIO_CLIP,
     )
     edges = np.quantile(s, np.linspace(0, 1, 9))
     idx = np.clip(np.digitize(s, edges[1:-1]), 0, 7)
     s2 = np.array([np.mean(s[idx == i] ** 2) for i in range(8)])
-    var = np.array([(1.4826 * np.median(np.abs(y[idx == i] - np.median(y[idx == i])))) ** 2 for i in range(8)])
+    var = np.array(
+        [(1.4826 * np.median(np.abs(y[idx == i] - np.median(y[idx == i])))) ** 2 for i in range(8)]
+    )
     design = np.column_stack([np.ones(8), s2])
     coef, *_ = np.linalg.lstsq(design, var, rcond=None)
     sigma_p2 = max(float(coef[0]), 1e-4)
@@ -82,8 +87,8 @@ def main() -> None:
             year = 2019 + (farm.day[prep.strong] + 243) // 365
             info["margins"][str(margin)] = {
                 "share_of_half_hours": len(prep.strong) / n_all,
-                "n_half_hours": int(len(prep.strong)),
-                "days_with_any": int(len(days)),
+                "n_half_hours": len(prep.strong),
+                "days_with_any": len(days),
                 "share_of_days_with_any": len(days) / common.N_DAYS,
                 "mismatch_rate_under_50pct": float((obs_strong < 0.5).mean()),
                 "p999_observed": float(np.quantile(obs_strong, 0.999)),
@@ -91,15 +96,15 @@ def main() -> None:
                 "max_observed": float(obs_strong.max()),
                 "visibility_margin_p999": float(1.0 - np.quantile(obs_strong, 0.999)),
                 "ref_p999_calibration": prep.ref_p999,
-                "n_by_year": {
-                    str(y): int((year == y).sum()) for y in np.unique(year)
-                },
+                "n_by_year": {str(y): int((year == y).sum()) for y in np.unique(year)},
             }
             if margin == 2.0:
                 month = (farm.day[prep.strong] // 30.4375).astype(int)
-                frame = pl.DataFrame({"site": site, "month_index": month}).group_by(
-                    "site", "month_index"
-                ).len()
+                frame = (
+                    pl.DataFrame({"site": site, "month_index": month})
+                    .group_by("site", "month_index")
+                    .len()
+                )
                 monthly.append(frame)
         out[site] = info
     (common.WORK_DIR / "prep.json").write_text(json.dumps(out, indent=1))
@@ -114,7 +119,12 @@ def main() -> None:
             f"mismatch={m['mismatch_rate_under_50pct']:.3f} p999={m['p999_observed']:.3f}",
         )
         for k, v in info["margins"].items():
-            print("  margin", k, f"{v['share_of_half_hours']:.4f}", f"days {v['share_of_days_with_any']:.3f}")
+            print(
+                "  margin",
+                k,
+                f"{v['share_of_half_hours']:.4f}",
+                f"days {v['share_of_days_with_any']:.3f}",
+            )
 
 
 if __name__ == "__main__":

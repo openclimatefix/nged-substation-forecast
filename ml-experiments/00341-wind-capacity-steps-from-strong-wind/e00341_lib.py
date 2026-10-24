@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Statistics, injections, change-point search, CUSUM, and state-space fits for experiment 00341.
 
 A *block* is a run of `B` consecutive UTC days, counted from 2019-09-01. A block statistic is
@@ -24,6 +25,9 @@ CUSUM_K: Final[float] = 0.5
 SWITCH_PROBABILITY: Final[float] = 0.02
 MAX_TURBINES_OUT: Final[int] = 4
 CLIP_LEVELS: Final[tuple[float, ...]] = (0.5, 0.75, 0.9)
+USED_FEATURES: Final[tuple[int, ...]] = (0, 1)
+"""The 99.9th percentile and the mid-wind ratio. The interquartile range of the strong set is
+already near zero on the flat top of the unmodified series, so it carries no signal."""
 
 
 @dataclass(frozen=True)
@@ -67,7 +71,8 @@ def prepare(*, farm: common.Farm, margin: float, sigma_v: float, sigma_p: float)
     """Build the half-hour index sets and the evidence weights for one farm."""
     grid, curve = common.power_curve_lookup(speed=farm.speed, exp=farm.exp, cut_out=farm.cut_out)
     strong = np.flatnonzero(
-        (farm.speed >= farm.v_sat + margin) & (farm.speed <= farm.cut_out - common.STRONG_MARGIN_M_S)
+        (farm.speed >= farm.v_sat + margin)
+        & (farm.speed <= farm.cut_out - common.STRONG_MARGIN_M_S)
     )
     mid = np.flatnonzero((farm.exp >= common.MID_LOW) & (farm.exp <= common.MID_HIGH))
     weighted = np.flatnonzero((farm.exp >= common.WEIGHTED_LOW) & (farm.exp <= 1.05))
@@ -132,6 +137,11 @@ def _bounds(*, days: np.ndarray, block: int, n_blocks: int) -> np.ndarray:
 
 def block_arms(*, prep: Prep, obs: np.ndarray, block: int) -> tuple[dict[str, Series], dict]:
     """Return the arm series (A quantiles, B, C, D) and the state-space features for one block size.
+
+    Args:
+        prep: The prepared farm.
+        obs: The observed share of scale of every half-hour, after any injected effects.
+        block: The block length in days.
 
     Returns:
         A dict of `Series` keyed `A_p90`, `A_p99`, `A_p999`, `A_max`, `B`, `C`, `D`, and a dict of
@@ -216,6 +226,10 @@ def partition(*, series: Series, penalty_c: float) -> tuple[np.ndarray, float]:
 
     The cost of a segment is its weighted sum of squared deviations from its weighted mean divided
     by the robust noise scale, and each segment adds `penalty_c * ln(n)`.
+
+    Args:
+        series: The observed blocks.
+        penalty_c: The penalty multiplier `c`.
 
     Returns:
         `last` (length n+1, the start index of the final segment of the best partition of each
@@ -346,15 +360,21 @@ def detection_delay(
     the injected one (the start is excluded). None means no boundary within the horizon.
     """
     start_block = start_day // block
-    acc_inj = accepted_by_prefix(series=series_inj, last=last_inj, start_block=start_block, block=block)
-    acc_base = accepted_by_prefix(series=series_base, last=last_base, start_block=start_block, block=block)
+    acc_inj = accepted_by_prefix(
+        series=series_inj, last=last_inj, start_block=start_block, block=block
+    )
+    acc_base = accepted_by_prefix(
+        series=series_base, last=last_base, start_block=start_block, block=block
+    )
     first_inj = next((t for t, ok in acc_inj.items() if ok), None)
     first_base = next((t for t, ok in acc_base.items() if ok), None)
     if first_base is not None and (first_inj is None or first_base <= first_inj):
         return float("nan")
     if first_inj is None:
         return None
-    return float(max(0, block_end_day(pos=int(series_inj.pos[first_inj - 1]), block=block) - start_day))
+    return float(
+        max(0, block_end_day(pos=int(series_inj.pos[first_inj - 1]), block=block) - start_day)
+    )
 
 
 def cusum_delay(
@@ -363,11 +383,13 @@ def cusum_delay(
     """Return the days to the first downward CUSUM alarm at or after the start, as in the search."""
     start_block = start_day // block
     inj = [
-        i for i, d in cusum_alarms(series=series_inj, h=h, block=block)
+        i
+        for i, d in cusum_alarms(series=series_inj, h=h, block=block)
         if d < 0 and series_inj.pos[i] >= start_block
     ]
     base = [
-        i for i, d in cusum_alarms(series=series_base, h=h, block=block)
+        i
+        for i, d in cusum_alarms(series=series_base, h=h, block=block)
         if d < 0 and series_base.pos[i] >= start_block
     ]
     if base and (not inj or base[0] <= inj[0]):
@@ -393,11 +415,15 @@ def new_boundaries(*, series: Series, last: np.ndarray, base: np.ndarray, tolera
 # ----- state-space (Viterbi) fit -------------------------------------------------------------
 
 
-def state_table(*, prep: Prep, block: int, turbines_only: bool) -> tuple[list[str], np.ndarray]:
+def state_table(
+    *, prep: Prep, refs: np.ndarray, turbines_only: bool
+) -> tuple[list[str], np.ndarray]:
     """Return state names and their mean feature vectors (p999, mid ratio, IQR), all relative.
 
-    Turbine states scale every feature by (N-k)/N. Clip states take the mid ratio and the IQR from
-    clipping the calibration half-hours at the clip level.
+    The features are divided by their median in the calibration window (`refs`), so the nameplate
+    state is (1, 1, 1). Turbine states scale every feature by (N-k)/N. Clip states take the mid
+    ratio and the IQR from clipping the calibration half-hours at the clip level, relative to the
+    unclipped values, and cap the 99.9th percentile at the clip level.
     """
     farm = prep.farm
     names = ["nameplate"]
@@ -411,33 +437,50 @@ def state_table(*, prep: Prep, block: int, turbines_only: bool) -> tuple[list[st
         cal = (farm.day >= common.CAL_START_DAY) & (farm.day <= common.CAL_END_DAY)
         cal_strong = prep.strong[cal[prep.strong]]
         cal_mid = prep.mid[cal[prep.mid]]
+        base_iqr = float(np.subtract(*np.quantile(farm.obs[cal_strong], [0.75, 0.25])))
         for c in CLIP_LEVELS:
             level = c * prep.ref_p999
             rm = np.minimum(farm.obs[cal_mid], level).sum() / farm.obs[cal_mid].sum()
             clipped = np.minimum(farm.obs[cal_strong], level)
-            iq = float(np.subtract(*np.quantile(clipped, [0.75, 0.25]))) / prep.ref_iqr
+            iq = float(np.subtract(*np.quantile(clipped, [0.75, 0.25]))) / base_iqr
             names.append(f"clip_{int(c * 100)}")
-            means.append(np.array([c, rm, iq]))
+            means.append(np.array([min(1.0, level / refs[0]), rm, iq]))
     return names, np.array(means)
 
 
+def feature_refs(*, feats: dict, block: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return the calibration-window median and robust standard deviation of the three features."""
+    cols = [feats["p999"], feats["rmid"], feats["iqr"]]
+    first = common.CAL_START_DAY // block
+    last = common.CAL_END_DAY // block
+    refs = np.ones(3)
+    noise = np.full(3, 0.2)
+    for j, col in enumerate(cols):
+        v = col[first:last]
+        v = v[np.isfinite(v)]
+        if len(v) > 5:
+            refs[j] = float(np.median(v))
+            noise[j] = max(1.4826 * float(np.median(np.abs(v - refs[j]))) / refs[j], 0.03)
+    return refs, noise
+
+
 def viterbi(
-    *, feats: dict, prep: Prep, block: int, turbines_only: bool, noise: np.ndarray,
+    *, feats: dict, prep: Prep, block: int, turbines_only: bool, refs: np.ndarray, noise: np.ndarray,
 ) -> tuple[np.ndarray, list[str]]:  # fmt: skip
     """Return the best state index per block and the state names.
 
-    `noise` holds the standard deviation of the three relative features (p999, mid ratio, IQR).
-    Missing features are skipped, and a block with none keeps the previous state.
+    `refs` and `noise` come from `feature_refs` on the unmodified series. Missing features are
+    skipped, and a block with none keeps the previous state.
     """
-    names, means = state_table(prep=prep, block=block, turbines_only=turbines_only)
+    names, means = state_table(prep=prep, refs=refs, turbines_only=turbines_only)
     rel = np.column_stack(
-        [feats["p999"] / prep.ref_p999, feats["rmid"] / prep.ref_rmid, feats["iqr"] / prep.ref_iqr]
+        [feats["p999"] / refs[0], feats["rmid"] / refs[1], feats["iqr"] / refs[2]]
     )
     if turbines_only:
         rel[:, 1:] = np.nan
     n_blocks, n_states = rel.shape[0], len(names)
     loglik = np.zeros((n_blocks, n_states))
-    for j in range(3):
+    for j in USED_FEATURES:
         ok = np.isfinite(rel[:, j])
         z = (rel[ok, j][:, None] - means[None, :, j]) / noise[j]
         loglik[ok] += -0.5 * z**2
@@ -458,20 +501,3 @@ def viterbi(
     for t in range(n_blocks - 2, -1, -1):
         path[t] = back[t + 1, path[t + 1]]
     return path, names
-
-
-def feature_noise(*, feats: dict, prep: Prep) -> np.ndarray:
-    """Return the robust standard deviation of the relative features in the calibration window."""
-    rel = np.column_stack(
-        [feats["p999"] / prep.ref_p999, feats["rmid"] / prep.ref_rmid, feats["iqr"] / prep.ref_iqr]
-    )
-    n_blocks = rel.shape[0]
-    block_days = common.N_DAYS / (n_blocks - 1)
-    first = int(common.CAL_START_DAY / block_days)
-    last = int(common.CAL_END_DAY / block_days)
-    out = np.zeros(3)
-    for j in range(3):
-        v = rel[first:last, j]
-        v = v[np.isfinite(v)]
-        out[j] = max(1.4826 * np.median(np.abs(v - np.median(v))), 0.03) if len(v) > 5 else 0.2
-    return out
