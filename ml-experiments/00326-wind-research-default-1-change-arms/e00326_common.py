@@ -30,7 +30,7 @@ IMPLIED_CASES_PATH: Final[Path] = (
     / "work"
     / "cases_hindcast.parquet"
 )
-"""Experiment 00307's hindcast cases with the implied 100 m wind and the ensemble mean 100 m wind."""
+"""Experiment 307's hindcast cases with the implied 100 m wind and the ensemble mean 100 m wind."""
 
 SEEDS: Final[tuple[int, ...]] = c303.SEEDS
 FARMS: Final[tuple[str, ...]] = ("W1", "W2", "W3")
@@ -41,7 +41,7 @@ KNOWN_ANSWER_SCALE: Final[float] = 0.85
 SHUFFLE_SEED: Final[int] = 326
 
 STORED_ARMS: Final[dict[str, str]] = {"stored_default": "xgb_B0", "c": "P8"}
-"""Arms read from storage: name -> the file prefix (experiment 285's xgb_B0, experiment 303's P8)."""
+"""Arms read from storage: name -> the file prefix (experiment 285 xgb_B0, experiment 303 P8)."""
 FIT_ARMS: Final[tuple[str, ...]] = ("default", "a", "b", "d", "d_rep", "a_pl", "b_pl", "c_pl")
 """Arms fitted here. `d_rep` is the hindcast set only, with the replicate's factor."""
 EXTRA_COLUMNS: Final[dict[str, tuple[str, ...]]] = {
@@ -62,7 +62,8 @@ def month_shuffle_index(*, valid: np.ndarray, seed: int) -> np.ndarray:
 
     Each calendar month is paired with a different calendar month (a random cyclic order of the
     months present, where a month is a year and a month), and each row takes the row at the same
-    rank by valid time within the paired month, modulo the paired month's row count. A single month is left unshuffled.
+    rank by valid time within the paired month, modulo the paired month's row count. A single month
+    is left unshuffled.
 
     Args:
         valid: The rows' valid times, any order.
