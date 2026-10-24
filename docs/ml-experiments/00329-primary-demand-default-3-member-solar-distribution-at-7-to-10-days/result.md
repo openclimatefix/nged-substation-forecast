@@ -9,7 +9,7 @@ theme: production-reference-and-best-guess
 also_relevant_to:
   - calibration-and-uncertainty
   - weather-products-and-blending
-status: planned
+status: done
 kind: change
 size: >-
   medium. Stored: private files under data/ml-experiments/00329-*/ only. Serving path: not touched.
@@ -63,6 +63,50 @@ metric: >-
   2026-06-30, replicate year 2024-25, rows outside the hand-filtered events, origin 09:00 UTC. Tail
   rates below q01 and q05 and above q95 and q99, and the probability-integral-transform histogram,
   on sunny daylight.
+best_arm: >-
+  None run. Primary demand research default 3 stays: 4.50 points on realised-sunny daylight at 168 to
+  240 hours, against the manual heuristic's 4.82.
+headline: >-
+  Stage 0 stopped the experiment. At 168 to 240 hours Primary demand research default 3 scores 4.50
+  points on realised-sunny daylight half-hours against the manual heuristic's 4.82 (6.6% better, 95%
+  interval 1.3% to 11.3% better), so the weakness of the convex chain (5.07, 5.2% worse) was closed
+  by the two-number solar summary and the daylight blend. One Primary (D5) is still worse than the
+  heuristic.
+take_home_message: >-
+  The 7-to-10-day weakness on sunny half-hours no longer exists in the research demand forecast:
+  the two-number solar summary and the daylight-only blend with the manual heuristic already took
+  it from 5.2% worse than the heuristic to 6.6% better, so no new distribution method is needed
+  there. What remains is one coastal Primary (D5), where the forecast is 11% worse than the
+  heuristic, which points back at the solar term and not at the width of the bands.
+lessons:
+  - >-
+    The sunny-daylight gap found in experiment 317 was a gap of the convex chain before the solar
+    summary (experiment 319) and the heuristic blend (experiment 322): the chain scores 5.07,
+    default 2 scores 4.74, and default 3 scores 4.50 against the heuristic's 4.82.
+  - >-
+    The sunny half-hours' q50 bias of +5.6 points is selection by the outcome: over all daylight
+    half-hours the bias is +0.01 points, so the pre-registered level-fault stop is not evidence of a
+    level fault.
+  - >-
+    On realised-sunny half-hours the default's lower tail is nearly calibrated (7.7% below q05, 1.7%
+    below q01), and the heuristic's is not (18.0% and 12.9%).
+  - >-
+    The remaining weakness is local: D5 scores 6.09 against the heuristic's 5.47, and D9 is level
+    with it (3.99 against 4.05), and both are coastal Primaries, as in experiment 325.
+advice:
+  - >-
+    Do not build a member-quantile or climatology-blended solar distribution for 7-to-10-day demand
+    bands: the sunny-daylight gap it aimed at is closed in default 3 (stage 0).
+  - >-
+    Investigate the solar term at the coastal Primaries D5 and D9 at 168 to 240 hours before any
+    further band change (per-Primary table, stage 0).
+  - >-
+    Read the q50 bias on a group defined by realised sunshine as selection by the outcome, and judge
+    level faults on all daylight half-hours (stage 0, "Checks").
+verdict: not supported
+production_status: not-for-production
+adopted_in: none
+code: ml-experiments/00329-primary-demand-default-3-member-solar-distribution-at-7-to-10-days/
 ---
 
 ## Plan
@@ -123,4 +167,70 @@ weights each month, so a weekly-retrained median would give the same contrast.
 
 ### Results
 
-To be written after the run.
+## Take-home message
+
+**The sunny-daylight weakness at 7 to 10 days that this experiment set out to fix is already
+closed in Primary demand research default 3, so the experiment stopped after stage 0 and ran none
+of its three arms.** Primary demand research default 3 is our research demand forecast for six
+Primary substations (anonymised as D5, D9, D10, D11, D14, and D16), up to 10 days ahead. We asked
+whether building its 7-to-10-day uncertainty bands from the 51 weather-forecast members' own solar
+responses (instead of their mean and standard deviation) would fix its score on the half-hours that
+turn out sunniest. We first scored the default on those half-hours (leads 168 to 240 hours, scored
+year 2025-07 to 2026-06). The default scores 4.50 points of capacity against the manual heuristic's
+4.82, which is 6.6% better (95% interval 1.3% to 11.3% better; the 99.5% interval includes zero).
+Experiment [317](../00317-primary-demand-default-1-at-7-to-10-days/result.md) had found the convex
+chain 5.2% worse (5.07), and the solar summary of experiment
+[319](../00319-primary-demand-default-1-solar-summary-and-heuristic-blend-at-7-to-10-days/result.md)
+and the daylight blend of experiment
+[322](../00322-primary-demand-default-2-daylight-only-heuristic-blend-and-sunshine-graft-replication/result.md)
+had already closed the gap. The one Primary still behind is D5, at 6.09 against 5.47.
+
+![Score on realised-sunny daylight by stage of the stack](sunny_by_stage.svg)
+
+![Score on realised-sunny daylight by Primary](sunny_by_primary.svg)
+
+![Where the realised demand falls among the forecast quantiles](pit_sunny.svg)
+
+## Findings
+
+- **Reproduction gate passed:** the default scores 2.727 at 0.5 to 240 hours and 3.077 at 168 to
+  240 hours, the values of experiment 322 (2.727 and 3.077).
+- **Sunny daylight, 37,612 half-hours at 168 to 240 hours:** default 3 scores 4.50, the manual
+  heuristic 4.82, and climatology 4.95. Default 3 beats the heuristic in each 24-hour band
+  (4.48, 4.52, and 4.51 against 4.83, 4.83, and 4.81).
+- **Per Primary (default, heuristic):** D5 6.09 and 5.47, D9 3.99 and 4.05, D10 5.41 and 6.21,
+  D11 3.55 and 4.06, D14 3.64 and 3.96, D16 4.48 and 5.23. Without D5 the default is 10.4% better
+  than the heuristic (95% interval 5.4% to 14.8%).
+- **Tails on realised-sunny half-hours:** the default has 1.7% below q01, 7.7% below q05, 0.7% above
+  q95, and 0.2% above q99. The heuristic has 12.9%, 18.0%, 1.3%, and 0.8%.
+- **Predictions against stage 0:** below-q05 rate above 8% failed (7.7%, near the bound). The q50
+  bias under 0.1 points failed (+5.6 points), and the bias over 0.3 points that stops the
+  experiment is met only through selection by the outcome (all daylight half-hours: +0.01).
+  Forecast-sunny half-hours (ensemble-mean clear-sky index of 0.9 or more) number only 601, and the
+  default is 18% worse than the heuristic there (5.02 against 4.27), too few rows to read.
+- **Stop rule:** the default already beats the heuristic on sunny daylight, so the experiment stops.
+  The three arms (X1, X2, X3) were not run, no model was refitted, and the slot was not used beyond
+  about 10 core-minutes.
+
+## Checks
+
+- **Median minus chain mean, per Primary, at 168 to 240 hours (points):** D5 -0.53, D9 -0.26,
+  D10 +0.01, D11 -0.17, D14 -0.22, D16 -0.07.
+- **Error of the median beside the score:** mean absolute error of the median on realised-sunny
+  half-hours is 8.20 for default 3 and 8.71 for the heuristic, the same direction as the score.
+- **Triggers:** none fired. The stage 0 results differ from the brief's expectation, and the cause
+  is tested above (the chain, default 2, and default 3 scored on the same rows). Leaving D5 out
+  strengthens the contrast and does not flip it, so no audit ran.
+
+## Caveats and what to try next
+
+- **Lead range:** 168 to 240 hours, the 7-to-10-day range, six Primaries, one scored year. The
+  replicate year was not scored, because the experiment stopped at stage 0.
+- **Interval:** the 99.5% interval of the default against the heuristic on sunny daylight includes
+  zero (-1.7% to 13.4%), so "6.6% better" is established at 95% only.
+- **Next:** look at the solar term at D5 and D9 (coastal Primaries) at 168 to 240 hours, where
+  experiment [325](../00325-primary-demand-default-3-sunshine-response-refit-and-restriction/result.md)
+  also found a sunshine response helps. The member-distribution arms stay available if a later
+  weakness at long leads shows a skewed tail.
+- **Code:** `ml-experiments/00329-primary-demand-default-3-member-solar-distribution-at-7-to-10-days/`
+  imports the folders of experiments 184, 202, 317, 319, 320, and 322 and reads their stored files.
