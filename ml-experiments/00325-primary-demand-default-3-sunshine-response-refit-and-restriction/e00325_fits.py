@@ -5,8 +5,8 @@ Cuts are the union of experiment 201's early cuts (2019-09 to 2024-07, for the p
 and experiment 184's monthly cuts (2024-04 onwards, for the ensemble-era rows). For each Primary
 and cut the training design is experiment 184's `build_base` plus the 30 response columns of
 `e00325_basis`, solved with the bounded least squares of experiment 323 (the response columns free
-in sign). One file per (Primary, cut) holds the coefficients of F1 and F1s. `e00325_chain` gates the rebuilt chain against the stored one; the fitted
-coefficients are compared with experiment 323's stored F1 by hand.
+in sign). One file per (Primary, cut) holds the coefficients of F1 and F1s. `e00325_chain` gates the rebuilt chain against the
+stored one; the fitted coefficients are compared with experiment 323's stored F1 by hand.
 
     PYTHONPATH=ml-experiments/00184-dp-ens-daylight-calibration:ml-experiments/00201-dp-gam-residual-mlp:ml-experiments/00323-primary-demand-default-3-flexible-sunshine-response-in-the-convex-fit \
     OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \

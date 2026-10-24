@@ -2,7 +2,8 @@
 r"""Stage C: rebuild Primary demand research default 3 with each variant's responses.
 
 For each variant (`v0r`, the rebuilt fit without a response, then `f1` and `f1s`), the chain's mean
-and all 11 quantiles are the variant's rebuilt chain of stage B, and the 51 members' responses are the variant's.
+and all 11 quantiles are the variant's rebuilt chain of stage B, and the 51 members' responses
+are the variant's.
 Every later stage is then rerun exactly as in the earlier experiments, with each factor refitted on
 completed history:
 
