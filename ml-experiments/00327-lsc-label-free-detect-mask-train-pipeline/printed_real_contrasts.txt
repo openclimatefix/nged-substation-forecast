@@ -1,0 +1,310 @@
+Running as unit: run-p648723-i92871470.scope; invocation ID: d96e1cb9d6344b83a26036e8b2fb279c
+=== all15 ===
+ordinary|winter=None units 27 rows 7452301
+   A   qs 2.7249 pin95 0.6957 pin99 0.2077 mae 4.7652 below01 0.0081 above99 0.0068
+   AF  qs 2.7149 pin95 0.6905 pin99 0.2061 mae 4.7514 below01 0.0082 above99 0.0065
+   B   qs 2.7378 pin95 0.6968 pin99 0.2234 mae 4.7626 below01 0.0082 above99 0.0063
+   C   qs 2.7605 pin95 0.7116 pin99 0.2201 mae 4.8268 below01 0.0084 above99 0.0077
+   D   qs 2.7437 pin95 0.7074 pin99 0.2187 mae 4.7969 below01 0.0084 above99 0.0077
+   E   qs 2.7315 pin95 0.6963 pin99 0.2088 mae 4.7743 below01 0.0085 above99 0.0070
+ordinary|winter=True units 9 rows 2167448
+   A   qs 2.6180 pin95 0.6874 pin99 0.2109 mae 4.5318 below01 0.0063 above99 0.0093
+   AF  qs 2.5933 pin95 0.6757 pin99 0.2074 mae 4.4914 below01 0.0063 above99 0.0083
+   B   qs 2.6526 pin95 0.6868 pin99 0.2286 mae 4.5522 below01 0.0074 above99 0.0074
+   C   qs 2.6686 pin95 0.7319 pin99 0.2534 mae 4.5966 below01 0.0064 above99 0.0113
+   D   qs 2.6549 pin95 0.7291 pin99 0.2517 mae 4.5708 below01 0.0063 above99 0.0115
+   E   qs 2.6374 pin95 0.6936 pin99 0.2158 mae 4.5576 below01 0.0073 above99 0.0104
+ordinary|winter=False units 18 rows 5284853
+   A   qs 2.7687 pin95 0.6991 pin99 0.2063 mae 4.8610 below01 0.0088 above99 0.0058
+   AF  qs 2.7647 pin95 0.6966 pin99 0.2055 mae 4.8581 below01 0.0090 above99 0.0058
+   B   qs 2.7728 pin95 0.7009 pin99 0.2212 mae 4.8489 below01 0.0085 above99 0.0059
+   C   qs 2.7982 pin95 0.7033 pin99 0.2065 mae 4.9212 below01 0.0091 above99 0.0062
+   D   qs 2.7801 pin95 0.6985 pin99 0.2052 mae 4.8896 below01 0.0093 above99 0.0062
+   E   qs 2.7700 pin95 0.6974 pin99 0.2060 mae 4.8632 below01 0.0090 above99 0.0056
+after48|winter=None units 23 rows 12348
+   A   qs 3.0507 pin95 0.7172 pin99 0.1975 mae 5.5291 below01 0.0047 above99 0.0195
+   AF  qs 3.0194 pin95 0.7159 pin99 0.1954 mae 5.4701 below01 0.0052 above99 0.0201
+   B   qs 2.7127 pin95 0.5754 pin99 0.1793 mae 4.9552 below01 0.0082 above99 0.0029
+   C   qs 4.8803 pin95 1.6699 pin99 0.5401 mae 8.0049 below01 0.0569 above99 0.0432
+   D   qs 2.4498 pin95 0.5562 pin99 0.1709 mae 4.3306 below01 0.0057 above99 0.0036
+   E   qs 2.9867 pin95 0.6482 pin99 0.1977 mae 5.4197 below01 0.0097 above99 0.0162
+after48|winter=True units 7 rows 3700
+   A   qs 3.3219 pin95 0.9262 pin99 0.2440 mae 5.9810 below01 0.0000 above99 0.0381
+   AF  qs 3.2678 pin95 0.9089 pin99 0.2297 mae 5.8889 below01 0.0000 above99 0.0370
+   B   qs 2.4936 pin95 0.5535 pin99 0.1792 mae 4.5962 below01 0.0000 above99 0.0008
+   C   qs 3.9581 pin95 1.2525 pin99 0.2255 mae 6.8707 below01 0.0278 above99 0.0257
+   D   qs 2.2343 pin95 0.4905 pin99 0.1621 mae 3.9830 below01 0.0000 above99 0.0011
+   E   qs 2.8522 pin95 0.6583 pin99 0.2312 mae 5.2325 below01 0.0000 above99 0.0251
+after48|winter=False units 16 rows 8648
+   A   qs 2.9347 pin95 0.6279 pin99 0.1776 mae 5.3357 below01 0.0067 above99 0.0116
+   AF  qs 2.9132 pin95 0.6333 pin99 0.1807 mae 5.2909 below01 0.0074 above99 0.0128
+   B   qs 2.8065 pin95 0.5847 pin99 0.1794 mae 5.1087 below01 0.0117 above99 0.0038
+   C   qs 5.2749 pin95 1.8485 pin99 0.6747 mae 8.4901 below01 0.0693 above99 0.0508
+   D   qs 2.5419 pin95 0.5842 pin99 0.1746 mae 4.4794 below01 0.0081 above99 0.0046
+   E   qs 3.0442 pin95 0.6438 pin99 0.1834 mae 5.4997 below01 0.0139 above99 0.0124
+after7d|winter=None units 25 rows 166868
+   A   qs 2.9276 pin95 0.7148 pin99 0.2215 mae 5.2357 below01 0.0055 above99 0.0154
+   AF  qs 2.9035 pin95 0.7208 pin99 0.2257 mae 5.1860 below01 0.0056 above99 0.0167
+   B   qs 2.7453 pin95 0.6483 pin99 0.2149 mae 4.9072 below01 0.0056 above99 0.0071
+   C   qs 3.6147 pin95 1.0348 pin99 0.3074 mae 6.2048 below01 0.0283 above99 0.0164
+   D   qs 2.6510 pin95 0.6361 pin99 0.2091 mae 4.6866 below01 0.0054 above99 0.0081
+   E   qs 2.9555 pin95 0.7113 pin99 0.2241 mae 5.2815 below01 0.0060 above99 0.0153
+after7d|winter=True units 8 rows 50202
+   A   qs 2.8549 pin95 0.7158 pin99 0.2671 mae 5.1145 below01 0.0005 above99 0.0186
+   AF  qs 2.8509 pin95 0.7382 pin99 0.2776 mae 5.0747 below01 0.0006 above99 0.0215
+   B   qs 2.4802 pin95 0.6011 pin99 0.2431 mae 4.4211 below01 0.0009 above99 0.0028
+   C   qs 3.1180 pin95 0.7985 pin99 0.2270 mae 5.5409 below01 0.0117 above99 0.0085
+   D   qs 2.3856 pin95 0.5782 pin99 0.2342 mae 4.1567 below01 0.0010 above99 0.0038
+   E   qs 2.7852 pin95 0.6863 pin99 0.2676 mae 5.0126 below01 0.0008 above99 0.0163
+after7d|winter=False units 17 rows 116666
+   A   qs 2.9588 pin95 0.7144 pin99 0.2018 mae 5.2878 below01 0.0076 above99 0.0140
+   AF  qs 2.9262 pin95 0.7133 pin99 0.2033 mae 5.2338 below01 0.0078 above99 0.0147
+   B   qs 2.8594 pin95 0.6685 pin99 0.2028 mae 5.1164 below01 0.0076 above99 0.0090
+   C   qs 3.8284 pin95 1.1365 pin99 0.3420 mae 6.4905 below01 0.0355 above99 0.0198
+   D   qs 2.7652 pin95 0.6610 pin99 0.1983 mae 4.9146 below01 0.0073 above99 0.0099
+   E   qs 3.0288 pin95 0.7221 pin99 0.2054 mae 5.3973 below01 0.0083 above99 0.0148
+all_rows|winter=None units 27 rows 13653741
+   A   qs 2.8035 pin95 0.7162 pin99 0.2115 mae 4.9181 below01 0.0081 above99 0.0068
+   AF  qs 2.7995 pin95 0.7149 pin99 0.2114 mae 4.9109 below01 0.0083 above99 0.0068
+   B   qs 2.8121 pin95 0.7160 pin99 0.2235 mae 4.9150 below01 0.0080 above99 0.0062
+   C   qs 2.8615 pin95 0.7395 pin99 0.2215 mae 5.0079 below01 0.0090 above99 0.0076
+   D   qs 2.8211 pin95 0.7229 pin99 0.2182 mae 4.9430 below01 0.0087 above99 0.0075
+   E   qs 2.8088 pin95 0.7171 pin99 0.2129 mae 4.9254 below01 0.0085 above99 0.0070
+all_rows|winter=True units 9 rows 4328901
+   A   qs 2.7188 pin95 0.6999 pin99 0.2127 mae 4.7386 below01 0.0070 above99 0.0082
+   AF  qs 2.7150 pin95 0.6991 pin99 0.2136 mae 4.7243 below01 0.0075 above99 0.0081
+   B   qs 2.7327 pin95 0.6978 pin99 0.2255 mae 4.7391 below01 0.0071 above99 0.0068
+   C   qs 2.7768 pin95 0.7305 pin99 0.2333 mae 4.8227 below01 0.0076 above99 0.0093
+   D   qs 2.7461 pin95 0.7209 pin99 0.2333 mae 4.7678 below01 0.0076 above99 0.0096
+   E   qs 2.7234 pin95 0.7011 pin99 0.2156 mae 4.7420 below01 0.0077 above99 0.0086
+all_rows|winter=False units 18 rows 9324840
+   A   qs 2.8429 pin95 0.7237 pin99 0.2110 mae 5.0014 below01 0.0086 above99 0.0061
+   AF  qs 2.8387 pin95 0.7222 pin99 0.2104 mae 4.9976 below01 0.0086 above99 0.0061
+   B   qs 2.8490 pin95 0.7245 pin99 0.2226 mae 4.9967 below01 0.0084 above99 0.0059
+   C   qs 2.9009 pin95 0.7436 pin99 0.2159 mae 5.0939 below01 0.0096 above99 0.0068
+   D   qs 2.8560 pin95 0.7239 pin99 0.2111 mae 5.0243 below01 0.0092 above99 0.0065
+   E   qs 2.8485 pin95 0.7246 pin99 0.2116 mae 5.0106 below01 0.0088 above99 0.0062
+A-C|ordinary|winter=None: qs -0.0356 (-0.0726 to -0.0067); pin95 -0.0160 (-0.0484 to +0.0056) [98.75%: -0.0599 to +0.0095]
+AF-C|ordinary|winter=None: qs -0.0456 (-0.0797 to -0.0202); pin95 -0.0211 (-0.0515 to -0.0022) [98.75%: -0.0627 to -0.0001]
+B-C|ordinary|winter=None: qs -0.0226 (-0.0513 to +0.0063); pin95 -0.0148 (-0.0469 to +0.0081) [98.75%: -0.0575 to +0.0119]
+D-C|ordinary|winter=None: qs -0.0168 (-0.0280 to -0.0084); pin95 -0.0042 (-0.0075 to -0.0013) [98.75%: -0.0086 to -0.0006]
+E-C|ordinary|winter=None: qs -0.0290 (-0.0683 to +0.0092); pin95 -0.0153 (-0.0467 to +0.0068) [98.75%: -0.0586 to +0.0115]
+A-C|ordinary|winter=True: qs -0.0506 (-0.1658 to +0.0246); pin95 -0.0445 (-0.1499 to +0.0234) [98.75%: -0.1906 to +0.0327]
+AF-C|ordinary|winter=True: qs -0.0752 (-0.1825 to +0.0001); pin95 -0.0561 (-0.1536 to +0.0023) [98.75%: -0.1919 to +0.0038]
+B-C|ordinary|winter=True: qs -0.0160 (-0.0709 to +0.0326); pin95 -0.0451 (-0.1458 to +0.0239) [98.75%: -0.1803 to +0.0324]
+D-C|ordinary|winter=True: qs -0.0136 (-0.0251 to -0.0026); pin95 -0.0028 (-0.0080 to +0.0010) [98.75%: -0.0098 to +0.0016]
+E-C|ordinary|winter=True: qs -0.0311 (-0.1592 to +0.0848); pin95 -0.0383 (-0.1427 to +0.0334) [98.75%: -0.1831 to +0.0487]
+A-C|ordinary|winter=False: qs -0.0295 (-0.0521 to -0.0059); pin95 -0.0043 (-0.0147 to +0.0055) [98.75%: -0.0175 to +0.0077]
+AF-C|ordinary|winter=False: qs -0.0334 (-0.0494 to -0.0178); pin95 -0.0067 (-0.0150 to +0.0003) [98.75%: -0.0175 to +0.0017]
+B-C|ordinary|winter=False: qs -0.0254 (-0.0587 to +0.0089); pin95 -0.0024 (-0.0161 to +0.0109) [98.75%: -0.0198 to +0.0144]
+D-C|ordinary|winter=False: qs -0.0181 (-0.0334 to -0.0074); pin95 -0.0048 (-0.0090 to -0.0012) [98.75%: -0.0105 to -0.0004]
+E-C|ordinary|winter=False: qs -0.0282 (-0.0500 to -0.0052); pin95 -0.0059 (-0.0151 to +0.0024) [98.75%: -0.0178 to +0.0041]
+A-C|after48|winter=None: qs -1.8296 (-3.5110 to -0.7342); pin95 -0.9527 (-2.3931 to -0.1790) [98.75%: -2.9527 to -0.1183]
+AF-C|after48|winter=None: qs -1.8609 (-3.6004 to -0.7438); pin95 -0.9540 (-2.4135 to -0.1801) [98.75%: -2.9694 to -0.1142]
+B-C|after48|winter=None: qs -2.1676 (-3.8339 to -1.0520); pin95 -1.0946 (-2.5420 to -0.2746) [98.75%: -3.0990 to -0.1911]
+D-C|after48|winter=None: qs -2.4306 (-3.9967 to -1.3439); pin95 -1.1138 (-2.5493 to -0.2983) [98.75%: -3.1021 to -0.2156]
+E-C|after48|winter=None: qs -1.8936 (-3.5045 to -0.8281); pin95 -1.0218 (-2.4542 to -0.2260) [98.75%: -3.0255 to -0.1520]
+A-C|after48|winter=True: qs -0.6362 (-1.1910 to -0.2227); pin95 -0.3264 (-0.8454 to -0.0118) [98.75%: -1.0602 to +0.0273]
+AF-C|after48|winter=True: qs -0.6903 (-1.3748 to -0.2009); pin95 -0.3436 (-0.9577 to -0.0079) [98.75%: -1.2244 to +0.0329]
+B-C|after48|winter=True: qs -1.4645 (-2.6921 to -0.4695); pin95 -0.6990 (-1.6097 to -0.0383) [98.75%: -1.9135 to +0.0081]
+D-C|after48|winter=True: qs -1.7238 (-2.8568 to -0.7126); pin95 -0.7620 (-1.6444 to -0.1015) [98.75%: -1.9408 to -0.0476]
+E-C|after48|winter=True: qs -1.1059 (-2.0611 to -0.2454); pin95 -0.5942 (-1.2634 to -0.0552) [98.75%: -1.4579 to +0.0026]
+A-C|after48|winter=False: qs -2.3402 (-4.7944 to -0.8026); pin95 -1.2206 (-3.3262 to -0.1378) [98.75%: -4.1845 to -0.0767]
+AF-C|after48|winter=False: qs -2.3617 (-4.9045 to -0.7954); pin95 -1.2152 (-3.3259 to -0.1361) [98.75%: -4.1982 to -0.0747]
+B-C|after48|winter=False: qs -2.4684 (-4.8814 to -0.9506); pin95 -1.2638 (-3.3612 to -0.1812) [98.75%: -4.2266 to -0.1120]
+D-C|after48|winter=False: qs -2.7330 (-5.0125 to -1.2567); pin95 -1.2643 (-3.3502 to -0.1898) [98.75%: -4.2111 to -0.1123]
+E-C|after48|winter=False: qs -2.2307 (-4.5814 to -0.7664); pin95 -1.2047 (-3.3014 to -0.1244) [98.75%: -4.1662 to -0.0658]
+A-C|after7d|winter=None: qs -0.6871 (-1.2045 to -0.3058); pin95 -0.3200 (-0.8262 to -0.0507) [98.75%: -1.0350 to -0.0281]
+AF-C|after7d|winter=None: qs -0.7111 (-1.2808 to -0.2960); pin95 -0.3140 (-0.8240 to -0.0438) [98.75%: -1.0310 to -0.0205]
+B-C|after7d|winter=None: qs -0.8693 (-1.3997 to -0.4555); pin95 -0.3866 (-0.8955 to -0.1040) [98.75%: -1.0941 to -0.0725]
+D-C|after7d|winter=None: qs -0.9636 (-1.4383 to -0.5845); pin95 -0.3987 (-0.9026 to -0.1144) [98.75%: -1.1042 to -0.0833]
+E-C|after7d|winter=None: qs -0.6592 (-1.1503 to -0.2919); pin95 -0.3235 (-0.8279 to -0.0544) [98.75%: -1.0361 to -0.0279]
+A-C|after7d|winter=True: qs -0.2631 (-0.6433 to +0.0632); pin95 -0.0827 (-0.2196 to -0.0012) [98.75%: -0.2668 to +0.0108]
+AF-C|after7d|winter=True: qs -0.2671 (-0.7529 to +0.1443); pin95 -0.0604 (-0.1827 to +0.0288) [98.75%: -0.2245 to +0.0454]
+B-C|after7d|winter=True: qs -0.6378 (-1.0734 to -0.2399); pin95 -0.1974 (-0.4664 to -0.0284) [98.75%: -0.5588 to -0.0008]
+D-C|after7d|winter=True: qs -0.7324 (-1.2123 to -0.2704); pin95 -0.2203 (-0.4835 to -0.0472) [98.75%: -0.5792 to -0.0195]
+E-C|after7d|winter=True: qs -0.3328 (-0.8084 to +0.0866); pin95 -0.1122 (-0.2719 to +0.0098) [98.75%: -0.3211 to +0.0343]
+A-C|after7d|winter=False: qs -0.8696 (-1.6181 to -0.3576); pin95 -0.4221 (-1.1536 to -0.0438) [98.75%: -1.4486 to -0.0162]
+AF-C|after7d|winter=False: qs -0.9022 (-1.7146 to -0.3541); pin95 -0.4232 (-1.1626 to -0.0436) [98.75%: -1.4556 to -0.0159]
+B-C|after7d|winter=False: qs -0.9690 (-1.7253 to -0.4146); pin95 -0.4680 (-1.1990 to -0.0813) [98.75%: -1.4809 to -0.0504]
+D-C|after7d|winter=False: qs -1.0632 (-1.7421 to -0.5682); pin95 -0.4755 (-1.1984 to -0.0870) [98.75%: -1.4808 to -0.0527]
+E-C|after7d|winter=False: qs -0.7997 (-1.4809 to -0.3214); pin95 -0.4144 (-1.1438 to -0.0387) [98.75%: -1.4345 to -0.0118]
+A-C|all_rows|winter=None: qs -0.0580 (-0.0831 to -0.0340); pin95 -0.0233 (-0.0445 to -0.0057) [98.75%: -0.0518 to -0.0023]
+AF-C|all_rows|winter=None: qs -0.0620 (-0.0870 to -0.0396); pin95 -0.0246 (-0.0447 to -0.0082) [98.75%: -0.0521 to -0.0056]
+B-C|all_rows|winter=None: qs -0.0494 (-0.0767 to -0.0229); pin95 -0.0234 (-0.0445 to -0.0049) [98.75%: -0.0517 to -0.0010]
+D-C|all_rows|winter=None: qs -0.0404 (-0.0642 to -0.0204); pin95 -0.0165 (-0.0329 to -0.0056) [98.75%: -0.0392 to -0.0042]
+E-C|all_rows|winter=None: qs -0.0527 (-0.0782 to -0.0288); pin95 -0.0223 (-0.0426 to -0.0059) [98.75%: -0.0500 to -0.0031]
+A-C|all_rows|winter=True: qs -0.0580 (-0.1024 to -0.0192); pin95 -0.0306 (-0.0767 to +0.0052) [98.75%: -0.0905 to +0.0109]
+AF-C|all_rows|winter=True: qs -0.0618 (-0.1103 to -0.0205); pin95 -0.0314 (-0.0736 to -0.0013) [98.75%: -0.0895 to -0.0001]
+B-C|all_rows|winter=True: qs -0.0441 (-0.0914 to -0.0007); pin95 -0.0327 (-0.0759 to +0.0053) [98.75%: -0.0886 to +0.0128]
+D-C|all_rows|winter=True: qs -0.0307 (-0.0568 to -0.0081); pin95 -0.0096 (-0.0200 to -0.0019) [98.75%: -0.0238 to -0.0012]
+E-C|all_rows|winter=True: qs -0.0533 (-0.1053 to -0.0089); pin95 -0.0294 (-0.0726 to +0.0010) [98.75%: -0.0878 to +0.0024]
+A-C|all_rows|winter=False: qs -0.0580 (-0.0898 to -0.0287); pin95 -0.0199 (-0.0438 to -0.0020) [98.75%: -0.0517 to +0.0011]
+AF-C|all_rows|winter=False: qs -0.0622 (-0.0923 to -0.0359); pin95 -0.0214 (-0.0445 to -0.0050) [98.75%: -0.0525 to -0.0026]
+B-C|all_rows|winter=False: qs -0.0519 (-0.0866 to -0.0186); pin95 -0.0191 (-0.0433 to +0.0001) [98.75%: -0.0510 to +0.0040]
+D-C|all_rows|winter=False: qs -0.0449 (-0.0777 to -0.0185); pin95 -0.0197 (-0.0430 to -0.0048) [98.75%: -0.0517 to -0.0033]
+E-C|all_rows|winter=False: qs -0.0524 (-0.0827 to -0.0245); pin95 -0.0190 (-0.0425 to -0.0026) [98.75%: -0.0509 to -0.0000]
+=== without_D9 ===
+ordinary|winter=None units 27 rows 7057333
+   A   qs 2.7541 pin95 0.7036 pin99 0.2095 mae 4.8203 below01 0.0085 above99 0.0070
+   AF  qs 2.7480 pin95 0.6994 pin99 0.2083 mae 4.8138 below01 0.0086 above99 0.0067
+   B   qs 2.7428 pin95 0.7012 pin99 0.2121 mae 4.7918 below01 0.0083 above99 0.0067
+   C   qs 2.7837 pin95 0.7093 pin99 0.2122 mae 4.8753 below01 0.0086 above99 0.0075
+   D   qs 2.7660 pin95 0.7048 pin99 0.2107 mae 4.8437 below01 0.0087 above99 0.0075
+   E   qs 2.7595 pin95 0.7033 pin99 0.2105 mae 4.8279 below01 0.0090 above99 0.0072
+ordinary|winter=True units 9 rows 2043324
+   A   qs 2.6489 pin95 0.6944 pin99 0.2131 mae 4.5906 below01 0.0067 above99 0.0096
+   AF  qs 2.6233 pin95 0.6811 pin99 0.2095 mae 4.5494 below01 0.0067 above99 0.0083
+   B   qs 2.6234 pin95 0.6880 pin99 0.2160 mae 4.5356 below01 0.0066 above99 0.0078
+   C   qs 2.6583 pin95 0.6973 pin99 0.2194 mae 4.6061 below01 0.0068 above99 0.0101
+   D   qs 2.6438 pin95 0.6944 pin99 0.2177 mae 4.5788 below01 0.0067 above99 0.0103
+   E   qs 2.6673 pin95 0.6991 pin99 0.2175 mae 4.6147 below01 0.0078 above99 0.0105
+ordinary|winter=False units 18 rows 5014009
+   A   qs 2.7970 pin95 0.7073 pin99 0.2080 mae 4.9139 below01 0.0092 above99 0.0060
+   AF  qs 2.7989 pin95 0.7068 pin99 0.2079 mae 4.9216 below01 0.0094 above99 0.0060
+   B   qs 2.7914 pin95 0.7066 pin99 0.2105 mae 4.8962 below01 0.0089 above99 0.0062
+   C   qs 2.8348 pin95 0.7141 pin99 0.2092 mae 4.9850 below01 0.0093 above99 0.0064
+   D   qs 2.8158 pin95 0.7091 pin99 0.2078 mae 4.9516 below01 0.0095 above99 0.0064
+   E   qs 2.7972 pin95 0.7050 pin99 0.2076 mae 4.9147 below01 0.0095 above99 0.0058
+after48|winter=None units 23 rows 12348
+   A   qs 3.0507 pin95 0.7172 pin99 0.1975 mae 5.5291 below01 0.0047 above99 0.0195
+   AF  qs 3.0194 pin95 0.7159 pin99 0.1954 mae 5.4701 below01 0.0052 above99 0.0201
+   B   qs 2.7127 pin95 0.5754 pin99 0.1793 mae 4.9552 below01 0.0082 above99 0.0029
+   C   qs 4.8803 pin95 1.6699 pin99 0.5401 mae 8.0049 below01 0.0569 above99 0.0432
+   D   qs 2.4498 pin95 0.5562 pin99 0.1709 mae 4.3306 below01 0.0057 above99 0.0036
+   E   qs 2.9867 pin95 0.6482 pin99 0.1977 mae 5.4197 below01 0.0097 above99 0.0162
+after48|winter=True units 7 rows 3700
+   A   qs 3.3219 pin95 0.9262 pin99 0.2440 mae 5.9810 below01 0.0000 above99 0.0381
+   AF  qs 3.2678 pin95 0.9089 pin99 0.2297 mae 5.8889 below01 0.0000 above99 0.0370
+   B   qs 2.4936 pin95 0.5535 pin99 0.1792 mae 4.5962 below01 0.0000 above99 0.0008
+   C   qs 3.9581 pin95 1.2525 pin99 0.2255 mae 6.8707 below01 0.0278 above99 0.0257
+   D   qs 2.2343 pin95 0.4905 pin99 0.1621 mae 3.9830 below01 0.0000 above99 0.0011
+   E   qs 2.8522 pin95 0.6583 pin99 0.2312 mae 5.2325 below01 0.0000 above99 0.0251
+after48|winter=False units 16 rows 8648
+   A   qs 2.9347 pin95 0.6279 pin99 0.1776 mae 5.3357 below01 0.0067 above99 0.0116
+   AF  qs 2.9132 pin95 0.6333 pin99 0.1807 mae 5.2909 below01 0.0074 above99 0.0128
+   B   qs 2.8065 pin95 0.5847 pin99 0.1794 mae 5.1087 below01 0.0117 above99 0.0038
+   C   qs 5.2749 pin95 1.8485 pin99 0.6747 mae 8.4901 below01 0.0693 above99 0.0508
+   D   qs 2.5419 pin95 0.5842 pin99 0.1746 mae 4.4794 below01 0.0081 above99 0.0046
+   E   qs 3.0442 pin95 0.6438 pin99 0.1834 mae 5.4997 below01 0.0139 above99 0.0124
+after7d|winter=None units 25 rows 166868
+   A   qs 2.9276 pin95 0.7148 pin99 0.2215 mae 5.2357 below01 0.0055 above99 0.0154
+   AF  qs 2.9035 pin95 0.7208 pin99 0.2257 mae 5.1860 below01 0.0056 above99 0.0167
+   B   qs 2.7453 pin95 0.6483 pin99 0.2149 mae 4.9072 below01 0.0056 above99 0.0071
+   C   qs 3.6147 pin95 1.0348 pin99 0.3074 mae 6.2048 below01 0.0283 above99 0.0164
+   D   qs 2.6510 pin95 0.6361 pin99 0.2091 mae 4.6866 below01 0.0054 above99 0.0081
+   E   qs 2.9555 pin95 0.7113 pin99 0.2241 mae 5.2815 below01 0.0060 above99 0.0153
+after7d|winter=True units 8 rows 50202
+   A   qs 2.8549 pin95 0.7158 pin99 0.2671 mae 5.1145 below01 0.0005 above99 0.0186
+   AF  qs 2.8509 pin95 0.7382 pin99 0.2776 mae 5.0747 below01 0.0006 above99 0.0215
+   B   qs 2.4802 pin95 0.6011 pin99 0.2431 mae 4.4211 below01 0.0009 above99 0.0028
+   C   qs 3.1180 pin95 0.7985 pin99 0.2270 mae 5.5409 below01 0.0117 above99 0.0085
+   D   qs 2.3856 pin95 0.5782 pin99 0.2342 mae 4.1567 below01 0.0010 above99 0.0038
+   E   qs 2.7852 pin95 0.6863 pin99 0.2676 mae 5.0126 below01 0.0008 above99 0.0163
+after7d|winter=False units 17 rows 116666
+   A   qs 2.9588 pin95 0.7144 pin99 0.2018 mae 5.2878 below01 0.0076 above99 0.0140
+   AF  qs 2.9262 pin95 0.7133 pin99 0.2033 mae 5.2338 below01 0.0078 above99 0.0147
+   B   qs 2.8594 pin95 0.6685 pin99 0.2028 mae 5.1164 below01 0.0076 above99 0.0090
+   C   qs 3.8284 pin95 1.1365 pin99 0.3420 mae 6.4905 below01 0.0355 above99 0.0198
+   D   qs 2.7652 pin95 0.6610 pin99 0.1983 mae 4.9146 below01 0.0073 above99 0.0099
+   E   qs 3.0288 pin95 0.7221 pin99 0.2054 mae 5.3973 below01 0.0083 above99 0.0148
+all_rows|winter=None units 27 rows 13066945
+   A   qs 2.8332 pin95 0.7240 pin99 0.2133 mae 4.9747 below01 0.0085 above99 0.0070
+   AF  qs 2.8318 pin95 0.7236 pin99 0.2136 mae 4.9725 below01 0.0086 above99 0.0070
+   B   qs 2.8256 pin95 0.7210 pin99 0.2145 mae 4.9557 below01 0.0081 above99 0.0065
+   C   qs 2.8870 pin95 0.7425 pin99 0.2182 mae 5.0590 below01 0.0090 above99 0.0076
+   D   qs 2.8447 pin95 0.7252 pin99 0.2147 mae 4.9912 below01 0.0087 above99 0.0075
+   E   qs 2.8380 pin95 0.7245 pin99 0.2145 mae 4.9815 below01 0.0088 above99 0.0071
+all_rows|winter=True units 9 rows 4137465
+   A   qs 2.7510 pin95 0.7070 pin99 0.2146 mae 4.8015 below01 0.0073 above99 0.0084
+   AF  qs 2.7492 pin95 0.7063 pin99 0.2158 mae 4.7909 below01 0.0078 above99 0.0083
+   B   qs 2.7309 pin95 0.7010 pin99 0.2161 mae 4.7612 below01 0.0068 above99 0.0072
+   C   qs 2.7927 pin95 0.7179 pin99 0.2174 mae 4.8659 below01 0.0079 above99 0.0088
+   D   qs 2.7606 pin95 0.7078 pin99 0.2173 mae 4.8083 below01 0.0079 above99 0.0091
+   E   qs 2.7551 pin95 0.7075 pin99 0.2173 mae 4.8042 below01 0.0080 above99 0.0087
+all_rows|winter=False units 18 rows 8929480
+   A   qs 2.8713 pin95 0.7318 pin99 0.2127 mae 5.0550 below01 0.0090 above99 0.0063
+   AF  qs 2.8701 pin95 0.7316 pin99 0.2126 mae 5.0567 below01 0.0090 above99 0.0063
+   B   qs 2.8695 pin95 0.7303 pin99 0.2138 mae 5.0459 below01 0.0087 above99 0.0062
+   C   qs 2.9307 pin95 0.7539 pin99 0.2185 mae 5.1485 below01 0.0094 above99 0.0071
+   D   qs 2.8838 pin95 0.7333 pin99 0.2135 mae 5.0759 below01 0.0090 above99 0.0067
+   E   qs 2.8765 pin95 0.7324 pin99 0.2132 mae 5.0637 below01 0.0092 above99 0.0064
+A-C|ordinary|winter=None: qs -0.0296 (-0.0508 to -0.0086); pin95 -0.0057 (-0.0190 to +0.0069) [98.75%: -0.0231 to +0.0102]
+AF-C|ordinary|winter=None: qs -0.0357 (-0.0544 to -0.0182); pin95 -0.0099 (-0.0215 to -0.0009) [98.75%: -0.0254 to +0.0006]
+B-C|ordinary|winter=None: qs -0.0410 (-0.0717 to -0.0102); pin95 -0.0081 (-0.0250 to +0.0073) [98.75%: -0.0304 to +0.0114]
+D-C|ordinary|winter=None: qs -0.0177 (-0.0299 to -0.0088); pin95 -0.0045 (-0.0081 to -0.0014) [98.75%: -0.0092 to -0.0007]
+E-C|ordinary|winter=None: qs -0.0242 (-0.0515 to +0.0099); pin95 -0.0060 (-0.0197 to +0.0086) [98.75%: -0.0236 to +0.0127]
+A-C|ordinary|winter=True: qs -0.0094 (-0.0514 to +0.0273); pin95 -0.0029 (-0.0411 to +0.0317) [98.75%: -0.0506 to +0.0387]
+AF-C|ordinary|winter=True: qs -0.0350 (-0.0824 to +0.0076); pin95 -0.0162 (-0.0477 to +0.0032) [98.75%: -0.0585 to +0.0040]
+B-C|ordinary|winter=True: qs -0.0349 (-0.0918 to +0.0154); pin95 -0.0093 (-0.0547 to +0.0284) [98.75%: -0.0676 to +0.0354]
+D-C|ordinary|winter=True: qs -0.0145 (-0.0271 to -0.0027); pin95 -0.0029 (-0.0089 to +0.0011) [98.75%: -0.0110 to +0.0016]
+E-C|ordinary|winter=True: qs +0.0089 (-0.0582 to +0.1068); pin95 +0.0018 (-0.0378 to +0.0471) [98.75%: -0.0477 to +0.0588]
+A-C|ordinary|winter=False: qs -0.0378 (-0.0619 to -0.0135); pin95 -0.0069 (-0.0178 to +0.0033) [98.75%: -0.0209 to +0.0057]
+AF-C|ordinary|winter=False: qs -0.0360 (-0.0538 to -0.0192); pin95 -0.0074 (-0.0163 to +0.0001) [98.75%: -0.0188 to +0.0015]
+B-C|ordinary|winter=False: qs -0.0434 (-0.0794 to -0.0064); pin95 -0.0076 (-0.0224 to +0.0069) [98.75%: -0.0265 to +0.0107]
+D-C|ordinary|winter=False: qs -0.0191 (-0.0356 to -0.0077); pin95 -0.0051 (-0.0097 to -0.0012) [98.75%: -0.0112 to -0.0004]
+E-C|ordinary|winter=False: qs -0.0377 (-0.0627 to -0.0128); pin95 -0.0091 (-0.0199 to -0.0001) [98.75%: -0.0230 to +0.0018]
+A-C|after48|winter=None: qs -1.8296 (-3.5110 to -0.7342); pin95 -0.9527 (-2.3931 to -0.1790) [98.75%: -2.9527 to -0.1183]
+AF-C|after48|winter=None: qs -1.8609 (-3.6004 to -0.7438); pin95 -0.9540 (-2.4135 to -0.1801) [98.75%: -2.9694 to -0.1142]
+B-C|after48|winter=None: qs -2.1676 (-3.8339 to -1.0520); pin95 -1.0946 (-2.5420 to -0.2746) [98.75%: -3.0990 to -0.1911]
+D-C|after48|winter=None: qs -2.4306 (-3.9967 to -1.3439); pin95 -1.1138 (-2.5493 to -0.2983) [98.75%: -3.1021 to -0.2156]
+E-C|after48|winter=None: qs -1.8936 (-3.5045 to -0.8281); pin95 -1.0218 (-2.4542 to -0.2260) [98.75%: -3.0255 to -0.1520]
+A-C|after48|winter=True: qs -0.6362 (-1.1910 to -0.2227); pin95 -0.3264 (-0.8454 to -0.0118) [98.75%: -1.0602 to +0.0273]
+AF-C|after48|winter=True: qs -0.6903 (-1.3748 to -0.2009); pin95 -0.3436 (-0.9577 to -0.0079) [98.75%: -1.2244 to +0.0329]
+B-C|after48|winter=True: qs -1.4645 (-2.6921 to -0.4695); pin95 -0.6990 (-1.6097 to -0.0383) [98.75%: -1.9135 to +0.0081]
+D-C|after48|winter=True: qs -1.7238 (-2.8568 to -0.7126); pin95 -0.7620 (-1.6444 to -0.1015) [98.75%: -1.9408 to -0.0476]
+E-C|after48|winter=True: qs -1.1059 (-2.0611 to -0.2454); pin95 -0.5942 (-1.2634 to -0.0552) [98.75%: -1.4579 to +0.0026]
+A-C|after48|winter=False: qs -2.3402 (-4.7944 to -0.8026); pin95 -1.2206 (-3.3262 to -0.1378) [98.75%: -4.1845 to -0.0767]
+AF-C|after48|winter=False: qs -2.3617 (-4.9045 to -0.7954); pin95 -1.2152 (-3.3259 to -0.1361) [98.75%: -4.1982 to -0.0747]
+B-C|after48|winter=False: qs -2.4684 (-4.8814 to -0.9506); pin95 -1.2638 (-3.3612 to -0.1812) [98.75%: -4.2266 to -0.1120]
+D-C|after48|winter=False: qs -2.7330 (-5.0125 to -1.2567); pin95 -1.2643 (-3.3502 to -0.1898) [98.75%: -4.2111 to -0.1123]
+E-C|after48|winter=False: qs -2.2307 (-4.5814 to -0.7664); pin95 -1.2047 (-3.3014 to -0.1244) [98.75%: -4.1662 to -0.0658]
+A-C|after7d|winter=None: qs -0.6871 (-1.2045 to -0.3058); pin95 -0.3200 (-0.8262 to -0.0507) [98.75%: -1.0350 to -0.0281]
+AF-C|after7d|winter=None: qs -0.7111 (-1.2808 to -0.2960); pin95 -0.3140 (-0.8240 to -0.0438) [98.75%: -1.0310 to -0.0205]
+B-C|after7d|winter=None: qs -0.8693 (-1.3997 to -0.4555); pin95 -0.3866 (-0.8955 to -0.1040) [98.75%: -1.0941 to -0.0725]
+D-C|after7d|winter=None: qs -0.9636 (-1.4383 to -0.5845); pin95 -0.3987 (-0.9026 to -0.1144) [98.75%: -1.1042 to -0.0833]
+E-C|after7d|winter=None: qs -0.6592 (-1.1503 to -0.2919); pin95 -0.3235 (-0.8279 to -0.0544) [98.75%: -1.0361 to -0.0279]
+A-C|after7d|winter=True: qs -0.2631 (-0.6433 to +0.0632); pin95 -0.0827 (-0.2196 to -0.0012) [98.75%: -0.2668 to +0.0108]
+AF-C|after7d|winter=True: qs -0.2671 (-0.7529 to +0.1443); pin95 -0.0604 (-0.1827 to +0.0288) [98.75%: -0.2245 to +0.0454]
+B-C|after7d|winter=True: qs -0.6378 (-1.0734 to -0.2399); pin95 -0.1974 (-0.4664 to -0.0284) [98.75%: -0.5588 to -0.0008]
+D-C|after7d|winter=True: qs -0.7324 (-1.2123 to -0.2704); pin95 -0.2203 (-0.4835 to -0.0472) [98.75%: -0.5792 to -0.0195]
+E-C|after7d|winter=True: qs -0.3328 (-0.8084 to +0.0866); pin95 -0.1122 (-0.2719 to +0.0098) [98.75%: -0.3211 to +0.0343]
+A-C|after7d|winter=False: qs -0.8696 (-1.6181 to -0.3576); pin95 -0.4221 (-1.1536 to -0.0438) [98.75%: -1.4486 to -0.0162]
+AF-C|after7d|winter=False: qs -0.9022 (-1.7146 to -0.3541); pin95 -0.4232 (-1.1626 to -0.0436) [98.75%: -1.4556 to -0.0159]
+B-C|after7d|winter=False: qs -0.9690 (-1.7253 to -0.4146); pin95 -0.4680 (-1.1990 to -0.0813) [98.75%: -1.4809 to -0.0504]
+D-C|after7d|winter=False: qs -1.0632 (-1.7421 to -0.5682); pin95 -0.4755 (-1.1984 to -0.0870) [98.75%: -1.4808 to -0.0527]
+E-C|after7d|winter=False: qs -0.7997 (-1.4809 to -0.3214); pin95 -0.4144 (-1.1438 to -0.0387) [98.75%: -1.4345 to -0.0118]
+A-C|all_rows|winter=None: qs -0.0538 (-0.0779 to -0.0315); pin95 -0.0185 (-0.0370 to -0.0038) [98.75%: -0.0429 to -0.0012]
+AF-C|all_rows|winter=None: qs -0.0551 (-0.0791 to -0.0348); pin95 -0.0189 (-0.0365 to -0.0059) [98.75%: -0.0427 to -0.0039]
+B-C|all_rows|winter=None: qs -0.0614 (-0.0899 to -0.0341); pin95 -0.0215 (-0.0410 to -0.0050) [98.75%: -0.0471 to -0.0014]
+D-C|all_rows|winter=None: qs -0.0422 (-0.0673 to -0.0213); pin95 -0.0172 (-0.0345 to -0.0059) [98.75%: -0.0411 to -0.0044]
+E-C|all_rows|winter=None: qs -0.0489 (-0.0721 to -0.0275); pin95 -0.0180 (-0.0357 to -0.0050) [98.75%: -0.0418 to -0.0028]
+A-C|all_rows|winter=True: qs -0.0416 (-0.0728 to -0.0146); pin95 -0.0108 (-0.0340 to +0.0094) [98.75%: -0.0410 to +0.0136]
+AF-C|all_rows|winter=True: qs -0.0435 (-0.0786 to -0.0174); pin95 -0.0116 (-0.0304 to -0.0002) [98.75%: -0.0386 to +0.0006]
+B-C|all_rows|winter=True: qs -0.0618 (-0.1075 to -0.0208); pin95 -0.0169 (-0.0470 to +0.0101) [98.75%: -0.0562 to +0.0153]
+D-C|all_rows|winter=True: qs -0.0321 (-0.0591 to -0.0086); pin95 -0.0100 (-0.0210 to -0.0020) [98.75%: -0.0252 to -0.0012]
+E-C|all_rows|winter=True: qs -0.0375 (-0.0733 to -0.0083); pin95 -0.0104 (-0.0289 to +0.0006) [98.75%: -0.0370 to +0.0016]
+A-C|all_rows|winter=False: qs -0.0594 (-0.0920 to -0.0299); pin95 -0.0221 (-0.0471 to -0.0035) [98.75%: -0.0554 to -0.0004]
+AF-C|all_rows|winter=False: qs -0.0605 (-0.0926 to -0.0346); pin95 -0.0223 (-0.0467 to -0.0052) [98.75%: -0.0555 to -0.0027]
+B-C|all_rows|winter=False: qs -0.0612 (-0.0978 to -0.0261); pin95 -0.0236 (-0.0491 to -0.0034) [98.75%: -0.0566 to +0.0008]
+D-C|all_rows|winter=False: qs -0.0469 (-0.0816 to -0.0192); pin95 -0.0206 (-0.0451 to -0.0050) [98.75%: -0.0543 to -0.0034]
+E-C|all_rows|winter=False: qs -0.0542 (-0.0841 to -0.0264); pin95 -0.0215 (-0.0461 to -0.0042) [98.75%: -0.0547 to -0.0016]
+ordinary rows, quantile score per series
+shape: (15, 7)
+┌────────┬──────────┬──────────┬──────────┬──────────┬──────────┬──────────┐
+│ series ┆ A        ┆ C        ┆ B        ┆ E        ┆ AF       ┆ D        │
+│ ---    ┆ ---      ┆ ---      ┆ ---      ┆ ---      ┆ ---      ┆ ---      │
+│ i32    ┆ f64      ┆ f64      ┆ f64      ┆ f64      ┆ f64      ┆ f64      │
+╞════════╪══════════╪══════════╪══════════╪══════════╪══════════╪══════════╡
+│ 3      ┆ 1.194871 ┆ 1.243347 ┆ 1.191831 ┆ 1.194592 ┆ 1.199    ┆ 1.2176   │
+│ 7      ┆ 2.20218  ┆ 2.345328 ┆ 2.649814 ┆ 2.229458 ┆ 2.122643 ┆ 2.345328 │
+│ 8      ┆ 2.318335 ┆ 2.322303 ┆ 2.247597 ┆ 2.399023 ┆ 2.231279 ┆ 2.324132 │
+│ 9      ┆ 2.865319 ┆ 2.855663 ┆ 2.838803 ┆ 2.867675 ┆ 2.840354 ┆ 2.845873 │
+│ 10     ┆ 2.721183 ┆ 2.729312 ┆ 2.637238 ┆ 2.71449  ┆ 2.722243 ┆ 2.731265 │
+│ …      ┆ …        ┆ …        ┆ …        ┆ …        ┆ …        ┆ …        │
+│ 17     ┆ 2.426081 ┆ 2.504156 ┆ 2.418437 ┆ 2.423329 ┆ 2.450657 ┆ 2.462755 │
+│ 18     ┆ 1.744891 ┆ 1.814392 ┆ 1.754121 ┆ 1.748595 ┆ 1.757442 ┆ 1.766867 │
+│ 24     ┆ 1.913174 ┆ 1.943852 ┆ 1.900678 ┆ 1.949117 ┆ 1.933363 ┆ 1.90113  │
+│ 25     ┆ 1.665715 ┆ 1.668818 ┆ 1.676409 ┆ 1.665736 ┆ 1.669641 ┆ 1.668733 │
+│ 26     ┆ 6.134097 ┆ 6.115569 ┆ 6.099008 ┆ 6.127817 ┆ 6.10002  ┆ 6.115425 │
+└────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
