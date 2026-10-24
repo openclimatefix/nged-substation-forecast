@@ -129,7 +129,8 @@ climatology](headline_score_by_lead.svg)
       replicate year (April and June 2025) F1s is -0.248 (-0.330 to -0.183), the same sign.
     - **PR3 (F1sel): mostly passed.** D10 and D16 move by +0.002 and +0.001. D5 and D9 keep all of F1s's
       gain (-0.049 and -0.013). D11 had no F1s gain (+0.006), and D14's F1s gain was 0.003. No
-      Primary's switch flipped more than twice (D10 twice, D11 and D16 once, D14, D5, and D9 never). The switch drops D14's F1s gain of 0.003, so the 80% retention test fails there.
+      Primary's switch flipped more than twice (D10 twice, D11 and D16 once, D14, D5, and D9 never).
+      The switch drops D14's F1s gain of 0.003, so the 80% retention test fails there.
     - **Stage 0: failed.** 52% of F1's all-daylight harm sits at index 0.3 to 0.9, under the 60%
       predicted. Another 23% sits under 0.3 and 25% above 0.9. Above 0.9, F1 also harms the
       placebo Primaries most.
