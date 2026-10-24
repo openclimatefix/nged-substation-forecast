@@ -26,7 +26,7 @@ import e00328_common as c
 import e00328_detectors as det
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import naive_utc
 
 BASE_DIR = c.WORK_DIR / "base"

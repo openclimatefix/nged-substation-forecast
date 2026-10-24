@@ -27,7 +27,7 @@ import e00328_detect as d328
 import e00328_detectors as det
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_ens_weather import replace_site
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
