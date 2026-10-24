@@ -494,6 +494,16 @@ and 0.062 points on the kept rows, intervals excluding zero), and worsened it by
 when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
 three farms, July 2025 to June 2026).
 
+**Do not check a wind farm's capacity from half-hours at strong ERA5 wind alone (provisional, medium
+confidence).** *Applies to: experiments.* The half-hours with ERA5 100 m speed at least 2 m/s above
+the speed where the fitted power curve saturates hold 0.31% (W1), 1.12% (W2), and 0.18% (W3) of
+half-hours, so 28-day blocks rarely hold the 20 half-hours that a stable high quantile needs. The
+ratio of observed to expected power over every half-hour at 20% of scale or more found a loss of half
+the capacity within 60 days at 91% to 93% of start dates at all three farms, and a loss of a quarter
+at 26% to 77%. Evidence: [experiment
+341](00341-wind-capacity-steps-from-strong-wind/result.md), three farms, 2019-09 to 2026-06. The
+real records show repaired episodes of 2 weeks to 3 months and no permanent step.
+
 **Do not zero the wind forecast, or the training target, where the wind speed is below the turbines'
 cut-in speed (provisional, medium confidence).** *Applies to: experiments and production.* The cut-
 in speeds fitted by the physics core are 2.69 m/s (W1), 2.85 m/s (W2), and 3.38 m/s (W3). The ERA5
