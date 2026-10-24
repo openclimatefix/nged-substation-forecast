@@ -33,8 +33,8 @@ import e00321_recal as recal  # noqa: E402  # ty: ignore[unresolved-import]
 import e00324_common as common  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
-from torch import nn  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
+from torch import nn  # noqa: E402  # ty: ignore[unresolved-import]
 
 TRAIN_CUTOFF: Final[datetime] = datetime(2025, 4, 16, tzinfo=UTC)
 EPOCHS: Final[int] = int(os.environ.get("E00324_EPOCHS", "40"))
