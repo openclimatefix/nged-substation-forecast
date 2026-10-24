@@ -13,7 +13,8 @@ size: >-
   write-up review and a Sonnet prose review (Sonnet only, by the maintainer's instruction).
   Stored: private tables under data/ml-experiments/00328-*/ only (the regime log is a table in
   that folder). Serving path: not touched. Degradation rule: not touched. Designs: more than one is
-  defensible (three detectors, four modelling arms), each fixed below before any score is read.
+defensible (two statistical detectors plus dates from the Embedded Capacity Register, and five
+  pre-registered arms), each fixed below before any score is read.
   Callers: this folder's scripts, which call the reviewed `studies.dp_gam` functions and the code
   of experiments 295 and 297 unchanged; the only change under `packages/` is a reviewed addition to
   `studies.ecr_reader` that returns the connection date.
@@ -72,7 +73,7 @@ adopted_in: none
 verdict: not supported
 best_arm: >-
   None. The best pre-registered arm, D2 (regime effects, bands from the regime's own residuals,
-  filter reset), scores 0.089 points worse than arm B (last 24 months) in the first 90 days after
+  filter reset), scores 0.088 points worse than arm B (last 24 months) in the first 90 days after
   an injected 10% step (98.75% interval 0.038 to 0.146 worse). Post hoc arm D2t (trailing bands)
   ties arm B there (B minus D2t +0.009, interval -0.023 to +0.042).
 headline: >-
@@ -82,48 +83,59 @@ headline: >-
   last 24 months scores as well as every regime-aware arm in the first 90 days after a step.
 lessons:
   - >-
-    A recent-window refit already handles an injected permanent step as well as the regime-stacked
-    arms do, so regime machinery is not needed for the forecast on this base.
+    A recent-window refit handled an injected permanent step as well as the regime-stacked arms
+    did, so this base needs no regime machinery for the forecast.
   - >-
-    Estimating bands from only the residuals since a detected change costs about 0.1 points on
-    Primaries with no change (arm Ar minus A), because false alarms leave a short, noisy sample.
+    Setting the bands from only the residuals since a detected change lowers the score by about 0.1
+    points on Primaries with no change (arm Ar minus A), because false alarms leave a short, noisy
+    sample.
   - >-
     Freezing the old effects at a detected change (C1) is 1.4 points worse on Primaries with no
     injected change, because every false alarm leaves a stale fit.
-production_status: not-for-production
-adopted_in: none
 take_home_message: >-
   Adding effects for a detected permanent change does not forecast better than refitting the
-  model on the last 24 months, on a model fed past weather. The detectors find a 10% step of a
+additive model on the last 24 months, in a lab setting where the model is given past weather. The
+  detectors find a 10% step of a
   Primary's load within 60 days only 26% of the time at an acceptable false-alarm rate, so there
-  is little time after the alarm for the extra effects to help. Regime changes are therefore a
-  retraining-cadence question, and the detector is useful at most for substation cards.
+  is little time after the alarm for the extra effects to help. On this base, handling a regime
+  change comes down to how often the model is refitted. The rolling-GAM detector might still help
+  when building substation cards, which this experiment did not test.
 advice:
   - >-
     Handle a permanent step in a Primary's load by refitting on a recent window, not by regime
     effects: B matched or beat C1, C2, D1, and D2 in the first 90 days (injected 10% and 25%
     steps).
   - >-
-    Do not estimate forecast bands from the residuals since a detected change alone: it costs
-    0.098 points on Primaries with no change (Ar minus A, real records).
+    Do not estimate forecast bands from the residuals since a detected change alone: it worsens the
+    score by 0.098 points on Primaries with no change (Ar minus A, real records).
   - >-
-    Do not rely on a CUSUM of the rolling lagless GAM's daily residual for steps under 15% of
-    load: it finds 26% of 10% steps within 60 days at one false change per Primary-year (detection
+    Do not rely on the rolling lagless GAM detector (a cumulative sum of its daily forecast
+errors) for steps under 15% of load: it finds 26% of 10% steps within 60 days at one false
+    change per Primary-year (detection
     table).
 ---
 
-**Take-home: adding effects for a detected permanent change does not beat refitting on the last 24 months.**
-The regime arms lose to a recent-window refit in the first 90 days after an injected step, because
-both detectors alarm late and miss small steps. At D8 the extra effects change the first-90-day
-score by no more than the noise. The verdict is `not supported`.
+**Take-home: adding effects for a detected permanent change does not forecast better than refitting
+the model on the last 24 months.**
+We injected a permanent step of 10% or 25% of load into the recorded demand of 14 Primary
+substations (the substations that feed local distribution feeders), and compared forecasts that add new effects
+after a detected change with forecasts refitted on the last 24 months (arm B). Arm B scored as well
+as or better than every pre-registered regime arm in the first 90 days after a step, because the two
+detectors raise their alarms late and miss small steps. At D8, the Primary with a real gas-engine
+connection, the difference in the first 90 days was smaller than its interval (B minus C2 -0.040,
+interval -0.262 to +0.154). The verdict is `not supported`, which means the hypothesis that regime
+effects beat a recent-window refit did not hold.
 
-We asked whether a substation that gains a lasting new behaviour (a large generator, a new
-factory) is forecast better by keeping the old effects and adding regime-specific effects than by
-refitting on a recent window. The model is a lagless additive model (GAM) fitted to past weather
-(ERA5 and CAMS), with a one-day-ahead level filter, so this is a lab setting and not Primary
-demand research default 3. The step is injected as a permanent 10% or 25% of load at 14 Primaries.
-D8's gas engine is the one real change. Fewer than three real changes exist, so the real-record
-evidence is D8 alone.
+The forecast model is a lagless generalised additive model (GAM) fitted to past weather (ERA5 and
+CAMS), with a one-day-ahead level filter, so the result applies to a lab setting and not to Primary
+demand research default 3. A "lagless" model reads no recent power. D8's gas engine is the only real
+change we identified in the 15 Primaries' records, so the real-record evidence is D8 alone.
+
+**Arm key.** A is one fit on all history, B one fit on the last 24 months, C1 a fit frozen at the
+detected change plus new effects, and C2 a joint fit of old and new effects. D1 and D2 are C1 and C2
+with the level filter reset at the change. Suffixes mark post hoc variants: `t` uses trailing
+365-day bands, `o` uses the true change date (an oracle), `r` is arm A with bands from only the
+residuals since the detected change, and `n` removes the level filter.
 
 ![Recall of 10% steps against false changes](detection_curve.svg)
 
@@ -131,20 +143,22 @@ evidence is D8 alone.
 
 ![D8 by days since the break](d8_by_group.svg)
 
-## Checks
+## Controls and audit
 
-- Median minus mean forecast: not applicable. Every arm forecasts quantiles and the median directly;
+- Median forecast against mean forecast: not applicable. Every arm forecasts quantiles and the
+  median directly;
   no mean forecast exists. The mean absolute error of the median is printed beside every score in
   `printed_report.txt` and points the same way as the quantile score.
 - Audit triggers that fired: (1) the pre-registered placebo (C arms against A at 14 Primaries with
-  no change) failed at +0.055 (C2) and +1.364 (C1); the explanation, tested, is the regime-band
-  rule (arm Ar minus A is +0.098) and stale frozen fits after false alarms. (5) Nested arm A beats
-  C1 and C2 on the real records.
+  no change) failed at +0.055 (C2) and +1.364 (C1); the tested explanation is the regime-band
+  rule (arm Ar minus A is +0.098) and stale frozen fits after false alarms. (5) nested arm A, which
+  C1 and C2 contain, beats both on the real records.
 - A Sonnet audit (Opus was excluded for this session) re-derived the 25% step contrasts from the
   stored forecasts and matched. Triage: the one-day look-ahead in `known_regime` (an alarm raised on
   the origin day) was fixed and every score re-run; the filter subtracting a step twice once a
   regime is known was tested with the no-filter arms below; the bootstrap clusters of one Primary
-  and one onset were too fine, so the headline intervals now cluster by onset (8 clusters), which
+  and one onset were too fine, so the headline intervals now cluster by onset (eight clusters),
+  which
   widens them. The oracle placebo C2o equals A by construction when no true change exists, so it
   checks the plumbing only.
 - Leaving D8 out is not applicable to the injected contrasts, which exclude D8.
@@ -159,17 +173,18 @@ evidence is D8 alone.
 - Weekly histogram (penalty 128): recall 0.00 for 10% steps and ramps, 0.10 for 25% steps.
 - D8 (break 2023-08-15): rolling GAM dates the change 2023-08-20 but alarms on 2023-12-06 (113 days
   late); histogram dates it 2023-08-17 and alarms 2023-10-19 (65 days late).
-- The Embedded Capacity Register holds 3 assets of 1 MW or more connected since 2020-06-01 at these
-  Primaries, none at D8 near 2023-08, so it gave no independent check of the D8 date.
+- The Embedded Capacity Register holds 3 generators of at least 1 MW connected since 2020-06-01 at
+  these
+  Primaries, none at D8 near 2023-08, so the Register gave no independent check of the D8 date.
 - False changes count real load shifts, so the rates are upper bounds.
 
 ## Forecast
 
 - Quantile score: twice the mean pinball loss over 11 levels (0.01 to 0.99), in points of capacity.
-  Intervals are 98.75% (four pre-registered contrasts) and resample the 8 onset months of the
+  Intervals are 98.75% (four pre-registered contrasts) and resample the eight onset months of the
   injected worlds, or the calendar months of the real records.
-- Injected 10% steps, first 90 days: A 3.273, B 3.270, C2 3.389, D2 3.358. B minus C2 -0.118
-  (-0.200 to -0.059); B minus D2 -0.088 (-0.146 to -0.038); C1 and D1 are about 1.4 points worse.
+- Injected 10% steps, first 90 days: A 3.273, B 3.270, C2 3.389, D2 3.358. B minus C2 is -0.118
+  (-0.200 to -0.059); B minus D2 is -0.088 (-0.146 to -0.038); C1 and D1 are about 1.4 points worse.
 - Injected 25% steps, first 90 days: A 3.945, B 3.978, C2 4.231, D2 4.171; B minus C2 -0.252
   (-0.320 to -0.181).
 - Post hoc, trailing bands (C2t, D2t): B minus C2t +0.004 (-0.034 to +0.046) at 10% and -0.081
@@ -177,12 +192,13 @@ evidence is D8 alone.
 - Post hoc, no level filter on any arm: the level filter matters more than the regime effects.
   Without it, C2 against the no-filter recent window (Bn) is +0.015 (-0.353 to +0.379) at 10% and
   +0.782 (-0.033 to +1.508) at 25% in the first 90 days, and +0.198 (+0.066 to +0.334) and +0.859
-  (+0.419 to +1.277) after day 90. The true-date oracle gains +1.331 (+0.757 to +1.868) at 25%. Every
+  (+0.419 to +1.277) after day 90. The true-date oracle gains +1.331 (+0.757 to +1.868) at 25%.
+  Every
   filtered arm still scores far better than every unfiltered arm (arm B 3.978, arm Bn 8.047 at 25%
   steps, first 90 days).
 - D8, first 90 days after the break: B minus C2 -0.040 (-0.262 to +0.154); post hoc B minus C2t
   +0.065 (+0.037 to +0.129); all rows after the break B minus C2t +0.150 (-0.057 to +0.372). The
-  D8 intervals rest on 3 to 4 forecast months. The q99 exceedance after the break is 0.031 for arm B
+  D8 intervals rest on 3 to 4 monthly forecast origins. The q99 exceedance after the break is 0.031 for arm B
   and 0.031 for C2t against a nominal 0.010, so no arm is calibrated at D8.
 - Primaries with no injection (14, real records): B minus A -0.021 (-0.037 to -0.004), C2t minus A
   -0.030 (-0.046 to -0.013), D2t minus A -0.033 (-0.050 to -0.016), against the 0.01 margin. C2
@@ -200,7 +216,7 @@ evidence is D8 alone.
   implementation the filter also subtracts a known step a second time once regime effects exist,
   which biases the regime arms against themselves; the no-filter rows above remove that bias but
   are far worse in absolute terms.
-- Next: Stage 1b of the brief (confirm each candidate regime date by whether arm C2 improves out of
-  sample on blocked time folds, then scan 60 days either side of each candidate) needs a new design
-  and is the next experiment. A regime arm that replaces the level filter, rather than stacking on
-  it, is the other untested design, and would be run on the full Primary demand research default 3.
+- Untested: confirming each candidate regime date by whether arm C2 improves out of sample on
+  blocked time folds, then scanning 60 days either side of each candidate, needs a new design.
+  A regime arm that replaces the level filter, instead of stacking on it, is also untested, and
+  would need testing on the full Primary demand research default 3.
