@@ -27,6 +27,7 @@ Outputs, in `work/final/`: `<arm>.npy` (3 seeds, scored cases, 11), `<arm>_rep.n
 import json
 import os
 import shutil
+from typing import Any
 
 for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_name, "1")
@@ -224,7 +225,7 @@ def main() -> None:  # noqa: PLR0915
         ).astype(np.float64)
         put(arm="default", main=scored_q, rep=rep_q)
         # Each period: (train quantiles, train actual, train sub-key, scored quantiles, scored key).
-        periods = {
+        periods: dict[str, dict[str, Any]] = {
             "main": {
                 "tq": hind_q,
                 "ta": hind_actual,
