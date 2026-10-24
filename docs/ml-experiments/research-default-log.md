@@ -9,6 +9,7 @@ afterwards except to change its status.
 
 | Version | Change | Adopting experiment | Scored-year gain | Replicate gain | Absolute headline score | Benchmarks (BG2, `manual_heuristic`, `climatology`) | Stored forecasts | Code commit | Status |
 |---|---|---|---|---|---|---|---|---|---|
+| Primary demand research default 2 | Default plus the two-number solar summary S extended from 0.5 to 168 hours to 0.5 to 240 hours | [319](00319-primary-demand-default-1-solar-summary-and-heuristic-blend-at-7-to-10-days/result.md) | -0.064 points (2.0%) at 168 to 240 hours, -0.019 points at 0.5 to 240 hours (99.5% interval wholly below zero) | -0.034 points at 168 to 240 hours (95% interval -0.050 to -0.017) | 2.749 points at 0.5 to 240 hours, 3.152 at 168 to 240 hours | BG2 not scored past 168 hours; manual heuristic 3.414 and climatology 3.664 at 0.5 to 240 hours | The private files `work/arms/scored_long_lead.parquet` and `replicate_long_lead.parquet` of experiment 319 | `20f0afe6f` | Current |
 | Primary demand research default 1 | The GAM stack A+H+S | [220](00220-dp-bg-stage4-assembly-with-drop-one/result.md) and [251](00251-dp-final-best-guess-assembly-clip-and-coast-against-bg2/result.md) | First version | First version | To be filled from experiment 251 when the first adoption is logged | To be filled with the first adoption | To be named with the first adoption | To be named with the first adoption | First version, set by the rule |
 
 ## Metered solar farms
