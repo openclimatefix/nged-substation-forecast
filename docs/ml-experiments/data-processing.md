@@ -494,6 +494,18 @@ and 0.062 points on the kept rows, intervals excluding zero), and worsened it by
 when the weather was ERA5 ([experiment 276](00276-wind-xgboost-vs-physics-gap-diagnostics/result.md),
 three farms, July 2025 to June 2026).
 
+**Do not zero the wind forecast, or the training target, where the wind speed is below the turbines'
+cut-in speed (provisional, medium confidence).** *Applies to: experiments and production.* The cut-
+in speeds fitted by the physics core are 2.69 m/s (W1), 2.85 m/s (W2), and 3.38 m/s (W3). The ERA5
+100 m speed falls below cut-in on 5.4% of scored half-hours, and 99.9% of those half-hours are
+already in experiment 210's mask. That ERA5 rule finds only 54% of the mask's rows. The ensemble-
+mean speed falls below cut-in on 0.77% of half-hours. Setting the forecast to zero on those half-
+hours raised the kept-row quantile score by 0.004 points (99.67% interval 0.000 to 0.012) and raised
+the score on the zeroed rows from 2.39 to 3.92, because the farms still produce small real output
+there. Setting the training target to zero changed the score by 0.001 points (-0.010 to 0.012).
+Evidence: [experiment 336](00336-wind-research-default-1-below-cut-in-zeroing/result.md), three
+farms, July 2025 to June 2026.
+
 **Build the ensemble hindcast member rows with the production feature engineer, and expect a table
 of offsets per lead day, quantile, and farm to lower the wind forecast's quantile score
 (provisional, low confidence).** *Applies to: experiments.* The production `TabularFeatureEngineer`
