@@ -18,6 +18,7 @@ or dropped).
 
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Final
 
 import numpy as np
@@ -104,7 +105,8 @@ def mark_clean(*, frame: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
         > PN_EXCESS_SHARE * pl.col("provisional_capacity_mw")
     )
     frame = frame.with_columns(
-        clean=~pl.col("accepted") & ~pl.col("pn_excess").fill_null(value=False)
+        clean=~pl.col("accepted"),
+        clean_pn5=~pl.col("accepted") & ~pl.col("pn_excess").fill_null(value=False),
     )
     capacity = (
         frame.filter(before, pl.col("clean"))
@@ -227,31 +229,9 @@ def main() -> None:
     selection.write_parquet(CLEAN_DIR / "selection.parquet")
     kept.write_parquet(CLEAN_DIR / "farms.parquet")
     names = kept["elexon_bmu_id"].to_list()
-    clean = frame.filter(pl.col("elexon_bmu_id").is_in(names)).select(
-        "elexon_bmu_id",
-        "period_start",
-        "clean",
-        norm=pl.when(pl.col("clean")).then(pl.col("mw") / pl.col("capacity_mw")),
-    )
-    ends = clean.select(
-        "elexon_bmu_id",
-        valid_time=pl.col("period_start") + pl.duration(minutes=30),
-        end_norm=pl.col("norm"),
-    )
-    starts = clean.select(
-        "elexon_bmu_id", valid_time=pl.col("period_start"), start_norm=pl.col("norm")
-    )
-    centred = (
-        ends.join(starts, on=["elexon_bmu_id", "valid_time"], how="inner")
-        .select(
-            "elexon_bmu_id",
-            "valid_time",
-            actual_norm=(pl.col("end_norm") + pl.col("start_norm")) / 2,
-        )
-        .drop_nulls("actual_norm")
-        .sort("elexon_bmu_id", "valid_time")
-    )
-    centred.write_parquet(CLEAN_DIR / "actual_centred.parquet")
+    kept_frame = frame.filter(pl.col("elexon_bmu_id").is_in(names))
+    write_centred(frame=kept_frame, keep="clean", path=CLEAN_DIR / "actual_centred.parquet")
+    write_centred(frame=kept_frame, keep="clean_pn5", path=CLEAN_DIR / "actual_centred_pn5.parquet")
     pl.Config.set_tbl_rows(60)
     pl.Config.set_tbl_cols(12)
     qualify = selection.filter(pl.col("qualifies")).height
@@ -272,6 +252,34 @@ def main() -> None:
             "fold",
         ).sort("fold", "elexon_bmu_id")
     )
+
+
+def write_centred(*, frame: pl.DataFrame, keep: str, path: Path) -> None:
+    """Write the mean of the two settlement periods around each instant, over capacity."""
+    clean = frame.select(
+        "elexon_bmu_id",
+        "period_start",
+        norm=pl.when(pl.col(keep)).then(pl.col("mw") / pl.col("capacity_mw")),
+    )
+    ends = clean.select(
+        "elexon_bmu_id",
+        valid_time=pl.col("period_start") + pl.duration(minutes=30),
+        end_norm=pl.col("norm"),
+    )
+    starts = clean.select(
+        "elexon_bmu_id", valid_time=pl.col("period_start"), start_norm=pl.col("norm")
+    )
+    centred = (
+        ends.join(starts, on=["elexon_bmu_id", "valid_time"], how="inner")
+        .select(
+            "elexon_bmu_id",
+            "valid_time",
+            actual_norm=(pl.col("end_norm") + pl.col("start_norm")) / 2,
+        )
+        .drop_nulls("actual_norm")
+        .sort("elexon_bmu_id", "valid_time")
+    )
+    centred.write_parquet(path)
 
 
 if __name__ == "__main__":
