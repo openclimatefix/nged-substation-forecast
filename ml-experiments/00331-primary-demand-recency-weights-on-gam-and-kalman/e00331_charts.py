@@ -1,8 +1,10 @@
 # ruff: noqa: E501
 """Draw the figures of experiment 331 from the stored scores.
 
+```bash
 PYTHONPATH=ml-experiments/00295-*:ml-experiments/00328-*:ml-experiments/00331-* \
     uv run --no-sync python ml-experiments/00331-*/e00331_charts.py
+```
 """
 
 import textwrap
