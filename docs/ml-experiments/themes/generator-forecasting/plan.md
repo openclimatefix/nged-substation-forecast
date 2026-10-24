@@ -6,7 +6,6 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
-| 336 | Does zeroing the wind forecast below the turbines' cut-in speed improve Wind farms research default 1? | 1 | nothing | Planned; fits running |
 | 307 | Which property of the ensemble's wind speed is wrong, judged against the wind that the farms' own power implies? | 2 | nothing | Planned |
 | 276 | Why does XGBoost beat the physics core on the three metered wind farms, and is the metering noise the reason? | 1 | nothing | Planned; running diagnostics D1 to D10 |
 
