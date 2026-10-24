@@ -111,6 +111,9 @@ def main() -> None:  # noqa: PLR0912, PLR0915
             if not path.exists():
                 continue
             quantiles = np.load(path)
+            if quantiles.shape[1] != frame.height:
+                msg = f"{arm}{suffix}: {quantiles.shape[1]} rows for {frame.height} cases"
+                raise ValueError(msg)
             metrics[arm] = {
                 **score303.row_metrics(quantiles=quantiles, actual=actual),
                 **score326.extra_metrics(quantiles=quantiles, actual=actual),
