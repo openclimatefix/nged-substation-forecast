@@ -93,7 +93,9 @@ def main() -> None:
     rep: dict = {"n_rows": joined.height, "n_cold_rows": int(cold.sum()), "n_sunny_rows": int(sunny.sum())}  # fmt: skip
     rep["by_mask"] = {a: {cut: {k: float(m[a][k][mask].mean()) for k in keys_abs} for cut, mask in masks.items() if mask.any()} for a in arms}  # fmt: skip
     rep["gate"] = {"default_168_240": float(m["default"]["qs"].mean()), "expected": GATE_168_240}
-    rep["gate"]["pass"] = bool(abs(rep["gate"]["default_168_240"] - GATE_168_240) <= base.GATE_TOLERANCE)
+    rep["gate"]["pass"] = bool(
+        abs(rep["gate"]["default_168_240"] - GATE_168_240) <= base.GATE_TOLERANCE
+    )
     contrasts: dict = {}
     for treat in CONTRASTS:
         diff = m[treat]["qs"] - m["default"]["qs"]
@@ -121,10 +123,27 @@ def main() -> None:
     rep["contrasts"] = contrasts
     mean_d = joined["mean_d"].to_numpy()
     rep["checks"] = {
-        "median_minus_mean_forecast_per_site": {a: {s: float((arms[a][site == s, common.MEDIAN_INDEX].astype(np.float64) - mean_d[site == s]).mean()) for s in common.SCORED_SITES} for a in ("default", "STD", "STDA")},  # fmt: skip
-        "mean_forecast_mae": {a: float(np.abs(arms[a].astype(np.float64).mean(axis=1) - actual).mean()) for a in ("default", "STD", "STDA")},  # fmt: skip
+        "median_minus_mean_forecast_per_site": {
+            a: {
+                s: float(
+                    (
+                        arms[a][site == s, common.MEDIAN_INDEX].astype(np.float64)
+                        - mean_d[site == s]
+                    ).mean()
+                )
+                for s in common.SCORED_SITES
+            }
+            for a in ("default", "STD", "STDA")
+        },
+        "mean_forecast_mae": {
+            a: float(np.abs(arms[a].astype(np.float64).mean(axis=1) - actual).mean())
+            for a in ("default", "STD", "STDA")
+        },
         "median_mae": {a: float(m[a]["mae"].mean()) for a in ("default", "STD", "STDA")},
-        "mean_forecast_mae_without_d10": {a: float(np.abs(arms[a].astype(np.float64).mean(axis=1) - actual)[no_d10].mean()) for a in ("default", "STD", "STDA")},  # fmt: skip
+        "mean_forecast_mae_without_d10": {
+            a: float(np.abs(arms[a].astype(np.float64).mean(axis=1) - actual)[no_d10].mean())
+            for a in ("default", "STD", "STDA")
+        },
     }
     own.REPORT_DIR.mkdir(parents=True, exist_ok=True)
     common.write_json_atomic(path=own.REPORT_DIR / "report_scored.json", content=rep)

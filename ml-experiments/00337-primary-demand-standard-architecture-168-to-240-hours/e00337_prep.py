@@ -48,7 +48,8 @@ def site_rows(*, site: str, cache) -> pl.DataFrame:  # noqa: ANN001
     run = chain["run"].to_numpy().astype(np.int64)
     ens_t, ens_sw = f201.ens_means(site=site)
     drv_temp, drv_sw = ens_t[run, step], ens_sw[run, step]
-    assert np.isfinite(drv_temp).all() and np.isfinite(drv_sw).all(), f"{site}: ensemble weather has gaps"  # fmt: skip
+    assert np.isfinite(drv_temp).all(), f"{site}: ensemble temperature has gaps"
+    assert np.isfinite(drv_sw).all(), f"{site}: ensemble shortwave has gaps"
     return chain.with_columns(
         anomaly=pl.lit(0.0, dtype=pl.Float32),
         drv_temp_c=pl.Series(drv_temp.astype(np.float32)),
@@ -82,7 +83,9 @@ def add_calendar(*, frame: pl.DataFrame) -> pl.DataFrame:
 def main() -> None:
     """Build the arrays."""
     cache = c201.load_cache()
-    frame = add_calendar(frame=pl.concat([site_rows(site=s, cache=cache) for s in c278.SCORED_SITES]))
+    frame = add_calendar(
+        frame=pl.concat([site_rows(site=s, cache=cache) for s in c278.SCORED_SITES])
+    )
     frame = frame.unique(subset=["site", "power_fcst_init_time", "valid_time"], keep="first", maintain_order=True)  # fmt: skip
     matrix = data.design_columns(frame=frame, arm=own_input_arm())
     width = (frame["q95"] - frame["q05"]).to_numpy().astype(np.float64) / 3.29

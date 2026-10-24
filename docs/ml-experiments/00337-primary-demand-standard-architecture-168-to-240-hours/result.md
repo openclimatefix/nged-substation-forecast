@@ -54,20 +54,24 @@ best_arm: >-
   interval -0.346 to +0.072).
 headline: >-
   At 168 to 240 hours the standard architecture scores 0.123 points (4.0%) better than Primary
-  demand research default 3, and 0.055 points (1.9%) better with D10 left out, so it is not worse by
-  0.03 or more. Both 95% intervals include zero, and the cold-winter-night and sunny-daylight
+  demand research default 3, and 0.055 points (1.9%) better with D10 left out, so the point
+  estimates are
+  better than the default. Both 95% intervals include zero, so a small harm cannot be excluded, and
+  the cold-winter-night and sunny-daylight
   no-harm bounds are not met with confidence. Negative differences are better.
 take_home_message: >-
-  The standard architecture (a neural network on top of the frozen convex stack, with a learned
-  input adapter and a mixture-density output) forecasts Primary demand at 7 to 10 days ahead at
-  least as well as the current research default, so demand does not need a different architecture
-  from wind and solar across NGED's 1-to-10-day range. As in experiment 330, the gain is carried by
-  the mixture-density output and by two Primaries (D10 and D16), and the gain is too uncertain to
-  call certain, so the architecture is a candidate and not a replacement.
+  The standard architecture (a neural network that corrects the forecast of the convex stack, with a
+  learned input adapter and a mixture-density output) forecast Primary demand at 7 to 10 days ahead
+  with a lower error than
+  the current research default over the 12 months scored. Most of the gain comes from the
+  mixture-density output and from two Primaries (D10 and D16). The 12 months of data cannot
+  establish the gain, so the standard architecture is a candidate for demand across NGED's
+  1-to-10-day range, not yet a replacement.
 lessons:
   - >-
-    The result of experiment 330 holds at 168 to 240 hours: the standard architecture is better than
-    the default by 0.123 points, or 0.055 without D10, in every 24-hour lead band.
+    At 168 to 240 hours the point estimates have the same sign as in experiment 330: the standard
+    architecture is better than the default by 0.123 points, or 0.055 without D10, and better in
+    each 24-hour lead band. The intervals include zero.
   - >-
     The median-only version (STD-A) gains 0.026 points, so most of the gain again comes from the
     mixture-density output; STD-A does improve cold winter nights by 0.143 points.
@@ -90,20 +94,24 @@ adopted_in: none
 ---
 
 **Take-home:** The standard architecture is a small neural network with a learned input adapter and
-a mixture-density output (a spread of forecast quantiles from three overlapping bell curves). It sits
-on top of the frozen convex stack of Primary demand research default 3. At forecast lead times of 168
+a mixture-density output (a spread of forecast quantiles from three overlapping bell curves). It
+sits
+on top of the frozen convex stack of Primary demand research default 3. At forecast lead times of
+168
 to 240 hours (7 to 10 days) it forecasts demand at six Primary substations (33/11 kV substations)
 slightly better than the default, as it did at 0.5 to 168 hours in
 [experiment 330](../00330-primary-demand-standard-architecture-arm/result.md). With experiment 330,
 the result now covers the 0.5-to-240-hour range that National Grid Electricity Distribution (NGED)
-needs. The 95% interval includes zero, and two Primaries (D10 and D16) supply most of the gain.
+needs. The 95% interval includes zero, so a small harm cannot be excluded, and two Primaries (D10
+and D16)
+supply most of the gain.
 Scores are quantile scores in points of effective capacity, and lower is better.
 
 We asked whether replacing the default's median correction, spread table, and band steps with one
-network costs accuracy at 7 to 10 days. The mixture-density output follows
+neural network makes the forecast less accurate at 7 to 10 days. The mixture-density output follows
 [Bishop (1994)](https://publications.aston.ac.uk/id/eprint/373/). The arms, network, and settings are
 those of experiment 330. STD scored 2.954 points against the default's 3.077 (difference -0.123).
-The same network with a median-only output (STD-A) scored 3.051 (difference -0.026).
+The same neural network with a median-only output (STD-A) scored 3.051 (difference -0.026).
 
 ![Quantile score by lead band for the default, STD, STD-A, the manual heuristic, and climatology](figure_1_score_by_lead.svg)
 
@@ -154,32 +162,33 @@ The same network with a median-only output (STD-A) scored 3.051 (difference -0.0
   STD against 5.326 for the default; mean 5.342 against 5.459 (without D10: 5.071 against 5.149).
   Both point the same way as the quantile score.
 - **Audit triggers:** none of the strict triggers fired. The sign survives leaving out D10. The
-  95% interval for STD is 3.6 times as wide as experiment 330's at the same contrast, which is the
-  size trigger 6 names; the rows differ (168 to 240 hours against 0.5 to 168), so the trigger does
+  95% interval for STD is 3.6 times as wide as experiment 330's at the same contrast, the size that
+  audit trigger 6 names; the rows differ (168 to 240 hours against 0.5 to 168), so the trigger does
   not strictly apply. The width has an explanation in the per-Primary gains (D10 and D16 gain
-  0.45 and 0.33 points, D5 and D9 do not) and in the 12 months of resampling blocks. No Opus audit
-  was run, because the session was limited to Sonnet; the manager is told.
+  0.45 and 0.33 points, D5 and D9 do not) and in the 12 months of resampling blocks. No independent
+  audit has been run on this result.
 
 ## Caveats and what to try next
 
 - **Lead range:** 168 to 240 hours only. With experiment 330 the full 0.5-to-240-hour range is
   covered, with different training rows for each part.
 - **Training rows:** only the ensemble era (July 2024 onward) has 168-to-240-hour rows, so the pool
-  grows from 233,628 rows at the first refit to 408,691 at the last, against 24 months of rows for
-  experiment 330. The networks were trained on 168-to-240-hour rows only.
+  grows from 233,628 rows at the first refit (12 months) to 408,691 at the last (about 23 months),
+  against 24 months of rows for experiment 330. The networks were trained on 168-to-240-hour rows
+  only.
 - **Inputs:** the filter's level is the level of the same run and hour band at 168 hours or less,
   and the anomaly is zero (its mean absolute value is 0.009 points at 144 to 168 hours).
 - **Comparator and not done:** the default is experiment 335's stored default 3 forecast (the
   daylight heuristic blend past 168 hours), and the as-of calibration of experiment 164 was not
   applied to STD. No replicate-year check was run, because the replicate months are in the training
   pool.
-- **Seeds:** STD and STD-A average 6 seeds, and the stored default averages 3.
+- **Seeds:** STD and STD-A average six seeds, and the stored default averages 3.
 - **Schedule:** monthly refits on a rolling pool (P-roll); absolute scores could move under weekly
   refits.
 - **Next:** score STD at 0.5 to 240 hours in one run once more months of 168-to-240-hour rows exist,
   and test the median-only adapter on cold winter nights at long leads.
 
-## The five plan items
+## The question, prediction, rows, metric, and stop rule
 
 1. **Question.** Does the standard architecture (STD) score within 0.03 points of Primary demand
    research default 3 at 168 to 240 hours, with and without D10?
@@ -187,7 +196,7 @@ The same network with a median-only output (STD-A) scored 3.051 (difference -0.0
 3. **Rows and period.** Six Primaries, scored year 2025-07-02 to 2026-06-30, origin 09:00 UTC, rows
    outside hand-filtered events, valid times 168 to 240 hours after the origin. Rows come from
    experiment 317's stored chain (the ensemble era only), so the training pool grows from 12 months
-   at the first refit to 24 months at the last.
+   at the first refit to about 23 months at the last.
 4. **Metric.** As in experiment 330: the quantile score, the research-default page's protected
    groups and tolerances, tail calibration at q01, q05, q95, and q99, and month-block intervals.
 5. **Stop rule.** The reproduction gate fails, or STD is more than 0.10 points worse than the

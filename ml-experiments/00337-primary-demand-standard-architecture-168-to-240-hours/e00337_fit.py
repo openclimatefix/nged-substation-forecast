@@ -100,7 +100,7 @@ def run_job(task: tuple[str, str, int]) -> str:
     centre = np.asarray(mean[test_idx])[:, None]
     width = np.asarray(scale[test_idx])[:, None]
     if head == "std":
-        q = centre + width * fit330._mixture_quantiles(model=model, x=x_test)  # noqa: SLF001
+        q = centre + width * fit330._mixture_quantiles(model=model, x=x_test)
         columns = [pl.Series(name, q[:, k].astype(np.float32)) for k, name in enumerate(common.QUANTILES)]  # fmt: skip
     else:
         with torch.no_grad():
