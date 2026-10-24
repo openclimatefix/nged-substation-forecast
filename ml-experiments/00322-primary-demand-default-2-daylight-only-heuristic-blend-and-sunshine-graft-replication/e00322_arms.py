@@ -135,9 +135,7 @@ def blend_arms(
     return {
         "d1": np.where(day, blended, base),
         "d2": a320.apply_blend(base=base, heuristic=heuristic, w=table),
-        "d3": np.where(
-            day, blended, a320.apply_blend(base=base, heuristic=heuristic, w=w_share)
-        ),
+        "d3": np.where(day, blended, a320.apply_blend(base=base, heuristic=heuristic, w=w_share)),
     }
 
 
@@ -182,7 +180,7 @@ def main() -> None:
     log: dict = {}
 
     def table_weight(*, rows: np.ndarray, weights: np.ndarray) -> np.ndarray:
-        return a320._table_w(frame=frame, rows=rows, weights=weights)  # noqa: SLF001
+        return a320._table_w(frame=frame, rows=rows, weights=weights)
 
     for m in sorted(set(month[scored])):
         rows_m = scored[month[scored] == m]

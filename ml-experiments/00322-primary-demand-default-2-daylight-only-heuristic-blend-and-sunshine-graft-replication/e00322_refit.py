@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 r"""Stage 3 refits: experiment 305's depth-1 XGBoost twin, refitted in the replicate year.
 
 Copies the additive (depth-1, four times the rounds) variant of experiment 305 and changes only the
@@ -34,7 +33,7 @@ PRED_DIR = common.WORK_DIR / "refit" / "preds"
 
 def run_site(*, site: str, threads: int) -> list[str]:
     """Fit and predict both refits of one site, keeping the site's training rows in memory once."""
-    series, arrays = recipe._series_and_arrays()  # noqa: SLF001
+    series, arrays = recipe._series_and_arrays()
     row = next(r for r in series.iter_rows(named=True) if r["site"] == site)
     config = recipe.CONFIGS["n1h"]
     rows = recipe.training_rows(row=row, arrays=arrays[site], frozen=True, a7=False)
@@ -63,12 +62,20 @@ def run_site(*, site: str, threads: int) -> list[str]:
         columns = recipe.input_columns(a7=False)
         raw = model.predict(xgb.DMatrix(wanted.select(columns).to_numpy().astype(np.float32)))
         quantiles = np.sort(raw, axis=1) * SCALE
-        table = wanted.select("power_fcst_init_time", "valid_time", *columns).with_columns(
-            site=pl.lit(site),
-            *[pl.Series(f"r_q{round(level * 100):02d}", quantiles[:, i]) for i, level in enumerate(c305.LEVELS)],
+        table = (
+            wanted.select("power_fcst_init_time", "valid_time", *columns)
+            .with_columns(
+                [
+                    pl.Series(f"r_q{round(level * 100):02d}", quantiles[:, i])
+                    for i, level in enumerate(c305.LEVELS)
+                ]
+            )
+            .with_columns(site=pl.lit(site))
         )
         c305.atomic_write(frame=table, target=out)
-        messages.append(f"{site} {month}: {known.height:,} training rows, {table.height:,} predictions")
+        messages.append(
+            f"{site} {month}: {known.height:,} training rows, {table.height:,} predictions"
+        )
     return messages
 
 

@@ -13,7 +13,9 @@ import e00320_common as c320  # ty: ignore[unresolved-import]
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 EXPERIMENT_ID: Final[int] = 322
-SLUG: Final[str] = "primary-demand-default-2-daylight-only-heuristic-blend-and-sunshine-graft-replication"
+SLUG: Final[str] = (
+    "primary-demand-default-2-daylight-only-heuristic-blend-and-sunshine-graft-replication"
+)
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
 WORK_DIR: Final[Path] = DATA_DIR / "work"
 ARMS_DIR: Final[Path] = WORK_DIR / "arms"

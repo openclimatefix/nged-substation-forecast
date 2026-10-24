@@ -21,7 +21,7 @@ import numpy as np
 import polars as pl
 
 QUANTILES = c320.QUANTILES
-LONG_ARMS = ("r319", "d1", "d2", "d3")
+LONG_ARMS = ("r319", "d1", "d2", "d3", "d3b")
 ARMS = ("default", *LONG_ARMS)
 REFERENCES = ("manual_heuristic", "climatology")
 BAND_EDGES = s317.BAND_EDGES
@@ -33,6 +33,9 @@ CONTRASTS = (
     ("d2", "default"),
     ("d3", "default"),
     ("d3", "d1"),
+    ("d3b", "default"),
+    ("d3b", "d1"),
+    ("d3b", "manual_heuristic"),
     ("d2", "d1"),
     ("d1", "r319"),
     ("d1", "manual_heuristic"),
@@ -49,6 +52,28 @@ def economy_7_night(*, valid_time: pl.Series) -> np.ndarray:
     local = valid_time.dt.convert_time_zone("Europe/London")
     minute = (local.dt.hour().cast(pl.Int32) * 60 + local.dt.minute().cast(pl.Int32)).to_numpy()
     return (minute >= 60) & (minute < 420)
+
+
+def add_d3b(*, frame: pl.DataFrame, kind_column: str) -> pl.DataFrame:
+    """Add the post hoc arm d3b: the experiment 319 blend everywhere except forecast cold winter nights.
+
+    A forecast cold winter night is a winter (November to March) half-hour after dark, local 18:00
+    to 07:00, where at least half of the 51 members have a 24-hour mean temperature below 3 C. On
+    those half-hours the chain alone is kept (experiment 320's B1 with the member share in place of
+    the ensemble-mean rule).
+    """
+    local_hour = frame["valid_time"].dt.convert_time_zone("Europe/London").dt.hour().to_numpy()
+    month = frame["valid_time"].dt.month().to_numpy()
+    flag = (
+        (np.nan_to_num(frame["p_share"].to_numpy(), nan=0.0) >= common.FLAG_SHARE)
+        & (frame[kind_column] != "daylight").fill_null(False).to_numpy()
+        & np.isin(month, list(c320.WINTER_MONTHS))
+        & ((local_hour >= 18) | (local_hour < 7))
+    )
+    return frame.with_columns(
+        pl.Series(f"d3b_{q}", np.where(flag, frame[f"x1_{q}"], frame[f"r319_{q}"]))
+        for q in QUANTILES
+    ).with_columns(share_rule=pl.Series(flag))
 
 
 def recall_table(*, rows: pl.DataFrame, long: np.ndarray) -> dict:
@@ -121,7 +146,9 @@ def recall_table(*, rows: pl.DataFrame, long: np.ndarray) -> dict:
 def replicate_report() -> dict:
     """Return the replicate year's contrasts at 168 to 240 hours for each arm."""
     chain = s319.load_chain_period(period="replicate")
-    stored = pl.read_parquet(common.ARMS_DIR / "replicate_long_lead.parquet")
+    stored = add_d3b(
+        frame=pl.read_parquet(common.ARMS_DIR / "replicate_long_lead.parquet"), kind_column="kind"
+    )
     keys = ["site", "power_fcst_init_time", "valid_time"]
     rows = chain.select(*keys, "actual").join(stored, on=keys, how="inner", validate="1:1")
     rows = rows.filter(pl.col("lead_hours") > c320.STORED_HORIZON_HOURS)
@@ -168,14 +195,17 @@ def main() -> None:
     )
     keys = ["site", "power_fcst_init_time", "valid_time"]
     rows = rows.join(stored, on=keys, how="left", validate="1:1")
-    long_arms = pl.read_parquet(
-        common.ARMS_DIR / "scored_long_lead.parquet",
-        columns=[
-            *keys,
-            "p_share",
-            "kind",
-            *[f"{a}_{q}" for a in ("x1", "r319", "d1", "d2", "d3") for q in QUANTILES],
-        ],
+    long_arms = add_d3b(
+        frame=pl.read_parquet(
+            common.ARMS_DIR / "scored_long_lead.parquet",
+            columns=[
+                *keys,
+                "p_share",
+                "kind",
+                *[f"{a}_{q}" for a in ("x1", "r319", "d1", "d2", "d3") for q in QUANTILES],
+            ],
+        ),
+        kind_column="kind",
     ).rename({"kind": "kind_long"})
     rows = rows.join(long_arms, on=keys, how="left", validate="1:1")
     rows = s317.flags(rows=rows)
@@ -238,10 +268,14 @@ def main() -> None:
         ),
         "cold_winter_night_rows_168_240": int((cold_scored & long).sum()),
         "cold_winter_night_rows_kind_daylight": int(
-            (cold_scored & long & (rows["kind_long"] == "daylight").fill_null(False).to_numpy()).sum()
+            (
+                cold_scored & long & (rows["kind_long"] == "daylight").fill_null(False).to_numpy()
+            ).sum()
         ),
         "d1_equals_default_on_cold_nights": float(
-            np.abs(quantiles["d1"][cold_scored & long] - quantiles["default"][cold_scored & long]).max()
+            np.abs(
+                quantiles["d1"][cold_scored & long] - quantiles["default"][cold_scored & long]
+            ).max()
         ),
     }
     groups = {
@@ -264,7 +298,9 @@ def main() -> None:
             if np.isfinite(loss[arm][mask]).all():
                 entry[arm] = s319.mean_ci(values=loss[arm], mask=mask, blocks=month)
         for a, b in CONTRASTS:
-            entry[f"{a}_vs_{b}"] = s319.contrast(treat=loss[a], ref=loss[b], mask=mask, blocks=month)
+            entry[f"{a}_vs_{b}"] = s319.contrast(
+                treat=loss[a], ref=loss[b], mask=mask, blocks=month
+            )
         rep["by_band"][label] = entry
     rep["by_group"] = {}
     for gname, gmask in groups.items():
@@ -297,7 +333,9 @@ def main() -> None:
                 "q01_below": float((actual < quantiles[arm][:, 0])[mask].mean()),
                 "q99_below": float((actual < quantiles[arm][:, 10])[mask].mean()),
                 "in90": float(
-                    ((actual >= quantiles[arm][:, 1]) & (actual <= quantiles[arm][:, 9]))[mask].mean()
+                    ((actual >= quantiles[arm][:, 1]) & (actual <= quantiles[arm][:, 9]))[
+                        mask
+                    ].mean()
                 ),
                 "q01_pinball": float(pin[arm][mask, 0].mean()),
                 "q99_pinball": float(pin[arm][mask, 10].mean()),
@@ -327,18 +365,15 @@ def main() -> None:
         }
     # Gain by UTC half-hour of the day at 168 to 240 hours.
     hh = (
-        rows["valid_time"].dt.hour().cast(pl.Int32) * 2 + rows["valid_time"].dt.minute().cast(pl.Int32) // 30
+        rows["valid_time"].dt.hour().cast(pl.Int32) * 2
+        + rows["valid_time"].dt.minute().cast(pl.Int32) // 30
     ).to_numpy()
     rep["gain_by_half_hour"] = {
-        a: [
-            float((loss[a] - loss["default"])[long & (hh == h)].mean()) for h in range(48)
-        ]
+        a: [float((loss[a] - loss["default"])[long & (hh == h)].mean()) for h in range(48)]
         for a in ("r319", "d1", "d3")
     }
     rep["gain_by_half_hour_winter"] = {
-        a: [
-            float((loss[a] - loss["default"])[long & winter & (hh == h)].mean()) for h in range(48)
-        ]
+        a: [float((loss[a] - loss["default"])[long & winter & (hh == h)].mean()) for h in range(48)]
         for a in ("r319", "d1", "d3")
     }
     rep["recall"] = recall_table(rows=rows, long=long)
