@@ -107,8 +107,8 @@ def figure_contrasts(*, contrasts: dict) -> None:
             {
                 "contrast": CONTRASTS[key],
                 "point": contrasts[key][f"{SCORES} | qs"][0],
-                "low": contrasts[key][f"{SCORES} | qs"][1],
-                "high": contrasts[key][f"{SCORES} | qs"][2],
+                "low": contrasts[key][f"{SCORES} | qs"][3 if key.startswith("C") else 1],
+                "high": contrasts[key][f"{SCORES} | qs"][4 if key.startswith("C") else 2],
                 "decisive": key.startswith("C"),
             }
             for key in CONTRASTS
@@ -140,9 +140,10 @@ def figure_contrasts(*, contrasts: dict) -> None:
         chart=(interval + dot + zero).properties(
             width=WIDTH - 360,
             title=alt.TitleParams(
-                ["Fine-tuning helps, but no more than an offset", "table fitted on W1 to W3"],
+                ["Fine-tuning helps, but an offset table fitted", "on W1 to W3 does about as well"],
                 subtitle=[
-                    "Orange: the three decisive contrasts, 98.33% interval. Blue: descriptive contrasts.",
+                    "Orange: decisive contrasts, 98.33% interval.",
+                    "Blue: descriptive contrasts, 95% interval.",
                     "Dot: estimate. Line: interval from resampling whole months and seeds.",
                     "Dashed line: no difference.",
                 ],
@@ -159,6 +160,8 @@ def figure_pool(*, per_farm: pl.DataFrame) -> None:
         pl.col("fold_pool").sub(pl.col("R0")).alias("With static inputs"),
         pl.col("fold_ns_pool").sub(pl.col("R0")).alias("Without static inputs"),
     ).sort("Without static inputs")
+    with_static = int((rows["With static inputs"] < 0).sum())
+    without_static = int((rows["Without static inputs"] < 0).sum())
     order = rows["farm"].to_list()
     long = rows.unpivot(index="farm", variable_name="head", value_name="difference")
     dots = (
@@ -188,11 +191,12 @@ def figure_pool(*, per_farm: pl.DataFrame) -> None:
             padding={"left": 24, "right": 10, "top": 5, "bottom": 5},
             title=alt.TitleParams(
                 [
-                    "A head that has not seen a farm beats R0 on 11 of 40",
-                    "public farms with static inputs, 24 without",
+                    f"A head that has not seen a farm beats R0 on {with_static} of 40",
+                    f"public farms with static inputs, {without_static} without",
                 ],
                 subtitle=[
-                    "Public Scottish wind farms, 53 Tuesday runs from July 2025, lead days 1 and 2,",
+                    "Public onshore wind farms (39 Scottish, 1 English), 53 Tuesday runs from July 2025,",
+                    "lead days 1 and 2,",
                     "head trained with the farm's fifth of the pool held out (seed 0). Dashed line: no difference.",
                 ],
             ),
@@ -231,7 +235,7 @@ def figure_curve(*, pool: dict) -> None:
             title=alt.TitleParams(
                 "More history does not improve R0 on the public farms",
                 subtitle=[
-                    "40 public Scottish wind farms, XGBoost R0 refitted on the last N months before April 2024,",
+                    "40 public onshore wind farms (39 Scottish, 1 English), XGBoost R0 refitted on the last N months before April 2024,",
                     "53 Tuesday runs from July 2025, lead days 1 and 2.",
                 ],
             ),

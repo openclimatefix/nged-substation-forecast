@@ -23,7 +23,7 @@ SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 MEMBERS: Final[int] = 51
 ERA5_START: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
 TRAIN_END: Final[datetime] = datetime(2025, 6, 17, tzinfo=UTC)
-"""Training uses valid times before this: 14 days before the first validation run."""
+"""End of the hindcast span (14 days before the first scored run); no model's training cut-off."""
 KEY_COLUMNS: Final[tuple[str, ...]] = ("time_series_id", "power_fcst_init_time", "valid_time")
 POINTS_PER_FRACTION: Final[float] = 100.0
 """Scores are in points of capacity: a fraction of capacity times this."""

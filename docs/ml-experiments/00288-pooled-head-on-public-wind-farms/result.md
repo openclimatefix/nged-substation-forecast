@@ -87,8 +87,8 @@ take_home_message: >-
   Training the correction on 40 public wind farms did not help the forecasts for the three NGED
   wind farms. Applied directly, it made them worse, because the public farms' size and turbine
   inputs let the head memorise each farm. Without those inputs it did no harm, and after a short
-  fine-tune on the three farms' own data it matched a simple offset table fitted on those farms, so
-  the public farms added nothing.
+  fine-tune on the three farms' own data it gained about as much as a simple offset table fitted on
+  those farms, so the public farms added nothing measurable.
 advice:
   - >-
     Leave capacity, turbine rating, and hub height out of a head trained on a pool of farms; with
@@ -109,7 +109,7 @@ advice:
 days 1 and 2, worse than the XGBoost model alone (R0, 7.091). After a fine-tune of up to 3 epochs on
 W1 to W3's own training runs, it scored 6.812, a 0.28-point gain over R0 that a table of quantile
 offsets per lead day fitted on W1 to W3 alone nearly matches (T1, 6.876). The public farms added
-nothing that W1 to W3's own runs did not already supply. An Opus audit found that the head's three
+nothing measurable beyond what W1 to W3's own runs supply. An Opus audit found that the head's three
 static inputs (capacity, turbine rating, hub height) identify each public farm and caused most of the
 zero-shot loss; every arm was rerun without them and is reported as a diagnostic. The verdict is
 `not supported`.
@@ -122,20 +122,25 @@ Contains BMRS data © Elexon Limited copyright and database right 2026.
 
 ![Contrasts with 98.33% intervals](figure_2.svg)
 
-**The three decisive contrasts all fail their predictions.** Each interval is the 98.33% interval
-from resampling whole months and the three seeds, on W1 to W3's kept rows at lead days 1 and 2.
+**Two of the three decisive contrasts fail their predictions, and the third fails on its tail
+condition.** Each interval is the 98.33% interval from resampling whole months and the three seeds,
+on W1 to W3's kept rows at lead days 1 and 2. Every interval of a descriptive contrast below is a
+95% interval.
 
 | Contrast | Prediction | Estimate | Interval | Mean-forecast error beside it |
 |---|---|---|---|---|
-| C1: P2 minus P1 | at most -0.10 | +1.534 | +1.010 to +2.075 | +2.040 (+1.243 to +2.851) |
-| C2: P3 minus P0 | -0.30 to 0.00, and 0.99 pinball loss 5% lower | -0.279 | -0.441 to -0.123 | -0.083 (-0.334 to +0.166) |
-| C3: P2 minus X2 | at most -0.03 | +1.016 | +0.603 to +1.442 | +1.646 (+0.989 to +2.323) |
+| C1: P2 minus P1 | at most -0.10 | +1.534 | +0.900 to +2.189 | +2.040 (+1.076 to +3.027) |
+| C2: P3 minus P0 | -0.30 to 0.00, and 0.99 pinball loss 5% lower | -0.279 | -0.477 to -0.086 | -0.083 (-0.389 to +0.227) |
+| C3: P2 minus X2 | at most -0.03 | +1.016 | +0.520 to +1.532 | +1.646 (+0.861 to +2.466) |
 
 - **C1:** the pooled head with no fine-tune is worse than the head trained on W1 to W3 alone, by
   more than the interval's width.
 - **C2:** the score gain falls inside the predicted range, but the 0.99 pinball loss did not fall.
-  P3's 0.401 against P0's 0.402 is a difference of -0.001 (interval -0.008 to +0.007), not 5%.
-  Because the second condition fails, C2 does not clear the porting threshold.
+  P3's 0.401 against P0's 0.402 is a difference of -0.001 (95% interval -0.008 to +0.007), not 5%.
+  The decision rule's porting threshold, C2 wholly below zero, is met. The verdict is nonetheless
+  `not supported`, because the prediction's second condition fails, C1 and C3 fail, and the plan's
+  "Reading the results" section says C2 alone does not license a port when P3 gains no more than the
+  offset table T1 (D2).
 - **C3:** the zero-shot network is worse than the zero-shot XGBoost stage (X2), so the non-neural
   stage is preferred.
 - **Mean forecast against the median:** the quantile score judges the whole distribution, and the
@@ -146,8 +151,8 @@ from resampling whole months and the three seeds, on W1 to W3's kept rows at lea
 **Fine-tuning recovers only what W1 to W3's own runs would give.** P3 minus T1 is -0.064 (interval
 -0.240 to +0.101), P3 minus P1 is +0.106 (-0.017 to +0.232), and X3, the XGBoost stage trained on
 the pool plus W1 to W3's rows, scored 6.740 against P3's 6.812 (X3 minus P3 -0.072, -0.209 to
-+0.069). The pool's mean offset therefore did not help beyond the offset table. P1 minus P0 is
--0.385 (-0.552 to -0.227), reproducing experiment 259's gain from a head on the three farms.
++0.069). The pool's mean offset therefore did not measurably help beyond the offset table. P1 minus
+P0 is -0.385 (-0.552 to -0.227), reproducing experiment 259's gain from a head on the three farms.
 
 | Arm | Hours 12 to 36 | Days 1 and 2 | Days 3 to 6 | Days 7 and later | All leads |
 |---|---|---|---|---|---|
@@ -176,9 +181,9 @@ Pinball loss at each level (points of capacity) and coverage of the 5% to 95% an
 kept rows, lead days 1 and 2. The tails barely move between arms. Every head's 5% to 95% band
 (0.906 to 0.914) is narrower than R0's (0.942), and all of them sit above the 0.90 target.
 
-**The blind share is not interpretable.** BL2 minus P0 is +0.394 and P2 minus P0 is +1.149, a share
-of 0.34, under the 0.5 threshold. The share is a fraction of a loss, not of a gain, so the
-threshold does not apply.
+**The blind-share prediction cannot be evaluated.** BL2 minus P0 is +0.394 and P2 minus P0 is +1.149.
+The prediction divides one gain by another, and both arms are worse than P0, so the share (0.34) has
+no meaning.
 
 ## The public farms
 
@@ -197,45 +202,35 @@ threshold does not apply.
   farms, 12.8% worse than the same farms scored by the all-farm head (8.627) and worse than R0
   (9.283); the plan predicted within 5%. It beat R0 on 11 of 40 held-out farms. Without the static
   inputs the held-out head scored 9.224, 4.4% worse than the all-farm head without them (8.836), and
-  beat R0 on 24 of 40 farms.
+  beat R0 on 24 of 40 farms. The audit's own retrain used seed 0 only and reported +3.9% and 19 of
+  40 farms; the figures here come from the final run of `e00288_pool_score.py`.
 - **Curtailment drop:** the plan dropped half-hours with a bid-offer acceptance and half-hours
   where the final physical notification exceeds metered output by more than 5% of capacity. The
-  second rule removed 35% of half-hours at the median farm (range 20% to 85% over the 65
-  candidates), because wind farms' notifications are forecasts that overshoot. Dropping on it also
+  second rule removed 35% of half-hours at the median farm (range 20% to 83% over the 40 kept
+  farms), because wind farms' notifications are forecasts that overshoot. Dropping on it also
   selects half-hours where the farm outproduced its own forecast. The primary clean set therefore
-  drops acceptance half-hours only (median 3.6%, at most 10.4% on the kept farms), and
-  the notification rule is written to a separate file for a sensitivity run that was not made.
-
-![R0's score on the public farms against months of history](figure_4.svg)
-
-**More history did not improve R0 on the public farms.** R0 refitted on the last 12, 24, 36, and 48
-months scored 9.285, 9.305, 9.298, and 9.266 at lead days 1 and 2, against 9.283 on all available
-history. The manager's learning-curve prediction (a gain of at least 0.15 points from 24 to 48
-months) was written for W1 to W3, and this curve is the public farms' only.
-
-## After the audit: the static inputs
-
-**The three static inputs identify each public farm, and the head used them to memorise
-farm-specific offsets.** An Opus audit (triggered by two rules: the result contradicted its
-prediction, and the blind head BL2 beat the full head P2 by 0.755 points) found no leakage, no scale
-mismatch between the public farms and W1 to W3, and no difference in how the spread factor was
-fitted. It found that all 40 public farms have a distinct triple of log capacity, turbine rating, and
-hub height, and that 3 random numbers per farm gave the same in-sample gain as the real inputs. W1 to
-W3 received the pool's median turbine rating and hub height, a pair the head never saw in training, so
-it raised the median forecast by 0.10 to 0.135 where 0.03 was needed. Every head and XGBoost arm was
-rerun with the three inputs set to zero (arms marked "without static inputs", diagnostic and not
-pre-registered).
-
-| Arm, days 1 and 2 | With static inputs | Without static inputs |
-|---|---|---|
-| P2 (pooled head, zero shot) | 8.239 | 7.219 |
-| P3 (pooled head, fine-tuned) | 6.812 | 6.766 |
-| X2 (XGBoost stage on the pool) | 7.223 | 7.108 |
-| X3 (X2 plus W1 to W3 rows) | 6.740 | 6.955 |
-| BL2 (blind pooled head) | 7.484 | 7.337 |
-| P1 (head on W1 to W3) | 6.706 | 6.802 |
-
-- **Zero shot:** P2 without static inputs minus P0 is +0.128 (-0.086 to +0.337, 98.33%), so the
+  drops acceptance half-hours only (median 3.6%, at most 10.4% on the kept farms), and the
+  notification rule is written to a separate file for a sensitivity run that was not made.  ![R0's
+  score on the public farms against months of history](figure_4.svg)  **More history did not
+  improve R0 on the public farms.** R0 refitted on the last 12, 24, 36, and 48 months scored
+  9.285, 9.305, 9.298, and 9.266 at lead days 1 and 2, against 9.283 on all available history. The
+  plan's learning-curve prediction (a gain of at least 0.15 points from 24 to 48 months) was
+  written for W1 to W3, and this curve is the public farms' only.  ## After the audit: the static
+  inputs  **The three static inputs identify each public farm, and the head used them to memorise
+  farm-specific offsets.** An Opus audit (triggered by two rules: the result contradicted its
+  prediction, and the blind head BL2 beat the full head P2 by 0.755 points) found no leakage, no
+  scale mismatch between the public farms and W1 to W3, and no difference in how the spread factor
+  was fitted. It found that all 40 public farms have a distinct triple of log capacity, turbine
+  rating, and hub height, and that 3 random numbers per farm gave the same in-sample gain as the
+  real inputs. W1 to W3 received the pool's median turbine rating and hub height, a pair the head
+  never saw in training, so it raised the median forecast by 0.10 to 0.135 where 0.03 was needed.
+  Every head and XGBoost arm was rerun with the three inputs set to zero (arms marked "without
+  static inputs", diagnostic and not pre-registered).  | Arm, days 1 and 2 | With static inputs |
+  Without static inputs | |---|---|---| | P2 (pooled head, zero shot) | 8.239 | 7.219 | | P3
+  (pooled head, fine-tuned) | 6.812 | 6.766 | | X2 (XGBoost stage on the pool) | 7.223 | 7.108 | |
+  X3 (X2 plus W1 to W3 rows) | 6.740 | 6.955 | | BL2 (blind pooled head) | 7.484 | 7.337 | | P1
+  (head on W1 to W3) | 6.706 | 6.802 |
+- **Zero shot:** P2 without static inputs minus P0 is +0.128 (95% interval -0.086 to +0.337), so the
   pooled head is level with R0 rather than worse. P2 minus P1 is still +0.513 (+0.213 to +0.831),
   so C1's prediction still fails, and P2 minus X2, both without static inputs, is +0.111
   (-0.025 to +0.252), so C3's does too.
