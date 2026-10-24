@@ -71,33 +71,37 @@ best_arm: >-
   best arm that uses the public farms is X3 (XGBoost stage trained on the pool plus W1 to W3),
   6.740; R0 scored 7.091.
 headline: >-
-  The head trained on the public farms and applied with no fine-tune scored 1.15 points worse than
-  R0 (8.239 against 7.091); fine-tuning on W1 to W3 recovered a 0.28-point gain over R0, no better
-  than an offset table fitted on W1 to W3 alone.
+  The planned head trained on the public farms and applied with no fine-tune scored 1.15 points
+  worse than R0 (8.239 against 7.091), mostly because its three static inputs identify each farm;
+  without them it scored 7.219. Fine-tuned on W1 to W3, it gained 0.28 to 0.33 points over R0, no
+  more than an offset table fitted on W1 to W3 alone.
 lessons: >-
-  The public farms are almost all in Scotland, and a head trained on them does not carry a
-  correction to farms in England and Wales. Even within the pool, a head that has not seen a farm
-  beat R0 on only 11 of 40 farms. After fine-tuning, the pooled head gained what any correction
-  fitted on W1 to W3's own runs gains, and its 0.99 pinball loss did not fall. R0's score on the
-  public farms did not change with 12 to 54 months of history.
+  The three static inputs (capacity, turbine rating, hub height) give each public farm a distinct
+  triple, so the head memorised a farm-specific offset that failed on farms it had not seen, and
+  W1 to W3's constant stand-in values misled it. Without those inputs the held-out check passed
+  (+4.4%) and the zero-shot head was level with R0, though still worse than a head trained on W1 to
+  W3. After fine-tuning, the pooled head gained what a correction fitted on W1 to W3's own runs
+  gains, and its 0.99 pinball loss did not fall. R0's score on the public farms did not change with
+  12 to 54 months of history.
 take_home_message: >-
   Training the correction on 40 public wind farms did not help the forecasts for the three NGED
-  wind farms. Applied directly, it made them worse, because the public farms are nearly all in
-  Scotland. After a short fine-tune on the three farms' own data, it matched what a simple offset
-  table fitted on those farms gives, so the public farms added nothing.
+  wind farms. Applied directly, it made them worse, because the public farms' size and turbine
+  inputs let the head memorise each farm. Without those inputs it did no harm, and after a short
+  fine-tune on the three farms' own data it matched a simple offset table fitted on those farms, so
+  the public farms added nothing.
 advice:
   - >-
-    Do not apply a correction head trained on Scottish wind farms to farms in England and Wales
-    without fine-tuning (C1, C3).
+    Leave capacity, turbine rating, and hub height out of a head trained on a pool of farms; with
+    one distinct triple per farm they act as a farm identifier (D14, D16, held-out check).
   - >-
     Fit the correction on the target farms' own runs; a pooled head fine-tuned on them scored no
-    better than an offset table per lead day and quantile (D2).
+    better than an offset table per lead day and quantile (D2, D18).
   - >-
     Look for public wind farms in England and Wales before pooling again; the register held 1
-    English and no Welsh farm that passed the checks (region table).
+    English and no Welsh farm that passed the checks (region bullet).
   - >-
     Do not apply the 5% physical-notification drop to wind farms' half-hours; the notification is a
-    forecast that exceeds metered output in 35% of half-hours (data stage).
+    forecast that exceeds metered output in 35% of half-hours (curtailment bullet).
 ---
 
 **Training a correction head on 40 public wind farms did not help the three metered wind farms
@@ -105,7 +109,10 @@ advice:
 days 1 and 2, worse than the XGBoost model alone (R0, 7.091). After a fine-tune of up to 3 epochs on
 W1 to W3's own training runs, it scored 6.812, a 0.28-point gain over R0 that a table of quantile
 offsets per lead day fitted on W1 to W3 alone nearly matches (T1, 6.876). The public farms added
-nothing that W1 to W3's own runs did not already supply. The verdict is `not supported`.
+nothing that W1 to W3's own runs did not already supply. An Opus audit found that the head's three
+static inputs (capacity, turbine rating, hub height) identify each public farm and caused most of the
+zero-shot loss; every arm was rerun without them and is reported as a diagnostic. The verdict is
+`not supported`.
 
 Contains BMRS data © Elexon Limited copyright and database right 2026.
 
@@ -188,9 +195,9 @@ threshold does not apply.
   2 on 1 of 40 farms (mean 9.29 against 15.17).
 - **Held-out fifth:** a head trained on the other four spatial blocks scored 9.731 on its held-out
   farms, 12.8% worse than the same farms scored by the all-farm head (8.627) and worse than R0
-  (9.283). The plan predicted within 5%. The head beat R0 on 11 of 40 held-out farms. The
-  all-farm score is in sample for the pool, so the fair comparison is the held-out score against
-  R0.
+  (9.283); the plan predicted within 5%. It beat R0 on 11 of 40 held-out farms. Without the static
+  inputs the held-out head scored 9.224, 4.4% worse than the all-farm head without them (8.836), and
+  beat R0 on 24 of 40 farms.
 - **Curtailment drop:** the plan dropped half-hours with a bid-offer acceptance and half-hours
   where the final physical notification exceeds metered output by more than 5% of capacity. The
   second rule removed 35% of half-hours at the median farm (range 20% to 85% over the 65
@@ -205,6 +212,39 @@ threshold does not apply.
 months scored 9.285, 9.305, 9.298, and 9.266 at lead days 1 and 2, against 9.283 on all available
 history. The manager's learning-curve prediction (a gain of at least 0.15 points from 24 to 48
 months) was written for W1 to W3, and this curve is the public farms' only.
+
+## After the audit: the static inputs
+
+**The three static inputs identify each public farm, and the head used them to memorise
+farm-specific offsets.** An Opus audit (triggered by two rules: the result contradicted its
+prediction, and the blind head BL2 beat the full head P2 by 0.755 points) found no leakage, no scale
+mismatch between the public farms and W1 to W3, and no difference in how the spread factor was
+fitted. It found that all 40 public farms have a distinct triple of log capacity, turbine rating, and
+hub height, and that 3 random numbers per farm gave the same in-sample gain as the real inputs. W1 to
+W3 received the pool's median turbine rating and hub height, a pair the head never saw in training, so
+it raised the median forecast by 0.10 to 0.135 where 0.03 was needed. Every head and XGBoost arm was
+rerun with the three inputs set to zero (arms marked "without static inputs", diagnostic and not
+pre-registered).
+
+| Arm, days 1 and 2 | With static inputs | Without static inputs |
+|---|---|---|
+| P2 (pooled head, zero shot) | 8.239 | 7.219 |
+| P3 (pooled head, fine-tuned) | 6.812 | 6.766 |
+| X2 (XGBoost stage on the pool) | 7.223 | 7.108 |
+| X3 (X2 plus W1 to W3 rows) | 6.740 | 6.955 |
+| BL2 (blind pooled head) | 7.484 | 7.337 |
+| P1 (head on W1 to W3) | 6.706 | 6.802 |
+
+- **Zero shot:** P2 without static inputs minus P0 is +0.128 (-0.086 to +0.337, 98.33%), so the
+  pooled head is level with R0 rather than worse. P2 minus P1 is still +0.513 (+0.213 to +0.831),
+  so C1's prediction still fails, and P2 minus X2, both without static inputs, is +0.111
+  (-0.025 to +0.252), so C3's does too.
+- **Fine-tuned:** P3 without static inputs minus P0 is -0.325 (-0.397 to -0.255) and its 0.99
+  pinball loss is 0.407 against P0's 0.402, so the tail does not improve. P3 without static inputs
+  minus the offset table T1 is -0.110 (-0.233 to +0.002), a smaller margin than the interval's
+  half-width, and minus P3 with static inputs -0.046 (-0.233 to +0.128).
+- **Verdict:** the pre-registered verdict stands. The diagnosis changes: the zero-shot failure came
+  mainly from the head's inputs, and a Scottish pool does not by itself rule out transfer.
 
 ## What was not done
 
@@ -223,8 +263,10 @@ months) was written for W1 to W3, and this curve is the public farms' only.
   beside each quantile contrast above.
 - **Audit triggers fired:** the result contradicts its own prediction (C1, C3, and the held-out
   check), and a nested arm beats the arm that contains it (the blind head BL2 scores 0.755 points
-  better than the full head P2, D10). Within Scotland, the held-out check fails too, so the region
-  does not explain the failure alone. The audit findings are triaged below.
+  better than the full head P2, D10). The Opus audit's findings are in the section above. Triage:
+  the static-input cause was accepted and every arm rerun without them; the minor point that early
+  stopping never considers the untrained head (epoch 0) was accepted and left as a limitation; the
+  findings that leakage, target scale, and the spread factor were sound needed no change.
 - **Retraining schedule:** every R0 model is fitted once on ERA5 before 2024-04-01; heads are
   trained once on runs before 2025-04-16. No rolling retraining.
 - **Tail calibration:** coverage and pinball losses at 0.01, 0.05, 0.95, and 0.99 are in the table
@@ -232,7 +274,8 @@ months) was written for W1 to W3, and this curve is the public farms' only.
 
 ## What the next experiment should answer
 
-**Does a head trained on public wind farms in England and Wales transfer to W1 to W3?** The public
-register held no such farm that passed the checks, so the transfer question stays open for farms
-in the same region. A cheaper question is whether more of W1 to W3's own history helps the XGBoost
+**Does a pooled head trained without farm-identifying inputs help once the base model's bias is
+removed?** Without static inputs the zero-shot head was level with R0, so a later experiment could
+retest the pool with those inputs left out, and with public farms in England and Wales if any pass
+the checks. A cheaper question is whether more of W1 to W3's own history helps the XGBoost
 model, which the unrun learning curve on W1 to W3 would answer.

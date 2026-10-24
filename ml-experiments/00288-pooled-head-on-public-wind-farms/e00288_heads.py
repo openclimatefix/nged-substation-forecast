@@ -22,6 +22,7 @@ block of rows per seed, and `validation_loss.json`.
 """
 
 import json
+import os
 import sys
 from datetime import UTC, datetime
 from typing import Final
@@ -30,13 +31,15 @@ import e00288_common as common
 import e00288_tables as tables
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 import xgboost as xgb
-from torch import nn  # ty: ignore[unresolved-import]
+from torch import nn
 
 OUT_DIR: Final = common.WORK_DIR / "heads"
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
 ARMS: Final[tuple[str, ...]] = ("T1", "P1", "P2", "P3", "X2", "X3", "BL2", "fold")
+SUFFIX: Final[str] = "_ns" if os.environ.get("E288_NO_STATIC") else ""
+"""Arms run with `E288_NO_STATIC` set are written under names ending `_ns`."""
 TRAIN_CUTOFF: Final[datetime] = datetime(2025, 4, 16, tzinfo=UTC)
 EPOCHS_W: Final[int] = 60
 EPOCHS_POOL: Final[int] = 30
@@ -388,10 +391,10 @@ def main() -> None:
                 pool_by_seed[seed] = held
             print(f"{arm} seed {seed} done", flush=True)
         if by_seed:
-            write(name=arm, frame=w_s[SEEDS[0]], by_seed=by_seed)
+            write(name=f"{arm}{SUFFIX}", frame=w_s[SEEDS[0]], by_seed=by_seed)
         if pool_by_seed:
-            write(name=f"{arm}_pool", frame=pool_s, by_seed=pool_by_seed)
-        losses[arm] = arm_losses
+            write(name=f"{arm}{SUFFIX}_pool", frame=pool_s, by_seed=pool_by_seed)
+        losses[f"{arm}{SUFFIX}"] = arm_losses
         loss_path.write_text(json.dumps(losses, indent=1))
         print(f"{arm} written", flush=True)
 

@@ -16,7 +16,21 @@ DOCS_DIR: Final = (
 )
 WIDTH: Final = 640
 SCORES: Final = "kept rows | days 1-2"
-ARMS: Final = ("P0", "A0r-230", "T1", "P1", "P2", "P3", "X2", "X3", "BL2", "CLIM-230")
+ARMS: Final = (
+    "P0",
+    "A0r-230",
+    "T1",
+    "P1",
+    "P2",
+    "P3",
+    "P2_ns",
+    "P3_ns",
+    "X2",
+    "X2_ns",
+    "X3",
+    "BL2",
+    "CLIM-230",
+)
 ARM_NAMES: Final = {
     "P0": "P0: R0 alone",
     "A0r-230": "Experiment 230's A0r",
@@ -27,6 +41,9 @@ ARM_NAMES: Final = {
     "X2": "X2: XGBoost on pool",
     "X3": "X3: X2 plus W1-W3 rows",
     "BL2": "BL2: blind pooled head",
+    "P2_ns": "P2 without static inputs",
+    "P3_ns": "P3 without static inputs",
+    "X2_ns": "X2 without static inputs",
     "CLIM-230": "Climatology",
 }
 CONTRASTS: Final = {
@@ -35,6 +52,9 @@ CONTRASTS: Final = {
     "C3": "C3: P2 minus X2 (network vs XGBoost, zero shot)",
     "D2": "D2: P3 minus T1 (pooled head vs offset table)",
     "D6": "D6: P1 minus P0 (head on W1-W3 vs R0)",
+    "D14": "D14: P2 without static inputs minus P0",
+    "D15": "D15: P3 without static inputs minus P0",
+    "D16": "D16: P2 minus X2, both without static inputs",
 }
 
 
@@ -50,7 +70,7 @@ def figure_absolute(*, scores: dict) -> None:
     )
     order = rows["arm"].to_list()
     dots = (
-        alt.Chart(rows)
+        alt.Chart(rows)  # ty: ignore[unresolved-attribute]
         .mark_circle(size=90, color=DATA_BLUE, aria=False)
         .encode(
             y=alt.Y("arm:N", sort=order, title=None),
@@ -63,12 +83,16 @@ def figure_absolute(*, scores: dict) -> None:
     )
     save(
         chart=dots.properties(
-            width=WIDTH - 200,
+            width=WIDTH - 230,
             title=alt.TitleParams(
-                ["The pooled head applied with no fine-tune", "is worse than R0 alone"],
+                [
+                    "The pooled head with no fine-tune is worse",
+                    "than R0 alone, most of all with static inputs",
+                ],
                 subtitle=[
-                    "Three wind farms in England and Wales (W1 to W3), 53 Tuesday runs from July 2025,",
-                    "rows kept by the maintainer's curtailment mask, lead days 1 and 2, mean of 3 seeds.",
+                    "Three wind farms (W1 to W3), 53 Tuesday runs from July 2025,",
+                    "rows kept by the curtailment mask, lead days 1 and 2,",
+                    "mean of 3 seeds. Dot: estimate.",
                 ],
             ),
         ),
@@ -98,7 +122,7 @@ def figure_contrasts(*, contrasts: dict) -> None:
         legend=None,
     )
     interval = (
-        alt.Chart(rows)
+        alt.Chart(rows)  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeWidth=3, aria=False)
         .encode(
             y=y,
@@ -110,8 +134,8 @@ def figure_contrasts(*, contrasts: dict) -> None:
             color=colour,
         )
     )
-    dot = alt.Chart(rows).mark_circle(size=90, aria=False).encode(y=y, x="point:Q", color=colour)
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 4]).encode(x="x:Q")
+    dot = alt.Chart(rows).mark_circle(size=90, aria=False).encode(y=y, x="point:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 4]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     save(
         chart=(interval + dot + zero).properties(
             width=WIDTH - 360,
@@ -129,28 +153,44 @@ def figure_contrasts(*, contrasts: dict) -> None:
 
 
 def figure_pool(*, per_farm: pl.DataFrame) -> None:
-    """Per-farm difference between the held-out head and R0 on the public farms."""
-    rows = per_farm.select("farm", difference=pl.col("fold_pool") - pl.col("R0")).sort("difference")
+    """Per-farm difference between the held-out head and R0, with and without static inputs."""
+    rows = per_farm.select(
+        "farm",
+        pl.col("fold_pool").sub(pl.col("R0")).alias("With static inputs"),
+        pl.col("fold_ns_pool").sub(pl.col("R0")).alias("Without static inputs"),
+    ).sort("Without static inputs")
     order = rows["farm"].to_list()
+    long = rows.unpivot(index="farm", variable_name="head", value_name="difference")
     dots = (
-        alt.Chart(rows)
-        .mark_circle(size=60, color=DATA_PURPLE, aria=False)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
+        .mark_circle(size=60, aria=False)
         .encode(
             y=alt.Y("farm:N", sort=order, title=None),
             x=alt.X(
                 "difference:Q",
                 title="Held-out head minus R0 (points of capacity; negative is better)",
             ),
+            color=alt.Color(
+                "head:N",
+                scale=alt.Scale(
+                    domain=["With static inputs", "Without static inputs"],
+                    range=[DATA_PURPLE, DATA_GREEN],
+                ),
+                legend=alt.Legend(orient="top", title=None),
+            ),
         )
     )
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 4]).encode(x="x:Q")
+    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 4]).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     save(
         chart=(dots + zero).properties(
             width=WIDTH - 130,
             height=520,
             padding={"left": 24, "right": 10, "top": 5, "bottom": 5},
             title=alt.TitleParams(
-                ["A head that has not seen a farm beats R0", "on 11 of the 40 public farms"],
+                [
+                    "A head that has not seen a farm beats R0 on 11 of 40",
+                    "public farms with static inputs, 24 without",
+                ],
                 subtitle=[
                     "Public Scottish wind farms, 53 Tuesday runs from July 2025, lead days 1 and 2,",
                     "head trained with the farm's fifth of the pool held out (seed 0). Dashed line: no difference.",
@@ -171,11 +211,12 @@ def figure_curve(*, pool: dict) -> None:
         }
     )
     line = (
-        alt.Chart(rows)
+        alt.Chart(rows)  # ty: ignore[unresolved-attribute]
         .mark_line(point=True, color=DATA_GREEN, aria=False)
         .encode(
             x=alt.X(
-                "months:Q", title="Months of ERA5 and output history before April 2024 (last point: all available history)"
+                "months:Q",
+                title="Months of ERA5 and output history before April 2024 (last point: all available history)",
             ),
             y=alt.Y(
                 "score:Q",

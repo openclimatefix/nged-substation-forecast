@@ -152,7 +152,7 @@ def repd_static(*, candidates: pl.DataFrame) -> pl.DataFrame:
         hub=pl.col("Height of Turbines (m)").cast(pl.Float64, strict=False),
     ).drop_nulls()
     slope, intercept = np.polyfit(pairs["turbine"].to_numpy(), pairs["hub"].to_numpy(), 1)
-    median_turbine = float(candidates["turbine_mw"].drop_nulls().median())
+    median_turbine = float(candidates["turbine_mw"].drop_nulls().median())  # ty: ignore[invalid-argument-type]
     return candidates.with_columns(
         turbine_mw=pl.col("turbine_mw").fill_null(median_turbine),
         hub_imputed=pl.col("hub_height_m").is_null(),

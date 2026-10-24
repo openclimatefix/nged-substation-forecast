@@ -7,6 +7,7 @@ summaries, which score the same 53 Tuesday runs. W1 to W3 take the pool's median
 hub height, because their own values are private.
 """
 
+import os
 from typing import Final
 
 import e00288_common as common
@@ -92,11 +93,17 @@ def w_table(*, set_name: str, seed: int, pool_farms: pl.DataFrame) -> pl.DataFra
         *Q,
         *SUMMARY_COLUMNS,
         pl.col("effective_capacity_mw").log().alias("log_capacity_mw"),
-        pl.lit(float(pool_farms["turbine_mw"].median())).alias("turbine_mw"),
-        pl.lit(float(pool_farms["hub_height_m"].median())).alias("hub_height_m"),
+        pl.lit(float(pool_farms["turbine_mw"].median())).alias("turbine_mw"),  # ty: ignore[invalid-argument-type]
+        pl.lit(float(pool_farms["hub_height_m"].median())).alias("hub_height_m"),  # ty: ignore[invalid-argument-type]
     )
 
 
 def static_matrix(*, frame: pl.DataFrame) -> np.ndarray:
-    """Return the static inputs as shape (cases, 3)."""
+    """Return the static inputs as shape (cases, 3), or zeros when `E288_NO_STATIC` is set.
+
+    The audit found that the three static columns give each public farm a distinct triple, so a
+    head can memorise a farm-specific offset through them. The no-static arms zero the columns.
+    """
+    if os.environ.get("E288_NO_STATIC"):
+        return np.zeros((frame.height, len(STATIC_COLUMNS)))
     return frame.select(STATIC_COLUMNS).to_numpy().astype(np.float64)

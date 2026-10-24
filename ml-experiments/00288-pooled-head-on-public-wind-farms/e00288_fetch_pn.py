@@ -28,7 +28,7 @@ def main() -> None:
     """Run the fetcher with its whole-empty-month guard replaced by a no-op."""
     sys.path.insert(0, str(FETCHER_DIR))
     fetcher = importlib.import_module("fetch_bmu_notifications")
-    fetcher.check_no_empty_month = lambda **_: None
+    fetcher.check_no_empty_month = lambda **_: None  # ty: ignore[invalid-assignment]
     sys.argv = [
         "fetch_bmu_notifications.py",
         "--sources",

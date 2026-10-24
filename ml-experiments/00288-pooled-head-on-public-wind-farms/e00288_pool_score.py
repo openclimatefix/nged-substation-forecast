@@ -38,7 +38,7 @@ def main() -> None:
         path = BASE_DIR / f"R0_scored_h{history}_seed0.parquet"
         if path.exists():
             arms[f"R0 last {history} months"] = cases.join(pl.read_parquet(path), on=KEYS)
-    for name in ("P2_pool", "X2_pool", "fold_pool"):
+    for name in ("P2_pool", "X2_pool", "fold_pool", "P2_ns_pool", "X2_ns_pool", "fold_ns_pool"):
         stored = pl.read_parquet(HEADS_DIR / f"{name}.parquet")
         arms[name] = stored.filter(pl.col("seed") == 0).drop("lead_day", "actual_norm")
         arms[name] = cases.join(arms[name], on=KEYS)
@@ -48,8 +48,8 @@ def main() -> None:
         window = frame.filter(pl.col("lead_day").is_between(1, 2))
         scores = arm_scores(frame=window).join(window.select(*KEYS, "lead_day"), on=KEYS)
         result[name] = {
-            "days 1-2": float(scores["score"].mean()),
-            "all leads": float(arm_scores(frame=frame)["score"].mean()),
+            "days 1-2": float(scores["score"].mean()),  # ty: ignore[invalid-argument-type]
+            "all leads": float(arm_scores(frame=frame)["score"].mean()),  # ty: ignore[invalid-argument-type]
         }
         per_farm.append(
             scores.group_by("farm").agg(pl.col("score").mean()).with_columns(arm=pl.lit(name))
@@ -65,6 +65,8 @@ def main() -> None:
         f"held-out fifth vs in pool: {held:.3f} vs {inside:.3f} ({100 * (held / inside - 1):+.1f}%)"
     )
     farms_better = int((table["fold_pool"] < table["R0"]).sum())
+    farms_better_ns = int((table["fold_ns_pool"] < table["R0"]).sum())
+    print(f"no-static held-out head beats R0 on {farms_better_ns} of {table.height} farms")
     print(f"held-out head beats R0 on {farms_better} of {table.height} farms")
     table.write_parquet(common.WORK_DIR / "pool_score_per_farm.parquet")
     (common.WORK_DIR / "pool_score.json").write_text(json.dumps(result, indent=1))

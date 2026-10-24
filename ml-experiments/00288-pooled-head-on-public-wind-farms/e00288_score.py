@@ -38,7 +38,21 @@ KEYS = ("farm", "power_fcst_init_time", "valid_time")
 RESAMPLES = 50_000
 DECISIVE_LEVEL = 1 - 0.05 / 3
 LEVEL_95 = 0.95
-HEAD_ARMS = ("T1", "P1", "P2", "P3", "X2", "X3", "BL2")
+HEAD_ARMS = (
+    "T1",
+    "P1",
+    "P2",
+    "P3",
+    "X2",
+    "X3",
+    "BL2",
+    "P1_ns",
+    "P2_ns",
+    "P3_ns",
+    "X2_ns",
+    "X3_ns",
+    "BL2_ns",
+)
 CONTRAST_METRICS = ("qs", "tail_t", "pinball_q99", "mean_abs_error", "median_abs_error")
 DECISIVE = (("C1", "P2", "P1"), ("C2", "P3", "P0"), ("C3", "P2", "X2"))
 DESCRIPTIVE = (
@@ -54,6 +68,13 @@ DESCRIPTIVE = (
     ("D10", "P2", "BL2"),
     ("D11", "P3", "A0r-230"),
     ("D12", "X3", "P0"),
+    ("D13", "P2_ns", "P1"),
+    ("D14", "P2_ns", "P0"),
+    ("D15", "P3_ns", "P0"),
+    ("D16", "P2_ns", "X2_ns"),
+    ("D17", "P3_ns", "P3"),
+    ("D18", "P3_ns", "T1"),
+    ("D19", "P1_ns", "P0"),
 )
 
 

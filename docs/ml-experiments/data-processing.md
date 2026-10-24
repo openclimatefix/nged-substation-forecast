@@ -479,6 +479,24 @@ The swap lowered the median by 10.2 points of capacity (1 point is 1% of a farm'
 10 m and 100 m speeds each explained about 7 points alone. Evidence: [experiment
 261](00261-wind-low-bias-decomposition/result.md), three farms, July 2025 to June 2026.
 
+**Do not drop half-hours on the rule "final physical notification exceeds metered output by more
+than 5% of capacity" when cleaning public wind farms' Elexon output (provisional, medium
+confidence).** *Applies to: experiments.* A wind farm's physical notification is the operator's own
+forecast, correlated with metered output at only 0.7 to 0.8 and above it in 35% of half-hours at the
+median of the 40 farms, so the rule removed 20% to 85% of each candidate's half-hours and kept those
+where the farm outproduced its forecast. Dropping the half-hours with a bid-offer acceptance removed
+3.6% at the median farm and 10.4% at most. Evidence: [experiment
+288](00288-pooled-head-on-public-wind-farms/result.md), 65 Elexon wind units, 2019-09 to 2026-06.
+
+**Leave capacity, turbine rating, and hub height out of a correction head trained on a pool of
+farms (provisional, medium confidence).** *Applies to: experiments.* The 40 public wind farms each
+have a distinct triple of those three values, and 3 random numbers per farm gave the same in-sample
+gain as the triples. With the triples, a head trained on four fifths of the farms scored 12.8% worse
+on the held-out fifth than the all-farm head and beat R0 on 11 of 40 held-out farms; without them
+the held-out head was 4.4% worse and beat R0 on 24 of 40. Evidence: [experiment
+288](00288-pooled-head-on-public-wind-farms/result.md), 40 Scottish and English wind farms, July 2025
+to June 2026.
+
 ## Embedded solar capacity
 
 **Hold embedded-solar capacity as one value per Primary per season-year, and do not estimate it
