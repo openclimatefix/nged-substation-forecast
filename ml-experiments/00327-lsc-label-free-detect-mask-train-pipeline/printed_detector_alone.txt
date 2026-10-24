@@ -1,0 +1,171 @@
+{
+ "A_plain": {
+  "alarms": 313,
+  "false_alarms": 148,
+  "d8_false": 6,
+  "d9_false": 5,
+  "matched": 26,
+  "matched_lo": 21.0,
+  "matched_hi": 31.0,
+  "matched_stratum": 16,
+  "stratum_n": 19,
+  "median_lag_hours": 17.25,
+  "alarms_per_match": 12.038461538461538,
+  "matched_by_duration": {
+   "24-48h": 4,
+   "48-96h": 10,
+   "over 96h": 12
+  },
+  "n_by_duration": {
+   "24-48h": 8,
+   "48-96h": 15,
+   "over 96h": 12
+  }
+ },
+ "A": {
+  "alarms": 221,
+  "false_alarms": 85,
+  "d8_false": 4,
+  "d9_false": 5,
+  "matched": 25,
+  "matched_lo": 20.0,
+  "matched_hi": 30.0,
+  "matched_stratum": 15,
+  "stratum_n": 19,
+  "median_lag_hours": 17.0,
+  "alarms_per_match": 8.84,
+  "matched_by_duration": {
+   "24-48h": 4,
+   "48-96h": 10,
+   "over 96h": 11
+  },
+  "n_by_duration": {
+   "24-48h": 8,
+   "48-96h": 15,
+   "over 96h": 12
+  }
+ },
+ "B_plain": {
+  "alarms": 302,
+  "false_alarms": 138,
+  "d8_false": 5,
+  "d9_false": 3,
+  "matched": 26,
+  "matched_lo": 21.0,
+  "matched_hi": 31.0,
+  "matched_stratum": 15,
+  "stratum_n": 19,
+  "median_lag_hours": 23.5,
+  "alarms_per_match": 11.615384615384615,
+  "matched_by_duration": {
+   "24-48h": 5,
+   "48-96h": 11,
+   "over 96h": 10
+  },
+  "n_by_duration": {
+   "24-48h": 8,
+   "48-96h": 15,
+   "over 96h": 12
+  }
+ },
+ "B": {
+  "alarms": 231,
+  "false_alarms": 85,
+  "d8_false": 5,
+  "d9_false": 3,
+  "matched": 26,
+  "matched_lo": 21.0,
+  "matched_hi": 31.0,
+  "matched_stratum": 15,
+  "stratum_n": 19,
+  "median_lag_hours": 24.0,
+  "alarms_per_match": 8.884615384615385,
+  "matched_by_duration": {
+   "24-48h": 5,
+   "48-96h": 11,
+   "over 96h": 10
+  },
+  "n_by_duration": {
+   "24-48h": 8,
+   "48-96h": 15,
+   "over 96h": 12
+  }
+ },
+ "E_plain": {
+  "alarms": 306,
+  "false_alarms": 139,
+  "d8_false": 8,
+  "d9_false": 7,
+  "matched": 23,
+  "matched_lo": 17.0,
+  "matched_hi": 28.0,
+  "matched_stratum": 13,
+  "stratum_n": 19,
+  "median_lag_hours": 17.5,
+  "alarms_per_match": 13.304347826086957,
+  "matched_by_duration": {
+   "24-48h": 4,
+   "48-96h": 10,
+   "over 96h": 9
+  },
+  "n_by_duration": {
+   "24-48h": 8,
+   "48-96h": 15,
+   "over 96h": 12
+  }
+ },
+ "E": {
+  "alarms": 238,
+  "false_alarms": 99,
+  "d8_false": 7,
+  "d9_false": 7,
+  "matched": 23,
+  "matched_lo": 17.0,
+  "matched_hi": 28.0,
+  "matched_stratum": 13,
+  "stratum_n": 19,
+  "median_lag_hours": 18.0,
+  "alarms_per_match": 10.347826086956522,
+  "matched_by_duration": {
+   "24-48h": 4,
+   "48-96h": 10,
+   "over 96h": 9
+  },
+  "n_by_duration": {
+   "24-48h": 8,
+   "48-96h": 15,
+   "over 96h": 12
+  }
+ },
+ "A-B": {
+  "diff": -1,
+  "lo": -5.0,
+  "hi": 3.0
+ },
+ "A-B_stratum": {
+  "diff": 0,
+  "lo": -3.0,
+  "hi": 3.0
+ },
+ "E-A": {
+  "diff": -2,
+  "lo": -5.0,
+  "hi": 0.0
+ },
+ "E-A_stratum": {
+  "diff": -2,
+  "lo": -5.0,
+  "hi": 0.0
+ },
+ "A-A_plain": {
+  "diff": -1,
+  "lo": -3.0,
+  "hi": 0.0
+ },
+ "A-A_plain_stratum": {
+  "diff": -1,
+  "lo": -3.0,
+  "hi": 0.0
+ }
+}
+shifts 35 stratum 19
