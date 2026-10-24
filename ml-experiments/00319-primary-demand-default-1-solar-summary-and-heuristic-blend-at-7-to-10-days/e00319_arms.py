@@ -17,9 +17,8 @@ experiment 202 does for S below 168 hours.
   mean pinball loss on a grid of 0, 0.05, ..., 1. The heuristic is rebuilt from the feature cache
   with experiment 161's recipe and gated against experiment 87's stored heuristic.
 
-    PYTHONPATH=ml-experiments/00184-dp-ens-daylight-calibration:ml-experiments/00202-dp-ens-two-number-rolling-replay \
-    OMP_NUM_THREADS=1 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00319-*/e00319_arms.py
+Run it with the folders of experiments 184 and 202 on `PYTHONPATH`, one thread per worker, and
+`systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue`.
 """
 
 import json
