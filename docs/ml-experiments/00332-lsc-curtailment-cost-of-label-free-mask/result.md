@@ -216,10 +216,10 @@ published limit, so the injected-world costs rank forecasts and state no money s
   without D16, so the verdict does not change. The fresh Sonnet audit that these triggers call for
   ran in place of an Opus audit, on the maintainer's instruction that this run use no Opus. The
   audit re-derived the deciding contrast from the raw files with its own code: -GBP 38.9 per
-  half-hour (interval -309 to +388), ordinary +18.68 (+1.27%), and both leave-one-out values. It found no error. It noted
-  that a single world holds 22% to 41% of the pooled difference at D11 and D16, which is why the
-  intervals resample whole worlds, and that the files hold both the earlier and the scored
-  periods, both of which are used, as in experiment 327.
+  half-hour (interval -309 to +388), ordinary +18.68 (+1.27%), and both leave-one-out values. It
+  found no error. It noted that a single world holds 22% to 41% of the pooled difference at D11 and
+  D16, which is why the intervals resample whole worlds, and that the files hold both the earlier
+  and the scored periods, both of which are used, as in experiment 327.
 - **Weak node forecast.** At D13 the NGED baseline (generators assumed at capacity, the
   maintainer's unconfirmed understanding) costs GBP 5.89 million, below every demand arm. The node
   forecast, which ignores the farms, is the weak link, so the real-record levels are not money
