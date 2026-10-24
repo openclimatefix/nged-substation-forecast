@@ -57,57 +57,65 @@ best_arm: >-
   x2, the default plus boosted trees for the speed scale, 11.301 points on the kept rows against
   11.352 for the default (-0.051, 95% interval -0.089 to -0.012, 99.75% interval -0.109 to +0.007)
 headline: >-
-  No non-neural column passed condition 1 of the adoption rule. The best, boosted trees (x2), kept
-  51% of the neural adapter's gain (95% interval 20% to 82%) at 1 to 10 days. The lookup table (x1)
+  No non-neural column passed condition 1 of the adoption rule. The best of the three, boosted trees (x2),
+  kept 51% of the neural adapter's gain (95% interval 20% to 82%) at 1 to 10 days. The lookup table (x1)
   kept 5% and the table copying the network (x3) kept 16%.
 production_status: not-for-production
 adopted_in: none
 lessons: >-
   An adapter's gain on the forecast tracks how much the adapter lowers the physics core's own
   error on ERA5: the neural adapter by 10% to 12%, boosted trees by 6% to 8%, the lookup table by
-  4% to 5%, and the table copying the network by 0% or less. A lookup table of 192 cells is too
-  coarse to carry the network's gain, and boosted trees on the network's inputs carry about half
-  of it.
+  4% to 5%, and the table copying the network by 0% or less. A lookup table of 192 cells carried 5% of
+  the neural network's gain (a finer table was not tried), and boosted trees on the network's
+  inputs carried about half of it.
 take_home_message: >-
   A lookup table of wind-speed corrections keeps almost none (5%) of
   the gain that the neural adapter gave the wind forecast, and boosted trees keep about half
   (0.051 of 0.099 points of capacity, scored at 1 to 10 day leads). Neither passes the adoption
-  rule, so the neural adapter of experiment 326 stays the only candidate that does, and the
+  rule, so the neural adapter of experiment 326 is the only arm tested that does, and the
   maintainer decides whether it belongs in the production service. A non-neural column would need
-  to fit the physics core's ERA5 error as well as the network does, which boosted trees on more
-  inputs might approach.
+  to reduce the physics-based wind-power model's error on ERA5 as much as the neural network does.
+  Boosted trees with more inputs might approach that.
 advice:
   - >-
     Do not replace the neural adapter by a lookup table of speed scale by direction sector, speed
-    ratio, and temperature: it keeps 5% of the gain and its interval includes zero (x1).
+    ratio, and temperature: the lookup table keeps 5% of the gain and the 95% interval of that
+    gain includes zero (x1).
   - >-
     Do not distil the neural adapter into a coarse table: the table copying the network keeps 16%
     of the gain and fits ERA5 worse than no adapter (x3).
   - >-
     Try boosted trees with more inputs, or a longer or differently regularised fit, if a
     non-neural adapter is wanted: x2 kept about half of the gain with a 95% interval that excludes
-    zero (x2).
+    zero.
   - >-
     Rank candidate adapters by how much they lower the physics core's error on ERA5 before scoring
-    the forecast: the ranking matched the forecast's in this experiment (diagnostics).
+    the forecast: the best two adapters ranked the same on ERA5 and on the forecast, and the two
+    weaker ones swapped places (section "Why the table fails").
 ---
 
-**Take-home: a lookup table keeps 5% of the neural adapter's gain and boosted trees keep 51%, so
-no non-neural column passes the adoption rule.** We asked whether the improvement that experiment
-326 found, from giving XGBoost the neural adapter's corrected wind speed as an extra input, can be
-had without a neural network in the production service. The corrected wind speed is the 100 m wind
-speed from the ensemble forecast of ECMWF (the European weather centre), rescaled by a factor that
-depends on weather. We replaced the neural network by three simpler ways of choosing the factor: a
-lookup table by wind direction, speed ratio, and temperature (x1), boosted trees on the network's
-inputs (x2), and a table filled in from the network's own factors (x3). Each was fitted to the same
-target as the network, the error of a physics-based wind-power model on ERA5 (our estimate of past
-weather) before April 2024. The score is the quantile score over 11 quantile levels, in points of
-capacity (lower is better), on the kept rows of the three metered wind farms W1 to W3. The default
-is [Wind farms research default 1](../research-default.md), 11.352 points. The neural adapter (x4,
-[experiment 326](../00326-wind-research-default-1-change-arms/result.md)'s arm (c)) lowers it by
-0.099. The lookup table lowers it by 0.005, the table copying the network by 0.016, and the boosted
-trees by 0.051. Only the boosted trees have a 95% interval below zero, and their 99.75% interval,
-which the adoption rule uses, includes zero. The verdict is `not supported`.
+**Take-home: a lookup table keeps 5% of the neural network's gain in forecast score and boosted
+trees keep 51%, so no non-neural column passes the adoption rule.** [Experiment
+326](../00326-wind-research-default-1-change-arms/result.md) found that giving XGBoost one extra
+input, the wind speed corrected by a small neural network (the neural adapter), lowers the wind
+forecast's score by 0.099 points. We asked whether a simpler method can produce that input, so
+that the production service needs no neural network. The input is the 100 m wind speed from the
+ensemble forecast of the European Centre for Medium-Range Weather Forecasts (ECMWF), multiplied by
+a speed scale that depends on wind direction, temperature, and the ratio of the 10 m to the 100 m
+wind speed. We replaced the neural network by three simpler methods for choosing the speed scale:
+a lookup table by direction, speed ratio, and temperature (x1), boosted decision trees on the
+neural network's inputs (x2), and a table filled in from the neural network's own speed scales
+(x3). Each method was fitted as the neural network was: it minimises the error of a physics-based
+wind-power model against the power observed at three metered wind farms (W1 to W3, anonymised),
+driven by ERA5 (our estimate of past weather) before April 2024. The score is the quantile score
+over 11 quantile levels, in percentage points of each farm's capacity, scored at forecast leads of
+1 to 10 days on the rows that experiment 210's mask keeps (lower is better). The default forecast,
+[Wind farms research default 1](../research-default.md), scores 11.352. The neural adapter (x4,
+experiment 326's arm (c)) lowers the default's score by 0.099. The lookup table lowers it by
+0.005, the table copying the neural network by 0.016, and the boosted trees by 0.051. The boosted
+trees and the copied table have a 95% interval for that difference below zero, but the 99.75%
+interval that the adoption rule uses includes zero for all three non-neural columns. The
+hypothesis, that a non-neural column keeps most of the gain, is `not supported`.
 
 ![Each column's score minus the default's, scored year and replicate period](figure_1.svg)
 
@@ -153,9 +161,10 @@ which the adoption rule uses, includes zero. The verdict is `not supported`.
 - **Tails.** No arm raises the 0.01 or 0.99 pinball loss by more than 0.05; the one-sided 95% upper
   bounds are at most +0.0124 (x2 at 0.99).
 - **Serving each arm needs.** x1 and x3: a table file of 192 numbers per farm. x2: a boosted-tree
-  model file per farm. x4: a neural network per farm. All four also need the physics core's
-  hub-height speed formula, which is a short function of the 10 m and 100 m speeds and the
-  temperature.
+  model file per farm. x4: a neural network per farm. All four also need the fitted physics core
+  (power curve, hub height, idle layer, and
+  air-density terms) to turn the 10 m and 100 m speeds and the temperature into the effective
+  speed, and x2 also needs the hour of day.
 
 ## Why the table fails
 
@@ -171,7 +180,7 @@ seed 0.
 | W2 | 0.0822 | 0.0725 | 0.0760 | 0.0784 | 0.0870 |
 | W3 | 0.0906 | 0.0802 | 0.0831 | 0.0860 | 0.0966 |
 
-- **The lookup table closes 40% to 45% of the network's ERA5 error reduction** (W1 43%, W2 39%, W3
+- **The lookup table closes 39% to 44% of the network's ERA5 error reduction** (W1 43%, W2 39%, W3
   44%), yet keeps 5% of its forecast gain. Whatever the table learns on ERA5 mostly does not carry
   to the ensemble members' wind speeds.
 - **The copied table is worse than none.** The median of the network's factor in a cell loses the
@@ -192,8 +201,9 @@ seed 0.
 - **x2.** Boosted trees (depth 3, learning rate 0.1) give the log scale through a custom objective
   (pseudo-Huber loss on the core's power, delta 0.1). Pass 1 runs 60 rounds with the core fixed at
   the fit without an adapter, the core's curve is then refitted with the scale held fixed, and
-  pass 2 adds 30 rounds. The monotone constraints were +1 on the speed ratio and +1 on temperature
-  for all three farms and seeds, taken from x1's fitted scale before any forecast was scored.
+  pass 2 adds 30 rounds. The monotone constraints took the sign of the Spearman correlation
+  between x1's fitted scale and each input, before any forecast was scored: +1 on the speed ratio
+  at all three farms, and +1 on temperature at W1 and -1 at W2 and W3 (the same for every seed).
 - **x3.** The first fit gave medians outside the table's range of 0.8 to 1.25 at low speeds, which
   produced undefined values. The medians are now clipped to the range, and the arm was refitted
   before any forecast score was read.
@@ -214,9 +224,9 @@ seed 0.
   only). The fits use ERA5 before 2024-04-01.
 - **Conditions for x1, x2, and x3, in that order.** Condition 1 (gain): failed for all three, since
   no 99.75% interval lies wholly below zero. Condition 2 (no harm to the 0.01 and 0.99 tails):
-  met. Condition 3 (replication): met on sign and size, with no interval excluding zero. Condition
+  met. Condition 3 (replication): met on sign, with no interval excluding zero. Condition
   4 (controls): met. Condition 5 (inputs available at forecast time): met. No arm is adopted, and
-  no arm is a candidate under the rule, because each fails condition 1.
+  no arm is kept as a candidate, because each fails condition 1.
 
 ## Checks
 
