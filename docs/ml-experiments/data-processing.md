@@ -530,6 +530,26 @@ The swap lowered the median by 10.2 points of capacity (1 point is 1% of a farm'
 10 m and 100 m speeds each explained about 7 points alone. Evidence: [experiment
 261](00261-wind-low-bias-decomposition/result.md), three farms, July 2025 to June 2026.
 
+**Do not drop half-hours when the final physical notification exceeds metered output by more than
+5% of capacity, when cleaning public wind farms' Elexon output (provisional, medium
+confidence).** *Applies to: experiments.* A wind farm's physical notification is the operator's own
+forecast. It correlates with metered output at only 0.7 to 0.8, and exceeds metered output in 35% of
+half-hours at the median of the 40 kept farms. The rule therefore removed 20% to 83% of the kept
+farms' half-hours, and kept the half-hours where the farm outproduced its forecast. Dropping only
+the half-hours with a bid-offer acceptance removed 3.6% of half-hours at the median kept farm and
+at most 10.4%. Evidence: [experiment 288](00288-pooled-head-on-public-wind-farms/result.md), 65
+candidate Elexon wind units, of which 40 were kept, 2019-09 to 2026-06.
+
+**Leave capacity, turbine rating, and hub height out of a correction head trained on a pool of
+farms (provisional, medium confidence).** *Applies to: experiments.* Each of the 40 kept public
+wind farms has a distinct combination of those three values. A head given 3 random numbers per farm
+fitted the training farms as well as one given the real values. With the real values, a head
+trained on four fifths of the farms scored 12.8% worse on the held-out fifth than the head trained
+on all 40 farms, and beat the XGBoost forecast (R0) on 11 of 40 held-out farms. Without them, the
+held-out head scored 4.4% worse and beat R0 on 24 of 40. Evidence: [experiment
+288](00288-pooled-head-on-public-wind-farms/result.md), 39 Scottish and 1 English wind farms, July
+2025 to June 2026. Covers the pooled correction head only.
+
 **Score a wind-farm head on the idle half-hours before using it (provisional).** The idle half-hours
 are the ones experiment 210's idle-band mask removes, where wind is near zero and the metered series
 holds a reactive-power floor. Where it applies: experiments that train a head on wind-farm rows
