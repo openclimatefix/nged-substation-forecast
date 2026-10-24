@@ -109,7 +109,7 @@ def arm_metric_arrays(
 def after_masks(
     *, series: int, origins: np.ndarray, targets: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Rows whose target is within 48 hours and within 7 days after a labelled shift of the series, and the shift label."""
+    """Rows whose target is within 48 hours and within 7 days after a labelled shift, and its label."""
     shifts = (
         dat.labelled_loads()
         .with_row_index("shift_index")
