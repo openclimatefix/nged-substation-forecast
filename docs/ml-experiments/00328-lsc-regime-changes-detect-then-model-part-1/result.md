@@ -96,9 +96,10 @@ take_home_message: >-
   Adding effects for a detected permanent change does not forecast better than refitting the
   additive model on the last 24 months, in a lab setting where the model is given past weather. The
   detectors find a 10% step of a Primary's load within 60 days only 26% of the time at an
-  acceptable false-alarm rate, so there is little time after the alarm for the extra effects to help. On this base, handling a regime
-  change comes down to how often the model is refitted. The rolling-GAM detector might still help
-  when building substation cards, which this experiment did not test.
+  acceptable false-alarm rate, so there is little time after the alarm for the extra effects to
+  help. On this base, handling a regime change comes down to how often the model is refitted. The
+  rolling-GAM detector might still help when building substation cards, which this experiment did
+  not test.
 advice:
   - >-
     Handle a permanent step in a Primary's load by refitting on a recent window, not by regime
