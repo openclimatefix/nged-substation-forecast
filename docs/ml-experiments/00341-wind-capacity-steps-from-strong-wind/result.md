@@ -87,3 +87,21 @@ the worker brief of 2026-10-24, summarised here:
 - **Known-answer test.** Steps and episodes of 1 turbine, 2 turbines, 10%, 25%, 50%, and half a
   turbine, lasting 3 to 365 days; export clips at 90%, 75%, and 50% of the farm's 99.9th percentile;
   seasonal swings of 9%, 15%, and 25%; a drift of 1% per year; a 5% speed bias over 30 days.
+
+## Choices fixed before any run
+
+- **Primary settings.** Strong-set margin 2 m/s (1 and 3 as sensitivities, and 0 m/s, experiment
+  233's above-rated set, as a post hoc comparison). Block length 28 days for steps (P1, P3, P7) and
+  7 days for episodes (P4, P5), with 3, 14, and 56 days and a daily series as sensitivities.
+- **Noise model.** The speed-error and power-noise terms are estimated per farm from the variance of
+  the log ratio against the squared log slope of the fitted power curve, in 2021-09 to 2024-06,
+  instead of from experiment 307's implied wind. The nuisance speed-scale term has a prior standard
+  deviation of 5%.
+- **Penalty rule.** The primary (farm, arm, block length) combinations for the false-alarm rule are
+  arms A (99.9th percentile, both margins), B, C, and D at 7, 14, and 28 days.
+  The CUSUM limit h comes from the grid 4 to 12 by the same rule.
+- **False alarms.** The rate on the unmodified series counts change points inside 2021-09 to
+  2024-06 per farm-year. Under a control, an excess change point is one with no change point of the
+  unmodified series within two blocks.
+- **Public neighbours.** The count of public farms within 150 km of W1, W2, and W3 is zero (287
+  candidates from experiment 288), so arms F and G are untestable and P8 is untestable.
