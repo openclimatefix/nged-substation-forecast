@@ -20,6 +20,10 @@ treated differently, and the last section says how.
   coordinates, and the capacity (exp 183; 6 farms; provisional).
 - **Farms miss 7.6% to 27.6% of their half-hours.** Check coverage before comparing farms (exp 179; 6
   farms; provisional).
+- **About 3.0% of the daylight half-hours of the six solar farms read exactly zero.** Count a zero
+  actual as inside a quantile forecast only by a rule stated in advance: the share at or below the
+  0.01 quantile (3.3% to 3.5% for research default 1) counts them, and the share strictly below it
+  (1.2% to 1.4%) does not (exp 321; 6 farms; provisional).
 - **A flat top in a farm's output is not proof of clipping.** The cause is not settled (exp 179,
   183, 218; 6 farms; provisional). See the [metered solar farms
   theme](../themes/metered-solar-farms/index.md).
