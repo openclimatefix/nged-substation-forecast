@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Paths, constants, and small functions shared by the scripts of experiment 00326.
 
 The scripts import experiment 00303's modules (which copy experiments 00285, 00259, and 00230), so
