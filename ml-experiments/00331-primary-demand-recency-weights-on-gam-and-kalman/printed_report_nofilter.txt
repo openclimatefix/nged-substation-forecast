@@ -1,0 +1,120 @@
+Primaries: 15 ['D10', 'D11', 'D12', 'D14', 'D16', 'D18', 'D19', 'D2', 'D21', 'D22', 'D3', 'D4', 'D5', 'D8', 'D9']; scored cuts 2021-09-01 to 2026-06-01 (58)
+NO-FILTER variant (Kalman gain 0): reproduction gate skipped
+
+== Reproduction gate (points; 328 arms A and B, per Primary mean over scored months) ==
+max |difference| over Primaries: R0 vs A 0.9808, W24 vs B 0.9719 (gate 0.005)
+placebo (half-life 1000 years) max |score difference| from R0: 0.00127 (gate 0.001)
+
+== Selected settings (ridge, gain, selection-half score) ==
+{'selected_on': 'even', 'arm': 'R0', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9225467688887425)}
+{'selected_on': 'even', 'arm': 'W24', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.901863436581052)}
+{'selected_on': 'even', 'arm': 'H3', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.900846912769544)}
+{'selected_on': 'even', 'arm': 'H6', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.876395072039153)}
+{'selected_on': 'even', 'arm': 'H12', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.8832968736119442)}
+{'selected_on': 'even', 'arm': 'H24', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.8968241014033118)}
+{'selected_on': 'even', 'arm': 'SH3', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.8896513812275444)}
+{'selected_on': 'even', 'arm': 'SH6', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.8739983855929747)}
+{'selected_on': 'even', 'arm': 'SH12', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.8806943720375278)}
+{'selected_on': 'even', 'arm': 'SH24', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.8923644588856556)}
+{'selected_on': 'even', 'arm': 'bestH', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.876395072039153)}
+{'selected_on': 'odd', 'arm': 'R0', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9557331247439143)}
+{'selected_on': 'odd', 'arm': 'W24', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9403761656967042)}
+{'selected_on': 'odd', 'arm': 'H3', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9564738704604712)}
+{'selected_on': 'odd', 'arm': 'H6', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9272245026554589)}
+{'selected_on': 'odd', 'arm': 'H12', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.926183823404676)}
+{'selected_on': 'odd', 'arm': 'H24', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9347530774212625)}
+{'selected_on': 'odd', 'arm': 'SH3', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9409616846422821)}
+{'selected_on': 'odd', 'arm': 'SH6', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9177410527889243)}
+{'selected_on': 'odd', 'arm': 'SH12', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.917198430162408)}
+{'selected_on': 'odd', 'arm': 'SH24', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.9241316766943728)}
+{'selected_on': 'odd', 'arm': 'bestH', 'ridge': 0.3, 'gain': 0.0, 'selection_score': np.float64(1.926183823404676)}
+
+== Arms (cross-fitted; mean over all Primaries; points) ==
+arm | score | MAE median | q95 | q99 | cov q01 below | cov q99 above | winter score | score ex-D8
+R0 | 1.947 | 6.531 | 1.1571 | 0.3407 | 0.0175 | 0.0168 | 1.937 | 1.809
+W24 | 1.930 | 6.435 | 1.1525 | 0.3396 | 0.0182 | 0.0174 | 1.942 | 1.803
+H3 | 1.938 | 6.438 | 1.1575 | 0.3463 | 0.0182 | 0.0160 | 2.035 | 1.815
+H6 | 1.911 | 6.360 | 1.1465 | 0.3410 | 0.0179 | 0.0167 | 1.958 | 1.788
+H12 | 1.914 | 6.384 | 1.1455 | 0.3394 | 0.0178 | 0.0169 | 1.934 | 1.787
+H24 | 1.924 | 6.433 | 1.1485 | 0.3396 | 0.0178 | 0.0170 | 1.931 | 1.793
+bestH | 1.914 | 6.386 | 1.1453 | 0.3395 | 0.0178 | 0.0168 | 1.947 | 1.789
+SH3 | 1.924 | 6.389 | 1.1528 | 0.3448 | 0.0182 | 0.0164 | 2.002 | 1.804
+SH6 | 1.905 | 6.333 | 1.1462 | 0.3411 | 0.0182 | 0.0172 | 1.937 | 1.784
+SH12 | 1.908 | 6.357 | 1.1449 | 0.3397 | 0.0183 | 0.0174 | 1.919 | 1.782
+SH24 | 1.917 | 6.401 | 1.1470 | 0.3393 | 0.0180 | 0.0173 | 1.916 | 1.786
+bestS | 1.908 | 6.358 | 1.1448 | 0.3397 | 0.0180 | 0.0173 | 1.928 | 1.785
+
+== Planned contrasts (pooled over all Primaries, month-block bootstrap) ==
+C1: bestH minus R0 on score: -0.0327 (95% -0.0561 to -0.0088; one-sided upper 95% -0.0120)
+C2: bestH minus W24 on score: -0.0157 (95% -0.0377 to +0.0074; one-sided upper 95% +0.0038)
+C3: bestS minus bestH on score: -0.0060 (95% -0.0168 to +0.0053; one-sided upper 95% +0.0034)
+  each: H3 minus R0 on score: -0.0093 (95% -0.0586 to +0.0422; one-sided upper 95% +0.0344)
+  each: H6 minus R0 on score: -0.0363 (95% -0.0638 to -0.0086; one-sided upper 95% -0.0128)
+  each: H12 minus R0 on score: -0.0335 (95% -0.0479 to -0.0183; one-sided upper 95% -0.0208)
+  each: H24 minus R0 on score: -0.0227 (95% -0.0303 to -0.0147; one-sided upper 95% -0.0159)
+  ex-D8: bestH minus R0 on score: -0.0199 (95% -0.0435 to +0.0046; one-sided upper 95% +0.0005)
+  winter: bestH minus R0 on score: +0.0098 (95% -0.0322 to +0.0598; one-sided upper 95% +0.0505)
+  check: bestH minus R0 on mae: -0.1450 (95% -0.2349 to -0.0512; one-sided upper 95% -0.0659)
+  check: bestH minus R0 on p95: -0.0118 (95% -0.0249 to +0.0032; one-sided upper 95% +0.0009)
+  check: bestH minus R0 on p99: -0.0011 (95% -0.0072 to +0.0066; one-sided upper 95% +0.0050)
+
+== Non-inferiority of bestH against R0 per Primary (margin 0.01, one-sided 95% upper bound) ==
+D10: diff -0.0307, upper +0.0351 LOOK
+D11: diff -0.0426, upper -0.0029 PASS
+D12: diff -0.0395, upper +0.0273 LOOK
+D14: diff -0.0102, upper +0.0137 LOOK
+D16: diff -0.0336, upper -0.0090 PASS
+D18: diff -0.0389, upper -0.0010 PASS
+D19: diff +0.0212, upper +0.0842 LOOK
+D2: diff -0.0397, upper -0.0171 PASS
+D21: diff -0.0498, upper -0.0059 PASS
+D22: diff -0.0208, upper +0.0710 LOOK
+D3: diff -0.0241, upper +0.0016 PASS
+D4: diff +0.0032, upper +0.0239 LOOK
+D5: diff +0.0179, upper +0.0620 LOOK
+D8: diff -0.2085, upper -0.1230 excluded (D8)
+D9: diff -0.0004, upper +0.0150 LOOK
+pooled ex-D8 upper 95% bound: +0.0005
+
+== D8 on its own ==
+R0: all months 3.767; after break 6.639; q99 above rate after 0.0282; q01 below rate after 0.1944
+W24: all months 3.607; after break 6.458; q99 above rate after 0.0365; q01 below rate after 0.1810
+H3: all months 3.551; after break 6.112; q99 above rate after 0.0778; q01 below rate after 0.1267
+H6: all months 3.518; after break 6.186; q99 above rate after 0.0476; q01 below rate after 0.1497
+H12: all months 3.578; after break 6.345; q99 above rate after 0.0350; q01 below rate after 0.1720
+H24: all months 3.651; after break 6.472; q99 above rate after 0.0319; q01 below rate after 0.1833
+bestH: all months 3.558; after break 6.243; q99 above rate after 0.0378; q01 below rate after 0.1632
+
+== Effective winters at the last origin (median over Primaries) ==
+{'R0': 5.6537037037037035, 'W24': 1.9997685185185186, 'H3': 1.0907241779310368, 'H6': 1.6273985501523667, 'H12': 2.817292679521117, 'H24': 4.290900458731614, 'P': 5.653694528016542, 'SH3': 1.0907241779310364, 'SH6': 1.627398550152366, 'SH12': 2.8172926795211186, 'SH24': 4.290900458731612}
+
+== Injected-step worlds (known answer; ridge 0.1, gain per arm fixed at 0.10) ==
+d0_30 W24 minus R0: +0.0100 (95% -0.1192 to +0.1629; 200 worlds, 8 onsets)
+d0_30 H3 minus R0: +0.0719 (95% -0.1274 to +0.2904; 200 worlds, 8 onsets)
+d0_30 H6 minus R0: +0.0351 (95% -0.0933 to +0.1829; 200 worlds, 8 onsets)
+d0_30 H12 minus R0: +0.0127 (95% -0.0706 to +0.1021; 200 worlds, 8 onsets)
+d0_30 H24 minus R0: +0.0047 (95% -0.0425 to +0.0531; 200 worlds, 8 onsets)
+d0_30 P minus R0: +0.0000 (95% -0.0001 to +0.0001; 200 worlds, 8 onsets)
+d30_90 W24 minus R0: -0.0958 (95% -0.1902 to -0.0013; 200 worlds, 8 onsets)
+d30_90 H3 minus R0: -0.5147 (95% -0.8977 to -0.0816; 200 worlds, 8 onsets)
+d30_90 H6 minus R0: -0.4054 (95% -0.6047 to -0.1928; 200 worlds, 8 onsets)
+d30_90 H12 minus R0: -0.2252 (95% -0.3258 to -0.1226; 200 worlds, 8 onsets)
+d30_90 H24 minus R0: -0.1115 (95% -0.1610 to -0.0635; 200 worlds, 8 onsets)
+d30_90 P minus R0: -0.0002 (95% -0.0003 to -0.0001; 200 worlds, 8 onsets)
+d90p W24 minus R0: -0.0100 (95% -0.0485 to +0.0305; 200 worlds, 8 onsets)
+d90p H3 minus R0: -0.1443 (95% -0.2066 to -0.0821; 200 worlds, 8 onsets)
+d90p H6 minus R0: -0.1094 (95% -0.1490 to -0.0728; 200 worlds, 8 onsets)
+d90p H12 minus R0: -0.0631 (95% -0.0852 to -0.0420; 200 worlds, 8 onsets)
+d90p H24 minus R0: -0.0325 (95% -0.0441 to -0.0214; 200 worlds, 8 onsets)
+d90p P minus R0: -0.0001 (95% -0.0001 to -0.0000; 200 worlds, 8 onsets)
+KNOWN ANSWER first 90 days pooled W24 minus R0: -0.0605 (95% -0.1604 to +0.0484; 200 worlds)
+KNOWN ANSWER first 90 days pooled H3 minus R0: -0.3192 (95% -0.5634 to -0.0430; 200 worlds)
+KNOWN ANSWER first 90 days pooled H6 minus R0: -0.2586 (95% -0.3927 to -0.1225; 200 worlds)
+KNOWN ANSWER first 90 days pooled H12 minus R0: -0.1459 (95% -0.2186 to -0.0790; 200 worlds)
+KNOWN ANSWER first 90 days pooled H24 minus R0: -0.0728 (95% -0.1110 to -0.0401; 200 worlds)
+first 90 days R0: score 3.285
+first 90 days W24: score 3.222
+first 90 days H3: score 2.955
+first 90 days H6: score 3.019
+first 90 days H12: score 3.136
+first 90 days H24: score 3.211
