@@ -538,7 +538,21 @@ from 0.21 to 0.25 at W3, while the ensemble-mean speed rose by 0.3 m/s. A neural
 the hindcast runs scored 0.21 to 1.04 points worse than the same adapter fitted to ERA5 and then
 given an offset table, and an offset table fitted to the hindcast runs still helped. Evidence:
 [experiment 303](00303-wind-adapter-in-production-setting/result.md), three farms, July 2025 to
-June 2026; the cause of the shift is not identified.
+June 2026; the cause of the shift is not identified. In [experiment
+344](00344-wind-research-default-1-speed-dependent-offsets/result.md), a correction keyed by the
+ensemble-mean wind speed and fitted to the hindcast gained 0.021 points on the kept rows (99.67%
+interval -0.126 to +0.077), and the same correction fitted to January to June 2025 gained 0.146
+points (-0.257 to -0.038).
+
+**Judge a wind forecast's harm at low winds on rows grouped by the forecast-time ensemble-mean
+speed, not by ERA5 speed (provisional, medium confidence).** *Applies to: experiments.* The rows
+whose ERA5 100 m speed is below cut-in are chosen by the observed wind, so they collect the
+half-hours where the forecast was too high, and every upward correction worsens them: a constant
+shift by 0.51 points and a speed-dependent curve by 0.65 points (both fitted to January to June
+2025), while the rows whose forecast speed is below cut-in improved by 0.17 points under the curve
+and worsened by 0.08 under the shift. Evidence: [experiment
+344](00344-wind-research-default-1-speed-dependent-offsets/result.md), three farms, July 2025 to
+June 2026.
 
 **Correct the ECMWF ensemble's 10 m and 100 m wind speeds before a wind-power model fitted to ERA5
 reads them, and expect the uncorrected input to lower the median forecast by about 10 points of
