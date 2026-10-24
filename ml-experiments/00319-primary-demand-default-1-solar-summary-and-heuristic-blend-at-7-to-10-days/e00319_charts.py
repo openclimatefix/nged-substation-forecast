@@ -111,7 +111,7 @@ def headline(*, report: dict) -> None:
 
 
 def difference(*, report: dict) -> None:
-    """Each arm's score minus the default's, with 95% and 99.5% intervals, from 168 to 240 hours."""
+    """Each arm's score minus the default's, with 95% intervals, from 168 to 240 hours."""
     rows = []
     for b in BANDS[7:]:
         for key, label in (

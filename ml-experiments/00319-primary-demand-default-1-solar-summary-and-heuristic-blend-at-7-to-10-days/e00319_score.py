@@ -152,6 +152,7 @@ def main() -> None:
     rows = chain.join(manual, on=s317.common.KEYS, how="inner", validate="1:1")
     rows = rows.join(clim, on=s317.common.KEYS, how="inner", validate="1:1")
     rows = rows.filter(pl.col("lead_hours") <= common.HORIZON_HOURS)
+    rows_after_reference_joins = rows.height
     stored = (
         pl.read_parquet(common.E251_ARMS / "rows.parquet")
         .select(["site", "power_fcst_init_time", "valid_time"])
@@ -242,6 +243,9 @@ def main() -> None:
         "x2_equals_default_below_168": float(np.abs(x2_q[short] - default_q[short]).max()),
         "chain_168_240_score": float(loss["default"][long].mean()),
         "x1_long_rows_missing": int(rows.filter(pl.Series(long))["x1_q50"].is_null().sum()),
+        "x2_long_rows_missing": int(rows.filter(pl.Series(long))["x2_q50"].is_null().sum()),
+        "xr_long_rows_missing": int(rows.filter(pl.Series(long))["xr_q50"].is_null().sum()),
+        "rows_after_reference_joins": rows_after_reference_joins,
     }
     heuristic_gate = json.loads((common.ARMS_DIR / "gates_arms.json").read_text())
     rep["gate"]["heuristic_rebuild_vs_experiment_87"] = heuristic_gate
