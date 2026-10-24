@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Score experiment 318: per-row losses, farm-equal means, month-block intervals at 99.17%.
 
 Per band and setting, rows are the scored-year runs that every arm compared holds with finite
@@ -12,6 +11,7 @@ planned contrasts. `h1` and `h2` are the first and second half of the scored yea
         uv run --no-sync python ml-experiments/00318-*/e00318_score.py
 """
 
+import re
 from typing import Final
 
 import e00310_common as c310  # ty: ignore[unresolved-import]
@@ -91,7 +91,7 @@ def load_band(*, band: str) -> pl.DataFrame:
         mine = sorted((common.PRED_DIR / band / setting).glob("*.parquet"))
         per_arm = {}
         for f in mine:
-            arm = f.name.split("_s")[0] if "_s" in f.name else f.name
+            arm = re.sub(r"_s\d+_.*$", "", f.name)
             per_arm[arm] = per_arm.get(arm, 0) + 1
         for arm, n_files in per_arm.items():
             seeds = common.OWN_SEEDS if setting == "own_history" else common.ZERO_SEEDS
@@ -155,7 +155,16 @@ def main() -> None:
                     for a in arms:
                         lo, hi = np.nanpercentile(draws[idx[a]], [LO_PCT, HI_PCT])
                         scores.append(
-                            dict(band=band, setting=setting, half=half, metric=metric, arm=a, value=point[idx[a]], lo=lo, hi=hi)
+                            {
+                                "band": band,
+                                "setting": setting,
+                                "half": half,
+                                "metric": metric,
+                                "arm": a,
+                                "value": point[idx[a]],
+                                "lo": lo,
+                                "hi": hi,
+                            }
                         )
                     if metric not in ("score", "pin01", "pin99", "ae_mean"):
                         continue
@@ -167,21 +176,29 @@ def main() -> None:
                         lo, hi = np.nanpercentile(change, [LO_PCT, HI_PCT])
                         dlo, dhi = np.nanpercentile(diff, [LO_PCT, HI_PCT])
                         contrasts.append(
-                            dict(
-                                band=band, setting=setting, half=half, metric=metric, arm=arm, reference=ref,
-                                planned=(arm, ref) in PLANNED,
-                                points=point[idx[arm]] - point[idx[ref]], points_lo=dlo, points_hi=dhi,
-                                percent=100.0 * (point[idx[arm]] - point[idx[ref]]) / point[idx[ref]],
-                                lo=lo, hi=hi,
-                            )
+                            {
+                                "band": band,
+                                "setting": setting,
+                                "half": half,
+                                "metric": metric,
+                                "arm": arm,
+                                "reference": ref,
+                                "planned": (arm, ref) in PLANNED,
+                                "points": point[idx[arm]] - point[idx[ref]],
+                                "points_lo": dlo,
+                                "points_hi": dhi,
+                                "percent": 100.0
+                                * (point[idx[arm]] - point[idx[ref]])
+                                / point[idx[ref]],
+                                "lo": lo,
+                                "hi": hi,
+                            }
                         )
         print("scored", band, flush=True)
     pl.concat(all_rows).write_parquet(common.DATA_DIR / "row_losses.parquet")
     pl.DataFrame(scores).write_csv(common.DATA_DIR / "scores.csv")
     pl.DataFrame(contrasts).write_csv(common.DATA_DIR / "contrasts.csv")
-    table = pl.DataFrame(scores).filter(
-        (pl.col("metric") == "score") & (pl.col("half") == "all")
-    )
+    table = pl.DataFrame(scores).filter((pl.col("metric") == "score") & (pl.col("half") == "all"))
     for setting in c310.SETTINGS:
         print(f"--- {setting}: quantile score by band")
         print(

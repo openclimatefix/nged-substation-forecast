@@ -13,7 +13,9 @@ DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / SLUG
 PRED_DIR: Final[Path] = DATA_DIR / "predictions"
 E310_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00310-metered-farm-long-lead-scoring"
 E313_PRED_DIR: Final[Path] = (
-    ML_EXPERIMENTS_DATA_DIR / "00313-metered-farm-pure-xgboost-and-mdn-vs-plant" / "solar_predictions"
+    ML_EXPERIMENTS_DATA_DIR
+    / "00313-metered-farm-pure-xgboost-and-mdn-vs-plant"
+    / "solar_predictions"
 )
 OWN_SEEDS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4)
 ZERO_SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
@@ -54,9 +56,7 @@ DEFAULT_INPUTS: Final[tuple[str, ...]] = (
 """Experiment 310's mixture-head inputs (`HEAD_INPUTS`), copied so a change there is noticed."""
 LEAD_INPUTS: Final[tuple[str, ...]] = (*DEFAULT_INPUTS, "lead_day")
 FULL_INPUTS: Final[tuple[str, ...]] = (*LEAD_INPUTS, *ADDED_COLUMNS)
-FULL_NOLAG_INPUTS: Final[tuple[str, ...]] = tuple(
-    c for c in FULL_INPUTS if c not in LAG_COLUMNS
-)
+FULL_NOLAG_INPUTS: Final[tuple[str, ...]] = tuple(c for c in FULL_INPUTS if c not in LAG_COLUMNS)
 
 # arm -> (input columns, whether the head's base is the plant forecast, shuffle the added columns)
 PER_BAND_ARMS: Final[dict[str, tuple[tuple[str, ...], bool, bool]]] = {

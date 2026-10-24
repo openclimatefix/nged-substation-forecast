@@ -26,7 +26,7 @@ import e00310_fit as f310  # ty: ignore[unresolved-import]
 import e00318_common as common
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.tail_calibration import level_column
 
 N_PROCESSES: Final[int] = 4
@@ -94,8 +94,12 @@ def train_head(
     train_x = train.select(cols).to_numpy().astype(np.float64)
     mean, std = train_x.mean(axis=0), train_x.std(axis=0) + 1e-6
     is_val = train["is_val"].to_numpy()
-    fit_b = make_batch(frame=train, inputs=cols, mean=mean, std=std, plant_base=plant_base, rows=~is_val)
-    val_b = make_batch(frame=train, inputs=cols, mean=mean, std=std, plant_base=plant_base, rows=is_val)
+    fit_b = make_batch(
+        frame=train, inputs=cols, mean=mean, std=std, plant_base=plant_base, rows=~is_val
+    )
+    val_b = make_batch(
+        frame=train, inputs=cols, mean=mean, std=std, plant_base=plant_base, rows=is_val
+    )
     model = f310.MixtureHead(len(cols))
     optimiser = torch.optim.AdamW(
         model.parameters(), lr=f310.LEARNING_RATE, weight_decay=f310.WEIGHT_DECAY
@@ -138,7 +142,14 @@ def out_path(*, band: str, setting: str, site: str, arm: str, seed: int, start: 
 
 
 def write(
-    *, st: f310.Setting, band: str, setting: str, arm: str, seed: int, start: datetime, q: np.ndarray
+    *,
+    st: f310.Setting,
+    band: str,
+    setting: str,
+    arm: str,
+    seed: int,
+    start: datetime,
+    q: np.ndarray,
 ) -> None:
     """Write a job's test rows atomically."""
     path = out_path(band=band, setting=setting, site=st.site, arm=arm, seed=seed, start=start)
@@ -215,9 +226,7 @@ def run_pooled_job(task: tuple[str, str, datetime]) -> str:
     ]
     if not todo:
         return f"pooled {setting} {site} {start:%Y-%m} skipped"
-    sts = {
-        b: new_setting(band=b, setting=setting, site=site, start=start) for b in c310.BAND_ORDER
-    }
+    sts = {b: new_setting(band=b, setting=setting, site=site, start=start) for b in c310.BAND_ORDER}
     train = pl.concat([st.train for st in sts.values()])
     tests = {b: st.test for b, st in sts.items()}
     ceilings = {b: st.ceiling for b, st in sts.items()}
@@ -270,11 +279,7 @@ def main() -> None:
             if (not (keep & bands)) and matches((t[0], t[1], f"{t[2]:%Y-%m}"), groups)
         ]
     if "pooled" not in kinds or "bands" in kinds:
-        tasks += [
-            t
-            for t in band_tasks
-            if matches((t[0], t[1], t[2], f"{t[3]:%Y-%m}"), groups)
-        ]
+        tasks += [t for t in band_tasks if matches((t[0], t[1], t[2], f"{t[3]:%Y-%m}"), groups)]
     with multiprocessing.get_context("spawn").Pool(N_PROCESSES) as pool:
         for done in pool.imap_unordered(run_any, tasks):
             print("finished", done, flush=True)
