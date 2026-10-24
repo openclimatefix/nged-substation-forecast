@@ -28,7 +28,7 @@ import e00323_fits as fits323  # ty: ignore[unresolved-import]
 import e00325_basis as sun
 import e00325_common as common
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache
 from studies.dp_pinned_capacity import read_vintages
 

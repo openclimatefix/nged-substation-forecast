@@ -27,7 +27,7 @@ import e00325_common as common
 import e00325_variant as variant_module
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 SEEDS = (0, 1, 2)
 ARM = 2

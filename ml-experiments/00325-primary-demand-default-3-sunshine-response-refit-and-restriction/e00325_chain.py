@@ -29,7 +29,7 @@ import e00325_variant as variant_module
 import numpy as np
 import polars as pl
 import studies.dp_ens_weather as weather
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 
 BASE_COLUMNS = (*c317.BASE_COLUMNS, "level", "anomaly")
