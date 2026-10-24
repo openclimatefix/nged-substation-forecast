@@ -95,8 +95,7 @@ lessons:
 take_home_message: >-
   Adding effects for a detected permanent change does not forecast better than refitting the
   additive model on the last 24 months, in a lab setting where the model is given past weather. The
-  detectors find a 10% step of a
-  Primary's load within 60 days only 26% of the time at an acceptable false-alarm rate, so there
+  detectors find a 10% step of a Primary's load within 60 days only 26% of the time at an acceptable false-alarm rate, so there
   is little time after the alarm for the extra effects to help. On this base, handling a regime
   change comes down to how often the model is refitted. The rolling-GAM detector might still help
   when building substation cards, which this experiment did not test.
@@ -118,7 +117,8 @@ advice:
 **Take-home: adding effects for a detected permanent change does not forecast better than refitting
 the model on the last 24 months.**
 We injected a permanent step of 10% or 25% of load into the recorded demand of 14 Primary
-substations (the substations that feed local distribution feeders), and compared forecasts that add new effects
+substations (the substations that feed local distribution feeders), and compared forecasts that add
+new effects
 after a detected change with forecasts refitted on the last 24 months (arm B). Arm B scored as well
 as or better than every pre-registered regime arm in the first 90 days after a step, because the two
 detectors raise their alarms late and miss small steps. At D8, the Primary with a real gas-engine
@@ -198,7 +198,8 @@ residuals since the detected change, and `n` removes the level filter.
   steps, first 90 days).
 - D8, first 90 days after the break: B minus C2 -0.040 (-0.262 to +0.154); post hoc B minus C2t
   +0.065 (+0.037 to +0.129); all rows after the break B minus C2t +0.150 (-0.057 to +0.372). The
-  D8 intervals rest on 3 to 4 monthly forecast origins. The q99 exceedance after the break is 0.031 for arm B
+  D8 intervals rest on 3 to 4 monthly forecast origins. The q99 exceedance after the break is 0.031
+  for arm B
   and 0.031 for C2t against a nominal 0.010, so no arm is calibrated at D8.
 - Primaries with no injection (14, real records): B minus A -0.021 (-0.037 to -0.004), C2t minus A
   -0.030 (-0.046 to -0.013), D2t minus A -0.033 (-0.050 to -0.016), against the 0.01 margin. C2
