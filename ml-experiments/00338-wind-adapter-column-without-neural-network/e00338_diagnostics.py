@@ -7,7 +7,8 @@ the ERA5 training rows, and, on the ensemble member rows of the scored year, eac
 effective hub-height speed and its correlation with the neural adapter's column. Nothing here
 reads a score.
 
-    PYTHONPATH as for the fit; uv run --no-sync python ml-experiments/00338-*/e00338_diagnostics.py --farm W1
+    PYTHONPATH as for the fit; uv run --no-sync python \
+      ml-experiments/00338-*/e00338_diagnostics.py --farm W1
 """
 
 import argparse
