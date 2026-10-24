@@ -1,0 +1,479 @@
+== Tuning (pooled D+1 mean absolute error of the corrected median, tuning rows) ==
+chosen: {'ANALOG+R': 'ANALOG+R_k20_n13_l0.5_kappa1', 'ANALOG+R-notemp': 'ANALOG+R-notemp_k20_n8_l0.5_kappa1', 'ANALOG-k': 'ANALOG-k_k20_n8_l1_kappa0.75'}
+  ANALOG+R: ANALOG+R_k20_n13_l0.5_kappa1 4.0529
+  ANALOG+R-notemp: ANALOG+R-notemp_k20_n8_l0.5_kappa1 4.0548
+  ANALOG-k: ANALOG-k_k20_n8_l1_kappa0.75 4.1074
+  K0: 4.2994
+  R-exact: 4.1308
+  R-kappa0.5: 4.1487
+  R-kappa1: 4.1546
+  R-kappa1.25: 4.2216
+  ANALOG-holiday: 4.1289
+  ANALOG-k-ref: 4.1384
+  ANALOG+R-ref: 4.0731
+== Gate: median share of the injected shift recovered, and the lookahead check ==
+{
+ "g1": {
+  "ANALOG+R-ref": 0.22042410714285712,
+  "ANALOG+R-ref-placebo": 0.04464285714285713,
+  "ANALOG+R-tuned": 0.20375457875457872,
+  "ANALOG+R-tuned-placebo": 0.05952380952380953,
+  "ANALOG-k-k3-n4": 0.5555555555555556,
+  "ANALOG-k-k3-n4-notemp": 0.5902777777777778,
+  "ANALOG-k-ref": 0.3515625,
+  "ANALOG-k-ref-placebo": -8.673617379884035e-19,
+  "ANALOG-k-tuned": 0.3515625,
+  "R": 0.08928571428571426
+ },
+ "g2": {
+  "ANALOG+R-tuned": 0.4166666666666667,
+  "ANALOG-holiday": 0.3125,
+  "R": 0.0
+ },
+ "g3": {
+  "ANALOG+R-ref": 0.300051510989011,
+  "ANALOG+R-ref-notemp": 0.26549622252747246
+ }
+}
+G0 largest profile change when the target day and the origin's day are injected: 0.0
+D10 tuning and replicate: non-holiday targets with an analog pool 349, mean pool 33.5, mean prior-year candidates 7.8
+D10 scored: non-holiday targets with an analog pool 346, mean pool 80.3, mean prior-year candidates 51.2
+D10 scored holiday-like targets 16 (the scored runs hold fewer): identity path 16, fallback path 0, no set 0
+D10 cold scored days 15: mean absolute temperature gap to the chosen analogs 3.01 C (all-days gap on non-cold days for comparison below)
+D10 other scored days 331: mean gap 1.31 C
+== replicate: planned contrasts (99%), then breakdowns ==
+replicate | C1 ANALOG+R - R | lead band D+1 | -0.0330 [-0.0558, -0.0045] 4/5 sites, rows 41,126, site-days 889; MAE median -0.0556, MAE mean -0.0553
+replicate | C1 ANALOG+R - R | lead band 0-24 h | +0.0106 [-0.0040, +0.0265] 2/5 sites, rows 41,966, site-days 917; MAE median +0.0205, MAE mean +0.0218
+replicate | C1 ANALOG+R - R | lead band 24-48 h | -0.0224 [-0.0365, -0.0018] 4/5 sites, rows 40,622, site-days 889; MAE median -0.0323, MAE mean -0.0318
+replicate | C1 ANALOG+R - R | lead band 48-144 h | +0.0275 [+0.0152, +0.0387] 0/5 sites, rows 148,928, site-days 861; MAE median +0.0558, MAE mean +0.0552
+replicate | C1 ANALOG+R - R | lead band 144-168 h | +0.0110 [-0.0029, +0.0279] 2/5 sites, rows 33,770, site-days 746; MAE median +0.0338, MAE mean +0.0400
+replicate | C1 ANALOG+R - R | lead band 12-36 h | -0.0250 [-0.0453, +0.0027] 3/5 sites, rows 41,294, site-days 917; MAE median -0.0446, MAE mean -0.0443
+replicate | C1 ANALOG+R - R | lead band 0.5-168 h | +0.0150 [+0.0039, +0.0271] 0/5 sites, rows 265,286, site-days 917; MAE median +0.0339, MAE mean +0.0347
+replicate | C1 ANALOG+R - R | leave out D5 | -0.0413 [-0.0699, -0.0078] 3/4 sites, rows 32,726, site-days 708; MAE median -0.0685, MAE mean -0.0695
+replicate | C1 ANALOG+R - R | leave out D10 | -0.0422 [-0.0640, -0.0202] 4/4 sites, rows 33,234, site-days 718; MAE median -0.0679, MAE mean -0.0675
+replicate | C1 ANALOG+R - R | leave out D11 | -0.0378 [-0.0679, -0.0003] 3/4 sites, rows 32,726, site-days 708; MAE median -0.0648, MAE mean -0.0648
+replicate | C1 ANALOG+R - R | leave out D14 | -0.0213 [-0.0425, +0.0021] 3/4 sites, rows 32,966, site-days 712; MAE median -0.0366, MAE mean -0.0359
+replicate | C1 ANALOG+R - R | leave out D16 | -0.0222 [-0.0407, +0.0018] 3/4 sites, rows 32,852, site-days 710; MAE median -0.0402, MAE mean -0.0390
+replicate | C1 ANALOG+R - R | all D+1 | -0.0330 [-0.0558, -0.0045] 4/5 sites, rows 41,126, site-days 889; MAE median -0.0556, MAE mean -0.0553
+    absolute {'ANALOG+R': 2.3009948526994726, 'R': 2.3339624131053105}
+replicate | C1 ANALOG+R - R | all leads | +0.0150 [+0.0039, +0.0271] 0/5 sites, rows 265,286, site-days 917; MAE median +0.0339, MAE mean +0.0347
+replicate | C1 ANALOG+R - R | non-holiday rows | -0.0415 [-0.0575, -0.0301] 5/5 sites, rows 38,001, site-days 819; MAE median -0.0671, MAE mean -0.0672
+replicate | C1 ANALOG+R - R | holiday-like days | +0.0710 [-0.0660, +0.1163] 0/5 sites, rows 3,125, site-days 70; MAE median +0.0843, MAE mean +0.0887
+replicate | C1 ANALOG+R - R | Christmas window | +0.0494 [+0.0494, +0.0494] 1/5 sites, rows 4,085, site-days 90; MAE median +0.0829, MAE mean +0.0838
+replicate | C1 ANALOG+R - R | Easter | +0.0144 [+0.0144, +0.0144] 1/5 sites, rows 960, site-days 20; MAE median +0.0205, MAE mean +0.0179
+replicate | C1 ANALOG+R - R | 1 to 3 days after a holiday-like day | -0.0241 [-0.0279, -0.0203] 3/5 sites, rows 1,440, site-days 30; MAE median -0.0264, MAE mean -0.0204
+replicate | C1 ANALOG+R - R | weekday Mon | -0.0994 [-0.1342, -0.0623] 5/5 sites, rows 5,404, site-days 113; MAE median -0.1463, MAE mean -0.1469
+replicate | C1 ANALOG+R - R | weekday Tue | -0.0248 [-0.0423, -0.0036] 5/5 sites, rows 5,452, site-days 119; MAE median -0.0398, MAE mean -0.0407
+replicate | C1 ANALOG+R - R | weekday Wed | -0.0127 [-0.0251, +0.0013] 4/5 sites, rows 5,832, site-days 122; MAE median -0.0233, MAE mean -0.0293
+replicate | C1 ANALOG+R - R | weekday Thu | +0.0100 [-0.0202, +0.0323] 1/5 sites, rows 5,618, site-days 122; MAE median +0.0248, MAE mean +0.0287
+replicate | C1 ANALOG+R - R | weekday Fri | -0.1479 [-0.1975, -0.0986] 5/5 sites, rows 5,333, site-days 117; MAE median -0.2750, MAE mean -0.2715
+replicate | C1 ANALOG+R - R | weekday Sat | +0.0004 [-0.0418, +0.0351] 3/5 sites, rows 5,158, site-days 113; MAE median +0.0104, MAE mean +0.0093
+replicate | C1 ANALOG+R - R | weekday Sun | -0.0194 [-0.0624, +0.0235] 4/5 sites, rows 5,204, site-days 113; MAE median -0.0255, MAE mean -0.0246
+replicate | C1 ANALOG+R - R | winter | -0.0267 [-0.0662, +0.0088] 3/5 sites, rows 13,685, site-days 300; MAE median -0.0549, MAE mean -0.0553
+replicate | C1 ANALOG+R - R | winter evening 16-20 | -0.0913 [-0.1170, -0.0681] 4/5 sites, rows 2,280, site-days 285; MAE median -0.1804, MAE mean -0.1792
+replicate | C1 ANALOG+R - R | non-winter | -0.0361 [-0.0443, -0.0271] 5/5 sites, rows 27,441, site-days 589; MAE median -0.0559, MAE mean -0.0554
+replicate | C1 ANALOG+R - R | cold-snap days | -0.1114 [-0.1114, -0.1114] 5/5 sites, rows 1,248, site-days 32; MAE median -0.2097, MAE mean -0.2149
+replicate | C1 ANALOG+R - R | cold-snap nights | -0.0818 [-0.0818, -0.0818] 4/5 sites, rows 468, site-days 32; MAE median -0.1950, MAE mean -0.1941
+replicate | C2 ANALOG-k - R | lead band D+1 | +0.0002 [-0.0427, +0.0498] 2/5 sites, rows 41,126, site-days 889; MAE median +0.0083, MAE mean +0.0099
+replicate | C2 ANALOG-k - R | lead band 0-24 h | +0.0752 [+0.0389, +0.1131] 0/5 sites, rows 41,966, site-days 917; MAE median +0.1409, MAE mean +0.1430
+replicate | C2 ANALOG-k - R | lead band 24-48 h | +0.0129 [-0.0181, +0.0537] 1/5 sites, rows 40,622, site-days 889; MAE median +0.0355, MAE mean +0.0372
+replicate | C2 ANALOG-k - R | lead band 48-144 h | +0.0833 [+0.0478, +0.1177] 0/5 sites, rows 148,928, site-days 861; MAE median +0.1602, MAE mean +0.1599
+replicate | C2 ANALOG-k - R | lead band 144-168 h | +0.0578 [+0.0150, +0.0935] 1/5 sites, rows 33,770, site-days 746; MAE median +0.1219, MAE mean +0.1311
+replicate | C2 ANALOG-k - R | lead band 12-36 h | +0.0133 [-0.0277, +0.0633] 2/5 sites, rows 41,294, site-days 917; MAE median +0.0265, MAE mean +0.0281
+replicate | C2 ANALOG-k - R | lead band 0.5-168 h | +0.0680 [+0.0354, +0.1015] 0/5 sites, rows 265,286, site-days 917; MAE median +0.1332, MAE mean +0.1348
+replicate | C2 ANALOG-k - R | leave out D5 | -0.0169 [-0.0610, +0.0373] 2/4 sites, rows 32,726, site-days 708; MAE median -0.0188, MAE mean -0.0182
+replicate | C2 ANALOG-k - R | leave out D10 | -0.0099 [-0.0549, +0.0409] 2/4 sites, rows 33,234, site-days 718; MAE median -0.0050, MAE mean -0.0036
+replicate | C2 ANALOG-k - R | leave out D11 | -0.0013 [-0.0563, +0.0605] 2/4 sites, rows 32,726, site-days 708; MAE median +0.0043, MAE mean +0.0060
+replicate | C2 ANALOG-k - R | leave out D14 | +0.0172 [-0.0273, +0.0665] 1/4 sites, rows 32,966, site-days 712; MAE median +0.0338, MAE mean +0.0352
+replicate | C2 ANALOG-k - R | leave out D16 | +0.0119 [-0.0173, +0.0521] 1/4 sites, rows 32,852, site-days 710; MAE median +0.0271, MAE mean +0.0301
+replicate | C2 ANALOG-k - R | all D+1 | +0.0002 [-0.0427, +0.0498] 2/5 sites, rows 41,126, site-days 889; MAE median +0.0083, MAE mean +0.0099
+    absolute {'ANALOG-k': 2.334183358323586, 'R': 2.3339624131053105}
+replicate | C2 ANALOG-k - R | all leads | +0.0680 [+0.0354, +0.1015] 0/5 sites, rows 265,286, site-days 917; MAE median +0.1332, MAE mean +0.1348
+replicate | C2 ANALOG-k - R | non-holiday rows | -0.0165 [-0.0498, +0.0265] 2/5 sites, rows 38,001, site-days 819; MAE median -0.0131, MAE mean -0.0117
+replicate | C2 ANALOG-k - R | holiday-like days | +0.2033 [+0.0699, +0.2786] 0/5 sites, rows 3,125, site-days 70; MAE median +0.2689, MAE mean +0.2732
+replicate | C2 ANALOG-k - R | Christmas window | +0.1428 [+0.1428, +0.1428] 0/5 sites, rows 4,085, site-days 90; MAE median +0.2240, MAE mean +0.2273
+replicate | C2 ANALOG-k - R | Easter | +0.0856 [+0.0856, +0.0856] 0/5 sites, rows 960, site-days 20; MAE median +0.1317, MAE mean +0.1327
+replicate | C2 ANALOG-k - R | 1 to 3 days after a holiday-like day | -0.0453 [-0.0799, -0.0108] 3/5 sites, rows 1,440, site-days 30; MAE median -0.0432, MAE mean -0.0283
+replicate | C2 ANALOG-k - R | weekday Mon | -0.0657 [-0.1472, +0.0029] 2/5 sites, rows 5,404, site-days 113; MAE median -0.0883, MAE mean -0.0876
+replicate | C2 ANALOG-k - R | weekday Tue | -0.0129 [-0.0426, +0.0178] 3/5 sites, rows 5,452, site-days 119; MAE median +0.0024, MAE mean +0.0074
+replicate | C2 ANALOG-k - R | weekday Wed | -0.0000 [-0.0318, +0.0479] 2/5 sites, rows 5,832, site-days 122; MAE median +0.0198, MAE mean +0.0163
+replicate | C2 ANALOG-k - R | weekday Thu | +0.0173 [-0.0232, +0.0466] 1/5 sites, rows 5,618, site-days 122; MAE median +0.0527, MAE mean +0.0596
+replicate | C2 ANALOG-k - R | weekday Fri | -0.1214 [-0.2129, -0.0151] 2/5 sites, rows 5,333, site-days 117; MAE median -0.2324, MAE mean -0.2306
+replicate | C2 ANALOG-k - R | weekday Sat | +0.0474 [-0.0688, +0.1338] 1/5 sites, rows 5,158, site-days 113; MAE median +0.1186, MAE mean +0.1159
+replicate | C2 ANALOG-k - R | weekday Sun | +0.0202 [-0.0453, +0.0727] 1/5 sites, rows 5,204, site-days 113; MAE median +0.0347, MAE mean +0.0364
+replicate | C2 ANALOG-k - R | winter | +0.0042 [-0.0777, +0.0649] 3/5 sites, rows 13,685, site-days 300; MAE median -0.0107, MAE mean -0.0089
+replicate | C2 ANALOG-k - R | winter evening 16-20 | -0.1011 [-0.1539, -0.0537] 4/5 sites, rows 2,280, site-days 285; MAE median -0.1849, MAE mean -0.1824
+replicate | C2 ANALOG-k - R | non-winter | -0.0017 [-0.0241, +0.0471] 2/5 sites, rows 27,441, site-days 589; MAE median +0.0178, MAE mean +0.0193
+replicate | C2 ANALOG-k - R | cold-snap days | -0.0581 [-0.0581, -0.0581] 3/5 sites, rows 1,248, site-days 32; MAE median -0.1262, MAE mean -0.1319
+replicate | C2 ANALOG-k - R | cold-snap nights | +0.0066 [+0.0066, +0.0066] 3/5 sites, rows 468, site-days 32; MAE median +0.0029, MAE mean +0.0044
+replicate | C3 ANALOG+R - RB-day-types | lead band D+1 | -0.0051 [-0.0171, +0.0127] 2/5 sites, rows 41,126, site-days 889; MAE median -0.0132, MAE mean -0.0142
+replicate | C3 ANALOG+R - RB-day-types | lead band 0-24 h | -0.0000 [-0.0187, +0.0161] 3/5 sites, rows 41,966, site-days 917; MAE median -0.0006, MAE mean +0.0010
+replicate | C3 ANALOG+R - RB-day-types | lead band 24-48 h | -0.0034 [-0.0133, +0.0077] 2/5 sites, rows 40,622, site-days 889; MAE median -0.0075, MAE mean -0.0089
+replicate | C3 ANALOG+R - RB-day-types | lead band 48-144 h | +0.0077 [+0.0006, +0.0144] 1/5 sites, rows 148,928, site-days 861; MAE median +0.0184, MAE mean +0.0175
+replicate | C3 ANALOG+R - RB-day-types | lead band 144-168 h | -0.0026 [-0.0197, +0.0134] 3/5 sites, rows 33,770, site-days 746; MAE median +0.0069, MAE mean +0.0159
+replicate | C3 ANALOG+R - RB-day-types | lead band 12-36 h | -0.0046 [-0.0166, +0.0117] 3/5 sites, rows 41,294, site-days 917; MAE median -0.0105, MAE mean -0.0114
+replicate | C3 ANALOG+R - RB-day-types | lead band 0.5-168 h | +0.0035 [-0.0042, +0.0101] 2/5 sites, rows 265,286, site-days 917; MAE median +0.0099, MAE mean +0.0107
+replicate | C3 ANALOG+R - RB-day-types | leave out D5 | -0.0074 [-0.0251, +0.0171] 2/4 sites, rows 32,726, site-days 708; MAE median -0.0158, MAE mean -0.0175
+replicate | C3 ANALOG+R - RB-day-types | leave out D10 | -0.0083 [-0.0165, +0.0011] 2/4 sites, rows 33,234, site-days 718; MAE median -0.0144, MAE mean -0.0150
+replicate | C3 ANALOG+R - RB-day-types | leave out D11 | -0.0071 [-0.0205, +0.0145] 2/4 sites, rows 32,726, site-days 708; MAE median -0.0186, MAE mean -0.0202
+replicate | C3 ANALOG+R - RB-day-types | leave out D14 | -0.0007 [-0.0128, +0.0148] 1/4 sites, rows 32,966, site-days 712; MAE median -0.0072, MAE mean -0.0084
+replicate | C3 ANALOG+R - RB-day-types | leave out D16 | -0.0019 [-0.0121, +0.0159] 1/4 sites, rows 32,852, site-days 710; MAE median -0.0101, MAE mean -0.0102
+replicate | C3 ANALOG+R - RB-day-types | all D+1 | -0.0051 [-0.0171, +0.0127] 2/5 sites, rows 41,126, site-days 889; MAE median -0.0132, MAE mean -0.0142
+    absolute {'ANALOG+R': 2.3009948526994726, 'RB-day-types': 2.3060661593773046}
+replicate | C3 ANALOG+R - RB-day-types | all leads | +0.0035 [-0.0042, +0.0101] 2/5 sites, rows 265,286, site-days 917; MAE median +0.0099, MAE mean +0.0107
+replicate | C3 ANALOG+R - RB-day-types | non-holiday rows | -0.0079 [-0.0184, +0.0042] 3/5 sites, rows 38,001, site-days 819; MAE median -0.0155, MAE mean -0.0164
+replicate | C3 ANALOG+R - RB-day-types | holiday-like days | +0.0296 [-0.0066, +0.0502] 3/5 sites, rows 3,125, site-days 70; MAE median +0.0148, MAE mean +0.0115
+replicate | C3 ANALOG+R - RB-day-types | Christmas window | +0.0319 [+0.0319, +0.0319] 2/5 sites, rows 4,085, site-days 90; MAE median +0.0443, MAE mean +0.0376
+replicate | C3 ANALOG+R - RB-day-types | Easter | -0.0066 [-0.0066, -0.0066] 4/5 sites, rows 960, site-days 20; MAE median -0.0575, MAE mean -0.0518
+replicate | C3 ANALOG+R - RB-day-types | 1 to 3 days after a holiday-like day | -0.0190 [-0.0453, +0.0073] 4/5 sites, rows 1,440, site-days 30; MAE median -0.0419, MAE mean -0.0387
+replicate | C3 ANALOG+R - RB-day-types | weekday Mon | -0.0224 [-0.0579, +0.0089] 4/5 sites, rows 5,404, site-days 113; MAE median -0.0405, MAE mean -0.0392
+replicate | C3 ANALOG+R - RB-day-types | weekday Tue | -0.0003 [-0.0131, +0.0166] 3/5 sites, rows 5,452, site-days 119; MAE median -0.0092, MAE mean -0.0103
+replicate | C3 ANALOG+R - RB-day-types | weekday Wed | +0.0046 [-0.0160, +0.0229] 2/5 sites, rows 5,832, site-days 122; MAE median -0.0006, MAE mean -0.0027
+replicate | C3 ANALOG+R - RB-day-types | weekday Thu | +0.0135 [-0.0003, +0.0383] 1/5 sites, rows 5,618, site-days 122; MAE median +0.0259, MAE mean +0.0251
+replicate | C3 ANALOG+R - RB-day-types | weekday Fri | -0.0463 [-0.0749, -0.0150] 5/5 sites, rows 5,333, site-days 117; MAE median -0.0826, MAE mean -0.0797
+replicate | C3 ANALOG+R - RB-day-types | weekday Sat | -0.0006 [-0.0208, +0.0355] 3/5 sites, rows 5,158, site-days 113; MAE median -0.0077, MAE mean -0.0142
+replicate | C3 ANALOG+R - RB-day-types | weekday Sun | -0.0061 [-0.0376, +0.0200] 4/5 sites, rows 5,204, site-days 113; MAE median +0.0034, MAE mean +0.0037
+replicate | C3 ANALOG+R - RB-day-types | winter | +0.0059 [-0.0107, +0.0456] 3/5 sites, rows 13,685, site-days 300; MAE median +0.0057, MAE mean +0.0023
+replicate | C3 ANALOG+R - RB-day-types | winter evening 16-20 | -0.0177 [-0.0271, -0.0093] 3/5 sites, rows 2,280, site-days 285; MAE median -0.0435, MAE mean -0.0454
+replicate | C3 ANALOG+R - RB-day-types | non-winter | -0.0106 [-0.0205, -0.0022] 3/5 sites, rows 27,441, site-days 589; MAE median -0.0227, MAE mean -0.0225
+replicate | C3 ANALOG+R - RB-day-types | cold-snap days | -0.0346 [-0.0346, -0.0346] 3/5 sites, rows 1,248, site-days 32; MAE median -0.0669, MAE mean -0.0657
+replicate | C3 ANALOG+R - RB-day-types | cold-snap nights | -0.0381 [-0.0381, -0.0381] 4/5 sites, rows 468, site-days 32; MAE median -0.0836, MAE mean -0.0830
+replicate | C4 ANALOG-holiday - R | lead band D+1 | +0.0046 [-0.0027, +0.0167] 1/5 sites, rows 41,126, site-days 889; MAE median +0.0083, MAE mean +0.0083
+replicate | C4 ANALOG-holiday - R | lead band 0-24 h | +0.0056 [-0.0004, +0.0128] 0/5 sites, rows 41,966, site-days 917; MAE median +0.0096, MAE mean +0.0091
+replicate | C4 ANALOG-holiday - R | lead band 24-48 h | +0.0030 [-0.0021, +0.0096] 1/5 sites, rows 40,622, site-days 889; MAE median +0.0051, MAE mean +0.0052
+replicate | C4 ANALOG-holiday - R | lead band 48-144 h | +0.0039 [-0.0008, +0.0087] 2/5 sites, rows 148,928, site-days 861; MAE median +0.0053, MAE mean +0.0053
+replicate | C4 ANALOG-holiday - R | lead band 144-168 h | +0.0009 [-0.0021, +0.0034] 2/5 sites, rows 33,770, site-days 746; MAE median +0.0022, MAE mean +0.0014
+replicate | C4 ANALOG-holiday - R | lead band 12-36 h | +0.0049 [-0.0017, +0.0168] 1/5 sites, rows 41,294, site-days 917; MAE median +0.0083, MAE mean +0.0085
+replicate | C4 ANALOG-holiday - R | lead band 0.5-168 h | +0.0037 [-0.0008, +0.0085] 2/5 sites, rows 265,286, site-days 917; MAE median +0.0055, MAE mean +0.0054
+replicate | C4 ANALOG-holiday - R | leave out D5 | +0.0050 [-0.0026, +0.0165] 1/4 sites, rows 32,726, site-days 708; MAE median +0.0090, MAE mean +0.0094
+replicate | C4 ANALOG-holiday - R | leave out D10 | +0.0023 [-0.0031, +0.0108] 1/4 sites, rows 33,234, site-days 718; MAE median +0.0043, MAE mean +0.0040
+replicate | C4 ANALOG-holiday - R | leave out D11 | +0.0065 [-0.0031, +0.0222] 0/4 sites, rows 32,726, site-days 708; MAE median +0.0111, MAE mean +0.0111
+replicate | C4 ANALOG-holiday - R | leave out D14 | +0.0045 [-0.0021, +0.0164] 1/4 sites, rows 32,966, site-days 712; MAE median +0.0082, MAE mean +0.0084
+replicate | C4 ANALOG-holiday - R | leave out D16 | +0.0047 [-0.0029, +0.0174] 1/4 sites, rows 32,852, site-days 710; MAE median +0.0087, MAE mean +0.0089
+replicate | C4 ANALOG-holiday - R | all D+1 | +0.0046 [-0.0027, +0.0167] 1/5 sites, rows 41,126, site-days 889; MAE median +0.0083, MAE mean +0.0083
+    absolute {'ANALOG-holiday': 2.3385759948148124, 'R': 2.3339624131053105}
+replicate | C4 ANALOG-holiday - R | all leads | +0.0037 [-0.0008, +0.0085] 2/5 sites, rows 265,286, site-days 917; MAE median +0.0055, MAE mean +0.0054
+replicate | C4 ANALOG-holiday - R | non-holiday rows | -0.0005 [-0.0017, +0.0002] 3/5 sites, rows 38,001, site-days 819; MAE median +0.0001, MAE mean +0.0002
+replicate | C4 ANALOG-holiday - R | holiday-like days | +0.0663 [-0.1248, +0.0845] 1/5 sites, rows 3,125, site-days 70; MAE median +0.1077, MAE mean +0.1076
+replicate | C4 ANALOG-holiday - R | Christmas window | +0.0398 [+0.0398, +0.0398] 1/5 sites, rows 4,085, site-days 90; MAE median +0.0599, MAE mean +0.0594
+replicate | C4 ANALOG-holiday - R | Easter | +0.0776 [+0.0776, +0.0776] 2/5 sites, rows 960, site-days 20; MAE median +0.1759, MAE mean +0.1750
+replicate | C4 ANALOG-holiday - R | 1 to 3 days after a holiday-like day | -0.0002 [-0.0029, +0.0026] 3/5 sites, rows 1,440, site-days 30; MAE median +0.0055, MAE mean +0.0046
+replicate | C4 ANALOG-holiday - R | weekday Mon | -0.0007 [-0.0031, +0.0009] 2/5 sites, rows 5,404, site-days 113; MAE median -0.0001, MAE mean +0.0000
+replicate | C4 ANALOG-holiday - R | weekday Tue | +0.0008 [-0.0012, +0.0036] 1/5 sites, rows 5,452, site-days 119; MAE median +0.0009, MAE mean +0.0012
+replicate | C4 ANALOG-holiday - R | weekday Wed | -0.0002 [-0.0009, +0.0002] 2/5 sites, rows 5,832, site-days 122; MAE median +0.0016, MAE mean +0.0000
+replicate | C4 ANALOG-holiday - R | weekday Thu | -0.0010 [-0.0027, +0.0000] 5/5 sites, rows 5,618, site-days 122; MAE median -0.0005, MAE mean +0.0000
+replicate | C4 ANALOG-holiday - R | weekday Fri | -0.0004 [-0.0013, +0.0000] 4/5 sites, rows 5,333, site-days 117; MAE median -0.0007, MAE mean +0.0000
+replicate | C4 ANALOG-holiday - R | weekday Sat | -0.0006 [-0.0021, +0.0000] 3/5 sites, rows 5,158, site-days 113; MAE median -0.0006, MAE mean +0.0000
+replicate | C4 ANALOG-holiday - R | weekday Sun | -0.0011 [-0.0050, +0.0007] 4/5 sites, rows 5,204, site-days 113; MAE median -0.0001, MAE mean +0.0000
+replicate | C4 ANALOG-holiday - R | winter | +0.0119 [+0.0000, +0.0226] 1/5 sites, rows 13,685, site-days 300; MAE median +0.0179, MAE mean +0.0177
+replicate | C4 ANALOG-holiday - R | winter evening 16-20 | +0.0064 [+0.0000, +0.0122] 2/5 sites, rows 2,280, site-days 285; MAE median -0.0002, MAE mean -0.0002
+replicate | C4 ANALOG-holiday - R | non-winter | +0.0010 [-0.0040, +0.0085] 2/5 sites, rows 27,441, site-days 589; MAE median +0.0035, MAE mean +0.0037
+replicate | C4 ANALOG-holiday - R | cold-snap days | +0.0000 [+0.0000, +0.0000] 2/5 sites, rows 1,248, site-days 32; MAE median +0.0000, MAE mean +0.0000
+replicate | C4 ANALOG-holiday - R | cold-snap nights | +0.0000 [+0.0000, +0.0000] 0/5 sites, rows 468, site-days 32; MAE median +0.0000, MAE mean +0.0000
+replicate | C5 ANALOG+R - K0 | lead band D+1 | -0.1245 [-0.2075, -0.0568] 5/5 sites, rows 41,126, site-days 889; MAE median -0.2446, MAE mean -0.2459
+replicate | C5 ANALOG+R - K0 | lead band 0-24 h | -0.0873 [-0.1891, -0.0212] 5/5 sites, rows 41,966, site-days 917; MAE median -0.1809, MAE mean -0.1781
+replicate | C5 ANALOG+R - K0 | lead band 24-48 h | -0.1068 [-0.1923, -0.0394] 5/5 sites, rows 40,622, site-days 889; MAE median -0.2125, MAE mean -0.2142
+replicate | C5 ANALOG+R - K0 | lead band 48-144 h | -0.0442 [-0.1262, +0.0157] 5/5 sites, rows 148,928, site-days 861; MAE median -0.1011, MAE mean -0.1063
+replicate | C5 ANALOG+R - K0 | lead band 144-168 h | -0.0486 [-0.1327, +0.0089] 5/5 sites, rows 33,770, site-days 746; MAE median -0.0919, MAE mean -0.0952
+replicate | C5 ANALOG+R - K0 | lead band 12-36 h | -0.1206 [-0.2054, -0.0546] 5/5 sites, rows 41,294, site-days 917; MAE median -0.2414, MAE mean -0.2426
+replicate | C5 ANALOG+R - K0 | lead band 0.5-168 h | -0.0612 [-0.1472, -0.0008] 5/5 sites, rows 265,286, site-days 917; MAE median -0.1296, MAE mean -0.1328
+replicate | C5 ANALOG+R - K0 | leave out D5 | -0.1142 [-0.1764, -0.0626] 4/4 sites, rows 32,726, site-days 708; MAE median -0.2243, MAE mean -0.2269
+replicate | C5 ANALOG+R - K0 | leave out D10 | -0.1331 [-0.2301, -0.0540] 4/4 sites, rows 33,234, site-days 718; MAE median -0.2512, MAE mean -0.2530
+replicate | C5 ANALOG+R - K0 | leave out D11 | -0.1457 [-0.2328, -0.0708] 4/4 sites, rows 32,726, site-days 708; MAE median -0.2857, MAE mean -0.2876
+replicate | C5 ANALOG+R - K0 | leave out D14 | -0.1162 [-0.2067, -0.0447] 4/4 sites, rows 32,966, site-days 712; MAE median -0.2309, MAE mean -0.2311
+replicate | C5 ANALOG+R - K0 | leave out D16 | -0.1131 [-0.2038, -0.0404] 4/4 sites, rows 32,852, site-days 710; MAE median -0.2309, MAE mean -0.2311
+replicate | C5 ANALOG+R - K0 | all D+1 | -0.1245 [-0.2075, -0.0568] 5/5 sites, rows 41,126, site-days 889; MAE median -0.2446, MAE mean -0.2459
+    absolute {'ANALOG+R': 2.3009948526994726, 'K0': 2.425461683705663}
+replicate | C5 ANALOG+R - K0 | all leads | -0.0612 [-0.1472, -0.0008] 5/5 sites, rows 265,286, site-days 917; MAE median -0.1296, MAE mean -0.1328
+replicate | C5 ANALOG+R - K0 | non-holiday rows | -0.1369 [-0.2248, -0.0595] 5/5 sites, rows 38,001, site-days 819; MAE median -0.2652, MAE mean -0.2670
+replicate | C5 ANALOG+R - K0 | holiday-like days | +0.0267 [-0.0278, +0.0532] 2/5 sites, rows 3,125, site-days 70; MAE median +0.0059, MAE mean +0.0104
+replicate | C5 ANALOG+R - K0 | Christmas window | -0.0387 [-0.0387, -0.0387] 4/5 sites, rows 4,085, site-days 90; MAE median -0.0908, MAE mean -0.0923
+replicate | C5 ANALOG+R - K0 | Easter | -0.0278 [-0.0278, -0.0278] 4/5 sites, rows 960, site-days 20; MAE median -0.0602, MAE mean -0.0521
+replicate | C5 ANALOG+R - K0 | 1 to 3 days after a holiday-like day | -0.1025 [-0.1197, -0.0853] 5/5 sites, rows 1,440, site-days 30; MAE median -0.1921, MAE mean -0.1831
+replicate | C5 ANALOG+R - K0 | weekday Mon | -0.1974 [-0.3155, -0.0950] 5/5 sites, rows 5,404, site-days 113; MAE median -0.3348, MAE mean -0.3359
+replicate | C5 ANALOG+R - K0 | weekday Tue | -0.1116 [-0.1856, -0.0367] 5/5 sites, rows 5,452, site-days 119; MAE median -0.2269, MAE mean -0.2285
+replicate | C5 ANALOG+R - K0 | weekday Wed | -0.0855 [-0.2115, +0.0093] 5/5 sites, rows 5,832, site-days 122; MAE median -0.1959, MAE mean -0.2033
+replicate | C5 ANALOG+R - K0 | weekday Thu | -0.0738 [-0.1905, +0.0132] 4/5 sites, rows 5,618, site-days 122; MAE median -0.1540, MAE mean -0.1551
+replicate | C5 ANALOG+R - K0 | weekday Fri | -0.2664 [-0.3250, -0.1747] 5/5 sites, rows 5,333, site-days 117; MAE median -0.4990, MAE mean -0.4992
+replicate | C5 ANALOG+R - K0 | weekday Sat | -0.0922 [-0.1357, -0.0393] 5/5 sites, rows 5,158, site-days 113; MAE median -0.1900, MAE mean -0.1889
+replicate | C5 ANALOG+R - K0 | weekday Sun | -0.1377 [-0.2273, -0.0373] 5/5 sites, rows 5,204, site-days 113; MAE median -0.2657, MAE mean -0.2675
+replicate | C5 ANALOG+R - K0 | winter | -0.1011 [-0.1482, -0.0876] 5/5 sites, rows 13,685, site-days 300; MAE median -0.2062, MAE mean -0.2093
+replicate | C5 ANALOG+R - K0 | winter evening 16-20 | -0.1127 [-0.1170, -0.1079] 3/5 sites, rows 2,280, site-days 285; MAE median -0.3093, MAE mean -0.3117
+replicate | C5 ANALOG+R - K0 | non-winter | -0.1361 [-0.2677, -0.0399] 5/5 sites, rows 27,441, site-days 589; MAE median -0.2638, MAE mean -0.2642
+replicate | C5 ANALOG+R - K0 | cold-snap days | -0.2104 [-0.2104, -0.2104] 5/5 sites, rows 1,248, site-days 32; MAE median -0.4257, MAE mean -0.4140
+replicate | C5 ANALOG+R - K0 | cold-snap nights | -0.4446 [-0.4446, -0.4446] 5/5 sites, rows 468, site-days 32; MAE median -0.9035, MAE mean -0.9028
+== replicate: other contrasts (95%) ==
+replicate | ANALOG+R-notemp - ANALOG+R (diagnostic) | all D+1 | +0.0029 [-0.0041, +0.0102] 1/5 sites, rows 41,126, site-days 889; MAE median +0.0004, MAE mean -0.0006
+replicate | ANALOG+R-notemp - ANALOG+R (diagnostic) | all leads | +0.0046 [-0.0038, +0.0131] 1/5 sites, rows 265,286, site-days 917; MAE median +0.0025, MAE mean -0.0004
+replicate | ANALOG+R-notemp - ANALOG+R (diagnostic) | non-holiday rows | +0.0030 [-0.0054, +0.0111] 1/5 sites, rows 38,001, site-days 819; MAE median +0.0005, MAE mean -0.0006
+replicate | ANALOG+R-notemp - ANALOG+R (diagnostic) | winter | +0.0029 [-0.0472, +0.0160] 2/5 sites, rows 13,685, site-days 300; MAE median -0.0054, MAE mean -0.0029
+replicate | ANALOG+R-notemp - ANALOG+R (diagnostic) | winter evening 16-20 | +0.0160 [+0.0076, +0.0253] 2/5 sites, rows 2,280, site-days 285; MAE median +0.0190, MAE mean +0.0200
+replicate | ANALOG+R-recent - ANALOG+R (post hoc) | all D+1 | +0.0016 [-0.0108, +0.0152] 1/5 sites, rows 41,126, site-days 889; MAE median +0.0033, MAE mean +0.0027
+replicate | ANALOG+R-recent - ANALOG+R (post hoc) | all leads | +0.0027 [-0.0049, +0.0114] 2/5 sites, rows 265,286, site-days 917; MAE median +0.0055, MAE mean +0.0042
+replicate | ANALOG+R-recent - ANALOG+R (post hoc) | non-holiday rows | +0.0013 [-0.0111, +0.0155] 2/5 sites, rows 38,001, site-days 819; MAE median +0.0021, MAE mean +0.0018
+replicate | ANALOG+R-recent - ANALOG+R (post hoc) | winter | +0.0004 [+0.0000, +0.0007] 2/5 sites, rows 13,685, site-days 300; MAE median -0.0003, MAE mean +0.0001
+replicate | ANALOG+R-recent - ANALOG+R (post hoc) | winter evening 16-20 | +0.0044 [+0.0000, +0.0094] 1/5 sites, rows 2,280, site-days 285; MAE median +0.0121, MAE mean +0.0125
+replicate | ANALOG+R-recent - R (post hoc) | all D+1 | -0.0313 [-0.0538, -0.0080] 4/5 sites, rows 41,126, site-days 889; MAE median -0.0523, MAE mean -0.0526
+replicate | ANALOG+R-recent - R (post hoc) | all leads | +0.0178 [+0.0076, +0.0267] 0/5 sites, rows 265,286, site-days 917; MAE median +0.0395, MAE mean +0.0388
+replicate | ANALOG+R-recent - R (post hoc) | non-holiday rows | -0.0403 [-0.0569, -0.0233] 5/5 sites, rows 38,001, site-days 819; MAE median -0.0650, MAE mean -0.0654
+replicate | ANALOG+R-recent - R (post hoc) | winter | -0.0264 [-0.0654, +0.0088] 3/5 sites, rows 13,685, site-days 300; MAE median -0.0552, MAE mean -0.0552
+replicate | ANALOG+R-recent - R (post hoc) | winter evening 16-20 | -0.0868 [-0.1077, -0.0681] 4/5 sites, rows 2,280, site-days 285; MAE median -0.1682, MAE mean -0.1667
+replicate | ANALOG+R - RB | all D+1 | -0.0196 [-0.0334, -0.0060] 4/5 sites, rows 41,126, site-days 889; MAE median -0.0332, MAE mean -0.0353
+replicate | ANALOG+R - RB | all leads | +0.0101 [+0.0022, +0.0170] 0/5 sites, rows 265,286, site-days 917; MAE median +0.0239, MAE mean +0.0238
+replicate | ANALOG+R - RB | non-holiday rows | -0.0230 [-0.0353, -0.0117] 5/5 sites, rows 38,001, site-days 819; MAE median -0.0365, MAE mean -0.0391
+replicate | ANALOG+R - RB | winter | -0.0186 [-0.0472, +0.0293] 4/5 sites, rows 13,685, site-days 300; MAE median -0.0370, MAE mean -0.0402
+replicate | ANALOG+R - RB | winter evening 16-20 | -0.0553 [-0.0787, -0.0343] 4/5 sites, rows 2,280, site-days 285; MAE median -0.1131, MAE mean -0.1142
+replicate | ANALOG-k - ANALOG+R | all D+1 | +0.0332 [+0.0106, +0.0591] 0/5 sites, rows 41,126, site-days 889; MAE median +0.0639, MAE mean +0.0653
+replicate | ANALOG-k - ANALOG+R | all leads | +0.0529 [+0.0341, +0.0761] 0/5 sites, rows 265,286, site-days 917; MAE median +0.0992, MAE mean +0.1001
+replicate | ANALOG-k - ANALOG+R | non-holiday rows | +0.0250 [+0.0077, +0.0529] 0/5 sites, rows 38,001, site-days 819; MAE median +0.0539, MAE mean +0.0555
+replicate | ANALOG-k - ANALOG+R | winter | +0.0309 [-0.0491, +0.0561] 0/5 sites, rows 13,685, site-days 300; MAE median +0.0442, MAE mean +0.0465
+replicate | ANALOG-k - ANALOG+R | winter evening 16-20 | -0.0099 [-0.0368, +0.0144] 3/5 sites, rows 2,280, site-days 285; MAE median -0.0046, MAE mean -0.0031
+replicate | R - K0 | all D+1 | -0.0915 [-0.1510, -0.0365] 5/5 sites, rows 41,126, site-days 889; MAE median -0.1890, MAE mean -0.1906
+replicate | R - K0 | all leads | -0.0762 [-0.1369, -0.0243] 5/5 sites, rows 265,286, site-days 917; MAE median -0.1636, MAE mean -0.1674
+replicate | R - K0 | non-holiday rows | -0.0954 [-0.1556, -0.0371] 5/5 sites, rows 38,001, site-days 819; MAE median -0.1981, MAE mean -0.1998
+replicate | R - K0 | winter | -0.0744 [-0.1195, -0.0498] 5/5 sites, rows 13,685, site-days 300; MAE median -0.1513, MAE mean -0.1540
+replicate | R - K0 | winter evening 16-20 | -0.0214 [-0.0489, +0.0091] 3/5 sites, rows 2,280, site-days 285; MAE median -0.1289, MAE mean -0.1324
+replicate | D9 absolute D+1: K0 1.942, R 1.836, RB 1.837, RB-day-types 1.842, ANALOG-k 1.883, ANALOG+R 1.840, ANALOG-holiday 1.847, ANALOG+R-notemp 1.841, ANALOG+R-recent 1.844
+replicate | absolute on rows every arm holds:
+    K0: D+1 2.425, all leads 2.756
+    R: D+1 2.334, all leads 2.679
+    RB: D+1 2.321, all leads 2.684
+    RB-day-types: D+1 2.306, all leads 2.691
+    ANALOG-k: D+1 2.334, all leads 2.747
+    ANALOG+R: D+1 2.301, all leads 2.694
+    ANALOG-holiday: D+1 2.339, all leads 2.683
+    ANALOG+R-notemp: D+1 2.304, all leads 2.699
+    ANALOG+R-recent: D+1 2.303, all leads 2.697
+replicate | tails at D+1 (coverage gap pts, pinball):
+    K0: q01 +1.38 0.2149, q05 +1.55 0.6587, q95 -0.89 0.5995, q99 -0.61 0.1653
+    R: q01 +1.58 0.2116, q05 +1.62 0.6388, q95 -0.49 0.5930, q99 -0.53 0.1656
+    ANALOG+R: q01 +1.31 0.2031, q05 +1.63 0.6210, q95 -0.54 0.5934, q99 -0.61 0.1674
+    ANALOG-holiday: q01 +1.55 0.2122, q05 +1.71 0.6413, q95 -0.49 0.5942, q99 -0.52 0.1657
+replicate | median minus mean forecast at D+1, per site:
+    K0: D10 +0.003, D11 -0.023, D14 +0.005, D16 -0.011, D5 -0.082
+    R: D10 +0.007, D11 -0.022, D14 +0.000, D16 -0.010, D5 -0.026
+    ANALOG+R: D10 -0.004, D11 -0.021, D14 +0.005, D16 -0.019, D5 -0.067
+    ANALOG-holiday: D10 -0.003, D11 -0.020, D14 +0.004, D16 -0.008, D5 -0.025
+cold-snap nights (22:00 to 06:00, daily mean under 3 C) at D+1: coverage of q95, q99
+    K0: rows 468, q95 0.991, q99 1.000
+    R: rows 468, q95 0.998, q99 1.000
+    ANALOG+R: rows 468, q95 0.998, q99 1.000
+    ANALOG-holiday: rows 468, q95 0.998, q99 1.000
+== scored: planned contrasts (99%), then breakdowns ==
+scored | C1 ANALOG+R - R | lead band D+1 | -0.0405 [-0.0572, -0.0169] 4/5 sites, rows 66,844, site-days 1,751; MAE median -0.0675, MAE mean -0.0689
+scored | C1 ANALOG+R - R | lead band 0-24 h | -0.0014 [-0.0151, +0.0164] 1/5 sites, rows 66,818, site-days 1,751; MAE median -0.0052, MAE mean -0.0053
+scored | C1 ANALOG+R - R | lead band 24-48 h | -0.0323 [-0.0477, -0.0154] 4/5 sites, rows 66,785, site-days 1,751; MAE median -0.0534, MAE mean -0.0546
+scored | C1 ANALOG+R - R | lead band 48-144 h | +0.0182 [+0.0079, +0.0295] 1/5 sites, rows 264,935, site-days 1,748; MAE median +0.0421, MAE mean +0.0420
+scored | C1 ANALOG+R - R | lead band 144-168 h | +0.0079 [-0.0110, +0.0332] 2/5 sites, rows 65,825, site-days 1,726; MAE median +0.0208, MAE mean +0.0229
+scored | C1 ANALOG+R - R | lead band 12-36 h | -0.0335 [-0.0498, -0.0085] 4/5 sites, rows 66,838, site-days 1,747; MAE median -0.0581, MAE mean -0.0594
+scored | C1 ANALOG+R - R | lead band 0.5-168 h | +0.0067 [-0.0048, +0.0187] 2/5 sites, rows 464,363, site-days 1,758; MAE median +0.0186, MAE mean +0.0186
+scored | C1 ANALOG+R - R | leave out D5 | -0.0436 [-0.0609, -0.0205] 3/4 sites, rows 54,721, site-days 1,432; MAE median -0.0699, MAE mean -0.0714
+scored | C1 ANALOG+R - R | leave out D10 | -0.0521 [-0.0703, -0.0259] 4/4 sites, rows 52,996, site-days 1,388; MAE median -0.0858, MAE mean -0.0859
+scored | C1 ANALOG+R - R | leave out D11 | -0.0490 [-0.0668, -0.0220] 3/4 sites, rows 52,879, site-days 1,387; MAE median -0.0833, MAE mean -0.0853
+scored | C1 ANALOG+R - R | leave out D14 | -0.0270 [-0.0473, -0.0042] 3/4 sites, rows 53,174, site-days 1,393; MAE median -0.0479, MAE mean -0.0499
+scored | C1 ANALOG+R - R | leave out D16 | -0.0307 [-0.0472, -0.0084] 3/4 sites, rows 53,606, site-days 1,404; MAE median -0.0510, MAE mean -0.0521
+scored | C1 ANALOG+R - R | all D+1 | -0.0405 [-0.0572, -0.0169] 4/5 sites, rows 66,844, site-days 1,751; MAE median -0.0675, MAE mean -0.0689
+    absolute {'ANALOG+R': 2.3951631649767324, 'R': 2.4356286664071933}
+scored | C1 ANALOG+R - R | all leads | +0.0067 [-0.0048, +0.0187] 2/5 sites, rows 464,363, site-days 1,758; MAE median +0.0186, MAE mean +0.0186
+scored | C1 ANALOG+R - R | non-holiday rows | -0.0486 [-0.0629, -0.0320] 5/5 sites, rows 64,218, site-days 1,683; MAE median -0.0798, MAE mean -0.0814
+scored | C1 ANALOG+R - R | holiday-like days | +0.1595 [+0.0441, +0.2851] 1/5 sites, rows 2,626, site-days 68; MAE median +0.2329, MAE mean +0.2375
+scored | C1 ANALOG+R - R | Christmas window | +0.0133 [-0.0050, +0.0181] 3/4 sites, rows 3,453, site-days 87; MAE median +0.0350, MAE mean +0.0302
+scored | C1 ANALOG+R - R | Easter | +0.2786 [+0.2786, +0.2786] 0/5 sites, rows 720, site-days 20; MAE median +0.3507, MAE mean +0.3749
+scored | C1 ANALOG+R - R | 1 to 3 days after a holiday-like day | -0.0279 [-0.0620, +0.1369] 3/5 sites, rows 2,463, site-days 69; MAE median -0.0552, MAE mean -0.0561
+scored | C1 ANALOG+R - R | weekday Mon | -0.0928 [-0.1140, -0.0696] 5/5 sites, rows 8,539, site-days 228; MAE median -0.1589, MAE mean -0.1585
+scored | C1 ANALOG+R - R | weekday Tue | -0.0251 [-0.0452, -0.0055] 4/5 sites, rows 9,391, site-days 244; MAE median -0.0386, MAE mean -0.0423
+scored | C1 ANALOG+R - R | weekday Wed | -0.0157 [-0.0353, +0.0126] 3/5 sites, rows 9,085, site-days 240; MAE median -0.0099, MAE mean -0.0125
+scored | C1 ANALOG+R - R | weekday Thu | -0.0046 [-0.0258, +0.0195] 4/5 sites, rows 9,285, site-days 242; MAE median +0.0037, MAE mean +0.0033
+scored | C1 ANALOG+R - R | weekday Fri | -0.1375 [-0.1857, -0.0928] 5/5 sites, rows 9,471, site-days 243; MAE median -0.2668, MAE mean -0.2680
+scored | C1 ANALOG+R - R | weekday Sat | -0.0296 [-0.0600, -0.0062] 5/5 sites, rows 9,149, site-days 243; MAE median -0.0416, MAE mean -0.0446
+scored | C1 ANALOG+R - R | weekday Sun | -0.0363 [-0.0576, -0.0116] 5/5 sites, rows 9,298, site-days 243; MAE median -0.0475, MAE mean -0.0482
+scored | C1 ANALOG+R - R | winter | -0.0526 [-0.0676, -0.0259] 4/5 sites, rows 26,422, site-days 693; MAE median -0.0915, MAE mean -0.0929
+scored | C1 ANALOG+R - R | winter evening 16-20 | -0.1095 [-0.1625, -0.0375] 4/5 sites, rows 4,416, site-days 552; MAE median -0.2001, MAE mean -0.2022
+scored | C1 ANALOG+R - R | non-winter | -0.0325 [-0.0557, +0.0009] 3/5 sites, rows 40,422, site-days 1,058; MAE median -0.0519, MAE mean -0.0532
+scored | C1 ANALOG+R - R | cold-snap days | -0.1092 [-0.2264, -0.0593] 5/5 sites, rows 2,400, site-days 80; MAE median -0.1877, MAE mean -0.1878
+scored | C1 ANALOG+R - R | cold-snap nights | -0.0442 [-0.1664, +0.0362] 4/5 sites, rows 900, site-days 80; MAE median -0.0905, MAE mean -0.0897
+scored | C2 ANALOG-k - R | lead band D+1 | -0.0138 [-0.0471, +0.0295] 2/5 sites, rows 66,844, site-days 1,751; MAE median -0.0109, MAE mean -0.0128
+scored | C2 ANALOG-k - R | lead band 0-24 h | +0.0475 [+0.0136, +0.0853] 0/5 sites, rows 66,818, site-days 1,751; MAE median +0.0883, MAE mean +0.0893
+scored | C2 ANALOG-k - R | lead band 24-48 h | -0.0049 [-0.0357, +0.0268] 2/5 sites, rows 66,785, site-days 1,751; MAE median +0.0104, MAE mean +0.0087
+scored | C2 ANALOG-k - R | lead band 48-144 h | +0.0643 [+0.0406, +0.0891] 0/5 sites, rows 264,935, site-days 1,748; MAE median +0.1396, MAE mean +0.1396
+scored | C2 ANALOG-k - R | lead band 144-168 h | +0.0440 [+0.0109, +0.0851] 1/5 sites, rows 65,825, site-days 1,726; MAE median +0.0931, MAE mean +0.0996
+scored | C2 ANALOG-k - R | lead band 12-36 h | -0.0026 [-0.0358, +0.0416] 2/5 sites, rows 66,838, site-days 1,747; MAE median +0.0047, MAE mean +0.0027
+scored | C2 ANALOG-k - R | lead band 0.5-168 h | +0.0491 [+0.0237, +0.0759] 0/5 sites, rows 464,363, site-days 1,758; MAE median +0.1070, MAE mean +0.1078
+scored | C2 ANALOG-k - R | leave out D5 | -0.0197 [-0.0533, +0.0243] 2/4 sites, rows 54,721, site-days 1,432; MAE median -0.0214, MAE mean -0.0235
+scored | C2 ANALOG-k - R | leave out D10 | -0.0298 [-0.0668, +0.0180] 2/4 sites, rows 52,996, site-days 1,388; MAE median -0.0382, MAE mean -0.0387
+scored | C2 ANALOG-k - R | leave out D11 | -0.0190 [-0.0555, +0.0285] 2/4 sites, rows 52,879, site-days 1,387; MAE median -0.0173, MAE mean -0.0207
+scored | C2 ANALOG-k - R | leave out D14 | +0.0017 [-0.0357, +0.0450] 1/4 sites, rows 53,174, site-days 1,393; MAE median +0.0155, MAE mean +0.0137
+scored | C2 ANALOG-k - R | leave out D16 | -0.0021 [-0.0358, +0.0397] 1/4 sites, rows 53,606, site-days 1,404; MAE median +0.0070, MAE mean +0.0054
+scored | C2 ANALOG-k - R | all D+1 | -0.0138 [-0.0471, +0.0295] 2/5 sites, rows 66,844, site-days 1,751; MAE median -0.0109, MAE mean -0.0128
+    absolute {'ANALOG-k': 2.4218574735408085, 'R': 2.4356286664071933}
+scored | C2 ANALOG-k - R | all leads | +0.0491 [+0.0237, +0.0759] 0/5 sites, rows 464,363, site-days 1,758; MAE median +0.1070, MAE mean +0.1078
+scored | C2 ANALOG-k - R | non-holiday rows | -0.0297 [-0.0579, -0.0005] 4/5 sites, rows 64,218, site-days 1,683; MAE median -0.0359, MAE mean -0.0382
+scored | C2 ANALOG-k - R | holiday-like days | +0.3747 [+0.2352, +0.5498] 0/5 sites, rows 2,626, site-days 68; MAE median +0.6014, MAE mean +0.6079
+scored | C2 ANALOG-k - R | Christmas window | +0.1084 [+0.0136, +0.1332] 1/4 sites, rows 3,453, site-days 87; MAE median +0.2186, MAE mean +0.2109
+scored | C2 ANALOG-k - R | Easter | +0.5692 [+0.5692, +0.5692] 0/5 sites, rows 720, site-days 20; MAE median +0.8071, MAE mean +0.8456
+scored | C2 ANALOG-k - R | 1 to 3 days after a holiday-like day | -0.0478 [-0.0884, +0.1735] 2/5 sites, rows 2,463, site-days 69; MAE median -0.0662, MAE mean -0.0716
+scored | C2 ANALOG-k - R | weekday Mon | -0.1045 [-0.1648, -0.0398] 4/5 sites, rows 8,539, site-days 228; MAE median -0.1687, MAE mean -0.1665
+scored | C2 ANALOG-k - R | weekday Tue | -0.0117 [-0.0458, +0.0201] 4/5 sites, rows 9,391, site-days 244; MAE median +0.0002, MAE mean -0.0028
+scored | C2 ANALOG-k - R | weekday Wed | +0.0158 [-0.0315, +0.0705] 1/5 sites, rows 9,085, site-days 240; MAE median +0.0589, MAE mean +0.0536
+scored | C2 ANALOG-k - R | weekday Thu | +0.0545 [+0.0076, +0.1040] 0/5 sites, rows 9,285, site-days 242; MAE median +0.1176, MAE mean +0.1140
+scored | C2 ANALOG-k - R | weekday Fri | -0.1322 [-0.1994, -0.0630] 5/5 sites, rows 9,471, site-days 243; MAE median -0.2534, MAE mean -0.2589
+scored | C2 ANALOG-k - R | weekday Sat | -0.0044 [-0.0498, +0.0347] 4/5 sites, rows 9,149, site-days 243; MAE median +0.0149, MAE mean +0.0139
+scored | C2 ANALOG-k - R | weekday Sun | -0.0279 [-0.0861, +0.0241] 5/5 sites, rows 9,298, site-days 243; MAE median -0.0248, MAE mean -0.0240
+scored | C2 ANALOG-k - R | winter | -0.0106 [-0.0566, +0.0429] 3/5 sites, rows 26,422, site-days 693; MAE median -0.0055, MAE mean -0.0093
+scored | C2 ANALOG-k - R | winter evening 16-20 | -0.0875 [-0.1736, +0.0076] 3/5 sites, rows 4,416, site-days 552; MAE median -0.1417, MAE mean -0.1447
+scored | C2 ANALOG-k - R | non-winter | -0.0158 [-0.0562, +0.0464] 3/5 sites, rows 40,422, site-days 1,058; MAE median -0.0144, MAE mean -0.0150
+scored | C2 ANALOG-k - R | cold-snap days | -0.1068 [-0.2299, -0.0374] 5/5 sites, rows 2,400, site-days 80; MAE median -0.1736, MAE mean -0.1784
+scored | C2 ANALOG-k - R | cold-snap nights | +0.0262 [-0.1194, +0.1520] 2/5 sites, rows 900, site-days 80; MAE median +0.0598, MAE mean +0.0617
+scored | C3 ANALOG+R - RB-day-types | lead band D+1 | -0.0185 [-0.0315, -0.0052] 5/5 sites, rows 66,844, site-days 1,751; MAE median -0.0320, MAE mean -0.0323
+scored | C3 ANALOG+R - RB-day-types | lead band 0-24 h | -0.0108 [-0.0250, +0.0036] 5/5 sites, rows 66,818, site-days 1,751; MAE median -0.0209, MAE mean -0.0211
+scored | C3 ANALOG+R - RB-day-types | lead band 24-48 h | -0.0159 [-0.0256, -0.0054] 4/5 sites, rows 66,785, site-days 1,751; MAE median -0.0298, MAE mean -0.0303
+scored | C3 ANALOG+R - RB-day-types | lead band 48-144 h | -0.0025 [-0.0104, +0.0040] 4/5 sites, rows 264,935, site-days 1,748; MAE median -0.0023, MAE mean -0.0026
+scored | C3 ANALOG+R - RB-day-types | lead band 144-168 h | -0.0064 [-0.0234, +0.0148] 3/5 sites, rows 65,825, site-days 1,726; MAE median -0.0109, MAE mean -0.0103
+scored | C3 ANALOG+R - RB-day-types | lead band 12-36 h | -0.0166 [-0.0290, -0.0025] 5/5 sites, rows 66,838, site-days 1,747; MAE median -0.0291, MAE mean -0.0293
+scored | C3 ANALOG+R - RB-day-types | lead band 0.5-168 h | -0.0062 [-0.0134, +0.0005] 4/5 sites, rows 464,363, site-days 1,758; MAE median -0.0101, MAE mean -0.0103
+scored | C3 ANALOG+R - RB-day-types | leave out D5 | -0.0178 [-0.0315, -0.0048] 4/4 sites, rows 54,721, site-days 1,432; MAE median -0.0269, MAE mean -0.0282
+scored | C3 ANALOG+R - RB-day-types | leave out D10 | -0.0227 [-0.0380, -0.0072] 4/4 sites, rows 52,996, site-days 1,388; MAE median -0.0367, MAE mean -0.0356
+scored | C3 ANALOG+R - RB-day-types | leave out D11 | -0.0207 [-0.0319, -0.0084] 4/4 sites, rows 52,879, site-days 1,387; MAE median -0.0391, MAE mean -0.0398
+scored | C3 ANALOG+R - RB-day-types | leave out D14 | -0.0161 [-0.0314, -0.0021] 4/4 sites, rows 53,174, site-days 1,393; MAE median -0.0305, MAE mean -0.0309
+scored | C3 ANALOG+R - RB-day-types | leave out D16 | -0.0151 [-0.0297, -0.0003] 4/4 sites, rows 53,606, site-days 1,404; MAE median -0.0272, MAE mean -0.0271
+scored | C3 ANALOG+R - RB-day-types | all D+1 | -0.0185 [-0.0315, -0.0052] 5/5 sites, rows 66,844, site-days 1,751; MAE median -0.0320, MAE mean -0.0323
+    absolute {'ANALOG+R': 2.3951631649767324, 'RB-day-types': 2.4136471076621495}
+scored | C3 ANALOG+R - RB-day-types | all leads | -0.0062 [-0.0134, +0.0005] 4/5 sites, rows 464,363, site-days 1,758; MAE median -0.0101, MAE mean -0.0103
+scored | C3 ANALOG+R - RB-day-types | non-holiday rows | -0.0239 [-0.0318, -0.0168] 5/5 sites, rows 64,218, site-days 1,683; MAE median -0.0403, MAE mean -0.0405
+scored | C3 ANALOG+R - RB-day-types | holiday-like days | +0.1134 [-0.1242, +0.3843] 1/5 sites, rows 2,626, site-days 68; MAE median +0.1704, MAE mean +0.1685
+scored | C3 ANALOG+R - RB-day-types | Christmas window | -0.0647 [-0.0702, -0.0437] 4/4 sites, rows 3,453, site-days 87; MAE median -0.0958, MAE mean -0.0999
+scored | C3 ANALOG+R - RB-day-types | Easter | +0.3556 [+0.3556, +0.3556] 0/5 sites, rows 720, site-days 20; MAE median +0.5362, MAE mean +0.5347
+scored | C3 ANALOG+R - RB-day-types | 1 to 3 days after a holiday-like day | -0.0672 [-0.0802, -0.0430] 5/5 sites, rows 2,463, site-days 69; MAE median -0.1183, MAE mean -0.1207
+scored | C3 ANALOG+R - RB-day-types | weekday Mon | -0.0289 [-0.0505, -0.0086] 5/5 sites, rows 8,539, site-days 228; MAE median -0.0559, MAE mean -0.0506
+scored | C3 ANALOG+R - RB-day-types | weekday Tue | -0.0229 [-0.0381, -0.0091] 4/5 sites, rows 9,391, site-days 244; MAE median -0.0409, MAE mean -0.0416
+scored | C3 ANALOG+R - RB-day-types | weekday Wed | -0.0228 [-0.0388, -0.0059] 4/5 sites, rows 9,085, site-days 240; MAE median -0.0313, MAE mean -0.0321
+scored | C3 ANALOG+R - RB-day-types | weekday Thu | +0.0085 [-0.0159, +0.0306] 1/5 sites, rows 9,285, site-days 242; MAE median +0.0248, MAE mean +0.0244
+scored | C3 ANALOG+R - RB-day-types | weekday Fri | -0.0595 [-0.0890, -0.0348] 5/5 sites, rows 9,471, site-days 243; MAE median -0.1052, MAE mean -0.1027
+scored | C3 ANALOG+R - RB-day-types | weekday Sat | -0.0209 [-0.0498, +0.0043] 5/5 sites, rows 9,149, site-days 243; MAE median -0.0369, MAE mean -0.0396
+scored | C3 ANALOG+R - RB-day-types | weekday Sun | -0.0202 [-0.0348, -0.0019] 5/5 sites, rows 9,298, site-days 243; MAE median -0.0364, MAE mean -0.0405
+scored | C3 ANALOG+R - RB-day-types | winter | -0.0303 [-0.0519, -0.0134] 5/5 sites, rows 26,422, site-days 693; MAE median -0.0496, MAE mean -0.0493
+scored | C3 ANALOG+R - RB-day-types | winter evening 16-20 | -0.0194 [-0.0592, +0.0405] 3/5 sites, rows 4,416, site-days 552; MAE median -0.0407, MAE mean -0.0419
+scored | C3 ANALOG+R - RB-day-types | non-winter | -0.0108 [-0.0226, +0.0039] 3/5 sites, rows 40,422, site-days 1,058; MAE median -0.0205, MAE mean -0.0211
+scored | C3 ANALOG+R - RB-day-types | cold-snap days | -0.0738 [-0.3648, +0.0501] 5/5 sites, rows 2,400, site-days 80; MAE median -0.1287, MAE mean -0.1286
+scored | C3 ANALOG+R - RB-day-types | cold-snap nights | -0.0655 [-0.1561, +0.0270] 4/5 sites, rows 900, site-days 80; MAE median -0.1140, MAE mean -0.1121
+scored | C4 ANALOG-holiday - R | lead band D+1 | +0.0025 [-0.0000, +0.0060] 1/5 sites, rows 66,844, site-days 1,751; MAE median +0.0036, MAE mean +0.0038
+scored | C4 ANALOG-holiday - R | lead band 0-24 h | +0.0026 [-0.0014, +0.0079] 1/5 sites, rows 66,818, site-days 1,751; MAE median +0.0040, MAE mean +0.0041
+scored | C4 ANALOG-holiday - R | lead band 24-48 h | +0.0008 [-0.0016, +0.0033] 2/5 sites, rows 66,785, site-days 1,751; MAE median +0.0005, MAE mean +0.0006
+scored | C4 ANALOG-holiday - R | lead band 48-144 h | +0.0018 [-0.0008, +0.0059] 1/5 sites, rows 264,935, site-days 1,748; MAE median +0.0036, MAE mean +0.0037
+scored | C4 ANALOG-holiday - R | lead band 144-168 h | +0.0028 [-0.0012, +0.0132] 2/5 sites, rows 65,825, site-days 1,726; MAE median +0.0037, MAE mean +0.0038
+scored | C4 ANALOG-holiday - R | lead band 12-36 h | +0.0030 [-0.0001, +0.0077] 1/5 sites, rows 66,838, site-days 1,747; MAE median +0.0043, MAE mean +0.0046
+scored | C4 ANALOG-holiday - R | lead band 0.5-168 h | +0.0019 [-0.0001, +0.0057] 1/5 sites, rows 464,363, site-days 1,758; MAE median +0.0032, MAE mean +0.0033
+scored | C4 ANALOG-holiday - R | leave out D5 | +0.0025 [-0.0003, +0.0067] 1/4 sites, rows 54,721, site-days 1,432; MAE median +0.0038, MAE mean +0.0039
+scored | C4 ANALOG-holiday - R | leave out D10 | +0.0009 [-0.0028, +0.0047] 1/4 sites, rows 52,996, site-days 1,388; MAE median +0.0011, MAE mean +0.0012
+scored | C4 ANALOG-holiday - R | leave out D11 | +0.0026 [+0.0000, +0.0058] 1/4 sites, rows 52,879, site-days 1,387; MAE median +0.0032, MAE mean +0.0036
+scored | C4 ANALOG-holiday - R | leave out D14 | +0.0035 [+0.0000, +0.0077] 0/4 sites, rows 53,174, site-days 1,393; MAE median +0.0054, MAE mean +0.0056
+scored | C4 ANALOG-holiday - R | leave out D16 | +0.0029 [-0.0000, +0.0068] 1/4 sites, rows 53,606, site-days 1,404; MAE median +0.0044, MAE mean +0.0045
+scored | C4 ANALOG-holiday - R | all D+1 | +0.0025 [-0.0000, +0.0060] 1/5 sites, rows 66,844, site-days 1,751; MAE median +0.0036, MAE mean +0.0038
+    absolute {'ANALOG-holiday': 2.43810730212119, 'R': 2.4356286664071933}
+scored | C4 ANALOG-holiday - R | all leads | +0.0019 [-0.0001, +0.0057] 1/5 sites, rows 464,363, site-days 1,758; MAE median +0.0032, MAE mean +0.0033
+scored | C4 ANALOG-holiday - R | non-holiday rows | -0.0003 [-0.0009, +0.0000] 4/5 sites, rows 64,218, site-days 1,683; MAE median -0.0003, MAE mean -0.0004
+scored | C4 ANALOG-holiday - R | holiday-like days | +0.0713 [+0.0192, +0.1424] 1/5 sites, rows 2,626, site-days 68; MAE median +0.0993, MAE mean +0.1056
+scored | C4 ANALOG-holiday - R | Christmas window | +0.0053 [+0.0000, +0.0067] 3/4 sites, rows 3,453, site-days 87; MAE median +0.0126, MAE mean +0.0116
+scored | C4 ANALOG-holiday - R | Easter | +0.1161 [+0.1161, +0.1161] 0/5 sites, rows 720, site-days 20; MAE median +0.1253, MAE mean +0.1505
+scored | C4 ANALOG-holiday - R | 1 to 3 days after a holiday-like day | -0.0070 [-0.0234, +0.0009] 4/5 sites, rows 2,463, site-days 69; MAE median -0.0103, MAE mean -0.0102
+scored | C4 ANALOG-holiday - R | weekday Mon | -0.0002 [-0.0015, +0.0008] 2/5 sites, rows 8,539, site-days 228; MAE median -0.0001, MAE mean +0.0000
+scored | C4 ANALOG-holiday - R | weekday Tue | -0.0012 [-0.0050, +0.0009] 4/5 sites, rows 9,391, site-days 244; MAE median -0.0028, MAE mean -0.0028
+scored | C4 ANALOG-holiday - R | weekday Wed | +0.0004 [+0.0000, +0.0009] 3/5 sites, rows 9,085, site-days 240; MAE median -0.0001, MAE mean +0.0000
+scored | C4 ANALOG-holiday - R | weekday Thu | +0.0001 [-0.0002, +0.0006] 1/5 sites, rows 9,285, site-days 242; MAE median +0.0009, MAE mean +0.0000
+scored | C4 ANALOG-holiday - R | weekday Fri | -0.0004 [-0.0011, +0.0001] 4/5 sites, rows 9,471, site-days 243; MAE median +0.0005, MAE mean +0.0001
+scored | C4 ANALOG-holiday - R | weekday Sat | -0.0004 [-0.0016, +0.0001] 5/5 sites, rows 9,149, site-days 243; MAE median -0.0001, MAE mean +0.0000
+scored | C4 ANALOG-holiday - R | weekday Sun | -0.0006 [-0.0017, +0.0000] 5/5 sites, rows 9,298, site-days 243; MAE median -0.0006, MAE mean +0.0000
+scored | C4 ANALOG-holiday - R | winter | +0.0007 [+0.0000, +0.0028] 4/5 sites, rows 26,422, site-days 693; MAE median +0.0016, MAE mean +0.0015
+scored | C4 ANALOG-holiday - R | winter evening 16-20 | +0.0056 [+0.0000, +0.0225] 4/5 sites, rows 4,416, site-days 552; MAE median +0.0114, MAE mean +0.0113
+scored | C4 ANALOG-holiday - R | non-winter | +0.0036 [-0.0003, +0.0092] 0/5 sites, rows 40,422, site-days 1,058; MAE median +0.0048, MAE mean +0.0052
+scored | C4 ANALOG-holiday - R | cold-snap days | -0.0106 [-0.0885, +0.0000] 3/5 sites, rows 2,400, site-days 80; MAE median -0.0177, MAE mean -0.0181
+scored | C4 ANALOG-holiday - R | cold-snap nights | +0.0023 [+0.0000, +0.0194] 1/5 sites, rows 900, site-days 80; MAE median +0.0011, MAE mean +0.0005
+scored | C5 ANALOG+R - K0 | lead band D+1 | -0.1291 [-0.1765, -0.0899] 5/5 sites, rows 66,844, site-days 1,751; MAE median -0.2447, MAE mean -0.2482
+scored | C5 ANALOG+R - K0 | lead band 0-24 h | -0.0929 [-0.1344, -0.0587] 5/5 sites, rows 66,818, site-days 1,751; MAE median -0.1842, MAE mean -0.1841
+scored | C5 ANALOG+R - K0 | lead band 24-48 h | -0.1143 [-0.1567, -0.0789] 5/5 sites, rows 66,785, site-days 1,751; MAE median -0.2246, MAE mean -0.2271
+scored | C5 ANALOG+R - K0 | lead band 48-144 h | -0.0450 [-0.0788, -0.0203] 4/5 sites, rows 264,935, site-days 1,748; MAE median -0.0992, MAE mean -0.1022
+scored | C5 ANALOG+R - K0 | lead band 144-168 h | -0.0431 [-0.0773, -0.0103] 5/5 sites, rows 65,825, site-days 1,726; MAE median -0.0958, MAE mean -0.0989
+scored | C5 ANALOG+R - K0 | lead band 12-36 h | -0.1241 [-0.1710, -0.0840] 5/5 sites, rows 66,838, site-days 1,747; MAE median -0.2385, MAE mean -0.2418
+scored | C5 ANALOG+R - K0 | lead band 0.5-168 h | -0.0616 [-0.0954, -0.0360] 5/5 sites, rows 464,363, site-days 1,758; MAE median -0.1290, MAE mean -0.1315
+scored | C5 ANALOG+R - K0 | leave out D5 | -0.1285 [-0.1728, -0.0916] 4/4 sites, rows 54,721, site-days 1,432; MAE median -0.2352, MAE mean -0.2377
+scored | C5 ANALOG+R - K0 | leave out D10 | -0.1322 [-0.1787, -0.0924] 4/4 sites, rows 52,996, site-days 1,388; MAE median -0.2435, MAE mean -0.2463
+scored | C5 ANALOG+R - K0 | leave out D11 | -0.1506 [-0.2067, -0.1043] 4/4 sites, rows 52,879, site-days 1,387; MAE median -0.2901, MAE mean -0.2941
+scored | C5 ANALOG+R - K0 | leave out D14 | -0.1163 [-0.1632, -0.0788] 4/4 sites, rows 53,174, site-days 1,393; MAE median -0.2318, MAE mean -0.2364
+scored | C5 ANALOG+R - K0 | leave out D16 | -0.1179 [-0.1686, -0.0753] 4/4 sites, rows 53,606, site-days 1,404; MAE median -0.2238, MAE mean -0.2274
+scored | C5 ANALOG+R - K0 | all D+1 | -0.1291 [-0.1765, -0.0899] 5/5 sites, rows 66,844, site-days 1,751; MAE median -0.2447, MAE mean -0.2482
+    absolute {'ANALOG+R': 2.3951631649767324, 'K0': 2.5242187736481685}
+scored | C5 ANALOG+R - K0 | all leads | -0.0616 [-0.0954, -0.0360] 5/5 sites, rows 464,363, site-days 1,758; MAE median -0.1290, MAE mean -0.1315
+scored | C5 ANALOG+R - K0 | non-holiday rows | -0.1394 [-0.1804, -0.1037] 5/5 sites, rows 64,218, site-days 1,683; MAE median -0.2616, MAE mean -0.2653
+scored | C5 ANALOG+R - K0 | holiday-like days | +0.1230 [-0.1140, +0.3784] 1/5 sites, rows 2,626, site-days 68; MAE median +0.1670, MAE mean +0.1690
+scored | C5 ANALOG+R - K0 | Christmas window | -0.1242 [-0.1442, -0.0477] 4/4 sites, rows 3,453, site-days 87; MAE median -0.2131, MAE mean -0.2170
+scored | C5 ANALOG+R - K0 | Easter | +0.3804 [+0.3804, +0.3804] 0/5 sites, rows 720, site-days 20; MAE median +0.5419, MAE mean +0.5397
+scored | C5 ANALOG+R - K0 | 1 to 3 days after a holiday-like day | -0.0125 [-0.1253, +0.1076] 3/5 sites, rows 2,463, site-days 69; MAE median -0.0811, MAE mean -0.0861
+scored | C5 ANALOG+R - K0 | weekday Mon | -0.1313 [-0.1633, -0.0960] 5/5 sites, rows 8,539, site-days 228; MAE median -0.2409, MAE mean -0.2448
+scored | C5 ANALOG+R - K0 | weekday Tue | -0.0924 [-0.1359, -0.0454] 5/5 sites, rows 9,391, site-days 244; MAE median -0.1821, MAE mean -0.1867
+scored | C5 ANALOG+R - K0 | weekday Wed | -0.1090 [-0.1736, -0.0463] 5/5 sites, rows 9,085, site-days 240; MAE median -0.1972, MAE mean -0.2031
+scored | C5 ANALOG+R - K0 | weekday Thu | -0.1299 [-0.1711, -0.0817] 5/5 sites, rows 9,285, site-days 242; MAE median -0.2263, MAE mean -0.2269
+scored | C5 ANALOG+R - K0 | weekday Fri | -0.2413 [-0.2964, -0.1924] 5/5 sites, rows 9,471, site-days 243; MAE median -0.4814, MAE mean -0.4859
+scored | C5 ANALOG+R - K0 | weekday Sat | -0.1399 [-0.2130, -0.0874] 5/5 sites, rows 9,149, site-days 243; MAE median -0.2626, MAE mean -0.2666
+scored | C5 ANALOG+R - K0 | weekday Sun | -0.1290 [-0.2198, -0.0526] 5/5 sites, rows 9,298, site-days 243; MAE median -0.2340, MAE mean -0.2365
+scored | C5 ANALOG+R - K0 | winter | -0.1882 [-0.2338, -0.1507] 5/5 sites, rows 26,422, site-days 693; MAE median -0.3523, MAE mean -0.3509
+scored | C5 ANALOG+R - K0 | winter evening 16-20 | -0.2278 [-0.3187, -0.1127] 5/5 sites, rows 4,416, site-days 552; MAE median -0.4785, MAE mean -0.4784
+scored | C5 ANALOG+R - K0 | non-winter | -0.0904 [-0.1259, -0.0559] 5/5 sites, rows 40,422, site-days 1,058; MAE median -0.1744, MAE mean -0.1811
+scored | C5 ANALOG+R - K0 | cold-snap days | -0.2435 [-0.4607, -0.1911] 5/5 sites, rows 2,400, site-days 80; MAE median -0.3949, MAE mean -0.3963
+scored | C5 ANALOG+R - K0 | cold-snap nights | -0.2882 [-0.5331, -0.2061] 5/5 sites, rows 900, site-days 80; MAE median -0.5101, MAE mean -0.5075
+== scored: other contrasts (95%) ==
+scored | ANALOG+R-notemp - ANALOG+R (diagnostic) | all D+1 | +0.0046 [-0.0012, +0.0110] 2/5 sites, rows 66,844, site-days 1,751; MAE median +0.0053, MAE mean +0.0060
+scored | ANALOG+R-notemp - ANALOG+R (diagnostic) | all leads | +0.0066 [+0.0018, +0.0117] 0/5 sites, rows 464,363, site-days 1,758; MAE median +0.0125, MAE mean +0.0128
+scored | ANALOG+R-notemp - ANALOG+R (diagnostic) | non-holiday rows | +0.0048 [-0.0013, +0.0112] 2/5 sites, rows 64,218, site-days 1,683; MAE median +0.0055, MAE mean +0.0061
+scored | ANALOG+R-notemp - ANALOG+R (diagnostic) | winter | -0.0005 [-0.0053, +0.0047] 2/5 sites, rows 26,422, site-days 693; MAE median -0.0048, MAE mean -0.0051
+scored | ANALOG+R-notemp - ANALOG+R (diagnostic) | winter evening 16-20 | +0.0174 [-0.0165, +0.0450] 1/5 sites, rows 4,416, site-days 552; MAE median +0.0313, MAE mean +0.0321
+scored | ANALOG+R-recent - ANALOG+R (post hoc) | all D+1 | +0.0162 [+0.0107, +0.0224] 0/5 sites, rows 66,844, site-days 1,751; MAE median +0.0290, MAE mean +0.0293
+scored | ANALOG+R-recent - ANALOG+R (post hoc) | all leads | +0.0093 [+0.0048, +0.0137] 0/5 sites, rows 464,363, site-days 1,758; MAE median +0.0175, MAE mean +0.0176
+scored | ANALOG+R-recent - ANALOG+R (post hoc) | non-holiday rows | +0.0208 [+0.0153, +0.0265] 0/5 sites, rows 64,218, site-days 1,683; MAE median +0.0355, MAE mean +0.0362
+scored | ANALOG+R-recent - ANALOG+R (post hoc) | winter | +0.0168 [+0.0098, +0.0232] 0/5 sites, rows 26,422, site-days 693; MAE median +0.0219, MAE mean +0.0218
+scored | ANALOG+R-recent - ANALOG+R (post hoc) | winter evening 16-20 | +0.0226 [-0.0033, +0.0434] 1/5 sites, rows 4,416, site-days 552; MAE median +0.0332, MAE mean +0.0329
+scored | ANALOG+R-recent - R (post hoc) | all D+1 | -0.0243 [-0.0375, -0.0072] 3/5 sites, rows 66,844, site-days 1,751; MAE median -0.0385, MAE mean -0.0396
+scored | ANALOG+R-recent - R (post hoc) | all leads | +0.0160 [+0.0090, +0.0235] 0/5 sites, rows 464,363, site-days 1,758; MAE median +0.0361, MAE mean +0.0362
+scored | ANALOG+R-recent - R (post hoc) | non-holiday rows | -0.0278 [-0.0392, -0.0128] 3/5 sites, rows 64,218, site-days 1,683; MAE median -0.0443, MAE mean -0.0452
+scored | ANALOG+R-recent - R (post hoc) | winter | -0.0359 [-0.0529, -0.0152] 3/5 sites, rows 26,422, site-days 693; MAE median -0.0696, MAE mean -0.0711
+scored | ANALOG+R-recent - R (post hoc) | winter evening 16-20 | -0.0869 [-0.1217, -0.0487] 4/5 sites, rows 4,416, site-days 552; MAE median -0.1668, MAE mean -0.1693
+scored | ANALOG+R - RB | all D+1 | -0.0292 [-0.0403, -0.0155] 5/5 sites, rows 66,844, site-days 1,751; MAE median -0.0493, MAE mean -0.0506
+scored | ANALOG+R - RB | all leads | +0.0005 [-0.0068, +0.0074] 3/5 sites, rows 464,363, site-days 1,758; MAE median +0.0050, MAE mean +0.0047
+scored | ANALOG+R - RB | non-holiday rows | -0.0351 [-0.0422, -0.0277] 5/5 sites, rows 64,218, site-days 1,683; MAE median -0.0582, MAE mean -0.0596
+scored | ANALOG+R - RB | winter | -0.0411 [-0.0518, -0.0307] 5/5 sites, rows 26,422, site-days 693; MAE median -0.0715, MAE mean -0.0724
+scored | ANALOG+R - RB | winter evening 16-20 | -0.0607 [-0.1032, -0.0147] 3/5 sites, rows 4,416, site-days 552; MAE median -0.1115, MAE mean -0.1123
+scored | ANALOG-k - ANALOG+R | all D+1 | +0.0267 [+0.0105, +0.0457] 0/5 sites, rows 66,844, site-days 1,751; MAE median +0.0566, MAE mean +0.0561
+scored | ANALOG-k - ANALOG+R | all leads | +0.0424 [+0.0296, +0.0562] 0/5 sites, rows 464,363, site-days 1,758; MAE median +0.0885, MAE mean +0.0893
+scored | ANALOG-k - ANALOG+R | non-holiday rows | +0.0190 [+0.0055, +0.0345] 0/5 sites, rows 64,218, site-days 1,683; MAE median +0.0439, MAE mean +0.0432
+scored | ANALOG-k - ANALOG+R | winter | +0.0420 [+0.0145, +0.0669] 0/5 sites, rows 26,422, site-days 693; MAE median +0.0860, MAE mean +0.0836
+scored | ANALOG-k - ANALOG+R | winter evening 16-20 | +0.0220 [-0.0118, +0.0595] 2/5 sites, rows 4,416, site-days 552; MAE median +0.0584, MAE mean +0.0575
+scored | R - K0 | all D+1 | -0.0886 [-0.1189, -0.0605] 5/5 sites, rows 66,844, site-days 1,751; MAE median -0.1772, MAE mean -0.1793
+scored | R - K0 | all leads | -0.0683 [-0.0922, -0.0463] 5/5 sites, rows 464,363, site-days 1,758; MAE median -0.1475, MAE mean -0.1501
+scored | R - K0 | non-holiday rows | -0.0907 [-0.1211, -0.0626] 5/5 sites, rows 64,218, site-days 1,683; MAE median -0.1818, MAE mean -0.1839
+scored | R - K0 | winter | -0.1356 [-0.1662, -0.0989] 5/5 sites, rows 26,422, site-days 693; MAE median -0.2608, MAE mean -0.2580
+scored | R - K0 | winter evening 16-20 | -0.1183 [-0.1775, -0.0629] 4/5 sites, rows 4,416, site-days 552; MAE median -0.2784, MAE mean -0.2762
+scored | D9 absolute D+1: K0 2.194, R 2.123, RB 2.127, RB-day-types 2.129, ANALOG-k 2.131, ANALOG+R 2.107, ANALOG-holiday 2.128, ANALOG+R-notemp 2.109, ANALOG+R-recent 2.124
+scored | absolute on rows every arm holds:
+    K0: D+1 2.524, all leads 2.812
+    R: D+1 2.436, all leads 2.744
+    RB: D+1 2.424, all leads 2.750
+    RB-day-types: D+1 2.414, all leads 2.756
+    ANALOG-k: D+1 2.422, all leads 2.793
+    ANALOG+R: D+1 2.395, all leads 2.750
+    ANALOG-holiday: D+1 2.438, all leads 2.746
+    ANALOG+R-notemp: D+1 2.400, all leads 2.757
+    ANALOG+R-recent: D+1 2.411, all leads 2.760
+scored | tails at D+1 (coverage gap pts, pinball):
+    K0: q01 +1.31 0.1912, q05 +1.75 0.6362, q95 -1.57 0.6613, q99 -1.21 0.2090
+    R: q01 +1.39 0.1875, q05 +1.76 0.6138, q95 -1.01 0.6573, q99 -1.16 0.2124
+    ANALOG+R: q01 +1.27 0.1843, q05 +1.65 0.5910, q95 -0.94 0.6570, q99 -1.16 0.2130
+    ANALOG-holiday: q01 +1.39 0.1878, q05 +1.75 0.6146, q95 -1.00 0.6585, q99 -1.20 0.2129
+scored | median minus mean forecast at D+1, per site:
+    K0: D10 +0.003, D11 -0.022, D14 +0.014, D16 -0.014, D5 -0.097
+    R: D10 +0.009, D11 -0.019, D14 +0.002, D16 -0.015, D5 -0.037
+    ANALOG+R: D10 +0.011, D11 -0.018, D14 +0.007, D16 -0.021, D5 -0.060
+    ANALOG-holiday: D10 +0.001, D11 -0.017, D14 +0.005, D16 -0.013, D5 -0.035
+cold-snap nights (22:00 to 06:00, daily mean under 3 C) at D+1: coverage of q95, q99
+    K0: rows 900, q95 0.839, q99 0.953
+    R: rows 900, q95 0.888, q99 0.976
+    ANALOG+R: rows 900, q95 0.891, q99 0.978
+    ANALOG-holiday: rows 900, q95 0.888, q99 0.976

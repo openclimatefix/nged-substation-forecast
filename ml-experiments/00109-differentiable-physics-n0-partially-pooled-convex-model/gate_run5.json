@@ -1,0 +1,151 @@
+{
+  "lambda_star": {
+    "base": 300.0,
+    "tau_x10": 0.0,
+    "tau_x0.1": 1000.0
+  },
+  "checks": {
+    "a_fleet_mean": {
+      "passed": true,
+      "band_relative_error": [
+        0.006722096728761237,
+        0.02959113233446627,
+        0.03763191342498168,
+        0.002738608504927176
+      ],
+      "profile_rms_points": 0.43670673536101867
+    },
+    "c_full_history_keeps_own": {
+      "passed": true,
+      "slope_on_heating_contribution": 0.951057688276339,
+      "slope_on_coefficients_reported": 0.7832320343682392
+    },
+    "b_shrinkage_on_4_weeks": {
+      "passed": true,
+      "reference": "joint oracle posterior mean, independent noise, true tau and sigma",
+      "oracle_slope_on_heating_contribution": 0.31792472284516893,
+      "slope_on_heating_contribution": 0.1746286414828237,
+      "closed_form_slope": 0.8158690727897507,
+      "closed_form_slope_independent_noise_original": 0.5845475441059294,
+      "rmse": 2.540916190936955,
+      "oracle_rmse": 2.821459668004015,
+      "rmse_of_heating_only_oracle_that_knows_other_coefficients": 1.4766453961494999,
+      "note": "scale not rebuilt, to isolate shrinkage"
+    },
+    "diagnostic_heating_lambda_sweep": {
+      "passed": true,
+      "blocking": false,
+      "note": "diagnostic only; decides nothing",
+      "rows": [
+        {
+          "heating_lambda": 0.0,
+          "slope_on_heating_contribution": 0.7099165601714108,
+          "heating_rmse": 7.936583110716378
+        },
+        {
+          "heating_lambda": 10.0,
+          "slope_on_heating_contribution": 0.6374225398111631,
+          "heating_rmse": 5.153131858217226
+        },
+        {
+          "heating_lambda": 30.0,
+          "slope_on_heating_contribution": 0.5420257538386082,
+          "heating_rmse": 3.753320285692578
+        },
+        {
+          "heating_lambda": 100.0,
+          "slope_on_heating_contribution": 0.3504137756365849,
+          "heating_rmse": 2.8133146649231557
+        },
+        {
+          "heating_lambda": 300.0,
+          "slope_on_heating_contribution": 0.1746286414828237,
+          "heating_rmse": 2.540916190936955
+        },
+        {
+          "heating_lambda": 1000.0,
+          "slope_on_heating_contribution": 0.061334339183511236,
+          "heating_rmse": 2.5616002941188007
+        },
+        {
+          "heating_lambda": 10000.0,
+          "slope_on_heating_contribution": 0.006549152186333664,
+          "heating_rmse": 2.6089250211759225
+        }
+      ]
+    },
+    "e_capacity_from_a_short_window": {
+      "passed": true,
+      "within_25_percent_of_8": {
+        "4w": 8,
+        "3m": 8,
+        "g_4w": 0,
+        "g_3m": 5
+      },
+      "ratios": {
+        "4w": [
+          0.9866572482905199,
+          0.972683780162855,
+          1.1950006554132173,
+          0.815577736992551,
+          0.8451701180042152,
+          0.9829974587123324,
+          0.8536481146867666,
+          1.0916925308980874
+        ],
+        "3m": [
+          0.9617233863306281,
+          1.0138710883768938,
+          1.0411219173008879,
+          0.8878446344408516,
+          0.9578858533760451,
+          0.9872665328540466,
+          0.9389340399540993,
+          1.138725503124159
+        ],
+        "g_4w": [
+          0.46080353250362077,
+          0.4295640647657251,
+          0.597094231938916,
+          0.40866279406174577,
+          0.40320314131158563,
+          0.4594159630505463,
+          0.3809984454328451,
+          0.49463748007935476
+        ],
+        "g_3m": [
+          0.7542020362089521,
+          0.7928646822475134,
+          0.8388346371682711,
+          0.7087101991938916,
+          0.746823588522657,
+          0.7623488161721471,
+          0.7435684463861768,
+          0.9005203315574625
+        ]
+      }
+    },
+    "discrimination_g_4w_heating": {
+      "passed": true,
+      "blocking": false,
+      "note": "reported only; passes by construction",
+      "g_4w_heating_rmse": 3.7095001418743005
+    },
+    "discrimination_small_tau": {
+      "passed": true,
+      "blocking": false,
+      "note": "reported only; passes by construction",
+      "n_4w_heating_rmse": 0.816237914861724,
+      "g_4w_heating_rmse": 3.165416315661089
+    },
+    "d_tuning_responds": {
+      "passed": false,
+      "lambda_base": 300.0,
+      "lambda_tau_x10": 0.0,
+      "lambda_tau_x0.1": 1000.0,
+      "all_rows_delta_tau_x10": 0.0
+    }
+  },
+  "passed": false,
+  "minutes": 22.029729833333334
+}
