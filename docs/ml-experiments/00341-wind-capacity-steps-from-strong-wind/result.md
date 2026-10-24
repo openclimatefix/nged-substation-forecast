@@ -81,7 +81,8 @@ headline: >-
 lessons: >-
   Strong wind is too rare for a stable statistic at the planned margin. Using every half-hour at
   20% of scale or more finds a 50% step within 60 days at 91% to 93% of start dates at every
-  farm, and nothing smaller at 80%. The real series shows repaired episodes, not permanent steps.
+  farm, and nothing smaller at 80%. The real series shows repaired episodes and one drop at W3 that
+  had not returned by the end of the record.
 take_home_message: >-
   A change in a wind farm's usable capacity shows up in time only when it is large: a loss of half
   the capacity is found within 60 days at 91% to 93% of start dates at all three farms, and a loss
@@ -96,19 +97,21 @@ advice:
     28-day blocks rarely hold the 20 half-hours needed (Figure 1, Figure 4).
   - >-
     Use the ratio of observed to expected power over every half-hour at 20% of scale or more, in
-    14-day to 28-day blocks, to look for capacity changes of half the capacity or more; it is
+    28-day blocks, to look for capacity changes of half the capacity or more; it is
     the best of the statistics here for a one-turbine step at W3, found at 93% of start dates
     (arm D; arm B finds it at 90%, Figure 4).
   - >-
-    Expect a capacity change of 25% or less to go unseen for more than 60 days at W2 by arms
-    B, C, and D, and one of 12.5% or less to go unseen at W1 and W2 by those arms (Figure 4).
+    Expect a capacity change of 25% to go unseen within 60 days at most start dates at W2 (arm B
+    8%, arm C 0%, arm D 26%), and one turbine (7.7% at W1, 12.5% at W2) to go unseen at 100% of
+    start dates for arms B, C, and D (Figure 4).
   - >-
-    Expect a dip in the ratio to end in a return to the old level; all four dips that end
-    inside the record (one at W1, two at W2, one at W3) did, after 2 weeks (W1), 12 and 6
+    In the records here, a dip in the ratio ended in a return to the old level; all four dips that
+    end inside the record (one at W1, two at W2, one at W3) did, after 2 weeks (W1), 12 and 6
     weeks (W2), and 14 weeks (W3) (Figure 3).
   - >-
     Do not rely on the fitted state-space model of this experiment to tell an export clip from lost
-    turbines; it labelled the unmodified series as clipped for years at W1 and W2 (State-space fit).
+    turbines; it labelled the unmodified W2 series as having turbines out near every start date with
+    7-day blocks (State-space fit).
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00341-wind-capacity-steps-from-strong-wind/
@@ -129,15 +132,16 @@ block. W1, W2, and W3 are three metered wind farms, anonymised.
 Capacity falls when turbines fail and returns when they are repaired. Experiment 233 divided
 observed power by the power that a fitted wind-turbine model expects, over the half-hours when the
 model expects at least 95% of the farm's maximum output, and was too slow (a 25% loss was found
-within 120 days at about half the start dates at W1 and W2 and at none at W3). This experiment changes
-the statistic and the detector. The statistic is a high quantile of observed power in half-hours when
-the ERA5 100 m wind speed is at least 2 m/s above the speed at which the fitted power curve saturates
-(the "strong set"). The detectors are a change-point search (optimal partitioning, after
-[Killick et al. (2012)](https://doi.org/10.1080/01621459.2012.737745)) and a two-sided CUSUM test
-(cumulative sum, after [Page (1954)](https://doi.org/10.1093/biomet/41.1-2.100)).
+within 120 days at about half the start dates at W1 and W2 and at none at W3). This experiment
+changes the statistic and the detector. The statistic is a high quantile of observed power in
+half-hours when the ERA5 100 m wind speed is at least 2 m/s above the speed at which the fitted
+power curve saturates (the "strong set"). The detectors are a change-point search (optimal
+partitioning, after [Killick et al. (2012)](https://doi.org/10.1080/01621459.2012.737745)) and a
+two-sided CUSUM test (cumulative sum, after [Page
+(1954)](https://doi.org/10.1093/biomet/41.1-2.100)).
 
-**We tested the detectors by cutting the observed power in known ways and counting the start dates at
-which each detector found the cut.** We cut power by whole turbines, by 10%, 25%, and 50%, and by
+**We tested the detectors by cutting the observed power in known ways and counting the start dates
+at which each detector found the cut.** We cut power by whole turbines, by 10%, 25%, and 50%, and by
 half a turbine, for 3 to 365 days from each of 30 random start dates (2024-07 to 2025-12). We also
 clipped output at 90%, 75%, and 50% of the 99.9th percentile (a lost export cable), added seasonal
 swings and a slow drift, and added a 5% error in wind speed. Five arms were compared: A (the 99.9th
@@ -151,54 +155,60 @@ within 150 km of W1, W2, or W3, and the other 222 candidates have no position.
 
 **The result narrows the search to larger losses and to statistics that use every busy half-hour.**
 It rules out the strong-wind quantile. It also finds that the real records show repaired episodes
-and no permanent steps. The penalty rule fired a stop (below), so the change-point penalty was chosen
-separately for each arm after the injection test and before the real series was read.
+and no permanent steps. The penalty rule fired a stop (below), so the change-point penalty was
+chosen separately for each arm after the injection test and before the real series was read.
 
 ![Figure 1: share of half-hours in the strong set, by month](figure_1_strong_set_share.svg)
 
-![Figure 2: the 99.9th percentile in 28-day blocks, strong and saturated sets, with change-point levels](figure_2_strong_p999_series.svg)
+![Figure 2: the 99.9th percentile in 28-day blocks, strong and saturated sets, with change-point
+levels](figure_2_strong_p999_series.svg)
 
-![Figure 3: observed over expected power in 14-day blocks, with change-point levels and idle runs](figure_3_ratio_series.svg)
+![Figure 3: observed over expected power in 14-day blocks, with change-point levels and idle
+runs](figure_3_ratio_series.svg)
 
-![Figure 4: share of start dates at which a 90-day step is found within 60 days, by step size](figure_4_detection_by_step_size.svg)
+![Figure 4: share of start dates at which a 90-day step is found within 60 days, by step
+size](figure_4_detection_by_step_size.svg)
 
-![Figure 5: share of start dates at which a 25% episode that ends is found, by episode length](figure_5_episode_detection.svg)
+![Figure 5: share of start dates at which a 25% episode that ends is found, by episode
+length](figure_5_episode_detection.svg)
 
-![Figure 6: false alarms per farm-year against the change-point penalty](figure_6_false_alarms_by_penalty.svg)
+![Figure 6: false alarms per farm-year against the change-point
+penalty](figure_6_false_alarms_by_penalty.svg)
 
 ## Results
 
 - **Pre-registered predictions: two held, four failed, two untestable.** P1 failed (arm A at the
   planned 2 m/s margin found a 25% step at 0% of start dates at W1 and 10% at W2, although at W1 and
-  W3 that arm has fewer than 8 observed blocks, so the 0% is structural). P2 held vacuously: arm A at
-  the 2 m/s margin raised 0, 0, and 0 new change points under a 9% swing (W1, W2, W3) against 1, 2,
-  and 1 for D, only because it has almost no blocks (at the saturation speed, arm A raised 2, 4, and
-  0). P3 failed: D finds a 10% step at 31% of W3 start dates, and arm A at the saturation speed
+  W3 that arm has fewer than 8 observed blocks, so the 0% is structural). P2 held vacuously: arm A
+  at the 2 m/s margin raised 0, 0, and 0 new change points under a 9% swing (W1, W2, W3) against 1,
+  2, and 1 for D, only because it has almost no blocks (at the saturation speed, arm A raised 2, 4,
+  and 0). P3 failed: D finds a 10% step at 31% of W3 start dates, and arm A at the saturation speed
   flags every size from half a turbine (3.8%) to 50% at the same 50% of start dates at W1 (its
   statistic is so flat that any dip in a block that exists is flagged). P4 failed (State-space fit).
-  P5 held (episodes shorter than 7 days: D finds 3-day 25% episodes at 0%, 0%, and 14% of start dates
-  and 7-day ones at 0%, 3%, and 27%). P6 is untestable: it names the gap to the registered capacity,
-  which was not available, and the effective capacity comes from the same readings. P7 failed
-  (Weighted evidence). P8 is untestable (no public farm with a known position within 150 km).
+  P5 held (episodes shorter than 7 days: D finds 3-day 25% episodes at 0%, 0%, and 14% of start
+  dates and 7-day ones at 0%, 3%, and 27%). P6 is untestable: it names the gap to the registered
+  capacity, which was not available, and the effective capacity comes from the same readings. P7
+  failed (Weighted evidence). P8 is untestable (no public farm with a known position within 150 km).
 - **Strong wind is rare.** At the 2 m/s margin the strong set holds 0.31% (W1), 1.12% (W2), and
   0.18% (W3) of half-hours, on 3.2%, 5.1%, and 1.3% of days. At the margin of 0 m/s (experiment
   233's above-rated set) the shares are 1.6%, 3.3%, and 0.65%, on 7.3%, 11.1%, and 3.1% of days. The
   saturation speeds of the fitted curve are 15.3, 15.8, and 18.6 m/s at 100 m. Of strong-set
   half-hours at the 2 m/s margin, 0%, 4.7%, and 12.8% have observed power under half of scale (an
   outage or an ERA5 error).
-- **The data give no sign of an export limit at strong wind.** The 99.9th percentile of observed
-  power in the strong set is 4% (W1), 16% (W2), and 17% (W3) above the fitted scale. The fitted
-  scale comes from the same readings, so this check is circular and the visibility margin is not
-  identified without turbine ratings. Coverage is the clear limit on seeing a loss. For W1 and
-  W3 the observed power is in MVA, so reactive power adds to the readings.
+**The check for an export limit at strong wind is circular, so it shows nothing either way.** The
+  99.9th percentile of observed power in the strong set is 4% (W1), 16% (W2), and 17% (W3) above the
+  fitted scale. The fitted scale comes from the same readings, so this check is circular and the
+  visibility margin is not identified without turbine ratings. Coverage is the clear limit on seeing
+  a loss. For W1 and W3 the observed power is in MVA, so reactive power adds to the readings.
 - **The stop rule fired and the penalty was chosen per arm.** At `c = 2`, the worst primary
   combination of farm, arm, and block length raised 4.9 change points per farm-year in 2021-09 to
-  2024-06, against the limit of one. At the largest penalty the worst was 1.06, because several change
-  points of the unmodified series are probably real. Only change points that vanish at the largest
-  penalty were then counted as false alarms ([Figure 6](figure_6_false_alarms_by_penalty.svg)). The
-  chosen multipliers are 2 (A), 8 (B), 16 (C), and 4 (D); the CUSUM limits are 5 (A), 10 (B), 8 (C),
-  and 8 (D). The noise estimates (relative speed error and power noise per farm) are 0.125 and 0.056
-  (W1), 0.139 and 0.098 (W2), and 0.116 and 0.148 (W3).
+  2024-06, against the limit of one. At the largest penalty the worst was 1.06, because several
+  change points of the unmodified series are probably real. Only change points that vanish at the
+  largest penalty were then counted as false alarms ([Figure
+  6](figure_6_false_alarms_by_penalty.svg)). The chosen multipliers are 2 (A), 8 (B), 16 (C), and 4
+  (D); the CUSUM limits are 5 (A), 10 (B), 8 (C), and 8 (D). The noise estimates (relative speed
+  error and power noise per farm) are 0.125 and 0.056 (W1), 0.139 and 0.098 (W2), and 0.116 and
+  0.148 (W3).
 - **Steps lasting 90 days, 28-day blocks, change-point search, share found within 60 days
   (95% interval from resampling calendar months of start dates).**
 
@@ -213,10 +223,10 @@ separately for each arm after the injection test and before the real series was 
 | W1, one turbine (7.7%) | 0% | 50% | 0% | 0% | 0% |
 | W2, one turbine (12.5%) | 0% | 45% | 0% | 0% | 0% |
 
-- **Smallest step found at 80% power within 60 days:** 50% of capacity at every farm (arm D, 93%,
-  91%, and 93%), and no smaller size reaches 80%. Median delay of arm D at a 50% step is 28 days at
-  W3; at a 25% step it is 42 days (W1) and 36.5 days (W3), and W2's median is 78 days, past the
-  60-day limit.
+- **Smallest step found at 80% of start dates or more within 60 days:** 50% of capacity at every farm
+  (arm D, 93%, 91%, and 93%), and no smaller size reaches 80%. Median delay of arm D at a 50% step
+  is 28 days at W3; at a 25% step it is 42 days (W1) and 36.5 days (W3), and W2's median is 78 days,
+  past the 60-day limit.
 - **CUSUM on the saturated set flagged 25% steps at 83% of start dates at W1, 100% at W2 (median
   delay 34 days), and 14% at W3,** on 18, 17, and 7 valid start dates. At W1 it flags a one-turbine
   step at the same 83%, so this reflects the flat statistic and not a faster detection. It also
@@ -225,7 +235,8 @@ separately for each arm after the injection test and before the real series was 
   8%, and 29% and arm C at 46%, 0%, and 0%, against arm D's 63%, 26%, and 77%. Under a 9%
   seasonal swing at 28-day blocks arm B raised 1, 0, and 0 new change points and arm C raised 0, 3,
   and 0. Under a 5% speed bias that lowers observed power for 30 days, arm D raised a false step at
-  45% of start dates at W3 and arm C at 0% (arm B 4%), so the speed-scale term helped there.
+  45% of start dates at W3 and arm C at 0% (arm B 4%), so the weighting, not the speed-scale term,
+  removed most false steps.
 - **Episodes (7-day blocks, arm D):** a 25% episode that then ends is found within its length plus
   60 days at 0%, 0%, and 14% of start dates when it lasts 3 days, at 7%, 10%, and 40% when it lasts
   14 days, and at 77%, 52%, and 73% when it lasts 60 days (W1, W2, W3). A one-turbine episode at W3
@@ -236,16 +247,16 @@ separately for each arm after the injection test and before the real series was 
   is found at 4% of start dates, no better than arm B on W2 alone (8%), and no correlation between
   the two farms' ratios was measured.
 - **State-space fit.** The fit could not be validated, so no clip result is claimed. With 7-day
-  blocks the fit labelled the unmodified series at W2 as not nameplate near every start date, so no W2
-  start date is valid. With 14-day blocks W2 has 30 valid start dates, and 5 of the 14-day 25%
-  episodes were labelled as turbines out, none of the clips as a clip. At W1, 14-day episodes that cut
-  output by 25% were labelled as turbines out for 7 of 30 start dates (7-day blocks) and 2 of 21
+  blocks the fit labelled the unmodified series at W2 as not nameplate near every start date, so no
+  W2 start date is valid. With 14-day blocks W2 has 30 valid start dates, and 5 of the 14-day 25%
+  episodes were labelled as turbines out, none of the clips as a clip. At W1, 14-day episodes that
+  cut output by 25% were labelled as turbines out for 7 of 30 start dates (7-day blocks) and 2 of 21
   (14-day blocks), and 14-day clips at 75% of the 99.9th percentile as a clip for none. The 99.9th
   percentile of the strong set exists in under 3% of 7-day and 14-day blocks at W1 and W3, so the
   fit falls back on fixed reference values there. The lattice-constrained variant never returned a
-  whole-turbine state at W1 or W3 for the same reason, so that result does not test the lattice.
-  The interquartile range of the strong set is near zero on the flat top, so it carries no signal for
-  a clip, and the fit used only the 99.9th percentile and the mid-wind ratio.
+  whole-turbine state at W1 or W3 for the same reason, so that result does not test the lattice. The
+  interquartile range of the strong set is near zero on the flat top, so it carries no signal for a
+  clip, and the fit used only the 99.9th percentile and the mid-wind ratio.
 - **Real series (dates are change points of arm D in 14-day blocks, with arm A as a check).** W1:
   one 2-week episode from 2024-03-10 to 2024-03-23 at 0.34 times expected power against 1.00
   before and after, which overlaps three of experiment 210's idle runs (2024-03-16 to 2024-03-19),
@@ -266,12 +277,12 @@ separately for each arm after the injection test and before the real series was 
   steps, so the 9 steps are about 4 to 5 independent events and p = 0.02 is overstated; no
   correction is made for the several counts and two arms. At W2, 0 of 6 steps of arm A (p = 1.0)
   and 1 of 4 of arm D (p = 0.59) lie near a multiple of one eighth. At W3, 3 of 5 steps of arm A lie
-  near a multiple of one half (p = 0.06) and 0 of 7 of arm D. The 31% loss at W2 lies between 2 and 3
-  turbines. No upward step is permanent: every rise is the return from a downward episode.
-- **A private capacity-state table** (full, reduced by an estimated share, or out) for every half-hour
+  near a multiple of one half (p = 0.06) and 0 of 7 of arm D. The 31% loss at W2 lies between 2 and
+  3 turbines. No upward step is permanent: every rise is the return from a downward episode.
+**A private capacity-state table** (full, reduced by an estimated share, or out) for every half-hour
   of the three farms is saved under `work/capacity_state.parquet`, built from the change points of
-  arm D and experiment 210's idle runs. A later experiment tests it as a training mask and as an
-  as-of feature.
+  arm D and experiment 210's idle runs. A later experiment could test it as a training mask and as
+  an as-of feature.
 
 ## Checks
 
@@ -282,9 +293,9 @@ separately for each arm after the injection test and before the real series was 
   Sonnet only, so a fresh Sonnet reviewer stood in for the Opus audit: it re-derived the shares and
   median delays of the table, the strong-set shares, and the idle-run counts from the stored rows
   and matched all of them. It found no leakage in the injected effects or the prefix replay.
-- **Not causal in two small ways.** The noise scale and the `ln(n)` in the change-point penalty use
-  the whole 2019 to 2026 series, and the fitted core was fitted before 2025-06-17, so about 12 of the
-  18 months of start dates lie in the core's fitting data.
+**Two steps use data from after the start date.** The noise scale and the `ln(n)` in the
+  change-point penalty use the whole 2019 to 2026 series, and the fitted core was fitted before
+  2025-06-17, so about 12 of the 18 months of start dates lie in the core's fitting data.
 - **The seasonal swing is a one-off ramp.** It begins at 2024-07 and falls by its range over half a
   year, so it is a half cycle and not a stationary seasonal pattern.
 - **Lab conditions:** the injected power cut multiplies the observed power from the start day, the
@@ -294,7 +305,7 @@ separately for each arm after the injection test and before the real series was 
 
 ## Caveats and what to try next
 
-- **Arms A at the saturated set, the CUSUM comparison, and the 0 m/s margin are post hoc.** The 2
+- **Arm A at the saturated set, the CUSUM comparison, and the 0 m/s margin are post hoc.** The 2
   m/s margin and the change-point search are the pre-registered rows.
 - **The state-space fit is an unfinished tool** and is not evidence about clips.
 - **Turbine counts** (13, 8, and 2) come from the public planning register and are tied to the
