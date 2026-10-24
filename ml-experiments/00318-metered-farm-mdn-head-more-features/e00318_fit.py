@@ -26,7 +26,7 @@ import e00310_fit as f310  # ty: ignore[unresolved-import]
 import e00318_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.tail_calibration import level_column
 
 N_PROCESSES: Final[int] = 4
