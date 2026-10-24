@@ -34,7 +34,9 @@ prediction: >-
 decision_rule: >-
   The five adoption conditions of the research-default page, with Wind farms research default 1 as
   the default, read in the order x1, x2, x3, and the first arm that passes all five is adopted (at
-  most one); x4 is a reference and cannot be adopted. Condition 1: the 99.75% month-block interval (level 1 - 0.01/4, as the brief sets for four arms) of (default plus x minus default) on the kept-row quantile score lies wholly below zero, and the point estimate is
+  most one); x4 is a reference and cannot be adopted. Condition 1: the 99.75% month-block
+  interval (level 1 - 0.01/4, as the brief sets for four arms) of (default plus x minus default)
+  on the kept-row quantile score lies wholly below zero, and the point estimate is
   at least 0.02 points (a new fitted step, tier 2). Conditions 2 to 5 as in experiment 326. The
   share of (c)'s gain that x keeps is reported with a 95% month-resampled interval. A change that
   wins on condition 1 and fails another stays a candidate.
