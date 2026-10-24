@@ -79,7 +79,8 @@ adopted_in: none
 advice:
   - >-
     Do not train the wind XGBoost model on the ensemble mean to replace the offset table: the table
-    changes its score 20 times less but it scores 0.08 points worse and 0.12 worse below cut-in (figure 1).
+    changes its score 20 times less but it scores 0.08 points worse and 0.12 worse below cut-in
+    (figure 1).
   - >-
     Do not add the member spread of the 100 m and 10 m speeds as columns to a mean-trained wind
     model: MS is 0.02 points worse than M on the kept rows and 0.09 worse on the median error (MS
@@ -106,7 +107,8 @@ corrected by the table of [experiment
 259](../00259-wind-plant-plus-quantile-offset-head/result.md). The scored sites are the three
 metered wind farms (W1 to W3, anonymised) at 1 to 10 day leads. Scores are quantile scores in
 points of capacity (a point is 1% of a farm's capacity; lower is better). The kept rows are the
-half-hours that [experiment 210](../00210-wind-idle-noise-mva-artefact/result.md)'s mask keeps, and the idle rows
+half-hours that the mask of [experiment
+210](../00210-wind-idle-noise-mva-artefact/result.md) keeps, and the idle rows
 are the half-hours it drops. Mean training learned most of the bias, since the table changes its
 score by 0.017 points against 0.345 for the default, and its score stayed within noise of the
 default's. A mean-trained model with better low-wind behaviour is the open question.

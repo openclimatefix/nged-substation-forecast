@@ -48,21 +48,23 @@ def main() -> None:
     charts340.figure_1(score=score).save(DOCS_DIR / "figure_1.svg")
     observed, fc, diff, marks = charts340.curve_frames()
     for zoom, name in ((False, "figure_2.svg"), (True, "figure_3.svg")):
-        chart = charts340._curve_panels(  # noqa: SLF001
+        chart = charts340._curve_panels(
             observed=observed,
             fc=fc,
             marks=marks,
             x_max=8.0 if zoom else 25.0,
             quantile_arms=("default", "M"),
-            title=charts340._title(  # noqa: SLF001
+            title=charts340._title(
                 text="Power against 100 m wind speed" + (", 0 to 8 m/s" if zoom else ""),
                 lines=[
-                    "Black: observed median and 5% to 95% band in bins of ERA5 speed at the valid "
-                    "time. Coloured: each arm's median forecast in bins of the ensemble-mean speed "
-                    "at forecast time; dashed: the default's and M's 5% and 95% quantiles. Grey "
-                    "dotted: cut-in; grey dashed: rated speed; blue band: experiment 210 idle "
-                    "band. Scored year, all half-hours, 1 to 10 days. W1 to W3 are anonymised "
-                    "farms; the last panel pools them."
+                    (
+                        "Black: observed median and 5% to 95% band in bins of ERA5 speed at the "
+                        "valid time. Coloured: each arm's median forecast in bins of the "
+                        "ensemble-mean speed at forecast time; dashed: the default's and M's 5% "
+                        "and 95% quantiles. Grey dotted: cut-in; grey dashed: rated speed; blue "
+                        "band: experiment 210 idle band. Scored year, all half-hours, 1 to 10 "
+                        "days. W1 to W3 are anonymised farms; the last panel pools them."
+                    )
                 ],
             ),
         )
