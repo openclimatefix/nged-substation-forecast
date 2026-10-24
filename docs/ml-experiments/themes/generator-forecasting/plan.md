@@ -7,6 +7,7 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | 338 | Does a non-neural column keep the gain of the neural adapter's effective wind speed in the wind forecast? | 1 | nothing | Planned |
+| 342 | Can the upper quantiles of the wind forecast be made to cover the observed power, and does an ensemble-aware head beat a plain recalibration? | 1 | nothing | Planned |
 | 307 | Which property of the ensemble's wind speed is wrong, judged against the wind that the farms' own power implies? | 2 | nothing | Planned |
 | 276 | Why does XGBoost beat the physics core on the three metered wind farms, and is the metering noise the reason? | 1 | nothing | Planned; running diagnostics D1 to D10 |
 
