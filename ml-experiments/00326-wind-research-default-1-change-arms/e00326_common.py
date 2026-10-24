@@ -93,6 +93,9 @@ def speed_factor(*, valid_before: datetime | None, scale_members: float = 1.0) -
     Args:
         valid_before: Use only cases with a valid time before this (the replicate period's fit).
         scale_members: Multiplies the ensemble-mean wind first (the known-answer test).
+
+    Returns:
+        The factor, as a ratio of mean wind speeds.
     """
     cases = pl.read_parquet(IMPLIED_CASES_PATH).filter(
         pl.col("implied_100m").is_not_null() & ~pl.col("masked")
