@@ -7,7 +7,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [300](../../00300-metered-farm-best-guess-assembly/result.md) | How good is the assembled best-guess day-ahead forecast for the six metered farms, and what does a new farm with no history get? | 1 | Nothing | Planned |
-| [345](../../00345-pooled-solar-wind-mixture-density-network/result.md) | Does one pooled mixture-density network for solar and wind farms match the best single-family forecast for each fuel, and help a farm with no history? | 1 | Nothing | Planned |
 
 ## Planned experiments
 
