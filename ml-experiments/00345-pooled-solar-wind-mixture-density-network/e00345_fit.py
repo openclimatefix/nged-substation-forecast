@@ -35,7 +35,7 @@ import e00310_fit as f310  # noqa: E402  # ty: ignore[unresolved-import]
 import e00345_common as common  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 from studies.tail_calibration import level_column  # noqa: E402
 
 N_PROCESSES: Final[int] = int(os.environ.get("E345_PROCESSES", "5"))
