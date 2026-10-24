@@ -27,7 +27,7 @@ import e00325_common as common
 import e00325_variant as variant_module
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 
 SEEDS = (0, 1, 2)
 ARM = 2
@@ -73,7 +73,7 @@ def early_job(arguments: tuple[str, str]) -> str:
     return f"{variant} {site}: {line} ({time.monotonic() - started:.0f} s)"
 
 
-def train(*, variant: str) -> str:
+def train(*, variant: str, seeds: tuple[int, ...] = SEEDS, subdir: str = "preds") -> str:
     """Train arm 2 with three seeds on the variant's rows and write the scored-year shifts."""
     point_201_at(variant=variant)
     started = time.monotonic()
@@ -84,10 +84,10 @@ def train(*, variant: str) -> str:
     actual = frame["actual"].to_numpy().astype(np.float64)
     test = split == "test"
     keys = frame.select(*KEYS, "actual").filter(pl.Series(test))
-    out_dir = variant_dir(variant=variant) / "preds"
+    out_dir = variant_dir(variant=variant) / subdir
     out_dir.mkdir(parents=True, exist_ok=True)
     notes = []
-    for seed in SEEDS:
+    for seed in seeds:
         fit = nn201.fit_predict(x=x, q=q, actual=actual, split=split, seed=seed)
         part = keys.with_columns(
             *[
@@ -111,6 +111,9 @@ def main() -> None:
     parser.add_argument("--variants", nargs="+", default=list(common.VARIANTS))
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--skip-early", action="store_true")
+    parser.add_argument(
+        "--extra-seed-sets", type=int, default=0, help="Extra three-seed sets, 1 to this number."
+    )
     args = parser.parse_args()
     if not args.skip_early:
         jobs = [(v, s) for v in args.variants for s in common.SITES]
@@ -119,6 +122,13 @@ def main() -> None:
                 print(line, flush=True)
     for variant in args.variants:
         print(train(variant=variant), flush=True)
+        for k in range(1, args.extra_seed_sets + 1):
+            print(
+                train(
+                    variant=variant, seeds=tuple(range(3 * k, 3 * k + 3)), subdir=f"preds_set{k}"
+                ),
+                flush=True,
+            )
 
 
 if __name__ == "__main__":

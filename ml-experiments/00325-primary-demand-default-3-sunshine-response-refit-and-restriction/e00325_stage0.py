@@ -133,7 +133,7 @@ def main() -> None:
     placebo = rows["site"].is_in(list(PLACEBO)).to_numpy()
     report: dict = {
         "n_daylight_rows_0_168h": rows.height,
-        "net_mean_difference_all_daylight": float(rows["difference"].mean()),
+        "net_mean_difference_all_daylight": float(rows["difference"].mean()),  # ty: ignore[invalid-argument-type]
         "by_csi_all_daylight": summarise(rows=rows, by=csi, labels=CSI_LABELS),
         "by_csi_sunny_daylight": summarise(
             rows=rows.filter(pl.Series(sunny)), by=csi[sunny], labels=CSI_LABELS
@@ -146,7 +146,7 @@ def main() -> None:
         "by_hour_all_daylight": {
             int(h): {
                 "n": int((rows["hour"] == h).sum()),
-                "mean_difference": float(rows.filter(pl.col("hour") == h)["difference"].mean()),
+                "mean_difference": float(rows.filter(pl.col("hour") == h)["difference"].mean()),  # ty: ignore[invalid-argument-type]
             }
             for h in sorted(rows["hour"].unique().to_list())
         },

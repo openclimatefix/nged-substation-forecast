@@ -26,11 +26,13 @@ import polars as pl
 
 QUANTILES = c320.QUANTILES
 VARIANTS = ("f1_as_run", "f1r", "f1s", "f1sel")
-ARMS = ("default", *VARIANTS)
+SEED_SETS = 6
+ARMS = ("stored_default", "default", *VARIANTS)
 common323_arms = common323.ARMS_DIR
 REFERENCES = ("manual_heuristic", "climatology")
 KEYS = ["site", "power_fcst_init_time", "valid_time"]
 CONTRASTS = (
+    ("stored_default", "default"),
     ("f1_as_run", "default"),
     ("f1r", "default"),
     ("f1s", "default"),
@@ -49,13 +51,21 @@ SELECTION_MARGIN = 0.02
 SELECTION_MONTHS = 12
 
 
-def read_delta(*, variant: str) -> pl.DataFrame:
+def network_folder(*, seed_set: int) -> str:
+    """Return the folder of a seed set's network predictions (set 0 is experiment 201's seeds)."""
+    return "preds" if seed_set == 0 else f"preds_set{seed_set}"
+
+
+def read_delta(*, variant: str, seed_set: int) -> pl.DataFrame:
     """Return the three-seed mean of the network's median shift for every scored-year row."""
     frames = [
-        pl.read_parquet(common.NET_DIR / variant / "preds" / f"arm2_seed{seed}.parquet").select(
-            "site", "run", "valid_time", "delta"
-        )
-        for seed in range(3)
+        pl.read_parquet(
+            common.NET_DIR
+            / variant
+            / network_folder(seed_set=seed_set)
+            / f"arm2_seed{seed}.parquet"
+        ).select("site", "run", "valid_time", "delta")
+        for seed in range(3 * seed_set, 3 * seed_set + 3)
     ]
     return (
         pl.concat(frames)
@@ -168,7 +178,7 @@ def select_per_primary(
             window = part.filter(
                 (pl.col("valid_time") < start) & (pl.col("power_fcst_init_time") >= window_start)
             )
-            mean_difference = float(window["difference"].mean()) if window.height else float("nan")
+            mean_difference = float(window["difference"].mean())  # ty: ignore[invalid-argument-type] if window.height else float("nan")
             use = bool(window.height and mean_difference <= -SELECTION_MARGIN)
             out["on"][site][month] = use
             out["difference"][site][month] = mean_difference
@@ -190,7 +200,7 @@ def main() -> None:
     e251 = pl.read_parquet(c320.c319.E251_ARMS / "rows.parquet").select(KEYS).with_row_index("i251")
     rows = rows.join(e251, on=KEYS, how="left", validate="1:1")
     stored = pl.read_parquet(
-        common.E322_ARMS / "scored_long_lead.parquet",
+        common323.E322_ARMS / "scored_long_lead.parquet",
         columns=[*KEYS, "kind", *[f"d1_{q}" for q in QUANTILES]],
     ).rename({"kind": "kind_long"})
     rows = rows.join(stored, on=KEYS, how="left", validate="1:1")
@@ -219,14 +229,14 @@ def main() -> None:
             how="left",
             validate="1:1",
         )
-    deltas = {name: read_delta(variant=name) for name in common.VARIANTS}
-    for name, delta in deltas.items():
-        rows = rows.join(
-            delta.rename({c: f"net_{name}_{c}" for c in ("delta",)}),
-            on=["site", "run", "valid_time"],
-            how="left",
-            validate="m:1",
-        )
+    for name in common.VARIANTS:
+        for k in range(SEED_SETS):
+            rows = rows.join(
+                read_delta(variant=name, seed_set=k).rename({"delta": f"net{k}_{name}_delta"}),
+                on=["site", "run", "valid_time"],
+                how="left",
+                validate="m:1",
+            )
     rows = s317.flags(rows=rows)
     lead = rows["lead_hours"].to_numpy()
     long = lead > c320.STORED_HORIZON_HOURS
@@ -247,25 +257,38 @@ def main() -> None:
         rows.select([f"d1_{q}" for q in QUANTILES]).to_numpy().astype(np.float64),
         short_default,
     )
-    quantiles = {"default": default}
+    qsets: dict[str, list[np.ndarray]] = {"stored_default": [default]}
     missing_delta = {}
+    long_columns = {}
     for name in ("v0r", "f1", "f1s"):
         short_r2 = rows.select([f"r2_{name}_{q}" for q in QUANTILES]).to_numpy().astype(np.float64)
         long_q = rows.select([f"d1_{name}_{q}" for q in QUANTILES]).to_numpy().astype(np.float64)
-        net = rows[f"net_{name}_delta"].to_numpy().astype(np.float64)
-        missing_delta[name] = int((np.isnan(net) & ~long).sum())
-        net = np.where(np.isnan(net), 0.0, net)
-        quantiles[name] = np.sort(np.where(long[:, None], long_q, short_r2 + net[:, None]), axis=1)
+        long_columns[name] = long_q
+        qsets[name] = []
+        for k in range(SEED_SETS):
+            net = rows[f"net{k}_{name}_delta"].to_numpy().astype(np.float64)
+            missing_delta[f"{name}_set{k}"] = int((np.isnan(net) & ~long).sum())
+            net = np.where(np.isnan(net), 0.0, net)
+            qsets[name].append(
+                np.sort(np.where(long[:, None], long_q, short_r2 + net[:, None]), axis=1)
+            )
     e323_short = rows.select([f"r2_e323f1_{q}" for q in QUANTILES]).to_numpy().astype(np.float64)
     e323_long = rows.select([f"d1_e323f1_{q}" for q in QUANTILES]).to_numpy().astype(np.float64)
-    quantiles["f1_as_run"] = np.sort(
-        np.where(long[:, None], e323_long, e323_short + full_delta), axis=1
-    )
-    quantiles["f1r"] = quantiles.pop("f1")
+    qsets["f1_as_run"] = [
+        np.sort(np.where(long[:, None], e323_long, e323_short + full_delta), axis=1)
+    ]
+    qsets["f1r"] = qsets.pop("f1")
+    qsets["default"] = qsets.pop("v0r")
     gate = {
-        "v0r_equals_default_max_abs": float(np.abs(quantiles["v0r"] - default).max()),
-        "v0r_equals_default_below_168": float(np.abs(quantiles["v0r"] - default)[~long].max()),
-        "v0r_equals_default_above_168": float(np.abs(quantiles["v0r"] - default)[long].max()),
+        "control_set0_equals_stored_default_max_abs": float(
+            np.abs(qsets["default"][0] - default).max()
+        ),
+        "control_set0_equals_stored_default_below_168": float(
+            np.abs(qsets["default"][0] - default)[~long].max()
+        ),
+        "control_set0_equals_stored_default_above_168": float(
+            np.abs(qsets["default"][0] - default)[long].max()
+        ),
         "default_0_240": float(
             (
                 2.0
@@ -283,14 +306,23 @@ def main() -> None:
     actual = rows["actual"].to_numpy().astype(np.float64)
     site = rows["site"].to_numpy()
     month_of_origin = rows["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
+
+    def mean_loss(sets: list[np.ndarray]) -> np.ndarray:
+        return np.mean([2.0 * s317.pin(actual=actual, q=q).mean(axis=1) for q in sets], axis=0)
+
+    gate["control_score_by_seed_set_0_168"] = [
+        float(2.0 * s317.pin(actual=actual, q=q).mean(axis=1)[~long].mean())
+        for q in qsets["default"]
+    ]
     selection = select_per_primary(
-        rows=rows,
-        loss_default=2.0 * s317.pin(actual=actual, q=quantiles["default"]).mean(axis=1),
-        loss_f1s=2.0 * s317.pin(actual=actual, q=quantiles["f1s"]).mean(axis=1),
+        rows=rows, loss_default=mean_loss(qsets["default"]), loss_f1s=mean_loss(qsets["f1s"])
     )
     on = np.array([selection["on"][s_][m_] for s_, m_ in zip(site, month_of_origin, strict=True)])
-    quantiles["f1sel"] = np.where(on[:, None], quantiles["f1s"], default)
-    quantiles.pop("v0r")
+    qsets["f1sel"] = [
+        np.where(on[:, None], f1s_k, default_k)
+        for f1s_k, default_k in zip(qsets["f1s"], qsets["default"], strict=True)
+    ]
+    quantiles = {name: sets[0] for name, sets in qsets.items()}
     quantiles["manual_heuristic"] = (
         rows.select([f"mh_{q}" for q in QUANTILES]).to_numpy().astype(np.float64)
     )
@@ -300,16 +332,21 @@ def main() -> None:
     quantiles["BG2"] = np.where(long[:, None], np.nan, arms251["bg2"][idx])
     threshold = np.array([np.quantile(actual[site == s], 0.9) for s in c320.SCORED_SITES])
     thr = threshold[[c320.SCORED_SITES.index(s) for s in site]]
-    pin = {k: s317.pin(actual=actual, q=v) for k, v in quantiles.items()}
-    loss = {k: 2.0 * v.mean(axis=1) for k, v in pin.items()}
-    tw = {
-        k: 2.0 * np.maximum(
-            c320.LEVELS * (np.maximum(actual, thr)[:, None] - np.maximum(v, thr[:, None])),
-            (c320.LEVELS - 1.0) * (np.maximum(actual, thr)[:, None] - np.maximum(v, thr[:, None])),
+    for name in ("manual_heuristic", "climatology", "BG2"):
+        qsets[name] = [quantiles[name]]
+
+    def tw_of(q: np.ndarray) -> np.ndarray:
+        return 2.0 * np.maximum(
+            c320.LEVELS * (np.maximum(actual, thr)[:, None] - np.maximum(q, thr[:, None])),
+            (c320.LEVELS - 1.0) * (np.maximum(actual, thr)[:, None] - np.maximum(q, thr[:, None])),
         ).mean(axis=1)
-        for k, v in quantiles.items()
-        if k != "BG2"
-    }  # fmt: skip
+
+    pin = {
+        k: np.mean([s317.pin(actual=actual, q=q) for q in sets], axis=0)
+        for k, sets in qsets.items()
+    }
+    loss = {k: 2.0 * v.mean(axis=1) for k, v in pin.items()}
+    tw = {k: np.mean([tw_of(q) for q in sets], axis=0) for k, sets in qsets.items() if k != "BG2"}
     month = rows["power_fcst_init_time"].dt.strftime("%Y-%m").to_numpy()
     week = rows["power_fcst_init_time"].dt.strftime("%G-%V").to_numpy()
     valid_month = rows["valid_time"].dt.convert_time_zone("Europe/London").dt.month().to_numpy()
@@ -409,15 +446,15 @@ def main() -> None:
         for s in c320.SCORED_SITES
     }  # fmt: skip
     rep["median_minus_mean_by_site"] = {
-        arm: {s: float((quantiles[arm][site == s, 5] - quantiles[arm][site == s].mean(axis=1)).mean()) for s in c320.SCORED_SITES}
+        arm: {s: float(np.mean([(q[site == s, 5] - q[site == s].mean(axis=1)).mean() for q in qsets[arm]])) for s in c320.SCORED_SITES}
         for arm in ARMS
     }  # fmt: skip
     rep["mean_abs_median_error_by_window"] = {
-        wname: {arm: float(np.abs(actual - quantiles[arm][:, 5])[wmask].mean()) for arm in (*ARMS, *REFERENCES)}
+        wname: {arm: float(np.mean([np.abs(actual - q[:, 5])[wmask].mean() for q in qsets[arm]])) for arm in (*ARMS, *REFERENCES)}
         for wname, wmask in windows.items()
     }  # fmt: skip
     rep["signed_median_error_by_window"] = {
-        wname: {arm: float((actual - quantiles[arm][:, 5])[wmask].mean()) for arm in (*ARMS, *REFERENCES)}
+        wname: {arm: float(np.mean([(actual - q[:, 5])[wmask].mean() for q in qsets[arm]])) for arm in (*ARMS, *REFERENCES)}
         for wname, wmask in windows.items()
     }  # fmt: skip
     rep["selection"] = selection

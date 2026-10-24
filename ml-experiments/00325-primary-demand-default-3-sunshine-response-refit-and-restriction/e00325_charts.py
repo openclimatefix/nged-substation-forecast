@@ -27,9 +27,9 @@ WIDTH: Final[int] = 640
 BANDS: Final[tuple[str, ...]] = tuple(f"{a}-{a + 24} h" for a in range(0, 240, 24))
 CENTRES: Final[dict[str, int]] = {b: i * 24 + 12 for i, b in enumerate(BANDS)}
 NAMES: Final[dict[str, str]] = {
-    "default": "Default (Primary demand research default 3)",
+    "default": "Default (rebuilt, mean of 6 network seed sets)",
     "f1_as_run": "F1 as run in experiment 323",
-    "f1r": "F1r (F1 with the stack refitted)",
+    "f1r": "F1r (unrestricted response, stack refitted)",
     "f1s": "F1s (restricted response, refitted; post hoc)",
     "f1sel": "F1sel (F1s switched per Primary; post hoc)",
     "BG2": "BG2 (to 168 hours)",
@@ -106,8 +106,8 @@ def headline(*, report: dict) -> None:
         width=WIDTH,
         height=320,
         title=_title(
-            title="Refitting the stack around the sunshine response changes the score at every lead by well under the gap to the manual heuristic",
-            subtitle="Six Primaries, 2025-07-02 to 2026-06-30; 95% intervals resample the 12 initialisation months.",
+            title="Refitting the stack around the sunshine response changes the score by under 0.02 points at every lead",
+            subtitle="Six Primaries, 2025-07-02 to 2026-06-30; 95% intervals resample the 12 initialisation months. F1s and F1sel are post hoc.",
         ),
     )
     _save(chart, name="headline_score_by_lead")
@@ -139,7 +139,7 @@ def gain_by_group(*, report: dict) -> None:
             domain=[NAMES[k] for k in ("f1r", "f1s", "f1sel")],
             range=[ocf.DATA_GREEN, ocf.DATA_PURPLE, ocf.BRAND_ORANGE],
         ),
-        legend=alt.Legend(title=None, orient="top"),
+        legend=alt.Legend(title=None, orient="top", labelLimit=420, columns=1),
     )
     y = alt.Y("group:N", sort=groups, title=None)
     chart = (
@@ -255,7 +255,7 @@ def stage_zero() -> None:
             width=WIDTH,
             height=240,
             title=_title(
-                title="Experiment 323's F1 harmed daylight half-hours most at clear-sky index 0.3 to 0.6, where it also helped sunny daylight most",
+                title="Experiment 323's F1 harmed daylight half-hours mostly at clear-sky index under 0.3 and over 0.9, not at 0.3 to 0.9",
                 subtitle="Daylight half-hours at 0.5 to 168 hours, six Primaries, 2025-07-02 to 2026-06-30; the flux is the raw ensemble mean. Bands under 100 rows are omitted.",
             ),
         )
