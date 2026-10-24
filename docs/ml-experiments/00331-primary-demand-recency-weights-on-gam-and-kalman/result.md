@@ -247,5 +247,5 @@ on odd months and scored on even months, then swapped.
   resample the selection of the best half-life from four.
 - **Grid edges:** ridge 0.3 and gain 0.20 were the largest values offered, in every arm and both
   halves.
-- **Next:** test the 24-month window and the seasonal bonus as `change` experiments on Primary
-  demand research default 3, with a wider ridge and gain grid.
+- **Options for later:** a `change` experiment on Primary demand research default 3 could test the
+  24-month window and the seasonal bonus, with a wider ridge and gain grid.
