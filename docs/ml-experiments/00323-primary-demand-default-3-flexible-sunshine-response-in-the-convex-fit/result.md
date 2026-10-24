@@ -92,7 +92,6 @@ verdict: not supported
 production_status: not-for-production
 adopted_in: none
 code: ml-experiments/00323-primary-demand-default-3-flexible-sunshine-response-in-the-convex-fit/
-
 ---
 
 ## Take-home message
