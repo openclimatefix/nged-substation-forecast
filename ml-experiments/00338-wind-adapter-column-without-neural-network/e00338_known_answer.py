@@ -21,7 +21,7 @@ import e00338_adapters as adapters
 import e00338_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 FARM = "W1"
 SECTOR_SCALES = np.linspace(0.90, 1.12, common.DIRECTION_SECTORS)[[3, 0, 6, 2, 7, 1, 5, 4]].astype(

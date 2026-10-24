@@ -18,10 +18,10 @@ import e00303_core as core_module  # isort: skip  # ty: ignore[unresolved-import
 import e00303_fit as fit303  # isort: skip  # ty: ignore[unresolved-import]
 import e00338_common as common
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 import xgboost as xgb
 from scipy.stats import spearmanr
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 SCALE_RANGE = core_module.SCALE_RANGE
 MIN_SPEED = core_module.MIN_SHEAR_SPEED_M_S

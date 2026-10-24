@@ -22,7 +22,7 @@ import e00326_fit as fit326  # isort: skip  # ty: ignore[unresolved-import]
 import e00338_adapters as adapters
 import e00338_common as common
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 
 def l1(*, core: object, speed: np.ndarray, target: np.ndarray) -> float:
