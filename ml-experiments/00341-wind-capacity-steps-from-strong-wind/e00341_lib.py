@@ -99,7 +99,8 @@ def modified_obs(*, prep: Prep, effects: tuple[tuple, ...]) -> np.ndarray:
     Effects are tuples: ("loss", fraction, first_day, last_day), ("clip", level, first_day,
     last_day) with the level a share of the calibration 99.9th percentile of the strong set,
     ("swing", range), ("drift", per_year), ("bias", relative_speed_error, first_day, last_day).
-    Multiplicative effects apply first, then clips.
+    Multiplicative effects apply first, then clips. A swing and a drift start at 2024-07-01; a swing
+    falls by its range over half a year (a half cycle) and rises again.
     """
     farm = prep.farm
     obs = farm.obs.copy()

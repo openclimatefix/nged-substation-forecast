@@ -316,41 +316,6 @@ def run_pool(*, tasks: list[dict]) -> pl.DataFrame:
     )
 
 
-def choose_settings(*, frame: pl.DataFrame) -> dict:
-    """Apply the pre-registered penalty rule to the calibration table.
-
-    The change-point penalty is the smallest `c` in the grid for which every primary
-    (farm, arm, block length) with at least 15 observed calibration blocks has at most one change
-    point per farm-year in the calibration window of the unmodified series. The CUSUM limit is
-    chosen the same way with alarms. A setting that never meets the rule falls back to the largest.
-    """
-    years = (common.CAL_END_DAY - common.CAL_START_DAY + 1) / 365.25
-    out: dict = {}
-    for detector, grid, name in (("cal_pelt", C_GRID, "c"), ("cal_cusum", H_GRID, "h")):
-        sub = frame.filter(
-            (pl.col("detector") == detector)
-            & (pl.col("cell") == "null")
-            & pl.col("arm").is_in(FA_PRIMARY_ARMS)
-            & pl.col("block").is_in(FA_PRIMARY_BLOCKS)
-        )
-        chosen = grid[-1]
-        table = {}
-        for setting in grid:
-            worst = (
-                float(sub.filter(pl.col("setting") == setting)["value"].to_numpy().max()) / years
-            )
-            table[str(setting)] = worst
-            if (worst <= 1.0 and chosen == grid[-1] and setting != grid[-1]) or (
-                worst <= 1.0 and chosen == grid[-1]
-            ):
-                chosen = setting
-            if worst <= 1.0:
-                break
-        out[name] = chosen
-        out[f"{name}_worst_rate_per_farm_year"] = table
-    return out
-
-
 def main() -> None:
     """Run the requested stage."""
     stage = sys.argv[1]
@@ -358,9 +323,7 @@ def main() -> None:
         tasks = build_tasks(stage="calibrate", cs=C_GRID, hs=H_GRID)
         frame = run_pool(tasks=tasks)
         frame.write_parquet(common.WORK_DIR / "calibrate_rows.parquet")
-        settings = choose_settings(frame=frame)
-        (common.WORK_DIR / "penalty.json").write_text(json.dumps(settings, indent=1))
-        print(json.dumps(settings, indent=1))
+        print(frame.shape, "rows; run e00341_penalty.py to choose the penalties")
     else:
         settings = json.loads((common.WORK_DIR / "penalty.json").read_text())
         cs = tuple(sorted(set(settings["c"].values())))
