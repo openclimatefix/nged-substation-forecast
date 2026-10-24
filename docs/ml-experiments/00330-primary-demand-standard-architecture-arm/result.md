@@ -139,7 +139,8 @@ capacity against the default's 2.579 (difference -0.053). The adapter with a med
   it helps the tails is not shown (see the no-harm bounds).
 - **STD against G:** -0.012 (95% interval -0.055 to +0.040).
 - **Replicate year (2024-25 even months, against experiment 169's arm A bands):** STD -0.093 and
-  STD-A -0.043 points (95% intervals -0.121 to -0.064 and -0.066 to -0.020), absolute scores STD 2.497, STD-A
+  STD-A -0.043 points (95% intervals -0.121 to -0.064 and -0.066 to -0.020), absolute scores
+  STD 2.497, STD-A
   2.547, and default 2.589 (the arm A bands play the default's part in that year).
 - **No-harm bounds (one-sided 95% upper bounds, pooled six Primaries; tolerances 0.02 pooled, 0.05
   for each of q01, q99, cold winter nights, sunny daylight, 2% for the tail-weighted score):**
@@ -163,7 +164,8 @@ capacity against the default's 2.579 (difference -0.053). The adapter with a med
   STD against 4.510 for the default; mean 4.483 against 4.601. Both point the same way as the
   quantile score.
 - **Audit triggers:** none fired. The sign survives leaving out D10 (-0.009), but the verdict was
-  already "interval includes zero at 99.5%", so trigger 4 (leaving one Primary out flips the sign or the verdict of a contrast) does not fire.
+  already "interval includes zero at 99.5%", so trigger 4 (leaving one Primary out flips the sign
+  or the verdict of a contrast) does not fire.
 
 ## Caveats and what to try next
 
