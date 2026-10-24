@@ -57,9 +57,9 @@ best_arm: >-
   x2, the default plus boosted trees for the speed scale, 11.301 points on the kept rows against
   11.352 for the default (-0.051, 95% interval -0.089 to -0.012, 99.75% interval -0.109 to +0.007)
 headline: >-
-  No non-neural column passed condition 1 of the adoption rule. The best of the three, boosted trees (x2),
-  kept 51% of the neural adapter's gain (95% interval 20% to 82%) at 1 to 10 days. The lookup table (x1)
-  kept 5% and the table copying the network (x3) kept 16%.
+  No non-neural column passed condition 1 of the adoption rule. The best of the three, boosted
+  trees (x2), kept 51% of the neural adapter's gain (95% interval 20% to 82%) at 1 to 10 days. The
+  lookup table (x1) kept 5% and the table copying the network (x3) kept 16%.
 production_status: not-for-production
 adopted_in: none
 lessons: >-
