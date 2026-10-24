@@ -17,7 +17,7 @@ import multiprocessing
 import os
 import time
 from concurrent.futures import ProcessPoolExecutor
-from typing import Final
+from typing import Any, Final, cast
 
 import e00164_common as c164  # ty: ignore[unresolved-import]
 import e00164_fit as f164  # ty: ignore[unresolved-import]
@@ -168,7 +168,7 @@ def train_seq(
 
     def loss_of(b: dict[str, torch.Tensor]) -> torch.Tensor:
         if arm == "r":
-            return model.loss(hist=b["hist"], known=b["known"], z=b["z"], keep=b["keep"])  # ty: ignore[call-non-callable]
+            return cast(Any, model).loss(hist=b["hist"], known=b["known"], z=b["z"], keep=b["keep"])
         q = model(static=b["static"], past=b["hist"], known=b["known"])
         return (models.pinball_loss(q=q, z=b["z"]) * b["keep"]).sum() / b["keep"].sum().clamp(
             min=1.0
