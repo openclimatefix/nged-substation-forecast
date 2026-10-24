@@ -21,7 +21,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Final
 
-import e00130_gam_panel as g
+import e00130_gam_panel as g  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 import torch  # ty: ignore[unresolved-import]

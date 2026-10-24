@@ -19,7 +19,7 @@ import multiprocessing as mp
 from pathlib import Path
 from typing import Final
 
-import e00130_gam_panel as g
+import e00130_gam_panel as g  # ty: ignore[unresolved-import]
 import e00309_data as dat
 import e00309_harness as h
 import e00309_real as real
