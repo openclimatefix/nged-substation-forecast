@@ -66,8 +66,9 @@ best_arm: >-
 headline: >-
   Adding the lead, the clock as sine and cosine pairs, and the spread of the ensemble's irradiance
   to
-  the mixture-density head lowers its 0.99 pinball loss by 4.8% to 5.6% at days 3 to 7 (intervals
-  below zero) and leaves the quantile score unchanged within 0.13 points; the lead alone changes
+  the mixture-density head lowers its 0.99 pinball loss by 4.8% to 5.6% at days 3 to 7 (the
+  intervals exclude zero) and leaves the quantile score unchanged within 0.13 points; the lead alone
+  changes
   nothing, and the 0.01 quantile still lets 3.3% to 3.7% of actual values through.
 lessons: >-
   The head already holds the lead in hours, so a second lead column adds nothing. The sine and
@@ -79,7 +80,8 @@ take_home_message: >-
   inputs
   do lower the loss at the 0.99 quantile (the tail that matters for curtailment) by about 5% at days
   3 to 7, and none of the changes fixes the lower tail, where 3.3% to 3.7% of actual values fall
-  below the 0.01 quantile. Training one head for all leads makes the network with no plant nearly as
+  below the 0.01 quantile, where 1% is expected. Training one head for all leads makes the network
+  with no plant nearly as
   good as the plant-based head at days 8 to 10 (0.4% worse), so the plant adds little there.
 advice:
 - >-
@@ -95,14 +97,16 @@ advice:
   per band: the quantile score at days 8 to 10 falls by 3.0% (0.24 points, interval -0.69 to -0.03
   points) (C4).
 - >-
-  Look for the cause of the lower tail elsewhere than in the head's inputs: no head here moves the
-  share of actual values below the 0.01 quantile out of 3.3% to 3.7% (Figure 4).
+  Look for the cause of the lower tail elsewhere than in the head's inputs: no head here brings the
+  share of actual values below the 0.01 quantile down from 3.3% to 3.7% towards the expected 1%
+  (Figure 4).
 production_status: candidate
 adopted_in: none
 ---
 
-**Giving the head more inputs does not lower its overall score at any lead from 1 to 10 days; it
-lowers only the 0.99 pinball loss, by about 5% at days 3 to 7.** National Grid Electricity
+**Giving the mixture-density head of the solar-farm forecast more inputs does not lower its quantile
+score at any lead from 1 to 10 days. It lowers only the 0.99 pinball loss (the loss on the upper
+tail), by about 5% at days 3 to 7.** National Grid Electricity
 Distribution (NGED) meters six solar farms, labelled A to F. Metered solar farms research default 1
 ([experiment 300](../00300-metered-farm-best-guess-assembly/result.md), scored to 10 days by
 [experiment 310](../00310-metered-farm-long-lead-scoring/result.md)) starts from a physical model of
@@ -119,7 +123,8 @@ earlier months, and "zero history" means it trains on the other five farms only.
 
 **The verdict is partly supported, and nothing is adopted.** The extra inputs fail the research
 default's minimum gain of 0.02 points on the quantile score at every band, so the head of research
-default 1 stays as it is. The one gain is on the 0.99 pinball loss, which replicates in both halves
+default 1 stays as it is. The gain that appears is on the 0.99 pinball loss, which replicates in
+both halves
   of
 the scored year and in zero history. Scores are at leads of 12 to 252 hours (days 1 to 10), with
 quarterly refits.
@@ -137,7 +142,8 @@ quarterly refits.
 - **Arms.** "default" is experiment 310's head (plant forecast, plant spread, availability ratio,
   lagged power and its missing flag, clear-sky index, lead hours). "lead" adds the lead in whole
   days.
-  "full" adds lead, the hour and day-of-year pairs, and the irradiance spread (cloud cover itself is
+  "full" adds the lead in whole days, the hour-of-day and day-of-year sine and cosine pairs, and the
+  irradiance spread (cloud cover itself is
   not stored, and the clear-sky index was already an input). "full_pooled" and "default_pooled"
   train
   one head on all six bands. "full_shuffled" shuffles the added columns (control), and "full_nolag"
@@ -149,7 +155,8 @@ quarterly refits.
   day
   1, 6.08 (8.64; 8.68) at day 3, 7.35 (8.64; 8.73) at days 6 to 7, and 7.75 (8.64; 8.83) at days 8
   to
-  10. Zero-history default scores 5.53 at day 1 and 7.91 at days 8 to 10. Experiment 313's pure
+  10. Zero-history default scores 5.53 points at day 1 and 7.91 points at days 8 to 10. Experiment
+  313's pure
   network scores 5.34 and 8.03.
 - **C1, lead minus default, quantile score (own history).** +0.002 at day 1 to -0.006 at days 8 to
   10; every interval lies within ±0.03 points. The 0.99 pinball loss changes by at most 0.002.
@@ -161,16 +168,15 @@ quarterly refits.
   0.02
   points from day 3. The second half-year drives the rise (+0.20 at days 6 to 7); the first half-
   year
-  is flat. In zero history the change is +0.009 to +0.082.
+  is flat. In zero history the change is -0.024 to +0.082.
 - **C2, 0.99 pinball loss (own history).** -4.8% (-0.016 points, interval -0.030 to -0.006) at day
   3,
   -5.6% at days 4 to 5, -5.3% at days 6 to 7, and -2.6% (interval includes zero) at days 8 to 10;
   -1.4% and -2.4% at days 1 and 2 (intervals include zero). The change replicates: in the first
-  half-year it is -6.2% to -8.1% at days 3 to 7, and in the second half-year -3.0% to -4.2% at days
-  1
-  to 6. In zero history it is -2.9% to -4.7% at every band. Prediction P2 (3% or more, pooled over
+  half-year it is -6.2% to -8.1% at days 3 to 7, and in the second half-year -2.9% to -4.2% at days
+  1 to 7. In zero history it is -2.9% to -4.7% at every band. Prediction P2 (3% or more, pooled over
   days 3 to 10) holds at -4.6%.
-- **C3, one head for all leads (own history).** `full_pooled` minus `full`: -0.013 to +0.0 points
+- **C3, one head for all leads (own history).** `full_pooled` minus `full`: -0.024 to -0.001 points
   at days 1 to 3 and days 8 to 10, -0.035 (-0.083 to +0.014) at days 6 to 7; no interval excludes
   zero.
   `default_pooled` minus `default` is -0.015 at day 1 and -0.005 at days 8 to 10. `full_pooled`
@@ -180,12 +186,14 @@ quarterly refits.
 - **C4/C5, the network with no plant.** `pure_pooled` minus experiment 313's per-band `pure_mdn`:
   -0.04% at day 1 and -3.0% (-0.24 points, interval -0.69 to -0.03) at days 8 to 10, so one head for
   all leads closes most of experiment 313's gap: `pure_pooled` scores 0.4% above the default at days
-  8 to 10 and 0.4% below it at day 1. Adding the lead day to it (`pure_lead_pooled` minus
+  8 to 10 and 0.4% below it at day 1. Adding the lead day to `pure_pooled` (`pure_lead_pooled` minus
   `pure_pooled`) makes the score worse by 0.008 to 0.033 points (days 8 to 10 interval +0.003 to
-  +0.063). Prediction P5 (a gap under 1.5% at days 8 to 10) holds, at 0.85%, but pooling did the
+  +0.063). Prediction P5 (a gap under 1.5% at days 8 to 10) holds, at 0.85% (`pure_lead_pooled`
+  against the default), but pooling did the
   work and the lead day did not.
-- **C6, the plant forecast as a column of the no-plant network (`pure_plant`).** It differs from
-  experiment 313's pure network by -0.4% to +0.2% at every band (intervals include zero), so the
+- **C6, the plant forecast as a column of the no-plant network (`pure_plant`).** `pure_plant`
+  differs from experiment 313's pure network by -0.4% to +0.2% at every band (intervals include
+  zero), so the
   plant column adds nothing measurable to the network. Against the default it scores 0.244 points
   (3.1%) worse at days 8 to 10 (interval includes zero) and 0.012 better at day 1. Prediction P6
   holds only for the first comparison; the comparison with the default mixes in a different
@@ -198,9 +206,9 @@ quarterly refits.
   plant error adds nothing again.
 - **Lower tail (P4).** The share of actual values below the 0.01 quantile is 0.0355 for the default
   at day 1 and 0.0329 at days 8 to 10; 0.0371 and 0.0339 for `full`; 0.0358 and 0.0343 for
-  `full_pooled`; 0.0343 to 0.0347 for `pure_pooled`. Against a nominal 0.01 every arm is 3.3 to 3.7
+  `full_pooled`; 0.0343 and 0.0328 for `pure_pooled`. Against a nominal 0.01 every arm is 3.3 to 3.7
   times too high, and no arm moves it by more than 0.2 points, so P4 fails. Coverage of the 0.99
-  quantile is 0.982 to 0.986 for every arm.
+  quantile is 0.982 to 0.989 for every arm.
 
 ## Checks
 
@@ -222,8 +230,9 @@ quarterly refits.
   affects both arms of a contrast alike), no duplicate keys, no missing values, and identical row
   counts across arms. Bands d1, d2, and d4 to 5, the zero-history setting, and the interval limits
   were not re-derived. Trigger 4 did not fire: dropping any one farm
-  leaves the 0.99 change of `full` negative at days 3 to 10 (-0.0035 to -0.023). Triggers 1, 3, 6,
-  and 7 did not fire.
+  leaves the 0.99 change of `full` negative at days 3 to 10 (-0.0035 to -0.023). Triggers 1 (a
+  failed control), 3 (the mean-forecast error disagrees), 6 (an interval much wider or narrower than
+  a sister experiment's), and 7 (a later design depends on this result) did not fire.
 
 ## Method and schedule
 
@@ -236,8 +245,8 @@ quarterly refits.
 - **Rows.** Experiment 310's scored-year rows (2025-09 to 2026-08, farms A to F, 12 to 252 hours),
   common to every arm and to the floors; intervals resample the 12 scored months at 99.17%
   (Bonferroni, six planned contrasts per band and setting). The half-year intervals resample six
-  months and are coarse. The pooled arms ran in own history only; the optional arms `lead`,
-  `full_shuffled`, `full_nolag`, and `pure_plant` ran in own history only.
+  months and are coarse. The pooled arms and the arms `lead`, `full_shuffled`, `full_nolag`, and
+  `pure_plant` ran in own history only.
 - **Reuse.** The scripts import experiment 310's folder; the no-plant columns are copied from
   experiment 313.
 
@@ -246,7 +255,8 @@ quarterly refits.
 - **Leads.** The scored range is 12 to 252 hours (days 1 to 10), which covers NGED's horizon.
 - **The blend was not rescored.** The head is one of three blend members, so a head gain of 0.05
   points or more at the 0.99 quantile may shrink in the blend.
-- **Experiment 313's caveats stand.** Its intervals (-2.4% to +1.0% at day 1, -1.3% to +10.4% at
+- **Experiment 313's caveats stand.** Experiment 313's intervals (-2.4% to +1.0% at day 1, -1.3% to
+  +10.4% at
   days 8 to 10) show no detectable difference, not equivalence. Its zero-history test uses six farms
   in
   one region with one fleet-shape plant, so it cannot show whether a physical plant transfers better
