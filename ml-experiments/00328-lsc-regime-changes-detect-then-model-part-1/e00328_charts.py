@@ -108,7 +108,7 @@ def detection_curve() -> None:
 def headline() -> None:
     """B minus each arm, quantile score, injected 25% steps, with 98.75% intervals."""
     inj = r.load(pattern="inj_*.parquet").with_columns(
-        cluster=pl.col("site") + "|" + pl.col("world")
+        onset=pl.col("world").str.extract(r"_(\d{4}-\d{2})$")
     )
     inj = inj.with_columns(size=pl.col("world").str.extract(r"step_([0-9.]+)_").cast(pl.Float64))
     rows = []
@@ -120,7 +120,7 @@ def headline() -> None:
         ):
             for arm in ("C2", "D2", "C2t", "D2t"):
                 m, lo, hi = r.clustered_difference(
-                    frame=sub, cluster="cluster", arm_a="B", arm_b=arm, groups=groups
+                    frame=sub, cluster="onset", arm_a="B", arm_b=arm, groups=groups
                 )
                 rows.append(
                     {
@@ -150,7 +150,7 @@ def headline() -> None:
         + alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="#888").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     ).properties(width=WIDTH // 2 - 60, height=170).facet(row=alt.Row("size:N", title=None), column=alt.Column("rows:N", title=None)).properties(
         title=_title(title="Regime arms do not beat the recent window in the first 90 days after an injected step",
-                     subtitle="Worlds of 14 Primaries x 8 even-month onsets; 98.75% intervals resample whole worlds. Positive means the regime arm scores better than arm B.")
+                     subtitle="Worlds of 14 Primaries x 8 even-month onsets; 98.75% intervals resample the 8 onset months. Positive means the regime arm scores better than arm B.")
     )  # fmt: skip
     _save(chart, name="headline_contrasts")
 

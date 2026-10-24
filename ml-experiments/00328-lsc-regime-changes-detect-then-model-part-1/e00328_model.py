@@ -41,16 +41,18 @@ REGIME_BAND_DAYS = 60
 SCORE_FROM = datetime(2021, 9, 1, tzinfo=UTC)
 MONTHS_AFTER = 10
 PRE_REGISTERED = ("A", "B", "C1", "C2", "C2o", "D1", "D2", "D2o")
-POST_HOC = ("Ar", "C1t", "C2t", "C2ot", "D1t", "D2t", "D2ot")
+POST_HOC = ("An", "Bn", "C1n", "C2n", "C2on", "Ar", "C1t", "C2t", "C2ot", "D1t", "D2t", "D2ot")
 """Post hoc arms: `Ar` is A with the regime-band rule, and `t` arms are the C and D arms with the
 trailing 365-day bands of arm A. They separate the band rule from the regime effects."""
 ARMS = (*PRE_REGISTERED, *POST_HOC)
 BASE_OF = {
     "A": "A", "B": "B", "C1": "C1", "C2": "C2", "C2o": "C2o", "D1": "C1", "D2": "C2", "D2o": "C2o",
+    "An": "A", "Bn": "B", "C1n": "C1", "C2n": "C2", "C2on": "C2o",
     "Ar": "A", "C1t": "C1", "C2t": "C2", "C2ot": "C2o", "D1t": "C1", "D2t": "C2", "D2ot": "C2o",
 }  # fmt: skip
 RESETS = {"D1", "D2", "D2o", "D1t", "D2t", "D2ot"}
-ORACLE = {"C2o", "D2o", "C2ot", "D2ot"}
+ORACLE = {"C2o", "D2o", "C2ot", "D2ot", "C2on"}
+NO_FILTER = {"An", "Bn", "C1n", "C2n", "C2on"}
 REGIME_BANDS = {"C1", "C2", "C2o", "D1", "D2", "D2o", "Ar"}
 MODEL_DIR = c.WORK_DIR / "model"
 SPEC = GamSpec(ridge=c295.RIDGE, drift="none", capacity="fitted", final_knot="free")
@@ -89,7 +91,7 @@ def month_rows(*, cache: FeatureCache, rows: np.ndarray, cut: datetime) -> np.nd
 def known_regime(*, alarms: list[det.Alarm], cut: datetime) -> np.datetime64 | None:
     """Return the change day of the latest alarm raised at least 30 days before `cut`."""
     cut_day = np.datetime64(cut.replace(tzinfo=None), "D")
-    old = [a for a in alarms if a.alarm_day <= cut_day]
+    old = [a for a in alarms if a.alarm_day < cut_day]
     if not old:
         return None
     start = old[-1].change_day
@@ -271,6 +273,8 @@ def pass_two(
             month_end = np.datetime64(c.add_months(moment=cut, months=1).replace(tzinfo=None), "D")
             used = filter_days(days=days, daily=daily, until=month_end, reset=reset)
             level = np.array([used.get(d, 0.0) for d in day_all])
+            if arm in NO_FILTER:
+                level = np.zeros(len(day_all))
             filtered = resid0 - level
             past = (day_all < cut_day) & (day_all >= cut_day - np.timedelta64(BAND_DAYS, "D"))
             regime_start = (

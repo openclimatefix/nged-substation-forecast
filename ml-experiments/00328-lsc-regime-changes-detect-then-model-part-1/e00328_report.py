@@ -21,6 +21,11 @@ import polars as pl
 ARMS = (
     "A",
     "Ar",
+    "An",
+    "Bn",
+    "C1n",
+    "C2n",
+    "C2on",
     "B",
     "C1",
     "C2",
@@ -35,7 +40,7 @@ ARMS = (
     "D2t",
     "D2ot",
 )
-CONTRASTS = ("C1", "C2", "D1", "D2", "C2t", "D2t")
+CONTRASTS = ("C1", "C2", "D1", "D2", "C2t", "D2t", "C2n")
 GROUPS_90 = ("d0_30", "d30_90")
 LOW, HIGH = 0.625, 99.375
 N_BOOT = 4000
@@ -94,7 +99,9 @@ def main() -> None:
     """Print the report."""
     real = load(pattern="real_*.parquet")
     inj = load(pattern="inj_*.parquet").with_columns(cluster=pl.col("site") + "|" + pl.col("world"))
-    inj = inj.with_columns(size=pl.col("world").str.extract(r"step_([0-9.]+)_").cast(pl.Float64))
+    inj = inj.with_columns(onset=pl.col("world").str.extract(r"_(\d{4}-\d{2})$")).with_columns(
+        size=pl.col("world").str.extract(r"step_([0-9.]+)_").cast(pl.Float64)
+    )
     print(
         "== Injected permanent steps (even-month onsets, 14 Primaries), quantile score by arm and row group"
     )
@@ -132,6 +139,22 @@ def main() -> None:
                 }
                 print(
                     f"  B minus {arm:3s} {label:14s}: quantile score {m:+.3f} ({lo:+.3f} to {hi:+.3f}); q99 pinball*2 {m99:+.4f} ({l99:+.4f} to {h99:+.4f}); q99 exceedance B {cov['B']:.4f} vs {arm} {cov[arm]:.4f} (nominal 0.0100)"
+                )
+        for groups, label in ((GROUPS_90, "first 90 days"), (("d90_180", "d180p"), "after day 90")):
+            for arm in CONTRASTS:
+                m, lo, hi = clustered_difference(
+                    frame=sub, cluster="onset", arm_a="B", arm_b=arm, groups=groups
+                )
+                print(
+                    f"  [onset clusters, the headline interval] B minus {arm:3s} {label:14s}: {m:+.3f} ({lo:+.3f} to {hi:+.3f})"
+                )
+        for groups, label in ((GROUPS_90, "first 90 days"), (("d90_180", "d180p"), "after day 90")):
+            for arm in ("C1n", "C2n", "C2on"):
+                m, lo, hi = clustered_difference(
+                    frame=sub, cluster="onset", arm_a="Bn", arm_b=arm, groups=groups
+                )
+                print(
+                    f"  [no filter, onset clusters] Bn minus {arm:4s} {label:14s}: {m:+.3f} ({lo:+.3f} to {hi:+.3f})"
                 )
         mae = {
             arm: sub.filter((pl.col("arm") == arm) & pl.col("group").is_in(GROUPS_90))[  # ty: ignore[unsupported-operator]

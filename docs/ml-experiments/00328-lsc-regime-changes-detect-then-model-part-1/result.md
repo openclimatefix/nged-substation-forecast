@@ -73,7 +73,7 @@ verdict: not supported
 best_arm: >-
   None. The best pre-registered arm, D2 (regime effects, bands from the regime's own residuals,
   filter reset), scores 0.089 points worse than arm B (last 24 months) in the first 90 days after
-  an injected 10% step (98.75% interval 0.022 to 0.167 worse). Post hoc arm D2t (trailing bands)
+  an injected 10% step (98.75% interval 0.038 to 0.146 worse). Post hoc arm D2t (trailing bands)
   ties arm B there (B minus D2t +0.009, interval -0.023 to +0.042).
 headline: >-
   Both detectors alarm too late and too rarely for regime-specific effects to help: at one false
@@ -137,10 +137,16 @@ evidence is D8 alone.
   no mean forecast exists. The mean absolute error of the median is printed beside every score in
   `printed_report.txt` and points the same way as the quantile score.
 - Audit triggers that fired: (1) the pre-registered placebo (C arms against A at 14 Primaries with
-  no change) failed at +0.054 (C2) and +1.362 (C1); the explanation, tested, is the regime-band
-  rule (arm Ar minus A is +0.098) and stale frozen fits after false alarms, and the oracle placebo
-  C2o equals A exactly (+0.000). (5) Nested arm A beats C1 and C2 on the real records. A Sonnet
-  audit (Opus was excluded for this session) is triaged in the pull request.
+  no change) failed at +0.055 (C2) and +1.364 (C1); the explanation, tested, is the regime-band
+  rule (arm Ar minus A is +0.098) and stale frozen fits after false alarms. (5) Nested arm A beats
+  C1 and C2 on the real records.
+- A Sonnet audit (Opus was excluded for this session) re-derived the 25% step contrasts from the
+  stored forecasts and matched. Triage: the one-day look-ahead in `known_regime` (an alarm raised on
+  the origin day) was fixed and every score re-run; the filter subtracting a step twice once a
+  regime is known was tested with the no-filter arms below; the bootstrap clusters of one Primary
+  and one onset were too fine, so the headline intervals now cluster by onset (8 clusters), which
+  widens them. The oracle placebo C2o equals A by construction when no true change exists, so it
+  checks the plumbing only.
 - Leaving D8 out is not applicable to the injected contrasts, which exclude D8.
 
 ## Detection
@@ -160,23 +166,29 @@ evidence is D8 alone.
 ## Forecast
 
 - Quantile score: twice the mean pinball loss over 11 levels (0.01 to 0.99), in points of capacity.
-  Intervals are 98.75% (four pre-registered contrasts) and resample whole injected worlds.
-- Injected 10% steps, first 90 days: A 3.273, B 3.270, C2 3.389, D2 3.359. B minus C2 -0.119
-  (-0.200 to -0.049); B minus D2 -0.089 (-0.167 to -0.022); C1 and D1 are about 1.4 points worse.
-- Injected 25% steps, first 90 days: A 3.945, B 3.978, C2 4.221, D2 4.161; B minus C2 -0.243
-  (-0.334 to -0.158).
-- Post hoc, trailing bands (C2t, D2t): B minus C2t +0.003 (-0.027 to +0.035) at 10%, -0.078 (-0.134 to
-  -0.022) at 25% in the first 90 days, and +0.051 (+0.026 to +0.077) at 25% after day 90.
+  Intervals are 98.75% (four pre-registered contrasts) and resample the 8 onset months of the
+  injected worlds, or the calendar months of the real records.
+- Injected 10% steps, first 90 days: A 3.273, B 3.270, C2 3.389, D2 3.358. B minus C2 -0.118
+  (-0.200 to -0.059); B minus D2 -0.088 (-0.146 to -0.038); C1 and D1 are about 1.4 points worse.
+- Injected 25% steps, first 90 days: A 3.945, B 3.978, C2 4.231, D2 4.171; B minus C2 -0.252
+  (-0.320 to -0.181).
+- Post hoc, trailing bands (C2t, D2t): B minus C2t +0.004 (-0.034 to +0.046) at 10% and -0.081
+  (-0.183 to +0.029) at 25% in the first 90 days, and +0.051 (+0.011 to +0.092) at 25% after day 90.
+- Post hoc, no level filter on any arm: the level filter matters more than the regime effects.
+  Without it, C2 against the no-filter recent window (Bn) is +0.015 (-0.353 to +0.379) at 10% and
+  +0.782 (-0.033 to +1.508) at 25% in the first 90 days, and +0.198 (+0.066 to +0.334) and +0.859
+  (+0.419 to +1.277) after day 90. The true-date oracle gains +1.331 (+0.757 to +1.868) at 25%. Every
+  filtered arm still scores far better than every unfiltered arm (arm B 3.978, arm Bn 8.047 at 25%
+  steps, first 90 days).
 - D8, first 90 days after the break: B minus C2 -0.040 (-0.262 to +0.154); post hoc B minus C2t
   +0.065 (+0.037 to +0.129); all rows after the break B minus C2t +0.150 (-0.057 to +0.372). The
-  q99 exceedance after the break is 0.031 for arm B and 0.031 for C2t against a nominal 0.010, so
-  no arm is calibrated at D8.
+  D8 intervals rest on 3 to 4 forecast months. The q99 exceedance after the break is 0.031 for arm B
+  and 0.031 for C2t against a nominal 0.010, so no arm is calibrated at D8.
 - Primaries with no injection (14, real records): B minus A -0.021 (-0.037 to -0.004), C2t minus A
-  -0.030 (-0.047 to -0.013), D2t minus A -0.034 (-0.052 to -0.017), against the 0.01 margin.
-  C2 minus A is +0.054 (+0.018 to +0.101) and fails it.
-- Tail calibration: q01 and q99 exceedance and pinball loss are in `printed_report.txt`. Twice the
-  mean pinball loss at the 0.01 and 0.99 levels is the tail score. The tail-weighted continuous
-  ranked probability score and the curtailment cost were not computed.
+  -0.030 (-0.046 to -0.013), D2t minus A -0.033 (-0.050 to -0.016), against the 0.01 margin. C2
+  minus A is +0.055 (+0.019 to +0.102) and fails it.
+- Tail calibration: q01 and q99 exceedance and pinball loss are in `printed_report.txt`. The
+  tail-weighted continuous ranked probability score and the curtailment cost were not computed.
 
 ## Caveats and next steps
 
@@ -184,8 +196,11 @@ evidence is D8 alone.
   reading, a lagless GAM base with a simple fixed-gain level filter instead of the effects filter.
   The experiment 264 as-of band widening at D8 was not reproduced, so the success criterion for D8
   against that comparator is untested.
-- A plausible reason for the tie, not tested here, is that the level filter absorbs a step within
-  days, leaving little for regime effects to add. A follow-up could repeat the contrast without the
-  filter.
-- Next: if a regime-aware arm is revisited, use trailing bands (C2t), a detector that alarms
-  earlier, and the full Primary demand research default 3.
+- The level filter absorbs a step within days, which leaves regime effects little to add. In this
+  implementation the filter also subtracts a known step a second time once regime effects exist,
+  which biases the regime arms against themselves; the no-filter rows above remove that bias but
+  are far worse in absolute terms.
+- Next: Stage 1b of the brief (confirm each candidate regime date by whether arm C2 improves out of
+  sample on blocked time folds, then scan 60 days either side of each candidate) needs a new design
+  and is the next experiment. A regime arm that replaces the level filter, rather than stacking on
+  it, is the other untested design, and would be run on the full Primary demand research default 3.
