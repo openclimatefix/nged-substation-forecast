@@ -1,0 +1,11 @@
+Running as unit: run-p2177898-i90132051.scope; invocation ID: f4d625f0b1c14d58aabe20d658f3cc62
+r24 at LR_b20's plain k=3.5: matched 20 -> 20 (stratum+cp 9 -> 9); FA 35 -> 22; D8 FA 3->3, D9 FA 3->3
+    stratum+cp apm 6.1 -> 4.7, ratio 0.76 [0.5631824712643678, 0.9375]; pooled ratio 0.76 [0.5666566265060241, 0.9375000000000001]
+r24 at RO_b80's plain k=2.6: matched 24 -> 24 (stratum+cp 10 -> 10); FA 119 -> 83; D8 FA 17->17, D9 FA 7->7
+    stratum+cp apm 14.3 -> 10.7, ratio 0.75 [0.6387096774193549, 0.8623853211009174]; pooled ratio 0.75 [0.6369417273278738, 0.8629032258064516]
+pit24 at LR_b20's plain k=2.8: matched 22 -> 21 (stratum+cp 10 -> 10); FA 54 -> 31; D8 FA 4->3, D9 FA 1->1
+    stratum+cp apm 7.6 -> 5.2, ratio 0.68 [0.5465116279069767, 0.84375]; pooled ratio 0.72 [0.5729504982789252, 0.896]
+pit24 at RO_b80's plain k=2.4: matched 26 -> 25 (stratum+cp 12 -> 12); FA 141 -> 89; D8 FA 12->10, D9 FA 2->2
+    stratum+cp apm 13.9 -> 9.5, ratio 0.68 [0.5111641502292131, 0.906804245283019]; pooled ratio 0.71 [0.57614848826835, 0.8633185445781749]
+branches of flagged origins, r24 at k=2.6: {'flagged': 2485, 'no finite neighbour': 0, 'confirmed': 949, 'contradicted by 2+': 675, 'neither (kept)': 861}
+branches of flagged origins, pit24 at k=2.4: {'flagged': 2696, 'no finite neighbour': 0, 'confirmed': 1141, 'contradicted by 2+': 937, 'neither (kept)': 618}

@@ -390,6 +390,7 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 extra-paths = [
     "tests",
     "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
+    "ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth",
     "scripts/mkdocs_hooks",
     "studies/beam_diffuse_split",
     "studies/embedded_battery_forecast",
