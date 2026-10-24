@@ -262,13 +262,11 @@ def offset_table(*, train: pl.DataFrame, frame: pl.DataFrame) -> np.ndarray:
     residual = train.select(*keys, *[(pl.col("actual_norm") - pl.col(q)).alias(q) for q in Q])
     offsets = residual.group_by(keys).agg(
         [
-            pl.col(q).quantile(level, interpolation="linear")
+            pl.col(q).quantile(level, interpolation="linear").alias(f"{q}_offset")
             for q, level in zip(Q, common.LEVELS, strict=True)
         ]
     )
-    joined = frame.select(*keys).join(
-        offsets, on=keys, how="left", suffix="_offset", maintain_order="left"
-    )
+    joined = frame.select(*keys).join(offsets, on=keys, how="left", maintain_order="left")
     correction = joined.select([pl.col(f"{q}_offset").fill_null(0.0) for q in Q]).to_numpy()
     return np.clip(np.sort(frame.select(Q).to_numpy() + correction, axis=1), 0.0, 1.0)
 
@@ -367,8 +365,8 @@ def main() -> None:
                 pool_by_seed[seed] = apply_offsets(boosters=boosters, frame=pool_s)
             elif arm == "X3":
                 boosters = xgboost_offsets(
-                    train=pl.concat([pool_train, w_train[seed]]),
-                    validation=pl.concat([pool_val, w_val[seed]]),
+                    train=pl.concat([pool_train, w_train[seed]], how="vertical_relaxed"),
+                    validation=pl.concat([pool_val, w_val[seed]], how="vertical_relaxed"),
                     seed=seed,
                 )
                 by_seed[seed] = apply_offsets(boosters=boosters, frame=w_s[seed])
