@@ -62,10 +62,10 @@ headline: >-
 take_home_message: >-
   Adding a flexible sunshine curve to the solar part of the demand forecast does not recover the gap
   to the better-performing XGBoost model: it helps the sunniest half-hours but worsens the pooled
-  score by about 0.4%. The sunshine advantage seen in experiment 322
-  therefore does not come from a single smooth curve in clear-sky index and sun elevation. A
-  boosted-tree sunshine term could use more inputs at once, and whether to test it is a decision for
-  the research plan.
+  score by about 0.4%. The advantage seen in experiment 322 is therefore not recovered by adding a
+  smooth curve in clear-sky index and sun elevation on top of the existing level corrections, and
+  most of the harm sits in the level shift. A boosted-tree sunshine term could use more inputs at
+  once, and whether to test it is a decision for the research plan.
 lessons:
   - >-
     A tensor-product spline in clear-sky index and sun elevation recovers under 15% of the 0.30
@@ -181,7 +181,18 @@ code: ml-experiments/00323-primary-demand-default-3-flexible-sunshine-response-i
   not refitted here. The triggers for a failed control, a mean-error contrast in the other direction, a leave-one-out
   sign flip of a planned contrast, a nested arm beating its container, and an interval width
   mismatch did not fire. The trigger for a later experiment depending on this result's sign may
-  apply. No audit was run, because the brief rules out Opus.
+  apply.
+- **Audit (fresh Sonnet agent, no Opus).** It re-derived the headline contrasts from the saved arms
+  with its own code and found no method fault: pooled F1 +0.0109 and F2 +0.0156, D5 and D9 in April
+  to June -0.0440, all daylight at 0.5 to 168 hours +0.0314, D10 and D16 +0.0224, no crossing
+  quantiles, and the rebuilt default equal to the stored one to 1.5e-5. Its sunny-daylight figure
+  was -0.0934 against the page's -0.091, from a slightly different sunny-flag join, and its row count
+  was 798,236 against 798,116 because it did not join the reference forecasts. A partial test of the
+  double-counting explanation removed each row's median shift from F1 (a proxy, because the stored
+  files hold only the combined shift): the result scores -0.001 against the default at 0.5 to 240
+  hours and -0.013 at D5 and D9 in April to June daylight. Nearly all of F1's pooled harm therefore
+  sits in the level shift. This fits the double-counting explanation and does not prove it, so the
+  explanation stays untested.
 - **Limit of the test (code review).** The chain's mean is experiment 184's T-all forecast plus the
   Kalman filter's level and anomaly, and experiment 220's median correction is added afterwards. Both
   were estimated from the recent residuals of the stored fit without a response, so they may already
