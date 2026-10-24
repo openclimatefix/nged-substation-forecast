@@ -530,6 +530,16 @@ The swap lowered the median by 10.2 points of capacity (1 point is 1% of a farm'
 10 m and 100 m speeds each explained about 7 points alone. Evidence: [experiment
 261](00261-wind-low-bias-decomposition/result.md), three farms, July 2025 to June 2026.
 
+**Score a wind-farm head on the idle half-hours before using it (provisional).** The idle half-hours
+are the ones experiment 210's idle-band mask removes, where wind is near zero and the metered series
+holds a reactive-power floor. Where it applies: experiments that train a head on wind-farm rows
+after dropping those half-hours. Evidence: in
+[experiment 324](00324-wind-farm-solar-cross-breeds-long-run/result.md), a mixture-density head
+trained without the idle half-hours scored 0.27 points better than XGBoost plus the offset table on
+the other half-hours and 2.1 points worse on the 10,642 idle half-hours, so on all rows the gain was
+0.04 points (95% interval -0.12 to 0.05). We did not test training with the idle half-hours
+included. Covers the three metered wind farms, July 2025 to June 2026. Confidence: medium.
+
 ## Embedded solar capacity
 
 **Hold embedded-solar capacity as one value per Primary per season-year, and do not estimate it
