@@ -22,7 +22,10 @@ LOW_BOUND = 8.0
 
 
 def summary(*, actual: np.ndarray, q: np.ndarray, mask: np.ndarray) -> dict:
-    """Return the score, the tail rates (percent), and the q50's mean error on the masked rows."""
+    """Return the score, the tail rates (percent), and the q50 bias on the masked rows.
+
+    The bias is the q50 minus the realised demand, so a positive bias means the forecast is above it.
+    """
     a, qq = actual[mask], q[mask]
     return {
         "n": int(mask.sum()),
