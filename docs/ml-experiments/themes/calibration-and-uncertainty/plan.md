@@ -6,6 +6,7 @@
 
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
+| [335](../../00335-primary-demand-default-3-tail-calibration-at-0-5-to-240-hours/result.md) | Do per-lead-band, per-group tail calibrations bring the q01, q05, q95, q99 of Primary demand research default 3 to nominal from 0.5 to 240 hours? | 1 | Experiment 322 | Planned |
 | [P14](#p14-coupling) | Which coupling step, ECC-Q or the Schaake shuffle, gives better coherence scores at short and long leads? | 5 | The scoring harness and experiment 00016 | Deferred; no consumer needs coherent members yet |
 
 ## Planned experiments
