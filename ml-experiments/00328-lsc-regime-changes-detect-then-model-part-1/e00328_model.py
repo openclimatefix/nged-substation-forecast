@@ -1,3 +1,4 @@
+# ruff: noqa: E501, ANN001, ANN201, C416, RUF059
 r"""Stage 2: forward-chained forecasts of the arms on real records and on injected steps.
 
 Pass 1 computes, for each monthly origin, the pre-filter forecast of each base: A (all history),
@@ -18,16 +19,15 @@ import json
 import multiprocessing as mp
 import os
 import pickle
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import e00295_common as c295  # ty: ignore[unresolved-import]
-import e00295_segment as seg295  # ty: ignore[unresolved-import]
 import e00328_common as c
 import e00328_detect as d328
 import e00328_detectors as det
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_ens_weather import replace_site
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import GamSpec, TrainingWindow, fit_gam, predict_gam
@@ -103,7 +103,8 @@ def arm_c1(*, cache, site, cut, rows, target, start, fits):
         fits[str(start)] = fit_at(cache=cache, site=site, cut=r_cut, months=None)
     fit = fits[str(start)]
     regime = rows[
-        (cache.end_times[rows] > naive_utc(moment=r_cut)) & (cache.end_times[rows] <= naive_utc(moment=cut))
+        (cache.end_times[rows] > naive_utc(moment=r_cut))
+        & (cache.end_times[rows] <= naive_utc(moment=cut))
     ]
     resid = cache.sites[site].y[regime] - predict_gam(cache=cache, fit=fit, index=regime)
     table = effect_table(cell=cell_of(cache=cache, idx=regime), resid=resid)
@@ -114,7 +115,8 @@ def arm_c2(*, cache, site, cut, rows, target, start):
     """Return C2's forecast: the GAM and the regime effects fitted jointly by backfitting."""
     r_cut = datetime(*[int(x) for x in str(start).split("-")], tzinfo=UTC)
     regime = rows[
-        (cache.end_times[rows] > naive_utc(moment=r_cut)) & (cache.end_times[rows] <= naive_utc(moment=cut))
+        (cache.end_times[rows] > naive_utc(moment=r_cut))
+        & (cache.end_times[rows] <= naive_utc(moment=cut))
     ]
     y_full = cache.sites[site].y
     table = np.zeros(96)
@@ -148,15 +150,25 @@ def pass_one(
         if len(target) == 0:
             continue
         try:
-            pa = predict_gam(cache=cache, fit=fit_at(cache=cache, site=site, cut=cut, months=None), index=target)
-            pb = predict_gam(cache=cache, fit=fit_at(cache=cache, site=site, cut=cut, months=c.WINDOW_MONTHS), index=target)
+            pa = predict_gam(
+                cache=cache, fit=fit_at(cache=cache, site=site, cut=cut, months=None), index=target
+            )
+            pb = predict_gam(
+                cache=cache,
+                fit=fit_at(cache=cache, site=site, cut=cut, months=c.WINDOW_MONTHS),
+                index=target,
+            )
         except ValueError:
             continue
         streams[cut] = {"idx": target, "A": pa, "B": pb}
     times = np.concatenate([cache.end_times[s["idx"]] for s in streams.values()])
     resid = np.concatenate([cache.sites[site].y[s["idx"]] - s["B"] for s in streams.values()])
     days, means = det.daily_means(end_times=times, residual=resid)
-    alarms = det.cusum_alarms(days=days, means=means, h=json.loads((c.WORK_DIR / "chosen_detectors.json").read_text())["rolling_gam"])
+    alarms = det.cusum_alarms(
+        days=days,
+        means=means,
+        h=json.loads((c.WORK_DIR / "chosen_detectors.json").read_text())["rolling_gam"],
+    )
     fits: dict[str, object] = {}
     for cut in months:
         if cut not in streams:
@@ -170,17 +182,27 @@ def pass_one(
         s["regime_start"] = None if start is None else str(start)
         s["C1"], s["C2"] = s["A"], s["A"]
         if start is not None:
-            s["C1"] = arm_c1(cache=cache, site=site, cut=cut, rows=rows, target=target, start=start, fits=fits)
+            s["C1"] = arm_c1(
+                cache=cache, site=site, cut=cut, rows=rows, target=target, start=start, fits=fits
+            )
             s["C2"] = arm_c2(cache=cache, site=site, cut=cut, rows=rows, target=target, start=start)
         s["C2o"] = s["A"]
-        if truth is not None and (np.datetime64(cut.replace(tzinfo=None), "D") - truth) / np.timedelta64(1, "D") >= 14:
-            s["C2o"] = arm_c2(cache=cache, site=site, cut=cut, rows=rows, target=target, start=truth)
+        if (
+            truth is not None
+            and (np.datetime64(cut.replace(tzinfo=None), "D") - truth) / np.timedelta64(1, "D")
+            >= 14
+        ):
+            s["C2o"] = arm_c2(
+                cache=cache, site=site, cut=cut, rows=rows, target=target, start=truth
+            )
         out[cut] = s
-    out["alarms"] = [(str(a.alarm_day), str(a.change_day)) for a in alarms]  # type: ignore[index]
+    out["alarms"] = [(str(a.alarm_day), str(a.change_day)) for a in alarms]  # type: ignore[index]  # ty: ignore[invalid-assignment]
     return out
 
 
-def filter_days(*, days: np.ndarray, daily: np.ndarray, until: np.datetime64, reset: np.datetime64 | None):
+def filter_days(
+    *, days: np.ndarray, daily: np.ndarray, until: np.datetime64, reset: np.datetime64 | None
+):
     """Run the fixed-gain local-level filter; return `{day: state used for that day's forecast}`.
 
     The state before a day sees only earlier days' mean residuals. With a reset day the state
@@ -220,7 +242,10 @@ def pass_two(
     t_all = cache.end_times[idx_all]
     day_all = c.day_of(end_times=t_all)
     start = t_all - np.timedelta64(1, "s")
-    band_all = (((start - start.astype("datetime64[D]").astype("datetime64[us]")) // np.timedelta64(1, "h")) // 6).astype(int)
+    band_all = (
+        ((start - start.astype("datetime64[D]").astype("datetime64[us]")) // np.timedelta64(1, "h"))
+        // 6
+    ).astype(int)
     out: list[dict] = []
     for arm in ARMS:
         p_all = np.concatenate([streams[k][BASE_OF[arm]] for k in cuts])
@@ -234,16 +259,28 @@ def pass_two(
             cut_day = np.datetime64(cut.replace(tzinfo=None), "D")
             reset = None
             if arm in RESETS:
-                reset = truth if arm in ORACLE else (np.datetime64(s["regime_start"]) if s.get("regime_start") else None)
-                if arm in ORACLE and not (truth is not None and (cut_day - truth) / np.timedelta64(1, "D") >= 14):
+                reset = (
+                    truth
+                    if arm in ORACLE
+                    else (np.datetime64(s["regime_start"]) if s.get("regime_start") else None)
+                )
+                if arm in ORACLE and not (
+                    truth is not None and (cut_day - truth) / np.timedelta64(1, "D") >= 14
+                ):
                     reset = None
             month_end = np.datetime64(c.add_months(moment=cut, months=1).replace(tzinfo=None), "D")
             used = filter_days(days=days, daily=daily, until=month_end, reset=reset)
             level = np.array([used.get(d, 0.0) for d in day_all])
             filtered = resid0 - level
             past = (day_all < cut_day) & (day_all >= cut_day - np.timedelta64(BAND_DAYS, "D"))
-            regime_start = reset if reset is not None else (np.datetime64(s["regime_start"]) if s.get("regime_start") else None)
-            if arm in ORACLE and not (truth is not None and (cut_day - truth) / np.timedelta64(1, "D") >= 14):
+            regime_start = (
+                reset
+                if reset is not None
+                else (np.datetime64(s["regime_start"]) if s.get("regime_start") else None)
+            )
+            if arm in ORACLE and not (
+                truth is not None and (cut_day - truth) / np.timedelta64(1, "D") >= 14
+            ):
                 regime_start = None
             use = past
             if (arm in REGIME_BANDS and regime_start is not None
@@ -260,8 +297,20 @@ def pass_two(
             e = y[:, None] - q
             pinball = np.maximum(LEVELS * e, (LEVELS - 1) * e)
             day_now = day_all[now]
-            since = (day_now - truth) / np.timedelta64(1, "D") if truth is not None else np.full(len(y), np.nan)
-            group = np.where(np.isnan(since), "all", np.select([since < 0, since < 30, since < 90, since < 180], ["pre", "d0_30", "d30_90", "d90_180"], "d180p"))
+            since = (
+                (day_now - truth) / np.timedelta64(1, "D")
+                if truth is not None
+                else np.full(len(y), np.nan)
+            )
+            group = np.where(
+                np.isnan(since),
+                "all",
+                np.select(
+                    [since < 0, since < 30, since < 90, since < 180],
+                    ["pre", "d0_30", "d30_90", "d90_180"],
+                    "d180p",
+                ),
+            )
             for g in np.unique(group):
                 m = group == g
                 out.append({
@@ -293,33 +342,57 @@ def job(args: tuple[str, str, int, int, float, str]) -> str:
         onset = datetime(year, month, 1, tzinfo=UTC)
         base_pickle = MODEL_DIR / f"real_{site}.pkl"
         spliced = pickle.loads(base_pickle.read_bytes())
-        before = (cache.end_times <= naive_utc(moment=onset)) & (cache.end_times > naive_utc(moment=onset) - np.timedelta64(365, "D"))
+        before = (cache.end_times <= naive_utc(moment=onset)) & (
+            cache.end_times > naive_utc(moment=onset) - np.timedelta64(365, "D")
+        )
         y_site = cache.sites[site].y
         if np.isfinite(y_site[before]).sum() < 0.5 * 17520:
             return f"{site} {world}: too little history"
         level = float(np.nanmean(y_site[before]))
         delta = np.where(cache.end_times > naive_utc(moment=onset), size * level, 0.0)
-        use_cache = replace_site(cache=cache, site=site, y=np.nan_to_num(y_site, nan=np.nan) + delta)
+        use_cache = replace_site(
+            cache=cache, site=site, y=np.nan_to_num(y_site, nan=np.nan) + delta
+        )
         truth = np.datetime64(onset.replace(tzinfo=None), "D")
         delta_start = onset
-        months = [m for m in allm if m <= c.add_months(moment=onset, months=MONTHS_AFTER) and m <= c.LAST_CUT]
+        months = [
+            m
+            for m in allm
+            if m <= c.add_months(moment=onset, months=MONTHS_AFTER) and m <= c.LAST_CUT
+        ]
         score_months = [m for m in months if m >= onset]
     if target.exists():
         return f"{site} {world}: exists"
-    stream_file = MODEL_DIR / (f"real_{site}.pkl" if kind == "real" else f"inj_{site}_{size:.2f}_{year}_{month:02d}.pkl")
+    stream_file = MODEL_DIR / (
+        f"real_{site}.pkl" if kind == "real" else f"inj_{site}_{size:.2f}_{year}_{month:02d}.pkl"
+    )
     if stream_file.exists():
         streams = pickle.loads(stream_file.read_bytes())
         alarms = streams.pop("alarms", [])
     else:
-        streams = pass_one(cache=use_cache, site=site, months=months, truth=truth, spliced=spliced, delta_start=delta_start)
-        alarms = streams.pop("alarms")  # type: ignore[arg-type]
+        streams = pass_one(
+            cache=use_cache,
+            site=site,
+            months=months,
+            truth=truth,
+            spliced=spliced,
+            delta_start=delta_start,
+        )
+        alarms = streams.pop("alarms")  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
         MODEL_DIR.mkdir(parents=True, exist_ok=True)
         tmp = stream_file.with_name(f"{stream_file.name}.{os.getpid()}.tmp")
         tmp.write_bytes(pickle.dumps({**streams, "alarms": alarms}))
         tmp.rename(stream_file)
-    rows = pass_two(cache=use_cache, site=site, streams=streams, truth=truth, score_months=score_months, world=world)
+    rows = pass_two(
+        cache=use_cache,
+        site=site,
+        streams=streams,
+        truth=truth,
+        score_months=score_months,
+        world=world,
+    )
     frame = pl.DataFrame(rows)
-    d328._atomic(frame=frame, path=target)  # noqa: SLF001
+    d328._atomic(frame=frame, path=target)
     return f"{site} {world}: {frame.height} rows, {len(alarms)} alarms"
 
 
@@ -335,7 +408,14 @@ def main() -> None:
     if args.stage == "real":
         jobs = [("real", s, 0, 0, 0.0, "") for s in sites]
     else:
-        jobs = [("inj", s, y, m, size, p) for s in sites if s != "D8" for (y, m, p) in d328.ONSETS if p == "report" for size in c.STEP_SIZES]
+        jobs = [
+            ("inj", s, y, m, size, p)
+            for s in sites
+            if s != "D8"
+            for (y, m, p) in d328.ONSETS
+            if p == "report"
+            for size in c.STEP_SIZES
+        ]
     if args.count:
         jobs = jobs[: args.count]
     with mp.get_context("spawn").Pool(args.workers) as pool:

@@ -1,3 +1,4 @@
+# ruff: noqa: E501, ANN001, ANN201
 r"""Stage 1: run the rolling-GAM CUSUM detector and the weekly-histogram detector.
 
 Stage `base` writes each Primary's out-of-sample residual (a monthly refit of the lagless GAM on
@@ -17,7 +18,7 @@ import argparse
 import json
 import multiprocessing as mp
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import e00295_common as c295  # ty: ignore[unresolved-import]
 import e00295_segment as seg295  # ty: ignore[unresolved-import]
@@ -25,7 +26,7 @@ import e00328_common as c
 import e00328_detectors as det
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_features import naive_utc
 
 BASE_DIR = c.WORK_DIR / "base"
@@ -88,7 +89,10 @@ def base_job(site: str) -> str:
     out: list[dict] = []
     for h in c.CUSUM_H_GRID:
         out += alarms_frame(
-            site=site, detector="rolling_gam", param=h, alarms=det.cusum_alarms(days=days, means=means, h=h)
+            site=site,
+            detector="rolling_gam",
+            param=h,
+            alarms=det.cusum_alarms(days=days, means=means, h=h),
         )
     for beta in c.HISTOGRAM_BETA_GRID:
         out += alarms_frame(
@@ -98,7 +102,16 @@ def base_job(site: str) -> str:
             alarms=det.histogram_alarms(weeks=weeks, features=features, beta=beta),
         )
     BASE_DIR.mkdir(parents=True, exist_ok=True)
-    frame = pl.DataFrame(out, schema={"site": pl.String, "detector": pl.String, "param": pl.Float64, "alarm_day": pl.String, "change_day": pl.String})
+    frame = pl.DataFrame(
+        out,
+        schema={
+            "site": pl.String,
+            "detector": pl.String,
+            "param": pl.Float64,
+            "alarm_day": pl.String,
+            "change_day": pl.String,
+        },
+    )
     _atomic(frame=frame, path=BASE_DIR / f"{site}_alarms.parquet")
     tmp = BASE_DIR / f"{site}.{os.getpid()}.tmp.npz"
     np.savez(tmp, times=times, power=power, resid=resid, weeks=weeks, features=features)
@@ -142,13 +155,19 @@ def inject_job(args: tuple[str, int, int, str]) -> str:
         resid = np.concatenate([base["resid"][old], r_new])
         days, means = det.daily_means(end_times=times, residual=resid)
         for h in c.CUSUM_H_GRID:
-            alarms = [a for a in det.cusum_alarms(days=days, means=means, h=h) if a.alarm_day >= onset64]
-            results.append(score(site, "rolling_gam", h, onset, parity, shape, size, alarms, onset64))
+            alarms = [
+                a for a in det.cusum_alarms(days=days, means=means, h=h) if a.alarm_day >= onset64
+            ]
+            results.append(
+                score(site, "rolling_gam", h, onset, parity, shape, size, alarms, onset64)
+            )
         # weekly features: reuse the baseline weeks before the onset week, recompute from there
         onset_week = onset64.astype("datetime64[D]").astype(np.int64) // 7 * 7
         keep = base["weeks"].astype(np.int64) < onset_week
         late = c.day_of(end_times=times).astype(np.int64) >= onset_week
-        w_new, f_new = det.weekly_features(end_times=times[late], power=power[late], residual=resid[late])
+        w_new, f_new = det.weekly_features(
+            end_times=times[late], power=power[late], residual=resid[late]
+        )
         weeks = np.concatenate([base["weeks"][keep], w_new])
         features = np.vstack([base["features"][keep], f_new])
         first = max(2 * c.HISTOGRAM_MIN_WEEKS, int(keep.sum()) - 2)
@@ -161,7 +180,9 @@ def inject_job(args: tuple[str, int, int, str]) -> str:
                 for a in alarms
                 if abs((a.change_day - onset64) / np.timedelta64(1, "D")) <= c.HISTOGRAM_MATCH_DAYS
             ]
-            results.append(score(site, "histogram", beta, onset, parity, shape, size, near, onset64))
+            results.append(
+                score(site, "histogram", beta, onset, parity, shape, size, near, onset64)
+            )
     _atomic(frame=pl.DataFrame(results), path=target)
     return f"{site} {year}-{month}: {len(results)} rows"
 
@@ -183,8 +204,12 @@ def score(site, detector, param, onset, parity, shape, size, alarms, onset64) ->
         "shape": shape,
         "size": size,
         "detected": hit is not None,
-        "delay_days": None if hit is None else float((hit.alarm_day - onset64) / np.timedelta64(1, "D")),
-        "date_error_days": None if hit is None else float((hit.change_day - onset64) / np.timedelta64(1, "D")),
+        "delay_days": None
+        if hit is None
+        else float((hit.alarm_day - onset64) / np.timedelta64(1, "D")),
+        "date_error_days": None
+        if hit is None
+        else float((hit.change_day - onset64) / np.timedelta64(1, "D")),
         "n_alarms_after_onset": len(alarms),
     }
 
@@ -205,7 +230,7 @@ def main() -> None:
     if args.count:
         jobs = jobs[: args.count]
     with mp.get_context("spawn").Pool(args.workers) as pool:
-        for line in pool.imap_unordered(fn, jobs, chunksize=1):
+        for line in pool.imap_unordered(fn, jobs, chunksize=1):  # ty: ignore[invalid-argument-type]
             print(line, flush=True)
 
 

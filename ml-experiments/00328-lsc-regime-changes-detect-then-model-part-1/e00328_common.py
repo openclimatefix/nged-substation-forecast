@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Shared constants and helpers of experiment 328 (detect permanent regime changes, then model them).
 
 Every earlier experiment's files are read and never written. This experiment writes only under its
@@ -69,6 +70,12 @@ def out_of_sample_residual(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Fit the lagless GAM on the 24 months before `cut`, return the month after `cut`.
 
+    Args:
+        cache: The feature cache.
+        site: The Primary's label.
+        cut: The first of the month, the forecast origin.
+        rows: The grid rows with a reading and finite model inputs.
+
     Returns:
         The row indices of the month after `cut`, the readings, and the residual (reading minus
         forecast) in points of effective capacity. Empty arrays when the month has no rows or the
@@ -81,9 +88,7 @@ def out_of_sample_residual(
     if len(target) == 0:
         return target, empty, empty
     try:
-        pred = c295.fit_and_predict(
-            cache=cache, site=site, cut=cut, window=window(), index=target
-        )
+        pred = c295.fit_and_predict(cache=cache, site=site, cut=cut, window=window(), index=target)
     except ValueError:  # no training rows before this cut
         return target[:0], empty, empty
     y = cache.sites[site].y[target]

@@ -68,7 +68,9 @@ def cusum_alarms(*, days: np.ndarray, means: np.ndarray, h: float) -> list[Alarm
             start = up_start if up > h else down_start
             alarms.append(Alarm(alarm_day=days[t], change_day=days[start]))
             up = down = 0.0
-            quiet_until = int(np.searchsorted(days, days[t] + np.timedelta64(c.REFRACTORY_DAYS, "D")))
+            quiet_until = int(
+                np.searchsorted(days, days[t] + np.timedelta64(c.REFRACTORY_DAYS, "D"))
+            )
     return alarms
 
 
@@ -117,9 +119,7 @@ def histogram_alarms(
     for origin in origins if origins is not None else range(2 * c.HISTOGRAM_MIN_WEEKS, n):
         part = features[: origin + 1]
         sigma = c295.noise_scale(values=part)
-        starts = c295.segment(
-            values=part, sigma=sigma, beta=beta, min_length=c.HISTOGRAM_MIN_WEEKS
-        )
+        starts = c295.segment(values=part, sigma=sigma, beta=beta, min_length=c.HISTOGRAM_MIN_WEEKS)
         for s in starts:
             if s > origin - c.HISTOGRAM_MIN_WEEKS:
                 continue
