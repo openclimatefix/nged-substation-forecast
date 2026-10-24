@@ -51,9 +51,29 @@ decision_rule: >-
   equal R0 within 0.001); and a leakage check (every weight uses only the row time and the cut,
   and `fit_gam` rejects rows after the cut). Hyperparameters per arm (ridge in 0.03, 0.1, 0.3 and
   Kalman gain in 0.05, 0.10, 0.20) are chosen on the selection half and scored on the other half.
-  Verdict `supported` when the prediction holds, `not supported` when R0 or W24 matches the best
-  half-life (two-sided interval of the difference includes values within 0.02), `small gain` when
-  the interval excludes zero but the gain is under 0.02, `inconclusive` otherwise.
+  Every arm, R0 and W24 included, gets the same grid of 9 settings. The two-way cross-fit (select
+  on odd months, score even; select on even, score odd) is a cross-check and not a leakage-free
+  evaluation, because the selection half's refits train on rows of the scored half's months. C1
+  to C3 use the pooled cross-fit predictions, so each month is scored with the setting and
+  half-life chosen on the other half, and the bootstrap does not resample that selection. The
+  Kalman level for a day uses only earlier days' mean residuals and is never reset, and each
+  month's quantile offsets come from the arm's filtered residuals of the previous 365 days, in
+  four six-hour bands; the leakage check covers both. The bootstrap resamples whole calendar
+  months across all Primaries together, with 4000 replicates. Winter (December to February),
+  D8, and the effective number of winters per arm (the winter weight's effective sample size
+  divided by the rows in one winter) are reported. The scored lead is the month after each
+  origin, not 1 to 10 days, because the fit does not depend on lead on past weather; this is
+  stated as a caveat. If the reproduction gate fails, the run stops and the cause is found
+  before any arm is scored. The known-answer test passes when the pooled H3 minus R0 interval
+  over the first 90 days after the step lies below zero. Decision table, in order: (a) `supported`:
+  C1 point at most -0.02 with the interval wholly below zero, C2 bound under +0.01, and the
+  best half-life non-inferior to R0 at the pooled level and at every Primary except D8
+  (a Primary that fails triggers a look, per the research-default rule); (b) `partly supported`:
+  as (a) but the best half-life is worse than W24 by more than 0.01; (c) `small gain`: the C1
+  interval is wholly below zero but the point is above -0.02; (d) `not supported`: the C1
+  interval includes zero, or R0 or W24 is within 0.02 of the best half-life by the two-sided
+  interval of either difference; (e) `inconclusive` otherwise. D8's q99 coverage after the break
+  is descriptive (one break cannot support or fail a prediction).
 benchmark: >-
   R0 (equal weights, full history) and W24 (last 24 months), both with the same Kalman filter and
   bands; `manual_heuristic` and `climatology` as references.
