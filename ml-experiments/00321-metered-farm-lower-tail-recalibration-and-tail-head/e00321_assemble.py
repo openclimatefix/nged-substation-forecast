@@ -89,7 +89,7 @@ def read_assembled(*, band: str, setting: str, arm: str) -> pl.DataFrame:
 
 
 def blend_with(*, band: str, setting: str, head: pl.DataFrame) -> pl.DataFrame:
-    """Return research default 1's rolling blend with `head` (rows keyed like the components) as the mixture member."""
+    """Return research default 1's rolling blend with `head` in place of its mixture member."""
     gam = b310.load_component(band=band, setting=setting, arm="gam")
     xgb = b310.load_component(band=band, setting=setting, arm="xgb")
     frames = {"gam": gam, "head": head.select(*KEYS, "lead_hours", "actual", *QCOLS), "xgb": xgb}

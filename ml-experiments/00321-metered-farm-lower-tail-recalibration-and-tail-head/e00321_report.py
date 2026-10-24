@@ -1,7 +1,7 @@
 # ruff: noqa
 """Print the tables whose numbers `result.md` quotes, from the score tables of experiment 321.
 
-    PYTHONPATH=ml-experiments/00321-metered-farm-lower-tail-recalibration-and-tail-head \
+    PYTHONPATH=ml-experiments/00321-* \
         uv run --no-sync python ml-experiments/00321-*/e00321_report.py
 """
 
