@@ -30,10 +30,10 @@ import e00318_fit as f318  # ty: ignore[unresolved-import]
 import e00321_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from scipy.special import ndtr
 from studies.tail_calibration import level_column
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 N_PROCESSES: Final[int] = 8
 SHUFFLE_SEED_OFFSET: Final[int] = 2_000
