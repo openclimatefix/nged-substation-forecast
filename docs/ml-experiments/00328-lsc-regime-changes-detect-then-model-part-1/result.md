@@ -13,11 +13,11 @@ size: >-
   write-up review and a Sonnet prose review (Sonnet only, by the maintainer's instruction).
   Stored: private tables under data/ml-experiments/00328-*/ only (the regime log is a table in
   that folder). Serving path: not touched. Degradation rule: not touched. Designs: more than one is
-defensible (two statistical detectors plus dates from the Embedded Capacity Register, and five
+  defensible (two statistical detectors plus dates from the Embedded Capacity Register, and five
   pre-registered arms), each fixed below before any score is read.
   Callers: this folder's scripts, which call the reviewed `studies.dp_gam` functions and the code
-  of experiments 295 and 297 unchanged; the only change under `packages/` is a reviewed addition to
-  `studies.ecr_reader` that returns the connection date.
+  of experiments 295 and 297 unchanged. No change under `packages/`; the Embedded Capacity Register
+  connection dates come from experiment 191's stored asset table.
 hypothesis: >-
   A permanent change in the configuration of an electricity network (a large new generator, a new
   factory) can be found offline from a Primary's own history, and a forecast that keeps the effects
@@ -94,7 +94,7 @@ lessons:
     injected change, because every false alarm leaves a stale fit.
 take_home_message: >-
   Adding effects for a detected permanent change does not forecast better than refitting the
-additive model on the last 24 months, in a lab setting where the model is given past weather. The
+  additive model on the last 24 months, in a lab setting where the model is given past weather. The
   detectors find a 10% step of a
   Primary's load within 60 days only 26% of the time at an acceptable false-alarm rate, so there
   is little time after the alarm for the extra effects to help. On this base, handling a regime
@@ -110,7 +110,7 @@ advice:
     score by 0.098 points on Primaries with no change (Ar minus A, real records).
   - >-
     Do not rely on the rolling lagless GAM detector (a cumulative sum of its daily forecast
-errors) for steps under 15% of load: it finds 26% of 10% steps within 60 days at one false
+    errors) for steps under 15% of load: it finds 26% of 10% steps within 60 days at one false
     change per Primary-year (detection
     table).
 ---
