@@ -31,7 +31,7 @@ prediction: >-
   the blend's gain on sunny daylight, and is at least 8% better than the manual heuristic at 168 to
   240 hours; cold winter nights equal the default exactly. If D1 keeps under 50% of the gain, the
   gain sits at night and the daylight gate is wrong. (PD3) The member share P (flag: at least half of
-  the members below 3 C) flags at least 65% of realised cold winter nights at 168 to 240 hours
+  the members below 3 °C) flags at least 65% of realised cold winter nights at 168 to 240 hours
   (against 31% to 52% for the ensemble-mean rule) with a false-flag rate no more than twice the base
   rate of cold nights, D3 adds at least 0.02 points over D1 at 168 to 240 hours, and cold winter
   nights are harmed by under 0.03 points. If P flags under 50% of cold nights, D1 stands. (PG) In
@@ -77,28 +77,28 @@ take_home_message: >-
   when it is used only by day, which is the version with no harm on the coldest winter nights.
   Counting how many of the 51 ensemble members are cold finds 72% of those nights (the ensemble
   mean finds 41%), and a hard switch on that count keeps the whole 4% with almost no cold-night
-  harm, but it was not pre-registered. The sunshine response of the depth-1 XGBoost refit explains
-  about half of its advantage on the worst April-to-June half-hours in both years, so a flexible
+  harm, but that switch was not pre-registered. The sunshine response of the depth-1 XGBoost refit explains
+  about half of the refit's advantage on the worst April-to-June half-hours in both years, so a flexible
   sunshine term in the convex fit is worth testing.
 lessons:
   - >-
     The heuristic blend gains at night as well as by day: 0.111 points on night half-hours and 0.166
     on daylight half-hours at 168 to 240 hours, so a daylight gate keeps only 55% of it.
   - >-
-    The share of ensemble members below 3 C flags 72% of realised cold winter nights at 168 to 240
+    The share of ensemble members below 3 °C flags 72% of realised cold winter nights at 168 to 240
     hours at a false-flag rate of 1.8 times the base rate, against 41% for the ensemble-mean rule.
   - >-
-    A smooth member-share weight fitted on pinball loss leaves cold winter nights harmed by 0.069
+    A smooth member-share weight (D3) fitted on pinball loss leaves cold winter nights harmed by 0.069
     points, while a hard switch (post hoc) leaves 0.008.
   - >-
     The sunshine graft recovers 0.50 (0.34 to 0.67) of the refit's advantage at D5 and D9 in April
     and June 2025; the recent-power and calendar grafts recover none.
 advice:
   - >-
-    Use the daylight-only blend (Primary demand research default 3) as the base for 7 to 10 day
-    demand experiments, and compare any night blend with it at 168 to 240 hours (stage 1).
+    Consider the daylight-only blend (Primary demand research default 3) as the base for 7 to 10 day
+    demand experiments, and compare any night blend with the daylight-only blend at 168 to 240 hours (stage 1).
   - >-
-    Gate a night blend on the share of ensemble members below 3 C with a hard switch, not on the
+    Consider gating a night blend on the share of ensemble members below 3 °C with a hard switch (D3b), not on the
     ensemble mean, and pre-register it with the replicate-year cold nights pooled so the cold-night
     bound can fall under 0.05 points (D3b in "Checks and caveats").
   - >-
@@ -113,23 +113,19 @@ code: ml-experiments/00322-primary-demand-default-2-daylight-only-heuristic-blen
 
 ## Take-home message
 
-**Using the manual-heuristic blend only by day keeps no harm on cold winter nights but gives up
-nearly half of the blend's gain, and a hard switch on the share of cold ensemble members looks
-better.** Primary demand research default 2 is our research demand forecast for six Primary
+**Using the manual-heuristic blend only by day causes no harm on cold winter nights but gives up
+nearly half of the blend's gain, and a hard switch on the share of cold ensemble members keeps the whole gain with almost no cold-night harm, though that switch was not pre-registered.** Primary demand research default 2 is our research demand forecast for six Primary
 substations (anonymised as D5, D9, D10, D11, D14, and D16), up to 10 days ahead. Experiment
 [319](../00319-primary-demand-default-1-solar-summary-and-heuristic-blend-at-7-to-10-days/result.md)
-found that blending its median with the manual heuristic's median lowers the quantile score (twice
-the mean pinball loss over 11 quantiles, in points of the substation's effective capacity) by 4.5%
+found that blending the median of Primary demand research default 2 with the median of the manual heuristic (NGED's rule of thumb, built from the same half-hour in earlier weeks and years) lowers the quantile score (twice
+the mean pinball loss over 11 quantiles, in percentage points of the substation's capacity) by 4.5%
 at 168 to 240 hours, and experiment
 [320](../00320-primary-demand-default-2-night-aware-heuristic-blend-and-night-band-width/result.md)
-found that the blend harms cold winter nights. We asked whether confining the blend to daylight
-half-hours (D1) removes the harm, whether a night weight built from the share of the 51 ensemble
-members below 3 C (D3) recovers the night gain without the harm, and whether the sunshine graft of
+found that the blend harms cold winter nights (winter half-hours after dark, from 18:00 to 06:30 local time, that turn out to have a 24-hour mean temperature under 2 °C). We asked whether confining the blend to daylight
+half-hours (the daylight-only blend, D1) removes the harm, whether a night weight built from the share of the 51 ensemble
+members below 3 °C (D3) recovers the night gain without the harm, and whether the sunshine graft of
 experiment [316](../00316-primary-demand-night-level-and-single-input-terms/result.md) replicates.
-D1 gives -0.075 points (99.5% interval -0.151 to -0.028) at 168 to 240 hours, 55% of the blend's
--0.136, and is 11.0% better than the manual heuristic. D3 keeps the whole gain (-0.135) and harms
-cold winter nights by +0.069 points, over the 0.05 tolerance. The sunshine graft recovers 0.50 of
-the refit's advantage at D5 and D9 in April and June 2025.
+D1 lowers the score by 0.075 points (99.5% interval 0.028 to 0.151) at 168 to 240 hours, against the default's 3.152, which is 55% of the all-hours blend's 0.136, and is 11.0% better than the manual heuristic. D3 keeps the whole gain (0.135 points) and raises the score on cold winter nights by 0.069 points, over the 0.05-point bound on harm there. The sunshine graft (the sunshine response of a depth-1 XGBoost refit, added to the convex fit's forecast) recovers 0.50 of the refit's advantage over the convex fit at D5 and D9 in April and June 2025.
 
 **Verdict: partly supported.** D1 meets the five adoption conditions and becomes Primary demand
 research default 3. D3 fails the cold-night bound. Lead range: 0.5 to 240 hours for stages 1 and 2,
@@ -152,7 +148,7 @@ research default 3. D3 fails the cold-night bound. Lead range: 0.5 to 240 hours 
 
 - **Reproduction gate passed.** The default scores 2.749 at 0.5 to 240 hours and 3.152 at 168 to 240
   hours, as in experiment 319. All arms equal the default below 168 hours.
-- **Single families at 168 to 240 hours (stage 1 row set, 236,909 half-hours):** default 3.152
+- **Single forecast sources at 168 to 240 hours (stage 1 row set, 236,909 half-hours):** default 3.152
   (2.940 to 3.391), manual heuristic 3.456, climatology 3.663, all-hours blend 3.016, D1 3.077, D2
   3.013, D3 3.017. D1's added value over the best single family (the default) is -0.075 (99.5%
   interval -0.151 to -0.028). At 0.5 to 240 hours D1 scores 2.727 against 2.749 (-0.022, -0.044 to
@@ -165,7 +161,7 @@ research default 3. D3 fails the cold-night bound. Lead range: 0.5 to 240 hours 
   and none of the night gain.
 - **D2 (day and night weights refitted separately):** -0.139 pooled and +0.112 on cold winter nights
   (bound +0.230). Freeing the night weight reproduces the harm, as predicted.
-- **The member-share rule (flag: at least half of the members below 3 C) at 168 to 240 hours:**
+- **The member-share rule (flag: at least half of the members below 3 °C) at 168 to 240 hours:**
   flags 71.6% of the 2,384 realised cold winter-night half-hours (83%, 74%, and 61% in the three
   24-hour bands) against 40.5% for the ensemble-mean rule, at a false-flag rate of 8.4% against a
   base rate of 4.6% (1.7 to 1.9 times). The prediction (at least 65%, at most twice the base rate)
@@ -173,7 +169,7 @@ research default 3. D3 fails the cold-night bound. Lead range: 0.5 to 240 hours 
 - **D3:** -0.135 pooled, -0.059 against D1 (99.5% interval -0.130 to -0.015, so at least the 0.02
   predicted), and +0.069 on cold winter nights (bound +0.164), over the 0.03 predicted and the 0.05
   tolerance. D3 is not adopted.
-- **D3b (post hoc, not pre-registered):** the experiment 319 blend everywhere except on half-hours
+- **D3b (D3 with a hard switch; post hoc, not pre-registered):** the experiment 319 blend everywhere except on half-hours
   the member-share rule flags as cold winter nights, where the chain alone is kept. D3b scores -0.134
   pooled (99.5% interval -0.228 to -0.054), 12.7% better than the heuristic, and +0.008 on cold
   winter nights (one-sided 95% bound +0.061, point estimate under the 0.05 tolerance but the bound
@@ -193,15 +189,13 @@ research default 3. D3 fails the cold-night bound. Lead range: 0.5 to 240 hours 
 - **Stage 3, sunshine graft (0.5 to 168 hours, worst quarter of daylight half-hours by arm D's own
   score).** At D5 and D9 pooled (5,521 half-hours, 11 ISO weeks) in April and June 2025, the sunshine
   graft recovers 0.50 (95% interval 0.34 to 0.67) of the refit's advantage, the recent-power graft
-  -0.15 (-0.23 to -0.08), the calendar graft 0.01 (-0.02 to 0.04), temperature 0.17, and all five
-  families 0.50. The same selection in April to June 2026 gives 0.35 (0.29 to 0.42), -0.08, -0.02,
+  -0.15 (-0.23 to -0.08), the calendar graft 0.01 (-0.02 to 0.04), temperature 0.17, and all families together 0.50. The same selection in April to June 2026 gives 0.35 (0.29 to 0.42), -0.08, -0.02,
   0.13, and 0.50. By Primary the sunshine graft recovers 0.44 at D5 (0.32 to 0.57) and 0.93 at D9
   (interval -5.6 to 6.6, because the refit's advantage over arm D is only 0.47 points there), against
   0.45 and 0.19 in 2026. The placebos recover 0.28 at D10 and 0.21 at D16 (0.01 to 0.47), so part of
   the sunshine response is better in the refit everywhere.
 - **Stage 3 predictions:** sunshine at least 0.25 pooled and 0.15 at each Primary (point estimates
-  0.50, 0.44, and 0.93); recent power and calendar each under 0.25 (-0.15 and 0.01). All hold, so
-  the 316 lead is not noise.
+  0.50, 0.44, and 0.93); recent power and calendar each under 0.25 (-0.15 and 0.01). All four predictions hold, so the sunshine-graft lead of experiment 316 is not noise.
 
 ## Checks and caveats
 
@@ -218,8 +212,8 @@ research default 3. D3 fails the cold-night bound. Lead range: 0.5 to 240 hours 
   -0.136, D1 -0.075, D1 equal to the blend on daylight and to the default elsewhere (exactly), cold
   winter nights +0.076 for the blend and exactly 0 for D1, and leave-one-out -0.066 to -0.085. Its
   differences: the interval's lower bound is -0.145 against -0.151 here (an equal-weight version gives
-  -0.143, same conclusion), and the cold-night count is 2,196 under a 18:00 to 06:00 definition and
-  2,384 only when 06:30 is included, which is the definition used. It found no leakage in the as-of
+  -0.143, same conclusion), and the cold-night count is 2,196 under an 18:00 to 06:00 definition and
+  2,384 only when 06:30 is included, and the 2,384 figure uses that second definition. It found no leakage in the as-of
   fits or the member share, did not read the upstream `kind` flag (solar geometry from experiment 319),
   and noted that D3b is computed in the scoring script and is not a stored column.
 - **Adoption.** D1 meets the five conditions of the research-default page: its interval is wholly
@@ -233,6 +227,6 @@ research default 3. D3 fails the cold-night bound. Lead range: 0.5 to 240 hours 
   graft's recovery, so only the replicate against the same-selection 2026 figures is comparable.
 - **Fits on the chain:** the weights and logistic fits use the convex chain's rows, as in experiments
   319 and 320.
-- **Try next:** pre-register D3b with the cold winter nights of the replicate year pooled so the bound
+- **Candidate next steps:** pre-register D3b with the cold winter nights of the replicate year pooled so the bound
   has more half-hours; test a flexible sunshine response in the convex fit against Primary demand
   research default 3.
