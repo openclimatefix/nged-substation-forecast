@@ -8,9 +8,9 @@ M1, M2, and R end in a three-component Gaussian mixture (`mixture_*` helpers); T
 from typing import Final
 
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from scipy.special import ndtr
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 COMPONENTS: Final[int] = 3
 Z_LIMIT: Final[float] = 40.0

@@ -23,7 +23,7 @@ import e00164_common as c164  # ty: ignore[unresolved-import]
 import e00164_fit as f164  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 
 import e00334_common as common  # isort: skip
 import e00334_data as data_mod  # isort: skip
