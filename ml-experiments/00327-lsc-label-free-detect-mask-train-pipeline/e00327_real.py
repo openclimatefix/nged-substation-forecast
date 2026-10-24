@@ -155,6 +155,7 @@ def series_units(series: int) -> pl.DataFrame:
     year_month = dat.stamp_year_month()[clipped]
     winter = np.isin(month[clipped], list(WINTER))
     rows = []
+    mets = {}
     for name, (fdir, _) in ARMS.items():
         expected = (
             np.load(WORK / "forecast" / fdir / f"forecast_{series}.npy") * 100.0 / caps[series]
@@ -166,9 +167,11 @@ def series_units(series: int) -> pl.DataFrame:
         k0 = h.k0_trace(data=data, band=band)
         corr = h.mask_correction(data=data, spans=spans[name], band=band, k0=k0).astype(np.float64)
         offsets = h.fit_offsets(data=data, k0=corr, band=band)
-        met = arm_metric_arrays(data=data, correction=corr, offsets=offsets, band=band)
+        mets[name] = arm_metric_arrays(data=data, correction=corr, offsets=offsets, band=band)
+    every_arm = np.all([np.isfinite(m["qs"]) for m in mets.values()], axis=0)
+    for name, met in mets.items():
         for gname, gmask in groups.items():
-            m = gmask & np.isfinite(met["qs"])
+            m = gmask & every_arm
             unit = shift_label if gname.startswith("after") else year_month
             for w in (True, False):
                 m2 = m & (winter == w)

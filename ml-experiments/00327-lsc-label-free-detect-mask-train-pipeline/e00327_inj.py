@@ -39,7 +39,7 @@ WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00327-lsc-label-free-detect-mask-
 OUT: Final[Path] = WORK / "inj"
 STEP: Final[int] = 12
 """Half-hours between the detector's evaluation points (6 hours)."""
-DELAY: Final[int] = 8
+DELAY: Final[int] = 7
 """Half-hours between an evaluation point and the newest reading it may use."""
 WIDTH: Final[dict[str, int]] = {"A": 24, "B": 48}
 TARGET_RATE: Final[float] = 5.0
@@ -142,13 +142,14 @@ def detected(*, site: str, stream: np.ndarray, kind: str) -> list[nra.Span]:
         x=base_series(site=site, stream=stream, kind=kind), width=WIDTH[kind]
     )
     thr = site_threshold(site, kind)
-    n = len(stream)
     spans = []
     for o, first_low, closed in machine(score_=sig, threshold=thr):
         c_open = int(points[o] - DELAY - 1)
         onset = max(c_open - ONSET_BACK, 0)
         end = int(points[first_low] - DELAY - 1)
-        known = int(points[closed] - DELAY - 1) if closed >= 0 else n
+        known = int(
+            points[closed if closed >= 0 else min(o + MAX_OPEN + 1, len(points) - 1)] - DELAY - 1
+        )
         end = max(end, onset + 1)
         spans.append(nra.Span(onset, end, c_open, max(known, end + 1), 0.0))
     return spans

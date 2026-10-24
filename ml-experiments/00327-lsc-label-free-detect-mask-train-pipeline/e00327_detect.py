@@ -188,7 +188,11 @@ def detect(*, forecast_arm: str, kind: str, name: str) -> None:
                 c_open = int(cutoffs[o])
                 onset = max(c_open - ONSET_BACK, 0)
                 end = int(cutoffs[first_low])
-                known = int(cutoffs[closed]) if closed >= 0 else h.N_GRID
+                known = int(
+                    cutoffs[
+                        closed if closed >= 0 else min(o + MAX_ORIGINS_OPEN + 1, len(cutoffs) - 1)
+                    ]
+                )
                 row = {
                     "series": s, "onset": onset, "end": max(end, onset + 1), "start": c_open,
                     "known": max(known, end + 1), "sign": int(np.sign(score[s][o])),

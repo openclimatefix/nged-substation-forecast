@@ -1,3 +1,4 @@
+Running as unit: run-p649054-i92871475.scope; invocation ID: 3086e44961b049879fd90b23ded816e3
 {
  "A_plain": {
   "alarms": 313,
@@ -92,21 +93,21 @@
   }
  },
  "E_plain": {
-  "alarms": 306,
-  "false_alarms": 139,
+  "alarms": 309,
+  "false_alarms": 147,
   "d8_false": 8,
-  "d9_false": 7,
-  "matched": 23,
-  "matched_lo": 17.0,
-  "matched_hi": 28.0,
-  "matched_stratum": 13,
+  "d9_false": 5,
+  "matched": 25,
+  "matched_lo": 20.0,
+  "matched_hi": 30.0,
+  "matched_stratum": 15,
   "stratum_n": 19,
   "median_lag_hours": 17.5,
-  "alarms_per_match": 13.304347826086957,
+  "alarms_per_match": 12.36,
   "matched_by_duration": {
    "24-48h": 4,
    "48-96h": 10,
-   "over 96h": 9
+   "over 96h": 11
   },
   "n_by_duration": {
    "24-48h": 8,
@@ -115,21 +116,21 @@
   }
  },
  "E": {
-  "alarms": 238,
-  "false_alarms": 99,
+  "alarms": 220,
+  "false_alarms": 88,
   "d8_false": 7,
-  "d9_false": 7,
-  "matched": 23,
-  "matched_lo": 17.0,
-  "matched_hi": 28.0,
-  "matched_stratum": 13,
+  "d9_false": 5,
+  "matched": 24,
+  "matched_lo": 18.0,
+  "matched_hi": 29.0,
+  "matched_stratum": 14,
   "stratum_n": 19,
-  "median_lag_hours": 18.0,
-  "alarms_per_match": 10.347826086956522,
+  "median_lag_hours": 17.25,
+  "alarms_per_match": 9.166666666666666,
   "matched_by_duration": {
    "24-48h": 4,
    "48-96h": 10,
-   "over 96h": 9
+   "over 96h": 10
   },
   "n_by_duration": {
    "24-48h": 8,
@@ -148,13 +149,13 @@
   "hi": 3.0
  },
  "E-A": {
-  "diff": -2,
-  "lo": -5.0,
+  "diff": -1,
+  "lo": -3.0,
   "hi": 0.0
  },
  "E-A_stratum": {
-  "diff": -2,
-  "lo": -5.0,
+  "diff": -1,
+  "lo": -3.0,
   "hi": 0.0
  },
  "A-A_plain": {

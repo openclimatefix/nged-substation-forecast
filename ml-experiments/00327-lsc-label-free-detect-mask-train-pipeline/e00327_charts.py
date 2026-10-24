@@ -47,7 +47,7 @@ WIDTH: Final[int] = 560
 def contrast_rows() -> pl.DataFrame:
     """Dots and intervals of arm minus no-mask arm, for the headline panels."""
     inj = json.loads((WORK / "results" / "inj_contrasts.json").read_text())["contrast"]
-    real = json.loads((WORK / "results" / "real_contrasts_without_D9.json").read_text())["contrast"]
+    real = json.loads((WORK / "results" / "real_contrasts_all15.json").read_text())["contrast"]
     rows = []
     panels = [
         (
@@ -222,7 +222,7 @@ def figure_detector() -> alt.TopLevelMixin:
     data = pl.DataFrame(rows)
     order = list(names.values())
     base = alt.Chart(data)
-    bars = base.mark_rule(size=3, color="#306BFF").encode(
+    bars = base.mark_rule(size=3, color="#306BFF").encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "lo:Q",
             title="Real load shifts found, of 35 (dot: count; line: 95% interval; number: false alarms)",
@@ -230,13 +230,13 @@ def figure_detector() -> alt.TopLevelMixin:
         ),
         x2="hi:Q",
         y=alt.Y("arm:N", sort=order, title=None),
-    )  # ty: ignore[unresolved-attribute]
-    dots = base.mark_point(filled=True, size=90, color="#306BFF").encode(
+    )
+    dots = base.mark_point(filled=True, size=90, color="#306BFF").encode(  # ty: ignore[unresolved-attribute]
         x="found:Q", y=alt.Y("arm:N", sort=order)
-    )  # ty: ignore[unresolved-attribute]
-    text = base.mark_text(align="left", dx=8, color="#555555").encode(
+    )
+    text = base.mark_text(align="left", dx=8, color="#555555").encode(  # ty: ignore[unresolved-attribute]
         x="hi:Q", y=alt.Y("arm:N", sort=order), text=alt.Text("false:Q", format="d")
-    )  # ty: ignore[unresolved-attribute]
+    )
     return alt.layer(bars, dots, text).properties(width=WIDTH - 240, height=170)
 
 
