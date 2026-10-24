@@ -7,7 +7,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [300](../../00300-metered-farm-best-guess-assembly/result.md) | How good is the assembled best-guess day-ahead forecast for the six metered farms, and what does a new farm with no history get? | 1 | Nothing | Planned |
-| [321](../../00321-metered-farm-lower-tail-recalibration-and-tail-head/result.md) | Which single change brings the 0.01 quantile of the farm forecast to its nominal coverage at leads of 1 to 10 days, without costing the score or the 0.99 gain? | 1 | Nothing | Planned |
 
 ## Planned experiments
 

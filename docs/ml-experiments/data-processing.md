@@ -921,6 +921,14 @@ capacity ([experiment 277](00277-lsc-curtailment-metric-on-existing-forecasts/re
 is the six Primary substations (which step 33 kV down to 11 kV) and the two bulk supply points D13
 and D17 (which step 132 kV down to 33 kV); the confidence is high, because we read the stored files.
 
+**Report a tail's coverage as the share strictly below the quantile, beside the share at or below it
+and the share of exact zeros, wherever the actual output can sit on a point mass.** For the six
+metered solar farms, 3.0% of daylight half-hours read exactly zero. The share at or below the 0.01
+quantile is 3.3% to 3.5% for Metered solar farms research default 1, and the share strictly below
+it is 1.2% to 1.4%, so the "at or below" figure overstates the lower-tail miss by the zeros
+([experiment 321](00321-metered-farm-lower-tail-recalibration-and-tail-head/result.md)). Applies to
+experiments, for the 12 to 252 hour lead range. Confidence: provisional, six farms, one scored year.
+
 ## Privacy and anonymisation
 
 **Never publish the name, the identifier, or the time series of an NGED metered generator, and label
