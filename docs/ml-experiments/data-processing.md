@@ -963,3 +963,9 @@ audit of
 [experiment 124](00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/result.md)). The
 scope is two BSPs, of which one closed; the confidence is moderate, and the entry is provisional
 until the experiment has had its reviews.
+
+**Average several network seed sets before scoring a small contrast.** *Applies to: experiments.*
+Experiment 201's median-correction network, retrained with 6 different seed sets, moves the pooled
+score at 0.5 to 168 hours between 2.5787 and 2.6038, so one seed set carries 0.01 to 0.02 points of
+noise ([experiment 325](00325-primary-demand-default-3-sunshine-response-refit-and-restriction/result.md)).
+Confidence: provisional, one family, one scored year.
