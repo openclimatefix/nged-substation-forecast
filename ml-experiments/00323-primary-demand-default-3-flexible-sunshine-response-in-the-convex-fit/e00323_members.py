@@ -33,7 +33,7 @@ import e00323_fits as fits323
 import numpy as np
 import polars as pl
 import studies.dp_ens_weather as weather
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_ens import choose_fit
 from studies.dp_ens_weather import RunWindow, replace_site
 from studies.dp_features import FeatureCache
