@@ -31,9 +31,9 @@ import e00288_common as common
 import e00288_tables as tables
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 import xgboost as xgb
-from torch import nn
+from torch import nn  # ty: ignore[unresolved-import]
 
 OUT_DIR: Final = common.WORK_DIR / "heads"
 SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
