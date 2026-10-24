@@ -8,7 +8,7 @@ theme: generator-forecasting
 also_relevant_to:
   - calibration-and-uncertainty
   - curtailment-cost
-status: planned
+status: finished
 kind: change
 date: 2026-10-24
 size: >-
@@ -39,9 +39,10 @@ decision_rule: >-
   first arm that passes all five is adopted (at most one). Condition 1, gain: the 99.75% month-block
   interval of (default plus x, minus default) on the kept-row quantile score, scored at 1 to 10
   days, lies wholly below zero (level 1 - 0.01/4 for four arms), and the point estimate is at least
-  the tier's minimum gain: 0.02 points for (c), a new fitted step, and 0 for (a), (b), and (d). Condition 2,
-  no harm: the one-sided 95% upper bound of the harm to the pooled 0.01 pinball loss and to the
-  pooled 0.99 pinball loss is at most 0.05 points each; each farm on its own, rows with wind above
+  the tier's minimum gain: 0.02 points for (c), a new fitted step, and 0 for (a), (b), and (d).
+  Condition 2, no harm: the one-sided 95% upper bound of the harm to the pooled 0.01 pinball loss
+  and to the pooled 0.99 pinball loss is at most 0.05 points each; each farm on its own, rows with
+  wind above
   rated, and lead days 1 to 2 are reported without a pass or fail. Condition 3, replication: the
   replicate period of 2025-01 to 2025-06 gives the same sign, at least half of the smaller of the
   main estimate and the minimum gain, and a t test on the 6 monthly paired differences does not
@@ -62,100 +63,178 @@ metric: >-
   Quantile score over 11 levels in points of capacity, scored at 1 to 10 days, with days 1 to 2 and
   days 3 to 10 separately; tolerance 0.02 for the headline and 0.05 for the 0.01 and 0.99 pinball
   losses.
+code: ml-experiments/00326-wind-research-default-1-change-arms/
+verdict: supported
+best_arm: >-
+  (c), the default plus the ERA5-trained adapter's effective wind speed as an extra XGBoost column,
+  11.253 points on the kept rows against 11.352 for the default (-0.099, 99.75% interval -0.185 to
+  -0.011)
+headline: >-
+  Of four changes added alone to Wind farms research default 1, only the adapter's effective speed
+  (c) had a 99.75% interval wholly below zero (-0.099 points, scored at 1 to 10 days), and it passes
+  all five adoption conditions. Adopting it needs the maintainer's approval because a port puts a
+  neural adapter in the serving path. Hour and day of year (b) gained as much (-0.092) but its
+  interval includes zero.
+production_status: candidate
+adopted_in: none
+lessons: >-
+  The adapter's gain is flat across lead (-0.086 at days 1 to 2, -0.093 at days 3 to 10), so it is
+  a correction of the ensemble's wind-speed level and not of short-range detail. The hour-and-day
+  columns gained as much as the adapter in the scored year, and a month-shuffled placebo recovered
+  none of that gain, so the gain is real information; the replicate period is too short to confirm
+  or refute it. A single speed factor does nothing once the offset table is applied.
+take_home_message: >-
+  Feeding XGBoost the neural adapter's corrected wind speed lowers the wind forecast's score by
+  0.10 points of capacity, about 0.9% of the default's score, and the gain holds at every farm and
+  at short and long leads. The three other changes were not separable from zero. Only a port that
+  puts the adapter in the production service can use the gain, so the maintainer decides.
+advice:
+  - >-
+    Give XGBoost the ERA5-trained adapter's effective speed as an extra column if the wind forecast
+    is to be improved, and decide separately whether a neural adapter in the serving path is worth
+    0.10 points (C1, arm (c)).
+  - >-
+    Do not add a single wind-speed scale factor on top of the offset table: it scored 0.014 points
+    worse than the default and made lead days 1 to 2 worse by 0.091 (arm (d)).
+  - >-
+    Test hour of day and day of year again on a longer replicate period before adopting them: they
+    gained 0.092 points in the scored year, their interval included zero, and the 6-month replicate
+    could not separate them from zero (arm (b)).
+  - >-
+    Do not expect temperature and air density to help a wind XGBoost model that already has the
+    wind speed and direction: arm (a) gained 0.032 points with an interval from -0.136 to +0.060,
+    and air density at a fixed pressure is a function of temperature alone (arm (a)).
 ---
 
-**Plan only: no score has been read.** This page is committed before any code runs, as the
-`ml-experiment` skill requires. It holds the five plan items of the
-[research-default rule](../research-default.md) and is filled in with results afterwards.
+**Take-home: giving XGBoost the neural adapter's corrected wind speed lowers the wind forecast's
+quantile score by 0.099 points of capacity (about 0.9%), and it is the only one of four changes
+whose interval lies wholly below zero, scored at 1 to 10 days.** We asked whether any of four
+changes, each added alone to Wind farms research default 1, lowers the quantile score of the three
+metered wind farms (W1 to W3). The default is an XGBoost model fitted to ERA5 (our estimate of past
+weather), run on the 51 members of the ECMWF ensemble forecast and corrected by a table of offsets
+fitted on 442 daily ensemble forecasts. The four changes were: (a) 2 m temperature and air density
+as extra inputs, (b) hour of day and day of year, (c) the effective wind speed of a small neural
+adapter (a network fitted to ERA5 that rescales the wind speed the physics model reads), and (d)
+one wind-speed factor of 1.13 applied to every member. The score is a quantile score in points of
+capacity (1 point is 1% of a farm's capacity; lower is better), on the rows left after the mask of
+[experiment 210](../00210-wind-idle-noise-mva-artefact/result.md) removes half-hours when a farm is
+idle. The adapter (c) passes all five adoption conditions. Because porting it puts a neural network
+in the serving path, the research-default rule leaves adoption to the maintainer, so this page names
+(c) a candidate and does not log a version. The verdict is `supported`.
 
-## Plan item 1: family and version
+![Each change minus the default, scored year and replicate period](figure_1.svg)
 
-- **Family and version.** Wind farms research default 1 (family "Wind farms W1 to W3"), named in
-  the maintainer's weekend plan of 2026-10-24: the ERA5-trained XGBoost quantile model of
-  [experiment 33](../00033-best-guess-architecture-vs-production/result.md) (a binned power curve
-  as the base margin, a monthly spread factor), run on the 51 ensemble members and mixed with equal
-  weights, plus the offset table of [experiment
-  259](../00259-wind-plant-plus-quantile-offset-head/result.md) (one offset per lead day, quantile
-  level, and farm, fitted on the 442 daily hindcast runs of 2024-04-01 to 2025-06-16). The table
-  is applied to the default's spread-adjusted mixture, as in experiment 303's P1.
-- **Family settings.** Rows `fold_a_tuesdays_v1`; kept rows (experiment 210 mask) headline, all
-  rows beside; lead range 1 to 10 days, so every headline says "scored at 1 to 10 days"; refits:
-  the ERA5-trained XGBoost quarterly on ERA5 and the table monthly (here a single ERA5 fit before
-  2024-04-01 and a single table, as in experiments 259 and 303, which the page states as a
-  caveat); metric the quantile score over 11 levels in points of capacity; tolerance 0.02
-  headline and 0.05 on the 0.01 and 0.99 tails; reported groups each farm, wind above rated, and
-  lead days 1 to 2.
-- **Rows.** The 3 farms, 3 seeds, and the 53 Tuesday runs of the scored year; the replicate is the
-  daily hindcast runs initialised 2025-01-01 to 2025-06-16.
+![Each change's gain at lead days 1 to 2 and days 3 to 10](figure_2.svg)
 
-## Plan item 2: arms
+![Arm (c) and (b) minus the default by month](figure_3.svg)
 
-- **Default.** Read the stored default (experiment 285's `xgb_B0` mixtures and experiment 303's
-  `P1`, `P8`). The reproduction gate refits the default with this folder's code and requires its
-  kept-row score (spread factor and table applied) to match experiment 303's P1 (11.352) within
-  0.01. The run stops and reports if the gate fails.
-- **Default plus (a).** Seventh and eighth XGBoost columns: 2 m temperature (degrees Celsius) and
-  air density (fixed surface pressure of 100,000 Pa divided by the dry-air gas constant times the
-  temperature in kelvin, as in experiment 256). With a fixed pressure the density is a monotone
-  function of the temperature, so the density column adds no information to a tree model.
-- **Default plus (b).** Seventh and eighth columns: hour of day (fraction) and day of year.
-- **Default plus (c).** The effective wind speed of experiment 285's adapter A4, fitted to ERA5
-  before 2024-04-01 and never fine-tuned, as a seventh column. This is experiment 303's P8, read
-  from storage for the scored year and the hindcast.
-- **Default plus (d).** Every member's 100 m wind speed multiplied by one factor before the
-  XGBoost model (the feature and the base-margin power curve alike; the 10 m speed is not scaled).
-  The factor is the mean of the implied 100 m wind (experiment 307) over the mean of the ensemble
-  mean 100 m wind, on the unmasked, invertible hindcast cases (experiment 307 found 1.13).
-- **Adoption order** c, b, a, d. With k = 4 arms the interval for condition 1 is read at 1 - 0.01/4.
+## Design
 
-## Plan item 3: tier
+- **Family and default.** Wind farms research default 1: [experiment
+  33](../00033-best-guess-architecture-vs-production/result.md)'s ERA5-trained XGBoost on the
+  members, with the spread factor and [experiment
+  259](../00259-wind-plant-plus-quantile-offset-head/result.md)'s offset table, as [experiment
+  303](../00303-wind-adapter-in-production-setting/result.md)'s P1 and [experiment
+  285](../00285-wind-effective-wind-adapters/result.md)'s `xgb_B4`. Rows `fold_a_tuesdays_v1`
+  (53 Tuesday runs, July 2025 to June 2026), 3 farms, 3 seeds. Scored at 1 to 10 days. The XGBoost
+  models and the adapter are fitted once on ERA5 before 2024-04-01 and the table once on the
+  hindcast, not refitted quarterly and monthly as the family settings say.
+- **Arms and tier.** Tier 2 (inside the fitted stage), code imported from experiments 259, 285,
+  303, and 307. (a) and (b) added columns, (d) a changed setting (minimum gain 0); (c) a new fitted
+  step (minimum gain 0.02 points). Adoption order c, b, a, d; interval read at 99.75% (four arms).
+  Arm (c) is experiment 303's P8, read from storage.
+- **Controls.** Column subsampling off. Month-shuffled placebos for (a) and (b) (the added columns
+  taken from a randomly paired other calendar month, in the ERA5 rows and the member rows) and a
+  permuted-column placebo for (c). Known-answer test for (d): the refit factor after scaling the
+  members by 0.85 times 0.85 equals the unscaled factor (difference 3e-8). Reproduction gate: the
+  refit default is bit-identical to P1 (11.352 points, difference 0).
+- **Replicate.** The offset table and (d)'s factor refitted on hindcast cases with valid times
+  before 2025-01-01; the daily runs of 2025-01-01 to 2025-06-16 scored. Six months.
+- **Intervals** resample whole months and the 3 seeds (50,000 resamples); the farms are not
+  resampled, so every interval is conditional on these three farms.
 
-All four arms act inside the fitted stage (tier 2), so the default's code is imported from the
-experiment folders that hold it. Complexity tiers: (a) and (b) added columns, (d) a changed
-setting, minimum gain 0; (c) a new fitted step, minimum gain 0.02 points.
+## Results
 
-## Plan item 4: predictions that can fail
+| Arm | Kept rows | All rows | Days 1 to 2 | Days 3 to 10 | 0.01 pinball | 0.99 pinball | 5%-95% coverage |
+|---|---|---|---|---|---|---|---|
+| Default | 11.352 | 10.825 | 6.612 | 11.191 | 0.284 | 0.640 | 92.1% |
+| Default plus (c) | 11.253 | 10.746 | 6.525 | 11.097 | 0.283 | 0.639 | 92.0% |
+| Default plus (b) | 11.260 | 10.763 | 6.542 | 11.110 | 0.282 | 0.643 | 91.1% |
+| Default plus (a) | 11.320 | 10.804 | 6.600 | 11.154 | 0.283 | 0.637 | 92.0% |
+| Default plus (d) | 11.366 | 10.843 | 6.702 | 11.211 | 0.283 | 0.630 | 91.5% |
 
-See `prediction` above. Each can fail: (c) may not beat 0.05 or may gain more at days 3 to 10; (b)
-may not lose half its gain under the placebo; (a) may reach 0.1; (d) may exceed 0.05; any arm may
-raise a tail loss by more than 0.05.
+- **Benchmarks, kept rows.** The default scores 11.352. The frozen XGBoost reference (the default
+  without the table) scores 11.697, so the table gains 0.345 (95% interval 0.274 to 0.418).
+  Climatology scores 13.547, so the default is 2.195 better (1.577 to 2.808). Persistence is scored
+  on hours 0 to 6 only (1,696 kept rows): 15.566 against the default's 6.568 on the same rows.
+- **(c) minus default: -0.099 (99.75% interval -0.185 to -0.011; 95% -0.157 to -0.041).** Predicted
+  -0.05 to -0.15, held. Predicted a larger gain at days 1 to 2 than days 3 to 10: failed, the gains
+  are -0.086 (-0.155 to -0.021) and -0.093 (-0.167 to -0.021). It is negative at W1, W2, and W3
+  (-0.091, -0.129, -0.078) and without any one farm (-0.104, -0.084, -0.109), and negative in 10
+  of 12 months. Placebo for (c): -0.001 (-0.002 to +0.001), so the share recovered is 0.6%.
+- **(b) minus default: -0.092 (99.75% interval -0.190 to +0.014).** Predicted -0.05 to -0.15, held.
+  Predicted that its placebo recovers over half the gain: failed. The placebo is -0.001 (-0.069 to
+  +0.071), a share of 0.8%, so the gain is not a date fingerprint. The ERA5 fits cover 2019 to
+  2024 and never see 2025 and 2026 dates, so a fingerprint was unlikely; the placebo tested it.
+- **(a) minus default: -0.032 (-0.136 to +0.060).** Predicted under 0.1, held. Placebo -0.001.
+- **(d) minus default: +0.014 (-0.094 to +0.137).** Predicted a gain under 0.05, failed in sign:
+  the factor lowers the 0.99 pinball loss by 0.010 and the below-median share rises to 42.4% from
+  40.4%, but days 1 to 2 are worse by 0.091 and W3 by 0.262.
+- **Tails.** No arm raises the 0.01 pinball loss (upper 95% bound at most +0.0001) or the 0.99
+  pinball loss (at most +0.031, arm (b)) by more than 0.05, as predicted. Coverage of the 5%-95%
+  band falls from 92.1% to 91.1% for (b) and stays at 92.0% for (c).
 
-## Plan item 5: controls
+## Adoption conditions for (c)
 
-- **Column subsampling off** in every XGBoost fit (`colsample_bytree`, `colsample_bylevel`, and
-  `colsample_bynode` all 1.0).
-- **Month-shuffled placebo for (a) and (b).** Same columns, but each calendar month's rows take
-  the two added columns from a randomly paired other calendar month of the same set, at the same
-  position within the month (modulo the paired month's length), with a fixed seed. The placebo
-  keeps each column's distribution and its autocorrelation within a month and breaks the link to
-  the date and the wind. It is applied to the ERA5 training rows and to each set of member rows.
-  The share of the gain recovered is (placebo minus default) over (arm minus default).
-- **Shuffled-column placebo for (c).** The effective-speed column permuted at random across rows
-  within the training rows and within each set of member rows, with a fixed seed. Needs the
-  ERA5-trained adapter, which is refitted (three seeds, three farms) and checked to reproduce
-  experiment 303's P8 effective speed through the stored P8 mixtures' score.
-- **Known-answer test for (d).** Multiply the hindcast members by a known factor of 0.85, refit
-  the factor with the same routine, and require it to recover 1/0.85 to within 0.01.
-- **Leakage check.** Every column is available at forecast time: the ensemble's wind and
-  temperature, the clock of the valid time, and an adapter that reads only ensemble weather. The
-  XGBoost models and the adapter are fitted on ERA5 valid times before 2024-04-01, so no row of
-  the hindcast or the scored year is in a fit. The offset table and the factor for (d) are fitted
-  on hindcast cases only.
-- **Weather at lag times.** None used at forecast time, so the ERA5 delay does not apply.
+- **1, gain: met.** The 99.75% interval is wholly below zero and the gain 0.099 exceeds 0.02.
+- **2, no harm: met.** The one-sided 95% upper bounds of the harm are -0.0006 at 0.01 and +0.013 at
+  0.99, against 0.05. Reported without pass or fail: each farm is better; days 1 to 2 are better
+  by 0.086; rows with wind above rated are better by 0.45, on a small subset whose interval the
+  month resampling cannot give.
+- **3, replication: met.** The replicate gain is -0.084 (99.75% interval -0.211 to +0.062), the same
+  sign and above half of 0.02. The t test on the six monthly differences gives p = 0.13, so the sign
+  is not contradicted but not established either.
+- **4, controls: met.** The reproduction gate, the permuted-column placebo, and the known-answer
+  test passed. No audit trigger fired for (c) (see Checks).
+- **5, serving: met on inputs, with a port that touches the serving path.** The inputs are ensemble
+  weather only. Porting needs the adapter, a neural network, in the production service, so the rule
+  requires the maintainer's approval before adoption.
 
-## Replicate period (condition 3)
+(b) is next in the order and fails condition 1. (a) and (d) fail condition 1 too. Every one of the
+four has a 99.75% interval that is wide because there are three farms and 12 months, which the
+research-default page predicted.
 
-The offset tables and the factor for (d) are refitted on hindcast cases with valid times before
-2025-01-01 (2024-04 to 2024-12), and the daily hindcast runs initialised 2025-01-01 to 2025-06-16
-are scored on the cases the refits did not see. The spread factor is fitted month by month on
-earlier cases as in the scored year. The nominal 99% interval undercovers on 6 months, so a t test
-on the 6 monthly paired differences is added.
+## Checks
 
-## Reporting
+- **Median minus mean forecast.** Kept rows: default -4.805 points, (c) -4.720, (b) -4.548.
+  The median sits below the mean in every arm, as in [experiment
+  259](../00259-wind-plant-plus-quantile-offset-head/result.md).
+- **The mean forecast's error beside the quantile score.** (c): quantile score -0.099, mean-forecast
+  absolute error -0.122, median absolute error -0.130, the same direction. (b): -0.092, -0.100,
+  -0.109. (d): +0.014, +0.116, -0.019, so (d)'s mean forecast is worse.
+- **Triggers.** Trigger 2 (a result contradicts its own prediction) fired for the lead pattern of
+  (c) and the placebo of (b), and is explained above by tested placebos and a flat gain across lead.
+  It bears on (b) and on the prediction about lead, not on (c)'s gain. Triggers 1, 3, 4 (leaving
+  any one farm out keeps the sign of (c)), 5, 6 (the 95% interval of (c) matches experiment 303's
+  P8 against P1, which is the same data), and 7 did not fire. No audit ran (maintainer's brief:
+  Sonnet only).
+- **Reproduction.** The refit default equals experiment 303's P1 to the last digit. Refit default
+  versus stored default gives no difference, so every contrast reads the same against either.
 
-Take-home first, `kind: change`, the lead range as the headline caveat, the default's absolute
-score against climatology, the persistence on hours 0 to 6, and the frozen XGBoost reference with
-intervals, the five conditions one line each, the tail calibration (coverage and pinball at 0.01,
-0.05, 0.95, and 0.99), and the curtailment-cost metric of experiment 277 for the winning arm.
-Intervals resample whole months and the three seeds; farms are not resampled, so every interval is
-conditional on three farms.
+## Caveats
+
+- **Scored at 1 to 10 days, three farms, 12 months.** Intervals do not cover other farms.
+- **The fits are single ERA5 fits,** not the quarterly refits the family settings name, so the
+  contrasts could differ under refitting.
+- **The replicate is 6 months** and its interval is wide; its sign agrees with the scored year for
+  (c), (b), and the null (a), and disagrees for none of the gains.
+- **The curtailment-cost metric of experiment 277 is not scored.** It needs a substation node with
+  its generators, and W1 to W3 have no node forecast in this experiment. Tail calibration is above.
+- **No new data-processing finding** for `data-processing.md`.
+
+## What the next experiment should answer
+
+- **Does the adapter's gain survive quarterly refits of the XGBoost model and the adapter?** Run
+  (c) with the family's refit cadence.
+- **Is hour of day and day of year real?** Test (b) alone on a longer replicate, with the adapter
+  already in the default.
