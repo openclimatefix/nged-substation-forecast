@@ -32,7 +32,7 @@ import e00326_common as c326  # noqa: E402  # isort: skip  # ty: ignore[unresolv
 import e00339_common as common  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 
 DEVICE = run324.DEVICE
 
