@@ -1,0 +1,16 @@
+Running as unit: run-p631731-i92870982.scope; invocation ID: eea95ac4ec8b4b7b9cfb9d863644f8e1
+E series 7: 43765 forecast half-hours, 0 masked fits refused
+E series 8: 78815 forecast half-hours, 0 masked fits refused
+E series 9: 78815 forecast half-hours, 0 masked fits refused
+E series 3: 78815 forecast half-hours, 0 masked fits refused
+E series 13: 18879 forecast half-hours, 0 masked fits refused
+E series 10: 78815 forecast half-hours, 0 masked fits refused
+E series 11: 78815 forecast half-hours, 0 masked fits refused
+E series 14: 78812 forecast half-hours, 0 masked fits refused
+E series 15: 78620 forecast half-hours, 0 masked fits refused
+E series 16: 78815 forecast half-hours, 0 masked fits refused
+E series 17: 78615 forecast half-hours, 0 masked fits refused
+E series 18: 78813 forecast half-hours, 0 masked fits refused
+E series 24: 78743 forecast half-hours, 0 masked fits refused
+E series 25: 78815 forecast half-hours, 0 masked fits refused
+E series 26: 78809 forecast half-hours, 0 masked fits refused

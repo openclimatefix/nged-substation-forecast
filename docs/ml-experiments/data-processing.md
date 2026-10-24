@@ -866,6 +866,14 @@ was zero until those rows were set to missing ([experiment
 and to production, for any score built on the filter's correction. Provisional until the
 experiment's reviews are merged.
 
+**Give every detector alarm a closing rule that works when no end is known, and mask the alarm to
+that close.** *Applies to: experiments and any pipeline that masks detected load shifts.* An alarm
+with no close masks the series to its end, so a rule such as a 14-day cap has to close the alarm.
+With the cap closing the alarm, a label-free detect-and-mask pipeline scores 0.016 points of
+capacity better than no mask on ordinary rows, on the 95% pinball loss
+([experiment 327](00327-lsc-label-free-detect-mask-train-pipeline/result.md)). Confidence:
+provisional, 15 Primaries, one record.
+
 ## Forecast tails and curtailment cost
 
 **Count the half-hours beyond a limit before ranking forecasts on curtailment cost.** Two bulk
