@@ -80,7 +80,10 @@ def fit_t_side(*, z: np.ndarray) -> tuple[float, float, float] | None:
 
 
 def fit_c2(*, hist: dict, n_groups: int) -> np.ndarray:
-    """Return C2 factors, shape (bands, groups, 4): the fitted Student-t tail quantile over the stored q90 or q10 distance."""
+    """Return C2 factors, shape (bands, groups, 4).
+
+    Each factor is the fitted Student-t tail quantile over the stored q90 or q10 distance.
+    """
     table = np.ones((len(common.BAND_LABELS), n_groups, len(common.TAILS)))
     for b in range(len(common.BAND_LABELS)):
         for g in range(n_groups):

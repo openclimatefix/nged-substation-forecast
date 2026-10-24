@@ -64,7 +64,9 @@ def quantile_score(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
 
 
 def tail_ratio(*, actual: np.ndarray, quantiles: np.ndarray, column: int) -> np.ndarray:
-    """Return the standardised exceedance of one tail quantile: the error divided by the quantile's distance from the median.
+    """Return the standardised exceedance of one tail quantile.
+
+    The ratio is the error divided by the quantile's distance from the median.
 
     For an upper quantile this is (actual - median) / (q - median); for a lower quantile it is
     (median - actual) / (median - q). A factor f gives a calibrated quantile at the level where the

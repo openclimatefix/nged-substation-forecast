@@ -1,5 +1,7 @@
 # ruff: noqa: E501
-"""Post hoc check: fit C1 on the scored year itself (hindsight) to see whether the as-of fit or the method limits the tail correction.
+"""Post hoc check: fit C1 on the scored year itself (hindsight).
+
+The check shows whether the as-of fit or the method limits the tail correction.
 
 OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00335-*/e00335_oracle.py
 """
