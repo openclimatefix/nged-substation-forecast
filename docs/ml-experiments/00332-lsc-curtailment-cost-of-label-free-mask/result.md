@@ -29,43 +29,49 @@ prediction: >-
   interval includes zero; the answer is then that the quantile-score gain of experiment 327 does not
   show up as curtailment cost on this record.
 decision_rule: >-
-  Fixed before any cost is read. Step 0 (stop rule) is answered below: the stored forecasts cover
-  all 7 child Primaries of the bulk supply point D13 on the real record, so the stop rule does not
-  fire. Rows: experiment 327's. Injected worlds: all rows of experiment 297's worlds, 12 to 36 hour
-  leads, six Primaries, arms K0 (no mask, arm C), PERFECT (arm D), A, and B. Real record: even
-  calendar months of experiment 258's harness (2025-08, 2025-10, 2025-12, 2026-02, 2026-04,
-  2026-06, the months for which farm forecasts exist), on target rows outside every logged or
-  labelled span and every arm's alarm spans, as in experiment 327. Metric: `studies.node_curtailment`
-  at the headline price, breach ratio 20 (the tau = 0.95 quantile), Curtailment Limit 0, limits
-  f = 0.5 (pre-registered), 0.75, and 0.9 (sensitivity) times the node's largest observed flow
-  before the first scored half-hour. Part 1 (headline for the prediction): injected worlds at
-  Primary level, node-only, one node per Primary with the high tail of demand as the flow that can
-  breach (experiment 277's convention). A Primary has no published limit, so Part 1 is a relative
-  comparison between arms and states no money saved. Part 2 (the money result): the real record at
-  D13, a bulk supply point with 7 child Primaries and the metered farms A, C, and E, scored with
-  generators. The D13 node flow is the bulk supply point's own metered flow. The node forecast is
-  the sum of the 7 Primaries' arm forecasts (the location of experiment 327's filtered forecast),
-  plus quantile offsets fitted on the aggregate residual (metered node flow minus that sum) of odd
-  months by half-hour of day and lead band. All arms share the farms' forecasts (experiment 243's
-  H5 quantile forecast, seed 0, of which the metric reads only the median) paired by valid time,
-  which is a lab shortcut, and the other generators' forecasts of experiment 48. The Primary-level
-  groups are G0 all
-  rows, G1 ordinary, G2 BEFORE_ALARM, G3 DURING, G4 AFTER (48 hours), G5 within 7 days (the
-  experiment 297 phase labels); the real record has G0, G1, G4, and G5 only. Contrasts: A minus C,
-  B minus C, D minus C, and A minus B on avoidable cost (cost minus the perfect forecast's cost),
-  injected worlds against observed power (headline) and against the true normal-running-arrangement
-  series (reported), winter (November to March) separately. Intervals resample whole injected worlds
-  (44) for Part 1 and whole calendar months for Part 2, 20,000 draws, 95%. The prediction is
-  decided on the DURING and AFTER groups pooled (G3 plus G4 rows counted once) and on G1 at
-  f = 0.5. Detectability: the smallest difference the metric resolves is 2.8 times the bootstrap
-  standard error of the paired difference, printed beside each observed difference. If arm A loses
-  on observed power in DURING, the variant that adds the moved megawatts back (experiment 312) is
-  reported as a separate column, never as the headline. The threshold for porting is any
-  difference whose 95% interval excludes zero in the predicted direction, because the pipeline stage
-  already exists in experiment 327 and this experiment only measures what it costs or saves in
-  money. Verdict: supported if both parts of the prediction hold; partly supported if the DURING and
-  AFTER interval is below zero but G1 changes by 1% or more; not supported if the DURING and AFTER
-  interval includes zero.
+  Fixed before any cost is read. Rows are experiment 327's, so the quantile frames come from re-running
+  experiment 327's Kalman filter with each arm's spans set aside, using 327's stored demand
+  forecasts, hyperparameters and offsets unchanged (nothing is refitted). The metric is
+  `studies.node_curtailment` at the headline price of GBP 2,000 per MWh, breach ratio 20 (the 0.95
+  quantile), Curtailment Limit 0 hours, and limits of f times the node's largest observed flow, with
+  f = 0.5 pre-registered and 0.75 and 0.9 as sensitivity (0.9 holds few event half-hours and is
+  not read as evidence). Part 1 is the injected worlds of experiment 297 (44 worlds, six
+  Primaries), even calendar months, 12 to 36 hour leads, scored node-only with one node per
+  Primary and the high tail of demand as the flow that can breach (export sign +1, as in experiment
+  277). A Primary has no published limit, so Part 1 ranks arms and states no money saved. The limit
+  of each Primary is f times the largest real observed power of that Primary before the earliest
+  scored row, taken from the real record without injected shifts, and is the same for every arm and
+  for both targets. Arms: K0 (no mask, called arm C below), A, B, PERFECT (the true spans masked,
+  called arm D below), and a perfect forecast (every quantile equal to the target) that gives
+  avoidable cost. Groups follow experiment 297: G0 all rows, G1 ordinary, G2 before alarm, G3
+  during, G4 after, G5 near an event. Targets: observed power (headline) and the true
+  normal-running-arrangement series (reported). The one deciding contrast is A minus C on
+  avoidable cost per half-hour, G3 and G4 pooled, observed power, f = 0.5, with the 95% interval
+  from resampling whole worlds (20,000 draws). The prediction holds when that interval is below
+  zero and the point estimate of A minus C on G1 is within 1% of arm C's G1 cost per half-hour. The
+  verdict is supported when both hold, partly supported when only the first holds, and not
+  supported otherwise. The leave-one-Primary-out line, the other contrasts (B minus C, D minus C, A
+  minus B), the other limits and groups, the winter months (November to March), and the true-series
+  target are reported and cannot change the verdict. The leave-one-Primary-out line is printed
+  beside the deciding contrast, because experiment 327 found that one Primary held most of its
+  gain. The variant that adds the moved megawatts back (experiment 312) is computed for every run
+  and is never the headline. Detectability is 2.8 times the bootstrap standard error of each
+  paired difference, printed beside it. Part 2 is descriptive and cannot change the verdict. It
+  scores the real record at the bulk supply point D13 (Skegness, 7 child Primaries, all with stored
+  forecasts), with the metered solar farms A, C, and E as generators and the bulk supply point's own
+  metered flow as the node flow. The node forecast is the sum of the 7 Primaries' arm forecasts plus
+  quantile offsets fitted on the odd-month residual of that sum against the metered node flow, by
+  half-hour of day and lead band, so the offsets absorb the farms' output and the mismatch between
+  the node and its Primaries. The farms' forecasts (experiment 243's H5 quantile forecast, seed 0,
+  paired by valid time, of which the metric reads the median) only set the allocation of the planned
+  cut, are shared by every arm, and are a lab shortcut because their lead can be shorter than the
+  demand lead. Part 2 covers the six even months with farm forecasts (2025-08 to 2026-06) on
+  target rows outside every logged span and every arm's alarm spans, and the number of excluded
+  rows is printed. It cannot show a saving during a shift, because those rows are excluded, and
+  experiment 277 found that the real record resolves no difference. Boston (D17) lacks one child
+  Primary's forecast, so it is not scored. As in experiment 327, offsets are fitted on odd months
+  and scored on even months, so some offsets use later data than the rows they score. The
+  long-and-deep stratum and arm E are reported for the real record where they have rows.
 benchmark: >-
   Arm C (no mask) of experiment 327, scored by the same metric; arm D (the hand-labelled spans
   masked) as the oracle reference.
@@ -97,6 +103,6 @@ curtailment-cost metric of experiment
 - **Farms.** Forecasts for farms A, C, and E (D13's farms) from experiments 224 and 243 exist for
   2025-07 to 2026-06 only, so Part 2 covers the six even months in that window.
 
-**Experiment 327 stores a demand forecast, not quantiles.** The quantiles come from the Kalman filter
-with each arm's spans set aside, so the scripts re-run that filter (experiment 327's own functions,
-unchanged) and write the quantile frames.
+**Experiment 327 stores a demand forecast per Primary, not quantiles.** The quantile frames are
+re-computed by running the Kalman filter with each arm's spans set aside (experiment 327's own
+functions, unchanged), and are written under `data/ml-experiments/00332-*/`.
