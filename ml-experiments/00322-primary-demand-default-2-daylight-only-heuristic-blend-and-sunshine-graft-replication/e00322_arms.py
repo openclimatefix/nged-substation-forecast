@@ -1,5 +1,5 @@
 # ruff: noqa: E501, PLR0915
-"""Build the daylight-only blend (D1), the day-and-night refitted blend (D2), and the member-share night blend (D3).
+"""Build the daylight-only blend (D1), the refitted day and night blend (D2), and D3.
 
 All three act on rows with a lead above 168 hours and start from experiment 319's arm x1 (the
 default) and arm r319 (the blend at experiment 319's weights, stored by experiment 320).

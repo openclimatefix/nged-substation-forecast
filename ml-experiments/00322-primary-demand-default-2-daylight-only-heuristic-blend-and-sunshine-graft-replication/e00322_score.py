@@ -77,7 +77,7 @@ def add_d3b(*, frame: pl.DataFrame, kind_column: str) -> pl.DataFrame:
 
 
 def recall_table(*, rows: pl.DataFrame, long: np.ndarray) -> dict:
-    """Return, by 24-hour band past 168 hours, the recall and false-flag rate of the mean rule and the share rule."""
+    """Return the recall and false-flag rate of the mean rule and the share rule by lead band."""
     lead = rows["lead_hours"].to_numpy()
     group = rows["cold_winter_night"].to_numpy()
     local_hour = rows["valid_time"].dt.convert_time_zone("Europe/London").dt.hour().to_numpy()
