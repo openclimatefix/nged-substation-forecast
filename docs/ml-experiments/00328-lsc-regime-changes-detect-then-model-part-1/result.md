@@ -71,8 +71,6 @@ production_status: not-for-production
 adopted_in: none
 ---
 
-# Does modelling permanent regime changes beat retraining on a recent window?
-
 **Planned. Written before any fit; the results and the take-home message replace this page.**
 
 ## Plan notes

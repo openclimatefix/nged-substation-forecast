@@ -1,0 +1,102 @@
+== Injected permanent steps (even-month onsets, 14 Primaries), quantile score by arm and row group
+
+-- step of 10% of load; 100 worlds
+days 0-30              A=3.498  Ar=3.656  B=3.500  C1=5.041  C2=3.602  C2o=3.502  D1=5.035  D2=3.567  D2o=3.502  C1t=4.872  C2t=3.486  C2ot=3.502  D1t=4.874  D2t=3.477  D2ot=3.502
+first 90 days          A=3.273  Ar=3.414  B=3.270  C1=4.741  C2=3.389  C2o=3.369  D1=4.700  D2=3.359  D2o=3.303  C1t=4.543  C2t=3.267  C2ot=3.279  D1t=4.537  D2t=3.261  D2ot=3.284
+days 90-180            A=2.879  Ar=2.968  B=2.869  C1=4.402  C2=2.952  C2o=2.962  D1=4.381  D2=2.931  D2o=2.831  C1t=4.262  C2t=2.863  C2ot=2.876  D1t=4.266  D2t=2.855  D2ot=2.869
+after day 180          A=2.751  Ar=2.814  B=2.746  C1=4.165  C2=2.790  C2o=2.820  D1=4.156  D2=2.775  D2o=2.755  C1t=4.112  C2t=2.725  C2ot=2.757  D1t=4.113  D2t=2.719  D2ot=2.758
+all post-onset rows    A=2.931  Ar=3.022  B=2.925  C1=4.389  C2=3.000  C2o=3.011  D1=4.368  D2=2.980  D2o=2.927  C1t=4.273  C2t=2.913  C2ot=2.934  D1t=4.272  D2t=2.907  D2ot=2.934
+  B minus C1  first 90 days : quantile score -1.470 (-2.242 to -0.817); q99 pinball*2 -0.0165 (-0.1048 to +0.1055); q99 exceedance B 0.0200 vs C1 0.0200 (nominal 0.0100)
+  B minus C2  first 90 days : quantile score -0.119 (-0.200 to -0.049); q99 pinball*2 -0.0158 (-0.0357 to +0.0008); q99 exceedance B 0.0200 vs C2 0.0196 (nominal 0.0100)
+  B minus D1  first 90 days : quantile score -1.429 (-2.192 to -0.775); q99 pinball*2 -0.0153 (-0.1055 to +0.1119); q99 exceedance B 0.0200 vs D1 0.0201 (nominal 0.0100)
+  B minus D2  first 90 days : quantile score -0.089 (-0.167 to -0.022); q99 pinball*2 -0.0176 (-0.0376 to -0.0006); q99 exceedance B 0.0200 vs D2 0.0201 (nominal 0.0100)
+  B minus C2t first 90 days : quantile score +0.003 (-0.027 to +0.035); q99 pinball*2 +0.0067 (+0.0002 to +0.0144); q99 exceedance B 0.0200 vs C2t 0.0196 (nominal 0.0100)
+  B minus D2t first 90 days : quantile score +0.009 (-0.023 to +0.042); q99 pinball*2 +0.0046 (-0.0036 to +0.0133); q99 exceedance B 0.0200 vs D2t 0.0198 (nominal 0.0100)
+  B minus C1  after day 90  : quantile score -1.462 (-2.099 to -0.901); q99 pinball*2 -0.0939 (-0.1560 to -0.0490); q99 exceedance B 0.0094 vs C1 0.0133 (nominal 0.0100)
+  B minus C2  after day 90  : quantile score -0.059 (-0.109 to -0.020); q99 pinball*2 -0.0173 (-0.0336 to -0.0032); q99 exceedance B 0.0094 vs C2 0.0083 (nominal 0.0100)
+  B minus D1  after day 90  : quantile score -1.449 (-2.089 to -0.891); q99 pinball*2 -0.0934 (-0.1534 to -0.0490); q99 exceedance B 0.0094 vs D1 0.0142 (nominal 0.0100)
+  B minus D2  after day 90  : quantile score -0.042 (-0.091 to -0.003); q99 pinball*2 -0.0186 (-0.0359 to -0.0033); q99 exceedance B 0.0094 vs D2 0.0096 (nominal 0.0100)
+  B minus C2t after day 90  : quantile score +0.016 (-0.005 to +0.035); q99 pinball*2 +0.0046 (+0.0004 to +0.0098); q99 exceedance B 0.0094 vs C2t 0.0093 (nominal 0.0100)
+  B minus D2t after day 90  : quantile score +0.022 (-0.000 to +0.042); q99 pinball*2 +0.0039 (-0.0005 to +0.0093); q99 exceedance B 0.0094 vs D2t 0.0099 (nominal 0.0100)
+  mean absolute error of the median, first 90 days: A=5.417  Ar=5.628  B=5.404  C1=8.306  C2=5.621  C2o=5.543  D1=8.248  D2=5.578  D2o=5.515  C1t=7.903  C2t=5.462  C2ot=5.422  D1t=7.893  D2t=5.460  D2ot=5.420
+
+-- step of 25% of load; 100 worlds
+days 0-30              A=4.629  Ar=4.778  B=4.645  C1=6.049  C2=4.740  C2o=4.642  D1=6.044  D2=4.706  D2o=4.643  C1t=5.881  C2t=4.641  C2ot=4.642  D1t=5.884  D2t=4.633  D2ot=4.643
+first 90 days          A=3.945  Ar=4.105  B=3.978  C1=5.352  C2=4.221  C2o=4.191  D1=5.269  D2=4.161  D2o=4.122  C1t=4.998  C2t=4.056  C2ot=4.063  D1t=4.990  D2t=4.052  D2ot=4.074
+days 90-180            A=2.977  Ar=3.035  B=2.997  C1=3.688  C2=3.021  C2o=3.010  D1=3.659  D2=2.990  D2o=2.924  C1t=3.640  C2t=2.962  C2ot=2.955  D1t=3.635  D2t=2.953  D2ot=2.933
+after day 180          A=2.810  Ar=2.847  B=2.838  C1=3.517  C2=2.817  C2o=2.826  D1=3.511  D2=2.808  D2o=2.792  C1t=3.538  C2t=2.777  C2ot=2.789  D1t=3.538  D2t=2.775  D2ot=2.787
+all post-onset rows    A=3.170  Ar=3.246  B=3.197  C1=4.071  C2=3.261  C2o=3.254  D1=4.038  D2=3.232  D2o=3.196  C1t=3.969  C2t=3.181  C2ot=3.187  D1t=3.966  D2t=3.177  D2ot=3.183
+  B minus C1  first 90 days : quantile score -1.373 (-2.257 to -0.595); q99 pinball*2 -0.0194 (-0.1831 to +0.1647); q99 exceedance B 0.0435 vs C1 0.0409 (nominal 0.0100)
+  B minus C2  first 90 days : quantile score -0.243 (-0.334 to -0.158); q99 pinball*2 -0.0136 (-0.0542 to +0.0158); q99 exceedance B 0.0435 vs C2 0.0425 (nominal 0.0100)
+  B minus D1  first 90 days : quantile score -1.291 (-2.170 to -0.515); q99 pinball*2 -0.0142 (-0.1805 to +0.1699); q99 exceedance B 0.0435 vs D1 0.0410 (nominal 0.0100)
+  B minus D2  first 90 days : quantile score -0.183 (-0.271 to -0.101); q99 pinball*2 -0.0156 (-0.0499 to +0.0117); q99 exceedance B 0.0435 vs D2 0.0437 (nominal 0.0100)
+  B minus C2t first 90 days : quantile score -0.078 (-0.134 to -0.022); q99 pinball*2 +0.0039 (-0.0103 to +0.0193); q99 exceedance B 0.0435 vs C2t 0.0436 (nominal 0.0100)
+  B minus D2t first 90 days : quantile score -0.074 (-0.129 to -0.018); q99 pinball*2 +0.0016 (-0.0117 to +0.0141); q99 exceedance B 0.0435 vs D2t 0.0446 (nominal 0.0100)
+  B minus C1  after day 90  : quantile score -0.683 (-1.137 to -0.344); q99 pinball*2 -0.0482 (-0.0765 to -0.0236); q99 exceedance B 0.0060 vs C1 0.0080 (nominal 0.0100)
+  B minus C2  after day 90  : quantile score +0.005 (-0.038 to +0.047); q99 pinball*2 -0.0029 (-0.0135 to +0.0081); q99 exceedance B 0.0060 vs C2 0.0061 (nominal 0.0100)
+  B minus D1  after day 90  : quantile score -0.669 (-1.118 to -0.324); q99 pinball*2 -0.0419 (-0.0693 to -0.0175); q99 exceedance B 0.0060 vs D1 0.0100 (nominal 0.0100)
+  B minus D2  after day 90  : quantile score +0.022 (-0.017 to +0.064); q99 pinball*2 +0.0018 (-0.0095 to +0.0130); q99 exceedance B 0.0060 vs D2 0.0085 (nominal 0.0100)
+  B minus C2t after day 90  : quantile score +0.051 (+0.026 to +0.077); q99 pinball*2 +0.0048 (+0.0001 to +0.0103); q99 exceedance B 0.0060 vs C2t 0.0058 (nominal 0.0100)
+  B minus D2t after day 90  : quantile score +0.056 (+0.031 to +0.083); q99 pinball*2 +0.0071 (+0.0017 to +0.0132); q99 exceedance B 0.0060 vs D2t 0.0079 (nominal 0.0100)
+  mean absolute error of the median, first 90 days: A=6.448  Ar=6.740  B=6.498  C1=9.083  C2=6.962  C2o=6.889  D1=8.957  D2=6.852  D2o=6.773  C1t=8.392  C2t=6.685  C2ot=6.646  D1t=8.383  D2t=6.676  D2ot=6.643
+
+== D8 real record (break 2023-08-15)
+pre      n= 34224 A=3.038  Ar=3.226  B=3.038  C1=4.067  C2=3.072  C2o=3.038  D1=4.061  D2=3.070  D2o=3.038  C1t=3.886  C2t=2.978  C2ot=3.038  D1t=3.889  D2t=2.975  D2ot=3.038
+d0_30    n=  1440 A=12.858  Ar=12.793  B=12.684  C1=11.851  C2=12.541  C2o=12.087  D1=11.836  D2=12.546  D2o=12.139  C1t=12.680  C2t=12.606  C2ot=12.116  D1t=12.680  D2t=12.606  D2ot=12.139
+d30_90   n=  2880 A=14.010  Ar=14.221  B=13.915  C1=13.479  C2=14.046  C2o=13.289  D1=13.474  D2=14.040  D2o=12.942  C1t=13.969  C2t=13.856  C2ot=13.160  D1t=13.969  D2t=13.856  D2ot=13.120
+d90_180  n=  4320 A=9.051  Ar=8.938  B=8.729  C1=8.824  C2=8.784  C2o=8.318  D1=8.843  D2=8.785  D2o=7.820  C1t=8.649  C2t=8.568  C2ot=8.219  D1t=8.655  D2t=8.567  D2ot=8.214
+d180p    n= 41800 A=8.874  Ar=8.904  B=8.118  C1=8.028  C2=8.036  C2o=7.982  D1=8.030  D2=8.038  D2o=7.983  C1t=7.915  C2t=7.960  C2ot=7.953  D1t=7.914  D2t=7.960  D2ot=7.953
+  D8: B minus C1  all rows after the break: +0.115 (-0.146 to +0.375)
+  D8: B minus C1  first 90 days: +0.568 (+0.209 to +0.916)
+  D8: B minus C2  all rows after the break: +0.060 (-0.184 to +0.309)
+  D8: B minus C2  first 90 days: -0.040 (-0.262 to +0.154)
+  D8: B minus D1  all rows after the break: +0.113 (-0.146 to +0.373)
+  D8: B minus D1  first 90 days: +0.577 (+0.209 to +0.929)
+  D8: B minus D2  all rows after the break: +0.059 (-0.183 to +0.310)
+  D8: B minus D2  first 90 days: -0.037 (-0.251 to +0.149)
+  D8: B minus C2t all rows after the break: +0.150 (-0.057 to +0.372)
+  D8: B minus C2t first 90 days: +0.065 (+0.037 to +0.129)
+  D8: B minus D2t all rows after the break: +0.151 (-0.057 to +0.373)
+  D8: B minus D2t first 90 days: +0.065 (+0.037 to +0.129)
+  D8 after the break, q01 and q99 exceedance by arm (nominal 0.01):
+    A   below q01 0.0236  above q99 0.0323
+    Ar  below q01 0.0234  above q99 0.0374
+    B   below q01 0.0226  above q99 0.0307
+    C1  below q01 0.0192  above q99 0.0259
+    C2  below q01 0.0228  above q99 0.0338
+    C2o below q01 0.0202  above q99 0.0312
+    D1  below q01 0.0194  above q99 0.0253
+    D2  below q01 0.0231  above q99 0.0333
+    D2o below q01 0.0180  above q99 0.0269
+    C1t below q01 0.0222  above q99 0.0311
+    C2t below q01 0.0225  above q99 0.0306
+    C2ot below q01 0.0207  above q99 0.0293
+    D1t below q01 0.0223  above q99 0.0307
+    D2t below q01 0.0227  above q99 0.0301
+    D2ot below q01 0.0223  above q99 0.0273
+
+== Real records of the other 14 Primaries (no injection): rows scored since 2021-09; false alarms act
+  A=2.932  Ar=3.029  B=2.911  C1=4.294  C2=2.986  C2o=2.932  D1=4.284  D2=2.971  D2o=2.932  C1t=4.178  C2t=2.902  C2ot=2.932  D1t=4.178  D2t=2.898  D2ot=2.932
+  B   minus A: -0.021 (-0.037 to -0.004)  [margin 0.01]
+  C1  minus A: +1.362 (+1.108 to +1.653)  [margin 0.01]
+  C2  minus A: +0.054 (+0.018 to +0.101)  [margin 0.01]
+  D1  minus A: +1.352 (+1.095 to +1.640)  [margin 0.01]
+  D2  minus A: +0.039 (+0.006 to +0.081)  [margin 0.01]
+  C2t minus A: -0.030 (-0.047 to -0.013)  [margin 0.01]
+  D2t minus A: -0.034 (-0.052 to -0.017)  [margin 0.01]
+  C2o minus A: +0.000 (+0.000 to +0.000)  [margin 0.01]
+  per Primary, C2 minus A and D2 minus A:
+    D10: C2 +0.085, D2 +0.042, B -0.047
+    D11: C2 -0.032, D2 -0.036, B +0.005
+    D12: C2 +0.069, D2 +0.065, B +0.037
+    D14: C2 -0.013, D2 -0.024, B -0.021
+    D16: C2 -0.002, D2 -0.004, B -0.003
+    D18: C2 +0.051, D2 +0.036, B +0.000
+    D19: C2 +0.084, D2 +0.074, B -0.076
+    D2: C2 -0.023, D2 -0.025, B -0.039
+    D21: C2 +0.035, D2 -0.006, B -0.050
+    D22: C2 +0.117, D2 +0.087, B +0.029
+    D3: C2 +0.043, D2 +0.037, B -0.072
+    D4: C2 +0.234, D2 +0.196, B -0.016
+    D5: C2 +0.083, D2 +0.084, B -0.009
+    D9: C2 +0.000, D2 +0.000, B -0.004
