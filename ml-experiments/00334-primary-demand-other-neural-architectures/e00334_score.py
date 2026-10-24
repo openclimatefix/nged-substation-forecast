@@ -1,4 +1,4 @@
-# ruff: noqa: E501, PLR0915
+# ruff: noqa: PLR0915
 """Score the four networks against Primary demand research default 3 at 0.5 to 240 hours.
 
 Rows, default, and benchmarks are rebuilt as in experiment 322 (the chain's scored-year rows with a
