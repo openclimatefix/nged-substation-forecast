@@ -72,4 +72,4 @@ These are written by the Dagster application, not by experiments.
 - **`data/` sits on the second SSD:** the main checkout's `data/` is a symbolic link to
   `/mnt/data/nged-substation-forecast/data` (disk)
 
-Last checked against experiment 324.
+Last checked against experiment 321.
