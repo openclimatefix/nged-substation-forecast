@@ -42,7 +42,7 @@ import e00326_common as c326  # noqa: E402  # isort: skip  # ty: ignore[unresolv
 import e00347_s4_data as data  # noqa: E402
 import numpy as np  # noqa: E402
 import polars as pl  # noqa: E402
-import torch  # noqa: E402
+import torch  # noqa: E402  # ty: ignore[unresolved-import]
 
 DEVICE: Final = torch.device(
     "cpu" if os.environ.get("E00347_CPU") else ("cuda" if torch.cuda.is_available() else "cpu")
