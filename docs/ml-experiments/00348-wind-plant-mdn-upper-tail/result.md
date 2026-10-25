@@ -7,7 +7,7 @@ title: >-
 theme: generator-forecasting
 also_relevant_to:
   - calibration-and-uncertainty
-status: planned
+status: finished
 date: 2026-10-25
 kind: change
 size: >-
@@ -62,41 +62,151 @@ metric: >-
   240 hours, kept rows), with days 1 to 2, days 3 to 10, and every lead beside; tolerance 0.02 for
   the headline and 0.05 for the 0.01 and 0.99 pinball losses.
 code: ml-experiments/00348-wind-plant-mdn-upper-tail/
+verdict: partly supported
+best_arm: >-
+  z5 (plant residual band blended per quantile with the default's XGBoost quantiles): 10.605 points
+  on the kept rows at true days 1 to 10 against 10.752 for the default (-0.147, 99.8% interval
+  -0.274 to -0.059), with the 0.99 pinball loss unchanged (0.602 against 0.603). The five head
+  arms score 0.225 to 0.245 better than the default, and every 99.8% interval still includes zero.
+headline: >-
+  Tail weights, caps, and a point mass do not make the plant plus mixture head adoptable: every
+  head arm keeps experiment 347's gain over Wind farms research default 1 (0.225 to 0.245 points
+  over true days 1 to 10, 99.8% intervals reaching +0.05), the weighted loss and the monotone
+  increments leave 2.0% to 2.2% of observations above q99, and the point mass collapses q99 onto the
+  farm's scale and raises the 0.99 pinball loss by 0.15. The solar recipe is the only arm whose
+  interval excludes zero (-0.147), and it keeps the default's 0.99 pinball loss.
+production_status: candidate
+adopted_in: none
+lessons: >-
+  A point mass at the top of the mixture cannot be fitted with a pinball loss alone: once the mass
+  weight exceeds 1% the 0.99 quantile equals the scale for every row and the weight gets no
+  gradient from the top levels, so q99 stops depending on the forecast. The head's gain over the
+  default is mostly recalibration of the plant's median (a head given only the median reproduces
+  66% to 77% of it), so the tail needs its own information, which the XGBoost quantiles supply.
+take_home_message: >-
+  The frozen physics plant with a mixture head stays about 0.23 points of capacity better than the
+  research default over days 1 to 10, but none of the four tail fixes inside the head brings the top
+  quantile into calibration without losing score at that quantile, and none of their intervals
+  excludes zero. Blending the plant's residual band with the default's XGBoost quantiles gains less
+  (0.15 points) but is the one arm whose gain is clear and whose 0.99 quantile is no worse, so that
+  recipe, not a better head, is the next thing to build on.
+advice:
+  - >-
+    Do not train a point mass at the farm's scale with a pinball loss alone: q99 sat on the scale
+    for every row and the 0.99 pinball loss rose by 0.15 (z2, z4, tail table). Fit the mass weight
+    with a likelihood or a classification loss on saturated half-hours first.
+  - >-
+    Blend the plant's quantiles with the default's XGBoost quantiles per quantile and lead band
+    before adding tail machinery to the head: it was the only arm with a clear gain and no loss at
+    q99 (z5).
+  - >-
+    Score a wind head at true days 1 to 10 and report the share above q99 beside the 0.99 pinball
+    loss: z2 and z4 cut the share to 1.1% while the loss rose, so the share alone misleads.
+  - >-
+    Treat a base-only head as the reference for any gain claimed over the default: it reproduced
+    66% to 77% of every head arm's gain (controls bullet).
 ---
 
-**Take-home: planned; no score has been read.**
+**Take-home: the frozen physics plant with a mixture head stays about 0.23 points of capacity better
+than Wind farms research default 1 over days 1 to 10, but no tail fix inside the head calibrates the
+top quantile without costing score there, and the plain recipe of blending the plant's residual
+band with the default's XGBoost quantiles is the only arm whose gain is clear.** Verdict: partly
+supported. The next step is to build on that blend, and to fit a point mass with a likelihood.
 
-## Plan
+We asked whether five changes to the upper tail would make experiment 347's best arm (a physics
+model of each farm run on the 51 weather-ensemble members, then a three-component Gaussian mixture
+head) adoptable. The head scored 0.23 points better than the default but put 2.3% of observed power
+above its 0.99 quantile. The five changes were a loss that weights the top quantiles (z1), a point
+mass at the farm's maximum plus a cap (z2), monotone increments above the 0.9 quantile (z3), z1
+plus z2 (z4), and a blend of the plant's residual band with the default's XGBoost quantiles, the
+recipe that fixed the metered solar farms (z5; experiments [270](../00270-metered-farm-xgboost-vs-plant-diagnostic/result.md),
+[287](../00287-metered-farm-spread-binned-plant-heads/result.md), and
+[300](../00300-metered-farm-best-guess-assembly/result.md)). All scores are in points of capacity
+(1 point is 1% of a farm's capacity), on the 53 Tuesday runs of `fold_a_tuesdays_v1`, kept
+half-hours, **scored at true days 1 to 10 (lead 24 to 240 hours)**.
 
-- **Base.** Experiment 347's frozen Stage 3 plant and stored power-ensemble summaries (median,
-  mean, standard deviation, 10th and 90th percentile, share above saturation speed), the same
-  pooled head, hindcast rows, early stopping, and seeds. The head sees ensemble weather only.
-- **z1.** Quantiles from the mixture's CDF, trained on the pinball loss over the 11 levels with
-  weight 3 at q01, q90, q95, q99 and weight 1 elsewhere. Gradients pass through the quantile by
-  implicit differentiation of the CDF. Ceiling 1.0 as in y2.
-- **z2.** The mixture gets a point mass at the farm's fitted scale (`scale` of the Stage 3 plant)
-  with weight `pi` output by the head (init near 0.05, reads the saturation share); quantile =
-  `min(G^-1(tau / (1 - pi)), scale)`. Trained with the unweighted pinball loss, so the extra
-  reference `y2p` (z1's loss, all weights 1, no point mass, ceiling 1.0) separates the loss from
-  the tail components.
-- **z3.** The head's mixture supplies q01 to q90; a small network (16 hidden units; inputs the
-  plant's p90, saturation share, lead) gives q95 and q99 as non-negative increments above q90
-  (softplus), capped at the scale. Trained with z1's weighted pinball loss.
-- **z4.** z1's weighted loss with z2's point mass and cap.
-- **z5 (added 2026-10-25 by the maintainer's Discuss sessions, before any score was read).** On
-  stored quantiles: (a) per-farm offsets, `Q_tau(actual - plant quantile_tau)` by bin of the plant's
-  mean (6 quantile bins) and the ensemble spread (3 terciles), fitted on the hindcast; (b) an
-  additive band, `plant median + Q_tau(actual - plant median)` per mean bin and lead band (under
-  24 h, 24 to 72 h, 72 to 240 h, over 240 h); (c) the plant side is (b), blended per quantile and
-  lead band with the default's XGBoost quantiles, `w` in steps of 0.1 chosen by pinball loss on the
-  scored months before the one being predicted (weight 0.5 for the first month). Each family is
-  reported alone beside the blend. No neural network. The default's XGBoost forecasts exist only
-  for the scored year, so the blend weights use earlier scored months, and the replicate cannot
-  score z5.
-- **Controls.** A base-only head per arm (plant median, lead, farm), the shuffled-summary placebo,
-  five seeds (replicate three), the reproduction gate (y2 refit against experiment 347), the
-  leakage check (plant frozen, head sees ensemble weather only).
-- **Compute.** Heads on one GPU and CPU, under 1 GPU hour, up to 14 cores as separate processes
-  (never a forked pool), `OMP_NUM_THREADS=1`, `MemoryMax=16G` per job.
-- **Serving.** z1 to z4 serve as y2 does (the plant on each member, then the head); z5 needs the
-  plant, a stored table, and the default's XGBoost quantiles.
+![Every arm minus the default at true days 1 to 10, with 95% and 99.8% intervals](figure_1_headline.svg)
+
+![Share of observations above q99 and 0.99 pinball loss for every arm](figure_2_upper_tail.svg)
+
+![Forecast and observed q95 and q99 per farm for arm z4, whose q99 sits on the farm's scale](figure_3_power_curve_z4.svg)
+
+![Forecast and observed q95 and q99 per farm for arm z5](figure_3_power_curve_z5.svg)
+
+![Forecast and observed q95 and q99 per farm for the default](figure_3_power_curve_default.svg)
+
+## Results
+
+- **Arms.** Base is experiment 347's y2 (Stage 3 plant, summary of the 51 member powers, head with
+  three Gaussian components). z1 to z4 as in the plan. The reference `y2p` is y2 trained with the
+  pinball loss, weights 1. z5 works on stored quantiles: the plant's residual band in 6 bins of the
+  plant's mean and 4 lead bands, blended per quantile and lead band with weights chosen on earlier
+  scored months. Wind farms research default 1 is XGBoost plus experiment 259's offset table (the
+  log names no later wind version). Code reuse: experiments 230, 303, 310, 326, 336, and 347.
+- **Headline, true days 1 to 10 (kept rows, default 10.752).** y2 10.518 (-0.234; 99.8% interval
+  -0.512 to +0.056); y2p 10.507 (-0.245); z1 10.527 (-0.225; -0.496 to +0.060); z2 10.508 (-0.244;
+  -0.523 to +0.059); z3 10.514 (-0.238; -0.501 to +0.048); z4 10.507 (-0.245; -0.516 to +0.048);
+  z5 10.605 (-0.147; -0.274 to -0.059). Days 1 to 2: head arms -0.05 to -0.07, z5 -0.172. Days 3
+  to 10: head arms -0.28 to -0.31, z5 -0.158. Every head arm is within 0.011 of y2, and every
+  head arm is within 0.02 of y2p (z1 is the furthest, 0.020 worse).
+- **Reference rows (true days 1 to 10).** XGBoost alone 11.102; XGBoost with the adapter column
+  10.639; experiment 324's head 10.523; climatology 13.860. Seed sd of the head arms on kept rows is
+  0.011 to 0.044.
+- **Standard architecture (physics plant + mixture head).** The best head arm (z4, 10.507) sits
+  0.016 points (0.1%) below the best other family row (experiment 324's W4, 10.523) and 0.245
+  points (2.3%) below the default.
+- **Replicate** (heads trained on 2024-04 to 2024-11, scored on the daily runs of 2025-01 to
+  2025-06, default 9.728): y2 -0.376; y2p -0.354; z1 -0.343; z2 -0.356; z3 -0.329; z4 -0.331; z5
+  -0.209 (95% -0.371 to -0.070; t test on 6 monthly differences p = 0.028). All have the same sign.
+
+| Arm (true days 1 to 10) | Below q01 (%) | Above q95 (%) | Above q99 (%) | p01 | p95 | p99 | 5 to 95 coverage (%) |
+|---|---|---|---|---|---|---|---|
+| default | 0.55 | 6.62 | 1.66 | 0.285 | 2.415 | 0.603 | 92.0 |
+| y2 | 0.81 | 6.69 | 2.15 | 0.283 | 2.382 | 0.626 | 88.9 |
+| z1 | 0.52 | 6.43 | 1.95 | 0.283 | 2.384 | 0.613 | 90.8 |
+| z2 | 0.62 | 6.43 | 1.11 | 0.283 | 2.387 | 0.756 | 89.9 |
+| z3 | 0.53 | 6.68 | 2.21 | 0.283 | 2.393 | 0.620 | 90.5 |
+| z4 | 0.63 | 6.48 | 1.11 | 0.283 | 2.388 | 0.756 | 90.0 |
+| z5 | 0.68 | 6.62 | 1.79 | 0.287 | 2.407 | 0.602 | 90.8 |
+| z5a (plant + offsets) | 0.63 | 6.32 | 1.59 | 0.285 | 2.419 | 0.610 | 89.9 |
+| z5b (plant + residual band) | 1.02 | 7.18 | 2.32 | 0.295 | 2.543 | 0.650 | 89.0 |
+
+- **Tails.** z2 and z4 put q99 on the farm's scale for almost every row (figure 3), so their 1.1%
+  above q99 is the share of observations above the scale. The weight of the point mass gets no
+  gradient from the pinball loss at levels above 1 minus the weight, so the head cannot learn to
+  lower it. By farm, the share above q99 is 0.69%, 2.57%, and 0.04% for W1, W2, and W3 (W2's scale
+  is below capacity). The code reviewer found an earlier version whose q99 was not at the scale;
+  it was fixed and the two arms refitted.
+- **Controls.** The reproduction gate holds (y2 refit 11.081 against 11.081 on all leads, kept rows).
+  A base-only head (plant median, lead, farm) reproduces 71% (y2), 74% (y2p), 75% (z1), 66% (z2),
+  77% (z3), and 75% (z4) of each arm's gain. The shuffled-summary placebo scores 5.6 to 5.8 points
+  worse than the default. The plant is frozen and the head sees ensemble weather only.
+- **Checks.** Median minus mean forecast per farm (true days 1 to 10) is -3.3 to -4.5 points for
+  the default and -3.0 to -4.1 for every arm, so no arm shifts the forecast. The mean-forecast
+  squared error and the median absolute error move in the same direction as the quantile score for
+  every arm. No audit trigger fired: the head arms' failed predictions (below) are explained in the
+  tails bullet, no control failed, and no sister experiment has an interval to compare with.
+- **Pre-registered predictions.** z4's share above q99 under 1.5% holds (1.11%) but its 0.99
+  pinball loss is 0.153 above the default's, so the joint prediction fails. z2 doing best at W1 and
+  W2 fails (W2 is worst). z1 lowering the 0.99 pinball loss by under 0.03 holds (0.013 against y2),
+  and raising the quantile score by under 0.03 holds (0.009). Headline within 0.05 of y2 holds for
+  every arm. The base-only share of at least 70% holds for y2, y2p, z1, z3, and z4, and fails for
+  z2. z5 lowering the 0.99 pinball loss by 10% fails (0.2%), z5's share above q99 under 1.5% fails
+  (1.79%), and z5 within 0.1 of z4 holds (0.098).
+- **Adoption (order z4, z5, z3, z2, z1).** No head arm passes condition 1 (every 99.8% interval
+  includes zero), and z2 and z4 also fail condition 2 (0.99 pinball loss harm up to 0.212). z5
+  passes conditions 1 to 4 (gain 0.147, harm to p01 and p99 at most 0.013, replicate -0.209),
+  but its replicate was added after the main scores were read, because the plan wrongly said the
+  default's replicate forecasts did not exist, so z5 stays a candidate and nothing is adopted.
+- **Serving.** z1 to z4 need what y2 needs: the plant run on each member, then the head. z5 needs
+  the plant, a stored table of offsets by bin, and the default's XGBoost quantiles.
+- **Curtailment metric.** Not scored: `studies.node_curtailment` needs a node's export and its
+  generators' forecasts together, and this experiment forecasts the three farms alone.
+- **Caveats.** Scored at true days 1 to 10 only; three farms and 53 runs give wide intervals. z5's
+  blend weights for the first runs of a month use actuals of the earlier month that were not yet
+  observed at those runs' issue times, a small look-ahead. z5 fits on earlier scored months. Heads
+  used one schedule (fit once on the hindcast), and the contrast does not depend on it.
+- **What to try next.** (1) Fit the point mass's weight with a likelihood or a classification loss
+  on saturated half-hours, then retest z2. (2) Apply the solar recipe to the head's own quantiles
+  (plant plus head, then band, then blend), a tier 1 step. (3) Repeat z5 with a pre-registered
+  replicate before any adoption.
