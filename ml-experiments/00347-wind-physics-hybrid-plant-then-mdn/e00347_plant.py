@@ -79,7 +79,7 @@ class Weather:
 
     def tensors(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Return (speed_100m, speed_10m, temperature_c, direction) as float32 tensors."""
-        return tuple(  # ty: ignore[invalid-return-type]
+        return tuple(
             torch.as_tensor(a, dtype=torch.float32)
             for a in (self.speed_100m, self.speed_10m, self.temperature_c, self.direction_rad)
         )
