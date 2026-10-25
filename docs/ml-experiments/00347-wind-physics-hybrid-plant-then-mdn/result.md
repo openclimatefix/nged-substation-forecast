@@ -123,16 +123,17 @@ forecast's 11 quantiles match the observed power, in points of capacity (1 point
 capacity; lower is better).
 
 We asked whether a frozen physics model of each of the three metered wind farms (called W1 to W3
-here) can replace the XGBoost model in Wind farms research default 1, called "the default" below. The default is an XGBoost model trained on ERA5 (our estimate of past weather)
-and run on the 51 members of the ECMWF ensemble (51 perturbed runs of one weather forecast), plus a
-table of per-quantile offsets. The physics model, called the plant, turns wind speed at 10 m and
-100 m, air temperature, and wind direction into power through a smooth speed-to-power curve with a
+here) can replace the XGBoost model in Wind farms research default 1, called "the default" below.
+The default is an XGBoost model trained on ERA5 (our estimate of past weather) and run on the 51
+members of the ECMWF ensemble (51 perturbed runs of one weather forecast), plus a table of
+per-quantile offsets. The physics model, called the plant, turns wind speed at 10 m and 100 m, air
+temperature, and wind direction into power through a smooth speed-to-power curve with a
 direction-dependent loss. We fitted each plant once on ERA5 before April 2024 and then froze it. We
 passed each of the 51 members through the plant, summarised the 51 power values (median, mean,
 standard deviation, 10th and 90th percentiles, and the share of members at the top level), and fed
 the summary to a mixture-density head (a small neural network that fits three bell curves to each
-forecast, from which the 11 quantiles are read). Four arms differ in the plant and the inputs of
-the head (see "Arms").
+forecast, from which the 11 quantiles are read). Four arms differ in the plant and the inputs of the
+head (see "Arms").
 
 **The headline scores every lead from 0.5 hours to 15 days, as experiments 324 and 339 do; on true
 days 1 to 10 the gain is 0.23 and the 99.75% interval includes zero.** The row set holds every lead
