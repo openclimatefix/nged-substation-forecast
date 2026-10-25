@@ -596,6 +596,15 @@ the other half-hours and 2.1 points worse on the 10,642 idle half-hours, so on a
 0.04 points (95% interval -0.12 to 0.05). We did not test training with the idle half-hours
 included. Covers the three metered wind farms, July 2025 to June 2026. Confidence: medium.
 
+**Do not train a wind farm with no history on public wind farms alone (provisional, low
+confidence).** *Applies to: experiments.* A mixture-density network trained on 40 public onshore
+wind farms (hourly ERA5 weather from 2019-09 to 2024-03, no temperature) and applied to the three
+metered wind farms scored 17.7% worse at day 1 and 17.9% worse at day 2 than a network trained on
+the other two metered wind farms, with equal scores from day 4. Evidence: [experiment
+345](00345-pooled-solar-wind-mixture-density-network/result.md), three farms, July 2025 to June
+2026, ensemble weather. The cause is untested: the public farms' target, their missing temperature,
+and their different turbines are all candidates.
+
 ## Embedded solar capacity
 
 **Hold embedded-solar capacity as one value per Primary per season-year, and do not estimate it
