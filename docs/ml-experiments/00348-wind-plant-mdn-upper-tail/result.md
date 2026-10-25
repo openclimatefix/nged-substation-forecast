@@ -189,11 +189,12 @@ output in the plant model. "True days 1 to 10" means lead hours 24 to 240, on th
   A base-only head (plant median, lead, farm) reproduces 71% (y2), 74% (y2p), 75% (z1), 66% (z2),
   77% (z3), and 75% (z4) of each arm's gain. The shuffled-summary placebo scores 5.6 to 5.8 points
   worse than the default. The plant is frozen and the head sees ensemble weather only.
-- **Checks.** Median minus mean forecast per farm (true days 1 to 10) is -3.3 to -4.5 points for
-  the default and -3.0 to -4.1 for every arm, so every arm's median stays 3.0 to 4.1 points below
-  its mean, close to the default's. The mean-forecast squared error and the median absolute error
-  move in the same direction as the quantile score for every arm. No audit trigger fired: the head arms' failed predictions (below) are explained in the
-  tails bullet, no control failed, and no sister experiment has an interval to compare with.
+- **Checks.** Median minus mean forecast per farm (true days 1 to 10) is -3.3 to -4.5 points for the
+  default and -3.0 to -4.1 for every arm, so every arm's median stays 3.0 to 4.1 points below its
+  mean, close to the default's. The mean-forecast squared error and the median absolute error move
+  in the same direction as the quantile score for every arm. No audit trigger fired: the head arms'
+  failed predictions (below) are explained in the tails bullet, no control failed, and no sister
+  experiment has an interval to compare with.
 - **Pre-registered predictions.**
     - z4 brings the share above q99 under 1.5% (holds, 1.11%) and the 0.99 pinball loss within
       0.03 of the default's (fails, 0.153 above), so the joint prediction fails.
