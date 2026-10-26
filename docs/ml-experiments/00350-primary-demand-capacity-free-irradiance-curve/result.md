@@ -81,4 +81,3 @@ metric: >-
 - **Lead range.** Scored 0.5 to 240 hours and 24 to 240 hours, the maintainer's priority being
   the sunny daylight row. NGED's range is 1 to 10 days.
 - **Schedule.** Monthly refits on a 24-month window, as the default.
-
