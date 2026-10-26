@@ -68,9 +68,9 @@ lessons:
     D8's gap to BG2 sits mostly in the band borrowed from other Primaries, which leaves 21% of
     readings below q01 and 31% below q05. A band from D8's own earlier months removes most of it.
   - >-
-    The stack's night offset and recipe R scored 0.39 to 0.42 points higher (worse) than the fits
-    they correct, in both halves of the year; no interval was computed, and the step also swaps the
-    band, so this is a flag to test, not a finding.
+    The stack's night offset scored worse than the unshifted fit at D8, because D8's level steps
+    make last month's night error a poor guide to this month's (slope -1.10, audit); recipe R is
+    roughly neutral. Of the 0.39-point harm, 0.24 comes from the shifts and 0.15 from the band swap.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
@@ -88,9 +88,8 @@ advice:
     Fit D8's forecast band on D8's own earlier months, not on other Primaries' residuals; it
     lowered the score by 2.22 points (Figure 2 and the Results bullet on the own-history band).
   - >-
-    Test the night offset and recipe R at D8 with a paired interval, and with the band held fixed,
-    before using them; they scored 0.39 to 0.42 points worse here without an interval (Results
-    bullets).
+    Leave the night offset off at D8, where it scored 0.25 points worse with the band held fixed;
+    recipe R is roughly neutral (+0.07) (Checks, audit bullet).
   - >-
     Do not read D8's fitted negative flow as reverse flow: about half of it is at night, and signed
     megawatts do not exist to check the rest (Figure 5).
@@ -224,9 +223,17 @@ the gap.**
   worse than the fit they correct (B against experiment 152's arm A, and C against arm N). The
   first-year warm-up of the offset's expanding window explains part of the gap (B scores 12.093
   against 11.722 for the unshifted fit in the first half of the scored year), but the gap remains in
-  the second half (10.174 against 9.758). A Sonnet audit replaced the Opus audit (see the audit
-  bullet below). The fold verdict does not depend on it, because C1's interval includes zero with or
-  without stage 2 (experiment 152's own N, A, F arms: -0.19 for F minus N).
+  the second half (10.174 against 9.758). The Opus audit was waived by the manager; a Sonnet audit
+  ran instead (next bullet). The fold verdict does not depend on it, because C1's interval includes
+  zero with or without stage 2 (experiment 152's own N, A, F arms: -0.19 for F minus N).
+- **Sonnet audit of trigger 5.** It re-scored the raw stored forecasts of experiment 152 and found
+  no bug and no leakage (adding 500 to every later reading changed no earlier shift). It reproduced
+  the three headline contrasts: B minus C -0.234 (-0.796 to +0.196), B minus unshifted fit +0.393
+  (+0.187 to +0.612), and own-history band minus B -2.218 (-2.899 to -1.559). Of the +0.393, +0.243
+  comes from the shifts (night offset +0.254, recipe R +0.073) and +0.150 from replacing experiment
+  152's band with the band of other Primaries. D8's level steps explain the harm: the realised night
+  error regressed on the offset has slope -1.10. The audit did not re-run the donor Primaries or
+  check how the own-history band behaves in the first quarter of 2026.
 - **Triggers 3, 4, 6, and 7 did not fire:** the quantile score and the mean-forecast error agree in
   direction, there is one site so no leave-one-site-out check exists, no sister experiment has the
   same rows at D8, and no later design depends on this result.
