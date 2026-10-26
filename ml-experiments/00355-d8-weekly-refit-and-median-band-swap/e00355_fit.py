@@ -35,7 +35,7 @@ import e00252s2_corrections as corr  # ty: ignore[unresolved-import]
 import e00252s2_run as stage2  # ty: ignore[unresolved-import]
 import e00354_step as step  # ty: ignore[unresolved-import]
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
@@ -138,7 +138,14 @@ def main() -> None:
         arms = stage2.build_arms(site=site, frame=corr.add_calendar(frame=base))
         for name in ("a", "d"):
             arms[name].write_parquet(folder / f"{name}_scored_{site}.parquet")
-        print(site, cadence, "forecast", frame.height, f"{time.monotonic() - started:.0f} s", flush=True)
+        print(
+            site,
+            cadence,
+            "forecast",
+            frame.height,
+            f"{time.monotonic() - started:.0f} s",
+            flush=True,
+        )
 
 
 if __name__ == "__main__":

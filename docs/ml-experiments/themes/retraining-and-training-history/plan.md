@@ -7,7 +7,6 @@
 | Id | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | [P16](#p16-a-longer-ens-history) | Does the ENS backfill (2021-03 to 2024-03) give an extra validation fold, or improve the single-stage or stage 2 models? | 5 | The maintainer, who runs the fetch on a cloud machine | Deferred; tracked in [issue #959 (Extend ECMWF ENS training history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959), and the 51-member fetch cannot run autonomously because it needs a cloud machine in `us-west-2` |
-| P17 | Does refitting D8's stack weekly close its gap to BG2, and is the gap median or band? (experiment 355) | 1 | Nothing | Running |
 
 ## Planned experiments
 
