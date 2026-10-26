@@ -389,6 +389,7 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 # enforces that production never imports a script.
 extra-paths = [
     "tests",
+    "ml-experiments/00252-gam-stack-at-eight-more-primaries",
     "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
     "ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth",
     "scripts/mkdocs_hooks",
@@ -416,6 +417,7 @@ extra-paths = [
 include = [
     "packages/studies/src/studies/battery_recurrence.py",
     "ml-experiments/00241-pv-capacity-calibrated-interval/e00241_calibrate.py",
+    "ml-experiments/00353-d8-research-default-with-mva-fold/e00353_score.py",
     "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_common.py",
     "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_fit.py",
     "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_report.py",
