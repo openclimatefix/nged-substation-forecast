@@ -31,11 +31,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
-import e00252_common as common
-import e00252_score as score_module
-import e00252s2_common as s2common
-import e00252s2_corrections as corr
-import e00252s2_run as stage2
+import e00252_common as common  # ty: ignore[unresolved-import]
+import e00252_score as score_module  # ty: ignore[unresolved-import]
+import e00252s2_common as s2common  # ty: ignore[unresolved-import]
+import e00252s2_corrections as corr  # ty: ignore[unresolved-import]
+import e00252s2_run as stage2  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.dp_calendar import HOLIDAY_PERIODS
