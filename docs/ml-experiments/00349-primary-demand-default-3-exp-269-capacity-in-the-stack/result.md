@@ -12,8 +12,8 @@ status: done
 size: >-
   medium. Stored: private files under data/ml-experiments/00349-*/ only. Serving path: not touched.
   Degradation rule: not touched. Designs: more than one way to read the estimate in as-of fashion,
-  and the brief fixes three arms. Callers: this folder's scripts, which import the folders of
-  experiments 139, 129, 269, and (if stage 2 runs) 136, 155, 317, 319, and 322, and call reviewed
+  and the maintainer fixed three arms. Callers: this folder's scripts, which import the folders of
+  experiments 139, 129, and 269 (the stages after the first were not rerun), and call reviewed
   `studies.*` modules without changing them. No change under `packages/`.
 hypothesis: >-
   Primary demand research default 3 subtracts a solar capacity pinned to experiment 45's `frozen`
@@ -30,14 +30,15 @@ prediction: >-
   0.038 to 0.181), and the experiment 269 shape lowers the fitted capacities by only 0.2 to 0.4 MW
   at the five decision Primaries. Arm C (the first as-of value held for the year) is no better than
   arm B by more than 0.02 points, so growth tracking is not what matters. The change on cold winter
-  nights and at the tails is within 0.02 points.
+  nights and at the tails is within 0.02 points. The prediction and the decision rule name 0.5 to
+  240 hours; the experiment scored 0.5 to 168 hours only, because the later stages were not rerun.
 decision_rule: >-
   Contrast C1 is arm B minus the default (Primary demand research default 3) on sunny daylight
   half-hours, pooled over the six Primaries, at 0.5 to 240 hours and at 24 to 240 hours reported
   separately, with a month-resampled 95% interval. Contrast C2 is arm C minus arm B on the same
   rows. The hypothesis is `supported` when C1's interval lies wholly below zero. The change is worth
   porting only at a gain of at least 0.05 points on sunny daylight half-hours, because it adds a
-  capacity fit and a farm-response table to a pipeline that otherwise pins one number per Primary.
+  capacity fit and a plant-response table to a pipeline that otherwise pins one number per Primary.
   It is `small gain` when the interval lies below zero but the point estimate is under 0.05 points,
   `refuted` when the interval lies wholly above zero, and `inconclusive` otherwise. The no-harm
   groups are cold winter nights, all daylight, all night, and the tails; a harm above 0.02 points
@@ -53,7 +54,7 @@ metric: >-
   at the six Primaries D5, D9, D10, D11, D14, and D16, scored year 2025-07-02 to 2026-06-30, rows
   outside the hand-filtered events, origin 09:00 UTC. Headline: sunny daylight half-hours, then all
   half-hours, daylight, night, cold winter nights, and the tails (coverage and pinball loss at q01,
-  q05, q95, and q99). The mean absolute error of the mean forecast beside each. CRPS is not scored.
+  q05, q95, and q99). The mean absolute error of the mean forecast beside each.
 verdict: inconclusive
 production_status: not-for-production
 adopted_in: none
@@ -69,7 +70,8 @@ best_arm: >-
 take_home_message: >-
   Using the capacity estimated from six metered solar farms in place of the capacity pinned from
   earlier experiments did not improve the demand forecast on sunny half-hours: the score was 0.047
-  points worse, within the noise (-0.029 to +0.135), and the previous year pointed the same way.
+  points worse, within the noise (-0.029 to +0.135), and the replicate year (2024-07 to 2025-06)
+  pointed the same way.
   The estimate is lower than the pin at several Primaries, most of all at D16 where the forecast
   got worst. This was tested on the convex stage out to 7 days only, so the full stack and the
   7 to 10 day range are untested.
@@ -98,26 +100,32 @@ code: ml-experiments/00349-primary-demand-default-3-exp-269-capacity-in-the-stac
 ## Take-home message
 
 **Replacing the pinned solar capacity with the capacity estimate of experiment 269 did not lower the
-score on sunny half-hours, and it was no better elsewhere.** The research forecast of demand at six
-Primary substations (anonymised as D5, D9, D10, D11, D14, and D16) subtracts the output of
+score on sunny half-hours, and no group improved by more than 0.011 points.** The research forecast
+of demand at six Primary
+substations (anonymised as D5, D9, D10, D11, D14, and D16) subtracts the output of
 unmetered rooftop solar from each substation's demand. The size of that solar (its capacity) is
 pinned to the values of [experiment 45](../00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md).
 [Experiment 269](../00269-pv-capacity-gain-decomposition/result.md) found that a table learned from
 six metered solar farms recovers 0.89 to 0.97 of the output of an injected farm, where the physical
-fleet shape recovers 0.78 to 0.83. We asked whether a capacity read that way gives a better
-forecast. We refitted the first stage of the forecast (a convex demand model with a Kalman filter,
-from [experiment 139](../00139-differentiable-physics-pv-as-of-capacity-in-gam-k/result.md)) with
+fleet shape recovers 0.78 to 0.83.
+
+We asked whether a capacity read that way gives a better forecast. We refitted the first stage of
+the forecast (a convex demand model with a Kalman filter, from
+[experiment 139](../00139-differentiable-physics-pv-as-of-capacity-in-gam-k/result.md)) with
 the pinned capacity swapped for the new estimate, which was refitted each month on earlier rows
-only. Scores are quantile scores in points of the substation's capacity, smaller is better. On the
-sunniest third of daylight half-hours (the third of each Primary's daylight half-hours with the
+only.
+
+Scores are quantile scores in points of the substation's effective capacity, smaller is better. On
+the sunniest third of daylight half-hours (the third of each Primary's daylight half-hours with the
 highest solar output per unit of capacity), the score rose from 4.371 to 4.418, a change of +0.047
 points (95% interval from resampling whole months, -0.029 to +0.135). A positive change means a
-worse score. The interval includes zero, so the experiment cannot tell. **Verdict: inconclusive.**
+worse score. The interval includes zero, so the data cannot tell. **Verdict: inconclusive.**
 The pre-registered rule asks for an interval wholly below zero, which the score did not reach.
 
 The later stages of Primary demand research default 3 (the neural-network head, the solar summary,
 and the blend with the manual heuristic) and the 168 to 240 hour range were not rerun. The first
-stage showed no gain to carry into them. A gain after them cannot be ruled out.
+stage showed no gain to carry into those stages. A gain after the first stage cannot be ruled
+out.
 
 ## Figures
 
@@ -130,7 +138,7 @@ stage showed no gain to carry into them. A gain after them cannot be ruled out.
 ## Results
 
 - **Arms and what was refitted.** The experiment changes the solar capacity inside the fitted
-  stage and imports the default's code (a tier 2 change), and adds a farm-response table and a
+  stage and imports the default's code (a tier 2 change), and adds a plant-response table and a
   capacity fit per month. Arm A is the first stage with the pin (experiment 45's `frozen`
   vintage). Arm B replaces the capacity with the experiment 269 estimate, refitted at each of 27
   monthly origins (2024-04 to 2026-06) on rows before the origin. Arm C holds arm B's value at the
@@ -141,7 +149,8 @@ stage showed no gain to carry into them. A gain after them cannot be ruled out.
 - **Row set and range.** `fold_a_daily_gap_v1`, scored year 2025-07-02 to 2026-06-30, six
   Primaries, rows outside the hand-filtered events, forecast origin 09:00 UTC, lead 0.5 to 168 hours
   and 24 to 168 hours. The 168 to 240 hour range needs the experiment 317 chain, which was not
-  rerun, so the result covers 7 of NGED's 10 forecast days.
+  rerun, so the result covers 7 of the 10 forecast days that NGED (the distribution network
+  operator) cares about.
 - **Headline, sunniest third of daylight half-hours (B minus A, scored year).** At 0.5 to 168 hours:
   +0.047 (-0.029 to +0.135). At 24 to 168 hours: +0.044 (-0.037 to +0.133). Error of the mean
   forecast on the same rows, 0.5 to 168 hours: +0.120 (-0.002 to +0.277).
@@ -150,8 +159,10 @@ stage showed no gain to carry into them. A gain after them cannot be ruled out.
   (-0.012 to +0.158) and C minus B is +0.030 (-0.004 to +0.076).
 - **Replicate year (2024-07 to 2025-06), sunniest third, B minus A.** At 0.5 to 168 hours +0.040
   (-0.004 to +0.084). At 24 to 168 hours +0.044 (+0.004 to +0.085), an interval wholly above zero.
-  Error of the mean forecast +0.106 (0.006 to 0.187) at 0.5 to 168 hours. Both years point the same
-  way. Arms B and C are identical in the replicate year, because both read the 2025-07-01 origin
+  Error of the mean forecast +0.106 (+0.006 to +0.187) at 0.5 to 168 hours. Both years point the
+  same
+  way, and the replicate year's 24 to 168 hour interval excludes zero. Arms B and C are identical in
+  the replicate year, because both read the 2025-07-01 origin
   or an earlier one.
 - **The other groups, B minus A at 0.5 to 168 hours:** no group other than the sunniest third moved
   by more than 0.011 points, as the table shows.
