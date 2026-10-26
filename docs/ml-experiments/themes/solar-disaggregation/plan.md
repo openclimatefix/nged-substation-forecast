@@ -8,6 +8,7 @@
 |---|---|---|---|---|
 | [P2](#p2-embedded-solar-capacity-from-lagged-residuals) | Can summaries of the stage 1a residuals over recent days separate a change in a substation's embedded solar capacity since the stage 1a XGBoost model was trained from a fixed error in the irradiance input? | 2 | Nothing | Experiment 00007 (static CAMS correction) was inconclusive and experiment 00009 (CAMS-trained stage 1a) refuted a gain of 0.2 points; the slope statistics are still proposed and need a plan |
 | [PVDIS-T](#pvdis-t-the-capacity-table-a-study) | What is the unmetered solar capacity behind each Primary metered in MW, with error bars and outside checks? | 2 | The maintainer's review of this plan | Proposed; a study under `docs/studies/`, season-year table first from experiment 00040's outputs, weekly after PVDIS-4 |
+| [P350](#p350-capacity-free-irradiance-curve) | Can a learned curve of irradiance with no PV capacity estimate replace the pinned capacity times the unit solar shape in Primary demand research default 3? | 1 | Nothing | Experiment 00350, planned |
 
 ## Planned experiments
 
@@ -188,3 +189,7 @@ almost no information, so the season-year table is useful before the weekly seri
 reports C as the capacity, keeps sampling uncertainty separate from the named systematic scenarios,
 and carries each Primary's status from the earlier review. The joint fit of [experiment
 00063](../../00063-sw2-10-linear-joint-fit-v2-in-miniature/result.md) read the same capacities.
+
+### P350: capacity-free irradiance curve
+
+**The pinned PV capacity may be replaceable by a learned curve of irradiance.** Experiment 00350 tests a shared and a per-Primary monotone curve against the pinned capacity, headlining sunny daylight half-hours.
