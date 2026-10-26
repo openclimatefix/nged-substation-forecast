@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Final
 
-import e00252_design as design
+import e00252_design as design  # ty: ignore[unresolved-import]
 import numpy as np
 from studies.dp_features import naive_utc
 from studies.dp_gam import N_BANDS

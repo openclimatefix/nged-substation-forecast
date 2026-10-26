@@ -48,7 +48,7 @@ def main() -> None:
         wide=bands, column="p_arm2_arm1", flag="after_first_fit", site="D8"
     )
     out["abs_after_first_fit"] = {
-        n: float(bands.filter(pl.col("after_first_fit"))[f"s_{n}"].mean())
+        n: float(bands.filter(pl.col("after_first_fit"))[f"s_{n}"].mean())  # ty: ignore[invalid-argument-type]
         for n in ("arm1", "arm2", "arm3", "bg2")
     }
     (fit_module.WORK / "post_hoc.json").write_text(json.dumps(out, indent=2, default=float))

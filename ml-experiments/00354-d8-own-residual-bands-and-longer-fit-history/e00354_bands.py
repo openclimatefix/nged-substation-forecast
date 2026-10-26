@@ -25,8 +25,8 @@ os.environ.setdefault("E00252_ARM", "a1")
 
 from typing import Final
 
-import e00252_common as common252
-import e00252_score as score_module
+import e00252_common as common252  # ty: ignore[unresolved-import]
+import e00252_score as score_module  # ty: ignore[unresolved-import]
 import e00354_lib as lib
 import numpy as np
 import polars as pl
@@ -108,7 +108,7 @@ def summarise(*, wide: pl.DataFrame, arms: tuple[str, ...], site: str, capacity_
     out: dict = {"rows": wide.height, "capacity_mw": capacity_mw}
     names = (*arms, *score_module.REFERENCES)
     out["absolute"] = {
-        flag: {n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean()) for n in names}
+        flag: {n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean()) for n in names}  # ty: ignore[invalid-argument-type]
         for flag in slices
     }
     monthly = wide.group_by("month").agg(*[pl.col(f"s_{n}").mean() for n in names]).sort("month")
@@ -142,15 +142,16 @@ def summarise(*, wide: pl.DataFrame, arms: tuple[str, ...], site: str, capacity_
     out["tails_all"]["bg2"] = lib.coverage_and_tails(frame=wide, prefix="bg2_")
     out["checks"] = {
         "median_minus_mean_points": {
-            arm: float((wide[f"{arm}__q50"] - wide[f"{arm}__mean"]).mean()) for arm in arms
+            arm: float((wide[f"{arm}__q50"] - wide[f"{arm}__mean"]).mean())  # ty: ignore[invalid-argument-type]
+            for arm in arms
         },
         "mae_median_mw": {
-            arm: float((wide["actual"] - wide[f"{arm}__q50"]).abs().mean()) * capacity_mw / 100.0
+            arm: float((wide["actual"] - wide[f"{arm}__q50"]).abs().mean()) * capacity_mw / 100.0  # ty: ignore[invalid-argument-type]
             for arm in arms
         }
-        | {"bg2": float((wide["actual"] - wide["bg2_q50"]).abs().mean()) * capacity_mw / 100.0},
+        | {"bg2": float((wide["actual"] - wide["bg2_q50"]).abs().mean()) * capacity_mw / 100.0},  # ty: ignore[invalid-argument-type]
         "mae_mean_forecast_mw": {
-            arm: float((wide["actual"] - wide[f"{arm}__mean"]).abs().mean()) * capacity_mw / 100.0
+            arm: float((wide["actual"] - wide[f"{arm}__mean"]).abs().mean()) * capacity_mw / 100.0  # ty: ignore[invalid-argument-type]
             for arm in arms
         },
     }

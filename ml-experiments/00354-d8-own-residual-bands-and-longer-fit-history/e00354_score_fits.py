@@ -20,8 +20,8 @@ os.environ.setdefault("E00252_ARM", "a1")
 import pickle
 from typing import Final
 
-import e00252_common as common252
-import e00252_score as score_module
+import e00252_common as common252  # ty: ignore[unresolved-import]
+import e00252_score as score_module  # ty: ignore[unresolved-import]
 import e00354_bands as bands
 import e00354_fit as fit_module
 import e00354_lib as lib
@@ -73,7 +73,7 @@ def main() -> None:
     slices = ("all", "sunny", "daylight", "cold_night", "winter_night", "first3", "y2026")
     out["absolute"] = {
         flag: {
-            n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean())
+            n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean())  # ty: ignore[invalid-argument-type]
             for n in (*names, *score_module.REFERENCES)
         }
         for flag in slices
@@ -118,14 +118,15 @@ def main() -> None:
     }
     out["checks"] = {
         "median_minus_mean_points": {
-            n: float((wide[f"{n}__q50"] - wide[f"{n}__mean"]).mean()) for n in names
+            n: float((wide[f"{n}__q50"] - wide[f"{n}__mean"]).mean())  # ty: ignore[invalid-argument-type]
+            for n in names
         },
         "mae_median_mw": {
-            n: float((wide["actual"] - wide[f"{n}__q50"]).abs().mean()) * capacity_mw / 100.0
+            n: float((wide["actual"] - wide[f"{n}__q50"]).abs().mean()) * capacity_mw / 100.0  # ty: ignore[invalid-argument-type]
             for n in names
         },
         "mae_mean_forecast_mw": {
-            n: float((wide["actual"] - wide[f"{n}__mean"]).abs().mean()) * capacity_mw / 100.0
+            n: float((wide["actual"] - wide[f"{n}__mean"]).abs().mean()) * capacity_mw / 100.0  # ty: ignore[invalid-argument-type]
             for n in names
         },
     }

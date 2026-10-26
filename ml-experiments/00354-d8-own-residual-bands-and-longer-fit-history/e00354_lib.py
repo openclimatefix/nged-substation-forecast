@@ -16,9 +16,9 @@ os.environ.setdefault("E00252_ARM", "a1")
 
 from typing import Final
 
-import e00252_score as score_module
-import e00264_asof as asof
-import e00264_common as c264
+import e00252_score as score_module  # ty: ignore[unresolved-import]
+import e00264_asof as asof  # ty: ignore[unresolved-import]
+import e00264_common as c264  # ty: ignore[unresolved-import]
 import numpy as np
 import polars as pl
 from studies.dp_calendar import HOLIDAY_PERIODS
