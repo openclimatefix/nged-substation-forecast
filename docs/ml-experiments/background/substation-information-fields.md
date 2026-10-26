@@ -69,6 +69,10 @@ themselves are on the [NGED power telemetry page](nged-power-telemetry.md), and 
 - **Reading the capacity from the Primary's own power did not improve the forecast.** An as-of
   capacity scored 0.110 points of capacity worse than the pinned vintage on the sunniest third of
   daylight half-hours (exp 139; 5 Primaries, one scored year; provisional).
+- **A curve of irradiance with no capacity estimate matched the pinned capacity at five of six
+  Primaries and beat it at D5.** B minus A on sunny daylight half-hours was +0.025 [-0.252, +0.346]
+  over the five and -0.969 [-1.708, -0.176] at D5, so the D5 pin is a suspect (exp 350; 6
+  Primaries, one scored year; provisional).
 - **A monthly capacity path recovered less of an injected farm than a yearly one**, 0.67 to 0.78
   against 0.75 to 0.87 (exp 157; 6 Primaries, 5 injected farms; provisional).
 - **Refreshing the capacity table once per season-year lowered the error by 0.018 points of
