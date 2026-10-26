@@ -192,4 +192,6 @@ and carries each Primary's status from the earlier review. The joint fit of [exp
 
 ### P350: capacity-free irradiance curve
 
-**The pinned PV capacity may be replaceable by a learned curve of irradiance.** Experiment 00350 tests a shared and a per-Primary monotone curve against the pinned capacity, headlining sunny daylight half-hours.
+**The pinned PV capacity may be replaceable by a learned curve of irradiance.** Experiment 00350
+tests a shared and a per-Primary monotone curve against the pinned capacity, headlining sunny
+daylight half-hours.
