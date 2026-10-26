@@ -138,7 +138,7 @@ the methods of [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/re
 rule at D2, D3, and D4 (Primaries with no gas engine), and refitted D8's monthly stack with the
 longer history. The stack and its stored forecasts come from
 [experiment 252](../00252-gam-stack-at-eight-more-primaries/result.md). The D8 trial in
-[experiment 353](../00353-d8-research-default-with-mva-fold/result.md) first found that a band from
+experiment 353 (not yet merged) first found that a band from
 D8's own earlier months helps, and this experiment tests that finding against placebo Primaries.
 
 **Figure 1: the own-residual band closes about 60% of D8's gap to BG2.**
