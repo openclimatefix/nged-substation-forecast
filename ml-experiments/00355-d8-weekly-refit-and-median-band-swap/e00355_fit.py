@@ -35,7 +35,7 @@ import e00252s2_corrections as corr  # ty: ignore[unresolved-import]
 import e00252s2_run as stage2  # ty: ignore[unresolved-import]
 import e00354_step as step  # ty: ignore[unresolved-import]
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
