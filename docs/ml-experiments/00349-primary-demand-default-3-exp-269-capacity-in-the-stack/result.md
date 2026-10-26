@@ -20,8 +20,8 @@ hypothesis: >-
   vintage (a hindsight growth prior) times a unit solar shape. Replacing that capacity with the
   experiment 269 estimate (the mean plant response of six metered farms, read at the Primary's
   satellite irradiance, with the capacity fitted from rows before each fold's origin) lowers the
-  quantile score on sunny daylight half-hours, because the experiment 269 read-out recovers 0.89 to 0.97 of an
-  injected farm where the physical fleet shape recovers 0.78 to 0.83.
+  quantile score on sunny daylight half-hours, because the experiment 269 read-out recovers 0.89
+  to 0.97 of an injected farm where the physical fleet shape recovers 0.78 to 0.83.
 prediction: >-
   Written before any fit. On sunny daylight half-hours at 0.5 to 240 hours, arm B (as-of estimate)
   scores between 0.03 points better and 0.03 points worse than the default, with a point estimate
