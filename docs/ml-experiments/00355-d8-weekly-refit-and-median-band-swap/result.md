@@ -57,7 +57,8 @@ lessons:
     Refit cadence does not explain D8's gap: weekly minus monthly is -0.045 points, and the
     gain sits in July to September 2025 (-0.148 points, -0.309 to 0.000).
   - >-
-    Neither BG2's median nor BG2's spread closes most of the gap alone; the two parts may work only as a pair.
+    Neither BG2's median nor BG2's spread closes most of the gap alone; the two parts may work only
+    as a pair.
   - >-
     BG2's median is 0.07 MW (4.6%) more accurate than the stack's, and its spread covers 90.4% of
     readings inside q05 to q95 against the stack's 84.6%.
