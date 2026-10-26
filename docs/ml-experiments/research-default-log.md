@@ -31,7 +31,23 @@ of experiment 243 with the floors of experiment 224.
 
 ## Wind farms
 
-No version exists. The family accepts no adoption until its first default is named.
+| Version | Change | Adopting experiment | Scored-year gain | Replicate gain | Absolute headline score | Benchmarks (`climatology`; XGBoost without the offset table; `manual_heuristic` and BG2 not scored for wind farms) | Stored forecasts | Code commit | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| Wind farms research default 2 | The frozen physics plant of each wind farm, run on each of the 51 ensemble members, followed by a mixture-density neural-network head (experiment 347's arm y2). The maintainer decided on 2026-10-26 to adopt it although it fails the upper-tail condition: 2.28% of observations exceed q99 against a nominal 1%, and the one-sided 95% upper bound of the harm to the 0.99 pinball loss is +0.084 points over every lead against a limit of +0.05 | [347](00347-wind-physics-hybrid-plant-then-mdn/result.md), adopted by the maintainer's decision of 2026-10-26, overruling the upper-tail condition | -0.271 points (2.4%) over every lead from 0.5 hours to 15 days (99.75% interval -0.472 to -0.057); -0.234 points over true days 1 to 10 (99.75% interval -0.506 to +0.052, which includes zero) | -0.375 points over every lead (95% interval -0.535 to -0.243) and -0.376 over true days 1 to 10 (95% interval -0.563 to -0.226) | 11.081 points over every lead and 10.518 over true days 1 to 10, on the 96,479 kept rows of `fold_a_tuesdays_v1` | Wind farms research default 1 11.352 and 10.752; `climatology` 13.842 and 13.860; XGBoost without the offset table 11.697 and 11.102 | The private predictions of experiment 347, written once under its id | `2edd4e6b9` | Current |
+| Wind farms research default 1 | The ERA5-trained XGBoost of experiment [33](00033-best-guess-architecture-vs-production/result.md) on the 51 ensemble members with the spread factor, plus the per-quantile offset table of experiment [259](00259-wind-plant-plus-quantile-offset-head/result.md) (experiment [303](00303-wind-adapter-in-production-setting/result.md)'s P1). The wind-farm experiments that followed (336, 338 to 340, 342 to 344, and 346 to 348) scored their changes against this default, and their pages call it "Wind farms research default 1" | [303](00303-wind-adapter-in-production-setting/result.md) | First version | First version | 11.352 points on the kept rows over every lead, and 10.752 over true days 1 to 10 (from experiment 347's refit) | XGBoost without the offset table 11.697 and 11.102; `climatology` 13.842 and 13.860; `manual_heuristic` and BG2 not scored for wind farms | The private predictions of experiment 303 (its arm P1), reproduced to three decimal places (11.352) by the refits in experiments 336 and 347 | `334c127e4` | Superseded by Wind farms research default 2 |
+
+**The adoption of Wind farms research default 2 overrules the rule.** Experiment 347 passes the gain
+condition over every lead and the replicate condition, and fails the upper-tail condition and the
+gain condition over true days 1 to 10. A neural-network head given only the physics plant's median
+and the farm reproduces 83% of the gain over every lead. The maintainer adopted the arm anyway.
+
+**The scored lead range is 0.5 hours to 15 days, and NGED's range is 1 to 10 days.** The gain over
+true days 1 to 10 has an interval that includes zero.
+
+**Experiment 348 tested four tail fixes inside the head and found none that calibrates the top
+quantile.** Its blend of the physics plant's residual band with Wind farms research default 1's
+XGBoost quantiles gains less (0.147 points over true days 1 to 10) but leaves the 0.99 pinball loss
+unchanged. The blend is a candidate for a later version and does not change this adoption.
 
 ## Bulk and grid supply points
 
