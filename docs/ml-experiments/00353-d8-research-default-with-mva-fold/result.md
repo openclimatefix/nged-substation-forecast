@@ -34,7 +34,8 @@ decision_rule: >-
   C1, B minus C over all rows, is the only contrast that bears a verdict. Paired month-resampled
   bootstrap (20,000 resamples, 95%). `supported` when the interval lies wholly below zero and the
   point estimate is at most -0.10 points: a meter fit is existing reviewed code, so the threshold
-  covers only its extra complexity in a forecast that must run for eight Primaries. `small gain` when
+  covers only its extra complexity in a forecast that must run for eight Primaries. `small gain`
+  when
   wholly below zero but above -0.10. `not supported` when the interval includes zero. C2, B minus
   A, and C3, B minus BG2 on sunny daylight half-hours, are descriptive and do not change the
   verdict. Control gate: the stored arms A and N of experiment 152 and A1 of experiment 252 must
@@ -54,21 +55,22 @@ best_arm: >-
   not distinguishable from reading the folded series as signed demand. Absolute quantile score over
   all rows: B 11.132, C 11.366, A 11.433, BG2 7.593.
 headline: >-
-  Modelling the fold changes D8's quantile score by -0.23 points (95% interval -0.83 to +0.21) and leaves
-  every stack variant 3.5 to 3.8 points above BG2. A band fitted on D8's own earlier months (post
+  Modelling the fold changes D8's quantile score by -0.23 points (95% interval -0.83 to +0.21), and
+  arms A, B, and C stay 3.5 to 3.8 points above BG2. A band fitted on D8's own earlier months (post
   hoc) lowers arm B by 2.22 points (-2.90 to -1.56), to 1.32 points above BG2 (+0.57 to +2.17) and
   level with BG2 on sunny daylight rows (+0.24, -0.42 to +0.77).
 lessons:
   - >-
-    The fitted flow is negative on 1.8% of D8's scored half-hours, mostly in August and September
-    2025 and about half of them at night, so it marks the readings' drops, not solar export.
+    The fitted flow is negative on 1.8% of D8's scored rows, mostly in August and September 2025.
+    About half of those valid times are at night, so at least that half marks drops in the readings,
+    not solar export; the daytime half cannot be told apart from export.
   - >-
     D8's gap to BG2 sits mostly in the band borrowed from other Primaries, which leaves 21% of
     readings below q01 and 31% below q05. A band from D8's own earlier months removes most of it.
   - >-
-    The stack's night offset and recipe R worsen D8's score (higher is worse) by 0.39 to 0.42 points
-    over the fits alone, in both halves of the year, so these two corrections made D8's forecast
-    worse in this year of data.
+    The stack's night offset and recipe R scored 0.39 to 0.42 points higher (worse) than the fits
+    they correct, in both halves of the year; no interval was computed, and the step also swaps the
+    band, so this is a flag to test, not a finding.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
@@ -86,11 +88,12 @@ advice:
     Fit D8's forecast band on D8's own earlier months, not on other Primaries' residuals; it
     lowered the score by 2.22 points (Figure 2 and the Results bullet on the own-history band).
   - >-
-    Leave the night offset and recipe R off at D8 until D8 has more than 15 months of history; they
-    worsened the score by 0.39 to 0.42 points here (Results bullets).
+    Test the night offset and recipe R at D8 with a paired interval, and with the band held fixed,
+    before using them; they scored 0.39 to 0.42 points worse here without an interval (Results
+    bullets).
   - >-
-    Read the fitted negative flow at D8 as a marker of drops in the readings, not as evidence of
-    reverse flow, until signed megawatts exist (Figure 5).
+    Do not read D8's fitted negative flow as reverse flow: about half of it is at night, and signed
+    megawatts do not exist to check the rest (Figure 5).
 date: 2026-10-26
 ---
 
@@ -141,7 +144,7 @@ the gap.**
 
 ![Three example weeks](figure_4_weeks.svg)
 
-**Figure 5: the fitted negative flow sits in two months and at night.**
+**Figure 5: the fitted negative flow sits mostly in two months, and about half of it is at night.**
 
 ![Fitted negative flow by month and hour](figure_5_reverse_flow.svg)
 
@@ -149,13 +152,16 @@ the gap.**
 
 - **Arms.** A is experiment 252's arm A1 (stage-2 arm d) as stored. B is experiment 152's arm A
   (meter fit, symmetric quantiles) plus the night offset and recipe R. B-fold is experiment 152's
-  arm F (quantiles folded at zero) plus the same shift. C is experiment 152's arm N plus the same
-  stage 2. The fits are monthly on 3 to 14 months of data from 2025-04-01. This excludes the change
-  in what D8's series measures in April 2025. The width of the uncertainty band comes from the
-  forecast errors of six other Primaries (D2, D3, D4, D19, D21, and D22) on a tuning period.
-- **Rows.** 96,986 half-hourly rows, one per forecast run and valid time, in the scored year
-  2025-07-02 to 2026-06-30, leads 0.5 to 168 hours. The stored ensemble forecasts stop at 168 hours,
-  so the 168 to 240 hour blend of Primary demand research default 3 is not applied.
+  arm F (quantiles folded at zero) with the same shift added to its quantiles; it keeps arm F's own
+  band and has no refitted band, so B-fold minus B mixes the fold with a change of band and only
+  B-fold minus C is quoted. C is experiment 152's arm N plus the same stage 2. The fits are monthly
+  on 3 to 14 months of data from 2025-04-01. This excludes the change in what D8's series measures
+  in April 2025. The width of the uncertainty band comes from the forecast errors of six other
+  Primaries (D2, D3, D4, D19, D21, and D22) on a tuning period.
+- **Rows.** 96,986 half-hourly rows, one per forecast run and valid time (97,012 before the join to
+  BG2, climatology, and the manual heuristic drops 26), in the scored year 2025-07-02 to 2026-06-30,
+  leads 0.5 to 168 hours. The stored ensemble forecasts stop at 168 hours, so the 168 to 240 hour
+  blend of Primary demand research default 3 is not applied.
 - **The control gate passed.** The script reproduces experiment 252's stored D8 scores: A1 11.433
   and BG2 7.593. Experiment 152's F minus N at D8 is -0.190 here (-0.189 on its page).
 - **C1, B minus C (the verdict).** All rows -0.234 (-0.827 to +0.205); sunny daylight -0.229 (-0.661
@@ -184,19 +190,22 @@ the gap.**
   uses information a live forecast would not have and so is a best case, scores 8.443.
 - **High-level and low-level readings.** Rows are split by whether D8's reading, as a 24-hour
   centred median, is at or above 4.5 MW (37,477 rows) or below it (59,509 rows). B minus C is -0.005
-  (-0.567 to +0.375) at the high level and -0.379 (-1.025 to +0.098) at the low level. Every arm
-  scores 11.3 to 11.7 at the high level against BG2's 7.7, so the gap to BG2 is concentrated in the
-  high-level rows (Figure 4).
+  (-0.567 to +0.375) at the high level and -0.379 (-1.025 to +0.098) at the low level. The gap to
+  BG2 is +3.95 at the high level and +3.28 at the low level, with overlapping intervals. Climatology
+  (7.70) and the manual heuristic (7.85) score about as well as BG2 at the high level, so the stack
+  arms with the borrowed band lose there (Figure 4).
 - **Reverse flow.** The fitted signed flow is below zero on 1.8% of scored rows (2.9% of sunny
   daylight rows; 410 of 17,441 distinct valid times), down to -57% of effective capacity. 362 of
   those distinct valid times are in August and September 2025, and 188 are between 00:00 and 05:30
-  UTC, when no solar output exists. The readings are below 5% of effective capacity on 1.7% of rows.
-  The negative flow therefore marks drops in the readings and is not evidence of solar export; the
+  UTC, mostly before sunrise. About 198 are between 10:00 and 17:30 UTC, where solar export is
+  possible. The readings are below 5% of effective capacity on 1.7% of rows. The night-time negative
+  flow therefore marks drops in the readings. The daytime half could be export or drops, and the
   sign is not observable in an MVA meter.
-- **The night offset and recipe R worsen D8's score.** They raise the score (higher is worse) by
-  0.39 (fold-aware: 10.739 to 11.132) and 0.42 (signed-demand: 10.951 to 11.366) over all rows, and
-  by about 0.4 in the second half of the year alone (9.758 to 10.174). The offset alone is 11.067
-  and recipe R alone is 10.962 for the fold-aware arm.
+- **The night offset and recipe R scored worse than the fits they correct.** They raise the score
+  (higher is worse) by 0.39 (fold-aware: 10.739 to 11.132) and 0.42 (signed-demand: 10.951 to
+  11.366) over all rows, and by about 0.4 in the second half of the year alone (9.758 to 10.174).
+  The offset alone is 11.067 and recipe R alone is 10.962 for the fold-aware arm. No interval was
+  computed, and the step also replaces experiment 152's own band with the band from other Primaries.
 - **The stack arms leave far too many readings below q01.** Share of readings at or below each
   quantile, all rows (nominal 1%, 5%, 95%, 99%): B 21.4%, 31.0%, 72.0%, 83.0%; C 21.6%, 31.1%,
   72.2%, 82.9%; A 21.7%, 31.2%, 72.3%, 83.0%; BG2 0.2%, 4.0%, 94.4%, 99.8%. All stack arms put 21%
@@ -225,8 +234,9 @@ the gap.**
 ## Prediction against outcome
 
 - **(1) B minus C -0.30 to 0.00.** Got -0.234. Held.
-- **(2) Reverse flow on 0 to 2% of half-hours.** Got 1.8% of rows. Held, but 188 of 410 valid times
-  are at night, which the prediction did not expect.
+- **(2) Reverse flow on 0 to 2% of half-hours.** Got 1.8% of rows but 2.35% of distinct valid times
+  (410 of 17,441). Partly held, and 188 of the 410 are at night, which the prediction did not
+  expect.
 - **(3) B at least 1.5 points above BG2.** Got +3.539. Held.
 - **(4) B within 0.5 points of A.** Got -0.301. Held.
 
