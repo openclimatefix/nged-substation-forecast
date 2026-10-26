@@ -16,7 +16,6 @@ os.environ.setdefault("E00252_ARM", "a1")
 
 from typing import Final
 
-import e00252_common as common252
 import e00252_score as score_module
 import e00264_asof as asof
 import e00264_common as c264
@@ -74,7 +73,7 @@ def cell_residual_band(*, frame: pl.DataFrame) -> pl.DataFrame:
         rows = asof.fit_rows(resolved=resolved, fit_ns=fit_ns)
         if len(rows) < c264.MIN_FIT_ROWS:
             continue
-        table = asof._cell_quantiles(  # noqa: SLF001
+        table = asof._cell_quantiles(
             ratio=resolved.residual[rows],
             hours=asof.hour_block(valid_ns=resolved.valid_ns[rows]),
             seasons=asof.season(valid_ns=resolved.valid_ns[rows]),

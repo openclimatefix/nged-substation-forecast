@@ -659,6 +659,12 @@ include = [
     "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_run.py",
     "studies/unmetered_battery_capacity/capacity_runs.py",
     "studies/unmetered_battery_capacity/capacity_state_space.py",
+    "ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history/e00354_bands.py",
+    "ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history/e00354_fit.py",
+    "ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history/e00354_lib.py",
+    "ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history/e00354_post_hoc.py",
+    "ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history/e00354_score_fits.py",
+    "ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history/e00354_step.py",
 ]
 
 [tool.ty.overrides.rules]
@@ -813,3 +819,11 @@ plugins.md051.enabled = false
 # asterisk inconsistencies in prose, so the finding list can't be trusted without a per-instance
 # check the math would make risky to automate. Revisit once upstream is math-aware.
 plugins.md049.enabled = false
+
+[[tool.ty.overrides]]
+# Polars' `Series.mean()` is typed as a union that `float()` does not accept; every use here is a
+# mean of a float column.
+include = ["ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history/*.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"

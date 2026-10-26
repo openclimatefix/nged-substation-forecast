@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Fix 3: score D8's three fit histories, with and without stage 2, under three band rules.
 
 Frames are named `<fit>_<stage>_<band>`: fit `a` (from 2025-04), `b` (from 2023-09 with a level
@@ -24,7 +25,6 @@ import e00252_score as score_module
 import e00354_bands as bands
 import e00354_fit as fit_module
 import e00354_lib as lib
-import numpy as np
 import polars as pl
 
 FITS: Final[tuple[str, ...]] = ("a", "b", "c")
@@ -72,13 +72,21 @@ def main() -> None:
     out: dict = {"rows": wide.height, "capacity_mw": capacity_mw}
     slices = ("all", "sunny", "daylight", "cold_night", "winter_night", "first3", "y2026")
     out["absolute"] = {
-        flag: {n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean()) for n in (*names, *score_module.REFERENCES)}
+        flag: {
+            n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean())
+            for n in (*names, *score_module.REFERENCES)
+        }
         for flag in slices
     }
-    monthly = wide.group_by("month").agg(
-        *[pl.col(f"s_{n}").mean() for n in (*names, *score_module.REFERENCES)]
-    ).sort("month")
-    out["monthly"] = {r["month"]: {n: r[f"s_{n}"] for n in (*names, *score_module.REFERENCES)} for r in monthly.to_dicts()}
+    monthly = (
+        wide.group_by("month")
+        .agg(*[pl.col(f"s_{n}").mean() for n in (*names, *score_module.REFERENCES)])
+        .sort("month")
+    )
+    out["monthly"] = {
+        r["month"]: {n: r[f"s_{n}"] for n in (*names, *score_module.REFERENCES)}
+        for r in monthly.to_dicts()
+    }
     pairs = []
     for stage in STAGES:
         for band in BAND_RULES:
@@ -125,11 +133,27 @@ def main() -> None:
     wide.write_parquet(fit_module.WORK / "fits_wide.parquet")
     OUT_FILE.write_text(json.dumps(out, indent=2, default=float))
     for flag in ("all", "first3", "y2026"):
-        print(flag, {n: round(v, 3) for n, v in out["absolute"][flag].items() if n.endswith(("donated", "arm3")) or n in score_module.REFERENCES})
+        print(
+            flag,
+            {
+                n: round(v, 3)
+                for n, v in out["absolute"][flag].items()
+                if n.endswith(("donated", "arm3")) or n in score_module.REFERENCES
+            },
+        )
     stage, band = PRIMARY
-    for x, y in ((f"b_{stage}_{band}", f"a_{stage}_{band}"), (f"c_{stage}_{band}", f"a_{stage}_{band}")):
+    for x, y in (
+        (f"b_{stage}_{band}", f"a_{stage}_{band}"),
+        (f"c_{stage}_{band}", f"a_{stage}_{band}"),
+    ):
         for flag in ("all", "first3", "y2026"):
-            print("contrast", x, y, flag, [round(v, 2) for v in out["contrast"][f"c_{x}__{y}"][flag]["ci99"]])
+            print(
+                "contrast",
+                x,
+                y,
+                flag,
+                [round(v, 2) for v in out["contrast"][f"c_{x}__{y}"][flag]["ci99"]],
+            )
 
 
 if __name__ == "__main__":

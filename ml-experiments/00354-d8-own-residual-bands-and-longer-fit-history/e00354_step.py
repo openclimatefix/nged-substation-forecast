@@ -37,11 +37,11 @@ class StepArm(design.ArmSpec):
 def step_arm(*, base: design.ArmSpec, step_from: datetime | None) -> StepArm:
     """Return `base`'s settings as a `StepArm`."""
     return StepArm(
-        name=base.name,
-        heating_factors=base.heating_factors,
-        lighting_factors=base.lighting_factors,
-        penalty_weight=base.penalty_weight,
-        hinge_threshold_c=base.hinge_threshold_c,
+        name=base.name,  # ty: ignore[unknown-argument]
+        heating_factors=base.heating_factors,  # ty: ignore[unknown-argument]
+        lighting_factors=base.lighting_factors,  # ty: ignore[unknown-argument]
+        penalty_weight=base.penalty_weight,  # ty: ignore[unknown-argument]
+        hinge_threshold_c=base.hinge_threshold_c,  # ty: ignore[unknown-argument]
         step_from=step_from,
     )
 

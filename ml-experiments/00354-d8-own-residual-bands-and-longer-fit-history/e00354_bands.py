@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Fix 1: score D8's own-residual bands against the donated spread, with placebo Primaries.
 
 Arms at D8 (the scored year 2025-07-02 to 2026-06-30, leads 0.5 to 168 hours, stored forecasts):
@@ -31,7 +32,9 @@ import numpy as np
 import polars as pl
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-OUT_DIR: Final = ML_EXPERIMENTS_DATA_DIR / "00354-d8-own-residual-bands-and-longer-fit-history" / "work"
+OUT_DIR: Final = (
+    ML_EXPERIMENTS_DATA_DIR / "00354-d8-own-residual-bands-and-longer-fit-history" / "work"
+)
 STORED: Final = common252.ARM_DIR / "dp_preds_s2"
 SITE_D8: Final[str] = "D8"
 PLACEBOS: Final[tuple[str, ...]] = ("D2", "D3", "D4")
@@ -151,9 +154,7 @@ def summarise(*, wide: pl.DataFrame, arms: tuple[str, ...], site: str, capacity_
             for arm in arms
         },
     }
-    gap = {
-        month: values["arm1"] - values["bg2"] for month, values in out["monthly"].items()
-    }
+    gap = {month: values["arm1"] - values["bg2"] for month, values in out["monthly"].items()}
     out["closure_by_month"] = {
         month: {
             "gap_arm1_minus_bg2": gap[month],
@@ -183,7 +184,9 @@ def main() -> None:
             site=site,
             capacity_mw=float(cache.sites[site].table.effective_capacity_mw),
         )
-        print(site, wide.height, {k: round(v, 3) for k, v in results[site]["absolute"]["all"].items()})
+        print(
+            site, wide.height, {k: round(v, 3) for k, v in results[site]["absolute"]["all"].items()}
+        )
     gate = results["D8"]["absolute"]["all"]
     print("gate arm1", round(gate["arm1"], 3), "bg2", round(gate["bg2"], 3))
     (OUT_DIR / "bands_scores.json").write_text(json.dumps(results, indent=2, default=float))

@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Fix 3: fit D8's stack monthly at the stored cuts with a longer history, and forecast.
 
 Fit arms (all monthly, at the cuts of experiment 252's stored D8 fits, T-all with a fitted solar
@@ -38,12 +39,14 @@ import e00252s2_corrections as corr
 import e00252s2_run as stage2
 import e00354_step as step
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
 SITE: Final[str] = "D8"
-WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00354-d8-own-residual-bands-and-longer-fit-history" / "work"
+WORK: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00354-d8-own-residual-bands-and-longer-fit-history" / "work"
+)
 LONG_START: Final[datetime] = datetime(2023, 9, 1, tzinfo=UTC)
 STEP_AT: Final[datetime] = datetime(2025, 4, 1, tzinfo=UTC)
 LONG_WINDOW_MONTHS: Final[int] = 48
