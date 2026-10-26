@@ -55,7 +55,7 @@ def zero_rules(*, with_threshold: bool) -> alt.LayerChart:
     """Return the dashed rule at zero, and optionally the +0.05 non-inferiority bound."""
     values = [0.0, 0.05] if with_threshold else [0.0]
     return (
-        alt.Chart(pl.DataFrame({"x": values}))
+        alt.Chart(pl.DataFrame({"x": values}))  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeDash=[4, 3], color="#555555")
         .encode(x="x:Q")
     )
@@ -89,7 +89,7 @@ def figure_1(*, report: dict) -> None:
     )
     y = alt.Y("row:N", sort=order, title=None, axis=alt.Axis(labelLimit=400))
     bars = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeWidth=4)
         .encode(
             y=y,
@@ -101,7 +101,7 @@ def figure_1(*, report: dict) -> None:
             color=colour,
         )
     )
-    dots = alt.Chart(frame).mark_point(filled=True, size=70).encode(y=y, x="mean:Q", color=colour)
+    dots = alt.Chart(frame).mark_point(filled=True, size=70).encode(y=y, x="mean:Q", color=colour)  # ty: ignore[unresolved-attribute]
     chart = alt.layer(bars, dots, zero_rules(with_threshold=True)).properties(
         width=WIDTH - 140,
         height=150,
@@ -139,7 +139,7 @@ def figure_2(*, report: dict) -> None:
     y = alt.Y("site:N", sort=list(common.SCORED_SITES), title=None)
     offset = alt.YOffset("arm:N")
     bars = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_rule(strokeWidth=3)
         .encode(
             y=y,
@@ -153,7 +153,7 @@ def figure_2(*, report: dict) -> None:
         )
     )
     dots = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_point(filled=True, size=60)
         .encode(y=y, yOffset=offset, x="mean:Q", color=colour)
     )
@@ -227,7 +227,7 @@ def figure_3(*, rows: pl.DataFrame) -> None:
             print(f"fig3 {label} {row['month']}: B-A {row['diff']:+.3f} (n={row['n']:,})")
     frame = pl.concat(frames)
     chart = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_bar()
         .encode(
             x=alt.X("month:N", title="Month the forecast was issued"),
@@ -327,7 +327,7 @@ def figure_4() -> None:
             )
     frame = pl.DataFrame(rows)
     line = (
-        alt.Chart(frame)
+        alt.Chart(frame)  # ty: ignore[unresolved-attribute]
         .mark_line(strokeWidth=2)
         .encode(
             x=alt.X("irradiance:Q", title="Irradiance (W/m2)"),
