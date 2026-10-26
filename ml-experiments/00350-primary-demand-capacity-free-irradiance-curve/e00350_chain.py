@@ -39,7 +39,7 @@ import e00350_curve as curve
 import numpy as np
 import polars as pl
 import studies.dp_ens_weather as weather
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens_weather import proxy_cache
 from studies.dp_features import FeatureCache, naive_utc

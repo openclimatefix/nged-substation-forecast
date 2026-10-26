@@ -11,7 +11,7 @@ import e00136_common as c136  # ty: ignore[unresolved-import]
 import e00136_design as design  # ty: ignore[unresolved-import]
 import e00350_common as common
 import numpy as np
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache
 from studies.dp_gam import GamLayout, design_matrix, solve_bounded_quadratic
 

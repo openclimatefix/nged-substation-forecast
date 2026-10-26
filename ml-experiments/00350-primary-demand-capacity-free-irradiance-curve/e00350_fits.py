@@ -33,7 +33,7 @@ import e00136_common as c136  # ty: ignore[unresolved-import]
 import e00136_tall as tall  # ty: ignore[unresolved-import]
 import e00350_common as common
 import e00350_curve as curve
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_pinned_capacity import read_vintages
 
 
