@@ -6,7 +6,7 @@ the Primary's pinned capacity and fitted with the same cut `O`. Every fit uses t
 physical unit shape, the shape the fitted capacity is later multiplied by. So neither the capacity
 nor the divisor sees data after `O`. Experiment 129 took its divisor from fits to 2026-07-31.
 
-    uv run --no-sync python ml-experiments/00349-*/e00351_asof_table.py [--workers 3]
+    uv run --no-sync python ml-experiments/00351-*/e00351_asof_table.py [--workers 3]
 """
 
 import argparse

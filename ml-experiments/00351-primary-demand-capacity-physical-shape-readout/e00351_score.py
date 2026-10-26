@@ -6,10 +6,10 @@ hand-filtered switching events, in the named period. The replicate period is the
 
 Slices: daylight half-hours (CAMS-driven unit PV shape above 0.01) are split per Primary into
 thirds by that shape: the sunniest third and the darkest daylight third. Night half-hours are in
-no third. Contrasts use the month-block paired bootstrap at the 98.75% level.
+no third. Contrasts use the month-block paired bootstrap at the 95% level.
 
-    uv run --no-sync python ml-experiments/00349-*/e00351_score.py --period replicate
-    uv run --no-sync python ml-experiments/00349-*/e00351_score.py --period scored
+    uv run --no-sync python ml-experiments/00351-*/e00351_score.py --period replicate
+    uv run --no-sync python ml-experiments/00351-*/e00351_score.py --period scored
 """
 
 import argparse

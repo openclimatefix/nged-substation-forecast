@@ -1,6 +1,6 @@
 """Print the checks of experiment 349: wiring gate, sunniest third by Primary, capacity ratios.
 
-OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00349-*/e00351_checks.py
+OMP_NUM_THREADS=1 uv run --no-sync python ml-experiments/00351-*/e00351_checks.py
 """
 
 import e00351_common as common

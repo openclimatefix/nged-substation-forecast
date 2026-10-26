@@ -12,7 +12,7 @@ The arms differ only in the `PinnedCapacity` given to `fit_gam` (see `e00351_ada
 The spec, window (24 months), and cuts are experiment 111's `gamk`. D9 keeps the pin where its
 history is too short for an as-of block.
 
-    uv run --no-sync python ml-experiments/00349-*/e00351_fits.py [--workers 6] [--arms pin b c]
+    uv run --no-sync python ml-experiments/00351-*/e00351_fits.py [--workers 6] [--arms pin b p r]
 """
 
 import argparse

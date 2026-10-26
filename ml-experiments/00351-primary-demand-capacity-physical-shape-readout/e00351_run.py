@@ -6,7 +6,7 @@ The filter runs on the arm's own fits' residuals against the analysis proxy; the
 corrected mean plus a residual table fitted on the tuning months from the same arm, with every
 spread factor 1.
 
-    uv run --no-sync python ml-experiments/00349-*/e00351_run.py [--workers 6] [--arms pin asof]
+    uv run --no-sync python ml-experiments/00351-*/e00351_run.py [--workers 6] [--arms pin asof]
 """
 
 import argparse
