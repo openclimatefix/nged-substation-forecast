@@ -1,8 +1,7 @@
 # ruff: noqa: E501
 """Draw the figures of experiment 355 from `work/scores.json`.
 
-PYTHONPATH=ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history \
-        uv run --no-sync python ml-experiments/00355-*/e00355_charts.py
+Run with `ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history` on `PYTHONPATH`.
 """
 
 import json
