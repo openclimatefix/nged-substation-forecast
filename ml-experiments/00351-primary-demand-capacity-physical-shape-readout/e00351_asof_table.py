@@ -1,9 +1,10 @@
-"""Build the as-of solar capacity table of experiment 349, one block per origin and Primary.
+"""Build experiment 351's as-of physical-shape capacity table, one block per origin and Primary.
 
 At an origin `O`, a fit of experiment 129's arm 2 uses only rows before `O`. Its raw capacity per
 season-year is divided by a divisor, the median recovery of the five real farms' output injected at
-the Primary's pinned capacity and fitted with the same cut `O`. So neither the capacity nor the
-divisor sees data after `O`. Experiment 129 took its divisor from fits to 2026-07-31.
+the Primary's pinned capacity and fitted with the same cut `O`. Every fit uses the stack's own
+physical unit shape, the shape the fitted capacity is later multiplied by. So neither the capacity
+nor the divisor sees data after `O`. Experiment 129 took its divisor from fits to 2026-07-31.
 
     uv run --no-sync python ml-experiments/00349-*/e00351_asof_table.py [--workers 3]
 """
@@ -15,7 +16,6 @@ from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
-import e00269_common as c269  # ty: ignore[unresolved-import]
 import e00351_common as common
 import numpy as np
 import polars as pl
@@ -27,15 +27,7 @@ from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
 def table_path(*, site: str, origin: datetime) -> Path:
     """Return the file that holds one Primary's block for one origin."""
-    return common.WORK_DIR / "asof" / f"asof_{site}_{origin:%Y%m%d}.parquet"
-
-
-def shaped(*, cache: FeatureCache, site: str, shape: np.ndarray) -> FeatureCache:
-    """Return the cache with a Primary's unit shape replaced where both shapes exist."""
-    features = cache.sites[site]
-    both = np.isfinite(features.pv_unit_shape) & np.isfinite(shape)
-    new = replace(features, pv_unit_shape=np.where(both, shape, np.nan))
-    return replace(cache, sites={**cache.sites, site: new})
+    return common.WORK_DIR / "asof_physical" / f"asof_{site}_{origin:%Y%m%d}.parquet"
 
 
 def capacity_by_year(*, cache: FeatureCache, site: str, origin: datetime, device: str) -> dict:
@@ -69,31 +61,21 @@ def build_block(*, site: str, origin: datetime, device: str) -> str:
     cache = common.load_cache()
     table = cache.sites[site].table
     pinned = pinned_capacity(vintages=read_vintages(), table=table, cut=origin).held_points
-    all_shape = c269.learned_unit_shape(cache=cache, site=site, farms=c269.ALL_FARMS)
-    base = capacity_by_year(
-        cache=shaped(cache=cache, site=site, shape=all_shape),
-        site=site,
-        origin=origin,
-        device=device,
-    )
+    base = capacity_by_year(cache=cache, site=site, origin=origin, device=device)
     counts = year_row_counts(cache=cache, site=site, origin=origin)
     recoveries: dict[int, list[float]] = {year: [] for year in common.SEASON_YEARS}
     for farm in common.FARMS:
-        others = tuple(f for f in c269.ALL_FARMS if f != farm)
-        other_shape = c269.learned_unit_shape(cache=cache, site=site, farms=others)
-        without = shaped(cache=cache, site=site, shape=other_shape)
-        base_other = capacity_by_year(cache=without, site=site, origin=origin, device=device)
         injected = pinned * common.farm_norm(cache=cache, farm=farm)
         shifted = replace(
-            without,
+            cache,
             sites={
-                **without.sites,
-                site: replace(without.sites[site], y=without.sites[site].y - injected),
+                **cache.sites,
+                site: replace(cache.sites[site], y=cache.sites[site].y - injected),
             },
         )
         capacity = capacity_by_year(cache=shifted, site=site, origin=origin, device=device)
         for year in common.SEASON_YEARS:
-            recoveries[year].append((capacity[year] - base_other[year]) / pinned)
+            recoveries[year].append((capacity[year] - base[year]) / pinned)
     scale = table.effective_capacity_mw / 100.0
     rows = []
     for year in common.SEASON_YEARS:

@@ -30,6 +30,13 @@ SLUG: Final[str] = "primary-demand-capacity-physical-shape-readout"
 DATA_DIR: Final[Path] = ML_EXPERIMENTS_DATA_DIR / f"{EXPERIMENT_ID:05d}-{SLUG}"
 WORK_DIR: Final[Path] = DATA_DIR / "work"
 """Small result files (capacity tables, gate tables); private and never committed."""
+TABLE_349_DIR: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR
+    / "00349-primary-demand-default-3-exp-269-capacity-in-the-stack"
+    / "work"
+    / "asof"
+)
+"""Experiment 349's as-of table (empirical-shape read-out), read for the reference arm B."""
 CACHE_DIR: Final[Path] = (
     ML_EXPERIMENTS_DATA_DIR
     / "00106-differentiable-physics-4-all-years-drift-and-recent-level"
@@ -59,8 +66,6 @@ ORIGINS: Final[tuple[datetime, ...]] = tuple(
 )
 """The as-of origins: every monthly cut of the forecast fits (2024-04-01 to 2026-06-01), so that
 arm B's capacity at a cut uses rows before that cut and no later row."""
-HELD_ORIGIN: Final[datetime] = datetime(2025, 7, 1, tzinfo=UTC)
-"""Arm C holds the estimate at its value at this origin, the first of the scored year."""
 TRAINING_WINDOW: Final[TrainingWindow] = TrainingWindow()
 RIDGE: Final[float] = 0.1
 """Experiment 104's tuned ridge penalty, as experiments 106, 110, and 129 used it."""

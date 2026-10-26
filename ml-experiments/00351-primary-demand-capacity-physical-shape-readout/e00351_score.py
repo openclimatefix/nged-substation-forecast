@@ -32,8 +32,13 @@ LEVELS: Final[np.ndarray] = np.array(
 LEVEL: Final[float] = 95.0
 """The maintainer's headline interval (2026-10-26): month-resampled 95%."""
 N_RESAMPLES: Final[int] = 20000
-ARMS: Final[tuple[str, ...]] = ("pin", "b", "c")
-CONTRASTS: Final[tuple[tuple[str, str], ...]] = (("b", "pin"), ("c", "pin"), ("c", "b"))
+ARMS: Final[tuple[str, ...]] = ("pin", "b", "p", "r")
+CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("p", "pin"),
+    ("p", "b"),
+    ("r", "pin"),
+    ("b", "pin"),
+)
 LEAD_RANGES: Final[dict[str, tuple[float, float]]] = {
     "0.5 to 168 h": (0.0, 168.0),
     "24 to 168 h": (24.0, 168.0),

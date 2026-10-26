@@ -34,10 +34,10 @@ def wiring_gate() -> None:
 
 
 def sunny_by_primary() -> None:
-    """Print B minus A on the sunniest third by Primary and leaving one Primary out."""
+    """Print P minus A on the sunniest third by Primary and leaving one Primary out."""
     frames = {
         arm: score.load_arm(arm=arm, period="scored", sites=run_common.SCORED_SITES)
-        for arm in ("pin", "b")
+        for arm in ("pin", "p")
     }
     edges = score.tertile_edges(frame=frames["pin"])
     frames = {
@@ -53,7 +53,7 @@ def sunny_by_primary() -> None:
             (f"{site} only", sunny.filter(pl.col("label") == site)),
             (f"leave out {site}", sunny.filter(pl.col("label") != site)),
         ):
-            result = score.contrast(losses=part, treatment="b", reference="pin")
+            result = score.contrast(losses=part, treatment="p", reference="pin")
             rows.append({"scope": name, **result})
     table = pl.DataFrame(rows)
     common.write_parquet_atomic(frame=table, path=common.WORK_DIR / "sunny_by_primary.parquet")
@@ -61,26 +61,75 @@ def sunny_by_primary() -> None:
         print(table)
 
 
+def applied_capacity(*, table: pl.DataFrame) -> pl.DataFrame:
+    """Return, per Primary and origin, the capacity applied (the latest data year's estimate)."""
+    data = table.filter(pl.col("training_rows") >= common.MIN_YEAR_ROWS)
+    latest = data.group_by("site", "origin").agg(pl.col("season_year").max().alias("season_year"))
+    return data.join(latest, on=["site", "origin", "season_year"]).select(
+        "site", "origin", "estimate_points", "raw_points", "pinned_points"
+    )
+
+
 def capacity_ratios() -> None:
-    """Print the estimate over the pin for the latest season-year at selected origins."""
-    table = pl.concat(
-        [
-            pl.read_parquet(path)
-            for path in sorted((common.WORK_DIR / "asof").glob("asof_*.parquet"))
-        ]
-    ).filter(pl.col("season_year") == 2025)
-    first = table.group_by("site").agg(pl.col("origin").min().alias("first_origin"))
-    print(first.sort("site"))
-    with pl.Config(float_precision=3, tbl_rows=60):
+    """Compare arm P's capacity with experiment 349's table and the pin, per Primary and month."""
+    p = applied_capacity(
+        table=pl.concat(
+            [
+                pl.read_parquet(f)
+                for f in sorted((common.WORK_DIR / "asof_physical").glob("asof_*.parquet"))
+            ]
+        )
+    )
+    b = applied_capacity(
+        table=pl.concat(
+            [pl.read_parquet(f) for f in sorted(common.TABLE_349_DIR.glob("asof_*.parquet"))]
+        )
+    )
+    both = p.join(b, on=["site", "origin"], suffix="_b").with_columns(
+        p_over_pin=pl.col("estimate_points") / pl.col("pinned_points"),
+        b_over_pin=pl.col("estimate_points_b") / pl.col("pinned_points"),
+        p_over_b=pl.col("estimate_points") / pl.col("estimate_points_b"),
+        r_over_pin=pl.col("raw_points") / pl.col("pinned_points"),
+    )
+    common.write_parquet_atomic(frame=both, path=common.WORK_DIR / "capacity_comparison.parquet")
+    with pl.Config(float_precision=3, tbl_rows=80, tbl_cols=12):
         print(
-            table.with_columns(ratio=pl.col("estimate_points") / pl.col("pinned_points"))
-            .filter(pl.col("origin").dt.strftime("%Y-%m").is_in(["2024-07", "2025-07", "2026-06"]))
-            .select("site", "origin", "estimate_points", "pinned_points", "ratio")
+            both.filter(pl.col("origin").dt.strftime("%Y-%m").is_in(["2025-07", "2026-06"]))
+            .select(
+                "site",
+                "origin",
+                "pinned_points",
+                "estimate_points_b",
+                "estimate_points",
+                "raw_points",
+                "p_over_pin",
+                "b_over_pin",
+                "p_over_b",
+            )
             .sort("site", "origin")
         )
+        summary = (
+            both.group_by("site")
+            .agg(
+                n=pl.len(),
+                p_vs_pin_gt10=((pl.col("p_over_pin") - 1).abs() > 0.1).sum(),
+                b_vs_pin_gt10=((pl.col("b_over_pin") - 1).abs() > 0.1).sum(),
+                p_vs_b_gt10=((pl.col("p_over_b") - 1).abs() > 0.1).sum(),
+                mean_p_over_pin=pl.col("p_over_pin").mean(),
+                mean_b_over_pin=pl.col("b_over_pin").mean(),
+                mean_r_over_pin=pl.col("r_over_pin").mean(),
+            )
+            .sort("site")
+        )
+        print(summary)
 
 
 if __name__ == "__main__":
-    wiring_gate()
-    sunny_by_primary()
-    capacity_ratios()
+    import sys
+
+    if "--capacity-only" in sys.argv:
+        capacity_ratios()
+    else:
+        wiring_gate()
+        sunny_by_primary()
+        capacity_ratios()

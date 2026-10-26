@@ -6,7 +6,8 @@ The arms differ only in the `PinnedCapacity` given to `fit_gam` (see `e00351_ada
 |---|---|
 | `pin` | experiment 45's `frozen` vintage through the adaptor (arm A, the wiring check) |
 | `b` | experiment 269's pooled-empirical-shape estimate, fitted with rows before each cut |
-| `c` | arm B's estimate held at its value at the first scored origin (2025-07-01) |
+| `p` | the physical-shape read-out (experiment 351's table), divided by its injection divisor |
+| `r` | the same read-out without the divisor, in the model's own units |
 
 The spec, window (24 months), and cuts are experiment 111's `gamk`. D9 keeps the pin where its
 history is too short for an as-of block.
@@ -33,7 +34,7 @@ from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import GamFit, fit_gam
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
 
-ARMS: Final[tuple[str, ...]] = ("pin", "b", "c")
+ARMS: Final[tuple[str, ...]] = ("pin", "b", "p", "r")
 POST_HOC_ARMS: Final[tuple[str, ...]] = ()
 TABLE_SITES: Final[tuple[str, ...]] = common.TABLE_SITES
 
@@ -43,14 +44,10 @@ def fit_path(*, arm: str, site: str) -> Path:
     return run_common.WORK_DIR / "fits" / arm / f"{site}.pkl"
 
 
-def read_asof_table() -> pl.DataFrame:
-    """Return every Primary's and origin's as-of block."""
-    return pl.concat(
-        [
-            pl.read_parquet(path)
-            for path in sorted((common.WORK_DIR / "asof").glob("asof_*.parquet"))
-        ]
-    )
+def read_asof_table(*, arm: str) -> pl.DataFrame:
+    """Return every Primary's and origin's as-of block: experiment 349's for arm B, else ours."""
+    folder = common.TABLE_349_DIR if arm == "b" else common.WORK_DIR / "asof_physical"
+    return pl.concat([pl.read_parquet(path) for path in sorted(folder.glob("asof_*.parquet"))])
 
 
 def first_cut_index(*, cache: FeatureCache, site: str, cuts: list[datetime]) -> int:
@@ -68,14 +65,16 @@ def first_cut_index(*, cache: FeatureCache, site: str, cuts: list[datetime]) -> 
 def capacity_for(*, arm: str, site: str, cut: datetime, pin, table) -> tuple:  # noqa: ANN001
     """Return the arm's capacity at a cut, and the number of path weeks that took the pin.
 
-    Arm B reads the estimate fitted with rows before the cut. Arm C reads the estimate at the cut
-    or at `HELD_ORIGIN`, whichever is earlier. A Primary with no block at that origin (D9 before
+    Arms B and P read the estimate fitted with rows before the cut, and arm R its raw capacity. A
+    Primary with no block at that origin (D9 before
     its history is long enough) keeps the pin, and the weeks are counted.
     """
     if arm == "pin":
         return adaptor.pin_adaptor(pin=pin), 0
-    origin = cut if arm == "b" else min(cut, common.HELD_ORIGIN)
-    estimates, data_years = adaptor.asof_estimates(table=table, site=site, origin=origin)
+    column = "raw_points" if arm == "r" else "estimate_points"
+    estimates, data_years = adaptor.asof_estimates(
+        table=table, site=site, origin=cut, column=column
+    )
     if not any(np.isfinite(v) for v in estimates.values()) or not data_years:
         return adaptor.pin_adaptor(pin=pin), len(adaptor.WEEKS)
     return adaptor.table_adaptor(pin=pin, estimates=estimates, data_years=data_years)
@@ -89,7 +88,7 @@ def fit_site(*, arm: str, site: str) -> str:
     cuts = run_common.monthly_cuts()
     spec = run_common.base_spec()
     first = first_cut_index(cache=cache, site=site, cuts=cuts)
-    table = read_asof_table() if arm != "pin" else None
+    table = read_asof_table(arm=arm) if arm != "pin" else None
     fits: list[GamFit] = []
     fallback_weeks = 0
     for cut in cuts[first:]:

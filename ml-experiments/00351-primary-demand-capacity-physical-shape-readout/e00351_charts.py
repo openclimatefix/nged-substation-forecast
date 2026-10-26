@@ -1,6 +1,6 @@
-"""Draw the figures of experiment 349 from `work/contrasts_scored.parquet` and `work/asof/`.
+"""Draw the figures of experiment 351 from `work/contrasts_scored.parquet` and `work/asof/`.
 
-uv run --no-sync python ml-experiments/00349-*/e00351_charts.py
+uv run --no-sync python ml-experiments/00351-*/e00351_charts.py
 """
 
 from pathlib import Path
@@ -27,8 +27,9 @@ SCOPES: Final[tuple[str, ...]] = (
     "all half-hours",
 )
 NAMES: Final[dict[str, str]] = {
-    "b - pin": "B (estimate fitted before each month) minus default",
-    "c - pin": "C (estimate held at July 2025) minus default",
+    "p - pin": "P (physical-shape read-out, divided by injection recovery) minus default",
+    "r - pin": "R (physical-shape read-out, raw) minus default",
+    "b - pin": "B (experiment 349's empirical-shape read-out) minus default",
 }
 AXIS_TITLE: Final[str] = (
     "Quantile score minus the default's (points of capacity; below 0 is better)"
@@ -61,7 +62,8 @@ def contrasts() -> None:
             color=alt.Color(
                 "arm:N",
                 scale=alt.Scale(
-                    domain=list(NAMES.values()), range=[ocf.DATA_BLUE, ocf.BRAND_ORANGE]
+                    domain=list(NAMES.values()),
+                    range=[ocf.BRAND_ORANGE, ocf.DATA_PURPLE, ocf.DATA_BLUE],
                 ),
                 legend=alt.Legend(title=None, orient="bottom", columns=1),
             ),
@@ -74,7 +76,7 @@ def contrasts() -> None:
         ).properties(
             width=WIDTH,
             title=alt.TitleParams(
-                text=f"The new capacity does not lower the score on sunny half-hours ({lead})",
+                text=f"The physical-shape capacity does not lower the sunny score ({lead})",
                 anchor="start",
                 fontSize=13,
             ),
@@ -83,21 +85,18 @@ def contrasts() -> None:
 
 
 def capacities() -> None:
-    """Draw the pinned and estimated capacity of each Primary by monthly origin."""
-    table = pl.concat(
-        [
-            pl.read_parquet(path).filter(pl.col("season_year") == 2025)
-            for path in sorted((common.WORK_DIR / "asof").glob("asof_*.parquet"))
-        ]
-    )
+    """Draw the pinned capacity and the arm B and arm P estimates of each Primary by origin."""
+    table = pl.read_parquet(common.WORK_DIR / "capacity_comparison.parquet")
     pinned = "pinned (experiment 45)"
-    estimate = "experiment 269 estimate"
+    arm_b = "B (experiment 349, empirical shape)"
+    arm_p = "P (physical shape, this experiment)"
     long = pl.concat(
         [
-            table.select(
-                "site", "origin", series=pl.lit(estimate), points=pl.col("estimate_points")
-            ),
             table.select("site", "origin", series=pl.lit(pinned), points=pl.col("pinned_points")),
+            table.select(
+                "site", "origin", series=pl.lit(arm_b), points=pl.col("estimate_points_b")
+            ),
+            table.select("site", "origin", series=pl.lit(arm_p), points=pl.col("estimate_points")),
         ]
     ).with_columns(origin=pl.col("origin").dt.replace_time_zone(None))
     chart = (
@@ -108,8 +107,11 @@ def capacities() -> None:
             y=alt.Y("points:Q", title=POINTS_TITLE),
             color=alt.Color(
                 "series:N",
-                scale=alt.Scale(domain=[pinned, estimate], range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE]),
-                legend=alt.Legend(title=None, orient="bottom"),
+                scale=alt.Scale(
+                    domain=[pinned, arm_b, arm_p],
+                    range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE],
+                ),
+                legend=alt.Legend(title=None, orient="bottom", columns=1),
             ),
         )
         .properties(width=170, height=120)
@@ -119,7 +121,7 @@ def capacities() -> None:
         )
         .properties(
             title=alt.TitleParams(
-                text="The estimate sits well below the pin at D16 and near it elsewhere",
+                text="Arm P's capacity is 5 to 13% above arm B's, above the pin at some Primaries",
                 anchor="start",
                 fontSize=13,
             )
