@@ -38,8 +38,7 @@ decision_rule: >-
   wholly below zero but above -0.10. `not supported` when the interval includes zero. C2, B minus
   A, and C3, B minus BG2 on sunny daylight half-hours, are descriptive and do not change the
   verdict. Control gate: the stored arms A and N of experiment 152 and A1 of experiment 252 must
-  reproduce their printed D8 scores (7.29/7.56 are D12's; D8's are read from the stored files) when
-  rescored by this script.
+  reproduce their stored D8 scores when rescored by this script (A1: 11.433; BG2: 7.593).
 benchmark: >-
   BG2, climatology, and manual_heuristic as stored by experiment 87 and read by experiment 252's
   scoring code; experiment 252's arm A1 (stage-2 arm d) as the card's forecast
@@ -65,8 +64,7 @@ code: ml-experiments/00353-d8-research-default-with-mva-fold/
       the same shifts.
     - C: experiment 152's arm N (the reading as signed demand), then the same stage 2.
     - References: BG2, `manual_heuristic`, climatology.
-3. **What this does not test.** B does not use the T-all design, shared solar clip, or pinned solar
-   capacity of the stack, because `studies.dp_meter` fits the B0 design only. The lead range stops
+3. **What this does not test.** B does not use the T-all design or 60% solar clip of the stack, because `studies.dp_meter` fits the B0 design only. The lead range stops
    at 168 hours because the stored ensemble forecasts stop there, so the heuristic blend of Primary
    demand research default 3 (168 to 240 hours) is not applied.
 4. **Training length.** D8's series changes meaning in April 2025 (experiment 152); training starts
