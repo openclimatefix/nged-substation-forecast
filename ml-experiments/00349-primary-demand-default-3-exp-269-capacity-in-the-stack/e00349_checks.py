@@ -23,7 +23,7 @@ def wiring_gate() -> None:
     """Compare arm A with experiment 139's stored pin forecasts at every Primary."""
     keys = ["power_fcst_init_time", "valid_time"]
     for site in run_common.SCORED_SITES:
-        ours = pl.read_parquet(score.run_module.out_path(arm="pin", period="scored", site=site))
+        ours = pl.read_parquet(score.forecasts.out_path(arm="pin", period="scored", site=site))
         theirs = pl.read_parquet(SOURCE_139 / f"pin_scored_{site}.parquet")
         joined = ours.join(theirs, on=keys, suffix="_139")
         gap = max(

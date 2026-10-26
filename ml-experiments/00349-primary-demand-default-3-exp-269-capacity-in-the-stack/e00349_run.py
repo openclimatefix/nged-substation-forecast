@@ -25,7 +25,7 @@ import e00349_fits as fits_module
 import e00349_run_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_ens import proxy_residual_stream
 from studies.dp_ens_weather import Calibration, proxy_cache

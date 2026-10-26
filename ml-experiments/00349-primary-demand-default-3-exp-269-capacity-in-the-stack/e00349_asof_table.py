@@ -19,7 +19,7 @@ import e00269_common as c269  # ty: ignore[unresolved-import]
 import e00349_common as common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache
 from studies.dp_gam import fit_gam, training_rows
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages

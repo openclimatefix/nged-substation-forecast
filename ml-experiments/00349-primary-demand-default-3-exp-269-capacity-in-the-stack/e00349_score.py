@@ -16,7 +16,7 @@ import argparse
 from typing import Final
 
 import e00349_common as common
-import e00349_run as run_module
+import e00349_run as forecasts
 import e00349_run_common as run_common
 import numpy as np
 import polars as pl
@@ -51,7 +51,7 @@ def load_arm(*, arm: str, period: str, sites: tuple[str, ...]) -> pl.DataFrame:
     cache = common.load_cache()
     pieces = []
     for site in sites:
-        path = run_module.out_path(arm=arm, period=period, site=site)
+        path = forecasts.out_path(arm=arm, period=period, site=site)
         if not path.exists():
             continue
         frame = pl.read_parquet(path).with_columns(label=pl.lit(site))

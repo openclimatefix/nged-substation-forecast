@@ -28,7 +28,7 @@ import e00349_common as common
 import e00349_run_common as run_common
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_features import FeatureCache, naive_utc
 from studies.dp_gam import GamFit, fit_gam
 from studies.dp_pinned_capacity import pinned_capacity, read_vintages
