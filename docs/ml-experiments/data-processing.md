@@ -642,6 +642,15 @@ half-hourly output in AC power.** CAMS irradiance recovered an injected 99th-per
 45](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md) defines capacity the same way. Applies to
 experiments and capacity tables.
 
+**Compare each Primary's pinned capacity with a curve of irradiance fitted on the same window
+before trusting it (provisional; medium-low confidence).** In [experiment
+350](00350-primary-demand-capacity-free-irradiance-curve/result.md), a learned curve with no
+capacity estimate scored 0.969 points better than the pinned capacity at D5 on sunny daylight
+half-hours (24 to 240 hours), and 0.025 worse over the other five Primaries together. At D5 the
+pinned capacity forecast demand too low by 5.9 points above 550 W/m2, against 2.8 for the curve,
+which points to a pin that is too high, though the experiment did not separate that from a wrong
+unit solar shape. Applies to experiments. Scope: 6 Primaries, one scored year.
+
 **Treat Wrangle T1 and Wrangle T2 as one area for any outside solar count, and use the Primary's
 polygon and not its point.** The two share one polygon, and one Primary's point lies 95 m outside
 its own polygon ([experiment 45](00045-pvdis-4-weekly-capacity-asymmetric-l1/result.md)). Applies to
