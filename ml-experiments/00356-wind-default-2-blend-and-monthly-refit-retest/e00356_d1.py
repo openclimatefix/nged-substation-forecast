@@ -4,7 +4,7 @@ Reuses experiment 00346's cases and member mixtures: the ERA5-trained XGBoost on
 experiment 33's spread factor, and experiment 259's offset table fitted once on the hindcast runs
 (init before 2025-06-17). Stores `d1_keys.parquet` and `d1_s<seed>.npy` (cases, 11), seeds 0 to 2.
 
-    PYTHONPATH=<see e00356_common> uv run --no-sync python e00356_d1.py
+    PYTHONPATH=$PYTHONPATH_FOLDERS uv run --no-sync python e00356_d1.py
 """
 
 import os

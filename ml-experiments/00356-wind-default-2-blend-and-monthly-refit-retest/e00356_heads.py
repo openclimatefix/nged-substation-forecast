@@ -11,7 +11,7 @@ the lead terms, and the one-hot farm), on the table that `e00356_frame.py` store
 
 One process per seed keeps the GPU busy (a single fit uses about a quarter of it):
 
-    PYTHONPATH=<see e00356_common> uv run --no-sync python e00356_heads.py --seed 0 [--u3-only]
+    PYTHONPATH=$PYTHONPATH_FOLDERS uv run --no-sync python e00356_heads.py --seed 0 [--u3-only]
 """
 
 import os

@@ -8,7 +8,7 @@ Tuesday runs of 2025-07 to 2026-06 (blocks: calendar months of the run); the rep
 Tuesday runs of 2026-07 to 2026-10 (blocks: single runs). Contrasts are `arm - comparator`, so a
 negative number means the arm is better. Writes `score.json` and `report.txt` to the data folder.
 
-    PYTHONPATH=<see e00356_common> uv run --no-sync python e00356_score.py
+    PYTHONPATH=$PYTHONPATH_FOLDERS uv run --no-sync python e00356_score.py
 """
 
 import json

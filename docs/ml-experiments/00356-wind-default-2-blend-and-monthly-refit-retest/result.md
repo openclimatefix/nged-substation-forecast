@@ -147,11 +147,10 @@ replicate, about 16 runs).
 
 ## Results
 
-- **Arms and window.** Default 2 is experiment [347](../00347-wind-physics-hybrid-plant-then-
-  mdn/result.md)'s
+- **Arms and window.** Default 2 is experiment [347](../00347-wind-physics-hybrid-plant-then-mdn/result.md)'s
   y2, refitted here (five seeds). u2 and u4 refit on the first day of each month on kept daily runs
-  from 2025-04-16 whose valid times end at least 3.5 hours before that day (earlier runs are in-
-  sample for default 2's head, so a start in 2024-04 would measure the head's
+  from 2025-04-16 whose valid times end at least 3.5 hours before that day (earlier runs are
+  in-sample for default 2's head, so a start in 2024-04 would measure the head's
   training fit). u3 retrains on all finished
   runs from 2024-04, stopping early on the last 2 months. Kept rows end at 2026-09-13, so the
   refits of 2026-10 use runs to that date. Default 1 has 3 seeds and is paired with seed `s mod 3`.

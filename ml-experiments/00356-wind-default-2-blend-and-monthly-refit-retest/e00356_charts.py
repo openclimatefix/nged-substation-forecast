@@ -4,7 +4,7 @@
 Optimise afterwards with `npx svgo@4 --multipass --precision=1 --final-newline f.svg`. Farms are
 W1 to W3 and no chart shows a calendar date.
 
-    PYTHONPATH=<see e00356_common> uv run --no-sync python e00356_charts.py
+    PYTHONPATH=$PYTHONPATH_FOLDERS uv run --no-sync python e00356_charts.py
 """
 
 import textwrap

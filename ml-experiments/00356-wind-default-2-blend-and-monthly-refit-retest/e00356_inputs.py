@@ -8,7 +8,7 @@ per farm, `inputs/keys_<farm>.parquet` (the key columns, in case order) and
 `inputs/summary_<farm>.npy` (cases, 6): the median, mean, standard deviation, 10th and 90th
 percentile of the 51 member powers, and the saturation share (experiment 00347's `summarise`).
 
-    PYTHONPATH=<see e00356_common> uv run --no-sync python e00356_inputs.py W1 [W2 W3]
+    PYTHONPATH=$PYTHONPATH_FOLDERS uv run --no-sync python e00356_inputs.py W1 [W2 W3]
 """
 
 import os

@@ -14,7 +14,7 @@ and `arms/leakage.json`. Default 1 seed `s % 3` pairs with default 2 seed `s`.
   an offset per farm, lead day, and quantile, refitted monthly on the same window. `u3`: default 2's
   head retrained every month.
 
-    PYTHONPATH=<see e00356_common> uv run --no-sync python e00356_arms.py
+    PYTHONPATH=$PYTHONPATH_FOLDERS uv run --no-sync python e00356_arms.py
 """
 
 import json

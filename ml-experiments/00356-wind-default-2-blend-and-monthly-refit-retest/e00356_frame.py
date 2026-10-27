@@ -8,7 +8,7 @@ masked in the table, and `kept` drops them), `kept`, `month` (the run's month), 
 `scored` (the 53 Tuesday runs of `fold_a_tuesdays_v1`). Stores `frame.parquet`, `summary.npy`
 (cases, 6), and `d1.npy` (3 seeds, cases, 11).
 
-    PYTHONPATH=<see e00356_common> uv run --no-sync python e00356_frame.py
+    PYTHONPATH=$PYTHONPATH_FOLDERS uv run --no-sync python e00356_frame.py
 """
 
 import os
