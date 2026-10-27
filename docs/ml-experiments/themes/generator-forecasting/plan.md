@@ -8,6 +8,7 @@
 |---|---|---|---|---|
 | 338 | Does a non-neural column keep the gain of the neural adapter's effective wind speed in the wind forecast? | 1 | nothing | Planned |
 | 307 | Which property of the ensemble's wind speed is wrong, judged against the wind that the farms' own power implies? | 2 | nothing | Planned |
+| 356 | Does blending with Wind farms research default 1, or a monthly refit, fix the upper tail of Wind farms research default 2? | 1 | nothing | Planned |
 | 276 | Why does XGBoost beat the physics core on the three metered wind farms, and is the metering noise the reason? | 1 | nothing | Planned; running diagnostics D1 to D10 |
 
 ## Planned experiments
