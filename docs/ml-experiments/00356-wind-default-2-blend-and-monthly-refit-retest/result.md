@@ -243,5 +243,5 @@ replicate, about 16 runs).
   scored: it needs a node's export and its generators' forecasts together.
 - **What to try next.** (1) Retest u3 on a longer out-of-time period. (2) Give the top quantile new
   information: a point mass fitted with a likelihood (experiment 348's advice), or a monthly
-  recalibration of q99 on its own. (3) Use a fixed 0.75:0.25 mix of the two defaults, which the audit found
-  equals u2.
+  recalibration of q99 on its own. (3) Use a fixed 0.75:0.25 mix of the two defaults, which the
+  audit found equals u2.
