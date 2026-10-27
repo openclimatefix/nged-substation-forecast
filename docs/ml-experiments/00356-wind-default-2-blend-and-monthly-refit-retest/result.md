@@ -92,8 +92,9 @@ take_home_message: >-
   monthly retrained head is the one arm worth a longer retest.
 advice:
   - >-
-    Test a fixed-weight blend of the plant plus head and the XGBoost default before tuning weights
-    per quantile and month: weights shuffled between months gained as much (u2 minus placebo
+    Use a fixed weight of about 0.75 on the plant plus head if a blend with the XGBoost default is
+    wanted, rather than tuning weights per quantile and month (a fixed 0.75 scored -0.047 against
+    default 2 in the audit, as u2 did): weights shuffled between months gained as much (u2 minus placebo
     +0.005, 99.75% interval -0.021 to +0.035).
   - >-
     Do not expect a monthly offset layer or a monthly blend to move the share above q99 toward 1%
@@ -218,9 +219,18 @@ replicate, about 16 runs).
   Leaving W3 out turns u2's gain into a loss (+0.017); leaving out W1 or W2 keeps it. Triggers
   fired: 1 (the placebo kept the gain), 3 (u4), and 4 (u2 without W3). The weights differ
   between months by a standard deviation of 0.12 on average, so a shuffle moves them modestly; why
-  that leaves the score unchanged (a flat loss near the optimum) was not tested. No audit
-  has run: nothing is adopted, so no adoption depends on these triggers, and an audit is required
-  before the PR merges.
+  that leaves the score unchanged is explained by the audit below. The audit was run by a Sonnet
+  agent, not Opus (the manager waived Opus while credits are low); the auditor re-derived
+  the contrasts from the stored arrays and found no method fault. Its findings: the arrays are
+  sorted, in range, and aligned (median correlation with default 2 of 0.92 to 0.99); u2 reproduces
+  from its stored weights to 3e-8; a fixed weight of 0.75 on default 2 (no learning) gives -0.047,
+  the same as u2, so the placebo behaves as designed and the gain is averaging; u4's opposite
+  movement of mean-forecast error comes from lifting only the upper quantiles (+1.7 to +2.5 points
+  from q75 to q99); u2's pooled gain is one farm (W3 -0.186, W1 +0.026, W2 +0.007), and default 1
+  is competitive with default 2 only at W3; default 1 has only 3 independent seeds, so the seed sds
+  of the arms that use it are optimistic; and on every lead u4 leaves 1.84% above q99, not 1.77%
+  (the headline-scope figure). The auditor's own advice: u2's gain rests on W3, and only u3 and u4
+  keep their sign without it, both within noise.
 - **Caveats.** Scored at true days 1 to 10 only; three farms give wide intervals. The replicate is
   about 16 runs and its kept rows end at 2026-09-13. Intervals resample the seed mean of each row's
   score, so seed variation is reported separately. The runs 2025-04-16 to 2025-06-16 that stopped
@@ -233,6 +243,5 @@ replicate, about 16 runs).
   scored: it needs a node's export and its generators' forecasts together.
 - **What to try next.** (1) Retest u3 on a longer out-of-time period. (2) Give the top quantile new
   information: a point mass fitted with a likelihood (experiment 348's advice), or a monthly
-  recalibration of q99 on its own. (3) Test a fixed-weight mix of the two defaults, since the
-  learned
-  weights added nothing over shuffled ones.
+  recalibration of q99 on its own. (3) Use a fixed 0.75:0.25 mix of the two defaults, which the audit found
+  equals u2.
