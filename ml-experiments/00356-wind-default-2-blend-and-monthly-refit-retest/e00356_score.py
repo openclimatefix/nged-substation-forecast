@@ -285,6 +285,7 @@ def main() -> None:  # noqa: PLR0915
         say("u2, weight on default 2, mean over months, by lead band (rows) and level (cols):")
         say(str(np.round(w.mean(axis=0), 2).tolist()))
         w1 = np.load(arms.ARMS_DIR / f"u1_weights_s{s}.npy")
+        say(f"u2 weight sd over months, mean over bands and levels: {w.std(axis=0).mean():.3f}")
         say("u1, weight on the plant band, mean over months:")
         say(str(np.round(w1.mean(axis=0), 2).tolist()))
     (common.DATA_DIR / "score.json").write_text(json.dumps(result, indent=1))

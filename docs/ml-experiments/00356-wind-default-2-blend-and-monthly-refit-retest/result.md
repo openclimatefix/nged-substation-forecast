@@ -21,7 +21,7 @@ size: >-
   Sonnet code review and one Sonnet prose review, no Opus.
 hypothesis: >-
   Wind farms research default 2 (experiment 347's arm y2) gains 0.234 points over Wind farms research
-  default 1 at true days 1 to 10 but puts 2.28% of observations above q99. Either a per-quantile,
+  default 1 at true days 1 to 10 but puts 2.28% of observations above q99 over every lead (2.15% at true days 1 to 10). Either a per-quantile,
   per-lead-band blend of the two defaults (u2), experiment 348's arm z5 (u1), a monthly offset layer
   on default 2 (u4), or a monthly retrained head (u3) lowers the 0.99 pinball loss and the share above
   q99 without losing the gain.
@@ -75,8 +75,8 @@ production_status: not-for-production
 adopted_in: none
 lessons: >-
   The upper tail of the plant plus mixture head is not fixed by mixing it with the XGBoost default
-  or by refitting on recent runs: default 1 itself leaves 1.66% above q99, so any mix of the two
-  stays near 1.7% to 1.9%. A monthly retrained head is the one change whose replicate interval
+  or by refitting on recent runs: default 1 itself leaves 1.66% above q99, so every arm here stays
+  between 1.77% and 2.04%. A monthly retrained head is the one change whose replicate interval
   excludes zero (-0.120), and its scored-year interval only just includes it.
 take_home_message: >-
   Blending Wind farms research default 2 with research default 1, or refitting it every month,
@@ -104,13 +104,14 @@ advice:
     every blend and refit in this experiment left 1.77% to 2.04% above q99 (tails table).
 ---
 
-**Take-home: blending Wind farms research default 2 with research default 1, or refitting it every
-month, does not fix its upper tail.** The share of observations above the 0.99 quantile (q99) only
-falls from 2.15% to between 1.77% and 2.04%, against the 1% a calibrated q99 gives, and no arm clearly
-beats default 2 over days 1 to 10. The blend's small gain is the same with shuffled weights, so it
-comes from averaging two forecasts and not from learning weights. The top quantile needs new
-information, and the monthly retrained head is the one arm worth a longer retest. Verdict: not
-supported.
+**Take-home: blending Wind farms research default 2 (a physics model plus a neural-network head)
+with Wind farms research default 1 (an XGBoost model), or refitting default 2 every month, does not
+fix its upper tail.** Of the half-hourly observations at 24 to 240 hours' lead, 2.15% fall above
+default 2's 0.99 quantile (q99), against the 1% a calibrated q99 gives. The best arm leaves 1.77%,
+and no arm clearly beats default 2. The blend's small gain is the same with shuffled weights, so it
+comes from averaging two forecasts and not from learning weights. The top quantile probably needs
+new information, and the monthly retrained head is the one arm worth a longer retest. Verdict: not
+supported, meaning no arm fixed the tail while keeping the gain.
 
 We asked whether four cheap changes would fix the upper tail of Wind farms research default 2 (a
 physics model of each farm run on the 51 weather-ensemble members, then a mixture head) while keeping
@@ -123,7 +124,7 @@ physics model's residual band with default 1 (u1, the recipe of experiments
 [300](../00300-metered-farm-best-guess-assembly/result.md)); a monthly offset layer on default 2
 (u4, experiment [346](../00346-wind-research-default-1-offset-table-refit-cadence/result.md)'s
 recipe); and retraining default 2's head every month (u3). Scores are in points of capacity (1 point
-is 1% of a farm's capacity). W1 to W3 are the three metered wind farms, whose names are withheld.
+is 1% of a farm's capacity). W1 to W3 are the three metered wind farms, whose names are withheld. W1 to W3 are the three metered wind farms, whose names are withheld.
 **Scored at true days 1 to 10 (lead 24 to 240 hours)**, kept half-hours, on the 53 Tuesday runs of
 `fold_a_tuesdays_v1` (the scored year) and, once, on the Tuesday runs of 2026-07 to 2026-10 (the
 replicate, about 16 runs).
@@ -140,8 +141,8 @@ replicate, about 16 runs).
 
 - **Arms and window.** Default 2 is experiment [347](../00347-wind-physics-hybrid-plant-then-mdn/result.md)'s
   y2, refitted here (five seeds). u2 and u4 refit on the first day of each month on kept daily runs
-  from 2025-04-16 whose valid times end at least 3.5 hours before that day (the brief asked for a
-  start in 2024-04; earlier runs are in-sample for default 2's head). u3 retrains on all finished
+  from 2025-04-16 whose valid times end at least 3.5 hours before that day (earlier runs are in-sample for default 2's head, so a start in 2024-04 would measure the head's
+  training fit). u3 retrains on all finished
   runs from 2024-04, stopping early on the last 2 months. Kept rows end at 2026-09-13, so the
   refits of 2026-10 use runs to that date. Default 1 has 3 seeds and is paired with seed `s mod 3`.
   Code reuse: experiments 230, 259, 303, 310, 326, 336, 346, 347, and 348.
@@ -213,7 +214,11 @@ replicate, about 16 runs).
   about 16 runs and its kept rows end at 2026-09-13. Intervals resample the seed mean of each row's
   score, so seed variation is reported separately. The runs 2025-04-16 to 2025-06-16 that stopped
   default 2's head early feed u2 and u4's first windows, a small optimism for those arms. u1's
-  blend weights use earlier Tuesday runs only (as in experiment 348). The curtailment metric is not
+  blend weights come from earlier Tuesday runs selected by the month of the run, so a run from late
+  in a month contributes outcomes up to about 10 days into the next month, which breaks the
+  3.5-hour rule that u2, u3, and u4 obey; this lookahead (also present in experiment 348's z5)
+  can only flatter u1, which already loses. The u1 and u3 refits are not in `arms/leakage.json`
+  (u3's check is printed in the heads log). The curtailment metric is not
   scored: it needs a node's export and its generators' forecasts together.
 - **What to try next.** (1) Retest u3 on a longer out-of-time period. (2) Give the top quantile new
   information: a point mass fitted with a likelihood (experiment 348's advice), or a monthly
