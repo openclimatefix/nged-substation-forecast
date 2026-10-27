@@ -1,5 +1,8 @@
 # LSC detectors
 
+A short report on whether a better detector is worth building is on the [decision
+report](decision-report.md) page.
+
 **The best switching detector, [RO-NC](../../glossary.md#ro-nc), finds most of the [moved
 power](../../glossary.md#recall-mw-weighted) (the megawatts a transfer moves) of injected load
 transfers of 25% or more of the receiving load, but only about a third of that of the 35 real
