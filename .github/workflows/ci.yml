@@ -1,7 +1,6 @@
 name: CI
 
-# Per-PR quality gate: lint, format, types, markdown, docs, and the offline test suite (which an
-# experiment-only pull request replaces with the study boundaries test; see the scope step).
+# Per-PR quality gate: lint, format, types, markdown, docs, and the offline test suite.
 # Three jobs (docs, lint, tests) run in parallel, so the wall time is that of the slowest job. The
 # final job, named `ci`, is the one required status check in the repository ruleset.
 # The network-gated tests are NOT run here — they run in nightly_network_tests.yml.
@@ -87,7 +86,7 @@ jobs:
       # both failures in #812 landed from commits where the hooks never ran, which is the state of
       # a clone where `pre-commit install` was never run. The hooks that remain are
       # trailing-whitespace, end-of-file-fixer, check-yaml, no-sphinx-roles,
-      # check-experiment-front-matter, check-marimo-notebooks, pymarkdown (which scans every
+      # check-marimo-notebooks, pymarkdown (which scans every
       # tracked markdown file) and lint-docstring-markdown.
       # SKIP lists the hooks that have a step above running the same command over the same files:
       # ruff-check and ruff-check-marimo (`ruff check .`), ruff-format (`ruff format --check .`),
@@ -109,27 +108,6 @@ jobs:
         with:
           fetch-depth: 2
 
-      # A pull request that changes only experiment scripts, experiment write-ups and the
-      # navigation skips the offline test suite, because no test reads those files except the study
-      # boundaries test, which still runs. Every push to main runs the full suite. A pull request
-      # that touches anything else, `pyproject.toml` included, takes the full path.
-      - name: Scope (does the pull request change only experiments?)
-        id: scope
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          experiment_only=false
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            # --no-renames lists the old path of a moved file too, so moving code into an
-            # experiment folder still takes the full path.
-            changed=$(git diff --name-only --no-renames HEAD^1 HEAD)
-            others=$(echo "$changed" | grep -vE '^(ml-experiments/|docs/ml-experiments/|mkdocs\.yml$)' || true)
-            if [ -n "$changed" ] && [ -z "$others" ]; then
-              experiment_only=true
-            fi
-          fi
-          echo "experiment_only=$experiment_only" >> "$GITHUB_OUTPUT"
-
       # Resolves and downloads an interpreter satisfying requires-python; no setup-python step needed.
       - name: Set up uv
         uses: astral-sh/setup-uv@v9.0.0
@@ -143,14 +121,7 @@ jobs:
         run: uv sync --locked --all-packages
 
       - name: Test (pytest)
-        if: steps.scope.outputs.experiment_only != 'true'
         run: uv run --no-sync pytest
-
-      # The one test that reads `ml-experiments/`: no experiment script may import another
-      # experiment's script, touch `sys.path`, or be imported by production code.
-      - name: Test (study boundaries only, experiment-only pull request)
-        if: steps.scope.outputs.experiment_only == 'true'
-        run: uv run --no-sync pytest packages/studies/tests/test_study_boundaries.py
 
   # The repository ruleset requires a check named exactly `ci`. This job passes only when all three
   # jobs above passed. `if: '!cancelled()'` makes it run (and fail) when a job above failed,

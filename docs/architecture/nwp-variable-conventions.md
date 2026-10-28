@@ -149,7 +149,7 @@ native forecast steps. Before interpolates endpoint speeds and bearings arithmet
 uses the production half-hourly feature pipeline; expected values come from independent analytic
 trajectories. The same linear component rule applies to 6-hour native intervals.
 
-![Before and after wind interpolation compared with independent analytic values.](../studies/assets/wind-interpolation.svg)
+![Before and after wind interpolation compared with independent analytic values.](assets/wind-interpolation.svg)
 
 **Interpolating the vector preserves the North crossing and allows opposing winds to cancel.**
 The North-crossing midpoint is northerly, whereas the old arithmetic bearing is 180° (South).
@@ -164,7 +164,7 @@ Reproduce the figure and its checked CSV/report from the repository root:
 ```bash
 uv run python scripts/diagnostics/plot_wind_interpolation.py
 npx svgo@4 --multipass --precision=1 --final-newline \
-  docs/studies/assets/wind-interpolation.svg
+  docs/architecture/assets/wind-interpolation.svg
 ```
 
 The numerical report and CSV are written under
