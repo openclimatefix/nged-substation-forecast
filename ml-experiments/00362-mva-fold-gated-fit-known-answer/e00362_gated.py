@@ -35,7 +35,7 @@ from studies.dp_gam import (
     predict_gam,
     prepare_fit,
 )
-from studies.dp_meter import (  # ty: ignore[unresolved-import]
+from studies.dp_meter import (
     MeterFit,
     StartSummary,
     _Problem,
@@ -201,7 +201,12 @@ def run_job(job: tuple[str, str, float, str]) -> Path:  # noqa: PLR0915
     def capacity(fit: Any) -> float:
         return float(fit.capacity_points()[fit.last_season_year])
 
-    kwargs = {"site": site, "cut": cut, "window": window, "season_years": common.SEASON_YEARS}
+    kwargs: dict[str, Any] = {
+        "site": site,
+        "cut": cut,
+        "window": window,
+        "season_years": common.SEASON_YEARS,
+    }
     fit_s = fit_gam(cache=signed_cache, specs=[spec], **kwargs)
     fit_n = fit_gam(cache=folded_cache, specs=[spec], **kwargs)
     ungated = fit_gam_through_meter(cache=folded_cache, spec=spec, qmode="zero", **kwargs)

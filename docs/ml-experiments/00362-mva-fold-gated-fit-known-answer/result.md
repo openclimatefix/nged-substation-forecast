@@ -92,7 +92,7 @@ The ungated fit (L0) reproduces experiment 358's numbers.
 
 ## Results (reactive power zero; scored cut unless stated)
 
-- **Registered gate (ratio 0.75) rejects nothing.** The gate rejects 0 of 6 starts in all 60 cases, so it
+- **Registered gate (ratio 0.75) rejects nothing.** It rejects 0 of 6 starts in all 60 cases, so it
   gives the ungated fit's answer everywhere. D5 with no injection stays at 0.35 against the signed
   fit's 0.98. The decision rule fails on one criterion: the gate matches the signed fit within 0.02
   at 5
