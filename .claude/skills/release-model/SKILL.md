@@ -26,12 +26,12 @@ load before a fit.
 
 ## Step 0: write the agenda
 
-**List every adoption in `docs/ml-experiments/research-default-log.md` since the last release.** The
+**List every adoption in [the research-default log](https://openclimatefix.github.io/nged-ml-research/ml-experiments/research-default-log/) since the last release.** The
 log holds each family's versions of the research default, and each row names the adopting
 experiment, its gains with intervals, and the stored forecasts. The release starts from the
 family's current research default (for example, Primary demand research default 3) and not from a
 list of separate winners. Also list the experiments in the "Candidates for the next release" table
-of `docs/ml-experiments/README.md` that no log row covers (`production_status: candidate`), because
+of [the ML experiments overview](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) that no log row covers (`production_status: candidate`), because
 a candidate that was never adopted into the research default is a separate proposal. For each item,
 give the verdict, the headline number with its interval, and the production setting it would
 change. Mark items that change the same setting, because only one of them can be ported. Step 1
@@ -52,9 +52,9 @@ planned `result.md` of the research-default experiment in step 1.
 
 ## Step 1: test the current research default against the production recipe
 
-**Run one ml-experiment that asks whether the family's current research default, with leave-one-out
+**Run one ml-experiment (in the `nged-ml-research` repository) that asks whether the family's current research default, with leave-one-out
 arms, beats the production recipe.** Size the experiment and write its planned `result.md` first,
-as the `ml-experiment` skill says. The adoptions in the log each beat the previous version of the
+as the `ml-experiment` skill of `nged-ml-research` says. The adoptions in the log each beat the previous version of the
 research default, and none was measured against the recipe production uses now, so the experiment
 re-measures the whole chain against that recipe.
 
@@ -144,7 +144,7 @@ must beat `climatology` by the rule in the plan. The gate has four parts:
 **A failed gate has two routes.** A failed feature-parity check is a porting bug, so the fix is a
 new PR under step 3. A regression or a missed target goes to the maintainer in step 5. Primary
 substations are the headline, as in step 1. Ask the maintainer before spending more than the £30
-threshold that the `ml-experiment` skill sets. The output is the gate result in the tracking issue.
+threshold that the `ml-experiment` skill of `nged-ml-research` sets. The output is the gate result in the tracking issue.
 
 ## Step 5: the maintainer decides
 

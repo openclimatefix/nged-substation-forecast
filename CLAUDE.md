@@ -17,8 +17,7 @@ uv run ty check                # type checking
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md  # markdown lint
 
 # Testing
-uv run pytest                                # all tests except the slow studies tests
-uv run pytest --run-studies                  # all tests, studies tests included
+uv run pytest                                # all tests
 uv run pytest path/to/test_foo.py::test_bar  # single test
 
 # Run Dagster UI
@@ -70,12 +69,7 @@ one, the mistake is already written.
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
 | `prose-review` | reviewing, reordering or simplifying prose that already exists — structure first, then one pass per rule |
 | `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
-| `study` | planning, running, re-running, charting, writing up, or reviewing a study under `studies/`, or changing `packages/studies/` |
-| `ml-experiment` | planning, running, or writing up a small experiment that tests one hypothesis about improving the production forecast, under `ml-experiments/`, adopting a change into a family's research default, or running a night's agreed experiments |
-| `ml-experiment-manager` | coordinating several ml-experiment sessions at once: ordering the queue, allocating GPU and CPU slots, writing session briefs, merging and archiving, Opus planning reviews, running experiments overnight while the maintainer is away, or queueing changes to a research default |
 | `release-model` | choosing what goes into the next numbered model release from the research-default log, planning the port, or running the `model-release-N` cross-validation gate |
-| `data-download` | writing or resuming a bulk-download script (e.g. `studies/*/fetch_*.py`) that makes more than a handful of requests |
-| `data-validation` | trusting the output of a finished download or data build — gaps, duplicate keys, nulls and NaNs, implausible values, grid orientation, timestamp convention |
 
 ## Docs
 
@@ -433,9 +427,11 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
 - **GitHub** (issues + the OCF Project board) is the *complete, ordered* task list for the
   production code — task-level priority for that code lives only there. When current priorities
   matter, query it with `gh` (epics map 1:1 to roadmap milestones; dependencies are `blocked by`
-  issue links). The exception is ml-experiments: the Research plan page of each theme under
-  `docs/ml-experiments/themes/` owns that theme's queue and order, because experiments finish too
-  quickly for GitHub issues to keep up.
+  issue links). The exception is the research code, which lives in the separate
+  [`nged-ml-research`](https://github.com/openclimatefix/nged-ml-research) repository
+  ([docs site](https://openclimatefix.github.io/nged-ml-research/)): the Research plan page of each
+  theme there owns that theme's queue and order, because experiments finish too quickly for GitHub
+  issues to keep up.
 - **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics sit
   inside each page under an "Implementation details (deleted when this ships)" section.
 - **`docs/design-philosophy/engineering-hypotheses.md`** holds the falsifiable claims the
@@ -579,20 +575,8 @@ in
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
 | `baseline_forecasters` | Naive baseline `BaseForecaster` implementations the trained forecasting models must beat, currently `manual_heuristic` and `climatology` |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
-| `studies` | The tested machinery the one-off studies under `studies/` and the experiments under `ml-experiments/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score, the data paths, and the common rows the past-weather studies share. Study scripts import their own folder, other study and experiment folders, `studies.*`, and the other reviewed packages, and nothing in `src/` or any other package imports `studies` (see "Import rules for studies") |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
 | `notebooks` | Marimo exploration notebooks |
-
-### Import rules for studies
-
-**A script under `studies/` or `ml-experiments/` may import from its own folder, from the folder of
-another study or experiment, from `studies.*` (`packages/studies`), and from the other reviewed
-packages in `packages/*`.** `src/` and every package under `packages/` except `packages/studies`
-must never import `studies` or a script, because humans review that code and the study code is
-fast-moving and agent-written. Code that several folders need, or that production might one day
-need, moves into `packages/studies/src/studies/` with its tests.
-`packages/studies/tests/test_study_boundaries.py` enforces the rule about production code, and the `study`
-skill's "Where a study's pieces live" section says how to apply the rules.
 
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
 
