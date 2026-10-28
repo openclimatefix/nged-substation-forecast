@@ -1729,18 +1729,15 @@ def test_definitions_resolve(env: Path) -> None:
     import-time errors and duplicate asset keys, but *not* a broken ``deps=[…]`` string (Dagster
     silently treats an unknown key as an external asset) or a job ``AssetSelection`` pointing at
     a missing asset (resolved lazily) — so those are asserted explicitly below.
-
-    Uses ``get_repository_def()`` rather than the stricter ``Definitions.validate_loadable``: the
-    latter also runs ``validate_partitions``, which rejects the CV pipeline's deliberate
-    static-fold-upstream / dynamic-experiment-fold-downstream ``deps`` mapping that ``dg dev``
-    and the CV asset tests run against happily.
     """
-    from dagster import AssetKey
+    from dagster import AssetKey, Definitions
 
     from nged_substation_forecast.definitions import defs
     from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
     from nged_substation_forecast.defs.live_forecast_assets import live_forecast_partitions
 
+    # The strict check ``dg check defs`` runs; it also validates every partition mapping.
+    Definitions.validate_loadable(defs)
     repo = defs.get_repository_def()
     asset_graph = repo.asset_graph
 

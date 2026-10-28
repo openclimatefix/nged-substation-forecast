@@ -29,6 +29,8 @@ from contracts.uri import (
     if_local_path_then_make_parent_dir,
 )
 from dagster import (
+    AllPartitionMapping,
+    AssetDep,
     AssetExecutionContext,
     Config,
     DynamicPartitionsDefinition,
@@ -333,7 +335,15 @@ def _load_time_series_metadata(
 @asset(
     tags=RESEARCH_LAYER_TAGS,
     partitions_def=cv_experiment_folds,
-    deps=["clean_nged_power_data", "ecmwf_ens", "eligible_time_series"],
+    deps=[
+        "clean_nged_power_data",
+        # The upstream assets use other partition definitions (daily NWP runs; static CV folds),
+        # and a custom mapping class would not survive into the remote asset graph that the
+        # Dagster UI and `dg check defs` use. Built-in `AllPartitionMapping` does, and it is
+        # conservative: the dependency is on every upstream partition, not only the fold's own.
+        AssetDep("ecmwf_ens", partition_mapping=AllPartitionMapping()),
+        AssetDep("eligible_time_series", partition_mapping=AllPartitionMapping()),
+    ],
 )
 def trained_cv_model(context: AssetExecutionContext) -> None:
     """Train one forecaster for a single ``(CV run, fold)`` partition and save it to MLflow.
