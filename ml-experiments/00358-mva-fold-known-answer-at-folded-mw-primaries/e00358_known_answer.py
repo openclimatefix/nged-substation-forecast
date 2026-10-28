@@ -80,7 +80,7 @@ def run_job(job: tuple[str, str, float, str]) -> Path:  # noqa: PLR0915
     path = OUT_DIR / f"{site}_{cut_name}_L{level}_{reactive}.json"
     if path.exists():
         return path
-    import torch
+    import torch  # ty: ignore[unresolved-import]
 
     torch.set_num_threads(2)
     cut = CUTS[cut_name]
