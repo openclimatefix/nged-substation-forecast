@@ -1,7 +1,9 @@
 # ruff: noqa: E501
 """Draw the figures of experiment 359 from `work/blend_scores.json`.
 
-PYTHONPATH=ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history:ml-experiments/00252-gam-stack-at-eight-more-primaries:ml-experiments/00264-dp-gas-engine-asymmetric-bands-at-d8 \
+Run with the folders of experiments 252, 264, and 354 on `PYTHONPATH`:
+
+    PYTHONPATH=ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history:ml-experiments/00252-gam-stack-at-eight-more-primaries:ml-experiments/00264-dp-gas-engine-asymmetric-bands-at-d8 \
         uv run --no-sync python ml-experiments/00359-*/e00359_charts.py
 """
 
