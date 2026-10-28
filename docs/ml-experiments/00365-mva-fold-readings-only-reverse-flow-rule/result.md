@@ -46,11 +46,11 @@ best_arm: >-
   it chooses the naive fit at all 8 MVA-only Primaries
 headline: >-
   A rule on the meter readings alone passes its registered test, but it cannot tell reverse flow
-  from none: it picks the wrong fit at D5 with no injection, and at Stickney it picks the naive fit.
+  from none. It picks the wrong fit at D5 with no injection, and the wrong (naive) fit at Stickney.
 take_home_message: >-
   Looking for midday meter readings near zero does not reliably tell whether a substation has
-  reverse flow. It still picks the wrong fit at the substation with none (D5), because that
-  substation's readings also dip towards zero. It also misses heavy reverse flow, because heavy
+  reverse flow. The rule still picks the wrong fit at the substation with none (D5), because that
+  substation's readings also dip towards zero. The rule also misses heavy reverse flow, because heavy
   reverse flow gives large readings, not small ones: the rule picks the naive fit at Stickney (D12),
   the MVA-only Primary expected to have it. The registered pass test is met only because it
   allows one of five substations to be wrong. A rule that uses how the readings move with sunshine
@@ -103,7 +103,8 @@ which also defines the injection levels and the signed fit (S) used for comparis
 - **Census, not scored.** The statistic is 26.7 at Stickney (D12), 7.6 at Langrick (D22), and 5.9
   at Marsh Lane (D8), and 22 to 40 at the other 5 (D2, D3, D4, D19, D21). All 8 exceed 5, so the
   rule chooses the naive
-  fit everywhere, including at D12, where [experiment 110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md) fitted reverse flow on 96 to 97% of summer
+  fit everywhere, including at D12, where
+  [experiment 110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md) fitted reverse flow on 96 to 97% of summer
   midday half-hours. The prediction that the rule would pick L0 at D12 failed.
 - **Power factor 0.97.** With reactive power at power factor 0.97 in the data, the rule still
   chooses L0, which collapses
