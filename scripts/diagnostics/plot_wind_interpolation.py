@@ -1,7 +1,8 @@
 """Compare production wind interpolation with independent synthetic linear-vector answers.
 
 Run with `uv run python scripts/diagnostics/plot_wind_interpolation.py`. Writes the docs figure
-and a CSV/report under `data/studies/wind_storage/interpolation-proof/`. No weather download or
+and a CSV/report under `data/studies/wind_storage/interpolation-proof/` (the output folder keeps the
+name it had when the script belonged to a study). No weather download or
 trained forecasting model is needed.
 """
 
@@ -21,7 +22,7 @@ BEFORE: Final[str] = "Before (speed/bearing)"
 EXPECTED: Final[str] = "Expected"
 AFTER: Final[str] = "After (u/v)"
 OUTPUT: Final[Path] = Path("data/studies/wind_storage/interpolation-proof")
-FIGURE: Final[Path] = Path("docs/studies/assets/wind-interpolation")
+FIGURE: Final[Path] = Path("docs/architecture/assets/wind-interpolation")
 
 
 def _production_values(*, u: list[float], v: list[float]) -> pl.DataFrame:

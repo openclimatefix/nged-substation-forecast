@@ -3,7 +3,8 @@
 **This page explains how the operator of a battery in Great Britain (GB) decides when to charge and
 discharge, which of those decisions are visible in public data, and which must be inferred.** The
 data come from a year of four public batteries, from 1 September 2025 to 31 August 2026. The page is
-background for the [battery and solar separation study](../studies/battery-pv-separation.md). The
+background for the [battery and solar separation
+study](https://openclimatefix.github.io/nged-ml-research/studies/battery-pv-separation/). The
 prices a battery reacts to are described on [GB electricity prices: which are free and when each is
 known](gb-price-data-and-ancillary-markets.md).
 
@@ -46,7 +47,9 @@ Metered output equals the planned output (the physical notification), plus the v
 acceptances, plus a remainder. Figure P2 shows one week of the decomposition for one battery. Over
 the year, the planned output alone explains 29.2% to 36.3% of the variance of output across the four
 batteries, and the planned output plus the accepted volumes explains 81.4% to 97.2% ([battery and
-solar separation study](../studies/battery-pv-separation.md#rung-1-one-real-battery)). Wholesale
+solar separation
+study](https://openclimatefix.github.io/nged-ml-research/studies/battery-pv-separation/#rung-1-one-real-battery)).
+Wholesale
 trading shows in the planned output, and frequency response shows in the remainder.
 
 ![Figure P2: The planned output and the balancing acceptances explain most of a battery's output](assets/battery_pv_separation_primer_decomposition.svg)
@@ -74,7 +77,9 @@ do.** No published study of GB batteries that we found fits a dispatch model to 
 output. Of the papers we found, [Bian et al.](https://arxiv.org/abs/2306.11872) give the closest
 method, inverse optimisation (inferring an optimiser's objective from what it did). The four
 algorithms below are our plain-language summary of operator and analyst descriptions, and the
-[battery and solar separation study](../studies/battery-pv-separation.md) uses only the first.
+[battery and solar separation
+study](https://openclimatefix.github.io/nged-ml-research/studies/battery-pv-separation/) uses only
+the first.
 
 1. **Day-ahead arbitrage.** Take tomorrow's 48 day-ahead prices. Start from the expected state of
 charge at midnight. Choose a charge or discharge power for each half-hour to maximise revenue from
@@ -130,7 +135,8 @@ day, which is what a battery's schedule follows.
 public registers match none of them to a Balancing Mechanism Unit (BMU) by name and capacity.**
 A BMU is the unit in which output is notified, metered, and settled with the system operator.
 Each BMU submits a Final Physical Notification (FPN), its planned output. The counts below come from
-`studies/embedded_battery_forecast/census_report.py`, which recounts the registers. The registers
+[`studies/embedded_battery_forecast/census_report.py`](https://github.com/openclimatefix/nged-ml-research/blob/main/studies/embedded_battery_forecast/census_report.py)
+in the `nged-ml-research` repository, which recounts the registers. The registers
 are dated: the ECR is the August 2026 release, the Renewable Energy Planning Database (REPD) is the
 July 2026 release, and the National Energy System Operator's (NESO's) transmission entry capacity
 (TEC) register is the October 2026 release. A battery connected after those dates is missing.
@@ -184,7 +190,8 @@ at all.
 **For forecasting, most embedded batteries have no planned output, so a forecast for them cannot use
 it.** A forecast that takes the FPN as an input applies to a small share of the embedded batteries:
 about 4.5% of the storage rows by count, on the ratio of the two registers. The [battery and solar
-separation study](../studies/battery-pv-separation.md) does not need the FPN for its separation, and
+separation study](https://openclimatefix.github.io/nged-ml-research/studies/battery-pv-separation/)
+does not need the FPN for its separation, and
 uses it only in the primer's decomposition of the output. The public BMU batteries are therefore a
 small testbed, and a forecast for the other batteries has to work from metered flows and prices
 alone.
@@ -209,7 +216,7 @@ alone.
 **Historical analysis and forecasting need different inputs.** Which of these quantities is known
 after the event, the day before, and an hour before is tabulated in the study's section [Historical
 separation versus forecasting a
-battery](../studies/battery-pv-separation.md#historical-separation-versus-forecasting-a-battery).
+battery](https://openclimatefix.github.io/nged-ml-research/studies/battery-pv-separation/#historical-separation-versus-forecasting-a-battery).
 
 ## Physical notifications: submission times and public sources
 

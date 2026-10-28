@@ -20,15 +20,15 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
   and every `packages/*/tests/` directory. A brand-new `packages/<pkg>/tests/` directory is picked
   up with no configuration change — provided the package is installed in the root environment, which
   is automatic only when something already depends on it. A **leaf** package that nothing depends on
-  (`dashboard`, a marimo app, and `studies`, the machinery the one-off studies call) is *not* in the
+  (`dashboard`, a marimo app) is *not* in the
   default environment, so `uv run pytest` cannot import its tests; add it to the root
   `[dependency-groups] dev` list (and give it a `[tool.uv.sources]` workspace entry) so a plain `uv
   sync` installs it.
-- **The `dev` group is also what keeps a research dependency out of the production image.** The
+- **The `dev` group is also what keeps a test-only dependency out of the production image.** The
   `Dockerfile` runs `uv sync --frozen --no-dev`, so a package listed there is resolved for
-  developers and for CI and absent from the image. `studies` is the case that matters: it pulls in
-  `pvlib`, which the live-forecast service has no use for. The check is one command, and it belongs
-  in the pull request that adds such a dependency:
+  developers and for CI and absent from the image. `pvlib` is the case that matters: the radiation
+  test uses it as an independent solar-position reference, and the live-forecast service has no use
+  for it. The check is one command, and it belongs in the pull request that adds such a dependency:
 
     ```bash
     test "$(uv export --no-dev --format requirements-txt | grep -ciE '^(pvlib|cdsapi)')" -eq 0
@@ -52,16 +52,6 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
 - **Test data files go in a `tests/data/` subdirectory** and are loaded relative to the test module
   with `Path(__file__).parent / "data" / filename`. `packages/nged_data/tests/` is the canonical
   example (it also keeps a small script documenting how the fixtures were trimmed down).
-- **Study tests all live under `packages/studies/tests/`.** The tests of the machinery in
-  `packages/studies/src/studies/` sit at the top of that directory. The tests of a study's scripts
-  sit in `packages/studies/tests/<folder>/`, where `<folder>` is the study folder under `studies/`.
-  Each study folder is listed once in pytest's `pythonpath` and once in `ty`'s `extra-paths` in the
-  root `pyproject.toml`, so a test imports a script by its bare name (`import wind_products`).
-  A script that imports another folder's script passes under pytest, where every listed folder is
-  on the path, and fails under `uv run python studies/<folder>/<script>.py` unless the other folder
-  is on `PYTHONPATH`. `test_study_boundaries` forbids `sys.path` changes, path-based module loading,
-  a script basename shared by two folders, and any import of `studies` or of a script by production
-  code.
 
 ## Fixtures and mocking
 
@@ -69,7 +59,7 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
   is shared across more than one test module *within a single package*, put it in a package-level
   `tests/conftest.py`. `packages/dynamical_data/tests/conftest.py` is the example: it builds
   synthetic Xarray datasets that two test modules share. The only repo-root `conftest.py` holds
-  cross-package pytest plumbing, not fixtures — the network-test and studies-test gates below,
+  cross-package pytest plumbing, not fixtures — the network-test gate below,
   Sentry data source name (DSN) neutralisation, and the `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` caps
   described in [Running the suite in parallel](#running-the-suite-in-parallel). Production code
   reports its errors to Sentry, and the DSN is the address those reports go to, so the root
@@ -269,27 +259,9 @@ would silently replace an `addopts` `-m "not network"` and re-include the networ
 applied during collection cannot be overridden that way — the gate holds whatever `-m` the caller
 passes, and even `-m network` alone stays skipped until `--run-network` is added.
 
-## Studies tests
-
-**The tests under `packages/studies/tests` are skipped unless the caller passes `--run-studies`.**
-On a 12-core workstation they account for about 3 of a full run's 3.5 minutes, so a plain `uv run
-pytest` leaves them out and finishes in about 30 seconds. The root `conftest.py` selects them by
-path, so a new studies test needs no decorator. The one exception is `test_study_boundaries.py`,
-which runs by default because it takes about 3 seconds and enforces the import rules listed above
-for studies and production code.
-
-```bash
-uv run pytest --run-studies                          # whole suite, studies tests included
-uv run pytest --run-studies -n auto packages/studies  # only the studies tests (a named path turns off the automatic -n auto)
-```
-
-The gate is a collection hook for the same reason as the network gate above: a caller-supplied `-m`
-cannot override it. A run that names a path under `packages/studies/tests` still needs
-`--run-studies`, otherwise every test in it is reported as skipped.
-
 ## Continuous integration
 
-Three GitHub workflows in `.github/workflows/` run the checks described on this page:
+Two GitHub workflows in `.github/workflows/` run the checks described on this page:
 
 - **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`, as
   three parallel jobs plus an aggregate job. The wall time of a run is that of the slowest job, and
@@ -298,13 +270,12 @@ Three GitHub workflows in `.github/workflows/` run the checks described on this 
     - The `lint` job runs `ruff check`, `ruff format --check`, `pydoclint`, `ty check`, and
       `check_docs_links.py` (see below). It then runs `pre-commit run --all-files` with `SKIP`
       naming the six hooks that repeat one of those steps: `ruff-check`, `ruff-check-marimo`,
-      `ruff-format`, `ty`, `pydoclint`, and `check-docs-links`. Nine hooks remain:
+      `ruff-format`, `ty`, `pydoclint`, and `check-docs-links`. Eight hooks remain:
       `trailing-whitespace`, `end-of-file-fixer`, `check-yaml`, `check-added-large-files` (which
       inspects nothing in CI, since it looks only at staged additions), `check-marimo-notebooks`,
-      `pymarkdown` (every tracked markdown file), `lint-docstring-markdown`, `no-sphinx-roles`, and
-      `check-experiment-front-matter`.
+      `pymarkdown` (every tracked markdown file), `lint-docstring-markdown`, and `no-sphinx-roles`.
     - The `tests` job runs the offline test suite (plain `uv run pytest` — the network gate above
-      keeps CI off the network, and the studies gate skips the slow studies tests).
+      keeps CI off the network).
     - The final job, named `ci`, needs the other three and fails unless all of them succeeded. Its
       condition is `!cancelled()` so that a failed job fails `ci` rather than leaving it skipped,
       which a required check would treat as a pass.
@@ -317,12 +288,6 @@ Three GitHub workflows in `.github/workflows/` run the checks described on this 
   cancels the run it supersedes. A push to `main` runs in a concurrency group named by its commit
   SHA, because GitHub cancels an older queued run in a shared group even when
   `cancel-in-progress` is false.
-- **`studies_tests.yml` — the studies tests.** Runs `pytest -n auto --run-studies packages/studies`
-  on every push to `main`, and on a pull request only when the pull request changes
-  `packages/studies/`, `studies/`, or `docs/studies/`. A pull request that changes only
-  `ml-experiments/`, `docs/ml-experiments/`, and `mkdocs.yml` skips this workflow. For that pull
-  request, `ci.yml` also skips the offline test suite and runs only `test_study_boundaries.py`. The
-  push to `main` that follows runs both in full.
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated tests
   (`uv run pytest --run-network -m network`) on a daily schedule, plus `workflow_dispatch` for
   on-demand runs. This is the only CI that touches the real Dynamical.org catalog, and it needs no

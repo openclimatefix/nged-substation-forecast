@@ -406,12 +406,15 @@ dated list, for every weather model the project reads, is [Data sources → NWP 
 **In the one upgrade measured so far, the beam/diffuse split study's README attributes most of the
 apparent loss of skill to scoring post-upgrade rows with a model trained only on pre-upgrade
 rows.** The Met Office upgraded UKV at PS47 on 2026-01-21. The [beam/diffuse split
-study](../studies/beam-diffuse-split.md) cut its cross-validation folds as contiguous blocks of
+study](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/) cut its
+cross-validation folds as contiguous blocks of
 months. At five of the six generators every post-upgrade row therefore fell in the last fold, and
 the XGBoost model scoring that fold had trained on pre-upgrade UKV alone. Measured that way, [UKV's
 global irradiance scored about 1 percentage point worse than ERA5's from the upgrade
 onwards](data-sources.md#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill). The
-[weather-products study](../studies/past-weather/solar.md) cut its folds separately
+[weather-products
+study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/solar/) cut its folds
+separately
 before and after the upgrade, so every post-upgrade row was scored by a model that had trained on
 other post-upgrade months. There, XGBoost models trained on both sides of the upgrade put UKV 0.18
 percentage points of capacity behind ERA5 after the upgrade [+0.05, +0.42], and XGBoost models
@@ -459,7 +462,7 @@ carries the column is a question for the delivery contract
 ([#96](https://github.com/openclimatefix/nged-substation-forecast/issues/96)). The column also makes
 one further change possible, which is an option rather than part of the plan: cutting the canonical
 cross-validation folds so that a model scoring one cycle trained on that cycle, as
-`studies.cross_validation.assign_folds` already does for the studies.
+`studies.cross_validation.assign_folds` (in the `nged-ml-research` repository) already does for the studies.
 
 **Keep a dated list of upgrades in the repository, and warn when an NWP field shifts in a way the
 list does not explain.** Each entry names the NWP model, the cycle, and the first `init_time` on the
@@ -537,7 +540,8 @@ recovered level the curve is heading towards.
 
 **Report each arm's absolute error, not only the contrasts between arms.** Each arm gets its mean
 absolute error as a percentage of capacity, with a 95% interval from resampling whole months, using
-`studies.bootstrap`. Three contrasts are planned, each paired on the same rows: no version feature
+`studies.bootstrap` (in the `nged-ml-research` repository). Three contrasts are planned, each paired
+on the same rows: no version feature
 at 8 weeks against no version feature at 0 weeks, which says whether the model recovers at all; the
 flag against no version feature at 4 weeks; and recency weighting against no version feature at 4
 weeks. Every other contrast is exploratory.
@@ -648,8 +652,8 @@ and Delta rows remain.
 
 Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)
 
-1. **Run [the study](#the-study-how-fast-a-model-recovers-after-an-upgrade)** under
-   `studies/`, on the fold and bootstrap machinery in `packages/studies/`. The recovery curve sets
+1. **Run [the study](#the-study-how-fast-a-model-recovers-after-an-upgrade)** in the
+   `nged-ml-research` repository, on its fold and bootstrap machinery. The recovery curve sets
    how many weeks of post-upgrade training count as enough, and the decision rules say whether the
    post-upgrade flag or recency weighting goes into the production model.
 2. **Add the dated list of upgrades and the cycle column** to `Nwp` and `PowerForecast`, after the

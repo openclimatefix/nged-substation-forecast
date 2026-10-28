@@ -5,8 +5,8 @@ Each run writes one dated snapshot directory under ``--destination``, such as
 
 - the three storage roots in ``Settings`` — ``data_path_internal``, ``data_path_delivery``, and
   ``local_artifacts_path`` — which on the workstation are all ``data/``, and so hold the NWP and
-  NGED power tables, the forecasts, the metrics, the study outputs under ``data/studies/``, and the
-  production model;
+  NGED power tables, the forecasts, the metrics, the research outputs under ``data/studies/``, and
+  the production model;
 - the MLflow artifacts directory ``mlruns/`` at the repository root, which holds the trained models;
 - ``literature/`` at the repository root, the git-ignored library of papers and reference documents;
 - Dagster's run history: ``dagster_history/`` at the repository root, which the ``base_dir`` in

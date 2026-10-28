@@ -61,15 +61,9 @@ dev = [
     # dashboard is a leaf marimo app that nothing depends on at runtime, so it is a dev
     # dependency purely so `uv sync` installs it and `uv run pytest` can collect its tests.
     "dashboard",
-    # studies is a dev dependency for the same reason as dashboard, and for a second one: the
-    # Dockerfile runs `uv sync --frozen --no-dev`, so this line keeps pvlib out of the image.
-    "studies",
-    # gcsfs reads the WeatherNext 3 Zarr stores in `studies/weather_downloads/fetch_weathernext3.py`.
-    "gcsfs",
-    # icechunk and zarr write the WeatherNext 3 store in `fetch_weathernext3.py` and read it back
-    # in `validate_weathernext3.py`.
-    "icechunk>=2.2.0",
-    "zarr>=3.4.0",
+    # pvlib is the independent solar-position reference in `packages/ml_core/tests/test_radiation.py`.
+    # It is a dev dependency so the Dockerfile's `uv sync --no-dev` keeps it out of the image.
+    "pvlib>=0.11.0",
     "pytest-xdist>=3.6.1",
     # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
     # which prints an unsolicited warning urging a switch away from MkDocs on every build.
@@ -109,7 +103,6 @@ dynamical_data = { workspace = true }
 geo = { workspace = true }
 weather_utils = { workspace = true }
 dashboard = { workspace = true }
-studies = { workspace = true }
 
 # --- DAGSTER ---
 
@@ -131,10 +124,6 @@ registry_modules = [
 # See https://docs.astral.sh/ruff/configuration/
 [tool.ruff]
 line-length = 100
-# The era-fold measurement scripts are a record of how `studies/era_fold_design/report.md` was made.
-# They hard-code a scratch directory and star-import a sibling helper, so they run only from that
-# directory and are not linted or formatted.
-extend-exclude = ["studies/era_fold_design/scripts"]
 
 [tool.ruff.lint]
 # `select` is always written out here, never inherited. Ruff's *default* rule set is a curated
@@ -378,305 +367,7 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 # from a module sitting beside `_nwp_test_data` in `tests/`, and the same import from a package's
 # own test suite — `packages/ml_core/tests`, say — is an `unresolved-import` error even though
 # pytest runs it fine.
-#
-# `scripts/mkdocs_hooks` is listed so the tests can import the MkDocs hook `experiment_tables` by
-# bare name; MkDocs loads it by path, so it needs no installed package.
-#
-# Each folder under `studies/` that holds a script a test imports by bare name is listed here and in
-# `pythonpath` under `[tool.pytest.ini_options]`, so `ty` resolves `import wind_products` the same
-# way pytest does. A script may import its own folder, other study and experiment folders,
-# `studies.*`, and the other reviewed packages. `packages/studies/tests/test_study_boundaries.py`
-# enforces that production never imports a script.
-extra-paths = [
-    "tests",
-    "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
-    "ml-experiments/00309-lsc-two-forecast-gap-choosing-without-truth",
-    "scripts/mkdocs_hooks",
-    "studies/beam_diffuse_split",
-    "studies/embedded_battery_forecast",
-    "studies/ens_backfill_pilot",
-    "studies/lag_features",
-    "studies/llm_capacity_labeller",
-    "studies/nwp_forecast_comparison",
-    "studies/open_meteo_ensemble_means",
-    "studies/market_downloads",
-    "studies/past_weather",
-    "studies/quick_wins",
-    "studies/solar_bmu_census",
-    "studies/weather_downloads",
-    "studies/wind_storage",
-    "packages/studies/tests/past_weather",
-]
-
-[[tool.ty.overrides]]
-# `torch` and `triton` come from the optional `gpu` dependency group of `packages/studies`, which CI
-# does not install, so `ty` cannot resolve them there. The files listed in `include` are the ones
-# that import them, directly or through the differentiable-physics modules, and the tests and
-# scripts that go with those.
-include = [
-    "packages/studies/src/studies/battery_recurrence.py",
-    "ml-experiments/00241-pv-capacity-calibrated-interval/e00241_calibrate.py",
-    "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_common.py",
-    "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_fit.py",
-    "ml-experiments/00239-pv-capacity-seasonal-efficiency-curve/e00239_report.py",
-    "ml-experiments/00238-pv-capacity-nearest-farm-sunshine-reference/e00238_common.py",
-    "ml-experiments/00238-pv-capacity-nearest-farm-sunshine-reference/e00238_fit.py",
-    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_common.py",
-    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_fit.py",
-    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_real.py",
-    "ml-experiments/00269-pv-capacity-gain-decomposition/e00269_report.py",
-    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_design.py",
-    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_levels.py",
-    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_run.py",
-    "ml-experiments/00280-pv-empirical-shape-and-capacity-in-arm-d/e00280_tall.py",
-    "ml-experiments/00236-pv-capacity-clear-sky-fit/e00236_common.py",
-    "ml-experiments/00236-pv-capacity-clear-sky-fit/e00236_fit.py",
-    "ml-experiments/00236-pv-capacity-clear-sky-fit/e00236_report.py",
-    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_common.py",
-    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_fit.py",
-    "ml-experiments/00235-pv-capacity-matched-day-pairs/e00235_report.py",
-    "ml-experiments/00231-pv-capacity-audit-where-recovery-goes/e00231_common.py",
-    "ml-experiments/00231-pv-capacity-audit-where-recovery-goes/e00231_fit.py",
-    "ml-experiments/00231-pv-capacity-audit-where-recovery-goes/e00231_report.py",
-    "packages/studies/src/studies/battery_state_space.py",
-    "packages/studies/src/studies/capacity_physics_torch.py",
-    "packages/studies/src/studies/dp_edge_flow.py",
-    "packages/studies/src/studies/dp_filter_grid.py",
-    "packages/studies/src/studies/dp_gam.py",
-    "packages/studies/src/studies/dp_meter.py",
-    "packages/studies/src/studies/dp_gam_pooled.py",
-    "packages/studies/src/studies/dp_shape_library.py",
-    "packages/studies/src/studies/dp_hierarchy.py",
-    "packages/studies/src/studies/dp_joint_fit.py",
-    "packages/studies/src/studies/dp_gam_graph.py",
-    "packages/studies/src/studies/dp_onboarding.py",
-    "packages/studies/src/studies/dp_operator.py",
-    "packages/studies/src/studies/dp_pooled.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_c1.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_c2.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_c3.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_causal.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_checks.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_common.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_data.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_decide.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_flows.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_gam.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_gate.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_inject.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_local.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_refit.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_run.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_score.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_tune.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_charts.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_real_events.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_report.py",
-    "ml-experiments/00116-differentiable-physics-nra-edge-flows-between-primaries/e00116_variants.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_arms.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_charts.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_diag.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_equiv.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_fit.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_gate.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_onboard.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_tune.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_common.py",
-    "ml-experiments/00105-differentiable-physics-3-pooled-and-per-site-demand-model/e00105_losses.py",
-    "packages/studies/src/studies/dp_pooled_vp.py",
-    "ml-experiments/00104-differentiable-physics-2-simple-structural-model/e00104_benchmark.py",
-    "ml-experiments/00104-differentiable-physics-2-simple-structural-model/e00104_gam.py",
-    "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_cards.py",
-    "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_fit.py",
-    "ml-experiments/00109-differentiable-physics-n0-partially-pooled-convex-model/e00109_tune.py",
-    "ml-experiments/00150-differentiable-physics-n0-gate-rerun-fair-oracle-five-seeds/e00150_tune.py",
-    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_extra.py",
-    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_grid.py",
-    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_refit.py",
-    "ml-experiments/00106-differentiable-physics-4-all-years-drift-and-recent-level/e00106_tune.py",
-    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_capacity.py",
-    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_fit.py",
-    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_gate.py",
-    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_gate_intervals.py",
-    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_meter_boot.py",
-    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_tune.py",
-    "ml-experiments/00110-differentiable-physics-5-embedded-generation-and-capacity/e00110_xgb.py",
-    "ml-experiments/00108-differentiable-physics-shared-anomaly-factor-across-substations/e00108_fits.py",
-    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_arms.py",
-    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_common.py",
-    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_tune.py",
-    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_fit.py",
-    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_gate.py",
-    "ml-experiments/00120-differentiable-physics-sh-convex-daily-shape-library/e00120_report.py",
-    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_cell.py",
-    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_common.py",
-    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_controls.py",
-    "ml-experiments/00113-differentiable-physics-n5-convex-identification-at-realistic-noise/e00113_design.py",
-    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_dp_run.py",
-    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_drift.py",
-    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_fits.py",
-    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_gam_ens.py",
-    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_gate.py",
-    "ml-experiments/00111-differentiable-physics-6-ens-forecast-engine-against-bg2/e00111_tune.py",
-    "ml-experiments/00125-differentiable-physics-n8-ens-members-through-gam-k-and-the-spread-around-them/e00125_build_cache.py",
-    "ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/e00118_gate.py",
-    "ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/e00118_noise.py",
-    "ml-experiments/00118-differentiable-physics-kfe-kalman-filter-on-the-gam-effects-on-ens/e00118_run.py",
-    "ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/e00128_gate.py",
-    "ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/e00128_fit.py",
-    "ml-experiments/00128-differentiable-physics-kfd-shared-day-anomaly-and-sparse-q-in-gam-k/e00128_run.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_bundle.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_cards.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_checks.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_cv.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_final.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_gamk.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_model.py",
-    "ml-experiments/00119-differentiable-physics-enc-weather-patch-encoder-on-ens/e00119_sensitivities.py",
-    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_common.py",
-    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_design.py",
-    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_fit.py",
-    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_gate2.py",
-    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_profile.py",
-    "ml-experiments/00114-differentiable-physics-n3-n4-interactions-and-heating-threshold/e00114_tune.py",
-    "ml-experiments/00126-differentiable-physics-s1-cheap-screens-added-to-gam-k/e00126_common.py",
-    "ml-experiments/00126-differentiable-physics-s1-cheap-screens-added-to-gam-k/e00126_design.py",
-    "ml-experiments/00126-differentiable-physics-s1-cheap-screens-added-to-gam-k/e00126_tune.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_arms.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_charts.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_common.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_ens.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_gate.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_members.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_numbers.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_report.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_score.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_shape.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_site.py",
-    "ml-experiments/00115-differentiable-physics-w1-diurnal-shape-state-on-ens/e00115_tune.py",
-    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_armb.py",
-    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_audit.py",
-    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_gate.py",
-    "ml-experiments/00124-differentiable-physics-h-bsp-closure-audit-and-bsp-hint/e00124_run.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_arms.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_common.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_controls.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_ens.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_figures.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_fits.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_joint_fits.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_known_answer.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_p1.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_report.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_run.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_score.py",
-    "ml-experiments/00135-differentiable-physics-n10-joint-kalman-and-demand-fit/e00135_tune.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_arms.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_asof.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_beam.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_charts.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_common.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_july.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_pilot.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_real.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_registers.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_report.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_semi.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_semi_run.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_stage_c.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_step.py",
-    "ml-experiments/00129-differentiable-physics-pv-capacity-known-answer-test/e00129_timeseries.py",
-    "packages/studies/tests/test_battery_state_space.py",
-    "packages/studies/tests/test_capacity_physics_torch.py",
-    "packages/studies/tests/test_dp_edge_flow.py",
-    "packages/studies/tests/test_dp_filter_grid.py",
-    "studies/dp_filter_grid_benchmark/benchmark_filter_grid.py",
-    "packages/studies/tests/test_dp_gam.py",
-    "packages/studies/tests/test_dp_generation.py",
-    "packages/studies/tests/test_dp_hierarchy.py",
-    "packages/studies/tests/test_dp_joint_fit.py",
-    "packages/studies/tests/test_dp_meter.py",
-    "packages/studies/tests/test_dp_gam_pooled.py",
-    "packages/studies/tests/test_dp_shape_library.py",
-    "packages/studies/tests/test_dp_shape_library.py",
-    "packages/studies/tests/test_dp_gam_graph.py",
-    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_common.py",
-    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_design.py",
-    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_gate2.py",
-    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_gate4.py",
-    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_test1.py",
-    "ml-experiments/00121-differentiable-physics-mh-multi-hinge-heating-curve-and-night-step/e00121_tune.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_capacity_diagnosis.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_controls.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_gate.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_leave_one_out.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_real_intervals.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_synth.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_tune.py",
-    "ml-experiments/00117-differentiable-physics-h2-graph-prior-on-pooled-convex-parameters/e00117_fit.py",
-    "packages/studies/tests/test_dp_onboarding.py",
-    "packages/studies/tests/test_dp_operator.py",
-    "packages/studies/tests/test_dp_pooled.py",
-    "packages/studies/tests/test_dp_pooled_vp.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_common.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_vp.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_fit.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_forecast.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gate.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gradient.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_ladder.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_onboard.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_profile.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_convex.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_refs.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_objectives.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_report.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_budget.py",
-    "ml-experiments/00112-differentiable-physics-vp-variable-projection-fit-of-pooled-model/e00112_gate_diagnostics.py",
-    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_charts.py",
-    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_checks.py",
-    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_diagnose.py",
-    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_gam_panel.py",
-    "ml-experiments/00130-ro-nc-detector-on-the-gam-k-residual/e00130_variants.py",
-    "ml-experiments/00133-differentiable-physics-vk-learned-noise-and-observation-variance-in-gam-k/e00133_run.py",
-    "ml-experiments/00133-differentiable-physics-vk-learned-noise-and-observation-variance-in-gam-k/e00133_select.py",
-    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_data.py",
-    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_model.py",
-    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_run.py",
-    "ml-experiments/00142-differentiable-physics-sequence-model-on-gam-k-residuals/e00142_members.py",
-    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_members.py",
-    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_run.py",
-    "ml-experiments/00134-differentiable-physics-same-weekday-error-profile-on-gam-k/e00134_tune.py",
-    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_design.py",
-    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_run.py",
-    "ml-experiments/00136-dp-bg-stage1-assembly-on-the-ensemble-mean/e00136_tall.py",
-    "ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/e00180_design.py",
-    "ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/e00180_run.py",
-    "ml-experiments/00180-dp-sunny-daylight-fix-d5-solar-shape/e00180_tall.py",
-    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_asof_table.py",
-    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_fits.py",
-    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_kat.py",
-    "ml-experiments/00139-differentiable-physics-pv-as-of-capacity-in-gam-k/e00139_run.py",
-    "studies/unmetered_battery_capacity/capacity_runs.py",
-    "studies/unmetered_battery_capacity/capacity_state_space.py",
-]
-
-[tool.ty.overrides.rules]
-unresolved-import = "ignore"
-
-[[tool.ty.overrides]]
-# Triton's kernel decorators and `torch.autograd.Function`'s context object are not typed in a way
-# `ty` can follow, so the kernel file is checked for the other rules only.
-include = ["packages/studies/src/studies/battery_recurrence.py"]
-
-[tool.ty.overrides.rules]
-invalid-argument-type = "ignore"
-unresolved-attribute = "ignore"
-invalid-method-override = "ignore"
-
-[tool.ty.src]
-# The era-fold measurement scripts are a record, not maintained code (see the ruff exclude).
-exclude = ["studies/era_fold_design/scripts"]
+extra-paths = ["tests"]
 
 [tool.pytest.ini_options]
 # importlib mode lets test modules in different directories share a basename (e.g.
@@ -704,31 +395,7 @@ python_files = ["test_*.py", "*_test.py", "packages/notebooks/plot_missing_NWP_d
 # own directory to sys.path the way prepend mode does. This is also load-bearing for the `-p
 # _pytest_autoinject` entry in `addopts` above: `-p` resolves a bare module name against sys.path,
 # and `tests/_pytest_autoinject.py` is only importable as `_pytest_autoinject` because of this line.
-#
-# Each folder under `studies/` that holds a script a test imports by bare name is listed too, and in
-# `extra-paths` under `[tool.ty.environment]` above. A script that imports another folder's
-# script passes under this setting and fails under `uv run python studies/<folder>/<script>.py`
-# unless the other folder is on `PYTHONPATH`. A test directory is listed when its
-# tests import helpers from a sibling test module by bare name.
-pythonpath = [
-    "tests",
-    "ml-experiments/00297-lsc-need-a-detector-no-detector-arms-against-the-mask",
-    "scripts/mkdocs_hooks",
-    "studies/beam_diffuse_split",
-    "studies/embedded_battery_forecast",
-    "studies/ens_backfill_pilot",
-    "studies/lag_features",
-    "studies/llm_capacity_labeller",
-    "studies/nwp_forecast_comparison",
-    "studies/open_meteo_ensemble_means",
-    "studies/market_downloads",
-    "studies/past_weather",
-    "studies/quick_wins",
-    "studies/solar_bmu_census",
-    "studies/weather_downloads",
-    "studies/wind_storage",
-    "packages/studies/tests/past_weather",
-]
+pythonpath = ["tests"]
 # `error` first: any warning not explicitly excepted below fails the test that raised it, so a
 # deprecation in our own code is caught by the PR that introduces it instead of accumulating in the
 # summary. Later entries win, so every exception below is applied on top of `error`.

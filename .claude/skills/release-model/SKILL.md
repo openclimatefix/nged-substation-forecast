@@ -20,22 +20,26 @@ they work together, and porting them.
 stop for the maintainer's decision. Every other step runs autonomously, except that the maintainer
 picks the candidates in step 0.
 
-**Only one session runs the fits of steps 1 and 4 at a time.** Ask the ML experiment manager for a
-resource slot (the file `data/ml-experiments/SLOTS.md` lists the slots), and check the CPU and GPU
-load before a fit.
+**Only one session runs the fits of steps 1 and 4 at a time.** Ask the ML experiment manager (the
+`ml-experiment-manager` skill of the `nged-ml-research` repository) for a resource slot (the file
+`data/ml-experiments/SLOTS.md` lists the slots), and check the CPU and GPU load before a fit. Both
+repositories share the `data/ml-experiments/` folder, so the research-default experiment's
+predictions sit there, and the step 4 gate compares against them.
 
 ## Step 0: write the agenda
 
-**List every adoption in `docs/ml-experiments/research-default-log.md` since the last release.** The
-log holds each family's versions of the research default, and each row names the adopting
-experiment, its gains with intervals, and the stored forecasts. The release starts from the
-family's current research default (for example, Primary demand research default 3) and not from a
-list of separate winners. Also list the experiments in the "Candidates for the next release" table
-of `docs/ml-experiments/README.md` that no log row covers (`production_status: candidate`), because
-a candidate that was never adopted into the research default is a separate proposal. For each item,
-give the verdict, the headline number with its interval, and the production setting it would
-change. Mark items that change the same setting, because only one of them can be ported. Step 1
-tests the research default against the production recipe, with each component left out in turn.
+**List every adoption in [the research-default
+log](https://openclimatefix.github.io/nged-ml-research/ml-experiments/research-default-log/) since
+the last release.** The log holds each family's versions of the research default, and each row names
+the adopting experiment, its gains with intervals, and the stored forecasts. The release starts from
+the family's current research default (for example, Primary demand research default 3) and not from
+a list of separate winners. Also list the experiments in the "Candidates for the next release" table
+of [the ML experiments overview](https://openclimatefix.github.io/nged-ml-research/ml-experiments/)
+that no log row covers (`production_status: candidate`), because a candidate that was never adopted
+into the research default is a separate proposal. For each item, give the verdict, the headline
+number with its interval, and the production setting it would change. Mark items that change the
+same setting, because only one of them can be ported. Step 1 tests the research default against the
+production recipe, with each component left out in turn.
 
 **For the first release, a single-family candidate is the default.** The first production update is
 a relatively simple model implemented as one model family, for example XGBoost only, while blends
@@ -44,19 +48,20 @@ shows an added value over the best single family that the maintainer judges wort
 complexity.
 
 **Exclude a candidate that needs a design production does not have yet.** The staged design of
-experiments 00001 and 00002 is an example. Such a candidate goes through `plan-issue` as its own
-build, and it joins a later release.
+experiments 00001 and 00002 of `nged-ml-research` is an example. Such a candidate goes through
+`plan-issue` as its own build, and it joins a later release.
 
 The maintainer picks the candidates for the release. The output is that list, written into the
 planned `result.md` of the research-default experiment in step 1.
 
 ## Step 1: test the current research default against the production recipe
 
-**Run one ml-experiment that asks whether the family's current research default, with leave-one-out
-arms, beats the production recipe.** Size the experiment and write its planned `result.md` first,
-as the `ml-experiment` skill says. The adoptions in the log each beat the previous version of the
-research default, and none was measured against the recipe production uses now, so the experiment
-re-measures the whole chain against that recipe.
+**Run one ml-experiment (in the `nged-ml-research` repository) that asks whether the family's
+current research default, with leave-one-out arms, beats the production recipe.** Size the
+experiment and write its planned `result.md` first, as the `ml-experiment` skill of
+`nged-ml-research` says. The adoptions in the log each beat the previous version of the research
+default, and none was measured against the recipe production uses now, so the experiment re-measures
+the whole chain against that recipe.
 
 The arms are the current production recipe, the current research default, and, for each component
 adopted since the last release, "the research default minus that component". **The one deciding
@@ -90,7 +95,8 @@ newest unseen months.
 **A component that fails against production is dropped from the release, or deferred.** The release plan
 lists each dropped component with its reason, and the maintainer reviews that list when approving the
 plan. The research-default experiment sets its own `production_status` to `not-for-production`, because
-the experiment is a diagnostic, so it never appears as a candidate. The output is the final release
+the experiment is a diagnostic, so it never appears as a candidate. The experiment lives in
+`nged-ml-research`, so a companion pull request there sets the field. The output is the final release
 set and the combined effect size.
 
 ## Step 2: write the release plan
@@ -144,7 +150,8 @@ must beat `climatology` by the rule in the plan. The gate has four parts:
 **A failed gate has two routes.** A failed feature-parity check is a porting bug, so the fix is a
 new PR under step 3. A regression or a missed target goes to the maintainer in step 5. Primary
 substations are the headline, as in step 1. Ask the maintainer before spending more than the £30
-threshold that the `ml-experiment` skill sets. The output is the gate result in the tracking issue.
+threshold that the `ml-experiment` skill of `nged-ml-research` sets. The output is the gate result
+in the tracking issue.
 
 ## Step 5: the maintainer decides
 
@@ -158,9 +165,10 @@ one in `docs/live_service/model-releases.md`: promote the champion fold run, dep
 that the `promoted_model` asset reports `model_release: N`. The PR that records the release adds the
 row to the log with the promoted run's identifier and image tag and the rollback pairing, and the
 maintainer tags the commit `model-N`. The first release has no earlier release to roll back to. The
-same PR sets `production_status: adopted` and `adopted_in: N` in each incorporated experiment's
-`result.md`, which removes them from the candidates table, and updates the flag of each winner that
-step 1 dropped. The output is the deployed release.
+release PR links a companion pull request in `nged-ml-research`. That pull request sets
+`production_status: adopted` and `adopted_in: N` in each incorporated experiment's `result.md`,
+which removes them from the candidates table, and updates the flag of each winner that step 1
+dropped. The output is the deployed release.
 
 ## Step 7: watch the first runs
 

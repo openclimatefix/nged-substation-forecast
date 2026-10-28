@@ -23,9 +23,9 @@ maintainer has read the report.
 2. **Run the full verification set on the untouched lockfile**, and do not fix any failure
    in this PR. A failure here is already on `main`. Record it, so that it is not blamed on the
    upgrade, and tell the maintainer about it in the report. The hooks in this set rewrite files
-   when they find a problem, so discard those rewrites with `git checkout .`. The set is the union
-   of `.github/workflows/ci.yml` and `.github/workflows/studies_tests.yml`, which are authoritative
-   if this list has drifted, plus the pre-commit hooks:
+   when they find a problem, so discard those rewrites with `git checkout .`. The set is
+   `.github/workflows/ci.yml`, which is authoritative if this list has drifted, plus the pre-commit
+   hooks:
 
     ```bash
     uv run ruff check .
@@ -35,12 +35,11 @@ maintainer has read the report.
     uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
     uv run mkdocs build --strict --site-dir <scratchpad>/site
     uv run python scripts/lint/check_docs_links.py
-    uv run pytest --run-studies
+    uv run pytest
     uv run pre-commit run --all-files --show-diff-on-failure
     ```
 
-    `pytest --run-studies` takes about 3 minutes, and CI runs the studies tests in a separate
-    job, so run both. Check the CPU load first, because one spinning core slows the XGBoost tests.
+    Check the CPU load first, because one spinning core slows the XGBoost tests.
 
 3. **Upgrade**, keeping the list of changes for the PR body:
 
@@ -71,8 +70,8 @@ maintainer has read the report.
       which version fixes it, in the style of the ANTLR pin in `pyproject.toml`.
     - A new `ty` diagnostic is not always a bug in the code. Load `ty-workarounds` before adding
       any `# ty: ignore`, and give each ignore a comment saying why.
-    - A hook that rewrites a generated file (`studies/*/report.md`) means the generator must change
-      as well, or the next run reverts the fix.
+    - A hook that rewrites a generated file means the generator must change as well, or the next
+      run reverts the fix.
     - Commit each fix separately from the lockfile and push.
 
 6. **Research what the upgrades changed**, with one Sonnet sub-agent per group of related packages.
@@ -90,9 +89,9 @@ maintainer has read the report.
       report says so.
 
 7. **Judge each upgrade against the repository.** For each changelog entry, ask whether this
-   repository uses the changed behaviour. Grep for the changed API in `src/`,
-   `packages/`, and `studies/` before concluding either way, and answer four questions for every
-   package with a breaking change, a deprecation, or a behaviour change:
+   repository uses the changed behaviour. Grep for the changed API in `src/` and `packages/` before
+   concluding either way, and answer four questions for every package with a breaking change, a
+   deprecation, or a behaviour change:
     - **Does it need a wider code review?** For example, a Polars 2 upgrade changed row order after
       a lazy join without raising, and green tests did not prove the code was still right.
     - **Does it make a skill or a docs page stale?** Check `.claude/skills/`, `CLAUDE.md`, and

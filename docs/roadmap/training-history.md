@@ -12,7 +12,8 @@ estimate of past weather ([defined
 below](#train-on-the-long-power-history-then-calibrate-per-weather-product)) covers the gap. The
 version-1 plan is ERA5 as the estimate of past weather for every variable except irradiance, and
 CAMS for irradiance. CEDA UKV is not ingested. A [study of CEDA's UKV archive against
-ERA5](../studies/past-weather/ukv-ceda-vs-era5.md) found no clear advantage for CEDA's UKV in
+ERA5](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/ukv-ceda-vs-era5/)
+found no clear advantage for CEDA's UKV in
 forecasts of wind-farm power, and found CEDA's UKV temperature closer at four weather stations that
 UKV probably assimilates. The evidence and the caveats are under [Which estimate of past weather to
 train on](#which-estimate-of-past-weather-to-train-on).
@@ -123,9 +124,10 @@ post-processing methods we have read also assume a fixed product with ample hist
 **Most of this roadmap was written before autonomous forecasting experiments proved practical, which
 is why the older pages are cautious about adding weather products.** Claude Code runs whole
 forecasting experiments autonomously, including downloading new datasets. That research writes its
-code under `studies/` and `packages/studies/`, which no human reviews line by line, so the
-autonomous research can test many ideas quickly. Production code never imports from either
-directory, and production code is carefully reviewed.
+code in the [`nged-ml-research`](https://github.com/openclimatefix/nged-ml-research) repository,
+which no human reviews line by line, so the
+autonomous research can test many ideas quickly. Production code never imports from that
+repository, and production code is carefully reviewed.
 
 **An idea moves from an autonomous sweep to a reviewed production port in three steps.** A broad
 autonomous sweep narrows the search space; supervised narrow sweeps follow if the results look
@@ -145,7 +147,7 @@ make better wind and solar power forecasts.** Three criteria score a design agai
 
 **The project's own evidence supports the belief for wind and not yet for solar.** In the
 [matched-lead
-study](../studies/forecasts/matched-lead.md#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead),
+study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/matched-lead/#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead),
 adding ICON-EU and IFS 0.25° forecasts to ECMWF ENS lowered the wind error by 0.184 points of
 capacity [0.087, 0.282] at the conservative lead, and gave no detectable solar gain (−0.033 points
 [−0.106, +0.033]). That study trained an XGBoost model on 21 months of every product, which is the
@@ -266,7 +268,7 @@ what absorb that shift.
 **On past sunshine, CAMS beats ERA5 by a wide margin on each of the solar study's five headline row
 sets.** On the solar study's main row set, six solar farms from December 2022 to August 2026, an
 XGBoost model's error given ERA5 is 9.08% of capacity and given CAMS 5.09%
-([solar](../studies/past-weather/solar.md#cams-describes-past-sunshine-best-of-the-eight-main-row-set-products-by-a-wide-margin)).
+([solar](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/solar/#cams-describes-past-sunshine-best-of-the-eight-main-row-set-products-by-a-wide-margin)).
 Across the study's five headline row sets, CAMS beats ERA5 by 3.7 to 4.1 points of capacity on each
 row set, an exploratory comparison.
 
@@ -274,14 +276,14 @@ row set, an exploratory comparison.
 2024, with a seasonal caveat.** At three wind farms from August 2024 to September 2026, the error
 given UKV's T+0 wind as Open-Meteo serves it is 0.44 points [0.24, 0.63] lower than given ERA5's
 wind, a planned comparison
-([wind](../studies/past-weather/wind.md#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested)).
+([wind](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/wind/#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested)).
 In an exploratory seasonal split, UKV's advantage over ERA5 is not statistically significant at the
 5% level from October to March; only ICON-D2's is.
 
 **Over 2019 to 2026, CEDA's archived UKV showed no clear advantage over ERA5 for wind, and a closer
 temperature at four weather stations that moved solar-farm power forecasts by no more than 0.009
 points of capacity.** CEDA's archive is the first UKV source the studies have found that reaches
-back to 2019, and the [CEDA UKV against ERA5 study](../studies/past-weather/ukv-ceda-vs-era5.md)
+back to 2019, and the [CEDA UKV against ERA5 study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/ukv-ceda-vs-era5/)
 compares it with ERA5 over that span, in one area of Lincolnshire, with these results:
 
 - **Wind:** pooled over three wind farms, an XGBoost model given ERA5's 100 m and 10 m wind had a
@@ -309,7 +311,9 @@ not ingest both ERA5 and CEDA UKV, and no forecast in the study improved by as m
 margin with CEDA's temperature. The study did not test a history that mixes sources.
 
 **The best estimate of past weather may be a blend of several products rather than any one
-product.** In the [blending study](../studies/past-weather/blending.md), an XGBoost model given all
+product.** In the [blending
+study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/blending/), an XGBoost
+model given all
 six solar products in that study beats an XGBoost model given CAMS, with CAMS's neighbouring hours
 and its beam/diffuse split, by 0.13 points [0.10, 0.17]; CAMS with ICON-EU gives most of that gain,
 0.10 points [0.07, 0.14]. On rows from January 2021, adding SARAH-3's satellite irradiance to CAMS's
@@ -319,7 +323,7 @@ neighbouring hours by 0.48 points [0.40, 0.56], and UKV with ICON-EU beats the s
 0.26 points [0.21, 0.31]. The gain comes from the other products' hour-by-hour weather: a control
 that keeps the extra columns but shuffles their weather does no better than the single product.
 Weather stations were not part of the blending study. In the [wind
-study](../studies/past-weather/wind.md#one-nearby-10-m-weather-station-trails-era5s-10-m-wind-on-its-own-and-lowers-ukvs-error-when-added-to-it),
+study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/wind/#one-nearby-10-m-weather-station-trails-era5s-10-m-wind-on-its-own-and-lowers-ukvs-error-when-added-to-it),
 one nearby 10 m weather station trails ERA5's 10 m wind on its own and lowers UKV's error when added
 to UKV. Three caveats limit what the blending results say about training the weather-response model:
 
@@ -621,7 +625,7 @@ Two details still worth tracking regardless of which route lands:
 
 - **The backfilled span crosses further ENS resolution upgrades**: 41r2 in 2016-03 (32→18 km), 48r1
   in 2023-06 (18→9 km, within the staged bucket's complete-date range), and 49r1 in 2024-11. Each is
-  an era boundary under the `study` skill.
+  an era boundary under the `study` skill of the `nged-ml-research` repository.
 
 **The ERA5 ingest is needed whichever ENS backfill route lands.** ERA5 is the version-1 estimate of
 past weather for every variable except irradiance, and the [weather-abnormality
@@ -649,7 +653,7 @@ Ordered, and deliberately not one PR. Steps 1–2 are the data layer; the rest a
 The study of [a new weather product with a few months of
 history](#a-new-weather-product-with-a-few-months-of-history)
 ([#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999)) runs separately,
-under `studies/`:
+in the `nged-ml-research` repository:
 
 1. Build the weather-response model at the nine metered generators, lag-free and out-of-fold over
    month blocks, once per estimate of past weather under test (CAMS for irradiance and ERA5 for the

@@ -224,7 +224,8 @@ so a refusal leaves no rows or MLflow runs behind.
 **The refusals check which rows a forecast covers, not how the forecast was made.** The `metrics`
 asset cannot tell a forecast trained on the validation year, or built from power observed after its
 initialisation time, from an honest forecast. A study can build either forecast, because
-`studies.power.scan_power` serves every cleaned reading, including the whole validation year. A
+`studies.power.scan_power` (in the `nged-ml-research` repository) serves every cleaned reading,
+including the whole validation year. A
 study's leaderboard number is therefore out-of-sample only if a reviewer has confirmed that the
 study used no observation after the fold's `train_end`, except as a lag earlier than each forecast's
 initialisation time.

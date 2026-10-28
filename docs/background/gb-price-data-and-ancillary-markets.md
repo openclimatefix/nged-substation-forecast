@@ -3,7 +3,8 @@
 **This page lists the prices that a battery in Great Britain (GB) faces, which of them are free to
 download, and when each becomes known.** National Energy System Operator (NESO) is the system
 operator. The page is background for the [battery and solar separation
-study](../studies/battery-pv-separation.md). How a battery responds to the prices is described on
+study](https://openclimatefix.github.io/nged-ml-research/studies/battery-pv-separation/). How a
+battery responds to the prices is described on
 [how GB batteries schedule themselves](gb-battery-scheduling.md).
 
 **A battery faces several prices. Several free prices are known only after delivery, and three are

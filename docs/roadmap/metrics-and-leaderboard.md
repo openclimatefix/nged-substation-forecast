@@ -955,7 +955,9 @@ Two rungs, in increasing order of "cheating":
   irradiance and ERA5 for other variables (see [which estimate of past weather to train
   on](training-history.md#which-estimate-of-past-weather-to-train-on)). ERA5 is a reanalysis, so it
   assimilates observations, but it is still a 31 km model field — good, not perfect. A [study of
-  CEDA's UKV archive against ERA5](../studies/past-weather/ukv-ceda-vs-era5.md) scored the two
+  CEDA's UKV archive against
+  ERA5](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/ukv-ceda-vs-era5/)
+  scored the two
   against each other, and
   [#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492) is where the
   perfect-weather ceiling sits.

@@ -575,7 +575,7 @@ native values exactly. Storing direction also hands every later stage an angle t
 
 The saving has to be large, not merely positive. A paired sample of 24 full 2025 forecasts found
 that component storage uses 8.90% more Parquet bytes than polar storage. The maintainer accepted
-the increase to keep signed wind components through interpolation. The [measurement](../studies/forecasts/wind-storage.md)
+the increase to keep signed wind components through interpolation. The [measurement](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/wind-storage/)
 describes the sample and its limits.
 
 *Without it:* a stored transform becomes an assumption every later CV run inherits. Arithmetic

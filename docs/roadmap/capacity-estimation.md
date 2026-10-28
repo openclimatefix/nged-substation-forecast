@@ -125,7 +125,7 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
 
 **Ask for the raw export cap rather than a derived curtailment volume, and treat the cap as a
 constraint rather than as a label.** Joining both to six metered solar farms in the [beam/diffuse
-study](../studies/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
+study](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
 found one of the six under active network management. Its cap sits at the connection limit for
 80.7% of the half-hours since the scheme went live, and on the bright hours where the cap never
 moved the site's yield matches the other five
@@ -607,8 +607,8 @@ Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-brit
 **A throw-away study on the six metered solar farms in the trial area fitted a five-parameter
 physical model per site, and several of its by-products bear directly on this plan.** The write-up
 is [Does a weather product's beam/diffuse split help a PV
-forecast?](../studies/beam-diffuse-split.md); the code is in a pull request kept open for reference
-rather than merged,
+forecast?](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/); the code
+is in an unmerged pull request in this repository, kept open for reference,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering
 [issue #784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
 capacity estimator, and none of it settles which of the candidates above to build. What follows is
@@ -638,7 +638,7 @@ before trusting a fitted orientation or the capacity that comes with it.** The s
 the same rows moves its fitted azimuth by about 35 degrees when the timestamps are shifted by one
 half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a
 30-minute change in what the timestamp means. The [power timestamps on this
-feed](../studies/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late)
+feed](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late)
 were half an hour late until 08:30 UTC on 26 March 2026. Any estimator that fits orientation has
 the same exposure, and an orientation error feeds straight into the capacity it reports.
 
@@ -672,7 +672,7 @@ reading a constant.
 
 **A fixed-capacity model's signed error drifts by more than 6 points between neighbouring sites,
 which bounds how much capacity moved without estimating it.** The per-site, per-year drift table is
-[in the write-up](../studies/beam-diffuse-split.md#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
+[in the write-up](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 The drift appears on two independently-produced irradiance products and agrees between them to
 about half a point at the five longer-running sites, so it is in the power rather than in the
 weather. It remains an upper bound:
@@ -740,7 +740,8 @@ analyses on one small area. Neither study settles which of the candidates above 
 **In the first study, no capacity estimate lowered the day-ahead forecast error detectably, and the
 Kalman filter that the study's rule selected raised it.** The write-up is [No estimate of a solar
 plant's capacity lowered day-ahead forecast error detectably at 6 plants, and a daily Kalman filter
-raised it](../studies/forecasts/effective-capacity.md). Only 3 of 106 plant-months were the
+raised it](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/effective-capacity/).
+Only 3 of 106 plant-months were the
 low-output kind of loss that an estimator exists to repair, so the record cannot say whether a
 better estimator would help. The study suggests testing a hold-at-static detector on more plants,
 and that suggestion came from the results, not from the plan.
@@ -748,7 +749,9 @@ and that suggestion came from the results, not from the plan.
 **In the second study, Claude Sonnet 5.5 given deterministic evidence tools found 14% of planted
 one-month losses, close to the 10% of a fixed rule on the same tools.** The write-up is [Claude
 Sonnet 5.5 found about 1 in 7 planted one-month solar losses and all 12 of a 60% loss lasting 90
-days; the planned contrasts are untested](../studies/forecasts/llm-capacity-labeller.md). Claude
+days; the planned contrasts are
+untested](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/llm-capacity-labeller/).
+Claude
 Sonnet 5.5 found all 12 planted losses of 60% lasting 90 days and 5 of 12 losses of 30% lasting 90
 days. The study's planned comparisons are untested, because no estimator passed the positive
 control. The write-up ends with a proposed follow-up study, and a discussion of other places a

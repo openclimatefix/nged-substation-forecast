@@ -149,7 +149,7 @@ native forecast steps. Before interpolates endpoint speeds and bearings arithmet
 uses the production half-hourly feature pipeline; expected values come from independent analytic
 trajectories. The same linear component rule applies to 6-hour native intervals.
 
-![Before and after wind interpolation compared with independent analytic values.](../studies/assets/wind-interpolation.svg)
+![Before and after wind interpolation compared with independent analytic values.](assets/wind-interpolation.svg)
 
 **Interpolating the vector preserves the North crossing and allows opposing winds to cancel.**
 The North-crossing midpoint is northerly, whereas the old arithmetic bearing is 180° (South).
@@ -164,7 +164,7 @@ Reproduce the figure and its checked CSV/report from the repository root:
 ```bash
 uv run python scripts/diagnostics/plot_wind_interpolation.py
 npx svgo@4 --multipass --precision=1 --final-newline \
-  docs/studies/assets/wind-interpolation.svg
+  docs/architecture/assets/wind-interpolation.svg
 ```
 
 The numerical report and CSV are written under
@@ -177,7 +177,9 @@ expressions and regression tests cover both stored heights.
 GPU XGBoost models received only the derived 10 m and 100 m speed and bearing. Across the three
 wind farms, both tested lead bands and both fixed settings, the pooled point estimates favoured
 linear interpolation over PCHIP and modified Akima. Most differences were small and uncertain.
-The [experiment and plots](../studies/forecasts/wind-interpolation.md) explain the interpolation
+The [experiment and
+plots](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/wind-interpolation/)
+explain the interpolation
 assumptions and compare them with power observations and a direct station-wind check.
 The focused comparison supports retaining linear interpolation for the current forecasting
 pipeline; the comparison does not establish that linear is universally more accurate.
@@ -281,7 +283,7 @@ the fully-dark fallback. Production's validated site relation supplies those coo
 indices within each source segment and daylight block, then a keyed join supplies neighbouring
 anchors to half-hours. The helper avoids sorting and as-of joining the entire half-hour target
 frame. The [bulk resampler benchmark and reproduction
-commands](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/README.md#bulk-resampler-benchmark)
+commands](https://github.com/openclimatefix/nged-ml-research/blob/main/studies/radiation_resampling/README.md#bulk-resampler-benchmark)
 report in-memory time and whole-process peak resident set size (RSS), with the scope and scaling
 limits stated.
 
@@ -322,9 +324,10 @@ below 0.98 W/m² for 3-hour inputs and 3.64 W/m² for 6-hour inputs in the presc
 The smooth long-wave reference is one possible underlying curve; the native means cannot identify
 the true thermal variation. The script prints every plotted deviation and centroid shift in
 [its generated
-report](https://github.com/openclimatefix/nged-substation-forecast/blob/main/studies/radiation_resampling/report.md).
+report](https://github.com/openclimatefix/nged-ml-research/blob/main/studies/radiation_resampling/report.md).
 
-Reproduce the figure and report from the repository root:
+Reproduce the figure and report from the root of the `nged-ml-research` repository, where the
+script lives:
 
 ```bash
 uv run python studies/radiation_resampling/plot_radiation_resampling.py
@@ -368,7 +371,9 @@ how much has not been measured. The compression feeds the effective-temperature,
 A paired measurement of 24 full 00Z forecasts across 2025 used identical raw inputs, H3 weights,
 rounding, sorting, and the production writer. Polar storage used 3.802 GB; u/v used 4.140 GB.
 Adding scalar-mean speed at both heights raised the total to 4.881 GB, another 17.90 % over u/v.
-The [seasonal storage measurement](../studies/forecasts/wind-storage.md) gives the generated
+The [seasonal storage
+measurement](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/wind-storage/)
+gives the generated
 per-run tables and reproduction procedure. The percentages describe the sample, not an
 archive-wide census. Historical measurements of two August 2026 runs found +6.3 % and +5.7 %;
 the broader paired sample governs the storage decision.

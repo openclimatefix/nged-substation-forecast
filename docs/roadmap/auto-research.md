@@ -201,22 +201,23 @@ separation addresses that risk.
 **Phase 1 lasts until an XGBoost model beats `manual_heuristic` on CRPS on the leaderboard fold.**
 Until then, most gains come from fixing bugs and conceptual faults in the data pipeline and in the
 XGBoost model, and those gains are large next to noise and selection bias. In the [Quick
-wins](../studies/forecasts/quick-wins.md) study, quantile training alone lowered CRPS by 2.4
+wins](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/quick-wins/) study,
+quantile training alone lowered CRPS by 2.4
 percentage points of capacity.
 
 **Phase 1 assumes Claude is honest.** The leaderboard scorer keeps only the checks that catch honest
 mistakes, such as a study that scores fewer rows than the reference CV run.
 Each experiment's reviews look for broken and leaky implementations, as the `ml-experiment` skill
-requires.
+of the [`nged-ml-research`](https://github.com/openclimatefix/nged-ml-research) repository requires.
 
 **Phase 1 runs on a daily rhythm.** During the day, the maintainer and Claude read the latest
 results and agree the next night's experiments. Overnight, a Claude session runs them with the
-`ml-experiment` skill, on the current data, as the maintainer's own Unix user. Within a budget the
-plan sets, Claude may add experiments that combine the night's winners, and each experiment the plan
-did not name is labelled post hoc. The next day's discussion decides which ideas to keep. The ideas
-worth keeping are re-implemented in production in reviewed pull requests.
+`ml-experiment` skill of that repository, on the current data, as the maintainer's own Unix user.
+Within a budget the plan sets, Claude may add experiments that combine the night's winners, and each
+experiment the plan did not name is labelled post hoc. The next day's discussion decides which ideas
+to keep. The ideas worth keeping are re-implemented in production in reviewed pull requests.
 
-**Each ml-experiment tests one hypothesis and ends in a verdict.** The experiment's `result.md`
+**Each ML experiment tests one hypothesis and ends in a verdict.** The experiment's `result.md`
 holds the hypothesis, the verdict, the best arm, and the advice for future experiments, and it has
 the same fields that phase 2's hypothesis store records for an idea, so the research lead can read
 phase 1's experiments directly.
@@ -455,7 +456,8 @@ After each session, the maintainer fetches the branches into the maintainer's ow
 **The hypothesis store records what each idea taught the project, in a form a person and the
 research lead can both read.** [Issue #1034 (Set up the auto-research hypothesis
 store)](https://github.com/openclimatefix/nged-substation-forecast/issues/1034) tracks the store.
-The store holds one Markdown file per idea under `studies/auto_research/`, with the same fields in
+The store holds one Markdown file per idea under `studies/auto_research/` in the `nged-ml-research`
+repository, with the same fields in
 every file:
 
 - the hypothesis;

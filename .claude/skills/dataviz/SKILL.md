@@ -2,11 +2,11 @@
 name: dataviz
 description: >-
   This project's own charting rules, on top of the bundled `dataviz` skill's general method, for any
-  chart drawn in this repository — a study page, a dashboard, a notebook, or anywhere else: the
+  chart drawn in this repository — a docs page, a dashboard, a notebook, or anywhere else: the
   OCF-brand palette (`plotting.ocf_theme`), colour before shape, sizing a chart to a docs page's text
   column, hour-of-day axes, exporting and optimising SVG, and the extra care an NGED metered
   generator's time series needs so it cannot be re-identified. Load before drawing any chart in
-  this repository, whether or not the chart is for a study. Load the bundled `dataviz` skill too:
+  this repository, whether or not the chart is for a docs page. Load the bundled `dataviz` skill too:
   this skill supplements it and does not repeat its form heuristic, its six accessibility checks,
   its palette-validation script, or its interaction rules.
 ---
@@ -16,8 +16,7 @@ description: >-
 Every chart drawn in this repository follows the rules below, on top of the bundled `dataviz`
 skill's general method. Load the bundled skill too, for choosing a chart's form, the six
 accessibility checks, `validate_palette.py`/`.js`, and its interaction rules. This skill gives this
-project's own answers to the questions the bundled skill leaves brand-neutral. The `study` skill adds
-a further layer of rules that apply only to a study page's charts, on top of both.
+project's own answers to the questions the bundled skill leaves brand-neutral.
 
 ## Colours
 
@@ -50,10 +49,9 @@ colour a group of products instead and put every product's name on the axis.
 
 **Size a chart to the page's text column, so the chart shows at about 1:1 scale in the built site.**
 Stack panels vertically rather than side by side, let the plot area fill the column's width, put
-every key above the plot, and keep subtitles short in total words. `studies.charts` draws every figure
-`CONTENT_WIDTH_PX` (`packages/studies/src/studies/charts.py`) wide for this reason, the width of
-`docs/`'s text column; match that width for a chart outside `docs/studies/` too, and check that the
-text is legible in the built site, not only in the SVG.
+every key above the plot, and keep subtitles short in total words. Draw every figure 680 pixels
+wide, the width of `docs/`'s text column, and check that the text is legible in the built site, not
+only in the SVG.
 
 **Wrap the title and subtitle lines to the plot area's width.** Vertical space is the scarce
 resource on a docs page, so every row of the figure should go to the plot rather than to text. A
@@ -110,5 +108,5 @@ known dates, which identifies the generator behind its anonymised label. Count t
 on the axis (days 1 to 7), and give each plotted period's month and year in the surrounding text,
 never the day. Turn off per-point accessibility text (`aria=False` on the mark), because Vega
 otherwise writes each point's date and value into the SVG's ARIA labels. `CLAUDE.md` has the full
-anonymisation rule this follows from, and the `study` skill's "Anonymisation" section has the rest of
-the labelling workflow for a study.
+anonymisation rule this follows from, and the `study` skill of the `nged-ml-research` repository
+has the rest of the labelling workflow.
