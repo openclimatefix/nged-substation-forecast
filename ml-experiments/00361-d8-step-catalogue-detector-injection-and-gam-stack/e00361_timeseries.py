@@ -5,8 +5,9 @@ Weeks are chosen by a rule fixed before any chart was drawn. Scoring year: Monda
 from 2025-07-07 to 2026-06-22. Flagged hours are the hours of detected falls and drops in the
 stored D8 catalogue. Weeks 1 and 2 are the two non-overlapping weeks with the most flagged hours
 (ties go to the earlier week). Week 3 is the zero-flagged-hour week nearest the middle of the year.
-Injection panels use host D2, one draw per size with a fixed seed, with the first missed spell (none of its half-hours detected, and at least 2 days into the window so a
-baseline exists) and the first false alarm (a detected segment that overlaps no injected spell) in that draw.
+Injection panels use host D2, one draw per size with a fixed seed. Each draw shows the first
+missed spell (none of its half-hours detected, and at least 2 days into the window so a baseline
+exists) and the first false alarm (a detected segment that overlaps no injected spell).
 
     PYTHONPATH=$E252:$E264:$E354:$E361 uv run --no-sync python ml-experiments/00361-*/e00361_timeseries.py
 """
