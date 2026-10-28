@@ -71,14 +71,17 @@ lessons:
     The rule finds 171 rises of at least 1.5 MW for 193 falls, so some of its falls are probably
     ordinary demand swings, though a generator also causes rises when it switches back on.
   - >-
-    The multi-day drops (6 found, median 2.7 MW and 2.5 days) match the earlier reading in experiments 159 and 291 that the drops are generator spells, but
+    The multi-day drops (6 found, median 2.7 MW and 2.5 days) match the earlier reading in
+    experiments 159 and 291 that the drops are generator spells, but
     they cover too few rows to move a monthly fit.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
   A plain step detector finds injected 3 MW and 4 MW generator-like spells most of the time and 2
   MW spells about half the time. Removing the steps it finds from D8's training target does not
-  improve D8's forecast, so this test gives no support for building a particle filter that separates the generator. A detector that rejects ordinary demand swings, and a longer record of the generator's
+  improve D8's forecast, so this test gives no support for building a particle filter that
+  separates the generator. A detector that rejects ordinary demand swings, and a longer record of
+  the generator's
   own output, would be the next things to try.
 advice:
   - >-
@@ -86,7 +89,8 @@ advice:
     moved by -0.007 points (99% interval -0.097 to +0.053) (C1, Figure 2).
   - >-
     Expect a residual-median rule with a 1.5 MW threshold to miss about half of injected 2 MW
-    spells and to flag nearly as many rises (171) as falls (193) at D8, so test any detector against injected spells
+    spells and to flag nearly as many rises (171) as falls (193) at D8, so test any detector
+    against injected spells
     and against rises before using its output (Figures 1 and 3).
 date: 2026-10-28
 ---
@@ -94,23 +98,24 @@ date: 2026-10-28
 **A plain step detector separates 3 MW and 4 MW generator-like spells from D8's demand most of the
 time, but removing the steps it finds from the training target does not improve D8's forecast.**
 
-The test does not support building a particle filter on the evidence of this detector. A detector that rejects ordinary demand swings is one option, since the rule flags nearly as
-many rises as falls.
-The verdict is `not supported`.
+The test does not support building a particle filter on the evidence of this detector. A detector
+that rejects ordinary demand swings is one option, since the rule flags nearly as many rises as
+falls. The verdict is `not supported`.
 
 D8 is a primary substation (Primary) whose power seems to include a dispatchable generator that
 switches on and off. We asked whether a simple rule can find such steps in D8's power, and whether
 taking them out of the training target helps the forecast. We added simulated on/off spells of 2, 3,
-and 4 MW to three Primaries with no known generator, D2, D3, and D4, and counted how many spells
-the rule found again. We then refitted D8's generalised additive model (GAM) stack with the
-detected steps removed. The quantile score is twice the mean pinball loss over 11 quantiles, in
-points of D8's capacity (1 point is about 0.1 MW), and lower is better. The residual-median rule
-extends experiment 159's rule for multi-day drops ([experiment 159](../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md)). The stack,
-its refits, and the own-residual band come from
-[experiment 354](../00354-d8-own-residual-bands-and-longer-fit-history/result.md), and the
-gas-engine background from [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md),
-[experiment 265](../00265-dp-gas-engine-bands-prior-and-visibility-switch/result.md), and
-[experiment 291](../00291-d8-drops-engine-spells-load-shift/result.md).
+and 4 MW to three Primaries with no known generator, D2, D3, and D4, and counted how many spells the
+rule found again. We then refitted D8's generalised additive model (GAM) stack with the detected
+steps removed. The quantile score is twice the mean pinball loss over 11 quantiles, in points of
+D8's capacity (1 point is about 0.1 MW), and lower is better. The residual-median rule extends
+experiment 159's rule for multi-day drops ([experiment
+159](../00159-switching-d8-multi-day-drops-recurrence-and-report/result.md)). The stack, its refits,
+and the own-residual band come from [experiment
+354](../00354-d8-own-residual-bands-and-longer-fit-history/result.md), and the gas-engine background
+from [experiment 264](../00264-dp-gas-engine-asymmetric-bands-at-d8/result.md), [experiment
+265](../00265-dp-gas-engine-bands-prior-and-visibility-switch/result.md), and [experiment
+291](../00291-d8-drops-engine-spells-load-shift/result.md).
 
 **Figure 1: the detector finds 4 MW spells 91% of the time and 2 MW spells 55% of the time.**
 
