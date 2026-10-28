@@ -5,7 +5,7 @@ Frames are named `<arm>_<band>`, stage `d` throughout (night offset and recipe R
 354's primary), band `donated`, `arm2`, or `arm3`. Arm 3 (own residuals by hour block and season)
 is the band of the pre-registered contrasts. Gate: `ctl_arm3` must score 8.382 on all rows.
 
-    PYTHONPATH=ml-experiments/00252-gam-stack-at-eight-more-primaries:ml-experiments/00264-dp-gas-engine-asymmetric-bands-at-d8:ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history:ml-experiments/00361-d8-step-catalogue-detector-injection-and-gam-stack \
+    PYTHONPATH=<the folders of experiments 252, 264, 354, and 361> \
         OMP_NUM_THREADS=2 uv run --no-sync python -W ignore ml-experiments/00361-*/e00361_score.py
 """
 

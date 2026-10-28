@@ -1,7 +1,7 @@
 # ruff: noqa: E501
 """Step 1: catalogue D8's detected steps and multi-day drops, and print every number quoted.
 
-PYTHONPATH=ml-experiments/00252-gam-stack-at-eight-more-primaries:ml-experiments/00361-d8-step-catalogue-detector-injection-and-gam-stack \
+PYTHONPATH=<the folders of experiments 252, 264, 354, and 361> \
         OMP_NUM_THREADS=2 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
         uv run --no-sync python ml-experiments/00361-*/e00361_catalogue.py
 """

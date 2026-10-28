@@ -13,7 +13,7 @@ band at 2025-04-01) and edits the training target at each cut. Arms:
 The detector sees only rows ending at or before the cut (`e00361_detect`). A drop's level is used
 where a drop covers the row, and a step's level elsewhere.
 
-    PYTHONPATH=ml-experiments/00252-gam-stack-at-eight-more-primaries:ml-experiments/00354-d8-own-residual-bands-and-longer-fit-history:ml-experiments/00361-d8-step-catalogue-detector-injection-and-gam-stack \
+    PYTHONPATH=<the folders of experiments 252, 264, 354, and 361> \
         OMP_NUM_THREADS=4 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python -W ignore ml-experiments/00361-*/e00361_fit.py --arms ctl t1 t0
 """

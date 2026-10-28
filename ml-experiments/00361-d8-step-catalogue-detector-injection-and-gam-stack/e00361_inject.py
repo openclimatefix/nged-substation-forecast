@@ -8,7 +8,7 @@ segments (steps or drops) cover at least half of its half-hours and the covering
 is within 30% of the median injected total over the spell. The same windows on the uninjected host
 give the chance-recovery rate. Prints every number the write-up quotes.
 
-    PYTHONPATH=ml-experiments/00252-gam-stack-at-eight-more-primaries:ml-experiments/00361-d8-step-catalogue-detector-injection-and-gam-stack \
+    PYTHONPATH=<the folders of experiments 252, 264, 354, and 361> \
         OMP_NUM_THREADS=2 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
         uv run --no-sync python -W ignore ml-experiments/00361-*/e00361_inject.py
 """
