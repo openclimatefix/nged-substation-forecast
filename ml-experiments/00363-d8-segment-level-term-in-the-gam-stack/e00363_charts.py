@@ -45,17 +45,29 @@ def figure_1(*, scores: dict) -> None:
     for arm in LABELS:
         for flag, label in (("all", "All scored rows"), ("y2026", "2026 only")):
             point, low, high = scores["contrast"][f"c_{arm}__ctl"][flag]["ci99"]
-            rows.append({"arm": LABELS[arm], "rows": label, "point": point, "low": low, "high": high})
+            rows.append(
+                {"arm": LABELS[arm], "rows": label, "point": point, "low": low, "high": high}
+            )
     frame = pl.DataFrame(rows)
     base = alt.Chart(frame).encode(
         y=alt.Y("arm:N", title=None, sort=list(LABELS.values())),
         yOffset="rows:N",
         color=alt.Color("rows:N", title=None, scale=alt.Scale(range=[ocf.BRAND_ORANGE, ocf.DATA_BLUE])),
     )  # fmt: skip
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3], color="#333333").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    zero = (
+        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[4, 3], color="#333333")
+        .encode(x="x:Q")
+    )
     chart = (
         zero
-        + base.mark_rule(strokeWidth=2).encode(x=alt.X("low:Q", title="Quantile score minus the control's (points of capacity; negative is better)"), x2="high:Q")  # ty: ignore[unresolved-attribute]
+        + base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "low:Q",
+                title="Quantile score minus the control's (points of capacity; negative is better)",
+            ),
+            x2="high:Q",
+        )
         + base.mark_point(filled=True, size=45, aria=False).encode(x="point:Q")  # ty: ignore[unresolved-attribute]
     ).properties(
         width=WIDTH,
@@ -70,7 +82,14 @@ def figure_1(*, scores: dict) -> None:
 
 def figure_2(*, scores: dict) -> None:
     """Absolute score by lead band and by days with and without a detected step."""
-    slices = [("lead_le12", "Up to 12 h"), ("lead_12_36", "12 to 36 h"), ("lead_36_72", "36 to 72 h"), ("lead_gt72", "Over 72 h"), ("step_day", "Days with a detected step"), ("no_step_day", "Days without")]
+    slices = [
+        ("lead_le12", "Up to 12 h"),
+        ("lead_12_36", "12 to 36 h"),
+        ("lead_36_72", "36 to 72 h"),
+        ("lead_gt72", "Over 72 h"),
+        ("step_day", "Days with a detected step"),
+        ("no_step_day", "Days without"),
+    ]
     arms = {"ctl": "Control", "m": "Masking", "seg_mid": "Segment term, middle penalty"}
     rows = [
         {"slice": label, "arm": arms[arm], "score": scores["absolute"][flag][arm]}
@@ -78,7 +97,7 @@ def figure_2(*, scores: dict) -> None:
         for arm in arms
     ]
     chart = (
-        alt.Chart(pl.DataFrame(rows))
+        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
         .encode(
             y=alt.Y("slice:N", title=None, sort=[label for _, label in slices]),
@@ -105,8 +124,16 @@ def figure_3(*, placebo: dict) -> None:
         for site, v in placebo.items()
     ]  # fmt: skip
     base = alt.Chart(pl.DataFrame(rows)).encode(y=alt.Y("site:N", title=None))
-    zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(strokeDash=[4, 3], color="#333333").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
-    limit = alt.Chart(pl.DataFrame({"x": [3.0]})).mark_rule(strokeDash=[2, 2], color=ocf.BRAND_ORANGE).encode(x="x:Q")  # ty: ignore[unresolved-attribute]
+    zero = (
+        alt.Chart(pl.DataFrame({"x": [0.0]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[4, 3], color="#333333")
+        .encode(x="x:Q")
+    )
+    limit = (
+        alt.Chart(pl.DataFrame({"x": [3.0]}))  # ty: ignore[unresolved-attribute]
+        .mark_rule(strokeDash=[2, 2], color=ocf.BRAND_ORANGE)
+        .encode(x="x:Q")
+    )
     chart = (
         zero + limit
         + base.mark_rule(strokeWidth=2, color=ocf.DATA_BLUE).encode(x=alt.X("low:Q", title="Change in quantile score (% of the control's; negative is better)"), x2="high:Q")  # ty: ignore[unresolved-attribute]
@@ -124,9 +151,13 @@ def figure_3(*, placebo: dict) -> None:
 
 def figure_4(*, weather: dict) -> None:
     """Relative change of each weather and calendar term's coefficients when the segment term is added."""
-    rows = [{"site": site, "term": term, "change": value} for site, terms in weather.items() for term, value in terms.items()]
+    rows = [
+        {"site": site, "term": term, "change": value}
+        for site, terms in weather.items()
+        for term, value in terms.items()
+    ]
     chart = (
-        alt.Chart(pl.DataFrame(rows))
+        alt.Chart(pl.DataFrame(rows))  # ty: ignore[unresolved-attribute]
         .mark_bar(aria=False)
         .encode(
             y=alt.Y("term:N", title=None, sort=list(next(iter(weather.values())))),
@@ -153,17 +184,17 @@ def figure_5() -> None:
     )
     days = wide.group_by("day").agg(pl.col("step_day").first()).sort("day")
     roll = days.with_columns(roll=pl.col("step_day").cast(pl.Int32).rolling_sum(14))
-    end_row = int(roll["roll"].arg_max())
+    end_row = int(roll["roll"].arg_max())  # ty: ignore[invalid-argument-type]
     start, end = days["day"][end_row - 13], days["day"][end_row]
     part = wide.filter((pl.col("day") >= start) & (pl.col("day") <= end)).group_by("valid_time").agg(
         pl.col("actual").first(), pl.col("ctl__q50").mean(), pl.col("seg_mid__q50").mean(), pl.col("m__q50").mean()
     ).sort("valid_time")  # fmt: skip
     t0 = part["valid_time"][0]
     long = part.with_columns(day=(pl.col("valid_time") - t0).dt.total_hours() / 24 + 1).unpivot(
-        index="day", on=["actual", "ctl__q50", "seg_mid__q50"], variable_name="series", value_name="points", 
+        index="day", on=["actual", "ctl__q50", "seg_mid__q50"], variable_name="series", value_name="points",
     ).with_columns(pl.col("series").replace({"actual": "Reading", "ctl__q50": "Control median", "seg_mid__q50": "Segment term median"}))  # fmt: skip
     chart = (
-        alt.Chart(long)
+        alt.Chart(long)  # ty: ignore[unresolved-attribute]
         .mark_line(clip=True, aria=False)
         .encode(
             x=alt.X("day:Q", title="Day of the 14-day window", axis=alt.Axis(values=[1, 4, 7, 10, 14])),

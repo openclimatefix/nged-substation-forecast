@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Fit D8's (or a placebo Primary's) monthly stack with a penalised level per detected stretch.
 
 Arms (all monthly, at the cuts of experiment 252's stored fits, T-all with a fitted solar capacity):
@@ -41,12 +42,14 @@ import e00361_detect as detect  # ty: ignore[unresolved-import]
 import e00363_segment as segment
 import numpy as np
 import polars as pl
-import torch  # ty: ignore[unresolved-import]
+import torch
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_features import naive_utc
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
 
-WORK: Final[Path] = ML_EXPERIMENTS_DATA_DIR / "00363-d8-segment-level-term-in-the-gam-stack" / "work"
+WORK: Final[Path] = (
+    ML_EXPERIMENTS_DATA_DIR / "00363-d8-segment-level-term-in-the-gam-stack" / "work"
+)
 LAMBDAS: Final[dict[str, float]] = {
     "ctl": 0.0,
     "seg_weak": 0.1,
@@ -77,7 +80,9 @@ def stretches(*, cache, site: str, cut: datetime) -> dict:  # noqa: ANN001
             edges += [int(s), int(e)]
             depths.append(abs(float(level)))
     edges = sorted({edge for edge in edges if 0 < edge < n})
-    boundaries = tuple(int(np.datetime64(cache.end_times[edge], "ns").astype(np.int64)) for edge in edges)
+    boundaries = tuple(
+        int(np.datetime64(cache.end_times[edge], "ns").astype(np.int64)) for edge in edges
+    )
     finite = int(np.isfinite(power).sum())
     return {
         "boundaries": boundaries,
@@ -136,9 +141,7 @@ def forecast_frame(*, site: str) -> pl.DataFrame:
     frames = []
     for period in periods:
         runs = [
-            i
-            for i in context.setup.indices(periods={period})
-            if context.setup.origins[i] >= first
+            i for i in context.setup.indices(periods={period}) if context.setup.origins[i] >= first
         ]
         if runs:
             frames.append(forecaster.forecast(runs=runs).with_columns(period=pl.lit(period)))
@@ -172,7 +175,9 @@ def main() -> None:
         arms = stage2.build_arms(site=site, frame=corr.add_calendar(frame=base))
         for name in ("a", "d"):
             arms[name].write_parquet(folder / f"{name}_scored_{site}.parquet")
-        print(site, arm, "forecast", frame.height, f"{time.monotonic() - started:.0f} s", flush=True)
+        print(
+            site, arm, "forecast", frame.height, f"{time.monotonic() - started:.0f} s", flush=True
+        )
 
 
 if __name__ == "__main__":

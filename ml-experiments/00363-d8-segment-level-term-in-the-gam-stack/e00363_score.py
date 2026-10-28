@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Score arms C, M, S (three penalties) and S+ at D8, and C and S at the placebo Primaries.
 
 Every frame is stage `d` (night offset and recipe R) with experiment 354's arm-3 band (own
@@ -54,9 +55,13 @@ def read_arm(*, site: str, arm: str) -> pl.DataFrame:
 
 def widen_upper(*, frame: pl.DataFrame, site: str) -> pl.DataFrame:
     """Return arm S+: the mixture quantiles at q50 and above on rows whose latest stretch is a fall."""
-    fits = pickle.loads((fit_module.arm_dir(site=site, arm="seg_mid") / "tall_fits.pkl").read_bytes())
+    fits = pickle.loads(
+        (fit_module.arm_dir(site=site, arm="seg_mid") / "tall_fits.pkl").read_bytes()
+    )
     cuts = np.array([np.datetime64(f.cut.replace(tzinfo=None), "us") for f in fits])
-    origin = frame["power_fcst_init_time"].dt.replace_time_zone(None).to_numpy().astype("datetime64[us]")
+    origin = (
+        frame["power_fcst_init_time"].dt.replace_time_zone(None).to_numpy().astype("datetime64[us]")
+    )
     delay = np.timedelta64(int(timedelta(hours=DEFAULT_DELAY_HOURS).total_seconds()), "s")
     idx = np.clip(np.searchsorted(cuts + delay, origin, side="right") - 1, 0, len(fits) - 1)
     in_fall = np.array([fits[i].arm.last_in_fall for i in idx])
@@ -121,9 +126,18 @@ def main() -> None:
     capacity_mw = float(cache.sites[bands.SITE_D8].table.effective_capacity_mw)
     names, refs = list(frames), (*score_module.REFERENCES,)
     out: dict = {"rows": wide.height, "capacity_mw": capacity_mw}
-    slices = ("all", "sunny", "cold_night", "winter_night", "y2026", "step_day", "no_step_day", *LEADS)
+    slices = (
+        "all",
+        "sunny",
+        "cold_night",
+        "winter_night",
+        "y2026",
+        "step_day",
+        "no_step_day",
+        *LEADS,
+    )
     out["absolute"] = {
-        flag: {n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean()) for n in (*names, *refs)}
+        flag: {n: float(wide.filter(pl.col(flag))[f"s_{n}"].mean()) for n in (*names, *refs)}  # ty: ignore[invalid-argument-type]
         for flag in slices
     }
     out["rows_by_slice"] = {flag: int(wide.filter(pl.col(flag)).height) for flag in slices}
@@ -146,7 +160,8 @@ def main() -> None:
     actual = wide["actual"].to_numpy()
     out["checks"] = {
         "median_minus_mean_points": {
-            n: float((wide[f"{n}__q50"] - wide[f"{n}__mean"]).mean()) for n in names
+            n: float((wide[f"{n}__q50"] - wide[f"{n}__mean"]).mean())  # ty: ignore[invalid-argument-type]
+            for n in names
         },
         "mae_median_mw": {
             n: float(np.abs(actual - wide[f"{n}__q50"].to_numpy()).mean()) * capacity_mw / 100.0
@@ -164,7 +179,7 @@ def main() -> None:
             n: float(np.corrcoef(actual, wide[f"{n}__mean"].to_numpy())[0, 1]) for n in names
         },
     }
-    out["share_widened_rows"] = float(frames["seg_plus"]["widened"].mean())
+    out["share_widened_rows"] = float(frames["seg_plus"]["widened"].mean())  # ty: ignore[invalid-argument-type]
     wide.write_parquet(fit_module.WORK / "scores_wide_D8.parquet")
     out["placebo"] = {}
     for site in ("D2", "D4"):
@@ -175,21 +190,41 @@ def main() -> None:
             "rows": pwide.height,
             "ctl": float(pwide["s_ctl"].mean()),
             "seg_mid": float(pwide["s_seg_mid"].mean()),
-            "contrast": lib.contrast_both(wide=pwide, column="c_seg_mid__ctl", flag="all", site=site),
+            "contrast": lib.contrast_both(
+                wide=pwide, column="c_seg_mid__ctl", flag="all", site=site
+            ),
             "tails": {a: lib.coverage_and_tails(frame=pwide, prefix=f"{a}__") for a in pframes},
         }
     (fit_module.WORK / "scores.json").write_text(json.dumps(out, indent=2, default=float))
     print("rows", out["rows"], "widened share", round(out["share_widened_rows"], 3))
     for flag in slices:
-        print(flag, out["rows_by_slice"][flag], {n: round(v, 3) for n, v in out["absolute"][flag].items()})
+        print(
+            flag,
+            out["rows_by_slice"][flag],
+            {n: round(v, 3) for n, v in out["absolute"][flag].items()},
+        )
     for column, by_flag in out["contrast"].items():
         for flag, v in by_flag.items():
             print("contrast", column, flag, [round(x, 3) for x in v["ci99"]])
-    for key in ("median_minus_mean_points", "mae_median_mw", "mae_mean_forecast_mw", "bias_mean_forecast_mw", "correlation_mean_forecast"):
+    for key in (
+        "median_minus_mean_points",
+        "mae_median_mw",
+        "mae_mean_forecast_mw",
+        "bias_mean_forecast_mw",
+        "correlation_mean_forecast",
+    ):
         print(key, {n: round(v, 3) for n, v in out["checks"][key].items()})
     print("tails", {n: {k: round(v, 3) for k, v in t.items()} for n, t in out["tails_all"].items()})
     for site, v in out["placebo"].items():
-        print("placebo", site, v["rows"], round(v["ctl"], 3), round(v["seg_mid"], 3), [round(x, 3) for x in v["contrast"]["ci99"]], v["tails"])
+        print(
+            "placebo",
+            site,
+            v["rows"],
+            round(v["ctl"], 3),
+            round(v["seg_mid"], 3),
+            [round(x, 3) for x in v["contrast"]["ci99"]],
+            v["tails"],
+        )
 
 
 if __name__ == "__main__":
