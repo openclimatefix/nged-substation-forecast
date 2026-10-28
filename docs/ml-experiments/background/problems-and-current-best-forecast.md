@@ -108,7 +108,8 @@ generators, and curtailment with its tails.** Each bullet ends with an evidence 
   102](../00102-simp1-simplifying-the-bg2-best-guess-before-production/result.md)) (exp 102; 16
   Primaries, one year; provisional).
 - **The physics-based demand model could not be told apart from BG2 at 5 Primaries.** The convex
-  model with a Kalman filter on recent errors (GAM-K) scored 2.800 against 2.780 for BG2 (difference
+  model with a Kalman filter on recent errors (GAM-K; see the [animated
+  explainer](../kalman-gam-explainer.md)) scored 2.800 against 2.780 for BG2 (difference
   +0.020, interval -0.109 to +0.157, not like for like) ([experiment
   111](../00111-differentiable-physics-6-ens-forecast-engine-against-bg2/result.md)) (exp 111; 5
   Primaries, one year; provisional).
