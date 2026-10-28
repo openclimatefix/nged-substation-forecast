@@ -60,8 +60,8 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
     requirement.
 
 3. **Verify, all green before pushing**: `uv run ruff check .`, `uv run ruff format .`, `uv run
-   --all-packages ty check`, `uv run pytest`, plus (if docs were touched) `uv run pymarkdown scan -r docs
-   README.md CLAUDE.md packages/*/README.md` and `uv run mkdocs build --strict`.
+   --all-packages ty check`, `uv run pytest`, plus (if docs were touched) `uv run pymarkdown scan -r
+   docs README.md CLAUDE.md packages/*/README.md` and `uv run mkdocs build --strict`.
 
 4. **Commit, push, and mark the PR ready for review.** With a plan, `plan-issue` already opened the
    draft PR: commit, push, and run `gh pr ready <PR-number>`. Rewrite the body for the code that now

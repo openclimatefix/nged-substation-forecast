@@ -89,8 +89,9 @@ maintainer has read the report.
       report says so.
 
 7. **Judge each upgrade against the repository.** For each changelog entry, ask whether this
-   repository uses the changed behaviour. Grep for the changed API in `src/`
-   and `packages/` before concluding either way, and answer four questions for every package with a breaking change, a deprecation, or a behaviour change:
+   repository uses the changed behaviour. Grep for the changed API in `src/` and `packages/` before
+   concluding either way, and answer four questions for every package with a breaking change, a
+   deprecation, or a behaviour change:
     - **Does it need a wider code review?** For example, a Polars 2 upgrade changed row order after
       a lazy join without raising, and green tests did not prove the code was still right.
     - **Does it make a skill or a docs page stale?** Check `.claude/skills/`, `CLAUDE.md`, and

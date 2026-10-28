@@ -138,7 +138,7 @@ and the study has no demand target. Interpolating the wind as components moved t
 estimate by less than 0.1 points at every horizon to day 7, and raised it by 0.12 points [0.01,
 0.25] at day 10 and 0.15 points [−0.03, 0.34] at day 14. The measurements, and the ENS horizon study
 they come from, are in [How accurate is a power forecast driven by ECMWF ENS at each
-horizon?](../studies/forecasts/ens-horizons.md#turning-enss-steps-into-hourly-values).
+horizon?](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/ens-horizons/#turning-enss-steps-into-hourly-values).
 
 The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level`, and
 `geopotential_height_500hpa` lose almost nothing at 6-hourly spacing ([MAE/SD
@@ -155,7 +155,8 @@ follow vector interpolation and speed derivation.
 **The maintainer chose u/v alone after the seasonal storage measurement.** Across 24 full 2025
 forecasts, u/v used 8.90 % more Parquet bytes than polar storage; scalar-mean speeds added another
 17.90 %. Typical spatial scalar-minus-vector gaps were small, but rare cancellation was large.
-The [measurement](../studies/forecasts/wind-storage.md) does not establish whether scalar speed
+The [measurement](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/wind-storage/)
+does not establish whether scalar speed
 improves generation forecasts. A separate scalar-feature experiment remains possible.
 
 **Cutover requires a rebuilt archive and retrained forecasting models.** The
@@ -203,7 +204,8 @@ in a wind component or a clear-sky index is invisible to the leaderboard and obv
 
 The ENS horizon study measured arms 2 and 3, and the wind vector, outside the pipeline, on hourly
 XGBoost models per generator rather than on the leaderboard: [Turning ENS's steps into hourly
-values](../studies/forecasts/ens-horizons.md#turning-enss-steps-into-hourly-values) has the
+values](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/ens-horizons/#turning-enss-steps-into-hourly-values)
+has the
 figures, by horizon, for its nine farms.
 
 ## Tier 1 — config-level changes (hours each)
@@ -496,7 +498,8 @@ different question, and one for the serving path rather than the training loop.
 
 **Clamping a prediction to the export cap is fair when the cap is already on the record, and
 lookahead bias when the cap is still in the future.** The [beam/diffuse
-study](../studies/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
+study](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/) scores
+`min(export cap, prediction)` at the one site
 under active network management. That study reads reanalysis and satellite irradiance for
 hours that have already happened, so the cap the operator set is as much a historical record as the
 weather is. Every arm in that study gets the same clamp, so the clamp cannot favour the arm
@@ -521,7 +524,8 @@ months while the generator exports normally — the hour counts and the yields a
 network management caps what a generator may
 export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
 Masking on the raw feed would drop most of that site's early record as curtailed. The
-[beam/diffuse study](../studies/beam-diffuse-split.md) honours the cap only from the first
+[beam/diffuse study](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/)
+honours the cap only from the first
 half-hour at which it reaches the connection limit, which is a marker taken from the cap alone.
 
 ### Drop a generator's commissioning ramp from the training target
@@ -1368,7 +1372,7 @@ describes a solar experiment from issue #800. The experiment gave an XGBoost mod
 and UKV's global irradiance, as past-weather values, and scored it against an XGBoost model given
 ICON-D2's alone: -0.30 points of capacity [-0.37, -0.24]. That experiment does not use day-ahead
 forecasts. The [matched-lead
-study](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/)
+study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/matched-lead/)
 scores an XGBoost model given ENS's day-1 mean plus ICON-EU and IFS 0.25° forecasts against an
 XGBoost model given ENS alone, at 3 wind and 6 solar generators over 21 months. The contrast P4b
 (planned) gives the other products day-2 values, which are never fresher than a 09:00 UTC service
@@ -1381,7 +1385,9 @@ solar is -0.347 points [-0.482, -0.219], but its guard is uninformative because 
 is itself worse than ENS alone. The study scores point forecasts, so it does not test whether a
 second source improves the probabilistic forecast or the CRPS the experiment steps above use.
 
-**The [blends page](../studies/forecasts/blends-with-ens.md) names AIFS Single as the product to add
+**The [blends
+page](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/blends-with-ens/) names
+AIFS Single as the product to add
 to ENS only for solar at day 2, a fragile result. At solar day 1 and wind days 1 and 2, the page's
 ranking rule ranks neither AIFS Single nor ICON-EU above the other.** The wind day-1 gain from
 ICON-EU is exploratory and an upper bound, because it reads an ICON-EU run fresher than a live

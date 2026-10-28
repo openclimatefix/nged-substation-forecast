@@ -48,7 +48,7 @@ best-estimate, not a guarantee.
 - [A staged probabilistic forecast](staged-probabilistic-forecast.md) — 🔬 a design under test: a
   stage 1 that turns weather into power, a stage 2 that calibrates, uses lagged power, and blends
   weather products, and coupling that restores coherent ensemble members. The experiments that test
-  it are on the [ML experiments](../ml-experiments/README.md) pages.
+  it are on the [ML experiments](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) pages.
 - [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent
   searching for improvements to the XGBoost forecasting model in two phases: experiments run overnight
   from a plan agreed the day before, then a careful search in which the agent runs as a separate
@@ -202,7 +202,8 @@ and the **pre-training experiments** that ingest unlocks
 ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)) — see [Extending the
 training history](training-history.md). The version-1 plan is CAMS for irradiance and ERA5 for
 other variables, and CEDA UKV is not ingested (see the [CEDA UKV against ERA5
-study](../studies/past-weather/ukv-ceda-vs-era5.md)). Our power data reaches back to late
+study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/ukv-ceda-vs-era5/)).
+Our power data reaches back to late
 2019 while the ENS archive starts 2024-04-01, and Dynamical.org's ENS back-fill is not expected
 until ~November 2027, so an estimate of past weather is how the seasonal experiments on this page
 get more than one winter to learn from. The Tier-1 and Tier-2 config wins do not wait for it.

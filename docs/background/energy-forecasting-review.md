@@ -3236,7 +3236,8 @@ operational systems instead of continuing to look.
 ## Related notes
 
 **Bare-bones notes from a later, smaller literature scan sit on [Differentiable physics: literature
-scan](../ml-experiments/themes/differentiable-physics-literature.md).** The scan covers additive
+scan](https://openclimatefix.github.io/nged-ml-research/ml-experiments/themes/differentiable-physics-literature/).**
+The scan covers additive
 models and Kalman filters for demand forecasting, hierarchical reconciliation, and separating
 unmetered solar from substation demand. It informed the design of the differentiable-physics
 experiments, and has not had this review's fact-checking rounds.

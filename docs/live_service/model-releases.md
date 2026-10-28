@@ -9,7 +9,8 @@ XGBoost model that the maintainer ships to the live service. The number is an in
 
 **The software and the model carry separate version numbers.** The software release is a SemVer git
 tag (`v0.2.2`), and it changes when the code changes: a better dashboard, say. The model release
-changes when the trained model changes, usually because an ml-experiment's winner was ported into
+changes when the trained model changes, usually because an ML experiment's winner (run in the
+[`nged-ml-research`](https://github.com/openclimatefix/nged-ml-research) repository) was ported into
 the production pipeline, or because the model was retrained. A software release contains exactly one
 model release, because the Docker image bakes the model in. A software release with no new model
 keeps the previous model release, and only the software column of the log changes.
@@ -21,7 +22,7 @@ skill](https://github.com/openclimatefix/nged-substation-forecast/blob/main/.cla
 covers the work before and including the port in step 1 below: choosing the experiments, testing
 them together, and planning the port.
 
-1. Port the supported ml-experiments' winners into the production pipeline, in pull requests that
+1. Port the supported ML experiments' winners into the production pipeline, in pull requests that
    do not bump the release number.
 2. Register a cross-validation run named `model-release-N` whose `config_overrides` include
    `model_release: N`. The number is part of the run's registered configuration, so it travels
@@ -32,7 +33,7 @@ them together, and planning the port.
 4. Tag the commit `model-N`, and add a row to the log below in the same pull request. That pull
    request also sets `production_status` to `adopted` and `adopted_in` to N in each incorporated
    experiment's `result.md`, and checks that the candidates table on the [ML experiments
-   overview](../ml-experiments/README.md) no longer lists them.
+   overview](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) no longer lists them.
 
 A cross-validation run that is not a release leaves `model_release` at its default `0`. Nothing
 checks that the number in the config matches the run's name, so the log is the record of the

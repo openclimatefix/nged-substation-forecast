@@ -47,7 +47,7 @@ The script writes one snapshot directory per run, named after the time in UTC, s
 `/mnt/wd_18tb/nged-substation-forecast-backups/2026-10-05T183000Z/`. Each snapshot holds:
 
 - `data_internal/` — the whole of `data/`: the NWP and NGED power tables, `power_forecasts`,
-  `forecast_metrics`, the production model, and the study outputs under `data/studies/`
+  `forecast_metrics`, the production model, and the research outputs under `data/studies/`
 - `mlruns/` — the MLflow artifacts, which hold the trained models
 - `literature/` — the git-ignored library of papers and reference documents
 - `dagster_history/` and `dagster_home/` — Dagster's run history and its `$DAGSTER_HOME` directory

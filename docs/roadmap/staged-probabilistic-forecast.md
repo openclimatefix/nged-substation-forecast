@@ -1,7 +1,8 @@
 # A staged probabilistic forecast
 
 > **Status: 🔬 Research.** The design on this page is a best guess under test. The [ML
-> experiments](../ml-experiments/README.md) pages hold the experiments that test it, and each
+> experiments](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) pages hold the
+experiments that test it, and each
 > theme's Research plan page lists the experiments to run next. No production code implements it.
 
 **The page describes a probabilistic power forecast in three parts with fixed roles.** Stage 1 turns
@@ -297,7 +298,7 @@ must clear a low bar. The risks are thin data per bucket and quantile jumps at b
 - **A new NWP with short history:** add an adapter table. Stage 1 is untouched. Stage 2's calibrator
   keeps its form: the new product's rows join the pooled fit with one new spread factor, and the
   blend gains the product's weight, shrunk towards equal weights. The second-product experiments on
-  the [weather products Research plan](../ml-experiments/themes/weather-products-and-blending/plan.md)
+  the [weather products Research plan](https://openclimatefix.github.io/nged-ml-research/ml-experiments/themes/weather-products-and-blending/plan/)
   measure how few months of history this needs. The single-stage challenger
   instead adds a correction (a few numbers per technology) to a frozen champion, and the
   per-product-columns control retrains in full.
@@ -407,7 +408,8 @@ versioned stage 1 artefact, and a rule-based detector first.
 ## What the experiments show
 
 **Seven experiments and one closed study give the evidence so far.** The [ML
-experiments](../ml-experiments/README.md) pages hold each experiment's question, verdict, and
+experiments](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) pages hold each
+experiment's question, verdict, and
 figures; the bullets give the headline of each. Pull request numbers for 00005 and 00006 are
 [PR #1195 (Experiment 5: where lagged power enters a two-stage demand
 forecast)](https://github.com/openclimatefix/nged-substation-forecast/pull/1195) and [PR #1202
@@ -488,7 +490,8 @@ and input/output still probably dominate wall-clock time and need chunking by se
   hierarchy data exist for scoring it?
 - Is the target overall CRPS or exceedance at the 95th percentile? The answer decides between the
   location-and-scale form and a free quantile calibrator, which the [calibration Research
-  plan](../ml-experiments/themes/calibration-and-uncertainty/plan.md) tests.
+  plan](https://openclimatefix.github.io/nged-ml-research/ml-experiments/themes/calibration-and-uncertainty/plan/)
+  tests.
 - The final 51-member output fits `PowerForecast`, whose `ensemble_member` already has a different
   meaning for each forecaster (for `climatology` it is the rank of a quantile level). Should a
   docstring line say what the index means for the staged forecaster? The 19-level quantile table and
@@ -578,10 +581,12 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
   technique page.
 - **Reuse of stage 1:** the [capacity-estimation](capacity-estimation.md) and
   [data-cleaning](data-cleaning.md) roadmap pages.
-- **Evidence and process:** the [ML experiments](../ml-experiments/README.md) pages, which hold the
+- **Evidence and process:** the [ML
+  experiments](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) pages, which hold
+  the
   experiments' results, and the `release-model` skill, which describes how winners reach a numbered
-  model release. Earlier evidence: the [lag-features study](../studies/forecasts/lag-features.md)
-  and the [production feature faults study](../studies/forecasts/production-feature-faults.md).
+  model release. Earlier evidence: the [lag-features study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/lag-features/)
+  and the [production feature faults study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/production-feature-faults/).
 - **Principles:** [inherent stability](../design-philosophy/inherent-stability.md) and the [design
   principles](../design-philosophy/design-principles.md).
 
@@ -589,7 +594,8 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
 
 **Each theme's Research plan page lists the experiments to run next, and two pieces of
 infrastructure are tracked as GitHub issues because they change production-facing code.** The
-Research plan pages are linked from the [ML experiments overview](../ml-experiments/README.md). The
+Research plan pages are linked from the [ML experiments
+overview](https://openclimatefix.github.io/nged-ml-research/ml-experiments/). The
 two pieces of infrastructure are:
 
 - **The conventions adapter.** The radiation and wind rules have shipped. Remaining: step widths for

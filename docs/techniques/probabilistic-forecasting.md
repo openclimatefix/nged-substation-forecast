@@ -120,7 +120,7 @@ over-sensitive when fed forecast weather.** The damping above arises only becaus
 is a forecast, wrong by a lead-time-dependent amount. An estimate of past weather — a reanalysis
 such as ERA5, a satellite retrieval such as CAMS, or the first time steps of a weather-model run —
 usually carries smaller errors than a forecast at long lead, though not always: at six solar farms
-in the [past-sunshine study](../studies/past-weather/solar.md#ecmwf-ens-beats-era5-and-trails-cams),
+in the [past-sunshine study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/solar/#ecmwf-ens-beats-era5-and-trails-cams),
 ECMWF ENS's day-1 ensemble mean describes past sunshine better than ERA5 does. The smaller the
 estimate's own error, the closer a power-forecasting model trained on that estimate comes to the
 undamped response. Fed forecast weather, that power-forecasting model reacts fully to every forecast
