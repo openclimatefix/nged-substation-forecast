@@ -1,0 +1,199 @@
+== catalogue ==
+{
+ "t1.0": {
+  "negative_steps": 273,
+  "negative_drops_2d": 11,
+  "positive_steps": 290,
+  "median_level_mw": -2.1720000505447388,
+  "median_drop_level_mw": -2.1714999675750732,
+  "median_dwell_days": 0.4166666666666667,
+  "median_drop_dwell_days": 2.6875
+ },
+ "t1.5": {
+  "negative_steps": 193,
+  "negative_drops_2d": 6,
+  "positive_steps": 171,
+  "median_level_mw": -2.9555001258850098,
+  "median_drop_level_mw": -2.727124959230423,
+  "median_dwell_days": 0.375,
+  "median_drop_dwell_days": 2.53125
+ },
+ "t2.0": {
+  "negative_steps": 126,
+  "negative_drops_2d": 1,
+  "positive_steps": 107,
+  "median_level_mw": -3.2930001318454742,
+  "median_drop_level_mw": -3.799749940633774,
+  "median_dwell_days": 0.3541666666666667,
+  "median_drop_dwell_days": 2.125
+ }
+}
+== injection ==
+{
+ "uninjected_steps_per_year": {
+  "D2": 29.0,
+  "D3": 5.0,
+  "D4": 6.0
+ },
+ "k1_sizeNone": {
+  "spells": 3986,
+  "recovered_share": 0.7483692925238334,
+  "wilson": [
+   0.7346626656573777,
+   0.7615976370072696
+  ],
+  "chance_share": 0.004014049172102358,
+  "median_level_error": -0.0045000314712528855,
+  "median_abs_start_error_h": 0.5
+ },
+ "k1_size2.0": {
+  "spells": 1506,
+  "recovered_share": 0.5531208499335989,
+  "wilson": [
+   0.5279071797538314,
+   0.5780642016149161
+  ],
+  "chance_share": 0.008632138114209827,
+  "median_level_error": 0.0328749418258667,
+  "median_abs_start_error_h": 0.5
+ },
+ "k1_size3.0": {
+  "spells": 1318,
+  "recovered_share": 0.8323216995447648,
+  "wilson": [
+   0.8111931656195766,
+   0.8515186146724039
+  ],
+  "chance_share": 0.0007587253414264037,
+  "median_level_error": -0.009333292643229166,
+  "median_abs_start_error_h": 0.5
+ },
+ "k1_size4.0": {
+  "spells": 1162,
+  "recovered_share": 0.9061962134251291,
+  "wilson": [
+   0.8880680788658383,
+   0.9216474090700871
+  ],
+  "chance_share": 0.0017211703958691911,
+  "median_level_error": -0.021250009536743164,
+  "median_abs_start_error_h": 0.0
+ },
+ "k2_sizeNone": {
+  "spells": 8083,
+  "recovered_share": 0.6991216132624025,
+  "wilson": [
+   0.6890302931685626,
+   0.7090237505757837
+  ],
+  "chance_share": 0.0044537919089446985,
+  "median_level_error": -0.025937527418136597,
+  "median_abs_start_error_h": 0.5
+ },
+ "k2_size2.0": {
+  "spells": 2463,
+  "recovered_share": 0.4876167275680065,
+  "wilson": [
+   0.46791076650849206,
+   0.5073612574431068
+  ],
+  "chance_share": 0.008120178643930167,
+  "median_level_error": 0.006000041961669922,
+  "median_abs_start_error_h": 0.5
+ },
+ "k2_size3.0": {
+  "spells": 2653,
+  "recovered_share": 0.7542404824726724,
+  "wilson": [
+   0.7374974361597361,
+   0.7702483022388195
+  ],
+  "chance_share": 0.005277044854881266,
+  "median_level_error": -0.029166738192240544,
+  "median_abs_start_error_h": 0.5
+ },
+ "k2_size4.0": {
+  "spells": 2967,
+  "recovered_share": 0.8254128749578699,
+  "wilson": [
+   0.811334800759668,
+   0.8386493653432975
+  ],
+  "chance_share": 0.0006740815638692282,
+  "median_level_error": -0.03849999109903971,
+  "median_abs_start_error_h": 0.0
+ },
+ "k3_sizeNone": {
+  "spells": 11923,
+  "recovered_share": 0.5936425396292879,
+  "wilson": [
+   0.5847975766126661,
+   0.6024271786821473
+  ],
+  "chance_share": 0.004780676004361319,
+  "median_level_error": -0.04074998199939728,
+  "median_abs_start_error_h": 0.5
+ },
+ "k3_size2.0": {
+  "spells": 4587,
+  "recovered_share": 0.4318726836712448,
+  "wilson": [
+   0.41760075257907253,
+   0.44625863215770417
+  ],
+  "chance_share": 0.007194244604316547,
+  "median_level_error": -0.014500021934509277,
+  "median_abs_start_error_h": 1.0
+ },
+ "k3_size3.0": {
+  "spells": 2984,
+  "recovered_share": 0.660857908847185,
+  "wilson": [
+   0.643674342320527,
+   0.6776278311280254
+  ],
+  "chance_share": 0.007372654155495978,
+  "median_level_error": -0.038958301146825226,
+  "median_abs_start_error_h": 0.5
+ },
+ "k3_size4.0": {
+  "spells": 4352,
+  "recovered_share": 0.7180606617647058,
+  "wilson": [
+   0.7045047465353973,
+   0.7312319432468941
+  ],
+  "chance_share": 0.00045955882352941176,
+  "median_level_error": -0.059312522411346436,
+  "median_abs_start_error_h": 0.5
+ }
+}== scores ==
+rows 96986
+all {'ctl_arm3': 8.382, 't1_arm3': 8.375, 't0_arm3': 8.384, 'bg2': 7.593, 'climatology': 9.757, 'manual': 8.469}
+sunny {'ctl_arm3': 8.427, 't1_arm3': 8.231, 't0_arm3': 8.322, 'bg2': 8.223, 'climatology': 15.806, 'manual': 10.735}
+daylight {'ctl_arm3': 9.192, 't1_arm3': 9.16, 't0_arm3': 9.193, 'bg2': 8.512, 'climatology': 12.451, 'manual': 9.875}
+cold_night {'ctl_arm3': 8.058, 't1_arm3': 7.958, 't0_arm3': 7.962, 'bg2': 8.878, 'climatology': 9.269, 'manual': 8.424}
+winter_night {'ctl_arm3': 7.368, 't1_arm3': 7.348, 't0_arm3': 7.336, 'bg2': 6.936, 'climatology': 6.971, 'manual': 7.022}
+first3 {'ctl_arm3': 9.585, 't1_arm3': 9.643, 't0_arm3': 9.625, 'bg2': 7.663, 'climatology': 12.614, 'manual': 10.039}
+y2026 {'ctl_arm3': 7.829, 't1_arm3': 7.828, 't0_arm3': 7.829, 'bg2': 7.147, 'climatology': 8.195, 'manual': 7.617}
+contrast c_t1_donated__ctl_donated all [-0.039, -0.216, 0.057]
+contrast c_t1_donated__ctl_donated y2026 [-0.027, -0.059, 0.006]
+contrast c_t1_arm2__ctl_arm2 all [-0.017, -0.116, 0.048]
+contrast c_t1_arm2__ctl_arm2 y2026 [-0.016, -0.04, 0.003]
+contrast c_t1_arm3__ctl_arm3 all [-0.007, -0.097, 0.053]
+contrast c_t1_arm3__ctl_arm3 y2026 [-0.002, -0.023, 0.033]
+contrast c_t0_donated__ctl_donated all [-0.015, -0.165, 0.078]
+contrast c_t0_donated__ctl_donated y2026 [-0.002, -0.058, 0.058]
+contrast c_t0_arm2__ctl_arm2 all [-0.004, -0.086, 0.052]
+contrast c_t0_arm2__ctl_arm2 y2026 [-0.005, -0.037, 0.034]
+contrast c_t0_arm3__ctl_arm3 all [0.001, -0.071, 0.054]
+contrast c_t0_arm3__ctl_arm3 y2026 [-0.001, -0.029, 0.034]
+contrast c_t1_arm3__t0_arm3 all [-0.009, -0.037, 0.024]
+contrast c_t1_arm3__t0_arm3 y2026 [-0.001, -0.041, 0.055]
+tails {'ctl_arm3': {'inside_q05_q95': 0.846, 'below_q01': 0.039, 'below_q05': 0.083, 'above_q95': 0.071, 'above_q99': 0.029}, 't1_arm3': {'inside_q05_q95': 0.847, 'below_q01': 0.04, 'below_q05': 0.083, 'above_q95': 0.07, 'above_q99': 0.029}, 't0_arm3': {'inside_q05_q95': 0.845, 'below_q01': 0.04, 'below_q05': 0.083, 'above_q95': 0.072, 'above_q99': 0.029}}
+median-mean {'ctl_arm3': -1.441, 't1_arm3': -1.308, 't0_arm3': -1.296}
+mae_mean_mw {'ctl_arm3': 1.505, 't1_arm3': 1.499, 't0_arm3': 1.502}
+mae_median_mw {'ctl_arm3': 1.509, 't1_arm3': 1.504, 't0_arm3': 1.507}
+== explanation test: how far the edit moved the median forecast ==
+t1 mean |median diff| points 1.172 MW 0.1216 mean diff points 0.173 p95 |diff| points 3.152
+t0 mean |median diff| points 1.033 MW 0.1072 mean diff points 0.208 p95 |diff| points 2.776
