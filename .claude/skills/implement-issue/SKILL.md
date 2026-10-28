@@ -168,6 +168,15 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
 10. **Stop for human review. Never merge.** Report the size the issue was given, which reviews ran,
     what each changed, and what each found that you rejected.
 
+    Before you report, remove your scratch files and directories (in `~/`, `~/dev/`,
+    `.claude/scratch/`, and `.claude/worktrees/`); screenshot and render folders; and downloaded
+    files you no longer need. Keep the worktree and the branch, because the open PR still needs
+    them. Whoever merges the PR then removes the worktrees and local branches you created. Remove
+    only what you created, and nothing under `data/`. Remove a worktree with `git worktree remove`
+    from the main checkout, never with `-f` over uncommitted work, and delete its branch with `git
+    branch -d`, never `-D`, after checking that nothing is unpushed. First check that no process has
+    the worktree as its working directory, and keep any file that a committed file refers to.
+
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
 **Why:** diffs are reviewed in GitHub's UI, and a PR should already have survived an adversarial
