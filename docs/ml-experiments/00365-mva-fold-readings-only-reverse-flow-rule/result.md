@@ -104,7 +104,7 @@ which also defines the injection levels and the signed fit (S) used for comparis
   at Marsh Lane (D8), and 22 to 40 at the other 5 (D2, D3, D4, D19, D21). All 8 exceed 5, so the
   rule chooses the naive
   fit everywhere, including at D12, where
-  [experiment 110](../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md)
+  [experiment 110][e110]
   fitted reverse flow on 96 to 97% of summer midday half-hours. The prediction that the rule would pick L0 at D12 failed.
 - **Power factor 0.97.** With reactive power at power factor 0.97 in the data, the rule still
   chooses L0, which collapses
@@ -126,3 +126,5 @@ which also defines the injection levels and the signed fit (S) used for comparis
 - Next idea: test whether the sunny-midday reading rises or falls with irradiance. The design
   brief measured a positive correlation of +0.75 to +0.83 at Stickney and a negative one at the
   other MVA-only Primaries. Not tested here.
+
+[e110]: ../00110-differentiable-physics-5-embedded-generation-and-capacity/result.md
