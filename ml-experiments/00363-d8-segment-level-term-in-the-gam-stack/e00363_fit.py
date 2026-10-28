@@ -42,7 +42,7 @@ import e00361_detect as detect  # ty: ignore[unresolved-import]
 import e00363_segment as segment
 import numpy as np
 import polars as pl
-import torch
+import torch  # ty: ignore[unresolved-import]
 from studies.dp_assimilation import DEFAULT_DELAY_HOURS
 from studies.dp_features import naive_utc
 from studies.sources import ML_EXPERIMENTS_DATA_DIR
