@@ -131,11 +131,18 @@ observed power value.
   to compare with the median. The mean absolute error of the median in the table ranks the arms in
   the same order as the quantile score for the arms with the lowest scores (analogue alone, 1.408
   MW; the blend without the XGBoost stack, 1.419 MW).
-- **A member beats the blend that contains it.** The analogue member alone scores 0.121 points
-  better than the five-member blend (interval -0.255 to -0.013). A possible reason is that the
-  blend's weights are chosen on earlier months across all 16 Primary substations, so they fit no
-  single substation. We did not test this reason, and no independent audit of the method has run.
-  The control check at D2, D3, and D4 shows no member beating the blend by more than 0.03 points.
+- **A member beats the blend that contains it (audit trigger 5).** The analogue member alone scores
+  0.121 points better than the five-member blend (interval -0.255 to -0.013). A Sonnet agent (not
+  Opus, because this result does not decide a model release) audited the method by re-deriving the
+  scores from the stored D8 frame with its own code, and found no error. There were no duplicate row
+  keys, no missing values, and no crossing quantiles in any arm. The analogue member's advantage
+  comes from a lower median error and better coverage at the same interval width. The analogue
+  member beats the blend in 8 of 12 months, and about half of the total gain comes from January
+  2026, October 2025, and December 2025 together. In November to January the blend puts weight 0.5
+  on the XGBoost stack member, the worst member alone, because the weights are chosen on earlier
+  months across all 16 Primary substations. The audit calls the analogue member modestly better,
+  on one substation over 12 months. The control check at D2, D3, and D4 shows no member beating
+  the blend by more than 0.03 points.
 
 ## Caveats and what to try next
 
