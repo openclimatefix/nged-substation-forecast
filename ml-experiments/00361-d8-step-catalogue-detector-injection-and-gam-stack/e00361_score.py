@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Score the three fit arms (control, t1, t0) under three band rules and print every number.
 
 Frames are named `<arm>_<band>`, stage `d` throughout (night offset and recipe R, as experiment

@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Step 1: catalogue D8's detected steps and multi-day drops, and print every number quoted.
 
 PYTHONPATH=<the folders of experiments 252, 264, 354, and 361> \

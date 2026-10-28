@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Step 2: inject known on/off components into Primaries with no engine and measure recovery.
 
 Hosts are D2, D3, and D4 (experiment 354's placebo Primaries), over 2024-07-01 to 2025-06-30. Each

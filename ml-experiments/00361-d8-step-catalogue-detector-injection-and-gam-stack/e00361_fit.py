@@ -1,4 +1,3 @@
-# ruff: noqa: E501
 """Step 3: refit D8's monthly stack with detected steps removed from the training target.
 
 Copies experiment 354's `e00354_fit.py` fit loop (fit (b): from 2023-09 with a level step per hour
