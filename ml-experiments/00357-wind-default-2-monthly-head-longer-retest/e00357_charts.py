@@ -47,7 +47,7 @@ def main() -> None:
         for s in SCOPES
         if (v := result["contrasts"][a].get(f"{s}/headline"))
     ]
-    base = alt.Chart(pl.DataFrame(rows)).encode(  # ty: ignore[unresolved-attribute]
+    base = alt.Chart(pl.DataFrame(rows)).encode(
         y=alt.Y("scope:N", sort=list(SCOPES.values()), title=None),
         yOffset="arm:N",
         color=alt.Color(
@@ -56,13 +56,13 @@ def main() -> None:
             title=None,
         ),
     )
-    bars = base.mark_rule().encode(
+    bars = base.mark_rule().encode(  # ty: ignore[unresolved-attribute]
         x=alt.X(
             "lo:Q", title="Quantile score minus default 2 (points of capacity; negative is better)"
         ),
         x2="hi:Q",
     )
-    dots = base.mark_point(filled=True, size=60).encode(x="mean:Q")
+    dots = base.mark_point(filled=True, size=60).encode(x="mean:Q")  # ty: ignore[unresolved-attribute]
     zero = alt.Chart(pl.DataFrame({"x": [0.0]})).mark_rule(color="black").encode(x="x:Q")  # ty: ignore[unresolved-attribute]
     fig1 = alt.layer(bars, dots, zero).properties(
         width=WIDTH,

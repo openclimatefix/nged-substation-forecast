@@ -21,7 +21,7 @@ Writes `score.json` and `report.txt` to the data folder.
 import json
 import os
 from datetime import UTC, datetime
-from typing import Final
+from typing import Any, Final
 
 for _name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_name, "1")
@@ -119,7 +119,7 @@ def main() -> None:  # noqa: PLR0912
     blocks_month = s356.Blocks(labels=month)
     blocks_run = s356.Blocks(labels=runs)
     lines: list[str] = []
-    result: dict[str, object] = {"placebo_draw": draw}
+    result: dict[str, Any] = {"placebo_draw": draw}
 
     def say(text: str = "") -> None:
         lines.append(text)
@@ -157,8 +157,8 @@ def main() -> None:  # noqa: PLR0912
     say()
     say("== gate (tue_year, headline): d2 10.518, d1 10.752, u3 10.480 (experiment 356)")
     say(
-        f"d2 {result['abs_d2']['tue_year']:.3f}, d1 {result['abs_d1']['tue_year']:.3f}, "  # type: ignore[index]
-        f"u3 {result['abs_u3']['tue_year']:.3f}"  # type: ignore[index]
+        f"d2 {result['abs_d2']['tue_year']:.3f}, d1 {result['abs_d1']['tue_year']:.3f}, "
+        f"u3 {result['abs_u3']['tue_year']:.3f}"
     )
 
     say()
