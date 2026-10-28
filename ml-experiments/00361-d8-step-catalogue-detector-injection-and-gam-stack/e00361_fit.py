@@ -12,7 +12,7 @@ band at 2025-04-01) and edits the training target at each cut. Arms:
 The detector sees only rows ending at or before the cut (`e00361_detect`). A drop's level is used
 where a drop covers the row, and a step's level elsewhere.
 
-    PYTHONPATH=<the folders of experiments 252, 264, 354, and 361> \
+    PYTHONPATH=$E252:$E264:$E354:$E361 \
         OMP_NUM_THREADS=4 systemd-run --user --scope -p MemoryMax=16G -p OOMPolicy=continue \
         uv run --no-sync python -W ignore ml-experiments/00361-*/e00361_fit.py --arms ctl t1 t0
 """

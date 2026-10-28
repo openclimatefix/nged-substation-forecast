@@ -1,8 +1,8 @@
 """Step 1: catalogue D8's detected steps and multi-day drops, and print every number quoted.
 
-PYTHONPATH=<the folders of experiments 252, 264, 354, and 361> \
-        OMP_NUM_THREADS=2 systemd-run --user --scope -p MemoryMax=8G -p OOMPolicy=continue \
-        uv run --no-sync python ml-experiments/00361-*/e00361_catalogue.py
+Run it from the repository root with the folders of experiments 252, 264, 354, and 361 on
+`PYTHONPATH`, under `systemd-run` with `MemoryMax=8G` and `OOMPolicy=continue`, as
+`uv run --no-sync python`. The tables go to the experiment's private data folder.
 """
 
 import json
