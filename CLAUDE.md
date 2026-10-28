@@ -496,6 +496,16 @@ one trigger that fired.** A size naming only the trigger you noticed hides the t
 consider, and still reads as a complete judgement whether or not the rest were ever checked. The
 full rule, and the incident behind it, are in step 3 of `plan-issue`.
 
+**Tidy up when you finish.** Before you report the work as done, remove four kinds of leftover:
+scratch files and directories (in `~/`, `~/dev/`, `.claude/scratch/`, and `.claude/worktrees/`);
+screenshot and render folders; downloaded files you no longer need; and the worktrees and local
+branches you created, once their PRs have merged. Remove only what you created, and nothing under
+`data/`. Remove a worktree with `git worktree remove` from the main checkout, never with `-f` over
+uncommitted work, and delete its branch with `git branch -d`, never `-D`, after checking that
+nothing is unpushed. First check that no process has the worktree as its working directory, and keep
+any file that a committed file refers to. The `implement-issue` skill repeats this at the point it
+applies.
+
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
 **Ask before changing a Patito data contract.** The schemas in `packages/contracts/` are the
