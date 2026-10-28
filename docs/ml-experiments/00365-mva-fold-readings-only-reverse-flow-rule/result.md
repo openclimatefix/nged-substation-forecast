@@ -105,7 +105,8 @@ which also defines the injection levels and the signed fit (S) used for comparis
   rule chooses the naive
   fit everywhere, including at D12, where
   [experiment 110][e110]
-  fitted reverse flow on 96 to 97% of summer midday half-hours. The prediction that the rule would pick L0 at D12 failed.
+  fitted reverse flow on 96 to 97% of summer midday half-hours. The prediction that the rule would
+  pick L0 at D12 failed.
 - **Power factor 0.97.** With reactive power at power factor 0.97 in the data, the rule still
   chooses L0, which collapses
   at levels 1.0 and 2.0 (0 of 5 substations within 0.02), as in experiment 358.
