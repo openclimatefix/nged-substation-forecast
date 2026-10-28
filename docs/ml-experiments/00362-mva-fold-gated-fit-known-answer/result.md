@@ -44,17 +44,15 @@ best_arm: >-
   none: the registered gate (ratio 0.75) changed no fit, and the stricter post hoc gate (ratio 1.0)
   fixed D5 at the 2025 cut only
 headline: >-
-  A gate that accepts reverse flow only where independent solar output exceeds the fitted demand
-  either does nothing (ratio 0.75) or rejects the correct fits when reverse flow is heavy (ratio
-  1.0), so it does not stop the fit through the meter from inventing reverse flow at D5.
+  The gate does not stop the fit inventing reverse flow at D5. At ratio 0.75 it rejects nothing, and
+  at ratio 1.0 it rejects the correct fits where reverse flow is heavy.
 take_home_message: >-
-  Checking a fitted reverse flow against an independent solar forecast does not catch the invented
-  reverse flow at the substation that has none, because the invented flow appears on half-hours
-  after the fit was made and the independent forecast of solar output is too rough to tell a
-  slightly positive flow from a slightly negative one. A looser rule never rejects a fit, and a
-  stricter rule rejects the correct fits where reverse flow is heavy. The next idea to test is a
-  rule that uses the meter reading alone: accept reverse flow only if the training readings come
-  close to zero at midday.
+  A fit to meter readings that give only the size of the power flow sometimes invents reverse flow
+  (power flowing back to the grid) at a substation that has none. Rejecting such fits with an
+  independent solar forecast does not work. The registered gate (ratio 0.75) rejected no fit, and
+  the stricter gate (ratio 1.0) rejected the correct fits where reverse flow is heavy. The next
+  test is a rule that uses the meter readings alone: accept reverse flow only if the training
+  readings come close to zero at midday.
 lessons:
   - >-
     An independent solar forecast is too coarse to gate the sign of the power flow, because true
@@ -64,19 +62,21 @@ lessons:
     such rule on one cut and check it on the other.
 advice:
   - >-
-    Do not gate reverse flow with an independent solar forecast; use a test on the meter readings,
-    such as whether midday readings reach near zero in training (figure 1, post hoc ratio 1.0).
+    Do not gate reverse flow with an independent solar forecast (figure 1). Test next whether the
+    training readings come near zero at midday.
   - >-
     Report a gate's rejection counts per site, because a gate that rejects nothing leaves the fit
-    unchanged and a gate that rejects the correct fits looks like a fit with the wrong sign.
+    unchanged and a gate that rejects the correct fits looks like a fit whose reverse flow has the
+    wrong direction.
 ---
 
 # MVA fold: gated fit through the meter, known-answer test
 
 **A gate that checks fitted reverse flow against an independent solar forecast does not stop the
 fit through the meter from inventing reverse flow.** At the registered setting the gate rejected no
-fit in any of 60 cases. At a stricter post hoc setting it fixed D5, the one Primary substation with
-no reverse flow, at the 2025 cut only, and it rejected the correct fits at four of five substations
+fit in any of 60 cases. At a stricter post hoc setting it fixed D5, the one of the five substations
+with no reverse flow, at the 2025 cut only, and it rejected the correct fits at four of five
+substations
 when reverse flow was heavy. Verdict: refuted. The sequence stops here.
 
 Experiment 358 found that the model fitted through an apparent-power meter invents reverse flow at
@@ -92,9 +92,10 @@ The ungated fit (L0) reproduces experiment 358's numbers.
 
 ## Results (reactive power zero; scored cut unless stated)
 
-- **Registered gate (ratio 0.75) rejects nothing.** It rejects 0 of 6 starts in all 60 cases, so it
+- **Registered gate (ratio 0.75) rejects nothing.** The gate rejects 0 of 6 starts in all 60 cases, so it
   gives the ungated fit's answer everywhere. D5 with no injection stays at 0.35 against the signed
-  fit's 0.98. The rule fails on this one criterion: the gate matches the signed fit within 0.02 at 5
+  fit's 0.98. The decision rule fails on one criterion: the gate matches the signed fit within 0.02
+  at 5
   of 5 substations at both injection levels, but misses D5 at the natural level by 0.63.
 - **Why it rejects nothing.** On training half-hours the mirror fit's negative power falls where the
   independent solar output is at least 0.75 times the fitted demand, because true flow at midday is
@@ -111,14 +112,18 @@ The ungated fit (L0) reproduces experiment 358's numbers.
 ## Checks
 
 - **Triggers.** Audit trigger 1 (a control fails: the D5 placebo) and trigger 2 (the result
-  contradicts its prediction) fired. The explanation tested is the training-versus-test mismatch
-  above. A fresh Sonnet auditor found the gate code a faithful copy of
+  contradicts its prediction) fired. The explanation tested is that the invented reverse flow
+  appears on half-hours after the fit was
+  made, not on its training half-hours. A fresh Sonnet auditor found the gate code a faithful copy
+  of
   the ungated fit apart from the rejection step, found the units right, and reproduced experiment
-  358's D5 numbers. It found no bug behind the null at 0.75: a start is rejected only when its fitted
+  358's D5 numbers. It found no bug behind the null at 0.75: a start is rejected only when its
+  fitted
   solar exceeds about 1.33 times the independent solar, and the wrong D5 starts overshoot by only
   about 1.2 times. It also noted that clipping the forecast power at zero cannot change a sign
   accuracy, so the clip is inert here.
-- **Median against mean forecast.** Not applicable: point forecasts from frozen fits.
+- **Median against mean forecast.** Not applicable: the forecasts are single values from frozen
+  fits.
 - **Departures.** Ratios 1.0 and 1.25 are post hoc. The audit used Sonnet because the series brief
   requires Sonnet only.
 
