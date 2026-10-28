@@ -337,10 +337,11 @@ def _load_time_series_metadata(
     partitions_def=cv_experiment_folds,
     deps=[
         "clean_nged_power_data",
-        # The upstream assets use other partition definitions (daily NWP runs; static CV folds),
-        # and a custom mapping class would not survive into the remote asset graph that the
-        # Dagster UI and `dg check defs` use. Built-in `AllPartitionMapping` does, and it is
-        # conservative: the dependency is on every upstream partition, not only the fold's own.
+        # `ecmwf_ens` is partitioned daily and `eligible_time_series` by static CV fold, so the
+        # default identity mapping to the dynamic `cv_experiment_folds` is invalid. Dagster's remote
+        # asset graph (read by the UI and `dg check defs`) keeps only built-in mapping types, so a
+        # custom mapping class is not an option. `AllPartitionMapping` is conservative: the
+        # dependency is on every upstream partition, not only the fold's own.
         AssetDep("ecmwf_ens", partition_mapping=AllPartitionMapping()),
         AssetDep("eligible_time_series", partition_mapping=AllPartitionMapping()),
     ],
