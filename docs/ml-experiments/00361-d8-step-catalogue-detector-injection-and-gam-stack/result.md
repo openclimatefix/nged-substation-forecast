@@ -102,6 +102,48 @@ The test does not support building a particle filter on the evidence of this det
 that rejects ordinary demand swings is one option, since the rule flags nearly as many rises as
 falls. The verdict is `not supported`.
 
+**Figure A: the detector's falls and drops at D8 cover the long dips in demand in two winter weeks,
+and nothing in a week with no detected falls.**
+
+![D8 demand with detected steps](figure_4_d8_demand_with_detected_steps.svg)
+
+The three weeks start on 12 January 2026, 26 January 2026, and 22 December 2025. The first two are
+the non-overlapping weeks with the most detected hours (121 and 140) in the 12 months over which the
+forecasts are scored (2025-07-02 to 2026-06-30). The third is the week with no detected hours
+closest to the middle of those 12 months. The residual-median rule for choosing weeks was fixed
+before any chart was drawn. Detection here uses the whole record, including data after each monthly
+refit date. Orange shading marks falls of 6 hours or more. Purple shading marks multi-day drops.
+Where the two overlap, the colour is pink.
+
+**Figure B: with 2 MW and 4 MW spells injected into D2, the detector misses some spells and flags
+some segments that match no injected spell.**
+
+![Injected spells with the detector's output](figure_5_injected_spells_with_detector.svg)
+
+The spells are simulated and added to the power readings of D2, a primary substation (Primary) with
+no known generator: one random set of on/off spells for each size, spread over July 2024 to June
+2025. Each panel shows 8 days. Each "missed" panel shows the earliest injected spell (orange) that
+has no detected half-hours, and the first 2 MW panel also shows a second spell that was only partly
+found. Each "false alarm" panel shows the earliest detected segment (purple) that overlaps no
+injected spell, on 5 July 2024. In these panels, pink marks an injected spell that was also
+detected.
+
+**Figure C: removing the detected steps from the training target changes D8's median forecast by
+under 1 MW in the weeks shown, and the score does not improve.**
+
+![D8 forecasts with and without the detected steps](figure_6_forecasts_with_and_without_steps.svg)
+
+The lines are the median forecast, made 12 to 36 hours ahead, for the same three weeks as Figure A,
+from three variants of the GAM stack: the control (raw target), the variant with the detected levels
+added back to the training target, and the variant with the detected rows masked. The black line is
+the actual demand. Gaps are half-hours with no stored forecast. The lower panels show each variant's
+forecast minus the control forecast. In the week starting 22 December 2025, all three variants
+forecast negative demand on 25 and 26 December, while the readings stay positive.
+
+Figure A and Figure C show only D8, and Figure B shows only D2. These figures illustrate the result.
+They do not test it. The study is interim: a detector that rejects ordinary demand swings has not
+been tried.
+
 D8 is a primary substation (Primary) whose power seems to include a dispatchable generator that
 switches on and off. We asked whether a simple rule can find such steps in D8's power, and whether
 taking them out of the training target helps the forecast. We added simulated on/off spells of 2, 3,
