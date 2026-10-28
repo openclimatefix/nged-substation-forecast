@@ -174,7 +174,8 @@ When dispatching a sub-agent (or a fresh Claude Code/Desktop session), give it t
     only what you created, and nothing under `data/`. Remove a worktree with `git worktree remove`
     from the main checkout, never with `-f` over uncommitted work, and delete its branch with `git
     branch -d`, never `-D`, after checking that nothing is unpushed. First check that no process has
-    the worktree as its working directory, and keep any file that a committed file refers to.
+    the worktree as its working directory, and keep any file that a committed file refers to. Do not
+    delete remote branches, because GitHub deletes the head branch when the PR merges.
 
 Stay inside the issue's scope; report unrelated design mistakes rather than fixing them.
 
