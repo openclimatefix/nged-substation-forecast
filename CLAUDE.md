@@ -433,7 +433,8 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
   theme there owns that theme's queue and order, because experiments finish too quickly for GitHub
   issues to keep up. That repository also holds the `study`, `ml-experiment`,
   `ml-experiment-manager`, `data-download`, and `data-validation` skills. Nothing in `src/` or
-  `packages/` may import from it.
+  `packages/` may import from it. To use those skills, open a session in the checkout of that
+  repository.
 - **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics sit
   inside each page under an "Implementation details (deleted when this ships)" section.
 - **`docs/design-philosophy/engineering-hypotheses.md`** holds the falsifiable claims the

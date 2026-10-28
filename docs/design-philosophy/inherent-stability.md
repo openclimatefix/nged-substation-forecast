@@ -430,7 +430,7 @@ imputation, already happening, chosen
 by nobody — which inverts the obvious worry: the risk is not that someone might later "fix" this by
 imputing, it is that the fill already exists and is unbounded, unflagged, and unmeasured. Making it
 deliberate is [a planned
-ml-experiment](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
+ML experiment in `nged-ml-research`](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
 Set it against spatial renormalisation, and the contrast is the argument for preferring one: a
 spatial mean over a cell's own grid points at the same step stays inside one member's trajectory and
 one ~250 km² hexagon, whereas a temporal bridge spans 6 to 12 hours of a *rate* variable.

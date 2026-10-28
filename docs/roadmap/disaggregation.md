@@ -153,8 +153,7 @@ same product's global irradiance cut error by about 1.5% relative. On a 31 km re
 nothing detectable. Both claims are about those two products on those six sites. The write-up is
 [Does a weather product's beam/diffuse split help a PV
 forecast?](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/), and the
-code sits in a pull request kept for reference
-rather than merged,
+code sits in an unmerged pull request in this repository, kept for reference,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785).
 
 **Which product feeds the model matters far more than which split it sees.** Swapping the 31 km

@@ -608,8 +608,7 @@ Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-brit
 physical model per site, and several of its by-products bear directly on this plan.** The write-up
 is [Does a weather product's beam/diffuse split help a PV
 forecast?](https://openclimatefix.github.io/nged-ml-research/studies/beam-diffuse-split/); the code
-is in a pull request kept open for reference
-rather than merged,
+is in an unmerged pull request in this repository, kept open for reference,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering
 [issue #784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
 capacity estimator, and none of it settles which of the candidates above to build. What follows is

@@ -22,7 +22,9 @@ picks the candidates in step 0.
 
 **Only one session runs the fits of steps 1 and 4 at a time.** Ask the ML experiment manager (the
 `ml-experiment-manager` skill of the `nged-ml-research` repository) for a resource slot (the file
-`data/ml-experiments/SLOTS.md` lists the slots), and check the CPU and GPU load before a fit.
+`data/ml-experiments/SLOTS.md` lists the slots), and check the CPU and GPU load before a fit. Both
+repositories share the `data/ml-experiments/` folder, so the research-default experiment's
+predictions sit there, and the step 4 gate compares against them.
 
 ## Step 0: write the agenda
 
@@ -46,8 +48,8 @@ shows an added value over the best single family that the maintainer judges wort
 complexity.
 
 **Exclude a candidate that needs a design production does not have yet.** The staged design of
-experiments 00001 and 00002 is an example. Such a candidate goes through `plan-issue` as its own
-build, and it joins a later release.
+experiments 00001 and 00002 of `nged-ml-research` is an example. Such a candidate goes through
+`plan-issue` as its own build, and it joins a later release.
 
 The maintainer picks the candidates for the release. The output is that list, written into the
 planned `result.md` of the research-default experiment in step 1.
@@ -93,7 +95,8 @@ newest unseen months.
 **A component that fails against production is dropped from the release, or deferred.** The release plan
 lists each dropped component with its reason, and the maintainer reviews that list when approving the
 plan. The research-default experiment sets its own `production_status` to `not-for-production`, because
-the experiment is a diagnostic, so it never appears as a candidate. The output is the final release
+the experiment is a diagnostic, so it never appears as a candidate. The experiment lives in
+`nged-ml-research`, so a companion pull request there sets the field. The output is the final release
 set and the combined effect size.
 
 ## Step 2: write the release plan
@@ -162,9 +165,10 @@ one in `docs/live_service/model-releases.md`: promote the champion fold run, dep
 that the `promoted_model` asset reports `model_release: N`. The PR that records the release adds the
 row to the log with the promoted run's identifier and image tag and the rollback pairing, and the
 maintainer tags the commit `model-N`. The first release has no earlier release to roll back to. The
-same PR sets `production_status: adopted` and `adopted_in: N` in each incorporated experiment's
-`result.md`, which removes them from the candidates table, and updates the flag of each winner that
-step 1 dropped. The output is the deployed release.
+release PR links a companion pull request in `nged-ml-research`. That pull request sets
+`production_status: adopted` and `adopted_in: N` in each incorporated experiment's `result.md`,
+which removes them from the candidates table, and updates the flag of each winner that step 1
+dropped. The output is the deployed release.
 
 ## Step 7: watch the first runs
 
