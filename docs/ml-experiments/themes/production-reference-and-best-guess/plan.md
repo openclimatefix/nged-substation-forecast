@@ -3,7 +3,6 @@
 | Experiment | Question | Priority | Waits for | State |
 |---|---|---|---|---|
 | 252 | Does the best-guess stack score within 0.05 points of BG2 at the eight Primaries with no stack forecast? | High (cards) | Nothing | Planned |
-| 359 | Does averaging the GAM stack's quantiles with BG2's beat BG2 alone at D8? | High (maintainer agreed 2026-10-27) | Nothing | Planned |
 | 353 | How well does Primary demand research default 3's stack forecast D8 when the MVA meter's fold is modelled? | High (maintainer asked) | Nothing | Planned |
 | 333 | Does a pre-trained time-series foundation model (Chronos-2), used zero-shot with or without weather covariates, come close to Primary demand research default 3? | Medium | Nothing | Planned |
 | Proposed | Boosted-tree sunshine term in the stack against Primary demand research default 3 | Medium | Nothing | Proposed |
