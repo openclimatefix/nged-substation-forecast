@@ -625,7 +625,7 @@ Two details still worth tracking regardless of which route lands:
 
 - **The backfilled span crosses further ENS resolution upgrades**: 41r2 in 2016-03 (32→18 km), 48r1
   in 2023-06 (18→9 km, within the staged bucket's complete-date range), and 49r1 in 2024-11. Each is
-  an era boundary under the `study` skill.
+  an era boundary under the `study` skill of the `nged-ml-research` repository.
 
 **The ERA5 ingest is needed whichever ENS backfill route lands.** ERA5 is the version-1 estimate of
 past weather for every variable except irradiance, and the [weather-abnormality

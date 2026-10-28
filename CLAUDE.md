@@ -431,7 +431,9 @@ Full description and a "which place do I use?" table: `docs/documentation-guide.
   [`nged-ml-research`](https://github.com/openclimatefix/nged-ml-research) repository
   ([docs site](https://openclimatefix.github.io/nged-ml-research/)): the Research plan page of each
   theme there owns that theme's queue and order, because experiments finish too quickly for GitHub
-  issues to keep up.
+  issues to keep up. That repository also holds the `study`, `ml-experiment`,
+  `ml-experiment-manager`, `data-download`, and `data-validation` skills. Nothing in `src/` or
+  `packages/` may import from it.
 - **`docs/roadmap/`** holds design, dependencies, and the milestone arc. Step-by-step mechanics sit
   inside each page under an "Implementation details (deleted when this ships)" section.
 - **`docs/design-philosophy/engineering-hypotheses.md`** holds the falsifiable claims the

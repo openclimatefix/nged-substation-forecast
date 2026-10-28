@@ -20,9 +20,9 @@ they work together, and porting them.
 stop for the maintainer's decision. Every other step runs autonomously, except that the maintainer
 picks the candidates in step 0.
 
-**Only one session runs the fits of steps 1 and 4 at a time.** Ask the ML experiment manager for a
-resource slot (the file `data/ml-experiments/SLOTS.md` lists the slots), and check the CPU and GPU
-load before a fit.
+**Only one session runs the fits of steps 1 and 4 at a time.** Ask the ML experiment manager (the
+`ml-experiment-manager` skill of the `nged-ml-research` repository) for a resource slot (the file
+`data/ml-experiments/SLOTS.md` lists the slots), and check the CPU and GPU load before a fit.
 
 ## Step 0: write the agenda
 
