@@ -45,54 +45,59 @@ metric: >-
   point is about 0.1 MW at D8); MAE of the median in MW; bias in MW; Pearson correlation of the
   median with the actual demand, per lead band
 code: ml-experiments/00364-d8-stage-blame-and-analogue-recent-power/
-verdict: not supported
+verdict: partly supported
 best_arm: >-
-  None. At D8 with weekly refits the GAM stack's stages score 8.358 (plain GAM), 8.146 (plus the
-  Kalman level), 8.242, 8.271, and 8.338 (the stack). The analogue member scores 7.472, and 7.761
-  with its recent-power inputs removed.
+  None as a change. At D8 with weekly refits the GAM stack's stages score 8.358 (plain GAM), 8.146
+  (plus the Kalman level), 8.242, 8.271, and 8.338 (the stack). The analogue member scores 7.472,
+  and 7.761 with its recent-power inputs removed.
 headline: >-
-  No stage of the generalised additive model (GAM) stack adds more than 0.1 points of quantile score
-  at the substation D8 (largest: the Kalman transient, +0.096, 95% interval +0.041 to +0.159), so
-  the stack's 0.745-point gap to BG2 (the best-guess blend of five forecasts) is not in its
-  correction stages. The plain GAM with the Kalman level already scores 8.146. Removing recent power
-  from the analogue member raises its score by 0.289 (+0.103 to +0.525), to 7.761, which is 0.58
-  below the stack's 8.338.
+  Over all lead times no stage of the generalised additive model (GAM) stack adds more than 0.1
+  points of quantile score at the substation D8, but at leads of 0 to 24 hours the Kalman transient
+  adds 0.444 points (95% interval +0.277 to +0.641) and lowers the correlation by 0.036 (-0.059 to
+  -0.013). The stack's 0.745-point gap to BG2 (the best-guess blend of five forecasts) is therefore
+  mostly outside its correction stages. Removing recent power from the analogue member raises its
+  score by 0.289 (+0.103 to +0.525) over all leads and by 0.354 (+0.175 to +0.574) at 0 to 24 hours,
+  and it still scores 0.58 below the stack.
 lessons:
   - >-
-    The correction stages after the Kalman level add 0.19 points in total and leave the correlation
-    unchanged, so the loss against BG2's members sits in the plain GAM, not in its correction
-    stages.
+    The Kalman transient is the one stage that adds error, and only at leads under 24 hours (+0.444
+    points, correlation -0.036); at 24 to 168 hours it moves the score by at most 0.08.
   - >-
-    The analogue member keeps most of its lead without any power from the last 7 days, so recent
-    power is about a third of why the XGBoost members beat the stack at D8.
+    The correction stages together explain about a quarter of the stack's gap to BG2 (S4 minus S1
+    is 0.19 of 0.745 points), so most of the gap is already in the plain GAM or the way it is fitted.
   - >-
-    The Kalman level helps at D2 (-0.29 points) and the later stages help slightly at D2 and D4, so
-    the extra error at D8 is D8-specific and small.
+    The analogue member keeps most of its lead without any recent power (+0.289 of its 0.866-point
+    lead), and without recent power it is still worse than monthly XGBoost, which has no analogue
+    columns.
 production_status: not-for-production
 adopted_in: none
 take_home_message: >-
-  The GAM stack's gap to BG2 at the substation D8 does not come from one correction stage: the
-  stages after the Kalman level add only 0.19 points between them, and the plain GAM with the level
-  step already scores 0.67 points worse than BG2's analogue member. BG2's analogue member (a
-  forecast built from the demand on similar past days) owes only about a third of its lead to recent
-  power, because it still scores 7.76 without any, against the stack's 8.34. The next thing to look
-  at is what the XGBoost members see that the GAM does not, such as their weather columns, before
-  any more work on the correction stages.
+  One part of the stack does hurt D8's short-range forecast: the Kalman filter's short-lived
+  correction adds 0.44 points of quantile score at leads under 24 hours and does not help beyond.
+  Over the full 1-to-10-day horizon the three correction stages after the Kalman level add only 0.19
+  of the stack's 0.745-point gap to BG2, so most of the gap sits in the plain GAM or the way it is
+  fitted. BG2's analogue member (a forecast built from the demand on similar past days) owes about a
+  third of its lead to recent power. The next step is to test the short-range Kalman transient at
+  D8, and to compare the XGBoost members' inputs with the GAM's.
 advice:
   - >-
-    Do not rework the Kalman transient, night offset, or recipe R to close D8's gap to BG2; the
-    three add 0.19 points between them (S2 minus S1, S3 minus S2, S4 minus S3 in the stage table).
+    Test removing or damping the Kalman transient at leads under 24 hours at D8, where it adds 0.444
+    points (S2 minus S1, 0 to 24 h).
   - >-
-    Compare the XGBoost members' input columns with the GAM's at D8, because the lead survives
+    Do not rework the night offset or recipe R to close D8's gap to BG2; together they add 0.10
+    points (S3 minus S2 and S4 minus S3, stage table).
+  - >-
+    Compare the XGBoost members' input columns with the GAM's at D8, because their lead survives
     removing the analogue member's recent power (analogue refit table).
   - >-
-    Report any D8 stage contrast beside the correlation of the median forecast, which stays near
-    0.46 for every stage and member (figure 1).
+    Report each D8 stage contrast by lead band, because the all-lead contrast hides the 0 to 24 hour
+    loss (stage contrasts by lead band).
 date: 2026-10-28
 ---
 
-**Take-home message: the GAM stack's loss at D8 is not in one correction stage, and recent power
-explains about a third of the analogue member's lead.**
+**Take-home message: the Kalman filter's short-lived correction hurts D8's forecast at leads under
+24 hours, the other correction stages do not, and recent power explains about a third of the
+analogue member's lead.**
 
 This experiment asked where the GAM stack loses skill at the substation D8 (Marsh Lane, a primary
 substation) against BG2, and whether BG2's analogue member wins because it sees recent power. The
@@ -114,10 +119,11 @@ quantiles, in points of D8's 10.38 MW capacity; lower is better), the mean absol
 the median in MW, the bias (forecast minus actual) in MW, and the Pearson correlation of the median
 with the actual demand.
 
-No stage adds more than 0.1 points of score. The plain GAM with the Kalman level scores 8.146 and
-the full stack 8.338, against 7.472 for the analogue member. Removing recent power from the analogue
-member raises its score from 7.472 to 7.761. The verdict is `not supported`: the stop rule applies
-(no stage adds more than 0.1 points), and the analogue refit stayed below the predicted 8.0.
+Over all leads, no stage adds more than 0.1 points of score: the plain GAM with the Kalman level
+scores 8.146 and the full stack 8.338, against 7.472 for the analogue member. At leads of 0 to 24
+hours the Kalman transient adds 0.444 points. Removing recent power from the analogue member raises
+its score from 7.472 to 7.761. The verdict is `partly supported`: one stage (the Kalman transient,
+at 0 to 24 hours) meets the blame rule, and the analogue refit stayed below the predicted 8.0.
 
 **Caveat.** This result is interim: it covers one substation and one scored year. Whether a
 generator sits behind D8 is unproven ([experiments 264,
@@ -158,10 +164,19 @@ give the same pattern for S1 to S4).
   +0.159); S3 minus S2 +0.029 (+0.006 to +0.053); S4 minus S3 +0.067 (-0.014 to +0.167); S4 minus S0
   -0.020 (-0.339 to +0.249). The own-residual band lowers the score by 2.046 (-2.609 to -1.516)
   against the stored band.
+- **Stage contrasts by lead band (score, 95% interval):** S2 minus S1 is +0.444 (+0.277 to +0.641)
+  at 0 to 24 h, +0.079 (+0.015 to +0.150) at 24 to 72 h, and +0.017 (-0.018 to +0.061) at 72 to
+  168 h. At 0 to 24 h the correlation falls by 0.036 (-0.059 to -0.013) and the MAE rises by 0.054
+  MW (+0.029 to +0.082). S1 minus S0 is -0.326 (-0.599 to -0.116) at 0 to 24 h. S4 minus S3 is
+  +0.088 (-0.007 to +0.208) at 72 to 168 h.
+- **Recent power by lead band:** removing it raises the analogue score by +0.354 (+0.175 to
+  +0.574) at 0 to 24 h, +0.323 (+0.143 to +0.548) at 24 to 72 h, and +0.255 (+0.060 to +0.503) at 72
+  to 168 h. The analogue refit without recent power scores 7.761, worse than monthly XGBoost's
+  7.694, which keeps the origin lags and has no analogue columns.
 - **Correlation:** 0.454 (S0), 0.465 (S1), 0.460 (S2), 0.461 (S3), 0.462 (S4), 0.473 (analogue),
   0.465 (BG2). The largest fall, S2 minus S1, is -0.0056 (-0.0142 to +0.0031) over all rows and
-  -0.0082 (-0.0146 to -0.0029) on days without detected steps. On days with steps the change is
-  +0.0017. The prediction that a stage lowers correlation only on step days failed.
+  -0.0082 (-0.0146 to -0.0029) on days without detected steps. On days with steps it is -0.0019
+  (-0.0173 to +0.0131). The prediction that a stage lowers correlation only on step days failed.
 - **Bias and error:** bias -0.321 MW (S0), -0.071 (S1), -0.107 (S4), +0.176 (analogue). MAE 1.526 MW
   (S0), 1.486 (S1), 1.503 (S4), 1.408 (analogue). Over all rows the analogue member's MAE is 0.094
   MW below S4's (-0.160 to -0.017).
@@ -172,11 +187,12 @@ give the same pattern for S1 to S4).
 - **Analogue refits** (monthly refits at D8, experiment 87's recipe, same seed; the unchanged refit
   reproduces the stored 7.472):
 
-  | Arm | Score | Minus unchanged refit | |---|---|---| | Unchanged | 7.472 (6.881 to 8.052) | 0 | |
-  Without the three origin lags | 7.641 (7.015 to 8.258) | +0.168 (+0.063 to +0.296) | | Without
-  origin lags or analogue power from the last 7 days | 7.761 (7.066 to 8.474) | +0.289 (+0.103 to
-  +0.525) | | Monthly XGBoost (no analogue columns, origin lags kept) | 7.694 (7.003 to 8.413) |
-  +0.222 (+0.086 to +0.425) |
+  | Arm | Score | Minus unchanged refit |
+  |---|---|---|
+  | Unchanged | 7.472 (6.881 to 8.052) | 0 |
+  | Without the three origin lags | 7.641 (7.015 to 8.258) | +0.168 (+0.063 to +0.296) |
+  | Without origin lags or analogue power from the last 7 days | 7.761 (7.066 to 8.474) | +0.289 (+0.103 to +0.525) |
+  | Monthly XGBoost (no analogue columns, origin lags kept) | 7.694 (7.003 to 8.413) | +0.222 (+0.086 to +0.425) |
 
   Without recent power the analogue member still beats the stack by 0.58 points; recent power
   accounts for about a third of the analogue member's 0.866-point lead (+0.289 of 0.866).
@@ -198,12 +214,12 @@ give the same pattern for S1 to S4).
   every stage, so it does not favour one stage.
 - **Error of the median beside the score contrasts.** The score and MAE contrasts agree in direction
   at every stage (S2 minus S1: score +0.096, MAE +0.009 MW), so audit trigger 3 did not fire.
-- **Triggers fired.** Trigger 2 (a result contradicts its own prediction): predictions 1, 2, and 3
-  all failed, and the explanation that the lead sits in the XGBoost members' inputs was tested by
-  the monthly-XGBoost row of the analogue table. Trigger 5 (a nested arm beats the arm that contains
-  it): S1 beats S4, and the contrast is the finding. Trigger 1, 4 (leave one site out, not
-  applicable to one substation), 6, and 7 did not fire. A separate audit re-derived the headline
-  contrasts; its findings are in the pull request.
+- **Triggers fired.** Trigger 2 fired: predictions 1, 2, and 3 failed. The explanation that the lead
+  sits in the XGBoost members' inputs and not in recent power is supported by the monthly-XGBoost row
+  of the analogue table. Trigger 5 fired: the plain GAM with the Kalman level (S1) beats the stack (S4)
+  that contains it. Triggers 1, 3, 4 (not applicable to one substation), 6, and 7 did not fire. A
+  separate audit re-derived the headline scores, contrasts, and correlations from the stored
+  frame with its own code and found them correct. Its findings on wording are applied here.
 
 ## Caveats and what to try next
 
