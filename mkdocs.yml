@@ -166,6 +166,7 @@ nav:
           - Log of versions: ml-experiments/research-default-log.md
       - Data processing: ml-experiments/data-processing.md
       - Glossary: ml-experiments/glossary.md
+      - Kalman filter explainer: ml-experiments/kalman-gam-explainer.md
       - Calibration and uncertainty:
           - Summary: ml-experiments/themes/calibration-and-uncertainty/index.md
           - Experiments: ml-experiments/themes/calibration-and-uncertainty/experiments.md
