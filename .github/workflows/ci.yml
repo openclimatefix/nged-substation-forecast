@@ -1,6 +1,7 @@
 name: CI
 
-# Per-PR quality gate: lint, format, types, markdown, docs, and the offline test suite.
+# Per-PR quality gate (skipped while the pull request is a draft; marking the pull request ready for
+# review runs the gate): lint, format, types, markdown, docs, and the offline test suite.
 # Three jobs (docs, lint, tests) run in parallel, so the wall time is that of the slowest job. The
 # final job, named `ci`, is the one required status check in the repository ruleset.
 # The network-gated tests are NOT run here — they run in nightly_network_tests.yml.
@@ -10,6 +11,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
     branches: [main]
 
@@ -23,6 +25,7 @@ concurrency:
 
 jobs:
   docs:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -47,6 +50,7 @@ jobs:
         run: uv run --no-sync mkdocs build --strict --site-dir /tmp/ci-site
 
   lint:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -99,6 +103,7 @@ jobs:
         run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
 
   tests:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -126,9 +131,11 @@ jobs:
   # The repository ruleset requires a check named exactly `ci`. This job passes only when all three
   # jobs above passed. `if: '!cancelled()'` makes it run (and fail) when a job above failed,
   # instead of being skipped, which a required check would treat as passing. It does not run when
-  # the whole workflow run was cancelled by a newer push, so a superseded run leaves no red `ci`.
+  # the whole workflow run was cancelled by a newer push, so a superseded run leaves no red `ci`. On
+  # a draft pull request every job, `ci` included, is skipped; a draft cannot be merged, and marking
+  # it ready for review starts a run.
   ci:
-    if: '!cancelled()'
+    if: '!cancelled() && github.event.pull_request.draft != true'
     needs: [docs, lint, tests]
     runs-on: ubuntu-latest
     timeout-minutes: 5

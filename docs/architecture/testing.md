@@ -263,9 +263,10 @@ passes, and even `-m network` alone stays skipped until `--run-network` is added
 
 Two GitHub workflows in `.github/workflows/` run the checks described on this page:
 
-- **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`, as
-  three parallel jobs plus an aggregate job. The wall time of a run is that of the slowest job, and
-  each job has its own 15-minute limit.
+- **`ci.yml` — the per-PR quality gate.** Runs on every push to `main` and on every pull request
+  that is not a draft, as three parallel jobs plus an aggregate job. A draft pull request runs
+  nothing, so pushes to it cost no CI minutes, and marking it ready for review starts a run. The
+  wall time of a run is that of the slowest job, and each job has its own 15-minute limit.
     - The `docs` job runs `mkdocs build --strict`.
     - The `lint` job runs `ruff check`, `ruff format --check`, `pydoclint`, `ty check`, and
       `check_docs_links.py` (see below). It then runs `pre-commit run --all-files` with `SKIP`
@@ -278,7 +279,9 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
       keeps CI off the network).
     - The final job, named `ci`, needs the other three and fails unless all of them succeeded. Its
       condition is `!cancelled()` so that a failed job fails `ci` rather than leaving it skipped,
-      which a required check would treat as a pass.
+      which a required check would treat as a pass. The condition also excludes draft pull
+      requests, where all four jobs are skipped; a draft cannot be merged, and marking it ready
+      starts a run whose `ci` result replaces the skipped one.
   Every job installs with `uv sync --locked --all-packages`: `--all-packages` because `ty`
   type-checks the source of every workspace member, including leaf packages that a plain sync would
   omit, and `--locked` so the build fails loudly when `uv.lock` is stale. Every subsequent step
