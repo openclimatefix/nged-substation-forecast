@@ -263,7 +263,8 @@ passes, and even `-m network` alone stays skipped until `--run-network` is added
 
 Two GitHub workflows in `.github/workflows/` run the checks described on this page:
 
-- **`ci.yml` — the per-PR quality gate.** Runs on every pull request and every push to `main`, as
+- **`ci.yml` — the per-PR quality gate.** Runs on every push to `main` and on every pull request that is not a draft (opening
+  a pull request as a draft costs no CI minutes, and marking it ready for review starts a run), as
   three parallel jobs plus an aggregate job. The wall time of a run is that of the slowest job, and
   each job has its own 15-minute limit.
     - The `docs` job runs `mkdocs build --strict`.
