@@ -1,7 +1,7 @@
 name: CI
 
-# Per-PR quality gate (skipped while the pull request is a draft; marking it ready for review runs
-# it): lint, format, types, markdown, docs, and the offline test suite.
+# Per-PR quality gate (skipped while the pull request is a draft; marking the pull request ready for
+# review runs the gate): lint, format, types, markdown, docs, and the offline test suite.
 # Three jobs (docs, lint, tests) run in parallel, so the wall time is that of the slowest job. The
 # final job, named `ci`, is the one required status check in the repository ruleset.
 # The network-gated tests are NOT run here — they run in nightly_network_tests.yml.
