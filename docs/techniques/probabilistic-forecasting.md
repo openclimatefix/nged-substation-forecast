@@ -96,7 +96,7 @@ overall: a visibly fanned-out `extended_range` can still be under-dispersed, and
 not the eye, can say so.
 
 The mechanism also sharpens the case for giving the model `nwp_lead_time_hours` as a feature
-([#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230)). Beyond the
+([#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230), closed). Beyond the
 double-counting mitigation discussed in the caveat below, the lead-time feature is what lets the
 model learn *how much* to attenuate its weather sensitivity per horizon — narrow when the weather
 input is trustworthy, wide when it isn't — instead of the one horizon-averaged compromise it is
@@ -217,12 +217,14 @@ the pooled distribution can come out **over**-dispersed.
 
 Mitigations, in order of practicality:
 
-- **Give the model the lead time as a feature** (`nwp_lead_time_hours`, planned in
-  [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230)), so the learned
+- **Give the model the lead time as a feature** (`nwp_lead_time_hours`, tested in
+  [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230), closed), so the
+  learned
   conditional spread can be narrow when the weather input is trustworthy and wide when it isn't,
   rather than one horizon-averaged width.
-- **Train on many ensemble members, not just the control** (planned in
-  [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148)) — the model then
+- **Train on many ensemble members, not just the control**
+  ([#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148),
+  closed) — the model then
   sees "one plausible scenario" as its actual input distribution, which is what a member is at
   inference time.
 - **Measure, then correct**: check the [spread-skill ratio and

@@ -3,7 +3,8 @@
 > **Status: 🚧 Planned (v0.5).** Epic:
 > [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145). Ingest:
 > [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143); pre-training
-> experiments: [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167); a
+> experiments: [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)
+> (closed; the nged-ml-research experiments answered it); a
 > weather product with a few months of history: 🔬 study
 > [#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999).
 
@@ -229,7 +230,7 @@ C](metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-
 probabilistic metrics plan builds an EMOS-style calibration as a wrapper forecaster. The [calibrated
 manual
 heuristic](metrics-and-leaderboard.md#calibrating-the-manual-heuristic-aims-at-the-95th-percentile)
-([#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) and the
+([#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715), closed) and the
 degradation-conditional conformal calibration
 ([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)) are planned to share
 that wrapper. The product calibrator would be the wrapper's third consumer. The wrapper would live in
