@@ -17,6 +17,7 @@ from contracts.settings import Settings
 from dagster import DagsterInstance, ExecuteInProcessResult, materialize
 from delta_store.cleaned_power_time_series import read_cleaning_provenance
 from deltalake import DeltaTable
+from nged_data import cleaning
 
 from nged_substation_forecast.defs import cleaning_assets
 from nged_substation_forecast.defs.cleaning_assets import clean_nged_power_data, current_git_sha
@@ -26,7 +27,13 @@ _T0 = datetime(2026, 1, 1, tzinfo=UTC)
 
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
-    """Point every managed data path at a temp dir, and return the resulting settings."""
+    """Point every managed data path at a temp dir, and return the resulting settings.
+
+    Also switches the `initial_analogue_noise` cleaning rule off: the series here are a few rows
+    long, so the rule would flag every row, and `packages/nged_data/tests/test_cleaning.py` tests
+    the rule itself.
+    """
+    monkeypatch.setattr(cleaning, "INITIAL_ANALOGUE_NOISE_READINGS", 0)
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
@@ -108,6 +115,24 @@ def test_asset_writes_every_raw_row_with_the_flags(
     assert metadata["n_time_series"] == 2
     assert metadata["drop_reason/substation_zero/n_rows"] == 2
     assert metadata["drop_reason/substation_zero/n_time_series"] == 1
+
+
+def test_asset_writes_initial_analogue_noise_flags(
+    raw_data: Settings, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
+) -> None:
+    monkeypatch.setattr(cleaning, "INITIAL_ANALOGUE_NOISE_READINGS", 1)
+
+    metadata = _metadata(_materialize(dagster_instance))
+
+    assert _cleaned(raw_data)["drop_reason"].to_list() == [
+        "initial_analogue_noise",
+        "substation_zero",
+        "substation_zero",
+        "initial_analogue_noise",
+        None,
+    ]
+    assert metadata["drop_reason/initial_analogue_noise/n_rows"] == 2
+    assert metadata["drop_reason/initial_analogue_noise/n_time_series"] == 2
 
 
 def test_asset_reports_per_reason_stats(
