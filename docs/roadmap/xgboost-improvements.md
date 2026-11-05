@@ -1,10 +1,23 @@
 # XGBoost improvements ("quick wins")
 
-> **Status: 🚧 Planned (v0.5).** Epic:
-> [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145); the Tier-1 quick
-> wins are [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230). The live
-> service is running ([Live service](live-service.md), now on v0.2); forecast-quality work follows
-> once v0.3 and v0.4 land.
+> **Status: ⏹ Not planned for production.** The production forecast will be a neural network, so
+> the XGBoost experiments on this page have stopped. Epic
+> [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145) stays as the record.
+> Issues
+> [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230),
+> [#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201),
+> [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168),
+> [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167),
+> [#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104),
+> [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148),
+> [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91), and
+> [#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) are closed. The
+> XGBoost experiments that ran are
+> in the [quick-wins
+> study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/quick-wins/), and the
+> neural-network experiments
+> are in [nged-ml-research](https://openclimatefix.github.io/nged-ml-research/). The page keeps the
+> backlog as a record of the ideas.
 
 Quick wins to make XGBoost a strong baseline before the advanced approaches land — explicitly *not*
 deep ML work ("little point in spending ages on the ML model before we have good capacity
@@ -448,7 +461,9 @@ models actually promoted to production.
 
 ### Per-`time_series_type` feature lists
 
-Issues: [#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201),
+Issues: [#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201) (closed: the
+[quick-wins study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/quick-wins/)
+cut 8 columns for wind farms and lowered wind CRPS by 3.3 points),
 [#107](https://github.com/openclimatefix/nged-substation-forecast/issues/107)
 
 Every series type currently shares one demand-oriented feature list: four power lags (all nullified
@@ -560,7 +575,9 @@ the solar/wind physics proxies do for generation.
 
 ### Linearised physics features for solar and wind
 
-Issue: [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168)
+Issue: [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) (closed: the
+physics terms were built as plant models, not as XGBoost columns; see [experiment
+347](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00347-wind-physics-hybrid-plant-then-mdn/result/))
 
 Trees are poor at smooth monotone functions; give them the physics directly. Everything here hangs
 off one shared solar-position/clear-sky helper, so this lands as a three-stage stack — and the order
@@ -1122,7 +1139,7 @@ either way.
 ### Pre-train on estimates of past weather
 
 Issues: [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143) (ingest),
-[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments),
+[#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (experiments, closed),
 [#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
 (plans a two-stage test: a first stage trained on ERA5 and a second stage trained on ENS forecast
 errors)
@@ -1159,7 +1176,8 @@ most.
 
 ### Per-horizon-window models
 
-Issue: [#149](https://github.com/openclimatefix/nged-substation-forecast/issues/149)
+Issue: [#149](https://github.com/openclimatefix/nged-substation-forecast/issues/149) (open; the
+model family is not fixed, and no experiment has tried separate models per horizon)
 
 One booster per `(time_series_id, horizon_window)` — e.g. 0–2 d, 2–7 d, 7–14 d, configurable. Train
 and predict route rows by `nwp_lead_time_hours`; `save`/`load` gain a window dimension. **Requires
@@ -1171,7 +1189,8 @@ captures most of the benefit, the extra model count may not justify itself.
 
 ### Batched training via `xgb.DataIter` (enabler)
 
-Issue: [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91)
+Issue: [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91) (closed: not
+needed, because the production forecast will be a neural network)
 
 Issue #91 already contains a complete, validated implementation design (`LazyFrameBatchIter` +
 `QuantileDMatrix`, grouping-agnostic, no temp disk, `train_batch_size` config field) — treat the
@@ -1180,7 +1199,7 @@ training and the global model.
 
 ### Train on more ensemble members (after batched training)
 
-Issue: [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148)
+Issue: [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) (closed)
 
 Training on all 51 members multiplies training data ~51× for correlated rows. Run the dose-response
 experiment first: control-only (today) vs ~8 spread members vs all 51 (the NWP loader already takes
@@ -1445,7 +1464,10 @@ only step 3 tests.
 
 ### Global model per `time_series_type`
 
-Issue: [#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104)
+Issue: [#104](https://github.com/openclimatefix/nged-substation-forecast/issues/104) (closed:
+[experiment
+24](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00024-pooling-groupings-demand-xgboost/result/)
+found that pooling raised the demand error, and the neural network pools by design)
 
 One booster for all primaries, one for all PV sites, etc. — potentially the biggest win on this page
 for data-poor series (transfer across sites), and the stepping stone to V2 scale. **Hard
@@ -1480,7 +1502,8 @@ exact zeros at night.)
 ## Explicitly deferred (not quick, or not skill)
 
 - **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power
-  lags** — a DST edge case affecting a handful of half-hours per year; the issue itself says it may
+  lags (closed as not planned)** — a DST edge case affecting a handful of half-hours per year; the
+  issue itself says it may
   not be worth worrying about yet. Revisit if the metrics slices ever show a DST-transition
   artefact.
 - **A composable feature-expression grammar (consider designing later, deliberately not now).** The

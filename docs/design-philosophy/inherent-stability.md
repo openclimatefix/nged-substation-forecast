@@ -357,8 +357,9 @@ Clear-sky irradiance needs only latitude, longitude, and time, so as data degrad
 relax toward a physical envelope that is always computable — wide, honest, and still bounded by what
 the sky can deliver. That is rung 4.
 
-Clear-sky irradiance is already a named deliverable of
-[#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168), designed in [XGBoost
+Clear-sky irradiance was a named deliverable of
+[#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) (closed), designed in
+[XGBoost
 Improvements](../roadmap/xgboost-improvements.md), with further physics in [Differentiable
 Physics](../techniques/differentiable-physics.md). Only the **floor** framing is new here: nothing
 else says clear-sky is what we fall back *to*.
