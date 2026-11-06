@@ -75,9 +75,10 @@ question below for every figure:
 
 1. Does each colour, line style, and shade mean exactly one thing? Black and grey must not each
     stand for two different things.
-2. Does the legend name every mark that is drawn, and nothing that is not drawn?
-3. Is each panel tall enough to read, at most two panels per figure, and one forecast arm per
-    panel?
+2. Does the legend name every mark that is drawn, and nothing that is not drawn? The legend must
+    also repeat nothing that the panel titles already state, such as an arm name.
+3. Is each panel tall enough to read? Does each figure have at most two panels, and each panel one
+    forecast arm?
 4. Is every strip, bar, shade, and dashed line checked against the data it shows? The reviewer names
     the file and the rows or dates compared. A strip that is on across the whole axis is a bug until
     checked.
