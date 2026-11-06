@@ -67,6 +67,25 @@ right of any plot area, and text that is wider or narrower than the plot area be
 images" section has the full rule: run the export through `npx svgo@4 --multipass --precision=1
 --final-newline`, and look at every chart rendered to PNG before committing it.
 
+**Have a fresh reviewer open every rendered figure before the PR is marked ready.** The author's own
+look at a figure misses faults that a second reader finds at once: a busy panel, one colour carrying
+two meanings, and a strip drawn across the whole axis when the data say otherwise. Give the reviewer
+the figures rendered to PNG at the size the page shows them, and ask for a written answer to each
+question below for every figure:
+
+1. Does each colour, line style, and shade mean exactly one thing? Black and grey must not each
+    stand for two different things.
+2. Does the legend name every mark that is drawn, and nothing that is not drawn?
+3. Is each panel tall enough to read, at most two panels per figure, and one forecast arm per
+    panel?
+4. Is every strip, bar, shade, and dashed line checked against the data it shows? The reviewer names
+    the file and the rows or dates compared. A strip that is on across the whole axis is a bug until
+    checked.
+5. Does the caption say what to look at, and does the caption match what the figure shows?
+6. Is a quantity that is only an estimate labelled as an estimate, or left out?
+
+The author fixes each failure, and the reviewer re-checks the changed figures.
+
 ## Axes
 
 **Label an hour-of-day axis at human divisions: 0, 6, 12, 18, and 24, or 6, 12, and 18.** A reader
