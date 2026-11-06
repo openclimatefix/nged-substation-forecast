@@ -27,11 +27,11 @@ _T0 = datetime(2026, 1, 1, tzinfo=UTC)
 
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
-    """Point every managed data path at a temp dir, and return the resulting settings.
+    """Preset environment for testing.
 
-    Also switches the `initial_analogue_noise` cleaning rule off: the series here are a few rows
-    long, so the rule would flag every row, and `packages/nged_data/tests/test_cleaning.py` tests
-    the rule itself.
+    Point every managed data path at a temp dir, and return the resulting settings.
+    Switch `initial_analogue_noise` cleaning rule off by default; the rule itself is
+    tested in test_cleaning.py
     """
     monkeypatch.setattr(cleaning, "INITIAL_ANALOGUE_NOISE_READINGS", 0)
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))

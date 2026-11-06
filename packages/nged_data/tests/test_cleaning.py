@@ -4,12 +4,16 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.common import UTC_DATETIME_DTYPE
-from contracts.power_schemas import CleanedPowerTimeSeries, PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import (
+    DROP_REASONS,
+    CleanedPowerTimeSeries,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
+)
 from nged_data import cleaning
 from nged_data.cleaning import flag_nged_power
 
 T0 = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
-T1 = datetime(2026, 1, 1, 0, 30, tzinfo=UTC)
 
 
 def _half_hour(index: int) -> datetime:
@@ -82,7 +86,7 @@ def test_substation_zero_flags_every_substation_type(substation_type: str):
 
 
 def test_substation_non_zero_reading_is_not_flagged():
-    result = _flag([(1, T0, 0.5), (1, T1, -0.5)], {1: "Primary"})
+    result = _flag([(1, T0, 0.5), (1, _half_hour(1), -0.5)], {1: "Primary"})
     assert result["drop_reason"].to_list() == [None, None]
 
 
@@ -96,13 +100,32 @@ def test_zero_from_series_missing_from_metadata_is_not_flagged():
     assert result["drop_reason"].to_list() == ["substation_zero", None]
 
 
-def test_flag_nged_power_returns_exactly_the_input_rows():
-    rows = [(1, T0, 0.0), (1, T1, 2.0), (2, T0, 0.0), (3, T0, 4.0)]
+def test_flag_nged_power_returns_exactly_the_input_rows_and_meets_the_contract(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Check the output keeps every input row once, and passes `CleanedPowerTimeSeries.validate`.
+
+    `validate` rejects a `drop_reason` missing from `DROP_REASONS`, but only for reasons present in
+    the output. The rows are therefore chosen so that every rule flags at least one row: each
+    series' first reading is `initial_analogue_noise`, and the `Primary` zero at `_half_hour(1)` is
+    `substation_zero`. The final assertion fails when a new rule is added without a row here.
+    """
+    set_initial_analogue_noise_readings(monkeypatch, 1)
+    rows = [
+        (1, T0, 1.0),
+        (1, _half_hour(1), 0.0),
+        (1, _half_hour(2), 2.0),
+        (2, T0, 1.0),
+        (2, _half_hour(1), 0.0),
+        (3, T0, 1.0),
+        (3, _half_hour(1), 4.0),
+    ]
     result = _flag(rows, {1: "Primary", 2: "HV Customer"})
     assert result.columns == ["time_series_id", "time", "power", "drop_reason"]
     # `flag_nged_power` promises no row order, so compare sorted rows.
     assert sorted(result.select("time_series_id", "time", "power").rows()) == sorted(rows)
     CleanedPowerTimeSeries.validate(result.sort("time_series_id", "time"))
+    assert set(result["drop_reason"].drop_nulls()) == set(DROP_REASONS)
 
 
 def test_initial_analogue_noise_flags_the_first_readings_only(monkeypatch: pytest.MonkeyPatch):
@@ -115,7 +138,6 @@ def test_initial_analogue_noise_flags_the_first_readings_only(monkeypatch: pytes
         None,
         None,
     ]
-    CleanedPowerTimeSeries.validate(result)
 
 
 def test_initial_analogue_noise_counts_readings_not_calendar_time(
@@ -152,7 +174,7 @@ def test_initial_analogue_noise_counts_each_series_separately(monkeypatch: pytes
     assert result["drop_reason"].to_list() == ["initial_analogue_noise", None] * 2
 
 
-def test_initial_analogue_noise_counts_in_time_order_whatever_the_row_order(
+def test_initial_analogue_noise_counts_in_time_order(
     monkeypatch: pytest.MonkeyPatch,
 ):
     set_initial_analogue_noise_readings(monkeypatch, 2)
@@ -166,7 +188,7 @@ def test_initial_analogue_noise_counts_in_time_order_whatever_the_row_order(
     ]
 
 
-def test_initial_analogue_noise_moves_its_cut_off_when_earlier_readings_are_back_filled(
+def test_initial_analogue_noise_cutoff_moves_with_backfill(
     monkeypatch: pytest.MonkeyPatch,
 ):
     set_initial_analogue_noise_readings(monkeypatch, 1)
@@ -182,14 +204,13 @@ def test_initial_analogue_noise_moves_its_cut_off_when_earlier_readings_are_back
 
 def test_initial_analogue_noise_wins_over_substation_zero(monkeypatch: pytest.MonkeyPatch):
     set_initial_analogue_noise_readings(monkeypatch, 1)
-    result = _flag([(1, T0, 0.0), (1, T1, 0.0)], {1: "Primary"})
+    result = _flag([(1, T0, 0.0), (1, _half_hour(1), 0.0)], {1: "Primary"})
     assert result["drop_reason"].to_list() == ["initial_analogue_noise", "substation_zero"]
-    CleanedPowerTimeSeries.validate(result)
 
 
 def test_initial_analogue_noise_flags_a_series_missing_from_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ):
     set_initial_analogue_noise_readings(monkeypatch, 1)
-    result = _flag([(1, T0, 1.0), (1, T1, 1.0)], {2: "Primary"})
+    result = _flag([(1, T0, 1.0), (1, _half_hour(1), 1.0)], {2: "Primary"})
     assert result["drop_reason"].to_list() == ["initial_analogue_noise", None]

@@ -33,8 +33,8 @@ INITIAL_ANALOGUE_NOISE_READINGS: Final[int] = 30 * 3 * 48
 is 90 days' worth of half-hourly readings.
 
 The count is of readings present, not of calendar time, so a gap early in a series pushes the
-cut-off later. Some series report only sporadically at first, and the cut-off has to fall at least
-this many readings after the data starts in earnest.
+cut-off later than 3 months in time. Some series report only sporadically at first, and the cut-off
+has to fall at least is designed to include at least 2 months after the data starts in earnest.
 """
 
 
