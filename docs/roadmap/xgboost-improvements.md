@@ -1,7 +1,7 @@
 # XGBoost improvements ("quick wins")
 
 > **Status: ⏹ Not planned for production.** The production forecast will be a neural network, so
-> the XGBoost experiments on this page have stopped. Epic
+> the XGBoost backlog on this page is no longer being worked. Epic
 > [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145) stays as the record.
 > Issues
 > [#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230),
@@ -1192,9 +1192,9 @@ captures most of the benefit, the extra model count may not justify itself.
 Issue: [#91](https://github.com/openclimatefix/nged-substation-forecast/issues/91) (closed: not
 needed, because the production forecast will be a neural network)
 
-Issue #91 already contains a complete, validated implementation design (`LazyFrameBatchIter` +
+Issue #91 (closed) contains a complete, validated implementation design (`LazyFrameBatchIter` +
 `QuantileDMatrix`, grouping-agnostic, no temp disk, `train_batch_size` config field) — treat the
-issue body as the plan and implement as written. No direct skill gain; unblocks ensemble-member
+issue body as the plan if XGBoost is ever revived. No direct skill gain; unblocks ensemble-member
 training and the global model.
 
 ### Train on more ensemble members (after batched training)
@@ -1298,7 +1298,7 @@ informative. Calibration and attribution are genuinely different goods here.
   exist (member-rank-based statistics, or quantiles of a derived physics proxy rather than of each
   raw variable), and testing one is part of the experiment.
 - **A 51× cut in training data.** The mirror image of the resource-use win, and in direct tension
-  with [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) above, whose
+  with [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) (closed) above, whose
   whole argument is that member rows multiply the training set. The two items are alternatives at
   the same fork, so decide them together rather than in sequence.
 - **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics, and

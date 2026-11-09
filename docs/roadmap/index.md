@@ -37,7 +37,7 @@ best-estimate, not a guarantee.
   project ends (the working assumption is that NGED runs the service on its own AWS account): the
   operator-contract design constraint, and the handover workstreams (runbooks, alert-on-absence,
   infra-as-code, confirming NGED's cloud and security standards, and game days).
-- [XGBoost improvements](xgboost-improvements.md) — the v0.5 experiment backlog: four effort tiers,
+- [XGBoost improvements](xgboost-improvements.md) — the XGBoost experiment backlog, kept as a record because XGBoost is not planned for production: four effort tiers,
   ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Extending the training history](training-history.md) — using estimates of past weather, CAMS for
   irradiance and ERA5 for other variables, to train on the power data that predates the ECMWF
@@ -238,7 +238,8 @@ quantile pipeline:
   ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) — deliberately
   gated on the two items above, since degrading earlier would emit output no scenario has tested
 
-**Phase 2 of agentic ML research**: once an XGBoost model beats `manual_heuristic` on the continuous
+**Phase 2 of agentic ML research** (not started, and tracked in the `nged-ml-research`
+repository): once an XGBoost model beats `manual_heuristic` on the continuous
 ranked probability score (CRPS), an LLM agent screens the XGBoost backlog, and possibly larger ideas
 from other roadmap pages, as a separate Unix user that never sees the leaderboard's validation
 window ([#193](https://github.com/openclimatefix/nged-ml-research/issues/193), in the
@@ -378,12 +379,12 @@ leaderboard CV run or controlled ad-hoc ablation, so we keep the result either w
 
 - **Neural net vs XGBoost as a leaderboard CV run**
   ([#362](https://github.com/openclimatefix/nged-substation-forecast/issues/362), closed): the
-  production forecast will be a neural network. In the experiments of
-  `nged-ml-research`, a pooled neural network scored lower CRPS than monthly XGBoost and BG2 at the
-  eight MVA-only and the six signed-MW Primaries ([experiment
+  production forecast will be a neural network. In the `nged-ml-research` experiments, a pooled
+  neural network scored a lower continuous ranked probability score (CRPS) than monthly XGBoost
+  models and than the best-guess recipe BG2, at both the eight Primary substations that report
+  apparent power only and the six that report signed megawatts ([experiment
   425](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00425-best-mdn-architecture-assembly-with-ablations/result/)).
-  The
-  closing comment on the issue lists the caveats.
+  The closing comment on the issue lists the caveats.
 - **Additional NWP source, e.g. ICON-EU**
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore whether
   adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the v1
@@ -459,7 +460,7 @@ of the v2 live service)*
 ## v2.1 — XGBoost Improvements at Full Scale
 
 **v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time series.**
-v2.1 picks up whatever [XGBoost improvements](xgboost-improvements.md) v0.5 left undone, and adds
+v2.1 would pick up the [XGBoost improvements](xgboost-improvements.md) backlog if the production forecast were XGBoost, and adds
 [further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21), or
 through a [product
 calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history) if the study of

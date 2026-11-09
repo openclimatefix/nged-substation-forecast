@@ -6,13 +6,12 @@
 > Phase 2 tracking moved to the `nged-ml-research` repository as
 > [issue #193 (Tracking: phase 2 of agentic ML
 > research)](https://github.com/openclimatefix/nged-ml-research/issues/193), with five
-> sub-issues, numbered 188 to 192. The page describes the design as planned for XGBoost.
+> sub-issues, numbered 188 to 192. The rest of this page describes the design for the XGBoost forecast, and nothing below is being built.
 
 **We plan to have a large language model (LLM) agent search for improvements to this project's
 XGBoost forecasting model, in two phases.** Flexpectation is the forecasting system this project
 builds for National Grid Electricity Distribution (NGED). Flexpectation's current forecaster is an
-XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, which is under way,
-Claude runs experiments overnight from a plan that the maintainer and Claude agreed the previous
+XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, Claude runs experiments overnight from a plan that the maintainer and Claude agreed the previous
 day. In phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the
 list of ideas for improving the XGBoost forecasting model, so that people implement properly only the
 promising ideas. The phase 2 agent implements each idea, scores each implementation, and combines
@@ -196,6 +195,9 @@ leaderboard design names the risk of scoring hundreds of CV runs on one fold. He
 separation addresses that risk.
 
 ## Phase 1: experiments run overnight
+
+> **Kept as a record.** Phase 1 is closed. The text below describes the plan as it stood for the XGBoost
+> forecast.
 
 **Phase 1 lasts until an XGBoost model beats `manual_heuristic` on CRPS on the leaderboard fold.**
 Until then, most gains come from fixing bugs and conceptual faults in the data pipeline and in the

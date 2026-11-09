@@ -389,7 +389,7 @@ Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/
 planned), under the v0.9
 epic [#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)
 
-> **Status: 🚧 Planned (v0.9).** Nothing below is built. The first step is [a
+> **Status: ⏹ Not planned.** [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851) is closed. The text below is kept as a record, and nothing below is built. The first step is [a
 > study](#the-study-how-fast-a-model-recovers-after-an-upgrade), whose result sets how
 > long the uncertainty bands stay wide after an upgrade.
 
@@ -652,7 +652,7 @@ and Delta rows remain.
 
 ### NWP model upgrades — order of work
 
-Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)
+Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851) (closed as not planned; kept as a record)
 
 1. **Run [the study](#the-study-how-fast-a-model-recovers-after-an-upgrade)** in the
    `nged-ml-research` repository, on its fold and bootstrap machinery. The recovery curve sets
