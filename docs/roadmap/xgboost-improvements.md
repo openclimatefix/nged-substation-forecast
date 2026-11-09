@@ -463,7 +463,8 @@ models actually promoted to production.
 
 Issues: [#201](https://github.com/openclimatefix/nged-substation-forecast/issues/201) (closed: the
 [quick-wins study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/quick-wins/)
-cut 8 columns for wind farms and lowered wind CRPS by 3.3 points),
+cut 8 columns for wind farms and lowered the wind continuous ranked probability score (CRPS) by 3.3
+points),
 [#107](https://github.com/openclimatefix/nged-substation-forecast/issues/107)
 
 Every series type currently shares one demand-oriented feature list: four power lags (all nullified

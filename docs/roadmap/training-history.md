@@ -1,6 +1,6 @@
 # Extending the training history
 
-> **Status: 🚧 Planned (v0.5).** Epic:
+> **Status: ⏹ Not planned for XGBoost (v0.5), kept as a record.** Epic:
 > [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145). Ingest:
 > [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143); pre-training
 > experiments: [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)

@@ -193,8 +193,11 @@ AWS.*
 
 *Epic: [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145)*
 
-Establish a strong XGBoost baseline before investing in capacity estimation and switching event
-detection.
+> **Status: ⏹ Not planned for production.** The production forecast will be a neural network, so
+> the XGBoost experiments of this milestone have stopped, and the text below is kept as a record.
+
+The milestone aimed to establish a strong XGBoost baseline before investing in capacity estimation
+and switching event detection.
 
 The full experiment backlog — four effort tiers, ordered best bang-for-the-buck within each tier —
 is in [XGBoost improvements](xgboost-improvements.md).
