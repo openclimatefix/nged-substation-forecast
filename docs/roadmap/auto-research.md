@@ -1,19 +1,19 @@
 # Experiments run by an LLM agent (agentic ML research)
 
-> **Status: 🚧 Phase 1 under way; phase 2 planned.** Phase 1, in which Claude runs experiments
-> overnight, each testing one hypothesis, is tracked in [issue #1031 (Tracking: phase 1 of
-> agentic ML research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1031) in
-> the v0.3 milestone. Phase 2, the careful search that the rest of this page describes, is tracked
-> in [issue #1169 (Tracking: phase 2 of agentic ML
-> research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1169) in the v0.5
-> milestone. Phase 2 starts once an XGBoost model beats `manual_heuristic` on the continuous ranked
-> probability score (CRPS), and none of phase 2's infrastructure is built yet.
+> **Status: ⏹ Not planned for the XGBoost forecast.** XGBoost experiments have stopped, because the
+> production forecast will be a neural network. [Issue #1031 (Tracking: phase 1 of agentic ML
+> research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1031) is closed.
+> Phase 2 tracking moved to the `nged-ml-research` repository as
+> [issue #193 (Tracking: phase 2 of agentic ML
+> research)](https://github.com/openclimatefix/nged-ml-research/issues/193), with five
+> sub-issues, numbered 188 to 192. The rest of this page describes the design for the XGBoost
+> forecast, and nothing below is being built.
 
 **We plan to have a large language model (LLM) agent search for improvements to this project's
 XGBoost forecasting model, in two phases.** Flexpectation is the forecasting system this project
 builds for National Grid Electricity Distribution (NGED). Flexpectation's current forecaster is an
-XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, which is under way,
-Claude runs experiments overnight from a plan that the maintainer and Claude agreed the previous
+XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, Claude runs
+experiments overnight from a plan that the maintainer and Claude agreed the previous
 day. In phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the
 list of ideas for improving the XGBoost forecasting model, so that people implement properly only the
 promising ideas. The phase 2 agent implements each idea, scores each implementation, and combines
@@ -198,6 +198,10 @@ separation addresses that risk.
 
 ## Phase 1: experiments run overnight
 
+> **Kept as a record.** Phase 1 is closed. The text below describes the plan as it stood for the
+> XGBoost
+> forecast.
+
 **Phase 1 lasts until an XGBoost model beats `manual_heuristic` on CRPS on the leaderboard fold.**
 Until then, most gains come from fixing bugs and conceptual faults in the data pipeline and in the
 XGBoost model, and those gains are large next to noise and selection bias. In the [Quick
@@ -297,9 +301,9 @@ full power data or the leaderboard runs as the maintainer's own user.**
 
 **Unix file permissions enforce the cutoff, because a convention would not hold.** Any script that
 opens the cleaned power table directly would read past a cutoff that existed only in a helper
-function or in the agent's instructions. The agent might not notice the leak. [Issue #1093 (Set up
+function or in the agent's instructions. The agent might not notice the leak. [Issue #188 (Set up
 the research Unix user and the truncated power copy for
-auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1093) tracks the
+auto-research)](https://github.com/openclimatefix/nged-ml-research/issues/188) tracks the
 setup. The one-off setup is:
 
 1. Create the `researcher` user, with its own Claude login and no AWS credentials, including those
@@ -326,8 +330,8 @@ well on the validation window. The research lead learns from the hypothesis stor
 ### A research session
 
 **A session is a Claude Code session run as `researcher`, following the research-lead skill, in
-rounds.** [Issue #1036 (Write the research-lead skill for
-auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1036) tracks the
+rounds.** [Issue #191 (Write the research-lead skill for
+auto-research)](https://github.com/openclimatefix/nged-ml-research/issues/191) tracks the
 skill. Each round has six steps:
 
 1. The research lead merges the latest `main` into the hypothesis store's branch, then reads the
@@ -357,9 +361,9 @@ implementation to extend, and a baseline against which to measure the research l
 **Every implementation is scored by one shared command, the screening harness, so that every idea is
 scored the same way.** [Si et al.](#coding-agents-change-experiments-without-saying-so) found that
 an agent left to run its own experiments quietly changed baselines and defined metric functions
-wrongly. Either fault makes the scores of different ideas incomparable. [Issue #1130 (Build the
+wrongly. Either fault makes the scores of different ideas incomparable. [Issue #190 (Build the
 screening harness for
-auto-research)](https://github.com/openclimatefix/nged-substation-forecast/issues/1130) tracks the
+auto-research)](https://github.com/openclimatefix/nged-ml-research/issues/190) tracks the
 harness.
 
 **The harness reuses the existing cross-validation pipeline, on screening folds that end before
@@ -454,8 +458,8 @@ After each session, the maintainer fetches the branches into the maintainer's ow
 `git fetch`, so the code survives even if `researcher`'s clone is lost.
 
 **The hypothesis store records what each idea taught the project, in a form a person and the
-research lead can both read.** [Issue #1034 (Set up the auto-research hypothesis
-store)](https://github.com/openclimatefix/nged-substation-forecast/issues/1034) tracks the store.
+research lead can both read.** [Issue #189 (Set up the auto-research hypothesis
+store)](https://github.com/openclimatefix/nged-ml-research/issues/189) tracks the store.
 The store holds one Markdown file per idea under `studies/auto_research/` in the `nged-ml-research`
 repository, with the same fields in
 every file:

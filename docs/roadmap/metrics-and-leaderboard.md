@@ -18,7 +18,7 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > fold design [#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960) and scorer
 > enforcement [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) ·
 > calibrated manual heuristic
-> [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
+> [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715) (closed).
 
 ---
 
@@ -67,8 +67,8 @@ Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/
 `ManualHeuristicForecaster` is the first baseline in the codebase. Its leaderboard rows answer the
 question this project exists to answer: **do we beat the manual heuristic?** The climatology
 baseline gives XGBoost's numbers a further point of reference. The persistence baseline
-is deferred to the v0.9 nice-to-haves epic
-([#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)).
+is not planned, and [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087)
+is closed.
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
@@ -146,11 +146,15 @@ built on the manual heuristic:
 - `manual_heuristic_holiday_aligned` — the same skeleton, but analogue *selection* becomes
   calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
-  (Easter→Easter) rather than by fixed week offset. This no longer rides the pure lag machinery —
+  (Easter→Easter) rather than by fixed week offset. This variant no longer rides the pure lag
+  machinery —
   the analogue offset is conditional on the calendar — so it needs a bespoke picker plus a GB
-  bank-holiday calendar (the pure-Python `holidays` package). It is deferred to the v0.9
-  nice-to-haves epic and tracked in
-  [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088).
+  bank-holiday calendar (the pure-Python `holidays` package). The holiday-aligned variant is not
+  planned:
+  [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088) is closed, because
+  [experiment
+  471](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00471-manual-heuristic-calibration-and-analogue-upgrades/result/)
+  found that no cheap upgrade to the heuristic beat the faithful heuristic.
 
 A third variant, `manual_heuristic_calibrated`, corrects the analogues after selection rather than
 changing which analogues are selected, and has [its own section
@@ -158,7 +162,11 @@ below](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile).
 
 ### Calibrating the manual heuristic aims at the 95th percentile
 
-Issue: [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)
+Issue: [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715) (closed).
+[Experiment
+471](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00471-manual-heuristic-calibration-and-analogue-upgrades/result/)
+tested 10 variants, and none lowered CRPS beyond its interval at either group of Primaries. The
+faithful heuristic stays the benchmark.
 
 **A third variant, `manual_heuristic_calibrated`, keeps the same analogues and fits a statistical
 correction to them on past errors.** One standard form of that correction is Ensemble Model Output
@@ -304,21 +312,18 @@ yardstick here; `manual_heuristic` is the point on it.
 ### Implementation details — baselines (deleted when they ship)
 
 The `persistence`
-baseline (PR B) is deferred to the v0.9 nice-to-haves epic
-([#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)) and tracked in
-[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087). The metrics
+baseline (PR B) is not planned, and
+[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087) is closed. The
+metrics
 collapse below is its own issue under the v0.3 epic, and no baseline waits on the metrics collapse.
 The `manual_heuristic_holiday_aligned` variant (described under [A faithful replica and a "simple
-upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is deferred to the v0.9 epic
-and tracked in [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088). This
-section is deleted when the metrics collapse ships. Before then, copy the PR B item into the body of
-[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), because the
-persistence design text exists only here.
+upgrades" variant](#a-faithful-replica-and-a-simple-upgrades-variant)) is not planned,
+and [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088) is closed. This
+section is deleted when the metrics collapse ships.
 `manual_heuristic_calibrated` (described under [Calibrating the manual
-heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile), and tracked in
-[#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) is a further PR, on
-the same footing: out of scope here, tracked separately, and buildable now that `manual_heuristic`
-has shipped.
+heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile)) was a further PR, out of
+scope here. Its issue,
+[#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715), is closed.
 
 **Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
 mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`),
@@ -379,8 +384,8 @@ collapse config and no designated point-forecast columns on `PowerForecast`. In
   `docs/cross-validation/dagster-workflow.md`. Treat the change as a leaderboard epoch event,
   because the new collapse shifts existing numbers.
 
-**PR B — `PersistenceForecaster` (seasonal-naive).** This PR is deferred to the v0.9 epic and
-tracked in [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087).
+**PR B — `PersistenceForecaster` (seasonal-naive).** This PR is not planned, and
+[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087) is closed.
 `PersistenceForecaster` reuses `NwpRunRowsWithoutWeatherFeatureEngineer` and the shared `meta.json`
 helper, which the climatology PR extracted into `baseline_forecasters`. No `StatelessForecaster`
 base class until a third stateless model exists.
@@ -421,11 +426,8 @@ forecast](../background/manual-heuristic-forecast.md); the implementation spec:
   scaling. (So the holiday-aligned variant measures how much calendar awareness adds, rather than
   reimplementing a step the analogue method already takes.)
 
-**Cross-cutting.** (1) **Issue tracking:** PR B is tracked in
-[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087), and
-`manual_heuristic_holiday_aligned` in
-[#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088), so the two deferred
-items survive #147 closing. (2)
+**Cross-cutting.** (1) **Issue tracking:** PR B and `manual_heuristic_holiday_aligned` are not
+planned. (2)
 
 **Re-run recipe:** add a short "Re-running a CV run" subsection to
 `docs/cross-validation/dagster-workflow.md` describing the `trained_cv_model++` backfill, written
@@ -959,8 +961,10 @@ Two rungs, in increasing order of "cheating":
   ERA5](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/ukv-ceda-vs-era5/)
   scored the two
   against each other, and
-  [#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492) is where the
-  perfect-weather ceiling sits.
+  [#492](https://github.com/openclimatefix/nged-substation-forecast/issues/492) (closed)
+  measured the perfect-weather ceiling: [experiment
+  22](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00022-era5-weather-ceiling-primary-demand/result/)
+  found that ERA5 weather lowered the Primary demand quantile score by only 0.10 points of capacity.
 
 - **Observations.** Observations are measured at the site rather than averaged over a grid cell.
   Observations earn the second rung precisely because a gridded estimate's remaining error is not

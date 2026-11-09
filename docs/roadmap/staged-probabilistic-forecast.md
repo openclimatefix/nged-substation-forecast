@@ -541,7 +541,7 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
     - [Issue #443 (Degradation-conditional interval calibration: conformal prediction per
       regime)](https://github.com/openclimatefix/nged-substation-forecast/issues/443) and [issue
       #715 (`manual_heuristic_calibrated`: EMOS-style calibration of the manual heuristic's 13
-      analogues)](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
+      analogues)](https://github.com/openclimatefix/nged-substation-forecast/issues/715) (closed).
     - [Issue #730 (Rebuild coherent scenarios from the pooled percentiles with ensemble copula
       coupling (post-v1))](https://github.com/openclimatefix/nged-substation-forecast/issues/730).
 - **Ensemble statistics, several NWPs, and lead:**
@@ -557,14 +557,16 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
       (Implement `XGBoost Iterator` (to allow us to train efficiently on large
       datasets))](https://github.com/openclimatefix/nged-substation-forecast/issues/91), and [issue
       #230 (XGBoost Tier-1 quick wins: lead-time feature, ordinal time, early stopping,
-      holidays)](https://github.com/openclimatefix/nged-substation-forecast/issues/230).
+      holidays)](https://github.com/openclimatefix/nged-substation-forecast/issues/230). All three
+      are closed.
 - **Pre-training on estimates of past weather and longer history:**
     - [Pre-train on estimates of past
       weather](xgboost-improvements.md#pre-train-on-estimates-of-past-weather).
     - [Issue #143 (Ingest ERA5 for gap filling, comparison arms, and the weather-abnormality
       climatology)](https://github.com/openclimatefix/nged-substation-forecast/issues/143), [issue
       #167 (Train XGBoost on estimates of past weather (CAMS, UKV, ERA5) to use the power history
-      before 2024-04)](https://github.com/openclimatefix/nged-substation-forecast/issues/167), and
+      before 2024-04)](https://github.com/openclimatefix/nged-substation-forecast/issues/167)
+      (closed), and
       [issue #959 (Extend ECMWF ENS training
       history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959).
 - **Conventions and the adapter:**

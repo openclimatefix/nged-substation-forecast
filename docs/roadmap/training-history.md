@@ -1,9 +1,10 @@
 # Extending the training history
 
-> **Status: 🚧 Planned (v0.5).** Epic:
+> **Status: ⏹ Not planned for XGBoost (v0.5), kept as a record.** Epic:
 > [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145). Ingest:
 > [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143); pre-training
-> experiments: [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167); a
+> experiments: [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)
+> (closed; the nged-ml-research experiments answered it); a
 > weather product with a few months of history: 🔬 study
 > [#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999).
 
@@ -229,7 +230,7 @@ C](metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-
 probabilistic metrics plan builds an EMOS-style calibration as a wrapper forecaster. The [calibrated
 manual
 heuristic](metrics-and-leaderboard.md#calibrating-the-manual-heuristic-aims-at-the-95th-percentile)
-([#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715)) and the
+([#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715), closed) and the
 degradation-conditional conformal calibration
 ([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)) are planned to share
 that wrapper. The product calibrator would be the wrapper's third consumer. The wrapper would live in
@@ -416,16 +417,18 @@ pipeline.
 
 **For metered wind and solar generators, pre-training on estimates of past weather then fine-tuning
 on ECMWF ENS ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)) answers
-the same question as the weather-response model and product calibrator, so the study runs #167's
-variants as comparison arms.** Warm start can only add trees, so an over-confident weather
+the same question as the weather-response model and product calibrator, so the study would run the
+variants of [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (closed)
+as comparison arms.** Warm start can only add trees, so an over-confident weather
 sensitivity learned in the first phase is hard to shrink. The design replaces that second phase with
 a product calibrator small enough to fit on a few months. The
 [single-pool](#single-pool-vs-two-phase-warm-start), [lead-time-zero, and
 degraded-past-weather](#reconciling-estimates-of-past-weather-with-ens) arms are the fairer
 comparisons, because each trains one XGBoost model on every row. For demand substations the design
 does not apply, because their forecasts lean on power lags, which the lag-free weather-response
-model does not use. So #167 still owns the longer training history for the champion model at demand
-substations.
+model does not use. The longer training history for the champion model at demand substations has no
+owner now that [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) is
+closed.
 
 ### The design moves a calibration step into the serving path
 
@@ -646,7 +649,8 @@ Ordered, and deliberately not one PR. Steps 1–2 are the data layer; the rest a
 5. Define the evaluation protocol and the variance-versus-improvement test, and add the diagnostic
    `evaluation_scope` that scores against estimates of past weather.
 6. Sweep the variant grid
-   ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)): reconciliation
+   ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167), closed):
+   reconciliation
    method × single-pool/two-phase × pure/mixed phase two × flag on/off × spread columns
    present/masked.
 
@@ -661,7 +665,9 @@ in the `nged-ml-research` repository:
 2. Fit the power-space calibrator per technology, smooth in lead time, in capacity-factor units,
    censored at 0 and 1, and shrunk towards the ECMWF ENS calibrator, refitted on a rolling origin.
 3. Measure the learning curves on GEFS and ECMWF ENS, and on the blend of ECMWF ENS with AIFS-ENS,
-   with #167's pre-training variants as comparison arms for wind and solar.
+   with the pre-training variants of
+   [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (closed) as
+   comparison arms for wind and solar.
 4. Run the derivative-free weather-space arm on wind and on ICON-EU.
 5. Decide: promote the section to 🚧 with a milestone, or move the result to the study page and
    delete the section.
