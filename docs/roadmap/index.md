@@ -37,7 +37,8 @@ best-estimate, not a guarantee.
   project ends (the working assumption is that NGED runs the service on its own AWS account): the
   operator-contract design constraint, and the handover workstreams (runbooks, alert-on-absence,
   infra-as-code, confirming NGED's cloud and security standards, and game days).
-- [XGBoost improvements](xgboost-improvements.md) — the XGBoost experiment backlog, kept as a record because XGBoost is not planned for production: four effort tiers,
+- [XGBoost improvements](xgboost-improvements.md) — the XGBoost experiment backlog, kept as a record
+  because XGBoost is not planned for production: four effort tiers,
   ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Extending the training history](training-history.md) — using estimates of past weather, CAMS for
   irradiance and ERA5 for other variables, to train on the power data that predates the ECMWF
@@ -460,7 +461,8 @@ of the v2 live service)*
 ## v2.1 — XGBoost Improvements at Full Scale
 
 **v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time series.**
-v2.1 would pick up the [XGBoost improvements](xgboost-improvements.md) backlog if the production forecast were XGBoost, and adds
+v2.1 would pick up the [XGBoost improvements](xgboost-improvements.md) backlog if the production
+forecast were XGBoost, and adds
 [further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21), or
 through a [product
 calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history) if the study of

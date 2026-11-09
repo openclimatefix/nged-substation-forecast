@@ -67,7 +67,8 @@ Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/
 `ManualHeuristicForecaster` is the first baseline in the codebase. Its leaderboard rows answer the
 question this project exists to answer: **do we beat the manual heuristic?** The climatology
 baseline gives XGBoost's numbers a further point of reference. The persistence baseline
-is not planned, and [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087) is closed.
+is not planned, and [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087)
+is closed.
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
@@ -145,9 +146,11 @@ built on the manual heuristic:
 - `manual_heuristic_holiday_aligned` — the same skeleton, but analogue *selection* becomes
   calendar-aware: a bank-holiday target draws from prior bank holidays / the matching day-type (a
   bank-holiday Monday behaves like a Sunday). Moveable feasts align holiday-to-holiday
-  (Easter→Easter) rather than by fixed week offset. This variant no longer rides the pure lag machinery —
+  (Easter→Easter) rather than by fixed week offset. This variant no longer rides the pure lag
+  machinery —
   the analogue offset is conditional on the calendar — so it needs a bespoke picker plus a GB
-  bank-holiday calendar (the pure-Python `holidays` package). The holiday-aligned variant is not planned:
+  bank-holiday calendar (the pure-Python `holidays` package). The holiday-aligned variant is not
+  planned:
   [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/1088) is closed, because
   [experiment
   471](https://openclimatefix.github.io/nged-ml-research/ml-experiments/00471-manual-heuristic-calibration-and-analogue-upgrades/result/)
@@ -319,7 +322,8 @@ and [#1088](https://github.com/openclimatefix/nged-substation-forecast/issues/10
 section is deleted when the metrics collapse ships.
 `manual_heuristic_calibrated` (described under [Calibrating the manual
 heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile)) was a further PR, out of
-scope here. Its issue, [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715), is closed.
+scope here. Its issue,
+[#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715), is closed.
 
 **Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
 mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`),

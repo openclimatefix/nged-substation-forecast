@@ -565,7 +565,8 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
     - [Issue #143 (Ingest ERA5 for gap filling, comparison arms, and the weather-abnormality
       climatology)](https://github.com/openclimatefix/nged-substation-forecast/issues/143), [issue
       #167 (Train XGBoost on estimates of past weather (CAMS, UKV, ERA5) to use the power history
-      before 2024-04)](https://github.com/openclimatefix/nged-substation-forecast/issues/167) (closed), and
+      before 2024-04)](https://github.com/openclimatefix/nged-substation-forecast/issues/167)
+      (closed), and
       [issue #959 (Extend ECMWF ENS training
       history)](https://github.com/openclimatefix/nged-substation-forecast/issues/959).
 - **Conventions and the adapter:**

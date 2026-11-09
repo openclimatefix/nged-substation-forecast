@@ -1298,7 +1298,8 @@ informative. Calibration and attribution are genuinely different goods here.
   exist (member-rank-based statistics, or quantiles of a derived physics proxy rather than of each
   raw variable), and testing one is part of the experiment.
 - **A 51× cut in training data.** The mirror image of the resource-use win, and in direct tension
-  with [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) (closed) above, whose
+  with [#148](https://github.com/openclimatefix/nged-substation-forecast/issues/148) (closed) above,
+  whose
   whole argument is that member rows multiply the training set. The two items are alternatives at
   the same fork, so decide them together rather than in sequence.
 - **It moves the `AllFeatures` primary key**, and therefore touches cross-validation, metrics, and
