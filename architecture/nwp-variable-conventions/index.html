@@ -1,0 +1,3705 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../forecast-delivery/">
+      
+      
+        <link rel="next" href="../ecmwf-ens-known-issues/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>NWP variable conventions - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#nwp-variable-conventions" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              NWP variable conventions
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-battery-scheduling/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How GB batteries schedule themselves
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/gb-price-data-and-ancillary-markets/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GB electricity prices, free and when each is known
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-forecast-step-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The forecast step grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three axes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The three axes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-versus-period-ending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous versus period-ending
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-versus-circular" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear versus circular
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numeric-versus-categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric versus categorical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#every-variable-and-how-to-read-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every variable, and how to read it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-half-hourly-resample-does-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the half-hourly resample does today
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the half-hourly resample does today">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#interpolate-components-before-deriving-speed-and-bearing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpolate components before deriving speed and bearing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-retain-linear-component-interpolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why retain linear component interpolation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-direction-is-interpolated-across-the-0360-wrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Historical bearing interpolation crossed the 0°/360° wrap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#radiation-resampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radiation resampling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-variables-lose-diurnal-amplitude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous variables lose diurnal amplitude
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wind-is-stored-as-speed-and-direction-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind is stored as components
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migrate-into-a-separate-archive-before-switching-readers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrate into a separate archive before switching readers
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ensemble-archive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The ensemble weather archive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Cross-validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cross-validation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cross-validation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cross-validation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running the cross-validation pipeline end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cross-validation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/model-releases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model releases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/backup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backing up the workstation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/auto-research/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Experiments run by an LLM agent
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/staged-probabilistic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Staged probabilistic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending the training history
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-forecast-step-grid" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The forecast step grid
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-three-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The three axes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The three axes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-versus-period-ending" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous versus period-ending
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linear-versus-circular" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Linear versus circular
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#numeric-versus-categorical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Numeric versus categorical
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#every-variable-and-how-to-read-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every variable, and how to read it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-half-hourly-resample-does-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the half-hourly resample does today
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What the half-hourly resample does today">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#interpolate-components-before-deriving-speed-and-bearing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interpolate components before deriving speed and bearing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-retain-linear-component-interpolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why retain linear component interpolation?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-direction-is-interpolated-across-the-0360-wrap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Historical bearing interpolation crossed the 0°/360° wrap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#radiation-resampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Radiation resampling
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#instantaneous-variables-lose-diurnal-amplitude" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Instantaneous variables lose diurnal amplitude
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wind-is-stored-as-speed-and-direction-and-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind is stored as components
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#migrate-into-a-separate-archive-before-switching-readers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migrate into a separate archive before switching readers
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="nwp-variable-conventions">NWP variable conventions</h1>
+<p>This page says how to read a value out of the <code>nwp</code> Delta table, and what the feature pipeline does
+to it on the way to the model. Every ECMWF ENS variable we store is listed with the convention that
+governs it: some values describe an instant, some describe the 3 or 6 hours before that instant, and
+wind components are signed eastward and northward velocities.</p>
+<p>Everything here is a choice this project made, so a defect described on this page is a reason to
+change our code. Damage the data arrives with is the separate subject of <a href="../ecmwf-ens-known-issues/">Known ECMWF ENS
+data-quality issues</a>, which sets out how the two pages divide the subject
+between them.</p>
+<h2 id="the-forecast-step-grid">The forecast step grid</h2>
+<p>ECMWF ENS is <strong>not evenly spaced over the horizon</strong>. Measured on the 2026-08-10 00Z run, and
+identical in every run in the archive:</p>
+<table>
+<thead>
+<tr>
+<th>step width</th>
+<th>lead times</th>
+<th>number of steps</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>—</td>
+<td>0 h (analysis)</td>
+<td>1</td>
+</tr>
+<tr>
+<td>3 h</td>
+<td>3 h → 144 h</td>
+<td>48</td>
+</tr>
+<tr>
+<td>6 h</td>
+<td>150 h → 360 h</td>
+<td>36</td>
+</tr>
+</tbody>
+</table>
+<p>The change at <strong>144 h — 6 days</strong> matters most, because the primary user band is 3–10 days (<a href="../../roadmap/xgboost-improvements/">XGBoost
+improvements</a>), so days 6 to 10 of that band sit on the coarse
+half of the grid.</p>
+<h2 id="the-three-axes">The three axes</h2>
+<p>A variable takes one convention from each of the three axes below. Most are instantaneous, linear
+and numeric.</p>
+<h3 id="instantaneous-versus-period-ending">Instantaneous versus period-ending</h3>
+<p>An <strong>instantaneous</strong> variable describes conditions at <code>valid_time</code> itself.</p>
+<p>A <strong>period-ending</strong> variable is the <em>average rate over the interval that ends at <code>valid_time</code></em>.
+Dynamical.org de-accumulates these from ECMWF's cumulative source fields before we receive them.
+Three variables are period-ending: <code>downward_short_wave_radiation_flux_surface</code>,
+<code>downward_long_wave_radiation_flux_surface</code> and <code>precipitation_surface</code>. They are legitimately null
+at lead 0, because there is no preceding interval.</p>
+<p>Beyond 144 h the interval is <strong>6 hours long</strong>, so a 12:00 shortwave value is the mean over
+06:00–12:00. That window covers much of the morning ramp, so the value is far below the
+instantaneous irradiance at noon. What changes at day 6 is the averaging window, not the weather.</p>
+<p><code>PowerTimeSeries</code> uses the same convention — its <code>value</code> is the "average power over the preceding
+30-minute period" — so the two sides of the NWP-to-power join agree, and features derived from
+period-ending NWP should stay period-ending to match.</p>
+<h3 id="linear-versus-circular">Linear versus circular</h3>
+<p><code>wind_direction_10m</code> and <code>wind_direction_100m</code> are <strong>circular</strong>: 359° and 1° are two degrees apart
+in reality, and 358 degrees apart arithmetically. No arithmetic that assumes a number line —
+interpolation, mean, gradient, quantile, standardised anomaly — is valid on them without special
+handling. The archive stores <code>wind_u_10m</code>, <code>wind_v_10m</code>, <code>wind_u_100m</code>, and <code>wind_v_100m</code>,
+which are linear. Speed and bearing are derived features, not stored weather columns.</p>
+<h3 id="numeric-versus-categorical">Numeric versus categorical</h3>
+<p><code>categorical_precipitation_type_surface</code> is a category code, not a quantity, so it is aggregated by
+area-weighted mode rather than averaged, and forward-filled rather than interpolated.</p>
+<p>It appears to be instantaneous. The three period-ending variables are 100 % null at lead 0, because
+there is no preceding interval for them to average; <code>categorical_precipitation_type_surface</code> is
+fully populated there. That is good evidence but not proof, since a period field could in principle
+be published at lead 0 anyway, so confirm against <a href="https://codes.ecmwf.int/grib/param-db/260015">ECMWF's parameter database
+entry</a> before relying on its timing. If it did
+describe the preceding interval, forward-filling it would attribute one interval's precipitation
+type to the following one.</p>
+<h2 id="every-variable-and-how-to-read-it">Every variable, and how to read it</h2>
+<p><strong>Raw wind columns are instantaneous signed components at both stored heights.</strong>
+All four columns use metres per second and area-weighted H3 spatial means.</p>
+<table>
+<thead>
+<tr>
+<th>current raw wind column</th>
+<th>positive direction</th>
+<th>timing</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>wind_u_10m</code></td>
+<td>East</td>
+<td>instantaneous</td>
+</tr>
+<tr>
+<td><code>wind_v_10m</code></td>
+<td>North</td>
+<td>instantaneous</td>
+</tr>
+<tr>
+<td><code>wind_u_100m</code></td>
+<td>East</td>
+<td>instantaneous</td>
+</tr>
+<tr>
+<td><code>wind_v_100m</code></td>
+<td>North</td>
+<td>instantaneous</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The following table is a historical diagnostic of the polar archive</strong>, measured before component
+storage. The wind rows describe derived quantities rather than the current raw column set.
+The final column measures <strong>what the 3 h → 6 h step change costs</strong>: the error, at the held-out
+intermediate steps, from reconstructing the 3-hourly part of the horizon out of a 6-hourly version
+of itself using point interpolation, as measured before interval-aware radiation resampling.
+<code>MAE/SD</code> normalises that error
+by the variable's own spread, so the column is comparable across variables. Measured on the
+2026-08-10 00Z run, scored over the 2,045,304 held-out steps within leads 3–144 h. For the
+period-ending variables the 6-hourly product is <em>exactly</em> reproducible by averaging consecutive
+pairs of 3-hourly means, so their figures are exact rather than an emulation. The two directions are
+scored by mean circular distance — <code>|((reconstructed − truth + 180) mod 360) − 180|</code> — since a plain
+subtraction of two angles is not a distance.</p>
+<table>
+<thead>
+<tr>
+<th>variable</th>
+<th>convention</th>
+<th>unit</th>
+<th>MAE at 6-hourly</th>
+<th>MAE/SD</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>downward_short_wave_radiation_flux_surface</code></td>
+<td>period-ending</td>
+<td>W m⁻²</td>
+<td>111</td>
+<td><strong>0.44</strong></td>
+</tr>
+<tr>
+<td><code>wind_direction_10m</code></td>
+<td>instantaneous, <strong>circular</strong></td>
+<td>°</td>
+<td>20.9</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>wind_direction_100m</code></td>
+<td>instantaneous, <strong>circular</strong></td>
+<td>°</td>
+<td>19.4</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>downward_long_wave_radiation_flux_surface</code></td>
+<td>period-ending</td>
+<td>W m⁻²</td>
+<td>6.5</td>
+<td>0.27</td>
+</tr>
+<tr>
+<td><code>wind_speed_100m</code></td>
+<td>instantaneous</td>
+<td>m s⁻¹</td>
+<td>0.75</td>
+<td>0.30</td>
+</tr>
+<tr>
+<td><code>wind_speed_10m</code></td>
+<td>instantaneous</td>
+<td>m s⁻¹</td>
+<td>0.57</td>
+<td>0.28</td>
+</tr>
+<tr>
+<td><code>precipitation_surface</code></td>
+<td>period-ending</td>
+<td>kg m⁻² s⁻¹</td>
+<td>9.6 × 10⁻⁶</td>
+<td>0.19</td>
+</tr>
+<tr>
+<td><code>dew_point_temperature_2m</code></td>
+<td>instantaneous</td>
+<td>°C</td>
+<td>0.49</td>
+<td>0.17</td>
+</tr>
+<tr>
+<td><code>temperature_2m</code></td>
+<td>instantaneous</td>
+<td>°C</td>
+<td>0.66</td>
+<td>0.15</td>
+</tr>
+<tr>
+<td><code>pressure_reduced_to_mean_sea_level</code></td>
+<td>instantaneous</td>
+<td>Pa</td>
+<td>29</td>
+<td>0.09</td>
+</tr>
+<tr>
+<td><code>geopotential_height_500hpa</code></td>
+<td>instantaneous</td>
+<td>m</td>
+<td>2.4</td>
+<td>0.03</td>
+</tr>
+<tr>
+<td><code>pressure_surface</code></td>
+<td>instantaneous</td>
+<td>Pa</td>
+<td>29</td>
+<td>0.02</td>
+</tr>
+<tr>
+<td><code>categorical_precipitation_type_surface</code></td>
+<td>categorical</td>
+<td>code</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>The synoptic variables are unharmed by the coarser grid (MAE/SD 0.02–0.09). Shortwave radiation is
+the worst affected numeric variable, at half again the next-worst (0.44 against <code>wind_speed_100m</code>'s
+0.30). The two directions carry no MAE/SD because a standard deviation of a circular quantity is not
+meaningful; their error is the mean circular distance instead.</p>
+<h2 id="what-the-half-hourly-resample-does-today">What the half-hourly resample does today</h2>
+<p><code>_upsample_nwp_to_half_hourly</code> builds a 30-minute grid per <code>(nwp_init_time, ensemble_member,
+time_series_id)</code> group. <strong>Radiation follows a dedicated interval-aware path.</strong> Other numeric
+fields use point interpolation and the categorical field uses forward fill. Those generic paths
+can fill interior source nulls; radiation preserves its source-missing windows.</p>
+<p><code>Nwp.continuous_var_names()</code> remains the numeric-variable set used by storage rounding and dashboard
+plots. Resampling dispatch excludes both radiation columns locally, without changing that shared
+classification.</p>
+<p><strong>Wind components are interpolated before speed and bearing are derived.</strong> The feature pipeline
+computes <code>sqrt(u² + v²)</code> and <code>(atan2(u, v) × 180/π + 180) mod 360</code> at half-hourly resolution.
+The bearing describes where the wind comes from: North is 0°, East is 90°. Derivation happens
+before forecast joins, analysis-proxy selection, weather lags, and rolling features. Wind chill
+uses the derived 10 m speed even when speed is not explicitly requested.</p>
+<p><strong>Exact calm keeps the formula's 180° result, although calm has no physical direction.</strong> Null
+components propagate to null polar features. Per-component bounds are −200 to 200 m/s as a
+corrupt-feed guard; the contract does not impose a separate 200 m/s bound on vector magnitude.
+The ingest averages u and v over the contributing grid points of each H3 cell. Different missing
+footprints for u and v would imply different contributing sub-areas.</p>
+<p>Precipitation still receives ordinary linear interpolation. Its interval-aware reconstruction is
+tracked by <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/1165">issue #1165</a>.</p>
+<h3 id="interpolate-components-before-deriving-speed-and-bearing">Interpolate components before deriving speed and bearing</h3>
+<p><strong>These known-answer examples check linear vector interpolation, not observed weather accuracy.</strong>
+Two synthetic 3-hour intervals assume that eastward u and northward v change linearly between
+native forecast steps. Before interpolates endpoint speeds and bearings arithmetically. After
+uses the production half-hourly feature pipeline; expected values come from independent analytic
+trajectories. The same linear component rule applies to 6-hour native intervals.</p>
+<p><img alt="Before and after wind interpolation compared with independent analytic values." src="../assets/wind-interpolation.svg" /></p>
+<p><strong>Interpolating the vector preserves the North crossing and allows opposing winds to cancel.</strong>
+The North-crossing midpoint is northerly, whereas the old arithmetic bearing is 180° (South).
+Bearings in the figure are unwrapped through 360°; 370° means 10°. Speed at that midpoint is
+9.848078 m/s, below the 10 m/s endpoints. Opposing 10 m/s vectors reach calm at the midpoint;
+interpolated scalar speeds remain 10 m/s. Calm has no physical bearing, so the opposing-wind panel
+plots speed only. These deterministic examples need no uncertainty interval and establish no
+forecast-skill improvement.</p>
+<p>Reproduce the figure and its checked CSV/report from the repository root:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/diagnostics/plot_wind_interpolation.py
+npx<span class="w"> </span>svgo@4<span class="w"> </span>--multipass<span class="w"> </span>--precision<span class="o">=</span><span class="m">1</span><span class="w"> </span>--final-newline<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>docs/architecture/assets/wind-interpolation.svg
+</code></pre></div>
+<p>The numerical report and CSV are written under
+<code>data/studies/wind_storage/interpolation-proof/</code>. The figure uses 10 m components; the production
+expressions and regression tests cover both stored heights.</p>
+<h3 id="why-retain-linear-component-interpolation">Why retain linear component interpolation?</h3>
+<p><strong>The focused wind-farm comparison found no consistent power benefit from smoothing u/v.</strong>
+GPU XGBoost models received only the derived 10 m and 100 m speed and bearing. Across the three
+wind farms, both tested lead bands and both fixed settings, the pooled point estimates favoured
+linear interpolation over PCHIP and modified Akima. Most differences were small and uncertain.
+The <a href="https://openclimatefix.github.io/nged-ml-research/studies/forecasts/wind-interpolation/">experiment and
+plots</a>
+explain the interpolation
+assumptions and compare them with power observations and a direct station-wind check.
+The focused comparison supports retaining linear interpolation for the current forecasting
+pipeline; the comparison does not establish that linear is universally more accurate.</p>
+<h3 id="wind-direction-is-interpolated-across-the-0360-wrap">Historical bearing interpolation crossed the 0°/360° wrap</h3>
+<p><strong>A historical audit found that ordinary bearing interpolation can reverse northerly wind.</strong>
+Interpolating 350° → 10° arithmetically yields 180°, whereas the midpoint of equal-speed
+components points North. On the 2026-08-10 00Z polar archive, native-step pairs straddled North as
+follows:</p>
+<table>
+<thead>
+<tr>
+<th>step width</th>
+<th>pairs straddling north (<code>_10m</code>)</th>
+<th>pairs straddling north (<code>_100m</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3 h</td>
+<td>3.73 %</td>
+<td>3.50 %</td>
+</tr>
+<tr>
+<td>6 h</td>
+<td>8.30 %</td>
+<td>8.03 %</td>
+</tr>
+</tbody>
+</table>
+<p>The historical audit compared arithmetic bearings with a shortest-arc angular interpolation.
+That diagnostic is not observed weather truth and is not generally the same as component
+interpolation when endpoint speeds differ. Relative to the shortest-arc diagnostic, 6.57 % of
+interpolated 10 m bearings and 6.32 % of interpolated 100 m bearings differed across the wrap.
+The stored-component pipeline avoids arithmetic interpolation of bearings; downstream calculations
+on derived bearings still require circular handling.</p>
+<!-- pyml disable-next-line no-inline-html -->
+<p><a id="period-ending-variables-are-interpolated-as-though-they-were-instantaneous"></a></p>
+<h3 id="radiation-resampling">Radiation resampling</h3>
+<p><strong>Both radiation fields describe the interval before their timestamp.</strong> The production helper in
+<code>ml_core.features._radiation</code> expands each native mean into half-hours inside that backward window.
+The helper obtains widths from the ECMWF lead schedule: 3 hours through lead 144, then 6 hours,
+including <code>(144, 150]</code>. Width never comes from the previous available value, which could span
+missing windows.
+The half-hour ending at a native timestamp has a reconstructed feature value, not the original
+3/6-hour mean.</p>
+<p><strong>Short-wave uses the sun's daily shape and interpolates cloud attenuation.</strong> The helper evaluates
+<a href="https://gml.noaa.gov/grad/solcalc/solareqns.PDF">fractional-year solar geometry</a> from the US National
+Oceanic and Atmospheric Administration (NOAA), including longitude and equation of time, then
+Haurwitz clear-sky irradiance. Two 15-minute midpoint samples
+supply each backward half-hour mean. Averaging these half-hours supplies the matching native-window
+clear-sky mean. The native radiation divided by that mean is the clear-sky index, anchored at the
+native window midpoint. Windows with a clear-sky mean of at least 20 W/m² supply indices.
+The threshold is a conditioning safeguard, not a measured optimum: a small denominator can turn
+modest diffuse light into an extreme index that distorts the next daylight window. Weaker windows
+retain their supplied energy but do not supply indices to neighbouring windows.</p>
+<p><strong>Interpolation stays within a supported daylight block.</strong> The index varies linearly between
+midpoints; before the first usable index and after the last, it holds the nearest index. Solar
+night gaps on the half-hour grid separate daylight blocks, even when a short northern summer night
+fits between two native windows that both contain daylight. Missing native windows split the source
+support independently. Each window's index is available to every daylight block that window
+contains, and target means multiply the interpolated index by the half-hour clear-sky mean.</p>
+<p><strong>Every complete short-wave window conserves its supplied energy.</strong> Short-wave target means are
+rescaled so their mean equals the native mean; equivalently, the half-hour energy sum equals native
+mean × native duration. This constraint can introduce boundary steps and does not recover unknown
+sub-window cloud changes. The index is not clipped at 1.</p>
+<p><strong>Fallbacks preserve energy when solar shaping is unusable.</strong> If no usable index exists, distribute
+the native energy in proportion to the half-hour clear-sky means within that window. If all those
+means are zero, retain the source mean as a constant. A positive native mean whose timestamp falls
+after sunset can still describe a window containing daylight. A positive fully-dark source window takes
+the constant fallback, preserving energy rather than claiming both exact nighttime zero and
+conservation. Zero-energy windows output zero.</p>
+<p><strong>Long-wave uses a smooth spline through native-window midpoint means.</strong> Piecewise Cubic Hermite
+Interpolating Polynomial (PCHIP) interpolation preserves local trends without overshooting the
+neighbouring means. The helper evaluates the spline at each half-hour midpoint, holding the nearest
+mean before the first anchor and after the last. Two anchors give linear interpolation; a single
+anchor gives a constant. Thermal radiation depends on atmospheric temperature, humidity, and
+clouds, so long-wave uses no solar shaping.</p>
+<p><strong>Long-wave prioritises smooth features over exact interval energy.</strong> Native interval means act as
+midpoint estimates; spline values evaluated at half-hour midpoints need not average back to each
+original mean. The half-hour features feed an electricity forecasting model. The smoother long-wave
+profile avoids imposing steps at every native boundary. Smoothness does not establish a
+forecast-score gain or recover the
+unknown thermal variation within an interval. See the <a href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.PchipInterpolator.html">PCHIP
+algorithm</a>
+for the shape-preserving derivative rules.</p>
+<p><strong>Missing source windows stay null in both fields.</strong> Lead zero has no preceding window; a finite
+lead-3 mean supports lead 0.5 through 3. Source nulls and absent native rows leave their own windows
+null, including the final window. Unsupported source identifiers or off-schedule timestamps fail
+at collection in bulk research mode. Single-run serving logs <code>unsupported_radiation_schedule</code>,
+including example source/run/timestamps, and leaves unsupported radiation null while processing
+other weather columns. Native-batch validation runs lazily before window expansion. No window
+borrows values from another series, run, or ensemble member. Complete windows are reconstructed
+before cropping to the existing output grid, so a visible tail never receives the whole window's
+energy.</p>
+<p><strong>Training and inference use the same lazy helper.</strong> Site metadata supplies coordinates for
+short-wave, and geometry is reused across runs and members at matching site/time coordinates.
+Long-wave needs no coordinates. Raw NWP storage and rounding remain unchanged.
+Direct short-wave callers must supply a complete finite coordinate relation. Missing, null, or
+nonfinite coordinates raise <code>invalid_solar_coordinates</code> during collection rather than selecting
+the fully-dark fallback. Production's validated site relation supplies those coordinates.</p>
+<p><strong>Short-wave neighbour lookup operates on native windows.</strong> Forward/backward fills find usable
+indices within each source segment and daylight block, then a keyed join supplies neighbouring
+anchors to half-hours. The helper avoids sorting and as-of joining the entire half-hour target
+frame. The <a href="https://github.com/openclimatefix/nged-ml-research/blob/main/studies/radiation_resampling/README.md#bulk-resampler-benchmark">bulk resampler benchmark and reproduction
+commands</a>
+report in-memory time and whole-process peak resident set size (RSS), with the scope and scaling
+limits stated.</p>
+<p><strong>Regenerate engineered caches and retrain before deploying power-forecast models against these
+feature semantics.</strong> Corrected timing and smoother profiles do not establish a forecast-score gain.</p>
+<p><strong>Synthetic examples show interval timing and changing cloud attenuation.</strong> The figure uses an
+invented coordinate at 52°N, 0°E on 21 March 2026. Short-wave reference means use independent pvlib
+solar geometry and
+70% of Haurwitz clear sky in the constant-attenuation examples. A further 3-hour example uses
+85% before noon and 20% afterwards, representing a sunny morning and dull afternoon.
+A separate 3-hour example uses 70% of Ineichen clear sky at sea level with fixed Linke turbidity 3,
+so the reference shape differs from production's Haurwitz shape. Long-wave reference means follow
+a prescribed smooth daily curve.
+Aggregating the reference half-hours supplies identical native inputs to point interpolation and
+the production feature pipeline. The plotted middle day has complete 3-hour or 6-hour windows;
+nighttime values remain visible so displaced short-wave energy cannot disappear from the comparison.</p>
+<p><img alt="Short-wave and long-wave before and after resampling." src="../assets/radiation-resampling.svg" /></p>
+<p><strong>The constant-attenuation examples show the short-wave timing correction.</strong> The energy centroid is
+the average half-hour midpoint weighted by that half-hour's radiation energy. Point interpolation
+delays the whole-day short-wave energy centroid by 1.25 hours with 3-hour inputs and 2.73 hours with
+6-hour inputs. The new delays are under 12 seconds, with native-window mean errors below 0.000003
+W/m². The reported delays and mean errors describe these synthetic examples, not forecast scores.</p>
+<p><strong>The different-shape example tests timing beyond the matched clear-sky formula.</strong> Its reference
+uses Ineichen clear sky while reconstruction uses Haurwitz. The centroid delay falls from about
+1.25 hours to about 5.3 seconds in this example. The matched-Haurwitz examples are positive controls;
+none of these synthetic cases establishes a bound for other locations, seasons, or cloud profiles.</p>
+<p><strong>The sunny-morning example retains each interval's forecast energy.</strong> The reconstructed profile
+retains the stronger morning and weaker afternoon. Interpolation and rescaling can smooth the noon
+change or introduce boundary jumps; the native means cannot identify the true cloud-transition time.</p>
+<p><strong>Long-wave PCHIP trades exact interval energy for a smooth profile.</strong> Interval-mean deviations are
+below 0.98 W/m² for 3-hour inputs and 3.64 W/m² for 6-hour inputs in the prescribed daily curve.
+The smooth long-wave reference is one possible underlying curve; the native means cannot identify
+the true thermal variation. The script prints every plotted deviation and centroid shift in
+<a href="https://github.com/openclimatefix/nged-ml-research/blob/main/studies/radiation_resampling/report.md">its generated
+report</a>.</p>
+<p>Reproduce the figure and report from the root of the <code>nged-ml-research</code> repository, where the
+script lives:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/radiation_resampling/plot_radiation_resampling.py
+npx<span class="w"> </span>svgo@4<span class="w"> </span>--multipass<span class="w"> </span>--precision<span class="o">=</span><span class="m">1</span><span class="w"> </span>--final-newline<span class="w"> </span>docs/architecture/assets/radiation-resampling.svg
+</code></pre></div>
+<p>The archive confirms the period-ending reading. Forming the clear-sky index two ways over the
+2026-08-10 00Z run (1671 cells × 51 members, ~2.8 M rows after restricting to those where clear-sky
+irradiance exceeds 200 W m⁻², so the ratio is well conditioned) settles it. Cloud enhancement can
+lift irradiance a few tens of percent above the clear-sky value, so an index a little over 1 is real
+— but an index of 2 is not, least of all for a 6-hour mean over a whole H3 cell:</p>
+<table>
+<thead>
+<tr>
+<th>step</th>
+<th><code>GHI / CS(valid_time)</code> p99 / max</th>
+<th><code>GHI / CS(mean over preceding step)</code> p99 / max</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3 h</td>
+<td>2.0 / 2.2</td>
+<td>0.99 / <strong>1.02</strong></td>
+</tr>
+<tr>
+<td>6 h</td>
+<td>2.3 / 3.0</td>
+<td>0.96 / <strong>1.03</strong></td>
+</tr>
+</tbody>
+</table>
+<p>The period-mean denominator sits at 1.0 to within the clear-sky model's own error in both halves of
+the horizon; the instantaneous one implies irradiance twice what the sky can deliver. The exact tail
+figures depend on the clear-sky model and the daylight cut-off, so treat the leading digit as the
+result.</p>
+<h3 id="instantaneous-variables-lose-diurnal-amplitude">Instantaneous variables lose diurnal amplitude</h3>
+<p>Linear interpolation between 6-hourly samples misses the daily temperature maximum, which falls at
+around 15:00, between the 12:00 and 18:00 samples. The loss is measured by emulation, which controls
+for lead time: comparing the native 3-hourly steps of days 1–6 against a 6-hourly subsample of those
+same steps, the mean daily temperature range falls from <strong>6.09 °C to 5.37 °C — an 11.9%
+compression</strong>.</p>
+<p>This information loss has no exact interpolation fix. The diurnal cycle is not a pure sinusoid:
+its asymmetric afternoon peak needs the second and third harmonics, and four samples a day is
+already at the Nyquist limit for the second, so some amplitude is genuinely unrecoverable at
+6-hourly spacing. A shape-preserving interpolant would recover more of it than a linear one, though
+how much has not been measured. The compression feeds the effective-temperature, degree-day and
+<code>windchill</code> features.</p>
+<h2 id="wind-is-stored-as-speed-and-direction-and-why">Wind is stored as components</h2>
+<p><strong>The archive keeps u/v alone, accepting an 8.90 % increase in sampled Parquet bytes.</strong>
+A paired measurement of 24 full 00Z forecasts across 2025 used identical raw inputs, H3 weights,
+rounding, sorting, and the production writer. Polar storage used 3.802 GB; u/v used 4.140 GB.
+Adding scalar-mean speed at both heights raised the total to 4.881 GB, another 17.90 % over u/v.
+The <a href="https://openclimatefix.github.io/nged-ml-research/studies/forecasts/wind-storage/">seasonal storage
+measurement</a>
+gives the generated
+per-run tables and reproduction procedure. The percentages describe the sample, not an
+archive-wide census. Historical measurements of two August 2026 runs found +6.3 % and +5.7 %;
+the broader paired sample governs the storage decision.</p>
+<p><strong>Vector-mean speed and scalar-mean speed measure different spatial reductions.</strong>
+The pipeline derives the magnitude of the area-weighted mean vector, |E[<strong>v</strong>]|. Averaging the
+grid points' magnitudes gives E[|<strong>v</strong>|], which is at least as large before numerical rounding.
+Opposing winds can cancel in the vector mean while retaining large scalar speeds. Scalar means
+cannot be recovered from the stored vectors; obtaining scalar means requires the raw grid-point
+data. Neither spatial reduction alone gives the mean output of a nonlinear turbine power curve.</p>
+<p><strong>Typical spatial gaps are small, but the measured tails are substantial.</strong> Before writer
+rounding, the median scalar-minus-vector gap was about 0.0056 m/s at both heights. At 100 m, the
+99th percentile was 0.405 m/s and the maximum was 15.059 m/s; the 10 m maximum was 12.495 m/s.
+The maintainer chose u/v alone. Scalar-mean speed remains a possible forecasting experiment,
+not a quantity established as irrelevant by the storage measurement.</p>
+<h2 id="migrate-into-a-separate-archive-before-switching-readers">Migrate into a separate archive before switching readers</h2>
+<p><strong>A component schema requires a fresh destination; partition overwrite cannot migrate the archive.</strong>
+<code>write_nwp</code> rejects an existing table whose column set differs from the incoming frame, while
+allowing dtype widening within the same column set.
+<code>scripts/maintenance/rewrite_nwp_wind_components.py</code> reads an explicitly pinned local Delta
+snapshot and reconstructs <code>u = -speed × sin(bearing)</code> and <code>v = -speed × cos(bearing)</code>.
+Archived speeds and bearings have already been rounded, so reconstruction cannot recover the
+original native components exactly. Writing the reconstructed components applies 13-bit
+significand rounding as well. Wind validation bounds the round-trip error relative to the
+archived polar values, not the original downloaded u/v. Exact equality applies to row keys and
+non-wind columns.
+The script writes through <code>write_nwp</code>, verifies exact non-wind columns and row keys, and records
+quantization-aware speed and circular-bearing errors after readback. A sibling manifest records
+completed partitions and source files. Reruns skip verified partitions; a newer pinned snapshot
+adds new partitions and replaces source partitions whose files changed. Source partition removal
+requires reconciliation. The source archive remains read-only.</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>scripts/maintenance/rewrite_nwp_wind_components.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--source<span class="w"> </span>OLD_ARCHIVE<span class="w"> </span>--source-version<span class="w"> </span>VERSION<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--destination<span class="w"> </span>NEW_ARCHIVE<span class="w"> </span>--limit<span class="w"> </span><span class="m">4</span>
+</code></pre></div>
+<p><strong>Validate a seasonal pilot, then finish and catch up before cutover.</strong> Remove <code>--limit</code> for the
+complete build. Compare source and destination partition inventories, keys, member/lead/cell
+coverage, and non-wind values. Pin a newer source version to catch up while the old archive keeps
+serving, and confirm the live selected run exists in the destination. Switch the archive setting
+and matching code together, retrain affected forecasting models and rebuild derived feature caches.
+Keep the old archive, compatible code, and model artifacts for rollback. Never mix old and new
+schemas in a single table.</p>
+<p><strong>Study extracts must be rebuilt as matching versioned datasets.</strong> The horizon extract and day-4
+supplement require explicit source, Delta version, and new output directory. Both derive polar
+values at native steps and record the same source identity; the supplement retains exact equality
+checks on shared rows. Frozen historical polar extracts require the historical checkout and
+source archive. A matched forecasting comparison of interpolation ordering remains pending;
+the storage measurement does not establish forecast skill.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
