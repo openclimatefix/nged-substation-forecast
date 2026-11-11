@@ -87,3 +87,8 @@ site/
 # Copyrighted third-party material: never commit.
 literature/
 temp/
+
+#######################
+# Credentials: never commit.
+# Google account credential file for the WeatherNext 3 download.
+.google_account_for_weathernext3.json
