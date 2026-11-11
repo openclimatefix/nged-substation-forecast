@@ -28,6 +28,15 @@ run, whether or not the edit is committed. Every file a cleaning rule reads its 
 from must be in this hash.
 """
 
+INITIAL_ANALOGUE_NOISE_READINGS: Final[int] = 30 * 3 * 48
+"""How many of a series' earliest readings the `initial_analogue_noise` rule flags: 4,320, which
+is 90 days' worth of half-hourly readings.
+
+The count is of readings present, not of calendar time, so a gap early in a series pushes the
+cut-off later than 3 months in time. Some series report only sporadically at first, and the cut-off
+has to fall at least is designed to include at least 2 months after the data starts in earnest.
+"""
+
 
 def flag_nged_power(
     power: pt.LazyFrame[PowerTimeSeries],
@@ -51,10 +60,21 @@ def flag_nged_power(
     flagged and the range of flagged power and time, so a rule needs no logging code. Python's
     `logging` output reaches only the step's captured stderr.
 
-    The one rule today, `substation_zero`, flags a reading of exactly 0 from a `Primary`, `BSP`,
-    or `GSP` series. A substation almost never truly reads zero, so a zero is almost always a
-    telemetry fault. A series missing from the `TimeSeriesMetadata` table has no `substation_type`
-    and is not flagged.
+    The rules today, in the order they are tried:
+
+    1. `initial_analogue_noise` flags each series' first `INITIAL_ANALOGUE_NOISE_READINGS`
+       readings in time order, for every series whatever its `substation_type`. The first months
+       of a series are often noisy, so they are not trained on. The rule counts readings present,
+       so a gap does not count towards the cut-off. Two consequences follow, and both are
+       intended. A new series is flagged in full until it has `INITIAL_ANALOGUE_NOISE_READINGS`
+       readings, so the series gets no training data before then. A back-filled
+       reading earlier than a series' current first reading moves that series' cut-off earlier in
+       the series' history, and un-flags the readings that are no longer among the first
+       `INITIAL_ANALOGUE_NOISE_READINGS`.
+    2. `substation_zero` flags a reading of exactly 0 from a `Primary`, `BSP`, or `GSP` series. A
+       substation almost never truly reads zero, so a zero is almost always a telemetry fault. A
+       series missing from the `TimeSeriesMetadata` table has no `substation_type` and is not
+       flagged.
 
     **Example.** The output holds every input power row, with a `drop_reason` column added. These
     seven rows are real readings from a `Primary` substation, MARSH LANE 33 11kV S STN, after
@@ -101,6 +121,14 @@ def flag_nged_power(
         # `pl.when(condition).then(value)` sets `drop_reason` to `value` on every row where
         # `condition` is true. Add a rule as another `.when(...).then(...)` before `.otherwise`.
         drop_reason=pl.when(
+            # The `initial_analogue_noise` rule: the reading's position in its series, counting
+            # from 0 in time order, is below the cut-off. `order_by` is required because neither
+            # the raw Delta table nor the lazy join above returns rows in time order.
+            pl.int_range(pl.len()).over("time_series_id", order_by="time")
+            < INITIAL_ANALOGUE_NOISE_READINGS
+        )
+        .then(pl.lit("initial_analogue_noise"))
+        .when(
             # The `substation_zero` rule: the reading is exactly zero, and the series is a
             # substation. `&` is a row-by-row "and"; `is_in` is true where `substation_type` is
             # one of the listed values, and null (so not flagged) where `substation_type` is null.
