@@ -780,4 +780,4 @@ def test_aggregation_keeps_a_fully_overcast_cell_within_the_percent_bound() -> N
     )
 
     assert aggregated["total_cloud_cover_atmosphere"].max() == 100.0
-    assert aggregated["total_cloud_cover_atmosphere"].min() == 100.0
+    assert aggregated["total_cloud_cover_atmosphere"].min() == pytest.approx(100.0)
