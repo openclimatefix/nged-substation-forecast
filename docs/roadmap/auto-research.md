@@ -390,8 +390,8 @@ June 2025.** Our stored ENS archive starts on 2024-04-01 until the back-fill of 
 history before the series is scored. Two short folds therefore fit before the cutoff. The first fold
 trains on April to September 2024 and validates on October to December 2024. The second fold trains
 on April to December 2024 and validates on January to June 2025. Screening can under-rate an idea
-whose benefit falls mostly in summer. Small effects will also not stand out from noise. Once issue
-#959 adds about 3 more years of ENS history, screening folds can cover every season.
+whose benefit falls mostly in summer. Small effects will also not stand out from noise. Once
+issue #959 adds about 3 more years of ENS history, screening folds can cover every season.
 
 **Phase 2 searches for small effects, so the short folds limit phase 2 more than phase 1.** A large
 effect stands out even on the short folds, but finding large effects is phase 1's job, on the
