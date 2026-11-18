@@ -12,14 +12,16 @@ values as random draws, the spread-skill ratio takes their variance, and the das
 level as a grey "member" line.
 
 **The planned solution.** Replace `ensemble_member` and `power_fcst` with 11 Float32 columns,
-`power_fcst_q01` to `power_fcst_q99`, at the levels the research forecasts store (0.01, 0.05, 0.10,
-0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99). The primary key becomes `(time_series_id,
-power_fcst_init_time, valid_time)`, and a row constraint forbids a quantile below the level beneath
-it. The three forecasters that compute members today reduce their members to the 11 quantiles with
-one shared function in `ml_core` before they return. `ml_core.metrics` scores the quantile columns
-directly. The stored `power_forecasts` Delta table moves to a new URI, filled by converting the old
-table's partitions with the same reduction. The dashboard draws the power forecast as quantile
-bands, and its NWP panel keeps one line per ECMWF ENS weather member, read from `Nwp` as now.
+`power_fcst_p1` to `power_fcst_p99` (named with `contracts.common.quantile_label`), at the levels
+the research forecasts store (0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99). The
+primary key becomes `(time_series_id, power_fcst_init_time, valid_time)`, and a row constraint
+forbids a quantile below the level beneath it. The three forecasters that compute members today
+reduce their members to the 11 quantiles with one shared function in `ml_core` before they return.
+`ml_core.metrics` scores the quantile columns directly, at the 11 stored levels. The stored
+`power_forecasts` Delta table moves to a new path; the old table stays read-only, and a CV fold is
+re-run wherever a comparison with old results is wanted. The dashboard draws the power forecast as
+quantile bands, and its NWP panel keeps one line per ECMWF ENS weather member, read from `Nwp` as
+now.
 
 ## Verdict, size and departures
 
@@ -32,10 +34,12 @@ member-based metric computing something its docstring does not describe.
 - **What gets stored:** fires. It changes a Patito contract and the layout of the `power_forecasts`
   Delta table.
 - **The production serving path:** fires. `live_forecasts` and `XGBoostForecaster.predict` change.
-- **A degradation rule:** fires weakly. `live_forecasts_are_healthy` reads `n_ensemble_members` to
-  report a thinned NWP feed, and that report moves to the NWP side (below).
-- **More than one defensible design:** fires. Wide or long quantile columns; 11 or 13 levels;
-  converting or re-running the stored forecasts.
+- **A degradation rule:** fires weakly. `live_forecasts_are_healthy` counts `ensemble_member` on the
+  forecast rows to report a thinned NWP feed, and that count moves to the NWP run `live_forecasts`
+  already loads (below).
+- **More than one defensible design:** fires. Wide or long quantile columns (long was considered
+  and is not recommended: every reader would pivot it back); 11 or 13 levels; converting or
+  re-running the stored forecasts.
 - **Callers found only by searching:** fires. `PowerForecast` is named in about 30 source and test
   files across `contracts`, `ml_core`, `delta_store`, `baseline_forecasters`, `xgboost_forecaster`,
   `dashboard`, `scripts/forecasting`, and `src/nged_substation_forecast`.
@@ -59,7 +63,7 @@ booster prediction per member. Before returning, it calls the new
 `ml_core.quantiles.members_to_quantiles(frame, value_col="power_fcst")`. That function groups by
 `(time_series_id, power_fcst_init_time, valid_time)` plus the constant columns, takes the linear
 empirical quantile of the member values at each of the 11 `contracts.common.STORED_QUANTILES`
-levels, and returns one row per group with the 11 `power_fcst_qXX` columns. A group with one member
+levels, and returns one row per group with the 11 `power_fcst_pXX` columns. A group with one member
 returns 11 equal columns, which is the honest description of a deterministic forecast. `predict`
 returns `PowerForecast.validate(...)` on that frame, and the monotone constraint passes by
 construction because empirical quantiles never decrease. `live_forecasts` drops its
@@ -74,15 +78,19 @@ longer collapses members: each row already is one forecast. Per row it computes:
 
 - CRPS as twice the mean pinball loss over the 11 stored levels (the definition the research
   experiments use, so production and research scores agree);
-- the deterministic metrics (MAE, RMSE, MBE, NMAE) on `power_fcst_q50`, as issue #1077 proposes;
-- pinball loss, PICP, and interval width at the 13 `DELIVERY_QUANTILES`, with the 6 delivery levels
-  that are not stored (0.02, 0.20, 0.35, 0.65, 0.80, 0.98) read by linear interpolation of the
-  stored quantile function between its two neighbouring stored levels;
+- the deterministic metrics (MAE, RMSE, MBE, NMAE) on `power_fcst_p50`, as issue #1077 proposes;
+- pinball loss at each of the 11 stored levels, and PICP and interval width for the five symmetric
+  stored bands (`p1_p99`, `p5_p95`, `p10_p90`, `p25_p75`, `p40_p60`), read straight from the stored
+  columns;
 - the spread for the spread-skill ratio as the Gaussian-equivalent standard deviation
-  `(q90 − q10) / (2 × 1.2816)`.
+  `(p90 − p10) / 2.5632`.
 
-The `Metrics` contract keeps every metric name and `metric_param` label, so the leaderboard tables
-and MLflow keys do not change shape.
+The `Metrics` contract keeps every metric name. Its `metric_param` is a `pl.Enum` built from
+`DELIVERY_QUANTILES`, and `metric_value` is not nullable, so the 6 unstored delivery levels cannot
+be emitted as nulls. `QUANTILE_METRIC_PARAMS` and `BAND_METRIC_PARAMS` therefore become the union of
+the delivery labels and the stored labels, which adds `p25`, `p40`, `p60`, `p75`, `p25_p75`, and
+`p40_p60`. Stored metric rows that carry the old labels still validate, and new runs emit only the
+stored labels. `mean_pinball_loss` becomes the mean over the 11 stored levels.
 
 **Branches off the happy path.**
 
@@ -92,16 +100,15 @@ and MLflow keys do not change shape.
 - **Manual heuristic** reduces however many lag members survived `_nullify_leaky_lags` (one per lag
   column in `_lag_column_to_member` at most). With one surviving lag the 11 columns are equal, as
   for a one-member XGBoost forecast.
-- **A fresh table.** `write_power_forecasts` writes to the new table URI
-  (`Settings.power_forecasts_data_path`, whose default path segment changes from `power_forecasts`
-  to `power_forecasts_q11`). The first write creates the table with the new schema, as today.
-- **Stored history.** A one-off script,
-  `scripts/forecasting/convert_power_forecasts_to_quantiles.py`, reads the old table one
-  `(experiment_name, fold_id)` partition at a time, applies `members_to_quantiles`, and writes each
-  partition to the new table with `replace_partition`, so a crashed conversion is resumed by
-  rerunning it. The old table is left in place, read-only, until the maintainer deletes it. The live
-  slot that the live check compares against needs only the newest live run, so the live service does
-  not wait for the conversion.
+- **A fresh table.** `write_power_forecasts` writes to the path in
+  `Settings.power_forecasts_data_path`, whose default path segment changes from `power_forecasts`
+  to `power_forecasts_q11`. The first write creates the table with the new schema, as today. The
+  old table is left in place, read-only, until the maintainer deletes it. No conversion script is
+  written: converted rows would not be comparable with new runs anyway, because CRPS changes from
+  the members' fair CRPS to the quantile CRPS, so a CV fold is re-run wherever a comparison is
+  wanted. Rewriting the old path in place with delta-rs `schema_mode="overwrite"` was rejected,
+  because an overwrite with a new schema replaces every partition of the table, so the old results
+  would be lost rather than kept readable.
 
 **Error-handling paths.**
 
@@ -110,23 +117,29 @@ and MLflow keys do not change shape.
   which `live_forecasts_are_healthy` already reports as missing coverage. **A NaN member value** (a
   NaN booster output) is not dropped, so the row's quantiles become NaN, as `power_fcst` would be
   today. The live check today counts rows whose `power_fcst` is null, NaN, or infinite in the stored
-  table; after the change it counts rows where any of the 11 columns is. The implementer checks
-  whether `PowerForecast.validate` rejects a NaN Float32 value, and records the answer in the test.
-- **A thinned NWP feed.** Today the live check counts `n_ensemble_members` on the forecast rows to
-  warn when the ENS run carries fewer members. After the change the forecast rows carry no member,
-  so the live check reads the member count from the NWP run the slot used
-  (`contracts.weather_schemas.assess_nwp_run_completeness` already computes it), and the warning
-  text is unchanged. The check stays `WARN` and `blocking=False`, and its body still cannot raise.
+  table; after the change it counts rows where any of the 11 columns is. A one-line test records
+  whether `PowerForecast.validate` rejects a NaN Float32 value.
+- **A thinned NWP feed.** Today `live_forecasts_are_healthy` counts `ensemble_member` on the stored
+  forecast rows to warn when the ENS run carries fewer members, and `live_forecasts` puts the same
+  count in its materialisation metadata. After the change the forecast rows carry no member, so
+  `live_forecasts` counts the members of the `Nwp` frame it has already loaded for the slot, with no
+  second NWP read, and records the count in its metadata as now. The warning moves with the count:
+  `live_forecasts` reports a thinned run in its own degradation report (logged and sent to Sentry
+  tagged `degraded_asset=live_forecasts`, as its missing-control-member warning already is), and
+  the asset check drops its member count. The asset check stays `WARN` and `blocking=False`, and
+  its body still cannot raise.
 - **A crossed quantile** cannot come from `members_to_quantiles`. A future forecaster that emits
   quantiles directly (PR #1707's network) must sort them per row before validation; the constraint
   then makes a crossing fail `validate` loudly rather than reach the table.
 
 ### What changes, file by file
 
-- **`packages/contracts/src/contracts/common.py`**: add `STORED_QUANTILES` (the 11 levels) and a
-  helper naming each level's column (`power_fcst_quantile_column(q)` → `"power_fcst_q05"`).
-  `DELIVERY_QUANTILES` stays as the 13 levels agreed with NGED for the delivery tables, with its
-  docstring updated to say the metrics interpolate the 6 unstored levels.
+- **`packages/contracts/src/contracts/common.py`**: add `STORED_QUANTILES` (the 11 levels). Column
+  names are `f"power_fcst_{quantile_label(q)}"`, reusing the existing `quantile_label`, so no new
+  helper. `DELIVERY_QUANTILES` stays as the 13 levels agreed with NGED for the delivery tables.
+- **`packages/contracts/src/contracts/ml_schemas.py`**: `QUANTILE_METRIC_PARAMS` and
+  `BAND_METRIC_PARAMS` become the union of the delivery and stored labels; the `mean_pinball_loss`
+  description names the 11 stored levels.
 - **`packages/contracts/src/contracts/power_schemas.py`**: `PowerForecast` loses `ensemble_member`
   and `power_fcst`, gains the 11 Float32 quantile fields (each carrying `power_fcst`'s current
   description of available power, units, and sign, written once in a shared string), a
@@ -138,8 +151,9 @@ and MLflow keys do not change shape.
 - **`packages/ml_core/src/ml_core/metrics.py`**: `ROW_KEY_COLUMNS` and `COMPARABLE_KEY_COLUMNS`
   become the three-column key (the member-count argument in their docstring goes); `compute_metrics`
   drops the member collapse; `_fair_crps_expr` and `_corrected_variance_expr` are replaced by a
-  quantile CRPS and a quantile spread; the empirical delivery-quantile aggregation is replaced by
-  the interpolation above.
+  quantile CRPS and a quantile spread; the empirical delivery-quantile aggregation and
+  `_quantile_column` go, because the metrics read the stored columns; the pinball, PICP, and
+  interval-width loops run over `STORED_QUANTILES`, and `_BAND_LOWER_QUANTILES` is derived from it.
 - **`packages/ml_core/src/ml_core/base_forecaster.py`**: the `predict` docstring.
 - **`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py`**: `predict` reduces with
   `members_to_quantiles`.
@@ -150,18 +164,19 @@ and MLflow keys do not change shape.
   sort by the new key; docstrings. **`contracts/settings.py`**: the new default path segment of
   `power_forecasts_data_path`.
 - **`packages/dashboard/src/dashboard/forecast_chart.py`**: `build_view_forecast_chart` draws the
-  q05–q95 and q25–q75 bands and the q50 line instead of one grey line per member.
+  p5–p95 and p25–p75 bands and the p50 line instead of one grey line per member.
   `build_nwp_ensemble_chart` is unchanged: it reads `Nwp` rows and keeps one line per weather
   member.
 - **`src/nged_substation_forecast/defs/live_forecast_assets.py`**, **`cv_assets.py`**,
-  **`checks.py`**: drop the `ensemble_member` filters and counts on forecast rows; the CV
-  `n_ensemble_members` metadata becomes the count of members in the NWP rows the fold read; the
-  live check's non-finite test covers all 11 columns.
-- **`scripts/forecasting/score_study.py`**: validate study submissions against the new schema; a
-  submission in the member layout is rejected with a message naming `members_to_quantiles`.
-  **`export_baseline_forecasts.py`**: the full-ensemble file goes; the mean file becomes the q50
-  file; the quantile file reads the stored columns.
-- **`scripts/forecasting/convert_power_forecasts_to_quantiles.py`** (new): the one-off conversion.
+  **`checks.py`**: drop the `ensemble_member` filters and counts on forecast rows. The CV asset's
+  `n_ensemble_members` metadata and MLflow tag go, because no code reads them (the one reader is
+  the sentence in `docs/cross-validation/dagster-workflow.md` that lists the tag). `live_forecasts`
+  counts members from its loaded `Nwp` frame and reports a thinned run, as above. The live check's
+  non-finite test covers all 11 columns.
+- **`scripts/forecasting/score_study.py`**: no bespoke code. Its per-column dtype check and
+  `PowerForecast.validate` already reject a submission in the member layout.
+  **`export_baseline_forecasts.py`**: the smallest change that runs: its column list and its
+  member-based mean and quantile files read the stored columns instead.
 
 ### Design-philosophy check
 
@@ -175,64 +190,74 @@ means: a column of quantiles is no longer labelled a member.
 Each assertion below fails on `main` today, because the columns, the function, or the behaviour do
 not exist there.
 
-- **`contracts/tests/test_power_forecast.py`**: a frame with `power_fcst_q10 > power_fcst_q25` fails
-  `validate`; a frame with two rows on the same three-column key fails; the 11 quantile dtypes are
-  Float32; `ensemble_member` is not a field.
+- **`contracts/tests/test_power_forecast.py`**: one test that a frame with `power_fcst_p10 >
+  power_fcst_p25` fails `validate`; a frame with two rows on the same three-column key fails; one
+  line recording whether a NaN quantile fails `validate`.
 - **`ml_core/tests/test_quantiles.py`** (new): 101 members evenly spaced 0 to 100 give every stored
   level `q` the value `100 q` exactly; one member gives 11 equal columns; a null member value is
   dropped before the reduction; a group of all-null members yields no row.
 - **`ml_core/tests/test_metrics.py`**: CRPS of a row equals twice its mean pinball loss over the 11
-  levels; MAE uses q50, not the mean of the quantiles (a skewed row distinguishes the two); pinball
-  at 0.02 equals pinball at the linearly interpolated value between q01 and q05.
+  levels; MAE uses p50, not the mean of the quantiles (a skewed row distinguishes the two); the
+  metrics frame carries `pinball_loss` rows for `p25` and none for `p2`.
 - **`xgboost_forecaster/tests/test_forecaster.py`**, **`baseline_forecasters/tests/*`**: `predict`
-  returns one row per key, and climatology's q50 equals the cell's median.
+  returns one row per key, and climatology's p50 equals the cell's median.
 - **`delta_store/tests/test_power_forecasts.py`**: every quantile column is rounded to the stated
   significand bits on disk; the sort key is the new `PRIMARY_KEY`.
 - **`dashboard/tests/test_forecast_chart.py`**: the power chart has band layers and no
   `ensemble_member` detail channel; the NWP chart still has one line per member.
-- **`tests/test_live_forecasts.py`**, **`tests/test_checks.py`**: the live check warns on a thinned
-  ENS run with forecast rows that carry no member column.
-- **The conversion script**: converting a two-partition table twice leaves one copy of each
-  partition.
+- **`tests/test_live_forecasts.py`**: `live_forecasts` reports a thinned ENS run, counted from the
+  loaded `Nwp` frame, with forecast rows that carry no member column.
 
 ## Docs to update
 
-`docs/roadmap/delivery-tables.md` (Table 1: the internal table holds the 11 stored quantiles;
-Representation 1 no longer describes it), `docs/techniques/evaluation-metrics.md` (CRPS from
-quantiles, deterministic metrics on the median, interpolated delivery levels, the spread-skill
-ratio's Gaussian-equivalent spread), `docs/techniques/probabilistic-forecasting.md` (the closing
-section), `docs/roadmap/metrics-and-leaderboard.md`, `docs/architecture/ml-orchestration.md`,
-`docs/cross-validation/dagster-workflow.md`, and `docs/live_service/operations.md` where they
-describe members on forecast rows. Each describes the code as it now is.
+Only the pages that `git grep -n "ensemble_member\|power_fcst\b"` finds describing members on
+forecast rows, the `PowerForecast` contract, or the metric formulas; a hit about the members of an
+NWP run stays. The expected pages are `docs/roadmap/delivery-tables.md` (Table 1),
+`docs/techniques/evaluation-metrics.md` (CRPS from quantiles, deterministic metrics on the median,
+the stored levels, the spread-skill ratio's Gaussian-equivalent spread), and the
+`n_ensemble_members` tag sentence in `docs/cross-validation/dagster-workflow.md`. Each describes the
+code as it now is.
 
 ## Verification commands
 
 The `implement-issue` green-before-push set (`uv run ruff check .`, `uv run ruff format --check .`,
-`uv run ty check`, `uv run pytest`, the markdown lint), plus `uv run mkdocs build --strict`, and the
-conversion script run on a copy of one CV partition with the row count and a spot value compared by
-hand.
+`uv run ty check`, `uv run pytest`, the markdown lint), plus `uv run mkdocs build --strict`.
 
 ## Risks and open questions
 
 1. **11 or 13 levels?** `DELIVERY_QUANTILES` holds the 13 levels agreed with NGED, and the research
-   networks can only fill the 11 they store. Recommendation: store 11 now, interpolate the 6 others
-   in the metrics, and leave the delivered table's level set to the later delivery PR and to NGED's
-   answer.
-2. **Column naming.** `power_fcst_q01` … `power_fcst_q99` (recommended: the existing column name
-   plus the level, sortable, and the same `qXX` form as the research bundles), against `p1` … `p99`
-   as `delivery-tables.md` writes the delivered table.
-3. **Convert or re-run the stored history?** Recommendation: convert, because the reduction is
-   deterministic and the conversion is far cheaper than re-running every CV fold. The metric values
-   of converted runs change, because CRPS is now computed from 11 quantiles rather than from the
-   members' fair CRPS, so the leaderboard needs one rescore after the conversion.
+   networks can only fill the 11 they store. Recommendation: store and score the 11 now, and leave
+   the delivered table's level set to the later delivery PR and to NGED's answer.
+2. **Column naming.** `power_fcst_p1` … `power_fcst_p99`, from the existing `quantile_label` and
+   matching the `p1` … `p99` names of `delivery-tables.md`, against `power_fcst_q01` …
+   `power_fcst_q99`, the `qXX` form of the research bundles. Recommendation: the `p` form.
+3. **History.** The old table stays read-only, and no conversion runs. A comparison with an old CV
+   run means re-running that fold. Recommendation: accept that, because converted rows would score
+   differently anyway.
 4. **PR #1707 ordering.** PR #1707 plans to store the step-5 network's quantiles as 51 members. If
    this change merges first, that plan writes the 11 research quantiles straight into the new
    columns and drops its 51-level bisection. Recommendation: merge this change first, or have
    PR #1707 write its quantiles through `members_to_quantiles` until it does.
-5. **Spread-skill ratio.** The Gaussian-equivalent spread from q10 and q90 keeps the metric's name
-   and meaning for a near-Gaussian forecast. The alternative is to retire the metric, which changes
-   the `Metrics` contract. Recommendation: keep it, with the definition stated in
-   `evaluation-metrics.md`.
+5. **Spread-skill ratio.** Kept, with the Gaussian-equivalent spread `(p90 − p10) / 2.5632` stated
+   in `evaluation-metrics.md`.
 6. **Research studies.** `nged-ml-research` pins `contracts`. Its studies submit `PowerForecast`
    files through `score_study.py`, so they move to the new layout when that repository bumps its
    pin, in a pull request of its own.
+
+## Simplicity review: triage
+
+- **Cut the conversion script and its test:** accepted. Checked delta-rs `schema_mode="overwrite"`
+  as the alternative to a new path, and rejected it, because a schema overwrite replaces every
+  partition and would lose the old results.
+- **Score only at the 11 stored levels:** accepted, with one change. `Metrics.metric_param` is a
+  `pl.Enum` of the delivery labels and `metric_value` is not nullable, so null rows for the 6
+  unstored levels are not possible; the Enum becomes the union of the delivery and stored labels.
+- **Reuse `quantile_label` and drop `_quantile_column`:** accepted. Columns become
+  `power_fcst_p1` … `power_fcst_p99`.
+- **No bespoke rejection message in `score_study.py`:** accepted.
+- **`n_ensemble_members`:** accepted. No code reads the CV metadata or tag, so both go. The live
+  member count comes from the `Nwp` frame `live_forecasts` already loads, with no second read.
+- **Minimal `export_baseline_forecasts.py`, docs from grep hits:** accepted.
+- **Smaller points:** accepted (climatology computes the stored levels directly; one plain function
+  with two callers; one monotone test; spread-skill kept with `(p90 − p10) / 2.5632`; NaN as a
+  one-line test; long layout recorded as considered and not recommended).
