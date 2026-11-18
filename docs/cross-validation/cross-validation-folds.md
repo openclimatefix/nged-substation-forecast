@@ -32,9 +32,10 @@ folds).
 ## Current state: a single fold ✅
 
 Honest forecast-skill validation needs **real forecast NWP (ECMWF ENS) for both training and
-validation**. Our ECMWF ENS archive only reaches back to **2024-04-01** (Dynamical.org are
-back-filling earlier years, but slowly), so the entire usable window is ~2024-04 to mid-2026 — only
-enough for roughly **one** seasonally-complete fold. We therefore run a single fold:
+validation**. The ECMWF ENS archive we have ingested only reaches back to **2024-04-01**
+(Dynamical.org's archive reaches back to 2020-10-15, and the earlier years are not ingested yet),
+so the entire usable window is ~2024-04 to mid-2026 — only enough for roughly **one**
+seasonally-complete fold. We therefore run a single fold:
 
 | `fold_id` | Train | Validate | Weather source |
 |---|---|---|---|

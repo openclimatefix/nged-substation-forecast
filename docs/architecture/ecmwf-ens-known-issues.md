@@ -49,8 +49,11 @@ point *is* the cell and one null is still fatal; the V1 grid has 10 such cells o
 `categorical_precipitation_type_surface` reaches the same rule by a different route, since a
 category cannot be averaged: its cell takes whichever category covers the most of the cell's area,
 and points that supplied no category are excluded from that ranking rather than competing in it. So
-it too is null only when *no* point supplied a value, and a null there is fatal for any `init_time`
-after 2024-11-12.
+it too is null only when *no* point supplied a value. A null there is fatal for any `init_time`
+after 2024-11-12, and a column that is null in every cell of a run is fatal for any `init_time`
+before 2024-04-01. [Two variables are NaN-filled upstream for part of the
+archive](#variables-that-upstream-fills-with-nan-for-part-of-the-archive), and null is expected for
+them in that part.
 
 ## Spatial aggregation is where a grid point's null is resolved
 
@@ -280,7 +283,9 @@ three mean "the upstream run is not ready yet", and the asset detects each at a 
   empty slices. Scattered NaN grid points do not trigger the check. Neither does a NaN in a
   de-accumulated variable or in `categorical_precipitation_type_surface`, because both can
   legitimately be empty: a de-accumulated variable at lead-0, and the categorical variable in runs
-  before 2024-11-13.
+  from 2024-04-01 to 2024-11-12. `total_cloud_cover_atmosphere` is checked like the other
+  instantaneous variables, except for a run from 2024-04-01 to 2025-11-20, which upstream fills
+  with NaN.
 - **A de-accumulated variable is wholly empty.** `Nwp.validate` raises `NwpVariableWhollyMissing`
   after the conversion.
 
@@ -308,7 +313,9 @@ null across every member and step. An unwritten instantaneous variable shows up 
 which `raise_if_instantaneous_slices_empty` catches. An unwritten de-accumulated variable shows up
 as a wholly-empty column, which `Nwp.validate` rejects with `NwpVariableWhollyMissing`. The
 `categorical_precipitation_type_surface` column is nullable, but `Nwp.validate` rejects an all-null
-column in any run after 2024-11-12, and that rejection fails the partition at once, with no retry. A
+column in any run outside 2024-04-01 to 2024-11-12, and that rejection fails the partition at once,
+with no retry. `total_cloud_cover_atmosphere` is retried by the empty-slice check outside its empty
+window, but a wholly-null column that reaches `Nwp.validate` there also fails at once. A
 *defective* run also gets republished — the 2026-08-09 00Z run was repaired by a second sweep at
 11:45 UTC, 3 hours 25 minutes after its first publication, and well inside the retry budget.
 
@@ -444,8 +451,41 @@ The observed `n_ensemble_members`, `n_valid_times`, `n_h3_cells`, `valid_time_mi
 ones, so slow drift in the upstream dataset is visible in the Dagster UI's timeline before it ever
 becomes a warning.
 
-## `categorical_precipitation_type_surface` before 2024-11-13 (historical)
+## Variables that upstream fills with NaN for part of the archive
 
-This variable is all-null for init times on and before 2024-11-12 and populated from the 2024-11-13
-00Z run onwards. `Nwp.validate` enforces that split as a hard invariant — it is a fixed historical
-fact about the dataset, not a quality quirk, so a violation is always fatal.
+**Dynamical.org fills two variables with NaN for the runs initialised from 2024-04-01, and
+`Nwp.validate` enforces where each variable must be null.** The archive reaches back to 2020-10-15.
+Runs before 2024-04-01 come from ECMWF's MARS archive, and runs from 2024-04-01 come from ECMWF's
+open data, which lacked the two variables for a while. The windows are a fixed fact about the
+dataset, not a quality quirk, so a violation is always fatal. The windows live in one place,
+`contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS`.
+
+| variable | populated | all-null | populated again |
+|---|---|---|---|
+| `categorical_precipitation_type_surface` | before 2024-04-01 | 2024-04-01 to 2024-11-12 | from 2024-11-13 |
+| `total_cloud_cover_atmosphere` | before 2024-04-01 | 2024-04-01 to 2025-11-20 | from 2025-11-21 |
+
+**Inside its window a variable must be all null, and outside it a variable must not be wholly
+null.** A run in which the variable is null in every cell is fatal outside the window, because the
+upstream archive holds values there. `categorical_precipitation_type_surface` is also fatal when
+any cell is null from 2024-11-13 onwards. Before 2024-04-01 only a wholly-null run is fatal for
+both variables, because nobody has inspected the MARS-era values cell by cell.
+
+**`total_cloud_cover_atmosphere` is a percentage from 0 to 100, and `Nwp.validate` rejects a value
+outside that range.** The STAC collection for the dataset gives the unit as percent. The H3
+aggregation treats the variable as numeric, so a cell holds the area-weighted mean of its grid
+points, and `delta_store.nwp.write_nwp` rounds it to 13 significand bits like every other
+continuous variable.
+
+**Outside its empty window, `total_cloud_cover_atmosphere` counts as an instantaneous variable.**
+`raise_if_instantaneous_slices_empty` retries a run with a slice that is NaN at every grid point,
+and `nwp_instantaneous_variables_have_no_nulls` counts the variable's null grid points. Inside the
+window neither check looks at the variable, because every grid point is NaN there by design.
+
+**Partitions written before the variable existed lack the column, and the table adds it on the next
+write.** `delta_store.nwp.write_nwp` accepts a table that lacks `total_cloud_cover_atmosphere`, adds
+the column to the table schema, and leaves the earlier partitions' files untouched. Every reader
+sees the column as null in those partitions. Filling the column for the partitions from 2024-04-01
+to 2025-11-20 would be pointless, because upstream holds no values for them. The partitions from
+2025-11-21 onwards that were written before the column existed are the ones a later add-column
+back-fill would target.

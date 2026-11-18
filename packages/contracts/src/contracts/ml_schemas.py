@@ -113,6 +113,7 @@ class AllFeatures(pt.Model):
     downward_short_wave_radiation_flux_surface: float | None = _FEATURE_DTYPE
     precipitation_surface: float | None = _FEATURE_DTYPE
     categorical_precipitation_type_surface: int | None = _FEATURE_DTYPE
+    total_cloud_cover_atmosphere: float | None = _FEATURE_DTYPE
 
     # Derived weather features
     windchill: float | None = _FEATURE_DTYPE

@@ -212,6 +212,62 @@ def test_empty_slice_of_an_instantaneous_variable_raises(
         download.raise_if_instantaneous_slices_empty(ds)
 
 
+@pytest.mark.parametrize(
+    "init_time", [datetime(2024, 3, 31, tzinfo=UTC), datetime(2025, 11, 21, tzinfo=UTC)]
+)
+def test_empty_slice_of_total_cloud_raises_outside_its_empty_window(
+    make_ens_dataset: Callable[..., xr.Dataset], init_time: datetime
+) -> None:
+    values = _nan_where(lead_idx=1, member_idx=0, lat_idx=slice(None), lon_idx=slice(None))
+    ds = make_ens_dataset(init_time=init_time, var_values={"total_cloud_cover_atmosphere": values})
+
+    with pytest.raises(download.NwpRunNotYetAvailable, match="total_cloud_cover_atmosphere': 1"):
+        download.raise_if_instantaneous_slices_empty(ds)
+
+
+@pytest.mark.parametrize(
+    "init_time", [datetime(2024, 4, 1, tzinfo=UTC), datetime(2025, 11, 20, tzinfo=UTC)]
+)
+def test_wholly_empty_total_cloud_does_not_raise_inside_its_empty_window(
+    make_ens_dataset: Callable[..., xr.Dataset], init_time: datetime
+) -> None:
+    ds = make_ens_dataset(
+        init_time=init_time, var_values={"total_cloud_cover_atmosphere": float("nan")}
+    )
+
+    download.raise_if_instantaneous_slices_empty(ds)
+
+
+def test_empty_slice_of_another_instantaneous_variable_raises_inside_the_empty_window(
+    make_ens_dataset: Callable[..., xr.Dataset],
+) -> None:
+    values = _nan_where(lead_idx=1, member_idx=0, lat_idx=slice(None), lon_idx=slice(None))
+    ds = make_ens_dataset(
+        init_time=datetime(2024, 6, 1, tzinfo=UTC),
+        var_values={"temperature_2m": values, "total_cloud_cover_atmosphere": float("nan")},
+    )
+
+    with pytest.raises(download.NwpRunNotYetAvailable) as exc_info:
+        download.raise_if_instantaneous_slices_empty(ds)
+    assert "total_cloud_cover_atmosphere" not in str(exc_info.value)
+
+
+def test_instantaneous_vars_to_check_adds_total_cloud_only_outside_its_empty_window(
+    make_ens_dataset: Callable[..., xr.Dataset],
+) -> None:
+    assert "total_cloud_cover_atmosphere" not in download.ECMWF_ENS_INSTANTANEOUS_VARS
+    for init_time, checked in [
+        (datetime(2024, 3, 31, tzinfo=UTC), True),
+        (datetime(2024, 4, 1, tzinfo=UTC), False),
+        (datetime(2025, 11, 20, tzinfo=UTC), False),
+        (datetime(2025, 11, 21, tzinfo=UTC), True),
+    ]:
+        names = download.instantaneous_vars_to_check(make_ens_dataset(init_time=init_time))
+        assert ("total_cloud_cover_atmosphere" in names) is checked, init_time
+        assert names >= download.ECMWF_ENS_INSTANTANEOUS_VARS
+        assert "categorical_precipitation_type_surface" not in names
+
+
 def test_slice_with_one_valid_grid_point_does_not_raise(
     make_ens_dataset: Callable[..., xr.Dataset],
 ) -> None:
@@ -233,7 +289,7 @@ def test_empty_slice_of_a_variable_that_may_be_empty_does_not_raise(
     """A legitimately empty slice of a variable outside the instantaneous set does not raise.
 
     De-accumulated variables are empty at lead-0, and `categorical_precipitation_type_surface` is
-    empty in runs before 2024-11-13.
+    empty in runs from 2024-04-01 to 2024-11-12.
     """
     values = _nan_where(lead_idx=0, member_idx=0, lat_idx=slice(None), lon_idx=slice(None))
     ds = make_ens_dataset(var_values={variable: values})

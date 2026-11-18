@@ -28,8 +28,10 @@ forecasts onto the H3 cells attached to each substation.
 
 ## Step 3 — Materialise `ecmwf_ens`
 
-**Trigger:** Materialise the daily partitions from `2024-04-01` up to today (or up to the end of
-your training window). Use "Materialise all" or select a date range in the Dagster UI.
+**Trigger:** Materialise the daily partitions from `2020-10-15`, the first run in Dynamical.org's
+archive, up to today (or up to the end of your training window). The `mid_2025_to_mid_2026` fold
+needs only the partitions from `2024-04-01`. Select a date range in the Dagster UI rather than
+"Materialise all", because every partition is billions of rows' worth of download.
 
 Downloads the 00Z ECMWF ENS run for each partition date, converts it to a Polars DataFrame, and
 writes it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit

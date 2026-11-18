@@ -3,10 +3,16 @@ from datetime import UTC, datetime, timedelta
 import patito as pt
 import polars as pl
 import pytest
-from contracts.weather_schemas import Nwp, NwpVariableWhollyMissing, assess_nwp_quality
+from contracts.weather_schemas import (
+    Nwp,
+    NwpVariableWhollyMissing,
+    assess_nwp_quality,
+    variables_known_empty_at,
+)
 
-# A run initialised after 2024-11-12, when categorical_precipitation_type_surface became non-null.
-_INIT_TIME = datetime(2024, 12, 1, tzinfo=UTC)
+# A run initialised after every window in NWP_VARIABLE_EMPTY_WINDOWS, so that
+# categorical_precipitation_type_surface and total_cloud_cover_atmosphere are both populated.
+_INIT_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 _BEYOND_LEAD0 = _INIT_TIME + timedelta(hours=3)
 _LATER_BEYOND_LEAD0 = _INIT_TIME + timedelta(hours=6)
 
@@ -47,6 +53,7 @@ def _nwp_slice(
         "ensemble_member": [member] * n,
         "h3_index": list(h3_indices),
         "categorical_precipitation_type_surface": [1] * n,
+        "total_cloud_cover_atmosphere": [50.0] * n,
         "temperature_2m": [10.0] * n,
         "dew_point_temperature_2m": [5.0] * n,
         "wind_v_10m": [5.0] * n,
@@ -323,53 +330,150 @@ def test_continuous_weather_vars_are_stored_as_float32() -> None:
         assert validated[var].dtype == pl.Float32, var
 
 
-def test_categorical_precipitation_type_surface_validation() -> None:
-    # Test case 1: Valid data (all null before 2024-11-12, not null after)
-    df_valid = pl.DataFrame(
-        {
-            "nwp_model_id": ["ECMWF_ENS_0_25_degree", "ECMWF_ENS_0_25_degree"],
-            "init_time": [
-                datetime(2024, 11, 12, tzinfo=UTC),
-                datetime(2024, 11, 13, tzinfo=UTC),
-            ],
-            "valid_time": [
-                datetime(2024, 11, 12, 0, tzinfo=UTC),
-                datetime(2024, 11, 13, 1, tzinfo=UTC),
-            ],
-            "ensemble_member": [1, 1],
-            "h3_index": [1, 1],
-            "categorical_precipitation_type_surface": [None, 1],
-            "temperature_2m": [10.0, 10.0],
-            "dew_point_temperature_2m": [5.0, 5.0],
-            "wind_v_10m": [5.0, 5.0],
-            "wind_u_10m": [0.0, 0.0],
-            "wind_v_100m": [5.0, 5.0],
-            "wind_u_100m": [0.0, 0.0],
-            "pressure_surface": [1000.0, 1000.0],
-            "pressure_reduced_to_mean_sea_level": [1000.0, 1000.0],
-            "geopotential_height_500hpa": [5000.0, 5000.0],
-            "downward_long_wave_radiation_flux_surface": [None, 100.0],
-            "downward_short_wave_radiation_flux_surface": [None, 100.0],
-            "precipitation_surface": [None, 0.01],
-        }
+def _run_at(
+    init_time: datetime, *, ptype: int | None, cloud: float | None, cells: int = 2
+) -> pl.DataFrame:
+    """One run, beyond lead-0, with the two windowed variables set to the given value."""
+    return _nwp_slice(
+        init_time=init_time,
+        valid_time=init_time + timedelta(hours=3),
+        h3_indices=tuple(range(cells)),
+        overrides={
+            "categorical_precipitation_type_surface": [ptype] * cells,
+            "total_cloud_cover_atmosphere": [cloud] * cells,
+        },
     )
 
-    # This should pass
-    Nwp.validate(pt.DataFrame(df_valid).set_model(Nwp).cast())
 
-    # Test case 2: Invalid data (not null before 2024-11-12)
-    df_invalid_before = df_valid.with_columns(
-        pl.Series("categorical_precipitation_type_surface", [1, 1])
-    )
-    with pytest.raises(ValueError, match="must be all null for init_time <= 2024-11-12"):
-        Nwp.validate(pt.DataFrame(df_invalid_before).set_model(Nwp).cast())
+_BEFORE_WINDOWS = datetime(2024, 3, 31, tzinfo=UTC)
+_FIRST_DAY_IN_WINDOWS = datetime(2024, 4, 1, tzinfo=UTC)
+_LAST_PTYPE_EMPTY_DAY = datetime(2024, 11, 12, tzinfo=UTC)
+_FIRST_PTYPE_POPULATED_DAY = datetime(2024, 11, 13, tzinfo=UTC)
+_LAST_CLOUD_EMPTY_DAY = datetime(2025, 11, 20, tzinfo=UTC)
+_FIRST_CLOUD_POPULATED_DAY = datetime(2025, 11, 21, tzinfo=UTC)
 
-    # Test case 3: Invalid data (null after 2024-11-12)
-    df_invalid_after = df_valid.with_columns(
-        pl.Series("categorical_precipitation_type_surface", [None, None])
+
+def test_windowed_variables_are_valid_in_every_era_of_the_archive() -> None:
+    """Each run is valid when its two variables are populated or empty as upstream has them."""
+    runs = _nwp_run(
+        _run_at(datetime(2020, 10, 15, tzinfo=UTC), ptype=1, cloud=50.0),
+        _run_at(_BEFORE_WINDOWS, ptype=1, cloud=50.0),
+        _run_at(_FIRST_DAY_IN_WINDOWS, ptype=None, cloud=None),
+        _run_at(_LAST_PTYPE_EMPTY_DAY, ptype=None, cloud=None),
+        _run_at(_FIRST_PTYPE_POPULATED_DAY, ptype=1, cloud=None),
+        _run_at(_LAST_CLOUD_EMPTY_DAY, ptype=1, cloud=None),
+        _run_at(_FIRST_CLOUD_POPULATED_DAY, ptype=1, cloud=50.0),
     )
-    with pytest.raises(ValueError, match="must not be null for init_time > 2024-11-12"):
-        Nwp.validate(pt.DataFrame(df_invalid_after).set_model(Nwp).cast())
+
+    _validate(runs)  # does not raise
+
+
+@pytest.mark.parametrize(
+    "init_time", [_FIRST_DAY_IN_WINDOWS, _LAST_PTYPE_EMPTY_DAY], ids=["first day", "last day"]
+)
+def test_ptype_must_be_all_null_in_its_empty_window(init_time: datetime) -> None:
+    with pytest.raises(
+        ValueError,
+        match="categorical_precipitation_type_surface must be all null for init_time from "
+        "2024-04-01 to 2024-11-12",
+    ):
+        _validate(_run_at(init_time, ptype=1, cloud=None))
+
+
+@pytest.mark.parametrize(
+    "init_time", [_FIRST_DAY_IN_WINDOWS, _LAST_CLOUD_EMPTY_DAY], ids=["first day", "last day"]
+)
+def test_total_cloud_must_be_all_null_in_its_empty_window(init_time: datetime) -> None:
+    with pytest.raises(
+        ValueError,
+        match="total_cloud_cover_atmosphere must be all null for init_time from "
+        "2024-04-01 to 2025-11-20",
+    ):
+        _validate(
+            _run_at(
+                init_time, ptype=None if init_time < _FIRST_PTYPE_POPULATED_DAY else 1, cloud=50.0
+            )
+        )
+
+
+def test_ptype_wholly_null_before_its_window_is_fatal() -> None:
+    with pytest.raises(ValueError, match="must not be wholly null for init_time outside"):
+        _validate(_run_at(_BEFORE_WINDOWS, ptype=None, cloud=50.0))
+
+
+def test_ptype_scattered_null_before_its_window_is_tolerated() -> None:
+    """Before the window, only a wholly-null run is rejected: MARS-era cells are unchecked."""
+    run = _nwp_slice(
+        init_time=_BEFORE_WINDOWS,
+        valid_time=_BEFORE_WINDOWS + timedelta(hours=3),
+        overrides={"categorical_precipitation_type_surface": [1, None, 1]},
+    )
+
+    _validate(run)  # does not raise
+
+
+def test_ptype_with_any_null_after_its_window_is_fatal() -> None:
+    run = _nwp_slice(
+        init_time=_FIRST_PTYPE_POPULATED_DAY,
+        valid_time=_FIRST_PTYPE_POPULATED_DAY + timedelta(hours=3),
+        overrides={
+            "categorical_precipitation_type_surface": [1, None, 1],
+            "total_cloud_cover_atmosphere": [None] * 3,
+        },
+    )
+    with pytest.raises(ValueError, match="must not be null for init_time after 2024-11-12"):
+        _validate(run)
+
+
+@pytest.mark.parametrize("init_time", [_BEFORE_WINDOWS, _FIRST_CLOUD_POPULATED_DAY])
+def test_total_cloud_wholly_null_outside_its_window_is_fatal(init_time: datetime) -> None:
+    with pytest.raises(
+        ValueError,
+        match="total_cloud_cover_atmosphere must not be wholly null for init_time outside",
+    ):
+        _validate(_run_at(init_time, ptype=1, cloud=None))
+
+
+def test_total_cloud_scattered_null_outside_its_window_is_tolerated() -> None:
+    run = _nwp_slice(
+        init_time=_FIRST_CLOUD_POPULATED_DAY,
+        valid_time=_FIRST_CLOUD_POPULATED_DAY + timedelta(hours=3),
+        overrides={"total_cloud_cover_atmosphere": [50.0, None, 50.0]},
+    )
+
+    _validate(run)  # does not raise
+
+
+def test_a_wholly_null_run_is_found_even_beside_a_populated_run() -> None:
+    """The wholly-null judgement is per `init_time`, so a healthy run cannot mask a missing one."""
+    runs = _nwp_run(
+        _run_at(_BEFORE_WINDOWS, ptype=1, cloud=50.0),
+        _run_at(_BEFORE_WINDOWS - timedelta(days=1), ptype=1, cloud=None),
+    )
+    with pytest.raises(ValueError, match="2024-03-30"):
+        _validate(runs)
+
+
+@pytest.mark.parametrize("bad_value", [-1.0, 100.5])
+def test_out_of_range_total_cloud_is_fatal(bad_value: float) -> None:
+    df = _nwp_slice(overrides={"total_cloud_cover_atmosphere": [bad_value] * 3})
+    with pytest.raises(pt.exceptions.DataFrameValidationError):
+        _validate(df)
+
+
+@pytest.mark.parametrize("value", [0.0, 100.0])
+def test_total_cloud_bounds_are_inclusive(value: float) -> None:
+    _validate(_nwp_slice(overrides={"total_cloud_cover_atmosphere": [value] * 3}))
+
+
+def test_variables_known_empty_at_reads_the_windows() -> None:
+    assert variables_known_empty_at(_BEFORE_WINDOWS) == frozenset()
+    assert variables_known_empty_at(_FIRST_DAY_IN_WINDOWS) == {
+        "categorical_precipitation_type_surface",
+        "total_cloud_cover_atmosphere",
+    }
+    assert variables_known_empty_at(_FIRST_PTYPE_POPULATED_DAY) == {"total_cloud_cover_atmosphere"}
+    assert variables_known_empty_at(_FIRST_CLOUD_POPULATED_DAY) == frozenset()
 
 
 @pytest.mark.parametrize(

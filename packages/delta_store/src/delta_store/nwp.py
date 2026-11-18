@@ -161,9 +161,12 @@ def write_nwp(
     percent-encoded Hive directory name. Two materialisations of the *same* partition at once
     contend and the loser raises ``CommitFailedError``; disjoint partitions do not.
 
-    Existing tables must have exactly the incoming column set. A mismatch raises before writing,
-    naming the table and differing columns, so a component-wind run cannot silently change a
-    polar archive's schema. Breaking column changes require a separate rebuilt table.
+    Existing tables must have exactly the incoming column set, except that a table may lack the
+    columns in `Nwp.columns_absent_from_older_partitions`. The write then adds the column to the
+    table schema, leaves every other partition's files untouched, and those partitions read the
+    column as null. Any other mismatch raises before writing, naming the table and differing
+    columns, so a component-wind run cannot silently change a polar archive's schema. Breaking
+    column changes require a separate rebuilt table.
     ``schema_mode="overwrite"`` permits dtype widening within that column set. A widening changes
     the logical Delta schema while leaving other partitions' physical bytes readable at the
     widened dtype.
@@ -202,7 +205,11 @@ def write_nwp(
     else:
         stored_columns = {field.name for field in existing.schema().fields}
         incoming_columns = set(nwp.columns)
-        if stored_columns != incoming_columns:
+        # A stored table may lack a column added after the table was first written.
+        expected_stored_columns = incoming_columns - (
+            Nwp.columns_absent_from_older_partitions - stored_columns
+        )
+        if stored_columns != expected_stored_columns:
             raise ValueError(
                 f"NWP table {table_uri} has an incompatible column set: "
                 f"missing {sorted(incoming_columns - stored_columns)}, "

@@ -49,6 +49,7 @@ WeatherFeature = Literal[
     "downward_short_wave_radiation_flux_surface",
     "precipitation_surface",
     "categorical_precipitation_type_surface",
+    "total_cloud_cover_atmosphere",
 ]
 
 
@@ -56,6 +57,73 @@ class NwpModelId(StrEnum):
     """The NWP models we ingest, used as the `nwp_model_id` column's vocabulary."""
 
     ECMWF_ENS_0_25_degree = auto()
+
+
+@dataclass(frozen=True)
+class NwpEmptyWindow:
+    """The `init_time` range in which the upstream archive holds no values for one variable.
+
+    Dynamical.org, who we download ECMWF ENS from, fills the variable with NaN for every run
+    initialised in the half-open range `[first_empty_init_time, first_populated_init_time)`.
+    `Nwp.validate` requires the variable to be all null inside the range, and never wholly null in
+    a run outside it.
+    """
+
+    first_empty_init_time: datetime
+    """The earliest `init_time` whose run is NaN-filled upstream."""
+
+    first_populated_init_time: datetime
+    """The earliest `init_time` after the range whose run is populated upstream again."""
+
+    never_null_once_populated: bool
+    """Whether `Nwp.validate` rejects a null in any run from `first_populated_init_time` onwards,
+    where `False` rejects only a run that is wholly null."""
+
+    @property
+    def last_empty_day(self) -> str:
+        """The last NaN-filled day, as `YYYY-MM-DD`, for error messages and documentation."""
+        return (self.first_populated_init_time - timedelta(days=1)).date().isoformat()
+
+
+NWP_VARIABLE_EMPTY_WINDOWS: Final[dict[str, NwpEmptyWindow]] = {
+    "categorical_precipitation_type_surface": NwpEmptyWindow(
+        first_empty_init_time=datetime(2024, 4, 1, tzinfo=UTC),
+        first_populated_init_time=datetime(2024, 11, 13, tzinfo=UTC),
+        never_null_once_populated=True,
+    ),
+    "total_cloud_cover_atmosphere": NwpEmptyWindow(
+        first_empty_init_time=datetime(2024, 4, 1, tzinfo=UTC),
+        first_populated_init_time=datetime(2025, 11, 21, tzinfo=UTC),
+        never_null_once_populated=False,
+    ),
+}
+"""The `init_time` range in which each variable is NaN-filled upstream, keyed by `Nwp` field name.
+
+Dynamical.org's catalogue page states both ranges: the dataset "is filled with NaNs" for
+`categorical_precipitation_type_surface` from 2024-04-01 through 2024-11-12, and for
+`total_cloud_cover_atmosphere` from 2024-04-01 through 2025-11-20. Runs before 2024-04-01 come from
+ECMWF's MARS archive and carry both variables. Runs from 2024-04-01 come from ECMWF's open data,
+which lacked each variable until the end of its range. This dictionary is the only place the dates
+are written down. `Nwp.validate`, the `dynamical_data` upstream-null checks, and the test fixtures
+all read them from here.
+"""
+
+
+def variables_known_empty_at(init_time: datetime) -> frozenset[str]:
+    """The `Nwp` variables whose run initialised at `init_time` is NaN-filled upstream.
+
+    Args:
+        init_time: The run's initialisation time, timezone aware.
+
+    Returns:
+        The names of the variables in `NWP_VARIABLE_EMPTY_WINDOWS` whose range contains
+        `init_time`.
+    """
+    return frozenset(
+        variable
+        for variable, window in NWP_VARIABLE_EMPTY_WINDOWS.items()
+        if window.first_empty_init_time <= init_time < window.first_populated_init_time
+    )
 
 
 ECMWF_ENS_ENSEMBLE_MEMBERS: Final[frozenset[int]] = frozenset(range(51))
@@ -110,10 +178,10 @@ class NwpVariableWhollyMissing(ValueError):
     never reaches base validation, because
     `dynamical_data.ecmwf_ens.download.raise_if_instantaneous_slices_empty` finds the slice on the
     raw grid first and the `ecmwf_ens` asset retries the run. An all-null
-    `categorical_precipitation_type_surface` passes base validation, because that column is
-    nullable. The all-null column is rejected instead by
-    `_check_variables_that_were_introduced_after_start_of_dataset`, and only for an `init_time`
-    after 2024-11-12, because the column does not exist in the runs before then. See
+    `categorical_precipitation_type_surface` or `total_cloud_cover_atmosphere` passes base
+    validation, because both columns are nullable. `_check_variables_with_empty_windows` rejects
+    the wholly-null column instead, except for an `init_time` inside the variable's entry in
+    `NWP_VARIABLE_EMPTY_WINDOWS`, where upstream legitimately holds no values. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
@@ -330,8 +398,10 @@ class Nwp(pt.Model):
         ge=0,
         le=255,
         description=(
-            "This field is always null for init_times on and before 2024-11-12, and populated from"
-            " the 2024-11-13 00Z run onwards (confirmed by direct inspection of the source data)."
+            "This field is populated for init_times before 2024-04-01 (from ECMWF's MARS archive),"
+            " always null for init_times from 2024-04-01 to 2024-11-12 inclusive, and populated"
+            " from the 2024-11-13 00Z run onwards. The window of nulls is the one the upstream"
+            " catalogue documents, and `NWP_VARIABLE_EMPTY_WINDOWS` records it."
             " ECMWF's NaNs are converted to nulls at the ingest boundary, so the check tests for"
             " null rather than for NaN, and an Int16 column could not carry a NaN in any case."
             " Derived from ECMWF's `ptype` field. See https://codes.ecmwf.int/grib/param-db/260015"
@@ -341,6 +411,20 @@ class Nwp(pt.Model):
             " 14=Hail (greater than or equal to 5 mm);"
             " 15-191=Reserved; 192-254=Reserved for local use; 255=Missing"
         ),
+    )
+
+    total_cloud_cover_atmosphere: float | None = pt.Field(
+        dtype=pl.Float32,
+        description=(
+            "Total cloud cover over the whole atmospheric column, as the fraction of the sky"
+            " covered by cloud, from 0 for clear sky to 100 for overcast. Instantaneous. Unit:"
+            " percent. This field is populated for init_times before 2024-04-01, always null for"
+            " init_times from 2024-04-01 to 2025-11-20 inclusive, and populated from the 2025-11-21"
+            " 00Z run onwards, because Dynamical.org fills it with NaN in between."
+            " `NWP_VARIABLE_EMPTY_WINDOWS` records the window of nulls."
+        ),
+        ge=0,
+        le=100,
     )
 
     # ClassVars: excluded from Patito/Pydantic model fields so they're not treated as data columns.
@@ -373,6 +457,16 @@ class Nwp(pt.Model):
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated>.
     """
 
+    columns_absent_from_older_partitions: ClassVar[frozenset[str]] = frozenset(
+        {"total_cloud_cover_atmosphere"}
+    )
+    """Nullable columns that partitions written before the column existed do not carry.
+
+    The stored `nwp` Delta table keeps those partitions as they were. `delta_store.nwp.write_nwp`
+    accepts a table that lacks any of these columns and adds the column on the first write that
+    carries it, and `Nwp.scan_delta` reads the column as null where the table lacks it.
+    """
+
     # Columns that aren't NWP variables:
     _non_var_column_names: ClassVar[frozenset[str]] = frozenset(
         {"nwp_model_id", "init_time", "valid_time", "ensemble_member", "h3_index"}
@@ -401,9 +495,8 @@ class Nwp(pt.Model):
 
         Bounds `init_time`/`valid_time` to the plausible datetime range. Rejects a de-accumulated
         variable that is wholly missing, tolerating every smaller null pattern. Enforces
-        uniqueness. Enforces the introduction-date rule for
-        `categorical_precipitation_type_surface` — the column derived from ECMWF's `ptype` field,
-        whose own description states the rule and the date.
+        uniqueness. Enforces the empty-window rule for `categorical_precipitation_type_surface`
+        and `total_cloud_cover_atmosphere`, which `NWP_VARIABLE_EMPTY_WINDOWS` describes.
         """
         validated_df = super().validate(
             dataframe=dataframe,
@@ -417,7 +510,7 @@ class Nwp(pt.Model):
         check_datetime_bounds(validated_df, "init_time", "valid_time")
         cls._check_no_wholly_missing_deaccumulated_variable(validated_df)
         cls._check_unique(validated_df)
-        cls._check_variables_that_were_introduced_after_start_of_dataset(validated_df)
+        cls._check_variables_with_empty_windows(validated_df)
         return validated_df
 
     @classmethod
@@ -492,43 +585,54 @@ class Nwp(pt.Model):
             )
 
     @classmethod
-    def _check_variables_that_were_introduced_after_start_of_dataset(
-        cls, dataframe: pt.DataFrame[Self]
-    ) -> None:
-        """Check the introduction date of `categorical_precipitation_type_surface`.
+    def _check_variables_with_empty_windows(cls, dataframe: pt.DataFrame[Self]) -> None:
+        """Check each variable in `NWP_VARIABLE_EMPTY_WINDOWS` against its window.
 
-        The column is all-null when init_time <= 2024-11-12, and is never null afterwards.
+        Inside the window, upstream holds no values, so the variable must be all null. Outside
+        the window, a run in which the variable is wholly null is rejected, because the upstream
+        archive holds values there. A variable whose window sets `never_null_once_populated`
+        also rejects any null from the end of its window onwards.
 
-        Direct inspection of the source data confirms the dates. The 2024-11-13 00Z run — the run
-        initialised at 00:00 UTC that day — is the first run with `ptype` populated, 0% null
-        across all lead times. The 2024-11-12 run and every earlier run are 100% null.
+        Direct inspection of the source data confirmed the ptype dates. The 2024-11-13 00Z run is
+        the first run after 2024-04-01 with `ptype` populated, 0% null across all lead times, and
+        the 2024-11-12 run is 100% null. The runs before 2024-04-01 come from ECMWF's MARS archive,
+        which carries `ptype`.
+
+        Only a wholly-null run is rejected before the window, rather than any null, because the
+        MARS-era values have not been inspected cell by cell.
         """
-        threshold_date = datetime(2024, 11, 12, tzinfo=UTC)
-
-        # Split the frame at the threshold date, so each half can be checked against the opposite
-        # expectation: all-null before, never-null after.
-        partition_col = "is_before_or_on_threshold"
-        partitioned_df = dataframe.with_columns(
-            (pl.col("init_time") <= threshold_date).alias(partition_col)
-        )
-        partitions = partitioned_df.partition_by(partition_col, as_dict=True)
-
-        empty_df = pl.DataFrame(schema=dataframe.schema)
-        before_or_on = partitions.get((True,), empty_df)
-        after = partitions.get((False,), empty_df)
-
-        # Check before or on threshold
-        if not before_or_on["categorical_precipitation_type_surface"].is_null().all():
-            raise ValueError(
-                "categorical_precipitation_type_surface must be all null for "
-                "init_time <= 2024-11-12"
+        for variable, window in NWP_VARIABLE_EMPTY_WINDOWS.items():
+            in_window = (pl.col("init_time") >= window.first_empty_init_time) & (
+                pl.col("init_time") < window.first_populated_init_time
             )
+            if not dataframe.filter(in_window)[variable].is_null().all():
+                raise ValueError(
+                    f"{variable} must be all null for init_time from "
+                    f"{window.first_empty_init_time.date()} to {window.last_empty_day}"
+                )
 
-        # Check after threshold
-        if after["categorical_precipitation_type_surface"].is_null().any():
-            raise ValueError(
-                "categorical_precipitation_type_surface must not be null for init_time > 2024-11-12"
+            wholly_null_runs = (
+                dataframe.filter(~in_window)
+                .group_by("init_time")
+                .agg(is_wholly_null=pl.col(variable).is_null().all())
+                .filter("is_wholly_null")
+                .get_column("init_time")
+                .sort()
+                .to_list()
             )
+            if wholly_null_runs:
+                raise ValueError(
+                    f"{variable} must not be wholly null for init_time outside "
+                    f"{window.first_empty_init_time.date()} to {window.last_empty_day}. "
+                    f"Wholly null runs: {[str(init_time) for init_time in wholly_null_runs]}"
+                )
+
+            if window.never_null_once_populated:
+                after = dataframe.filter(pl.col("init_time") >= window.first_populated_init_time)
+                if after[variable].is_null().any():
+                    raise ValueError(
+                        f"{variable} must not be null for init_time after {window.last_empty_day}"
+                    )
 
     @classmethod
     def scan_delta(
@@ -552,20 +656,25 @@ class Nwp(pt.Model):
         Returns:
             A lazy frame over the ``nwp`` Delta table, set to the ``Nwp`` model and cast to its
             declared dtypes — one row per (NWP model, init time, ensemble member, valid time,
-            H3 cell), with the weather variables already in physical units.
+            H3 cell), with the weather variables already in physical units. A column in
+            `Nwp.columns_absent_from_older_partitions` that the table does not have yet is null in
+            every row.
         """
         settings = get_settings()
         if path is None:
             path = settings.nwp_data_path
         if storage_options is None:
             storage_options = settings.storage_options
-        return (
-            pt.LazyFrame.from_existing(
-                pl.scan_delta(path, storage_options=typeddict_to_dict(storage_options))
-            )
-            .set_model(cls)
-            .cast()
+        scan = pl.scan_delta(path, storage_options=typeddict_to_dict(storage_options))
+        stored_columns = scan.collect_schema().names()
+        # Where a column is in the table's schema but missing from an older partition's files,
+        # delta-rs and Polars already read it as null. Only a table with no partition that carries
+        # the column lacks it from the schema altogether.
+        scan = scan.with_columns(
+            pl.lit(None, dtype=cls.dtypes[column]).alias(column)
+            for column in sorted(cls.columns_absent_from_older_partitions - set(stored_columns))
         )
+        return pt.LazyFrame.from_existing(scan).set_model(cls).cast()
 
 
 def _deaccumulated_null_breakdown(dataframe: pl.DataFrame) -> pl.DataFrame:

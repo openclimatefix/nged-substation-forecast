@@ -33,6 +33,7 @@ _VAR_DEFAULTS: Final[dict[str, float]] = {
     "downward_short_wave_radiation_flux_surface": 200.0,
     "precipitation_surface": 0.0001,
     "categorical_precipitation_type_surface": 0.0,
+    "total_cloud_cover_atmosphere": 50.0,
 }
 
 # Guard against drift between this fixture and the real download list.
@@ -40,9 +41,10 @@ assert set(_VAR_DEFAULTS) == set(_ECMWF_ENS_VARS_TO_DOWNLOAD), (
     "conftest _VAR_DEFAULTS is out of sync with _ECMWF_ENS_VARS_TO_DOWNLOAD"
 )
 
-# After 2024-11-12, so a populated categorical_precipitation_type_surface passes Nwp validation
-# (that column must be all-null on/before 2024-11-12 and never-null afterwards).
-_DEFAULT_INIT_TIME: Final[datetime] = datetime(2025, 1, 1, tzinfo=UTC)
+# After both windows in `NWP_VARIABLE_EMPTY_WINDOWS` (the last ends with the 2025-11-20 run), so
+# that populated `categorical_precipitation_type_surface` and `total_cloud_cover_atmosphere`
+# columns pass Nwp validation.
+_DEFAULT_INIT_TIME: Final[datetime] = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 def _build_ens_dataset(
@@ -57,7 +59,7 @@ def _build_ens_dataset(
 ) -> xr.Dataset:
     """Build a synthetic ECMWF ENS dataset matching the structure the pipeline consumes.
 
-    The dataset always carries all 13 downloaded variables, a ``valid_time`` coordinate equal to
+    The dataset always carries all 14 downloaded variables, a ``valid_time`` coordinate equal to
     ``init_time + lead_time``, and (in real Dynamical orientation) descending latitudes.
 
     Args:
@@ -74,7 +76,7 @@ def _build_ens_dataset(
             coordinate (the post-``open`` shape ``convert`` consumes).
 
     Returns:
-        A dataset with all 13 downloaded ECMWF ENS variables on dims
+        A dataset with all 14 downloaded ECMWF ENS variables on dims
         ``(lead_time, ensemble_member, latitude, longitude)`` — plus a leading ``init_time``
         dimension when ``init_time_as_dim`` is True — and a ``valid_time`` coordinate equal
         to ``init_time`` plus each lead time.

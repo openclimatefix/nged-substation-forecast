@@ -23,7 +23,12 @@ import xarray as xr
 from contracts.geo_schemas import H3GridWeights
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from contracts.settings import Settings
-from contracts.weather_schemas import Nwp, NwpQualityReport, NwpVariableWhollyMissing
+from contracts.weather_schemas import (
+    Nwp,
+    NwpQualityReport,
+    NwpVariableWhollyMissing,
+    variables_known_empty_at,
+)
 from dagster import (
     AssetCheckEvaluation,
     AssetCheckResult,
@@ -136,30 +141,50 @@ _CONTINUOUS_NWP_VALUES: dict[str, float] = {
     "precipitation_surface": 0.00123,
 }
 
+_DEFAULT_INIT_TIME = datetime(year=2024, month=12, day=1, tzinfo=UTC)
+"""Inside the empty window of ``total_cloud_cover_atmosphere``, where upstream holds no values for
+it, and after the one of ``categorical_precipitation_type_surface``."""
+
+_INIT_TIME_AFTER_EMPTY_WINDOWS = datetime(year=2026, month=1, day=1, tzinfo=UTC)
+
 
 def _make_nwp(init_time: datetime, n: int = 4) -> pl.DataFrame:
-    """A tiny valid ``Nwp`` frame for one run — stands in for ``convert_…``'s output."""
+    """A tiny valid ``Nwp`` frame for one run — stands in for ``convert_…``'s output.
+
+    Each variable in ``NWP_VARIABLE_EMPTY_WINDOWS`` is null when ``init_time`` is inside its window,
+    as upstream has it, and populated otherwise.
+    """
+    empty_at_init_time = variables_known_empty_at(init_time)
     rows = {
         "nwp_model_id": ["ECMWF_ENS_0_25_degree"] * n,
         "init_time": [init_time] * n,
         "valid_time": [init_time + timedelta(hours=i + 1) for i in range(n)],
         "ensemble_member": list(range(n)),
         "h3_index": [100 + i for i in range(n)],
-        "categorical_precipitation_type_surface": [1] * n,
+        "categorical_precipitation_type_surface": [
+            None if "categorical_precipitation_type_surface" in empty_at_init_time else 1
+        ]
+        * n,
+        "total_cloud_cover_atmosphere": [
+            None if "total_cloud_cover_atmosphere" in empty_at_init_time else 50.0
+        ]
+        * n,
         **{var: [value] * n for var, value in _CONTINUOUS_NWP_VALUES.items()},
     }
     return Nwp.DataFrame(rows).cast().validate()
 
 
 def _make_downloaded_ds(
-    n_null_grid_points: int = 0, n_null_instantaneous_grid_points: int = 1
+    n_null_grid_points: int = 0,
+    n_null_instantaneous_grid_points: int = 1,
+    init_time: datetime = _DEFAULT_INIT_TIME,
 ) -> xr.Dataset:
     """A tiny stand-in for ``download_ecmwf_ens_data``'s output.
 
     A ``(lead_time, ensemble_member, latitude, longitude)`` grid whose first step is lead-0, so
     nulls placed beyond it are counted rather than filtered out as the by-design lead-0 ones.
 
-    Carries all thirteen downloaded variables, under their *download* names, because the two null
+    Carries all fourteen downloaded variables, under their *download* names, because the two null
     populations are counted over sets drawn from that list rather than from whatever ``ds``
     happens to hold — a fixture holding only the variables a test cares about would let a counter
     reading the wrong namespace pass. ``temperature_2m`` is the corrupt instantaneous one and
@@ -191,6 +216,8 @@ def _make_downloaded_ds(
             "ensemble_member": np.asarray([0]),
             "latitude": np.asarray([52.5], dtype=np.float32),
             "longitude": np.asarray([-1.0, -0.75, -0.5], dtype=np.float32),
+            # A scalar coordinate, as `open_ecmwf_ens_run` leaves it.
+            "init_time": np.datetime64(init_time.replace(tzinfo=None), "ns"),
         },
     )
 
@@ -971,8 +998,7 @@ def test_ecmwf_ens_materialises_and_writes_nwp(
     ``nwp_init_time`` (passed to ``open_ecmwf_ens_run``) and the converted frame is written to
     the NWP Delta table via ``write_nwp``."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
-    # After 2024-11-12, when categorical_precipitation_type_surface became a non-null Nwp variable.
-    init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
+    init_time = _DEFAULT_INIT_TIME
     captured: dict[str, datetime] = {}
 
     def _open(*, nwp_init_time: datetime, h3_grid: object) -> object:
@@ -1213,7 +1239,9 @@ def _stub_ecmwf_download(monkeypatch: pytest.MonkeyPatch, init_time: datetime) -
         value=lambda *, nwp_init_time, h3_grid: object(),  # noqa: PLW0108
     )
     monkeypatch.setattr(
-        target=assets, name="download_ecmwf_ens_data", value=lambda ds: _make_downloaded_ds()
+        target=assets,
+        name="download_ecmwf_ens_data",
+        value=lambda ds: _make_downloaded_ds(init_time=init_time),
     )
     monkeypatch.setattr(
         target=assets,
@@ -1900,3 +1928,65 @@ def test_make_table_returns_one_record_per_stage() -> None:
     )
     assert set(table_metadata) == {"nged_s3_paths"}
     assert len(table_metadata["nged_s3_paths"].value.records) == 2
+
+
+@pytest.mark.parametrize(
+    ("init_time", "partition_key", "expected_variable_count"),
+    [
+        (_DEFAULT_INIT_TIME, "2024-12-01", 9),
+        (_INIT_TIME_AFTER_EMPTY_WINDOWS, "2026-01-01", 10),
+    ],
+    ids=["inside the total-cloud window", "after the total-cloud window"],
+)
+def test_ecmwf_ens_counts_total_cloud_nulls_only_outside_its_empty_window(
+    env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    dagster_instance: DagsterInstance,
+    init_time: datetime,
+    partition_key: str,
+    expected_variable_count: int,
+) -> None:
+    """The instantaneous-variable check counts `total_cloud_cover_atmosphere` after its window.
+
+    Inside the window upstream holds no values, so counting the variable would fail the check on
+    every run there.
+    """
+    _write_h3_grid_weights(Settings().h3_grid_weights_path)
+    _stub_ecmwf_download(monkeypatch=monkeypatch, init_time=init_time)
+    ds = _make_downloaded_ds(n_null_instantaneous_grid_points=0, init_time=init_time)
+    ds["total_cloud_cover_atmosphere"][:, :, :, 0] = np.float32("nan")
+    ds["total_cloud_cover_atmosphere"][0, :, :, 1:] = 30.0
+    monkeypatch.setattr(target=assets, name="download_ecmwf_ens_data", value=lambda _: ds)
+
+    result = materialize([ecmwf_ens], partition_key=partition_key, instance=dagster_instance)
+
+    assert result.success
+    evaluation = _check_evaluations(result)["nwp_instantaneous_variables_have_no_nulls"]
+    # 2 steps x 3 grid points per variable; the total-cloud variable adds a null at one point of
+    # each step only when it is counted.
+    assert evaluation.metadata["n_total_nwp_grid_points"].value == expected_variable_count * 6
+    assert evaluation.passed is (expected_variable_count == 9)
+    assert evaluation.metadata["n_null_nwp_grid_points"].value == (
+        0 if expected_variable_count == 9 else 2
+    )
+
+
+def test_ecmwf_ens_partitions_start_in_2020_and_the_schedule_takes_only_today() -> None:
+    """The partitions reach back to 2020-10-15, yet the daily schedule requests only today's key."""
+    from dagster import RunRequest, build_schedule_context
+
+    from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
+    from nged_substation_forecast.defs.schedules import ecmwf_ens_schedule
+
+    keys = ecmwf_ens_partitions.get_partition_keys(
+        current_time=datetime(2026, 11, 18, 11, tzinfo=UTC)
+    )
+    assert keys[0] == "2020-10-15"
+    assert keys[-1] == "2026-11-18"  # end_offset=1: today's key exists before its run has landed
+
+    context = build_schedule_context(
+        scheduled_execution_time=datetime(2026, 11, 18, 10, 30, tzinfo=UTC)
+    )
+    request = ecmwf_ens_schedule(context)
+    assert isinstance(request, RunRequest)
+    assert request.partition_key == "2026-11-18"

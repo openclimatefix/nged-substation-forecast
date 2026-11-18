@@ -129,7 +129,7 @@ window for a fast end-to-end check), so the concrete values below target it:
 3. **`ecmwf_ens`** — downloads ECMWF ensemble weather, one daily partition at a time. Materialise
    the partitions covering the fold's train **and** validation window; for `smoke_test` that is
    `2025-01-01` through `2025-02-28`. Do not "Materialise all" on a first run — the full archive
-   back to `2024-04-01` is billions of rows.
+   back to `2020-10-15` is billions of rows.
 4. **`eligible_time_series`** — determines which series have enough coverage for a fold. This asset
    is **fold-partitioned**, so materialise the **`smoke_test`** partition (not
    `mid_2025_to_mid_2026`) to match the run below — otherwise training finds an empty population and

@@ -61,7 +61,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
         ds: One downloaded ECMWF ENS run, as returned by
             `dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             `(lead_time, ensemble_member, latitude, longitude)`, with `init_time` a scalar
-            coordinate, and carrying the 13 downloaded ECMWF ENS variables.
+            coordinate, and carrying the 14 downloaded ECMWF ENS variables.
         h3_grid: The H3 grid weights to aggregate onto. One row per (H3 cell, NWP grid point) pair
             whose cell and grid point overlap. `proportion` is the fraction of that cell's area the
             point covers.

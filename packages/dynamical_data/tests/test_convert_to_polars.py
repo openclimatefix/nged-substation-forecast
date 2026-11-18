@@ -23,14 +23,19 @@ from dynamical_data.ecmwf_ens.convert_to_polars import (
 )
 from patito.exceptions import DataFrameValidationError
 
-# After 2024-11-12 so the populated categorical_precipitation_type_surface column is valid; see
-# Nwp._check_variables_that_were_introduced_after_start_of_dataset.
-_INIT_TIME = datetime(2025, 1, 1, tzinfo=UTC)
+# After every window in NWP_VARIABLE_EMPTY_WINDOWS, so the populated
+# categorical_precipitation_type_surface and total_cloud_cover_atmosphere columns are valid; see
+# Nwp._check_variables_with_empty_windows.
+_INIT_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 
-# On or before 2024-11-12, where categorical_precipitation_type_surface is legitimately all-null —
-# the only era in which a wholly-uncovered H3 cell reaches the numeric columns without that
-# column's own historical invariant rejecting the frame first.
-_INIT_TIME_BEFORE_PTYPE = datetime(2024, 1, 1, tzinfo=UTC)
+# Inside both windows in NWP_VARIABLE_EMPTY_WINDOWS, where upstream fills
+# categorical_precipitation_type_surface and total_cloud_cover_atmosphere with NaN.
+_INIT_TIME_IN_EMPTY_WINDOWS = datetime(2024, 6, 1, tzinfo=UTC)
+
+_NAN_IN_EMPTY_WINDOWS = {
+    "categorical_precipitation_type_surface": float("nan"),
+    "total_cloud_cover_atmosphere": float("nan"),
+}
 
 
 def _single_cell_grid(
@@ -74,9 +79,9 @@ def test_convert_happy_path_shape_and_schema(
         assert col in df.columns
     assert df["init_time"].unique().to_list() == [_INIT_TIME]
     assert set(df["valid_time"].unique().to_list()) == {
-        datetime(2025, 1, 1, 0, tzinfo=UTC),
-        datetime(2025, 1, 1, 6, tzinfo=UTC),
-        datetime(2025, 1, 1, 12, tzinfo=UTC),
+        datetime(2026, 1, 1, 0, tzinfo=UTC),
+        datetime(2026, 1, 1, 6, tzinfo=UTC),
+        datetime(2026, 1, 1, 12, tzinfo=UTC),
     }
 
 
@@ -396,18 +401,17 @@ def test_convert_rejects_a_run_with_a_wholly_uncovered_cell(
     forever — and it is temporary; see
     <https://github.com/openclimatefix/nged-substation-forecast/issues/478>.
 
-    The init time is deliberately pre-2024-11-13. Later runs must carry a populated
-    ``categorical_precipitation_type_surface``, and an uncovered cell nulls that column too, so
-    they are rejected by that column's historical invariant before the numeric columns are ever
-    judged. This era is therefore the only one where the numeric nulls are what fails the frame.
+    The init time is deliberately inside both empty windows, where upstream leaves
+    ``categorical_precipitation_type_surface`` and ``total_cloud_cover_atmosphere`` null. The
+    contract then accepts those two columns, so the numeric nulls are what fails the frame.
     """
     ds = make_ens_dataset(
-        init_time=_INIT_TIME_BEFORE_PTYPE,
+        init_time=_INIT_TIME_IN_EMPTY_WINDOWS,
         latitudes=(52.0,),
         longitudes=(-1.0,),
         lead_time_hours=(0,),
         ensemble_members=(0,),
-        var_values={"categorical_precipitation_type_surface": float("nan")},
+        var_values=_NAN_IN_EMPTY_WINDOWS,
     )
     h3 = make_h3_grid(
         h3_index=[10, 20],
@@ -689,3 +693,65 @@ def test_full_pipeline_open_download_convert(
 
     Nwp.validate(df)
     assert df.height == 2 * 3 * 2
+
+
+def test_convert_averages_total_cloud_cover_like_any_numeric_variable(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
+) -> None:
+    ds = make_ens_dataset(
+        latitudes=(52.0,),
+        longitudes=(-1.0, -0.75),
+        lead_time_hours=(6,),
+        ensemble_members=(0,),
+        var_values={"total_cloud_cover_atmosphere": np.array([[20.0, 100.0]], dtype=np.float32)},
+    )
+    h3 = make_h3_grid(
+        h3_index=[10, 10],
+        nwp_lat=[52.0, 52.0],
+        nwp_lon=[-1.0, -0.75],
+        proportion=[0.75, 0.25],
+    )
+
+    df = convert(ds=ds, h3_grid=h3)
+
+    assert df["total_cloud_cover_atmosphere"].dtype == pl.Float32
+    assert df["total_cloud_cover_atmosphere"].item() == pytest.approx(0.75 * 20.0 + 0.25 * 100.0)
+
+
+def test_convert_accepts_a_run_in_the_empty_windows_with_nan_total_cloud_and_ptype(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    default_h3_grid: pt.DataFrame[H3GridWeights],
+) -> None:
+    ds = make_ens_dataset(init_time=_INIT_TIME_IN_EMPTY_WINDOWS, var_values=_NAN_IN_EMPTY_WINDOWS)
+
+    df = convert(ds=ds, h3_grid=default_h3_grid)
+
+    assert df["total_cloud_cover_atmosphere"].null_count() == df.height
+    assert df["categorical_precipitation_type_surface"].null_count() == df.height
+
+
+def test_convert_rejects_populated_total_cloud_inside_its_empty_window(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    default_h3_grid: pt.DataFrame[H3GridWeights],
+) -> None:
+    ds = make_ens_dataset(
+        init_time=_INIT_TIME_IN_EMPTY_WINDOWS,
+        var_values={"categorical_precipitation_type_surface": float("nan")},
+    )
+
+    with pytest.raises(ValueError, match="total_cloud_cover_atmosphere must be all null"):
+        convert(ds=ds, h3_grid=default_h3_grid)
+
+
+def test_convert_accepts_a_run_before_the_empty_windows_that_carries_both_variables(
+    make_ens_dataset: Callable[..., xr.Dataset],
+    default_h3_grid: pt.DataFrame[H3GridWeights],
+) -> None:
+    """The 2020 to 2024-03-31 back-fill: runs from ECMWF's MARS archive carry both variables."""
+    ds = make_ens_dataset(init_time=datetime(2021, 1, 1, tzinfo=UTC))
+
+    df = convert(ds=ds, h3_grid=default_h3_grid)
+
+    assert df["total_cloud_cover_atmosphere"].null_count() == 0
+    assert df["categorical_precipitation_type_surface"].null_count() == 0

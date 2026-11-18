@@ -107,6 +107,7 @@ NWP_PLOT_VARIABLES: Final[dict[str, NwpPlotVariable]] = {
     # Stored as kg/m²/s, which is numerically mm/s. Multiplying by 3600 displays the value as
     # mm/h, the unit forecasters expect.
     "precipitation_surface": NwpPlotVariable("Precipitation rate", "mm/h", scale=3600.0),
+    "total_cloud_cover_atmosphere": NwpPlotVariable("Total cloud cover", "%"),
 }
 """Raw continuous NWP columns and derived wind speed/bearing offered by the dashboard.
 
