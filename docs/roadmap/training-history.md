@@ -8,7 +8,8 @@
 > weather product with a few months of history: 🔬 study
 > [#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999).
 
-Our ECMWF ENS archive starts 2024-04-01; most trial-area power series go back to late 2019. An
+Dynamical.org's ECMWF ENS archive starts 2020-10-15, and our stored table starts 2024-04-01 until
+the back-fill has run. Most trial-area power series go back to late 2019. An
 estimate of past weather ([defined
 below](#train-on-the-long-power-history-then-calibrate-per-weather-product)) covers the gap. The
 version-1 plan is ERA5 as the estimate of past weather for every variable except irradiance, and
@@ -115,7 +116,8 @@ separately from weather age.
 
 **A new weather product usually arrives with months of archive, while the power history runs from
 late 2019, so an XGBoost model trained only on the new product's archive discards years of power
-data.** ECMWF ENS's archive starts 2024-04-01, the archive of AIFS-ENS (ECMWF's machine-learned
+data.** ECMWF ENS's archive starts 2020-10-15 (2024-04-01 in our stored table until the back-fill has
+run), the archive of AIFS-ENS (ECMWF's machine-learned
 ensemble) 2025-07-02, WeatherNext 3's 2026-01-01, and the archive of Dynamical.org's ICON-EU (the
 German weather service's European weather model) in early 2026 (dates from the [weather products
 survey](../background/weather-products-survey.md#forecast-models)). The traditional approach needs
@@ -383,11 +385,11 @@ the product calibrator is fitted on the N months before that month and scored on
 in 1, 2, 3, 6, and 12. GEFS, the Global Ensemble Forecast System of the US National Oceanic and
 Atmospheric Administration, is the primary stand-in. The GEFS archive starts 2020-10-01 and GEFS
 comes from a different weather-model family from UKV's and ERA5's, so the curve can be averaged over
-start months in every season. ECMWF ENS, from 2024-04-01, is the secondary and optimistic stand-in.
-AIFS-ENS, from 2025-07-02, is the real short-history case, entering as a blend with ECMWF ENS. The
-controls are the weather-response model fed raw forecast members with no product calibrator, an
-XGBoost model trained natively on the same N months, and the ENS champion trained on its full fold,
-which is a [confounded
+start months in every season. ECMWF ENS, from 2024-04-01 in our stored table, is the secondary and
+optimistic stand-in. AIFS-ENS, from 2025-07-02, is the real short-history case, entering as a blend
+with ECMWF ENS. The controls are the weather-response model fed raw forecast members with no product
+calibrator, an XGBoost model trained natively on the same N months, and the ENS champion trained on
+its full fold, which is a [confounded
 comparison](../cross-validation/cross-validation-folds.md#the-confounded-comparison-which-must-not-be-read-as-the-ablation)
 read only as the deployment reference.
 
@@ -590,9 +592,9 @@ ingests carry the connection dates needed to check.
 
 ## A staged-GRIB route fills three of the missing years without waiting for the Zarr backfill
 
-Dynamical.org are backfilling the **operational** IFS ENS archive as a queryable Zarr store — the
-real forecasts as they were issued, not reforecasts — from ECMWF's MARS tape archive: 2016-03-08 to
-2024-04-01, 51 members, 0.25°, 00Z initialisations only
+Dynamical.org serves the **operational** IFS ENS archive as a queryable Zarr store — the real
+forecasts as they were issued, not reforecasts — from 2020-10-15, built from ECMWF's MARS tape
+archive before 2024-04-01, 51 members, 0.25°, 00Z initialisations only
 ([dynamical-org/reformatters#446](https://github.com/dynamical-org/reformatters/issues/446)). Honest
 multi-year folds from that would be strictly better than pre-training and would make most of the
 variant grid unnecessary, but as of 2026-05 the Zarr estimate was **~November 2027**, MARS-bound at
