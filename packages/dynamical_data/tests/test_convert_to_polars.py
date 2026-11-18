@@ -16,6 +16,7 @@ from contracts.geo_schemas import H3GridWeights
 from contracts.weather_schemas import Nwp
 from dynamical_data.ecmwf_ens import download
 from dynamical_data.ecmwf_ens.convert_to_polars import (
+    _aggregate_grid_points_to_h3_cells,
     _process_chunk_for_1_lead_time_and_1_ens_member,
 )
 from dynamical_data.ecmwf_ens.convert_to_polars import (
@@ -755,3 +756,28 @@ def test_convert_accepts_a_run_before_the_empty_windows_that_carries_both_variab
 
     assert df["total_cloud_cover_atmosphere"].null_count() == 0
     assert df["categorical_precipitation_type_surface"].null_count() == 0
+
+
+def test_aggregation_keeps_a_fully_overcast_cell_within_the_percent_bound() -> None:
+    """A cell of uniformly overcast points stays at 100 percent whatever the area weights are.
+
+    A real 2020-10-15 run failed `Nwp.validate` with 144,840 rows just above 100: a weighted mean of
+    values that are all 100 rounds above 100 in `Float32` for some weights. The aggregation clips
+    the percent variables back into 0 to 100.
+    """
+    rng = np.random.default_rng(0)
+    weights = rng.dirichlet(np.ones(3), size=500)
+    joined = pl.DataFrame(
+        {
+            "h3_index": np.repeat(np.arange(500), 3),
+            "proportion": weights.ravel(),
+            "total_cloud_cover_atmosphere": pl.Series(np.full(1500, 100.0), dtype=pl.Float32),
+        }
+    )
+
+    aggregated = _aggregate_grid_points_to_h3_cells(
+        joined, numeric_vars=["total_cloud_cover_atmosphere"], categorical_vars=[]
+    )
+
+    assert aggregated["total_cloud_cover_atmosphere"].max() == 100.0
+    assert aggregated["total_cloud_cover_atmosphere"].min() == 100.0
