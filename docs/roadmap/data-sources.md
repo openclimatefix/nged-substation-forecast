@@ -1244,10 +1244,12 @@ way about v4.0 and v4.5. A series fetched before a version change and one fetche
 therefore disagree over the same hours, which is one more reason to [snapshot each
 fetch](#cams-use-the-point-api-not-the-gridded-product).
 
-**Two fields in Dynamical.org's ENS archive are NaN-filled for part of it.** The archive starts on
-2020-10-15, but both fields are NaN from 2024-04-01: 10 m gust until 2024-11-12 and total cloud cover
-until 2025-11-20. The table stores total cloud cover (`total_cloud_cover_atmosphere`) and not 10 m
-gust. A feature built on either would meet nulls across the NaN-filled part of the record.
+**Three fields in Dynamical.org's ENS archive are NaN-filled for part of it.** The archive starts on
+2020-10-15, but from 2024-04-01 the 10 m gust and the precipitation type are NaN until 2024-11-12,
+and total cloud cover is NaN until 2025-11-20. The table stores precipitation type
+(`categorical_precipitation_type_surface`) and total cloud cover (`total_cloud_cover_atmosphere`),
+and not 10 m gust. A feature built on any of the three would meet nulls across the NaN-filled part
+of the record.
 
 ## Electricity price data
 

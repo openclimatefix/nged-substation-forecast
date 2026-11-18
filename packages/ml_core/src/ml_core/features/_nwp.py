@@ -135,6 +135,12 @@ def _join_nwp_single_run(
     return result
 
 
+_RESAMPLE_KEY_COLUMNS: Final[frozenset[str]] = frozenset(
+    {"nwp_init_time", "ensemble_member", "time_series_id", "nwp_model_id"}
+)
+"""The columns that identify one independent run, ensemble member, and series for resampling."""
+
+
 def _upsample_nwp_to_half_hourly(
     nwp_lf: pl.LazyFrame,
     *,
@@ -163,9 +169,20 @@ def _upsample_nwp_to_half_hourly(
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()
-    group_cols = [
-        col for col in schema_names if col != "valid_time" and col not in all_weather_vars
+    unrecognised = [
+        col
+        for col in schema_names
+        if col != "valid_time" and col not in all_weather_vars and col not in _RESAMPLE_KEY_COLUMNS
     ]
+    if unrecognised:
+        # A column that is neither a weather variable nor a key must not silently become a group
+        # key: a weather variable added to `Nwp` later would otherwise collapse the half-hourly
+        # grid without raising, in any code that has not yet listed the new variable.
+        msg = (
+            f"Unrecognised NWP columns, neither weather variables nor resample keys: {unrecognised}"
+        )
+        raise ValueError(msg)
+    group_cols = [col for col in schema_names if col in _RESAMPLE_KEY_COLUMNS]
     continuous_cols_excluding_radiation = [
         col
         for col in schema_names

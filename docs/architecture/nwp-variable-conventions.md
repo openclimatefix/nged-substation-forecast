@@ -61,17 +61,17 @@ which are linear. Speed and bearing are derived features, not stored weather col
 `categorical_precipitation_type_surface` is a category code, not a quantity, so it is aggregated by
 area-weighted mode rather than averaged, and forward-filled rather than interpolated.
 
+`categorical_precipitation_type_surface` appears to be instantaneous. The three period-ending
+variables are 100 % null at lead 0, because there is no preceding interval for them to average;
+`categorical_precipitation_type_surface` is fully populated there. That is good evidence but not
+proof, since a period field could in principle be published at lead 0 anyway, so confirm against
+[ECMWF's parameter database entry](https://codes.ecmwf.int/grib/param-db/260015) before relying on
+its timing. If it did describe the preceding interval, forward-filling it would attribute one
+interval's precipitation type to the following one.
+
 `total_cloud_cover_atmosphere` is a percentage from 0 to 100 and describes one instant, so it is
 aggregated by area-weighted mean and interpolated linearly like the other instantaneous numeric
 variables. Its error from the resample has not been measured, so the table below omits it.
-
-It appears to be instantaneous. The three period-ending variables are 100 % null at lead 0, because
-there is no preceding interval for them to average; `categorical_precipitation_type_surface` is
-fully populated there. That is good evidence but not proof, since a period field could in principle
-be published at lead 0 anyway, so confirm against [ECMWF's parameter database
-entry](https://codes.ecmwf.int/grib/param-db/260015) before relying on its timing. If it did
-describe the preceding interval, forward-filling it would attribute one interval's precipitation
-type to the following one.
 
 ## Every variable, and how to read it
 

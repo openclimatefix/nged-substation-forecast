@@ -403,6 +403,9 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         metadata=metadata_df,
         window_start=train_start,
         window_end=train_end,
+        # The training runs start at the window start, not 16 days earlier, so that archive runs
+        # back-filled before the leaderboard epoch's first run cannot change the fold's data.
+        init_time_start=train_start,
         ensemble_members=[0],
         power_lookback=power_lookback,
     )
