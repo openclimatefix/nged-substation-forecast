@@ -238,16 +238,22 @@ def test_lead_0_nulls_are_counted_when_not_excluded(
 
 
 def test_every_downloaded_variable_belongs_to_exactly_one_population() -> None:
-    """A variable missed by all three sets would go uncounted by both checks, silently.
+    """A variable missed by all four sets would go uncounted by both checks, silently.
+
+    Total cloud cover is the fourth set: it is counted with the instantaneous variables, but only
+    for a run outside its empty window (``instantaneous_vars_to_check``).
 
     ``ECMWF_ENS_INSTANTANEOUS_VARS`` is what the download list has left after subtracting the two
     ``Nwp`` classvars, so this is the assertion that the subtraction means anything: it fails if
     a contract name is spelled differently in the download list, which is exactly how the winds
     differ.
     """
-    assert (ECMWF_ENS_INSTANTANEOUS_VARS | _DEACCUMULATED | Nwp.categorical_var_names) == set(
-        _ECMWF_ENS_VARS_TO_DOWNLOAD
-    )
+    assert (
+        ECMWF_ENS_INSTANTANEOUS_VARS
+        | _DEACCUMULATED
+        | Nwp.categorical_var_names
+        | {"total_cloud_cover_atmosphere"}
+    ) == set(_ECMWF_ENS_VARS_TO_DOWNLOAD)
 
 
 def test_counting_no_variables_at_all_reports_zero_rather_than_raising(

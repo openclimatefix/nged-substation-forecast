@@ -72,6 +72,38 @@ def test_upsample_nwp_to_half_hourly_interpolates_continuous_vars():
     assert mid["temperature_2m"][0] == pytest.approx(13.0)
 
 
+def test_upsample_nwp_to_half_hourly_keeps_a_total_cloud_column_out_of_the_group_keys():
+    """A weather column that varies within a run still yields one half-hourly row per half-hour."""
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [datetime(2020, 1, 1, 0)] * 3,
+            "ensemble_member": [0, 0, 0],
+            "valid_time": [datetime(2020, 1, 1, h) for h in (0, 3, 6)],
+            "temperature_2m": [10.0, 16.0, 12.0],
+            "total_cloud_cover_atmosphere": [20.0, 60.0, 100.0],
+        }
+    )
+    result = _upsample_nwp_to_half_hourly(df.lazy()).collect()
+
+    assert len(result) == 13  # 0:00 to 6:00 inclusive, every half-hour
+
+
+def test_upsample_nwp_to_half_hourly_rejects_an_unrecognised_column():
+    """A column that is neither a weather variable nor a resample key raises, not groups."""
+    df = pl.DataFrame(
+        {
+            "nwp_init_time": [datetime(2020, 1, 1, 0)] * 2,
+            "ensemble_member": [0, 0],
+            "valid_time": [datetime(2020, 1, 1, 0), datetime(2020, 1, 1, 3)],
+            "temperature_2m": [10.0, 16.0],
+            "some_future_weather_variable": [1.0, 2.0],
+        }
+    )
+
+    with pytest.raises(ValueError, match="Unrecognised NWP columns"):
+        _upsample_nwp_to_half_hourly(df.lazy()).collect()
+
+
 def test_upsample_nwp_to_half_hourly_forward_fills_categorical_vars():
     """Categorical vars are forward-filled, not interpolated."""
     df = pl.DataFrame(

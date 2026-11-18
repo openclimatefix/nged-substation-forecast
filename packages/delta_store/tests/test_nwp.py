@@ -8,6 +8,7 @@ separate ``(nwp_model_id, init_time)`` Hive partitions, and a re-written run rep
 partition and no other.
 """
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -17,7 +18,7 @@ import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-from contracts.weather_schemas import Nwp
+from contracts.weather_schemas import Nwp, variables_known_empty_at
 from delta_store.nwp import (
     NWP_ROW_GROUP_SIZE_LIMITS,
     NWP_SIGNIFICAND_BITS,
@@ -27,7 +28,9 @@ from delta_store.nwp import (
 from deltalake import DeltaTable, write_deltalake
 from polars.testing import assert_frame_equal
 
-_T0 = datetime(2025, 6, 1, tzinfo=UTC)
+# After every window in `NWP_VARIABLE_EMPTY_WINDOWS`, so that populated
+# `categorical_precipitation_type_surface` and `total_cloud_cover_atmosphere` columns are valid.
+_T0 = datetime(2026, 1, 1, tzinfo=UTC)
 
 _CONTINUOUS_BASE_VALUES = {
     "temperature_2m": 15.7031,
@@ -42,6 +45,7 @@ _CONTINUOUS_BASE_VALUES = {
     "downward_long_wave_radiation_flux_surface": 312.34,
     "downward_short_wave_radiation_flux_surface": 456.78,
     "precipitation_surface": 0.00123,
+    "total_cloud_cover_atmosphere": 45.678,
 }
 """Per-variable bases well inside each field's ``ge``/``le`` bounds, with full-entropy
 mantissas so the significand-rounding assertions have something to measure."""
@@ -53,7 +57,9 @@ def _make_nwp(
     """Build a valid ``Nwp`` frame with deliberately unsorted key columns.
 
     With ``n_members`` set, the ``n`` rows are spread over that many members, interleaved so each
-    member's rows are scattered through the frame before the writer sorts them.
+    member's rows are scattered through the frame before the writer sorts them. A variable in
+    ``NWP_VARIABLE_EMPTY_WINDOWS`` is null when ``init_time`` is inside its window, as the contract
+    requires.
     """
     members = list(range(n - 1, -1, -1)) if n_members is None else [i % n_members for i in range(n)]
     rows = {
@@ -71,6 +77,8 @@ def _make_nwp(
             for var, base in _CONTINUOUS_BASE_VALUES.items()
         },
     }
+    if "total_cloud_cover_atmosphere" in variables_known_empty_at(init_time):
+        rows["total_cloud_cover_atmosphere"] = [None] * n
     return Nwp.DataFrame(rows).cast().validate()
 
 
@@ -361,3 +369,127 @@ def test_scan_reads_correctly_across_old_narrow_and_new_wide_physical_partitions
     collected = Nwp.scan_delta(table).collect()
     assert collected.height == 2 * n
     assert collected["categorical_precipitation_type_surface"].to_list() == [1] * (2 * n)
+
+
+def _file_digests(table: Path) -> dict[str, str]:
+    """SHA-256 of every Parquet file the table's current version lists, keyed by relative path."""
+    return {
+        str(path.relative_to(table)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(table.rglob("*.parquet"))
+    }
+
+
+def _write_table_without_total_cloud(table: Path, *, init_time: datetime) -> None:
+    """Write a partition in the schema the table had before `total_cloud_cover_atmosphere`.
+
+    Built with `write_deltalake` directly, because `write_nwp` only writes the current schema.
+    """
+    old = _make_nwp(init_time=init_time).drop("total_cloud_cover_atmosphere")
+    write_deltalake(
+        table_or_uri=table, data=old.to_arrow(), partition_by=["nwp_model_id", "init_time"]
+    )
+
+
+def test_a_table_without_total_cloud_accepts_a_partition_that_has_it(tmp_path: Path) -> None:
+    """The back-fill adds `total_cloud_cover_atmosphere` to a table that never had it.
+
+    The existing partition's Parquet file must survive byte for byte, still be listed by the new
+    table version, and read the new column as null.
+    """
+    table = tmp_path / "nwp"
+    old_init_time = _T0
+    new_init_time = _T0 - timedelta(days=700)
+    _write_table_without_total_cloud(table, init_time=old_init_time)
+    old_digests = _file_digests(table)
+    old_listed_files = set(DeltaTable(str(table)).file_uris())
+
+    write_nwp(_make_nwp(init_time=new_init_time), table)
+
+    new_digests = _file_digests(table)
+    assert {path: new_digests.get(path) for path in old_digests} == old_digests
+    assert old_listed_files <= set(DeltaTable(str(table)).file_uris())
+    assert DeltaTable(str(table)).version() == 1
+    collected = Nwp.scan_delta(table).collect()
+    for init_time, has_cloud in ((old_init_time, False), (new_init_time, True)):
+        partition = collected.filter(pl.col("init_time") == init_time)
+        assert partition.height == 6
+        assert (partition["total_cloud_cover_atmosphere"].null_count() == 0) is has_cloud
+        assert (partition["total_cloud_cover_atmosphere"].null_count() == 6) is not has_cloud
+    Nwp.validate(
+        collected.filter(pl.col("init_time") == new_init_time)
+    )  # the new partition is whole
+
+
+def test_total_cloud_is_rounded_to_significand_bits(tmp_path: Path) -> None:
+    table = tmp_path / "nwp"
+    nwp = _make_nwp()
+
+    write_nwp(nwp, table)
+
+    stored = pl.read_delta(str(table)).sort("h3_index")
+    expected = nwp.sort("h3_index")["total_cloud_cover_atmosphere"].to_numpy()
+    kept = stored["total_cloud_cover_atmosphere"].to_numpy()
+    assert not np.array_equal(kept, expected)  # rounding changed the values...
+    np.testing.assert_allclose(
+        kept, expected, rtol=2.0**-NWP_SIGNIFICAND_BITS
+    )  # ...but only a little
+
+
+def test_scan_reads_total_cloud_as_null_from_a_table_that_lacks_the_column(
+    tmp_path: Path,
+) -> None:
+    table = tmp_path / "nwp"
+    _write_table_without_total_cloud(table, init_time=_T0)
+
+    collected = Nwp.scan_delta(table).collect()
+
+    assert collected.height == 6
+    assert collected["total_cloud_cover_atmosphere"].dtype == pl.Float32
+    assert collected["total_cloud_cover_atmosphere"].null_count() == 6
+    assert set(collected.columns) == set(Nwp.model_fields)
+
+
+def test_scan_filters_still_prune_partitions_of_a_table_that_lacks_the_column(
+    tmp_path: Path,
+) -> None:
+    table = tmp_path / "nwp"
+    _write_table_without_total_cloud(table, init_time=_T0)
+
+    plan = Nwp.scan_delta(table).filter(pl.col("init_time") == _T0).explain()
+
+    assert "SELECTION" in plan or "FILTER" in plan
+
+
+def test_rewriting_a_partition_of_a_mixed_table_replaces_only_that_partition(
+    tmp_path: Path,
+) -> None:
+    table = tmp_path / "nwp"
+    _write_table_without_total_cloud(table, init_time=_T0)
+    write_nwp(_make_nwp(init_time=_T0 + timedelta(days=1)), table)
+    old_digests = _file_digests(table)
+
+    write_nwp(_make_nwp(init_time=_T0 + timedelta(days=1)), table)
+
+    after = _file_digests(table)
+    kept = {
+        path
+        for path in old_digests
+        if path.startswith("nwp_model_id=ECMWF_ENS_0_25_degree/init_time=2026-01-01")
+    }
+    assert kept
+    assert {path: after.get(path) for path in kept} == {path: old_digests[path] for path in kept}
+    collected = Nwp.scan_delta(table).collect()
+    assert collected.height == 12
+
+
+def test_writer_rejects_a_frame_that_lacks_a_column_the_table_already_has(
+    tmp_path: Path,
+) -> None:
+    """Only a *table* may lack `total_cloud_cover_atmosphere`; a frame must carry it."""
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(), table)
+
+    incoming = _make_nwp(init_time=_T0 + timedelta(days=1)).drop("total_cloud_cover_atmosphere")
+    with pytest.raises(ValueError, match="incompatible column set"):
+        write_nwp(nwp=incoming, table_uri=table)
+    assert DeltaTable(str(table)).version() == 0

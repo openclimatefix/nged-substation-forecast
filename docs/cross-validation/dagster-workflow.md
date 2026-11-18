@@ -28,8 +28,20 @@ forecasts onto the H3 cells attached to each substation.
 
 ## Step 3 — Materialise `ecmwf_ens`
 
-**Trigger:** Materialise the daily partitions from `2024-04-01` up to today (or up to the end of
-your training window). Use "Materialise all" or select a date range in the Dagster UI.
+**Trigger:** Materialise the daily partitions from `2020-10-15`, the first run in Dynamical.org's
+archive, up to today (or up to the end of your training window). The `mid_2025_to_mid_2026` fold
+reads only runs initialised from `2024-04-01` (`trained_cv_model` passes
+`init_time_start=train_start`), so back-filled earlier runs leave its training data unchanged.
+Select a date range in the Dagster UI rather than "Materialise all", because the full archive, about
+2,226 daily partitions (one per 00Z run), is billions of rows.
+
+**Add `total_cloud_cover_atmosphere` to the table with one write before launching a back-fill.**
+Concurrent writes that change the table's schema fail with `CommitFailedError`, and `ecmwf_ens` does
+not retry them. The single write can be the 10:30 UTC daily run or one partition materialised on its
+own. This order applies until the production table carries the column. Code from before the column
+was added builds wrong half-hourly weather features from a table that has the column, without
+raising. `write_nwp` from before the column raises on every write once the column exists. Update
+every checkout, deployment, and research pin that reads or writes the table before the first write.
 
 Downloads the 00Z ECMWF ENS run for each partition date, converts it to a Polars DataFrame, and
 writes it to `nwp_data.delta` (partitioned by `[nwp_model_id, init_time]`) as physical-unit

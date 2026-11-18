@@ -144,10 +144,10 @@ def assess_upstream_grid_point_nulls(
         the total number of grid points counted (`n_total`).
     """
     # Selected per variable rather than once on `ds`. This code runs inside `ecmwf_ens` while the
-    # whole downloaded run is still held in memory. Slicing the whole dataset would copy all 13
-    # downloaded variables to read either the three de-accumulated variables or the nine
-    # instantaneous variables, depending on the call. The 13th is
-    # categorical_precipitation_type_surface, which neither call counts.
+    # whole downloaded run is still held in memory. Slicing the whole dataset would copy all 14
+    # downloaded variables to read either the three de-accumulated variables or the instantaneous
+    # variables, depending on the call. categorical_precipitation_type_surface, which neither call
+    # counts, is the one downloaded variable that is in neither set.
     beyond_lead_0 = ds.lead_time > _LEAD_0
     rows = []
     for name in sorted(variables):

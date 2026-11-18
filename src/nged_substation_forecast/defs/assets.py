@@ -45,9 +45,9 @@ from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
 from dynamical_data.ecmwf_ens.download import (
-    ECMWF_ENS_INSTANTANEOUS_VARS,
     NwpRunNotYetAvailable,
     download_ecmwf_ens_data,
+    instantaneous_vars_to_check,
     open_ecmwf_ens_run,
     raise_if_instantaneous_slices_empty,
 )
@@ -367,11 +367,12 @@ def h3_grid_weights(context: AssetExecutionContext) -> None:
 
 
 ecmwf_ens_partitions = DailyPartitionsDefinition(
-    start_date="2024-04-01", timezone="UTC", end_offset=1
+    start_date="2020-10-15", timezone="UTC", end_offset=1
 )
-"""One partition per day of ECMWF ENS 00Z runs. ``end_offset=1`` makes today's key exist before
-its 00Z run has actually landed, matching Dynamical's publication lag; shared with
-``ecmwf_ens_job``/``ecmwf_ens_schedule`` in ``defs/schedules.py``."""
+"""One partition per day of ECMWF ENS 00Z runs, from 2020-10-15, the first run in Dynamical.org's
+archive. ``end_offset=1`` makes today's key exist before its 00Z run has actually landed, matching
+Dynamical's publication lag; shared with ``ecmwf_ens_job``/``ecmwf_ens_schedule`` in
+``defs/schedules.py``, whose schedule requests only today's partition."""
 
 _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 """Retries × ``_ECMWF_ENS_RETRY_DELAY_SECONDS`` ≥ 4h of coverage past the 10:30 UTC schedule
@@ -475,7 +476,8 @@ read as a trend, against an anomaly to raise with Dynamical.org today."""
 
 _NWP_INSTANTANEOUS_CHECK_DESCRIPTION: Final[str] = (
     "Nulls in the instantaneous NWP variables (temperature, dew point, the winds, the pressures, "
-    "geopotential height) on the raw 0.25 degree grid Dynamical.org sent us. These are never "
+    "geopotential height, and total cloud cover outside the window in which Dynamical.org fills it "
+    "with NaN) on the raw 0.25 degree grid Dynamical.org sent us. These are never "
     "legitimately null, so `passed` is false on a single null grid point — unlike "
     "`nwp_has_no_unexpected_nulls`, whose nulls are expected. A red result is a mail to "
     "Dynamical.org, not a re-run: the run has landed and no stored cell is affected, because the "
@@ -641,7 +643,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
             ds=ds, variables=Nwp.deaccumulated_var_names, exclude_lead_0=True
         )
         instantaneous = assess_upstream_grid_point_nulls(
-            ds=ds, variables=ECMWF_ENS_INSTANTANEOUS_VARS, exclude_lead_0=False
+            ds=ds, variables=instantaneous_vars_to_check(ds), exclude_lead_0=False
         )
         completeness = assess_nwp_run_completeness(
             dataframe=nwp, expected_n_h3_cells=h3_grid["h3_index"].n_unique()
@@ -834,7 +836,7 @@ def _nwp_instantaneous_description(upstream: UpstreamNullRate) -> str:
 def _upstream_per_variable_metadata(per_variable: pl.DataFrame) -> TableMetadataValue:
     """Render the per-variable raw-grid null counts as a Dagster metadata table.
 
-    Uncapped, unlike the affected-slices table: there are thirteen weather variables in all, so
+    Uncapped, unlike the affected-slices table: there are fourteen weather variables in all, so
     this frame has no bad day on which it can grow.
     """
     records = [

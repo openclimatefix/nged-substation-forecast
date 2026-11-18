@@ -51,7 +51,7 @@ pytestmark = pytest.mark.integration
 
 ThreadedMotoServer = pytest.importorskip("moto.server").ThreadedMotoServer
 
-_T0 = datetime(2025, 7, 1, tzinfo=UTC)
+_T0 = datetime(2026, 1, 1, tzinfo=UTC)
 _BUCKET = "nged-test-bucket"
 
 _CONTINUOUS_BASE_VALUES = {
@@ -164,6 +164,7 @@ def _make_nwp(n: int = 6) -> pt.DataFrame[Nwp]:
                 "ensemble_member": list(range(n - 1, -1, -1)),
                 "h3_index": [100 + i for i in range(n)],
                 "categorical_precipitation_type_surface": [1] * n,
+                "total_cloud_cover_atmosphere": [50.0] * n,
                 **{
                     var: [base * (1 + 0.003 * i) for i in range(n)]
                     for var, base in _CONTINUOUS_BASE_VALUES.items()

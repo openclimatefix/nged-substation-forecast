@@ -7,13 +7,14 @@
 #     sanity checks. They reuse the identical pipeline but never feed the leaderboard.
 #
 # Current leaderboard state: a single MVP fold. Honest forecast-skill validation needs real forecast
-# NWP (ECMWF ENS) for both training and validation, and our ECMWF ENS archive only reaches back to
-# 2024-04-01 (Dynamical.org are backfilling earlier years, but slowly). So we train on the longest
-# honest window we have and validate on the following 12 months.
+# NWP (ECMWF ENS) for both training and validation. Dynamical.org's ECMWF ENS archive reaches back
+# to 2020-10-15 and the `ecmwf_ens` partitions start there, but the leaderboard epoch was founded
+# when the stored archive began on 2024-04-01. So the fold trains on that window and validates on
+# the following 12 months.
 #
-# Once Dynamical.org has backfilled ECMWF ENS to earlier years, we will move to the target
-# multiple-yearly-fold protocol (expanding training window, one validation year per fold) via a new
-# leaderboard epoch.  See docs/cross-validation/cross-validation-folds.md.
+# Once the earlier years are ingested, we will move to the target multiple-yearly-fold protocol
+# (expanding training window, one validation year per fold) via a new leaderboard epoch.  See
+# docs/cross-validation/cross-validation-folds.md.
 
 folds:
   - fold_id: "mid_2025_to_mid_2026"

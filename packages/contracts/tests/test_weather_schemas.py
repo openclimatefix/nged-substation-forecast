@@ -1,6 +1,7 @@
 from typing import get_args
 
 from contracts.weather_schemas import (
+    NWP_VARIABLE_EMPTY_WINDOWS,
     Nwp,
     WeatherFeature,
 )
@@ -27,3 +28,18 @@ def test_continuous_and_categorical_partition_all_weather_vars():
 
     assert continuous | categorical == all_vars, "union must equal all weather vars"
     assert continuous & categorical == frozenset(), "no variable should appear in both sets"
+
+
+def test_every_variable_with_an_empty_window_is_a_weather_variable() -> None:
+    assert frozenset(NWP_VARIABLE_EMPTY_WINDOWS) <= Nwp.all_weather_var_names()
+
+
+def test_total_cloud_cover_is_a_continuous_variable() -> None:
+    """Continuous variables are the ones `delta_store.nwp.write_nwp` rounds and H3 averages."""
+    assert "total_cloud_cover_atmosphere" in Nwp.continuous_var_names()
+
+
+def test_columns_absent_from_older_partitions_are_nullable_weather_variables() -> None:
+    for column in Nwp.columns_absent_from_older_partitions:
+        assert column in Nwp.all_weather_var_names()
+        assert column in Nwp.nullable_columns

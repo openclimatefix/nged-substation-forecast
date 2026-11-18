@@ -14,11 +14,11 @@ build a *partial* NWP frame that ``Nwp.validate`` cannot check.
 """
 
 from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Final
 
 import polars as pl
-from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, Nwp
+from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, Nwp, variables_known_empty_at
 from deltalake import write_deltalake
 from ml_core.features import NWP_PUBLICATION_DELAY_HOURS
 
@@ -38,10 +38,8 @@ NWP_CONTINUOUS_COL_VALUES: Final[dict[str, float]] = {
 }
 """Physically plausible Float32 constants, one per continuous ``Nwp`` variable."""
 
-_PTYPE_INTRODUCED: Final[datetime] = datetime(2024, 11, 12, tzinfo=UTC)
-"""``categorical_precipitation_type_surface`` must be null on or before this ``init_time`` and
-populated after it — see ``Nwp._check_variables_that_were_introduced_after_start_of_dataset``.
-``nwp_records`` sets the column to satisfy this so its output passes ``Nwp.validate``."""
+_TOTAL_CLOUD_COVER_PERCENT: Final[float] = 50.0
+"""The ``total_cloud_cover_atmosphere`` value that ``nwp_records`` gives a populated run."""
 
 
 def cast_to_nwp_dtypes(frame: pl.DataFrame, *columns: str) -> pl.DataFrame:
@@ -103,7 +101,13 @@ def nwp_records(
     first = max(time for time in schedule if time <= min(requested))
     last = min(time for time in schedule if time >= max(requested))
     resolved_valid_times = [time for time in schedule if first <= time <= last]
-    ptype = None if resolved_init_time <= _PTYPE_INTRODUCED else 0
+    # A variable is null inside its window in `NWP_VARIABLE_EMPTY_WINDOWS` and populated outside it,
+    # which `Nwp.validate` enforces, so `nwp_records` sets each column to pass it.
+    empty_at_init_time = variables_known_empty_at(resolved_init_time)
+    ptype = None if "categorical_precipitation_type_surface" in empty_at_init_time else 0
+    total_cloud = (
+        None if "total_cloud_cover_atmosphere" in empty_at_init_time else _TOTAL_CLOUD_COVER_PERCENT
+    )
     records = []
     for member in members:
         for valid_time in resolved_valid_times:
@@ -114,6 +118,7 @@ def nwp_records(
                 "ensemble_member": member,
                 "h3_index": cell,
                 "categorical_precipitation_type_surface": ptype,
+                "total_cloud_cover_atmosphere": total_cloud,
             }
             record.update(NWP_CONTINUOUS_COL_VALUES)
             if valid_time == resolved_init_time:

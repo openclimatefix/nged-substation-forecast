@@ -10,7 +10,7 @@ import patito as pt
 import polars as pl
 import xarray as xr
 from contracts.geo_schemas import H3GridWeights
-from contracts.weather_schemas import Nwp
+from contracts.weather_schemas import NWP_VARIABLE_EMPTY_WINDOWS, Nwp, variables_known_empty_at
 
 
 class NwpRunNotYetAvailable(Exception):
@@ -36,22 +36,59 @@ _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
     "downward_short_wave_radiation_flux_surface",
     "precipitation_surface",
     "categorical_precipitation_type_surface",
+    "total_cloud_cover_atmosphere",
 )
 
+_ECMWF_ENS_VARS_WITH_EMPTY_WINDOWS: Final[frozenset[str]] = (
+    frozenset(_ECMWF_ENS_VARS_TO_DOWNLOAD) & NWP_VARIABLE_EMPTY_WINDOWS.keys()
+)
+"""The downloaded variables that upstream NaN-fills for part of the archive."""
+
 ECMWF_ENS_INSTANTANEOUS_VARS: Final[frozenset[str]] = (
-    frozenset(_ECMWF_ENS_VARS_TO_DOWNLOAD) - Nwp.deaccumulated_var_names - Nwp.categorical_var_names
+    frozenset(_ECMWF_ENS_VARS_TO_DOWNLOAD)
+    - Nwp.deaccumulated_var_names
+    - Nwp.categorical_var_names
+    - _ECMWF_ENS_VARS_WITH_EMPTY_WINDOWS
 )
 """The downloaded variables describing conditions at one instant, under their *download* names.
 
-None of these is ever legitimately null, anywhere in a run. That is why
+None of these is ever legitimately null, anywhere in any run. Because of that,
 `dynamical_data.ecmwf_ens.upstream_nulls.assess_upstream_grid_point_nulls` counts them separately
-from the de-accumulated variables. It is also why the ``ecmwf_ens`` asset gates a check on that
-count being zero.
+from the de-accumulated variables, and the ``ecmwf_ens`` asset gates a check on that count being
+zero.
+
+The set leaves out every variable in `contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS`,
+because upstream holds no values for those in some runs. `instantaneous_vars_to_check` adds back
+the instantaneous ones for a run outside their windows.
 
 Derived from the download list so upstream checks describe exactly the requested dataset. Wind
 arrives as ``wind_u_*``/``wind_v_*`` and stays as components through H3 aggregation and storage.
 Feature engineering derives speed and bearing after temporal interpolation.
 """
+
+
+def instantaneous_vars_to_check(ds: xr.Dataset) -> frozenset[str]:
+    """The instantaneous variables that must hold values in the run that ``ds`` holds.
+
+    That is `ECMWF_ENS_INSTANTANEOUS_VARS`, plus each instantaneous variable in
+    `contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS` whose window does not contain the
+    run's ``init_time``. A variable in that set is never legitimately null outside its window.
+
+    Args:
+        ds: One downloaded run, with ``init_time`` as a scalar coordinate.
+
+    Returns:
+        Variable names, under their *download* names.
+    """
+    # Microsecond precision makes `.item()` return a `datetime` rather than an integer.
+    naive_init_time: datetime = ds["init_time"].values.astype("datetime64[us]").item()
+    init_time = naive_init_time.replace(tzinfo=UTC)
+    populated_with_windows = (
+        _ECMWF_ENS_VARS_WITH_EMPTY_WINDOWS
+        - Nwp.categorical_var_names
+        - variables_known_empty_at(init_time)
+    )
+    return ECMWF_ENS_INSTANTANEOUS_VARS | populated_with_windows
 
 
 def open_ecmwf_ens_run(
@@ -70,7 +107,7 @@ def open_ecmwf_ens_run(
     Returns:
         The catalog's dataset, sliced to the one `init_time` and to the latitude/longitude
         bounding box of `h3_grid`'s `nwp_lat`/`nwp_lon` columns, still lazy and holding the
-        13 downloaded ECMWF ENS variables.
+        14 downloaded ECMWF ENS variables.
     """
     # Convention-sensitive to the *real* Dynamical.org catalog: this function bakes in assumptions
     # about its shape (longitude in [-180, 180], descending latitude, coordinate/dimension names).
@@ -151,7 +188,7 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
     # network latency across multiple variables. A ProcessPoolExecutor would be less efficient here
     # due to the high serialisation overhead of Xarray objects between processes.
     #
-    # max_workers is capped rather than left at the default (one thread per variable, i.e. 13).
+    # max_workers is capped rather than left at the default (one thread per variable, i.e. 14).
     # Investigation of issue #276 found that 13 concurrent chunked-zarr fetches self-contend badly
     # (S3 rate limiting or connection-pool starvation). Most variables finish in 5-20s, but a few
     # straggle for minutes, which makes the whole download 600s+. Capping at 4 removed the
@@ -188,7 +225,9 @@ def raise_if_instantaneous_slices_empty(ds: xr.Dataset) -> None:
     contract violation. De-accumulated variables are not checked here, because they are legitimately
     empty at lead-0, and `Nwp.validate` raises `NwpVariableWhollyMissing` when a de-accumulated
     variable is wholly missing. `categorical_precipitation_type_surface` is not checked either,
-    because the column is empty in runs before 2024-11-13.
+    because the column is empty in runs from 2024-04-01 to 2024-11-12.
+    `total_cloud_cover_atmosphere` is checked only for a run outside its empty window, per
+    `instantaneous_vars_to_check`.
 
     Reasoning and the 2026-10-02 incident:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>
@@ -201,7 +240,7 @@ def raise_if_instantaneous_slices_empty(ds: xr.Dataset) -> None:
             grid point. The message names each variable and its count of empty slices.
     """
     empty_slices = (
-        ds[sorted(ECMWF_ENS_INSTANTANEOUS_VARS)].isnull().all(dim=["latitude", "longitude"])
+        ds[sorted(instantaneous_vars_to_check(ds))].isnull().all(dim=["latitude", "longitude"])
     )
     n_empty_per_variable = {
         str(name): int(array.sum()) for name, array in empty_slices.data_vars.items()

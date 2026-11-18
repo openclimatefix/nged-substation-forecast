@@ -95,6 +95,14 @@ def test_cached_real_slice_conventions_and_orientation() -> None:
     assert lons.min() >= -180.0, "the committed slice is in [-180, 180]"
     assert lons.max() <= 180.0, "the committed slice is in [-180, 180]"
 
+    # The committed slice was captured before `total_cloud_cover_atmosphere` joined the download
+    # list, and the capture needs the network. So the variable is added here, as a constant in the
+    # contract's 0-100 percent range, which the slice's 2026-07-17 init time requires populated.
+    # `test_ecmwf_ens_network.py` reads the genuine variable.
+    ds = ds.assign(
+        total_cloud_cover_atmosphere=xr.full_like(ds["temperature_2m"], 50.0),
+    )
+
     grid, expected = _one_cell_per_grid_point(ds)
     df = convert(ds=ds, h3_grid=grid)
 

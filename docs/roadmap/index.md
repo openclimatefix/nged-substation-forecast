@@ -208,14 +208,14 @@ and the **pre-training experiments** that ingest unlocks
 ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167), closed; the
 [nged-ml-research
 experiments](https://openclimatefix.github.io/nged-ml-research/ml-experiments/README/) answered it)
-— see [Extending the
-training history](training-history.md). The version-1 plan is CAMS for irradiance and ERA5 for
-other variables, and CEDA UKV is not ingested (see the [CEDA UKV against ERA5
+— see [Extending the training history](training-history.md). The version-1 plan is CAMS for
+irradiance and ERA5 for other variables, and CEDA UKV is not ingested (see the [CEDA UKV against
+ERA5
 study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/ukv-ceda-vs-era5/)).
-Our power data reaches back to late
-2019 while the ENS archive starts 2024-04-01, and Dynamical.org's ENS back-fill is not expected
-until ~November 2027, so an estimate of past weather is how the seasonal experiments on this page
-get more than one winter to learn from. The Tier-1 and Tier-2 config wins do not wait for it.
+Our power data reaches back to late 2019, Dynamical.org's ENS archive starts 2020-10-15, and our
+stored ENS table starts on 2024-04-01 and will start on 2020-10-15 once the back-fill has run, so an
+estimate of past weather is how the seasonal experiments on this page get more than one winter to
+learn from. The Tier-1 and Tier-2 config wins do not wait for it.
 
 This milestone also carries the **quantile-ensemble pipeline** (per-member quantile forecasts pooled
 into delivered percentiles — Phase D of [Delivering the probabilistic

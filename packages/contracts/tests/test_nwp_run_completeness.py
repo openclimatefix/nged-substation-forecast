@@ -20,9 +20,10 @@ from contracts.weather_schemas import (
     assess_nwp_run_completeness,
 )
 
-_INIT_TIME = datetime(2024, 12, 1, tzinfo=UTC)
-"""A run initialised after 2024-11-12, when ``categorical_precipitation_type_surface`` became
-non-null (``Nwp.validate`` enforces that split)."""
+_INIT_TIME = datetime(2026, 1, 1, tzinfo=UTC)
+"""A run initialised after every window in ``NWP_VARIABLE_EMPTY_WINDOWS``, so that
+``categorical_precipitation_type_surface`` and ``total_cloud_cover_atmosphere`` are both
+populated (``Nwp.validate`` enforces that split)."""
 
 _H3_INDICES: tuple[int, ...] = (100, 101)
 """Two cells is enough to exercise the cell-count arithmetic while keeping the frame small."""
@@ -64,6 +65,7 @@ def _complete_run() -> pt.DataFrame[Nwp]:
             init_time=pl.lit(_INIT_TIME),
             valid_time=pl.lit(_INIT_TIME) + pl.duration(hours=pl.col("lead_time_hours")),
             categorical_precipitation_type_surface=pl.lit(1),
+            total_cloud_cover_atmosphere=pl.lit(50.0),
             **{name: pl.lit(value) for name, value in _CONTINUOUS_VALUES.items()},
             **{
                 name: pl.when(is_lead0).then(None).otherwise(pl.lit(value))

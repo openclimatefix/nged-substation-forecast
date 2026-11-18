@@ -21,6 +21,14 @@ _CONTRIBUTING_WEIGHT_SUFFIX: Final[str] = "__contributing_weight"
 These columns are intermediate: they are dropped before the aggregated frame is returned.
 """
 
+_PERCENT_VARS: Final[tuple[str, ...]] = ("total_cloud_cover_atmosphere",)
+"""Variables bounded to 0 to 100 percent, which the aggregation clips back into that range.
+
+A weighted mean of values in [0, 100] lies in [0, 100] mathematically. Rounding in `Float32` can
+still land a cell of uniformly overcast points at 100.00001, which the `Nwp` contract's upper bound
+then rejects.
+"""
+
 _CATEGORY_WEIGHT_SUFFIX: Final[str] = "__category_weight"
 """Suffix of the per-category area weight the H3 aggregation ranks a categorical variable by.
 
@@ -61,7 +69,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
         ds: One downloaded ECMWF ENS run, as returned by
             `dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             `(lead_time, ensemble_member, latitude, longitude)`, with `init_time` a scalar
-            coordinate, and carrying the 13 downloaded ECMWF ENS variables.
+            coordinate, and carrying the 14 downloaded ECMWF ENS variables.
         h3_grid: The H3 grid weights to aggregate onto. One row per (H3 cell, NWP grid point) pair
             whose cell and grid point overlap. `proportion` is the fraction of that cell's area the
             point covers.
@@ -249,5 +257,6 @@ def _aggregate_grid_points_to_h3_cells(
                 for var in numeric_vars
             }
         )
+        .with_columns(pl.col(var).clip(0.0, 100.0) for var in _PERCENT_VARS if var in numeric_vars)
         .drop(cs.ends_with(_CONTRIBUTING_WEIGHT_SUFFIX))
     )

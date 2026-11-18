@@ -61,13 +61,23 @@ which are linear. Speed and bearing are derived features, not stored weather col
 `categorical_precipitation_type_surface` is a category code, not a quantity, so it is aggregated by
 area-weighted mode rather than averaged, and forward-filled rather than interpolated.
 
-It appears to be instantaneous. The three period-ending variables are 100 % null at lead 0, because
-there is no preceding interval for them to average; `categorical_precipitation_type_surface` is
-fully populated there. That is good evidence but not proof, since a period field could in principle
-be published at lead 0 anyway, so confirm against [ECMWF's parameter database
-entry](https://codes.ecmwf.int/grib/param-db/260015) before relying on its timing. If it did
-describe the preceding interval, forward-filling it would attribute one interval's precipitation
-type to the following one.
+**`categorical_precipitation_type_surface` is instantaneous.** [ECMWF's parameter database entry
+for precipitation type (`ptype`)](https://codes.ecmwf.int/grib/param-db/260015) says the field
+describes the type of precipitation at the surface "at the specified time", so forward-filling it
+does not attribute one interval's precipitation type to the following one. The archive agrees: the
+three period-ending variables are 100 % null at lead 0, because there is no preceding interval for
+them to average, and `categorical_precipitation_type_surface` is fully populated there.
+
+**The stored integer codes follow the entry's code table, which is WMO Code Table 4.201.** The
+entry lists these values as diagnosed by ECMWF's Integrated Forecasting System: 0 (no
+precipitation), 1 (rain), 3 (freezing rain), 5 (snow), 6 (wet snow), 7 (a mixture of rain and snow),
+8 (ice pellets), and 12 (freezing drizzle). The entry states that the system does not diagnose
+thunderstorm, mixed ice, graupel, hail, or drizzle (codes 2, 4, 9, 10, and 11). The codes are labels
+and not an ordered scale, which is why the aggregation takes the area-weighted mode.
+
+`total_cloud_cover_atmosphere` is a percentage from 0 to 100 and describes one instant, so it is
+aggregated by area-weighted mean and interpolated linearly like the other instantaneous numeric
+variables. Its error from the resample has not been measured, so the table below omits it.
 
 ## Every variable, and how to read it
 
