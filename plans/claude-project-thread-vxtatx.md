@@ -156,7 +156,7 @@ quantiles from `ClimatologyForecaster`.
 
 #### The main error-handling paths
 
-- **Today's 00Z run is absent at 14:00 UTC**: the asset reports a degradation to Sentry tagged
+- **Today's 00Z run is absent at 14:30 UTC**: the asset reports a degradation to Sentry tagged
   `degraded_asset=live_primaries_network_forecasts`, naming the run, and finishes without writing.
   It does not forecast from yesterday's run, because every lead would be 24 hours longer than the
   network trained on. NGED keeps the fallback forecast from `live_forecasts`, which runs at every
