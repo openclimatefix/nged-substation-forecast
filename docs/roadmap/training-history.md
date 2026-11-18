@@ -8,8 +8,8 @@
 > weather product with a few months of history: 🔬 study
 > [#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999).
 
-Dynamical.org's ECMWF ENS archive starts 2020-10-15, and our stored table starts 2024-04-01 until
-the back-fill has run. Most trial-area power series go back to late 2019. An
+Dynamical.org's ECMWF ENS archive starts 2020-10-15, and our stored table starts on 2024-04-01 and will
+start on 2020-10-15 once the back-fill has run. Most trial-area power series go back to late 2019. An
 estimate of past weather ([defined
 below](#train-on-the-long-power-history-then-calibrate-per-weather-product)) covers the gap. The
 version-1 plan is ERA5 as the estimate of past weather for every variable except irradiance, and
@@ -116,8 +116,8 @@ separately from weather age.
 
 **A new weather product usually arrives with months of archive, while the power history runs from
 late 2019, so an XGBoost model trained only on the new product's archive discards years of power
-data.** ECMWF ENS's archive starts 2020-10-15 (2024-04-01 in our stored table until the back-fill has
-run), the archive of AIFS-ENS (ECMWF's machine-learned
+data.** ECMWF ENS's archive starts 2020-10-15 (2024-04-01 in our stored table, and 2020-10-15 once the
+back-fill has run), the archive of AIFS-ENS (ECMWF's machine-learned
 ensemble) 2025-07-02, WeatherNext 3's 2026-01-01, and the archive of Dynamical.org's ICON-EU (the
 German weather service's European weather model) in early 2026 (dates from the [weather products
 survey](../background/weather-products-survey.md#forecast-models)). The traditional approach needs
@@ -597,8 +597,8 @@ forecasts as they were issued, not reforecasts — from 2020-10-15, built from E
 archive before 2024-04-01, 51 members, 0.25°, 00Z initialisations only
 ([dynamical-org/reformatters#446](https://github.com/dynamical-org/reformatters/issues/446)). Honest
 multi-year folds from that would be strictly better than pre-training and would make most of the
-variant grid unnecessary, but as of 2026-05 the Zarr estimate was **~November 2027**, MARS-bound at
-roughly 0.8 TB/day against ~446 TB remaining — well after v1.0.
+variant grid unnecessary, but the stored table does not hold those years until the back-fill of
+2020-10-15 to 2024-03-31 has run.
 
 **Dynamical.org also stage the same MARS files as raw GRIB1 on Source Cooperative, ahead of turning
 them into Zarr, and a pilot proved we can decode those files ourselves.** The staged bucket carries

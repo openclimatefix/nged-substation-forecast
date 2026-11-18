@@ -103,10 +103,9 @@ Dynamical.org's catalogue page states both ranges: the dataset "is filled with N
 `categorical_precipitation_type_surface` from 2024-04-01 through 2024-11-12, and for
 `total_cloud_cover_atmosphere` from 2024-04-01 through 2025-11-20. Runs before 2024-04-01 come from
 ECMWF's MARS archive and carry both variables. Runs from 2024-04-01 come from ECMWF's open data,
-which lacked each variable until the end of its range. This dictionary is the only place the dates
-are written down. `Nwp.validate`, the `dynamical_data` upstream-null checks, and the test fixtures
-all read them from here.
-"""
+which lacked each variable until the end of its range. The code reads the dates only from this
+dictionary. `Nwp.validate`, the `dynamical_data` upstream-null checks, and the test fixtures all
+read them from here. """
 
 
 def variables_known_empty_at(init_time: datetime) -> frozenset[str]:
@@ -420,8 +419,8 @@ class Nwp(pt.Model):
             " covered by cloud, from 0 for clear sky to 100 for overcast. Instantaneous. Unit:"
             " percent. This field is populated for init_times before 2024-04-01, always null for"
             " init_times from 2024-04-01 to 2025-11-20 inclusive, and populated from the 2025-11-21"
-            " 00Z run onwards, because Dynamical.org fills it with NaN in between."
-            " `NWP_VARIABLE_EMPTY_WINDOWS` records the window of nulls."
+            " 00Z run onwards. Dynamical.org fills the field with NaN from 2024-04-01 to"
+            " 2025-11-20, and `NWP_VARIABLE_EMPTY_WINDOWS` records that window."
         ),
         ge=0,
         le=100,
@@ -593,7 +592,8 @@ class Nwp(pt.Model):
         archive holds values there. A variable whose window sets `never_null_once_populated`
         also rejects any null from the end of its window onwards.
 
-        Direct inspection of the source data confirmed the ptype dates. The 2024-11-13 00Z run is
+        Direct inspection of the source data confirmed the dates for
+        `categorical_precipitation_type_surface` (ECMWF's `ptype`). The 2024-11-13 00Z run is
         the first run after 2024-04-01 with `ptype` populated, 0% null across all lead times, and
         the 2024-11-12 run is 100% null. The runs before 2024-04-01 come from ECMWF's MARS archive,
         which carries `ptype`.

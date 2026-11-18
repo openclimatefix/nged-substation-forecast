@@ -385,8 +385,8 @@ table. Both tables depend on how much power history they see. A screening score 
 different series from a leaderboard score, and divides by different capacities.
 
 **Until the ECMWF ENS history is extended, the screening folds can validate only on October 2024 to
-June 2025.** Our stored ENS archive starts on 2024-04-01 until the back-fill of 2020-10-15 to
-2024-03-31 has run, the pipeline's folds train before they validate, and a series needs 6 months of
+June 2025.** Our stored ENS archive starts on 2024-04-01 and will start on 2020-10-15 once the
+back-fill has run, the pipeline's folds train before they validate, and a series needs 6 months of
 history before the series is scored. Two short folds therefore fit before the cutoff. The first fold
 trains on April to September 2024 and validates on October to December 2024. The second fold trains
 on April to December 2024 and validates on January to June 2025. Screening can under-rate an idea

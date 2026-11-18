@@ -213,7 +213,7 @@ irradiance and ERA5 for other variables, and CEDA UKV is not ingested (see the [
 ERA5
 study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/ukv-ceda-vs-era5/)).
 Our power data reaches back to late 2019, Dynamical.org's ENS archive starts 2020-10-15, and our
-stored ENS table starts 2024-04-01 until the back-fill of 2020-10-15 to 2024-03-31 has run, so an
+stored ENS table starts on 2024-04-01 and will start on 2020-10-15 once the back-fill has run, so an
 estimate of past weather is how the seasonal experiments on this page get more than one winter to
 learn from. The Tier-1 and Tier-2 config wins do not wait for it.
 

@@ -50,8 +50,8 @@ point *is* the cell and one null is still fatal; the V1 grid has 10 such cells o
 category cannot be averaged: its cell takes whichever category covers the most of the cell's area,
 and points that supplied no category are excluded from that ranking rather than competing in it. So
 it too is null only when *no* point supplied a value. A null there is fatal for any `init_time`
-after 2024-11-12, and a column that is null in every cell of a run is fatal for any `init_time`
-before 2024-04-01. [Dynamical.org NaN-fills three variables for part of the
+after 2024-11-12. A column that is null in every cell of a run is fatal for any `init_time` before
+2024-04-01. [Dynamical.org NaN-fills three variables for part of the
 archive](#variables-that-upstream-fills-with-nan-for-part-of-the-archive), and the table stores two
 of them. `categorical_precipitation_type_surface` is null for runs from 2024-04-01 to 2024-11-12,
 and `total_cloud_cover_atmosphere` is null for runs from 2024-04-01 to 2025-11-20.
@@ -316,10 +316,9 @@ as a wholly-empty column, which `Nwp.validate` rejects with `NwpVariableWhollyMi
 `categorical_precipitation_type_surface` column is nullable, but `Nwp.validate` rejects an all-null
 column in any run outside 2024-04-01 to 2024-11-12, and that rejection fails the partition at once,
 with no retry. A run whose `total_cloud_cover_atmosphere` has an empty slice is retried outside the
-variable's empty window, but a wholly-null column that reaches `Nwp.validate` there also fails at
-once. A *defective* run also gets republished — the 2026-08-09 00Z run was repaired by a second
-sweep at 11:45 UTC, 3 hours 25 minutes after its first publication, and well inside the retry
-budget.
+variable's empty window. A wholly-null column that reaches `Nwp.validate` there fails at once. A
+*defective* run also gets republished — the 2026-08-09 00Z run was repaired by a second sweep at
+11:45 UTC, 3 hours 25 minutes after its first publication, and well inside the retry budget.
 
 The partition simply stays unmaterialised if every retry is exhausted, until the upstream data is
 fixed and it is re-run.
@@ -455,16 +454,20 @@ becomes a warning.
 
 ## Variables that upstream fills with NaN for part of the archive
 
-**Dynamical.org fills three variables with NaN for runs initialised from 2024-04-01, and the table
-stores two of them: `categorical_precipitation_type_surface` (until 2024-11-12) and
-`total_cloud_cover_atmosphere` (until 2025-11-20). `Nwp.validate` enforces where each stored
-variable must be null.** The third, `wind_gust_10m`, is not downloaded. The archive reaches back to
-2020-10-15. Runs before 2024-04-01 come from ECMWF's MARS archive, and runs from 2024-04-01 come
-from ECMWF's open data, which lacked the three variables until the dates above. The windows are a
-fixed fact about the dataset, not a quality quirk, so a violation is always fatal. The windows live
-in one place, `contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS`.
+**Dynamical.org leaves three variables as NaN for runs initialised from 2024-04-01, and the `Nwp`
+table stores two of them: `categorical_precipitation_type_surface` (until 2024-11-12) and
+`total_cloud_cover_atmosphere` (until 2025-11-20).** The third variable, `wind_gust_10m`, is not
+downloaded. `Nwp.validate` enforces where each stored variable must be null.
 
-| variable | populated | all-null | populated again |
+Dynamical.org's archive reaches back to 2020-10-15. Runs before 2024-04-01 come from ECMWF's
+Meteorological Archival and Retrieval System (MARS). Runs from 2024-04-01 come from ECMWF's
+open-data release, which lacked the three variables until the dates above, according to
+[Dynamical.org's catalogue page](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/).
+These windows are dates upstream began publishing each variable, not a quality quirk, so a
+violation is always fatal. The code reads the windows from
+`contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS`.
+
+| variable | before the window | inside the window | after the window |
 |---|---|---|---|
 | `categorical_precipitation_type_surface` | before 2024-04-01 | 2024-04-01 to 2024-11-12 | from 2024-11-13 |
 | `total_cloud_cover_atmosphere` | before 2024-04-01 | 2024-04-01 to 2025-11-20 | from 2025-11-21 |
@@ -473,33 +476,31 @@ in one place, `contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS`.
 null.** A run in which the variable is null in every cell is fatal outside the window, because the
 upstream archive holds values there. `categorical_precipitation_type_surface` is also fatal when
 any cell is null from 2024-11-13 onwards. Before 2024-04-01 only a wholly-null run is fatal for
-both variables, because nobody has inspected the MARS-era values cell by cell.
+both variables, because the values from before 2024-04-01 have not been inspected cell by cell.
 
 **`total_cloud_cover_atmosphere` is a percentage from 0 to 100, and `Nwp.validate` rejects a value
-outside that range.** The STAC collection for the dataset gives the unit as percent. The H3
-aggregation treats the variable as numeric, so a cell holds the area-weighted mean of its grid
-points, and `delta_store.nwp.write_nwp` rounds it to 13 significand bits like every other
-continuous variable.
+outside that range.** The dataset's SpatioTemporal Asset Catalog (STAC) collection gives the unit as
+percent. The H3 aggregation treats the variable as numeric, so a cell holds the area-weighted mean
+of its grid points, and `delta_store.nwp.write_nwp` rounds it to 13 significand bits like every
+other continuous variable.
 
 **Outside its empty window, `total_cloud_cover_atmosphere` counts as an instantaneous variable.**
 `raise_if_instantaneous_slices_empty` retries a run with a slice that is NaN at every grid point,
 and `nwp_instantaneous_variables_have_no_nulls` counts the variable's null grid points. Inside the
 window neither check looks at the variable, because every grid point is NaN there by design.
 
-**Partitions written before the variable existed lack the column, and the table adds it on the next
+**A partition written without the column lacks it, and the table adds the column on the next
 write.** `delta_store.nwp.write_nwp` accepts a table that lacks `total_cloud_cover_atmosphere`, adds
 the column to the table schema, and leaves the earlier partitions' files untouched. Every reader
-sees the column as null in those partitions. Filling the column for the partitions from 2024-04-01
-to 2025-11-20 would be pointless, because upstream holds no values for them. The partitions from
-2025-11-21 onwards that were written before the column existed are the ones a later add-column
-back-fill would target.
+sees the column as null in those partitions. Upstream holds no values for the partitions from
+2024-04-01 to 2025-11-20, so the column stays null there.
 
-## Stored partitions written before `total_cloud_cover_atmosphere` existed
+## Stored partitions that lack `total_cloud_cover_atmosphere`
 
-**Partitions initialised from 2025-11-21 that were written before the column was added read
-`total_cloud_cover_atmosphere` as null, and `Nwp.validate` rejects them.** The contract requires
-the column to be populated outside its empty window. A caller that re-validates a stored partition
-from that range, such as `scripts/forecasting/rewrite_nwp_row_groups.py`, therefore raises on it.
-Re-materialising `ecmwf_ens` for those dates repairs them, because each run replaces its own
-partition and the upstream archive holds real values from 2025-11-21. The re-materialisation
-rewrites files, so it needs the maintainer's decision.
+**Stored partitions initialised from 2025-11-21 that lack the column read
+`total_cloud_cover_atmosphere` as null, and `Nwp.validate` rejects those partitions.** The `Nwp`
+contract requires the column to be populated outside its empty window. A caller that re-validates a
+stored partition from that range, such as `scripts/forecasting/rewrite_nwp_row_groups.py`, therefore
+raises on it. Re-materialising `ecmwf_ens` for those dates repairs them, because each run replaces
+its own partition and the upstream archive holds real values from 2025-11-21. The re-materialisation
+overwrites stored files, so it is a deliberate operation and not part of an ordinary back-fill.

@@ -52,10 +52,10 @@ ECMWF_ENS_INSTANTANEOUS_VARS: Final[frozenset[str]] = (
 )
 """The downloaded variables describing conditions at one instant, under their *download* names.
 
-None of these is ever legitimately null, anywhere in any run. That is why
+None of these is ever legitimately null, anywhere in any run. Because of that,
 `dynamical_data.ecmwf_ens.upstream_nulls.assess_upstream_grid_point_nulls` counts them separately
-from the de-accumulated variables. It is also why the ``ecmwf_ens`` asset gates a check on that
-count being zero.
+from the de-accumulated variables, and the ``ecmwf_ens`` asset gates a check on that count being
+zero.
 
 The set leaves out every variable in `contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS`,
 because upstream holds no values for those in some runs. `instantaneous_vars_to_check` adds back
@@ -72,7 +72,7 @@ def instantaneous_vars_to_check(ds: xr.Dataset) -> frozenset[str]:
 
     That is `ECMWF_ENS_INSTANTANEOUS_VARS`, plus each instantaneous variable in
     `contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS` whose window does not contain the
-    run's ``init_time``. Such a variable is never legitimately null outside its window.
+    run's ``init_time``. A variable in that set is never legitimately null outside its window.
 
     Args:
         ds: One downloaded run, with ``init_time`` as a scalar coordinate.
