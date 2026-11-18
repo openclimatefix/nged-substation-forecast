@@ -8,8 +8,8 @@ constants that research experiment 705 exports. The goal is a daily forecast for
 the live service before the Christmas 2026 break.
 
 **The planned solution.** A new workspace package, `demand_network`, rebuilds the network's 60
-input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs a re-implemented
-forward pass for each of the three seeds, and reads 51 quantiles out of each seed's Gaussian
+input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs a forward pass
+re-implemented in numpy for each of the three seeds, and reads 51 quantiles out of each seed's Gaussian
 mixture. A new daily Dagster asset, `live_primaries_network_forecasts`, runs it at the 12:00 UTC
 origin on the day's 00Z ECMWF ENS run and writes the result to the existing `power_forecasts` Delta
 table, encoding quantile level k as `ensemble_member` k, as `ClimatologyForecaster` already does.
@@ -32,8 +32,8 @@ the Candidate. Step 5 also needs no daily K1 run, no stored lag-free table, and 
   missing lags.
 - **More than one defensible design:** fires. The output encoding and whether to subclass
   `BaseForecaster` both have alternatives (see "Risks and open questions").
-- **Callers I could not name without searching:** fires for `select_analysis_proxy`, which gains
-  two arguments.
+- **Callers I could not name without searching:** does not fire. `select_analysis_proxy` is called
+  unchanged, and every other function is new.
 
 **Reviews: both plan reviews (simplicity, then correctness), and all three diff reviews.**
 
@@ -49,16 +49,17 @@ quantiles from `ClimatologyForecaster`.
 
 #### The happy path
 
-1. **A schedule fires `live_primaries_network_forecasts` at 12:00 UTC each day.** The asset is
-   daily-partitioned; the partition's date gives `power_fcst_init_time` = that date at 12:00 UTC
+1. **A schedule fires `live_primaries_network_forecasts` at 12:00 UTC each day.** The asset
+   reuses `ecmwf_ens_partitions` (`defs/assets.py`), so its partition maps one-to-one to the day's
+   ENS run; the partition's date gives `power_fcst_init_time` = that date at 12:00 UTC
    and the native origin = 09:00 UTC, the time the network was trained to treat the 00Z run as
    available. The 12:00 slot is later than `ecmwf_ens_schedule` (10:30 UTC), so on a normal day the
    run is already on disk; the two schedules couple through data at rest, never through run status
    (design principle 14).
 2. **The asset loads the bundle** with `demand_network.bundle.load_bundle(path)` from the new
-   `Settings.primaries_network_bundle_path`. `load_bundle` checks `bundle_format_version == 1`,
-   checks every file's SHA-256 against `manifest.json`, builds the network modules for each seed
-   from `components/step5/weights/seed<N>.pt` with `torch.load(..., weights_only=True)`, and returns
+   `Settings.primaries_network_bundle_path`. `load_bundle` checks `bundle_format_version == 2`,
+   reads each seed's weights from `components/step5/weights/seed<N>.npz` with `numpy.load`, and
+   returns
    a frozen `Bundle` dataclass holding the config, the standardisers, the column order, the offset
    knots, and the 16 Primaries from `primaries.json` (identifier, H3 cell, latitude, longitude,
    `effective_capacity_mw`, `capacity_mw`, embedding index). The Primaries and their capacities come
@@ -66,7 +67,8 @@ quantiles from `ClimatologyForecaster`.
    `live_forecasts` uses its frozen metadata copy.
 3. **The asset checks that today's 00Z run is present** with the existing
    `_available_nwp_init_times`. If it is not, the asset raises `RetryRequested` (every 30 minutes,
-   up to 4 times, so until 14:00 UTC), mirroring `ecmwf_ens`.
+   up to 5 times, so until 14:30 UTC), which matches the last retry of `ecmwf_ens` (8 retries from
+   10:30 UTC).
 4. **The asset reads the NWP it needs in one scan** of the `nwp` Delta table, pruned to the 16 H3
    cells and to runs initialised from the native origin minus 9 days to today's 00Z run. The 9 days
    cover the expected-weather rows, which reach back to 192 hours before the native origin, and the
@@ -98,7 +100,10 @@ quantiles from `ClimatologyForecaster`.
 
    The analysis proxy comes from `select_analysis_proxy` called on the ENS summary means with the
    two new arguments, `member=None` (take the frame as already reduced) and `min_lead=9 h` with
-   `max_lead=33.5 h`, which experiment 705 showed reproduces the research history exactly. The
+   `max_lead=33.5 h`, which experiment 705 showed reproduces the research history exactly.
+   `select_analysis_proxy` itself is not changed: `demand_network.features.analysis_proxy` filters
+   the summary means to ENS leads above 9 and below 33.5 hours, labels the frame
+   `ensemble_member = NWP_ANALYSIS_MEMBER`, and calls the function as it stands. The
    expected-weather rows for each lag time come from `build_expected_rows(...)`: for each half-hour
    g in (native origin − 192 h, native origin − 24 h], the ENS summary row of the freshest run whose
    native 09:00 origin is at or before g, its 7 weather means and 21 recomputed date-time columns.
@@ -106,12 +111,15 @@ quantiles from `ClimatologyForecaster`.
    to 0 for the 37 lag-free columns; no clip for the B1 columns; float16 rounding of the
    expected-weather rows).
 7. **`demand_network.network.forecast(bundle, matrix, expected_rows)`** runs each seed's forward
-   pass (the weather, date-time, and shared lag encoders, then the mixer and the per-Primary offset
+   pass in numpy, with `scipy.special.erf` for the exact GELU and the mixture's cumulative
+   distribution (the weather, date-time, and shared lag encoders, then the mixer and the per-Primary offset
    interpolated between knots), reads 51 quantiles at levels (k + 0.5) / 51 from each seed's
    mixture by 40 bisection steps over ±40 standard deviations, converts each seed's quantiles to a
    fraction of capacity with the per-Primary target mean and standard deviation, averages the three
    seeds level by level, and sorts within each row. The forward pass is ported from the bundle's
-   `reference_check.py`, so it imports nothing from research.
+   functional `forward` and `mlp` of `reference_check.py`, applying the stored weights by their
+   `state_dict` names, so the port diffs line by line against the reference and imports nothing
+   from research.
 8. **The asset relabels the origin to 12:00 UTC, multiplies by `capacity_mw`, and keeps valid
    times strictly after 12:00 UTC and up to 12:00 UTC 14 days later** (671 half-hours per Primary,
    because `PowerForecast.valid_time` must be strictly after `power_fcst_init_time` and research's
@@ -122,21 +130,29 @@ quantiles from `ClimatologyForecaster`.
    until a release is cut), `nwp_init_time` = today's 00Z run, and `fold_id = "live"`.
 9. **The asset writes with `write_power_forecasts`**, replacing exactly the partition
    (`experiment_name`, `"live"`) and this `power_fcst_init_time`, so a rerun never duplicates rows,
-   and sends a Sentry check-in for a new monitor on the daily cadence.
+   No Sentry check-in monitor is added: a failed run reaches Sentry through
+   `sentry_capture_failure`, a missing run through the degradation report, and a dead daemon
+   through the existing `live-forecasts` monitor.
 
 #### The main branches off the happy path
 
-- **A replay of a past partition** (`availability_mode="replay"` in the config) reads the same NWP
-  runs, because the input rule is defined by the native origin and not by what is on disk "now",
-  and skips the Sentry check-in, as `live_forecasts` does.
+- **A backfill of a past partition** reads the same NWP runs as the live run did, because the
+  input rule is defined by the native origin and not by what is on disk now. The asset has no
+  `availability_mode` config.
 - **A Primary whose day or week lag is missing** (no cleaned reading at the lag time, or a stale
   telemetry feed) gets the missing encoding the network was trained with (value 0, flag 1, the
   largest age code). The network trained with 30% of origin days lag-masked, so this degrades the
   forecast towards the lag-free forecast rather than failing.
-- **An analysis-proxy half-hour with no first-day run** (a missing daily run in the past 9 days)
-  falls back to the freshest older run that covers it, which is production's existing column-wise
-  fill, and the asset reports the degradation. Research leaves the value missing, so this branch
-  differs from research by design; it is the only branch that does.
+- **An analysis-proxy half-hour with no first-day run** (a missing daily run in the past 9 days).
+  The first-day windows of consecutive daily runs touch with only 0.5 hours of overlap, so the
+  windowed proxy leaves a gap of a whole day when one run is missing. The asset coalesces the
+  windowed proxy with a second call of `select_analysis_proxy` without the lead window, which fills
+  the gap from the freshest older run that covers it, and reports the degradation. Any half-hour
+  still null after that (several runs missing) gets the standardised value 0 in its B1 columns,
+  the column's training mean, rather than reaching the network as NaN. Without this branch, one
+  missed ENS day would fail the asset for the 9 days the B1 columns reach back. Research leaves
+  the value missing, so this branch differs from research by design; it is the only branch that
+  does.
 
 #### The main error-handling paths
 
@@ -144,56 +160,49 @@ quantiles from `ClimatologyForecaster`.
   `degraded_asset=live_primaries_network_forecasts`, naming the run, and finishes without writing.
   It does not forecast from yesterday's run, because every lead would be 24 hours longer than the
   network trained on. NGED keeps the fallback forecast from `live_forecasts`, which runs at every
-  slot. The missed Sentry check-in also fires.
-- **Today's run has fewer than 51 members in a cell**: the summary uses the members present when
-  at least 40 are present, and the asset reports the degradation naming the run and the count.
-  Below 40, the asset treats the run as absent (previous bullet).
-- **The bundle is missing, fails its checksums, or has an unknown format version**: `load_bundle`
-  raises. That is our own deployment fault, not the outside world, so raising is right under the
+  slot.
+- **Today's run has fewer than 51 members in a cell**: the summary is the mean and standard
+  deviation over the members present. `nwp_run_is_complete` already warns about the run and names
+  the absent members, so the asset adds no report of its own.
+- **The bundle is missing or has an unknown format version**: `load_bundle` raises. The SHA-256 of
+  every file is checked once, at image build time, because the image cannot change after it is
+  built. That is our own deployment fault, not the outside world, so raising is right under the
   inherent-stability page; the run fails loudly and the Sentry failure hook reports it.
 - **The output fails `PowerForecast.validate`** (a duplicated key, a NaN quantile): raises, because
   that is our bug.
 
 ### What changes, file by file
 
-- **`pyproject.toml` and `uv.lock`**: add `torch` (CPU wheels, from the PyTorch CPU index through
-  `[tool.uv.sources]` for `linux/x86_64`; PyPI's `linux/aarch64` wheels are CPU-only already) and
-  `holidays` as dependencies of the new package. Check the arm64 image size in
-  `scripts/deploy/build_and_verify_image.sh`.
+- **No `torch` dependency.** The forward pass is a few linear layers, GELU, embedding lookups,
+  `log_softmax`, `erf`, and bisection, all of which numpy and scipy do. `holidays` is added as a
+  dependency of the new package; `numpy` and `scipy` are already locked.
+- **Research prerequisite (in `nged-ml-research`):** experiment 705's exporter also writes each
+  seed's weights as `seed<N>.npz`, and the bundle format becomes version 2. The `.pt` files can
+  stay for research's own `reference_check.py`.
 - **`packages/demand_network/`** (new workspace member):
     - `bundle.py`: `Bundle` (frozen dataclass), `load_bundle(path)`, `BUNDLE_FORMAT_VERSION: Final =
       1`.
     - `ens_summary.py`: `summarise_runs(nwp, coordinates)`.
     - `features.py`: `calendar_columns`, `b1_columns`, `lag_columns`, `knot_position`,
       `build_expected_rows`, `build_input_matrix`.
-    - `network.py`: the `torch.nn.Module` classes for the encoders and mixer, `mixture_quantiles`,
-      and `forecast`.
+    - `network.py`: the functional `mlp` and `forward` ported from `reference_check.py`,
+      `mixture_quantiles`, and `forecast`.
     - `README.md`: what the package does and where bundles come from.
-- **`packages/weather_utils/src/weather_utils/analysis_proxy.py`**: `select_analysis_proxy` gains
-  `member: int | None` (None skips the member filter, for a frame already reduced to one row per
-  run and valid time) and `min_lead: timedelta | None`. Defaults keep today's behaviour, so the existing callers (in `ml_core.features` and the
-  dashboard) are unchanged.
 - **`packages/contracts/src/contracts/settings.py`**: `primaries_network_bundle_path`, defaulting
   to `<local_artifacts_path>/primaries_network_bundle`.
-- **`src/nged_substation_forecast/defs/primaries_network_assets.py`** (new): the asset, its daily
-  partitions, and its config.
+- **`src/nged_substation_forecast/defs/primaries_network_assets.py`** (new): the asset, on
+  `ecmwf_ens_partitions`.
 - **`src/nged_substation_forecast/defs/schedules.py`**: `live_primaries_network_forecasts_job` and
   its 12:00 UTC schedule.
-- **`src/nged_substation_forecast/_sentry.py`**: a monitor config for the daily check-in.
-- **`src/nged_substation_forecast/defs/checks.py`**: `primaries_network_forecasts_are_fresh`, a
-  `WARN`, `blocking=False` check that warns when the newest `power_fcst_init_time` under
-  `experiment_name="primaries_demand_network"` is more than 36 hours old. Its body runs under the
-  same catch-all as `live_forecasts_are_healthy`, so it cannot raise.
 - **`Dockerfile` and `scripts/deploy/build_and_verify_image.sh`**: a second named build context,
-  `primaries_network_bundle`, copied to the bundle path, with the bundle's manifest commit printed
-  by the verify step.
+  `primaries_network_bundle`, copied to the bundle path. The verify step runs the SHA-256 check of
+  every file against `manifest.json` and prints the bundle's research commit.
 
 ### Implementation order (three pull requests on top of this plan)
 
-1. **`select_analysis_proxy` arguments and the `demand_network` package without the asset**, with
-   the golden tests. This is the part where train/serve skew can hide, so it gets reviewed on its
+1. **The `demand_network` package without the asset**, with the golden tests. This is the part where train/serve skew can hide, so it gets reviewed on its
    own.
-2. **The asset, schedule, check, Sentry monitor, settings, and image changes.**
+2. **The asset, schedule, settings, and image changes.**
 3. **Docs**: the runbook steps and the release-log row.
 
 ## Design-philosophy check
@@ -223,15 +232,16 @@ quantiles from `ClimatologyForecaster`.
   production's `ens_summary` against `ens_summary.parquet`, every `raw__` column of
   `build_input_matrix` against `input_matrix.parquet` (to 1e-5), the expected-weather rows against
   `lag_and_expected_rows.parquet`, and the seed-mean quantiles at the 11 research levels against
-  `outputs_native.parquet` (to 2e-5 of capacity). Each would fail on `main` today because none of
+  `outputs_native.parquet` (to 2e-5 of capacity). The contract rows are compared with
+  `outputs_contract.parquet` on its 671 rows after 12:00 UTC, because the research file's first row
+  sits at 12:00 UTC itself and `PowerForecast` drops it. Each would fail on `main` today because none of
   the functions exists; each also fails if the member order of step 5 is swapped back.
 - **The golden tests read production's own Delta tables, not the fixture inputs,** for the ENS and
   the power, so they test the real read path. The fixture's `ens_native.parquet` is used only to
   localise a mismatch.
 - **Committed unit tests on synthetic data (CI):**
-    - `select_analysis_proxy` with `member=None` and `min_lead`: on a frame with two overlapping
-      runs, a half-hour 5 hours after the freshest run's init comes from the older run (fails on
-      `main`, where the freshest run wins).
+    - `analysis_proxy`: on three daily runs with the middle run missing, the half-hours of the
+      missing run's first day come from the older run's later leads and are not null.
     - `summarise_runs`: two members whose 3-hourly radiation peaks differ give a different standard
       deviation from the average-then-interpolate order (fails if the order is swapped).
     - `lag_columns`: a target 30 hours after the native origin reads the lag 48 half-hours earlier
@@ -245,7 +255,6 @@ quantiles from `ClimatologyForecaster`.
       671 × 51 rows, every row strictly after the init time; a second run of the same partition
       leaves the row count unchanged; with today's run absent, it writes nothing and calls
       `report_asset_degradation`; MVA rows have no negative quantile.
-    - The check: returns a warning, never raises, when the Delta table is unreadable.
 
 ## Docs to update
 
@@ -282,5 +291,17 @@ scripts/deploy/build_and_verify_image.sh   # image size and bundle copy
 - **The first production bundle is refitted on 2026-10-01, so its offset is held flat past
   October.** The next refit, with a 2026-12-01 cut-off, can first run on about 2026-12-06 because
   ERA5 arrives about 5 days late (experiment 705, finding 3).
-- **Image size.** CPU `torch` adds roughly 200 to 300 MB to the image. Fargate pulls it once per
-  task start; check that start-up time stays acceptable.
+- **numpy instead of `torch`.** Recommendation: numpy, which keeps the image the size it is and
+  adds no dependency; the cost is the small research change to write `.npz` weights. If the later
+  Candidate or prevailing head needs operations numpy lacks, `torch` can be added then.
+- **No Sentry check-in monitor for the daily schedule.** What is lost is an alarm for the one
+  schedule being switched off while the daemon runs. Recommendation: add it later if wanted,
+  because `send_forecast_checkin` hard-codes the `live_forecasts` monitor today.
+- **Solar geometry.** If research's zenith and azimuth columns match ml_core's NOAA geometry in
+  `_half_hour_clear_sky`, move that geometry into its own function and reuse it; the golden tests
+  decide.
+
+### Simplicity review: findings rejected
+
+None rejected outright. Ten findings were applied as above, and the solar-geometry finding is left
+for the golden tests to decide.
