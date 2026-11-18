@@ -75,6 +75,20 @@ from nged_substation_forecast.defs._engineering_inputs import (
 )
 from nged_substation_forecast.defs._tags import RESEARCH_LAYER_TAGS
 
+LEADERBOARD_EPOCH_FIRST_RUN: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
+"""The first NWP run of the leaderboard epoch. The archive holds earlier runs, back-filled from
+2020-10-15, which no fold's training data reads, so every fold's scores stay comparable."""
+
+
+def training_init_time_start(train_start: datetime) -> datetime:
+    """Return the earliest NWP run a fold trains on: the usual look-back, floored at the epoch.
+
+    A run initialised up to ``MAX_NWP_LEAD`` before ``train_start`` can still cover the window,
+    but a run before ``LEADERBOARD_EPOCH_FIRST_RUN`` never enters a fold's training data.
+    """
+    return max(train_start - MAX_NWP_LEAD, LEADERBOARD_EPOCH_FIRST_RUN)
+
+
 # The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
 # (never hard-coded) so every CV run and asset agrees on the same folds. Loaded at import so
 # the partition keys are available when Dagster builds the asset graph. The raw CV_CONFIG_PATH
@@ -403,10 +417,9 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         metadata=metadata_df,
         window_start=train_start,
         window_end=train_end,
-        # The training runs start at the window start. Starting 16 days earlier (the NWP look-back)
-        # would let archive runs back-filled before the leaderboard epoch's first run change the
-        # fold's data.
-        init_time_start=train_start,
+        # Runs back-filled before the leaderboard epoch's first run must not change a fold's
+        # training data, so the usual 16-day NWP look-back is floored at that first run.
+        init_time_start=training_init_time_start(train_start),
         ensemble_members=[0],
         power_lookback=power_lookback,
     )

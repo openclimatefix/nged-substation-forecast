@@ -9,6 +9,7 @@ inclusive training window.
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import mlflow
 import polars as pl
@@ -26,8 +27,14 @@ from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
 from xgboost_forecaster.forecaster import XGBoostForecaster
 
+from nged_substation_forecast.defs import cv_assets
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
-from nged_substation_forecast.defs.cv_assets import _load_time_series_metadata, trained_cv_model
+from nged_substation_forecast.defs.cv_assets import (
+    LEADERBOARD_EPOCH_FIRST_RUN,
+    _load_time_series_metadata,
+    trained_cv_model,
+    training_init_time_start,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -405,6 +412,48 @@ def test_trained_cv_model_derives_power_lookback_from_selected_features(
     ).success
 
     assert calls == [timedelta(hours=24)]
+
+
+@pytest.mark.parametrize(
+    ("train_start", "expected"),
+    [
+        (datetime(2024, 4, 1, tzinfo=UTC), LEADERBOARD_EPOCH_FIRST_RUN),
+        (datetime(2024, 4, 10, tzinfo=UTC), LEADERBOARD_EPOCH_FIRST_RUN),
+        (datetime(2025, 1, 1, tzinfo=UTC), datetime(2024, 12, 16, tzinfo=UTC)),
+    ],
+)
+def test_training_init_time_start_keeps_the_look_back_except_before_the_epoch(
+    train_start: datetime, expected: datetime
+) -> None:
+    """A fold starting after the epoch keeps the 16-day look-back, and an early fold is floored."""
+    assert training_init_time_start(train_start) == expected
+
+
+def test_trained_cv_model_floors_the_nwp_look_back_at_the_leaderboard_epoch(
+    env: None,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperimentWithFeatures,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The training runs start 16 days before the window, but never before the epoch's first run.
+
+    The fold starts on the epoch's first run, so the floor binds and the back-filled runs before
+    2024-04-01 stay out of the training data.
+    """
+    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m"])
+    init_time_starts: list[datetime] = []
+
+    def _spy(*args: Any, **kwargs: Any) -> Any:
+        init_time_starts.append(kwargs["init_time_start"])
+        return load_engineering_inputs(*args, **kwargs)
+
+    monkeypatch.setattr(cv_assets, "load_engineering_inputs", _spy)
+
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    assert init_time_starts == [training_init_time_start(_TRAIN_START)]
 
 
 def test_trained_cv_model_trains_and_saves_to_mlflow(
