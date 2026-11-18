@@ -467,6 +467,9 @@ These windows are dates upstream began publishing each variable, not a quality q
 violation is always fatal. The code reads the windows from
 `contracts.weather_schemas.NWP_VARIABLE_EMPTY_WINDOWS`.
 
+**The table gives, for each stored variable, its window: the range of run initialisation times for
+which upstream holds only NaN for that variable.**
+
 | variable | before the window | inside the window | after the window |
 |---|---|---|---|
 | `categorical_precipitation_type_surface` | before 2024-04-01 | 2024-04-01 to 2024-11-12 | from 2024-11-13 |
