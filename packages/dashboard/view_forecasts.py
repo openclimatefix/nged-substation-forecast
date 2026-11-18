@@ -8,6 +8,7 @@ with app.setup:
     import polars as pl
     from contracts.power_schemas import TimeSeriesMetadata
     from contracts.typing_utils import typeddict_to_dict
+    from contracts.weather_schemas import Nwp
     from dashboard.data_source import settings_for_source, source_status_message
     from dashboard.forecast_chart import (
         LAG_OPTIONS,
@@ -468,10 +469,7 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
     ].item()
     try:
         nwp = (
-            pl.scan_delta(
-                settings.nwp_data_path,
-                storage_options=typeddict_to_dict(settings.storage_options),
-            )
+            Nwp.scan_delta(settings.nwp_data_path, storage_options=settings.storage_options)
             .filter(
                 pl.col("init_time") == nwp_init_time,
                 pl.col("h3_index") == _series_h3,
@@ -495,10 +493,7 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
         # reach the window, so the init_time filter starts there.
         nwp_analysis = (
             select_analysis_proxy(
-                pl.scan_delta(
-                    settings.nwp_data_path,
-                    storage_options=typeddict_to_dict(settings.storage_options),
-                )
+                Nwp.scan_delta(settings.nwp_data_path, storage_options=settings.storage_options)
                 .filter(
                     pl.col("init_time").is_between(
                         init_time - PLOT_HISTORY - NWP_ANALYSIS_LEAD, init_time + PLOT_HORIZON
