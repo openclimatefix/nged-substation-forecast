@@ -572,8 +572,8 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     warn rather than block, so a degraded run is still written and still forecast from.
 
     A run Dynamical.org has not finished publishing is retried up to 8 times, 30 minutes apart,
-    covering more than 4 hours past the 10:30 UTC schedule. The retry covers three cases: a run that
-    is absent from the catalog, a run with whole (member, lead time) slices of an instantaneous
+    covering more than 4 hours past the 10:30 UTC schedule. The retry covers four cases: a run that
+    is absent from the catalog, a catalog fetch that fails (for example a connection reset), a run with whole (member, lead time) slices of an instantaneous
     variable still empty, and a run with a de-accumulated variable still wholly empty. A
     materialisation that runs for hours and then fails is therefore this asset waiting for an
     upstream run that never arrived, not a bug. The first failed attempt that the asset will retry

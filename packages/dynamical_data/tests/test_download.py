@@ -92,6 +92,23 @@ def test_open_raises_when_run_not_available(
         download.open_ecmwf_ens_run(missing, default_h3_grid)
 
 
+def test_open_raises_retryable_error_when_catalog_fetch_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    default_h3_grid: pt.DataFrame[H3GridWeights],
+) -> None:
+    def _fail(*args: object, **kwargs: object) -> xr.Dataset:
+        raise download.dynamical_catalog.CatalogFetchError(
+            "Failed to fetch 1 STAC collection(s): ('https://stac.dynamical.org/x/collection.json',)",
+            urls=("https://stac.dynamical.org/x/collection.json",),
+            attempts=3,
+        )
+
+    monkeypatch.setattr(download.dynamical_catalog, "open", _fail)
+
+    with pytest.raises(download.NwpRunNotYetAvailable):
+        download.open_ecmwf_ens_run(_INIT_TIME, default_h3_grid)
+
+
 def test_open_raises_on_empty_coords(
     monkeypatch: pytest.MonkeyPatch,
     make_ens_dataset: Callable[..., xr.Dataset],

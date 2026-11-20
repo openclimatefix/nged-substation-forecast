@@ -22,6 +22,17 @@ class NwpRunNotYetAvailable(Exception):
     """
 
 
+class NwpCatalogUnreachable(NwpRunNotYetAvailable):
+    """Raised when the Dynamical.org STAC catalog cannot be fetched.
+
+    ``dynamical_catalog.open`` fetches every collection in the catalog, not only the one asked
+    for, and fails if any one collection fetch fails after its own 3 attempts, 1 second apart.
+    A connection reset on any collection, ECMWF or not, therefore fails the call. This subclasses
+    `NwpRunNotYetAvailable` so that the ``ecmwf_ens`` asset retries it on the same 30-minute
+    ladder.
+    """
+
+
 _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
     "temperature_2m",
     "dew_point_temperature_2m",
@@ -130,7 +141,12 @@ def open_ecmwf_ens_run(
     # and then stripped of tzinfo here.
     utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(UTC).replace(tzinfo=None))
 
-    ds = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
+    try:
+        ds = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
+    except dynamical_catalog.CatalogFetchError as exc:
+        raise NwpCatalogUnreachable(
+            f"Could not fetch the Dynamical.org STAC catalog: {exc}"
+        ) from exc
 
     ds = ds[list(_ECMWF_ENS_VARS_TO_DOWNLOAD)]
 
