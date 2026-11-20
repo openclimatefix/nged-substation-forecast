@@ -29,8 +29,8 @@ class NwpCatalogUnreachable(Exception):
 
     `open_ecmwf_ens_run` raises this when `dynamical_catalog.CatalogFetchError` was caused by a
     network error, a timeout, or an HTTP 5xx, 429, or 409 response. The ``dynamical_catalog``
-    package fetches every collection in the catalog, not only the one asked for, so a failure on
-    any collection raises the error. The ``ecmwf_ens`` asset retries this exception on the same
+    package fetches ``catalog.json`` and then the one collection that the caller opens, and each
+    fetch makes up to 3 attempts. The ``ecmwf_ens`` asset retries this exception on the same
     ladder as `NwpRunNotYetAvailable`, except for a run initialised more than 36 hours ago.
     """
 

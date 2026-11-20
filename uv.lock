@@ -1418,7 +1418,7 @@ wheels = [
 
 [[package]]
 name = "dynamical-catalog"
-version = "1.0.1"
+version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "gribberish" },
@@ -1426,9 +1426,9 @@ dependencies = [
     { name = "xarray" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/91/86/8f9c45100e96d2139f6f3e5833755e55977e44e2f84ade713f3fe3502bf6/dynamical_catalog-1.0.1.tar.gz", hash = "sha256:4b566d1fd7dbf3c9588ed3b307c0c0dc028f3f987c8bca0b9f8afe3ab104e7a4", size = 68975, upload-time = "2026-09-04T14:51:57.946Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/56/efc04a03d8b0d3785ba7ad86e3954a8f76da393f9999c0af7dabd850dc5f/dynamical_catalog-1.1.1.tar.gz", hash = "sha256:b1d3a1e9b2740ea6597c8a2119bbd15c2ac7ba6eabcff6efd2cb00497a04d128", size = 72592, upload-time = "2026-11-12T18:07:32.296Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/32/11/2c2f5b0e7b9c772ab159e51a5bbe315e3f30644eafa84d5b5920b4e403f5/dynamical_catalog-1.0.1-py3-none-any.whl", hash = "sha256:337ef1b9608952bef7e2b0987e3010d569ae2b0d0f0762a3c2882f9c1cbab9be", size = 10537, upload-time = "2026-09-04T14:51:56.717Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/f7/7379d46a5ae1d562da45294ee3ab8a244bc4341d04f30c94a727d5b2c165/dynamical_catalog-1.1.1-py3-none-any.whl", hash = "sha256:3ab88eb6ac3a11ed42dc3426bded5c44a5281472771f94b42bfe8729f5dd870b", size = 11403, upload-time = "2026-11-12T18:07:30.77Z" },
 ]
 
 [[package]]
@@ -1452,7 +1452,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "contracts", editable = "packages/contracts" },
-    { name = "dynamical-catalog", specifier = ">=0.5.0" },
+    { name = "dynamical-catalog", specifier = ">=1.1.1" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "patito" },
     { name = "polars", specifier = ">=1.38.1" },
