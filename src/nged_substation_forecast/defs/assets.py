@@ -411,7 +411,7 @@ Dynamical.org is unlikely to repair a run that is days old. Each retrying partit
 attempt, about 15 hours (the 10:30 UTC schedule plus the 4-hour ladder). The limit also lets a
 manual re-run of the previous day's partition retry, though that re-run's ladder stops early, once
 the run passes 36 hours. Reasoning:
-https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#why-only-these-three-failures-are-retried"""
+https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#why-only-these-four-failures-are-retried"""
 
 
 def _is_too_old_to_retry(nwp_init_time: datetime, now: datetime) -> bool:
