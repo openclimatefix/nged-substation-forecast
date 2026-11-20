@@ -5,9 +5,12 @@ which is patched with ``monkeypatch`` to return an in-memory synthetic dataset. 
 runs offline.
 """
 
+import json
+import urllib.error
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta, timezone
 
+import dynamical_catalog
 import numpy as np
 import patito as pt
 import pytest
@@ -92,20 +95,71 @@ def test_open_raises_when_run_not_available(
         download.open_ecmwf_ens_run(missing, default_h3_grid)
 
 
-def test_open_raises_retryable_error_when_catalog_fetch_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    default_h3_grid: pt.DataFrame[H3GridWeights],
-) -> None:
+def _catalog_fetch_error(cause: BaseException) -> dynamical_catalog.CatalogFetchError:
+    url = "https://stac.dynamical.org/x/collection.json"
+    error = dynamical_catalog.CatalogFetchError(
+        f"Failed to fetch 1 STAC collection(s): ({url!r},)", urls=(url,), attempts=3
+    )
+    error.__cause__ = cause
+    return error
+
+
+def _patch_catalog_failure(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
     def _fail(*args: object, **kwargs: object) -> xr.Dataset:
-        raise download.dynamical_catalog.CatalogFetchError(
-            "Failed to fetch 1 STAC collection(s): ('https://stac.dynamical.org/x/collection.json',)",
-            urls=("https://stac.dynamical.org/x/collection.json",),
-            attempts=3,
-        )
+        raise error
 
     monkeypatch.setattr(download.dynamical_catalog, "open", _fail)
 
-    with pytest.raises(download.NwpRunNotYetAvailable):
+
+@pytest.mark.parametrize(
+    "cause",
+    [
+        ConnectionResetError(104, "Connection reset by peer"),
+        urllib.error.HTTPError("https://x", 503, "Service Unavailable", {}, None),  # ty: ignore[invalid-argument-type]
+        urllib.error.HTTPError("https://x", 429, "Too Many Requests", {}, None),  # ty: ignore[invalid-argument-type]
+    ],
+)
+def test_open_raises_catalog_unreachable_on_a_transient_catalog_fetch_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    default_h3_grid: pt.DataFrame[H3GridWeights],
+    cause: BaseException,
+) -> None:
+    error = _catalog_fetch_error(cause)
+    _patch_catalog_failure(monkeypatch, error)
+
+    with pytest.raises(download.NwpCatalogUnreachable) as exc_info:
+        download.open_ecmwf_ens_run(_INIT_TIME, default_h3_grid)
+    assert exc_info.value.__cause__ is error
+
+
+@pytest.mark.parametrize(
+    "cause",
+    [
+        urllib.error.HTTPError("https://x", 404, "Not Found", {}, None),  # ty: ignore[invalid-argument-type]
+        json.JSONDecodeError("Expecting value", "<html>", 0),
+    ],
+)
+def test_open_does_not_wrap_a_catalog_fetch_failure_that_retrying_cannot_heal(
+    monkeypatch: pytest.MonkeyPatch,
+    default_h3_grid: pt.DataFrame[H3GridWeights],
+    cause: BaseException,
+) -> None:
+    error = _catalog_fetch_error(cause)
+    _patch_catalog_failure(monkeypatch, error)
+
+    with pytest.raises(dynamical_catalog.CatalogFetchError) as exc_info:
+        download.open_ecmwf_ens_run(_INIT_TIME, default_h3_grid)
+    assert exc_info.value is error
+
+
+def test_open_does_not_wrap_other_dynamical_catalog_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    default_h3_grid: pt.DataFrame[H3GridWeights],
+) -> None:
+    error = dynamical_catalog.InvalidCatalogError("STAC catalog response is missing 'links'")
+    _patch_catalog_failure(monkeypatch, error)
+
+    with pytest.raises(dynamical_catalog.InvalidCatalogError):
         download.open_ecmwf_ens_run(_INIT_TIME, default_h3_grid)
 
 

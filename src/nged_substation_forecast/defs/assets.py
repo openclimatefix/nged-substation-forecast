@@ -45,6 +45,7 @@ from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
 from dynamical_data.ecmwf_ens.download import (
+    NwpCatalogUnreachable,
     NwpRunNotYetAvailable,
     download_ecmwf_ens_data,
     instantaneous_vars_to_check,
@@ -379,19 +380,20 @@ _ECMWF_ENS_MAX_RETRIES: Final[int] = 8
 (``ecmwf_ens_schedule``), comfortably past Dynamical's typical publication time — and past the 3h25m
 a measured republication took. The 4h also exceeds the 3h28m that Dynamical.org's store took to fill
 on 2026-10-02, counted from an 08:30 UTC attempt. Applies to ``NwpRunNotYetAvailable`` (the run is
-absent from the catalog, or an instantaneous variable has a slice that is empty at every grid point)
-and ``NwpVariableWhollyMissing`` (a de-accumulated variable is wholly empty), the two exceptions
-through which an upstream run says "not ready yet". A genuine bug fails immediately instead of
-retrying for hours.
+absent from the catalog, or an instantaneous variable has a slice that is empty at every grid
+point), ``NwpVariableWhollyMissing`` (a de-accumulated variable is wholly empty), and
+``NwpCatalogUnreachable`` (the catalog fetch failed on a network error or a server-side HTTP
+error). A genuine bug fails immediately instead of retrying for hours.
 
-Waiting is the right response to those three failures because Dynamical.org publishes each 00Z run
-as roughly 40 separate Icechunk commits between 08:05 and 08:20 UTC, one per worker. A run part-way
-through that window is genuinely readable and genuinely incomplete: a variable whose worker has not
-committed yet reads as null across every member and step. Fuller reasoning:
+Waiting is the right response to the first three failures because Dynamical.org publishes each 00Z
+run as roughly 40 separate Icechunk commits between 08:05 and 08:20 UTC, one per worker. A run
+part-way through that window is genuinely readable and genuinely incomplete: a variable whose worker
+has not committed yet reads as null across every member and step. Fuller reasoning:
 https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright
 
-"≥" rather than "≈" because two of the three failures are found after the download. A run absent
-from the catalog is found before the download, but each retry caused by the other two failures
+"≥" rather than "≈" because two of the four failures are found after the download. A run absent
+from the catalog and an unreachable catalog are found before the download, but each retry caused by
+the other two failures
 repeats the download and re-takes the ``ECMWF`` concurrency pool slot. One attempt measured 81s on
 2026-10-06 (open 4s, download 38s, convert 39s), and an attempt that stops at the empty-slice check
 takes about 42s. On a normal day the elapsed window is therefore between about 4h6m and 4h12m, and
@@ -573,8 +575,9 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
 
     A run Dynamical.org has not finished publishing is retried up to 8 times, 30 minutes apart,
     covering more than 4 hours past the 10:30 UTC schedule. The retry covers four cases: a run that
-    is absent from the catalog, a catalog fetch that fails (for example a connection reset), a run with whole (member, lead time) slices of an instantaneous
-    variable still empty, and a run with a de-accumulated variable still wholly empty. A
+    is absent from the catalog, a catalog fetch that fails on a network error or a server-side
+    HTTP error, a run with whole (member, lead time) slices of an instantaneous variable still
+    empty, and a run with a de-accumulated variable still wholly empty. A
     materialisation that runs for hours and then fails is therefore this asset waiting for an
     upstream run that never arrived, not a bug. The first failed attempt that the asset will retry
     sends a Sentry warning naming the partition, so the operator learns of the fault hours before
@@ -594,9 +597,10 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         )
     ).set_model(H3GridWeights)
 
-    # Download and convert. Three failures mean "the upstream run is not ready yet" and are retried
-    # on the ladder in _ECMWF_ENS_MAX_RETRIES: the run is absent from the catalog, an instantaneous
+    # Download and convert. Four failures are retried on the ladder in _ECMWF_ENS_MAX_RETRIES. Three
+    # mean "the upstream run is not ready yet": the run is absent from the catalog, an instantaneous
     # variable has a slice empty at every grid point, or a de-accumulated variable is wholly empty.
+    # The fourth is a catalog fetch that failed on a network error or a server-side HTTP error.
     # Every other error fails immediately. Waiting does not heal a dtype or other structural
     # failure, and a bug of ours looks like an upstream defect, so retrying either kind of error
     # would only delay its alert by 4 hours. The reasoning and the upstream behaviour are at
@@ -611,7 +615,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         raise_if_instantaneous_slices_empty(ds)
 
         nwp = convert_nwp_xarray_dataset_to_polars_dataframe(ds=ds, h3_grid=h3_grid)
-    except (NwpRunNotYetAvailable, NwpVariableWhollyMissing) as exc:
+    except (NwpRunNotYetAvailable, NwpVariableWhollyMissing, NwpCatalogUnreachable) as exc:
         # The note puts the partition in every Sentry event for this failure: the warning below,
         # and the run-failed event if the ladder runs out. The two exceptions' own messages do not
         # name the partition.
@@ -621,7 +625,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
             raise
         if context.retry_number == 0:
             report_asset_retry(asset_name="ecmwf_ens", exc=exc)
-        context.log.warning(f"ECMWF ENS run not usable yet, requesting a retry: {exc}")
+        context.log.warning(f"ECMWF ENS run or catalog not usable yet, requesting a retry: {exc}")
         raise RetryRequested(
             max_retries=_ECMWF_ENS_MAX_RETRIES, seconds_to_wait=_ECMWF_ENS_RETRY_DELAY_SECONDS
         ) from exc

@@ -1,6 +1,8 @@
 """Opening and downloading one ECMWF ENS run from the Dynamical.org catalog."""
 
 import concurrent.futures
+import json
+import urllib.error
 from datetime import UTC, datetime
 from typing import Final, Literal
 
@@ -22,15 +24,36 @@ class NwpRunNotYetAvailable(Exception):
     """
 
 
-class NwpCatalogUnreachable(NwpRunNotYetAvailable):
-    """Raised when the Dynamical.org STAC catalog cannot be fetched.
+class NwpCatalogUnreachable(Exception):
+    """Raised when the Dynamical.org STAC catalog could not be fetched, and trying again may work.
 
-    ``dynamical_catalog.open`` fetches every collection in the catalog, not only the one asked
-    for, and fails if any one collection fetch fails after its own 3 attempts, 1 second apart.
-    A connection reset on any collection, ECMWF or not, therefore fails the call. This subclasses
-    `NwpRunNotYetAvailable` so that the ``ecmwf_ens`` asset retries it on the same 30-minute
-    ladder.
+    `open_ecmwf_ens_run` raises this when `dynamical_catalog.CatalogFetchError` was caused by a
+    network error, a timeout, or an HTTP 5xx, 429, or 409 response. The ``dynamical_catalog``
+    package fetches every collection in the catalog, not only the one asked for, so a failure on
+    any collection raises the error. The ``ecmwf_ens`` asset retries this exception on the same
+    ladder as `NwpRunNotYetAvailable`, except for a run initialised more than 36 hours ago.
     """
+
+
+def _is_transient_catalog_failure(exc: BaseException) -> bool:
+    """Whether a `CatalogFetchError` can heal by trying again, judged from its cause chain.
+
+    ``dynamical_catalog`` fails after one attempt on an HTTP 4xx response (other than 429 and 409)
+    and on a response that is not valid JSON, because those do not change between attempts. Waiting
+    does not heal them either, so they are not transient here.
+    """
+    cause = exc.__cause__
+    while cause is not None:
+        if isinstance(cause, json.JSONDecodeError):
+            return False
+        if (
+            isinstance(cause, urllib.error.HTTPError)
+            and 400 <= cause.code < 500
+            and cause.code not in (409, 429)
+        ):
+            return False
+        cause = cause.__cause__
+    return True
 
 
 _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
@@ -144,9 +167,11 @@ def open_ecmwf_ens_run(
     try:
         ds = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
     except dynamical_catalog.CatalogFetchError as exc:
-        raise NwpCatalogUnreachable(
-            f"Could not fetch the Dynamical.org STAC catalog: {exc}"
-        ) from exc
+        if _is_transient_catalog_failure(exc):
+            raise NwpCatalogUnreachable(
+                f"Could not fetch the Dynamical.org STAC catalog: {exc}"
+            ) from exc
+        raise
 
     ds = ds[list(_ECMWF_ENS_VARS_TO_DOWNLOAD)]
 
