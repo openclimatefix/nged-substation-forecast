@@ -277,9 +277,8 @@ Three mean "the upstream run is not ready yet", and the fourth is a failed fetch
 asset detects each at a different point:
 
 - **The catalog could not be fetched.** The `dynamical_catalog` package fetches `catalog.json` and
-  every collection it lists, in parallel, even when the caller opens only one dataset. A fetch that
-  fails after the package's 3 attempts, 1 second apart, fails the whole call, so a connection reset
-  on an unrelated collection fails the run. `open_ecmwf_ens_run` raises `NwpCatalogUnreachable`
+  then the one collection that the caller opens. A fetch that fails after the package's 3 attempts,
+  1 second apart, fails the whole call. `open_ecmwf_ens_run` raises `NwpCatalogUnreachable`
   when the failure was a network error, a timeout, or an HTTP 5xx, 429, or 409 response. An HTTP
   4xx response (other than 429 and 409) and a response that is not valid JSON are not retried,
   because they do not change between attempts.
