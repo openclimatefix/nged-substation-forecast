@@ -360,9 +360,9 @@ change deployed on 2026-10-02 re-runs a failed dataset update within about 20 mi
 hits.** In the repairs we have seen, Dynamical.org filled a store within about 3.5 hours of
 publication, so waiting 4 hours on a run that is days old has no evidence behind it. The limit has
 to exceed the age a run reaches by the last retry of its scheduled attempt, which is about 15 hours
-(the 10:30 UTC schedule plus the 4-hour ladder). The 36-hour limit also lets a manual re-run of the previous day's partition retry, although
-that re-run's ladder stops early, once the run passes 36 hours. A catch-up tick that fires more
-than about 25 hours late, or a backfill of an old partition, therefore fails at once with the
+(the 10:30 UTC schedule plus the 4-hour ladder). The 36-hour limit also lets a manual re-run of the previous day's partition retry,
+although that re-run's ladder stops early, once the run passes 36 hours. A catch-up tick that fires
+more than about 25 hours late, or a backfill of an old partition, therefore fails at once with the
 original exception.
 
 **When `ecmwf_ens` fails in a way it will retry, its first failed attempt sends a Sentry warning.**
