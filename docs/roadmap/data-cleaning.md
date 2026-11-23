@@ -33,10 +33,18 @@ changing a rule means re-running one asset over data already on disk.
 a rule flags.** Read the docstring on the
 [API page](https://openclimatefix.github.io/nged-substation-forecast/api/nged_data/#nged_data.cleaning.flag_nged_power).
 
-**The one rule today is an example, `substation_zero`.** The rule flags a reading of exactly 0 from
-a `Primary`, `BSP`, or `GSP` series, because a substation almost never truly reads zero. On the V1
-data as of 2026-10-05, `substation_zero` flags 5,363 of the 2,140,331 rows from the 20 substation
-series, about 0.25%, and no generator rows.
+**There are two rules today: `initial_analogue_noise` and `substation_zero`.** The first
+rule, `initial_analogue_noise`, flags the first 90 days' worth of datapoints. This ensures
+we cut off at least 2 months of data after the meter becomes operational, even if early
+timestamps have significant gaps in calendar time. This also means that a time series that
+has less than 30 \* 3 \* 24 \* 2 = 4,320 datapoints will be flagged in its entirety and not
+used for training.
+
+The second rule, `substation_zero`, flags a reading of exactly 0 from a `Primary`, `BSP`, or `GSP`
+series, because a substation almost never truly reads zero. On the V1 data as of 2026-10-05,
+`substation_zero` flags 5,363 of the 2,140,331 rows from the 20 substation
+series, about 0.25%, and no generator rows. As of 2026-11-10, as `initial_analogue_noise` flag has
+been introduced as a prevailing flag, this figure goes down to 0.10%.
 
 **A failed cleaning run leaves every reader on the last good cleaned table.** The asset fails
 loudly, and the job's Sentry failure hook reports the failure. The next hourly run rebuilds again,
