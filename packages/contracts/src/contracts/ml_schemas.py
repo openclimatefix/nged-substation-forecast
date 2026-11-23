@@ -417,7 +417,7 @@ class Metrics(pt.Model):
     """See the class docstring's "Primary key" paragraph."""
 
     @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
+    def validate(  # ty: ignore[incompatible-method-override]
         cls,
         dataframe: pl.DataFrame,
         columns: Sequence[str] | None = None,

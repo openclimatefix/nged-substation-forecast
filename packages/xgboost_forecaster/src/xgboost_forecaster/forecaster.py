@@ -83,7 +83,10 @@ class XGBoostForecaster(BaseForecaster):
     """
 
     MODEL_NAME = "xgboost"
-    CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = XGBoostConfig
+    # ty rejects narrowing a writable ClassVar, because code could assign a plain
+    # `BaseForecasterConfig` through the base class. No code assigns `CONFIG_CLASS`, and the
+    # narrowed type is what lets `load` pass the validated config to `__init__`.
+    CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = XGBoostConfig  # ty: ignore[incompatible-mutable-override]
 
     model_params: XGBoostConfig  # narrows the base class annotation for type checkers
 
