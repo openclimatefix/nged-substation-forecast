@@ -145,7 +145,7 @@ def _panel(
     lines = (
         base.transform_filter(alt.datum.series != AFTER)
         .mark_line(strokeWidth=3)
-        .encode(  # ty: ignore[unresolved-attribute]
+        .encode(  # ty: ignore[missing-attribute]
             strokeDash=alt.StrokeDash(
                 "series:N",
                 legend=None,
@@ -207,7 +207,7 @@ def main() -> None:
                 )
             )
             .mark_text(align="left", fontSize=12)
-            .encode(  # ty: ignore[unresolved-attribute]
+            .encode(  # ty: ignore[missing-attribute]
                 text="text:N", y=alt.Y("line:O", axis=None), x=alt.value(0)
             )
             .properties(width=590, height=35),
@@ -225,7 +225,8 @@ def main() -> None:
             )
         )
         .configure_axis(labelFontSize=12, titleFontSize=12)
-        .configure_view(stroke=None)
+        # `configure_axis` loses the chart type too (astral-sh/ty#2520, see `ty-workarounds`).
+        .configure_view(stroke=None)  # ty: ignore[missing-attribute]
     )
     FIGURE.parent.mkdir(parents=True, exist_ok=True)
     chart.save(FIGURE.with_suffix(".svg"))

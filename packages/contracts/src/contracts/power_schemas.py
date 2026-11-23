@@ -89,7 +89,7 @@ class PowerTimeSeries(pt.Model):
     )
 
     @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
+    def validate(  # ty: ignore[incompatible-method-override]
         cls,
         dataframe: pl.DataFrame,
         columns: Sequence[str] | None = None,
@@ -566,7 +566,7 @@ class PowerForecast(pt.Model):
     """At most one forecast per series, per init time, per target time, per ensemble member."""
 
     @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
+    def validate(  # ty: ignore[incompatible-method-override]
         cls,
         dataframe: pl.DataFrame,
         columns: Sequence[str] | None = None,

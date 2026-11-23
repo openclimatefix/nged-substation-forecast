@@ -56,7 +56,7 @@ def _(df):
             strokeWidth=1,
             opacity=0.3,
         )
-        .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
+        .encode(  # ty: ignore[missing-attribute]  # astral-sh/ty#2520
             x=alt.X(field="valid_time", type="temporal"),
             y=alt.Y(field=NWP_VAR_TO_PLOT, type="quantitative"),
             detail="ensemble_member:N",
@@ -96,7 +96,7 @@ def _(ENS_MEMBER_TO_PLOT, NWP_INIT_TIME, VALID_TIME_TO_PLOT, df):
 @app.cell
 def _(NWP_VAR_TO_PLOT, filtered_df):
     from lonboard.colormap import apply_continuous_cmap
-    from palettable.matplotlib import Viridis_20  # ty: ignore[unresolved-import]
+    from palettable.matplotlib import Viridis_20  # ty: ignore[missing-module-member]
 
     # apply_continuous_cmap wants values in 0-1, so rescale the chosen variable across the cells
     # drawn. Despite the name, max_bound holds the *range* rather than the maximum.

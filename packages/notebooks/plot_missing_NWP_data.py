@@ -89,7 +89,7 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
 
     # Layer 1: A light grey background line showing the full time series extent
     background_line = base.mark_line(color=GRID, strokeWidth=1)
-    background_lines = background_line.encode(  # ty: ignore[unresolved-attribute]
+    background_lines = background_line.encode(  # ty: ignore[missing-attribute]
         x=alt.X("valid_time:T", title="Valid Time"),
         detail="row_label:N",  # Ensures lines don't connect across different rows
     )
@@ -102,7 +102,7 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
             thickness=3,  # Make the red mark stand out
             size=12,  # Height of the tick mark
         )
-        .encode(x="valid_time:T")  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
+        .encode(x="valid_time:T")  # ty: ignore[missing-attribute]  # astral-sh/ty#2520
     )
 
     # Combine the layers and configure the chart size
