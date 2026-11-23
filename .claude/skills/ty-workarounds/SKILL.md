@@ -20,10 +20,10 @@ fails the same way, with `R@__call__` in place of `T@__call__`. The code is corr
 [astral-sh/ty#2520](https://github.com/astral-sh/ty/issues/2520).
 
 **How to apply:** put `# ty: ignore[missing-attribute]` on the `.encode(` line of each chart chain,
-and on the line of the call that follows a `configure_*()` call. ty 0.0.86 named this rule
-`unresolved-attribute`, and ty 0.0.108 names it `missing-attribute`. An ignore comment naming the
-old rule draws a `renamed-rule-in-ignore-comment` warning. Restructuring does not help: annotating
-an intermediate variable as `alt.Chart` instead raises `invalid-assignment`, and calling `.encode()`
-before `.mark_*()` just moves the unsolved type variable to the function's return. When ty fixes the
-bug, every suppression turns into an `unused-ignore-comment` warning, which is the signal to delete
-them all.
+and on the line of the call that follows a `configure_*()` call (in the chain above, the
+`.configure_view(...)` line). ty 0.0.108 names this rule `missing-attribute`. An ignore comment that
+uses the former name, `unresolved-attribute`, draws a `renamed-rule-in-ignore-comment` warning.
+Restructuring does not help: annotating an intermediate variable as `alt.Chart` instead raises
+`invalid-assignment`, and calling `.encode()` before `.mark_*()` just moves the unsolved type
+variable to the function's return. When ty fixes the bug, every suppression turns into an
+`unused-ignore-comment` warning, which is the signal to delete them all.
