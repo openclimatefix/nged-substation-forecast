@@ -89,7 +89,7 @@ class PowerTimeSeries(pt.Model):
     )
 
     @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
+    def validate(  # ty: ignore[incompatible-method-override]
         cls,
         dataframe: pl.DataFrame,
         columns: Sequence[str] | None = None,
@@ -208,7 +208,7 @@ class PowerTimeSeries(pt.Model):
     columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")
 
 
-DROP_REASONS: Final[tuple[str, ...]] = ("substation_zero",)
+DROP_REASONS: Final[tuple[str, ...]] = ("substation_zero", "initial_analogue_noise")
 """The vocabulary of `CleanedPowerTimeSeries.drop_reason`: one name per cleaning rule.
 
 A rule's author adds the rule's reason here, in the same change that adds the rule to
@@ -566,7 +566,7 @@ class PowerForecast(pt.Model):
     """At most one forecast per series, per init time, per target time, per ensemble member."""
 
     @classmethod
-    def validate(  # ty: ignore[invalid-method-override]
+    def validate(  # ty: ignore[incompatible-method-override]
         cls,
         dataframe: pl.DataFrame,
         columns: Sequence[str] | None = None,

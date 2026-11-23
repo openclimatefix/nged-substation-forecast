@@ -272,8 +272,16 @@ only ever arrived as whole-step dropouts.
 
 ### An empty slice or a wholly-missing variable is retried, not failed outright
 
-The `ecmwf_ens` asset **retries** three failures on one ladder: every 30 minutes, up to 8 times. All
-three mean "the upstream run is not ready yet", and the asset detects each at a different point:
+The `ecmwf_ens` asset **retries** four failures on one ladder: every 30 minutes, up to 8 times.
+Three mean "the upstream run is not ready yet", and the fourth is a failed fetch of the catalog. The
+asset detects each at a different point:
+
+- **The catalog could not be fetched.** The `dynamical_catalog` package fetches `catalog.json` and
+  then the one collection that the caller opens. A fetch that fails after the package's 3 attempts,
+  1 second apart, fails the whole call. `open_ecmwf_ens_run` raises `NwpCatalogUnreachable`
+  when the failure was a network error, a timeout, or an HTTP 5xx, 429, or 409 response. An HTTP
+  4xx response (other than 429 and 409) and a response that is not valid JSON are not retried,
+  because they do not change between attempts.
 
 - **The run is not in the catalog yet.** `open_ecmwf_ens_run` raises `NwpRunNotYetAvailable` before
   any download.
@@ -323,7 +331,7 @@ variable's empty window. A wholly-null column that reaches `Nwp.validate` there 
 The partition simply stays unmaterialised if every retry is exhausted, until the upstream data is
 fixed and it is re-run.
 
-#### Why only these three failures are retried
+#### Why only these four failures are retried
 
 Every other error fails the partition at once, a dtype mismatch included, for three reasons:
 
@@ -340,19 +348,21 @@ Every other error fails the partition at once, a dtype mismatch included, for th
   concurrency pool slot for about 4 hours, so a backfill over several bad partitions multiplies that
   wait.
 
-The three retried failures are the ones for which there is evidence that the data heals: the
-2026-08-09 republication and the 2026-10-02 fill described above. Dynamical.org's maintainer has
-also [said](https://github.com/dynamical-org/reformatters/issues/1149#issuecomment-5980497676) that
-a change deployed on 2026-10-02 re-runs a failed dataset update within about 20 minutes.
+The three upstream-run failures are the ones for which there is evidence that the data heals: the
+2026-08-09 republication and the 2026-10-02 fill described above. A failed catalog fetch is retried
+because a network error or a server-side HTTP error can clear within minutes. Dynamical.org's
+maintainer has also
+[said](https://github.com/dynamical-org/reformatters/issues/1149#issuecomment-5980497676) that a
+change deployed on 2026-10-02 re-runs a failed dataset update within about 20 minutes.
 
-**An ECMWF run initialised more than 36 hours ago is not retried.** In the repairs we have seen,
-Dynamical.org filled a store within about 3.5 hours of publication, so waiting 4 hours on a run that
-is days old has no evidence behind it. The limit has to exceed the age a run reaches by the last
-retry of its scheduled attempt, which is about 15 hours (the 10:30 UTC schedule plus the 4-hour
-ladder). The 36-hour limit also lets a manual re-run of the previous day's partition retry, although
-that re-run's ladder stops early, once the run passes 36 hours. A catch-up tick that fires more
-than about 25 hours late, or a backfill of an old partition, therefore fails at once with the
-original exception.
+**An ECMWF run initialised more than 36 hours ago is not retried, whichever of the four failures it
+hits.** In the repairs we have seen, Dynamical.org filled a store within about 3.5 hours of
+publication, so waiting 4 hours on a run that is days old has no evidence behind it. The limit has
+to exceed the age a run reaches by the last retry of its scheduled attempt, which is about 15 hours
+(the 10:30 UTC schedule plus the 4-hour ladder). The 36-hour limit also lets a manual re-run of the
+previous day's partition retry, although that re-run's ladder stops early, once the run passes 36
+hours. A catch-up tick that fires more than about 25 hours late, or a backfill of an old partition,
+therefore fails at once with the original exception.
 
 **When `ecmwf_ens` fails in a way it will retry, its first failed attempt sends a Sentry warning.**
 The warning carries the exception, a note naming the partition, and the `retrying_asset` tag. Sentry
