@@ -489,7 +489,7 @@ class Nwp(pt.Model):
         allow_missing_columns: bool = False,
         allow_superfluous_columns: bool = False,
         drop_superfluous_columns: bool = False,
-    ) -> pt.DataFrame[Self]:  # ty:ignore[invalid-method-override]
+    ) -> pt.DataFrame[Self]:  # ty:ignore[incompatible-method-override]
         """Validate the frame.
 
         Bounds `init_time`/`valid_time` to the plausible datetime range. Rejects a de-accumulated

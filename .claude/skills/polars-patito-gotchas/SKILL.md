@@ -48,7 +48,8 @@ dtypes. The result usually only surfaces later as a confusing `validate()` dtype
 
 The trap fires only when the Patito model is still attached, and which operations detach it is not
 guessable. Which operations detach it differs between eager and lazy frames. Measured on patito
-0.8.6 with Polars 2.0.0 (Polars 1.44.2 gives the same results except for `gather_every`):
+0.8.6 with Polars 2.0.0 and 2.1.0 (Polars 1.44.2 gives the same results except for
+`gather_every`):
 
 - **An eager `pt.DataFrame` keeps the Patito model through some operations and drops it through
   others, and the method name does not tell you which.** A method that Polars implements directly
@@ -59,7 +60,7 @@ guessable. Which operations detach it differs between eager and lazy frames. Mea
   `with_row_index`, `partition_by`, `vstack`, `hstack`, `extend`, `insert_column`,
   `replace_column`, `to_dummies`, `transpose`, `null_count`, `map_rows`, indexing with a slice, a
   list of row positions, or a list of column names, iterating a `group_by`, `.cast()`, and
-  `.lazy().collect()`, and on Polars 2.0.0 (not 1.44.2) through `gather_every`. It drops the model,
+  `.lazy().collect()`, and on Polars 2 (not 1.44.2) through `gather_every`. It drops the model,
   returning a plain `pl.DataFrame`, through `filter`, `select`, `with_columns`, `sort`, `unique`,
   `rename`, `join`, `unpivot`, `reverse`, `drop_nulls`, `fill_null(value)`, `fill_nan`, `shift`,
   `top_k`, `bottom_k`, `explode`, `interpolate`, `update`, `group_by(...).agg(...)`,
@@ -166,18 +167,18 @@ There is no `pt.DataFrame.from_existing`; re-wrap an eager frame with
 but `ty` types its result as a plain `pl.DataFrame` and rejects the `.set_model` call.)
 
 The runtime and `patito/polars.py` claims in this section and the lists under `.cast` above are
-measured against **patito 0.8.6 / polars 2.0.0**; `pyproject.toml` pins `polars>=1.0.0` and does
-not pin `patito` at all, so re-check them after an upgrade to either. The `ty` claim needs no such
-caveat: it follows from Polars' own annotations, so no checker version changes it.
+measured against **patito 0.8.6 / polars 2.0.0 and 2.1.0**; `pyproject.toml` pins `polars>=1.0.0`
+and does not pin `patito` at all, so re-check them after an upgrade to either. The `ty` claim needs
+no such caveat: it follows from Polars' own annotations, so no checker version changes it.
 
 ## Delta Lake dictionary-encoded columns: declare Delta filter/partition columns as `String`
 
 Cast a dictionary-encoded (`Categorical`, `Enum`) column to `String` before writing it to Delta.
-Measured with deltalake 1.6.6 on Polars 2.0.0, 1.44.2, and 1.43.2 alike, `pl.DataFrame.write_delta`
-panics on such a column (`cannot downcast Utf8View dictionary value to byte array`).
-`write_deltalake(df.to_arrow())` succeeds, but on an `Enum` column it leaves the Delta log
-recording `Utf8` while the parquet file holds a dictionary-typed column, and a later
-`pl.read_delta` raises `SchemaError: data type mismatch`.
+Measured with deltalake 1.6.6 on Polars 2.0.0, 1.44.2, and 1.43.2 alike, and with deltalake 1.7.0 on
+Polars 2.1.0, `pl.DataFrame.write_delta` panics on such a column (`cannot downcast Utf8View
+dictionary value to byte array`). `write_deltalake(df.to_arrow())` succeeds, but on an `Enum` column
+it leaves the Delta log recording `Utf8` while the parquet file holds a dictionary-typed column, and
+a later `pl.read_delta` raises `SchemaError: data type mismatch`.
 `delta_store.forecast_metrics.write_forecast_metrics` uses `write_deltalake` and casts its `Enum`
 columns to `String` first for exactly this reason. Two consequences:
 
@@ -188,7 +189,7 @@ columns to `String` first for exactly this reason. Two consequences:
    groups, so it reads the *whole* table even when the filter names one partition). Declaring the
    column `String` matches what is on disk, so the scan is typed by `set_model` with no cast, the
    filter pushes straight down, and there is no dtype tension at the write boundary either.
-   Polars does not see through the cast. Measured on Polars 2.0.0 and 1.44.2 on a table
+   Polars does not see through the cast. Measured on Polars 2.1.0, 2.0.0, and 1.44.2 on a table
    partitioned by one column, a filter placed after `.cast(pl.Enum(...))` leaves a separate
    `FILTER` above a scan of every partition, whether the filter compares with a string, an `Enum`
    literal, or `is_in`. Filtering on the `String` column *before* the cast prunes to the one

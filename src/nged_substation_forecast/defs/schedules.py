@@ -79,10 +79,12 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     12:00 UTC ``live_forecasts`` slot. ``ecmwf_ens_partitions``' ``end_offset=1`` means today's
     partition key already exists by this point. A run isn't usable yet when it is absent from the
     catalog, when whole (member, lead time) slices of an instantaneous variable are still empty, or
-    when a de-accumulated variable is still wholly empty. ``ecmwf_ens`` then retries every 30
-    minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` →
+    when a de-accumulated variable is still wholly empty. The same retry covers a failed fetch of
+    the catalog itself. ``ecmwf_ens`` then retries every 30
+    minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` /
+    ``NwpCatalogUnreachable`` →
     ``RetryRequested`` in ``defs/assets.py``), rather than failing outright. Any other error still
-    fails immediately, and so do the three retried failures for a run initialised more than 36 hours
+    fails immediately, and so do the four retried failures for a run initialised more than 36 hours
     ago, which a backfill, or a catch-up tick more than about 25 hours late, can request. Retrying
     is right because Dynamical.org publishes each run as roughly 40 separate commits over about 15
     minutes, so a run can be readable while a variable whose commit has not landed yet still reads

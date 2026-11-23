@@ -142,7 +142,7 @@ def test_trained_time_series_ids_is_abstract() -> None:
 
     with pytest.raises(TypeError):
         # Deliberately instantiate an abstract class to check the runtime contract.
-        _MissingPopulation(BaseForecasterConfig(selected_features=set()))  # ty: ignore[call-non-callable]
+        _MissingPopulation(BaseForecasterConfig(selected_features=set()))  # ty: ignore[abstract-class-instantiation]
 
 
 def _metadata_for(

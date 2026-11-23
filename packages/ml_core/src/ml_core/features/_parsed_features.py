@@ -79,8 +79,9 @@ class LagFeature(BaseLookbackFeature):
 
     SUFFIX: ClassVar[str] = "lag"
     # The Pydantic model is frozen, so no write can put "power" into a subclass that forbids it.
-    # ty reports `invalid-attribute-override` for any widened attribute, whatever `frozen` says.
-    base_col: WeatherFeature | Literal["power"]  # ty: ignore[invalid-attribute-override]
+    # ty reports `incompatible-attribute-override` for any widened attribute, whatever `frozen`
+    # says.
+    base_col: WeatherFeature | Literal["power"]  # ty: ignore[incompatible-attribute-override]
 
     def is_leaky(self) -> bool:
         """Power lags are always leaky.
