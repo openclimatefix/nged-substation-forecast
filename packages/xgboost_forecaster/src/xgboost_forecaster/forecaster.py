@@ -180,8 +180,13 @@ class XGBoostForecaster(BaseForecaster):
         busiest cell. See ``cv_power_forecasts`` and
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
-        ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
-        supplies it). Defaults to the ``"live"`` production sentinel.
+        Args:
+            data: The ``AllFeatures`` rows to forecast, one per NWP ensemble member.
+            fold_id: Stamped onto every output row, because the XGBoost model has no inherent
+                fold. Defaults to the ``"live"`` production sentinel.
+
+        Returns:
+            One ``PowerForecast`` row per ``(time_series_id, power_fcst_init_time, valid_time)``.
 
         Raises:
             ValueError: If a row has a null ``ensemble_member``. A row with no NWP member carries
