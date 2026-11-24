@@ -18,10 +18,10 @@ of `contracts.common.DELIVERY_QUANTILES` agreed with NGED (0.01, 0.02, 0.05, 0.1
 power_fcst_init_time, valid_time)`, and a row constraint forbids a quantile below the level beneath
 it. The three forecasters that compute members today reduce their members to the 13 quantiles with
 one shared function in `ml_core` before they return. `ml_core.metrics` scores the quantile columns
-directly, at the same 13 levels it scores on `main`. The stored `power_forecasts` Delta table moves
-to a new path; the old table stays read-only, and a CV fold is re-run wherever a comparison with old
-results is wanted. The dashboard draws the power forecast as quantile bands, and its NWP panel keeps
-one line per ECMWF ENS weather member, read from `Nwp` as now.
+directly, at the same 13 levels it scores on `main`. The stored `power_forecasts` and
+`forecast_metrics` Delta tables are deleted and recreated at their existing paths with the new
+schema. The dashboard draws the power forecast as quantile bands, and its NWP panel keeps one line
+per ECMWF ENS weather member, read from `Nwp` as now.
 
 ## Verdict, size and departures
 
@@ -39,7 +39,8 @@ member-based metric computing something its docstring does not describe.
   missing members as now.
 - **More than one defensible design:** fires. Wide or long quantile columns (long was considered
   and is not recommended: every reader would pivot it back); which quantile levels to store (the
-  maintainer chose the 13 delivery levels); converting or re-running the stored forecasts.
+  maintainer chose the 13 delivery levels); whether to keep, convert, or delete the stored
+  forecasts (the maintainer chose to delete them).
 - **Callers found only by searching:** fires. `PowerForecast` is named in about 30 source and test
   files across `contracts`, `ml_core`, `delta_store`, `baseline_forecasters`, `xgboost_forecaster`,
   `dashboard`, `scripts/forecasting`, and `src/nged_substation_forecast`.
@@ -51,7 +52,9 @@ the metric formulas are behaviours the tests are meant to pin down.
 **Departures from the issue body:** none of substance. Issue #262 asked for percentile columns
 *beside* the member representation; this plan replaces the member representation instead, because
 no production reader needs both and two representations double every writer and reader.
-Representation 3 (quantiles per member) stays out of scope, as the issue says.
+Representation 3 (quantiles per member) is not planned. When this work is done, issue #262 is
+closed as not planned, with a comment saying that Representation 2 is delivered by this change and
+Representation 3 will not be built.
 
 ## Solution
 
@@ -87,23 +90,23 @@ longer collapses members: each row already is one forecast. Per row it computes:
 - the deterministic metrics (MAE, RMSE, MBE, NMAE) on `power_fcst_p50`, as issue #1077 proposes;
 - pinball loss at each of the 13 delivery levels, and PICP and interval width for the six existing
   delivery bands (`p1_p99`, `p2_p98`, `p5_p95`, `p10_p90`, `p20_p80`, `p35_p65`), read straight
-  from the stored columns, with the loops over `DELIVERY_QUANTILES` as on `main`;
-- the spread for the spread-skill ratio as the Gaussian-equivalent standard deviation
-  `(p90 − p10) / (2 × z₀.₉) = (p90 − p10) / 2.5631`, with the constant computed from
-  `statistics.NormalDist().inv_cdf(0.9)`, not typed in.
+  from the stored columns, with the loops over `DELIVERY_QUANTILES` as on `main`.
 
-The `Metrics` contract is unchanged: every metric name, every `metric_param` label, and the
-`metric_param` Enum stay as on `main`, because the stored levels are the levels the metrics already
-score. `mean_pinball_loss` keeps its 13 levels.
+**The spread-skill ratio is retired.** Without members, its spread could only be estimated from the
+quantiles by assuming a Gaussian forecast distribution, which skewed power forecasts break. PICP and
+interval width for the six delivery bands already measure calibration without that assumption. The
+`spread_skill_ratio` value leaves the `Metrics` contract's metric-name Enum, and its code, tests,
+and docs go. Every other metric name, every `metric_param` label, and the `metric_param` Enum stay
+as on `main`, because the stored levels are the levels the metrics already score.
+`mean_pinball_loss` keeps its 13 levels.
 
 **Four metrics change meaning under unchanged names:** `crps` (fair CRPS of members → quantile
 CRPS), and `mae`, `rmse`, and `mbe` (ensemble mean → p50). The names reach the `forecast_metrics`
-table and the MLflow keys, so old and new values would mix on the leaderboard with no marker. The
-plan writes the metrics of new runs to a new `forecast_metrics` path beside the new forecasts path,
-so no table holds both definitions, and tags every new MLflow run `metrics_version=2`. The
+table and the MLflow keys. The `forecast_metrics` table is deleted and recreated with the
+`power_forecasts` table, so no Delta table holds both definitions, and every new MLflow run is
+tagged `metrics_version=2` to mark the new definitions among the old MLflow runs. The
 `METRIC_NAMES` docstring in `ml_schemas.py` (fair CRPS, Fortin spread, ensemble mean, the PICP
-reference of about 0.769 at 51 members) is rewritten for the quantile definitions. Open question 5
-asks the maintainer to choose between this and renaming the metrics.
+reference of about 0.769 at 51 members) is rewritten for the quantile definitions.
 
 **Branches off the happy path.**
 
@@ -125,15 +128,13 @@ asks the maintainer to choose between this and renaming the metrics.
   power scenarios, if one is added later, gets its own contract with a scenario index that is not a
   weather-member index (the delivery-recommendation page of nged-ml-research found scenarios built
   from the stored quantiles at least as good as tying scenario k to weather member k).
-- **A fresh table.** `write_power_forecasts` writes to the path in
-  `Settings.power_forecasts_data_path`, whose default path segment changes from `power_forecasts`
-  to `power_forecasts_q13`. The first write creates the table with the new schema, as today. The
-  old table is left in place, read-only, until the maintainer deletes it. No conversion script is
-  written: converted rows would not be comparable with new runs anyway, because CRPS changes from
-  the members' fair CRPS to the quantile CRPS, so a CV fold is re-run wherever a comparison is
-  wanted. Rewriting the old path in place with delta-rs `schema_mode="overwrite"` was rejected,
-  because an overwrite with a new schema replaces every partition of the table, so the old results
-  would be lost rather than kept readable.
+- **Delete and recreate the two tables.** The paths in `Settings.power_forecasts_data_path` and
+  `Settings.forecast_metrics_data_path` do not change. Before the first run of the new code, the
+  maintainer deletes both Delta tables, locally and in the delivery bucket, and the first write
+  recreates each table with the new schema, as `write_power_forecasts` does today. No code
+  converts, archives, or migrates the old rows: they mostly hold dummy forecasts, nobody outside
+  the project reads either table, and both are already backed up on the maintainer's external
+  disk. No study is re-run, and studies scored against the old rows stay as they are.
 
 **Error-handling paths.**
 
@@ -168,8 +169,8 @@ change and a re-export in nged-ml-research.
   it indexes. Column names are `f"power_fcst_{quantile_label(q)}"`, reusing the existing
   `quantile_label`, so no new helper.
 - **`packages/contracts/src/contracts/ml_schemas.py`**: only the `METRIC_NAMES` docstring, rewritten
-  for the quantile CRPS, the p50 deterministic metrics, and the Gaussian-equivalent spread. The
-  `metric_param` labels and Enum are unchanged.
+  for the quantile CRPS and the p50 deterministic metrics, and `spread_skill_ratio` leaves the
+  metric-name Enum. The `metric_param` labels and Enum are unchanged.
 - **`packages/contracts/src/contracts/power_schemas.py`**: `PowerForecast` loses `ensemble_member`
   and `power_fcst`, gains the 13 Float32 quantile fields (each carrying `power_fcst`'s current
   description of available power, units, and sign, written once in a shared string), per-field
@@ -182,10 +183,10 @@ change and a re-export in nged-ml-research.
   (over weather members) and the manual heuristic (over lag analogues).
 - **`packages/ml_core/src/ml_core/metrics.py`**: `ROW_KEY_COLUMNS` and `COMPARABLE_KEY_COLUMNS`
   become the three-column key (the member-count argument in their docstring goes); `compute_metrics`
-  drops the member collapse; `_fair_crps_expr` and `_corrected_variance_expr` are replaced by a
-  quantile CRPS and a quantile spread; the empirical delivery-quantile aggregation and
-  `_quantile_column` go, because the metrics read the stored columns; the pinball, PICP, and
-  interval-width loops and `_BAND_LOWER_QUANTILES` stay over `DELIVERY_QUANTILES`, as on `main`.
+  drops the member collapse; `_fair_crps_expr` is replaced by a quantile CRPS;
+  `_corrected_variance_expr` and the spread-skill ratio go; the empirical delivery-quantile
+  aggregation and `_quantile_column` go, because the metrics read the stored columns; the pinball,
+  PICP, and interval-width loops and `_BAND_LOWER_QUANTILES` stay over `DELIVERY_QUANTILES`, as on `main`.
 - **`packages/ml_core/src/ml_core/base_forecaster.py`**: the `predict` docstring.
 - **`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py`**: `predict` reduces with
   `to_stored_quantiles`.
@@ -200,8 +201,7 @@ change and a re-export in nged-ml-research.
   `PowerForecast`. **`README.md`**: the member description.
 - **`packages/delta_store/src/delta_store/power_forecasts.py`**: round every quantile column; give
   each the `BYTE_STREAM_SPLIT` column properties that `POWER_FORECASTS_WRITER_PROPERTIES` gives
-  `power_fcst` today; sort by the new key; docstrings. **`contracts/settings.py`**: the new default
-  path segment of `power_forecasts_data_path`.
+  `power_fcst` today; sort by the new key; docstrings. `contracts/settings.py` is unchanged.
 - **`packages/dashboard/src/dashboard/forecast_chart.py`**: `build_view_forecast_chart` draws the
   p1–p99, p5–p95, and p20–p80 bands, each fainter than the band inside it, and the p50 line
   instead of one grey line per member. Its orange comparison overlay draws the second forecast's
@@ -246,8 +246,8 @@ not exist there, except the two marked as regression guards.
   levels; MAE uses p50, not the mean of the quantiles (a skewed row distinguishes the two); PICP and
   interval width for `p35_p65` read the stored `power_fcst_p35` and `power_fcst_p65` columns, with
   hand-computed values on a row whose columns differ from the empirical quantiles `main` would take
-  across members; the spread equals
-  `(p90 − p10) / (2 × NormalDist().inv_cdf(0.9))` on a hand-built row.
+  across members; `compute_metrics` returns no `spread_skill_ratio`. The existing
+  spread-skill tests go.
 - **`xgboost_forecaster/tests/test_forecaster.py`**, **`baseline_forecasters/tests/*`**: `predict`
   returns one row per key, and climatology's p50 equals the cell's median. Climatology's saved
   lookup has exactly the 13 `quantile_label` columns (it has 51 on `main`). The manual heuristic
@@ -269,12 +269,11 @@ not exist there, except the two marked as regression guards.
 
 Only the pages that `git grep -n "ensemble_member\|power_fcst\b"` finds describing members on
 forecast rows, the `PowerForecast` contract, or the metric formulas; a hit about the members of an
-NWP run stays. The expected pages are `docs/roadmap/delivery-tables.md` (Table 1), the pages that
-name the `power_forecasts` path (`docs/architecture/aws.md`, `backup.md`, `setup.md`,
-`production-deployment.md`, `ml-orchestration.md`, and `docs/live_service/operations.md`),
+NWP run stays. The expected pages are `docs/roadmap/delivery-tables.md` (Table 1),
 `docs/techniques/evaluation-metrics.md` (CRPS from quantiles, deterministic metrics on the median,
-the spread-skill ratio's Gaussian-equivalent spread, and the passages that describe the PICP
-reference and the fair CRPS at 13 and 51 members), and the
+the passages that describe the PICP reference and the fair CRPS at 13 and 51 members, and the
+spread-skill section, which is deleted), every other page that `git grep -n -i "spread.skill"`
+finds (the roadmap pages, `dagster-workflow.md`, and the techniques pages), and the
 `n_ensemble_members` tag sentence in `docs/cross-validation/dagster-workflow.md`. Each describes the
 code as it now is. `docs/background/requirements.md` and `evaluation-metrics.md` already name the 13
 `DELIVERY_QUANTILES`, so neither needs an edit for the level count.
@@ -286,37 +285,26 @@ The `implement-issue` green-before-push set (`uv run ruff check .`, `uv run ruff
 
 ## Risks and open questions
 
-Two questions are settled: the stored levels are the 13 `DELIVERY_QUANTILES` (maintainer,
-2026-11-24, below), and the columns use the `p` form, `power_fcst_p1` … `power_fcst_p99`.
+**No question is open.** The maintainer settled every decision on 2026-11-24 (see the decision
+sections below):
 
-1. **History.** The old table stays read-only, and no conversion runs. A comparison with an old CV
-   run means re-running that fold. Recommendation: accept that, because converted rows would score
-   differently anyway.
-2. **The NGED-facing path moves.** `power_forecasts_data_path` derives from `data_path_delivery`, so
-   the table sits under the delivery bucket that NGED reads. A new path segment moves the table NGED
-   reads, `score_study.py` refuses every study until its `reference_experiment_name` is re-run into
-   the new table, and the dashboard shows no history until runs land there. The alternatives are to
-   keep the path and overwrite the whole table (losing the history), or to move only the internal
-   CV partitions. Recommendation: the new path, with the move announced to NGED, because NGED's
-   readers break on the new columns whichever path is used.
-3. **Spread-skill ratio.** Kept, with the Gaussian-equivalent spread `(p90 − p10) / 2.5631` stated
-   in `evaluation-metrics.md`.
-4. **Research studies.** `nged-ml-research` pins `contracts`. Its studies submit `PowerForecast`
-   files through `score_study.py`, so they move to the new layout when that repository bumps its
-   pin, in a pull request of its own. The bundles of experiments 705 and 708 are re-exported with
-   the 13 delivery levels in `quantile_levels`.
-5. **Metrics that change meaning under the same names.** Settled by the maintainer (2026-11-24):
-   every new MLflow run is tagged `metrics_version=2`, and the metric names stay. Whether the
-   `forecast_metrics` table moves to a new path follows decision 2.
-6. **Issue #262.** Its Representation 2 is what this change delivers, and its Representation 3 stays
-   out of scope. Recommendation: re-scope issue #262 to Representation 3 when this merges; the
-   maintainer decides, because this plan does not edit issue #262.
+1. **Stored levels:** the 13 `DELIVERY_QUANTILES`, as `power_fcst_p1` … `power_fcst_p99`.
+2. **Tables:** one `PowerForecast` table at the existing `power_forecasts` path, and the
+   `forecast_metrics` table at its existing path, both deleted and recreated. No archive, no new
+   path, no study re-run.
+3. **Spread-skill ratio:** retired.
+4. **Research repository:** `nged-ml-research` pins `contracts`, so its studies move to the new
+   layout when that repository bumps its pin, in a pull request of its own. The bundles of
+   experiments 705 and 708 are re-exported with the 13 delivery levels in `quantile_levels`.
+5. **Metrics:** every new MLflow run is tagged `metrics_version=2`, and the metric names stay.
+6. **Issue #262:** closed as not planned when this work is done.
 
 ## Simplicity review: triage
 
 - **Cut the conversion script and its test:** accepted. Checked delta-rs `schema_mode="overwrite"`
   as the alternative to a new path, and rejected it, because a schema overwrite replaces every
-  partition and would lose the old results.
+  partition and would lose the old results. Superseded: the maintainer later chose to delete the old
+  results and keep the existing path.
 - **Score only at the stored levels:** accepted, and superseded by the maintainer's decision to
   store the 13 delivery levels, which removes the union Enum and its six extra labels. As first
   triaged, with one change: `Metrics.metric_param` is a
@@ -329,8 +317,9 @@ Two questions are settled: the stored levels are the 13 `DELIVERY_QUANTILES` (ma
   member count comes from the `Nwp` frame `live_forecasts` already loads, with no second read.
 - **Minimal `export_baseline_forecasts.py`, docs from grep hits:** accepted.
 - **Smaller points:** accepted (climatology computes the stored levels directly; one plain function
-  with two callers; one monotone test; spread-skill kept with `(p90 − p10) / 2.5631`; NaN as a
-  one-line test; long layout recorded as considered and not recommended).
+  with two callers; one monotone test; spread-skill kept with `(p90 − p10) / 2.5631`, later
+  retired by the maintainer; NaN as a one-line test; long layout recorded as considered and not
+  recommended).
 
 ## Correctness review: triage
 
@@ -350,7 +339,8 @@ Two questions are settled: the stored levels are the 13 `DELIVERY_QUANTILES` (ma
   question 2.
 - **Stale PR #1707 risk:** accepted. PR #1707's plan already writes the quantile columns, so the
   ordering question is removed; issue #262 is open question 6.
-- **Smaller points:** accepted (2.5631 computed from `NormalDist`; per-field constraints, because
+- **Smaller points:** accepted (2.5631 computed from `NormalDist`, since dropped with the
+  spread-skill ratio; per-field constraints, because
   patito has no model-level constraint; the CRPS estimator stated as a choice; the replacement for
   the ensemble-mean export file named).
 - **Tests that pass on `main`:** accepted. Both are labelled regression guards, and the six missing
@@ -378,6 +368,12 @@ and the research bundles of experiments 705 and 708 change only the `quantile_le
 
 The maintainer asked for a fainter p1–p99 band on the dashboard's power chart, outside the p5–p95
 and p20–p80 bands. The maintainer also settled that new MLflow runs carry the tag
-`metrics_version=2`, with the metric names unchanged. The table path, and with it the
-`forecast_metrics` path, is still open: the maintainer suggested keeping one `PowerForecast` table
-rather than a second table at `power_forecasts_q13`.
+`metrics_version=2`, with the metric names unchanged.
+
+## Maintainer decisions: one table, no spread-skill ratio, and issue #262 (2026-11-24)
+
+The maintainer chose one `PowerForecast` table at the existing path rather than a second table. The
+old `power_forecasts` and `forecast_metrics` tables are deleted, because they mostly hold dummy
+forecasts, nobody outside the project reads them, and both are already backed up. Studies are not
+re-run. The spread-skill ratio is retired. Issue #262 is closed as not planned once this work is
+done.
