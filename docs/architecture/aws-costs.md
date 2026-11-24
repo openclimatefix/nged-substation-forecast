@@ -89,12 +89,12 @@ what settles this line.
 These costs are the same under every architecture option the roadmap decision considered, and at v1
 scale come to **~£2–4/month in total**:
 
-- **S3 Standard storage — ~£2/month.** The working set is ~100 GB, dominated by NWP — a year of v1
-  live forecasts is ~31 M rows of `power_forecasts`, about 0.75 GB at ~24 bytes per row (see [How
-  big is Flexpectation's power forecast
-  data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)) — at
-  £0.018/GB-month → ~£1.80/month, plus headroom for Delta version history between vacuums. Grows ~40
-  GB/year as daily NWP partitions accumulate.
+- **S3 Standard storage — ~£2/month.** The working set is ~100 GB, dominated by NWP. A year of v1
+  live forecasts adds only ~31 M rows of `power_forecasts`, about 0.75 GB at ~24 bytes per row (see
+  [How big is Flexpectation's power forecast
+  data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)). At £0.018/GB-month
+  the working set costs ~£1.80/month, plus headroom for Delta version history between vacuums. Grows
+  ~40 GB/year as daily NWP partitions accumulate.
 - **S3 requests — ~£1–2/month.** Delta Lake is request-heavy (transaction-log JSON reads,
   checkpoints, many small parquet GETs per scan). The materialisation count is ~33/day, most of it
   the 24 hourly `power_time_series_and_metadata` ticks. NGED publishes new telemetry at irregular,
@@ -132,12 +132,13 @@ not follow it:
   resize](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm).
 - **Power-telemetry ingest grows 78× from a tiny base.** 2,500 series at half-hourly resolution is
   ~120k rows/day — trivial for both compute and storage, so the hourly polling cost barely moves.
-- **What genuinely scales is the forecast itself.** Each 6-hourly run's `AllFeatures` frame, one
-  row per time series, ensemble member, and half-hour, grows from ~1.1 M rows (32 series × 51
-  ensemble members × 672 half-hours) to **~86 M rows**, dragging inference compute with it. The run's
-  stored forecast, one row of 13 quantiles per time series and half-hour, grows from 21,504 rows to
-  **1.68 M rows** (2,500 × 672) — the storage arithmetic is in [How big is Flexpectation's power
-  forecast data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data).
+- **What genuinely scales is the forecast itself.** The `AllFeatures` frame of each 6-hourly run
+  holds one row per time series, ensemble member, and half-hour, and grows from ~1.1 M rows (32
+  series × 51 ensemble members × 672 half-hours) to **~86 M rows**, dragging inference compute with
+  it. The run's stored forecast, one row of 13 quantiles per time series and half-hour, grows from
+  21,504 rows to **1.68 M rows** (2,500 × 672) — the storage arithmetic is in [How big is
+  Flexpectation's power forecast
+  data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data).
 
 **Headline cost: projected ~£70–135/month** — roughly 3–4× the v1 bill, dominated by inference
 compute. The headline includes the same components as v1's: the control plane, every scheduled run

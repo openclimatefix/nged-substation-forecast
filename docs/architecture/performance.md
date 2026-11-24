@@ -153,13 +153,13 @@ under a 24 GB laptop.
 
 ### Scoring the metrics: batch the series, and stream every scan
 
-**Scoring a whole fold at once OOM-kills a 29 GB machine, so `_score_forecast_group` scores a batch
-of time series at a time.** `compute_metrics` is independent per series, which is what makes the
-batching sound. The batch size was measured on the `mid_2025_to_mid_2026` fold with 28 series of
-about 13M rows each, one row per ensemble member: a batch of 4 series completed in roughly 50
-seconds at about 18 GB peak process resident set size. A stored row holds 13 quantiles, and the fold
-stores about 250,000 rows per series, a 51st of the measured rows, so these figures are an upper
-bound on today's fold. That peak is dominated by the streaming Delta scan rather than by the data:
+**`_score_forecast_group` scores a batch of time series at a time, so peak memory follows the batch
+rather than the fold.** `compute_metrics` is independent per series, which is what makes the
+batching sound. The batch size was measured on a 28-series frame of the `mid_2025_to_mid_2026`
+fold with about 13M rows per series, one row per ensemble member: a batch of 4 series completed in
+roughly 50 seconds at about 18 GB peak process resident set size. The fold stores one row of 13
+quantiles per half-hour, about 250,000 rows per series, a 51st as many, so these figures are an
+upper bound. That peak is dominated by the streaming Delta scan rather than by the data:
 each batch re-scans the partition, while the materialised batch frame itself is a few GB. A batch of
 2 measured only about 2 GB lower, so a smaller batch saves little memory — the scan overhead is
 roughly constant in the *fold* size, which is what keeps the approach workable as folds grow to V2
@@ -212,10 +212,11 @@ The rules that follow:
   collect far below the cap (input pruning + `init_time` chunking), so pipeline reads are
   unaffected. The cap is a second, independent reason that rule exists: an unbounded collect of a
   V2-scale table wouldn't just OOM, its row accounting would be wrong.
-* Tables past the cap today: **NWP** (~16.2B rows). **`power_forecasts`** will pass it at V2 scale,
-  where one live ML model adds ~2.45B rows a year and 4 years of 2 models reach ~20B rows — see
-  [forecast delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data). The `metrics`
-  asset discovers `(experiment_name, fold_id)` groups via a streaming `unique()` scan, then scores
-  each group in batches of four `time_series_id` values at a time, so peak memory is one batch,
-  never a whole fold or the whole matched population — the same chunking that keeps the row-index
-  cap out of reach.
+* Tables past the cap today: **NWP** (~16.2B rows). **`power_forecasts`** passes it within two years
+  of one live ML model at V2 scale (~2.45B rows a year against the 4.29B cap), and 4 years of 2
+  models reach ~20B rows — see [forecast
+  delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data). The `metrics` asset
+  discovers `(experiment_name, fold_id)` groups via a streaming `unique()` scan, then scores each
+  group in batches of four `time_series_id` values at a time, so peak memory is one batch, never a
+  whole fold or the whole matched population — the same chunking that keeps the row-index cap out of
+  reach.

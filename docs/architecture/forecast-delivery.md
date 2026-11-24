@@ -3,12 +3,12 @@
 **In brief:** We deliver forecasts to NGED as Delta Lake tables on S3, not through a
 Representational State Transfer (REST) application programming interface (API). The workload is a
 poor fit for REST — one power-user consumer who wants routine access to the *entire* forecast
-history, which grows by about 2.5 billion rows a year at V2 scale — and Delta Lake on S3 is a genuine
-database-grade delivery mechanism: an open protocol with ACID guarantees, lazy partition-pruned
-reads from off-the-shelf clients (Polars, DuckDB, Spark, …), and schema evolution, with no API
-server for OCF to build, run, or be on call for. If a future consumer needs small operational
-queries or per-customer permissions, a REST API can be added later as a purely additive layer over
-the same tables.
+history, which grows by about 2.5 billion rows a year for each ML model run live at V2 scale — and
+Delta Lake on S3 is a genuine database-grade delivery mechanism: an open protocol with ACID
+guarantees, lazy partition-pruned reads from off-the-shelf clients (Polars, DuckDB, Spark, …), and
+schema evolution, with no API server for OCF to build, run, or be on call for. If a future consumer
+needs small operational queries or per-customer permissions, a REST API can be added later as a
+purely additive layer over the same tables.
 
 ---
 
@@ -47,8 +47,7 @@ NGED Flexpectation turns out to look quite different on each of those axes:
     - and [forecast warnings](../roadmap/delivery-tables.md#table-2-power_forecast_warnings).
 - **Much more data** — quantified [below](#how-big-is-flexpectations-power-forecast-data). NGED
   wants 13 quantiles for every half-hour of every forecast run across thousands of time series, and
-  the whole history of those runs, where a typical solar-forecast request asks for the latest run
-  alone.
+  the whole history of those runs, not only the latest run.
 - **One user.** NGED is the only consumer. There is no multi-tenant permission problem to solve — a
   single authenticated AWS user covers the entire requirement. But this is not a ceiling on the
   architecture: S3 can grant read access to further users via bucket policies or [S3 Access
@@ -80,8 +79,8 @@ being just as important to NGED as the power forecasts.
 ## How big is Flexpectation's power forecast data?
 
 **At V2 scale, `power_forecasts` grows by about 2.5 billion rows and 59 GB a year for each ML model
-run live.** That is large for a REST API to serve in full, but
-within what a single Postgres database can hold (see [Could Postgres store this
+run live.** Serving that history in full over a REST API means about 1.6 TB of JSON a year, but a
+single Postgres database can hold the data (see [Could Postgres store this
 data?](#could-postgres-store-this-data), below).
 
 Each 6-hourly forecast run produces one row per time series and half-hour of the 14-day horizon.
@@ -109,8 +108,8 @@ to all of that history.
 
 Multiply that per-year figure out across several years of history and several ML models and it
 keeps climbing: 4 years of history across 2 concurrently-run models is 2.45 billion × 4 × 2 ≈ **20
-billion rows**, about 470 GB in Delta Lake. Backtests and additional model families add to both
-multipliers.
+billion rows**, about 470 GB in Delta Lake. Backtests and additional model families add further
+rows.
 
 Terabytes of JSON a year are an awkward fit for request/response cycles; in practice, REST designs for
 workloads like this tend to grow a "bulk export" endpoint that hands back files — at which point the
@@ -199,10 +198,9 @@ is therefore the conventional, low-risk choice.
 ## Could Postgres store this data?
 
 **Yes: a single Postgres database could hold V2's forecasts, so the size of the data does not rule
-Postgres out.** This doc is mostly about _delivery_ of forecast data, but the same numbers bear on
-our internal _storage_ of it. The [previous section](#how-big-is-flexpectations-power-forecast-data)
-put V2's `power_forecasts` at about 20 billion rows after 4 years of 2 live ML models. That is well
-inside Postgres's limits, and the reasons for Delta Lake on S3 are cost, the scan-heavy query
+Postgres out.** The [previous section](#how-big-is-flexpectations-power-forecast-data) put V2's
+`power_forecasts` at about 20 billion rows after 4 years of 2 live ML models. That row count is well
+inside Postgres's size limits, and the reasons for Delta Lake on S3 are cost, the scan-heavy query
 pattern, the operational load, and the delivery benefits the rest of this page describes.
 
 | At V2 scale (20 billion rows: 4 years, 2 models) | Postgres | Delta Lake on S3 |
@@ -226,7 +224,7 @@ At 20 billion rows that is ~2.6 TB of table, and a B-tree primary key on `(time_
 power_fcst_init_time, valid_time)` adds ~0.6–0.8 TB. A realistic indexed table therefore lands at
 **3–4 TB** (an estimate, not a measurement). The same rows in
 [`delta_store`](../api/delta_store/index.md)'s measured 24-bytes-per-row packing come to about **0.47
-TB**. The 6–8× gap sets the storage cost and nothing else:
+TB**. The 6–8× gap sets the storage cost:
 
 - A single Postgres table [tops out at 32 TB](https://www.postgresql.org/docs/current/limits.html),
   and RDS for PostgreSQL caps storage at 64 TiB per instance, so 3–4 TB fits either limit without
@@ -238,14 +236,14 @@ TB**. The 6–8× gap sets the storage cost and nothing else:
 **Operational load.** A multi-terabyte table carries ongoing work beyond storage: autovacuum and
 transaction-ID freeze scans, and B-tree index builds that take hours. The query pattern is also a
 poor structural fit — scan-heavy analytical aggregation over billions of rows touching few columns is
-exactly where a row store loses to a columnar one, typically by 10–100×. At 3–4 TB none of this needs
-Timescale, Citus, or a sharded cluster.
+exactly where a row store loses to a columnar one, typically by 10–100×. At 3–4 TB the table fits one
+RDS instance, but autovacuum and reindex times at 20 billion rows have not been measured.
 
 **Query scaling.** Postgres's B-tree indexes give O(log n) point lookups — a 20-billion-row index is
 only ~5 levels deep, close to flat in theory. The practical cliff is cache residency: once the index
 no longer fits in RAM, lookups become random disk I/O and latency jumps 10–100×, a threshold set by
-RAM budget rather than row count. A primary-key index of 0.6–0.8 TB is larger than the RAM of most
-database instances. Aggregate queries that can't use an index are full sequential scans of every
+RAM budget rather than row count. A primary-key index of 0.6–0.8 TB stays cached only on an instance
+with at least that much RAM. Aggregate queries that can't use an index are full sequential scans of every
 column, whether selected or not, and get slower every month as history grows (partitioning caps this
 to the matching partitions).
 
@@ -263,10 +261,10 @@ tables outgrow RAM, because its cost for well-aligned selective queries stops de
 size at all.
 
 **Bottom line.** At V2 scale Postgres is a viable store for `power_forecasts`, and its size does not
-decide between the two. The design uses Delta Lake on S3 for four other reasons: storage at
-a thirtieth to a fiftieth of the price, no always-on database server to run, columnar scans for an
-analytical, scan-heavy workload, and the same files serving NGED directly, as the sections below
-describe.
+decide between the two. The design uses Delta Lake on S3 for four other reasons: storage at a
+thirtieth to a fiftieth of the storage price, no always-on database server to run, columnar scans
+for an analytical, scan-heavy workload, and the same files serving NGED directly, as the sections
+below describe.
 
 ## We _are_ delivering data over an API (but not a _REST_ API)
 
@@ -433,7 +431,7 @@ underlying USD prices):
 At v1 scale that premium is a rounding error — maybe £1–3/month on a ~£27–40/month bill (see [AWS
 Running Costs](aws-costs.md)). At v2 scale the storage premium stays small: `power_forecasts` holds
 about 470 GB after 4 years of 2 models (see [How big is Flexpectation's power forecast
-data?](#how-big-is-flexpectations-power-forecast-data), above), so 4.3% is about 40p a month. The
+data?](#how-big-is-flexpectations-power-forecast-data), above), so 4.3% is about 35p a month. The
 15% Fargate premium on v2's larger inference task, £45–90/month, is the larger difference, at
 about £7–14/month.
 
