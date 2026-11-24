@@ -2,17 +2,20 @@
 
 **The problem.** The XGBoost forecaster is the only model `live_forecasts` serves, and the
 maintainer judged its forecast too poor to be useful even as a fallback. The code that exists to
-train, promote, serve, check, and document that one model is spread across about 70 files: the
+train, promote, serve, check, and document that one model is spread across about 130 files: the
 `xgboost_forecaster` package, the `live_forecasts` asset and its check, model promotion from
 MLflow to disk and into the Docker image, the switching-event baseline scripts, and the tests that
 use XGBoost as their trained forecaster.
 
 **The planned solution.** Delete the `xgboost_forecaster` package, `conf/model/xgboost.yaml`, the
-`live_forecasts` asset, its asset check, model promotion, and the baseline scripts. Move the two
-NWP-run helpers that the step-5 asset of PR #1707 reuses to a neutral module. Move the tests that
+`live_forecasts` asset, its asset check, model promotion, and the baseline scripts. Move
+`_available_nwp_init_times`, which the step-5 asset of PR #1707 reuses, and its parsing helper
+into the neutral module `defs/assets.py`, beside `ecmwf_ens`, the asset that writes the table they
+read. Move the tests that
 use XGBoost as a stand-in trained forecaster to `ClimatologyForecaster`. Point the CV reference run
-at a climatology run. The live service then writes no forecast until the step-5 asset exists (the
-maintainer's decision, below). The change removes about 6,700 lines and adds a few hundred.
+at a climatology run. The live service then writes no forecast until the step-5 asset
+`live_primary_substation_forecasts` exists, and each later time-series type gets a live asset of
+its own (the maintainer's decisions, below). The change removes about 7,500 lines and adds a few hundred.
 
 **Order.** This PR builds on `main` after PR #1709 merges. PR #1709 keeps its small XGBoost change
 (`XGBoostForecaster.predict` reducing members with `ml_core.quantiles.to_stored_quantiles`, and the
@@ -34,8 +37,8 @@ outside `live_forecasts` reads the promoted model.
 - **More than one defensible design:** fires. What `live_forecasts` does afterwards (settled:
   nothing), and whether a later live service is one generic asset or one asset per forecaster
   (open).
-- **Callers found only by searching:** fires. About 70 files name XGBoost, `live_forecasts`, or
-  promotion.
+- **Callers found only by searching:** fires. About 130 files name XGBoost, `live_forecasts`,
+  promotion, or the production model.
 
 **Reviews:** both plan reviews (simplicity, then correctness), and the three diff reviews of
 `implement-issue`. The mutation pass is limited to the tests that move to `ClimatologyForecaster`,
@@ -53,6 +56,25 @@ so the other 16 of the 32 trial series have no live forecast until a forecaster 
 `NwpRunRowsWithoutWeatherFeatureEngineer` to support single-run mode (it raises
 `NotImplementedError` today), `LIVE_POWER_HISTORY` raised from 15 days to at least 386 days for the
 heuristic's 55-week lag, and a promoted heuristic run. It would keep a forecast for all 32 series.
+
+## Maintainer decision: one live asset per time-series type (2026-11-24)
+
+The maintainer chose one live Dagster asset per time-series type over one generic live asset that
+loads any saved forecaster. So:
+
+- `live_forecasts` is deleted, with `live_forecast_partitions`, `LIVE_FORECAST_HORIZON`,
+  `live_forecasts_job`, `live_forecasts_schedule`, and `select_nwp_init_time`. Each live asset owns
+  its own partitions and schedule.
+- The helpers a live asset reuses stay in neutral modules: `_available_nwp_init_times` and
+  `_parse_utc_init_time` in `defs/assets.py`, and `write_power_forecasts`, `ecmwf_ens_partitions`,
+  `ecmwf_ens_schedule`, `_is_too_old_to_retry`, `report_asset_degradation`, and
+  `sentry_capture_failure` where they are today.
+- The step-5 asset of PR #1707 is named `live_primary_substation_forecasts`.
+
+**Context for that choice.** Colleagues have asked for the wind and solar power forecasts to be
+refactored into modules of their own, so that they can be reused outside the NGED project. One live
+asset per time-series type, with the shared helpers in neutral modules, fits that refactor. The
+refactor itself belongs to a later issue and is not planned here.
 
 ## Solution
 
@@ -80,17 +102,19 @@ climatology run.
   recreates it.
 - **The Docker image** keeps its role as the Dagster code-location server and run image. Its
   default `CMD` and the smoke test in `scripts/deploy/build_and_verify_image.sh` run
-  `live_forecasts_job` today, so both switch to an ingest job that needs no credentials, or the
-  smoke run is dropped and only the code location's import is checked. The image tag in
-  `push_and_deploy_image.sh` comes from `promotion.json` today and becomes the git commit hash.
+  `live_forecasts_job` today. The default `CMD` is deleted, and the smoke test runs
+  `definitions validate -m nged_substation_forecast.definitions` in the image with
+  `--network=none`, because no inference is left whose hermeticity the old smoke run proved. The
+  image tag in `push_and_deploy_image.sh` comes from `promotion.json` today and becomes the git
+  commit hash.
 
 **Error handling.** Nothing new can fail. The Sentry `live-forecasts` cron monitor stops receiving
-heartbeats once the new code deploys, so it is paused or deleted in Sentry by hand at deploy time,
-or it alarms.
+heartbeats once the new code deploys, so it is deleted in Sentry by hand at deploy time, or it
+alarms.
 
 ### What changes, file by file
 
-**Deleted whole files (4,923 lines in 17 files):**
+**Deleted whole files (5,482 lines in 20 files):**
 
 | File | Lines |
 |---|---|
@@ -100,6 +124,7 @@ or it alarms.
 | `scripts/forecasting/run_baseline_experiment.py` | 177 |
 | `scripts/forecasting/export_baseline_forecasts.py` | 248 |
 | `packages/notebooks/view_baseline_export.py` | 307 |
+| `src/nged_substation_forecast/defs/live_forecast_assets.py` (after moving two helpers out) | 333 |
 | `src/nged_substation_forecast/defs/promotion_assets.py` | 108 |
 | `packages/ml_core/src/ml_core/production_helpers.py` | 403 |
 | `tests/test_live_forecasts.py` | 725 |
@@ -107,32 +132,38 @@ or it alarms.
 | `tests/test_promoted_model.py` | 232 |
 | `packages/ml_core/tests/test_production_helpers.py` | 422 |
 | `docs/roadmap/xgboost-improvements.md` | 1,544 |
+| `docs/live_service/model-releases.md` | 46 |
+| `.claude/skills/release-model/SKILL.md` | 180 |
 
-**Edited, with lines removed (about 1,800 lines):**
+**Edited, with lines removed (about 2,000 lines):**
 
-- **`defs/live_forecast_assets.py`** (333 lines): the asset, `LiveForecastsConfig`,
-  `LIVE_POWER_HISTORY`, and the promoted-model load go. The file is deleted. `_parse_utc_init_time`
-  and `_available_nwp_init_times` move unchanged to a new `defs/_nwp_runs.py`, because
-  `checks.py::_nwp_init_times_on_disk` and PR #1707's asset call `_available_nwp_init_times`. The
-  fate of `live_forecast_partitions` and `LIVE_FORECAST_HORIZON` follows open question 1.
+- **`defs/assets.py`**: gains `_parse_utc_init_time` and `_available_nwp_init_times`, moved
+  unchanged from `defs/live_forecast_assets.py` and placed beside `ecmwf_ens`. After this PR, the
+  only caller is PR #1707's asset. Their test,
+  `test_available_nwp_init_times_parses_both_fractional_second_renderings`, moves from
+  `tests/test_live_forecast_assets.py` into `tests/test_assets.py`. The rest of
+  `live_forecast_assets.py` goes: the asset, `LiveForecastsConfig`, `LIVE_POWER_HISTORY`,
+  `LIVE_FORECAST_HORIZON`, `live_forecast_partitions`, and the promoted-model load.
 - **`defs/checks.py`**: the `live_forecasts_are_healthy` section (about 580 lines: `_LIVE_FOLD_ID`,
   the NWP-run deadline constants, `count_missed_nwp_runs`, `evaluate_live_forecast_health`,
-  `_read_live_forecast_rows`, `_read_promoted_model_facts`, the describe and metadata helpers, and
-  the check) goes, with its import of `live_forecasts`.
-- **`defs/schedules.py`**: `live_forecasts_job` and `live_forecasts_schedule` go (open question 1),
+  `_read_live_forecast_rows`, `_read_promoted_model_facts`, the describe and metadata helpers,
+  `_nwp_init_times_on_disk`, and the check) goes, with its import of `live_forecasts`.
+- **`defs/schedules.py`**: `live_forecasts_job` and `live_forecasts_schedule` go,
   and the docstrings of `power_time_series_and_metadata_schedule` stop citing them.
 - **`definitions.py`**: drop `live_forecast_assets`, `promotion_assets`,
   `checks.live_forecasts_are_healthy`, and `schedules.live_forecasts_schedule`.
-- **`_sentry.py`**: `NWP_CONTROL_MEMBER_MISSING_FINGERPRINT` goes. `send_forecast_checkin`,
-  `LIVE_FORECAST_MONITOR_SLUG`, and `LIVE_FORECAST_MONITOR_CONFIG` stay, because PR #1707's plan
-  names `send_forecast_checkin`, but their docstrings stop naming `live_forecasts` and
-  `live_forecast_partitions`. `report_asset_degradation` and `sentry_capture_failure` are unchanged.
+- **`_sentry.py`**: `NWP_CONTROL_MEMBER_MISSING_FINGERPRINT`, `send_forecast_checkin`,
+  `LIVE_FORECAST_MONITOR_SLUG`, and `LIVE_FORECAST_MONITOR_CONFIG` go. Their only caller is
+  `live_forecasts`, and PR #1707's plan adds no check-in monitor. `report_asset_degradation` and
+  `sentry_capture_failure` are unchanged.
 - **`ml_core/mlflow_runs.py`**: `PromotableRun` and `list_promotable_runs` go.
 - **`ml_core/base_forecaster.py`**: docstrings that cite XGBoost, `live_forecasts`, or promotion.
   `load_trained_metadata` and the frozen `TimeSeriesMetadata` copy that `save` writes beside a model
-  stay, because a later live asset that loads a saved forecaster needs them (open question 1).
-- **`contracts/settings.py`**: `production_model_path` goes. `sentry_monitor_forecasts` stays with
-  `send_forecast_checkin`.
+  stay, because a live asset for another time-series type that loads a saved forecaster needs
+  them. PR #1707's asset does not use them: it reads its Primaries from its bundle's
+  `primaries.json`.
+- **`contracts/settings.py`**: `production_model_path` and `sentry_monitor_forecasts` go, with
+  their tests in `contracts/tests/test_settings.py`.
 - **`contracts/config_schemas.py`**, **`ml_core/features/_lags.py`**, **`_nwp.py`**,
   **`tabular_feature_engineer.py`**, **`features/__init__.py`**,
   **`baseline_forecasters/manual_heuristic.py`**, **`nwp_run_rows.py`**: comments and docstrings
@@ -143,42 +174,42 @@ or it alarms.
 - **Root `pyproject.toml`** and **`uv.lock`**: the `xgboost_forecaster` workspace member and the
   `xgboost` dependency. **`mkdocs.yml`**: the two nav entries.
 - **`Dockerfile`**: the `production_model` build context, the `MODEL_RUN_ID` argument and label,
-  `PRODUCTION_MODEL_PATH`, and the default `CMD`. **`scripts/deploy/*.sh`**: the `promotion.json`
-  tag and the `live_forecasts_job` smoke run.
+  `PRODUCTION_MODEL_PATH`, and the default `CMD`. **`.dockerignore`**: the comment on the
+  `production_model` context. **`scripts/deploy/*.sh`**: the `promotion.json` tag becomes the git
+  commit hash, and the smoke run becomes `definitions validate`.
 - **`.gitignore`**, **`README.md`**, **`CLAUDE.md`**, **`scripts/README.md`**,
-  **`packages/notebooks/README.md`**, the package READMEs, and the skills (`release-model`,
-  `update-dependencies`, `plan-issue`): every passage describing XGBoost, `live_forecasts`, or
-  promotion as current. The `release-model` skill describes promotion end to end, so it is cut to
-  what still applies or deleted.
+  **`packages/notebooks/README.md`**, the package READMEs, and the skills (`update-dependencies`,
+  `plan-issue`): every passage describing XGBoost, `live_forecasts`, or promotion as current. The
+  `release-model` skill and `model-releases.md` describe only promotion, so both are deleted
+  rather than rewritten.
 
 **Tests moved to `ClimatologyForecaster`:** `tests/conftest.py` (the CV-registration fixture's
 default `base_model_config` and overrides), `test_jobs.py`, `test_trained_cv_model.py`,
 `test_register_experiment_job.py`, `test_forecaster_config_serialisation.py`,
 `packages/ml_core/tests/test_load_experiment_forecaster.py`, and the `"xgboost"` model-name strings
-in `test_s3_data_paths.py`, `contracts/tests/test_metrics.py`, and the `delta_store` tests. The live
-tests in `tests/test_checks.py` (about 780 lines) and the check-in tests in `tests/test_sentry.py`
-that drive `live_forecasts` go.
+in `test_s3_data_paths.py`, `contracts/tests/test_metrics.py`, and the `delta_store` tests. These
+go: the live tests in `tests/test_checks.py` (about 780 lines), the check-in tests and the
+monitor-schedule drift guard in `tests/test_sentry.py`, the `live_forecasts_job` partition and
+schedule tests in `tests/test_assets.py`, and the `list_promotable_runs` tests in
+`ml_core/tests/test_mlflow_runs.py`. Comments naming XGBoost in `tests/_pytest_autoinject.py`,
+`ml_core/tests/test_base_forecaster.py`, and `ml_core/tests/test_features.py` are reworded.
 
 ### Design-philosophy check
 
 The serving path is removed rather than changed, so no degradation rule is weakened in code that
 still runs. The gap is the cost: until PR #1707 lands, no live forecast reaches NGED and Sentry has
 no live-slot check. The change follows the principle that code no caller uses goes, rather than
-staying for a possible future caller. The two exceptions, `send_forecast_checkin` and
-`load_trained_metadata`, stay because the next PR's plan names the first and open question 1
-decides the second.
+staying for a possible future caller. The one exception, `load_trained_metadata` with
+the frozen metadata copy, stays for a live asset of another time-series type.
 
 ## Tests
 
-No test is added: every behaviour this PR leaves is already tested. The tests that move to
-`ClimatologyForecaster` keep their assertions on the CV, MLflow, and config machinery. Each has to
-fail on a broken machinery path, not on XGBoost, so the mutation pass checks those moved tests
-only. Two tests assert the absence of what goes:
-
-- `tests/test_asset_selection_parses.py` (extended): the definitions load, and no asset, job, or
-  schedule named `live_forecasts` or `promoted_model` is registered. This fails on `main`.
-- A `git grep -il xgboost` guard is not added, because the CLAUDE.md prose rules use "XGBoost
-  model" as an example and some docs keep XGBoost as history in research references.
+No test is added: every behaviour this PR leaves is already tested, and a test asserting that the
+removed assets are absent would guard against a change nobody is going to make. The tests that
+move to `ClimatologyForecaster` keep their assertions on the CV, MLflow, and config machinery. Each
+has to fail on a broken machinery path, not on XGBoost, so the mutation pass checks those moved
+tests only. `dagster definitions validate`, run in CI and in the image smoke test, catches a
+dangling import of a deleted module.
 
 The CV integration tests lose their only coverage of a weather feature (`temperature_2m`) through
 CV, because climatology selects none. The weather path keeps its unit tests in
@@ -187,8 +218,8 @@ CV, because climatology selects none. The weather path keeps its unit tests in
 ## Docs to update
 
 Every page that `git grep -il "xgboost\|live_forecasts\|promoted_model\|production_model"` finds
-under `docs/` (about 40 pages), rewritten to describe the code as it now is. The heaviest are
-`docs/live_service/aws.md` ("Redeploying a new champion model"), `model-releases.md`,
+under `docs/` (46 pages), rewritten to describe the code as it now is. The heaviest are
+`docs/live_service/aws.md` (whose "Redeploying a new champion model" section is deleted),
 `operations.md`, `setup.md`, `docs/architecture/production-deployment.md`, `overview.md`,
 `testing.md`, `docs/cross-validation/model-configuration.md`, `dagster-workflow.md`, and the
 roadmap pages that describe XGBoost as the current model. `docs/roadmap/index.md` links to the
@@ -200,16 +231,17 @@ PR #1707's plan assumes `live_forecasts` keeps running as the fallback. After th
 
 - **No fallback.** When today's 00Z run is absent at 15:00 UTC, the step-5 asset writes nothing and
   NGED gets no forecast that day. The plan's error-handling text changes to say so.
-- **The live asset checks**, re-added for `live_primaries_network_forecasts` if wanted: the slot
+- **The live asset checks**, re-added for `live_primary_substation_forecasts` if wanted: the slot
   wrote rows, every expected series is present, the horizon is at least the minimum fraction, no
   quantile column is non-finite, no row is a hindcast, and the count of missed NWP runs.
-- **The Sentry check-in monitor.** PR #1707's plan relies on the `live-forecasts` monitor to catch
-  a dead daemon. `send_forecast_checkin` and its monitor config stay, so the step-5 asset can call
-  `send_forecast_checkin` with its own `monitor_slug` and a crontab matching its daily schedule.
+- **A dead-daemon alarm, if wanted.** PR #1707's plan adds no check-in monitor and counts on the
+  existing `live-forecasts` monitor, which this PR removes with its only feeder. A heartbeat for
+  `live_primary_substation_forecasts` is about 60 lines of `_sentry.py` to re-add, with a crontab
+  matching its daily schedule.
 - **The Docker image.** PR #1707's plan copies the bundle "beside the existing champion model". The
-  bundle becomes the image's only model, and the image's default `CMD` and smoke test run the
-  step-5 job.
-- **`_available_nwp_init_times`** is imported from `defs/_nwp_runs.py`, not
+  bundle becomes the image's only model. The image has no default `CMD`, and its smoke test runs
+  `definitions validate`.
+- **`_available_nwp_init_times`** is imported from `defs/assets.py`, not
   `defs/live_forecast_assets.py`.
 - Unchanged and reused as named: `write_power_forecasts` with `replace_partition`,
   `ecmwf_ens_partitions`, `ecmwf_ens_schedule`, `_is_too_old_to_retry`, `report_asset_degradation`,
@@ -224,27 +256,37 @@ nged_substation_forecast.definitions`.
 
 ## Risks and open questions
 
-1. **One generic live asset, or one live asset per forecaster?** The maintainer is deciding.
-    - *One generic asset:* keep `live_forecast_partitions`, `LIVE_FORECAST_HORIZON`,
-      `select_nwp_init_time` and its live and replay modes, `load_trained_metadata`, and the
-      replace-partition write pattern in a neutral module, and keep the 6-hourly cadence for a
-      later asset that loads any saved forecaster and calls `predict`. PR #1707's plan would then
-      plug the step-5 network in behind that asset rather than adding its own.
-    - *One asset per forecaster:* delete `live_forecast_partitions`, `live_forecasts_job`,
-      `live_forecasts_schedule`, and `select_nwp_init_time` now. Each forecaster asset owns its
-      partitions and schedule, as PR #1707's plan does with its daily 12:00 UTC asset, and shares
-      only the helpers listed above.
-
-   No recommendation until the maintainer answers. Either way the `live_forecasts` asset itself is
-   deleted, because it has no forecaster left to serve.
-2. **The CV reference run.** `reference_experiment_name` moves from `xgboost_no_power_lags` to a
+1. **The CV reference run.** `reference_experiment_name` moves from `xgboost_no_power_lags` to a
    climatology run. Recommendation: climatology, because it trains in seconds and needs no weather.
    The run has to be re-run into the `power_forecasts` table that PR #1709 recreates before
    `score_study.py` accepts a study.
-3. **The Sentry monitor at deploy.** Pause or delete the `live-forecasts` cron monitor by hand when
-   this PR deploys. Recommendation: pause it, and let PR #1707 resume it under its own slug.
-4. **Follow-up, not in this PR: the weather features.** With XGBoost gone, no production
+2. **The Sentry monitor at deploy.** Delete the `live-forecasts` cron monitor by hand when this PR
+   deploys, because no code feeds it any more.
+3. **Follow-up, not in this PR: the weather features.** With XGBoost gone, no production
    forecaster selects a weather feature from `TabularFeatureEngineer`, and the step-5 asset builds
    its own inputs. The weather columns of `AllFeatures`, `windchill` (issue #1199), and the weather
    path of the tabular engineer could go in a follow-up issue. That issue changes a Patito
    contract, so it is not folded in here.
+
+## Simplicity review: triage
+
+Two independent simplicity reviews ran on the first draft and agreed on most findings.
+
+- **Delete the Sentry check-in code:** accepted. PR #1707's plan adds no check-in monitor, so
+  `send_forecast_checkin` and its monitor config had no caller left. The issue body listed the
+  function under "What stays" and is amended.
+- **Move the NWP-run helpers into `defs/assets.py`, and keep their test:** accepted. A new
+  `defs/_nwp_runs.py` was one module too many, and the first draft deleted the helpers' only test.
+- **Choose one Docker smoke option:** accepted. The smoke test runs `definitions validate`, and the
+  default `CMD` is deleted.
+- **Drop the absence test:** accepted. `definitions validate` catches the real failure, a dangling
+  import.
+- **Delete `load_trained_metadata` and the frozen metadata copy as dead code:** rejected. PR #1707
+  does not use them, but a live asset for another time-series type that loads a saved forecaster
+  does, and the plan now says so.
+- **Delete promotion-only pages instead of rewriting them:** accepted for `model-releases.md`, the
+  `release-model` skill, and the "Redeploying a new champion model" section of `aws.md`.
+- **Count corrections:** accepted. About 130 files name the removed code, not 70, and 46 docs
+  pages, not 40. `live_forecast_assets.py` moves to the deleted-files table, and
+  `tests/test_assets.py`, `ml_core/tests/test_mlflow_runs.py`, `contracts/tests/test_settings.py`,
+  `.dockerignore`, and the `cv_assets.py` docstring are added.
