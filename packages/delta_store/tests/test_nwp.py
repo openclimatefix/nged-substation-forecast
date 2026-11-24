@@ -501,10 +501,9 @@ def test_the_partition_directory_name_keeps_the_format_the_migration_script_expe
     """A datetime partition's value must end in ``Z``, as ``deltalake`` 1.7 writes it.
 
     ``scripts/forecasting/rename_nwp_partitions.py`` tells a migrated partition from an
-    unmigrated one by that suffix. Polars also cannot parse a table whose partition values are in
-    two datetime formats, so a table holding both cannot be scanned. If this test fails, a
-    ``deltalake`` upgrade changed the format again: migrate the existing tables before accepting
-    the upgrade.
+    unmigrated one by that suffix. Polars cannot parse a table whose partition values are in two
+    datetime formats. If this test fails, a ``deltalake`` upgrade changed the partition value
+    format. Migrate the existing tables before accepting the upgrade.
     """
     table = tmp_path / "nwp"
     write_nwp(_make_nwp(), table)

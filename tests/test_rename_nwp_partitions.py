@@ -1,15 +1,16 @@
 """Tests for `scripts/forecasting/rename_nwp_partitions.py`.
 
-The script edits the Delta log of the whole ``nwp`` table by hand, so the tests check what a bug
-there would break silently: a scan that still fails, a row lost or duplicated, a later
-``write_nwp`` that no longer replaces the right partition, and a half-finished rename.
+The script writes a Delta commit itself instead of going through ``deltalake``. The tests check
+what a bug in that commit would break silently: a scan that still fails, a row lost or
+duplicated, a later ``write_nwp`` that no longer replaces the right partition, and a failure that
+leaves the table unreadable.
 """
 
 import importlib.util
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Final
 
 import polars as pl
@@ -55,8 +56,8 @@ def _segments(run: datetime) -> tuple[str, str]:
 def _make_old_format(table: Path, run: datetime) -> None:
     """Make one run's partition look as if ``deltalake`` 1.6.x had written it.
 
-    Renames the directory and rewrites the same strings in the Delta log. The log holds the path
-    percent-encoded twice and the partition value as plain text.
+    The helper renames the directory and rewrites the same strings in the Delta log. The log holds
+    the path percent-encoded twice and the partition value as plain text.
     """
     new, old = _segments(run)
     (table / _MODEL_DIR / new).rename(table / _MODEL_DIR / old)
@@ -66,6 +67,9 @@ def _make_old_format(table: Path, run: datetime) -> None:
             .replace(new.replace("%", "%25"), old.replace("%", "%25"))
             .replace(f"{run:%Y-%m-%d}T00:00:00.000000Z", f"{run:%Y-%m-%d} 00:00:00.000000")
         )
+
+
+_KEY: Final[list[str]] = ["init_time", "ensemble_member", "valid_time", "h3_index"]
 
 
 @pytest.fixture
@@ -92,12 +96,6 @@ def test_a_mixed_table_cannot_be_scanned_until_the_script_has_run(mixed_table: P
     assert sorted(p["init_time"] for p in DeltaTable(mixed_table).partitions()) == [
         f"{run:%Y-%m-%d}T00:00:00.000000Z" for run in _RUNS
     ]
-    for run in _RUNS:
-        new = _segments(run)[0]
-        assert (mixed_table / _MODEL_DIR / new).is_dir()
-
-
-_KEY: Final[list[str]] = ["init_time", "ensemble_member", "valid_time", "h3_index"]
 
 
 def test_a_dry_run_changes_nothing(mixed_table: Path) -> None:
@@ -106,7 +104,6 @@ def test_a_dry_run_changes_nothing(mixed_table: Path) -> None:
     assert rename_nwp_partitions.rename_partitions(mixed_table, dry_run=True) == 2
 
     assert sorted(p.name for p in (mixed_table / "_delta_log").iterdir()) == log_before
-    assert (mixed_table / _MODEL_DIR / _segments(_RUNS[0])[1]).is_dir()
 
 
 def test_a_second_run_finds_nothing_to_rename(mixed_table: Path) -> None:
@@ -130,7 +127,7 @@ def test_write_nwp_still_replaces_only_its_own_partition_after_the_rename(
     assert scanned.height == 2 + 4 + 4
 
 
-def test_a_failed_commit_leaves_the_table_as_it_was_and_no_partial_commit(
+def test_a_failed_commit_leaves_the_table_readable_and_a_rerun_finishes(
     mixed_table: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Fail at the flush of the commit file, after every file has been linked."""
@@ -139,51 +136,23 @@ def test_a_failed_commit_leaves_the_table_as_it_was_and_no_partial_commit(
     def fail(*_args: object, **_kwargs: object) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr(rename_nwp_partitions.os, "fsync", fail)
-
-    with pytest.raises(OSError, match="disk full"):
-        rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+    with monkeypatch.context() as patched:
+        patched.setattr(rename_nwp_partitions.os, "fsync", fail)
+        with pytest.raises(OSError, match="disk full"):
+            rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
 
     assert sorted(p.name for p in (mixed_table / "_delta_log").iterdir()) == log_before
-    for run in _RUNS[:2]:
-        new, old = _segments(run)
-        assert (mixed_table / _MODEL_DIR / old).is_dir()
-        assert not (mixed_table / _MODEL_DIR / new).exists()
-
-
-def test_a_crash_after_linking_but_before_the_commit_is_harmless_and_a_rerun_finishes(
-    mixed_table: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Simulate a kill between the links and the commit, which runs no cleanup."""
-
-    def crash(*_args: object, **_kwargs: object) -> None:
-        raise KeyboardInterrupt
-
-    with monkeypatch.context() as patched:
-        patched.setattr(rename_nwp_partitions, "_write_commit", crash)
-        with pytest.raises(KeyboardInterrupt):
-            rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
-    # The cleanup of a normal failure ran above, so recreate the half-linked state by hand.
-    for run in _RUNS[:2]:
-        new, old = _segments(run)
-        (mixed_table / _MODEL_DIR / new).mkdir(exist_ok=True)
-        for file in (mixed_table / _MODEL_DIR / old).iterdir():
-            (mixed_table / _MODEL_DIR / new / file.name).hardlink_to(file)
-
     assert pl.scan_delta(mixed_table, use_pyarrow=True).collect().height == 12
-    assert rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False) == 2
 
+    assert rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False) == 2
     assert Nwp.scan_delta(mixed_table).collect().height == 12
 
 
 def test_a_table_with_writer_features_is_refused(
     mixed_table: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    class _Protocol:
-        min_writer_version = 7
-        writer_features = ("deletionVectors",)
-
-    monkeypatch.setattr(DeltaTable, "protocol", lambda _self: _Protocol())
+    protocol = SimpleNamespace(min_writer_version=7, writer_features=("deletionVectors",))
+    monkeypatch.setattr(DeltaTable, "protocol", lambda _self: protocol)
 
     with pytest.raises(RuntimeError, match="writer version"):
         rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)

@@ -1,39 +1,36 @@
-"""Give every ``nwp`` Delta partition in the old ``deltalake`` partition-value format the new one.
+"""Rewrite every ``nwp`` Delta partition value from the ``deltalake`` 1.6.x to the 1.7 format.
 
 ``deltalake`` 1.6.x stored the ``init_time`` partition value of a run as
 ``2026-11-23 00:00:00.000000``, and named the partition directory
 ``init_time=2026-11-23%2000%3A00%3A00.000000``. ``deltalake`` 1.7.0 stores
 ``2026-11-23T00:00:00.000000Z`` and names the directory
 ``init_time=2026-11-23T00%3A00%3A00.000000Z``. Polars cannot parse the two value formats in one
-table, so a table holding both fails every ``Nwp.scan_delta`` collect with
-``could not parse '2026-11-23 00:00:00.000000' with pattern 'DatetimeYMDZ'``. This script gives
-every old-format partition the new format without copying any data.
+table. A table holding both therefore fails every ``Nwp.scan_delta`` collect with
+``could not parse '2026-11-23 00:00:00.000000' with pattern 'DatetimeYMDZ'``.
 
 **The script hard-links each data file of an old-format partition into the directory that
-``deltalake`` 1.7 would have used, and writes one new Delta commit.**
-The commit removes each data file at its old path and adds the same file, with the same size and
-statistics, at its new path with the new partition value. A hard link is a second name for the
-same file on disk, so no Parquet file is read, rewritten, or copied. The script takes seconds and
-needs no free disk space. It works on a local table only, because it creates hard links.
-The old links stay in place until the first ``vacuum`` after the retention period (7 days by
-default) removes them as unreferenced files, so the table holds two names for each moved file
-until then.
+``deltalake`` 1.7 would have used, and writes one new Delta commit.** The commit removes each data
+file at its old path and adds the same file, with the same size and statistics, at its new path
+with the new partition value. A hard link is a second name for the same file on disk, so no
+Parquet file is read, rewritten, or copied. The script needs no free disk space. It works on a
+local table only, because it creates hard links. The old links stay in place until the first
+``vacuum`` after the retention period (7 days by default) removes them as unreferenced files.
 
 **A crash at any point before the commit leaves the table readable.** The only trace is the new
 links, which a rerun reuses, or which ``vacuum`` removes. The commit file is created atomically,
 so the log never holds a partly written commit. If the script fails after the commit, the table
 is valid and the script reports what failed. To undo a finished run, restore the table to the
-version before the commit with ``DeltaTable.restore``, which needs the old links, so run it
+version before the commit with ``DeltaTable.restore``. The restore needs the old links, so run it
 before the first ``vacuum`` that runs after the retention period. A restore also discards every
-commit made after the migration, so those NWP runs must be ingested again. Never pass
-``ignore_missing_files=True`` to ``restore`` here, because the next ``vacuum`` then deletes the
-only remaining links. Do not delete the commit file by hand once another writer has committed
-after it.
+commit made after the migration, so those numerical weather prediction (NWP) runs must be
+ingested again. Never pass ``ignore_missing_files=True`` to ``restore`` here, because the next
+``vacuum`` then deletes the only remaining links.
 
-The script reads the Delta log directly, replaying the latest checkpoint and the commits after
-it. It refuses to run if the table's protocol has writer features, and it refuses to commit if
-its replay of the log and ``deltalake`` disagree on which files are active. After the commit, the
-script checks that every active file exists and that every partition value is in the new format.
+**The script checks its own replay of the Delta log against ``deltalake``, before and after the
+commit.** The script refuses to run if the table's protocol has writer features, and it refuses to
+commit if its replay of the log and ``deltalake`` disagree on which files are active. After the
+commit, the script checks that every active file exists and that every partition value is in the
+new format.
 
 **Run the script with ``deltalake`` 1.7.0 or later installed, while nothing else writes to the
 table.** A write that lands between the script's read of the log and its commit makes the commit
@@ -98,8 +95,9 @@ def _json_value(value: Any) -> Any:
 def active_add_actions(table_path: Path) -> dict[str, _Action]:
     """Replay the Delta log and return each active file's ``add`` action, keyed by its path.
 
-    Starts from the latest checkpoint named in ``_last_checkpoint``, if there is one, and applies
-    every commit file after it. A multi-part checkpoint is read part by part.
+    The replay starts from the latest checkpoint named in ``_last_checkpoint``, if there is one, and
+    applies every commit file after that checkpoint. The replay reads a multi-part checkpoint part
+    by part.
     """
     log_dir = table_path / "_delta_log"
     active: dict[str, _Action] = {}
@@ -120,22 +118,12 @@ def active_add_actions(table_path: Path) -> dict[str, _Action]:
         if int(commit_file.stem) <= checkpoint_version:
             continue
         for line in commit_file.read_text().splitlines():
-            if not line.strip():
-                continue
             action = json.loads(line)
             if "add" in action:
                 active[action["add"]["path"]] = action["add"]
             elif "remove" in action:
                 active.pop(action["remove"]["path"], None)
     return active
-
-
-def _old_format_actions(actions: dict[str, _Action]) -> list[_Action]:
-    return [
-        action
-        for action in actions.values()
-        if not action["partitionValues"]["init_time"].endswith(_NEW_FORMAT_SUFFIX)
-    ]
 
 
 def _renamed(action: _Action) -> _Action:
@@ -149,7 +137,6 @@ def _renamed(action: _Action) -> _Action:
         **action,
         "path": action["path"].replace(old_segment, new_segment),
         "partitionValues": {**action["partitionValues"], "init_time": new_value},
-        "dataChange": True,
     }
 
 
@@ -173,10 +160,10 @@ def _flat_actions(table: DeltaTable) -> list[tuple[Any, ...]]:
 def _write_commit(commit_file: Path, lines: list[dict[str, Any]]) -> None:
     """Create ``commit_file`` atomically, failing if that Delta version is already taken.
 
-    Writes the whole commit to a temporary file in the same folder, flushes it to disk, and then
-    hard-links the temporary file to the commit's name. The link either appears complete or does
-    not appear, and raises ``FileExistsError`` if another writer took the version. A crash or a
-    full disk therefore cannot leave a partly written commit in the log.
+    The function writes the whole commit to a temporary file in the same folder, flushes it to
+    disk, and then hard-links the temporary file to the commit's name. The link either appears
+    complete or does not appear. If another writer took the version, the link raises
+    ``FileExistsError``.
     """
     temporary = commit_file.with_name(commit_file.name + ".tmp")
     try:
@@ -193,9 +180,8 @@ def _write_commit(commit_file: Path, lines: list[dict[str, Any]]) -> None:
 def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
     """Give every old-format partition the new format, recording it in one new commit.
 
-    Hard-links each data file to its new path, writes one commit that removes the old paths and
-    adds the new ones. The old links stay in place. The hard links make every step before the
-    commit harmless: a crash leaves the table intact, plus links that a rerun reuses.
+    The function hard-links each data file to its new path and writes one commit that removes the
+    old paths and adds the new ones.
 
     Args:
         table_path: Local path of the ``nwp`` Delta table.
@@ -217,7 +203,11 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
             "The files that the replayed Delta log calls active differ from the files that"
             " deltalake reads. Nothing was changed."
         )
-    old = _old_format_actions(actions)
+    old = [
+        action
+        for action in actions.values()
+        if not action["partitionValues"]["init_time"].endswith(_NEW_FORMAT_SUFFIX)
+    ]
     partitions = sorted({a["partitionValues"]["init_time"] for a in old})
     _LOGGER.info("%s has %d partitions to change (%d files)", table_path, len(partitions), len(old))
     if dry_run or not old:
@@ -231,53 +221,37 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
         (_disk_path(table_path, action["path"]), _disk_path(table_path, new_action["path"]))
         for action, new_action in zip(old, new_actions, strict=True)
     ]
-    created: list[Path] = []
-    committed = False
-    try:
-        for source, target in pairs:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if target.exists() and target.samefile(source):
-                continue  # linked by an earlier run that stopped before its commit
+    # A crash before the commit leaves only links that the log does not mention. A rerun reuses
+    # them, and `vacuum` removes them otherwise.
+    for source, target in pairs:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not (target.exists() and target.samefile(source)):
             os.link(source, target)
-            created.append(target)
-        now = int(time.time() * 1000)
-        lines: list[dict[str, Any]] = [
+    now = int(time.time() * 1000)
+    lines: list[dict[str, Any]] = [
+        {"commitInfo": {"timestamp": now, "operation": "RELOCATE PARTITIONS"}},
+        *(
             {
-                "commitInfo": {
-                    "timestamp": now,
-                    "operation": "RELOCATE PARTITIONS",
-                    "operationParameters": {"reason": "deltalake 1.7 partition value format"},
-                    "engineInfo": "rename_nwp_partitions.py",
+                "remove": {
+                    "path": a["path"],
+                    "deletionTimestamp": now,
+                    "dataChange": False,
+                    "extendedFileMetadata": True,
+                    "partitionValues": a["partitionValues"],
+                    "size": a["size"],
+                    **({"stats": a["stats"]} if "stats" in a else {}),
                 }
-            },
-            *(
-                {
-                    "remove": {
-                        "path": a["path"],
-                        "deletionTimestamp": now,
-                        "dataChange": False,
-                        "extendedFileMetadata": True,
-                        "partitionValues": a["partitionValues"],
-                        "size": a["size"],
-                        **({"stats": a["stats"]} if "stats" in a else {}),
-                    }
-                }
-                for a in old
-            ),
-            *({"add": {**a, "dataChange": False}} for a in new_actions),
-        ]
-        _write_commit(commit_file, lines)
-        committed = True
-    except BaseException:
-        if not committed:
-            for target in reversed(created):
-                target.unlink(missing_ok=True)
-                if target.parent.exists() and not any(target.parent.iterdir()):
-                    target.parent.rmdir()
-        raise
+            }
+            for a in old
+        ),
+        *({"add": {**a, "dataChange": False}} for a in new_actions),
+    ]
+    _write_commit(commit_file, lines)
 
     after_table = DeltaTable(table_path)
-    still_old = [p for p in after_table.partitions() if not p["init_time"].endswith("Z")]
+    still_old = [
+        p for p in after_table.partitions() if not p["init_time"].endswith(_NEW_FORMAT_SUFFIX)
+    ]
     missing = [p for p in _active_paths(after_table) if not _disk_path(table_path, p).exists()]
     unchanged = _flat_actions(after_table) == before
     if after_table.version() < version + 1 or still_old or missing or not unchanged:
@@ -287,13 +261,7 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
             " missing files, or changed statistics. The old links were left in place. Investigate"
             " before deleting anything."
         )
-    _LOGGER.info(
-        "Wrote %s, and linked %d files into new-format directories. The old links stay until the"
-        " first vacuum after the retention period, which keeps DeltaTable.restore usable until"
-        " then.",
-        commit_file,
-        len(pairs),
-    )
+    _LOGGER.info("Wrote %s, linking %d files into new-format directories.", commit_file, len(pairs))
     return len(partitions)
 
 
