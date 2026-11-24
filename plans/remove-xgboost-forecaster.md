@@ -35,8 +35,8 @@ outside `live_forecasts` reads the promoted model.
 - **A degradation rule:** fires. `live_forecasts_are_healthy` and the `live_forecasts` Sentry
   degradation report go.
 - **More than one defensible design:** fires. What `live_forecasts` does afterwards (settled:
-  nothing), and whether a later live service is one generic asset or one asset per forecaster
-  (open).
+  nothing), and whether a later live service is one generic asset or one asset per time-series
+  type (settled: one asset per time-series type).
 - **Callers found only by searching:** fires. About 130 files name XGBoost, `live_forecasts`,
   promotion, or the production model.
 
