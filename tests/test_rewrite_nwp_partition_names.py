@@ -94,3 +94,37 @@ def test_a_migrated_table_has_nothing_left_to_rewrite(mixed_table: Path) -> None
     )
 
     assert rewrite_nwp_partition_names.old_format_partitions(str(mixed_table), {}) == []
+
+
+def test_a_partition_that_fails_validation_is_reported_and_the_rest_are_still_rewritten(
+    mixed_table: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    third_run = _SECOND_RUN + timedelta(days=1)
+    write_nwp(nwp=_make_nwp(4, init_time=third_run), table_uri=mixed_table)
+    # Make the third run's partition old-format too, by repeating the rename for its directory.
+    third_new = "init_time=2026-01-03T00%3A00%3A00.000000Z"
+    third_old = "init_time=2026-01-03%2000%3A00%3A00.000000"
+    (mixed_table / _MODEL_DIR / third_new).rename(mixed_table / _MODEL_DIR / third_old)
+    for log_file in (mixed_table / "_delta_log").glob("*.json"):
+        log_file.write_text(
+            log_file.read_text()
+            .replace(third_new.replace("%", "%25"), third_old.replace("%", "%25"))
+            .replace("2026-01-03T00:00:00.000000Z", "2026-01-03 00:00:00.000000")
+        )
+    real_rewrite = rewrite_nwp_partition_names.rewrite_partition
+
+    def fail_for_second_run(table_uri: str, init_time: datetime, storage_options: dict) -> None:
+        if init_time == _SECOND_RUN:
+            raise ValueError("contract violation")
+        real_rewrite(table_uri=table_uri, init_time=init_time, storage_options=storage_options)
+
+    monkeypatch.setattr(rewrite_nwp_partition_names, "rewrite_partition", fail_for_second_run)
+    monkeypatch.setattr(
+        sys, "argv", ["rewrite_nwp_partition_names.py", "--table-uri", str(mixed_table)]
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        rewrite_nwp_partition_names.main()
+
+    assert excinfo.value.code == 1
+    assert rewrite_nwp_partition_names.old_format_partitions(str(mixed_table), {}) == [_SECOND_RUN]

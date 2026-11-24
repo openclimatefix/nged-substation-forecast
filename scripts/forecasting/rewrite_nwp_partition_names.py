@@ -3,8 +3,8 @@
 ``deltalake`` 1.6.x named a datetime partition directory
 ``init_time=2026-11-23%2000%3A00%3A00.000000``. ``deltalake`` 1.7.0 names it
 ``init_time=2026-11-23T00%3A00%3A00.000000Z``. Polars infers the datetime
-format from the first partition directory it lists and cannot parse the other format. A table
-holding directories in both formats therefore fails every ``Nwp.scan_delta`` collect with
+format from the first partition it lists and cannot parse the other format. A table holding
+partitions in both formats therefore fails every ``Nwp.scan_delta`` collect with
 ``could not parse '2026-11-23 00:00:00.000000' with pattern 'DatetimeYMDZ'``. This script
 rewrites each old-format partition through ``write_nwp``, so that the partition lands in a
 directory with the new name. **Run the script with ``deltalake`` 1.7.0 or later installed**, which
@@ -14,12 +14,18 @@ Each partition is read through the pyarrow reader, because the Polars reader is 
 fails on a mixed table. The pyarrow reader takes partition values from the Delta log and ignores
 directory names. The rows are then cast and validated against the ``Nwp`` data contract and
 written through ``write_nwp``, which replaces that ``(nwp_model_id, init_time)`` partition and
-nothing else. A partition whose value already ends in ``Z`` is skipped, so an interrupted run
-resumes where it stopped and a finished table is left alone.
+nothing else. A partition that fails validation, such as a stored run that lacks
+``total_cloud_cover_atmosphere``, is logged and skipped, and the script exits with status 1 after
+the other partitions are done. That partition stays in the old format, so the table stays
+unscannable until the run is re-materialised with the ``ecmwf_ens`` asset, which gives the
+partition the new name. A partition whose value already ends in ``Z`` is skipped, so an
+interrupted run resumes where it stopped and a finished table is left alone.
 
-**The rewrite roughly doubles the table on disk** until the superseded files are reclaimed with
-``vacuum(full=True)``. Plain ``vacuum()`` reports deleting the files but does not delete them. The
-reason is recorded on
+**The rewrite needs free disk space roughly equal to the size of the table** until the superseded
+files are reclaimed with ``vacuum(full=True)``. A 123 GB table needs about 250 GB in total. The
+script commits one partition at a time, so ``vacuum(full=True)`` can run between interrupted
+runs. Plain ``vacuum()`` reports deleting the files but does not delete them. The reason is
+recorded on
 <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/>.
 A table small enough to recreate, such as the AWS table, can be deleted and re-ingested instead.
 
@@ -31,6 +37,7 @@ Usage::
 
 import argparse
 import logging
+import sys
 import time
 from datetime import UTC, datetime
 from typing import Final
@@ -83,6 +90,13 @@ def rewrite_partition(
         .filter(pl.col("init_time") == init_time)
         .collect()
     )
+    # `Nwp.scan_delta` adds a column that is absent from the whole table as nulls. The pyarrow
+    # reader does not, so the same fill is applied here before validation.
+    stored_columns = set(rows.columns)
+    rows = rows.with_columns(
+        pl.lit(None, dtype=Nwp.dtypes[column]).alias(column)
+        for column in sorted(Nwp.columns_absent_from_older_partitions - stored_columns)
+    )
     write_nwp(
         nwp=Nwp.DataFrame(rows).cast().validate(),
         table_uri=table_uri,
@@ -111,6 +125,7 @@ def main() -> None:
     pending = old_format_partitions(table_uri, storage_options)
     _LOGGER.info("%s has %d partitions to rewrite", table_uri, len(pending))
 
+    failed: list[datetime] = []
     for index, init_time in enumerate(pending, start=1):
         if args.dry_run:
             _LOGGER.info(
@@ -118,7 +133,14 @@ def main() -> None:
             )
             continue
         started = time.perf_counter()
-        rewrite_partition(table_uri=table_uri, init_time=init_time, storage_options=storage_options)
+        try:
+            rewrite_partition(
+                table_uri=table_uri, init_time=init_time, storage_options=storage_options
+            )
+        except Exception:
+            _LOGGER.exception("[%d/%d] %s failed", index, len(pending), init_time.isoformat())
+            failed.append(init_time)
+            continue
         _LOGGER.info(
             "[%d/%d] %s rewritten in %.1fs",
             index,
@@ -133,6 +155,15 @@ def main() -> None:
             " Use vacuum(full=True); plain vacuum() silently deletes nothing here — see"
             " https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/"
         )
+
+    if failed:
+        _LOGGER.error(
+            "%d partitions could not be rewritten and are still in the old format: %s."
+            " Re-materialise each run with the ecmwf_ens asset.",
+            len(failed),
+            ", ".join(init_time.isoformat() for init_time in failed),
+        )
+        sys.exit(1)
 
 
 if __name__ == "__main__":
