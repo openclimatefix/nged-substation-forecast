@@ -956,7 +956,7 @@ def assess_nwp_run_completeness(
 
     Row counting is safe here despite Polars' 32-bit row index. This function runs on a single
     in-memory run: at V1 scale, 1671 cells x 51 members x 85 steps ~ 7.24M rows. That row count is
-    nearly three orders of magnitude below the 2**32 ceiling, which the whole ~5.9B-row NWP Delta
+    nearly three orders of magnitude below the 2**32 ceiling, which the whole ~16.2B-row NWP Delta
     table would hit.
 
     Args:

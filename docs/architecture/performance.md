@@ -178,20 +178,24 @@ loop whose whole job is holding the frame at 2 to 3 GB.
 
 RAM is not the only bound a Polars query must respect. Default Polars builds use a 32-bit row index
 (`IdxSize`), so any single materialised frame, row count, or row index is capped at **2³² ≈ 4.29
-billion rows** — and crossing the cap raises **no error**. Row counts wrap modulo 2³²:
-`pl.scan_delta` over the ~5.9-billion-row NWP dev table reports 1,652,180,189 rows via
+billion rows**. Crossing the cap can go unreported: in the investigation below, row counts wrapped
+modulo 2³² without an error. On the 16.2-billion-row workstation NWP table, Polars 2.1.0 instead
+raised "Polars' maximum length reached" for `pl.len()` and `group_by(...).agg(pl.len())`, and the
+pyarrow reader returned 0. Code must rely on neither outcome. In the investigation,
+`pl.scan_delta` over the ~5.9-billion-row NWP dev table reported 1,652,180,189 rows via
 `.select(pl.len())` (= 5,947,147,485 mod 2³², exactly), and `group_by(...).agg(pl.len())` wraps
 identically for any single group past the cap, streaming engine included. This was investigated and
 empirically pinned down in
 [issue #293](https://github.com/openclimatefix/nged-substation-forecast/issues/293): the wraparound
 reproduces on plain Parquet scans (it is not a Delta Lake bug), and the `polars-u64-idx` build
-(64-bit index, lags mainline releases) returns correct counts on the same queries.
+(64-bit index, lagged mainline releases) returned correct counts on the same queries. Polars 2.1.0
+installs a 64-bit row index with the `polars[rt64]` extra.
 
 What is and isn't affected — each verified empirically on 5-billion-row scans:
 
 | Operation on a >2³²-row scan | Outcome |
 |---|---|
-| `pl.len()` / `group_by(...).agg(pl.len())` where a count exceeds 2³² | **Silently wraps mod 2³²** |
+| `pl.len()` / `group_by(...).agg(pl.len())` where a count exceeds 2³² | Wraps mod 2³² without an error (5.9-billion-row scan), or raises "maximum length reached" (Polars 2.1.0, 16.2-billion-row table) |
 | Materialising a single frame of ≥2³² rows | Unsupported (in practice RAM is exhausted first, which at least fails loudly) |
 | Filtered / partition-pruned query whose *result* is < 2³² rows | Correct |
 | Value aggregations (`sum`, `min`/`max`, quantiles) over > 2³² rows | Correct — values aren't indices |
@@ -206,7 +210,7 @@ The rules that follow:
   collect far below the cap (input pruning + `init_time` chunking), so pipeline reads are
   unaffected. The cap is a second, independent reason that rule exists: an unbounded collect of a
   V2-scale table wouldn't just OOM, its row accounting would be wrong.
-* Tables past the cap today: **NWP** (~5.9B rows). **`power_forecasts`** will pass it at V2 scale
+* Tables past the cap today: **NWP** (~16.2B rows). **`power_forecasts`** will pass it at V2 scale
   (~1 trillion rows — see [forecast
   delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)). The `metrics`
   asset discovers `(experiment_name, fold_id)` groups via a streaming `unique()` scan, then scores
