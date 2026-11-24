@@ -22,6 +22,9 @@ its own (the maintainer's decisions, below). The change removes about 7,500 line
 13-column non-finite count in `live_forecasts_are_healthy`) so that `main` stays green, and this PR
 deletes that change with the rest of the code. PR #1707 follows this PR.
 
+**Deployment.** Once this PR merges, `main` writes no live forecast, so do not deploy `main` to AWS
+until the step-5 PR (PR #1707) has merged too.
+
 ## Verdict, size and departures
 
 **Verdict: worth implementing.** No forecaster in the repository depends on XGBoost, and nothing
