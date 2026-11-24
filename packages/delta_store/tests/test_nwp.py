@@ -495,14 +495,16 @@ def test_writer_rejects_a_frame_that_lacks_a_column_the_table_already_has(
     assert DeltaTable(str(table)).version() == 0
 
 
-def test_the_partition_directory_name_keeps_the_format_polars_parses(tmp_path: Path) -> None:
-    """A datetime partition directory must keep the format that ``deltalake`` 1.6.x writes.
+def test_the_partition_directory_name_keeps_the_format_the_migration_script_expects(
+    tmp_path: Path,
+) -> None:
+    """A datetime partition's value must end in ``Z``, as ``deltalake`` 1.7 writes it.
 
-    ``deltalake`` 1.7.0 renders the same partition as ``init_time=2026-01-01T00%3A00%3A00.000000Z``.
-    Polars infers the datetime format from the first partition directory it lists, so a table
-    holding directories in both formats fails with ``could not parse '...' with pattern
-    'DatetimeYMDZ'``. Failing here means a dependency upgrade changed the format: migrate the
-    existing table before accepting the upgrade.
+    ``scripts/forecasting/rewrite_nwp_partition_names.py`` tells a migrated partition from an
+    unmigrated one by that suffix. Polars also infers the datetime format from the first partition
+    directory it lists, so a table holding two formats cannot be scanned. If this test fails, a
+    ``deltalake`` upgrade changed the format again: migrate the existing tables before accepting
+    the upgrade.
     """
     table = tmp_path / "nwp"
     write_nwp(_make_nwp(), table)
@@ -510,4 +512,7 @@ def test_the_partition_directory_name_keeps_the_format_polars_parses(tmp_path: P
     partition_dirs = [
         p.name for p in (table / "nwp_model_id=ECMWF_ENS_0_25_degree").iterdir() if p.is_dir()
     ]
-    assert partition_dirs == ["init_time=2026-01-01%2000%3A00%3A00.000000"]
+    assert partition_dirs == ["init_time=2026-01-01T00%3A00%3A00.000000Z"]
+    assert [p["init_time"] for p in DeltaTable(table).partitions()] == [
+        "2026-01-01T00:00:00.000000Z"
+    ]

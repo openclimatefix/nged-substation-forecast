@@ -9,13 +9,7 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "contracts",
-    # Capped below 1.7 because deltalake 1.7.0 renders a datetime partition directory as
-    # `init_time=2026-11-23T00%3A00%3A00.000000Z`, where 1.6.x wrote
-    # `init_time=2026-11-23%2000%3A00%3A00.000000`. Polars infers the format from the first
-    # directory it lists and fails to parse the other format, so a table holding both formats
-    # cannot be scanned. `test_the_partition_directory_name_keeps_the_format_polars_parses`
-    # pins the format.
-    "deltalake<1.7",
+    "deltalake",
     "patito",
     "polars>=1.0.0",
     "pyarrow",
