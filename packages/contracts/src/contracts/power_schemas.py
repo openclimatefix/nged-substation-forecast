@@ -442,12 +442,11 @@ def _power_fcst_quantile_field(quantile: float) -> Any:
     has no model-level constraint, so the ordering check lives on each field. The finite check is
     explicit because a NaN passes the ordering check: ``b >= a`` accepts (NaN, NaN) and (1, NaN).
     """
-    column = f"power_fcst_{quantile_label(quantile)}"
-    constraints = [pl.col(column).is_finite()]
     position = DELIVERY_QUANTILES.index(quantile)
+    column = POWER_FCST_QUANTILE_COLUMNS[position]
+    constraints = [pl.col(column).is_finite()]
     if position > 0:
-        lower_column = f"power_fcst_{quantile_label(DELIVERY_QUANTILES[position - 1])}"
-        constraints.append(pl.col(column) >= pl.col(lower_column))
+        constraints.append(pl.col(column) >= pl.col(POWER_FCST_QUANTILE_COLUMNS[position - 1]))
     return pt.Field(
         dtype=pl.Float32,
         constraints=constraints,

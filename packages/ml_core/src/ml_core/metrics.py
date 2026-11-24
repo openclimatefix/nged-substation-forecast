@@ -440,8 +440,7 @@ def compute_metrics(
 
     A deterministic forecast — one whose 13 quantile columns are equal — is scored
     unconditionally. Its CRPS equals its MAE. Its quantile bands are degenerate, so PICP ≈ 0 and
-    interval width = 0. Those values are honest descriptions of a deterministic forecast, not
-    errors.
+    interval width = 0.
 
     Args:
         cv_forecasts: CV predictions to evaluate. Currently only CV fold rows are handled. Support

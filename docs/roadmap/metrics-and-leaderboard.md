@@ -368,8 +368,8 @@ base class until a third stateless model exists.
   interval width degenerate (expected and ignorable for a deterministic baseline).
 - **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out
   and its `all` / `extended_range` aggregates cover a shorter lead population than other models'.
-  Nothing is *wrong* with the scores, but state the caveat where the sanity numbers
-  are read, backed by the per-series coverage counts in asset metadata.
+  State the caveat where the sanity numbers are read, backed by the per-series coverage counts in
+  asset metadata.
 
 **The recipe.** No open questions remain. Full write-up in [the manual heuristic
 forecast](../background/manual-heuristic-forecast.md); the implementation spec:
@@ -577,8 +577,7 @@ judged against the nominal rate, because the stored quantiles are the forecast N
 
 **Every deterministic metric scores the stored median, `power_fcst_p50`, the same way for every
 model.** `PowerForecast` stores the 13 delivery quantiles and no ensemble members, so the metrics
-layer has no ensemble mean to score. The reasoning below explains what scoring RMSE and MBE on the
-median gives up, and the [evaluation-metrics
+layer has no ensemble mean to score. The [evaluation-metrics
 reference](../techniques/evaluation-metrics.md#deterministic-metrics) states the definitions.
 
 #### The problem
@@ -631,7 +630,7 @@ RMSE and MBE scored on its mean would have to store the mean as a column of its 
 
 The manual heuristic's conservative operating point is the stored `power_fcst_p95`. Its pinball
 loss is already on the leaderboard; an MAE or MBE scored on it would be an **extra, labelled** row,
-never a headline, and the metrics layer does not compute one.
+never a headline.
 
 ### Effective-capacity normalisation, and the v0.7 upgrade to time-varying 🚧
 

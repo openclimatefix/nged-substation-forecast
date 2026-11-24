@@ -102,8 +102,7 @@ These probabilistic metrics score all 13 stored quantile columns. A recurring ca
 whose quantiles are taken from a few point values — the manual heuristic's 13 historical
 analogues, say — stores quantiles that are systematically too narrow, because empirical quantiles
 from few values sit inside the true quantiles. PICP, pinball loss, interval width, and CRPS all
-reflect that narrowing. Read the narrowing as a property of the forecaster, not of the metric:
-the stored quantiles are the forecast NGED would receive.
+reflect that narrowing.
 
 ### CRPS (continuous ranked probability score)
 

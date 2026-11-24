@@ -3,7 +3,7 @@ from datetime import UTC, datetime, timedelta
 import patito as pt
 import polars as pl
 import pytest
-from contracts.common import DELIVERY_QUANTILES, quantile_label
+from contracts.common import DELIVERY_QUANTILES
 from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast
 
 _INCREASING_QUANTILES: list[float] = [float(i) for i in range(len(DELIVERY_QUANTILES))]
@@ -48,15 +48,11 @@ def test_power_forecast_quantile_columns_follow_the_delivery_levels():
     otherwise pin the dtype this schema declares.
     """
     assert (
-        tuple(f"power_fcst_{quantile_label(quantile)}" for quantile in DELIVERY_QUANTILES)
+        tuple(f"power_fcst_p{level}" for level in (1, 2, 5, 10, 20, 35, 50, 65, 80, 90, 95, 98, 99))
         == POWER_FCST_QUANTILE_COLUMNS
     )
     assert all(PowerForecast.dtypes[column] == pl.Float32 for column in POWER_FCST_QUANTILE_COLUMNS)
     assert "ensemble_member" not in PowerForecast.columns
-
-
-def test_power_forecast_validation():
-    _forecast_rows(valid_time_offsets_minutes=[30]).validate()
 
 
 def test_power_forecast_accepts_equal_quantiles():

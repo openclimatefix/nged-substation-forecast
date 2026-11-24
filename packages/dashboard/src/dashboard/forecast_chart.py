@@ -438,10 +438,9 @@ def build_view_forecast_chart(
     line_legend = alt.Legend(title=None, orient="top", symbolType="stroke", symbolStrokeWidth=2)
 
     # Layers are appended in draw order: weekend bands at the back, then the forecast bands and
-    # medians,
-    # then lagged power, then observed power, with the init-time rule on top of everything. Lagged
-    # power sits below observed power because lagged power is a model *input*, and a model input
-    # must not obscure observations.
+    # medians, then lagged power, then observed power, with the init-time rule on top of
+    # everything. Lagged power sits below observed power because lagged power is a model *input*,
+    # and a model input must not obscure observations.
     layers: list[alt.Chart] = []
     subtitle_notes: list[str] = []
     if shade_weekends:
