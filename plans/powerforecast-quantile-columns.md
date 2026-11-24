@@ -60,7 +60,7 @@ Representation 3 (quantiles per member) stays out of scope, as the issue says.
 **The happy path, live.** `live_forecasts` loads one ENS run and calls
 `XGBoostForecaster.predict` as now. `predict` still builds one feature row per member and gets one
 booster prediction per member. Before returning, it calls the new
-`ml_core.quantiles.members_to_quantiles(frame, value_col="power_fcst")`. That function groups by
+`ml_core.quantiles.to_stored_quantiles(frame, value_col="power_fcst")`. That function groups by
 `(time_series_id, power_fcst_init_time, valid_time)` plus the constant columns, takes the linear
 empirical quantile of the member values at each of the 11 `contracts.common.STORED_QUANTILES`
 levels, and returns one row per group with the 11 `power_fcst_pXX` columns. A group with one member
@@ -109,11 +109,23 @@ and renaming the metrics.
 **Branches off the happy path.**
 
 - **Climatology** computes its 11 levels directly from the training power of each calendar cell
-  (`climatology.py`), rather than computing 51 levels and reducing them, because the cell's
-  empirical quantile at the exact level is what the 51 levels approximated.
-- **Manual heuristic** reduces however many lag members survived `_nullify_leaky_lags` (one per lag
-  column in `_lag_column_to_member` at most). With one surviving lag the 11 columns are equal, as
-  for a one-member XGBoost forecast.
+  and its pooled neighbours (`_pooled_quantile_lookup` in `climatology.py`), rather than computing
+  51 levels and reducing them, because the cell's empirical quantile at the exact level is what the
+  51 levels approximated. The lookup stores the 11 levels as columns named with `quantile_label`,
+  and `predict` joins the lookup and renames those columns to `power_fcst_pXX`: there is no unpivot
+  and no member index. `CLIMATOLOGY_MEMBER_COUNT`, `CLIMATOLOGY_QUANTILE_LEVELS`, and the
+  column-to-member mapping go.
+- **Manual heuristic** treats its surviving power lags as analogues, not members. After
+  `_nullify_leaky_lags`, `predict` unpivots the lag columns into one value per lag and passes them
+  to `to_stored_quantiles` with `value_col="power"`, so `_lag_column_to_member` and the member index
+  go. With one surviving lag the 11 columns are equal, as for an XGBoost forecast from a
+  one-member NWP run.
+- **No ensemble-member concept stays on the power side.** After this change, `ensemble_member`
+  appears only where it names an ECMWF ENS weather member: `Nwp`, the per-member feature rows that
+  XGBoost predicts on, the live join-miss filter, and the dashboard's NWP panel. A set of coherent
+  power scenarios, if one is added later, gets its own contract with a scenario index that is not a
+  weather-member index (the delivery-recommendation page of nged-ml-research found scenarios built
+  from the stored quantiles at least as good as tying scenario k to weather member k).
 - **A fresh table.** `write_power_forecasts` writes to the path in
   `Settings.power_forecasts_data_path`, whose default path segment changes from `power_forecasts`
   to `power_forecasts_q11`. The first write creates the table with the new schema, as today. The
@@ -127,7 +139,7 @@ and renaming the metrics.
 **Error-handling paths.**
 
 - **A member value that is null** (a join miss): the live filter above drops those feature rows
-  before `predict`, and `members_to_quantiles` also drops null values, so a group keeps its other
+  before `predict`, and `to_stored_quantiles` also drops null values, so a group keeps its other
   members. A group with no member left yields no row, which `live_forecasts_are_healthy` already
   reports as missing coverage.
 - **A NaN quantile.** Measured on patito 0.8.6 and polars 2.0.0, a cross-column `b >= a` constraint
@@ -140,7 +152,7 @@ and renaming the metrics.
   members. The plan drops the member count from the check's message and from `live_forecasts`'s
   metadata, and adds no new report: counting members of the lazy `Nwp` frame would be a second
   collect, outside the asset's catch-all.
-- **A crossed quantile** cannot come from `members_to_quantiles`. A future forecaster that emits
+- **A crossed quantile** cannot come from `to_stored_quantiles`. A future forecaster that emits
   quantiles directly (PR #1707's network) must sort them per row before validation; the constraint
   then makes a crossing fail `validate` loudly rather than reach the table.
 
@@ -160,7 +172,8 @@ and renaming the metrics.
   ("time_series_id", "power_fcst_init_time", "valid_time")`. The class docstring describes a
   quantile forecast. The PLANNED normalisation comment moves to the class docstring unchanged.
 - **`packages/contracts/README.md`**: the `PowerForecast` bullet.
-- **`packages/ml_core/src/ml_core/quantiles.py`** (new): `members_to_quantiles`.
+- **`packages/ml_core/src/ml_core/quantiles.py`** (new): `to_stored_quantiles`, shared by XGBoost
+  (over weather members) and the manual heuristic (over lag analogues).
 - **`packages/ml_core/src/ml_core/metrics.py`**: `ROW_KEY_COLUMNS` and `COMPARABLE_KEY_COLUMNS`
   become the three-column key (the member-count argument in their docstring goes); `compute_metrics`
   drops the member collapse; `_fair_crps_expr` and `_corrected_variance_expr` are replaced by a
@@ -169,11 +182,15 @@ and renaming the metrics.
   interval-width loops run over `STORED_QUANTILES`, and `_BAND_LOWER_QUANTILES` is derived from it.
 - **`packages/ml_core/src/ml_core/base_forecaster.py`**: the `predict` docstring.
 - **`packages/xgboost_forecaster/src/xgboost_forecaster/forecaster.py`**: `predict` reduces with
-  `members_to_quantiles`.
+  `to_stored_quantiles`.
 - **`packages/baseline_forecasters/src/baseline_forecasters/climatology.py`**: compute the 11 levels
-  per cell; drop the unpivot to members. The saved lookup artefact stores 51 quantile columns per
-  cell (`CLIMATOLOGY_MEMBER_COUNT`), so saved climatology models are retrained.
-  **`manual_heuristic.py`**: reduce the lag members. **`nwp_run_rows.py`**: the docstring that names
+  per cell into a lookup of 11 `quantile_label` columns; drop `CLIMATOLOGY_MEMBER_COUNT`,
+  `CLIMATOLOGY_QUANTILE_LEVELS`, the column-to-member mapping, and the unpivot to members. The saved
+  lookup artefact stores 51 quantile columns per cell today, so saved climatology models are
+  retrained.
+  **`manual_heuristic.py`**: drop `_lag_column_to_member` and the member index; reduce the surviving
+  lags with `to_stored_quantiles`; rewrite the class docstring around analogues.
+  **`nwp_run_rows.py`**: the docstring that names
   `PowerForecast`. **`README.md`**: the member description.
 - **`packages/delta_store/src/delta_store/power_forecasts.py`**: round every quantile column; give
   each the `BYTE_STREAM_SPLIT` column properties that `POWER_FORECASTS_WRITER_PROPERTIES` gives
@@ -217,7 +234,7 @@ not exist there, except the two marked as regression guards.
   quantile fails `validate`.
 - **`contracts/tests/test_ml_schemas.py`**: a `Metrics` row with the old label `p2` and a row with
   the new label `p25_p75` both validate under the union Enum.
-- **`ml_core/tests/test_quantiles.py`** (new): 101 members evenly spaced 0 to 100 give every stored
+- **`ml_core/tests/test_quantiles.py`** (new): 101 values evenly spaced 0 to 100 give every stored
   level `q` the value `100 q` exactly; one member gives 11 equal columns; a null member value is
   dropped before the reduction; a group of all-null members yields no row.
 - **`ml_core/tests/test_metrics.py`**: CRPS of a row equals twice its mean pinball loss over the 11
@@ -226,7 +243,10 @@ not exist there, except the two marked as regression guards.
   are emitted for `p25_p75` and `p40_p60` with hand-computed values; the spread equals
   `(p90 − p10) / (2 × NormalDist().inv_cdf(0.9))` on a hand-built row.
 - **`xgboost_forecaster/tests/test_forecaster.py`**, **`baseline_forecasters/tests/*`**: `predict`
-  returns one row per key, and climatology's p50 equals the cell's median.
+  returns one row per key, and climatology's p50 equals the cell's median. Climatology's saved
+  lookup has exactly the 11 `quantile_label` columns (it has 51 on `main`). The manual heuristic
+  with lags 1, 2, and 3 MW on one row returns the 11 empirical quantiles of those three values
+  (`main` returns three member rows).
 - **`delta_store/tests/test_power_forecasts.py`**: every quantile column is rounded to the stated
   significand bits on disk; `POWER_FORECASTS_WRITER_PROPERTIES` names all 11 quantile columns with
   `BYTE_STREAM_SPLIT`. Regression guard: the sort key is `PRIMARY_KEY` (true on `main` too).
@@ -327,3 +347,12 @@ The `implement-issue` green-before-push set (`uv run ruff check .`, `uv run ruff
   the ensemble-mean export file named).
 - **Tests that pass on `main`:** accepted. Both are labelled regression guards, and the six missing
   tests are added.
+
+## Maintainer decision: remove the remaining member code (2026-11-24)
+
+The maintainer asked that the plan remove every ensemble-member concept from the power side now,
+rather than keep code for a possible future set of coherent scenarios. Two leftovers were added:
+climatology's 51-member lookup (`CLIMATOLOGY_MEMBER_COUNT` and its unpivot to members) and the
+manual heuristic's lag members (`_lag_column_to_member`). The shared reduction is renamed
+`to_stored_quantiles`, because its second caller reduces lag analogues rather than members. The
+ECMWF ENS weather-member code stays, because it is how the forecasters read the weather ensemble.
