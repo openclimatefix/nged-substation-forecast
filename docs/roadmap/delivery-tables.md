@@ -77,7 +77,7 @@ several of these:
    `PowerForecast` stores the 13 columns `power_fcst_p1` … `power_fcst_p99`.
 3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🚧 Planned (v0.5).
 
-**Today's percentiles are the empirical quantiles of the ensemble members' point forecasts.** The
+**The stored percentiles are the empirical quantiles of the ensemble members' point forecasts.** The
 XGBoost model predicts one power value per ECMWF ENS member, and `ml_core.quantiles` takes the
 linear empirical quantile of those 51 values at each of the 13 levels. The climatology baseline
 stores the quantiles of past power in the same calendar cell, and the manual heuristic stores the

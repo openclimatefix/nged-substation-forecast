@@ -84,7 +84,6 @@ root `.env` points at.
   this file.
 - `view_baseline_export.py` — inspects the parquet file
   `scripts/forecasting/export_baseline_forecasts.py` writes: observed power against the forecast,
-  and the observed-minus-median residual that switching-event detection consumes. Switching-event
-  detection reads that residual because a
+  and the observed-minus-median residual. Switching-event detection reads that residual because a
   sudden step in the gap between measured and forecast power is the signature of a feeder being
   switched onto or off the substation. The notebook's module docstring says what each chart shows.

@@ -299,7 +299,8 @@ run config dialog before launching.
 5. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the fold's
    MLflow child run, then averages across folds and logs the mean to the parent run. Both runs are
    tagged `metrics_version=2`, which marks scores computed from the 13 stored quantile columns;
-   runs without the tag were scored by earlier definitions under the same metric names. The key token
+   a run without the tag uses other definitions under the same metric names, so compare scores only
+   between runs with the same tag value. The key token
    is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for parametric metrics,
    in three families: overall (`rmse__all`, `crps__all`), per type (`rmse__disaggregated_demand`),
    and per horizon slice (`nmae__all__day_ahead`). Parametric metrics are restricted to a headline

@@ -1,7 +1,7 @@
 """Scoring forecasts against the power that was actually observed.
 
 A forecast here is a *quantile forecast*: for one time series, one forecast run, and one future
-half-hour, the model emits one ``PowerForecast`` row holding the forecast at the 13
+half-hour, the forecaster emits one ``PowerForecast`` row holding the forecast at the 13
 ``DELIVERY_QUANTILES``, and those quantile columns are what the probabilistic scores below measure.
 The deterministic scores read the median column, ``power_fcst_p50``. A cross-validation (CV) fold
 is one train-and-validate split of the history, identified by a ``fold_id``. MLflow is the CV run
@@ -373,9 +373,9 @@ def _wide_metrics(scored: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
 
     The continuous ranked probability score (CRPS) is estimated as twice the unweighted mean
     pinball loss over the 13 ``DELIVERY_QUANTILES``. Twice the integral of the pinball loss over
-    every level is the CRPS exactly, and the mean over the 13 levels is a sum over that integral's
-    points. The 13 levels are tail-heavy, so this estimate weights the tails more than an estimate
-    over evenly spaced levels would.
+    every level is the CRPS exactly, and the mean over the 13 levels is a discrete approximation of
+    that integral. The 13 levels are tail-heavy, so this estimate weights the tails more than an
+    estimate over evenly spaced levels would.
     """
     actual = pl.col("power_actual").cast(pl.Float64)
     aggs: dict[str, pl.Expr] = {

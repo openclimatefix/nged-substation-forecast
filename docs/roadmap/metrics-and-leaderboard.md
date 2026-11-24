@@ -119,7 +119,7 @@ actually reads. Two consequences follow.
 
 **The manual heuristic stores the quantiles of its 13 historical analogues.** `predict()` unpivots
 its analogue-lag columns into one value per analogue, and `ml_core.quantiles.to_stored_quantiles`
-reduces those values to the 13 `PowerForecast` quantile columns; it runs with
+reduces those values to the 13 `PowerForecast` quantile columns. The manual heuristic runs with
 `weather_source: "none"`. The analogue method weights the analogues equally, with no further
 processing, so the empirical quantiles of the analogues — and the probabilistic metrics (CRPS etc.)
 computed over them — are a faithful reading of the method, not an approximation.
@@ -568,10 +568,13 @@ target](xgboost-improvements.md#drop-curtailed-hours-from-the-training-target).
 **Every ratio between a model and a reference carries its reference forecast and population** — see
 [Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
-for the general commitment. Every forecaster stores the same 13 quantile levels, and the CRPS in
-the table above is computed from those 13 levels. The score therefore takes the same form whether 51
-ECMWF ENS members, 13 power analogues, or a fitted distribution produced the quantiles. PICP is
-judged against the nominal rate, because the stored quantiles are the forecast NGED receives.
+for the general commitment.
+
+**Every forecaster stores the same 13 quantile levels, so the CRPS takes the same form for every
+forecaster.** The CRPS in the table above is computed from those 13 levels. The score therefore
+takes the same form whether 51 ECMWF ENS members, 13 power analogues, or a fitted distribution
+produced the quantiles. PICP is judged against the nominal rate, because the stored quantiles are
+the forecast NGED receives.
 
 ### Which ensemble collapse defines the deterministic point forecast? ✅
 

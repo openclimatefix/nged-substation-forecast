@@ -911,9 +911,9 @@ METRICS_VERSION_TAG: Final[dict[str, str]] = {"metrics_version": "2"}
 """The tag the ``metrics`` asset sets on every fold run and parent run it logs to.
 
 Version 2 scores the 13 stored quantile columns: CRPS is twice the mean pinball loss over the 13
-levels, and MAE, RMSE, and mean bias error are scored on ``power_fcst_p50``. MLflow runs without
-the tag were scored by earlier definitions under the same metric names, so a leaderboard compares
-only runs carrying the same ``metrics_version``."""
+levels, and MAE, RMSE, and mean bias error are scored on ``power_fcst_p50``. An MLflow run
+without the tag uses other definitions under the same metric names, so a leaderboard compares only
+runs carrying the same ``metrics_version``."""
 
 PAIRED_METRIC_PREFIX: Final[str] = "vs_reference__"
 """Prefix of the metric keys that hold a study's score minus the reference's, on a study fold run.

@@ -162,8 +162,8 @@ Delta table after the write and reporting what is actually there: the row count,
 with a null, NaN, or infinite forecast quantile, the count of rows targeting a `valid_time` at or
 before their own init time (which `PowerForecast` forbids), how far ahead the furthest row reaches,
 and any `time_series_id` the promoted model was trained on that the slot did not forecast. None of
-that is a measure of forecast *skill*, which is production monitoring's job, not a data-health
-check's.
+these counts measures forecast *skill*, which production monitoring checks, not this data-health
+check.
 
 Two of those checks deserve a note. The **horizon** is checked because `live_forecasts` drops rows
 outside the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast

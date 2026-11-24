@@ -91,18 +91,17 @@ is a diagnosis of *direction*, never of *size*.
 
 $$ \mathrm{MBE} = \frac{1}{T} \sum_t \left( \hat{q}_t(0.5) - y_t \right) $$
 
-**Why the median, not the mean:** the stored row holds quantiles, and the median is the one point
-forecast those quantiles carry exactly. The median is also the point forecast that minimises MAE.
-RMSE and MBE are minimised by the mean, so a skewed forecast distribution reads slightly worse on
-those two metrics than the mean of the same distribution would.
+**The median is the point forecast, because the stored row holds quantiles and the median is the one
+point forecast those quantiles carry exactly.** The median is also the point forecast that minimises
+MAE. RMSE and MBE are minimised by the mean, so a skewed forecast distribution reads slightly worse
+on those two metrics than the mean of the same distribution would.
 
 ## Probabilistic metrics
 
-These probabilistic metrics score all 13 stored quantile columns. A recurring caveat: a forecaster
-whose quantiles are taken from a few point values — the manual heuristic's 13 historical
-analogues, say — stores quantiles that are systematically too narrow, because empirical quantiles
-from few values sit inside the true quantiles. PICP, pinball loss, interval width, and CRPS all
-reflect that narrowing.
+These probabilistic metrics score all 13 stored quantile columns. A forecaster whose quantiles are
+taken from a few point values — the manual heuristic's 13 historical analogues, say — stores
+quantiles that are systematically too narrow, because empirical quantiles from few values sit inside
+the true quantiles. PICP, pinball loss, interval width, and CRPS all reflect that narrowing.
 
 ### CRPS (continuous ranked probability score)
 
@@ -110,7 +109,7 @@ reflect that narrowing.
 *distribution* from what happened?" — it rewards being right, and being *confidently* right, in one
 number. For a deterministic forecast, whose 13 quantiles are equal, CRPS equals MAE, so CRPS values
 sit on the same MW scale as MAE and the two are directly comparable: a forecast whose CRPS beats its
-own MAE is extracting real value from its spread.
+own MAE is using its spread to improve on its median error.
 
 We estimate CRPS from the 13 stored quantiles as twice the mean pinball loss over the 13 levels:
 
@@ -120,7 +119,7 @@ where $L_\tau$ is the [pinball loss](#pinball-loss) at level $\tau$ and $\overli
 pinball loss](#mean-pinball-loss). The CRPS equals twice the integral of the pinball loss over every
 level from 0 to 1 ([Gneiting and Raftery (2007)](https://doi.org/10.1198/016214506000001437)), and
 the mean over 13 levels is a discrete version of that integral. The 13 delivery levels are
-tail-heavy — six of the 13 sit at or beyond p10 and p90 — so this estimate weights the tails more
+tail-heavy — 6 of the 13 sit at or beyond p10 and p90 — so this estimate weights the tails more
 than an estimate over evenly spaced levels would. The 13 levels are symmetric about 0.5, which is
 what makes "CRPS = MAE for a deterministic forecast" exact.
 
