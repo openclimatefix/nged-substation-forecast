@@ -15,15 +15,19 @@ The commit removes each data file at its old path and adds the same file, with t
 statistics, at its new path with the new partition value. A hard link is a second name for the
 same file on disk, so no Parquet file is read, rewritten, or copied. The script takes seconds and
 needs no free disk space. It works on a local table only, because it creates hard links.
-The old links stay in place until ``vacuum(full=True)`` removes them as unreferenced files, so
-the table holds two names for each moved file until then.
+The old links stay in place until the first ``vacuum`` after the retention period (7 days by
+default) removes them as unreferenced files, so the table holds two names for each moved file
+until then.
 
 **A crash at any point before the commit leaves the table readable.** The only trace is the new
 links, which a rerun reuses, or which ``vacuum`` removes. The commit file is created atomically,
 so the log never holds a partly written commit. If the script fails after the commit, the table
 is valid and the script reports what failed. To undo a finished run, restore the table to the
 version before the commit with ``DeltaTable.restore``, which needs the old links, so run it
-before any ``vacuum``. Do not delete the commit file by hand once another writer has committed
+before the first ``vacuum`` that runs after the retention period. A restore also discards every
+commit made after the migration, so those NWP runs must be ingested again. Never pass
+``ignore_missing_files=True`` to ``restore`` here, because the next ``vacuum`` then deletes the
+only remaining links. Do not delete the commit file by hand once another writer has committed
 after it.
 
 The script reads the Delta log directly, replaying the latest checkpoint and the commits after
@@ -285,7 +289,7 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
         )
     _LOGGER.info(
         "Wrote %s, and linked %d files into new-format directories. The old links stay until"
-        " vacuum(full=True), which keeps DeltaTable.restore usable as the undo.",
+        " the first vacuum after the retention period, which keeps DeltaTable.restore usable until then.",
         commit_file,
         len(pairs),
     )
