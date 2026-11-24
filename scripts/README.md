@@ -77,7 +77,7 @@ infrastructure steps around those two scripts stay in the AWS console.
 
 ## `forecasting/` — ad-hoc CV run and maintenance scripts
 
-None of these five scripts is on a schedule. `run_baseline_experiment.py` and
+None of these four scripts is on a schedule. `run_baseline_experiment.py` and
 `export_baseline_forecasts.py` are run in sequence when the weather-and-calendar-only baseline is
 rebuilt. `rewrite_nwp_row_groups.py` is a migration that is run once per Delta table and then left
 alone. `score_study.py` is run whenever a study hands over a predictions file to be scored.
@@ -96,10 +96,10 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,
   skips a partition that is already aligned, and therefore resumes cleanly after an interruption.
-- `rewrite_nwp_partition_names.py` — rewrites every partition of the `nwp` Delta table whose
-  directory name uses the format that `deltalake` 1.6.x wrote, so that all partitions use the format
-  of `deltalake` 1.7. A table holding both formats cannot be scanned with Polars. A one-off
-  migration that skips a partition already in the new format and so resumes cleanly.
+- `rename_nwp_partitions.py` — gives every partition of the `nwp` Delta table that uses the
+  `init_time` format of `deltalake` 1.6.x the format of `deltalake` 1.7, which Polars needs to scan
+  the table. A one-off migration for a local table: the script renames each old-format partition
+  directory and records the renames in one new Delta commit, without reading or copying any data.
 
 - `score_study.py` — stores a study's predictions file in `power_forecasts` under the
   `experiment_name` `study/<study name>` and scores it with the `metrics` asset in leaderboard
