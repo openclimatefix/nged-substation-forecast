@@ -631,6 +631,18 @@ def test_compute_metrics_picp_distinguishes_bands():
     )
 
 
+def test_compute_metrics_interval_width_is_the_mean_over_rows():
+    """Two rows whose p10–p90 bands are 8 MW and 16 MW wide give a width of 12 MW, not their sum."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [0.0, 0.0])
+    forecasts = _make_sample_forecasts(1, times, [[0.0, 5.0, 10.0], [0.0, 10.0, 20.0]])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [100.0]))
+
+    assert math.isclose(
+        _metric_value(result, "interval_width", metric_param="p10_p90"), 12.0, rel_tol=1e-6
+    )
+
+
 def test_compute_metrics_perfect_forecast_scores_finite_zero():
     """A perfect deterministic forecast scores 0 on every error metric, never NaN.
 
@@ -1011,6 +1023,14 @@ def test_row_key_fingerprint_ignores_row_order_and_batch_size() -> None:
 
     assert _fingerprint(frame.reverse()) == reference
     assert _fingerprint(frame, series_batch_size=5) == reference
+    assert _fingerprint(pl.concat([frame, frame.head(1)])) == reference
+
+
+def test_row_key_fingerprint_changes_when_only_the_valid_times_change() -> None:
+    frame = _row_key_frame(series={1: _TIMES})
+    shifted = frame.with_columns(valid_time=pl.col("valid_time") + timedelta(hours=1))
+
+    assert _fingerprint(shifted) != _fingerprint(frame)
 
 
 @pytest.mark.parametrize(

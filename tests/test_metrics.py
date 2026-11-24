@@ -855,6 +855,7 @@ def test_metrics_scores_a_study_beside_the_reference_in_the_same_run(
     assert study_tags["row_key_fingerprint"] == study_tags["reference_row_key_fingerprint"]
     assert study_tags["row_keys_match_reference"] == "true"
     assert study_tags["stale_against_reference"] == "false"
+    assert study_tags["metrics_version"] == "2"
     # The study holds the reference's own rows, so every paired difference is zero.
     paired = {
         key: value
