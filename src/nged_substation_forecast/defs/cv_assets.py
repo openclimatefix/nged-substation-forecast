@@ -606,7 +606,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         is_first = False
         n_rows += forecasts.height
         # `.unique()` before `.to_list()`: only the distinct values reach the set, so this builds
-        # a ~30-element Python list per chunk rather than a ~14M-element one. Measured on a
+        # a ~30-element Python list per chunk rather than one element per row. Measured on a
         # 14M-row Int32 column: 2.78 s and 560 MB peak, against 0.05 s and no measurable
         # allocation. The 560 MB landed inside the loop whose whole job is holding the frame at
         # 2-3 GB.
