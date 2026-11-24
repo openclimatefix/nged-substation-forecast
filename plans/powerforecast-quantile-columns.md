@@ -203,8 +203,9 @@ change and a re-export in nged-ml-research.
   `power_fcst` today; sort by the new key; docstrings. **`contracts/settings.py`**: the new default
   path segment of `power_forecasts_data_path`.
 - **`packages/dashboard/src/dashboard/forecast_chart.py`**: `build_view_forecast_chart` draws the
-  p5–p95 and p20–p80 bands and the p50 line instead of one grey line per member, and its orange
-  comparison overlay draws the second forecast's p5–p95 band and p50 line.
+  p1–p99, p5–p95, and p20–p80 bands, each fainter than the band inside it, and the p50 line
+  instead of one grey line per member. Its orange comparison overlay draws the second forecast's
+  p5–p95 band and p50 line.
   **`packages/dashboard/src/dashboard/view_forecasts.py`** (the marimo app) and its test: read the
   quantile columns. **`packages/notebooks/view_baseline_export.py`**: read the exported files' new
   columns.
@@ -256,7 +257,8 @@ not exist there, except the two marked as regression guards.
   significand bits on disk; `POWER_FORECASTS_WRITER_PROPERTIES` names all 13 quantile columns with
   `BYTE_STREAM_SPLIT`. Regression guard: the sort key is `PRIMARY_KEY` (true on `main` too).
 - **`dashboard/tests/test_forecast_chart.py`**, **`test_view_forecasts.py`**: the power chart and
-  its comparison overlay have band layers and no `ensemble_member` detail channel. Regression
+  its comparison overlay have band layers and no `ensemble_member` detail channel; the power
+  chart's outermost band spans `power_fcst_p1` to `power_fcst_p99`. Regression
   guard: the NWP chart still has one line per member (true on `main` too).
 - **`tests/test_live_forecasts.py`**: extending the predict spy, feature rows with a null
   `ensemble_member` never reach `predict`, so the stored rows hold no join-miss forecast.
@@ -303,10 +305,9 @@ Two questions are settled: the stored levels are the 13 `DELIVERY_QUANTILES` (ma
    files through `score_study.py`, so they move to the new layout when that repository bumps its
    pin, in a pull request of its own. The bundles of experiments 705 and 708 are re-exported with
    the 13 delivery levels in `quantile_levels`.
-5. **Metrics that change meaning under the same names.** A new `forecast_metrics` path plus a
-   `metrics_version=2` MLflow tag, or new metric names (`crps_quantile`, `mae_median`, and so on).
-   Recommendation: the new path and tag, because renaming changes the `Metrics` contract's name
-   Enum and every leaderboard query.
+5. **Metrics that change meaning under the same names.** Settled by the maintainer (2026-11-24):
+   every new MLflow run is tagged `metrics_version=2`, and the metric names stay. Whether the
+   `forecast_metrics` table moves to a new path follows decision 2.
 6. **Issue #262.** Its Representation 2 is what this change delivers, and its Representation 3 stays
    out of scope. Recommendation: re-scope issue #262 to Representation 3 when this merges; the
    maintainer decides, because this plan does not edit issue #262.
@@ -372,3 +373,11 @@ levels, so `STORED_QUANTILES`, the union `metric_param` Enum, and its six extra 
 `mean_pinball_loss` keeps its meaning. Every production forecaster computes quantiles at any level,
 and the research bundles of experiments 705 and 708 change only the `quantile_levels` of their
 `config.json` and are re-exported.
+
+## Maintainer decisions: dashboard bands and the metrics tag (2026-11-24)
+
+The maintainer asked for a fainter p1–p99 band on the dashboard's power chart, outside the p5–p95
+and p20–p80 bands. The maintainer also settled that new MLflow runs carry the tag
+`metrics_version=2`, with the metric names unchanged. The table path, and with it the
+`forecast_metrics` path, is still open: the maintainer suggested keeping one `PowerForecast` table
+rather than a second table at `power_forecasts_q13`.
