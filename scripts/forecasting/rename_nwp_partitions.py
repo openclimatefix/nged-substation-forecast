@@ -161,6 +161,10 @@ def _flat_actions(table: DeltaTable) -> list[tuple[Any, ...]]:
 def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
     """Rename every old-format partition and record the renames in one new commit.
 
+    Args:
+        table_path: Local path of the ``nwp`` Delta table.
+        dry_run: When true, report what would be renamed and change nothing.
+
     Returns:
         The number of partitions renamed, or that would be renamed when ``dry_run`` is true.
     """
