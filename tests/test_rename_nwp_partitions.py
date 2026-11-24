@@ -7,11 +7,12 @@ leaves the table unreadable.
 """
 
 import importlib.util
+import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Final
+from typing import Any, Final
 
 import polars as pl
 import pytest
@@ -193,3 +194,104 @@ def test_the_script_refuses_when_its_replay_of_the_log_disagrees_with_deltalake(
         rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
 
     assert sorted(p.name for p in (mixed_table / "_delta_log").iterdir()) == log_before
+
+
+def _migration_commit(table: Path) -> list[dict[str, Any]]:
+    """Return the actions of the newest commit file in the table's log."""
+    newest = max((table / "_delta_log").glob("[0-9]" * 20 + ".json"))
+    return [json.loads(line) for line in newest.read_text().splitlines()]
+
+
+def test_the_commit_marks_every_action_as_a_relocation_and_keeps_the_file_details(
+    mixed_table: Path,
+) -> None:
+    rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+
+    actions = _migration_commit(mixed_table)
+
+    adds = [a["add"] for a in actions if "add" in a]
+    removes = [a["remove"] for a in actions if "remove" in a]
+    assert len(adds) == len(removes) == 2
+    assert all(a["dataChange"] is False for a in adds + removes)
+    assert all(r["size"] > 0 and r["partitionValues"] and "stats" in r for r in removes)
+
+
+def test_the_new_paths_are_hard_links_of_the_old_files_not_copies(mixed_table: Path) -> None:
+    old_directories = [mixed_table / _MODEL_DIR / _segments(run)[1] for run in _RUNS[:2]]
+    old_files = sorted(p for directory in old_directories for p in directory.iterdir())
+
+    rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+
+    for run in _RUNS[:2]:
+        new_directory = mixed_table / _MODEL_DIR / _segments(run)[0]
+        old_directory = mixed_table / _MODEL_DIR / _segments(run)[1]
+        for old_file in old_directory.iterdir():
+            new_file = new_directory / old_file.name
+            assert old_file.stat().st_nlink == 2
+            assert new_file.samefile(old_file)
+            assert not new_file.is_symlink()
+    assert old_files
+
+
+@pytest.mark.parametrize(
+    ("min_writer_version", "writer_features"),
+    [(2, ("deletionVectors",)), (7, ())],
+    ids=["features-only", "version-only"],
+)
+def test_either_half_of_the_protocol_check_is_enough_to_refuse(
+    mixed_table: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    min_writer_version: int,
+    writer_features: tuple[str, ...],
+) -> None:
+    protocol = SimpleNamespace(
+        min_writer_version=min_writer_version, writer_features=writer_features
+    )
+    monkeypatch.setattr(DeltaTable, "protocol", lambda _self: protocol)
+
+    with pytest.raises(RuntimeError, match="writer version"):
+        rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+
+
+def test_a_different_file_already_at_a_new_path_is_never_committed_as_the_data_file(
+    mixed_table: Path,
+) -> None:
+    new, old = _segments(_RUNS[0])
+    (mixed_table / _MODEL_DIR / new).mkdir()
+    first_file = next((mixed_table / _MODEL_DIR / old).iterdir())
+    (mixed_table / _MODEL_DIR / new / first_file.name).write_bytes(b"junk")
+
+    with pytest.raises(FileExistsError):
+        rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+
+    assert pl.scan_delta(mixed_table, use_pyarrow=True).collect().height == 12
+
+
+def test_a_path_without_the_expected_partition_segment_is_refused() -> None:
+    action = {
+        "path": "nwp_model_id=X/init_time=something-else/part.parquet",
+        "partitionValues": {"init_time": "2026-01-01 00:00:00.000000"},
+    }
+
+    with pytest.raises(ValueError, match="does not contain the segment"):
+        rename_nwp_partitions._renamed(action)
+
+
+def test_the_new_value_keeps_microseconds() -> None:
+    assert (
+        rename_nwp_partitions.new_format_value("2026-01-01 00:00:00.123456")
+        == "2026-01-01T00:00:00.123456Z"
+    )
+
+
+def test_the_script_works_when_the_log_is_only_a_checkpoint(mixed_table: Path) -> None:
+    DeltaTable(mixed_table).create_checkpoint()
+    version = DeltaTable(mixed_table).version()
+    for commit in (mixed_table / "_delta_log").glob("[0-9]" * 20 + ".json"):
+        if int(commit.stem) <= version:
+            commit.unlink()
+
+    assert len(rename_nwp_partitions.active_add_actions(mixed_table)) == 3
+    assert rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False) == 2
+
+    assert Nwp.scan_delta(mixed_table).collect().height == 12
