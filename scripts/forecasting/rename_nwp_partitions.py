@@ -288,8 +288,9 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
             " before deleting anything."
         )
     _LOGGER.info(
-        "Wrote %s, and linked %d files into new-format directories. The old links stay until"
-        " the first vacuum after the retention period, which keeps DeltaTable.restore usable until then.",
+        "Wrote %s, and linked %d files into new-format directories. The old links stay until the"
+        " first vacuum after the retention period, which keeps DeltaTable.restore usable until"
+        " then.",
         commit_file,
         len(pairs),
     )
