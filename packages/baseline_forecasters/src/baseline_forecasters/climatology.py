@@ -7,9 +7,9 @@ from typing import ClassVar, Final, Self
 
 import patito as pt
 import polars as pl
-from contracts.common import UTC_DATETIME_DTYPE
+from contracts.common import DELIVERY_QUANTILES, UTC_DATETIME_DTYPE
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerForecast
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
 from ml_core.features import FeatureEngineer
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE
@@ -18,27 +18,6 @@ from baseline_forecasters._saved_model import clear_directory_and_write_meta, re
 from baseline_forecasters.nwp_run_rows import NwpRunRowsWithoutWeatherFeatureEngineer
 
 logger = logging.getLogger(__name__)
-
-CLIMATOLOGY_MEMBER_COUNT: Final[int] = 51
-"""The number of ensemble members, and so of quantiles stored per calendar cell."""
-
-CLIMATOLOGY_QUANTILE_LEVELS: Final[tuple[float, ...]] = tuple(
-    (member + 0.5) / CLIMATOLOGY_MEMBER_COUNT for member in range(CLIMATOLOGY_MEMBER_COUNT)
-)
-"""The equiprobable quantile level of each member: ``(k + 0.5) / 51`` for member k from 0 to 50.
-
-The metrics layer treats the members as an equiprobable sample, so the levels are equally spaced,
-and member 25 is exactly the median.
-"""
-
-CLIMATOLOGY_QUANTILE_COLUMNS: Final[tuple[str, ...]] = tuple(
-    f"power_quantile_member_{member:02d}" for member in range(CLIMATOLOGY_MEMBER_COUNT)
-)
-"""The lookup's quantile column names, in member order."""
-
-_QUANTILE_COLUMN_TO_MEMBER: Final[dict[str, int]] = {
-    column: member for member, column in enumerate(CLIMATOLOGY_QUANTILE_COLUMNS)
-}
 
 CLIMATOLOGY_POOLING_OFFSETS: Final[pl.DataFrame] = pl.DataFrame(
     {
@@ -72,7 +51,7 @@ _LOOKUP_SCHEMA: Final[dict[str, pl.DataType | type[pl.DataType]]] = {
     "local_month": pl.Int8,
     "local_half_hour_of_day": pl.Int8,
     "local_is_weekend": pl.Boolean,
-    **dict.fromkeys(CLIMATOLOGY_QUANTILE_COLUMNS, pl.Float32),
+    **dict.fromkeys(POWER_FCST_QUANTILE_COLUMNS, pl.Float32),
 }
 
 _LOOKUP_FILENAME: Final[str] = "climatology_quantiles.parquet"
@@ -133,22 +112,20 @@ def _pooled_quantile_lookup(samples: pl.DataFrame) -> pl.DataFrame:
     # levels inside `group_by().agg`, so each level is its own expression.
     quantiles = [
         pl.col("power").quantile(level, "linear").cast(pl.Float32).alias(column)
-        for level, column in zip(
-            CLIMATOLOGY_QUANTILE_LEVELS, CLIMATOLOGY_QUANTILE_COLUMNS, strict=True
-        )
+        for level, column in zip(DELIVERY_QUANTILES, POWER_FCST_QUANTILE_COLUMNS, strict=True)
     ]
     return pooled.group_by(*_CELL_KEY_COLUMNS).agg(*quantiles, pooled_sample_count=pl.len())
 
 
 class ClimatologyForecaster(BaseForecaster):
-    """Forecasts each target time as 51 quantiles of past power in the same calendar cell.
+    """Forecasts each target time as 13 quantiles of past power in the same calendar cell.
 
     A cell is ``(time_series_id, local month, local half-hour of day, local is-weekend)``. Each
     training sample counts towards nine cells: its own, and the cells one month and one half-hour
-    either side, with the same weekend flag. ``train`` stores the 51 equiprobable quantiles of each
-    cell's pooled samples, at levels ``(k + 0.5) / 51``. ``predict`` emits the quantiles as the
-    ensemble members 0 to 50, with member 0 the lowest quantile. ``nwp_init_time`` is null on every
-    row, because the forecaster consumes no weather.
+    either side, with the same weekend flag. ``train`` stores the linear empirical quantiles of
+    each cell's pooled samples at the 13 ``DELIVERY_QUANTILES``, in the ``PowerForecast`` quantile
+    columns. ``predict`` copies a cell's 13 columns onto each forecast row in that cell.
+    ``nwp_init_time`` is null on every row, because the forecaster consumes no weather.
 
     Bank holidays are ordinary days. A forecast row in a cell with no training sample anywhere in
     its neighbourhood is dropped, and ``predict`` logs a warning with the count.
@@ -185,7 +162,7 @@ class ClimatologyForecaster(BaseForecaster):
         return self._trained_ids
 
     def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:
-        """Store the 51 pooled quantiles of power for every populated calendar cell.
+        """Store the 13 pooled quantiles of power for every populated calendar cell.
 
         The engineer repeats each target once per NWP run covering it, so the targets are
         deduplicated on ``(time_series_id, valid_time)`` before any quantile is taken. The pooling
@@ -234,7 +211,7 @@ class ClimatologyForecaster(BaseForecaster):
     def predict(
         self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
     ) -> pt.DataFrame[PowerForecast]:
-        """Look up each row's calendar cell and unpivot its 51 quantiles into ensemble members.
+        """Look up each row's calendar cell and copy its 13 quantile columns onto the row.
 
         Only ``time_series_id``, ``power_fcst_init_time``, and ``valid_time`` are read from
         ``data``, so the observed power of the forecast period cannot reach the forecast. A row in
@@ -246,8 +223,8 @@ class ClimatologyForecaster(BaseForecaster):
             fold_id: The value stamped onto every row's ``fold_id`` column.
 
         Returns:
-            One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``,
-            with members 0 to 50 in order of increasing quantile level.
+            One row per ``(time_series_id, power_fcst_init_time, valid_time)`` whose cell has a
+            lookup row.
         """
         config = self.model_params
         # Strip the Patito model: a cross-model join raises, and the select drops most columns.
@@ -267,31 +244,19 @@ class ClimatologyForecaster(BaseForecaster):
                 unseen.height,
                 sorted(unseen["time_series_id"].unique().to_list()),
             )
-        members = (
-            rows.join(self._lookup, on=_CELL_KEY_COLUMNS, how="inner")
-            .unpivot(
-                on=list(CLIMATOLOGY_QUANTILE_COLUMNS),
-                index=["time_series_id", "power_fcst_init_time", "valid_time"],
-                variable_name="quantile_column",
-                value_name="quantile_value",
-            )
-            .select(
-                "valid_time",
-                "time_series_id",
-                "power_fcst_init_time",
-                ensemble_member=pl.col("quantile_column").replace_strict(
-                    _QUANTILE_COLUMN_TO_MEMBER, return_dtype=pl.Int8
-                ),
-                power_fcst="quantile_value",
-                nwp_init_time=pl.lit(None, dtype=UTC_DATETIME_DTYPE),
-                power_fcst_model_name=pl.lit(self.MODEL_NAME),
-                power_fcst_model_version=pl.lit(config.model_release, dtype=pl.Int16),
-                ml_flow_experiment_id=pl.lit(config.ml_flow_experiment_id, dtype=pl.Int32),
-                experiment_name=pl.lit(config.experiment_name),
-                fold_id=pl.lit(fold_id),
-            )
+        forecasts = rows.join(self._lookup, on=_CELL_KEY_COLUMNS, how="inner").select(
+            "valid_time",
+            "time_series_id",
+            "power_fcst_init_time",
+            *POWER_FCST_QUANTILE_COLUMNS,
+            nwp_init_time=pl.lit(None, dtype=UTC_DATETIME_DTYPE),
+            power_fcst_model_name=pl.lit(self.MODEL_NAME),
+            power_fcst_model_version=pl.lit(config.model_release, dtype=pl.Int16),
+            ml_flow_experiment_id=pl.lit(config.ml_flow_experiment_id, dtype=pl.Int32),
+            experiment_name=pl.lit(config.experiment_name),
+            fold_id=pl.lit(fold_id),
         )
-        return PowerForecast.validate(members)
+        return PowerForecast.validate(forecasts)
 
     def save(self, path: Path) -> None:
         """Replace ``path`` with ``meta.json`` and the quantile lookup."""

@@ -63,11 +63,12 @@ already: sorting each member's quantiles at predict time ([Probabilistic
 Forecasting](../techniques/probabilistic-forecasting.md#turning-51-quantile-sets-into-one-the-pooling-recipe),
 [#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)).
 
-The gap: `live_forecasts_are_healthy` already warns on a null, NaN, or infinite `power_fcst`, but
-nothing checks a *finite, plausible-looking* output for implausible magnitude or, once quantiles
-ship, crossed levels. Every input boundary in this project follows the same pattern — validate, and
-warn on what validation can't reject outright — but that pattern has not yet been applied to the
-output itself ([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
+The gap: `live_forecasts_are_healthy` already warns on a null, NaN, or infinite forecast quantile,
+and `PowerForecast` rejects crossed quantile levels, but nothing checks a *finite,
+plausible-looking* output for implausible magnitude. Every input boundary in this project follows
+the same pattern — validate, and warn on what validation can't reject outright — but that pattern
+has not yet been applied to the output itself
+([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
 
 ## Shared-compute blast radius
 

@@ -175,7 +175,8 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     same check, so this only bites when the code changed after the champion was promoted.
     Forecasts exactly ``forecaster.trained_time_series_ids`` (never today's eligibility set — the
     train==predict population invariant) across every NWP ensemble member, using single-run
-    feature engineering stamped with this partition's ``power_fcst_init_time``.
+    feature engineering stamped with this partition's ``power_fcst_init_time``. The forecaster
+    reduces each row's ensemble members to the 13 stored quantile columns.
 
     Each series' location comes from the model's own frozen metadata copy
     (``load_trained_metadata``), never from the ``TimeSeriesMetadata`` table, so a metadata table
@@ -327,7 +328,6 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
             "nwp_init_time": str(nwp_init),
             "n_rows": forecasts.height,
             "n_time_series": len(set(forecasts["time_series_id"].to_list())),
-            "n_ensemble_members": len(set(forecasts["ensemble_member"].to_list())),
             "experiment_name": forecaster.model_params.experiment_name,
         }
     )

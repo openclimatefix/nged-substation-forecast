@@ -235,13 +235,35 @@ def test_only_trained_time_series_are_forecast(
     assert set(forecasts["time_series_id"].unique().to_list()) == {1}
 
 
-def test_all_ensemble_members_present(
-    env: dict[str, str], dagster_instance: DagsterInstance
+def test_every_ensemble_member_reaches_predict_and_leaves_one_row_per_key(
+    env: dict[str, str], monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
+    """Predict reads every NWP member, and the stored forecast holds one row per key.
+
+    The spy captures the frame ``live_forecasts`` hands ``XGBoostForecaster.predict``, after the
+    asset's ``ensemble_member is not null`` filter, so the null count below is that filter's
+    real output.
+    """
+    captured: list[pt.LazyFrame[AllFeatures]] = []
+    real_predict = XGBoostForecaster.predict
+
+    def _spy_predict(
+        self: XGBoostForecaster, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
+    ) -> pt.DataFrame[PowerForecast]:
+        captured.append(data)
+        return real_predict(self, data, fold_id=fold_id)
+
+    monkeypatch.setattr(XGBoostForecaster, "predict", _spy_predict)
+
     assert _materialize(dagster_instance, "live").success
 
+    (predicted_from,) = captured
+    members = predicted_from.collect()["ensemble_member"]
+    assert members.null_count() == 0
+    assert set(members.unique().to_list()) == set(_MEMBERS)
     forecasts = _read_forecasts(env)
-    assert set(forecasts["ensemble_member"].unique().to_list()) == set(_MEMBERS)
+    assert "ensemble_member" not in forecasts.columns
+    assert not forecasts.select(PowerForecast.PRIMARY_KEY).is_duplicated().any()
 
 
 def test_idempotency_same_partition_twice(

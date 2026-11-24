@@ -35,6 +35,7 @@ from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.power_schemas import (
     LIST_OF_TIME_SERIES_TYPES,
+    POWER_FCST_QUANTILE_COLUMNS,
     PowerForecast,
     TimeSeriesMetadata,
 )
@@ -45,6 +46,7 @@ from ml_core.metrics import (
     RowKeyMismatchError,
     RowsOutsideWindowError,
 )
+from ml_core.quantiles import to_stored_quantiles
 from mlflow.tracking import MlflowClient
 
 from nged_substation_forecast.defs.cv_assets import (
@@ -374,9 +376,9 @@ def test_metrics_does_not_score_flagged_actuals(
 def _batch_forecast_frame(
     time_series_id: int, times: list[datetime], power_fcst: list[float]
 ) -> pl.DataFrame:
-    """One-member PowerForecast rows for the per-series-batching test."""
+    """Deterministic PowerForecast rows for the per-series-batching test."""
     n = len(times)
-    return pl.DataFrame(
+    point_forecasts = pl.DataFrame(
         {
             "time_series_id": pl.Series([time_series_id] * n, dtype=pl.Int32),
             "valid_time": pl.Series(times, dtype=pl.Datetime("us", "UTC")),
@@ -385,7 +387,6 @@ def _batch_forecast_frame(
             "power_fcst_init_time": pl.Series(
                 [min(times) - timedelta(minutes=30)] * n, dtype=pl.Datetime("us", "UTC")
             ),
-            "ensemble_member": pl.Series([0] * n, dtype=pl.Int8),
             "nwp_init_time": pl.Series([None] * n, dtype=pl.Datetime("us", "UTC")),
             "power_fcst": pl.Series(power_fcst, dtype=pl.Float32),
             "power_fcst_model_name": pl.Series(["stub"] * n, dtype=pl.String),
@@ -395,6 +396,7 @@ def _batch_forecast_frame(
             "fold_id": pl.Series(["2025"] * n, dtype=pl.String),
         }
     )
+    return to_stored_quantiles(point_forecasts, value_col="power_fcst")
 
 
 def test_score_forecast_group_per_series_batches(
@@ -875,7 +877,7 @@ def test_metrics_logs_a_study_score_minus_the_reference_score(
     _store_variant(
         file_mlflow_env["forecasts"],
         experiment_name=STUDY_EXPERIMENT_NAME,
-        transform=lambda rows: rows.with_columns(power_fcst=pl.col("power_fcst") + 5.0),
+        transform=lambda rows: rows.with_columns(pl.col(POWER_FCST_QUANTILE_COLUMNS) + 5.0),
     )
 
     assert materialize(

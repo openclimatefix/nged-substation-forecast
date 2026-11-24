@@ -122,9 +122,11 @@ and [design principle
   Also holds the MLflow round-trip that both research and production read a saved model through,
   which ships a model as one replaceable archive rather than as a directory of files. The constant
   `_MLFLOW_MODEL_ARTIFACT` documents why that distinction matters.
-- `metrics` — the scoring pipeline: effective capacity, the ensemble-aware metrics (fair continuous
-  ranked probability score, Fortin-corrected spread, pinball loss, prediction-interval coverage
-  probability, and interval width), the horizon-slice bands, and the MLflow aggregate keys.
+- `quantiles` — `to_stored_quantiles`, which reduces several point values per forecast row (one per
+  weather member, or one per historical power lag) to the 13 quantile columns of `PowerForecast`.
+- `metrics` — the scoring pipeline: effective capacity, the quantile metrics (continuous ranked
+  probability score, pinball loss, prediction-interval coverage probability, and interval width),
+  the horizon-slice bands, and the MLflow aggregate keys.
   Effective capacity is the per-series denominator the normalised errors divide by, taken as the
   99th percentile of observed `|power|`. A horizon-slice band is a group of forecast lead times the
   scores are reported over separately, so that a day-ahead score never hides behind an intraday

@@ -79,9 +79,9 @@ for authoritative signatures and semantics, and do not restate them, because mkd
 already published them.
 
 **A measurement has one home — the place the decision it justifies is made — and that copy is the
-one kept up to date.** The choice to round `power_fcst` to a 13-bit significand is made in
-`delta_store.power_forecasts`, so the measured effect of that choice belongs in that module's
-docstring. Another page may restate the figure where its own reader needs it, as
+one kept up to date.** The choice to round the forecast quantile columns to a 13-bit significand is
+made in `delta_store.power_forecasts`, so the measured effect of that choice belongs in that
+module's docstring. Another page may restate the figure where its own reader needs it, as
 [Performance](architecture/performance.md) does, but should say where the decision lives so a later
 change knows what else to update. Restating a measurement is how it goes stale: a fold's row count
 appeared in three places, and when the fold gained series every copy became wrong at once. Some

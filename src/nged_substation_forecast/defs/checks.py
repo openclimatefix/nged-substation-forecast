@@ -72,6 +72,7 @@ from typing import Any, Final
 
 import polars as pl
 from contracts.common import UTC_DATETIME_DTYPE
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import ObjectStoreOptions, delta_table_exists, object_exists
@@ -692,13 +693,12 @@ class LiveForecastRows:
     both non-finite and a hindcast is counted once and ``n_invalid`` can never exceed ``n_rows``."""
 
     n_nonfinite_power: int
-    """Rows whose ``power_fcst`` is null, NaN, or infinite."""
+    """Rows with any of the 13 ``PowerForecast`` quantile columns null, NaN, or infinite."""
 
     n_hindcast: int
     """Rows whose ``valid_time`` is at or before ``power_fcst_init_time`` — forbidden by
     ``PowerForecast``'s own constraint, so any such row means a pipeline regression."""
 
-    n_ensemble_members: int
     time_series_ids: tuple[int, ...]
     latest_valid_time: datetime | None
 
@@ -864,7 +864,6 @@ _EMPTY_LIVE_FORECAST_ROWS: Final[LiveForecastRows] = LiveForecastRows(
     n_invalid=0,
     n_nonfinite_power=0,
     n_hindcast=0,
-    n_ensemble_members=0,
     time_series_ids=(),
     latest_valid_time=None,
     nwp_init_time=None,
@@ -930,9 +929,12 @@ def _read_live_forecast_rows(
     if experiment_name is not None:
         slot = slot.filter(pl.col("experiment_name") == experiment_name)
 
-    # A null `power_fcst` makes the left operand true, so under Kleene logic the row is counted
-    # once and `is_finite()`'s own null on that row never leaks into the sum.
-    nonfinite_power = pl.col("power_fcst").is_null() | ~pl.col("power_fcst").is_finite()
+    # A null quantile makes the left operand true, so under Kleene logic the row is counted once
+    # and `is_finite()`'s own null on that row never leaks into the sum.
+    nonfinite_power = pl.any_horizontal(
+        pl.col(column).is_null() | ~pl.col(column).is_finite()
+        for column in POWER_FCST_QUANTILE_COLUMNS
+    )
     hindcast = pl.col("valid_time") <= pl.lit(power_fcst_init_time)
     # `nwp_init_time` is `allow_missing=True` on `PowerForecast` — a model that uses no NWP (a
     # persistence baseline) never writes the column at all. Selecting it unconditionally would
@@ -949,7 +951,6 @@ def _read_live_forecast_rows(
         n_invalid=(nonfinite_power | hindcast).sum(),
         n_nonfinite_power=nonfinite_power.sum(),
         n_hindcast=hindcast.sum(),
-        n_ensemble_members=pl.col("ensemble_member").n_unique(),
         time_series_ids=pl.col("time_series_id").unique().implode(),
         latest_valid_time=pl.max("valid_time"),
         nwp_init_time=nwp_init_time,
@@ -961,7 +962,6 @@ def _read_live_forecast_rows(
         n_invalid=int(row["n_invalid"] or 0),
         n_nonfinite_power=int(row["n_nonfinite_power"] or 0),
         n_hindcast=int(row["n_hindcast"] or 0),
-        n_ensemble_members=int(row["n_ensemble_members"]),
         time_series_ids=tuple(sorted(row["time_series_ids"] or ())),
         latest_valid_time=row["latest_valid_time"],
         nwp_init_time=row["nwp_init_time"],
@@ -1026,7 +1026,7 @@ def _describe_live_forecast_health(result: LiveForecastHealthResult) -> str:
     if rows.n_rows == 0:
         problems.append("no forecast rows were written")
     if rows.n_nonfinite_power:
-        problems.append(f"{rows.n_nonfinite_power} rows have a null/NaN/infinite power_fcst")
+        problems.append(f"{rows.n_nonfinite_power} rows have a null/NaN/infinite forecast quantile")
     if rows.n_hindcast:
         problems.append(f"{rows.n_hindcast} rows target a valid_time at or before the init time")
     if result.horizon_is_truncated:
@@ -1050,15 +1050,9 @@ def _describe_live_forecast_health(result: LiveForecastHealthResult) -> str:
     if not problems:
         return (
             f"{rows.n_rows} valid forecast rows for {slot} across {rows.n_time_series} time "
-            f"series and {_plural(rows.n_ensemble_members, 'ensemble member')}; the NWP feed is "
-            "up to date."
+            "series; the NWP feed is up to date."
         )
     return f"Live forecast for {slot} is degraded: " + "; ".join(problems) + "."
-
-
-def _plural(count: int, noun: str) -> str:
-    """``"3 ensemble members"`` / ``"1 ensemble member"`` — regular plurals only."""
-    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
 def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str, Any]:
@@ -1076,7 +1070,6 @@ def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str,
         "n_nonfinite_power": rows.n_nonfinite_power,
         "n_hindcast_rows": rows.n_hindcast,
         "n_time_series": rows.n_time_series,
-        "n_ensemble_members": rows.n_ensemble_members,
         "nwp_init_time_on_disk": str(result.nwp.latest_init_time),
         "nwp_init_time_expected": result.nwp.expected_latest_init_time.isoformat(),
         "nwp_init_time_on_rows": str(rows.nwp_init_time),

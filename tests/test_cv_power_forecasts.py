@@ -19,6 +19,7 @@ import pytest
 from _cleaned_power_test_data import write_cleaned_copy
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from contracts.ml_schemas import EligibleTimeSeries
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast
 from dagster import DagsterInstance, materialize
 from delta_store.power_forecasts import POWER_FCST_SIGNIFICAND_BITS
 from delta_store.precision import FLOAT32_SIGNIFICAND_BITS
@@ -140,8 +141,10 @@ def test_cv_power_forecasts_predicts_validation_fold(
     # Only the model's trained population (ts1) is scored.
     assert set(forecasts["time_series_id"].unique().to_list()) == {1}
 
-    # Every ensemble member flows through — not collapsed to the control member.
-    assert set(forecasts["ensemble_member"].unique().to_list()) == set(_VAL_MEMBERS)
+    # The ensemble members are reduced to one row per key, holding the 13 quantile columns.
+    assert "ensemble_member" not in forecasts.columns
+    assert not forecasts.select(PowerForecast.PRIMARY_KEY).is_duplicated().any()
+    assert set(POWER_FCST_QUANTILE_COLUMNS) <= set(forecasts.columns)
 
     # The fold's child run gained prediction stats.
     experiment = mlflow.get_experiment_by_name(EXPERIMENT_NAME)
@@ -224,21 +227,20 @@ def test_cv_power_forecasts_storage_format(
         for column, (compression, _encodings) in encodings_by_column.items():
             assert compression == "ZSTD", f"{column} written as {compression}, expected ZSTD"
         assert "DELTA_BINARY_PACKED" in encodings_by_column["valid_time"][1]
-        assert "BYTE_STREAM_SPLIT" in encodings_by_column["power_fcst"][1]
+        for quantile_column in POWER_FCST_QUANTILE_COLUMNS:
+            assert "BYTE_STREAM_SPLIT" in encodings_by_column[quantile_column][1]
 
         rows = pl.read_parquet(parquet_file)
-        sort_key = rows.select(
-            key=pl.struct("time_series_id", "power_fcst_init_time", "valid_time", "ensemble_member")
-        )["key"]
+        sort_key = rows.select(key=pl.struct(*PowerForecast.PRIMARY_KEY))["key"]
         assert sort_key.is_sorted()
 
-    # power_fcst is rounded to POWER_FCST_SIGNIFICAND_BITS: the low fraction bits of every finite
-    # value are zero, yet the values were not destroyed outright. (The synthetic fixture's
-    # constant NWP features make every prediction near-identical, so don't assert on value
-    # diversity — the fixture trains on power ≈ 100, so surviving values must be in that
+    # Every quantile column is rounded to POWER_FCST_SIGNIFICAND_BITS: the low fraction bits of
+    # every finite value are zero, yet the values were not destroyed outright. (The synthetic
+    # fixture's constant NWP features make every prediction near-identical, so don't assert on
+    # value diversity — the fixture trains on power ≈ 100, so surviving values must be in that
     # ballpark.)
     zeroed_low_bits = FLOAT32_SIGNIFICAND_BITS - POWER_FCST_SIGNIFICAND_BITS
-    stored = _read_forecasts(env)["power_fcst"].to_numpy()
+    stored = _read_forecasts(env).select(POWER_FCST_QUANTILE_COLUMNS).to_numpy()
     assert np.isfinite(stored).all()
     assert (stored.view(np.uint32) & np.uint32((1 << zeroed_low_bits) - 1) == 0).all()
     assert (np.abs(stored) > 50).all()

@@ -8,17 +8,19 @@ error by, to express that error as a fraction of the series' capacity.
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import ClassVar, Final, NamedTuple, Self
+from typing import Any, ClassVar, Final, NamedTuple, Self
 
 import patito as pt
 import polars as pl
 
 from .common import (
+    DELIVERY_QUANTILES,
     MAX_PLAUSIBLE_DATETIME,
     MIN_PLAUSIBLE_DATETIME,
     UTC_DATETIME_DTYPE,
     _get_time_series_id_dtype,
     check_datetime_bounds,
+    quantile_label,
     split_by_datetime_plausibility,
 )
 
@@ -77,7 +79,7 @@ class PowerTimeSeries(pt.Model):
             "TimeSeriesMetadata."
             " This is what the meter recorded, so an hour in which the network operator capped"
             " a generator's export reads as the capped value rather than as the power that was"
-            " available. `PowerForecast.power_fcst` is defined the other way round."
+            " available. The `PowerForecast` quantile columns are defined the other way round."
             " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
             " a direction, so it applies only where `units` is `MW`. A series metered in `MVA`"
             " reports the magnitude of the flow and cannot see direction, so reverse power flow"
@@ -402,6 +404,61 @@ class TimeSeriesMetadata(pt.Model):
     )
 
 
+POWER_FCST_QUANTILE_COLUMNS: Final[tuple[str, ...]] = tuple(
+    f"power_fcst_{quantile_label(quantile)}" for quantile in DELIVERY_QUANTILES
+)
+"""The 13 quantile columns of ``PowerForecast``, lowest level first: ``power_fcst_p1`` …
+``power_fcst_p99``, one per level of ``contracts.common.DELIVERY_QUANTILES``."""
+
+_POWER_FCST_DESCRIPTION: Final[str] = (
+    " The power forecast is in units of MW (active power) or MVA (apparent power)."
+    " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
+    " This forecasts the power *available*: what the series would have exported or drawn"
+    " had no active-network-management (ANM) instruction been in force. A generator on a"
+    " flexible connection can be told to turn down when the local electricity network"
+    " fills, and that instruction is a network decision rather than a weather outcome, so"
+    " it falls outside what this column describes. Holding a delivered forecast down to a"
+    " cap the operator has set is the consumer's own step, and the same assumption is what"
+    " the `power_forecast` delivery block means by a normal running arrangement — see"
+    " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#the-idea."
+    " `PowerTimeSeries.power` is the opposite convention: a metered value that already"
+    " carries any curtailment the operator instructed."
+    " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
+    " a direction, so it applies only where `units` is `MW` — see the Sign convention"
+    " section in this package's README.md, also published at"
+    " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention."
+    " Rows read back from the internal `power_forecasts` Delta table carry reduced"
+    " precision: values are rounded to a 13-bit significand at write time"
+    " (max relative error 2^-13 ≈ 1.2e-4, far below forecast error) to aid compression;"
+    " see `delta_store.power_forecasts`."
+)
+"""The description every ``PowerForecast`` quantile column shares after its own first sentence."""
+
+
+def _power_fcst_quantile_field(quantile: float) -> Any:
+    """Return the ``pt.Field`` for the ``PowerForecast`` quantile column at ``quantile``.
+
+    Each column must be finite, and must be at least the column at the next lower level. Patito
+    has no model-level constraint, so the ordering check lives on each field. The finite check is
+    explicit because a NaN passes the ordering check: ``b >= a`` accepts (NaN, NaN) and (1, NaN).
+    """
+    column = f"power_fcst_{quantile_label(quantile)}"
+    constraints = [pl.col(column).is_finite()]
+    position = DELIVERY_QUANTILES.index(quantile)
+    if position > 0:
+        lower_column = f"power_fcst_{quantile_label(DELIVERY_QUANTILES[position - 1])}"
+        constraints.append(pl.col(column) >= pl.col(lower_column))
+    return pt.Field(
+        dtype=pl.Float32,
+        constraints=constraints,
+        description=(
+            f"The {quantile:g} quantile of the power forecast: the forecaster's estimate of the"
+            f" power that the actual value falls at or below with probability {quantile:g}."
+            + _POWER_FCST_DESCRIPTION
+        ),
+    )
+
+
 FoldId = str
 """Fold identifier for ``PowerForecast.fold_id``.
 
@@ -412,19 +469,27 @@ the reserved sentinel for a production forecast that belongs to no CV fold.
 
 
 class PowerForecast(pt.Model):
-    """Forecast data schema for an ensemble of deterministic forecasts.
+    """Forecast data schema for a quantile forecast of power.
 
-    Each ensemble member carries its own single-valued, or deterministic, forecast. The spread
-    across the members is what expresses the forecast's uncertainty.
-
-    One row per time series, per forecast run, per target time, per ensemble member — the four
-    columns of ``PRIMARY_KEY``, declared below in that order.
+    One row per time series, per forecast run, per target time — the three columns of
+    ``PRIMARY_KEY``, declared below in that order. Each row carries the forecast at the 13 quantile
+    levels of ``contracts.common.DELIVERY_QUANTILES``, the levels agreed with NGED, in the columns
+    ``power_fcst_p1`` … ``power_fcst_p99`` (``POWER_FCST_QUANTILE_COLUMNS``). The quantiles never
+    decrease from the lowest level to the highest, and each is finite. A deterministic forecast
+    carries the same value in all 13 columns.
 
     Internal vs delivered schema (Milestone 1 report Table 1, p.28): three columns are
     INTERNAL-ONLY — ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id``. They exist
     on this schema and on the internal ``power_forecasts`` Delta table, to support
     cross-validation and the leaderboard. They are NOT part of the ``power_forecast`` table
     delivered to NGED.
+
+    PLANNED: We intend to change the quantile columns to normalised values in the range [-1, +1],
+    which NGED multiplies by a capacity to recover MW/MVA. That change follows the
+    delivery-contract design agreed with NGED in the Milestone 1 report. The switch is planned for
+    v0.5. The switch will use the static P99 `effective_capacity` estimate that already exists —
+    the same scalar the `metrics` pipeline already divides by for normalised mean absolute error
+    (NMAE). The switch therefore no longer waits for a time-varying capacity estimate.
     """
 
     valid_time: datetime = pt.Field(
@@ -441,20 +506,6 @@ class PowerForecast(pt.Model):
     )
 
     time_series_id: int = _get_time_series_id_dtype()
-
-    ensemble_member: int = pt.Field(
-        dtype=pl.Int8,
-        description=(
-            "Ensemble member index. For a forecaster that consumes an NWP ensemble, the index is"
-            " the numerical weather prediction (NWP) ensemble member, and member 0 is the control"
-            " member. For `manual_heuristic`, the index is a historical analogue: the rank of"
-            " the power lag that supplied the value, with 0 the shortest lag. For `climatology`,"
-            " the index is the rank of a quantile level, with 0 the lowest: member k is the"
-            " empirical quantile at level (k + 0.5)/51 of the series' training power in the valid"
-            " time's calendar cell and the eight cells one month and one half-hour away with the"
-            " same day type."
-        ),
-    )
 
     ml_flow_experiment_id: int | None = pt.Field(
         dtype=pl.Int32,
@@ -512,38 +563,19 @@ class PowerForecast(pt.Model):
         ),
     )
 
-    power_fcst: float = pt.Field(
-        dtype=pl.Float32,
-        description=(
-            "The power forecast itself in units of MW (active power) or MVA (apparent power)."
-            " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
-            " This forecasts the power *available*: what the series would have exported or drawn"
-            " had no active-network-management (ANM) instruction been in force. A generator on a"
-            " flexible connection can be told to turn down when the local electricity network"
-            " fills, and that instruction is a network decision rather than a weather outcome, so"
-            " it falls outside what this column describes. Holding a delivered forecast down to a"
-            " cap the operator has set is the consumer's own step, and the same assumption is what"
-            " the `power_forecast` delivery block means by a normal running arrangement — see"
-            " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#the-idea."
-            " `PowerTimeSeries.power` is the opposite convention: a metered value that already"
-            " carries any curtailment the operator instructed."
-            " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
-            " a direction, so it applies only where `units` is `MW` — see the Sign convention"
-            " section in this package's README.md, also published at"
-            " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention."
-            " Rows read back from the internal `power_forecasts` Delta table carry reduced"
-            " precision: values are rounded to a 13-bit significand at write time"
-            " (max relative error 2^-13 ≈ 1.2e-4, far below forecast error) to aid compression;"
-            " see `delta_store.power_forecasts`."
-            # PLANNED: We intend to change `power_fcst` to a normalised value in the range
-            # [-1, +1], which NGED multiplies by a capacity to recover MW/MVA. That change follows
-            # the delivery-contract design agreed with NGED in the Milestone 1 report. The switch
-            # is planned for v0.5. The switch will use the static P99 `effective_capacity`
-            # estimate that already exists — the same scalar the `metrics` pipeline already divides
-            # by for normalised mean absolute error (NMAE). The switch therefore no longer waits
-            # for a time-varying capacity estimate.
-        ),
-    )
+    power_fcst_p1: float = _power_fcst_quantile_field(0.01)
+    power_fcst_p2: float = _power_fcst_quantile_field(0.02)
+    power_fcst_p5: float = _power_fcst_quantile_field(0.05)
+    power_fcst_p10: float = _power_fcst_quantile_field(0.10)
+    power_fcst_p20: float = _power_fcst_quantile_field(0.20)
+    power_fcst_p35: float = _power_fcst_quantile_field(0.35)
+    power_fcst_p50: float = _power_fcst_quantile_field(0.50)
+    power_fcst_p65: float = _power_fcst_quantile_field(0.65)
+    power_fcst_p80: float = _power_fcst_quantile_field(0.80)
+    power_fcst_p90: float = _power_fcst_quantile_field(0.90)
+    power_fcst_p95: float = _power_fcst_quantile_field(0.95)
+    power_fcst_p98: float = _power_fcst_quantile_field(0.98)
+    power_fcst_p99: float = _power_fcst_quantile_field(0.99)
 
     fold_id: FoldId = pt.Field(
         dtype=pl.String,  # String, not Categorical — see experiment_name above.
@@ -561,9 +593,8 @@ class PowerForecast(pt.Model):
         "time_series_id",
         "power_fcst_init_time",
         "valid_time",
-        "ensemble_member",
     )
-    """At most one forecast per series, per init time, per target time, per ensemble member."""
+    """At most one forecast per series, per init time, per target time."""
 
     @classmethod
     def validate(  # ty: ignore[incompatible-method-override]

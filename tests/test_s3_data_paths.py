@@ -28,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 import patito as pt
 import polars as pl
 import pytest
-from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast, TimeSeriesMetadata
 from contracts.settings import Settings
 from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import object_exists
@@ -136,7 +136,6 @@ def _make_forecasts(experiment_name: str, power_fcst: list[float]) -> pt.DataFra
             {
                 "valid_time": [_T0 + timedelta(hours=i) for i in range(n)],
                 "time_series_id": list(range(1, n + 1)),
-                "ensemble_member": [i % 3 for i in range(n)],
                 "ml_flow_experiment_id": [None] * n,
                 "nwp_init_time": [_T0] * n,
                 "power_fcst_model_name": ["xgboost"] * n,
@@ -145,7 +144,7 @@ def _make_forecasts(experiment_name: str, power_fcst: list[float]) -> pt.DataFra
                 # 30 min before the earliest valid_time (_T0): the PowerForecast contract
                 # requires valid_time strictly after power_fcst_init_time.
                 "power_fcst_init_time": [_T0 - timedelta(minutes=30)] * n,
-                "power_fcst": power_fcst,
+                **dict.fromkeys(POWER_FCST_QUANTILE_COLUMNS, power_fcst),
                 "fold_id": ["s3_test"] * n,
             }
         )

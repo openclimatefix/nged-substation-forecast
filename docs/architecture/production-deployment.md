@@ -158,11 +158,12 @@ operator-facing health state has one home rather than two.
 NGED consumes. The asset can raise nothing, report a green tick, and still have written no rows — or
 rows carrying a NaN forecast, or rows for only half the promoted model's population.
 `live_forecasts_are_healthy` closes that gap by reading the slot back out of the `power_forecasts`
-Delta table after the write and reporting what is actually there: the row count, the count of
-null/NaN/infinite `power_fcst` values, the count of rows targeting a `valid_time` at or before their
-own init time (which `PowerForecast` forbids), how far ahead the furthest row reaches, and any
-`time_series_id` the promoted model was trained on that the slot did not forecast. None of that is a
-measure of forecast *skill*, which is production monitoring's job, not a data-health check's.
+Delta table after the write and reporting what is actually there: the row count, the count of rows
+with a null, NaN, or infinite forecast quantile, the count of rows targeting a `valid_time` at or
+before their own init time (which `PowerForecast` forbids), how far ahead the furthest row reaches,
+and any `time_series_id` the promoted model was trained on that the slot did not forecast. None of
+that is a measure of forecast *skill*, which is production monitoring's job, not a data-health
+check's.
 
 Two of those checks deserve a note. The **horizon** is checked because `live_forecasts` drops rows
 outside the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast

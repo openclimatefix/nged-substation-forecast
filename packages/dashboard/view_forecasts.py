@@ -6,7 +6,7 @@ app = marimo.App(width="full")
 with app.setup:
     import marimo as mo
     import polars as pl
-    from contracts.power_schemas import TimeSeriesMetadata
+    from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, TimeSeriesMetadata
     from contracts.typing_utils import typeddict_to_dict
     from contracts.weather_schemas import Nwp
     from dashboard.data_source import settings_for_source, source_status_message
@@ -29,15 +29,16 @@ def _():
     mo.md("""
     # View forecasts
 
-    Pick a time series and a forecast run. The plot shows every forecast ensemble member
-    (thin grey lines) against the observed power (thick blue line), from 24 hours before the
+    Pick a time series and a forecast run. The plot shows the forecast median (grey line) inside
+    three grey bands, against the observed power (thick blue line), from 24 hours before the
     forecast init time to 14 days after the forecast init time. The init time is when the
-    forecast was issued. A member is one of the many possible futures that make up a single
-    forecast, each computed from a slightly different weather forecast, so the spread of the grey
-    lines is how uncertain the forecast is.
+    forecast was issued. The darkest band runs from the forecast's 20th to its 80th percentile,
+    the middle band from the 5th to the 95th, and the faintest from the 1st to the 99th, so the
+    width of the bands is how uncertain the forecast is.
 
     Optionally compare a second experiment at the same forecast init time, fold, and series.
-    Its ensemble appears in orange; the NWP panel continues to show the primary experiment.
+    Its median and its 5th-to-95th-percentile band appear in orange; the NWP panel continues to
+    show the primary experiment.
 
     Two optional lagged-power lines overlay observed power shifted forward by 7 and by 14
     days. Shifted observed power is the raw material of the models' power-lag features.
@@ -321,9 +322,9 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
             pl.col("valid_time") <= init_time + PLOT_HORIZON,
         )
         # nwp_init_time identifies the NWP run for the panel below the power chart. The power
-        # chart cell drops the column again, so nwp_init_time is not serialised into the 34k-row
-        # chart data.
-        .select("valid_time", "power_fcst", "ensemble_member", "nwp_init_time")
+        # chart cell drops the column again, so nwp_init_time is not serialised into the chart
+        # data.
+        .select("valid_time", *POWER_FCST_QUANTILE_COLUMNS, "nwp_init_time")
         .collect()
     )
     # History starts max(LAG_OPTIONS.values()) — 14 days — before the plotted window. The
@@ -369,7 +370,7 @@ def _(comparison_picker, fold_picker, init_time, series_picker, settings):
                 pl.col("power_fcst_init_time") == init_time,
                 pl.col("valid_time") <= init_time + PLOT_HORIZON,
             )
-            .select("valid_time", "power_fcst", "ensemble_member")
+            .select("valid_time", *POWER_FCST_QUANTILE_COLUMNS)
             .collect()
         )
         if comparison_forecasts.is_empty():
@@ -432,8 +433,8 @@ def _(
             if box.value
         ],
     )
-    # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining the rows
-    # in the cell output. Inlining the rows would blow marimo's max-output-size guard. Selections
+    # mo.ui.altair_chart serves the data rows as a virtual file instead of inlining the rows in
+    # the cell output. Inlining the rows would blow marimo's max-output-size guard. Selections
     # are disabled — the chart's own scale-bound zoom/pan is the intended interaction.
     _chart = mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
     mo.vstack([comparison_message, _chart]) if comparison_message is not None else _chart

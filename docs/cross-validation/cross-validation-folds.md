@@ -212,15 +212,12 @@ so a refusal leaves no rows or MLflow runs behind.
 - **The reference row keys, for a study.** In leaderboard scope, a
   forecast whose `experiment_name` starts with `study/` was submitted through
   `scripts/forecasting/score_study.py`. The rows of a study must have exactly the keys
-  `(time_series_id, power_fcst_init_time, valid_time, ensemble_member)` of the CV run named by
+  `(time_series_id, power_fcst_init_time, valid_time)` of the CV run named by
   `reference_experiment_name` in the same config, for the same fold. A study that omits a row the
-  reference forecasts, adds a series, forecasts only at short lead times, or uses ensemble-member
-  labels other than the reference's is refused. The row key includes `power_fcst_init_time`, so a
-  study must forecast from the reference's initialisation times, which are the times each run of the
-  European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble becomes available. The row key
-  includes `ensemble_member`, because a study that chose its own member count could forecast with
-  two members either side of the observation, and so score a fair continuous ranked probability
-  score of zero without changing the ensemble mean.
+  reference forecasts, adds a series, or forecasts only at short lead times is refused. The row key
+  includes `power_fcst_init_time`, so a study must forecast from the reference's initialisation
+  times, which are the times each run of the European Centre for Medium-Range Weather Forecasts
+  (ECMWF) ensemble becomes available.
 
 **The refusals check which rows a forecast covers, not how the forecast was made.** The `metrics`
 asset cannot tell a forecast trained on the validation year, or built from power observed after its
@@ -250,8 +247,7 @@ run:
   rewrites its `forecast_metrics` partition and its fold-run metrics from the current snapshot, and
   leaves its parent run alone.
 - **Every fold run carries a fingerprint of its forecast problem.** `row_key_fingerprint` hashes the
-  distinct `(time_series_id, power_fcst_init_time, valid_time)` keys of the group, ignoring
-  `ensemble_member`, so a reviewed CV run with 13 members and the reference with 51 members have
+  distinct `(time_series_id, power_fcst_init_time, valid_time)` keys of the group, so two runs have
   the same fingerprint when they forecast the same series, initialisation times, and valid times.
   The tag `row_keys_match_reference` says whether a group's fingerprint equals the reference's. A
   reviewed CV run whose fingerprint differs is scored and tagged `false`, not refused, because a

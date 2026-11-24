@@ -221,9 +221,10 @@ provides ACID transactions, meaning NGED never reads an incomplete forecast. (Wh
 than a REST API? See [Forecast Delivery](../architecture/forecast-delivery.md).) The tables are
 designed as "building blocks" that NGED can combine to construct:
 
-* A **Normal Operation Forecast** (MW or MVA): the `power_fcst` column is in MW (active power) or
-  MVA (apparent power), with the unit given per time series in `TimeSeriesMetadata`. Assumes the
-  grid is in a normal running arrangement with all generators at full unconstrained capacity.
+* A **Normal Operation Forecast** (MW or MVA): the `power_fcst_p1` … `power_fcst_p99` columns are in
+  MW (active power) or MVA (apparent power), with the unit given per time series in
+  `TimeSeriesMetadata`. Assumes the grid is in a normal running arrangement with all generators at
+  full unconstrained capacity.
 * A **Prevailing Conditions Forecast** (MW or MVA): planned. It will combine the forecast with the
   most recently observed effective capacity, reflecting current switching state and any reduced
   generator capacity — see [Forecast building blocks](../roadmap/forecast-building-blocks.md).

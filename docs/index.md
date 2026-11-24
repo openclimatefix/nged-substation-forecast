@@ -14,7 +14,8 @@ page](https://commercial.nationalgrid.co.uk/innovation/projects/flexpectation).
 
 Each forecast is:
 
-- **Probabilistic** — expressed as an ensemble of 51 members, one per ECMWF ENS member
+- **Probabilistic** — expressed as 13 quantiles, from the 1st to the 99th percentile, derived from
+  the 51 ECMWF ENS members
 - **14-day horizon**, half-hourly temporal resolution
 - Refreshed **every 6 hours**
 - **In MW (active power) or MVA (apparent power)** — the unit is given per `time_series_id` in

@@ -34,10 +34,10 @@ assumed:
   year is the measured average of the 899 daily runs on disk today, which is higher than the figure
   that PR extrapolated.
 
-* **`power_forecasts`** (`delta_store.power_forecasts`) sorts ensemble members of the same target
-  adjacent, uses `DELTA_BINARY_PACKED` timestamps and `BYTE_STREAM_SPLIT` for `power_fcst`
-  (near-continuous ML output has no repeats for a dictionary to exploit), shrinking the 403.6M-row
-  development table from 6.33 GB to 0.73 GB (8.7×). Details in
+* **`power_forecasts`** (`delta_store.power_forecasts`) sorts rows by
+  `(time_series_id, power_fcst_init_time, valid_time)`, uses `DELTA_BINARY_PACKED` timestamps, and
+  uses `BYTE_STREAM_SPLIT` for each of the 13 quantile columns, because near-continuous ML output
+  has no repeats for a dictionary to exploit. The levers were chosen in
   [PR #268](https://github.com/openclimatefix/nged-substation-forecast/pull/268).
 
 ## Lazy evaluation strategy

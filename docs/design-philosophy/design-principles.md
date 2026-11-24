@@ -463,9 +463,9 @@ later reader can tell which numbers are still true.
 *Without it:* plausible-sounding defaults ship unexamined — `BYTE_STREAM_SPLIT` on NWP *sounds*
 right and measures worse — and the docs fill with numbers nobody can reproduce or trust.
 
-*Decided:* `BYTE_STREAM_SPLIT` is used for `power_fcst` but deliberately *not* for NWP, because it
-measured *worse* there; the NWP scan-pruning rules were each verified with `LazyFrame.explain()`
-rather than reasoned about.
+*Decided:* `BYTE_STREAM_SPLIT` is used for the forecast quantile columns but deliberately *not* for
+NWP, because it measured *worse* there; the NWP scan-pruning rules were each verified with
+`LazyFrame.explain()` rather than reasoned about.
 
 *Serves:* [Hypothesis 4: it runs for pocket
 money](engineering-hypotheses.md#h4-it-runs-for-pocket-money), [Hypothesis 5: scale without

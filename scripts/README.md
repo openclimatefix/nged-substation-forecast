@@ -87,11 +87,10 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   fold, forecast, materialise `effective_capacity` (the denominator of the normalised mean absolute
   error), then compute the leaderboard metrics that rank this CV run against the others. Takes
   no arguments.
-- `export_baseline_forecasts.py` — exports one CV run's forecasts to three
-  self-contained parquet files (the full ensemble of about 51 members from the European Centre for
-  Medium-Range Weather Forecasts' (ECMWF) ensemble, the mean across those members, and quantiles
-  across those members) for offline analysis, each carrying the observed power beside the forecast
-  so residuals can be computed directly.
+- `export_baseline_forecasts.py` — exports one CV run's forecasts to a self-contained parquet
+  file holding the 10th, 50th, and 90th percentiles of the freshest forecast run per half-hour, for
+  offline analysis. The file carries the observed power beside the forecast so residuals can be
+  computed directly.
 - `rewrite_nwp_row_groups.py` — rewrites every partition of the `nwp` (numerical weather prediction)
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,

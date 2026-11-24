@@ -23,8 +23,8 @@ put (and stay linkable — including from code docstrings) as the work that appl
   [delivery tables](../roadmap/delivery-tables.md#table-1-power_forecast).
 - [Evaluation metrics](evaluation-metrics.md) — every metric `compute_metrics` produces, each with a
   plain-language summary, the equation, and the design decisions behind it: the deterministic four
-  (MAE, NMAE, RMSE, MBE), fair CRPS, the Fortin-corrected spread-skill ratio, pinball loss at the
-  NGED delivery quantiles, PICP with its finite-ensemble calibrated references, and interval width.
+  (MAE, NMAE, RMSE, MBE) on the median, CRPS from the 13 stored quantiles, pinball loss at the NGED
+  delivery quantiles, PICP with its finite-ensemble calibrated references, and interval width.
   Applied by the [metrics & leaderboard plan](../roadmap/metrics-and-leaderboard.md) and computed by
   the `metrics` Dagster asset.
 - [Differentiable physics](differentiable-physics.md) — inversion through differentiable forward

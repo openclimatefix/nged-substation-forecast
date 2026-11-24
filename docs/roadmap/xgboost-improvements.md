@@ -1308,16 +1308,16 @@ informative. Calibration and attribution are genuinely different goods here.
   8](../design-philosophy/design-principles.md#8-every-cv-run-is-scored-identically) means it
   must be scored against the existing board by a controlled comparison, not swapped in.
 
-**How to evaluate.** One registered CV run against the member-by-member champion on the same
-folds and population, with four arms: quantile features, representative-member subsampling,
-control-member only (today), and all-member training. Running the subsampling arm alongside the
-collapse is what separates "the resource saving was the win" from "the member axis was carrying
-information", which the two-arm version cannot distinguish. Headline NMAE sliced by horizon and
-`time_series_type` as usual, but this item also needs the [probabilistic
-metrics](../techniques/evaluation-metrics.md#probabilistic-metrics) — spread-skill ratio and PICP
-(prediction interval coverage probability) — because what is being traded away is uncertainty
-structure, which NMAE cannot see. A result where quantile features match on NMAE and lose on
-spread-skill is the outcome that tells you the decomposition was doing real work.
+**How to evaluate.** One registered CV run against the member-by-member champion on the same folds
+and population, with four arms: quantile features, representative-member subsampling, control-member
+only (today), and all-member training. Running the subsampling arm alongside the collapse is what
+separates "the resource saving was the win" from "the member axis was carrying information", which
+the two-arm version cannot distinguish. Headline NMAE sliced by horizon and `time_series_type` as
+usual, but this item also needs the [probabilistic
+metrics](../techniques/evaluation-metrics.md#probabilistic-metrics) — CRPS and PICP (prediction
+interval coverage probability) — because what is being traded away is uncertainty structure, which
+NMAE cannot see. A result where quantile features match on NMAE and lose on CRPS is the outcome that
+tells you the decomposition was doing real work.
 
 ### Reduce the members after the power model, as well as before it
 

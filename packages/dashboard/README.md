@@ -120,10 +120,11 @@ width, and both put their legend above the plot rather than beside the plot, so 
 area ends up narrower than the other's. Changing any one of those three settings on one chart alone
 visibly misaligns the pair.
 
-**A chart's data is served out of line, because the ensemble is large.** One forecast run for one
-series is 51 members × 14 days × 48 half-hours ≈ 34,000 rows, which is past both Altair's 5,000-row
-default guard and marimo's maximum output size. `build_view_forecast_chart` calls
-`alt.data_transformers.disable_max_rows()` to lift Altair's guard. `view_forecasts.py` hands the
+**A chart's data is served out of line, so a denser NWP product or a longer window does not break
+the dashboard.** One forecast run for one series is 14 days × 48 half-hours = 672 rows of 13
+quantiles, and the NWP panel holds about 51 members × 85 steps ≈ 4,300 rows, both under Altair's
+5,000-row default guard. `build_view_forecast_chart` calls `alt.data_transformers.disable_max_rows()`
+to lift Altair's guard anyway. `view_forecasts.py` hands the
 chart to `mo.ui.altair_chart`, which serves the rows as an Arrow virtual file instead of inlining
 the rows in the cell output, so the cell output marimo measures against its guard holds a URL
 rather than the rows. Values are serialised at their stored `Float32` width, because Arrow is
