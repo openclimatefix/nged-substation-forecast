@@ -190,8 +190,9 @@ alarms.
   **`packages/notebooks/README.md`**, the package READMEs, and the skills (`update-dependencies`,
   `plan-issue`, `plan-wave`): every passage describing XGBoost, `live_forecasts`, or promotion as
   current. The `release-model` skill and `model-releases.md` describe only promotion, so both are
-  deleted rather than rewritten. `docs/example_power_forecast.svg`, a chart of an XGBoost forecast,
-  is deleted with the passage that shows it.
+  deleted rather than rewritten. `docs/example_power_forecast.svg` charts the XGBoost
+  live forecast on the docs home page, so the chart and its `docs/index.md` link are deleted until a
+  step-5 forecast can replace them.
 
 **Tests moved to `ClimatologyForecaster`.** `ClimatologyForecaster` raises on any non-empty
 `selected_features`, and its config has no hyperparameters beyond `random_seed` and
