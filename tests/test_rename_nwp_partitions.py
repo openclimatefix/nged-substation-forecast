@@ -93,9 +93,8 @@ def test_a_mixed_table_cannot_be_scanned_until_the_script_has_run(mixed_table: P
         f"{run:%Y-%m-%d}T00:00:00.000000Z" for run in _RUNS
     ]
     for run in _RUNS:
-        new, old = _segments(run)
+        new = _segments(run)[0]
         assert (mixed_table / _MODEL_DIR / new).is_dir()
-        assert not (mixed_table / _MODEL_DIR / old).exists()
 
 
 _KEY: Final[list[str]] = ["init_time", "ensemble_member", "valid_time", "h3_index"]
@@ -175,8 +174,6 @@ def test_a_crash_after_linking_but_before_the_commit_is_harmless_and_a_rerun_fin
     assert rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False) == 2
 
     assert Nwp.scan_delta(mixed_table).collect().height == 12
-    for run in _RUNS[:2]:
-        assert not (mixed_table / _MODEL_DIR / _segments(run)[1]).exists()
 
 
 def test_a_table_with_writer_features_is_refused(
@@ -190,3 +187,17 @@ def test_a_table_with_writer_features_is_refused(
 
     with pytest.raises(RuntimeError, match="writer version"):
         rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+
+
+def test_restore_undoes_the_migration(mixed_table: Path) -> None:
+    version_before = DeltaTable(mixed_table).version()
+    rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+
+    DeltaTable(mixed_table).restore(version_before)
+
+    assert sorted(p["init_time"] for p in DeltaTable(mixed_table).partitions()) == [
+        f"{_RUNS[0]:%Y-%m-%d} 00:00:00.000000",
+        f"{_RUNS[1]:%Y-%m-%d} 00:00:00.000000",
+        f"{_RUNS[2]:%Y-%m-%dT00:00:00.000000Z}",
+    ]
+    assert pl.scan_delta(mixed_table, use_pyarrow=True).collect().height == 12

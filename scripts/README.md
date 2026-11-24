@@ -98,8 +98,9 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   skips a partition that is already aligned, and therefore resumes cleanly after an interruption.
 - `rename_nwp_partitions.py` — gives every partition of the `nwp` Delta table that uses the
   `init_time` format of `deltalake` 1.6.x the format of `deltalake` 1.7, which Polars needs to scan
-  the table. A one-off migration for a local table: the script renames each old-format partition
-  directory and records the renames in one new Delta commit, without reading or copying any data.
+  the table. A one-off migration for a local table: the script hard-links each data file of an
+  old-format partition into a new-format directory and records the move in one new Delta commit,
+  without reading or copying any data.
 
 - `score_study.py` — stores a study's predictions file in `power_forecasts` under the
   `experiment_name` `study/<study name>` and scores it with the `metrics` asset in leaderboard

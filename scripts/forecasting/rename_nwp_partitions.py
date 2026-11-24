@@ -10,18 +10,21 @@ table, so a table holding both fails every ``Nwp.scan_delta`` collect with
 every old-format partition the new format without copying any data.
 
 **The script hard-links each data file of an old-format partition into the directory that
-``deltalake`` 1.7 would have used, writes one new Delta commit, and then deletes the old links.**
+``deltalake`` 1.7 would have used, and writes one new Delta commit.**
 The commit removes each data file at its old path and adds the same file, with the same size and
 statistics, at its new path with the new partition value. A hard link is a second name for the
 same file on disk, so no Parquet file is read, rewritten, or copied. The script takes seconds and
 needs no free disk space. It works on a local table only, because it creates hard links.
+The old links stay in place until ``vacuum(full=True)`` removes them as unreferenced files, so
+the table holds two names for each moved file until then.
 
 **A crash at any point before the commit leaves the table readable.** The only trace is the new
 links, which a rerun reuses, or which ``vacuum`` removes. The commit file is created atomically,
 so the log never holds a partly written commit. If the script fails after the commit, the table
-is valid, the old links remain, and the script reports what failed. To undo a finished run, restore
-the table to the version before the commit with ``DeltaTable.restore`` while no later commit
-exists. Do not delete the commit file once another writer has committed after it.
+is valid and the script reports what failed. To undo a finished run, restore the table to the
+version before the commit with ``DeltaTable.restore``, which needs the old links, so run it
+before any ``vacuum``. Do not delete the commit file by hand once another writer has committed
+after it.
 
 The script reads the Delta log directly, replaying the latest checkpoint and the commits after
 it. It refuses to run if the table's protocol has writer features, and it refuses to commit if
@@ -187,7 +190,7 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
     """Give every old-format partition the new format, recording it in one new commit.
 
     Hard-links each data file to its new path, writes one commit that removes the old paths and
-    adds the new ones, and then deletes the old links. The hard links make every step before the
+    adds the new ones. The old links stay in place. The hard links make every step before the
     commit harmless: a crash leaves the table intact, plus links that a rerun reuses.
 
     Args:
@@ -280,11 +283,12 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
             " missing files, or changed statistics. The old links were left in place. Investigate"
             " before deleting anything."
         )
-    for source, _ in pairs:
-        source.unlink(missing_ok=True)
-        if source.parent.exists() and not any(source.parent.iterdir()):
-            source.parent.rmdir()  # the old directory, now empty
-    _LOGGER.info("Wrote %s, and moved %d files to new-format directories", commit_file, len(pairs))
+    _LOGGER.info(
+        "Wrote %s, and linked %d files into new-format directories. The old links stay until"
+        " vacuum(full=True), which keeps DeltaTable.restore usable as the undo.",
+        commit_file,
+        len(pairs),
+    )
     return len(partitions)
 
 
