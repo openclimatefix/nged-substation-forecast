@@ -6,8 +6,7 @@ description: >-
   a datetime field, `pt.LazyFrame` methods typed as plain `pl.LazyFrame`, and dictionary-encoded
   columns blocking Delta predicate pushdown. Also lists Polars 2 behaviour changes that alter a
   result without raising, such as row order after a lazy join, zero-height empty frames, and the
-  `cut`/`qcut` replacements. Also warns that a row count over a table of more than 2³² rows is wrong
-  or raises in Polars. Load before writing Polars/Patito code that joins, casts, filters a
+  `cut`/`qcut` replacements. Load before writing Polars/Patito code that joins, casts, filters a
   `pt.LazyFrame`, declares a Patito field, or reads/writes Delta — or when a `validate()` dtype
   error, a `.join()` TypeError, an `invalid-assignment` on a filtered scan, an over-reading Delta
   scan, or a change in row order looks inexplicable.
@@ -249,23 +248,6 @@ changes that raise, is in Polars' [upgrade guide](https://docs.pola.rs/releases/
   `h3_index` column held as `Int64` in one table and `UInt64` in another is the case to watch.
 
 These are Polars changes, not Patito traps, so they do not count against the budget below.
-
-## Row counts over a table of more than 2³² rows
-
-**Never count the rows of a table that can exceed 2³² (about 4.29 billion) rows with Polars.**
-Default Polars builds index rows with 32 bits, and the failure takes one of three forms. A
-`pl.len()` or a `group_by(...).agg(pl.len())` over `pl.scan_delta` can wrap modulo 2³² without an
-error. The same `Nwp.scan_delta(...).select(pl.len()).collect()` over the 16.2-billion-row
-workstation `nwp` table raised "Polars' maximum length reached" under Polars 2.1.0. A
-`pl.scan_delta(..., use_pyarrow=True).select(pl.len())` over that table returned 0.
-
-Count from the Delta log instead, with `DeltaTable(path).count()` or by summing `num_records` over
-`get_add_actions(flatten=True)`. Both read metadata only and are exact. To check that a whole
-table scans, count one slice at a time, such as one year of `init_time`, and add the slices up.
-Value aggregations such as `sum` and `min`/`max`, and filtered queries whose result stays under
-2³² rows, are not affected. The background and the `polars-u64-idx` build that avoids the limit
-are in [the performance
-page](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#the-other-hard-ceiling-polars-32-bit-row-index).
 
 ## The friction budget
 
