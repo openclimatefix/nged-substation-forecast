@@ -279,7 +279,8 @@ Three places where a positional argument is right:
   as `dataframely`.
 - **Never row-count a table that can exceed 2³² rows with Polars.** Default Polars builds use a
   32-bit row index, so past ~4.29 billion rows `pl.len()` and `group_by(...).agg(pl.len())` wrap
-  modulo 2³² with **no error**. Use the Delta log instead — `DeltaTable(path).count()`, or sum
+  modulo 2³² with **no error**, or raise "maximum length reached", or return 0 through the pyarrow
+  reader. Use the Delta log instead — `DeltaTable(path).count()`, or sum
   `num_records` over `get_add_actions(flatten=True)` — both metadata-only and exact. Value
   aggregations (`sum`, `min`/`max`, quantiles) are unaffected, and so are filtered queries whose
   *result* stays under the cap. NWP (~5.9B rows) is past it today; `power_forecasts` will pass it at
