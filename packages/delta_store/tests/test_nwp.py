@@ -493,3 +493,21 @@ def test_writer_rejects_a_frame_that_lacks_a_column_the_table_already_has(
     with pytest.raises(ValueError, match="incompatible column set"):
         write_nwp(nwp=incoming, table_uri=table)
     assert DeltaTable(str(table)).version() == 0
+
+
+def test_the_partition_directory_name_keeps_the_format_polars_parses(tmp_path: Path) -> None:
+    """A datetime partition directory must keep the format that ``deltalake`` 1.6.x writes.
+
+    ``deltalake`` 1.7.0 renders the same partition as ``init_time=2026-01-01T00%3A00%3A00.000000Z``.
+    Polars infers the datetime format from the first partition directory it lists, so a table
+    holding directories in both formats fails with ``could not parse '...' with pattern
+    'DatetimeYMDZ'``. Failing here means a dependency upgrade changed the format: migrate the
+    existing table before accepting the upgrade.
+    """
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(), table)
+
+    partition_dirs = [
+        p.name for p in (table / "nwp_model_id=ECMWF_ENS_0_25_degree").iterdir() if p.is_dir()
+    ]
+    assert partition_dirs == ["init_time=2026-01-01%2000%3A00%3A00.000000"]
