@@ -161,38 +161,68 @@ alarms.
   `load_trained_metadata` and the frozen `TimeSeriesMetadata` copy that `save` writes beside a model
   stay, because a live asset for another time-series type that loads a saved forecaster needs
   them. PR #1707's asset does not use them: it reads its Primaries from its bundle's
-  `primaries.json`.
+  `primaries.json`. `fetch_model_artifacts` and `load_forecaster_from_dir` go with
+  `production_helpers.py`. The `load_trained_metadata` tests in `test_base_forecaster.py` and
+  `tests/test_trained_cv_model.py` read the directory `save` writes instead of an artifact that
+  `fetch_model_artifacts` fetched, and the `fetch_model_artifacts` tests go.
 - **`contracts/settings.py`**: `production_model_path` and `sentry_monitor_forecasts` go, with
-  their tests in `contracts/tests/test_settings.py`.
+  their tests in `contracts/tests/test_settings.py`. `Settings` forbids unknown fields from `.env`,
+  so the two lines go from `.env.example` and from every deployed or workstation `.env` before the
+  new code starts.
 - **`contracts/config_schemas.py`**, **`ml_core/features/_lags.py`**, **`_nwp.py`**,
-  **`tabular_feature_engineer.py`**, **`features/__init__.py`**,
+  **`tabular_feature_engineer.py`**, **`features/__init__.py`**, **`defs/_engineering_inputs.py`**,
+  **`cleaning_assets.py`**, **`cv_assets.py`**, **`jobs.py`**, **`delta_store/power_forecasts.py`**,
   **`baseline_forecasters/manual_heuristic.py`**, **`nwp_run_rows.py`**: comments and docstrings
-  that name XGBoost, `live_forecasts`, or `select_nwp_init_time`.
+  that name XGBoost, `live_forecasts`, or `select_nwp_init_time`. The `_nwp.py` passage on
+  `select_nwp_init_time`'s replay mode is rewritten around `NWP_PUBLICATION_DELAY_HOURS`, which
+  survives, rather than renamed.
 - **`conf/cv/default.yaml`**: `reference_experiment_name` names a climatology run (open
-  question 2). **`conf/model/climatology.yaml`**, **`manual_heuristic.yaml`**: their header comments
+  question 1). **`conf/model/climatology.yaml`**, **`manual_heuristic.yaml`**: their header comments
   stop citing `xgboost.yaml`.
 - **Root `pyproject.toml`** and **`uv.lock`**: the `xgboost_forecaster` workspace member and the
-  `xgboost` dependency. **`mkdocs.yml`**: the two nav entries.
+  `xgboost` dependency. **`mkdocs.yml`**: the two nav entries. **`docs/api/ml_core/index.md`**: the
+  `::: ml_core.production_helpers` line, which otherwise breaks `mkdocs build --strict`.
 - **`Dockerfile`**: the `production_model` build context, the `MODEL_RUN_ID` argument and label,
   `PRODUCTION_MODEL_PATH`, and the default `CMD`. **`.dockerignore`**: the comment on the
   `production_model` context. **`scripts/deploy/*.sh`**: the `promotion.json` tag becomes the git
   commit hash, and the smoke run becomes `definitions validate`.
 - **`.gitignore`**, **`README.md`**, **`CLAUDE.md`**, **`scripts/README.md`**,
   **`packages/notebooks/README.md`**, the package READMEs, and the skills (`update-dependencies`,
-  `plan-issue`): every passage describing XGBoost, `live_forecasts`, or promotion as current. The
-  `release-model` skill and `model-releases.md` describe only promotion, so both are deleted
-  rather than rewritten.
+  `plan-issue`, `plan-wave`): every passage describing XGBoost, `live_forecasts`, or promotion as
+  current. The `release-model` skill and `model-releases.md` describe only promotion, so both are
+  deleted rather than rewritten. `docs/example_power_forecast.svg`, a chart of an XGBoost forecast,
+  is deleted with the passage that shows it.
 
-**Tests moved to `ClimatologyForecaster`:** `tests/conftest.py` (the CV-registration fixture's
-default `base_model_config` and overrides), `test_jobs.py`, `test_trained_cv_model.py`,
-`test_register_experiment_job.py`, `test_forecaster_config_serialisation.py`,
-`packages/ml_core/tests/test_load_experiment_forecaster.py`, and the `"xgboost"` model-name strings
-in `test_s3_data_paths.py`, `contracts/tests/test_metrics.py`, and the `delta_store` tests. These
+**Tests moved to `ClimatologyForecaster`.** `ClimatologyForecaster` raises on any non-empty
+`selected_features`, and its config has no hyperparameters beyond `random_seed` and
+`model_release`, so the move is not a rename:
+
+- `tests/conftest.py`: the CV-registration fixture's default `base_model_config` becomes `{}`, in
+  place of `["temperature_2m"]` and `n_estimators: 5`.
+- `test_jobs.py` and `test_register_experiment_job.py`: the overrides of `n_estimators` and
+  `max_depth` become overrides of `random_seed`, and each test checks that the override still
+  changes the experiment's identity.
+- `test_trained_cv_model.py` and `tests/test_cv_power_forecasts.py`: the two tests of the
+  `power_lag_24h` look-back wiring use `conf/model/manual_heuristic.yaml`, which selects power lags,
+  because climatology selects none.
+- `tests/test_cv_power_forecasts.py` and `tests/test_metrics.py`: assertions that depend on
+  XGBoost's output change. Climatology emits members 0 to 50 rather than the validation members
+  present, and drops rows in cells with no training samples.
+- `packages/ml_core/tests/test_load_experiment_forecaster.py`, and the `"xgboost"` model-name
+  strings in `test_s3_data_paths.py`, `contracts/tests/test_metrics.py`, and the `delta_store`
+  tests.
+
+`test_forecaster_config_serialisation.py` is deleted rather than moved, because `XGBoostConfig` is
+the only `BaseForecasterConfig` subclass it can check. `tests/test_asset_layer_tags.py` drops
+`live_forecasts` from its production assets and its docstring drops the promotion assets. These
 go: the live tests in `tests/test_checks.py` (about 780 lines), the check-in tests and the
 monitor-schedule drift guard in `tests/test_sentry.py`, the `live_forecasts_job` partition and
 schedule tests in `tests/test_assets.py`, and the `list_promotable_runs` tests in
 `ml_core/tests/test_mlflow_runs.py`. Comments naming XGBoost in `tests/_pytest_autoinject.py`,
-`ml_core/tests/test_base_forecaster.py`, and `ml_core/tests/test_features.py` are reworded.
+`ml_core/tests/test_base_forecaster.py`, `ml_core/tests/test_features.py`,
+`ml_core/tests/test_cross_mode_equivalence.py`, `ml_core/tests/test_feature_engineer.py`,
+`tests/_nwp_test_data.py`, and `tests/test_metrics.py` are reworded, and
+`tests/test_backup_workstation.py` drops `production_model` as a backup source.
 
 ### Design-philosophy check
 
@@ -208,8 +238,9 @@ No test is added: every behaviour this PR leaves is already tested, and a test a
 removed assets are absent would guard against a change nobody is going to make. The tests that
 move to `ClimatologyForecaster` keep their assertions on the CV, MLflow, and config machinery. Each
 has to fail on a broken machinery path, not on XGBoost, so the mutation pass checks those moved
-tests only. `dagster definitions validate`, run in CI and in the image smoke test, catches a
-dangling import of a deleted module.
+tests only. `dagster definitions validate`, run locally and in the image smoke test, catches a
+dangling import of a deleted module. CI does not run that command, but
+`tests/test_asset_layer_tags.py` imports `defs` and so fails on the same dangling import.
 
 The CV integration tests lose their only coverage of a weather feature (`temperature_2m`) through
 CV, because climatology selects none. The weather path keeps its unit tests in
@@ -254,12 +285,21 @@ The `implement-issue` green-before-push set (`uv run ruff check .`, `uv run ruff
 removed pages and links, `uv lock --check`, and a local `dagster definitions validate -m
 nged_substation_forecast.definitions`.
 
+After the change, `git grep -n "production_helpers\|fetch_model_artifacts\|live_forecasts\|xgboost"`
+over the whole repository, docs and tests included, returns only research references that cite
+XGBoost as history. The implementation then does one CV run of the new reference and a
+`score_study.py` dry run against it.
+
 ## Risks and open questions
 
 1. **The CV reference run.** `reference_experiment_name` moves from `xgboost_no_power_lags` to a
    climatology run. Recommendation: climatology, because it trains in seconds and needs no weather.
    The run has to be re-run into the `power_forecasts` table that PR #1709 recreates before
-   `score_study.py` accepts a study.
+   `score_study.py` accepts a study. `score_study.py` requires a study's row keys to equal the
+   reference's, and climatology always emits 51 members and drops rows in empty cells, so the
+   implementation checks the climatology run's key set against one existing study's keys on one
+   fold before switching. `docs/cross-validation/cross-validation-folds.md` names the reference
+   and is updated.
 2. **The Sentry monitor at deploy.** Delete the `live-forecasts` cron monitor by hand when this PR
    deploys, because no code feeds it any more.
 3. **Follow-up, not in this PR: the weather features.** With XGBoost gone, no production
@@ -290,3 +330,20 @@ Two independent simplicity reviews ran on the first draft and agreed on most fin
   pages, not 40. `live_forecast_assets.py` moves to the deleted-files table, and
   `tests/test_assets.py`, `ml_core/tests/test_mlflow_runs.py`, `contracts/tests/test_settings.py`,
   `.dockerignore`, and the `cv_assets.py` docstring are added.
+
+## Correctness review: triage
+
+- **`fetch_model_artifacts` is still imported by surviving tests:** accepted. The function goes
+  with `production_helpers.py`, and the `load_trained_metadata` tests read the saved directory.
+- **Climatology rejects any selected feature, so the moved tests need named substitutes:**
+  accepted. The test list now names each substitute.
+- **`test_forecaster_config_serialisation.py` cannot move:** accepted. The file is deleted.
+- **`test_asset_layer_tags.py` and `docs/api/ml_core/index.md` name deleted code:** accepted.
+- **`test_cv_power_forecasts.py` and `test_metrics.py` change through the fixture:** accepted.
+- **The climatology reference may not share the study's row keys:** accepted as a check in open
+  question 1.
+- **Removing two `Settings` fields breaks any `.env` that still sets them:** accepted.
+- **CI does not run `definitions validate`:** accepted. The claim is corrected.
+- **Docstrings in a dozen more files name the deleted code:** accepted.
+- **The deleted-lines total double-counts the package:** rejected. The 16 rows sum to 5,482 lines,
+  with the package's five files in one row, so the table's count of 20 files stands.
