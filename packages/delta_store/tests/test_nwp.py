@@ -493,3 +493,25 @@ def test_writer_rejects_a_frame_that_lacks_a_column_the_table_already_has(
     with pytest.raises(ValueError, match="incompatible column set"):
         write_nwp(nwp=incoming, table_uri=table)
     assert DeltaTable(str(table)).version() == 0
+
+
+def test_the_partition_directory_name_keeps_the_format_the_migration_script_expects(
+    tmp_path: Path,
+) -> None:
+    """A datetime partition's value must end in ``Z``, as ``deltalake`` 1.7 writes it.
+
+    ``scripts/forecasting/rename_nwp_partitions.py`` tells a migrated partition from an
+    unmigrated one by that suffix. Polars cannot parse a table whose partition values are in two
+    datetime formats. If this test fails, a ``deltalake`` upgrade changed the partition value
+    format. Migrate the existing tables before accepting the upgrade.
+    """
+    table = tmp_path / "nwp"
+    write_nwp(_make_nwp(), table)
+
+    partition_dirs = [
+        p.name for p in (table / "nwp_model_id=ECMWF_ENS_0_25_degree").iterdir() if p.is_dir()
+    ]
+    assert partition_dirs == ["init_time=2026-01-01T00%3A00%3A00.000000Z"]
+    assert [p["init_time"] for p in DeltaTable(table).partitions()] == [
+        "2026-01-01T00:00:00.000000Z"
+    ]
