@@ -1,4 +1,4 @@
-"""Rename every ``nwp`` Delta partition that uses the old ``deltalake`` partition-value format.
+"""Give every ``nwp`` Delta partition in the old ``deltalake`` partition-value format the new one.
 
 ``deltalake`` 1.6.x stored the ``init_time`` partition value of a run as
 ``2026-11-23 00:00:00.000000``, and named the partition directory
@@ -9,24 +9,28 @@ table, so a table holding both fails every ``Nwp.scan_delta`` collect with
 ``could not parse '2026-11-23 00:00:00.000000' with pattern 'DatetimeYMDZ'``. This script gives
 every old-format partition the new format without copying any data.
 
-**The script renames each old-format partition directory and then records the rename in one new
-Delta commit.** The commit removes each data file at its old path and adds the same file, with the
-same size and statistics, at its new path with the new partition value. No Parquet file is read or
-rewritten, so the script takes seconds, needs no free disk space, and runs on a table of any size.
-The script works on a local table only, because it renames directories.
+**The script hard-links each data file of an old-format partition into the directory that
+``deltalake`` 1.7 would have used, writes one new Delta commit, and then deletes the old links.**
+The commit removes each data file at its old path and adds the same file, with the same size and
+statistics, at its new path with the new partition value. A hard link is a second name for the
+same file on disk, so no Parquet file is read, rewritten, or copied. The script takes seconds and
+needs no free disk space. It works on a local table only, because it creates hard links.
 
-**The script undoes itself if the commit fails**, by renaming the directories back. To undo a
-finished run by hand, delete the new commit file that the script reports, and rename each
-directory back.
+**A crash at any point before the commit leaves the table readable.** The only trace is the new
+links, which a rerun reuses, or which ``vacuum`` removes. The commit file is created atomically,
+so the log never holds a partly written commit. If the script fails after the commit, the table
+is valid, the old links remain, and the script reports what failed. To undo a finished run, restore
+the table to the version before the commit with ``DeltaTable.restore`` while no later commit
+exists. Do not delete the commit file once another writer has committed after it.
 
 The script reads the Delta log directly, replaying the latest checkpoint and the commits after
-it. It then checks the result against what ``deltalake`` itself reads, and refuses to commit if
-the two disagree on which files are active. After the commit, the script checks that every active
-file exists and that every partition value is in the new format.
+it. It refuses to run if the table's protocol has writer features, and it refuses to commit if
+its replay of the log and ``deltalake`` disagree on which files are active. After the commit, the
+script checks that every active file exists and that every partition value is in the new format.
 
 **Run the script with ``deltalake`` 1.7.0 or later installed, while nothing else writes to the
 table.** A write that lands between the script's read of the log and its commit makes the commit
-fail, and the script then renames the directories back.
+fail, and a rerun then succeeds.
 
 Usage::
 
@@ -37,6 +41,7 @@ Usage::
 import argparse
 import json
 import logging
+import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -158,17 +163,47 @@ def _flat_actions(table: DeltaTable) -> list[tuple[Any, ...]]:
     return sorted(tuple(str(value) for value in row) for row in flat.select(kept).rows())
 
 
+def _write_commit(commit_file: Path, lines: list[dict[str, Any]]) -> None:
+    """Create ``commit_file`` atomically, failing if that Delta version is already taken.
+
+    Writes the whole commit to a temporary file in the same folder, flushes it to disk, and then
+    hard-links the temporary file to the commit's name. The link either appears complete or does
+    not appear, and raises ``FileExistsError`` if another writer took the version. A crash or a
+    full disk therefore cannot leave a partly written commit in the log.
+    """
+    temporary = commit_file.with_name(commit_file.name + ".tmp")
+    try:
+        with temporary.open("w") as handle:
+            handle.write("\n".join(json.dumps(line, separators=(",", ":")) for line in lines))
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(temporary, commit_file)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
-    """Rename every old-format partition and record the renames in one new commit.
+    """Give every old-format partition the new format, recording it in one new commit.
+
+    Hard-links each data file to its new path, writes one commit that removes the old paths and
+    adds the new ones, and then deletes the old links. The hard links make every step before the
+    commit harmless: a crash leaves the table intact, plus links that a rerun reuses.
 
     Args:
         table_path: Local path of the ``nwp`` Delta table.
-        dry_run: When true, report what would be renamed and change nothing.
+        dry_run: When true, report what would be changed and change nothing.
 
     Returns:
-        The number of partitions renamed, or that would be renamed when ``dry_run`` is true.
+        The number of partitions changed, or that would be changed when ``dry_run`` is true.
     """
     table = DeltaTable(table_path)
+    protocol = table.protocol()
+    if protocol.min_writer_version > 2 or protocol.writer_features:
+        raise RuntimeError(
+            f"The table needs writer version {protocol.min_writer_version} with features"
+            f" {protocol.writer_features}, which the hand-written commit does not support."
+        )
     actions = active_add_actions(table_path)
     if set(actions) != _active_paths(table):
         raise RuntimeError(
@@ -177,31 +212,33 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
         )
     old = _old_format_actions(actions)
     partitions = sorted({a["partitionValues"]["init_time"] for a in old})
-    _LOGGER.info("%s has %d partitions to rename (%d files)", table_path, len(partitions), len(old))
+    _LOGGER.info("%s has %d partitions to change (%d files)", table_path, len(partitions), len(old))
     if dry_run or not old:
         return len(partitions)
 
     before = _flat_actions(table)
     version = table.version()
-    moved: list[tuple[Path, Path]] = []
-    new_actions: list[_Action] = []
+    commit_file = table_path / "_delta_log" / f"{version + 1:020d}.json"
+    new_actions = [_renamed(action) for action in old]
+    pairs = [
+        (_disk_path(table_path, action["path"]), _disk_path(table_path, new_action["path"]))
+        for action, new_action in zip(old, new_actions, strict=True)
+    ]
+    created: list[Path] = []
+    committed = False
     try:
-        for action in old:
-            new_action = _renamed(action)
-            source, target = (
-                _disk_path(table_path, action["path"]),
-                _disk_path(table_path, new_action["path"]),
-            )
+        for source, target in pairs:
             target.parent.mkdir(parents=True, exist_ok=True)
-            source.rename(target)
-            moved.append((source, target))
-            new_actions.append(new_action)
+            if target.exists() and target.samefile(source):
+                continue  # linked by an earlier run that stopped before its commit
+            os.link(source, target)
+            created.append(target)
         now = int(time.time() * 1000)
-        lines = [
+        lines: list[dict[str, Any]] = [
             {
                 "commitInfo": {
                     "timestamp": now,
-                    "operation": "RENAME PARTITIONS",
+                    "operation": "RELOCATE PARTITIONS",
                     "operationParameters": {"reason": "deltalake 1.7 partition value format"},
                     "engineInfo": "rename_nwp_partitions.py",
                 }
@@ -211,7 +248,7 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
                     "remove": {
                         "path": a["path"],
                         "deletionTimestamp": now,
-                        "dataChange": True,
+                        "dataChange": False,
                         "extendedFileMetadata": True,
                         "partitionValues": a["partitionValues"],
                         "size": a["size"],
@@ -220,34 +257,34 @@ def rename_partitions(table_path: Path, *, dry_run: bool) -> int:
                 }
                 for a in old
             ),
-            *({"add": a} for a in new_actions),
+            *({"add": {**a, "dataChange": False}} for a in new_actions),
         ]
-        commit_file = table_path / "_delta_log" / f"{version + 1:020d}.json"
-        with commit_file.open("x") as handle:  # "x" fails if another writer took the version
-            handle.write("\n".join(json.dumps(line, separators=(",", ":")) for line in lines))
-            handle.write("\n")
+        _write_commit(commit_file, lines)
+        committed = True
     except BaseException:
-        for source, target in reversed(moved):
-            target.rename(source)
-            if not any(target.parent.iterdir()):
-                target.parent.rmdir()  # the new directory, now empty
+        if not committed:
+            for target in reversed(created):
+                target.unlink(missing_ok=True)
+                if target.parent.exists() and not any(target.parent.iterdir()):
+                    target.parent.rmdir()
         raise
 
     after_table = DeltaTable(table_path)
     still_old = [p for p in after_table.partitions() if not p["init_time"].endswith("Z")]
     missing = [p for p in _active_paths(after_table) if not _disk_path(table_path, p).exists()]
     unchanged = _flat_actions(after_table) == before
-    if after_table.version() != version + 1 or still_old or missing or not unchanged:
+    if after_table.version() < version + 1 or still_old or missing or not unchanged:
         raise RuntimeError(
-            f"The commit {commit_file} was written but its check failed: version"
+            f"The commit {commit_file} was written, but its check failed: version"
             f" {after_table.version()}, {len(still_old)} old-format partitions, {len(missing)}"
-            " missing files, or changed statistics. Delete the commit file and rename the"
-            " directories back to undo it."
+            " missing files, or changed statistics. The old links were left in place. Investigate"
+            " before deleting anything."
         )
-    for source, _ in moved:
-        if not any(source.parent.iterdir()):
+    for source, _ in pairs:
+        source.unlink(missing_ok=True)
+        if source.parent.exists() and not any(source.parent.iterdir()):
             source.parent.rmdir()  # the old directory, now empty
-    _LOGGER.info("Wrote %s, and renamed %d directories", commit_file, len(moved))
+    _LOGGER.info("Wrote %s, and moved %d files to new-format directories", commit_file, len(pairs))
     return len(partitions)
 
 

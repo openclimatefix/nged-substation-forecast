@@ -131,20 +131,62 @@ def test_write_nwp_still_replaces_only_its_own_partition_after_the_rename(
     assert scanned.height == 2 + 4 + 4
 
 
-def test_a_failed_commit_renames_the_directories_back(
+def test_a_failed_commit_leaves_the_table_as_it_was_and_no_partial_commit(
     mixed_table: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Fail at the moment of the commit, after every directory has been renamed."""
+    """Fail at the flush of the commit file, after every file has been linked."""
+    log_before = sorted(p.name for p in (mixed_table / "_delta_log").iterdir())
 
-    def fail(*_args: object, **_kwargs: object) -> str:
-        raise RuntimeError("another writer took the version")
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise OSError("disk full")
 
-    monkeypatch.setattr(rename_nwp_partitions.json, "dumps", fail)
+    monkeypatch.setattr(rename_nwp_partitions.os, "fsync", fail)
 
-    with pytest.raises(RuntimeError, match="another writer"):
+    with pytest.raises(OSError, match="disk full"):
         rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
 
+    assert sorted(p.name for p in (mixed_table / "_delta_log").iterdir()) == log_before
     for run in _RUNS[:2]:
         new, old = _segments(run)
         assert (mixed_table / _MODEL_DIR / old).is_dir()
         assert not (mixed_table / _MODEL_DIR / new).exists()
+
+
+def test_a_crash_after_linking_but_before_the_commit_is_harmless_and_a_rerun_finishes(
+    mixed_table: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Simulate a kill between the links and the commit, which runs no cleanup."""
+
+    def crash(*_args: object, **_kwargs: object) -> None:
+        raise KeyboardInterrupt
+
+    with monkeypatch.context() as patched:
+        patched.setattr(rename_nwp_partitions, "_write_commit", crash)
+        with pytest.raises(KeyboardInterrupt):
+            rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+    # The cleanup of a normal failure ran above, so recreate the half-linked state by hand.
+    for run in _RUNS[:2]:
+        new, old = _segments(run)
+        (mixed_table / _MODEL_DIR / new).mkdir(exist_ok=True)
+        for file in (mixed_table / _MODEL_DIR / old).iterdir():
+            (mixed_table / _MODEL_DIR / new / file.name).hardlink_to(file)
+
+    assert pl.scan_delta(mixed_table, use_pyarrow=True).collect().height == 12
+    assert rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False) == 2
+
+    assert Nwp.scan_delta(mixed_table).collect().height == 12
+    for run in _RUNS[:2]:
+        assert not (mixed_table / _MODEL_DIR / _segments(run)[1]).exists()
+
+
+def test_a_table_with_writer_features_is_refused(
+    mixed_table: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _Protocol:
+        min_writer_version = 7
+        writer_features = ("deletionVectors",)
+
+    monkeypatch.setattr(DeltaTable, "protocol", lambda _self: _Protocol())
+
+    with pytest.raises(RuntimeError, match="writer version"):
+        rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
