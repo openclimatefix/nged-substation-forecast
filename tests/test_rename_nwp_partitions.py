@@ -170,3 +170,26 @@ def test_restore_undoes_the_migration(mixed_table: Path) -> None:
         f"{_RUNS[2]:%Y-%m-%dT00:00:00.000000Z}",
     ]
     assert pl.scan_delta(mixed_table, use_pyarrow=True).collect().height == 12
+
+
+def test_a_commit_never_overwrites_a_version_that_another_writer_took(tmp_path: Path) -> None:
+    taken = tmp_path / "00000000000000000007.json"
+    taken.write_text("another writer's commit\n")
+
+    with pytest.raises(FileExistsError):
+        rename_nwp_partitions._write_commit(taken, [{"commitInfo": {}}])
+
+    assert taken.read_text() == "another writer's commit\n"
+    assert [p.name for p in tmp_path.iterdir()] == [taken.name]
+
+
+def test_the_script_refuses_when_its_replay_of_the_log_disagrees_with_deltalake(
+    mixed_table: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    log_before = sorted(p.name for p in (mixed_table / "_delta_log").iterdir())
+    monkeypatch.setattr(rename_nwp_partitions, "_active_paths", lambda _table: set())
+
+    with pytest.raises(RuntimeError, match="differ"):
+        rename_nwp_partitions.rename_partitions(mixed_table, dry_run=False)
+
+    assert sorted(p.name for p in (mixed_table / "_delta_log").iterdir()) == log_before
