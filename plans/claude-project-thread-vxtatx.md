@@ -9,10 +9,10 @@ the live service before the Christmas 2026 break.
 
 **The planned solution.** A new workspace package, `demand_network`, rebuilds the network's 60
 input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs a forward pass
-re-implemented in numpy for each of the three seeds, and reads the 11 research quantile levels out
+re-implemented in numpy for each of the three seeds, and reads the 13 NGED delivery quantile levels out
 of each seed's Gaussian mixture. A new daily Dagster asset, `live_primaries_network_forecasts`,
 runs the package at the 12:00 UTC origin on the day's 00Z ECMWF ENS run and writes one row per
-Primary and half-hour to `power_forecasts`, with the 11 quantile columns that a separate issue adds
+Primary and half-hour to `power_forecasts`, with the 13 quantile columns that a separate issue adds
 to `PowerForecast` (see "Dependency on the contract change"). The bundle is copied into the image
 beside the existing champion model. The 6-hourly `live_forecasts` asset keeps running, as the
 fallback.
@@ -39,8 +39,9 @@ the Candidate. Step 5 also needs no daily K1 run, no stored lag-free table, and 
 **Reviews: both plan reviews (simplicity, then correctness), and all three diff reviews.**
 
 **Dependency on the contract change.** The maintainer decided on 2026-11-18 that `PowerForecast`
-itself changes from one `power_fcst` per `ensemble_member` to 11 `Float32` quantile columns at the
-research levels (0.01, 0.05, 0.10, 0.25, 0.40, 0.50, 0.60, 0.75, 0.90, 0.95, 0.99), keyed by
+itself changes from one `power_fcst` per `ensemble_member` to 13 `Float32` quantile columns at the
+levels agreed with NGED for the delivery tables (`DELIVERY_QUANTILES`: 0.01, 0.02, 0.05, 0.10, 0.20,
+0.35, 0.50, 0.65, 0.80, 0.90, 0.95, 0.98, 0.99), keyed by
 (`time_series_id`, `power_fcst_init_time`, `valid_time`). That change touches every forecaster, the
 metrics, and the `power_forecasts` table, so it is its own issue and pull request. This plan only
 needs it before step 2 of "Implementation order" below; the package in step 1 does not depend on
@@ -130,7 +131,8 @@ structure.
    distribution. The forward pass is the functional `forward` and `mlp` of `reference_check.py`,
    ported line by line and applying the stored weights by their `state_dict` names, so the port
    diffs against the reference and imports nothing from research. `forecast` reads the quantiles at
-   `levels` (the 11 research levels in production) from each seed's mixture by 40 bisection steps
+   `levels` (the 13 delivery levels in production, and the 11 research levels in the golden tests)
+   from each seed's mixture by 40 bisection steps
    over ±40 standard deviations, sorts each seed's quantiles, converts them to a fraction of
    capacity with the per-Primary target mean and standard deviation, averages the three seeds level
    by level, and sorts within each row again, as research does.
@@ -139,7 +141,7 @@ structure.
    contract rows start at 12:00 UTC itself; `PowerForecast.valid_time` must be strictly after
    `power_fcst_init_time`, so that row is dropped. The asset then clamps every quantile of the
    eight MVA Primaries at zero, as the backtest files do. It builds a `PowerForecast` frame with the
-   11 quantile columns, `power_fcst_model_name = "primaries_demand_network"`, `experiment_name =
+   13 quantile columns, `power_fcst_model_name = "primaries_demand_network"`, `experiment_name =
    "primaries_demand_network"`, `power_fcst_model_version` from the bundle's `model_release`,
    `nwp_init_time` = today's 00Z run, and `fold_id = "live"`.
 9. **The asset writes with `write_power_forecasts`**, replacing exactly the partition
@@ -262,7 +264,8 @@ structure.
       values, the test feeds the fixture's own CAMS columns into the matrix, so the rest of the
       matrix and the outputs are still compared;
     - the expected-weather rows against `lag_and_expected_rows.parquet`;
-    - the seed-mean quantiles at the 11 research levels against `outputs_native.parquet`, to 2e-5
+    - the seed-mean quantiles at the 11 research levels (the fixtures' levels, passed as the
+      `levels` argument) against `outputs_native.parquet`, to 2e-5
       of capacity;
     - the contract-origin megawatts, before the MVA clamp, against `outputs_contract.parquet` on
       its 671 rows after 12:00 UTC. The fixtures are unclamped, so the comparison comes before the
@@ -349,7 +352,8 @@ superseded by the correctness review's finding that research uses pvlib's SPA.
 All 18 findings were checked against the code and accepted. The history scan grew from 9 to 13
 days for the cold-snap column. The golden tests now feed the `replay` bundle's own CAMS columns and
 compare before the MVA clamp. `forecast` takes the quantile levels as an argument, and the output
-now uses the 11 research levels directly. The sun columns now come from pvlib's SPA. The
+now uses the 13 delivery levels, which the bundle's config (`quantile_levels`) does not fix. The sun
+columns now come from pvlib's SPA. The
 `definitions.py` and root `pyproject.toml` steps were added, and the `_upsample_nwp_to_half_hourly`
 column and `strict_radiation_schedule` traps are now handled. The B1 fallback now follows research's
 finite-value aggregation, the expected-weather fallback is specified, and the analysis-proxy unit
