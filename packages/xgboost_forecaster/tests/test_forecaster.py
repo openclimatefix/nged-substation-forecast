@@ -127,6 +127,18 @@ def test_predict_reduces_the_ensemble_members_to_quantiles_of_one_row() -> None:
     assert (both["power_fcst_p1"] <= both["power_fcst_p99"]).all()
 
 
+def test_predict_rejects_a_row_without_an_nwp_member() -> None:
+    df = _make_df()
+    forecaster = _trained(df)
+    memberless = df.with_columns(
+        ensemble_member=pl.when(pl.int_range(pl.len()) == 0)
+        .then(None)
+        .otherwise(pl.col("ensemble_member"))
+    )
+    with pytest.raises(ValueError, match="1 rows have a null ensemble_member"):
+        forecaster.predict(pt.LazyFrame.from_existing(memberless.lazy()))
+
+
 def test_predict_with_mlflow_experiment_id() -> None:
     df = _make_df()
     lf = pt.LazyFrame.from_existing(df.lazy())

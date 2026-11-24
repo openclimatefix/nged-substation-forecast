@@ -182,6 +182,10 @@ class XGBoostForecaster(BaseForecaster):
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
         supplies it). Defaults to the ``"live"`` production sentinel.
+
+        Raises:
+            ValueError: If a row has a null ``ensemble_member``. A row with no NWP member carries
+                no weather, and its prediction would silently widen the quantiles of its key.
         """
         feature_cols = self._feature_cols
         cfg = self.model_params
@@ -209,6 +213,12 @@ class XGBoostForecaster(BaseForecaster):
         # Stream the NWP scan, for the reasons on ``train`` above. See
         # <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
         df = data.collect(engine="streaming")
+        n_memberless = df["ensemble_member"].null_count()
+        if n_memberless:
+            raise ValueError(
+                f"{n_memberless} rows have a null ensemble_member; drop rows without an NWP member"
+                " before predict."
+            )
         parts: list[pl.DataFrame] = []
         for group_key, group in df.group_by(["time_series_id"]):
             booster = self._models.get(int(group_key[0]))

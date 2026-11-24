@@ -28,7 +28,8 @@ def to_stored_quantiles(
     Empirical quantiles never decrease from one level to the next, so the output passes
     ``PowerForecast``'s ordering constraint by construction. A group with one value gets that
     value in all 13 columns. Null values are dropped first, so a group keeps its other values, and
-    a group whose values are all null yields no row.
+    a group whose values are all null yields no row. A NaN value is not dropped: it turns the upper
+    quantiles of its group into NaN, which ``PowerForecast.validate`` rejects.
 
     Args:
         frame: One row per point value. Holds ``value_col``, the columns in ``drop_cols``, and the
