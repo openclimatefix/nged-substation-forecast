@@ -10,7 +10,7 @@ the live service before the Christmas 2026 break.
 **The planned solution.** A new workspace package, `demand_network`, rebuilds the network's 60
 input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs a forward pass
 re-implemented in numpy for each of the three seeds, and reads the 13 NGED delivery quantile levels out
-of each seed's Gaussian mixture. A new daily Dagster asset, `live_primaries_network_forecasts`,
+of each seed's Gaussian mixture. A new daily Dagster asset, `live_primary_substation_forecasts`,
 runs the package at the 12:00 UTC origin on the day's 00Z ECMWF ENS run and writes one row per
 Primary and half-hour to `power_forecasts`, with the 13 quantile columns that a separate issue adds
 to `PowerForecast` (see "Dependency on the contract change"). The bundle is copied into the image
@@ -55,7 +55,7 @@ structure.
 
 #### The happy path
 
-1. **A schedule fires `live_primaries_network_forecasts` at 12:00 UTC each day.** The asset reuses
+1. **A schedule fires `live_primary_substation_forecasts` at 12:00 UTC each day.** The asset reuses
    `ecmwf_ens_partitions` (`defs/assets.py`), so its partition maps one-to-one to the day's ENS
    run. The partition's date gives `power_fcst_init_time` = that date at 12:00 UTC and the native
    origin = 09:00 UTC, the time the network was trained to treat the 00Z run as available. The
@@ -176,7 +176,7 @@ structure.
 #### The main error-handling paths
 
 - **Today's 00Z run is absent at 15:00 UTC**: the asset reports a degradation to Sentry tagged
-  `degraded_asset=live_primaries_network_forecasts`, naming the run, and finishes without writing.
+  `degraded_asset=live_primary_substation_forecasts`, naming the run, and finishes without writing.
   It does not forecast from yesterday's run, because every lead would be 24 hours longer than the
   network trained on. NGED keeps the fallback forecast from `live_forecasts`, which runs at every
   slot.
@@ -214,7 +214,7 @@ structure.
   to `<local_artifacts_path>/primaries_network_bundle`.
 - **`src/nged_substation_forecast/defs/primaries_network_assets.py`** (new): the asset, on
   `ecmwf_ens_partitions`.
-- **`src/nged_substation_forecast/defs/schedules.py`**: `live_primaries_network_forecasts_job` and
+- **`src/nged_substation_forecast/defs/schedules.py`**: `live_primary_substation_forecasts_job` and
   its 12:00 UTC schedule.
 - **`src/nged_substation_forecast/definitions.py`**: the new module in `load_assets_from_modules`,
   and the schedule in `schedules=[...]`.
