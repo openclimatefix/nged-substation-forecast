@@ -424,7 +424,7 @@ _NWP_QUALITY_CHECK_NAME: Final[str] = "nwp_has_no_unexpected_nulls"
 
 Computed in-asset from the frame already in memory rather than as a standalone ``@asset_check``
 scanning the Delta table: the quality of a run is a property of the specific ingest we are holding,
-so there is nothing to re-scan (and re-scanning the whole ~5.9B-row NWP table would hit Polars'
+so there is nothing to re-scan (and re-scanning the whole ~16.2B-row NWP table would hit Polars'
 2**32 row-count ceiling). This differs from ``power_data_is_fresh``, whose freshness genuinely
 drifts over time and so must re-read the table on a schedule."""
 

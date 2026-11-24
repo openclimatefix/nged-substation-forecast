@@ -96,7 +96,11 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,
   skips a partition that is already aligned, and therefore resumes cleanly after an interruption.
-
+- `rename_nwp_partitions.py` — rewrites the `init_time` partition values of the `nwp` Delta table
+  from the format that `deltalake` 1.6.x wrote to the format that `deltalake` 1.7 writes. Polars
+  cannot scan a table that holds both formats. A one-off migration for a local table: the script
+  hard-links each data file of an old-format partition into a new-format directory and records
+  the move in one new Delta commit.
 - `score_study.py` — stores a study's predictions file in `power_forecasts` under the
   `experiment_name` `study/<study name>` and scores it with the `metrics` asset in leaderboard
   scope. The script refuses a file whose `(time_series_id, power_fcst_init_time, valid_time,
