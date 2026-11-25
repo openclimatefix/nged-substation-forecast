@@ -1,18 +1,17 @@
 """Tests for the MLflow model-artifact plumbing, against file-based MLflow.
 
-Covers ``BaseForecaster.save_to_mlflow``/``load_from_mlflow`` and the third function that touches
-the same archive layout, ``ml_core.production_helpers.fetch_model_artifacts`` — they are tested
-together here because they share one on-the-wire format and one fake forecaster.
+Covers ``BaseForecaster.save_to_mlflow``/``load_from_mlflow`` and the frozen metadata copy that
+travels in the same archive — they are tested together here because they share one on-the-wire
+format and one fake forecaster.
 
 That fake (rather than a concrete model) keeps the tests focused on the shared behaviour —
 archive upload/download — and free of any model-library dependency. It writes one file per
-``time_series_id``, mirroring ``XGBoostForecaster``'s one-``.ubj``-per-series layout, which is
-what makes a *shrinking* population observable as files that must vanish from the run.
+``time_series_id``, which is what makes a *shrinking* population observable as files that must
+vanish from the run.
 """
 
 import json
-import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Self
 
@@ -28,10 +27,9 @@ from ml_core.base_forecaster import (
     TRAINED_METADATA_FILENAME,
     BaseForecaster,
     BaseForecasterConfig,
-    _archive_model_dir,
+    _download_and_unpack_model,
     load_trained_metadata,
 )
-from ml_core.production_helpers import fetch_model_artifacts
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
 
@@ -91,34 +89,6 @@ class _FakeForecaster(BaseForecaster):
         self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
     ) -> pt.DataFrame[PowerForecast]:
         raise NotImplementedError  # pragma: no cover - unused
-
-
-class _MetaWithoutModelParams(_FakeForecaster):
-    """A forecaster whose saved record omits ``model_params`` altogether."""
-
-    def save(self, path: Path) -> None:
-        super().save(path)
-        meta = json.loads((path / "meta.json").read_text())
-        del meta["model_params"]
-        (path / "meta.json").write_text(json.dumps(meta))
-
-
-class _MetaWithUndeclaredHyperparameter(_FakeForecaster):
-    """A forecaster saved while the code still declared a hyper-parameter that has since gone."""
-
-    def save(self, path: Path) -> None:
-        super().save(path)
-        meta = json.loads((path / "meta.json").read_text())
-        meta["model_params"]["dropout_rate"] = 0.1
-        (path / "meta.json").write_text(json.dumps(meta))
-
-
-class _MetaJsonMissing(_FakeForecaster):
-    """A forecaster whose saved record omits ``meta.json`` altogether."""
-
-    def save(self, path: Path) -> None:
-        super().save(path)
-        (path / "meta.json").unlink()
 
 
 def test_trained_time_series_ids_is_abstract() -> None:
@@ -253,26 +223,23 @@ def test_re_saving_a_smaller_model_leaves_no_trace_of_the_dropped_series(
 
     The regression this issue exists to prevent (issue #470). A directory upload
     (``log_artifacts``) *merges*, and MLflow has no public artifact-delete API, so series 30's
-    file would survive in the run forever — downloaded on every subsequent load and baked into
-    the production container image. Uploading one same-name archive replaces it instead.
+    file would survive in the run forever, downloaded on every subsequent load. Uploading one
+    same-name archive replaces it instead.
     """
     _save(saved_run, "smaller-model", series=[10, 20])
 
     # Nothing in the run's artifact store mentions the dropped series...
     assert _artifact_file_paths(saved_run) == ["model.tar.gz"]
 
-    # ...and nothing the download path materialises does either, on either consumer.
+    # ...and nothing the download path materialises does either.
     assert _FakeForecaster.load_from_mlflow(saved_run).trained_time_series_ids == [10, 20]
 
-    dest = tmp_path / "production_model"
-    fetch_model_artifacts(saved_run, dest)
-    assert not (dest / "30.part").exists()
+    dest = _download_and_unpack_model(run_id=saved_run, work_dir=tmp_path, remedy="")
     assert sorted(p.name for p in dest.iterdir()) == [
         "10.part",
         "20.part",
         "meta.json",
         "payload.txt",
-        "promotion.json",
         TRAINED_METADATA_FILENAME,
     ]
 
@@ -291,22 +258,10 @@ def test_loading_a_run_with_no_archive_says_what_to_do_about_it(saved_run: str) 
         _FakeForecaster.load_from_mlflow(empty_run_id)
 
 
-def test_fetch_model_artifacts_unpacks_the_archive_into_dest(
-    saved_run: str, tmp_path: Path
-) -> None:
-    """The production download path lands a plain model directory, not an archive file."""
-    dest = tmp_path / "production_model"
-    fetch_model_artifacts(saved_run, dest)
-
-    assert not (dest / "model.tar.gz").exists()
-    assert _FakeForecaster.load(dest).payload == "hello-model"
-    assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
-
-
 def test_the_archive_carries_the_trained_metadata_without_area_wkt(
     saved_run: str, tmp_path: Path
 ) -> None:
-    """Promotion must land the rows live inference locates its series by — and only those.
+    """The archive must carry the rows a live asset locates its series by — and only those.
 
     ``area_wkt`` is 98.5% of the metadata table's bytes and nothing reads it, so it must not ride
     along into every fold's archive.
@@ -315,8 +270,7 @@ def test_the_archive_carries_the_trained_metadata_without_area_wkt(
         BaseForecasterConfig(selected_features=set()), payload="located", series=[10, 20]
     ).save_to_mlflow(saved_run, time_series_metadata=_metadata_for([10, 20], area_wkt=True))
 
-    dest = tmp_path / "production_model"
-    fetch_model_artifacts(saved_run, dest)
+    dest = _download_and_unpack_model(run_id=saved_run, work_dir=tmp_path, remedy="")
 
     metadata = load_trained_metadata(dest)
     assert metadata["time_series_id"].to_list() == [10, 20]
@@ -352,151 +306,8 @@ def test_load_trained_metadata_says_what_to_do_about_a_directory_without_it(
     """A model directory predating the frozen copy names the remedy, not just the missing path."""
     tmp_path.joinpath("empty_model").mkdir()
 
-    with pytest.raises(FileNotFoundError, match="promote that run"):
+    with pytest.raises(FileNotFoundError, match="deploy that run"):
         load_trained_metadata(tmp_path / "empty_model")
-
-
-def _save_stale_vocabulary(run_id: str) -> None:
-    """Save a model naming a feature a rename retired."""
-    _save(run_id=run_id, payload="stale", series=[10], selected_features={"local_utc_offset"})
-
-
-def _save_without_model_params(run_id: str) -> None:
-    """Save a record with no ``model_params``, which no forecaster here can build a config from."""
-    _MetaWithoutModelParams(
-        model_params=BaseForecasterConfig(selected_features=set()),
-        payload="featureless",
-        series=[10],
-    ).save_to_mlflow(run_id, time_series_metadata=_metadata_for([10]))
-
-
-def _save_with_an_undeclared_hyperparameter(run_id: str) -> None:
-    """Save a model whose stored config carries a key the config class no longer declares."""
-    _MetaWithUndeclaredHyperparameter(
-        model_params=BaseForecasterConfig(selected_features=set()),
-        payload="undeclared",
-        series=[10],
-    ).save_to_mlflow(run_id, time_series_metadata=_metadata_for([10]))
-
-
-def _save_without_meta_json(run_id: str) -> None:
-    """Save a run whose archive holds the model files but no record describing them."""
-    _MetaJsonMissing(
-        model_params=BaseForecasterConfig(selected_features=set()),
-        payload="recordless",
-        series=[10],
-    ).save_to_mlflow(run_id, time_series_metadata=_metadata_for([10]))
-
-
-def _save_without_trained_metadata(run_id: str) -> None:
-    """Upload an archive built the way ``save_to_mlflow`` did before it froze the metadata.
-
-    Not reachable through ``save_to_mlflow``, which now always deposits the file — this is what
-    every fold run trained before that change actually holds, and promoting one would leave live
-    inference unable to locate a single series.
-    """
-    forecaster = _FakeForecaster(
-        BaseForecasterConfig(selected_features=set()), payload="unlocatable", series=[10]
-    )
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        model_dir = Path(tmp_dir) / "model"
-        model_dir.mkdir()
-        forecaster.save(model_dir)
-        archive_path = Path(tmp_dir) / "model.tar.gz"
-        _archive_model_dir(model_dir, archive_path)
-        with mlflow.start_run(run_id=run_id):
-            mlflow.log_artifact(str(archive_path))
-
-
-class _TrainedMetadataCorrupt(_FakeForecaster):
-    """A forecaster whose frozen metadata is present but not a readable parquet."""
-
-    def save(self, path: Path) -> None:
-        super().save(path)
-        # Written here rather than after `save_to_mlflow`'s own write, which would overwrite it.
-        (path / TRAINED_METADATA_FILENAME).write_bytes(b"not a parquet file")
-
-
-def _save_with_corrupt_trained_metadata(run_id: str) -> None:
-    """Save a run whose frozen metadata cannot be read back."""
-    forecaster = _TrainedMetadataCorrupt(
-        BaseForecasterConfig(selected_features=set()), payload="corrupt", series=[10]
-    )
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        model_dir = Path(tmp_dir) / "model"
-        model_dir.mkdir()
-        forecaster.save(model_dir)
-        archive_path = Path(tmp_dir) / "model.tar.gz"
-        _archive_model_dir(model_dir, archive_path)
-        with mlflow.start_run(run_id=run_id):
-            mlflow.log_artifact(str(archive_path))
-
-
-@pytest.mark.parametrize(
-    ("save_unservable", "expected"),
-    [
-        (_save_stale_vocabulary, "local_utc_offset"),
-        (_save_without_model_params, "model_params"),
-        (_save_with_an_undeclared_hyperparameter, "model_params"),
-        (_save_without_meta_json, "no meta.json"),
-        (_save_without_trained_metadata, TRAINED_METADATA_FILENAME),
-        (_save_with_corrupt_trained_metadata, TRAINED_METADATA_FILENAME),
-    ],
-)
-def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unservable(
-    saved_run: str,
-    tmp_path: Path,
-    save_unservable: Callable[[str], None],
-    expected: str,
-) -> None:
-    """A promotion this code could not serve must not displace the champion already in place.
-
-    The check runs before the atomic swap, so ``dest`` is untouched and the outgoing champion
-    keeps serving instead of the service breaking at its next tick. The cases are the ways a
-    saved record outlives the code that wrote it: a retired feature name, a hyper-parameter this
-    code no longer declares, no config at all, no record at all, and frozen metadata that is
-    missing or unreadable.
-    """
-    dest = tmp_path / "production_model"
-    fetch_model_artifacts(run_id=saved_run, dest=dest)
-
-    # Each parametrised case gets its own tmp_path, so its own tracking store: one name is enough.
-    with mlflow.start_run(experiment_id=mlflow.create_experiment("unservable")) as run:
-        unservable_run_id = run.info.run_id
-    save_unservable(unservable_run_id)
-
-    with pytest.raises(ValueError, match=expected) as exc_info:
-        fetch_model_artifacts(run_id=unservable_run_id, dest=dest)
-
-    # Which run was refused, so an operator knows what to re-train rather than what to re-download.
-    assert unservable_run_id in str(exc_info.value)
-    assert _FakeForecaster.load(dest).payload == "hello-model"
-    assert json.loads((dest / "promotion.json").read_text())["mlflow_run_id"] == saved_run
-
-
-def test_fetch_model_artifacts_keeps_the_previous_model_when_the_run_holds_no_model(
-    saved_run: str, tmp_path: Path
-) -> None:
-    """A run id naming a run with no model saved to it must not displace the champion either.
-
-    This is the likeliest operator slip of the three, because a mistyped or stale run id names a
-    real run that simply never held a model. It is also the only refusal that happens in the
-    download rather than in ``_check_meta_is_servable``, so it needs its own case to pin that
-    ``dest`` survives it.
-
-    The message must send the operator back to the run id they chose. Re-materialising
-    ``trained_cv_model`` is the remedy for the *other* caller of the same download helper.
-    """
-    dest = tmp_path / "production_model"
-    fetch_model_artifacts(run_id=saved_run, dest=dest)
-
-    with mlflow.start_run(experiment_id=mlflow.create_experiment("modelless")) as run:
-        modelless_run_id = run.info.run_id
-
-    with pytest.raises(MlflowException, match="check the run id"):
-        fetch_model_artifacts(run_id=modelless_run_id, dest=dest)
-
-    assert _FakeForecaster.load(dest).payload == "hello-model"
 
 
 @pytest.mark.parametrize("model_release", [-1, 32768])

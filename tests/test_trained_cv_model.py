@@ -16,16 +16,15 @@ import polars as pl
 import pytest
 from _cleaned_power_test_data import write_cleaned_copy
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
+from baseline_forecasters.climatology import ClimatologyForecaster
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
 from dagster import DagsterInstance, materialize
 from deltalake import write_deltalake
-from ml_core.base_forecaster import load_trained_metadata
+from ml_core.base_forecaster import _download_and_unpack_model, load_trained_metadata
 from ml_core.features.tabular_feature_engineer import TabularFeatureEngineer
-from ml_core.production_helpers import fetch_model_artifacts
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
-from xgboost_forecaster.forecaster import XGBoostForecaster
 
 from nged_substation_forecast.defs import cv_assets
 from nged_substation_forecast.defs._engineering_inputs import load_engineering_inputs
@@ -41,9 +40,9 @@ pytestmark = pytest.mark.integration
 RegisterExperiment = Callable[[DagsterInstance, str], None]
 """Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
 
-RegisterExperimentWithFeatures = Callable[[DagsterInstance, str, list[str]], None]
-"""Type of the ``register_experiment`` fixture when called with its optional ``selected_features``
-argument."""
+RegisterExperimentWithConfig = Callable[..., None]
+"""Type of the ``register_experiment`` fixture when called with its keyword-only
+``base_model_config`` and ``config_overrides`` arguments."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_smoke"
@@ -390,7 +389,7 @@ def _fold_run(client: MlflowClient) -> Run:
 def test_trained_cv_model_derives_power_lookback_from_selected_features(
     env: None,
     dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperimentWithFeatures,
+    register_experiment: RegisterExperimentWithConfig,
     spy_power_lookback: Callable[[], list[timedelta]],
 ) -> None:
     """``trained_cv_model`` derives ``power_lookback`` from the experiment's own
@@ -399,12 +398,18 @@ def test_trained_cv_model_derives_power_lookback_from_selected_features(
     The two tests above prove ``load_engineering_inputs`` and ``ParsedFeatures.max_power_lag()``
     are each correct in isolation; this proves the asset's own wiring — computing
     ``power_lookback`` and passing it to the loader — is correct too. The shared
-    ``register_experiment`` fixture defaults to a ``selected_features`` set with no power lag, so
-    every other test in this module cannot catch a hardcoded ``power_lookback=timedelta(0)`` or a
-    derivation from the wrong config field; this test passes ``power_lag_24h`` explicitly to
-    exercise that derivation.
+    ``register_experiment`` fixture defaults to climatology, which selects no feature, so every
+    other test in this module cannot catch a hardcoded ``power_lookback=timedelta(0)`` or a
+    derivation from the wrong config field; this test registers the manual heuristic with
+    ``power_lag_24h`` to exercise that derivation.
     """
-    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m", "power_lag_24h"])
+    # Climatology selects no feature, so the manual heuristic carries the power lag here.
+    register_experiment(
+        dagster_instance,
+        EXPERIMENT_NAME,
+        base_model_config="conf/model/manual_heuristic.yaml",
+        config_overrides={"selected_features": ["power_lag_24h"]},
+    )
     calls = spy_power_lookback()
 
     assert materialize(
@@ -432,7 +437,7 @@ def test_training_init_time_start_keeps_the_look_back_except_before_the_epoch(
 def test_trained_cv_model_floors_the_nwp_look_back_at_the_leaderboard_epoch(
     env: None,
     dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperimentWithFeatures,
+    register_experiment: RegisterExperimentWithConfig,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The training runs start 16 days before the window, but never before the epoch's first run.
@@ -440,7 +445,7 @@ def test_trained_cv_model_floors_the_nwp_look_back_at_the_leaderboard_epoch(
     The fold starts on the epoch's first run, so the floor binds and the back-filled runs before
     2024-04-01 stay out of the training data.
     """
-    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m"])
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
     init_time_starts: list[datetime] = []
 
     def _spy(*args: Any, **kwargs: Any) -> Any:
@@ -482,13 +487,14 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
 
     # The model round-trips from MLflow, and only the in-window ts1 was trained (ts2's data is all
     # past train_end, so the inclusive-window filter excludes it).
-    loaded = XGBoostForecaster.load_from_mlflow(fold_run.info.run_id)
+    loaded = ClimatologyForecaster.load_from_mlflow(fold_run.info.run_id)
     assert loaded.trained_time_series_ids == [1]
 
     # The archive also carries the metadata table rows the model was engineered against, which is
-    # what `live_forecasts` locates its time series by instead of reading the metadata table.
-    model_dir = tmp_path / "promoted"
-    fetch_model_artifacts(fold_run.info.run_id, model_dir)
+    # what a live asset locates its time series by instead of reading the metadata table.
+    model_dir = _download_and_unpack_model(
+        run_id=fold_run.info.run_id, work_dir=tmp_path, remedy=""
+    )
     frozen = load_trained_metadata(model_dir)
     # Narrowed to the trained population, not the wider eligible one it was engineered over.
     assert frozen["time_series_id"].to_list() == [1]
@@ -519,7 +525,7 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
 
     client = MlflowClient()
     first_run_id = _fold_run(client).info.run_id
-    assert XGBoostForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
+    assert ClimatologyForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
 
     # Second pass: coverage has extended, so ts2 is now eligible too — the exact input change
     # that used to be rejected. ts2's data is still all past train_end (see the module
@@ -537,7 +543,7 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     assert fold_run.data.tags["n_eligible_time_series"] == "2"
 
     # The model still loads cleanly from the reused run after the second training pass.
-    assert XGBoostForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
+    assert ClimatologyForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
 
 
 def test_trained_cv_model_fails_loudly_when_no_eligible_series(

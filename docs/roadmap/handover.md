@@ -25,15 +25,15 @@ scheduled cadence (e.g. quarterly maintenance windows) rather than reactively.
 Several decisions already made serve this constraint well, and this page makes that connection
 explicit so we don't accidentally undo them:
 
-- **The champion model is baked into the container image** with no MLflow (or any tracking server)
-  on the production hot path — see [Production Deployment —
+- **Each live forecaster's trained model is baked into the container image** with no MLflow (or
+  any tracking server) on the production hot path — see [Production Deployment —
   Design](../architecture/production-deployment.md). Under the handover model this is a feature
   twice over: there are fewer runtime moving parts to break, and the model simply *freezes* between
   model updates.
 - **Replay mode** means a missed slot is recovered by a one-click UI backfill, not by an engineer
   reconstructing state — see [Operating the live service](../live_service/operations.md).
-- **Promotion is rebuild + redeploy**, auditable via image tags — no live mutable model registry for
-  an operator to mis-drive.
+- **Changing the live model is rebuild + redeploy**, auditable via image tags — no live mutable
+  model registry for an operator to mis-drive.
 - **No static AWS keys for OCF's own resources** (IAM roles throughout) removes a whole class of
   credential-expiry incidents. The two static credentials that remain sit at the boundary with NGED
   — the NGED read-access user and the source-bucket credentials. [Workstream
@@ -72,7 +72,7 @@ expected to take.**
 Keep the contract to roughly **ten items or fewer**, each one a documented button-press or a single
 command with a runbook page in [`docs/live_service/`](../live_service/index.md).
 
-Everything *not* on that list — model promotion, dependency upgrades, schema changes, infrastructure
+Everything *not* on that list — model updates, dependency upgrades, schema changes, infrastructure
 changes — is OCF's job during the NIA project, handled on a scheduled maintenance cadence. After the
 NIA project, the [written support agreement](#7-organisational-prerequisites) sets who does that
 work. Model re-training sits in this category too: the re-training pipeline is automated end-to-end,
@@ -103,11 +103,13 @@ handover they need an editing pass with the NGED operator as the audience, plus 
 missed-check-in alarm.** A hung daemon, a full disk, an expired credential, or a schedule that
 simply stopped firing raises no per-task alert. A missed-check-in alarm (Sentry's cron-monitoring
 terminology) fires when *no successful forecast has landed in N hours* (e.g. 8 hours, i.e. one
-missed 6-hourly slot plus margin), regardless of why. That alarm is built and running on **Sentry
-cron monitoring**: each successful `live_forecasts` run checks in with Sentry, and Sentry alerts on
-a missed check-in — Sentry sits outside the service being watched (a dead daemon simply stops
-checking in), and check-in pings are plain portable code. The as-built mechanism is [Send telemetry
-to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
+missed 6-hourly slot plus margin), regardless of why. The mechanism for that alarm is **Sentry
+cron monitoring**: a live forecast asset checks in with Sentry after each successful run, and Sentry
+alerts on a missed check-in. Sentry sits outside the service being watched (a dead daemon simply
+stops checking in), and check-in pings are plain portable code. The Sentry design is in [Send
+telemetry to
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry). No
+live forecast asset checks in with Sentry today, so the alarm has nothing to watch until one does.
 What handover still has to settle: the Sentry account is OCF's today, so the alert routing (and
 possibly the account itself) moves to NGED.
 

@@ -188,7 +188,7 @@ alarms.
   1, below). **`conf/model/climatology.yaml`**, **`manual_heuristic.yaml`**: their header comments
   stop citing `xgboost.yaml`.
 - **Root `pyproject.toml`**: the `xgboost_forecaster` dependency and its workspace source.
-  **`uv.lock`**: the `xgboost_forecaster` and `xgboost` packages. **`mkdocs.yml`**: the two nav
+  **`uv.lock`**: the `xgboost_forecaster` and `xgboost` packages. **`mkdocs.yml`**: the three nav
   entries. **`docs/api/ml_core/index.md`**: the `::: ml_core.production_helpers` line, which otherwise
   breaks `mkdocs build --strict`.
 - **`Dockerfile`**: the `production_model` build context, the `MODEL_RUN_ID` argument and label,

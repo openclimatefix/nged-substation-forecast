@@ -61,33 +61,25 @@ def register_experiment() -> Callable[..., None]:
     it the same way — pytest injection — with no ``from conftest import ...`` (see the module
     docstring for why that import is ambiguous).
 
-    The callable registers ``conf/model/xgboost.yaml`` with ``selected_features`` of
-    ``["temperature_2m"]`` and ``n_estimators`` of 5 unless told otherwise. ``selected_features``
-    edits only the ``selected_features`` entry of those default overrides. ``base_model_config``
-    names another model YAML. ``config_overrides`` replaces the whole default overrides dict,
-    ``selected_features`` included, so a caller passing ``{}`` sends no overrides at all.
+    The callable registers ``conf/model/climatology.yaml`` with no overrides unless told
+    otherwise. ``base_model_config`` names another model YAML, and ``config_overrides`` is passed
+    to the registration as given.
     """
 
     def _register(
         instance: DagsterInstance,
         experiment_name: str,
-        selected_features: list[str] | None = None,
         *,
-        base_model_config: str = "conf/model/xgboost.yaml",
+        base_model_config: str = "conf/model/climatology.yaml",
         config_overrides: dict[str, Any] | None = None,
     ) -> None:
-        overrides = (
-            {"selected_features": selected_features or ["temperature_2m"], "n_estimators": 5}
-            if config_overrides is None
-            else config_overrides
-        )
         result = register_experiment_job.execute_in_process(
             run_config=RunConfig(
                 ops={
                     "register_experiment": RegisterExperimentConfig(
                         experiment_name=experiment_name,
                         base_model_config=base_model_config,
-                        config_overrides=overrides,
+                        config_overrides=config_overrides or {},
                         run_mode="full_cv",
                     )
                 }

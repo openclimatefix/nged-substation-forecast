@@ -263,12 +263,12 @@ def test_entries_changed_since_ignores_a_directory_timestamp(tmp_path: Path) -> 
 
 
 def test_collect_sources_drops_nested_and_duplicate_roots(tmp_path: Path) -> None:
-    (tmp_path / "data" / "production_model").mkdir(parents=True)
+    (tmp_path / "data" / "studies").mkdir(parents=True)
     (tmp_path / "link").symlink_to(tmp_path / "data")
 
     sources = backup_workstation.collect_sources(
         [
-            BackupSource(name="production_model", path=tmp_path / "data" / "production_model"),
+            BackupSource(name="studies", path=tmp_path / "data" / "studies"),
             BackupSource(name="data", path=tmp_path / "data"),
             BackupSource(name="link", path=tmp_path / "link"),
         ]

@@ -5,7 +5,6 @@ from dagster import (
     RunRequest,
     ScheduleDefinition,
     ScheduleEvaluationContext,
-    build_schedule_from_partitioned_job,
     define_asset_job,
     schedule,
 )
@@ -21,9 +20,7 @@ power_time_series_and_metadata_job = define_asset_job(
     description=(
         "Pull the latest NGED telemetry from S3 into the power_time_series Delta table, upsert"
         " the substation metadata parquet, then rebuild the cleaned_power_time_series Delta table"
-        " if new telemetry arrived. Runs hourly at :55, 5 minutes before live_forecasts_schedule"
-        " ticks; see power_time_series_and_metadata_schedule for why a missed pull still lets"
-        " live_forecasts run on time."
+        " if new telemetry arrived. Runs hourly at :55."
     ),
 )
 
@@ -32,28 +29,19 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
     job=power_time_series_and_metadata_job,
     cron_schedule="55 * * * *",
     description=(
-        "Fires at :55 past every hour, 5 minutes before live_forecasts_schedule ticks at"
-        " 00/06/12/18 UTC, so this hour's telemetry has landed and been cleaned first. A missed"
-        " or late pull does not hold live_forecasts back: the two schedules couple through data"
-        " at rest, never through run status, so the forecast runs on time against whatever"
-        " cleaned telemetry is already on disk."
+        "Fires at :55 past every hour. Nothing downstream waits on this job's run status: an"
+        " asset that reads the cleaned telemetry runs on its own schedule against whatever"
+        " cleaned telemetry is already on disk, so a missed or late pull never holds it back."
     ),
 )
-"""Fires at :55 past every hour — 5 minutes *before* the top of the hour — so this hour's pull
-has landed, and been cleaned by ``clean_nged_power_data``, by the time
-``live_forecasts_schedule`` ticks at 00/06/12/18 UTC.
+"""Fires at :55 past every hour, so this hour's pull has landed, and been cleaned by
+``clean_nged_power_data``, a few minutes before the top of the hour.
 
-``live_forecasts`` declares ``clean_nged_power_data`` as a dep, but the two run as
-separate jobs on separate schedules and nothing enforces the ordering at runtime. That is
-deliberate, not a gap: the offset is an optimisation for freshness, and if it is missed —
-because this pull failed, or ran long — ``live_forecasts`` still runs on time against whatever
-telemetry is already on disk. Making the ordering a precondition would convert one failed
-ingest into a missing forecast, which is the failure mode the whole design exists to avoid.
-
-(The NWP run used is stamped on every forecast row as ``nwp_init_time``, and
-``live_forecasts_are_healthy`` reports how many daily NWP runs were missing at forecast time;
-telemetry staleness is not yet recorded on the forecast row itself.) Rule: "never make one
-production job's run status a precondition for another's" —
+No downstream job waits on this job's run status. An asset that reads the cleaned telemetry runs
+as a separate job on its own schedule, and if this pull fails or runs long, that asset runs on
+time against whatever telemetry is already on disk. Making the ordering a precondition would
+convert one failed ingest into a missing output, which is the failure mode the whole design exists
+to avoid. Rule: "never make one production job's run status a precondition for another's" —
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 The principle in full, with the trade it makes:
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status>."""
@@ -75,57 +63,22 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     """Materialise today's ``ecmwf_ens`` partition daily at 10:30 UTC.
 
     10:30 UTC is a safety margin past the 00Z run's usual arrival on ECMWF's bucket and
-    Dynamical.org's publication (08:05 to 08:20 UTC on a normal day), and 90 minutes before the
-    12:00 UTC ``live_forecasts`` slot. ``ecmwf_ens_partitions``' ``end_offset=1`` means today's
-    partition key already exists by this point. A run isn't usable yet when it is absent from the
-    catalog, when whole (member, lead time) slices of an instantaneous variable are still empty, or
-    when a de-accumulated variable is still wholly empty. The same retry covers a failed fetch of
-    the catalog itself. ``ecmwf_ens`` then retries every 30
-    minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` /
-    ``NwpCatalogUnreachable`` →
-    ``RetryRequested`` in ``defs/assets.py``), rather than failing outright. Any other error still
+    Dynamical.org's publication (08:05 to 08:20 UTC on a normal day). ``ecmwf_ens_partitions``'
+    ``end_offset=1`` means today's partition key already exists by this point. A run isn't usable
+    yet when it is absent from the catalog, when whole (member, lead time) slices of an
+    instantaneous variable are still empty, or when a de-accumulated variable is still wholly
+    empty. The same retry covers a failed fetch of the catalog itself. ``ecmwf_ens`` then retries
+    every 30 minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` /
+    ``NwpCatalogUnreachable`` → ``RetryRequested`` in ``defs/assets.py``), rather than failing
+    outright. Any other error still
     fails immediately, and so do the four retried failures for a run initialised more than 36 hours
     ago, which a backfill, or a catch-up tick more than about 25 hours late, can request. Retrying
     is right because Dynamical.org publishes each run as roughly 40 separate commits over about 15
     minutes, so a run can be readable while a variable whose commit has not landed yet still reads
-    as empty — that is a run mid-publication, not a broken one. Live inference
-    (``live_forecasts``) always uses the freshest run genuinely present regardless of this
-    schedule's exact timing.
+    as empty — that is a run mid-publication, not a broken one.
 
     Further reading:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#an-empty-slice-or-a-wholly-missing-variable-is-retried-not-failed-outright>
     — why an unfinished run is retried rather than failed.
     """
     return RunRequest(partition_key=context.scheduled_execution_time.strftime("%Y-%m-%d"))
-
-
-live_forecasts_job = define_asset_job(
-    "live_forecasts_job",
-    selection=AssetSelection.assets("live_forecasts"),
-    hooks={sentry_capture_failure},
-    description=(
-        "Production inference: forecast from the latest NWP for one 6-hourly slot and write it"
-        " to the power_forecasts Delta table. Runs at 00/06/12/18 UTC with"
-        " availability_mode='live'; see the live_forecasts asset docstring for partition"
-        " semantics and what a degraded run looks like."
-    ),
-)
-
-# `name` is explicit because `build_schedule_from_partitioned_job` otherwise derives the
-# registered name from the job's — `live_forecasts_job_schedule` — which is not the name this
-# variable, the runbook, and the operator's Dagster UI all use.
-live_forecasts_schedule = build_schedule_from_partitioned_job(
-    live_forecasts_job,
-    name="live_forecasts_schedule",
-    description=(
-        "Ticks at 00/06/12/18 UTC and materialises the just-completed window with"
-        " availability_mode='live'. The schedule is always live; replays are manual, launched"
-        " from the UI with availability_mode='replay'. The slot fires on the clock whether or"
-        " not the ingest and cleaning steps succeeded."
-    ),
-)
-"""Ticks at 00/06/12/18 UTC, materialising the just-completed window with default run config
-(``availability_mode="live"``) — the schedule is always live; replays are manual, launched from
-the UI with ``availability_mode="replay"``. This slot fires on the clock regardless of whether
-the ingest and cleaning steps succeeded; see ``power_time_series_and_metadata_schedule``'s
-docstring above for why the two schedules are deliberately not ordered against each other."""

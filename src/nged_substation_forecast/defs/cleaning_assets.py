@@ -110,9 +110,9 @@ def clean_nged_power_data(context: AssetExecutionContext, config: CleanNgedPower
     passes both to ``nged_data.cleaning.flag_nged_power``, and overwrites the
     ``cleaned_power_time_series`` Delta table with the result: every raw row, plus a nullable
     ``drop_reason`` column that is null for a row that passed and otherwise names the rule that
-    flagged it. The raw table is never modified. Training, CV prediction, ``live_forecasts``,
-    eligibility, effective capacity, ``metrics``, and the dashboards read only the unflagged rows
-    of the cleaned table. Only the ingest and its ``power_data_is_fresh`` check read the raw table.
+    flagged it. The raw table is never modified. Training, CV prediction, eligibility, effective
+    capacity, ``metrics``, and the dashboards read only the unflagged rows of the cleaned table.
+    Only the ingest and its ``power_data_is_fresh`` check read the raw table.
 
     Runs hourly in ``power_time_series_and_metadata_job``, straight after the ingest. NGED
     delivers about every 6 hours, so most runs skip. The asset compares four values with what the

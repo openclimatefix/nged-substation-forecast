@@ -19,7 +19,7 @@ def _full_key_rows(
         Metrics.DataFrame(
             {
                 "time_series_id": [123] * n,
-                "power_fcst_model_name": ["xgboost"] * n,
+                "power_fcst_model_name": ["climatology"] * n,
                 "experiment_name": ["baseline"] * n,
                 "fold_id": ["live"] * n,
                 "evaluation_scope": ["production_monitoring"] * n,
@@ -71,7 +71,7 @@ def test_metrics_validate_skips_uniqueness_check_when_key_columns_missing():
     rows = Metrics.DataFrame(
         {
             "time_series_id": [123, 123],
-            "power_fcst_model_name": ["xgboost", "xgboost"],
+            "power_fcst_model_name": ["climatology", "climatology"],
             "fold_id": ["live", "live"],
             "horizon_slice": ["all", "all"],
             "metric_name": ["mae", "mae"],

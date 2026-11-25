@@ -31,11 +31,11 @@ class RegisterExperimentConfig(Config):
     experiment_name: str = Field(
         description=(
             "Human-readable, unique name; becomes the MLflow experiment name and the partition"
-            " key prefix. For sweeps, generate programmatically, e.g. 'xgboost_lr0p01_depth3'."
+            " key prefix. For sweeps, generate programmatically, e.g. 'heuristic_seed1'."
         ),
     )
     base_model_config: str = Field(
-        description="Path relative to PROJECT_ROOT, e.g. 'conf/model/xgboost.yaml'.",
+        description="Path relative to PROJECT_ROOT, e.g. 'conf/model/manual_heuristic.yaml'.",
     )
     config_overrides: dict[str, Any] = Field(
         default_factory=dict,

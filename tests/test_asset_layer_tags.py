@@ -20,11 +20,8 @@ def test_every_asset_carries_exactly_one_layer() -> None:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/> gives the
     reader, so adding a production asset should mean editing both.
 
-    The two judgement calls: ``h3_grid_weights`` is production despite having no schedule,
+    The one judgement call: ``h3_grid_weights`` is production despite having no schedule,
     because the deployment materialises it by hand once and ``ecmwf_ens`` cannot run without it.
-    ``promoted_model`` and ``promotable_model_runs`` are research despite changing what the
-    service serves, because both need MLflow: the champion reaches production baked into the
-    Docker image.
     """
     from nged_substation_forecast.definitions import defs
 
@@ -37,7 +34,6 @@ def test_every_asset_carries_exactly_one_layer() -> None:
         AssetKey("clean_nged_power_data"),
         AssetKey("h3_grid_weights"),
         AssetKey("ecmwf_ens"),
-        AssetKey("live_forecasts"),
     }
     assert research == asset_graph.executable_asset_keys - production
     assert not production & research

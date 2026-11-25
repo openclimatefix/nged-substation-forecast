@@ -130,10 +130,9 @@ def write_power_forecasts(
             still clears the partition.
         replace_predicate_extra: An additional ``AND``-ed SQL predicate clause narrowing the
             overwrite below the ``(experiment_name, fold_id)`` partition. For example,
-            ``"power_fcst_init_time = '2026-07-04T06:00:00+00:00'"`` lets ``live_forecasts`` replace
-            one 6-hourly slot's rows without wiping the rest of the ``"live"`` fold's
-            partition. The production service forecasts every 6 hours, and stores every one of
-            those runs under the reserved ``fold_id`` of ``"live"`` rather than under a
+            ``"power_fcst_init_time = '2026-07-04T06:00:00+00:00'"`` lets a live asset replace one
+            forecast slot's rows without wiping the rest of the ``"live"`` fold's partition. A live
+            asset stores every slot under the reserved ``fold_id`` of ``"live"`` rather than under a
             cross-validation fold. delta-rs' ``replaceWhere`` supports predicates on non-partition
             columns (confirmed empirically: a `datetime.isoformat()` literal round-trips correctly
             against a ``Timestamp`` column). Only meaningful alongside ``replace_partition``.

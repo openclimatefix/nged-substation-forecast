@@ -41,6 +41,7 @@ from dagster import (
 )
 from delta_store.nwp import write_nwp
 from delta_store.power_time_series import write_power_time_series
+from deltalake import DeltaTable
 from dynamical_data.ecmwf_ens.convert_to_polars import (
     convert_nwp_xarray_dataset_to_polars_dataframe,
 )
@@ -147,8 +148,8 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     newest file, including a series that has stopped reporting, so the metadata parquet holds
     NGED's current ``Information`` note for it. Nothing cleans this data further:
     ``eligible_time_series``, ``effective_capacity``, ``trained_cv_model``, and
-    ``cv_power_forecasts`` in ``defs/cv_assets.py``, and ``live_forecasts`` in
-    ``defs/live_forecast_assets.py``, all read the Delta table this asset writes directly.
+    ``cv_power_forecasts`` in ``defs/cv_assets.py`` all read the Delta table this asset writes
+    directly.
 
     The stored timestamps are not always NGED's own, and an operator rebuilding this table has to
     know that. NGED's feed stamped every reading half an hour late until
@@ -172,10 +173,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     page](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/)
     covers the first run, rebuilds, and these errors.
 
-    Runs hourly on ``power_time_series_and_metadata_schedule``, 5 minutes before
-    ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair: the
-    next hourly run downloads whatever this one missed. The ``NGED_INGEST`` pool limits the asset
-    to one run at a time.
+    Runs hourly on ``power_time_series_and_metadata_schedule``, at :55. A failed or skipped run
+    leaves nothing behind to repair: the next hourly run downloads whatever this one missed. The
+    ``NGED_INGEST`` pool limits the asset to one run at a time.
 
     WHY UNPARTITIONED? Because NGED's JSON files land at irregular, several-hours-apart intervals
     with no fixed schedule, so the start time changes every day. And because we don't want people
@@ -280,10 +280,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     # Save TimeSeriesMetadata. A metadata table failure must not stop the power write below: the
     # metadata table is derived data, and the power series is not, so a metadata table fault must
     # never stall the hourly ingest. The only loss is this run's metadata change, lost until the
-    # series' next file arrives, about 6 hours later — and `live_forecasts` reads the promoted
-    # model's own frozen copy of the metadata table, not this one, so inference is unaffected. The
-    # downloaded-files list is still written below, because holding it back would make every later
-    # hour download a growing backlog. The full consequences:
+    # series' next file arrives, about 6 hours later. The downloaded-files list is still written
+    # below, because holding it back would make every later hour download a growing backlog. The
+    # full consequences:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/
     try:
         upsert_metadata_stats = upsert_metadata(
@@ -561,9 +560,9 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     Polars DataFrame, and writes it to the Delta table through ``delta_store.nwp.write_nwp``
     (Float32, significand-rounded), which replaces that ``(nwp_model_id, init_time)`` partition.
     Runs daily on ``ecmwf_ens_schedule``, and depends on ``h3_grid_weights`` for the grid that
-    its aggregation maps onto. ``live_forecasts`` in ``defs/live_forecast_assets.py`` reads this
-    table for production inference; ``trained_cv_model`` and ``cv_power_forecasts`` in
-    ``defs/cv_assets.py`` read it for cross-validation.
+    its aggregation maps onto. ``trained_cv_model`` and ``cv_power_forecasts`` in
+    ``defs/cv_assets.py`` read this table for cross-validation, and ``_available_nwp_init_times``
+    lists the runs it holds.
 
     Its ``nwp_has_no_unexpected_nulls`` check reports null counts for both the raw NWP grid and
     the stored H3 cells; that check's own description says which keys are which and why they
@@ -692,6 +691,40 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         },
         check_results=check_results,
     )
+
+
+def _parse_utc_init_time(value: str) -> datetime:
+    """Parse one partition-value ``init_time`` string into a tz-aware UTC datetime.
+
+    delta-rs renders our own writes as naive ``"YYYY-MM-DD HH:MM:SS[.ffffff]"`` strings, so the
+    common case just attaches UTC. An offset-carrying string is handled separately —
+    ``.replace(tzinfo=UTC)`` would silently *relabel* it to the wrong instant rather than convert
+    it, and nothing upstream guarantees delta-rs never renders one.
+    """
+    parsed = datetime.fromisoformat(value)
+    return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def _available_nwp_init_times(settings: Settings) -> list[datetime]:
+    """Return the distinct ``init_time``s in the ``nwp`` Delta table that ``ecmwf_ens`` writes.
+
+    Reads only Delta partition metadata (``DeltaTable.partitions()``, no data scan) and parses
+    the ``init_time`` partition values into tz-aware UTC datetimes via ``_parse_utc_init_time``.
+    Uses ``datetime.fromisoformat`` rather than a fixed ``strptime`` pattern so a delta-rs
+    rendering that drops the fractional seconds (whole-second ``init_time``s have no fractional
+    part to keep) parses the same as one that keeps them — ``strptime``'s ``%f`` requires at
+    least one fractional digit and would raise on that rendering.
+
+    Deliberately uncaught: a partition value that ``_parse_utc_init_time`` cannot parse means our
+    own write path (``delta_store.nwp.write_nwp``) corrupted its own metadata, not that some
+    outside system misbehaved, and the inherent-stability rule reserves raising for exactly that
+    case. A caller that must stay fail-open, such as an asset check, wraps the call itself.
+    """
+    delta_table = DeltaTable(
+        settings.nwp_data_path, storage_options=typeddict_to_dict(settings.storage_options)
+    )
+    raw_values = {partition["init_time"] for partition in delta_table.partitions()}
+    return [_parse_utc_init_time(value) for value in raw_values]
 
 
 def _degraded_nwp_check_result(check_name: str, exc: BaseException) -> AssetCheckResult:

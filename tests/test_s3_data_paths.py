@@ -138,7 +138,7 @@ def _make_forecasts(experiment_name: str, power_fcst: list[float]) -> pt.DataFra
                 "time_series_id": list(range(1, n + 1)),
                 "ml_flow_experiment_id": [None] * n,
                 "nwp_init_time": [_T0] * n,
-                "power_fcst_model_name": ["xgboost"] * n,
+                "power_fcst_model_name": ["climatology"] * n,
                 "experiment_name": [experiment_name] * n,
                 "power_fcst_model_version": [1] * n,
                 # 30 min before the earliest valid_time (_T0): the PowerForecast contract

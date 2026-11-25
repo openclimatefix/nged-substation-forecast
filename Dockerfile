@@ -1,24 +1,15 @@
 # syntax=docker/dockerfile:1
 
-# Production image for the live-forecast service. Bakes the champion model into the image at
-# build time and loads it via a plain save/load — no MLflow, run ID, or cache lookup at
-# runtime. See docs/live_service/aws.md for the promotion/deployment runbook and
+# Production image: the Dagster code-location server and the image every Dagster run executes in.
+# No MLflow at runtime. See docs/live_service/aws.md for the deployment runbook and
 # docs/architecture/production-deployment.md for why this design was chosen.
 #
 # Build (always linux/arm64 — ARM Fargate is ~20% cheaper and the control-plane box is
 # Graviton, so an amd64 image cannot run anywhere in the deployment; on an x86 host this
 # needs QEMU registered, which scripts/deploy/build_and_verify_image.sh checks for):
 #   docker build --platform linux/arm64 \
-#     --build-context production_model="$(realpath data/production_model)" \
-#     --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD) \
-#     -t nged-forecast:<id-short>-<commit-short> .
-#
-# The champion model must already be promoted to data/production_model/ (via the
-# `promoted_model` Dagster asset) before running this build — the build itself never talks to
-# MLflow, so it copies that directory hermetically. The model arrives as the named build context
-# `production_model` rather than through the main context, because the main context sends a
-# symlinked data/ as the link itself and the COPY then finds nothing; `realpath` resolves the
-# link before Docker sees the path.
+#     --build-arg GIT_SHA=$(git rev-parse HEAD) \
+#     -t nged-forecast:<commit-short> .
 
 FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS builder
 
@@ -43,16 +34,13 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS runtime
 
-ARG MODEL_RUN_ID
 ARG GIT_SHA
 
 LABEL org.opencontainers.image.source="https://github.com/openclimatefix/nged-substation-forecast" \
-      org.opencontainers.image.revision="${GIT_SHA}" \
-      org.openclimatefix.model-run-id="${MODEL_RUN_ID}"
+      org.opencontainers.image.revision="${GIT_SHA}"
 
 ENV GIT_SHA="${GIT_SHA}" \
-    PATH="/app/.venv/bin:${PATH}" \
-    PRODUCTION_MODEL_PATH="/app/data/production_model"
+    PATH="/app/.venv/bin:${PATH}"
 
 WORKDIR /app
 
@@ -62,7 +50,6 @@ WORKDIR /app
 # can run in-container.
 COPY --from=builder /app/.venv /app/.venv
 COPY uv.lock ./
-COPY --from=production_model . data/production_model/
 COPY conf/ conf/
 
 ENTRYPOINT ["dagster"]
@@ -71,13 +58,5 @@ ENTRYPOINT ["dagster"]
 # with "dagster", so the ECS task definition neutralises this ENTRYPOINT with /usr/bin/env
 # (docs/live_service/aws.md, Step 9), and the control-plane services override it outright.
 #
-# The default target: live_forecasts_job is the real, already-existing partitioned job
-# (defs/schedules.py). EcsRunLauncher overrides this command per run, and the
-# same image separately serves as the code-location server — this default only matters for
-# `docker run` smoke tests. Partition selection is via --tags, not --partition: `dagster job
-# execute` has no --partition flag at all, and selecting the job by name keeps the smoke test
-# exercising exactly the entry point the EcsRunLauncher uses. Inference needs no credentials of
-# any kind, so this is the reliable invocation:
-#   docker run --network=none \
-#     <image> job execute -j live_forecasts_job --tags '{"dagster/partition": "<key>"}'
-CMD ["job", "execute", "-m", "nged_substation_forecast.definitions", "-j", "live_forecasts_job"]
+# The image has no default command: every caller names the command it runs. The smoke test in
+# scripts/deploy/build_and_verify_image.sh runs `definitions validate`.

@@ -1,6 +1,7 @@
 # Extending the training history
 
-> **Status: ⏹ Not planned for XGBoost (v0.5), kept as a record.** Epic:
+> **Status: ⏹ Not planned (v0.5), kept as a record of designs written around an XGBoost
+> forecaster.** Epic:
 > [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145). Ingest:
 > [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143); pre-training
 > experiments: [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167)
@@ -92,9 +93,7 @@ separately from weather age.
 
 - **Single pool, with per-era sample weights.** All rows in one training set, and the weight on
   pre-2024 rows becomes a tunable hyperparameter rather than a yes/no decision. Run this first: it
-  is the cheap form of the mixed warm start below, and recency sample weights are already a Tier-1
-  item on the [XGBoost
-  improvements](xgboost-improvements.md#early-stopping-instead-of-fixed-n_estimators500) page.
+  is the cheap form of the mixed warm start below.
 
 - **Two-phase warm start.** Train on the pre-2024 history of estimates of past weather, then
   continue boosting on 2024+ ENS data. Warm start only *adds* trees, so the correcting trees see
@@ -388,8 +387,8 @@ comes from a different weather-model family from UKV's and ERA5's, so the curve 
 start months in every season. ECMWF ENS, from 2024-04-01 in our stored table, is the secondary and
 optimistic stand-in. AIFS-ENS, from 2025-07-02, is the real short-history case, entering as a blend
 with ECMWF ENS. The controls are the weather-response model fed raw forecast members with no product
-calibrator, an XGBoost model trained natively on the same N months, and the ENS champion trained on
-its full fold, which is a [confounded
+calibrator, an XGBoost model trained natively on the same N months, and an ENS-trained model trained
+on its full fold, which is a [confounded
 comparison](../cross-validation/cross-validation-folds.md#the-confounded-comparison-which-must-not-be-read-as-the-ablation)
 read only as the deployment reference.
 
@@ -428,7 +427,7 @@ a product calibrator small enough to fit on a few months. The
 degraded-past-weather](#reconciling-estimates-of-past-weather-with-ens) arms are the fairer
 comparisons, because each trains one XGBoost model on every row. For demand substations the design
 does not apply, because their forecasts lean on power lags, which the lag-free weather-response
-model does not use. The longer training history for the champion model at demand substations has no
+model does not use. The longer training history for a demand-substation forecaster has no
 owner now that [#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167) is
 closed.
 
@@ -450,8 +449,8 @@ the step is safe to ship.
   ICON-EU carries wind at 10 m only, so a common set would leave a richer product's extra variables
   unused.
 - **The whole forecast, or a feature.** Is the calibrated forecast the whole forecast for wind and
-  solar, beyond day 1 for example, or an input feature to the champion XGBoost model? A feature
-  would need the champion retrained each time a product is added, which loses the "no retrain"
+  solar, beyond day 1 for example, or an input feature to the main forecaster? A feature would
+  need the main forecaster retrained each time a product is added, which loses the "no retrain"
   benefit.
 - **The serving path.** Is a calibration and blend step in the serving path acceptable against
   principle 2, complexity offline?
@@ -473,10 +472,9 @@ The 2020–2026 span contains regime changes the weather cannot explain, in two 
 
 **Smooth trends** — EV and heat-pump uptake, embedded PV build-out, the 2022 price shock and the
 Demand Flexibility Service. Handle these with recency sample weights, not a date ordinal: trees
-extrapolate flat, so a date feature always sits beyond its training range at inference. The
-[init-time-anchored
-features](xgboost-improvements.md#init-time-anchored-features-current-level-anchor-prerequisite-for-the-global-model)
-absorb level drift for the same reason.
+extrapolate flat, so a date feature always sits beyond its training range at inference.
+Init-time-anchored features, which give the model the series' current level at the forecast's init
+time, absorb level drift for the same reason.
 
 **COVID lockdowns** are a pulse, and the case for a dedicated feature:
 
@@ -539,9 +537,8 @@ absorb level drift for the same reason.
 
 - **It breaks under the global model.** A per-series booster learns its own sign and magnitude for a
   national scalar, which handles customer mix for free: an industrial-estate primary and a
-  residential one moved in opposite directions. A single [global booster per
-  `time_series_type`](xgboost-improvements.md#global-model-per-time_series_type) cannot, without a
-  customer-mix covariate we do not have.
+  residential one moved in opposite directions. A single global booster per `time_series_type`
+  cannot, without a customer-mix covariate we do not have.
 
 - **It is a v0.6 requirement, and a v0.6 test case.** An unmodelled 16-month regime is the largest
   phantom event the [stage-1 switching baseline](switching-events.md#the-baseline-shared-foundation)
@@ -633,8 +630,8 @@ Two details still worth tracking regardless of which route lands:
   an era boundary under the `study` skill of the `nged-ml-research` repository.
 
 **The ERA5 ingest is needed whichever ENS backfill route lands.** ERA5 is the version-1 estimate of
-past weather for every variable except irradiance, and the [weather-abnormality
-climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) uses ERA5.
+past weather for every variable except irradiance, and weather-abnormality features, which score
+each weather variable as a z-score against its climatology, would take that climatology from ERA5.
 
 ## Implementation details (deleted when this ships)
 
@@ -674,9 +671,7 @@ in the `nged-ml-research` repository:
 5. Decide: promote the section to 🚧 with a milestone, or move the result to the study page and
    delete the section.
 
-**Ordering against the rest of v0.5.** The Tier-1 and Tier-2 config wins on [XGBoost
-improvements](xgboost-improvements.md) do not wait for any of this, and one of them, [the lead-time
-feature](xgboost-improvements.md#feed-the-model-the-forecast-lead-time-review-discovery-one-line),
-is a prerequisite for the lead-time-zero framing. The data-hungry structural items (batched
-training, ensemble-member training, the global model) are worth running *after* the history lands,
-since that is where four extra years change the answer most.
+**Ordering against the rest of v0.5.** A lead-time feature, which gives the model the forecast's
+lead time as an input, is a prerequisite for the lead-time-zero framing. Data-hungry structural
+changes (batched training, ensemble-member training, a global model) are worth running *after* the
+history lands, since that is where four extra years change the answer most.

@@ -930,8 +930,8 @@ def test_engineer_features_single_run_freshest_run_excludes_later_nwp_run():
 def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_delay():
     """The single-run analysis proxy cuts at nwp_init_time, whatever the publication delay says.
 
-    ``live_forecasts`` selects its NWP run in ``"live"`` availability mode, which accepts any run
-    genuinely present in the Delta table however fresh. The freshest-run join must accept that
+    A live caller selects the newest NWP run genuinely present in the Delta table, however
+    fresh. The freshest-run join must accept that
     same run. The ceiling is therefore the selected run rather than a modelled publication delay.
     Here power_fcst_init_time is only 1 hour after the selected run while
     nwp_publication_delay_hours is 9, so a delay-based cut would exclude the selected run and
@@ -1332,10 +1332,10 @@ def test_engineer_features_omits_unrequested_time_series_type():
 def test_engineer_features_rolling_mean_collects_under_streaming_engine():
     """A rolling-mean feature must survive `collect(engine="streaming")`.
 
-    That is the engine `XGBoostForecaster.train` and `.predict` use, and a `LazyFrame.rolling`
-    implementation raises `ComputeError: input data is not sorted` there — the streaming engine
-    does not carry the sortedness flag an upstream `.sort()` sets. Sorting within the window
-    instead makes the precondition local, so both engines agree.
+    A forecaster may collect its features with that engine, and a `LazyFrame.rolling` implementation
+    raises `ComputeError: input data is not sorted` there — the streaming engine does not carry the
+    sortedness flag an upstream `.sort()` sets. Sorting within the window instead makes the
+    precondition local, so both engines agree.
     """
     nwp_init_time = datetime(2025, 1, 1, 0, 0)
     steps = [nwp_init_time + timedelta(hours=3 * i) for i in range(9)]
@@ -1408,8 +1408,8 @@ def test_upsample_nwp_fills_agree_across_engines():
     """`order_by="valid_time"` is the only thing ordering the fills, so pin it on both engines.
 
     The upsample does not sort, so `interpolate()` and `forward_fill()` each carry their own
-    `order_by`. The streaming engine — the one `XGBoostForecaster` uses — reorders morsels, so
-    dropping either `order_by` leaves nulls unfilled and the two engines disagreeing.
+    `order_by`. The streaming engine, which a forecaster may collect its features with, reorders
+    morsels, so dropping either `order_by` leaves nulls unfilled and the two engines disagreeing.
     """
     t0 = datetime(2020, 1, 1)
     steps = [t0 + timedelta(hours=3 * i) for i in range(9)]

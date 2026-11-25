@@ -1,8 +1,8 @@
 # Baseline forecasters
 
 This package holds the naive baselines that a trained forecasting model has to beat. A baseline
-subclasses `BaseForecaster` and rides the same cross-validation chain as `XGBoostForecaster`, so the
-leaderboard scores it the same way.
+subclasses `BaseForecaster` and rides the same cross-validation chain as any other forecaster, so
+the leaderboard scores it the same way.
 
 ## What each baseline emits
 

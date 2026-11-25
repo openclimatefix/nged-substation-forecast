@@ -69,10 +69,6 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
     update either this set or Settings._derive_unset_paths accordingly.
     """
     known_delivery_fields = {"power_forecasts_data_path", "effective_capacity_data_path"}
-    # Always-local artifacts derive from local_artifacts_path, not either data-table root, so
-    # they're excluded from this internal-vs-delivery check even though their names also end in
-    # "_data_path".
-    local_artifact_fields = {"production_model_path"}
     settings = Settings(
         data_path_internal="/internal",
         data_path_delivery="/delivery",
@@ -80,11 +76,8 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
     managed_data_table_fields = {
         name
         for name in Settings.model_fields
-        if (
-            name.endswith("_data_path")
-            or name in {"metadata_path", "list_of_downloaded_files_path", "h3_grid_weights_path"}
-        )
-        and name not in local_artifact_fields
+        if name.endswith("_data_path")
+        or name in {"metadata_path", "list_of_downloaded_files_path", "h3_grid_weights_path"}
     }
     for field_name in managed_data_table_fields:
         value = getattr(settings, field_name)
@@ -105,7 +98,7 @@ def test_remote_data_path_keeps_artifacts_local():
     )
     assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"
     assert settings.power_time_series_data_path == "s3://bucket/data/NGED/power_time_series.delta"
-    assert settings.production_model_path == "/local/artifacts/production_model"
+    assert settings.local_artifacts_path == "/local/artifacts"
 
 
 def test_explicit_path_overrides_derivation():
@@ -113,10 +106,8 @@ def test_explicit_path_overrides_derivation():
     settings = Settings(
         data_path_internal="s3://bucket/data",
         data_path_delivery="s3://bucket/data",
-        production_model_path="/mnt/models/prod",
         nwp_data_path="/mnt/fast/NWP",
     )
-    assert settings.production_model_path == "/mnt/models/prod"
     assert settings.nwp_data_path == "/mnt/fast/NWP"
     # Siblings still derive normally.
     assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"

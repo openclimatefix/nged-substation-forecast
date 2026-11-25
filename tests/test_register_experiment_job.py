@@ -41,7 +41,7 @@ def _execute(
             ops={
                 "register_experiment": RegisterExperimentConfig(
                     experiment_name=experiment_name,
-                    base_model_config="conf/model/xgboost.yaml",
+                    base_model_config="conf/model/manual_heuristic.yaml",
                     config_overrides=config_overrides or {},
                     run_mode=run_mode,
                     description=description,
@@ -87,17 +87,17 @@ def test_smoke_test_registers_experiment_and_dev_fold(
     assert "config" in experiment.tags
     # The forecaster class is stamped so assets can reconstruct it — and, through its
     # CONFIG_CLASS, its config subclass — from MLflow alone.
-    assert experiment.tags["forecaster_target"].endswith("XGBoostForecaster")
+    assert experiment.tags["forecaster_target"].endswith("ManualHeuristicForecaster")
 
     parent = _parent_run(experiment.experiment_id)
-    assert parent.data.tags["model_family"] == "xgboost"
-    assert parent.data.tags["weather_source"] == "ecmwf_control"
+    assert parent.data.tags["model_family"] == "manual_heuristic"
+    assert parent.data.tags["weather_source"] == "none"
     # Provenance: registration stamps the git SHA on the parent run (the tests run inside the
     # repo, so it resolves to a real 40-char SHA, not the out-of-repo "unknown" sentinel).
     assert len(parent.data.tags["register_git_sha"]) == 40
     assert parent.data.tags["register_git_dirty"] in ("true", "false")
-    # Resolved config is logged as flattened params (e.g. an XGBoost hyperparameter).
-    assert "n_estimators" in parent.data.params
+    # Resolved config is logged as flattened params (e.g. the random seed).
+    assert "random_seed" in parent.data.params
 
     # smoke_test selects the non-leaderboard dev folds; conf/cv/default.yaml holds one (smoke_test).
     assert _partition_keys(dagster_instance) == ["exp_smoke__smoke_test"]
@@ -146,19 +146,19 @@ def test_re_registration_with_a_changed_config_leaves_no_half_written_state(
     experiment describing a config its parent run's params contradict — and every later fold
     would train on the config of a registration that *failed*.
     """
-    _run(dagster_instance, "exp_changed", run_mode="full_cv", config_overrides={"n_estimators": 7})
+    _run(dagster_instance, "exp_changed", run_mode="full_cv", config_overrides={"random_seed": 7})
 
     experiment = mlflow.get_experiment_by_name("exp_changed")
     assert experiment is not None
     tags_before = dict(experiment.tags)
     params_before = dict(_parent_run(experiment.experiment_id).data.params)
-    assert params_before["n_estimators"] == "7"
+    assert params_before["random_seed"] == "7"
 
     result = _execute(
         dagster_instance,
         "exp_changed",
         run_mode="full_cv",
-        config_overrides={"n_estimators": 300},
+        config_overrides={"random_seed": 300},
         raise_on_error=False,
     )
     assert not result.success
@@ -170,7 +170,7 @@ def test_re_registration_with_a_changed_config_leaves_no_half_written_state(
     cause = failure.error.cause
     assert cause is not None
     assert cause.cls_name == "ExperimentIdentityChangedError"
-    assert "config.n_estimators: 7 -> 300" in cause.message
+    assert "config.random_seed: 7 -> 300" in cause.message
 
     experiment_after = mlflow.get_experiment_by_name("exp_changed")
     assert experiment_after is not None

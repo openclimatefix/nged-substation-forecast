@@ -212,8 +212,8 @@ photovoltaic output, which is what the study above ran on six sites.
 
 **A gradient-boosted tree settles the question for the tree path alone.** A tree fed the split as
 extra features can ignore those features, where the physics chain cannot proceed without the split.
-A null result from a tree is therefore evidence about the [tree
-path](xgboost-improvements.md#several-nwp-sources-as-features-v21), and does not justify dropping
+A null result from a tree is therefore evidence about the tree path alone, and does not justify
+dropping
 the direct beam from the physics plan. The study above used a tree as its primary instrument
 and a fitted physical model as a second one, and the two disagreed on the sign — the physical
 model divides the horizontal beam by the cosine of the solar zenith angle, which magnifies a beam
@@ -627,7 +627,7 @@ contribution.
 | **Transparent baseline** | [Convex dictionary disaggregator](#the-convex-dictionary-baseline) | The reproducible floor the engine must beat on the leaderboard |
 | **ARA handling** | Time-varying neighbourhood mixture with node-level flow balance — see [switching-events.md](switching-events.md) | Reconstructs latent demand under the normal running arrangement |
 | **Output** | Latent demand under nominal topology, per substation, per half-hour | Target variable for downstream probabilistic forecasting |
-| **Forecast layer** | XGBoost or neural sequence model on cleaned latent demand | Produces 14-day probabilistic forecasts in NGED-required format |
+| **Forecast layer** | Gradient-boosted tree or neural sequence model on cleaned latent demand | Produces 14-day probabilistic forecasts in NGED-required format |
 
 ## Correcting satellite irradiance over Great Britain
 

@@ -1,6 +1,6 @@
-"""Sentry.io telemetry: error reporting, the missed-check-in alarm, and freshness warnings.
+"""Sentry.io telemetry: error reporting and freshness warnings.
 
-Three independent mechanisms, all no-ops when Sentry is unconfigured, so laptops and CI need no
+Two independent mechanisms, all no-ops when Sentry is unconfigured, so laptops and CI need no
 Sentry configuration:
 
 - **Error telemetry** — `init_sentry` initialises the SDK once per process (a no-op unless
@@ -23,31 +23,25 @@ Sentry configuration:
   exception at *warning* level on the first failed attempt, so the operator learns of the fault
   hours before the last retry fails. It is called from inside the asset, so it also fires in a
   manual or backfill run.
-- **The missed-check-in alarm** — `send_forecast_checkin` sends a *success-only* heartbeat to a
-  Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
-  ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error
-  testing never heartbeats the production monitor. Sentry fires the alarm on the *absence* of a
-  heartbeat past the margin (a dead daemon cannot report itself); in-band run errors are handled
-  by the failure hook above, never by this heartbeat.
 - **Freshness warnings** — `report_power_freshness` forwards the ``power_data_is_fresh`` asset
   check's per-series staleness to Sentry as a *warning*-level event when any series is late.
-  Gated on the DSN like error telemetry (not the heartbeat flag), and fingerprinted per
+  Gated on the DSN like error telemetry, and fingerprinted per
   environment so each deployment gets its own ongoing issue. Because a warning event models only
   one direction of a two-way state (stale vs recovered), recovery is signalled by the events
   *stopping* and is resolved by the operator — see the design page's freshness section.
 
 The ``environment`` tag (``Settings.sentry_environment``) separates deployments: ``production``
-on the always-on box, ``<name>-laptop`` on each developer's machine. The alarm's alert rule is
-scoped to ``environment:production`` so intermittently-run laptops never page.
+on the always-on box, ``<name>-laptop`` on each developer's machine. An alert rule scoped to
+``environment:production`` therefore never pages for an intermittently-run laptop.
 
 Further reading:
 
-- [Send telemetry to Sentry, and alarm on
-  absence](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
+- [Send telemetry to
+  Sentry](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry)
   — what each mechanism carries, what it means, and the tag an alert rule routes on.
 - [Separating laptop telemetry from
   production](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production)
-  — why the environment tag and a throwaway monitor slug are both needed.
+  — why every deployment carries its own environment tag.
 """
 
 import logging
@@ -61,13 +55,9 @@ from dagster import (
     RetryRequested,
     failure_hook,
 )
-from sentry_sdk.crons import capture_checkin
-from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 if TYPE_CHECKING:
-    from sentry_sdk._types import MonitorConfig
-
     # Type-only import: importing this at runtime would be circular (defs/checks.py imports
     # report_power_freshness from this module). Annotate as a string below. Deferring the pure
     # freshness core into its own module — so this could be a real import — is left until a second
@@ -75,39 +65,6 @@ if TYPE_CHECKING:
     from nged_substation_forecast.defs.checks import PowerFreshnessResult
 
 logger = logging.getLogger(__name__)
-
-LIVE_FORECAST_MONITOR_SLUG: Final[str] = "live-forecasts"
-"""Slug of the Sentry cron monitor fed by ``live_forecasts``' success heartbeat.
-
-Laptop testing must use a *different*, throwaway slug (e.g. ``"live-forecasts-test"``) so an
-intermittently-run laptop never registers a stale environment on the production monitor. The
-``environment`` tag alone is not enough: this slug is a constant here in the source, not a setting,
-so a laptop that merely switched ``Settings.sentry_monitor_forecasts`` on would check in to the
-shared ``"live-forecasts"`` monitor and then stop, leaving it expecting a 6-hourly heartbeat the
-laptop will never send. Fuller reasoning:
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production>"""
-
-LIVE_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037
-    # DUPLICATED SCHEDULE: this crontab must match live_forecast_partitions.cron_schedule in
-    # defs/live_forecast_assets.py — it is the cadence Sentry expects a heartbeat on, so it has to
-    # track the cadence the live_forecasts asset actually runs on. The value is copied rather than
-    # imported because defs/live_forecast_assets.py imports this module for send_forecast_checkin;
-    # importing back would be a circular import. If you change the live schedule there, change it
-    # here.
-    "schedule": {"type": "crontab", "value": "0 0,6,12,18 * * *"},
-    "timezone": "UTC",
-    "checkin_margin": 120,
-}
-"""Declarative config upserted with each heartbeat: the 6-hourly live schedule plus 120 minutes of
-grace after each expected check-in before that slot counts as missed — so the alarm effectively
-fires ~8 hours after the last success (one 6-hourly slot plus the 2-hour margin). Only *success*
-check-ins are ever sent, so the alarm keys off missed check-ins alone; ``max_runtime`` is
-deliberately omitted because it needs an ``in_progress`` check-in to time against, which the
-success-only heartbeat never sends.
-
-The ``schedule`` crontab is a hand-kept copy of ``live_forecast_partitions.cron_schedule`` in
-``defs/live_forecast_assets.py`` — see the inline comment above for why it is copied, not
-imported."""
 
 
 def init_sentry(settings: Settings) -> None:
@@ -334,38 +291,6 @@ def report_check_degradation(check_name: str, exc: BaseException) -> None:
     )
 
 
-def send_forecast_checkin(
-    settings: Settings, monitor_slug: str = LIVE_FORECAST_MONITOR_SLUG
-) -> None:
-    """Send a success heartbeat to the Sentry cron monitor, or do nothing if disabled.
-
-    A no-op unless ``settings.sentry_monitor_forecasts`` is set (True only on the always-on
-    production box), so a laptop never registers a monitor environment that Sentry would then mark
-    as missed. Sends a single ``OK`` check-in — never ``in_progress`` or ``error`` — so the alarm
-    fires purely on the *absence* of a heartbeat. Never raises: this runs after ``live_forecasts``
-    has already committed its Delta write, so a raise here would leave the run reported as failed
-    while the rows it produced sit committed — the run looking like it produced nothing when it in
-    fact produced everything.
-
-    Args:
-        settings: The project settings carrying ``sentry_monitor_forecasts`` and the environment.
-        monitor_slug: The Sentry monitor to check in to. Defaults to the production
-            ``live-forecasts`` monitor; laptop tests should pass a throwaway slug.
-    """
-    if not settings.sentry_monitor_forecasts:
-        return
-    try:
-        capture_checkin(
-            monitor_slug=monitor_slug,
-            status=MonitorStatus.OK,
-            monitor_config=LIVE_FORECAST_MONITOR_CONFIG,
-        )
-    except Exception:
-        # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
-        # with the traceback rather than swallowing.
-        logger.exception("Failed to send the live-forecasts heartbeat check-in to Sentry")
-
-
 POWER_DATA_STALE_FINGERPRINT: Final[str] = "nged-power-data-stale"
 """Stable fingerprint root for the power-data staleness warning.
 
@@ -374,15 +299,6 @@ deployment gets its *own* ongoing Sentry issue — Sentry's ``environment`` is a
 grouping dimension, so without the environment in the fingerprint every deployment (production and
 each ``<name>-laptop``) would share one issue. A stable fingerprint also collapses the hourly
 re-reports of an ongoing stall into that single issue rather than a fresh issue each hour."""
-
-NWP_CONTROL_MEMBER_MISSING_FINGERPRINT: Final[str] = "nged-nwp-control-member-missing"
-"""Stable fingerprint root for the ``live_forecasts`` missing-control-member degradation.
-
-Combined with ``Settings.sentry_environment`` by the caller, for the reason
-`POWER_DATA_STALE_FINGERPRINT` gives above. The fingerprint is what makes the alert readable: the
-event carries a synthesised exception, which has no stack trace, so Sentry would otherwise group
-on the message. The message names the run and the slot, so a sequence of degraded slots would open
-one new issue each rather than one issue firing repeatedly."""
 
 MAX_LATE_SERIES_IN_CONTEXT: Final[int] = 50
 """Cap on the number of late series listed in the Sentry event *context* (the structured payload).

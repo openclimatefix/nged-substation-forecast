@@ -8,14 +8,11 @@ The forecasts help NGED optimise flexibility procurement and manage electricity 
 NGED describe the project on [their Flexpectation project
 page](https://commercial.nationalgrid.co.uk/innovation/projects/flexpectation).
 
-![Example power forecast](example_power_forecast.svg)
-
 ## What the forecasts look like
 
 Each forecast is:
 
-- **Probabilistic** — expressed as 13 quantiles, from the 1st to the 99th percentile, derived from
-  the 51 ECMWF ENS members
+- **Probabilistic** — expressed as 13 quantiles, from the 1st to the 99th percentile
 - **14-day horizon**, half-hourly temporal resolution
 - Refreshed **every 6 hours**
 - **In MW (active power) or MVA (apparent power)** — the unit is given per `time_series_id` in
@@ -78,8 +75,8 @@ industries we borrow practice from and what we declined.
   test suites
 - [Cross-validation](cross-validation/index.md) — methodology for our implemented
   cross-validation runs: cross-validation folds, the leaderboard, and how we evaluate models
-- [Live Service](live_service/index.md) — operating the live, 6-hourly production service: promoting
-  a champion model and backfilling missed runs
+- [Live Service](live_service/index.md) — operating the live production service: deploying it,
+  running the ingest, and backfilling missed runs
 - [Roadmap](roadmap/index.md) — planned future work, plus detailed design docs for the delivery
   tables, forecast building blocks, metrics & leaderboard, data sources, differentiable physics,
   switching events, disaggregation evaluation, and encoders

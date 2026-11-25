@@ -32,8 +32,8 @@ engineering trends is the admission test described below.
 
 If data inputs are disrupted, the forecast gets less certain instead of stopping — the full
 argument, the degradation ladder and the failure-modes table are in [Inherent
-Stability](inherent-stability.md). An error in **our own code** — an empty promoted model, a
-contract violation, a join that has fanned out — gets the opposite posture: fail as early as
+Stability](inherent-stability.md). An error in **our own code** — a saved model that will not
+load, a contract violation, a join that has fanned out — gets the opposite posture: fail as early as
 possible, because degrading around our own bug would deliver a wrong forecast and bury its cause.
 How far such a failure then spreads is a different axis, and the business of [principle 10 ("*every
 write is atomic and idempotent, and every failure is confined to one
@@ -56,7 +56,7 @@ another; all three are required, and two of the three are still to be built. Wha
 who reads it, is set out in [Three audiences, three
 channels](inherent-stability.md#three-audiences-three-channels). A Sentry event says whether we
 broke or an input degraded, and both kinds have to be delivered — see [Send telemetry to
-Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry),
 which defines the two kinds.
 
 *Without it:* every wobble in an upstream feed becomes an outage — the service raises at 06:00
@@ -68,10 +68,7 @@ developer spends the morning re-running a pipeline whose only real problem was a
 degradation must still send a Sentry event, without failing the run it is warning about. On the
 other side of the line, `PowerForecast.validate` hard-fails a whole slot on a duplicated primary
 key, because only a bug of ours can duplicate a forecast row: every numerical weather prediction
-(NWP) write replaces its partition, so the duplication cannot come from the data at rest. One
-production raise is not yet on the right side of that line: a sustained NWP outage still fails
-`live_forecasts` rather than degrading to a weather-blind forecast
-([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)).
+(NWP) write replaces its partition, so the duplication cannot come from the data at rest.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
@@ -99,17 +96,16 @@ measure.
 are easy to leave under-exercised: unless a team deliberately tests all these execution paths, their
 first real execution happens during an incident, unattended.
 
-*Decided:* `promoted_model` copies the champion to local disk, so production inference makes no
-MLflow call at all.
+*Decided:* no serving-path decision is in code yet, because the live service writes no forecast
+today.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself), [Hypothesis 3: one-click
 promotion, and one-click
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
-*Detail:* [Where complexity should live](inherent-stability.md#where-complexity-should-live) —
-including the two qualifiers that keep this principle honest — and [Bake the model into the
-image](../architecture/production-deployment.md#bake-the-model-into-the-image-at-build-time).
+*Detail:* [Where complexity should live](inherent-stability.md#where-complexity-should-live),
+including the two qualifiers that keep this principle honest.
 
 ### 3 — One execution path from research to production
 
@@ -417,8 +413,7 @@ without redesign](engineering-hypotheses.md#h5-scale-without-redesign).
 *Detail:* [ACID on object
 storage](../architecture/forecast-delivery.md#and-it-is-a-database-acid-on-object-storage),
 [Idempotent writes and
-concurrency](../architecture/ml-orchestration.md#idempotent-writes-and-concurrency), [Serve only the
-trained population](../architecture/production-deployment.md#serve-only-the-trained-population).
+concurrency](../architecture/ml-orchestration.md#idempotent-writes-and-concurrency).
 
 ### 11 — Push the work down to the query engine; materialise once, as late as possible
 
@@ -520,34 +515,29 @@ B's real input is *the event of A having run*. That design has no way to disting
 downstream of it for the rest of the day, and recovery means replaying the chain in order.
 
 Ours cannot propagate a failure that way, because there is no channel for it to propagate down.
-`live_forecasts` does not care whether `ecmwf_ens` succeeded in the last 24 hours, or whether this
-hour's telemetry pull ran: it selects the freshest NWP run genuinely present as of its own init
-time, and stamps that run's `nwp_init_time` on every row it writes. A failed telemetry pull makes
-the 06:00 forecast slightly staler; it cannot make it late, and it cannot make it absent. One case
-still falls short of that today: a *sustained* NWP outage, where no run on disk still covers the
-horizon, makes `live_forecasts` raise rather than degrade — the one hard failure left in the
-[failure-modes table](inherent-stability.md#failure-modes), which
-[#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446) will convert into a
-weather-blind forecast.
+The hourly telemetry pull (`power_time_series_and_metadata` and `clean_nged_power_data`) and the
+daily ECMWF download (`ecmwf_ens`) run on independent schedules, and neither asks whether the other
+ran. `power_data_is_fresh` judges the power table by the readings on disk, not by whether the last
+pull succeeded. The rule for any asset that reads both NWP and telemetry is the same: select the
+freshest NWP run genuinely present as of the asset's own init time, read whatever telemetry is on
+disk, and stamp that run's `nwp_init_time` on every row written. A failed telemetry pull then makes
+a forecast slightly staler; it cannot make the forecast late, and it cannot make it absent.
 
 Note the deliberate distinction between the *lineage* graph and a runtime precondition. Dagster
-still knows that `live_forecasts` depends on `ecmwf_ens` and `power_time_series_and_metadata`; that
-edge is what lets a developer ask Dagster to materialise an asset *together with its upstreams* on a
-laptop, and what makes the graph legible in the UI. What we decline is letting that edge become a
+still records which assets each asset depends on; that edge is what lets a developer ask Dagster to
+materialise an asset *together with its upstreams* on a laptop, and what makes the graph legible in
+the UI. What we decline is letting that edge become a
 gate in production.
 
 *Without it:* in a chained design, one failed 06:00 ingest suppresses the 06:00 forecast and the
-slots behind it, and someone has to replay the chain in order, out of hours, to catch up — the
+forecasts behind it, and someone has to replay the chain in order, out of hours, to catch up — the
 precise out-of-hours intervention that the [T1.1 operability
 test](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts will never be needed.
 
-*Decided:* the three production jobs run on three independent schedules with no run-status coupling
-between them, and the `:55` offset on the telemetry pull is an optimisation for freshness, not a
-precondition — if it is missed, the forecast still runs. A related decision shows how far the
-preference for filesystem coupling goes: `promoted_model` was removed from `live_forecasts`' deps
-altogether once it became clear the model arrives by filesystem path rather than by data flow, so
-even the lineage edge was not worth the permanently un-materialised parent it rendered on the
-production box, which has no MLflow and never runs promotion.
+*Decided:* the two production jobs, `power_time_series_and_metadata_job` and `ecmwf_ens_job`, run
+on independent schedules with no run-status coupling between them. The `:55` offset on the
+telemetry pull lands each hour's telemetry a few minutes before the top of the hour, which is an
+optimisation for freshness rather than a precondition for any other job.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
@@ -612,8 +602,8 @@ own assumptions actually broke — an hour per incident, and a cause recorded in
 log](../live_service/intervention-log.md) that is a guess.
 
 *Decided:* every Sentry event sender carries a tag an alert rule can route on, and the stale-power
-event names the worst-affected series — see [Send telemetry to Sentry, and alarm on
-absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence) for
+event names the worst-affected series — see [Send telemetry to
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry) for
 the routing rules and the mechanisms that keep those tags trustworthy.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
@@ -623,8 +613,8 @@ alone](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself), and
 [T1.1](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)'s cause taxonomy, which is
 only as good as what the telemetry says caused the failure.
 
-*Detail:* [Send telemetry to Sentry, and alarm on
-absence](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence),
+*Detail:* [Send telemetry to
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry),
 which also defines the two kinds of event, and [Three audiences, three
 channels](inherent-stability.md#three-audiences-three-channels).
 
@@ -681,9 +671,9 @@ flagged — not as a fault, but as a legitimate reason for wider uncertainty ban
 into the in-band channel of [principle 1 ("*the power forecast never
 stops*")](#1-the-power-forecast-never-stops) rather than to a pager. There is also a model-side
 answer that is not monitoring at all: give the model features that let it *represent* the regime
-rather than merely detecting that it is unusual — the planned [weather-abnormality
-features](../roadmap/xgboost-improvements.md#weather-abnormality-climatology-z-score-features) are
-that answer, and the two are complementary rather than alternatives. We do not yet know the right
+rather than merely detecting that it is unusual. Weather-abnormality features, such as each
+weather variable's z-score against its own climatology, would be that answer, and the two are
+complementary rather than alternatives. We do not yet know the right
 design; working it out is the task.
 
 ### Shadow (champion–challenger) deployment

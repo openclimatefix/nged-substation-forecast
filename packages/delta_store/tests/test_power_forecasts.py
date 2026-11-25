@@ -38,7 +38,7 @@ def _make_forecasts(
         "time_series_id": list(range(n, 0, -1)),
         "ml_flow_experiment_id": [None] * n,
         "nwp_init_time": [_T0] * n,
-        "power_fcst_model_name": ["xgboost"] * n,
+        "power_fcst_model_name": ["climatology"] * n,
         "experiment_name": ["exp_storage_test"] * n,
         "power_fcst_model_version": [1] * n,
         "power_fcst_init_time": [_T0] * n,

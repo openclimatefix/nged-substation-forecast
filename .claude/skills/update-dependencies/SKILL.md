@@ -39,7 +39,7 @@ maintainer has read the report.
     uv run pre-commit run --all-files --show-diff-on-failure
     ```
 
-    Check the CPU load first, because one spinning core slows the XGBoost tests.
+    Check the CPU load first, because one spinning core slows the whole test suite.
 
 3. **Upgrade**, keeping the list of changes for the PR body:
 

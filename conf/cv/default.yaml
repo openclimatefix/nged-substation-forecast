@@ -39,4 +39,4 @@ min_training_months: 6
 
 # The experiment whose (time_series_id, power_fcst_init_time, valid_time) keys
 # every `study/` experiment must match before the metrics asset scores the study.
-reference_experiment_name: "xgboost_no_power_lags"
+reference_experiment_name: "manual_heuristic"

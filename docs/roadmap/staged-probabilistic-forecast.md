@@ -47,7 +47,7 @@ cannot take a second weather model is the wrong design. The aims, in priority or
    beyond day 7, where ENS members disagree sharply about wind speed and irradiance.
 5. **Explainability.** An engineer should be able to say which stage produced an error.
 6. **Inherent stability.** Each stage always runs. No conditional skips a stage. A missing input is
-   a null that XGBoost routes, never a raised exception.
+   a null that the model routes, never a raised exception.
 7. **Research first.** Experiments test every idea before production code changes.
 
 Aims 2 and 5 are the reason the forecast chain has more than one learned stage. Each stage has one
@@ -154,8 +154,6 @@ power at a lag time minus stage 1's expectation at that time, given the weather 
 2 how far recent power sat from what the weather explains, which is the "delta" that stage 2 needs
 to read the lags. Experiment 00005 supports this placement over a separate persistence stage that
 predicts the residual from the lags, as the 00005 bullet under "What the experiments show" gives.
-The roadmap already has a related idea ([weather-delta compensation for power
-lags](xgboost-improvements.md#weather-delta-compensation-for-power-lags-an-implicit-handle-on-unmetered-generation)).
 Three risks apply. The lag anomalies of 00005 are ceilings, because serving has ERA5T about 5 days
 late and CAMS about 1 day late. Flagged or stuck-meter lags enter as nulls. A lag no longer than the
 lead is nullified, so the lead decides which lags exist. Stage 1 alone stays lag-free and lead-free,
@@ -265,15 +263,13 @@ model of its own. The pooled choice for solar and wind has no experiment behind 
 
 **Targets for solar and wind power.** Stage 1 could predict a ratio for solar: power divided by
 clear-sky PV power, multiplied back by the known half-hourly clear-sky curve, so the output stays in
-megawatts ([roadmap
-section](xgboost-improvements.md#predict-pv-as-a-fraction-of-clear-sky-pv)).
-Quantile loss in ratio space needs weights equal to the clear-sky power so that it equals the
-megawatt loss. Rows with zero clear-sky power are dropped. The per-site clear-sky scale is unknown
-for embedded PV, so it comes from a trailing (not centred) rolling quantile of clear-sky-normalised
-output, or from a physics model for solar farms. For wind, the analogue is a `base_margin` from a
-power curve of forecast wind speed, with stage 1 learning the residual. The ratio target is tested
-once, as a stage 1 arm. Multiplying quantiles by a positive clear-sky value preserves their order,
-so the coupling step is unaffected.
+megawatts. Quantile loss in ratio space needs weights equal to the clear-sky power so that it equals
+the megawatt loss. Rows with zero clear-sky power are dropped. The per-site clear-sky scale is
+unknown for embedded PV, so it comes from a trailing (not centred) rolling quantile of
+clear-sky-normalised output, or from a physics model for solar farms. For wind, the analogue is a
+`base_margin` from a power curve of forecast wind speed, with stage 1 learning the residual. The
+ratio target is tested once, as a stage 1 arm. Multiplying quantiles by a positive clear-sky value
+preserves their order, so the coupling step is unaffected.
 
 **Lead time.** Stage 0 (if built) sees all leads and takes the lead as an input. Stage 1 takes no
 lead. Stage 2 takes the lead, and the lead also decides which lag features exist: a lag shorter than
@@ -388,13 +384,10 @@ detection and training. The guard is the same each time: a robust fit, out-of-fo
 versioned stage 1 artefact, and a rule-based detector first.
 
 - **Switching-event detection:** the roadmap's [approach 1, the two-stage
-  forecaster](switching-events.md#approach-1-the-two-stage-forecaster),
-  is nearly this design. Stage 1 is the baseline and its residual is the switching signal. The
-  residuals feed stage 2 as lag-anomaly features (the existing idea of [residual lag features from
-  the switching-detector
-  baseline](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline)),
-  and a recent detected event could widen stage 2's interval. Live detection runs on the analysis
-  proxy.
+  forecaster](switching-events.md#approach-1-the-two-stage-forecaster), is nearly this design. Stage
+  1 is the baseline and its residual is the switching signal. The residuals feed stage 2 as
+  lag-anomaly features (residual lag features from the switching-detector baseline), and a recent
+  detected event could widen stage 2's interval. Live detection runs on the analysis proxy.
 - **Effective capacity:** the PV ratio target needs a per-site clear-sky scale, which is an
   effective-capacity estimate, so capacity estimation feeds stage 1 and stage 1 feeds the cheap
   capacity baselines. The scale must be causal. A physics stage 1 would make capacity a fitted
@@ -545,11 +538,6 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
     - [Issue #730 (Rebuild coherent scenarios from the pooled percentiles with ensemble copula
       coupling (post-v1))](https://github.com/openclimatefix/nged-substation-forecast/issues/730).
 - **Ensemble statistics, several NWPs, and lead:**
-    - [Ensemble statistics as
-      features](xgboost-improvements.md#ensemble-statistics-as-features-instead-of-member-by-member-rows),
-      [several NWP sources as
-      features](xgboost-improvements.md#several-nwp-sources-as-features-v21), and
-      [per-horizon-window models](xgboost-improvements.md#per-horizon-window-models).
     - The encoders page on [blending several NWP
       sources](../techniques/encoders.md#blending-several-nwp-sources).
     - [Issue #148 (Train on all ECMWF ensemble members (one by
@@ -560,8 +548,7 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
       holidays)](https://github.com/openclimatefix/nged-substation-forecast/issues/230). All three
       are closed.
 - **Pre-training on estimates of past weather and longer history:**
-    - [Pre-train on estimates of past
-      weather](xgboost-improvements.md#pre-train-on-estimates-of-past-weather).
+    - [Extending the training history](training-history.md).
     - [Issue #143 (Ingest ERA5 for gap filling, comparison arms, and the weather-abnormality
       climatology)](https://github.com/openclimatefix/nged-substation-forecast/issues/143), [issue
       #167 (Train XGBoost on estimates of past weather (CAMS, UKV, ERA5) to use the power history
@@ -585,9 +572,7 @@ That is stage 1 plus a per-product calibrator. This page differs in four ways:
   [data-cleaning](data-cleaning.md) roadmap pages.
 - **Evidence and process:** the [ML
   experiments](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) pages, which hold
-  the
-  experiments' results, and the `release-model` skill, which describes how winners reach a numbered
-  model release. Earlier evidence: the [lag-features study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/lag-features/)
+  the experiments' results. Earlier evidence: the [lag-features study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/lag-features/)
   and the [production feature faults study](https://openclimatefix.github.io/nged-ml-research/studies/forecasts/production-feature-faults/).
 - **Principles:** [inherent stability](../design-philosophy/inherent-stability.md) and the [design
   principles](../design-philosophy/design-principles.md).

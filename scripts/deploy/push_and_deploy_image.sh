@@ -4,8 +4,8 @@
 # Elastic Container Service (ECS) task definition at the pushed image.
 #
 # The script is Step 6 of the AWS setup runbook as one command. Together with
-# scripts/deploy/build_and_verify_image.sh, the script is also the whole recurring champion-redeploy
-# loop (aws.md "Redeploying a new champion model"). This header is the source of truth for *why*
+# scripts/deploy/build_and_verify_image.sh, the script is also most of the recurring redeploy loop
+# (aws.md "Redeploying new code"). This header is the source of truth for *why*
 # each choice below is made. The runbook is the file `docs/live_service/aws.md`, cited below as
 # aws.md and published at
 # <https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/>.
@@ -14,8 +14,7 @@
 #   scripts/deploy/push_and_deploy_image.sh          # no arguments — everything is derived
 #
 # Zero arguments by design, so nothing can be mistyped or drift:
-#   - The image tag is the first 12 hex chars of the promoted MLflow run id, read from
-#     data/production_model/promotion.json, then a hyphen and the short git commit hash.
+#   - The image tag is the short git commit hash of the checked-out commit.
 #     build_and_verify_image.sh derives the tag exactly the same way. So this script can only ever
 #     push the image that script built and verified, from the commit that is checked out now.
 #   - The AWS account id comes from `aws sts get-caller-identity` — never typed by hand.
@@ -56,15 +55,7 @@ REPO="nged-forecast"
 TASK_FAMILY="nged-forecast"
 CONTAINER_NAME="nged-forecast"
 
-PROMOTION_JSON="data/production_model/promotion.json"
-if [[ ! -f "$PROMOTION_JSON" ]]; then
-  echo "error: $PROMOTION_JSON not found — materialise the promoted_model asset first" >&2
-  echo "       (aws.md Step 3), then build the image (aws.md Step 4)." >&2
-  exit 2
-fi
-
-RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
-IMAGE_TAG="${RUN_ID:0:12}-$(git rev-parse --short=8 HEAD)"
+IMAGE_TAG="$(git rev-parse --short=8 HEAD)"
 LOCAL_IMAGE="${REPO}:${IMAGE_TAG}"
 
 if ! docker image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
@@ -125,6 +116,5 @@ echo "    ${CURRENT_IMAGE}"
 echo "    -> ${REMOTE_IMAGE}"
 echo
 echo "==> Done. EcsRunLauncher resolves the family's latest revision at launch time, so the"
-echo "    next scheduled run uses this image — no restart needed on the control-plane box."
-echo "    (Control-plane containers only need updating when CODE changed, not just the model:"
-echo "    see aws.md 'Redeploying a new champion model'.)"
+echo "    next scheduled run uses this image. The control-plane containers on the box evaluate"
+echo "    the schedules, so update them too: see aws.md 'Redeploying new code'."

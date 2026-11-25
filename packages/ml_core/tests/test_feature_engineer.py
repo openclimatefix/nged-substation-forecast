@@ -100,11 +100,10 @@ def test_tabular_feature_engineer_returns_all_features_shape() -> None:
 def test_tabular_feature_engineer_drops_series_with_no_metadata_row() -> None:
     """A series with power observations but no metadata row produces no output rows at all.
 
-    Single-run mode is power-centric, so without the semi-join in ``_engineer_features`` the
-    series would survive with every weather feature null and be predicted on regardless — a
-    garbage forecast that reads as healthy to ``live_forecasts_are_healthy`` because the series
-    is present. ``AllFeatures.time_series_type`` is declared non-nullable on the strength of
-    this.
+    Single-run mode is power-centric, so without the semi-join in ``_engineer_features`` the series
+    would survive with every weather feature null and be predicted on regardless — a garbage
+    forecast that reads as healthy to any check that counts the series present.
+    ``AllFeatures.time_series_type`` is declared non-nullable on the strength of this.
     """
     power_fcst_init_time = datetime(2024, 6, 1, 12, 0)
     # ts1 has a metadata row; ts3 does not.
@@ -218,13 +217,12 @@ def test_tabular_feature_engineer_threads_local_timezone() -> None:
 def test_tabular_feature_engineer_default_local_timezone_is_london() -> None:
     """Calling ``engineer()`` with no ``local_timezone`` must default production to Europe/London.
 
-    Every production and CV call site (``live_forecast_assets.py``, ``cv_assets.py``) calls
-    ``engineer()`` without passing ``local_timezone`` as of writing, so a wrong default would
-    reach them silently. This test pins only the parameter's default value, not those call sites
-    themselves, and it is invisible to every other test in this module, which passes
-    ``local_timezone`` explicitly. British Summer Time gives a UTC+1 offset in June, so the
-    correct default (``Europe/London``) yields ``local_utc_offset_minutes == 60``; a wrong
-    default (e.g. ``Asia/Kolkata``'s fixed +5:30) would silently produce ``330`` instead, with
+    Every CV call site (``cv_assets.py``) calls ``engineer()`` without passing ``local_timezone`` as
+    of writing, so a wrong default would reach them silently. This test pins only the parameter's
+    default value, not those call sites themselves, and it is invisible to every other test in this
+    module, which passes ``local_timezone`` explicitly. British Summer Time gives a UTC+1 offset in
+    June, so the correct default (``Europe/London``) yields ``local_utc_offset_minutes == 60``; a
+    wrong default (e.g. ``Asia/Kolkata``'s fixed +5:30) would silently produce ``330`` instead, with
     every other test in the suite still green.
     """
     valid_time = datetime(2024, 6, 1, 12, 0)

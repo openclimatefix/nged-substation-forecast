@@ -269,9 +269,9 @@ def _engineer_features(
     # no metadata row regardless, because `_attach_containing_nwp_cell` inner-joins on `h3_res_5`.
     # Single-run mode is power-centric, so single-run mode would otherwise keep the series with
     # every weather feature null and predict on it. That forecast would be garbage, and would read
-    # as healthy because the series is present. Dropping the series instead makes
-    # `live_forecasts_are_healthy` report that series, via `missing_time_series_ids`. Unconditional,
-    # so the output row set never depends on which features were requested.
+    # as healthy because the series is present. Dropping the series instead lets a caller report
+    # that series as missing, via `missing_time_series_ids`. Unconditional, so the output row set
+    # never depends on which features were requested.
     power_lf = power_lf.join(metadata_lf.select("time_series_id"), on="time_series_id", how="semi")
     nwp_lf: pl.LazyFrame | None = nwp
 
@@ -313,19 +313,15 @@ def _engineer_features(
     elif power_fcst_init_time is not None:
         # Single-run mode: cap the freshest-run (analysis-proxy) selection at the NWP run this call
         # already selected, so a later run cannot answer a past target time. That run is by
-        # construction the freshest run that was available. `select_nwp_init_time` returns the
-        # newest qualifying run in either of its two availability modes: `"live"`, where the cutoff
-        # is power_fcst_init_time itself because the table only holds runs that were genuinely
-        # published, and `"replay"`, where the cutoff is power_fcst_init_time minus
-        # nwp_publication_delay_hours. The runs at or before the selected run are therefore exactly
-        # the runs that were available, so no modelled publication delay is needed to work out which
-        # runs those are. A slot is one scheduled forecast the live service issues. A `"live"` slot
-        # therefore keeps the run it is forecasting with even when that run is fresher than
-        # nwp_publication_delay_hours. Keeping that run matches bulk mode's effective ceiling — the
-        # invariant spelled out in the branch below.
-        # The filter is input validation for a reusable package, not a guard on a state production
-        # can reach. The single-run caller in this repo today, `live_forecasts`, passes a frame
-        # holding just the selected run. The filter therefore drops nothing. The filter guards the
+        # construction the freshest run that was available, because the caller selects the newest
+        # run present on disk at power_fcst_init_time. The runs at or before the selected run are
+        # therefore exactly the runs that were available, so no modelled publication delay is
+        # needed to work out which runs those are. A single-run call therefore keeps the run it is
+        # forecasting with even when that run is fresher than nwp_publication_delay_hours. Keeping
+        # that run matches bulk mode's effective ceiling — the invariant spelled out in the branch
+        # below.
+        # The filter is input validation for a reusable package: a single-run caller that passes a
+        # frame holding just the selected run loses nothing to the filter, and the filter guards the
         # multi-run frame this function's docstring lets a single-run caller pass.
         historical_weather = select_analysis_proxy(
             processed_nwp.filter(

@@ -30,8 +30,9 @@ time-varying](metrics-and-leaderboard.md#effective-capacity-normalisation-and-th
 
 **How capacity feeds the forecast:** a **two-pass** approach. The first pass estimates effective
 capacity (this page); the second normalises each generator's time series by its effective capacity
-before the power-forecast model trains on it. XGBoost continues to do the actual power forecasting
-in v1; the estimators here are responsible only for *estimating capacity* of *metered* generators.
+before the power-forecast model trains on it. The power-forecast model does the actual power
+forecasting in v1; the estimators here are responsible only for *estimating capacity* of *metered*
+generators.
 None of the "clever" latent-demand or switching inversion happens here — that is [v2
 research](disaggregation.md).
 

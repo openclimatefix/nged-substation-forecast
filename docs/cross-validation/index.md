@@ -56,24 +56,25 @@ about it needs translating.
 
 ### Nothing gets rewritten on the way to production
 
-The model that wins the evaluation is, bit for bit, the model we deploy — not a re-implementation of
-it. Promotion to production takes minutes, and that speed is a *consequence* of rigour, not a trade
-against it. By the time promotion is on the table, the candidate has already been trained,
-cross-validated (see [Cross-validation folds](cross-validation-folds.md)), and evaluated on the same
-pipeline, under the same standardised protocol, as every model before it. Holding that protocol
+The model that wins the evaluation is, bit for bit, the model that serves production — not a
+re-implementation of it. The route to production can therefore be fast, and that speed is a
+*consequence* of rigour, not a trade against it. By the time a candidate is considered for
+production, the candidate has already been trained, cross-validated (see [Cross-validation
+folds](cross-validation-folds.md)), and evaluated on the same pipeline, under the same standardised
+protocol, as every model before it. Holding that protocol
 fixed is what makes two CV runs comparable at all. That is the reason [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch) fixes every training run to the same
 5-minute budget: a fixed budget "makes experiments directly comparable regardless of what the agent
 changes".
 
-Holding the protocol fixed is what makes a one-command promotion *safe* to press rather than merely
-quick. In a conventional setup, the artifact measured and the artifact deployed can be two different
-pieces of code — a risk that does not exist here. The comparison that picked the winner was made
-against every other candidate on identical folds. And the way back to the previous champion is a
-single command too. A fast promotion route is worth no more than a slow route if nobody trusts the
-fast route enough to use it. The speed comes from the protocol rather than from haste, a distinction
-[Karpathy (2019)](https://karpathy.github.io/2019/04/25/recipe/) puts bluntly: "a 'fast and furious'
-approach to training neural networks does not work and only leads to suffering".
+Holding the protocol fixed is what makes a fast route to production *safe* to use rather than
+merely quick. In a conventional setup, the artifact measured and the artifact deployed can be two
+different pieces of code — a risk that does not exist here. The comparison that picked the winner
+was made against every other candidate on identical folds. A fast route to production is worth no
+more than a slow route if nobody trusts the fast route enough to use it. The speed comes from the
+protocol rather than from haste, a distinction [Karpathy
+(2019)](https://karpathy.github.io/2019/04/25/recipe/) puts bluntly: "a 'fast and furious' approach
+to training neural networks does not work and only leads to suffering".
 
 **An autonomous study takes the same scoring path and a different route to production.** An
 autonomous study is code that an agent writes in the
@@ -84,5 +85,5 @@ under a `study/`-prefixed `experiment_name` and runs the same `metrics` asset as
 run. The `metrics` asset refuses a study whose row keys differ from the reference CV run's (see
 [What the `metrics` asset refuses to
 score](cross-validation-folds.md#what-the-metrics-asset-refuses-to-score)). A `study/` run is never
-a promotion candidate. A finding reaches production only as a written specification and a reviewed
+a candidate for production. A finding reaches production only as a written specification and a reviewed
 re-implementation on the pipeline, never as merged study code.

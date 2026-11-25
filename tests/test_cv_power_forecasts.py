@@ -33,18 +33,20 @@ pytestmark = pytest.mark.integration
 RegisterExperiment = Callable[[DagsterInstance, str], None]
 """Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
 
-RegisterExperimentWithFeatures = Callable[[DagsterInstance, str, list[str]], None]
-"""Type of the ``register_experiment`` fixture when called with its optional ``selected_features``
-argument."""
+RegisterExperimentWithConfig = Callable[..., None]
+"""Type of the ``register_experiment`` fixture when called with its keyword-only
+``base_model_config`` and ``config_overrides`` arguments."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_predict_smoke"
 PARTITION_KEY = f"{EXPERIMENT_NAME}__{FOLD_ID}"
 
-# ts1 sits in H3 cell 10. It has training-window data (so the fold model trains a Booster for it)
+# ts1 sits in H3 cell 10. It has training-window data (so the fold model trains on it)
 # and validation-window NWP across three ensemble members (so prediction spans the ensemble).
 _TS1_CELL = 10
-_TRAIN_DAY = datetime(2024, 6, 1, tzinfo=UTC)  # inside train window [2024-04-01, 2025-06-30]
+# A weekday in the month before the validation day: climatology forecasts a validation row only
+# from training samples on the same day type, at most one local month and half-hour away.
+_TRAIN_DAY = datetime(2024, 7, 31, tzinfo=UTC)  # inside train window [2024-04-01, 2025-06-30]
 _VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)  # inside val window [2025-07-01, 2026-06-30]
 _VAL_MEMBERS = (0, 1, 2)  # stands in for the full 51-member ensemble in this synthetic fixture
 
@@ -162,7 +164,7 @@ def test_cv_power_forecasts_predicts_validation_fold(
 def test_cv_power_forecasts_derives_power_lookback_from_selected_features(
     env: dict[str, str],
     dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperimentWithFeatures,
+    register_experiment: RegisterExperimentWithConfig,
     spy_power_lookback: Callable[[], list[timedelta]],
 ) -> None:
     """``cv_power_forecasts`` derives ``power_lookback`` from the experiment's own
@@ -171,10 +173,17 @@ def test_cv_power_forecasts_derives_power_lookback_from_selected_features(
 
     Mirrors ``test_trained_cv_model_derives_power_lookback_from_selected_features`` in
     ``tests/test_trained_cv_model.py``, for this asset's own call site. The shared
-    ``register_experiment`` fixture defaults to a ``selected_features`` set with no power lag, so
-    passing ``power_lag_24h`` explicitly here is what exercises this call site's own derivation.
+    ``register_experiment`` fixture defaults to climatology, which selects no feature, so
+    registering the manual heuristic with ``power_lag_24h`` is what exercises this call site's own
+    derivation.
     """
-    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m", "power_lag_24h"])
+    # Climatology selects no feature, so the manual heuristic carries the power lag here.
+    register_experiment(
+        dagster_instance,
+        EXPERIMENT_NAME,
+        base_model_config="conf/model/manual_heuristic.yaml",
+        config_overrides={"selected_features": ["power_lag_24h"]},
+    )
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success

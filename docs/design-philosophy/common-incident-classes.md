@@ -21,17 +21,15 @@ minutes to days, for reasons entirely outside the consuming service's control.
 This kind of outage is the shape [Inherent Stability](inherent-stability.md) is built around: the
 [degradation ladder](inherent-stability.md#the-degradation-ladder) states what the forecast should
 still produce at each stage of loss, from one missed weather-model run through to no fresh data at
-all. Telemetry already degrades this way today — a stalled meter widens nothing yet, but it does not
-stop the forecast either. Weather data is the sharper case: a sustained numerical weather prediction
-(NWP) outage currently makes the live-forecast asset **raise** rather than degrade — one of three
-hard-failure rows in the [failure-modes table](inherent-stability.md#failure-modes), and the only
-row tracked to change
-([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)). The other two stay
-deliberate raises: an empty or unloadable promoted model is a promotion bug rather than a data
-outage, and a duplicated forecast primary key means one of our own joins has fanned out, which
-`PowerForecast.validate` rejects at the contract boundary rather than delivering. The NWP gap is
-tracked, and the fix is deliberately sequenced behind training the model against realistic outages,
-so that a degraded forecast is measured rather than merely produced.
+all. The ingest already degrades this way: a stalled meter or a missed ECMWF run stops no other
+job. The live service writes no forecast today, so the forecast's own degradation is designed but
+not built. Weather data is the sharper case, because no forecaster in the repository yet falls back
+to a weather-blind forecast when numerical weather prediction (NWP) data is absent. That fallback
+is deliberately sequenced behind training a model against realistic outages, so that a degraded
+forecast is measured rather than merely produced. The [failure-modes
+table](inherent-stability.md#failure-modes) keeps one deliberate hard failure: a duplicated
+forecast primary key means one of our own joins has fanned out, which `PowerForecast.validate`
+rejects at the contract boundary rather than delivering.
 
 ## Upstream data malformed or silently reshaped
 
@@ -63,11 +61,10 @@ already: sorting each member's quantiles at predict time ([Probabilistic
 Forecasting](../techniques/probabilistic-forecasting.md#turning-51-quantile-sets-into-one-the-pooling-recipe),
 [#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)).
 
-The gap: `live_forecasts_are_healthy` already warns on a null, NaN, or infinite forecast quantile,
-and `PowerForecast` rejects crossed quantile levels, but nothing checks a *finite,
-plausible-looking* output for implausible magnitude. Every input boundary in this project follows
-the same pattern — validate, and warn on what validation can't reject outright — but that pattern
-has not yet been applied to the output itself
+The gap: `PowerForecast` rejects crossed quantile levels, but no asset check reads a written
+forecast back, so nothing checks a *finite, plausible-looking* output for implausible magnitude.
+Every input boundary in this project follows the same pattern — validate, and warn on what
+validation can't reject outright — but that pattern has not yet been applied to the output itself
 ([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
 
 ## Shared-compute blast radius
@@ -84,9 +81,11 @@ architecture](../roadmap/live-service.md#aws-architecture) extends the same inst
 every live and backtest run dispatches to its own ephemeral Fargate task, so a bad run cannot starve
 another one. The gap sits on the always-on control-plane box itself, where the Dagster daemon,
 webserver, and dashboard run as separate processes sharing one machine's memory and disk with no
-per-process limit — today's mitigation is restart-on-failure plus the [missed-check-in
-alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm), both reactive rather
-than preventive ([#561](https://github.com/openclimatefix/nged-substation-forecast/issues/561)).
+per-process limit — today's mitigation is restart-on-failure, which is reactive rather than
+preventive, and the [missed-check-in
+alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) that would report a
+dead daemon is designed but not running
+([#561](https://github.com/openclimatefix/nged-substation-forecast/issues/561)).
 
 ## Orchestrator or scheduler silently stops
 
@@ -98,8 +97,9 @@ This silent-stop scenario is the shape the [missed-check-in
 alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) exists to close, and
 closes about as directly as a single mechanism can: it is evaluated from **outside** the deployment,
 on the logic that a dead process cannot be relied on to report its own death, and it fires on the
-absence of a successful run rather than on any particular failure signal. Of every shape on this
-page, this is the shape with the most direct, already-shipped answer.
+absence of a successful run rather than on any particular failure signal. The alarm is designed
+but not running: no production job sends Sentry a check-in today, so a scheduler that stops firing
+is silent.
 
 ## Deploy or configuration drift between environments
 
@@ -110,11 +110,10 @@ until a run fails on the difference, or worse, produces a wrong answer that pass
 [One execution path from research to
 production](design-principles.md#3-one-execution-path-from-research-to-production) removes an entire
 class of this: there is no second, separately deployed implementation for research versus production
-to drift apart from. Atomic Delta commits and `promoted_model`'s all-or-nothing swap — it refuses to
-replace the model on disk at all if the incoming config can't be rebuilt — close the model-promotion
-instance of this shape specifically. What is not yet addressed is a staged or canary rollout for a
-**code** deploy itself, as opposed to a model promotion; today a new image goes live everywhere the
-next run picks it up. Left as an open question rather than a proposed change — the single-image,
+to drift apart from. Atomic Delta commits close the data instance of this shape: a reader sees a
+table as it was before a write or after it, never half-way through. What is not yet addressed is a
+staged or canary rollout for a **code** deploy; today a new image goes live everywhere the next run
+picks it up. Left as an open question rather than a proposed change — the single-image,
 single-environment deployment this project runs today is a narrower target than a multi-service
 system, so the shape may not earn a dedicated mechanism until the architecture grows past that.
 

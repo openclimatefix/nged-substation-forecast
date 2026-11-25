@@ -130,8 +130,8 @@ def _apply_weather_lag(
         # changes output for every non-control ensemble member at that boundary. The freshest-run
         # branch is `select_analysis_proxy`, which keeps only `ensemble_member == 0`. A `>` boundary
         # would therefore read member 5's own row where `>=` reads member 0's row. The difference is
-        # inconsequential today only because `conf/model/xgboost.yaml` selects no weather-lag
-        # features.
+        # inconsequential today only because no config under `conf/model/` selects a weather-lag
+        # feature.
         pl.when(pl.col("target_time") >= pl.col("power_fcst_init_time"))
         .then(pl.col(f"{lag_feature.string_repr}_same_run"))
         .otherwise(pl.col(f"{lag_feature.string_repr}_freshest_run"))

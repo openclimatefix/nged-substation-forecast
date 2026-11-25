@@ -28,10 +28,8 @@ plus general cleanup.
   independence of `eligible_time_series` from the CV run.
 - **Determinism**: training a fold twice with a fixed `random_seed` yields identical predictions.
   Determinism underpins idempotent retries and a stable leaderboard.
-  `test_random_seed_makes_training_deterministic` exists and evidences this at the forecaster level
-  — it trains an `XGBoostForecaster` twice directly on an in-memory frame. But it never goes through
-  `trained_cv_model` or fold-window loading, so the fold-level claim above is not evidenced by it
-  and remains one of the guardrail tests below that are still unwritten.
+  No test evidences this claim through `trained_cv_model` or fold-window loading, so the fold-level
+  claim above is one of the guardrail tests that are still unwritten.
 - **Degradation smoke-tests**: ablate whole input groups — NWP absent, telemetry absent, a single
   weather variable nulled — and assert that a forecast is still produced for every time series, that
   every value stays inside physical bounds, and that nothing explodes. These consume the scenario
@@ -46,9 +44,8 @@ plus general cleanup.
 
 - Remove any remaining dead code/imports from the phased build-out.
 - **Split `defs/cv_assets.py`** (the largest module in `defs/`, and the complexity hotspot flagged
-  in the 2026-07 codebase review) into `cv_assets.py` / `metric_assets.py`.
-  Live inference lives in `live_forecast_assets.py`, and model promotion in `promotion_assets.py`;
-  move the `metrics` asset and its helpers into `metric_assets.py` here.
+  in the 2026-07 codebase review) into `cv_assets.py` / `metric_assets.py`: move the `metrics`
+  asset and its helpers into `metric_assets.py`.
   Pure logic stays in `ml_core.cv_helpers`.
 
 **Part 3 — docs freshness pass.** The permanent-docs migration from the old `dagster_plan.md` is

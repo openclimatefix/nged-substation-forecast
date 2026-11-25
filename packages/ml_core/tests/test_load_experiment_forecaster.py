@@ -4,9 +4,10 @@ from pathlib import Path
 
 import mlflow
 import pytest
+from baseline_forecasters.manual_heuristic import ManualHeuristicForecaster
+from ml_core.base_forecaster import BaseForecasterConfig
 from ml_core.mlflow_runs import get_or_create_experiment, load_experiment_forecaster
 from mlflow.tracking import MlflowClient
-from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 
 @pytest.fixture
@@ -21,23 +22,24 @@ def test_round_trips_class_and_config_through_tags(mlflow_tracking: None) -> Non
     The config class is not named by a tag: it is reached through the forecaster's
     ``CONFIG_CLASS``, so no third tag is stamped here.
     """
-    config = XGBoostConfig(
-        selected_features={"temperature_2m", "power_lag_24h"},
+    config = BaseForecasterConfig(
+        selected_features={"power_lag_168h", "power_lag_336h"},
         experiment_name="exp",
-        n_estimators=123,
-        max_depth=4,
+        random_seed=123,
     )
     experiment_id = get_or_create_experiment("exp")
     client = MlflowClient()
     client.set_experiment_tag(experiment_id, "config", config.model_dump_json())
     client.set_experiment_tag(
-        experiment_id, "forecaster_target", "xgboost_forecaster.forecaster.XGBoostForecaster"
+        experiment_id,
+        "forecaster_target",
+        "baseline_forecasters.manual_heuristic.ManualHeuristicForecaster",
     )
 
     forecaster_cls, loaded_config = load_experiment_forecaster("exp")
 
-    assert forecaster_cls is XGBoostForecaster
-    assert isinstance(loaded_config, XGBoostConfig)
+    assert forecaster_cls is ManualHeuristicForecaster
+    assert isinstance(loaded_config, BaseForecasterConfig)
     assert loaded_config == config
 
 

@@ -38,11 +38,12 @@ artifact alongside this archive would reopen the merge problem for that artifact
 TRAINED_METADATA_FILENAME: Final[str] = "time_series_metadata.parquet"
 """Name of the file holding the ``TimeSeriesMetadata`` rows a saved model carries.
 
-The file holds one row per series in the model's trained population. Production inference reads each
-series' location from that file, never from the ``TimeSeriesMetadata`` table. An unreadable or
-thinned metadata table therefore cannot fail a live slot, and cannot silently drop a series from a
-slot. Being the model's own frozen copy of what it trained against also keeps a series' H3 cell and
-static feature values identical between training and serving. See
+The file holds one row per series in the model's trained population. A live asset that loads a saved
+forecaster reads each series' location from that file (``load_trained_metadata``), never from the
+``TimeSeriesMetadata`` table. An unreadable or thinned metadata table therefore cannot fail a live
+slot, and cannot silently drop a series from a slot. Being the model's own frozen copy of what it
+trained against also keeps a series' H3 cell and static feature values identical between training
+and serving. See
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
 Logging the frozen metadata copy as a second MLflow artifact rather than putting the copy in the
@@ -118,7 +119,7 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
 
     Args:
         model_dir: A directory written by ``save_to_mlflow`` (via ``write_trained_metadata``) and
-            typically unpacked by ``fetch_model_artifacts``.
+            unpacked from that run's model archive.
 
     Returns:
         One row per series in ``trained_time_series_ids``, without ``_UNPERSISTED_METADATA_COLUMN``.
@@ -127,16 +128,17 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
 
     Raises:
         FileNotFoundError: The directory holds no such file, so the model was saved by code
-            predating ``TRAINED_METADATA_FILENAME`` or assembled by hand. The absence is a promotion
-            fault rather than a data outage: the model on disk is not a model this code can serve. A
-            promotion fault raises rather than degrading, just as a missing ``meta.json`` does.
+            predating ``TRAINED_METADATA_FILENAME`` or assembled by hand. The absence is a
+            deployment fault rather than a data outage: the model on disk is not a model this code
+            can serve. A deployment fault raises rather than degrading, just as a missing
+            ``meta.json`` does.
     """
     path = model_dir / TRAINED_METADATA_FILENAME
     if not path.exists():
         raise FileNotFoundError(
             f"The model directory {model_dir} has no {TRAINED_METADATA_FILENAME}, so there is no "
             "record of where its time series are and it cannot be served. Re-train against the "
-            "current code and promote that run."
+            "current code and deploy that run."
         )
     return pt.DataFrame(pl.read_parquet(path)).set_model(TimeSeriesMetadata)
 
@@ -144,9 +146,8 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
 def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path:
     """Download an MLflow run's model archive into ``work_dir`` and unpack it.
 
-    Shared by ``BaseForecaster.load_from_mlflow`` and
-    ``ml_core.production_helpers.fetch_model_artifacts``, the only two readers of a run's saved
-    model in this repo, so the archive layout is defined in exactly one place.
+    Called by ``BaseForecaster.load_from_mlflow``, the one reader of a run's saved model in this
+    repo, so the archive layout is defined in exactly one place.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
     beforehand.
@@ -156,8 +157,8 @@ def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path
         work_dir: A scratch directory (typically a ``TemporaryDirectory``) to download and
             extract into. Needs room for the archive *and* its unpacked contents.
         remedy: What the reader should do when the run holds no archive, appended to the message.
-            The two callers reach this state by different routes: a CV fold run that no training has
-            written yet, versus a run id an operator chose. No one wording is right for both.
+            A CV fold run that no training has written yet and a run id an operator chose reach
+            this state by different routes, so no one wording is right for both.
 
     Returns:
         The directory holding the unpacked model, ready to hand to a subclass's ``load``. The
@@ -285,8 +286,8 @@ class BaseForecaster(ABC):
     """The config class that ``load`` rebuilds from a saved ``model_params`` mapping.
 
     A subclass's ``load`` must build its config through this attribute rather than naming its config
-    class again. ``ml_core.production_helpers._check_meta_is_servable`` then always validates a
-    saved config against the same class ``load`` uses. """
+    class again, so a saved config is always validated against the same class ``load`` uses.
+    """
 
     feature_engineer: ClassVar[FeatureEngineer] = TabularFeatureEngineer()
     """The feature pipeline this forecaster's data is engineered through.
@@ -316,7 +317,7 @@ class BaseForecaster(ABC):
         invariant**: the population a model is scored on must equal the population it was trained
         on. The invariant holds *even if* the live eligibility set has drifted since training.
         Power coverage changes over time, so a series may newly qualify or newly drop out.
-        Consumers (``cv_power_forecasts``, ``live_forecasts``) filter their inputs to this set,
+        Consumers such as ``cv_power_forecasts`` filter their inputs to this set,
         so a model scores exactly the population it learned — never whatever eligibility says
         *today*. The frozen population is what keeps the leaderboard apples-to-apples, and what
         stops production forecasting a series the model never saw.
@@ -334,20 +335,18 @@ class BaseForecaster(ABC):
 
         - The saved directory must contain a ``meta.json`` with a ``model_class`` field. That
           field holds the fully-qualified ``{module}.{qualname}`` of the concrete subclass, for
-          example ``"xgboost_forecaster.forecaster.XGBoostForecaster"``. Production inference
-          (``ml_core.production_helpers.load_forecaster_from_dir``) uses that field to
-          reconstruct the correct class from a plain model directory — no caller-supplied class
-          name, no class registry, and no MLflow run (issue #221).
+          example ``"baseline_forecasters.climatology.ClimatologyForecaster"``. A caller loading a
+          plain model directory uses that field to reconstruct the correct class — no
+          caller-supplied class name, no class registry, and no MLflow run.
         - ``path`` must be cleared first, so that saving over a directory holding a *larger*
           model's files leaves none of them behind. A dropped time series' weights would survive
           a re-train, if a save merged into the directory instead of replacing its contents
-          (issue #197). ``XGBoostForecaster.save`` clears with ``shutil.rmtree(path,
+          (issue #197). The baseline forecasters clear with ``shutil.rmtree(path,
           ignore_errors=True)``.
 
         The clearing requirement makes ``path`` the model's to own while it saves, so any file a
-        caller left there is gone afterwards. Depositing a file *after* a save is fine.
-        Depositing after a save is how ``production_helpers.fetch_model_artifacts`` puts
-        ``promotion.json`` beside the model.
+        caller left there is gone afterwards. Depositing a file *after* a save is fine, and is how
+        ``save_to_mlflow`` adds the frozen metadata copy.
         """
 
     @classmethod
@@ -370,7 +369,7 @@ class BaseForecaster(ABC):
         Args:
             run_id: The MLflow run to attach the artifact to.
             time_series_metadata: The metadata table rows this model was engineered against.
-                Required, because a model uploaded without them cannot be promoted — see
+                Required, because a model uploaded without them cannot be served — see
                 ``TRAINED_METADATA_FILENAME``. Narrowed to ``trained_time_series_ids`` before the
                 rows are written. Callers engineer over a wider population than they end up
                 training, because an eligible series with no usable power gets no model. Every
@@ -433,12 +432,11 @@ class BaseForecaster(ABC):
         Args:
             data: The engineered features (lazy; the caller must not pre-collect).
             time_series_ids: The population the model must train on — the caller's eligible set.
-                The model
-                decides how to map that population onto boosters. ``XGBoostForecaster`` uses one
-                booster per id. A future model could instead use one booster per group of ids, for
-                example all solar sites. The population is the model's frozen record of who the
-                model trained on (the train==predict invariant), and bounds ``predict`` to that same
-                population.
+                The model decides how to map that population onto fitted state.
+                ``ClimatologyForecaster`` stores quantiles per calendar cell of each id. A future
+                model could instead fit one model per group of ids, for example all solar sites. The
+                population is the model's frozen record of who the model trained on (the
+                train==predict invariant), and bounds ``predict`` to that same population.
         """
 
     @abstractmethod

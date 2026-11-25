@@ -20,7 +20,7 @@ deliberately few, so that logging an intervention is never the reason an interve
 | Column | What goes in it |
 |---|---|
 | **Date** | `YYYY-MM-DD HH:MM` UTC of the intervention, not of the underlying fault. The time of day matters: the [T1.1 operability test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) scores out-of-hours interventions separately, and a date alone cannot be scored for that |
-| **Trigger** | What alerted us — a Sentry alarm, a missed check-in, an NGED email, a routine glance at the Dagster UI |
+| **Trigger** | What alerted us — a Sentry alarm, a failed run, an NGED email, a routine glance at the Dagster UI |
 | **Cause** | One of the [cause categories](#cause-taxonomy) below |
 | **Minutes** | Human-minutes spent, start to finish, rounded to the nearest 5 |
 | **Runbook?** | Did [Operating the live service](operations.md) already cover it? `yes` / `partial` / `no` |
@@ -57,7 +57,7 @@ cannot falsify the claim on its own.
 | `upstream-outage` | Upstream data absent or stuck for long enough that a human had to act, without the contract itself changing |
 | `infrastructure` | The host, container, scheduler, network, or cloud account — anything below our own code |
 | `our-bug` | A defect in this codebase |
-| `model` | Forecast quality required a human decision — a promotion, a rollback, a retrain |
+| `model` | Forecast quality required a human decision — a change of production model, a rollback, a retrain |
 | `routine-ops` | Keep-it-running work that needed a human without anything having failed: credential rotation, a certificate, a dependency bump forced by an upstream deprecation |
 | `self-recovered` | Not an intervention at all — a run that failed and recovered on its own retry, logged with `Minutes = 0` because self-recovery is evidence for the design |
 

@@ -6,18 +6,17 @@ Marimo notebooks for exploratory data analysis and ad-hoc analysis.
 
 **A notebook here answers one question about the data, and is allowed to be rough.** What the
 numerical weather prediction (NWP) archive holds for one H3 cell — H3 being the grid of hexagons
-this project aggregates weather onto — where a weather variable goes missing, and whether a baseline
-export looks the way its author expected: each question is worth a chart, and worth no more
-engineering than a chart. Nothing in `src/`, and no other package under `packages/`, imports this
-package, so a notebook that stops working stops working alone.
+this project aggregates weather onto — and where a weather variable goes missing: each question is
+worth a chart, and worth no more engineering than a chart. Nothing in `src/`, and no other package
+under `packages/`, imports this package, so a notebook that stops working stops working alone.
 
 **Roughness is acceptable here because a notebook is never the route into production.** [Design
 principle 3 — one execution path from research to
 production](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#3-one-execution-path-from-research-to-production)
-holds that an idea becomes a CV run — a candidate that can enter the leaderboard, and therefore
-be promoted to production — only once the idea is implemented in the pipeline's own code, behind the
-same data contracts and tests as everything else. The leaderboard is the ranked table that scores
-candidate models against each other. The winner is what the live service serves. A data contract is
+holds that an idea becomes a CV run — a candidate that can enter the leaderboard, and from there
+reach production — only once the idea is implemented in the pipeline's own code, behind the same
+data contracts and tests as everything else. The leaderboard is the ranked table that scores
+candidate models against each other. A data contract is
 a written, enforced definition of what a table's columns mean. Exploring in a notebook first is
 expected. Lifting a notebook's code into the pipeline afterwards is not expected, because the
 pipeline gets its own implementation, reviewed and tested.
@@ -82,8 +81,3 @@ root `.env` points at.
   notebook: the chart builder is an `@app.function`, and the `test_*` function beside the chart
   builder is collected by a plain `uv run pytest`, because `python_files` in `pyproject.toml` names
   this file.
-- `view_baseline_export.py` — inspects the parquet file
-  `scripts/forecasting/export_baseline_forecasts.py` writes: observed power against the forecast,
-  and the observed-minus-median residual. Switching-event detection reads that residual because a
-  sudden step in the gap between measured and forecast power is the signature of a feeder being
-  switched onto or off the substation. The notebook's module docstring says what each chart shows.

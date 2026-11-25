@@ -68,8 +68,10 @@ EXPERIMENT_NAME = "exp_metrics_smoke"
 PARTITION_KEY = f"{EXPERIMENT_NAME}__{FOLD_ID}"
 
 _TS1_CELL = 10
-# Train day inside window [2024-04-01, 2025-06-30]; val day inside [2025-07-01, 2026-06-30].
-_TRAIN_DAY = datetime(2024, 6, 1, tzinfo=UTC)
+# Train day inside window [2024-04-01, 2025-06-30]; val day inside [2025-07-01, 2026-06-30]. The
+# train day is a weekday in the month before the val day: climatology forecasts a val row only
+# from training samples on the same day type, at most one local month and half-hour away.
+_TRAIN_DAY = datetime(2024, 7, 31, tzinfo=UTC)
 _VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)
 _VAL_MEMBERS = (0, 1, 2)
 
@@ -642,8 +644,8 @@ def test_metrics_no_filter_scores_every_group(
 def _append_live_fold_rows(forecasts_path: str) -> None:
     """Copy the produced forecasts into a ``fold_id="live"`` partition of the same table.
 
-    This is what ``live_forecasts`` writes: production output shares ``power_forecasts`` with the
-    CV folds, keyed by ``(experiment_name, fold_id="live")``.
+    This is what a live asset writes: production output shares ``power_forecasts`` with the CV
+    folds, keyed by ``(experiment_name, fold_id="live")``.
     """
     live = pl.read_delta(forecasts_path).with_columns(fold_id=pl.lit("live"))
     write_deltalake(

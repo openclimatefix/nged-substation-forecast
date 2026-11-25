@@ -22,7 +22,7 @@ def _make_metrics(
         Metrics.DataFrame(
             {
                 "time_series_id": time_series_ids,
-                "power_fcst_model_name": ["xgboost"] * n,
+                "power_fcst_model_name": ["climatology"] * n,
                 "fold_id": [fold_id] * n,
                 "horizon_slice": ["all"] * n,
                 "metric_name": ["mae"] * n,

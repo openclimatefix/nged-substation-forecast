@@ -155,10 +155,9 @@ T2.1.
 
 **A count of T2.1 leaves out every MLflow experiment named with the prefix `study/`.** A study's
 forecasts are scored through `scripts/forecasting/score_study.py` under such an MLflow experiment,
-which never goes through CV run registration, and the promotion path never offers a `study/`
-MLflow experiment as a candidate. T2.1 counts registered CV runs, so the count filters out the
-prefix and T2.1's definition does not change. A study finding reaches production
-only through a reviewed re-implementation, so a count of studies would say little about how fast the
+which never goes through CV run registration. T2.1 counts registered CV runs, so the count filters
+out the prefix and T2.1's definition does not change. A study finding reaches production only
+through a reviewed re-implementation, so a count of studies would say little about how fast the
 project learns what to ship. If studies come to outnumber reviewed CV runs, a new appended
 hypothesis can count what studies produce, and T2.1 stays as written.
 
@@ -195,14 +194,14 @@ slowly and less repeatably, with the added risk that a hand-run check is skipped
 pressure.
 
 **T3.1 — Promotion effort.** Commands required to get from "the leaderboard says X won" to "X is
-serving", following the runbook. The mechanism already exists (the `promoted_model` asset — see
-[Production
-Deployment](../architecture/production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script));
-what is missing is a runbook that pins down what counts as one command.
+serving", following the runbook. No promotion mechanism exists today, because the live service
+writes no forecast yet, so the test cannot be run until a live forecasting asset and its runbook
+exist.
 
-**T3.2 — Rollback effort.** Commands required to get from "X is serving" back to the previous
-champion. Promotion without rollback is not safe at any speed, and rollback is the damping half of
-[inherent stability](inherent-stability.md#the-rules) — so this is not the optional half of H3.
+**T3.2 — Rollback effort.** Commands required to get from "X is serving" back to the model that
+served before X. Promotion without rollback is not safe at any speed, and rollback is the damping
+half of [inherent stability](inherent-stability.md#the-rules) — so this is not the optional half of
+H3.
 
 ## H4 — it runs for pocket money
 

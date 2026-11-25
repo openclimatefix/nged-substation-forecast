@@ -76,8 +76,8 @@ class ManualHeuristicForecaster(BaseForecaster):
     def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:
         """Record the requested series that have at least one non-null ``power`` row.
 
-        Nothing is fitted. The rule mirrors ``XGBoostForecaster``: a series with no usable rows is
-        not trained, so train and predict cover the same population.
+        Nothing is fitted. A series with no usable rows is not trained, so train and predict cover
+        the same population.
         """
         requested = set(time_series_ids)
         lazy: pl.LazyFrame = data

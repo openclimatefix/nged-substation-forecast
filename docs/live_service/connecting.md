@@ -70,8 +70,8 @@ In a browser, open **`http://nged-forecast-ctrl:3000`** (plain `http`, MagicDNS 
 `100.x` Tailscale IP works too). There is no login prompt — that omission is by design (see the
 security note at the top of this page).
 
-From here, driving the running service — promoting a champion, materialising or backfilling a slot,
-inspecting a forecast — is [Operating the live service](operations.md).
+From here, driving the running service — materialising or backfilling a partition, reading the
+asset checks, inspecting a forecast — is [Operating the live service](operations.md).
 
 ## Step 5 — SSH into the box
 
@@ -96,5 +96,5 @@ docker compose logs -f daemon
 - [Setting up the live service on AWS](aws.md) — the one-time bring-up this page assumes is done,
   including [Step 12](aws.md#step-12-join-the-tailnet) (joining the box to the tailnet) and [Step
   15](aws.md#step-15-start-the-stack-and-connect-over-tailscale) (starting the stack).
-- [Operating the live service](operations.md) — what to do once you are connected: promotion, the
-  6-hourly schedule, inspecting forecasts, backfilling missed slots.
+- [Operating the live service](operations.md) — what to do once you are connected: the ingest
+  schedules, reading the asset checks, inspecting forecasts, backfilling missed partitions.

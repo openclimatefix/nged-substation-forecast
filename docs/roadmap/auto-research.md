@@ -9,15 +9,13 @@
 > sub-issues, numbered 188 to 192. The rest of this page describes the design for the XGBoost
 > forecast, and nothing below is being built.
 
-**We plan to have a large language model (LLM) agent search for improvements to this project's
-XGBoost forecasting model, in two phases.** Flexpectation is the forecasting system this project
-builds for National Grid Electricity Distribution (NGED). Flexpectation's current forecaster is an
-XGBoost model, and XGBoost is a standard machine-learning method. In phase 1, Claude runs
-experiments overnight from a plan that the maintainer and Claude agreed the previous
-day. In phase 2, the agent screens the [XGBoost improvements](xgboost-improvements.md) backlog, the
-list of ideas for improving the XGBoost forecasting model, so that people implement properly only the
-promising ideas. The phase 2 agent implements each idea, scores each implementation, and combines
-the ideas that help, in the style of [Karpathy's
+**The design has a large language model (LLM) agent search for improvements to an XGBoost
+forecasting model, in two phases.** Flexpectation is the forecasting system this project builds for
+National Grid Electricity Distribution (NGED). XGBoost is a standard machine-learning method. In
+phase 1, Claude runs experiments overnight from a plan that the maintainer and Claude agreed the
+previous day. In phase 2, the agent screens a backlog of ideas for improving the XGBoost forecasting
+model, so that people implement properly only the promising ideas. The phase 2 agent implements each
+idea, scores each implementation, and combines the ideas that help, in the style of [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch), with no human in the loop during a round.
 In neither phase does the agent write production code.
 
@@ -33,8 +31,8 @@ ideas that survive.
 tried without touching the reviewed code on `main`.** A change reaches `main` only through a pull
 request, which a person reviews before merging.
 
-**Every idea on the XGBoost improvements page is a candidate for phase 2, and the maintainer leans
-towards screening every idea.** Larger ideas from other roadmap pages, such as a new estimator of
+**Every idea in the XGBoost backlog is a candidate for phase 2, and the maintainer leans towards
+screening every idea.** Larger ideas from other roadmap pages, such as a new estimator of
 generator capacity, may also go to the agent.
 
 ## Why energy forecasting suits automated research
@@ -44,7 +42,7 @@ check on results that the system being judged does not control.** Two of the res
 reviewed [below](#agents-that-generate-rank-and-critique-ideas), the AI Scientist and Co-Scientist,
 judge whether a result is good by a simulated review or a tournament run by the system's own agents.
 A forecasting idea found by the agent is instead checked against power measured at the substation,
-in a validation window the agent never saw, and, once promoted, in [live
+in a validation window the agent never saw, and, once deployed, in [live
 monitoring](live-service.md#production-monitoring).
 
 **Live monitoring is a check no forecast can game, because the power each forecast is scored against
@@ -336,8 +334,8 @@ skill. Each round has six steps:
 
 1. The research lead merges the latest `main` into the hypothesis store's branch, then reads the
    store's index.
-2. The research lead chooses the ideas for the round, starting from the order on the XGBoost
-   improvements page.
+2. The research lead chooses the ideas for the round, starting from the order of the XGBoost
+   backlog.
 3. For each implementation, the research lead starts a fresh worker on a new git branch, and gives
    the worker only the written idea, not the earlier branches.
 4. The worker writes the code and commits the code.
@@ -418,9 +416,8 @@ improvement](#from-a-sessions-results-to-a-shipped-improvement) describes.
 ### Small ideas and large ideas
 
 **The design has two modes: a search over small ideas and one long agent session per large idea.** A
-small idea is a [Tier 1](xgboost-improvements.md#tier-1-config-level-changes-hours-each) or [Tier
-2](xgboost-improvements.md#tier-2-low-effort-feature-engineering-about-a-day-each) entry in the
-XGBoost backlog, such as a calendar feature or an XGBoost setting, which a worker can implement in
+small idea is a config-level or low-effort feature-engineering entry in the XGBoost backlog, such
+as a calendar feature or an XGBoost setting, which a worker can implement in
 one session. A large idea is a research project lasting days: a new estimator of the effective
 capacity of metered generators, a detector of switching events, a full differentiable-physics
 forecaster, or a method for disaggregating unmetered generation. A large idea usually adds a new
@@ -489,8 +486,7 @@ commercially sensitive.
 ### Which score steers the search
 
 **The search steers on normalised mean absolute error (NMAE) over forecast lead times of 3 to 10
-days, the headline score that the [XGBoost
-improvements](xgboost-improvements.md#how-each-win-is-evaluated) page names.** The scorer does not
+days, the headline score of the XGBoost backlog.** The scorer does not
 yet report that band. [Issue #1033 (Report NMAE over 3–10 day lead times as a leaderboard horizon
 slice)](https://github.com/openclimatefix/nged-substation-forecast/issues/1033) adds the band.
 Steering on the same metric as the leaderboard keeps the screening ranking and the leaderboard
@@ -578,8 +574,8 @@ self-driving-lab practice in materials science, not from a paper this project ha
 and is worth checking against the self-driving-lab literature before the design relies on the idea.
 
 **It is open whether to screen every small idea or to let the research lead choose which small ideas
-to try.** An exhaustive search would make the research lead's choice matter less. Most entries on
-the [XGBoost improvements](xgboost-improvements.md) page are quick to implement and quick to run, so
+to try.** An exhaustive search would make the research lead's choice matter less. Most entries in
+the XGBoost backlog are quick to implement and quick to run, so
 the maintainer leans towards screening every entry. The research lead's choices would then matter
 for the order of work, for which combinations to try, for which ideas get a second or third
 implementation, and for the large ideas. A worker writing one implementation while the previous

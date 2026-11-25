@@ -5,7 +5,7 @@
 **Version 1** (current focus): 32 time series in NGED's trial area — 16 primary substations, 6 solar
 PV farms (5 extra-high-voltage, 1 high-voltage), 3 wind farms, 2 grid supply points (GSPs), 2 bulk
 supply points (BSPs), 1 biofuel generator, 1 battery energy storage system (BESS), and 1
-reciprocating gas generator. All implemented with a single XGBoost model family.
+reciprocating gas generator.
 
 **Version 2** (future): Scale to approximately 2,500 time series (all of NGED's primary substations,
 BSPs, GSPs, and most customer meters). See [Roadmap](../roadmap/index.md).
@@ -122,10 +122,8 @@ Three properties matter as much as raw throughput:
 * **A short, safe path from R&D to production.** Conducting CV runs is only half the loop: a
   CV run that wins on the leaderboard must move into the live service as easily and as safely as
   possible. This is why R&D and production share a single unified codebase — the exact
-  feature-engineering and model code that won the CV run is what runs in production, and
-  promotion is an [audited configuration
-  change](../architecture/production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
-  not a rewrite or a port between systems.
+  feature-engineering and model code that won the CV run is what runs in production, not a rewrite
+  or a port between systems.
 
 This requirement shapes the architecture: it is why the cross-validation layer is built around
 per-(CV run, fold) partitions that can be run — and re-run — individually (see [ML Orchestration
@@ -194,10 +192,9 @@ corresponding *positive* claim, that interventions will be rare in the first pla
 tested as [H1, a service that mostly runs
 itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
-Missed forecasts are also not lost for evaluation purposes: once the service is back, missed slots
-are backfilled in replay mode, reconstructing what would have been forecast at the time — see
-[Operating the live service: Backfilling a missed
-slot](../live_service/operations.md#backfilling-a-missed-slot).
+Missed input data is not lost either: once the service is back, each ingest asset recovers the
+partitions it missed — see [Operating the live service: Backfilling a missed
+partition](../live_service/operations.md#backfilling-a-missed-partition).
 
 The same properties give the service **built-in maintenance windows**. New forecasts are produced
 only once every 6 hours, and NGED reads published forecasts directly from S3 rather than from any
