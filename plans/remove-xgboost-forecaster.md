@@ -166,13 +166,11 @@ alarms.
   `sentry_capture_failure` are unchanged.
 - **`ml_core/mlflow_runs.py`**: `PromotableRun` and `list_promotable_runs` go.
 - **`ml_core/base_forecaster.py`**: docstrings that cite XGBoost, `live_forecasts`, or promotion.
-  `load_trained_metadata` and the frozen `TimeSeriesMetadata` copy that `save` writes beside a model
-  stay, because a live asset for another time-series type that loads a saved forecaster needs
-  them. PR #1707's asset does not use them: it reads its Primaries from its bundle's
-  `primaries.json`. `fetch_model_artifacts` and `load_forecaster_from_dir` go with
-  `production_helpers.py`. The `load_trained_metadata` tests in `test_base_forecaster.py` and
-  `tests/test_trained_cv_model.py` read the directory `save` writes instead of an artifact that
-  `fetch_model_artifacts` fetched, and the `fetch_model_artifacts` tests go.
+  `load_trained_metadata`, `write_trained_metadata`, `TRAINED_METADATA_FILENAME`, and the frozen
+  `TimeSeriesMetadata` copy that `save` writes beside a model go, because nothing reads the copy.
+  The step-5 forecaster of PR #1707 reads its Primaries from its bundle's `primaries.json`.
+  `fetch_model_artifacts` and `load_forecaster_from_dir` go with `production_helpers.py`. The
+  tests of `load_trained_metadata` and of `fetch_model_artifacts` go with the functions.
 - **`contracts/settings.py`**: `production_model_path` and `sentry_monitor_forecasts` go, with
   their tests in `contracts/tests/test_settings.py`. `Settings` forbids unknown fields from `.env`,
   so the two lines go from `.env.example` and from every deployed or workstation `.env` before the
@@ -240,8 +238,8 @@ schedule tests in `tests/test_assets.py`, and the `list_promotable_runs` tests i
 The serving path is removed rather than changed, so no degradation rule is weakened in code that
 still runs. The gap is the cost: until PR #1707 lands, no live forecast reaches NGED and Sentry has
 no live-slot check. The change follows the principle that code no caller uses goes, rather than
-staying for a possible future caller. The one exception, `load_trained_metadata` with
-the frozen metadata copy, stays for a live asset of another time-series type.
+staying for a possible future caller. The frozen trained-metadata copy and its
+loaders go as well, because nothing reads the copy.
 
 ## Tests
 
@@ -335,9 +333,10 @@ Two independent simplicity reviews ran on the first draft and agreed on most fin
   default `CMD` is deleted.
 - **Drop the absence test:** accepted. `definitions validate` catches the real failure, a dangling
   import.
-- **Delete `load_trained_metadata` and the frozen metadata copy as dead code:** rejected. PR #1707
-  does not use them, but a live asset for another time-series type that loads a saved forecaster
-  does, and the plan now says so.
+- **Delete `load_trained_metadata` and the frozen metadata copy as dead code:** rejected at the plan
+  stage. PR #1707 does not use them, but a live asset for another time-series type that loads a
+  saved forecaster might. Implementation-stage simplicity review: deleting the orphaned
+  trained-metadata copy was accepted, reversing the plan-stage rejection, because no reader remains.
 - **Delete promotion-only pages instead of rewriting them:** accepted for `model-releases.md`, the
   `release-model` skill, and the "Redeploying a new champion model" section of `aws.md`.
 - **Count corrections:** accepted. About 130 files name the removed code, not 70, and 46 docs
@@ -348,7 +347,7 @@ Two independent simplicity reviews ran on the first draft and agreed on most fin
 ## Correctness review: triage
 
 - **`fetch_model_artifacts` is still imported by surviving tests:** accepted. The function goes
-  with `production_helpers.py`, and the `load_trained_metadata` tests read the saved directory.
+  with `production_helpers.py`, and the tests that imported it go or no longer need it.
 - **Climatology rejects any selected feature, so the moved tests need named substitutes:**
   accepted. The test list now names each substitute.
 - **`test_forecaster_config_serialisation.py` cannot move:** accepted. The file is deleted.

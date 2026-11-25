@@ -42,7 +42,7 @@ EXPERIMENT_NAME = "exp_predict_smoke"
 PARTITION_KEY = f"{EXPERIMENT_NAME}__{FOLD_ID}"
 
 # ts1 sits in H3 cell 10. It has training-window data (so the fold model trains on it)
-# and validation-window NWP across three ensemble members (so prediction spans the ensemble).
+# and validation-window NWP rows for three ensemble members, which the feature engineer drops.
 _TS1_CELL = 10
 # A weekday in the month before the validation day: climatology forecasts a validation row only
 # from training samples on the same day type, at most one local month and half-hour away.
@@ -143,7 +143,7 @@ def test_cv_power_forecasts_predicts_validation_fold(
     # Only the model's trained population (ts1) is scored.
     assert set(forecasts["time_series_id"].unique().to_list()) == {1}
 
-    # The ensemble members are reduced to one row per key, holding the 13 quantile columns.
+    # The output has one row per key, no ensemble_member column, and the 13 quantile columns.
     assert "ensemble_member" not in forecasts.columns
     assert not forecasts.select(PowerForecast.PRIMARY_KEY).is_duplicated().any()
     assert set(POWER_FCST_QUANTILE_COLUMNS) <= set(forecasts.columns)

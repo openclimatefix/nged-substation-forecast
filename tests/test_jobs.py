@@ -12,8 +12,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from _dummy_forecaster import DummyForecaster, DummyForecasterConfig
 from baseline_forecasters.manual_heuristic import ManualHeuristicForecaster
-from contracts.config_schemas import CvConfig, CvFoldConfig
+from contracts.config_schemas import CvConfig, CvFoldConfig, class_target
 from ml_core.base_forecaster import BaseForecasterConfig
 from ml_core.cv_helpers import flatten_config
 from pydantic import ValidationError
@@ -40,6 +41,23 @@ def test_resolve_applies_scalar_override() -> None:
     assert isinstance(config, BaseForecasterConfig)
     assert config.random_seed == 7
     assert config.experiment_name == "exp"
+
+
+def test_resolve_builds_the_config_through_the_forecasters_config_class(tmp_path: Path) -> None:
+    """A forecaster with a config subclass as its ``CONFIG_CLASS`` gets that subclass."""
+    config_path = tmp_path / "dummy.yaml"
+    config_path.write_text(
+        f"_target_: {class_target(DummyForecaster)}\nmodel_params:\n"
+        "  selected_features: []\n  dummy_extra: 5\n"
+    )
+
+    forecaster_cls, config = _resolve_forecaster_config(
+        base_model_config=str(config_path), config_overrides={}, experiment_name="exp"
+    )
+
+    assert forecaster_cls is DummyForecaster
+    assert type(config) is DummyForecasterConfig
+    assert config.dummy_extra == 5
 
 
 def test_resolve_replaces_list_override() -> None:
