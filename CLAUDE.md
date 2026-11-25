@@ -650,8 +650,8 @@ trained population, plus a parquet file of its quantile lookup.
 Identity is split across three levels. **Model-family identity** — `MODEL_NAME` — is a class-level
 constant on each `BaseForecaster` subclass (a property of the implementation). **CV run identity** —
 `experiment_name` and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with
-the saved model. The **model release** — `model_release`, an integer where `0` means "not a release"
-— lives in `BaseForecasterConfig` too. All three are stamped onto
+the saved model. `model_release` — an integer that defaults to `0` — lives in
+`BaseForecasterConfig` too. All three are stamped onto
 every `PowerForecast` row at predict time: `power_fcst_model_name` from the class,
 `power_fcst_model_version` from `model_release`, and the dedicated
 `experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse CV run identity

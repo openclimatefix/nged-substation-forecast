@@ -187,7 +187,7 @@ def test_init_sentry_disables_log_to_event_capture(monkeypatch: pytest.MonkeyPat
 def test_init_sentry_survives_a_malformed_dsn(caplog: pytest.LogCaptureFixture) -> None:
     """A malformed DSN must not stop the Dagster code location from loading — a typo in one
     environment variable would otherwise take down the whole service (no schedule, no forecasts),
-    with Sentry itself unreachable so the only signal is the missed-check-in alarm hours later.
+    with Sentry itself unreachable so the only signal is the log record this test asserts on.
 
     Uses a real DSN string that genuinely makes ``sentry_sdk.init`` raise ``BadDsn``, rather than
     monkeypatching ``init`` to raise, so this pins the actual failure mode instead of passing

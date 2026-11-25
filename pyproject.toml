@@ -282,7 +282,6 @@ ignore = [
 "packages/notebooks/plot_gb_map.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
 "packages/notebooks/plot_missing_NWP_data.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
 "packages/notebooks/plot_nwp_map.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
-"packages/notebooks/view_baseline_export.py" = ["ANN", "B018", "D", "N803", "PLR1711"]
 # `**/tests/**` covers both the root `tests/` directory and every `packages/*/tests/`.
 #
 # DTZ: test frames are hand-built with `datetime(2023, 1, 1, 12, 0)` and fed to helpers that are

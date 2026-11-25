@@ -269,9 +269,9 @@ def _engineer_features(
     # no metadata row regardless, because `_attach_containing_nwp_cell` inner-joins on `h3_res_5`.
     # Single-run mode is power-centric, so single-run mode would otherwise keep the series with
     # every weather feature null and predict on it. That forecast would be garbage, and would read
-    # as healthy because the series is present. Dropping the series instead lets a caller report
-    # that series as missing, via `missing_time_series_ids`. Unconditional, so the output row set
-    # never depends on which features were requested.
+    # as healthy because the series is present. Dropping the series instead keeps it out of the
+    # output, so the caller sees it as absent rather than as a garbage forecast. Unconditional, so
+    # the output row set never depends on which features were requested.
     power_lf = power_lf.join(metadata_lf.select("time_series_id"), on="time_series_id", how="semi")
     nwp_lf: pl.LazyFrame | None = nwp
 

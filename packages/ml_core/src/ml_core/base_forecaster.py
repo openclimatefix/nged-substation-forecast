@@ -37,11 +37,11 @@ artifact alongside this archive would reopen the merge problem for that artifact
 _ARCHIVE_COMPRESSLEVEL: Final[int] = 1
 """gzip level used for the model archive — the fastest, not ``tarfile``'s default of 9.
 
-Measured on 40 real XGBoost boosters (500 estimators, depth 6, 24 features; 77 MB of ``.ubj``):
-level 1 takes 0.7 s and shrinks those 77 MB of boosters 2.7-fold, while level 9 takes 14.9 s and
-shrinks the same 77 MB 3.5-fold. Level 9 would put ~15 minutes of pure CPU on every
-``trained_cv_model`` materialisation at V2 scale (~2,500 series) to save a fifth of the bytes.
-Boosters are already dense, and the archive is transient — it exists to be one replaceable object,
+Measured once, on the archive of 40 saved forecasters (77 MB of serialised gradient-boosted
+trees): level 1 took 0.7 s and shrank those 77 MB 2.7-fold, while level 9 took 14.9 s and shrank
+the same 77 MB 3.5-fold. Level 9 would put ~15 minutes of pure CPU on every ``trained_cv_model``
+materialisation at V2 scale (~2,500 series) to save a fifth of the bytes. Serialised model weights
+are already dense, and the archive is transient — it exists to be one replaceable object,
 not to be small. The fastest level is therefore the right setting.
 """
 
@@ -123,11 +123,11 @@ class BaseForecasterConfig(BaseModel):
     threaded into each model's training so that re-training a fold reproduces the same model —
     keeping retries and the leaderboard stable.
 
-    ``model_release`` is the number of the production model release this config trains, stamped
-    onto every ``PowerForecast`` row as ``power_fcst_model_version``. ``0`` means "not a release",
-    which is every CV run that is not a numbered release. The bounds are the range of the
-    contract's Int16 column: ``predict`` casts the value to Int16, so a value outside the range
-    would raise on every live forecast, and the bound rejects it at registration instead. The
+    ``model_release`` is an integer that ``predict`` stamps onto every ``PowerForecast`` row as
+    ``power_fcst_model_version``. ``0`` is the default, for a run that is not a numbered release.
+    The bounds are the range of the contract's Int16 column: ``predict`` casts the value to Int16,
+    so a value outside the range would raise when the forecaster predicts, and the bound rejects it
+    at registration instead. The
     model family's name lives on the ``BaseForecaster`` class as ``MODEL_NAME``, a property of the
     implementation.
 
@@ -252,9 +252,8 @@ class BaseForecaster(ABC):
 
         - The saved directory must contain a ``meta.json`` with a ``model_class`` field. That
           field holds the fully-qualified ``{module}.{qualname}`` of the concrete subclass, for
-          example ``"baseline_forecasters.climatology.ClimatologyForecaster"``. A caller loading a
-          plain model directory uses that field to reconstruct the correct class — no
-          caller-supplied class name, no class registry, and no MLflow run.
+          example ``"baseline_forecasters.climatology.ClimatologyForecaster"``. The baseline
+          forecasters' ``read_meta`` reads that field back when they load a saved directory.
         - ``path`` must be cleared first, so that saving over a directory holding a *larger*
           model's files leaves none of them behind. A dropped time series' weights would survive
           a re-train, if a save merged into the directory instead of replacing its contents

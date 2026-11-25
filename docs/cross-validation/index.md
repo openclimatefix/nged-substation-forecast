@@ -56,13 +56,13 @@ about it needs translating.
 
 ### Nothing gets rewritten on the way to production
 
-The model that wins the evaluation is, bit for bit, the model that serves production — not a
-re-implementation of it. The route to production can therefore be fast, and that speed is a
-*consequence* of rigour, not a trade against it. By the time a candidate is considered for
-production, the candidate has already been trained, cross-validated (see [Cross-validation
-folds](cross-validation-folds.md)), and evaluated on the same pipeline, under the same standardised
-protocol, as every model before it. Holding that protocol
-fixed is what makes two CV runs comparable at all. That is the reason [Karpathy's
+The design aim is that the model that wins the evaluation is, bit for bit, the model that would
+serve production — not a re-implementation of it. The route to production could therefore be
+fast, and that speed would be a *consequence* of rigour, not a trade against it. By the time a
+candidate is considered for production, the candidate has already been trained, cross-validated
+(see [Cross-validation folds](cross-validation-folds.md)), and evaluated on the same pipeline,
+under the same standardised protocol, as every model before it. Holding that protocol fixed is what
+makes two CV runs comparable at all. That is the reason [Karpathy's
 autoresearch](https://github.com/karpathy/autoresearch) fixes every training run to the same
 5-minute budget: a fixed budget "makes experiments directly comparable regardless of what the agent
 changes".

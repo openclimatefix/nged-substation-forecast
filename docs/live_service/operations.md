@@ -340,9 +340,9 @@ the read-only laptop credentials — see the [Configuration
 reference](setup.md#at-a-glance-which-settings-for-which-environment)), pick a fold in the **Fold**
 dropdown, then pick a time series and a forecast date/run. The **Fold** dropdown selects `live` when
 the `power_forecasts` table holds live rows and the first fold otherwise. The live service currently
-writes no forecast, so the table holds cross-validation forecasts only. The plot shows every
-forecast ensemble member against the observed power, from 24 hours before the forecast init time to
-14 days after it.
+writes no new forecast, but any `fold_id="live"` rows written earlier remain in the table. The plot
+shows the forecast median inside three grey quantile bands (p1 to p99, p5 to p95, and p20 to p80)
+against the observed power, from 24 hours before the forecast init time to 14 days after it.
 
 Press **Reload data** to pick up runs written since you opened the app: the date and run selectors
 move to the newest run, and your chosen time series is kept.

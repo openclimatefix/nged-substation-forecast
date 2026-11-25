@@ -92,7 +92,7 @@ implementation. Each subclass of `BaseForecaster` is responsible for defining:
   serialised config. (This may change later. We may switch to saving models using native MLflow
   flavors, which serialize the raw model object directly.)
 * _Identity_: `MODEL_NAME` is a class-level constant on each `BaseForecaster` subclass, separate
-  from `BaseForecasterConfig`. `experiment_name`, `ml_flow_experiment_id`, and `model_release` (the
-  number of the production model release, `0` when the run is not a release) travel in the config
+  from `BaseForecasterConfig`. `experiment_name`, `ml_flow_experiment_id`, and `model_release` (an
+  integer, `0` by default, stamped as `power_fcst_model_version`) travel in the config
   instead. All of them are stamped onto every `PowerForecast` row at predict time, so each row is
   self-describing.

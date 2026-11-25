@@ -164,7 +164,7 @@ hyperparameters of its own declares them on a subclass of `BaseForecasterConfig`
 | `weather_source` | `""` | Leaderboard tag, e.g. `"ecmwf_control"` or `"ecmwf_ens"`. |
 | `training_strategy` | `""` | Leaderboard tag, e.g. `"horizon_as_feature"`. |
 | `random_seed` | `0` | Seed for a forecaster's random draws, so re-training a fold reproduces the same model. Neither baseline forecaster draws at random, so for them the field changes only the CV run's identity. |
-| `model_release` | `0` | Number of the production model release, stamped on every forecast row as `power_fcst_model_version`. `0` means the run is not a release. Range 0 to 32767. |
+| `model_release` | `0` | Integer stamped on every forecast row as `power_fcst_model_version`. `0` is the default, for a run that is not a numbered release. Range 0 to 32767. |
 | `experiment_name` | `""` | Set from the job's own `experiment_name`; cannot be overridden. |
 | `ml_flow_experiment_id` | `None` | Stamped onto every `PowerForecast` row. Nothing sets it automatically. |
 

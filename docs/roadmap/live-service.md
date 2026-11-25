@@ -594,16 +594,17 @@ Still 🚧 after v0.1:
 
 - **A bigger backtest task definition** (e.g. 8 vCPU / 32 GB) — the live 4 vCPU / 16 GB definition
   exists; right-size it after a week of CloudWatch metrics.
-- **Per-task failure email alerting** (a failed run → SNS → email) — Sentry error telemetry and the
-  missed-check-in alarm already shipped in
-  [#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63); this is the one piece
-  of alerting still open. Decided 2026-07-14: prefer **portable alerting logic over AWS-native
+- **Per-task failure email alerting** (a failed run → SNS → email) — Sentry error telemetry has
+  shipped ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)); this is the
+  one piece of alerting still open. The [missed-check-in
+  alarm](#alert-on-absence-the-missed-check-in-alarm) needs a live forecast asset to check in, so it
+  does not exist yet. Decided 2026-07-14: prefer **portable alerting logic over AWS-native
   glue** (no EventBridge rules) — the checks should be plain code that runs end-to-end on a laptop
   or any cloud, with only the thin notification edge (SNS, SMTP, …) being platform-specific. Under
   the accepted option, Dagster's own run-failure sensors are the natural portable mechanism (the
-  daemon evaluates them); an EC2 instance-status-check alarm and the [missed-check-in
-  alarm](#alert-on-absence-the-missed-check-in-alarm) cover the silent-failure classes ("daemon
-  silently dead") that per-task alerts miss. The SNS-subscription-confirm step joins the
+  daemon evaluates them); an EC2 instance-status-check alarm would cover the silent-failure class ("daemon
+  silently dead") that per-task alerts miss. The missed-check-in alarm would cover it too, once a
+  live forecast asset exists to check in. The SNS-subscription-confirm step joins the
   [runbook](../live_service/aws.md) once this lands.
 - **Infra-as-code** ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326))
   once there's enough to justify it — per the [Access phasing sequencing note](#access-phasing),

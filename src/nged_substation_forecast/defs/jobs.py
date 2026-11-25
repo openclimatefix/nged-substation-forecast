@@ -41,7 +41,7 @@ class RegisterExperimentConfig(Config):
         default_factory=dict,
         description=(
             "Key-value overrides applied to the base YAML's model_params, replacing whole values,"
-            " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}. Every key must name a"
+            " e.g. {'selected_features': ['power_lag_168h']}. Every key must name a"
             " field the config class declares; an unknown one is rejected, so a misspelling fails"
             " here rather than training on the YAML's value."
         ),

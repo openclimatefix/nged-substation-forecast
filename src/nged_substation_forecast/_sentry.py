@@ -1,7 +1,7 @@
 """Sentry.io telemetry: error reporting and freshness warnings.
 
-Two independent mechanisms, all no-ops when Sentry is unconfigured, so laptops and CI need no
-Sentry configuration:
+The two mechanisms below are independent, and both are no-ops when Sentry is unconfigured, so
+laptops and CI need no Sentry configuration:
 
 - **Error telemetry** — `init_sentry` initialises the SDK once per process (a no-op unless
   ``Settings.sentry_dsn`` is set), and the `sentry_capture_failure` Dagster failure hook reports the
