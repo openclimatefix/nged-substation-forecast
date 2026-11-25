@@ -7,15 +7,15 @@ lead band. The network is step 5 of research experiment 677 at monthly refits. T
 constants that research experiment 705 exports. The goal is a daily forecast for the Primaries in
 the live service before the Christmas 2026 break.
 
-**The planned solution.** A new workspace package, `demand_network`, rebuilds the network's 60
-input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs a forward pass
-re-implemented in numpy for each of the three seeds, and reads the 13 NGED delivery quantile levels out
-of each seed's Gaussian mixture. A new daily Dagster asset, `live_primary_substation_forecasts`,
-runs the package at the 12:00 UTC origin on the day's 00Z ECMWF ENS run and writes one row per
-Primary and half-hour to `power_forecasts`, with the 13 quantile columns that a separate issue adds
-to `PowerForecast` (see "Dependency on the contract change"). The bundle is copied into the image
-beside the existing champion model. The 6-hourly `live_forecasts` asset keeps running, as the
-fallback.
+**The planned solution.** A new workspace package, `substation_demand_forecaster`, rebuilds the
+network's 60 input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs a
+forward pass re-implemented in numpy for each of the three seeds, and reads the 13 NGED delivery
+quantile levels out of each seed's Gaussian mixture. A new daily Dagster asset,
+`live_primary_substation_forecasts`, runs the package at the 12:00 UTC origin on the day's 00Z ECMWF
+ENS run and writes one row per Primary and half-hour to `power_forecasts`, with the 13 quantile
+columns that a separate issue adds to `PowerForecast` (see "Dependency on the contract change"). The
+bundle is copied into the image beside the existing champion model. The 6-hourly `live_forecasts`
+asset keeps running, as the fallback.
 
 ## Verdict, size, and departures
 
@@ -62,16 +62,16 @@ structure.
    12:00 slot is later than `ecmwf_ens_schedule` (10:30 UTC), so on a normal day the run is already
    on disk. The two schedules couple through data at rest, never through run status (design
    principle 14).
-2. **The asset loads the bundle** with `demand_network.bundle.load_bundle(path)` from the new
-   `Settings.primaries_network_bundle_path`. `load_bundle` checks that the manifest's
+2. **The asset loads the bundle** with `substation_demand_forecaster.bundle.load_bundle(path)` from
+   the new `Settings.primary_substation_bundle_path`. `load_bundle` checks that the manifest's
    `bundle_format_version` equals `BUNDLE_FORMAT_VERSION: Final = "2"` (the manifest stores it as a
-   string), reads each seed's weights from `components/step5/weights/seed<N>.npz` with
-   `numpy.load`, and returns a frozen `Bundle` dataclass. The dataclass holds the config, the
-   standardisers, the column order, the offset knots, the model release number from the manifest's
-   new `model_release` field (0 until a release is cut), and the 16 Primaries from `primaries.json`
-   (identifier, H3 cell, latitude, longitude, `effective_capacity_mw`, `capacity_mw`, embedding
-   index). The Primaries and their capacities come from the bundle, never from today's
-   `TimeSeriesMetadata` table, for the same reason `live_forecasts` uses its frozen metadata copy.
+   string), reads each seed's weights from `components/step5/weights/seed<N>.npz` with `numpy.load`,
+   and returns a frozen `Bundle` dataclass. The dataclass holds the config, the standardisers, the
+   column order, the offset knots, the model release number from the manifest's new `model_release`
+   field (0 until a release is cut), and the 16 Primaries from `primaries.json` (identifier, H3
+   cell, latitude, longitude, `effective_capacity_mw`, `capacity_mw`, embedding index). The
+   Primaries and their capacities come from the bundle, never from today's `TimeSeriesMetadata`
+   table, for the same reason `live_forecasts` uses its frozen metadata copy.
 3. **The asset checks that today's 00Z run is present** with the existing
    `_available_nwp_init_times`. If it is not, the asset raises `RetryRequested` every 30 minutes,
    up to 6 times, so until 15:00 UTC. That is 30 minutes after the last retry of `ecmwf_ens`
@@ -83,19 +83,20 @@ structure.
    `e00437_features.py`, a 10-day cold-snap cap plus a 24-hour mean window). The first day of run
    D−13 is the earliest that reaches 12 days before the origin. The scan also covers the
    expected-weather rows, which reach back 192 hours.
-5. **`demand_network.ens_summary.summarise_runs(nwp, primaries)` builds the ENS summary per run.**
-   It first joins each H3 cell to the Primaries' `time_series_id`, drops `h3_index`, and renames
-   `init_time` to `nwp_init_time`, because `_upsample_nwp_to_half_hourly` raises on any other
-   column. It then calls `_upsample_nwp_to_half_hourly` on each member separately, with the
-   Primaries' coordinates as `solar_coordinates` and `strict_radiation_schedule=False`, so that one
-   run with an unusual radiation lead degrades instead of failing the asset. It derives
-   `wind_speed_10m = sqrt(u² + v²)` per member, and only then takes the member mean and the
-   population standard deviation (`ddof=0`). Experiment 705 found that averaging first is wrong by
-   up to 4.24 m/s in wind speed. Precipitation gets `log1p` of the value clipped at zero, applied to
-   both the mean and the standard deviation, as the bundle's `ens_summary_recipe` states.
-6. **`demand_network.features.build_input_matrix(...)` builds the 60 columns** for each (Primary,
-   valid half-hour) from the native origin plus 0.5 hours to plus 339 hours, in the order of
-   `components/step5/columns.json`:
+5. **`substation_demand_forecaster.ens_summary.summarise_runs(nwp, primaries)` builds the ENS
+   summary per run.** It first joins each H3 cell to the Primaries' `time_series_id`, drops
+   `h3_index`, and renames `init_time` to `nwp_init_time`, because `_upsample_nwp_to_half_hourly`
+   raises on any other column. It then calls `_upsample_nwp_to_half_hourly` on each member
+   separately, with the Primaries' coordinates as `solar_coordinates` and
+   `strict_radiation_schedule=False`, so that one run with an unusual radiation lead degrades
+   instead of failing the asset. It derives `wind_speed_10m = sqrt(u² + v²)` per member, and only
+   then takes the member mean and the population standard deviation (`ddof=0`). Experiment 705 found
+   that averaging first is wrong by up to 4.24 m/s in wind speed. Precipitation gets `log1p` of the
+   value clipped at zero, applied to both the mean and the standard deviation, as the bundle's
+   `ens_summary_recipe` states.
+6. **`substation_demand_forecaster.features.build_input_matrix(...)` builds the 60 columns** for
+   each (Primary, valid half-hour) from the native origin plus 0.5 hours to plus 339 hours, in the
+   order of `components/step5/columns.json`:
     - the 14 ENS means and standard deviations of today's run;
     - the 21 calendar and sun columns, computed from the valid time. The sun columns are the
       apparent zenith cosine and the azimuth sine and cosine at the half-hour's stamp minus 15
@@ -115,40 +116,40 @@ structure.
     - the knot position (months since 2019-09 plus the fraction of the month, clamped to the knot
       range).
 
-   The analysis proxy comes from `demand_network.features.analysis_proxy`. It filters the ENS
-   summary means to leads strictly above 9 hours and strictly below 33.5 hours, labels the frame
-   `ensemble_member = NWP_ANALYSIS_MEMBER`, and calls `select_analysis_proxy` unchanged; experiment
-   705 showed that this window reproduces the research history exactly. The expected-weather rows
-   come from `build_expected_rows(...)`. For each half-hour g in (native origin − 192 h, native
-   origin − 24 h], the row is the ENS summary row of the freshest run whose native 09:00 origin is
-   at or before g: its 7 weather means (precipitation `log1p`) and 21 date-time columns recomputed
-   from g, with the 14 B1 slots set to 0. Standardisation follows the rules in
-   `standardisers.json`: float32 arithmetic, clip at ±5, and NaN to 0 for the 37 lag-free columns;
-   float64 and a clip for the lag values; non-finite to 0 and no clip for the B1 columns; float16
-   rounding of the expected-weather rows.
-7. **`demand_network.network.forecast(bundle, matrix, expected_rows, levels)`** runs each seed's
-   forward pass in numpy, with `scipy.special.erf` for the exact GELU and the mixture's cumulative
-   distribution. The forward pass is the functional `forward` and `mlp` of `reference_check.py`,
-   ported line by line and applying the stored weights by their `state_dict` names, so the port
-   diffs against the reference and imports nothing from research. `forecast` reads the quantiles at
-   `levels` (the 13 delivery levels in production, and the 11 research levels in the golden tests)
-   from each seed's mixture by 40 bisection steps
-   over ±40 standard deviations, sorts each seed's quantiles, converts them to a fraction of
-   capacity with the per-Primary target mean and standard deviation, averages the three seeds level
-   by level, and sorts within each row again, as research does.
+   The analysis proxy comes from `substation_demand_forecaster.features.analysis_proxy`. It filters
+   the ENS summary means to leads strictly above 9 hours and strictly below 33.5 hours, labels the
+   frame `ensemble_member = NWP_ANALYSIS_MEMBER`, and calls `select_analysis_proxy` unchanged;
+   experiment 705 showed that this window reproduces the research history exactly. The
+   expected-weather rows come from `build_expected_rows(...)`. For each half-hour g in (native
+   origin − 192 h, native origin − 24 h], the row is the ENS summary row of the freshest run whose
+   native 09:00 origin is at or before g: its 7 weather means (precipitation `log1p`) and 21
+   date-time columns recomputed from g, with the 14 B1 slots set to 0. Standardisation follows the
+   rules in `standardisers.json`: float32 arithmetic, clip at ±5, and NaN to 0 for the 37 lag-free
+   columns; float64 and a clip for the lag values; non-finite to 0 and no clip for the B1 columns;
+   float16 rounding of the expected-weather rows.
+7. **`substation_demand_forecaster.network.forecast(bundle, matrix, expected_rows, levels)`** runs
+   each seed's forward pass in numpy, with `scipy.special.erf` for the exact GELU and the mixture's
+   cumulative distribution. The forward pass is the functional `forward` and `mlp` of
+   `reference_check.py`, ported line by line and applying the stored weights by their `state_dict`
+   names, so the port diffs against the reference and imports nothing from research. `forecast`
+   reads the quantiles at `levels` (the 13 delivery levels in production, and the 11 research levels
+   in the golden tests) from each seed's mixture by 40 bisection steps over ±40 standard deviations,
+   sorts each seed's quantiles, converts them to a fraction of capacity with the per-Primary target
+   mean and standard deviation, averages the three seeds level by level, and sorts within each row
+   again, as research does.
 8. **The asset relabels the origin to 12:00 UTC, multiplies by `capacity_mw`, and keeps the 671
    valid times strictly after 12:00 UTC, the last being 12:00 UTC 14 days later.** Research's own
    contract rows start at 12:00 UTC itself; `PowerForecast.valid_time` must be strictly after
-   `power_fcst_init_time`, so that row is dropped. The asset then clamps every quantile of the
-   eight MVA Primaries at zero, as the backtest files do. It builds a `PowerForecast` frame with the
-   13 quantile columns, `power_fcst_model_name = "primaries_demand_network"`, `experiment_name =
-   "primaries_demand_network"`, `power_fcst_model_version` from the bundle's `model_release`,
-   `nwp_init_time` = today's 00Z run, and `fold_id = "live"`.
+   `power_fcst_init_time`, so that row is dropped. The asset then clamps every quantile of the eight
+   MVA Primaries at zero, as the backtest files do. It builds a `PowerForecast` frame with the 13
+   quantile columns, `power_fcst_model_name = "primary_substation_demand_forecaster"`,
+   `experiment_name = "primary_substation_demand_forecaster"`, `power_fcst_model_version` from the
+   bundle's `model_release`, `nwp_init_time` = today's 00Z run, and `fold_id = "live"`.
 9. **The asset writes with `write_power_forecasts`**, replacing exactly the partition
    (`experiment_name`, `"live"`) and this `power_fcst_init_time`, so a rerun never duplicates rows.
-   No Sentry check-in monitor is added: a failed run reaches Sentry through `sentry_capture_failure`,
-   a missing run through the degradation report, and a dead daemon through the existing
-   `live-forecasts` monitor.
+   No Sentry check-in monitor is added: a failed run reaches Sentry through
+   `sentry_capture_failure`, a missing run through the degradation report, and a dead daemon through
+   the existing `live-forecasts` monitor.
 
 #### The main branches off the happy path
 
@@ -197,12 +198,12 @@ structure.
   format becomes version `"2"`. The `.pt` files can stay for research's own `reference_check.py`.
 - **No `torch` dependency.** The forward pass is a few linear layers, GELU, embedding lookups,
   `log_softmax`, `erf`, and bisection, all of which numpy and scipy do.
-- **Root `pyproject.toml` and `uv.lock`**: `demand_network` as a dependency of the root project
-  with a `[tool.uv.sources]` workspace entry, because the Dockerfile's `uv sync --no-dev
-  --no-editable` installs only the root project's dependencies. `holidays` and `pvlib` become
-  runtime dependencies of `demand_network`; `pvlib` stays in the dev group too, for
-  `test_radiation.py`.
-- **`packages/demand_network/`** (new workspace member):
+- **Root `pyproject.toml` and `uv.lock`**: `substation_demand_forecaster` as a dependency of the
+  root project with a `[tool.uv.sources]` workspace entry, because the Dockerfile's `uv sync
+  --no-dev --no-editable` installs only the root project's dependencies. `holidays` and `pvlib`
+  become runtime dependencies of `substation_demand_forecaster`; `pvlib` stays in the dev group too,
+  for `test_radiation.py`.
+- **`packages/substation_demand_forecaster/`** (new workspace member):
     - `bundle.py`: `Bundle` (frozen dataclass), `load_bundle(path)`, and `BUNDLE_FORMAT_VERSION`.
     - `ens_summary.py`: `summarise_runs(nwp, primaries)`.
     - `features.py`: `analysis_proxy`, `calendar_columns`, `sun_columns`, `b1_columns`,
@@ -210,23 +211,23 @@ structure.
     - `network.py`: the functional `mlp` and `forward` ported from `reference_check.py`,
       `mixture_quantiles`, and `forecast`.
     - `README.md`: what the package does and where bundles come from.
-- **`packages/contracts/src/contracts/settings.py`**: `primaries_network_bundle_path`, defaulting
-  to `<local_artifacts_path>/primaries_network_bundle`.
-- **`src/nged_substation_forecast/defs/primaries_network_assets.py`** (new): the asset, on
+- **`packages/contracts/src/contracts/settings.py`**: `primary_substation_bundle_path`, defaulting
+  to `<local_artifacts_path>/primary_substation_bundle`.
+- **`src/nged_substation_forecast/defs/primary_substation_forecast_assets.py`** (new): the asset, on
   `ecmwf_ens_partitions`.
 - **`src/nged_substation_forecast/defs/schedules.py`**: `live_primary_substation_forecasts_job` and
   its 12:00 UTC schedule.
 - **`src/nged_substation_forecast/definitions.py`**: the new module in `load_assets_from_modules`,
   and the schedule in `schedules=[...]`.
 - **`Dockerfile` and `scripts/deploy/build_and_verify_image.sh`**: a second named build context,
-  `primaries_network_bundle`, copied to the bundle path. The verify step runs the SHA-256 check of
+  `primary_substation_bundle`, copied to the bundle path. The verify step runs the SHA-256 check of
   every file against `manifest.json` and prints the bundle's research commit.
 
 ### Implementation order
 
-1. **The `demand_network` package without the asset**, with the golden tests. This is the part
-   where train/serve skew can hide, so it gets reviewed on its own. It does not wait for the
-   contract change.
+1. **The `substation_demand_forecaster` package without the asset**, with the golden tests. This is
+   the part where train/serve skew can hide, so it gets reviewed on its own. It does not wait for
+   the contract change.
 2. **The asset, schedule, definitions, settings, and image changes**, once `PowerForecast` has its
    quantile columns.
 3. **Docs**: the runbook steps and the release-log row.
@@ -253,8 +254,8 @@ structure.
 
 ## Tests
 
-- **Golden tests against a bundle (`tests/test_demand_network_golden.py`), skipped unless
-  `PRIMARIES_NETWORK_BUNDLE_PATH` names a bundle.** They run on the workstation against both
+- **Golden tests against a bundle (`tests/test_substation_demand_forecaster_golden.py`), skipped
+  unless `PRIMARY_SUBSTATION_BUNDLE_PATH` names a bundle.** They run on the workstation against both
   bundles (the production `drop/2026-10` and the test `replay/2026-04`), because the fixtures hold
   NGED telemetry that is not committed. For each fixture origin they compare, column by column:
     - production's ENS summary against `ens_summary.parquet`;
@@ -316,7 +317,7 @@ structure.
 uv run ruff check . && uv run ruff format --check .
 uv run ty check
 uv run pytest
-PRIMARIES_NETWORK_BUNDLE_PATH=<bundle> uv run pytest tests/test_demand_network_golden.py  # workstation
+PRIMARY_SUBSTATION_BUNDLE_PATH=<bundle> uv run pytest tests/test_substation_demand_forecaster_golden.py  # workstation
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
 ```
@@ -327,8 +328,8 @@ scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
   "Design-philosophy check". The cost is that `promoted_model` and `load_forecaster_from_dir` do
   not apply; the bundle is copied by hand from the workstation, as the runbook will say.
 - **`pvlib` in the image, or a port of SPA.** Research's sun columns come from pvlib's SPA, and
-  ml_core's NOAA geometry will not match to 1e-5. Recommendation: make `pvlib` a runtime
-  dependency of `demand_network` and call its numpy SPA functions, so no pandas object appears in
+  ml_core's NOAA geometry will not match to 1e-5. Recommendation: make `pvlib` a runtime dependency
+  of `substation_demand_forecaster` and call its numpy SPA functions, so no pandas object appears in
   our code. The cost is pandas arriving in the image as pvlib's own dependency.
 - **The first production bundle is refitted on 2026-10-01, so its offset is held flat past
   October.** The next refit, with a 2026-12-01 cut-off, can first run on about 2026-12-06, because
