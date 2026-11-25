@@ -21,15 +21,14 @@ minutes to days, for reasons entirely outside the consuming service's control.
 This kind of outage is the shape [Inherent Stability](inherent-stability.md) is built around: the
 [degradation ladder](inherent-stability.md#the-degradation-ladder) states what the forecast should
 still produce at each stage of loss, from one missed weather-model run through to no fresh data at
-all. The ingest already degrades this way: a stalled meter or a missed ECMWF run stops no other
-job. The live service writes no forecast today, so the forecast's own degradation is designed but
-not built. Weather data is the sharper case, because no forecaster in the repository yet falls back
-to a weather-blind forecast when numerical weather prediction (NWP) data is absent. That fallback
-is deliberately sequenced behind training a model against realistic outages, so that a degraded
-forecast is measured rather than merely produced. The [failure-modes
-table](inherent-stability.md#failure-modes) keeps one deliberate hard failure: a duplicated
-forecast primary key means one of our own joins has fanned out, which `PowerForecast.validate`
-rejects at the contract boundary rather than delivering.
+all. The ingest already degrades this way: a stalled meter or a missed ECMWF run stops no other job.
+The forecast's own degradation is designed but not built. Weather data is the sharper case, because
+no forecaster in the repository yet falls back to a weather-blind forecast when numerical weather
+prediction (NWP) data is absent. That fallback is deliberately sequenced behind training a model
+against realistic outages, so that a degraded forecast is measured rather than merely produced. The
+[failure-modes table](inherent-stability.md#failure-modes) keeps one deliberate hard failure: a
+duplicated forecast primary key means one of our own joins has fanned out, which
+`PowerForecast.validate` rejects at the contract boundary rather than delivering.
 
 ## Upstream data malformed or silently reshaped
 

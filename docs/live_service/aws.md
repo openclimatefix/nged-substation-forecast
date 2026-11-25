@@ -5,7 +5,7 @@ unattended: data tables on S3 (Simple Storage Service, AWS's object store), one 
 every role, an always-on control-plane box running Dagster behind Tailscale, and the scheduled
 ingest runs executing on ephemeral Fargate (AWS's serverless container compute) tasks. When you
 finish this page, you open the Dagster UI from your laptop over Tailscale and watch the ingest runs
-land. The live service currently writes no forecast.
+land.
 
 You can point a coding agent (e.g. Claude Code) at this page and have it drive the console steps
 alongside you. It's also worth asking the agent to check your work as you go: after completing a

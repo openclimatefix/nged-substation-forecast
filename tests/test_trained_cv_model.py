@@ -21,7 +21,6 @@ from contracts.ml_schemas import EligibleTimeSeries
 from contracts.settings import Settings
 from dagster import DagsterInstance, materialize
 from deltalake import write_deltalake
-from ml_core.base_forecaster import _download_and_unpack_model, load_trained_metadata
 from ml_core.features.tabular_feature_engineer import TabularFeatureEngineer
 from mlflow.entities import Run
 from mlflow.tracking import MlflowClient
@@ -489,16 +488,6 @@ def test_trained_cv_model_trains_and_saves_to_mlflow(
     # past train_end, so the inclusive-window filter excludes it).
     loaded = ClimatologyForecaster.load_from_mlflow(fold_run.info.run_id)
     assert loaded.trained_time_series_ids == [1]
-
-    # The archive also carries the metadata table rows the model was engineered against, which is
-    # what a live asset locates its time series by instead of reading the metadata table.
-    model_dir = _download_and_unpack_model(
-        run_id=fold_run.info.run_id, work_dir=tmp_path, remedy=""
-    )
-    frozen = load_trained_metadata(model_dir)
-    # Narrowed to the trained population, not the wider eligible one it was engineered over.
-    assert frozen["time_series_id"].to_list() == [1]
-    assert frozen["h3_res_5"].item() == _TS1_CELL
 
 
 def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(

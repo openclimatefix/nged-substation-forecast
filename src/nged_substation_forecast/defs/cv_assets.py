@@ -283,9 +283,7 @@ def _time_series_ids_missing_metadata(
     the metadata frame is already eager and already filtered to ``time_series_ids``.
 
     The CV assets raise on a non-empty answer. CV is R&D and fails fast, so a silently-shrunk
-    population can never poison a leaderboard comparison. A production asset must never raise on
-    an absent input, so it would degrade and report the gap instead. The split in full:
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
+    population can never poison a leaderboard comparison.
     """
     return sorted(set(time_series_ids) - set(metadata["time_series_id"].to_list()))
 
@@ -326,8 +324,7 @@ def _load_time_series_metadata(
     **Research callers only.** The metadata table is the live registry of what NGED operates, so a
     fault in it must stop a training or scoring run rather than silently shrink its population. A
     fault here means an off-contract file, or a metadata table rebuilt from a snapshot that dropped
-    rows. A production asset that loads a saved forecaster reads
-    ``ml_core.base_forecaster.load_trained_metadata`` instead.
+    rows.
 
     Args:
         settings: Application settings (data paths, credentials).
@@ -445,7 +442,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     parent_run_id = get_or_create_parent_run(experiment_id)
     fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
 
-    forecaster.save_to_mlflow(fold_run_id, time_series_metadata=metadata_df)
+    forecaster.save_to_mlflow(fold_run_id)
     with mlflow.start_run(run_id=fold_run_id):
         # MLflow params are immutable and the fold run is reused on every re-materialisation, so
         # nothing here that can legitimately change between materialisations may be a param.

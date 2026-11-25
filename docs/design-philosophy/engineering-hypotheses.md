@@ -194,9 +194,8 @@ slowly and less repeatably, with the added risk that a hand-run check is skipped
 pressure.
 
 **T3.1 — Promotion effort.** Commands required to get from "the leaderboard says X won" to "X is
-serving", following the runbook. No promotion mechanism exists today, because the live service
-writes no forecast yet, so the test cannot be run until a live forecasting asset and its runbook
-exist.
+serving", following the runbook. No promotion mechanism exists today, so the test cannot be
+run until a live forecasting asset and its runbook exist.
 
 **T3.2 — Rollback effort.** Commands required to get from "X is serving" back to the model that
 served before X. Promotion without rollback is not safe at any speed, and rollback is the damping

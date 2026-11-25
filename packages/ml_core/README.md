@@ -58,8 +58,8 @@ without a Dagster instance, an MLflow server, or an object store. The assets hol
 **Every neighbouring package owns a piece of the data; `ml_core` owns what is done with that data.**
 `contracts` owns what every frame means, and `ml_core` consumes those Patito schemas without
 declaring any of its own. `delta_store` owns how a table is physically written, and `ml_core` writes
-no Delta table at all. The files `ml_core` does write are a saved model's frozen copy of the
-metadata table and the gzipped tar archive that model ships in. `nged_data` and `dynamical_data`
+no Delta table at all. The one file `ml_core` writes is the gzipped tar archive that a saved
+model ships in. `nged_data` and `dynamical_data`
 own the ingest of observed power and of gridded weather, and `ml_core` starts from whatever those
 two packages landed. `geo` owns H3 indexing, and `weather_utils` owns the analysis-proxy query the
 weather-lag join is built on. What is left — turning power, weather, and metadata into a
@@ -85,8 +85,7 @@ the `time_series_id` population it trained on, whatever the eligibility rules wo
 `BaseForecaster.trained_time_series_ids` is that frozen record. Power coverage changes over time, so
 a series can newly qualify or newly drop out between a training run and a scoring run. Letting the
 scored population drift with the coverage would silently compare two CV runs over two different
-populations. `load_trained_metadata` reads back the frozen copy of the metadata table that a saved
-model carries, so a caller that loads a saved model sees exactly the series that model trained on.
+populations.
 
 ## Research and production share one execution path
 

@@ -145,8 +145,7 @@ committing to a long `full_cv` training run.
 ## Running the live service on your laptop
 
 The entire live service — the hourly telemetry ingest, the daily NWP download, and the Dagster UI —
-runs on the laptop you have just set up, with no AWS involved. The live service writes no forecast
-yet: no Dagster asset writes live rows to `power_forecasts`. Running the whole stack
+runs on the laptop you have just set up, with no AWS involved. Running the whole stack
 locally is a deliberate portability requirement rather than a development convenience: no
 cloud-specific service may be load-bearing for scheduling or orchestration (see [the orchestration
 decision](architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)).

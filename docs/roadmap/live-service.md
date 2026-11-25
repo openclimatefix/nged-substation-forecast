@@ -41,10 +41,9 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
   (`fold_id="live"`) — see [live forecast assets](#live-forecast-assets).
 - Forecast *quality* does not matter yet — science improvements (baselines, trained forecasters)
   are explicitly out of scope for this milestone.
-- Production inference must have **zero dependency on MLflow at runtime** — a live forecaster's
-  trained model is baked directly into the container image at build time and loaded via a plain
-  `save`/`load`, so there is no run ID, cache lookup, or tracking-server call on the hot path at
-  all.
+- Production inference must have **zero dependency on MLflow at runtime**. The production image
+  carries no model today, and no production asset makes a run ID, cache lookup, or tracking-server
+  call.
 - Support both **live** (current partition) and **replay** (historical backfill) NWP availability
   modes, so missed runs can be backfilled
   ([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)).
@@ -89,19 +88,18 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
 exists yet.** Each live asset owns its partitions and its schedule, and writes `fold_id="live"` rows
 to `power_forecasts`. The helpers a live asset reuses sit in neutral modules: the NWP-run lookup
 `_available_nwp_init_times` in `defs/assets.py`, beside `ecmwf_ens`, and `write_power_forecasts`
-in the `delta_store` package. Until a live forecast asset exists, the live service writes no
-forecast. [Operating the live service](../live_service/operations.md) is the permanent home this
-page's shipped material moves to (and, eventually, this whole page, once every section below has
-landed).
+in the `delta_store` package. [Operating the live service](../live_service/operations.md) is the
+permanent home this page's shipped material moves to (and, eventually, this whole page, once every
+section below has landed).
 
 ## Production model artifacts
 
 Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)
 
-> **Status: ✅ Done.** The design decision (bake each live forecaster's trained model into the image
-> at build time; no MLflow at runtime) and its rationale now live at [Production Deployment —
-> Design](../architecture/production-deployment.md); the build-and-verify runbook lives at [Setting
-> up the live service on AWS](../live_service/aws.md).
+> **Status: the production image carries no model.** The design for a future live forecaster (put
+> its trained model in the image at build time; no MLflow at runtime) and its rationale live at
+> [Production Deployment — Design](../architecture/production-deployment.md); the build-and-verify
+> runbook lives at [Setting up the live service on AWS](../live_service/aws.md).
 
 ## AWS architecture
 

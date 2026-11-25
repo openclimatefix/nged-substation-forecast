@@ -37,11 +37,9 @@ power_time_series_and_metadata_schedule = ScheduleDefinition(
 """Fires at :55 past every hour, so this hour's pull has landed, and been cleaned by
 ``clean_nged_power_data``, a few minutes before the top of the hour.
 
-No downstream job waits on this job's run status. An asset that reads the cleaned telemetry runs
-as a separate job on its own schedule, and if this pull fails or runs long, that asset runs on
-time against whatever telemetry is already on disk. Making the ordering a precondition would
-convert one failed ingest into a missing output, which is the failure mode the whole design exists
-to avoid. Rule: "never make one production job's run status a precondition for another's" —
+No downstream job waits on this job's run status, so a failed or late pull never holds back an
+asset that reads the cleaned telemetry. Rule: "never make one production job's run status a
+precondition for another's" —
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 The principle in full, with the trade it makes:
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status>."""

@@ -57,6 +57,3 @@ ENTRYPOINT ["dagster"]
 # command spells the full argv instead: EcsRunLauncher's generated run command itself starts
 # with "dagster", so the ECS task definition neutralises this ENTRYPOINT with /usr/bin/env
 # (docs/live_service/aws.md, Step 9), and the control-plane services override it outright.
-#
-# The image has no default command: every caller names the command it runs. The smoke test in
-# scripts/deploy/build_and_verify_image.sh runs `definitions validate`.

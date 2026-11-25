@@ -1,8 +1,7 @@
 """Tests for the MLflow model-artifact plumbing, against file-based MLflow.
 
-Covers ``BaseForecaster.save_to_mlflow``/``load_from_mlflow`` and the frozen metadata copy that
-travels in the same archive — they are tested together here because they share one on-the-wire
-format and one fake forecaster.
+Covers ``BaseForecaster.save_to_mlflow`` and ``load_from_mlflow``, which are tested together here
+because they share one on-the-wire format and one fake forecaster.
 
 That fake (rather than a concrete model) keeps the tests focused on the shared behaviour —
 archive upload/download — and free of any model-library dependency. It writes one file per
@@ -15,20 +14,16 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Self
 
-import ml_core.base_forecaster
 import mlflow
 import patito as pt
-import polars as pl
 import pytest
 from contracts.config_schemas import class_target
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerForecast, TimeSeriesMetadata
+from contracts.power_schemas import PowerForecast
 from ml_core.base_forecaster import (
-    TRAINED_METADATA_FILENAME,
     BaseForecaster,
     BaseForecasterConfig,
     _download_and_unpack_model,
-    load_trained_metadata,
 )
 from mlflow.exceptions import MlflowException
 from mlflow.tracking import MlflowClient
@@ -115,25 +110,6 @@ def test_trained_time_series_ids_is_abstract() -> None:
         _MissingPopulation(BaseForecasterConfig(selected_features=set()))  # ty: ignore[abstract-class-instantiation]
 
 
-def _metadata_for(
-    series: Sequence[int], area_wkt: bool = False
-) -> pt.DataFrame[TimeSeriesMetadata]:
-    """A metadata table for ``series``, carrying only the columns any consumer reads.
-
-    ``set_model`` rather than ``validate``, as the assets themselves do, so a partial frame is
-    enough. ``area_wkt`` adds the one column ``write_trained_metadata`` is expected to drop.
-    """
-    frame = pl.DataFrame(
-        {
-            "time_series_id": pl.Series(series, dtype=pl.Int32),
-            "h3_res_5": pl.Series([100 + i for i in range(len(series))], dtype=pl.UInt64),
-        }
-    )
-    if area_wkt:
-        frame = frame.with_columns(area_wkt=pl.lit("POLYGON((0 0,1 1,1 0,0 0))"))
-    return pt.DataFrame(frame).set_model(TimeSeriesMetadata)
-
-
 def _save(
     run_id: str,
     payload: str,
@@ -150,7 +126,7 @@ def _save(
         payload=payload,
         series=series,
     )
-    forecaster.save_to_mlflow(run_id, time_series_metadata=_metadata_for(series))
+    forecaster.save_to_mlflow(run_id)
 
 
 def _artifact_file_paths(run_id: str) -> list[str]:
@@ -234,13 +210,12 @@ def test_re_saving_a_smaller_model_leaves_no_trace_of_the_dropped_series(
     # ...and nothing the download path materialises does either.
     assert _FakeForecaster.load_from_mlflow(saved_run).trained_time_series_ids == [10, 20]
 
-    dest = _download_and_unpack_model(run_id=saved_run, work_dir=tmp_path, remedy="")
+    dest = _download_and_unpack_model(run_id=saved_run, work_dir=tmp_path)
     assert sorted(p.name for p in dest.iterdir()) == [
         "10.part",
         "20.part",
         "meta.json",
         "payload.txt",
-        TRAINED_METADATA_FILENAME,
     ]
 
 
@@ -256,58 +231,6 @@ def test_loading_a_run_with_no_archive_says_what_to_do_about_it(saved_run: str) 
 
     with pytest.raises(MlflowException, match="re-materialise `trained_cv_model`"):
         _FakeForecaster.load_from_mlflow(empty_run_id)
-
-
-def test_the_archive_carries_the_trained_metadata_without_area_wkt(
-    saved_run: str, tmp_path: Path
-) -> None:
-    """The archive must carry the rows a live asset locates its series by — and only those.
-
-    ``area_wkt`` is 98.5% of the metadata table's bytes and nothing reads it, so it must not ride
-    along into every fold's archive.
-    """
-    _FakeForecaster(
-        BaseForecasterConfig(selected_features=set()), payload="located", series=[10, 20]
-    ).save_to_mlflow(saved_run, time_series_metadata=_metadata_for([10, 20], area_wkt=True))
-
-    dest = _download_and_unpack_model(run_id=saved_run, work_dir=tmp_path, remedy="")
-
-    metadata = load_trained_metadata(dest)
-    assert metadata["time_series_id"].to_list() == [10, 20]
-    assert "h3_res_5" in metadata.columns
-    assert "area_wkt" not in metadata.columns
-
-
-def test_save_to_mlflow_hands_over_metadata_that_still_carries_its_patito_model(
-    saved_run: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """``write_trained_metadata`` is annotated to take a ``TimeSeriesMetadata`` frame.
-
-    The rows reach it through an eager ``filter``, which returns a plain frame, so the model is
-    only attached if ``save_to_mlflow`` re-attaches it.
-    """
-    received_models: list[object] = []
-    original = ml_core.base_forecaster.write_trained_metadata
-
-    def spy(*, model_dir: Path, time_series_metadata: pt.DataFrame[TimeSeriesMetadata]) -> None:
-        received_models.append(getattr(time_series_metadata, "model", None))
-        original(model_dir=model_dir, time_series_metadata=time_series_metadata)
-
-    monkeypatch.setattr(ml_core.base_forecaster, "write_trained_metadata", spy)
-
-    _save(saved_run, "re-saved", series=[10, 20])
-
-    assert received_models == [TimeSeriesMetadata]
-
-
-def test_load_trained_metadata_says_what_to_do_about_a_directory_without_it(
-    tmp_path: Path,
-) -> None:
-    """A model directory predating the frozen copy names the remedy, not just the missing path."""
-    tmp_path.joinpath("empty_model").mkdir()
-
-    with pytest.raises(FileNotFoundError, match="deploy that run"):
-        load_trained_metadata(tmp_path / "empty_model")
 
 
 @pytest.mark.parametrize("model_release", [-1, 32768])

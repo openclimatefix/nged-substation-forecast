@@ -96,8 +96,7 @@ measure.
 are easy to leave under-exercised: unless a team deliberately tests all these execution paths, their
 first real execution happens during an incident, unattended.
 
-*Decided:* no serving-path decision is in code yet, because the live service writes no forecast
-today.
+*Decided:* no serving-path decision is in code yet.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself), [Hypothesis 3: one-click
@@ -117,9 +116,10 @@ allowed, but an idea becomes a *CV run* — a candidate that can be promoted to 
 it is implemented in the pipeline's own code, behind the same data contracts and tests as everything
 else. There is then no "now rewrite the research code for production" step, because there was never
 a second, scruffier implementation to rewrite (and this should *accelerate* research, not slow it
-down). This is also what makes a one-command promotion *safe* rather than merely fast: the model
-that won the leaderboard is, bit for bit, the model that serves, so there is no re-implementation
-whose divergence from the measured version can only be discovered in production.
+down). This would also make a one-command promotion *safe* rather than merely fast, once promotion
+exists: the model that won the leaderboard would be, bit for bit, the model that serves, so there
+would be no re-implementation whose divergence from the measured version can only be discovered in
+production.
 
 *Without it:* research code is rewritten for production, the two implementations drift apart, and
 the deployed model no longer does what the winning CV run measured. And it takes *longer* to get

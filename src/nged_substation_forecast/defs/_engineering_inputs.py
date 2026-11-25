@@ -1,8 +1,6 @@
 """Loading the observed power and gridded NWP that feature engineering runs on.
 
-Called by the research assets in ``cv_assets``, and kept in a module of its own so that a
-production asset can share it. The caller supplies the ``TimeSeriesMetadata`` that goes alongside,
-because a research asset and a production asset get it from different places.
+Called by the research assets in ``cv_assets``.
 """
 
 from datetime import datetime, timedelta

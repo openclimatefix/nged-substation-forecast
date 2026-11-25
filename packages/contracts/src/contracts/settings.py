@@ -101,9 +101,7 @@ class Settings(BaseSettings):
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#6-the-whole-system-must-be-exercisable-on-one-laptop
     #
     # Absence is therefore caught at the point of *use*, in `get_nged_s3_store`. Catching it there
-    # confines a mis-wired secret to the one schedule that needs it. Inference — the scheduled run
-    # that produces a forecast — reads our own Delta tables and a model baked into the deployment
-    # image, so failing inference over an ingest credential would stop the forecast.
+    # confines a mis-wired secret to the one schedule that needs it.
     nged_s3_bucket_url: str = Field(
         default="",
         description=(

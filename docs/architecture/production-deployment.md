@@ -1,9 +1,9 @@
 # Production Deployment — Design
 
-How the live service is orchestrated, and why. The live service currently writes no forecast: it
-ingests NGED's power telemetry and the ECMWF ensemble NWP, and checks both. For the step-by-step
-recipe — build the image, verify it, push it, and stand up the AWS deployment around it — see
-[Setting up the live service on AWS](../live_service/aws.md).
+How the live service is orchestrated, and why. The live service ingests NGED's power telemetry and
+the ECMWF ensemble NWP, and checks both. For the step-by-step recipe — build the image, verify it,
+push it, and stand up the AWS deployment around it — see [Setting up the live service on
+AWS](../live_service/aws.md).
 
 ## Run the Dagster control plane continuously on one small VM
 
@@ -310,13 +310,6 @@ carries no model. A model the live service runs reaches the container inside the
 directory that the forecaster's own `load` reads, and the image build never contacts MLflow. (The
 rejected alternative — fetching the model from MLflow at container startup — is covered in
 [Considered but rejected designs](#fetching-a-model-from-mlflow-at-container-startup).)
-
-**A saved model carries its own copy of the metadata table rows it trained against.**
-`BaseForecaster.save_to_mlflow` writes those rows to `time_series_metadata.parquet` in the model
-directory, and `load_trained_metadata` reads them back. A live asset that takes each series' H3
-cell and static features from that frozen copy, rather than from the live metadata table, needs only
-the NWP and power Delta tables at runtime. A metadata table that is unreadable, or has lost rows,
-then cannot fail a slot or silently drop a series from it.
 
 This design also serves the operating model for after this Network Innovation Allowance (NIA)
 project (see [Requirements → Operating model &

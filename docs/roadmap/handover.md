@@ -25,11 +25,11 @@ scheduled cadence (e.g. quarterly maintenance windows) rather than reactively.
 Several decisions already made serve this constraint well, and this page makes that connection
 explicit so we don't accidentally undo them:
 
-- **Each live forecaster's trained model is baked into the container image** with no MLflow (or
-  any tracking server) on the production hot path — see [Production Deployment —
-  Design](../architecture/production-deployment.md). Under the handover model this is a feature
-  twice over: there are fewer runtime moving parts to break, and the model simply *freezes* between
-  model updates.
+- **The production hot path has no MLflow (or any tracking server)**, and the production image
+  carries no model today. The design for a future live forecaster puts its trained model in the
+  container image — see [Production Deployment — Design](../architecture/production-deployment.md).
+  Under the handover model that design is a feature twice over: there are fewer runtime moving parts
+  to break, and the model simply *freezes* between model updates.
 - **Replay mode** means a missed slot is recovered by a one-click UI backfill, not by an engineer
   reconstructing state — see [Operating the live service](../live_service/operations.md).
 - **Changing the live model is rebuild + redeploy**, auditable via image tags — no live mutable

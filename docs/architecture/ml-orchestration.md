@@ -72,12 +72,9 @@ loads from there; there is no local-disk cache.
 
 ### One archive file, not a directory of files
 
-`save_to_mlflow` adds `time_series_metadata.parquet` to the model directory, then packs the whole
-directory into a single `model.tar.gz` and logs that one file to the run's artifact root. The
-Parquet file holds the metadata table rows the model trained against, and `load_trained_metadata`
-reads those rows back from an unpacked model directory. `load_from_mlflow` unpacks the archive into
-a temporary directory. Subclass `save`/`load` never see the archive: they stay directory-based and
-MLflow-free.
+`save_to_mlflow` packs the whole model directory into a single `model.tar.gz` and logs that one file
+to the run's artifact root. `load_from_mlflow` unpacks the archive into a temporary directory.
+Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free.
 
 The archive exists because **MLflow's directory upload merges rather than replaces**, and MLflow
 exposes no public artifact-delete API. Verified empirically against MLflow 3.15.1: re-uploading

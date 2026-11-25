@@ -150,7 +150,7 @@ rather than the event level, because that is what decides whether anybody is tol
 | **digest** | A Sentry event from a degradation sender or from `report_asset_retry` — the run carried on or has not failed yet, so it is routed to a digest rather than a notification |
 | **warning** | A Sentry `warning` event from `report_power_freshness`, which has its own alert rule |
 | **operator** | No event: a human is already watching, because they started the run by hand |
-| **no forecast yet** | The live service writes no forecast today, so there is no forecast whose degradation could be reported |
+| **no forecast yet** | There is no live forecast whose degradation could be reported |
 | **nobody is told 🚧** | No Sentry event is sent. Each cell says where the fault does show up instead — usually Dagster's Checks view, which only helps somebody who already went to look — and what the silence costs |
 | **n/a** | Not a production path |
 
@@ -163,18 +163,21 @@ do are the rows still to be wired up.
 
 | Failure | Today | Intended | Human alerted? |
 |---|---|---|---|
-| One or two daily NWP runs missed | No live forecast is written | The forecast uses the freshest NWP run present as of the forecast time, through the normal path; bands widen slightly, and a Sentry **warning** carries the count of missed runs 🚧 | **run failed** — from the `ecmwf_ens` run that should have landed the missing NWP, which is the usual cause. For the forecast: **no forecast yet** |
-| NWP stale but still covering the horizon | No live forecast is written | The forecast is produced from the stale run, with `nwp_init_time` on every row; bands widen with the regime, with a `STALE NWP` warning row and a Sentry **warning** 🚧 | **run failed** — the missed `ecmwf_ens` run reports itself, as in the row above. For the forecast: **no forecast yet** |
-| NWP absent, or too old to cover the horizon | No live forecast is written | Weather-blind forecast, wide bands, warning row, and a degradation event rather than a failed run, because nothing of ours has broken 🚧 | **run failed** — from the `ecmwf_ens` runs that failed. For the forecast: **no forecast yet** |
+| One or two daily NWP runs missed | — | The forecast uses the freshest NWP run present as of the forecast time, through the normal path; bands widen slightly, and a Sentry **warning** carries the count of missed runs 🚧 | **run failed** — from the `ecmwf_ens` run that should have landed the missing NWP, which is the usual cause. For the forecast: **no forecast yet** |
+| NWP stale but still covering the horizon | — | The forecast is produced from the stale run, with `nwp_init_time` on every row; bands widen with the regime, with a `STALE NWP` warning row and a Sentry **warning** 🚧 | **run failed** — the missed `ecmwf_ens` run reports itself, as in the row above. For the forecast: **no forecast yet** |
+| NWP absent, or too old to cover the horizon | — | Weather-blind forecast, wide bands, warning row, and a degradation event rather than a failed run, because nothing of ours has broken 🚧 | **run failed** — from the `ecmwf_ens` runs that failed. For the forecast: **no forecast yet** |
 | Telemetry stalled for one series | `power_data_is_fresh` warns, names the late series, and sends a Sentry warning event. No live forecast is written | Unchanged, plus a forecast still produced from the model's other features, with regime-appropriate band widening 🚧 | **warning** |
 | The cleaning of power telemetry fails, or silently stops running | A failing cleaning rule raises, and every reader carries on with the last good cleaned table, which is stale rather than uncleaned. `cleaned_power_keeps_up_with_raw` warns when the cleaned table is built from a raw table 2 or more commits (about 6 to 12 hours of NGED deliveries) behind the current raw table | Unchanged | **run failed** for a run that raised. For a cleaning that silently stopped, **nobody is told** 🚧: the check names the lag in Dagster's Checks view and sends no event |
 | A meter reporting detectably wrong values | Malformed timestamps are dropped at ingest, but wrong *values* are not yet detected; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path, and warned on like any other missing input 🚧 | **nobody is told** 🚧, and nothing detects the fault either: ingest rejects a value outside `PowerTimeSeries`' range, but nothing looks for a value that is in range and still wrong, so there is not yet a warning to send |
 | A whole ECMWF slice of a de-accumulated variable corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged, plus a Sentry **warning** once the slice count is large 🚧 | **nobody is told** 🚧 — `nwp_has_no_unexpected_nulls` names the slice in Dagster's Checks view and, when it evaluates successfully, sends no event, so the size of the loss reaches nobody ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
 | A whole ECMWF weather variable absent, or a slice of an instantaneous variable empty at every grid point | `ecmwf_ens` turns each failure into a retry for up to 4h (the empty slice is found on the raw download, the absent variable by `Nwp.validate`) and sends a Sentry warning on the first failed attempt. An ECMWF run initialised more than 36h ago fails at once instead of retrying. Once the retries are exhausted, the failure shows downstream as a missed run | Unchanged | **digest** — a `retrying_asset` warning on the first failed attempt — then **run failed** once the retries are exhausted (an old run failing at once in a backfill: **operator**) |
-| The `TimeSeriesMetadata` table is unreadable, or has lost rows for trained series | The hourly ingest contains the upsert failure, records `metadata_upsert_failed` and sends a Sentry error event through `report_asset_degradation` | Unchanged, and a forecast unchanged too: `BaseForecaster.save` writes a frozen copy of the metadata rows a model trained against beside the model, so a live forecast that loads a saved model need not read the metadata table 🚧 | **digest** — if the upsert raised, via `report_asset_degradation`. A metadata table that merely *lost rows* raises nothing at all, so **nobody is told** 🚧: the freshness check reads the metadata table only to decide what to watch, so a series that vanishes from it is quietly no longer watched, and the last stored values for it stand indefinitely |
+| The `TimeSeriesMetadata` table is unreadable, or has lost rows for trained series | The hourly ingest contains the upsert failure, records `metadata_upsert_failed` and sends a Sentry error event through `report_asset_degradation` | Unchanged | **digest** — if the upsert raised, via `report_asset_degradation`. A metadata table that merely *lost rows* raises nothing at all, so **nobody is told** 🚧: the freshness check reads the metadata table only to decide what to watch, so a series that vanishes from it is quietly no longer watched, and the last stored values for it stand indefinitely |
 | A duplicated forecast row reaches the model output — a join fanning out, which takes a bug of ours rather than duplicated data at rest, since every NWP write replaces its partition | **Hard failure** — `PowerForecast.validate` raises on the duplicated primary key and the write is refused. Only cross-validation runs write forecasts today | Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it | **operator** — a cross-validation run is started by hand |
 | The service is not running at all | No production job sends Sentry a check-in, so nothing outside the deployment notices | A Sentry missed-check-in alarm fires from outside the deployment 🚧 | **nobody is told** 🚧 — stale ingest tables are the only sign, and only for somebody who looks |
 | Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
+
+A dash in the Today column means that the live service writes no forecast, so no behaviour exists
+to describe.
 
 Nothing here is a 2am page. The uptime posture that makes that acceptable is argued in [Requirements
 → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
@@ -280,7 +283,7 @@ run is also a production risk, because [H2, a hundred CV runs per person in a pe
 month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month) and [H3,
 one-click promotion and one-click
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) depend on
-retraining staying cheap and promotion staying one command.
+retraining staying cheap and on promotion becoming one command, which no mechanism provides yet.
 
 ## Mechanisms
 
@@ -393,8 +396,7 @@ ingest schedule or the slot times change, and that still cannot say *how many* r
 signal is **missed runs** — how many daily runs are absent between the freshest run on disk and the
 freshest that ought to exist by now. That is zero in every healthy slot, whichever slot it is.
 
-No asset check counts missed runs today, because the live service writes no forecast whose NWP
-run could be counted.
+No asset check counts missed runs today.
 
 ### Missingness in learned models
 
