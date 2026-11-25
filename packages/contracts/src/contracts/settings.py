@@ -73,8 +73,8 @@ class Settings(BaseSettings):
     ``.env``, or from the default declared here, in that order of precedence. The managed
     data-table paths default to ``""``, a sentinel meaning "derive me". Pydantic runs the
     ``after``-mode model validator ``_derive_unset_paths`` once, immediately after the
-    ``Settings`` is built. That validator fills a path left unset from ``data_path_internal``,
-    ``data_path_delivery``, or ``local_artifacts_path``. A caller therefore never observes the
+    ``Settings`` is built. That validator fills a path left unset from ``data_path_internal`` or
+    ``data_path_delivery``. A caller therefore never observes the
     sentinel and always reads a concrete path, while a path set explicitly keeps the value it was
     given. Every value is read when the ``Settings`` is built. A test that changes the
     environment afterwards therefore has to build a fresh ``Settings``. If that test reads
