@@ -221,8 +221,8 @@ change and a re-export in nged-ml-research.
 - **`scripts/forecasting/score_study.py`**: no bespoke code. Its per-column dtype check and
   `PowerForecast.validate` already reject a submission in the member layout.
   **`export_baseline_forecasts.py`**: the smallest change that runs. The full-ensemble file goes;
-  the ensemble-mean file is replaced by a p50 file; the quantile file reads the stored p10, p50,
-  and p90 columns.
+  the ensemble-mean file goes too, because its p50 replacement would repeat a column of the
+  quantile file; the quantile file reads the stored quantile columns.
 
 ### Design-philosophy check
 

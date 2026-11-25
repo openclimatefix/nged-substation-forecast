@@ -268,9 +268,19 @@ class ClimatologyForecaster(BaseForecaster):
         """Reconstruct a ClimatologyForecaster from the files that ``save`` wrote.
 
         The trained population comes from ``meta.json``, not from the lookup.
+
+        Raises:
+            ValueError: The saved lookup lacks a column of the current lookup layout.
         """
         meta = read_meta(path)
         instance = cls(cls.CONFIG_CLASS.model_validate(meta["model_params"]))
         instance._trained_ids = meta["trained_time_series_ids"]
-        instance._lookup = pl.read_parquet(path / _LOOKUP_FILENAME)
+        lookup = pl.read_parquet(path / _LOOKUP_FILENAME)
+        missing = [column for column in _LOOKUP_SCHEMA if column not in lookup.columns]
+        if missing:
+            raise ValueError(
+                f"{path / _LOOKUP_FILENAME} lacks the lookup columns {missing}; the model was saved"
+                " in an older layout and must be retrained."
+            )
+        instance._lookup = lookup
         return instance

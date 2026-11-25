@@ -31,6 +31,10 @@ def to_stored_quantiles(
     a group whose values are all null yields no row. A NaN value is not dropped: it turns the upper
     quantiles of its group into NaN, which ``PowerForecast.validate`` rejects.
 
+    When ``drop_cols`` is not empty, every row must be unique on all columns except
+    ``value_col``. A duplicate means an upstream join fanned out and copied a point value, which
+    would silently double-weight that value in the quantiles, so this raises.
+
     Args:
         frame: One row per point value. Holds ``value_col``, the columns in ``drop_cols``, and the
             grouping columns.
@@ -40,7 +44,18 @@ def to_stored_quantiles(
     Returns:
         One row per group: the grouping columns, in their input order, then the 13 quantile
         columns. Groups appear in the order of their first row in ``frame``.
+
+    Raises:
+        ValueError: ``drop_cols`` is not empty and two rows share every column except
+            ``value_col``.
     """
+    if drop_cols:
+        identity_cols = [column for column in frame.columns if column != value_col]
+        if frame.select(identity_cols).n_unique() != frame.height:
+            raise ValueError(
+                f"to_stored_quantiles: rows are not unique on {identity_cols}; an upstream join"
+                " fanned out and copied point values."
+            )
     values = frame.drop(drop_cols).filter(pl.col(value_col).is_not_null())
     group_cols = [column for column in values.columns if column != value_col]
     return values.group_by(group_cols, maintain_order=True).agg(

@@ -102,10 +102,10 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   the move in one new Delta commit.
 - `score_study.py` — stores a study's predictions file in `power_forecasts` under the
   `experiment_name` `study/<study name>` and scores it with the `metrics` asset in leaderboard
-  scope. The script refuses a file whose `(time_series_id, power_fcst_init_time, valid_time,
-  ensemble_member)` keys differ from those of the reference CV run named in `conf/cv/default.yaml`.
-  The script appends every attempt, scored or refused, to `study_submissions.jsonl`, and overwrites
-  an earlier submission only when passed `--replace`.
+  scope. The script refuses a file whose `(time_series_id, power_fcst_init_time, valid_time)` keys
+  differ from those of the reference CV run named in `conf/cv/default.yaml`. The script appends
+  every attempt, scored or refused, to `study_submissions.jsonl`, and overwrites an earlier
+  submission only when passed `--replace`.
 
 ## `diagnostics/` — checking and illustrating processing behaviour
 

@@ -45,6 +45,13 @@ def test_a_null_value_is_dropped_before_the_reduction():
     assert result["power_fcst_p50"].item() == 2.0
 
 
+def test_a_duplicated_point_value_raises():
+    """A fanned-out join that copies a member must fail, not double-weight that member."""
+    duplicated = pl.concat([_members([1, 1], [1.0, 2.0]), _members([1], [1.0])])
+    with pytest.raises(ValueError, match="not unique"):
+        to_stored_quantiles(duplicated, value_col="power_fcst", drop_cols=["ensemble_member"])
+
+
 def test_a_group_of_only_null_values_yields_no_row():
     result = to_stored_quantiles(
         _members([1, 2, 2], [4.0, None, None]),

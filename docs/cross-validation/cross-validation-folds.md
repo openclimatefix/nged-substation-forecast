@@ -256,8 +256,7 @@ run:
   carries `row_keys_match_reference` set to `true`.
 - **An unfiltered run marks each study it skips as stale or current.** The tag
   `stale_against_reference` is `true` when the reference's fingerprint for the fold no longer equals
-  the one the study was scored against. The fingerprint ignores `ensemble_member`, so a change to the
-  reference's members alone leaves the tag `false`.
+  the one the study was scored against.
 - **Every submission attempt is logged.** `scripts/forecasting/score_study.py` appends each attempt,
   scored or refused, to `study_submissions.jsonl`. The script tags a scored study's fold run
   `study_submission_number` with the count of attempts by every study at that fold. Each new study

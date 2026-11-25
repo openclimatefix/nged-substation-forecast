@@ -278,6 +278,18 @@ def test_save_then_load_round_trips_and_replaces_the_directory(tmp_path: Path) -
     assert meta["model_class"] == "baseline_forecasters.climatology.ClimatologyForecaster"
 
 
+def test_load_refuses_a_lookup_saved_in_an_older_layout(tmp_path: Path) -> None:
+    """A lookup without the quantile columns fails at ``load``, naming the retrain."""
+    forecaster = _forecaster(experiment_name="exp")
+    forecaster.train(_features(_january_weekday_samples()), [1])
+    forecaster.save(tmp_path)
+    lookup_path = tmp_path / climatology._LOOKUP_FILENAME
+    pl.read_parquet(lookup_path).drop(POWER_FCST_QUANTILE_COLUMNS[0]).write_parquet(lookup_path)
+
+    with pytest.raises(ValueError, match="must be retrained"):
+        ClimatologyForecaster.load(tmp_path)
+
+
 def test_neighbourhood_is_one_month_and_one_half_hour_with_the_same_day_type(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

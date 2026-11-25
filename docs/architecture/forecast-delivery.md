@@ -90,7 +90,7 @@ that is 32 series × 672 half-hours = **21,504 rows per run**, holding about 280
 day, a year of V1 live forecasts is 21,504 × 1,460 ≈ **31 million rows**.
 
 Our [`delta_store`](../api/delta_store/index.md) storage format packs a row into **about 24
-bytes**, or 1.9 bytes per quantile value. That figure is measured on 60 forecast runs of the XGBoost
+bytes**, or 1.8 bytes per quantile value. That figure is measured on 60 forecast runs of the XGBoost
 cross-validation fold, 1.14 million rows across 31 series, written with `write_power_forecasts`: 27.3
 MB on disk. A year of V1 live forecasts is therefore about 0.75 GB.
 
@@ -454,7 +454,7 @@ Choosing Delta Lake for delivery is also a vote for our own infrastructure, beca
 format we already rely on internally — and it is a good internal choice for reasons of its own:
 
 - **It's remarkably compact.** The same `delta_store` precision policy that packs `power_forecasts`
-  to ~1.9 bytes per quantile value ([above](#how-big-is-flexpectations-power-forecast-data)) works
+  to ~1.8 bytes per quantile value ([above](#how-big-is-flexpectations-power-forecast-data)) works
   just as well on [ECMWF
   ENS NWP](../api/dynamical_data/index.md): a full daily run (~7.24 million rows across 1,671 H3
   cells × 51 members × 85 lead times) averages ~158 MB, and our entire local development table — 899

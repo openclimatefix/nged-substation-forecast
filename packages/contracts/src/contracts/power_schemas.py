@@ -607,8 +607,11 @@ class PowerForecast(pt.Model):
         """Validate the given dataframe, ensuring the primary key is unique.
 
         A duplicated primary key means either a join fanned out on the way here or the same rows
-        were written twice, and both corrupt the metrics computed from them. It is our own bug
-        rather than the outside world misbehaving, so this raises rather than degrading — see
+        were written twice, and both corrupt the metrics computed from them. A fan-out among the
+        point values that a forecaster reduces to quantiles never reaches this check, because the
+        reduction collapses it, so ``ml_core.quantiles.to_stored_quantiles`` raises on it instead.
+        It is our own bug rather than the outside world misbehaving, so this raises rather than
+        degrading — see
         <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
         """
         validated_df = super().validate(
