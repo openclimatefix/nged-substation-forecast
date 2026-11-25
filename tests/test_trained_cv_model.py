@@ -598,3 +598,51 @@ def test_trained_cv_model_fails_loudly_when_an_eligible_series_has_no_metadata(
     assert failure is not None
     assert "no row in the metadata parquet" in str(failure.error)
     assert "[9]" in str(failure.error)
+
+
+def test_trained_cv_model_loads_only_the_control_ensemble_member_for_training(
+    env: None,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Training reads NWP ensemble member 0 only, because the scored forecasts use all members."""
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
+    ensemble_members: list[Any] = []
+
+    def _spy(*args: Any, **kwargs: Any) -> Any:
+        ensemble_members.append(kwargs["ensemble_members"])
+        return load_engineering_inputs(*args, **kwargs)
+
+    monkeypatch.setattr(cv_assets, "load_engineering_inputs", _spy)
+
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    assert ensemble_members == [[0]]
+
+
+def test_trained_cv_model_fails_loudly_when_the_forecaster_trains_on_no_series(
+    env: None,
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A forecaster that kept none of the eligible series must fail the asset, not save a model."""
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
+    monkeypatch.setattr(
+        ClimatologyForecaster, "trained_time_series_ids", property(lambda _self: [])
+    )
+
+    result = materialize(
+        [trained_cv_model],
+        partition_key=PARTITION_KEY,
+        instance=dagster_instance,
+        raise_on_error=False,
+    )
+
+    assert not result.success
+    failure = result.failure_data_for_node("trained_cv_model")
+    assert failure is not None
+    assert "Trained 0 of 2 eligible time series" in str(failure.error)
