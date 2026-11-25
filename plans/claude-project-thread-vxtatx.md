@@ -96,7 +96,11 @@ series and half-hour, with no member structure.
    `ens_summary_recipe` states.
 6. **`substation_demand_forecaster.features.build_input_matrix(...)` builds the 60 columns** for
    each (Primary, valid half-hour) from the native origin plus 0.5 hours to plus 339 hours, in the
-   order of `components/step5/columns.json`:
+   order of `components/step5/columns.json`. The function takes the recipe from the component
+   folder that the bundle's manifest lists, and dispatches on that name through one dictionary of
+   recipes, so that the same package can later serve BSPs and GSPs with a different recipe. Only
+   `step5` exists today, and a bundle that names another recipe raises `ValueError`, because that
+   is our own packaging bug:
     - the 14 ENS means and standard deviations of today's run;
     - the 21 calendar and sun columns, computed from the valid time. The sun columns are the
       apparent zenith cosine and the azimuth sine and cosine at the half-hour's stamp minus 15
@@ -142,9 +146,11 @@ series and half-hour, with no member structure.
    contract rows start at 12:00 UTC itself; `PowerForecast.valid_time` must be strictly after
    `power_fcst_init_time`, so that row is dropped. The asset then clamps every quantile of the eight
    MVA Primaries at zero, as the backtest files do. It builds a `PowerForecast` frame with the 13
-   quantile columns, `power_fcst_model_name = "primary_substation_demand_forecaster"`,
-   `experiment_name = "primary_substation_demand_forecaster"`, `power_fcst_model_version` from the
-   bundle's `model_release`, `nwp_init_time` = today's 00Z run, and `fold_id = "live"`.
+   quantile columns, `power_fcst_model_name = MODEL_NAME`, which is the constant
+   `"substation_demand_forecaster"` in the package, as for every `BaseForecaster` subclass,
+   `experiment_name = "primary_substation_demand_forecaster"`, which names the family,
+   `power_fcst_model_version` from the bundle's `model_release`, `nwp_init_time` = today's 00Z run,
+   and `fold_id = "live"`.
 9. **The asset writes with `write_power_forecasts`**, replacing exactly the partition
    (`experiment_name`, `"live"`) and this `power_fcst_init_time`, so a rerun never duplicates rows.
    No Sentry check-in monitor is added: a failed run reaches Sentry through
@@ -204,6 +210,7 @@ series and half-hour, with no member structure.
   become runtime dependencies of `substation_demand_forecaster`; `pvlib` stays in the dev group too,
   for `test_radiation.py`.
 - **`packages/substation_demand_forecaster/`** (new workspace member):
+    - `__init__.py`: `MODEL_NAME = "substation_demand_forecaster"`.
     - `bundle.py`: `Bundle` (frozen dataclass), `load_bundle(path)`, and `BUNDLE_FORMAT_VERSION`.
     - `ens_summary.py`: `summarise_runs(nwp, primaries)`.
     - `features.py`: `analysis_proxy`, `calendar_columns`, `sun_columns`, `b1_columns`,
@@ -321,6 +328,10 @@ scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
 
 ## Risks and open questions
 
+- **One package serves several substation types.** The package takes the series and capacities from
+  the bundle, and `features.py` dispatches on the bundle's recipe. A BSP or GSP forecast therefore
+  adds a bundle, a setting, and an asset per type, plus a recipe only if its inputs differ. The
+  setting and the asset stay per type, and `power_fcst_model_name` is the package's name.
 - **Not subclassing `BaseForecaster`.** Recommendation: a plain function, for the reason under
   "Design-philosophy check". The cost is that the bundle is copied by hand from the workstation,
   as the runbook will say.
