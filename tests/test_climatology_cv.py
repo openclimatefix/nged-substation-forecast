@@ -18,8 +18,14 @@ import pytest
 from _cleaned_power_test_data import write_cleaned_copy, write_metadata
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from _power_test_data import power_at
+from contracts.common import DELIVERY_QUANTILES
 from contracts.ml_schemas import EligibleTimeSeries
-from contracts.power_schemas import EffectiveCapacity, PowerForecast, TimeSeriesMetadata
+from contracts.power_schemas import (
+    POWER_FCST_QUANTILE_COLUMNS,
+    EffectiveCapacity,
+    PowerForecast,
+    TimeSeriesMetadata,
+)
 from dagster import DagsterInstance, materialize
 from delta_store.power_forecasts import POWER_FCST_SIGNIFICAND_BITS
 from delta_store.precision import round_to_significand_bits
@@ -43,7 +49,6 @@ _TRAIN_DAYS = [datetime(2024, 8, day, tzinfo=UTC) for day in range(5, 10)]  # Mo
 _VAL_FRIDAY = datetime(2025, 8, 1, tzinfo=UTC)
 _VAL_SATURDAY = datetime(2025, 8, 2, tzinfo=UTC)
 _VAL_MEMBERS = (0, 1, 2)
-_MEMBER_COUNT = 51
 _LONDON = ZoneInfo("Europe/London")
 
 
@@ -114,8 +119,8 @@ def paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     }
 
 
-def _oracle_members(validation_half_hour: int) -> list[float]:
-    """The 51 quantiles, pooled in plain Python from the August 2024 weekday samples."""
+def _oracle_quantiles(validation_half_hour: int) -> list[float]:
+    """The 13 delivery quantiles, pooled in plain Python from the August 2024 weekday samples."""
     samples = [
         power_at(valid_time)
         for day in _TRAIN_DAYS
@@ -126,16 +131,15 @@ def _oracle_members(validation_half_hour: int) -> list[float]:
         )
         <= 1
     ]
-    levels = [(k + 0.5) / _MEMBER_COUNT for k in range(_MEMBER_COUNT)]
-    quantiles = pl.Series(np.quantile(samples, levels, method="linear"), dtype=pl.Float32).to_frame(
-        "quantile"
-    )
+    quantiles = pl.Series(
+        np.quantile(samples, DELIVERY_QUANTILES, method="linear"), dtype=pl.Float32
+    ).to_frame("quantile")
     return quantiles.select(
         round_to_significand_bits(pl.col("quantile"), keep_bits=POWER_FCST_SIGNIFICAND_BITS)
     )["quantile"].to_list()
 
 
-def test_climatology_emits_pooled_quantiles_as_members_and_crps_flows(
+def test_climatology_emits_pooled_quantiles_and_crps_flows(
     paths: dict[str, Path],
     dagster_instance: DagsterInstance,
     register_experiment: RegisterExperiment,
@@ -160,19 +164,18 @@ def test_climatology_emits_pooled_quantiles_as_members_and_crps_flows(
     assert forecasts["fold_id"].unique().to_list() == [FOLD_ID]
     assert forecasts["experiment_name"].unique().to_list() == [EXPERIMENT_NAME]
     assert forecasts["power_fcst_model_name"].unique().to_list() == ["climatology"]
-    # Six Friday valid times times 51 members: the three NWP members are not repeated, and the
-    # Saturday run, whose weekend cells have no training sample nearby, is dropped.
+    # One row per Friday valid time: the three NWP members are not repeated, and the Saturday
+    # run, whose weekend cells have no training sample nearby, is dropped.
     valid_times = half_hours(_VAL_FRIDAY).to_list()
-    assert forecasts.height == len(valid_times) * _MEMBER_COUNT
+    assert forecasts.height == len(valid_times)
     assert set(forecasts["valid_time"].to_list()) == set(valid_times)
     for valid_time in valid_times:
-        rows = forecasts.filter(pl.col("valid_time") == valid_time).sort("ensemble_member")
-        assert rows["ensemble_member"].to_list() == list(range(_MEMBER_COUNT))
-        expected = _oracle_members(_local_half_hour(valid_time))
-        assert len(set(expected)) == _MEMBER_COUNT
-        assert rows["power_fcst"].to_list() == expected
+        row = forecasts.filter(pl.col("valid_time") == valid_time)
+        expected = _oracle_quantiles(_local_half_hour(valid_time))
+        assert len(set(expected)) == len(DELIVERY_QUANTILES)
+        assert [row[column].item() for column in POWER_FCST_QUANTILE_COLUMNS] == expected
 
-    # CRPS flows over the members: the fair CRPS differs from the MAE of the ensemble mean.
+    # CRPS flows over the quantiles: the CRPS differs from the MAE of the median.
     metadata = pt.DataFrame(pl.read_parquet(paths["metadata"])).set_model(TimeSeriesMetadata)
     capacity = EffectiveCapacity.validate(
         pl.DataFrame(

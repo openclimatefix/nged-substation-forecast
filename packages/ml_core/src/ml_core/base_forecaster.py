@@ -457,9 +457,12 @@ class BaseForecaster(ABC):
                 ``"live"`` default.
 
         Returns:
-            One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``
-            present in ``data``. Each row holds the predicted ``power_fcst``, in megawatts (MW) or
-            megavolt-amperes (MVA) according to that series' unit in ``TimeSeriesMetadata``. Each
+            One row per ``(time_series_id, power_fcst_init_time, valid_time)`` present in
+            ``data``. Each row holds the forecast at the 13 ``DELIVERY_QUANTILES``, in the
+            ``PowerForecast`` columns ``power_fcst_p1`` … ``power_fcst_p99``, in megawatts (MW) or
+            megavolt-amperes (MVA) according to that series' unit in ``TimeSeriesMetadata``. A
+            forecaster that produces several point values per row, such as one per NWP ensemble
+            member, reduces them with ``ml_core.quantiles.to_stored_quantiles``. Each
             row also holds the model-family identity (``power_fcst_model_name``), the model release
             the config carries (``power_fcst_model_version``), the CV run identity the config
             carries (``experiment_name``, ``ml_flow_experiment_id``), and ``fold_id`` set to the

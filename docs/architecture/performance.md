@@ -34,10 +34,10 @@ assumed:
   year is the measured average of the 899 daily runs on disk today, which is higher than the figure
   that PR extrapolated.
 
-* **`power_forecasts`** (`delta_store.power_forecasts`) sorts ensemble members of the same target
-  adjacent, uses `DELTA_BINARY_PACKED` timestamps and `BYTE_STREAM_SPLIT` for `power_fcst`
-  (near-continuous ML output has no repeats for a dictionary to exploit), shrinking the 403.6M-row
-  development table from 6.33 GB to 0.73 GB (8.7×). Details in
+* **`power_forecasts`** (`delta_store.power_forecasts`) sorts rows by
+  `(time_series_id, power_fcst_init_time, valid_time)`, uses `DELTA_BINARY_PACKED` timestamps, and
+  uses `BYTE_STREAM_SPLIT` for each of the 13 quantile columns, because near-continuous ML output
+  has no repeats for a dictionary to exploit. The levers were chosen in
   [PR #268](https://github.com/openclimatefix/nged-substation-forecast/pull/268).
 
 ## Lazy evaluation strategy
@@ -148,31 +148,33 @@ across runs, so a chunk's forecast frame stays small while each partition is rea
 all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell
 — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the
 `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction
-(~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
+(~321M per-member predictions, reduced to ~6.3M stored rows of 13 quantiles) peaks ~9 GB — both well
+under a 24 GB laptop.
 
 ### Scoring the metrics: batch the series, and stream every scan
 
-**Scoring a whole fold at once OOM-kills a 29 GB machine, so `_score_forecast_group` scores a batch
-of time series at a time.** `compute_metrics` is independent per series, which is what makes the
-batching sound. Measured on the `mid_2025_to_mid_2026` fold when it held 28 series of about 13M
-forecast rows each, a batch of 4 series completes in roughly 50 seconds at about 18 GB peak process
-resident set size. That fold has gained series since, so the figures below understate today's fold
-and the case for batching is only stronger. That peak is dominated by the streaming Delta scan
-rather than by the data: each batch re-scans the partition, while the materialised batch frame
-itself is a few GB. A batch of 2 measured only about 2 GB lower, so a smaller batch saves little
-memory — the scan overhead is roughly constant in the *fold* size, which is what keeps the approach
-workable as folds grow to V2 scale.
+**`_score_forecast_group` scores a batch of time series at a time, so peak memory follows the batch
+rather than the fold.** `compute_metrics` is independent per series, which is what makes the
+batching sound. The batch size was measured on a 28-series frame of the `mid_2025_to_mid_2026`
+fold with about 13M rows per series, one row per ensemble member: a batch of 4 series completed in
+roughly 50 seconds at about 18 GB peak process resident set size. The fold stores one row of 13
+quantiles per half-hour, about 250,000 rows per series, a 51st as many, so these figures are an
+upper bound. That peak is dominated by the streaming Delta scan rather than by the data:
+each batch re-scans the partition, while the materialised batch frame itself is a few GB. A batch of
+2 measured only about 2 GB lower, so a smaller batch saves little memory — the scan overhead is
+roughly constant in the *fold* size, which is what keeps the approach workable as folds grow to V2
+scale.
 
 **Every scan in the scoring path streams, because the eager equivalent materialises full-length rows
 before it reduces them.** Discovering which groups a fold holds projects just the two partition
 columns, `experiment_name` and `fold_id`, and takes their distinct values. Collected eagerly, those
 two columns are still materialised at full row length before the unique, which OOM-killed that fold
-at its then-size of 364M rows; the streaming collect peaks at 0.3 GB. The same rule applies to the
-`time_series_id` and `ensemble_member` values `cv_power_forecasts` accumulates from each chunk:
-taking the unique values gives a roughly 30-element Python list per chunk instead of a roughly
-14M-element one. Measured on a 14M-row `Int32` column, the full-length list cost 2.78 seconds and
-560 MB peak against 0.05 seconds and no measurable allocation — and that 560 MB landed inside the
-loop whose whole job is holding the frame at 2 to 3 GB.
+at 364M rows; the streaming collect peaks at 0.3 GB. The same rule applies to the `time_series_id`
+values `cv_power_forecasts` accumulates from each chunk: taking the unique values gives a roughly
+30-element Python list per chunk instead of one element per forecast row. Measured on a 14M-row
+`Int32` column, the full-length list cost 2.78 seconds and 560 MB peak against 0.05 seconds and no
+measurable allocation — and that 560 MB landed inside the loop whose whole job is holding the frame
+at 2 to 3 GB.
 
 ## The other hard ceiling: Polars' 32-bit row index
 
@@ -210,10 +212,11 @@ The rules that follow:
   collect far below the cap (input pruning + `init_time` chunking), so pipeline reads are
   unaffected. The cap is a second, independent reason that rule exists: an unbounded collect of a
   V2-scale table wouldn't just OOM, its row accounting would be wrong.
-* Tables past the cap today: **NWP** (~16.2B rows). **`power_forecasts`** will pass it at V2 scale
-  (~1 trillion rows — see [forecast
-  delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)). The `metrics`
-  asset discovers `(experiment_name, fold_id)` groups via a streaming `unique()` scan, then scores
-  each group in batches of four `time_series_id` values at a time, so peak memory is one batch,
-  never a whole fold or the whole matched population — the same chunking that keeps the row-index
-  cap out of reach.
+* Tables past the cap today: **NWP** (~16.2B rows). **`power_forecasts`** passes it within two years
+  of one live ML model at V2 scale (~2.45B rows a year against the 4.29B cap), and 4 years of 2
+  models reach ~20B rows — see [forecast
+  delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data). The `metrics` asset
+  discovers `(experiment_name, fold_id)` groups via a streaming `unique()` scan, then scores each
+  group in batches of four `time_series_id` values at a time, so peak memory is one batch, never a
+  whole fold or the whole matched population — the same chunking that keeps the row-index cap out of
+  reach.

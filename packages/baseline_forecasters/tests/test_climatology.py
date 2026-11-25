@@ -10,13 +10,12 @@ import pytest
 from baseline_forecasters import climatology
 from baseline_forecasters.climatology import (
     _LOOKUP_SCHEMA,
-    CLIMATOLOGY_MEMBER_COUNT,
-    CLIMATOLOGY_QUANTILE_COLUMNS,
     ClimatologyForecaster,
     _local_calendar_cell_keys,
 )
+from contracts.common import DELIVERY_QUANTILES, quantile_label
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerForecast
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast
 from ml_core.base_forecaster import BaseForecasterConfig
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE
 from polars.testing import assert_frame_equal
@@ -71,8 +70,9 @@ def _january_weekday_samples() -> list[tuple[int, datetime, float | None]]:
     ]
 
 
-def _expected_members(top: float) -> list[float]:
-    return [top * (k + 0.5) / CLIMATOLOGY_MEMBER_COUNT for k in range(CLIMATOLOGY_MEMBER_COUNT)]
+def _expected_quantiles(top: float) -> list[float]:
+    """The linear quantiles of 5 evenly spaced samples from 0 to ``top``: ``top`` × the level."""
+    return [top * level for level in DELIVERY_QUANTILES]
 
 
 def _trained_on_january_weekdays() -> ClimatologyForecaster:
@@ -96,10 +96,10 @@ def test_train_stores_hand_computed_quantiles_over_the_wrapped_neighbourhood() -
     assert lookup.select(_KEY_COLUMNS).rows() == [
         (1, month, half_hour, False) for month in (1, 2, 12) for half_hour in (0, 1, 47)
     ]
-    expected = _expected_members(40.0)
-    assert len(set(expected)) == CLIMATOLOGY_MEMBER_COUNT
+    expected = _expected_quantiles(40.0)
+    assert len(set(expected)) == len(DELIVERY_QUANTILES)
     for row in lookup.iter_rows(named=True):
-        actual = [row[column] for column in CLIMATOLOGY_QUANTILE_COLUMNS]
+        actual = [row[column] for column in POWER_FCST_QUANTILE_COLUMNS]
         assert actual == pytest.approx(expected, abs=1e-4)
 
 
@@ -115,13 +115,22 @@ def test_train_deduplicates_the_targets_that_several_nwp_runs_repeat() -> None:
     assert_frame_equal(repeated._lookup, plain._lookup)
 
 
-def test_predict_emits_members_in_increasing_quantile_order() -> None:
-    forecaster = _trained_on_january_weekdays()
-    forecast = forecaster.predict(_features([(1, _utc(2025, 1, 14), 5.0)])).sort("ensemble_member")
+def test_lookup_columns_are_the_power_forecast_quantile_columns() -> None:
+    assert [column for column in _LOOKUP_SCHEMA if column not in _KEY_COLUMNS] == [
+        f"power_fcst_{quantile_label(level)}" for level in DELIVERY_QUANTILES
+    ]
 
-    assert forecast["ensemble_member"].to_list() == list(range(CLIMATOLOGY_MEMBER_COUNT))
-    values = forecast["power_fcst"].to_list()
-    assert values == pytest.approx(_expected_members(40.0), abs=1e-4)
+
+def test_predict_emits_one_row_with_the_13_quantiles_in_increasing_order() -> None:
+    forecaster = _trained_on_january_weekdays()
+    forecast = forecaster.predict(_features([(1, _utc(2025, 1, 14), 5.0)]))
+
+    assert forecast.height == 1
+    assert "ensemble_member" not in forecast.columns
+    values = [forecast[column][0] for column in POWER_FCST_QUANTILE_COLUMNS]
+    assert values == pytest.approx(_expected_quantiles(40.0), abs=1e-4)
+    # The median of the samples 0, 10, 20, 30, and 40.
+    assert forecast["power_fcst_p50"][0] == pytest.approx(20.0)
 
 
 def test_cell_keys_are_local_across_both_clock_changes_and_local_midnight() -> None:
@@ -198,7 +207,7 @@ def test_predict_stamps_the_identity_columns() -> None:
 
     forecast = forecaster.predict(_features([(1, _utc(2025, 1, 14), 5.0)]), fold_id="fold_x")
 
-    assert forecast.height == CLIMATOLOGY_MEMBER_COUNT
+    assert forecast.height == 1
     assert forecast["power_fcst_model_name"].unique().to_list() == ["climatology"]
     assert forecast["power_fcst_model_version"].unique().to_list() == [3]
     assert forecast["experiment_name"].unique().to_list() == ["exp_clim"]
@@ -215,9 +224,7 @@ def test_predict_ignores_the_power_of_the_forecast_period() -> None:
     quiet = forecaster.predict(_features(rows))
     loud = forecaster.predict(_features(shouted))
 
-    assert_frame_equal(
-        quiet.sort("valid_time", "ensemble_member"), loud.sort("valid_time", "ensemble_member")
-    )
+    assert_frame_equal(quiet.sort("valid_time"), loud.sort("valid_time"))
 
 
 def test_train_keeps_the_requested_series_with_power_and_keeps_series_apart(
@@ -243,7 +250,7 @@ def test_train_keeps_the_requested_series_with_power_and_keeps_series_apart(
         pl.col("local_half_hour_of_day") == 0,
         ~pl.col("local_is_weekend"),
     ).sort("time_series_id")
-    assert shared_cell["power_quantile_member_25"].to_list() == pytest.approx([15.0, 150.0])
+    assert shared_cell["power_fcst_p50"].to_list() == pytest.approx([15.0, 150.0])
     # The lookup does not depend on how many series are pooled together.
     monkeypatch.setattr(climatology, "_POOLING_SERIES_PER_BATCH", 1)
     one_series_per_batch = _forecaster()
@@ -271,6 +278,18 @@ def test_save_then_load_round_trips_and_replaces_the_directory(tmp_path: Path) -
     assert meta["model_class"] == "baseline_forecasters.climatology.ClimatologyForecaster"
 
 
+def test_load_refuses_a_lookup_saved_in_an_older_layout(tmp_path: Path) -> None:
+    """A lookup without the quantile columns fails at ``load``, naming the retrain."""
+    forecaster = _forecaster(experiment_name="exp")
+    forecaster.train(_features(_january_weekday_samples()), [1])
+    forecaster.save(tmp_path)
+    lookup_path = tmp_path / climatology._LOOKUP_FILENAME
+    pl.read_parquet(lookup_path).drop(POWER_FCST_QUANTILE_COLUMNS[0]).write_parquet(lookup_path)
+
+    with pytest.raises(ValueError, match="must be retrained"):
+        ClimatologyForecaster.load(tmp_path)
+
+
 def test_neighbourhood_is_one_month_and_one_half_hour_with_the_same_day_type(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -288,7 +307,7 @@ def test_neighbourhood_is_one_month_and_one_half_hour_with_the_same_day_type(
     with caplog.at_level(logging.INFO, logger=_LOGGER_NAME):
         forecaster.train(_features(rows), [1])
 
-    def members(month: int, half_hour: int, *, weekend: bool) -> list[float] | None:
+    def quantiles(month: int, half_hour: int, *, weekend: bool) -> list[float] | None:
         cell = forecaster._lookup.filter(
             pl.col("local_month") == month,
             pl.col("local_half_hour_of_day") == half_hour,
@@ -297,21 +316,21 @@ def test_neighbourhood_is_one_month_and_one_half_hour_with_the_same_day_type(
         if cell.height == 0:
             return None
         assert cell.height == 1
-        return [cell[column][0] for column in CLIMATOLOGY_QUANTILE_COLUMNS]
+        return [cell[column][0] for column in POWER_FCST_QUANTILE_COLUMNS]
 
-    level = [(k + 0.5) / CLIMATOLOGY_MEMBER_COUNT for k in range(CLIMATOLOGY_MEMBER_COUNT)]
+    level = DELIVERY_QUANTILES
     april = [60 * p if p <= 2 / 3 else 180 * p - 80 for p in level]
-    assert members(3, 10, weekend=False) == pytest.approx([40 * p for p in level], abs=1e-4)
-    assert members(4, 10, weekend=False) == pytest.approx(april, abs=1e-4)
-    assert april[33] == pytest.approx(39.412, abs=1e-3)
-    assert april[34] == pytest.approx(41.765, abs=1e-3)
-    assert april[50] == pytest.approx(98.235, abs=1e-3)
-    assert members(6, 10, weekend=False) == pytest.approx([100.0] * 51)
-    assert members(3, 12, weekend=False) == pytest.approx([20.0] * 51)
-    assert members(3, 10, weekend=True) == pytest.approx([1000.0] * 51)
+    assert quantiles(3, 10, weekend=False) == pytest.approx([40 * p for p in level], abs=1e-4)
+    assert quantiles(4, 10, weekend=False) == pytest.approx(april, abs=1e-4)
+    assert april[level.index(0.65)] == pytest.approx(39.0, abs=1e-3)
+    assert april[level.index(0.8)] == pytest.approx(64.0, abs=1e-3)
+    assert april[level.index(0.99)] == pytest.approx(98.2, abs=1e-3)
+    assert quantiles(6, 10, weekend=False) == pytest.approx([100.0] * 13)
+    assert quantiles(3, 12, weekend=False) == pytest.approx([20.0] * 13)
+    assert quantiles(3, 10, weekend=True) == pytest.approx([1000.0] * 13)
     # Half-hour 47 wraps up to half-hour 0 and keeps its own day type, not the next day's.
-    assert members(3, 0, weekend=False) == pytest.approx([7.0] * 51)
-    assert members(3, 0, weekend=True) == pytest.approx([9.0] * 51)
-    assert members(3, 13, weekend=False) is None
-    assert members(7, 10, weekend=False) is None
+    assert quantiles(3, 0, weekend=False) == pytest.approx([7.0] * 13)
+    assert quantiles(3, 0, weekend=True) == pytest.approx([9.0] * 13)
+    assert quantiles(3, 13, weekend=False) is None
+    assert quantiles(7, 10, weekend=False) is None
     assert any("minimum 1," in record.getMessage() for record in caplog.records)

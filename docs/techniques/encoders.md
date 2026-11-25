@@ -87,10 +87,11 @@ biases, but cannot learn how far to trust that source, because trust is relative
 alternatives. ICON-EU is a single deterministic run, so the same ICON-EU tokens enter all 51 forward
 passes. Where training finds ICON-EU reliable, the ICON-EU tokens pull every member towards the
 ICON-EU solution, without adding spread of their own. Pulling every member towards one run narrows
-the spread, so the per-horizon spread-skill ratio has to confirm that the pooled forecast is not
-under-dispersed. The output stays 51 equiprobable members, so the [linear
+the spread, so the per-horizon prediction interval coverage probability (PICP) has to confirm that
+the pooled forecast is not under-dispersed. The 51 forward passes still reduce to the 13 stored
+quantiles, so the [linear
 pool](probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-distributions) and the
-fair [continuous ranked probability score
+[continuous ranked probability score
 (CRPS)](evaluation-metrics.md#crps-continuous-ranked-probability-score) apply unchanged.
 
 **The operational alternative is to blend the sources' distributions and then rebuild members with

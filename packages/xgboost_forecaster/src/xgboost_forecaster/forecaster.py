@@ -13,6 +13,7 @@ from contracts.config_schemas import class_target
 from contracts.ml_schemas import AllFeatures
 from contracts.power_schemas import PowerForecast
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
+from ml_core.quantiles import to_stored_quantiles
 
 
 def _prepare_features(df: pl.DataFrame, feature_cols: list[str]) -> pl.DataFrame:
@@ -161,7 +162,11 @@ class XGBoostForecaster(BaseForecaster):
     def predict(
         self, data: pt.LazyFrame[AllFeatures], *, fold_id: str = "live"
     ) -> pt.DataFrame[PowerForecast]:
-        """Generate one power_fcst per row, dispatching by time_series_id to the right Booster.
+        """Forecast the 13 delivery quantiles of each row, one Booster per time_series_id.
+
+        Each Booster predicts one point value per NWP ensemble member. ``to_stored_quantiles``
+        reduces the members of one ``(time_series_id, power_fcst_init_time, valid_time)`` row to
+        the empirical quantiles of those point values.
 
         ``data`` is collected once and grouped in memory by ``time_series_id``. This model
         ignores rows for any ``time_series_id`` it was not trained on, and only scores its own
@@ -175,8 +180,17 @@ class XGBoostForecaster(BaseForecaster):
         busiest cell. See ``cv_power_forecasts`` and
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
-        ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
-        supplies it). Defaults to the ``"live"`` production sentinel.
+        Args:
+            data: The ``AllFeatures`` rows to forecast, one per NWP ensemble member.
+            fold_id: Stamped onto every output row, because the XGBoost model has no inherent
+                fold. Defaults to the ``"live"`` production sentinel.
+
+        Returns:
+            One ``PowerForecast`` row per ``(time_series_id, power_fcst_init_time, valid_time)``.
+
+        Raises:
+            ValueError: If a row has a null ``ensemble_member``. A row with no NWP member carries
+                no weather, and its prediction would silently widen the quantiles of its key.
         """
         feature_cols = self._feature_cols
         cfg = self.model_params
@@ -204,6 +218,12 @@ class XGBoostForecaster(BaseForecaster):
         # Stream the NWP scan, for the reasons on ``train`` above. See
         # <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
         df = data.collect(engine="streaming")
+        n_memberless = df["ensemble_member"].null_count()
+        if n_memberless:
+            raise ValueError(
+                f"{n_memberless} rows have a null ensemble_member; drop rows without an NWP member"
+                " before predict."
+            )
         parts: list[pl.DataFrame] = []
         for group_key, group in df.group_by(["time_series_id"]):
             booster = self._models.get(int(group_key[0]))
@@ -221,7 +241,11 @@ class XGBoostForecaster(BaseForecaster):
         # The identity columns (power_fcst_model_name / experiment_name / fold_id) are built as
         # ``pl.lit(str)`` above, so they are already ``String``. ``String`` is the dtype
         # PowerForecast declares, so these columns need no cast before validation.
-        return PowerForecast.validate(pl.concat(parts))
+        return PowerForecast.validate(
+            to_stored_quantiles(
+                pl.concat(parts), value_col="power_fcst", drop_cols=["ensemble_member"]
+            )
+        )
 
     def save(self, path: Path) -> None:
         """Save all Boosters as .ubj files plus a meta.json with the full config.

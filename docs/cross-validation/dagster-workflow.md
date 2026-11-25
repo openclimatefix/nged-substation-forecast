@@ -202,7 +202,7 @@ MLflow experiment "xgboost_smoke_test"
    chunk overwrites the partition (clearing any prior run), the rest **append**, so a full
    re-materialisation replaces the fold's rows without ever holding all forecasts in memory.
 5. Tags the fold run with `val_start`/`val_end` and the `n_forecast_rows`/
-   `n_forecast_time_series`/`n_ensemble_members` counters. All five are tags rather than params or
+   `n_forecast_time_series` counters. All four are tags rather than params or
    metrics because they legitimately change — and can shrink — between materialisations of the same
    fold run. Params are write-once, and MLflow reports a metric's latest value as the max over all
    its writes, so a shrunk count would read back too high.
@@ -226,21 +226,22 @@ chosen fold holds more than one `experiment_name`. Then choose a **time series**
 groups the 32 series by type, so all the PV sites or all the primaries sit together), a **forecast
 date**, and one of that day's **forecast runs**.
 
-**Compare with** optionally adds a second CV run's ensemble in orange for the same fold, series,
-and forecast init time. The default is **No comparison**. If the second CV run has no matching
-rows, a warning appears and the primary forecast stays visible. The NWP panel shows the primary
-CV run's weather run.
+**Compare with** optionally adds a second CV run's p5–p95 band and p50 line in orange for the same
+fold, series, and forecast init time. The default is **No comparison**. If the second CV run has no
+matching rows, a warning appears and the primary forecast stays visible. The NWP panel shows the
+primary CV run's weather run.
 
 **Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
 without restarting marimo. Its new `experiment_name` appears in the **Experiment** dropdown;
 **Fold**, **forecast date** and **forecast run** go back to their defaults, and the chosen time
 series is kept.
 
-The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
-including past the init time) as a thick blue line, and a vertical rule at the forecast init time,
-spanning 24 hours before the init time to 14 days after it. The x-axis is labelled at midnight
-(Europe/London) with the day of week and date, with unlabelled minor ticks every 3 hours. Scroll to
-zoom, drag to pan, hover for the `ensemble_member` and value.
+The chart draws the forecast's p1–p99, p5–p95, and p20–p80 bands, each fainter than the band inside
+it, and the p50 line, with observed power (wherever available, including past the init time) as a
+thick blue line, and a vertical rule at the forecast init time, spanning 24 hours before the init
+time to 14 days after it. The x-axis is labelled at midnight (Europe/London) with the day of week
+and date, with unlabelled minor ticks every 3 hours. Scroll to zoom, drag to pan, hover for the
+values.
 
 The **Data source** radio switches the app between the local data tables (the root `.env`) and the
 production S3 buckets without restarting marimo — see the [dashboard
@@ -286,10 +287,10 @@ run config dialog before launching.
    batch, never a whole fold or the entire matched population. See [The other hard ceiling: Polars'
    32-bit row index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index)
    for why this chunking also keeps the row-index cap out of reach at V2 scale. For each group: a.
-   Calls `compute_metrics()` — joins observed power, collapses each forecast run's ensemble members
-   into per-timestamp quantities, and computes the deterministic metrics (MAE / NMAE / RMSE / MBE on
-   the ensemble mean) plus the probabilistic metrics (fair CRPS, spread-skill ratio, pinball loss at
-   the 13 delivery quantiles, PICP and interval width for the 6 symmetric bands) per
+   Calls `compute_metrics()` — joins observed power to each stored forecast row and computes the
+   deterministic metrics (MAE / NMAE / RMSE / MBE on the median, `power_fcst_p50`) plus the
+   probabilistic metrics (pinball loss at the 13 stored delivery quantiles, CRPS as twice their
+   mean, PICP and interval width for the 6 symmetric bands) per
    `(time_series_id, fold_id, power_fcst_model_name, horizon_slice)` — see the [evaluation-metrics
    reference](../techniques/evaluation-metrics.md) for definitions. b. Enriches rows with scope
    (`evaluation_scope`), window bounds (`window_start`, `window_end`, `window_label`),
@@ -297,7 +298,10 @@ run config dialog before launching.
    `forecast_metrics` Delta, partitioned by `(experiment_name, fold_id)` with an idempotent
    overwrite predicate — safe to re-run without duplicating rows.
 5. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the fold's
-   MLflow child run, then averages across folds and logs the mean to the parent run. The key token
+   MLflow child run, then averages across folds and logs the mean to the parent run. Both runs are
+   tagged `metrics_version=2`, which marks scores computed from the 13 stored quantile columns;
+   a run without the tag uses other definitions under the same metric names, so compare scores only
+   between runs with the same tag value. The key token
    is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for parametric metrics,
    in three families: overall (`rmse__all`, `crps__all`), per type (`rmse__disaggregated_demand`),
    and per horizon slice (`nmae__all__day_ahead`). Parametric metrics are restricted to a headline

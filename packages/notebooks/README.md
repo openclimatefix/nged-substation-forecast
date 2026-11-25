@@ -82,9 +82,8 @@ root `.env` points at.
   notebook: the chart builder is an `@app.function`, and the `test_*` function beside the chart
   builder is collected by a plain `uv run pytest`, because `python_files` in `pyproject.toml` names
   this file.
-- `view_baseline_export.py` — inspects the parquets
+- `view_baseline_export.py` — inspects the parquet file
   `scripts/forecasting/export_baseline_forecasts.py` writes: observed power against the forecast,
-  the observed-minus-ensemble-mean residual that switching-event detection consumes, and the raw
-  ensemble members over a chosen window. Switching-event detection reads that residual because a
+  and the observed-minus-median residual. Switching-event detection reads that residual because a
   sudden step in the gap between measured and forecast power is the signature of a feeder being
   switched onto or off the substation. The notebook's module docstring says what each chart shows.

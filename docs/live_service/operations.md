@@ -405,7 +405,7 @@ shows slow drift in the upstream dataset before it becomes a warning.
 after each 6-hourly materialisation, is likewise non-blocking WARN, and reads the forecasts back
 *off disk* — so it answers "did this slot really land usable rows?", which the run's own green tick
 does not. It goes yellow when the slot wrote no rows at all, when any row carries a null, NaN or
-infinite `power_fcst`, when a row targets a `valid_time` at or before its own init time, when the
+infinite forecast quantile, when a row targets a `valid_time` at or before its own init time, when the
 forecast reaches less than half the 14-day horizon we ask for, when the slot forecast fewer time
 series than the promoted model was trained on, or when the NWP feed is behind. Its metadata carries
 each of those counts plus `nwp_init_time_on_disk` and `nwp_init_time_expected`, so the description

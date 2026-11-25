@@ -87,11 +87,10 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   fold, forecast, materialise `effective_capacity` (the denominator of the normalised mean absolute
   error), then compute the leaderboard metrics that rank this CV run against the others. Takes
   no arguments.
-- `export_baseline_forecasts.py` — exports one CV run's forecasts to three
-  self-contained parquet files (the full ensemble of about 51 members from the European Centre for
-  Medium-Range Weather Forecasts' (ECMWF) ensemble, the mean across those members, and quantiles
-  across those members) for offline analysis, each carrying the observed power beside the forecast
-  so residuals can be computed directly.
+- `export_baseline_forecasts.py` — exports one CV run's forecasts to a self-contained parquet
+  file holding the 10th, 50th, and 90th percentiles of the freshest forecast run per half-hour, for
+  offline analysis. The file carries the observed power beside the forecast so residuals can be
+  computed directly.
 - `rewrite_nwp_row_groups.py` — rewrites every partition of the `nwp` (numerical weather prediction)
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,
@@ -103,10 +102,10 @@ alone. `score_study.py` is run whenever a study hands over a predictions file to
   the move in one new Delta commit.
 - `score_study.py` — stores a study's predictions file in `power_forecasts` under the
   `experiment_name` `study/<study name>` and scores it with the `metrics` asset in leaderboard
-  scope. The script refuses a file whose `(time_series_id, power_fcst_init_time, valid_time,
-  ensemble_member)` keys differ from those of the reference CV run named in `conf/cv/default.yaml`.
-  The script appends every attempt, scored or refused, to `study_submissions.jsonl`, and overwrites
-  an earlier submission only when passed `--replace`.
+  scope. The script refuses a file whose `(time_series_id, power_fcst_init_time, valid_time)` keys
+  differ from those of the reference CV run named in `conf/cv/default.yaml`. The script appends
+  every attempt, scored or refused, to `study_submissions.jsonl`, and overwrites an earlier
+  submission only when passed `--replace`.
 
 ## `diagnostics/` — checking and illustrating processing behaviour
 

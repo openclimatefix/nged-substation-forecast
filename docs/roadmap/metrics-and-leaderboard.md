@@ -4,7 +4,7 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 
 > **Status legend** — ✅ Implemented · 🚧 Planned · 🔬 Research. The `Metrics` schema, the `metrics`
 > Dagster asset, the deterministic metrics (MAE, NMAE, RMSE, MBE), and the probabilistic metrics
-> (CRPS, spread-skill ratio, pinball loss, PICP, interval width — see the [evaluation-metrics
+> (CRPS, pinball loss, PICP, interval width — see the [evaluation-metrics
 > reference](../techniques/evaluation-metrics.md)) are ✅ implemented, as are the `manual_heuristic`
 > and `climatology` baseline forecasters. The interactive leaderboard visualisation is 🚧 planned.
 > The implemented [cross-validation protocol](../cross-validation/cross-validation-folds.md) has
@@ -117,23 +117,19 @@ metrics](#phase-b-probabilistic-metrics-from-the-existing-ensemble) score them w
 implementation work — scoring the spread is the closest automatable proxy for the plot a human
 actually reads. Two consequences follow.
 
-**`ensemble_member` is overloaded here.** For NWP models that column indexes an NWP ensemble member;
-for `manual_heuristic` it indexes a *historical analogue*. Same column, different meaning. We
-document this on the `PowerForecast` / `AllFeatures` schema so nobody assumes `ensemble_member ⇒
-NWP`. The manual heuristic *synthesises* its ensemble inside `predict()` (by unpivoting its
-analogue-lag columns into member rows) rather than consuming an NWP ensemble; it runs with
-`weather_source: "none"`.
+**The manual heuristic stores the quantiles of its 13 historical analogues.** `predict()` unpivots
+its analogue-lag columns into one value per analogue, and `ml_core.quantiles.to_stored_quantiles`
+reduces those values to the 13 `PowerForecast` quantile columns. The manual heuristic runs with
+`weather_source: "none"`. The analogue method weights the analogues equally, with no further
+processing, so the empirical quantiles of the analogues — and the probabilistic metrics (CRPS etc.)
+computed over them — are a faithful reading of the method, not an approximation.
 
-**Deterministic collapse is a property of the metrics layer, not the manual heuristic.** The manual
-heuristic emits its 13 members and nothing else; the [metric-matched collapse
-decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast) then scores its MAE on
-the members' median (apples-to-apples with every other model's central forecast) and reports the
-operator's conservative operating point — the **95th percentile** — as a labelled secondary number
-(`mae`/`mbe` at `metric_param="p95"`). Being deliberately conservative, the P95 carries a large
-*positive* MBE **by design** (a peak-safety choice, not a forecasting error), so it belongs *beside*
-the central metric. Either way the analogue method weights the analogues equally, with no further
-processing, so equiprobable members — and the probabilistic metrics (CRPS etc.) computed over them —
-are faithful, not an approximation.
+**The metrics layer scores the stored median, `power_fcst_p50`, the same way for every model** (see
+[the point-forecast decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast)).
+The operator's conservative operating point, the **95th percentile**, is stored as
+`power_fcst_p95`. Being deliberately conservative, the P95 carries a large *positive* bias **by
+design** (a peak-safety choice, not a forecasting error), so a P95 number belongs *beside* the
+central metric, never replacing it.
 
 ### A faithful replica and a "simple upgrades" variant
 
@@ -346,44 +342,6 @@ the observations in the cleaned power table that lie at least 49 weeks before `v
 Eligibility requires only `min_training_months` of history, so a series can qualify yet have no
 annual analogue, and its ensemble then holds only the weekly members.
 
-**Metrics collapse — deterministic-collapse rework in `compute_metrics`, its own issue under the
-v0.3 epic.** The metrics collapse can land before or after any baseline. Implements the
-[metric-matched collapse
-decision](#which-ensemble-collapse-defines-the-deterministic-point-forecast). Forecasters emit
-**members only**; every collapse lives in the metrics layer, so there is no per-CV-run
-collapse config and no designated point-forecast columns on `PowerForecast`. In
-`packages/ml_core/src/ml_core/metrics.py`:
-
-- In the per-run aggregation, emit both `power_fcst_mean` (`.mean()`) and `power_fcst_median` (reuse
-  the already-computed `q_p50` empirical-quantile column — Polars `.quantile(0.5, "linear")` is
-  exactly `.median()`), and keep `q_p95`.
-- Score `mae`/`nmae` on the median error; `rmse`/`mbe` on the mean error; the spread-skill
-  denominator stays the mean-error RMSE (its Fortin "1.0 = calibrated" target is defined against the
-  mean). Add extra labelled rows: `mae`/`mbe` at `metric_param="p95"` (the conservative operating
-  point) and `mbe` at `metric_param="p50"` (bias of the delivered median). `METRIC_PARAMS` already
-  contains `"p95"` and `"p50"` (both are in `DELIVERY_QUANTILES`), so **no `Metrics` schema change**
-  — and the primary key includes `metric_param`, so the new rows do not collide with the
-  `metric_param="all"` headline rows.
-- Extend the MLflow allowlist `_MLFLOW_LOGGED_PARAMETRIC` with `("mbe", "p95")` and `("mbe", "p50")`
-  so the operating-point bias and the median's bias appear on the leaderboard (aggregate keys come
-  out distinct, e.g. `mbe_p95__all` vs `mbe__all`).
-- Update the docstrings that currently say deterministic metrics are "scored on the per-run ensemble
-  mean" (`METRIC_NAMES` in `contracts/ml_schemas.py`), the `Metrics.metric_param` field description
-  (no longer pinball-only), and the `_MLFLOW_LOGGED_PARAMETRIC` key-count claims. The promoted
-  [evaluation-metrics reference](../techniques/evaluation-metrics.md) section must state explicitly
-  that MAE/NMAE and RMSE/MBE score *different point forecasts* and why (otherwise the first person
-  to recompute RMSE from the stored median members files a bug), and note the identity `mae ≡ 2 ×
-  pinball_loss@p50` as a deliberate internal consistency check.
-- Tests: member sets where mean ≠ median ≠ p95, with hand-computed expected values per metric; the
-  single-member ensemble (all collapses coincide; CRPS still reduces to MAE); the pinball-p50
-  identity. Recompute existing expected values — never relax a test to absorb the shift.
-- **After the metrics collapse lands, run one `trained_cv_model++` backfill over every existing
-  CV run partition** — retrain, re-predict, and re-score everything under the new collapse. The
-  backfill is deliberately the exact "re-run everything after a pipeline fix" drill, and it doubles
-  as the empirical verification of the backfill mechanics before the recipe is written into
-  `docs/cross-validation/dagster-workflow.md`. Treat the change as a leaderboard epoch event,
-  because the new collapse shifts existing numbers.
-
 **PR B — `PersistenceForecaster` (seasonal-naive).** This PR is not planned, and
 [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087) is closed.
 `PersistenceForecaster` reuses `NwpRunRowsWithoutWeatherFeatureEngineer` and the shared `meta.json`
@@ -397,22 +355,21 @@ base class until a third stateless model exists.
   lag columns in ascending-lag order — `_nullify_leaky_lags` nulls any lag with `lead ≥ lag_hours`
   (so the 24 h lag survives all intraday leads), and coalesce then selects the shortest *non-leaky*
   lag per row: same-time-yesterday for day-1, last-week for day 2–7, two-weeks-ago beyond. Zero
-  lookahead risk because it rides the audited pipeline. Output is one member, index 0, built
-  as an `Int8` expression (`Nwp.ensemble_member` and `AllFeatures.ensemble_member` are both `Int8`),
-  with `nwp_init_time` null. The identity columns follow `XGBoostForecaster._build_part`. Rows where
-  all lags are null are dropped, the count logged, and the per-series dropped/coverage counts
-  recorded in asset metadata.
+  lookahead risk because it rides the audited pipeline. Output is one value per row, written to all
+  13 quantile columns by `ml_core.quantiles.to_stored_quantiles`, with `nwp_init_time` null. The
+  identity columns follow `XGBoostForecaster._build_part`. Rows where all lags are null are dropped,
+  the count logged, and the per-series dropped/coverage counts recorded in asset metadata.
 - `conf/model/persistence.yaml`: `weather_source: "none"`, `training_strategy: "none"`.
 - Tests: unit (shortest-non-leaky selection on a hand-built `AllFeatures` fixture; all-null-row
   dropping; `save`/`load` round-trip freezing ids) plus an integration smoke fold via the
   `tests/test_trained_cv_model.py` fixture pattern.
 - Register (`smoke_test` → `full_cv`), materialise the chain, sanity-check: NMAE worse than XGBoost
-  overall but plausibly competitive intraday; single-member CRPS = MAE; spread-skill 0; PICP /
+  overall but plausibly competitive intraday; deterministic CRPS = MAE; PICP /
   interval width degenerate (expected and ignorable for a deterministic baseline).
 - **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out
   and its `all` / `extended_range` aggregates cover a shorter lead population than other models'.
-  Fair CRPS is size-comparable so nothing is *wrong*, but state the caveat where the sanity numbers
-  are read, backed by the per-series coverage counts in asset metadata.
+  State the caveat where the sanity numbers are read, backed by the per-series coverage counts in
+  asset metadata.
 
 **The recipe.** No open questions remain. Full write-up in [the manual heuristic
 forecast](../background/manual-heuristic-forecast.md); the implementation spec:
@@ -575,10 +532,9 @@ runs.
 | Mean bias error (MBE) | Deterministic | ✅ | Systematic over/under-prediction. |
 | Histogram of errors | Deterministic | 🚧 | Visual check that errors are ~Normal. |
 | [Pinball loss (quantile loss)](../techniques/evaluation-metrics.md#pinball-loss) | Quantile | ✅ | Penalises asymmetrically by target quantile, at the 13 NGED delivery quantiles. Averaged across quantiles for a single quantile-skill score. |
-| [PICP (Prediction Interval Coverage Probability)](../techniques/evaluation-metrics.md#picp-prediction-interval-coverage-probability) | Quantile | ✅ | Coverage of six symmetric bands (p1–p99 … p35–p65). Judge against the finite-ensemble calibrated reference (≈ 0.769 for p10–p90 at 51 members), not the nominal rate. |
+| [PICP (Prediction Interval Coverage Probability)](../techniques/evaluation-metrics.md#picp-prediction-interval-coverage-probability) | Quantile | ✅ | Coverage of six symmetric bands (p1–p99 … p35–p65), read from the stored quantile columns. A calibrated forecast covers the nominal rate; quantiles taken from 51 calibrated values cover ≈ 0.769 for p10–p90. |
 | [Interval width](../techniques/evaluation-metrics.md#interval-width) | Quantile | ✅ | Mean band width (MW) — the sharpness companion that stops PICP being gamed by over-widening. |
-| [CRPS (Continuous Ranked Probability Score)](../techniques/evaluation-metrics.md#crps-continuous-ranked-probability-score) | Ensemble | ✅ | Probabilistic equivalent of MAE; rewards both accuracy and sharpness. Fair (finite-ensemble-unbiased) form — the one metric comparable across ensemble sizes. |
-| [Spread-Skill Ratio](../techniques/evaluation-metrics.md#spread-skill-ratio) | Ensemble | ✅ | Fortin-corrected RMS ensemble spread ÷ RMSE of the ensemble mean. 1.0 = well-calibrated; < 1 under-dispersed (overconfident); > 1 over-dispersed (underconfident). |
+| [CRPS (Continuous Ranked Probability Score)](../techniques/evaluation-metrics.md#crps-continuous-ranked-probability-score) | Quantile | ✅ | Probabilistic equivalent of MAE; rewards both accuracy and sharpness. Estimated as twice the mean pinball loss over the 13 stored quantiles. |
 | [Threshold-weighted CRPS (twCRPS)](../techniques/evaluation-metrics.md#threshold-weighted-crps-twcrps) | Ensemble | 🚧 | CRPS confined to behaviour above a per-series threshold — the ranking-grade metric for skill near the network limit. See [Tail & exceedance metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks). |
 | [Exceedance rate of upper quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles) | Quantile | 🚧 | "When we said p95, was it exceeded ~5% of the time?" — one-sided calibration check for the delivered tail quantiles. |
 | [Brier score for threshold exceedance](../techniques/evaluation-metrics.md#brier-score-for-threshold-exceedance) | Ensemble | 🚧 | Grades the ensemble's "chance load exceeds the threshold" probability — the score for the yes/no warning NGED acts on. |
@@ -609,33 +565,34 @@ being scored, which a forecast issued hours earlier could not have held. When th
 when the clamp is lookahead bias are set out under [drop curtailed hours from the training
 target](xgboost-improvements.md#drop-curtailed-hours-from-the-training-target).
 
-**Every ratio between a model and a reference is corrected for the ensemble-size bias [Weigel et al.
-(2007)](https://doi.org/10.1175/MWR3280.1) describe, and carries its reference forecast, population,
-and ensemble-member count** — see [Publishing results that others can compare
+**Every ratio between a model and a reference carries its reference forecast and population** — see
+[Publishing results that others can compare
 against](../background/energy-forecasting-review.md#publishing-results-that-others-can-compare-against)
-for the general commitment. The fair, finite-ensemble-unbiased CRPS in the table above is the form
-that carries this correction. PICP is judged against the finite-ensemble calibrated reference rather
-than the nominal rate for the same reason.
+for the general commitment.
 
-### Which ensemble collapse defines the deterministic point forecast? 🚧
+**Every forecaster stores the same 13 quantile levels, so the CRPS takes the same form for every
+forecaster.** The CRPS in the table above is computed from those 13 levels. The score therefore
+takes the same form whether 51 ECMWF ENS members, 13 power analogues, or a fitted distribution
+produced the quantiles. PICP is judged against the nominal rate, because the stored quantiles are
+the forecast NGED receives.
 
-**Decided: metric-matched collapse, uniform across every model.** Implemented as part of the
-baseline work ([the metrics-collapse item in the baseline
-implementation details](#implementation-details-baselines-deleted-when-they-ship)); the reasoning
-below is the durable design rationale, promoted to [the evaluation-metrics
-reference](../techniques/evaluation-metrics.md) when the metrics collapse ships.
+### Which ensemble collapse defines the deterministic point forecast? ✅
+
+**Every deterministic metric scores the stored median, `power_fcst_p50`, the same way for every
+model.** `PowerForecast` stores the 13 delivery quantiles and no ensemble members, so the metrics
+layer has no ensemble mean to score. The [evaluation-metrics
+reference](../techniques/evaluation-metrics.md#deterministic-metrics) states the definitions.
 
 #### The problem
 
 The deterministic metrics (MAE, NMAE, RMSE, MBE) score a **single point forecast**, but every model
-on the leaderboard is really an *ensemble* (51 NWP members for the ML models; 13 historical
-analogues for `manual_heuristic`; a quantile sample for `climatology`). The metrics layer has to
-collapse each ensemble to one number. `compute_metrics` today collapses every ensemble to its
-**mean** (`packages/ml_core/src/ml_core/metrics.py`), and the risk we were guarding against was that
-different models would be scored on *different* collapses — e.g. the ML models on their mean and
+on the leaderboard is really a *distribution* (quantiles of 51 NWP-driven predictions for the ML
+models; of 13 historical analogues for `manual_heuristic`; of pooled past power for `climatology`).
+The metrics layer has to reduce each distribution to one number, and the risk is that different
+models would be scored on *different* reductions — e.g. the ML models on their mean and
 `manual_heuristic` on the median that an operator effectively reads off its analogue spread. Mean
-and median diverge for skewed or underdispersed ensembles, so scoring some models on one and some on
-the other is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
+and median diverge for skewed or underdispersed distributions, so scoring some models on one and
+some on the other is **not apples-to-apples** — a silent trap that quietly mis-ranks models.
 
 #### Mean versus median — the trade-off
 
@@ -667,26 +624,16 @@ Evaluating Point Forecasts*). The apples-to-apples requirement is only that the 
 
 #### The decision
 
-Score each deterministic metric on the ensemble collapse it is consistent with, **the same way for
-every model**:
+**MAE, NMAE, RMSE, and MBE all score `power_fcst_p50`, for every model.** The median is consistent
+with MAE and NMAE, the headline columns. RMSE and MBE are consistent with the mean, so on those two
+columns a model whose distribution is skewed reads slightly worse than its own mean would. The
+trap above stays closed, because the reduction is uniform across models. A forecaster that needs
+RMSE and MBE scored on its mean would have to store the mean as a column of its own, which
+`PowerForecast` does not carry.
 
-- **MAE / NMAE ← ensemble median** (NMAE is the headline cross-series metric, so the headline is
-  effectively median-based).
-- **RMSE / MBE ← ensemble mean.**
-- **Spread-skill ratio ← ensemble mean, internally, unchanged** — its Fortin calibration target
-  (RMSE of the ensemble mean = `√((m+1)/m) ×` RMS spread, so "1.0 = calibrated") is *defined*
-  against the mean; switching its internal collapse would silently break that reading.
-
-Everything else is an **extra, labelled** row, never a headline: the manual heuristic's conservative
-**P95** operating point (`mae`/`mbe` at `metric_param="p95"` — conservative by design, so a large
-positive MBE that belongs *beside* the central number), and the **median's own bias** (`mbe` at
-`metric_param="p50"`, so the delivered central forecast has an honest bias number distinct from the
-mean's energy-balance bias). No model is structurally disadvantaged on any column — which a single
-uniform statistic cannot achieve — and the trap is closed because the collapse is uniform across
-models. Because the collapse lives entirely *downstream* of the stored forecasts, switching it
-re-scores the whole leaderboard from a single `metrics` re-materialisation with no retraining or
-re-prediction. Doing it now, before the leaderboard adjudicates anything, is the easiest moment to
-shift every existing deterministic number.
+The manual heuristic's conservative operating point is the stored `power_fcst_p95`. Its pinball
+loss is already on the leaderboard; an MAE or MBE scored on it would be an **extra, labelled** row,
+never a headline.
 
 ### Effective-capacity normalisation, and the v0.7 upgrade to time-varying 🚧
 
@@ -747,9 +694,8 @@ distribution network has already been scored this way: [Maia et al.
 (2026)](https://arxiv.org/abs/2603.01653) compare fault-count forecasts for SP Energy Networks
 against a quantile-regression baseline on the threshold-weighted score, because an unweighted one
 "would place substantial emphasis on parts of the predictive distribution where the two models are
-identical". Implementation needs almost no extra work: replace members and observation by
-`max(value, threshold)` and reuse the existing fair-CRPS aggregation unchanged, inheriting its
-comparability across ensemble sizes.
+identical". Implementation needs almost no extra work: replace each quantile and the observation by
+`max(value, threshold)` and reuse the existing quantile CRPS aggregation unchanged.
 
 - **[Exceedance rate of the upper delivery
   quantiles](../techniques/evaluation-metrics.md#exceedance-rate-of-the-upper-delivery-quantiles)**
@@ -800,11 +746,12 @@ before/after instruments for Phases C and D.
   value can see the same outcomes a model is scored against. A training-window-only threshold avoids
   that leak, at the cost of a threshold that shifts between folds rather than staying one fixed
   number per series.
-- **twCRPS:** transform members and observation with `pl.max_horizontal(col, threshold)` and reuse
-  the existing fair-CRPS expression (sorted-member identity, Float64 accumulation) verbatim.
-- **Exceedance rates:** compare `y` against the already-computed empirical quantile columns for p80,
-  p90, p95, p98, p99 — one boolean mean per level.
-- **Brier score:** exceedance probability = member fraction above the threshold; outcome indicator
+- **twCRPS:** transform the 13 quantile columns and the observation with
+  `pl.max_horizontal(col, threshold)` and reuse the existing pinball-loss CRPS expression verbatim.
+- **Exceedance rates:** compare `y` against the stored quantile columns for p80, p90, p95, p98,
+  and p99 — one boolean mean per level.
+- **Brier score:** exceedance probability = one minus the quantile level at the threshold,
+  interpolated between the stored quantiles; outcome indicator
   from `y`; squared difference, averaged.
 - **Event counts:** print the number of exceedance days each tail metric is computed over, and
   refuse a comparison between two candidates when either side's event count falls below a minimum
@@ -1058,17 +1005,16 @@ Shipped. `compute_metrics` now scores every metric per `HORIZON_SLICES` band (de
 
 ### Phase B — probabilistic metrics from the existing ensemble ✅
 
-Shipped. `compute_metrics` now computes fair CRPS, the Fortin-corrected spread-skill ratio, pinball
-loss at the 13 NGED delivery quantiles (plus their mean), and PICP and interval width for the six
-symmetric delivery bands — all member-aware, computed before the ensemble-mean collapse, per horizon
-slice. Definitions, equations, and the design decisions (fair CRPS divisor, RMS spread, delivery
-quantiles, MLflow allowlist) live in the [evaluation-metrics
+Shipped. `compute_metrics` computes pinball loss at the 13 NGED delivery quantiles (plus their
+mean), CRPS as twice that mean, and PICP and interval width for the six symmetric delivery bands —
+all read from the 13 stored quantile columns, per horizon slice. Definitions, equations, and the
+design decisions (the delivery quantiles, the MLflow allowlist) live in the [evaluation-metrics
 reference](../techniques/evaluation-metrics.md).
 
 ### Phase C — low-effort calibration (after B proves the diagnosis)
 
-Decide based on Phase B's spread-skill numbers — and on the **rank (Talagrand) histogram** of the
-observations among the 51 members, computed ad hoc per horizon slice: a U-shape confirms plain
+Decide based on Phase B's PICP numbers — and on the **rank (Talagrand) histogram** of the
+observations among the 51 member predictions, computed ad hoc per horizon slice: a U-shape confirms plain
 underdispersion (a single multiplicative inflation can fix it), whereas a sloped or asymmetric
 histogram means bias or shape error, which a symmetric inflation cannot repair and which would push
 toward a rank-dependent correction instead. **Post-hoc spread inflation** (a cut-down Ensemble Model
@@ -1119,7 +1065,7 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
    ([#264](https://github.com/openclimatefix/nged-substation-forecast/issues/264)) — pool the
    per-member quantiles into delivered Rep 2 percentiles (the pseudo-sample recipe in the
    explainer), with a per-horizon affine recalibration hook (fit on train) applied only if the
-   pooled spread-skill/PICP numbers demand it. Scored with pinball/PICP/CRPS head-to-head against
+   pooled PICP numbers demand it. Scored with pinball/PICP/CRPS head-to-head against
    the Phase-C inflated deterministic champion. The quick-wins study found that crossing the quantile
    model's output with the 51 members left the 10% to 90% band covering 57% of outcomes,
    against a nominal 80%, and [issue

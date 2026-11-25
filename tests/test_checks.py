@@ -28,6 +28,7 @@ import polars as pl
 import pytest
 from _cleaned_power_test_data import write_metadata
 from contracts.common import UTC_DATETIME_DTYPE
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
 from contracts.settings import Settings
 from dagster import (
     AssetCheckResult,
@@ -933,7 +934,6 @@ _HEALTHY_ROWS = LiveForecastRows(
     n_invalid=0,
     n_nonfinite_power=0,
     n_hindcast=0,
-    n_ensemble_members=51,
     time_series_ids=(1, 2),
     latest_valid_time=_SLOT + timedelta(days=14),
     nwp_init_time=_SLOT - timedelta(hours=12),
@@ -963,7 +963,6 @@ def test_zero_rows_is_not_healthy() -> None:
         replace(
             _HEALTHY_ROWS,
             n_rows=0,
-            n_ensemble_members=0,
             time_series_ids=(),
             latest_valid_time=None,
         ),
@@ -1093,6 +1092,7 @@ def _write_live_forecasts(
     *,
     time_series_ids: tuple[int, ...] = (1, 2),
     power_fcst: float | None = 12.5,
+    power_fcst_columns: Sequence[str] = POWER_FCST_QUANTILE_COLUMNS,
     valid_time_offset: timedelta = _FULL_HORIZON,
     fold_id: str = "live",
     experiment_name: str = _EXPERIMENT,
@@ -1106,17 +1106,21 @@ def _write_live_forecasts(
     here would obscure what each case is actually varying. ``mode="append"`` adds a second
     experiment's rows to an existing table. ``with_nwp_init_time=False`` omits the column
     entirely, which is what a model using no NWP writes — ``PowerForecast`` marks it
-    ``allow_missing=True``.
+    ``allow_missing=True``. Each series gets two rows, at ``valid_time_offset`` and 30 minutes
+    before it. The quantile columns named in ``power_fcst_columns`` hold ``power_fcst``, and the
+    other quantile columns hold 12.5.
     """
     rows = [
         {
             "experiment_name": experiment_name,
             "fold_id": fold_id,
             "power_fcst_init_time": power_fcst_init_time,
-            "valid_time": power_fcst_init_time + valid_time_offset,
+            "valid_time": power_fcst_init_time + valid_time_offset - step_back,
             "time_series_id": ts_id,
-            "ensemble_member": member,
-            "power_fcst": power_fcst,
+        }
+        | {
+            column: power_fcst if column in power_fcst_columns else 12.5
+            for column in POWER_FCST_QUANTILE_COLUMNS
         }
         | (
             {"nwp_init_time": power_fcst_init_time - timedelta(hours=12)}
@@ -1124,7 +1128,7 @@ def _write_live_forecasts(
             else {}
         )
         for ts_id in time_series_ids
-        for member in (0, 1)
+        for step_back in (timedelta(0), timedelta(minutes=30))
     ]
     schema = {
         "experiment_name": pl.String,
@@ -1132,8 +1136,7 @@ def _write_live_forecasts(
         "power_fcst_init_time": UTC_DATETIME_DTYPE,
         "valid_time": UTC_DATETIME_DTYPE,
         "time_series_id": pl.Int32,
-        "ensemble_member": pl.Int8,
-        "power_fcst": pl.Float32,
+        **dict.fromkeys(POWER_FCST_QUANTILE_COLUMNS, pl.Float32),
     }
     if with_nwp_init_time:
         schema["nwp_init_time"] = UTC_DATETIME_DTYPE
@@ -1277,7 +1280,7 @@ def test_live_forecasts_check_warns_on_a_truncated_horizon(env: Path) -> None:
 
 @pytest.mark.parametrize("bad_power", [float("nan"), float("inf")])
 def test_live_forecasts_check_warns_on_non_finite_forecasts(env: Path, bad_power: float) -> None:
-    """Rows exist, but every ``power_fcst`` is unusable."""
+    """Rows exist, but every quantile column is unusable."""
     settings = Settings()
     slot = _current_slot()
     _write_live_forecasts(settings.power_forecasts_data_path, slot, power_fcst=bad_power)
@@ -1291,7 +1294,7 @@ def test_live_forecasts_check_warns_on_non_finite_forecasts(env: Path, bad_power
 
 
 def test_live_forecasts_check_warns_on_null_forecasts(env: Path) -> None:
-    """A null ``power_fcst`` counts as non-finite, which Kleene logic makes easy to get wrong.
+    """A null quantile counts as non-finite, which Kleene logic makes easy to get wrong.
 
     ``~is_finite()`` is *null* — not true — for a null input, and ``sum()`` skips nulls, so the
     explicit ``is_null()`` arm is the only thing that catches the single likeliest way for the
@@ -1307,6 +1310,28 @@ def test_live_forecasts_check_warns_on_null_forecasts(env: Path) -> None:
     assert result.passed is False
     assert result.metadata["n_nonfinite_power"].value == 4
     assert result.metadata["n_invalid_rows"].value == 4
+
+
+@pytest.mark.parametrize("bad_power", [float("nan"), None])
+def test_a_row_with_only_its_p99_unusable_counts_as_non_finite(
+    env: Path, bad_power: float | None
+) -> None:
+    """Every quantile column is checked, not just the median or the first column."""
+    settings = Settings()
+    slot = _current_slot()
+    _write_live_forecasts(
+        settings.power_forecasts_data_path,
+        slot,
+        power_fcst=bad_power,
+        power_fcst_columns=("power_fcst_p99",),
+    )
+    _write_nwp_runs(settings.nwp_data_path, _healthy_runs_at(slot))
+    _write_promoted_model_meta(settings.production_model_path, [1, 2])
+
+    result = _run_live_check()
+    assert result.passed is False
+    assert result.metadata["n_nonfinite_power"].value == 4
+    assert "null/NaN/infinite forecast quantile" in str(result.description)
 
 
 def test_a_row_that_is_both_non_finite_and_a_hindcast_is_counted_once(env: Path) -> None:
