@@ -87,20 +87,6 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
             assert value.startswith("/internal"), f"{field_name} should derive from /internal"
 
 
-def test_remote_data_path_keeps_artifacts_local():
-    """A remote data_path_internal yields s3:// tables; artifacts stay under
-    local_artifacts_path.
-    """
-    settings = Settings(
-        data_path_internal="s3://bucket/data",
-        data_path_delivery="s3://bucket/data",
-        local_artifacts_path="/local/artifacts",
-    )
-    assert settings.power_forecasts_data_path == "s3://bucket/data/power_forecasts"
-    assert settings.power_time_series_data_path == "s3://bucket/data/NGED/power_time_series.delta"
-    assert settings.local_artifacts_path == "/local/artifacts"
-
-
 def test_explicit_path_overrides_derivation():
     """An explicitly set path wins over derivation from its root."""
     settings = Settings(

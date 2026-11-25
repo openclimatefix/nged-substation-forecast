@@ -127,9 +127,8 @@ class BaseForecasterConfig(BaseModel):
     ``power_fcst_model_version``. ``0`` is the default, for a run that is not a numbered release.
     The bounds are the range of the contract's Int16 column: ``predict`` casts the value to Int16,
     so a value outside the range would raise when the forecaster predicts, and the bound rejects it
-    at registration instead. The
-    model family's name lives on the ``BaseForecaster`` class as ``MODEL_NAME``, a property of the
-    implementation.
+    at registration instead. The model family's name lives on the ``BaseForecaster`` class as
+    ``MODEL_NAME``, a property of the implementation.
 
     **Serialisation must be canonical.** A config is compared and stored as its serialised form:
     ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the

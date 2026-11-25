@@ -72,10 +72,10 @@ as a v2 item.
 each pair of 15-minute readings into the half-hour ending at `:00` or `:30` leaves the training
 grid, the metrics, and the leaderboard exactly as they are, because two period-ending 15-minute
 means average to the period-ending 30-minute mean the contract already specifies. Everything
-downstream stays correct on that basis — `_upsample_nwp_to_half_hourly`, the inference spine in
-`production_helpers`, and the row-wise forecast metrics all assume a fixed half-hourly step and
-would keep getting one. The milestone that actually wants a finer step is v2 disaggregation, which
-can read it from a separate table rather than by widening `PowerTimeSeries`.
+downstream stays correct on that basis — `_upsample_nwp_to_half_hourly` and the row-wise forecast
+metrics both assume a fixed half-hourly step and would keep getting one. The milestone that
+actually wants a finer step is v2 disaggregation, which can read it from a separate table rather
+than by widening `PowerTimeSeries`.
 
 **Do that averaging explicitly, because today's ingest would silently keep the wrong half of each
 half-hour.** `PowerTimeSeries.drop_implausible_rows` filters to readings aligned to `:00` and `:30`,

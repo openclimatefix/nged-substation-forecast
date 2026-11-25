@@ -1992,7 +1992,7 @@ def _patch_delta_table(monkeypatch: pytest.MonkeyPatch, raw_init_times: set[str]
         ("2026-07-04 00:00:00+02:00", datetime(2026, 7, 3, 22, 0, tzinfo=UTC)),
     ],
 )
-def test_available_nwp_init_times_parses_both_fractional_second_renderings(
+def test_available_nwp_init_times_parses_each_rendering_to_utc(
     monkeypatch: pytest.MonkeyPatch, raw_value: str, expected: datetime
 ) -> None:
     """Must survive either spelling delta-rs might emit for a whole-second ``init_time``.
