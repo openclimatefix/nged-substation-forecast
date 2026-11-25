@@ -269,6 +269,12 @@ class ClimatologyForecaster(BaseForecaster):
 
         The trained population comes from ``meta.json``, not from the lookup.
 
+        Args:
+            path: The directory that ``save`` wrote.
+
+        Returns:
+            The forecaster, ready to ``predict``.
+
         Raises:
             ValueError: The saved lookup lacks a column of the current lookup layout.
         """
