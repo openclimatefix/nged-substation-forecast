@@ -9,7 +9,7 @@ from collections.abc import Sequence
 
 import polars as pl
 from contracts.common import DELIVERY_QUANTILES
-from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast
 
 
 def to_stored_quantiles(
@@ -31,9 +31,10 @@ def to_stored_quantiles(
     a group whose values are all null yields no row. A NaN value is not dropped: it turns the upper
     quantiles of its group into NaN, which ``PowerForecast.validate`` rejects.
 
-    When ``drop_cols`` is not empty, every row must be unique on all columns except
-    ``value_col``. A duplicate means an upstream join fanned out and copied a point value, which
-    would silently double-weight that value in the quantiles, so this raises.
+    When ``drop_cols`` is not empty, every row must be unique on the ``PowerForecast`` key columns
+    that ``frame`` holds plus ``drop_cols``. A duplicate means an upstream join fanned out and
+    copied a point value, which would silently double-weight that value in the quantiles, so this
+    raises.
 
     Args:
         frame: One row per point value. Holds ``value_col``, the columns in ``drop_cols``, and the
@@ -46,11 +47,14 @@ def to_stored_quantiles(
         columns. Groups appear in the order of their first row in ``frame``.
 
     Raises:
-        ValueError: ``drop_cols`` is not empty and two rows share every column except
-            ``value_col``.
+        ValueError: ``drop_cols`` is not empty and two rows share the ``PowerForecast`` key
+            columns and ``drop_cols``.
     """
     if drop_cols:
-        identity_cols = [column for column in frame.columns if column != value_col]
+        identity_cols = [
+            *(column for column in PowerForecast.PRIMARY_KEY if column in frame.columns),
+            *drop_cols,
+        ]
         if frame.select(identity_cols).n_unique() != frame.height:
             raise ValueError(
                 f"to_stored_quantiles: rows are not unique on {identity_cols}; an upstream join"

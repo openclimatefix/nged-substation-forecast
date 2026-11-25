@@ -428,12 +428,12 @@ underlying USD prices):
 | Fargate ARM GB-hour | £0.00267/hr | £0.00307/hr | +14.9% |
 | S3 Standard storage (first 50 TB) | £0.0173/GB-mo | £0.0180/GB-mo | +4.3% |
 
-At v1 scale that premium is a rounding error — maybe £1–3/month on a ~£27–40/month bill (see [AWS
-Running Costs](aws-costs.md)). At v2 scale the storage premium stays small: `power_forecasts` holds
-about 470 GB after 4 years of 2 models (see [How big is Flexpectation's power forecast
-data?](#how-big-is-flexpectations-power-forecast-data), above), so 4.3% is about 35p a month. The
-15% Fargate premium on v2's larger inference task, £45–90/month, is the larger difference, at
-about £7–14/month.
+At Flexpectation v1 scale that premium is a rounding error — maybe £1–3/month on a ~£27–40/month
+bill (see [AWS Running Costs](aws-costs.md)). At Flexpectation v2 scale the storage premium stays
+small: `power_forecasts` holds about 470 GB after 4 years of 2 models (see [How big is
+Flexpectation's power forecast data?](#how-big-is-flexpectations-power-forecast-data), above), so
+4.3% is about 35p a month. The 15% Fargate premium on Flexpectation v2's larger inference task,
+£45–90/month, is the larger difference, at about £7–14/month.
 
 No data-residency requirement has been raised for this data, by NGED or by regulation, so the region
 choice above is a settled operational decision rather than an open question — `eu-west-2` because

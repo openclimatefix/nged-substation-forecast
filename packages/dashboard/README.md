@@ -46,18 +46,18 @@ block.
 ## The apps
 
 - **`view_forecasts.py`** — inspect a single forecast run: pick a time series, a fold, and a
-  forecast init time, then see every forecast ensemble member (thin grey lines) against the observed
-  power (thick blue line), from 24 hours before the init time to 14 days after it. A fold id says
-  which forecasts to look at: a cross-validation (CV) fold id names one held-out slice of history a
-  model was scored on, and `live` is the reserved id for production forecasts, which belong to no CV
-  fold. The x-axis is labelled at Europe/London midnight with the day of week and date. Optional
-  coloured lines overlay observed power shifted forward by 7 and by 14 days — the raw material of
-  the models' power-lag features. A second panel below the power chart, on the same time axis, plots
-  the numerical weather prediction (NWP) ensemble that fed the forecast at the H3 cell containing
-  the series, for whichever weather variable is picked. H3 is a grid of hexagons covering Great
-  Britain, onto which the weather is aggregated. A stitched proxy-analysis line on that second panel
-  stands in for the weather that actually happened. **Reload data** re-reads the forecast, power,
-  and NWP tables.
+  forecast init time, then see the forecast's median line inside its p20–p80, p5–p95, and p1–p99
+  bands against the observed power (thick blue line), from 24 hours before the init time to 14 days
+  after it. A fold id says which forecasts to look at: a cross-validation (CV) fold id names one
+  held-out slice of history a model was scored on, and `live` is the reserved id for production
+  forecasts, which belong to no CV fold. The x-axis is labelled at Europe/London midnight with the
+  day of week and date. Optional coloured lines overlay observed power shifted forward by 7 and by
+  14 days — the raw material of the models' power-lag features. A second panel below the power
+  chart, on the same time axis, plots the numerical weather prediction (NWP) ensemble that fed the
+  forecast at the H3 cell containing the series, for whichever weather variable is picked. H3 is a
+  grid of hexagons covering Great Britain, onto which the weather is aggregated. A stitched
+  proxy-analysis line on that second panel stands in for the weather that actually happened.
+  **Reload data** re-reads the forecast, power, and NWP tables.
 - **`map_and_timeseries.py`** — a map of every time series in the NGED trial area, the part of
   NGED's licence area this project forecasts; click a dot to see its observed power. The power query
   is capped to recent observations, because the chart inlines its rows and Altair refuses more than

@@ -196,7 +196,10 @@ Probabilistic (scored on the 13 stored quantile columns of `PowerForecast`):
   `DELIVERY_QUANTILES` (MW). Tail-heavy by construction, matching NGED's priorities.
 - `"picp"`: prediction-interval coverage probability of the band named by `metric_param`
   (dimensionless fraction), read from the band's two stored quantile columns. A calibrated
-  forecast covers the band's nominal fraction, e.g. 0.8 for `p10_p90`.
+  forecast whose quantiles come from a continuous distribution covers the band's nominal fraction,
+  e.g. 0.8 for `p10_p90`. Quantiles taken empirically from a finite set of point values, such as
+  51 ENS members or a handful of power lags, cover less than nominal even when calibrated; the PICP
+  section of `docs/techniques/evaluation-metrics.md` gives the expected coverage.
 - `"interval_width"`: mean width (MW) of the band named by `metric_param` — the sharpness
   companion to `"picp"` (coverage is only impressive if the band is also narrow).
 """

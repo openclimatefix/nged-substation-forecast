@@ -43,7 +43,8 @@ number of timestamps in the group; $Q$ is the set of 13 delivery levels.
 ## Deterministic metrics
 
 These deterministic metrics score the **median forecast** $\hat{q}_t(0.5)$ — a single number per
-timestamp — without saying anything about whether the forecast's claimed uncertainty was honest.
+timestamp — without measuring whether the forecast's quantile bands cover the observed power at
+their stated rate.
 
 ### Mean absolute error (MAE)
 
