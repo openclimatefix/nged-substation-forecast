@@ -13,7 +13,7 @@ use XGBoost as their trained forecaster.
 into the neutral module `defs/assets.py`, beside `ecmwf_ens`, the asset that writes the table they
 read. Move the tests that
 use XGBoost as a stand-in trained forecaster to `ClimatologyForecaster`. Point the CV reference run
-at a climatology run. The live service then writes no forecast until the step-5 asset
+at a manual-heuristic run. The live service then writes no forecast until the step-5 asset
 `live_primary_substation_forecasts` exists, and each later time-series type gets a live asset of
 its own (the maintainer's decisions, below). The change removes about 7,700 lines and adds a few hundred.
 
@@ -97,7 +97,7 @@ unchanged. No asset writes `fold_id="live"` rows. CV registers an experiment thr
 `conf/model/manual_heuristic.yaml`, trains through `trained_cv_model`, forecasts through
 `cv_power_forecasts`, and scores through the metrics assets, all unchanged. `score_study.py`
 compares a study with `conf/cv/default.yaml`'s `reference_experiment_name`, which now names a
-climatology run.
+manual-heuristic run.
 
 **Branches.**
 
@@ -184,8 +184,8 @@ alarms.
   that name XGBoost, `live_forecasts`, or `select_nwp_init_time`. The `_nwp.py` passage on
   `select_nwp_init_time`'s replay mode is rewritten around `NWP_PUBLICATION_DELAY_HOURS`, which
   survives, rather than renamed.
-- **`conf/cv/default.yaml`**: `reference_experiment_name` names a climatology run (open
-  question 1). **`conf/model/climatology.yaml`**, **`manual_heuristic.yaml`**: their header comments
+- **`conf/cv/default.yaml`**: `reference_experiment_name` names a manual-heuristic run (decision
+  1, below). **`conf/model/climatology.yaml`**, **`manual_heuristic.yaml`**: their header comments
   stop citing `xgboost.yaml`.
 - **Root `pyproject.toml`**: the `xgboost_forecaster` dependency and its workspace source.
   **`uv.lock`**: the `xgboost_forecaster` and `xgboost` packages. **`mkdocs.yml`**: the two nav
@@ -301,23 +301,26 @@ over the whole repository, docs and tests included, returns only research refere
 XGBoost as history. The implementation then does one CV run of the new reference and a
 `score_study.py` dry run against it.
 
-## Risks and open questions
+## Maintainer decisions on the open questions (2026-11-25)
 
-1. **The CV reference run.** `reference_experiment_name` moves from `xgboost_no_power_lags` to a
-   climatology run. Recommendation: climatology, because it trains in seconds and needs no weather.
-   The run has to be re-run into the `power_forecasts` table that PR #1709 recreates before
-   `score_study.py` accepts a study. `score_study.py` requires a study's `PowerForecast.PRIMARY_KEY`
-   values to equal the reference's, and climatology drops rows in empty cells, so the
-   implementation checks the climatology run's key set against one existing study's keys on one
-   fold before switching. `docs/cross-validation/cross-validation-folds.md` is updated only if it
-   names the XGBoost run.
-2. **The Sentry monitor at deploy.** Delete the `live-forecasts` cron monitor by hand when this PR
-   deploys, because no code feeds it any more.
-3. **Follow-up, not in this PR: the weather features.** With XGBoost gone, no production
-   forecaster selects a weather feature from `TabularFeatureEngineer`, and the step-5 asset builds
-   its own inputs. The weather columns of `AllFeatures`, `windchill` (issue #1199), and the weather
-   path of the tabular engineer could go in a follow-up issue. That issue changes a Patito
-   contract, so it is not folded in here.
+1. **The CV reference run is the manual heuristic.** `reference_experiment_name` moves from
+   `xgboost_no_power_lags` to a run of `conf/model/manual_heuristic.yaml`, which reads no weather
+   and learns nothing. The run has to be re-run into the `power_forecasts` table that PR #1709
+   recreated before `score_study.py` accepts a study. `score_study.py` requires a study's
+   `PowerForecast.PRIMARY_KEY` values to equal the reference's. The manual heuristic drops a row
+   whose power lags are all null, so the implementation checks the manual-heuristic run's key set
+   against one existing study's keys on one fold before switching.
+   `docs/cross-validation/cross-validation-folds.md` is updated only if it names the XGBoost run.
+2. **The maintainer deletes the Sentry monitor by hand at deploy.** No code feeds the
+   `live-forecasts` cron monitor once this PR deploys, so the maintainer deletes the monitor in the
+   Sentry web interface. The reminder is the "Reminder: delete the Sentry monitor by hand" section
+   of [issue #1724](https://github.com/openclimatefix/nged-substation-forecast/issues/1724).
+3. **The unused weather features go in a follow-up issue, not in this PR.** With XGBoost gone, no
+   production forecaster selects a weather feature from `TabularFeatureEngineer`, and the step-5
+   asset builds its own inputs.
+   [Issue #1725](https://github.com/openclimatefix/nged-substation-forecast/issues/1725) lists the
+   weather code that loses its last caller. That issue changes a Patito contract, so it
+   is not folded in here.
 
 ## Simplicity review: triage
 
@@ -351,8 +354,8 @@ Two independent simplicity reviews ran on the first draft and agreed on most fin
 - **`test_forecaster_config_serialisation.py` cannot move:** accepted. The file is deleted.
 - **`test_asset_layer_tags.py` and `docs/api/ml_core/index.md` name deleted code:** accepted.
 - **`test_cv_power_forecasts.py` and `test_metrics.py` change through the fixture:** accepted.
-- **The climatology reference may not share the study's row keys:** accepted as a check in open
-  question 1.
+- **The reference run may not share the study's row keys:** accepted as a check in decision 1 on
+  the open questions, which applies the check to the manual-heuristic reference.
 - **Removing two `Settings` fields breaks any `.env` that still sets them:** accepted.
 - **CI does not run `definitions validate`:** accepted. The claim is corrected.
 - **Docstrings in a dozen more files name the deleted code:** accepted.
