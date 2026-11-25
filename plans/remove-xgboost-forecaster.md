@@ -2,7 +2,7 @@
 
 **The problem.** The XGBoost forecaster is the only model `live_forecasts` serves, and the
 maintainer judged its forecast too poor to be useful even as a fallback. The code that exists to
-train, promote, serve, check, and document that one model is spread across about 130 files: the
+train, promote, serve, check, and document that one model is spread across about 120 files: the
 `xgboost_forecaster` package, the `live_forecasts` asset and its check, model promotion from
 MLflow to disk and into the Docker image, the switching-event baseline scripts, and the tests that
 use XGBoost as their trained forecaster.
@@ -15,12 +15,17 @@ read. Move the tests that
 use XGBoost as a stand-in trained forecaster to `ClimatologyForecaster`. Point the CV reference run
 at a climatology run. The live service then writes no forecast until the step-5 asset
 `live_primary_substation_forecasts` exists, and each later time-series type gets a live asset of
-its own (the maintainer's decisions, below). The change removes about 7,500 lines and adds a few hundred.
+its own (the maintainer's decisions, below). The change removes about 7,700 lines and adds a few hundred.
 
-**Order.** This PR builds on `main` after PR #1709 merges. PR #1709 keeps its small XGBoost change
-(`XGBoostForecaster.predict` reducing members with `ml_core.quantiles.to_stored_quantiles`, and the
-13-column non-finite count in `live_forecasts_are_healthy`) so that `main` stays green, and this PR
-deletes that change with the rest of the code. PR #1707 follows this PR.
+**Order.** This PR builds on `main`, which already holds the merged PR #1709. PR #1709 kept a small
+XGBoost change so that `main` stayed green: `XGBoostForecaster.predict` reduces members with
+`ml_core.quantiles.to_stored_quantiles`, and `live_forecasts_are_healthy` counts non-finite values
+across the 13 quantile columns. This PR deletes that change with the rest of the code. PR #1707
+follows this PR.
+
+**`to_stored_quantiles` stays.** The manual heuristic and two metrics tests call
+`ml_core.quantiles.to_stored_quantiles`, so the function and `test_quantiles.py` stay. Only the
+XGBoost caller goes.
 
 **Deployment.** Once this PR merges, `main` writes no live forecast, so do not deploy `main` to AWS
 until the step-5 PR (PR #1707) has merged too.
@@ -40,7 +45,7 @@ outside `live_forecasts` reads the promoted model.
 - **More than one defensible design:** fires. What `live_forecasts` does afterwards (settled:
   nothing), and whether a later live service is one generic asset or one asset per time-series
   type (settled: one asset per time-series type).
-- **Callers found only by searching:** fires. About 130 files name XGBoost, `live_forecasts`,
+- **Callers found only by searching:** fires. About 120 files name XGBoost, `live_forecasts`,
   promotion, or the production model.
 
 **Reviews:** both plan reviews (simplicity, then correctness), and the three diff reviews of
@@ -117,20 +122,20 @@ alarms.
 
 ### What changes, file by file
 
-**Deleted whole files (5,482 lines in 20 files):**
+**Deleted whole files (5,464 lines in 20 files):**
 
 | File | Lines |
 |---|---|
-| `packages/xgboost_forecaster/` (README, `pyproject.toml`, `__init__.py`, `forecaster.py`, `tests/test_forecaster.py`) | 637 |
+| `packages/xgboost_forecaster/` (README, `pyproject.toml`, `__init__.py`, `forecaster.py`, `tests/test_forecaster.py`) | 699 |
 | `docs/api/xgboost_forecaster/index.md` | 5 |
 | `conf/model/xgboost.yaml` | 56 |
 | `scripts/forecasting/run_baseline_experiment.py` | 177 |
-| `scripts/forecasting/export_baseline_forecasts.py` | 248 |
-| `packages/notebooks/view_baseline_export.py` | 307 |
+| `scripts/forecasting/export_baseline_forecasts.py` | 209 |
+| `packages/notebooks/view_baseline_export.py` | 244 |
 | `src/nged_substation_forecast/defs/live_forecast_assets.py` (after moving two helpers out) | 333 |
 | `src/nged_substation_forecast/defs/promotion_assets.py` | 108 |
 | `packages/ml_core/src/ml_core/production_helpers.py` | 403 |
-| `tests/test_live_forecasts.py` | 725 |
+| `tests/test_live_forecasts.py` | 747 |
 | `tests/test_live_forecast_assets.py` | 59 |
 | `tests/test_promoted_model.py` | 232 |
 | `packages/ml_core/tests/test_production_helpers.py` | 422 |
@@ -138,7 +143,7 @@ alarms.
 | `docs/live_service/model-releases.md` | 46 |
 | `.claude/skills/release-model/SKILL.md` | 180 |
 
-**Edited, with lines removed (about 2,000 lines):**
+**Edited, with lines removed (about 2,200 lines):**
 
 - **`defs/assets.py`**: gains `_parse_utc_init_time` and `_available_nwp_init_times`, moved
   unchanged from `defs/live_forecast_assets.py` and placed beside `ecmwf_ens`. After this PR, the
@@ -182,15 +187,17 @@ alarms.
 - **`conf/cv/default.yaml`**: `reference_experiment_name` names a climatology run (open
   question 1). **`conf/model/climatology.yaml`**, **`manual_heuristic.yaml`**: their header comments
   stop citing `xgboost.yaml`.
-- **Root `pyproject.toml`** and **`uv.lock`**: the `xgboost_forecaster` workspace member and the
-  `xgboost` dependency. **`mkdocs.yml`**: the two nav entries. **`docs/api/ml_core/index.md`**: the
-  `::: ml_core.production_helpers` line, which otherwise breaks `mkdocs build --strict`.
+- **Root `pyproject.toml`**: the `xgboost_forecaster` dependency and its workspace source.
+  **`uv.lock`**: the `xgboost_forecaster` and `xgboost` packages. **`mkdocs.yml`**: the two nav
+  entries. **`docs/api/ml_core/index.md`**: the `::: ml_core.production_helpers` line, which otherwise
+  breaks `mkdocs build --strict`.
 - **`Dockerfile`**: the `production_model` build context, the `MODEL_RUN_ID` argument and label,
   `PRODUCTION_MODEL_PATH`, and the default `CMD`. **`.dockerignore`**: the comment on the
   `production_model` context. **`scripts/deploy/*.sh`**: the `promotion.json` tag becomes the git
   commit hash, and the smoke run becomes `definitions validate`.
 - **`.gitignore`**, **`README.md`**, **`CLAUDE.md`**, **`scripts/README.md`**,
-  **`packages/notebooks/README.md`**, the package READMEs, and the skills (`update-dependencies`,
+  **`packages/notebooks/README.md`**, the package READMEs (`packages/contracts/README.md` and
+  `packages/ml_core/README.md`), and the skills (`update-dependencies`,
   `plan-issue`, `plan-wave`): every passage describing XGBoost, `live_forecasts`, or promotion as
   current. The `release-model` skill and `model-releases.md` describe only promotion, so both are
   deleted rather than rewritten. `docs/example_power_forecast.svg` charts the XGBoost
@@ -210,17 +217,17 @@ alarms.
   `power_lag_24h` look-back wiring use `conf/model/manual_heuristic.yaml`, which selects power lags,
   because climatology selects none.
 - `tests/test_cv_power_forecasts.py` and `tests/test_metrics.py`: assertions that depend on
-  XGBoost's output change. Climatology emits members 0 to 50 rather than the validation members
-  present, and drops rows in cells with no training samples.
+  XGBoost's output change. Climatology returns one row per primary key, carrying its cell's 13
+  quantile columns, and drops rows in cells with no training samples.
 - `packages/ml_core/tests/test_load_experiment_forecaster.py`, and the `"xgboost"` model-name
   strings in `test_s3_data_paths.py`, `contracts/tests/test_metrics.py`, and the `delta_store`
-  tests.
+  tests `test_forecast_metrics.py`, `test_power_forecasts.py`, and `test_nwp.py`.
 
 `test_forecaster_config_serialisation.py` is deleted rather than moved, because `XGBoostConfig` is
 the only `BaseForecasterConfig` subclass it can check. `tests/test_asset_layer_tags.py` drops
 `live_forecasts` from its production assets and its docstring drops the promotion assets. These
-go: the live tests in `tests/test_checks.py` (about 780 lines), the check-in tests and the
-monitor-schedule drift guard in `tests/test_sentry.py`, the `live_forecasts_job` partition and
+go: the live tests in `tests/test_checks.py` (about 970 lines, from line 801), the check-in tests
+and the monitor-schedule drift guard in `tests/test_sentry.py`, the `live_forecasts_job` partition and
 schedule tests in `tests/test_assets.py`, and the `list_promotable_runs` tests in
 `ml_core/tests/test_mlflow_runs.py`. Comments naming XGBoost in `tests/_pytest_autoinject.py`,
 `ml_core/tests/test_base_forecaster.py`, `ml_core/tests/test_features.py`,
@@ -253,7 +260,7 @@ CV, because climatology selects none. The weather path keeps its unit tests in
 ## Docs to update
 
 Every page that `git grep -il "xgboost\|live_forecasts\|promoted_model\|production_model"` finds
-under `docs/` (46 pages), rewritten to describe the code as it now is. The heaviest are
+under `docs/` (47 pages), rewritten to describe the code as it now is. The heaviest are
 `docs/live_service/aws.md` (whose "Redeploying a new champion model" section is deleted),
 `operations.md`, `setup.md`, `docs/architecture/production-deployment.md`, `overview.md`,
 `testing.md`, `docs/cross-validation/model-configuration.md`, `dagster-workflow.md`, and the
@@ -299,11 +306,11 @@ XGBoost as history. The implementation then does one CV run of the new reference
 1. **The CV reference run.** `reference_experiment_name` moves from `xgboost_no_power_lags` to a
    climatology run. Recommendation: climatology, because it trains in seconds and needs no weather.
    The run has to be re-run into the `power_forecasts` table that PR #1709 recreates before
-   `score_study.py` accepts a study. `score_study.py` requires a study's row keys to equal the
-   reference's, and climatology always emits 51 members and drops rows in empty cells, so the
+   `score_study.py` accepts a study. `score_study.py` requires a study's `PowerForecast.PRIMARY_KEY`
+   values to equal the reference's, and climatology drops rows in empty cells, so the
    implementation checks the climatology run's key set against one existing study's keys on one
-   fold before switching. `docs/cross-validation/cross-validation-folds.md` names the reference
-   and is updated.
+   fold before switching. `docs/cross-validation/cross-validation-folds.md` is updated only if it
+   names the XGBoost run.
 2. **The Sentry monitor at deploy.** Delete the `live-forecasts` cron monitor by hand when this PR
    deploys, because no code feeds it any more.
 3. **Follow-up, not in this PR: the weather features.** With XGBoost gone, no production
