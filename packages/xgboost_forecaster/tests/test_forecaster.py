@@ -8,6 +8,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.ml_schemas import AllFeatures
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
 from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 from xgboost_forecaster.forecaster import _prepare_features
 
@@ -87,7 +88,7 @@ def test_predict_output_schema() -> None:
     result = _trained(df, experiment_name=experiment_name).predict(lf)
 
     assert len(result) == len(df)
-    assert result["power_fcst"].dtype == pl.Float32
+    assert all(result[column].dtype == pl.Float32 for column in POWER_FCST_QUANTILE_COLUMNS)
     assert result["power_fcst_model_name"].dtype == pl.String
     assert result["power_fcst_model_version"].dtype == pl.Int16
     # ml_flow_experiment_id=None → every row is null
@@ -97,6 +98,45 @@ def test_predict_output_schema() -> None:
     assert (result["power_fcst_model_name"] == XGBoostForecaster.MODEL_NAME).all()
     # Experiment identity comes from the config, and stays distinct from model-family identity.
     assert (result["experiment_name"] == experiment_name).all()
+
+
+def test_predict_reduces_the_ensemble_members_to_quantiles_of_one_row() -> None:
+    """Two NWP members give one row per key, whose median is the mean of the two predictions."""
+    member_0 = _make_df(ens_member=0)
+    member_1 = _make_df(ens_member=1).with_columns(
+        local_time_of_day_sin=-pl.col("local_time_of_day_sin")
+    )
+    forecaster = _trained(member_0)
+    sort_cols = ["time_series_id", "valid_time"]
+
+    def _predict(df: pl.DataFrame) -> pl.DataFrame:
+        return forecaster.predict(pt.LazyFrame.from_existing(df.lazy())).sort(sort_cols)
+
+    both = _predict(pl.concat([member_0, member_1]))
+    alone_0, alone_1 = _predict(member_0), _predict(member_1)
+
+    assert alone_0["power_fcst_p50"].to_list() != alone_1["power_fcst_p50"].to_list()
+    assert len(both) == len(member_0)
+    assert "ensemble_member" not in both.columns
+    expected_median = (alone_0["power_fcst_p50"] + alone_1["power_fcst_p50"]) / 2
+    assert both["power_fcst_p50"].to_list() == pytest.approx(expected_median.to_list(), rel=1e-6)
+    lowest = pl.DataFrame(
+        {"member_0": alone_0["power_fcst_p50"], "member_1": alone_1["power_fcst_p50"]}
+    ).min_horizontal()
+    assert (both["power_fcst_p1"] >= lowest - 1e-5).all()
+    assert (both["power_fcst_p1"] <= both["power_fcst_p99"]).all()
+
+
+def test_predict_rejects_a_row_without_an_nwp_member() -> None:
+    df = _make_df()
+    forecaster = _trained(df)
+    memberless = df.with_columns(
+        ensemble_member=pl.when(pl.int_range(pl.len()) == 0)
+        .then(None)
+        .otherwise(pl.col("ensemble_member"))
+    )
+    with pytest.raises(ValueError, match="1 rows have a null ensemble_member"):
+        forecaster.predict(pt.LazyFrame.from_existing(memberless.lazy()))
 
 
 def test_predict_with_mlflow_experiment_id() -> None:
@@ -146,10 +186,10 @@ def test_save_load_roundtrip(tmp_path: Path) -> None:
     assert loaded.model_params == forecaster.model_params
     assert loaded.model_params.model_release == 7
 
-    sort_cols = ["time_series_id", "valid_time", "ensemble_member"]
+    sort_cols = ["time_series_id", "valid_time"]
     orig = forecaster.predict(lf).sort(sort_cols)
     restored = loaded.predict(lf).sort(sort_cols)
-    assert orig["power_fcst"].to_list() == pytest.approx(restored["power_fcst"].to_list())
+    assert orig["power_fcst_p50"].to_list() == pytest.approx(restored["power_fcst_p50"].to_list())
 
 
 def test_save_creates_one_ubj_per_ts_id(tmp_path: Path) -> None:
@@ -249,11 +289,11 @@ def test_random_seed_makes_training_deterministic() -> None:
     """Two models trained with the same random_seed produce identical predictions."""
     df = _make_df()
     lf = pt.LazyFrame.from_existing(df.lazy())
-    sort_cols = ["time_series_id", "valid_time", "ensemble_member"]
+    sort_cols = ["time_series_id", "valid_time"]
 
     a = _trained(df, random_seed=7, subsample=0.5, colsample_bytree=0.5).predict(lf).sort(sort_cols)
     b = _trained(df, random_seed=7, subsample=0.5, colsample_bytree=0.5).predict(lf).sort(sort_cols)
-    assert a["power_fcst"].to_list() == b["power_fcst"].to_list()
+    assert a["power_fcst_p50"].to_list() == b["power_fcst_p50"].to_list()
 
 
 def test_training_skips_series_with_all_null_power() -> None:

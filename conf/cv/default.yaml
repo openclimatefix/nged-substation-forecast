@@ -37,6 +37,6 @@ folds:
 # A fold may override this with its own `min_training_months`.
 min_training_months: 6
 
-# The experiment whose (time_series_id, power_fcst_init_time, valid_time, ensemble_member) keys
+# The experiment whose (time_series_id, power_fcst_init_time, valid_time) keys
 # every `study/` experiment must match before the metrics asset scores the study.
 reference_experiment_name: "xgboost_no_power_lags"

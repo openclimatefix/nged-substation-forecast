@@ -18,6 +18,7 @@ from unittest.mock import Mock
 import marimo as mo
 import polars as pl
 import pytest
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
 from contracts.typing_utils import typeddict_to_dict
 from dashboard.forecast_chart import PLOT_HORIZON
 from marimo._ast.app import InternalApp
@@ -68,15 +69,14 @@ def test_comparison_reads_only_the_same_fold_series_and_run(
         "time_series_id": 24,
         "power_fcst_init_time": init_time,
         "valid_time": init_time + timedelta(hours=1),
-        "power_fcst": 1.0,
-        "ensemble_member": 0,
+        **dict.fromkeys(POWER_FCST_QUANTILE_COLUMNS, 1.0),
     }
     rows = [
         row,
-        {**row, "experiment_name": "primary", "power_fcst": 2.0},
-        {**row, "fold_id": "fold-2", "power_fcst": 3.0},
-        {**row, "time_series_id": 25, "power_fcst": 4.0},
-        {**row, "power_fcst_init_time": init_time - timedelta(days=1), "power_fcst": 5.0},
+        {**row, "experiment_name": "primary", "power_fcst_p50": 2.0},
+        {**row, "fold_id": "fold-2", "power_fcst_p50": 3.0},
+        {**row, "time_series_id": 25, "power_fcst_p50": 4.0},
+        {**row, "power_fcst_init_time": init_time - timedelta(days=1), "power_fcst_p50": 5.0},
         {**row, "valid_time": init_time + PLOT_HORIZON + timedelta(minutes=30)},
     ]
     scan = Mock(return_value=pl.DataFrame(rows).lazy())
@@ -90,6 +90,7 @@ def test_comparison_reads_only_the_same_fold_series_and_run(
         "mo": mo,
         "typeddict_to_dict": typeddict_to_dict,
         "PLOT_HORIZON": PLOT_HORIZON,
+        "POWER_FCST_QUANTILE_COLUMNS": POWER_FCST_QUANTILE_COLUMNS,
         "comparison_picker": SimpleNamespace(value=experiment),
         "fold_picker": SimpleNamespace(value="fold-1"),
         "series_picker": SimpleNamespace(value=24),
@@ -101,7 +102,7 @@ def test_comparison_reads_only_the_same_fold_series_and_run(
     comparison = namespace["comparison_forecasts"]
     if experiment == "second":
         assert isinstance(comparison, pl.DataFrame)
-        assert comparison.get_column("power_fcst").to_list() == [1.0]
+        assert comparison.get_column("power_fcst_p50").to_list() == [1.0]
         assert namespace["comparison_message"] is None
     else:
         assert comparison is None

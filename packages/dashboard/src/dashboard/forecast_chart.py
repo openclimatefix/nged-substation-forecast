@@ -1,7 +1,8 @@
 """Chart builders for the ``view_forecasts.py`` dashboard app.
 
 ``build_view_forecast_chart`` plots one forecast run for one ``time_series_id``. The chart draws
-every forecast ensemble member as a thin grey line, observed power as a thick blue line, a
+the forecast median as a grey line inside three grey quantile bands (p1–p99, p5–p95, and p20–p80,
+each darker than the one outside it), observed power as a thick blue line, a
 vertical rule at ``power_fcst_init_time``, a faint shaded band behind each weekend, and optional
 lagged-power lines. Weekday/weekend structure dominates demand, so weekends should be findable at
 a glance. A lagged-power line is observed power shifted forward by e.g. 7 days — the raw material
@@ -56,8 +57,24 @@ WEEKEND_SHADE_OPACITY: Final[float] = 0.07
 
 At this level, ``ocf_theme.DATA_AMBER`` over the cream theme background reads as a slightly warmer
 cream rather than an orange stripe. The bands therefore mark weekends without competing with the
-low-opacity grey ensemble lines.
+low-opacity grey forecast quantile bands.
 """
+
+FORECAST_BANDS: Final[tuple[tuple[str, str, float], ...]] = (
+    ("power_fcst_p1", "power_fcst_p99", 0.12),
+    ("power_fcst_p5", "power_fcst_p95", 0.2),
+    ("power_fcst_p20", "power_fcst_p80", 0.3),
+)
+"""The ``(lower column, upper column, opacity)`` of each forecast quantile band, outermost first.
+
+The bands are drawn on top of each other, so the overlapping opacities stack: the central p20–p80
+band reads darkest, and the p1–p99 tails read faintest.
+"""
+
+COMPARISON_FORECAST_BANDS: Final[tuple[tuple[str, str, float], ...]] = (
+    ("power_fcst_p5", "power_fcst_p95", 0.2),
+)
+"""The quantile band drawn for a comparison CV run: p5–p95 alone, so two runs stay legible."""
 
 Y_AXIS_EXTENT: Final[int] = 56
 """Pinned pixel width of the y-axis region (labels + ticks) on every chart.
@@ -366,7 +383,7 @@ def build_view_forecast_chart(
 
     Args:
         forecasts: ``PowerForecast`` rows for one ``(time_series_id, power_fcst_init_time)``
-            (UTC ``valid_time``); every distinct ``ensemble_member`` becomes a thin grey line.
+            (UTC ``valid_time``), drawn as the ``FORECAST_BANDS`` and a ``power_fcst_p50`` line.
         actuals: ``PowerTimeSeries`` observations for the same series (UTC ``time``). The thick
             blue line plots the window's observations, including past the init time. Rows from
             deeper history feed only the lagged-power lines, and callers must include those rows
@@ -378,18 +395,19 @@ def build_view_forecast_chart(
         title: Chart title (the series name / type / id line).
         subtitle: Chart subtitle (the init time / CV run line).
         shade_weekends: Whether to draw a faint background band behind each weekend.
-        show_forecast: Whether to draw the grey forecast-ensemble lines.
+        show_forecast: Whether to draw the forecast bands and median lines.
         show_actuals: Whether to draw the thick blue observed-power line.
         lags: Power lags to plot as coloured lines (observed power shifted forward by each lag,
             using only pre-init observations — see ``_lagged_power_frame``). Empty for none.
         comparison_forecasts: Optional second CV run for the same series, fold, and init time.
-        comparison_label: Legend label identifying the second CV run's orange ensemble.
+        comparison_label: Legend label identifying the second CV run's orange band and median.
 
     Returns:
         A layered, zoomable Altair chart in Europe/London wall time.
     """
-    # One forecast run for one series is 51 members × 14 days × 48 half-hours ≈ 34k rows, past
-    # Altair's 5,000-row default guard.
+    # One forecast run for one series is 14 days × 48 half-hours = 672 rows, and the NWP panel
+    # about 51 members × 85 steps ≈ 4,300 rows, both under Altair's 5,000-row default guard. The
+    # guard is lifted so that a denser NWP product or a longer window does not break the dashboard.
     alt.data_transformers.disable_max_rows()
 
     init_wall = _wall_time(power_fcst_init_time)
@@ -412,34 +430,48 @@ def build_view_forecast_chart(
     # Swatch opacity is pinned to 1 in the OCF theme's legend config. A per-legend
     # ``symbolOpacity`` here is overridden by the opacity Vega-Lite derives from the marks.
     line_colors = dict(_LINE_COLORS)
-    forecast_layers = [(_FORECAST_LABEL, forecasts)]
+    forecast_layers = [(_FORECAST_LABEL, forecasts, FORECAST_BANDS)]
     if comparison_forecasts is not None:
         line_colors[comparison_label] = ocf_theme.BRAND_ORANGE
-        forecast_layers.append((comparison_label, comparison_forecasts))
+        forecast_layers.append((comparison_label, comparison_forecasts, COMPARISON_FORECAST_BANDS))
     line_color_scale = alt.Scale(domain=list(line_colors), range=list(line_colors.values()))
     line_legend = alt.Legend(title=None, orient="top", symbolType="stroke", symbolStrokeWidth=2)
 
-    # Layers are appended in draw order: weekend bands at the back, then the forecast ensemble,
-    # then lagged power, then observed power, with the init-time rule on top of everything. Lagged
-    # power sits below observed power because lagged power is a model *input*, and a model input
-    # must not obscure observations.
+    # Layers are appended in draw order: weekend bands at the back, then the forecast bands and
+    # medians, then lagged power, then observed power, with the init-time rule on top of
+    # everything. Lagged power sits below observed power because lagged power is a model *input*,
+    # and a model input must not obscure observations.
     layers: list[alt.Chart] = []
     subtitle_notes: list[str] = []
     if shade_weekends:
         layers.append(_weekend_layer(window_start, window_end))
         subtitle_notes.append("Shaded: weekends")
-    for label, forecast_data in forecast_layers if show_forecast else []:
+    for label, forecast_data, bands in forecast_layers if show_forecast else []:
+        forecast_frame = _prepare_for_plot(forecast_data, "valid_time").collect()
+        for lower, upper, opacity in bands:
+            layers.append(
+                alt.Chart(forecast_frame)
+                .mark_area(opacity=opacity)
+                .encode(  # ty: ignore[missing-attribute]  # astral-sh/ty#2520
+                    x=x,
+                    y=alt.Y(f"{lower}:Q", title=y_title, axis=_y_axis()),
+                    y2=f"{upper}:Q",
+                    color=alt.ColorDatum(label),
+                    tooltip=["valid_time", lower, upper],
+                )
+            )
         layers.append(
-            alt.Chart(_prepare_for_plot(forecast_data, "valid_time").collect())
-            .mark_line(strokeWidth=1, opacity=0.3)
+            alt.Chart(forecast_frame)
+            .mark_line(strokeWidth=1.5)
             .encode(  # ty: ignore[missing-attribute]  # astral-sh/ty#2520
                 x=x,
-                y=alt.Y("power_fcst:Q", title=y_title, axis=_y_axis()),
+                y=alt.Y("power_fcst_p50:Q", title=y_title, axis=_y_axis()),
                 color=alt.ColorDatum(label),
-                detail="ensemble_member:N",
-                tooltip=["ensemble_member", "valid_time", "power_fcst"],
+                tooltip=["valid_time", "power_fcst_p50"],
             )
         )
+    if show_forecast:
+        subtitle_notes.append("Forecast: median line; bands p20–p80, p5–p95, and p1–p99")
     if lags:
         sorted_lags = sorted(lags)
         layers.append(

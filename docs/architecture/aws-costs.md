@@ -89,11 +89,12 @@ what settles this line.
 These costs are the same under every architecture option the roadmap decision considered, and at v1
 scale come to **~£2–4/month in total**:
 
-- **S3 Standard storage — ~£2/month.** The working set is ~100 GB, dominated by NWP — the entire v1
-  `power_forecasts` table, ~407 M rows of it, packs into under 1 GB (see [How big is Flexpectation's
-  power forecast data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)) — at
-  £0.018/GB-month → ~£1.80/month, plus headroom for Delta version history between vacuums. Grows ~40
-  GB/year as daily NWP partitions accumulate.
+- **S3 Standard storage — ~£2/month.** The working set is ~100 GB, dominated by NWP. A year of v1
+  live forecasts adds only ~31 M rows of `power_forecasts`, about 0.75 GB at ~24 bytes per row (see
+  [How big is Flexpectation's power forecast
+  data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)). At £0.018/GB-month
+  the working set costs ~£1.80/month, plus headroom for Delta version history between vacuums. Grows
+  ~40 GB/year as daily NWP partitions accumulate.
 - **S3 requests — ~£1–2/month.** Delta Lake is request-heavy (transaction-log JSON reads,
   checkpoints, many small parquet GETs per scan). The materialisation count is ~33/day, most of it
   the 24 hourly `power_time_series_and_metadata` ticks. NGED publishes new telemetry at irregular,
@@ -111,7 +112,7 @@ scale come to **~£2–4/month in total**:
   Design](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm)) — are each
   well under £0.50/month.
 
-## v2 scale (~2,500 time series): projected ~£70–140/month
+## v2 scale (~2,500 time series): projected ~£70–135/month
 
 > **Status: projection, not a measurement.** The v1 figures above are anchored in measured task
 > sizes and observed run times; nothing has yet run at v2 scale. The figures below scale the
@@ -131,15 +132,17 @@ not follow it:
   resize](production-deployment.md#running-the-data-ingest-runs-on-the-control-plane-vm).
 - **Power-telemetry ingest grows 78× from a tiny base.** 2,500 series at half-hourly resolution is
   ~120k rows/day — trivial for both compute and storage, so the hourly polling cost barely moves.
-- **What genuinely scales is the forecast itself.** Each 6-hourly run grows from ~1.1 M rows (32
-  series × 51 ensemble members × 672 half-hours) to **~86 M rows** — the row arithmetic is in [How
-  big is Flexpectation's power forecast
-  data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data) — dragging inference
-  compute and forecast storage with it.
+- **What genuinely scales is the forecast itself.** The `AllFeatures` frame of each 6-hourly run
+  holds one row per time series, ensemble member, and half-hour, and grows from ~1.1 M rows (32
+  series × 51 ensemble members × 672 half-hours) to **~86 M rows**, dragging inference compute with
+  it. The run's stored forecast, one row of 13 quantiles per time series and half-hour, grows from
+  21,504 rows to **1.68 M rows** (2,500 × 672) — the storage arithmetic is in [How big is
+  Flexpectation's power forecast
+  data?](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data).
 
-**Headline cost: projected ~£70–140/month** — roughly 3–4× the v1 bill, dominated by inference
+**Headline cost: projected ~£70–135/month** — roughly 3–4× the v1 bill, dominated by inference
 compute. The headline includes the same components as v1's: the control plane, every scheduled run
-(with inference on a larger task), storage and requests (now growing ~£5/month with each further
+(with inference on a larger task), storage and requests (now growing ~£2/month with each further
 year of history), and the weekly GPU re-train at its heavier-model bracket. It excludes the same
 items too — per-run backtests and other CV runs, and NGED's read-side compute — plus any
 internet-egress spend if NGED pull bulk history over the public internet rather than reading from
@@ -150,7 +153,7 @@ eu-west-2 (both priced below). It is made up of:
 | Always-on control plane (unchanged) | 15–22 |
 | Live Fargate inference (4 runs/day, larger task) | 45–90 |
 | Hourly polling wake-ups (unchanged) | ~2 |
-| S3 storage + requests (first v2 year) | 5–10, growing ~£5/month with each further year of history |
+| S3 storage + requests (first v2 year) | 4–7, growing ~£2/month with each further year of history |
 | Data transfer | ≈0 (assuming NGED read via eu-west-2 compute) |
 | Weekly re-training (heavier model, ephemeral GPU instance) | ~2–15 |
 | Backtests | very roughly £10–50 per run, as needed |
@@ -176,14 +179,14 @@ empirically once v2-scale data exists.
 
 ### Storage grows linearly with accumulated history
 
-Live v2 forecasts add ~86 M rows/run × 4 runs/day ≈ **125 billion rows/year**, which at the measured
-~1.8 bytes/row is **~225 GB/year** of Delta growth — each year of accumulated v2 history adds
-~£4/month at £0.018/GB-month, and NWP accumulation adds a further ~40 GB/year (~£0.75/month per
-year). Starting from the ~100 GB v1 working set, the first v2 year therefore averages ~£4/month of
-storage and ends at ~£7/month, plus £1–3/month of requests (commit cadence is unchanged, but each
-forecast commit writes more parquet files). Left unpruned this grows without bound; if it ever
-matters, the lever is lifecycle policy on old forecast history (colder S3 tiers or deletion), not a
-format change.
+Live v2 forecasts add 1.68 M rows/run × 4 runs/day × 365 ≈ **2.45 billion rows/year**, which at the
+measured ~24 bytes/row is **~59 GB/year** of Delta growth — each year of accumulated v2 history adds
+~£1.10/month at £0.018/GB-month, and NWP accumulation adds a further ~40 GB/year (~£0.75/month per
+year). Starting from the ~100 GB v1 working set, the first v2 year therefore averages ~150 GB, or
+~£2.70/month of storage, and ends at ~200 GB, or ~£3.60/month, plus £1–3/month of requests (commit
+cadence is unchanged, but each forecast commit writes more parquet files). Left unpruned this grows
+without bound; if it ever matters, the lever is lifecycle policy on old forecast history (colder S3
+tiers or deletion), not a format change.
 
 ### Data transfer depends on how NGED read
 
@@ -192,8 +195,8 @@ bucket via their own eu-west-2 compute (Athena, Glue, EC2) costs nothing — tha
 scale points towards anyway, and a load-bearing part of [why we deploy in
 eu-west-2](forecast-delivery.md#securing-it). Reads over the public internet instead cost £0.067/GB
 beyond the account-wide 100 GB/month free allowance — a full pull of one year of v2 forecast history
-(~225 GB) would be ~£8–15 depending on how much of that month's free allowance is left, so routine
-bulk reads that way would make this line item real rather than ≈0.
+(~59 GB) would cost between £0 and ~£4, depending on how much of that month's free allowance is
+left, so only repeated bulk reads that way would make this line item real rather than ≈0.
 
 ### Backtests and training scale with forecast rows too
 

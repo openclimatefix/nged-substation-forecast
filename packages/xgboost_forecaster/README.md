@@ -14,11 +14,9 @@ interval before the target time, and a rolling feature is a statistic over a rec
 power. Before being handed to XGBoost, each `Enum` column is encoded as each value's position in
 the `Enum`'s declared list of values, so a code means the same in training and prediction. All
 features are cast to `Float32`, and missing values are left as `NaN` so XGBoost handles them
-natively. ECMWF publishes ~51 members of the same weather forecast — one
-unperturbed control member plus ~50 perturbed members — and an ensemble forecast is one power
-prediction per member.
-The model is deterministic, and an ensemble forecast still comes out of that deterministic model
-— the `XGBoostForecaster` class below says how.
+natively. ECMWF publishes ~51 members of the same weather forecast — one unperturbed control member
+plus ~50 perturbed members. The XGBoost model is deterministic: `predict` makes one power prediction
+per member, then stores the 13 quantiles of those predictions in one row per forecast target.
 
 Both `train()` and `predict()` collect their input once, so keeping that collect bounded is the
 **caller's** job. The dominant cost is the multi-tens-of-GB NWP scan, which has to be pruned at the

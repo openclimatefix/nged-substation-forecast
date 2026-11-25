@@ -24,6 +24,7 @@ from ml_core.metrics import (
     require_valid_times_within_window,
     row_key_fingerprint,
 )
+from ml_core.quantiles import to_stored_quantiles
 from polars.testing import assert_frame_equal
 
 
@@ -63,7 +64,6 @@ def _make_cv_forecasts(
             "time_series_id": pl.Series([time_series_id] * n, dtype=pl.Int32),
             "valid_time": pl.Series(times, dtype=pl.Datetime("us", "UTC")),
             "power_fcst_init_time": pl.Series(init_times, dtype=pl.Datetime("us", "UTC")),
-            "ensemble_member": pl.Series([0] * n, dtype=pl.Int8),
             "nwp_init_time": pl.Series([None] * n, dtype=pl.Datetime("us", "UTC")),
             "power_fcst": pl.Series(power_fcst, dtype=pl.Float32),
             "power_fcst_model_name": pl.Series(["stub"] * n, dtype=pl.String),
@@ -73,7 +73,8 @@ def _make_cv_forecasts(
             "fold_id": pl.Series([fold_id] * n, dtype=pl.String),
         }
     )
-    return PowerForecast.validate(df, allow_superfluous_columns=True)
+    # A deterministic forecast: one value fills all 13 quantile columns.
+    return PowerForecast.validate(to_stored_quantiles(df, value_col="power_fcst"))
 
 
 def _make_metadata(
@@ -247,17 +248,15 @@ def test_compute_metrics_raises_when_series_missing_capacity():
         compute_metrics(forecasts, actuals, _make_metadata([1]), capacity)
 
 
-def test_compute_metrics_ensemble_averaging():
-    """Ensemble mean should be taken before computing the deterministic metrics.
+def test_compute_metrics_deterministic_metrics_read_the_median():
+    """MAE is scored on ``power_fcst_p50``, not on the mean of the forecast distribution.
 
-    Members 8 and 12 against an actual of 11: the ensemble mean is 10, so MAE = 1 — whereas
-    scoring the members individually would give (3 + 1)/2 = 2. (The actual deliberately differs
-    from the ensemble mean: an exact hit with positive spread is the contradictory zero-RMSE
-    corner that ``compute_metrics`` rejects as non-finite.)
+    Samples [8, 9, 13] against an actual of 10: the median is 9, so MAE = 1. The mean of the
+    samples is 10, which would give MAE = 0.
     """
     time = _utc(2022, 1, 1, 0, 0)
-    forecasts = _make_ensemble_forecasts(1, [time], [[8.0, 12.0]])
-    actuals = _make_actuals(1, [time], [11.0])
+    forecasts = _make_sample_forecasts(1, [time], [[8.0, 9.0, 13.0]])
+    actuals = _make_actuals(1, [time], [10.0])
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
     mae_row = result.filter(pl.col("metric_name") == "mae")
     assert math.isclose(mae_row["metric_value"][0], 1.0, abs_tol=1e-5)
@@ -405,7 +404,7 @@ def test_compute_metrics_all_slice_is_row_weighted():
     assert math.isclose(_slice_mae(result, "all"), 40.0 / 7.0, rel_tol=1e-5)
 
 
-def test_compute_metrics_collapses_ensemble_per_forecast_run():
+def test_compute_metrics_scores_each_forecast_run_separately():
     """Runs covering the same valid_time at different lead times are scored independently.
 
     Two runs forecast the same valid_time: one predicts 8, the other 12, actual is 10. Per-run
@@ -456,17 +455,17 @@ def test_power_forecast_contract_rejects_hindcast_rows():
 # ---------------------------------------------------------------------------
 
 
-def _make_ensemble_forecasts(
+def _make_sample_forecasts(
     time_series_id: int,
     times: list[datetime],
-    member_values: list[list[float]],
+    sample_values: list[list[float]],
     init_times: list[datetime] | None = None,
 ) -> pt.DataFrame[PowerForecast]:
-    """Build forecasts with one row per (valid_time, ensemble_member).
+    """Build one forecast row per ``times`` entry from the empirical quantiles of its samples.
 
-    ``member_values[i]`` lists the ensemble-member forecasts for ``times[i]``. Two rows with the
-    same ``valid_time`` but different ``init_times`` entries form two separate forecast runs,
-    each with its own members.
+    ``sample_values[i]`` lists the point samples for ``times[i]``; ``to_stored_quantiles`` reduces
+    them to the 13 quantile columns. Two rows with the same ``valid_time`` but different
+    ``init_times`` entries form two separate forecast runs, each with its own samples.
     """
     if init_times is None:
         init_times = [_utc(2021, 12, 31, 23, 30)] * len(times)
@@ -474,8 +473,8 @@ def _make_ensemble_forecasts(
     run_init_times: list[datetime] = []
     members: list[int] = []
     values: list[float] = []
-    for valid_time, init_time, run_members in zip(times, init_times, member_values, strict=True):
-        for member, value in enumerate(run_members):
+    for valid_time, init_time, run_samples in zip(times, init_times, sample_values, strict=True):
+        for member, value in enumerate(run_samples):
             valid_times.append(valid_time)
             run_init_times.append(init_time)
             members.append(member)
@@ -496,7 +495,9 @@ def _make_ensemble_forecasts(
             "fold_id": pl.Series(["2022"] * n, dtype=pl.String),
         }
     )
-    return PowerForecast.validate(df, allow_superfluous_columns=True)
+    return PowerForecast.validate(
+        to_stored_quantiles(df, value_col="power_fcst", drop_cols=["ensemble_member"])
+    )
 
 
 def _metric_value(
@@ -515,16 +516,12 @@ def _metric_value(
     return float(rows["metric_value"][0])
 
 
-def test_compute_metrics_probabilistic_three_member_toy():
-    """Every probabilistic metric matches hand computation on a 3-member toy ensemble.
+def test_compute_metrics_probabilistic_three_sample_toy():
+    """Every probabilistic metric matches hand computation on a forecast from 3 samples.
 
-    Members [1, 2, 4] forecast an actual of 2.5 (one timestamp, one run, m = 3):
+    Samples [1, 2, 4] forecast an actual of 2.5 (one timestamp, one run):
 
-    - Fair CRPS = mean|xᵢ − y| − Σᵢ<ⱼ|xᵢ − xⱼ| / (m(m−1)) = (1.5 + 0.5 + 1.5)/3 − (1 + 3 + 2)/6 =
-      7/6 − 1 = 1/6.
-    - Ensemble mean = 7/3 → error = 7/3 − 2.5 = −1/6, so RMSE = 1/6. Sample variance (ddof=1) =
-      7/3; Fortin-corrected variance = (m+1)/m · 7/3 = 28/9; spread_skill_ratio = √(28/9) / (1/6)
-      = 6·√(28/9).
+    - The median is 2, so MAE = RMSE = 0.5.
     - Linear empirical quantiles interpolate at position (m−1)·τ: p10 → 1.2, p50 → 2, p90 → 3.6,
       p99 → 3.96.
     - Pinball loss (y = 2.5): p10 → 0.1·1.3 = 0.13; p50 → 0.5·0.5 = 0.25; p90 → 0.1·1.1 = 0.11;
@@ -533,13 +530,11 @@ def test_compute_metrics_probabilistic_three_member_toy():
     """
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [2.5])
-    forecasts = _make_ensemble_forecasts(1, times, [[1.0, 2.0, 4.0]])
+    forecasts = _make_sample_forecasts(1, times, [[1.0, 2.0, 4.0]])
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
 
-    assert math.isclose(_metric_value(result, "crps"), 1.0 / 6.0, rel_tol=1e-5)
-    assert math.isclose(
-        _metric_value(result, "spread_skill_ratio"), 6.0 * math.sqrt(28.0 / 9.0), rel_tol=1e-5
-    )
+    assert math.isclose(_metric_value(result, "mae"), 0.5, rel_tol=1e-5)
+    assert math.isclose(_metric_value(result, "rmse"), 0.5, rel_tol=1e-5)
     assert math.isclose(
         _metric_value(result, "pinball_loss", metric_param="p10"), 0.13, rel_tol=1e-5
     )
@@ -566,26 +561,29 @@ def test_compute_metrics_probabilistic_three_member_toy():
     assert math.isclose(
         _metric_value(result, "mean_pinball_loss"), mean_of_quantile_pinballs, rel_tol=1e-5
     )
+    # CRPS is twice the mean pinball loss over the 13 levels: 0.2134 for this forecast.
+    assert math.isclose(
+        _metric_value(result, "crps"), 2.0 * mean_of_quantile_pinballs, rel_tol=1e-5
+    )
+    assert math.isclose(_metric_value(result, "crps"), 0.213385, rel_tol=1e-4)
     # Pinball loss is non-negative at every quantile.
     assert (pinball_rows["metric_value"] >= 0).all()
 
 
-def test_compute_metrics_single_member_ensemble_degenerates_gracefully():
-    """A deterministic (single-member) forecast is scored honestly, with no null values.
+def test_compute_metrics_deterministic_forecast_degenerates_gracefully():
+    """A deterministic forecast is scored honestly, with no null values.
 
-    Fair CRPS reduces to MAE (the pairwise term is defined as 0 at m = 1), the spread-skill ratio
-    is 0 (zero spread, not null — ``.var(ddof=1)`` alone would return null), every quantile
-    coincides with the forecast so interval widths are 0, and PICP is 0 whenever the actual
-    differs from the forecast.
+    All 13 quantile columns equal the forecast. The 13 levels are symmetric about 0.5, so the
+    CRPS reduces to the MAE. Interval widths are 0, and PICP is 0 whenever the actual differs
+    from the forecast.
     """
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
-    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # single member; MAE = 2
+    forecasts = _make_cv_forecasts(1, times, [12.0, 8.0])  # deterministic; MAE = 2
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
 
     assert result["metric_value"].is_not_null().all()
     assert math.isclose(_metric_value(result, "crps"), _metric_value(result, "mae"), rel_tol=1e-6)
-    assert _metric_value(result, "spread_skill_ratio") == 0.0
     assert _metric_value(result, "interval_width", metric_param="p10_p90") == 0.0
     assert _metric_value(result, "picp", metric_param="p10_p90") == 0.0
 
@@ -593,7 +591,7 @@ def test_compute_metrics_single_member_ensemble_degenerates_gracefully():
 def test_compute_metrics_picp_boundary_is_inclusive():
     """PICP counts the actual as covered when it exactly equals a band bound.
 
-    A single-member forecast that exactly matches the actual makes every empirical quantile — and
+    A deterministic forecast that exactly matches the actual makes every quantile column — and
     so both p10-p90 band bounds — coincide with the actual value. Whether that boundary counts as
     covered is a modelling choice (``pl.Expr.is_between`` defaults to ``closed="both"``), not
     free-floating behaviour, so pin it here: PICP must be 1.0, not 0.0.
@@ -609,8 +607,8 @@ def test_compute_metrics_picp_boundary_is_inclusive():
 def test_compute_metrics_picp_distinguishes_bands():
     """Each band's PICP comes from its own quantile pair, not one pair shared by every band.
 
-    101 members evenly spaced 0..100 give every ``DELIVERY_QUANTILES`` level ``q`` an exact
-    empirical quantile of ``100*q`` (linear interpolation lands on an integer member for every
+    101 samples evenly spaced 0..100 give every ``DELIVERY_QUANTILES`` level ``q`` an exact
+    empirical quantile of ``100*q`` (linear interpolation lands on an integer sample for every
     level in that tuple), so each band's bounds are exactly its own p-labels: ``p35_p65`` = [35,
     65], ``p20_p80`` = [20, 80]. An actual of 30 sits inside ``p20_p80`` but outside ``p35_p65``.
     Every other PICP assertion in this file uses only ``p10_p90``, with an actual that is inside
@@ -620,7 +618,7 @@ def test_compute_metrics_picp_distinguishes_bands():
     """
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [30.0])
-    forecasts = _make_ensemble_forecasts(1, times, [[float(m) for m in range(101)]])
+    forecasts = _make_sample_forecasts(1, times, [[float(m) for m in range(101)]])
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [100.0]))
 
     assert _metric_value(result, "picp", metric_param="p20_p80") == 1.0
@@ -633,102 +631,91 @@ def test_compute_metrics_picp_distinguishes_bands():
     )
 
 
-def test_compute_metrics_perfect_forecast_scores_finite_zero_spread_skill():
-    """A perfect deterministic forecast (RMSE = 0, spread = 0) scores 0, never NaN.
+def test_compute_metrics_interval_width_is_the_mean_over_rows():
+    """Two rows whose p10–p90 bands are 8 MW and 16 MW wide give a width of 12 MW, not their sum."""
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    actuals = _make_actuals(1, times, [0.0, 0.0])
+    forecasts = _make_sample_forecasts(1, times, [[0.0, 5.0, 10.0], [0.0, 10.0, 20.0]])
+    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [100.0]))
 
-    The unguarded ratio would be 0/0 = NaN — which is not null, so it would pass
-    ``Metrics.validate`` and silently poison every downstream MLflow mean. Realistically
-    reachable: a persistence baseline forecasting a flat series.
+    assert math.isclose(
+        _metric_value(result, "interval_width", metric_param="p10_p90"), 12.0, rel_tol=1e-6
+    )
+
+
+def test_compute_metrics_perfect_forecast_scores_finite_zero():
+    """A perfect deterministic forecast scores 0 on every error metric, never NaN.
+
+    Realistically reachable: a persistence baseline forecasting a flat series.
     """
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
     forecasts = _make_cv_forecasts(1, times, [10.0, 10.0])  # exact hit at every timestamp
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
 
-    assert _metric_value(result, "spread_skill_ratio") == 0.0
+    for metric_name in ("mae", "rmse", "mbe", "crps", "mean_pinball_loss"):
+        assert _metric_value(result, metric_name) == 0.0
     assert result["metric_value"].is_finite().all()
-
-
-def test_compute_metrics_zero_rmse_with_positive_spread_raises():
-    """Positive spread around an error-free ensemble mean fails loudly, not as inf.
-
-    Members [8, 12] against an actual of 10: the ensemble mean is exact (RMSE = 0) but the spread
-    is positive, so the spread-skill ratio divides to infinity — the finiteness check must refuse
-    to emit it.
-    """
-    times = [_utc(2022, 1, 1, 0, 0)]
-    actuals = _make_actuals(1, times, [10.0])
-    forecasts = _make_ensemble_forecasts(1, times, [[8.0, 12.0]])
-    with pytest.raises(ValueError, match="non-finite"):
-        compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
 
 
 def test_compute_metrics_deduplicates_actuals():
     """A duplicated (time_series_id, time) actuals row leaves every metric unchanged.
 
-    Without the dedupe, the join would double the ensemble members — doubling m and silently
-    corrupting the member-aware metrics (CRPS, spread, quantiles) while the deterministic ones,
-    which only see the mean, stay untouched.
+    The actual for the first valid time is duplicated. Without the dedupe, the join would double
+    the first forecast row, which would then carry twice the weight of the second row in every
+    mean.
     """
-    times = [_utc(2022, 1, 1, 0, 0)]
-    forecasts = _make_ensemble_forecasts(1, times, [[1.0, 2.0, 4.0]])
+    times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
+    forecasts = _make_sample_forecasts(1, times, [[1.0, 2.0, 4.0], [3.0, 5.0, 9.0]])
     metadata, capacity = _make_metadata([1]), _make_capacity([1], [10.0])
 
-    clean = compute_metrics(forecasts, _make_actuals(1, times, [2.5]), metadata, capacity)
+    clean = compute_metrics(forecasts, _make_actuals(1, times, [2.5, 6.0]), metadata, capacity)
     duplicated = compute_metrics(
-        forecasts, _make_actuals(1, times * 2, [2.5, 2.5]), metadata, capacity
+        forecasts,
+        _make_actuals(1, [times[0], *times], [2.5, 2.5, 6.0]),
+        metadata,
+        capacity,
     )
 
     sort_keys = ["horizon_slice", "metric_name", "metric_param"]
     assert_frame_equal(clean.sort(sort_keys), duplicated.sort(sort_keys))
 
 
-def test_compute_metrics_fair_crps_handles_duplicate_members():
-    """The sorted-member pairwise identity is exact when members tie.
-
-    Members [2, 2, 5], actual 3.5: CRPS = (1.5 + 1.5 + 1.5)/3 − (0 + 3 + 3)/6 = 1.5 − 1 = 0.5.
-    """
-    times = [_utc(2022, 1, 1, 0, 0)]
-    actuals = _make_actuals(1, times, [3.5])
-    forecasts = _make_ensemble_forecasts(1, times, [[2.0, 2.0, 5.0]])
-    result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
-    assert math.isclose(_metric_value(result, "crps"), 0.5, rel_tol=1e-5)
-
-
 def test_compute_metrics_crps_scored_per_forecast_run():
-    """CRPS pools members within a run, never across runs covering the same valid_time.
+    """Each run covering a valid_time is scored on its own, never pooled with the other runs.
 
-    Two 2-member runs forecast the same valid_time (actual 10): members [7, 9] give CRPS = (3 +
-    1)/2 − 2/2 = 1, and members [11, 13] likewise give 1, so per-run scoring averages to 1.
-    Pooling all four members into one lagged ensemble would instead give (3 + 1 + 1 + 3)/4 −
-    20/12 = 1/3.
+    Two runs forecast the same valid_time (actual 10), from samples [7, 9] and [11, 13]. The two
+    runs mirror each other about the actual, so each scores CRPS 1.4182 and the mean is 1.4182.
+    Pooling all four samples into one lagged ensemble would instead give 0.3498.
     """
     valid_time = _utc(2022, 1, 2)
     init_times = [_utc(2022, 1, 1, 0), _utc(2022, 1, 1, 6)]  # leads 24 h and 18 h: day_ahead
     actuals = _make_actuals(1, [valid_time], [10.0])
-    forecasts = _make_ensemble_forecasts(
+    forecasts = _make_sample_forecasts(
         1, [valid_time, valid_time], [[7.0, 9.0], [11.0, 13.0]], init_times=init_times
     )
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
-    assert math.isclose(_metric_value(result, "crps"), 1.0, rel_tol=1e-5)
+    assert math.isclose(_metric_value(result, "crps"), 1.418154, rel_tol=1e-4)
 
 
 def test_compute_metrics_probabilistic_metrics_per_slice():
     """Probabilistic metrics are aggregated per horizon slice, with "all" as the row mean.
 
-    One run: an intraday timestamp with members [7, 9] (CRPS 1) and a day_ahead timestamp with
-    members [4, 8] (CRPS = (6 + 2)/2 − 4/2 = 2), both against an actual of 10.
+    One run: an intraday timestamp forecast from samples [7, 9] (CRPS 1.4182) and a day_ahead
+    timestamp forecast from samples [4, 8] (CRPS 2.8363), both against an actual of 10.
     """
     init_time = _utc(2022, 1, 1)
     times = [init_time + timedelta(hours=0.5), init_time + timedelta(hours=24)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
-    forecasts = _make_ensemble_forecasts(
+    forecasts = _make_sample_forecasts(
         1, times, [[7.0, 9.0], [4.0, 8.0]], init_times=[init_time] * 2
     )
     result = compute_metrics(forecasts, actuals, _make_metadata([1]), _make_capacity([1], [10.0]))
-    assert math.isclose(_metric_value(result, "crps", horizon_slice="intraday"), 1.0, rel_tol=1e-5)
-    assert math.isclose(_metric_value(result, "crps", horizon_slice="day_ahead"), 2.0, rel_tol=1e-5)
-    assert math.isclose(_metric_value(result, "crps"), 1.5, rel_tol=1e-5)
+    intraday = _metric_value(result, "crps", horizon_slice="intraday")
+    day_ahead = _metric_value(result, "crps", horizon_slice="day_ahead")
+    assert math.isclose(intraday, 1.418154, rel_tol=1e-4)
+    assert math.isclose(day_ahead, 2.836308, rel_tol=1e-4)
+    assert math.isclose(_metric_value(result, "crps"), (intraday + day_ahead) / 2, rel_tol=1e-5)
 
 
 # ---------------------------------------------------------------------------
@@ -948,21 +935,17 @@ def test_require_valid_times_within_window(
         call()
 
 
-def _row_key_frame(
-    *, series: dict[int, list[datetime]], members: tuple[int, ...] = (0,)
-) -> pl.LazyFrame:
-    """One row per series, valid time and member, initialised 30 minutes before the valid time."""
+def _row_key_frame(*, series: dict[int, list[datetime]]) -> pl.LazyFrame:
+    """One row per series and valid time, initialised 30 minutes before the valid time."""
     return pl.LazyFrame(
         [
             {
                 "time_series_id": time_series_id,
                 "power_fcst_init_time": valid_time - timedelta(minutes=30),
                 "valid_time": valid_time,
-                "ensemble_member": member,
             }
             for time_series_id, valid_times in series.items()
             for valid_time in valid_times
-            for member in members
         ]
     )
 
@@ -980,28 +963,10 @@ def _check_row_keys(*, study: pl.LazyFrame, reference: pl.LazyFrame) -> None:
     )
 
 
-def test_require_same_row_keys_accepts_the_reference_keys_with_the_same_members() -> None:
-    reference = _row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2))
+def test_require_same_row_keys_accepts_the_reference_keys() -> None:
+    reference = _row_key_frame(series={1: _TIMES, 2: _TIMES})
 
-    _check_row_keys(
-        study=_row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2)), reference=reference
-    )
-
-
-@pytest.mark.parametrize(
-    "study_members",
-    [(0,), (0, 1), (0, 1, 2, 3), (1, 2, 3)],
-    ids=["one", "fewer", "more", "shifted"],
-)
-def test_require_same_row_keys_refuses_a_different_set_of_ensemble_members(
-    study_members: tuple[int, ...],
-) -> None:
-    reference = _row_key_frame(series={1: _TIMES}, members=(0, 1, 2))
-
-    with pytest.raises(RowKeyMismatchError, match="ensemble_member"):
-        _check_row_keys(
-            study=_row_key_frame(series={1: _TIMES}, members=study_members), reference=reference
-        )
+    _check_row_keys(study=_row_key_frame(series={1: _TIMES, 2: _TIMES}), reference=reference)
 
 
 @pytest.mark.parametrize(
@@ -1051,14 +1016,21 @@ def _fingerprint(frame: pl.LazyFrame, series_batch_size: int = 1) -> str:
     return row_key_fingerprint(forecasts=frame, series_batch_size=series_batch_size)
 
 
-def test_row_key_fingerprint_ignores_row_order_member_count_and_batch_size() -> None:
-    frame = _row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0, 1, 2))
+def test_row_key_fingerprint_ignores_row_order_and_batch_size() -> None:
+    frame = _row_key_frame(series={1: _TIMES, 2: _TIMES})
 
     reference = _fingerprint(frame)
 
     assert _fingerprint(frame.reverse()) == reference
-    assert _fingerprint(_row_key_frame(series={1: _TIMES, 2: _TIMES}, members=(0,))) == reference
     assert _fingerprint(frame, series_batch_size=5) == reference
+    assert _fingerprint(pl.concat([frame, frame.head(1)])) == reference
+
+
+def test_row_key_fingerprint_changes_when_only_the_valid_times_change() -> None:
+    frame = _row_key_frame(series={1: _TIMES})
+    shifted = frame.with_columns(valid_time=pl.col("valid_time") + timedelta(hours=1))
+
+    assert _fingerprint(shifted) != _fingerprint(frame)
 
 
 @pytest.mark.parametrize(

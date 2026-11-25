@@ -1,14 +1,13 @@
-"""Export one CV run's forecasts to three parquet files for offline analysis.
+"""Export one CV run's forecasts to a parquet file for offline analysis.
 
 Written for issue #179: hand the weather/calendar-only baseline forecasts (the switching-event
 "shared baseline") to a colleague for switching-event detection work. A switching event is a
 reconfiguration of the high-voltage network, after which load that was metered at one substation
 is metered at a neighbouring substation instead.
 
-The forecasts are read from the internal ``power_forecasts`` Delta table and written as three
-self-contained parquet files, all in physical MW/MVA units. ``power_fcst`` is already stored in
-MW/MVA on disk — see ``PowerForecast.power_fcst``. The per-series unit lives in
-``TimeSeriesMetadata.units``.
+The forecasts are read from the internal ``power_forecasts`` Delta table and written as one
+self-contained parquet file, in physical MW/MVA units. The ``PowerForecast`` quantile columns are
+already stored in MW/MVA on disk. The per-series unit lives in ``TimeSeriesMetadata.units``.
 
 For each ``(time_series_id, valid_time)`` we keep only the **freshest** forecast run: the run
 whose ``power_fcst_init_time`` is largest. That run is the most recent run that still precedes
@@ -19,16 +18,9 @@ analysis of the past. Every row is therefore a hindcast of expected power at the
 time available, and that hindcast is the natural baseline for an observed-minus-expected
 residual.
 
-Three files are written:
-
-- ``*_full_ensemble.parquet`` — every ECMWF ensemble member (~51) of the freshest run. ECMWF is
-  the European Centre for Medium-Range Weather Forecasts, whose ensemble runs the weather model
-  about 51 times: once unperturbed, and about 50 more times from slightly perturbed starting
-  states.
-- ``*_ensemble_mean.parquet`` — the ensemble mean of ``power_fcst`` per timestep.
-- ``*_quantiles.parquet``     — the p10 / p50 / p90 of ``power_fcst`` across members per timestep.
-
-Every file also carries ``observed_power``, left-joined from the unflagged rows of the
+The file, ``*_quantiles.parquet``, holds one row per ``(time_series_id, valid_time)`` with the
+freshest run's ``power_fcst_p10``, ``power_fcst_p50``, and ``power_fcst_p90``. The file also
+carries ``observed_power``, left-joined from the unflagged rows of the
 ``cleaned_power_time_series`` table so residuals can be computed directly. ``observed_power`` is
 the metered value at that ``valid_time``, in the same MW/MVA units.
 
@@ -50,15 +42,16 @@ from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import ObjectStoreOptions
 from nged_data.storage import scan_cleaned_power
 
-# Columns carried through to the full-ensemble file. The internal-only partition columns
+# Columns carried through to the exported file. The internal-only partition columns
 # experiment_name, fold_id, and ml_flow_experiment_id are intentionally dropped.
 _FORECAST_COLUMNS: tuple[str, ...] = (
     "time_series_id",
     "valid_time",
     "power_fcst_init_time",
     "nwp_init_time",
-    "ensemble_member",
-    "power_fcst",
+    "power_fcst_p10",
+    "power_fcst_p50",
+    "power_fcst_p90",
 )
 
 
@@ -73,8 +66,7 @@ def _freshest_forecasts(
     ``experiment_name`` / ``fold_id`` are ``String`` partition columns, so both filters push down
     into the Delta scan (partition pruning). For each ``(time_series_id, valid_time)`` the run
     with the largest ``power_fcst_init_time`` is selected, via a semi-join on the per-timestep
-    max init time. The semi-join keeps *all* ensemble members of that run, because the whole
-    ensemble shares one init time.
+    max init time, so one row survives per timestep.
 
     Args:
         power_forecasts_path: URI of the ``power_forecasts`` Delta table.
@@ -109,7 +101,7 @@ def _observed_power(
     """Scan the unflagged observed metered power, deduplicated on the join key.
 
     The dedupe on ``(time_series_id, time)`` mirrors the metrics pipeline: a duplicated observation
-    would double every ensemble member through the left-join. ``power`` is renamed to
+    would double the forecast row it joins to. ``power`` is renamed to
     ``observed_power`` and is in the same MW/MVA units as the forecast.
 
     Args:
@@ -150,21 +142,20 @@ def _with_observed(forecasts: pl.LazyFrame, observed: pl.LazyFrame) -> pl.LazyFr
     )
 
 
-def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> dict[str, Path]:
-    """Write the three parquet files for one CV run/fold and return their paths.
+def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> Path:
+    """Write the quantiles parquet file for one CV run/fold and return its path.
 
     Args:
         experiment_name: CV run whose forecasts to export.
         fold_id: CV fold whose forecasts to export.
-        output_dir: Directory to write the parquet files into (created if absent).
+        output_dir: Directory to write the parquet file into (created if absent).
 
     Returns:
-        A mapping of ``{"full_ensemble", "ensemble_mean", "quantiles"} -> written path``.
+        The path of the written ``{experiment_name}__{fold_id}_quantiles.parquet`` file.
     """
     settings = Settings()
     storage_options = typeddict_to_dict(settings.storage_options)
     output_dir.mkdir(parents=True, exist_ok=True)
-    stem = f"{experiment_name}__{fold_id}"
 
     freshest = _freshest_forecasts(
         settings.power_forecasts_data_path, experiment_name, fold_id, storage_options
@@ -172,39 +163,11 @@ def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> di
     observed = _observed_power(
         settings.cleaned_power_time_series_data_path, settings.storage_options
     )
-    full = _with_observed(freshest, observed)
-
-    per_timestep = ["time_series_id", "valid_time"]
-    ensemble_mean = full.group_by(per_timestep).agg(
-        power_fcst_init_time=pl.col("power_fcst_init_time").first(),
-        power_fcst_mean=pl.col("power_fcst").mean(),
-        observed_power=pl.col("observed_power").first(),
-    )
-    # NOTE (revisit if this export is ever re-run for serious use): Polars' default quantile
-    # interpolation is "nearest". So these band edges are actual member values across the ~51
-    # members, not linearly-interpolated p10/p50/p90. The baseline is under-dispersed — its ensemble
-    # spread is narrower than the real uncertainty — so the band is already caveated, and the
-    # nearest-member edges are acceptable. Pass interpolation="linear" for true quantile estimates.
-    quantiles = full.group_by(per_timestep).agg(
-        power_fcst_init_time=pl.col("power_fcst_init_time").first(),
-        power_fcst_p10=pl.col("power_fcst").quantile(0.1),
-        power_fcst_p50=pl.col("power_fcst").quantile(0.5),
-        power_fcst_p90=pl.col("power_fcst").quantile(0.9),
-        observed_power=pl.col("observed_power").first(),
-    )
-
-    paths = {
-        "full_ensemble": output_dir / f"{stem}_full_ensemble.parquet",
-        "ensemble_mean": output_dir / f"{stem}_ensemble_mean.parquet",
-        "quantiles": output_dir / f"{stem}_quantiles.parquet",
-    }
-    # Stream the (large) full-ensemble frame straight to disk; the aggregates are small.
-    full.sink_parquet(paths["full_ensemble"])
-    ensemble_mean.sort(per_timestep).collect(engine="streaming").write_parquet(
-        paths["ensemble_mean"]
-    )
-    quantiles.sort(per_timestep).collect(engine="streaming").write_parquet(paths["quantiles"])
-    return paths
+    path = output_dir / f"{experiment_name}__{fold_id}_quantiles.parquet"
+    _with_observed(freshest, observed).sort("time_series_id", "valid_time").collect(
+        engine="streaming"
+    ).write_parquet(path)
+    return path
 
 
 def _parse_args() -> argparse.Namespace:
@@ -239,9 +202,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     """Export the requested fold's forecasts and print where each file landed."""
     args = _parse_args()
-    paths = export_forecasts(args.experiment_name, args.fold_id, args.output_dir)
-    for kind, path in paths.items():
-        print(f"{kind:>14}: {path}")
+    print(export_forecasts(args.experiment_name, args.fold_id, args.output_dir))
 
 
 if __name__ == "__main__":

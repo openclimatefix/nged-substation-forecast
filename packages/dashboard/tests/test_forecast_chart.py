@@ -7,8 +7,11 @@ import polars as pl
 import pytest
 from _nwp_test_data import cast_to_nwp_dtypes
 from altair import LayerChart
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
 from contracts.weather_schemas import Nwp
 from dashboard.forecast_chart import (
+    COMPARISON_FORECAST_BANDS,
+    FORECAST_BANDS,
     LAG_OPTIONS,
     NWP_ANALYSIS_LEAD,
     NWP_PLOT_VARIABLES,
@@ -28,7 +31,12 @@ NWP_INIT_TIME = INIT_TIME - timedelta(hours=6)
 """The NWP run feeding the forecast, published 6 h before the power init time."""
 
 
-def _forecasts(members: tuple[int, ...]) -> pl.LazyFrame:
+_FORECAST_LAYER_COUNT = len(FORECAST_BANDS) + 1
+"""One area layer per quantile band, then the median line."""
+
+
+def _forecasts() -> pl.LazyFrame:
+    """One forecast run: quantile column ``k`` (0 to 12) holds ``i + k`` at half-hour ``i``."""
     valid_times = pl.datetime_range(
         INIT_TIME,
         INIT_TIME + PLOT_HORIZON,
@@ -38,14 +46,13 @@ def _forecasts(members: tuple[int, ...]) -> pl.LazyFrame:
     )
     return pl.DataFrame(
         {
-            "valid_time": pl.concat([valid_times for _ in members]),
-            "power_fcst": pl.Series(
-                [float(m + i) for m in members for i in range(len(valid_times))],
-                dtype=pl.Float32,
-            ),
-            "ensemble_member": pl.Series(
-                [m for m in members for _ in range(len(valid_times))], dtype=pl.Int8
-            ),
+            "valid_time": valid_times,
+            **{
+                column: pl.Series(
+                    [float(i + position) for i in range(len(valid_times))], dtype=pl.Float32
+                )
+                for position, column in enumerate(POWER_FCST_QUANTILE_COLUMNS)
+            },
         }
     ).lazy()
 
@@ -65,7 +72,6 @@ def _actuals(history: timedelta = PLOT_HISTORY) -> pl.LazyFrame:
 
 def _build(
     *,
-    members: tuple[int, ...] = (0, 1, 2),
     shade_weekends: bool = True,
     show_forecast: bool = True,
     show_actuals: bool = True,
@@ -73,7 +79,7 @@ def _build(
     history: timedelta = PLOT_HISTORY,
 ) -> LayerChart:
     return build_view_forecast_chart(
-        _forecasts(members),
+        _forecasts(),
         _actuals(history),
         power_fcst_init_time=INIT_TIME,
         units="MW",
@@ -86,10 +92,11 @@ def _build(
     )
 
 
-def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
+def test_chart_layers_weekends_forecast_bands_median_actuals_and_init_rule() -> None:
     spec = _build().to_dict()
-    assert len(spec["layer"]) == 4  # weekend bands, ensemble members, actuals, init-time rule
-    weekends, ensemble, actuals, rule = spec["layer"]
+    # Weekend bands, three forecast bands, the forecast median, actuals, and the init-time rule.
+    assert len(spec["layer"]) == 7
+    weekends, outer, middle, inner, median, actuals, rule = spec["layer"]
     assert weekends["mark"]["type"] == "rect"  # drawn first, so every line sits on top of it
     assert weekends["encoding"]["x2"]["field"] == "end"
     # Layers share the x scale, so Vega-Lite merges their axis definitions — one deviating
@@ -98,11 +105,25 @@ def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
     axes = [layer["encoding"]["x"].get("axis") for layer in spec["layer"]]
     assert all(axis == axes[0] for axis in axes)
     assert axes[0] is not None
-    assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
-    assert ensemble["encoding"]["y"]["title"] == "Power (MW)"
+    # Outermost band first, so each narrower, darker band is drawn over the wider one.
+    bands = [
+        (layer["mark"]["type"], layer["encoding"]["y"]["field"], layer["encoding"]["y2"]["field"])
+        for layer in (outer, middle, inner)
+    ]
+    assert bands == [
+        ("area", "power_fcst_p1", "power_fcst_p99"),
+        ("area", "power_fcst_p5", "power_fcst_p95"),
+        ("area", "power_fcst_p20", "power_fcst_p80"),
+    ]
+    opacities = [layer["mark"]["opacity"] for layer in (outer, middle, inner)]
+    assert opacities == sorted(opacities)
+    assert median["mark"]["type"] == "line"
+    assert median["encoding"]["y"]["field"] == "power_fcst_p50"
+    assert median["encoding"]["y"]["title"] == "Power (MW)"
     # Single-colour layers take their colour from the shared scale via a datum encoding, so
     # they participate in the always-shown legend without a constant column in their data.
-    assert ensemble["encoding"]["color"]["datum"] == "Forecast power"
+    for layer in (outer, middle, inner, median):
+        assert layer["encoding"]["color"]["datum"] == "Forecast power"
     assert actuals["encoding"]["y"]["field"] == "power"
     assert actuals["encoding"]["color"]["datum"] == "Actual power"
     assert rule["mark"]["type"] == "rule"
@@ -110,7 +131,7 @@ def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
 
 def test_shade_weekends_false_omits_the_band_layer() -> None:
     spec = _build(shade_weekends=False).to_dict()
-    assert len(spec["layer"]) == 3  # ensemble members, actuals, init-time rule
+    assert len(spec["layer"]) == _FORECAST_LAYER_COUNT + 2  # forecast, actuals, init-time rule
     assert all(layer["mark"]["type"] != "rect" for layer in spec["layer"])
     assert "weekends" not in " ".join(spec["title"]["subtitle"])
 
@@ -140,7 +161,7 @@ def test_weekend_bands_sit_at_wall_midnights_clipped_to_window() -> None:
 def test_times_are_rendered_as_europe_london_wall_time() -> None:
     spec = _build().to_dict()
     # 06:00 UTC during BST is 07:00 wall time; the rule layer's single datum carries it, naive.
-    (rule_datum,) = spec["datasets"][spec["layer"][3]["data"]["name"]]
+    (rule_datum,) = spec["datasets"][spec["layer"][-1]["data"]["name"]]
     assert rule_datum["valid_time"].startswith("2026-07-04T07:00:00")
     assert "+" not in rule_datum["valid_time"]  # naive — no zone for Vega to re-localise
     assert spec["layer"][1]["encoding"]["x"]["title"] == "Time (Europe/London)"
@@ -164,10 +185,10 @@ def test_x_axis_has_3_hourly_ticks_labelled_at_midnight_only() -> None:
 def test_lag_lines_end_at_init_plus_lag_and_use_only_pre_init_power() -> None:
     lag = timedelta(days=7)
     spec = _build(lags=(lag,), history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
-    # Layer order: weekend bands, ensemble, lags, actuals, init rule — inputs must not obscure
+    # Layer order: weekend bands, forecast, lags, actuals, init rule — inputs must not obscure
     # the observations.
-    assert len(spec["layer"]) == 5
-    lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    assert len(spec["layer"]) == _FORECAST_LAYER_COUNT + 4
+    lag_rows = spec["datasets"][spec["layer"][_FORECAST_LAYER_COUNT + 1]["data"]["name"]]
     times = sorted(row["valid_time"] for row in lag_rows)
     # Wall-time window starts Fri 03 Jul 07:00; only pre-init observations are shifted, so the
     # line ends exactly at init + lag (Sat 04 Jul 07:00 wall + 7 d) — where feature engineering
@@ -210,21 +231,21 @@ def test_legend_always_lists_every_line() -> None:
 
 def test_lag_lines_share_the_legend_colour_scale() -> None:
     spec = _build(lags=tuple(LAG_OPTIONS.values())).to_dict()
-    colour = spec["layer"][2]["encoding"]["color"]
+    colour = spec["layer"][_FORECAST_LAYER_COUNT + 1]["encoding"]["color"]
     assert colour["field"] == "lag"
     # Identical scale to the rule layer's, so Vega-Lite merges them without conflict and the
     # lag lines pick up their (ascending-lag-ordered) colours from the shared domain.
     assert colour["scale"] == spec["layer"][-1]["encoding"]["color"]["scale"]
-    lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
+    lag_rows = spec["datasets"][spec["layer"][_FORECAST_LAYER_COUNT + 1]["data"]["name"]]
     assert {row["lag"] for row in lag_rows} == {"7-day lagged power", "14-day lagged power"}
 
 
 def test_actuals_line_ignores_the_deep_history_loaded_for_lags() -> None:
     spec = _build(history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
-    actuals_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
-    # No lags requested → 4 layers, and the blue line still starts at the window, not at the
+    actuals_rows = spec["datasets"][spec["layer"][_FORECAST_LAYER_COUNT + 1]["data"]["name"]]
+    # No lags requested → no lag layer, and the blue line still starts at the window, not at the
     # start of the deeper history the dashboard now always loads.
-    assert len(spec["layer"]) == 4
+    assert len(spec["layer"]) == _FORECAST_LAYER_COUNT + 3
     assert min(row["valid_time"] for row in actuals_rows) == "2026-07-03T07:00:00"
 
 
@@ -232,7 +253,7 @@ def test_show_flags_toggle_the_forecast_and_actuals_layers() -> None:
     no_forecast = _build(show_forecast=False).to_dict()
     assert len(no_forecast["layer"]) == 3  # weekend bands, actuals, init rule
     no_actuals = _build(show_actuals=False).to_dict()
-    assert len(no_actuals["layer"]) == 3  # weekend bands, ensemble, init rule
+    assert len(no_actuals["layer"]) == _FORECAST_LAYER_COUNT + 2  # weekends, forecast, init rule
     assert no_actuals["layer"][1]["encoding"]["color"]["datum"] == "Forecast power"
     only_lags = _build(
         show_forecast=False,
@@ -245,19 +266,10 @@ def test_show_flags_toggle_the_forecast_and_actuals_layers() -> None:
     assert only_lags["layer"][1]["encoding"]["y"]["title"] == "Power (MW)"
 
 
-def test_a_realistic_ensemble_size_does_not_hit_altairs_row_limit() -> None:
-    """A real ECMWF ENS ensemble (51 members) over the full horizon is ~34k rows for the ensemble
-    layer alone — well past Altair's 5000-row default guard.
-
-    Every other test in this file uses 3 members, so a regression that dropped
-    ``alt.data_transformers.disable_max_rows()`` in ``build_view_forecast_chart`` would go
-    unnoticed by them: Altair only counts rows at serialisation, so this has to call
-    ``.to_dict()`` (as every other test here does) rather than just constructing the chart
-    object.
-    """
-    spec = _build(members=tuple(range(51))).to_dict()
-    ensemble_rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
-    assert len(ensemble_rows) > 5_000
+def test_the_forecast_subtitle_names_the_median_and_the_bands() -> None:
+    assert "bands p20–p80, p5–p95, and p1–p99" in " ".join(_build().to_dict()["title"]["subtitle"])
+    no_forecast = " ".join(_build(show_forecast=False).to_dict()["title"]["subtitle"])
+    assert "bands" not in no_forecast
 
 
 def test_forecast_values_keep_their_stored_float32_precision() -> None:
@@ -276,8 +288,10 @@ def test_forecast_values_keep_their_stored_float32_precision() -> None:
         pl.DataFrame(
             {
                 "valid_time": valid_times,
-                "power_fcst": pl.Series([10.3] * len(valid_times), dtype=pl.Float32),
-                "ensemble_member": pl.Series([0] * len(valid_times), dtype=pl.Int8),
+                **{
+                    column: pl.Series([10.3] * len(valid_times), dtype=pl.Float32)
+                    for column in POWER_FCST_QUANTILE_COLUMNS
+                },
             }
         ).lazy(),
         _actuals(),
@@ -291,10 +305,11 @@ def test_forecast_values_keep_their_stored_float32_precision() -> None:
         lags=(),
     ).to_dict()
     plotted = {
-        row["power_fcst"]
+        row[column]
         for rows in spec["datasets"].values()
         for row in rows
-        if "power_fcst" in row
+        for column in POWER_FCST_QUANTILE_COLUMNS
+        if column in row
     }
     assert plotted == {stored}
 
@@ -578,10 +593,10 @@ def test_chart_renders_to_html() -> None:
 
 
 @pytest.mark.parametrize("show_forecast", [True, False])
-def test_comparison_members_stay_in_separate_experiment_layers(show_forecast: bool) -> None:
-    comparison = _forecasts((0, 1)).with_columns(power_fcst=pl.col("power_fcst") + 1000)
+def test_a_comparison_run_draws_its_own_p5_p95_band_and_median(show_forecast: bool) -> None:
+    comparison = _forecasts().with_columns(pl.col(POWER_FCST_QUANTILE_COLUMNS) + 1000)
     spec = build_view_forecast_chart(
-        forecasts=_forecasts((0, 1)),
+        forecasts=_forecasts(),
         actuals=_actuals(),
         power_fcst_init_time=INIT_TIME,
         units="MW",
@@ -592,16 +607,27 @@ def test_comparison_members_stay_in_separate_experiment_layers(show_forecast: bo
         show_forecast=show_forecast,
         shade_weekends=False,
     ).to_dict()
-    ensembles = [layer for layer in spec["layer"] if "detail" in layer.get("encoding", {})]
-    assert len(ensembles) == (2 if show_forecast else 0)
+    by_label = {
+        label: [
+            layer
+            for layer in spec["layer"]
+            if layer["encoding"].get("color", {}).get("datum") == label
+        ]
+        for label in ("Forecast power", "Comparison: second")
+    }
+    assert len(by_label["Forecast power"]) == (_FORECAST_LAYER_COUNT if show_forecast else 0)
+    second = by_label["Comparison: second"]
+    assert len(second) == (len(COMPARISON_FORECAST_BANDS) + 1 if show_forecast else 0)
     if show_forecast:
-        primary, second = ensembles
-        assert primary["encoding"]["color"]["datum"] == "Forecast power"
-        assert second["encoding"]["color"]["datum"] == "Comparison: second"
-        assert primary["encoding"]["x"] == second["encoding"]["x"]
-        assert second["encoding"]["detail"]["field"] == "ensemble_member"
-        data = spec["datasets"][second["data"]["name"]]
-        assert min(row["power_fcst"] for row in data) == 1000
+        band, median = second
+        assert (band["encoding"]["y"]["field"], band["encoding"]["y2"]["field"]) == (
+            "power_fcst_p5",
+            "power_fcst_p95",
+        )
+        assert median["encoding"]["y"]["field"] == "power_fcst_p50"
+        assert median["encoding"]["x"] == by_label["Forecast power"][-1]["encoding"]["x"]
+        data = spec["datasets"][median["data"]["name"]]
+        assert min(row["power_fcst_p50"] for row in data) == 1006
     scale = spec["layer"][-1]["encoding"]["color"]["scale"]
     colors = dict(zip(scale["domain"], scale["range"], strict=True))
     assert colors["Comparison: second"] == ocf_theme.BRAND_ORANGE

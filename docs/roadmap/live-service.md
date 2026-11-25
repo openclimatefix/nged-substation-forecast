@@ -378,9 +378,9 @@ ops use `OpExecutionContext` (they need `context.instance`).
 
 ### Interaction with the probabilistic metrics
 
-Any metric added to `compute_metrics` flows through this scope automatically — once the
-[probabilistic metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
-(PICP/spread-skill) land, production monitoring tracks ensemble calibration over time for free. No
+Any metric added to `compute_metrics` flows through this scope automatically, so the
+[probabilistic metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) (PICP and
+interval width) let production monitoring track calibration over time with no extra code. No
 coupling needed; the ordering is flexible.
 
 ## NWP model upgrades

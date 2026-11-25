@@ -11,17 +11,20 @@
 
 ## How scoring works, in brief
 
-Every forecast in this project is an **ensemble**: for each substation (`time_series_id`) and each
-target half-hour (`valid_time`), one forecast *run* (`power_fcst_init_time`) produces $m$ member
-forecasts $x_1, \dots, x_m$ (51 members for the NWP-driven ML models; a deterministic baseline is
-simply $m = 1$). Scoring proceeds in two steps:
+Every forecast in this project is a **quantile forecast**: for each substation (`time_series_id`)
+and each target half-hour (`valid_time`), one forecast *run* (`power_fcst_init_time`) stores one
+`PowerForecast` row holding the forecast at the 13 delivery quantiles, in the columns
+`power_fcst_p1` … `power_fcst_p99`. A forecaster that produces several point values per row — the
+XGBoost model's one prediction per ECMWF ENS weather member, or the manual heuristic's one
+observation per historical analogue — reduces them to the 13 linear empirical quantiles before
+storing the row. A deterministic forecast stores one value in all 13 columns. Scoring proceeds in
+two steps:
 
-1. **Per timestamp** — each forecast run's members are collapsed into per-timestamp quantities: the
-   ensemble mean $\bar{x}_t$ (which the deterministic metrics score), plus the member-aware
-   quantities (CRPS, ensemble variance, and the empirical quantiles). Runs that cover the same
-   `valid_time` at different lead times are scored **independently**, exactly as a production
-   consumer would experience each of them — members are never pooled across runs into a
-   lagged-ensemble blend.
+1. **Per timestamp** — each stored row is scored on its own: the median column `power_fcst_p50`
+   gives the deterministic errors, and the 13 quantile columns give the pinball losses, the CRPS,
+   and the band coverage. Runs that cover the same `valid_time` at different lead times are scored
+   **independently**, exactly as a production consumer would experience each of them — runs are
+   never pooled into a lagged-ensemble blend.
 2. **Per group** — the per-timestamp values are averaged within each `(time_series_id, fold_id,
    power_fcst_model_name, horizon_slice)` group, where `horizon_slice` buckets rows by lead time
    (`intraday` < 6 h ≤ `day_ahead` < 36 h ≤ `short_medium_range` < 168 h ≤ `extended_range`), plus
@@ -33,22 +36,22 @@ per `(time_series_id, fold_id, horizon_slice, metric_name, metric_param)`), and 
 per-CV-run aggregates under a [restricted headline
 subset](#where-the-numbers-live-delta-vs-mlflow).
 
-Notation below: $y_t$ is the observed power at valid time $t$; $x_{t,1}, \dots, x_{t,m}$ are the
-ensemble members of the run being scored; $\bar{x}_t$ is their mean; $T$ is the number of timestamps
-in the group; $\hat{q}_t(\tau)$ is the empirical quantile of the members at level $\tau$ (linear
-interpolation between order statistics).
+Notation below: $y_t$ is the observed power at valid time $t$; $\hat{q}_t(\tau)$ is the stored
+forecast quantile at level $\tau$ (the column `power_fcst_p50` holds $\hat{q}_t(0.5)$); $T$ is the
+number of timestamps in the group; $Q$ is the set of 13 delivery levels.
 
 ## Deterministic metrics
 
-These deterministic metrics score the **ensemble mean** — a single number per timestamp — without
-saying anything about whether the forecast's claimed uncertainty was honest.
+These deterministic metrics score the **median forecast** $\hat{q}_t(0.5)$ — a single number per
+timestamp — without measuring whether the forecast's quantile bands cover the observed power at
+their stated rate.
 
 ### Mean absolute error (MAE)
 
 **MW; smaller is better.** the typical size of the miss. An MAE of 3 MW means the forecast is off by
 about 3 MW on an average half-hour, in one direction or the other.
 
-$$ \mathrm{MAE} = \frac{1}{T} \sum_t \left| \bar{x}_t - y_t \right| $$
+$$ \mathrm{MAE} = \frac{1}{T} \sum_t \left| \hat{q}_t(0.5) - y_t \right| $$
 
 Every MW of error costs the same, so MAE is not distorted by a few bad hours — but for the same
 reason it cannot tell you whether errors are steady or spiky (that is RMSE's job), nor whether they
@@ -79,7 +82,7 @@ time, not for comparing skill across the population.
 hurts more than two 50 MW errors. If RMSE is much larger than MAE, the model's errors are spiky: it
 is usually fine and occasionally very wrong.
 
-$$ \mathrm{RMSE} = \sqrt{ \frac{1}{T} \sum_t \left( \bar{x}_t - y_t \right)^2 } $$
+$$ \mathrm{RMSE} = \sqrt{ \frac{1}{T} \sum_t \left( \hat{q}_t(0.5) - y_t \right)^2 } $$
 
 ### Mean bias error (MBE)
 
@@ -87,93 +90,39 @@ $$ \mathrm{RMSE} = \sqrt{ \frac{1}{T} \sum_t \left( \bar{x}_t - y_t \right)^2 } 
 over-prediction. A model can have MBE ≈ 0 and still be terrible (large errors that cancel), so MBE
 is a diagnosis of *direction*, never of *size*.
 
-$$ \mathrm{MBE} = \frac{1}{T} \sum_t \left( \bar{x}_t - y_t \right) $$
+$$ \mathrm{MBE} = \frac{1}{T} \sum_t \left( \hat{q}_t(0.5) - y_t \right) $$
+
+**The median is the point forecast, because the stored row holds quantiles and the median is the one
+point forecast those quantiles carry exactly.** The median is also the point forecast that minimises
+MAE. RMSE and MBE are minimised by the mean, so a skewed forecast distribution reads slightly worse
+on those two metrics than the mean of the same distribution would.
 
 ## Probabilistic metrics
 
-These probabilistic metrics score the ensemble **before** the mean collapse, which is why we pay 51×
-inference cost. A recurring caveat: of everything below, **only CRPS is fair across ensemble sizes,
-for members drawn at random from one forecaster's belief** — PICP, pinball loss, interval width, and
-(residually) the spread-skill ratio all shift with the member count $m$, because empirical quantiles
-from few members are systematically too narrow. When comparing models with different ensemble sizes
-(e.g. the 51-member ML models against `manual_heuristic`'s 13 historical analogues), lean on CRPS.
+These probabilistic metrics score all 13 stored quantile columns. A forecaster whose quantiles are
+taken from a few point values — the manual heuristic's 13 historical analogues, say — stores
+quantiles that are systematically too narrow, because empirical quantiles from few values sit inside
+the true quantiles. PICP, pinball loss, interval width, and CRPS all reflect that narrowing.
 
 ### CRPS (continuous ranked probability score)
 
 **MW; smaller is better.** MAE for a whole probability forecast. CRPS asks "how far was the forecast
 *distribution* from what happened?" — it rewards being right, and being *confidently* right, in one
-number. For a deterministic forecast ($m = 1$) CRPS literally equals MAE, so CRPS values sit on the
-same MW scale as MAE and the two are directly comparable: an ensemble whose CRPS beats its own MAE
-is extracting real value from its spread.
+number. For a deterministic forecast, whose 13 quantiles are equal, CRPS equals MAE, so CRPS values
+sit on the same MW scale as MAE and the two are directly comparable: a forecast whose CRPS beats its
+own MAE is using its spread to improve on its median error.
 
-We compute the **fair** (finite-ensemble-unbiased) form of Ferro (2014), per timestamp:
+We estimate CRPS from the 13 stored quantiles as twice the mean pinball loss over the 13 levels:
 
-$$ \mathrm{CRPS}_t = \frac{1}{m} \sum_{i} \left| x_{t,i} - y_t \right| \;-\; \frac{1}{m(m-1)}
-\sum_{i<j} \left| x_{t,i} - x_{t,j} \right| $$
+$$ \mathrm{CRPS} = 2 \, \overline{L} = \frac{2}{13} \sum_{\tau \in Q} L_\tau $$
 
-with the second (spread) term defined as 0 when $m = 1$, and the group value being the mean of
-$\mathrm{CRPS}_t$ over the group's timestamps. The first term is accuracy (how far members sit from
-reality); the subtracted term is a reward for spread — hedging across the members' honest
-disagreement is scored better than betting everything on their mean.
-
-**Why the fair form:** the textbook ensemble estimator divides the spread term by $m^2$ rather than
-$m(m-1)$, which under-credits small ensembles — a *perfectly calibrated* 2-member ensemble scores
-~50% worse than its true CRPS, shrinking to ~3% at 13 members (we verified this by Monte Carlo).
-Since we will compare ensembles of different sizes, we use the unbiased divisor; the $m = 1$
-convention then makes "CRPS = MAE for deterministic forecasts" exact.
-
-**How it is computed:** the naive pairwise sum is $O(m^2)$ per timestamp and, at fold scale, would
-require a members self-join materialising billions of pair rows. We instead use the sorted-member
-identity $\sum_{i<j} |x_i - x_j| = \sum_{k=1}^{m} (2k - m - 1)\, x_{(k)}$ (for ascending order
-statistics $x_{(k)}$), which is a single $O(m \log m)$ aggregation expression. The sum is
-accumulated in Float64: its terms are as large as $\pm m \cdot |x|$ while the result is only
-spread-sized, and that cancellation loses percent-level accuracy in Float32 when members are
-near-identical (precisely the underdispersed-intraday case we most care about).
-
-### Spread-skill ratio
-
-**Dimensionless; 1.0 is best.** is the fan the right width? The ratio compares how uncertain the
-forecast *claims* to be (the spread of its members) against how wrong it *actually* is (the RMSE of
-its mean). A ratio of 1.0 means the claimed uncertainty matches the realised error — the fan can be
-trusted. Below 1 the model is overconfident (**underdispersed**: the fan is too thin, and reality
-keeps landing outside it); above 1 it is underconfident. This is the headline diagnostic for the
-[underdispersion this project
-expects](probabilistic-forecasting.md#where-forecast-uncertainty-actually-comes-from).
-
-$$ \mathrm{SSR} = \frac{ \sqrt{ \dfrac{1}{T} \sum_t \dfrac{m+1}{m}\, s_t^2 } }{ \mathrm{RMSE} },
-\qquad s_t^2 = \frac{1}{m-1} \sum_i \left( x_{t,i} - \bar{x}_t \right)^2 $$
-
-Two definitional choices matter here, both made so that "1.0 = well-calibrated" is *literally true*
-rather than approximately true:
-
-- **RMS spread, not mean-of-stddev.** Averaging per-timestamp standard deviations and dividing by
-  RMSE looks natural but is biased low by Jensen's inequality whenever spread varies across
-  timestamps. Power-forecast spread varies strongly (diurnally and synoptically). In a simulation of
-  a *perfectly calibrated* heteroscedastic 51-member ensemble, the mean-of-stddev form read 0.80
-  while the RMS form read 0.99. We therefore aggregate variances and take one square root ("RMS
-  spread"), so a calibrated model cannot be misdiagnosed as underdispersed.
-- **The Fortin $(m+1)/m$ factor.** Even with RMS spread, a calibrated $m$-member ensemble satisfies
-  $\mathrm{RMSE}^2 = \frac{m+1}{m} \times$ (mean ensemble variance) — the truth behaves like one
-  extra draw from the same distribution (Fortin et al. 2014). Folding $(m+1)/m$ into the numerator
-  makes the calibrated target exactly 1.0 at *any* ensemble size, instead of ~0.99 at 51 members and
-  ~0.96 at 13 — where the uncorrected form would read as spurious underdispersion.
-
-The variance uses `ddof=1` (the sample variance), and a single-member forecast scores spread 0 —
-zero spread is the honest description of a deterministic forecast, and 0/RMSE keeps the ratio's
-meaning (maximally overconfident) rather than becoming null. The remaining corner is RMSE = 0 (a
-perfect forecast over the scored group): with zero spread the ratio is defined as 0 rather than the
-indeterminate 0/0. With positive spread (contradictory: claimed uncertainty around an error-free
-mean) the computation refuses to emit a value — NaN or infinity in any metric raises rather than
-silently poisoning the leaderboard aggregates.
-
-**A published instance shows why an accuracy score is never reported alone.** The
-[energy-forecasting
-review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
-records a case where the two best-ranked models on a threshold-crossing metric had 90% prediction
-intervals that captured the truth only 58–62% of the time overall, and under half the time at the
-peaks — exactly the fault a spread-skill ratio below 1.0 flags. A model that understates its
-uncertainty raises fewer false alarms, so it can score well on a threshold-crossing test while being
-exactly the model an operator should not trust near a capacity limit.
+where $L_\tau$ is the [pinball loss](#pinball-loss) at level $\tau$ and $\overline{L}$ is the [mean
+pinball loss](#mean-pinball-loss). The CRPS equals twice the integral of the pinball loss over every
+level from 0 to 1 ([Gneiting and Raftery (2007)](https://doi.org/10.1198/016214506000001437)), and
+the mean over 13 levels is a discrete version of that integral. The 13 delivery levels are
+tail-heavy — 6 of the 13 sit at or beyond p10 and p90 — so this estimate weights the tails more
+than an estimate over evenly spaced levels would. The 13 levels are symmetric about 0.5, which is
+what makes "CRPS = MAE for a deterministic forecast" exact.
 
 ### Pinball loss
 
@@ -184,7 +133,7 @@ below it the loss is shallow (weight 0.1). A forecaster minimises expected pinba
 $\tau$ by reporting the true $\tau$-quantile — bluffing wide or narrow both cost — so pinball loss
 is the honest scorecard for each individual quantile.
 
-For the empirical member quantile $\hat{q}_t(\tau)$:
+For the stored forecast quantile $\hat{q}_t(\tau)$:
 
 $$ L_\tau = \frac{1}{T} \sum_t \begin{cases} \tau \, \left( y_t - \hat{q}_t(\tau) \right) & \text{if
 } y_t \ge \hat{q}_t(\tau) \\[2pt] (1 - \tau) \, \left( \hat{q}_t(\tau) - y_t \right) &
@@ -200,11 +149,13 @@ pipeline](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-for
 will be scored head-to-head at these same levels, so today's numbers are directly the baseline it
 must beat.
 
-**Finite-ensemble tail caveat:** from 51 members, $\hat{q}(0.01)$ interpolates between the two
-lowest members — the raw ensemble simply cannot represent its own far tails well, so its tail
-pinball losses are partly a representational limit rather than pure skill. That is not a reason to
-skip them (the product needs tails scored); it is the quantitative motivation for Phase D's
-per-member quantile models.
+**Finite-ensemble tail caveat:** the XGBoost model takes its stored quantiles from its 51
+predictions, one per ECMWF ENS member, so its $\hat{q}(0.01)$ interpolates between the two lowest
+predictions.
+The raw ensemble simply cannot represent its own far tails well, so its tail pinball losses are
+partly a representational limit rather than pure skill. That is not a reason to skip them (the
+product needs tails scored); it is the quantitative motivation for Phase D's per-member quantile
+models.
 
 ### Mean pinball loss
 
@@ -218,7 +169,7 @@ $$ \overline{L} = \frac{1}{13} \sum_{\tau \in Q} L_\tau , \qquad Q = \{0.01, 0.0
 
 ### PICP (prediction interval coverage probability)
 
-**Dimensionless; aim for the calibrated reference below.** how often reality actually lands inside
+**Dimensionless; aim for the nominal coverage.** how often reality actually lands inside
 the claimed band. For the p10–p90 band, roughly 80% of observations should fall inside; markedly
 less means the band is too narrow (overconfident), markedly more means too wide. PICP is scored for
 every symmetric pair of delivery quantiles — six bands from p35–p65 (30%) out to p1–p99 (98%) — so
@@ -227,12 +178,15 @@ together the six values trace a **coverage curve** across the whole distribution
 $$ \mathrm{PICP}_{[\tau_{\mathrm{lo}}, \tau_{\mathrm{hi}}]} = \frac{1}{T} \sum_t \mathbf{1}\!\left[
 \hat{q}_t(\tau_{\mathrm{lo}}) \le y_t \le \hat{q}_t(\tau_{\mathrm{hi}}) \right] $$
 
-**The calibrated reference is *below* nominal coverage.** Empirical quantiles from a finite ensemble
-sit inside the true quantiles, so even a perfectly calibrated $m$-member ensemble covers less than
-the nominal rate — approximately $\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})$. Judge
-PICP against these references, not the nominal rates:
+**A calibrated forecast covers the nominal rate.** The stored quantiles are the forecast NGED would
+receive, so a band that covers less than its nominal rate is too narrow for NGED's purposes,
+whatever the reason. Part of a shortfall can come from how the quantiles were made. Quantiles taken
+from $m$ point values sit inside the true quantiles, so even $m$ values drawn from a perfectly
+calibrated distribution cover less than the nominal rate — approximately
+$\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})$. The table gives that coverage for the
+XGBoost model's 51 predictions, one per ECMWF ENS member:
 
-| Band | Nominal coverage | Calibrated reference at $m = 51$ |
+| Band | Nominal coverage | Coverage of 51 calibrated values |
 |---|---|---|
 | p1–p99 | 0.98 | ≈ 0.942 |
 | p2–p98 | 0.96 | ≈ 0.923 |
@@ -241,9 +195,10 @@ PICP against these references, not the nominal rates:
 | p20–p80 | 0.60 | ≈ 0.577 |
 | p35–p65 | 0.30 | ≈ 0.288 |
 
-A p10–p90 PICP of 0.72 at 51 members is therefore mild overconfidence (reference 0.769), not the
-8-point shortfall a naive comparison with 0.8 would suggest. The gap grows as $m$ shrinks — one more
-reason PICP is not comparable across ensemble sizes.
+A p10–p90 PICP of 0.72 for the XGBoost model is therefore 0.05 below what 51 calibrated values would
+give (0.769). The remaining 0.03 of the 8-point shortfall from 0.8 comes from taking quantiles of 51
+values, and a calibration step has to remove both parts. The finite-sample shortfall grows as $m$
+shrinks.
 
 One caveat on precision: the formula is exact only when the interpolated quantile estimator is
 evaluated on a uniform distribution; for other distribution shapes the interpolation between extreme
@@ -255,10 +210,16 @@ roughly ±0.005 depending on the forecast distribution's shape; the central band
 
 PICP alone is also **gameable**: an absurdly wide band hits any coverage target for free. It must
 always be read alongside a sharpness measure — which is what interval width is for (and the proper
-scores, CRPS and pinball, punish over-widening automatically when the members are drawn at random).
-A submitter who chooses both the member count and the member values can drive fair CRPS to zero,
-with two members either side of the observation. The leaderboard scorer therefore requires a study
-to carry the reference's ensemble-member labels, which fixes the member count.
+scores, CRPS and pinball, punish over-widening automatically).
+
+**A published instance shows why an accuracy score is never reported alone.** The
+[energy-forecasting
+review](../background/energy-forecasting-review.md#evaluating-the-performance-of-power-forecasts)
+records a case where the two best-ranked models on a threshold-crossing metric had 90% prediction
+intervals that captured the truth only 58–62% of the time overall, and under half the time at the
+peaks — exactly the fault a PICP below nominal flags. A model that understates its uncertainty
+raises fewer false alarms, so it can score well on a threshold-crossing test while being exactly the
+model an operator should not trust near a capacity limit.
 
 ### Interval width
 
@@ -359,16 +320,16 @@ metric: two models can tie on CRPS while twCRPS reveals which one actually knows
 near-limit hours.
 
 Computation is a one-line extension of the existing machinery: for the threshold $r$, replace every
-member and the observation by $v(z) = \max(z, r)$ and compute the [fair
-CRPS](#crps-continuous-ranked-probability-score) of the transformed values (this equivalence is
-standard — [Gneiting and Ranjan (2011)](https://doi.org/10.1198/jbes.2010.08110)):
+stored quantile and the observation by $v(z) = \max(z, r)$ and compute the
+[CRPS](#crps-continuous-ranked-probability-score) of the transformed values (this equivalence is
+standard — [Gneiting and Ranjan (2011)](https://doi.org/10.1198/jbes.2010.08110)). The maximum
+never reverses two values, so the transformed quantiles are the quantiles of the transformed
+forecast:
 
-$$ \mathrm{twCRPS}_t(r) = \mathrm{CRPS}_t\!\left( \max(x_{t,1}, r), \dots, \max(x_{t,m}, r);\;
+$$ \mathrm{twCRPS}_t(r) = \mathrm{CRPS}_t\!\left( \max(\hat{q}_t(\tau), r) \text{ for } \tau \in Q;\;
 \max(y_t, r) \right) $$
 
-Because it reuses the fair form, twCRPS inherits CRPS's one crucial comparability property: it is
-unbiased across ensemble sizes, so the 13-member `manual_heuristic` and the 51-member ML models can
-be compared on it directly. It is computed against the [per-series
+It is computed against the [per-series
 threshold](#choosing-the-thresholds-static-per-series-quantile-derived), with `metric_param`
 carrying the threshold label.
 
@@ -397,23 +358,27 @@ deserves its own directly-readable number. It is *not* a ranking metric (a model
 exceedance rates with absurdly wide quantiles; pinball loss and twCRPS punish that); it is the trust
 check for the delivered tail quantiles.
 
-As with PICP, empirical quantiles from a finite ensemble sit slightly inside the true quantiles, so
-even a perfectly calibrated ensemble exceeds its p95 *more* than 5% of the time — slightly at 51
-members, and by a wide margin at the 13 members `manual_heuristic` carries. The exact calibrated
-reference per quantile and ensemble size will be derived and verified by Monte Carlo at
-implementation time, mirroring [PICP's reference
+As with PICP, quantiles taken from a finite set of point values sit slightly inside the true
+quantiles, so even values drawn from a perfectly calibrated distribution exceed their p95 *more*
+than 5% of the time — slightly for the XGBoost model's 51 predictions, and by a wide margin for the
+13 historical analogues `manual_heuristic` reads. The exact shortfall per quantile and value count
+will be derived and verified by Monte Carlo at implementation time, mirroring [PICP's
 table](#picp-prediction-interval-coverage-probability).
 
 ### Brier score for threshold exceedance
 
-**Dimensionless (0 to 1); smaller is better.** The ensemble can answer "what is the chance load
-exceeds threshold $r$?" — the fraction of members above $r$. The Brier score grades those
+**Dimensionless (0 to 1); smaller is better.** The stored quantiles can answer "what is the chance
+load exceeds threshold $r$?" — one minus the level at which the quantile curve crosses $r$. The
+Brier score grades those
 probability statements the way you would grade a weather presenter's "70% chance of rain": it is the
 mean squared difference between the stated probability and what actually happened (1 if load
 exceeded the threshold, 0 if not):
 
 $$ \mathrm{BS}(r) = \frac{1}{T} \sum_t \left( p_t(r) - \mathbf{1}\!\left[ y_t > r \right] \right)^2,
-\qquad p_t(r) = \frac{1}{m} \sum_i \mathbf{1}\!\left[ x_{t,i} > r \right] $$
+\qquad p_t(r) = 1 - \hat{F}_t(r) $$
+
+where $\hat{F}_t$ is the forecast distribution function interpolated between the 13 stored
+quantiles.
 
 A forecaster minimises it by stating their honest probability — hedging toward 50% and alarmism both
 cost — so it is a proper score. Mathematically it is not independent of twCRPS (CRPS is the Brier
@@ -421,10 +386,10 @@ score integrated over all possible thresholds, so twCRPS above $r$ aggregates th
 $r$); we compute it anyway because it is the most *decision-legible* number in this section — it
 grades exactly the yes/no warning NGED acts on.
 
-One caveat to carry into reading it: a 51-member ensemble can only express 52 distinct
-probabilities, and an underdispersed ensemble slams its exceedance probabilities to 0 or 1 too
-early. That is not a flaw in the metric — it is precisely the failure mode this metric exists to
-expose, and the before/after instrument for the [calibration
+One caveat to carry into reading it: 13 quantiles leave $p_t(r)$ coarse in the tails — beyond p1
+or p99 the stored forecast says only "under 1%" or "over 99%" — and an underdispersed forecast
+slams its exceedance probabilities to 0 or 1 too early. That is not a flaw in the metric — it is
+precisely the failure mode this metric exists to expose, and the before/after instrument for the [calibration
 work](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics). The
 per-probability breakdown (a *reliability diagram*) is a curve rather than a scalar, so it lives in
 ad-hoc analyses — see [What is deliberately not here](#what-is-deliberately-not-here).
@@ -538,7 +503,7 @@ Anything not in MLflow is still one Polars filter away in Delta.
   of exceedance, how many actually exceeded?", plotted across probability bins. A curve, not a
   scalar; computed ad hoc when the Brier numbers need explaining.
 
-- **Hit-rate / false-alarm trigger analyses** — turning the ensemble's exceedance probability into a
+- **Hit-rate / false-alarm trigger analyses** — turning the forecast's exceedance probability into a
   yes/no warning requires choosing a trigger ("warn when the probability tops X%"), and the
   informative object is the *scan* across triggers (a ROC curve — Receiver Operating Characteristic
   — and, for rare events, base-rate-robust summaries such as the Symmetric Extremal Dependence
