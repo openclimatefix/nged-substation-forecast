@@ -1,15 +1,15 @@
-# Plan: serve the step-5 demand network for the 16 Primaries (#1706)
+# Plan: serve the step-5 neural-network demand forecast for the 16 Primaries (#1706)
 
 **The problem.** The live service forecasts every series with the naive forecaster, while research
 has a neural network for the 16 Primaries that beats the manual heuristic and climatology at every
-lead band. The network is step 5 of research experiment 677 at monthly refits. Training stays in
-`nged-ml-research`, so production needs inference only, from a plain directory of weights and
+lead band. The neural network is step 5 of research experiment 677 at monthly refits. Training stays
+in `nged-ml-research`, so production needs inference only, from a plain directory of weights and
 constants that research experiment 705 exports. The goal is a daily forecast for the Primaries in
 the live service before the Christmas 2026 break.
 
 **The planned solution.** A new workspace package, `substation_demand_forecaster`, rebuilds the
-network's 60 input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs a
-forward pass re-implemented in numpy for each of the three seeds, and reads the 13 NGED delivery
+neural network's 60 input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs
+a forward pass re-implemented in numpy for each of the three seeds, and reads the 13 NGED delivery
 quantile levels out of each seed's Gaussian mixture. A new daily Dagster asset,
 `live_primary_substation_forecasts`, runs the package at the 12:00 UTC origin on the day's 00Z ECMWF
 ENS run and writes one row per Primary and half-hour to `power_forecasts`, with the 13 quantile
@@ -21,10 +21,11 @@ after this plan's code merges.
 
 ## Verdict, size, and departures
 
-**Verdict: worth implementing, as the issue describes.** The maintainer chose the step-5 network
-over the full Candidate on 2026-11-18. Experiment 677 measured a normalised MAE of the median of
-7.39 and a CRPS of 4.19 points of capacity for step 5 at monthly refits, against 7.48 and 4.26 for
-the Candidate. Step 5 also needs no daily K1 run, no stored lag-free table, and no neighbour list.
+**Verdict: worth implementing, as the issue describes.** The maintainer chose the step-5 neural
+network over the full Candidate on 2026-11-18. Experiment 677 measured a normalised MAE of the
+median of 7.39 and a CRPS of 4.19 points of capacity for step 5 at monthly refits, against 7.48 and
+4.26 for the Candidate. Step 5 also needs no daily K1 run, no stored lag-free table, and no
+neighbour list.
 
 **Size: complex.** The five triggers:
 
@@ -55,12 +56,12 @@ series and half-hour, with no member structure.
 #### The happy path
 
 1. **A schedule fires `live_primary_substation_forecasts` at 12:00 UTC each day.** The asset reuses
-   `ecmwf_ens_partitions` (`defs/assets.py`), so its partition maps one-to-one to the day's ENS
-   run. The partition's date gives `power_fcst_init_time` = that date at 12:00 UTC and the native
-   origin = 09:00 UTC, the time the network was trained to treat the 00Z run as available. The
-   12:00 slot is later than `ecmwf_ens_schedule` (10:30 UTC), so on a normal day the run is already
-   on disk. The two schedules couple through data at rest, never through run status (design
-   principle 14).
+   `ecmwf_ens_partitions` (`defs/assets.py`), so its partition maps one-to-one to the day's ENS run.
+   The partition's date gives `power_fcst_init_time` = that date at 12:00 UTC and the native origin
+   = 09:00 UTC, the time the neural network was trained to treat the 00Z run as available. The 12:00
+   slot is later than `ecmwf_ens_schedule` (10:30 UTC), so on a normal day the run is already on
+   disk. The two schedules couple through data at rest, never through run status (design principle
+   14).
 2. **The asset loads the bundle** with `substation_demand_forecaster.bundle.load_bundle(path)` from
    the new `Settings.primary_substation_bundle_path`. `load_bundle` checks that the manifest's
    `bundle_format_version` equals `BUNDLE_FORMAT_VERSION: Final = "2"` (the manifest stores it as a
@@ -126,9 +127,9 @@ series and half-hour, with no member structure.
    rules in `standardisers.json`: float32 arithmetic, clip at ±5, and NaN to 0 for the 37 lag-free
    columns; float64 and a clip for the lag values; non-finite to 0 and no clip for the B1 columns;
    float16 rounding of the expected-weather rows.
-7. **`substation_demand_forecaster.network.forecast(bundle, matrix, expected_rows, levels)`** runs
-   each seed's forward pass in numpy, with `scipy.special.erf` for the exact GELU and the mixture's
-   cumulative distribution. The forward pass is the functional `forward` and `mlp` of
+7. **`substation_demand_forecaster.neural_network.forecast(bundle, matrix, expected_rows, levels)`**
+   runs each seed's forward pass in numpy, with `scipy.special.erf` for the exact GELU and the
+   mixture's cumulative distribution. The forward pass is the functional `forward` and `mlp` of
    `reference_check.py`, ported line by line and applying the stored weights by their `state_dict`
    names, so the port diffs against the reference and imports nothing from research. `forecast`
    reads the quantiles at `levels` (the 13 delivery levels in production, and the 11 research levels
@@ -158,9 +159,9 @@ series and half-hour, with no member structure.
   retry, which mirrors `_is_too_old_to_retry` in `ecmwf_ens`. The asset has no `availability_mode`
   config.
 - **A Primary whose day or week lag is missing** (no cleaned reading at the lag time, or a stale
-  telemetry feed) gets the missing encoding the network was trained with: value 0, flag 1, and the
-  largest age code. The network trained with 30% of origin days lag-masked, so this degrades the
-  forecast towards the lag-free forecast rather than failing.
+  telemetry feed) gets the missing encoding the neural network was trained with: value 0, flag 1,
+  and the largest age code. The neural network trained with 30% of origin days lag-masked, so this
+  degrades the forecast towards the lag-free forecast rather than failing.
 - **A missing daily run in the 13-day history.** The windowed proxy then has a gap of about a day,
   because consecutive runs' first-day windows only touch. The B1 columns are trailing aggregates
   that research computes over the finite values only (`trailing_mean`, `np.fmin`, and `np.fmax`
@@ -178,8 +179,8 @@ series and half-hour, with no member structure.
 - **Today's 00Z run is absent at 15:00 UTC**: the asset reports a degradation to Sentry tagged
   `degraded_asset=live_primary_substation_forecasts`, naming the run, and finishes without writing.
   It does not forecast from yesterday's run, because every lead would be 24 hours longer than the
-  network trained on. The service then writes no forecast for that day, because no other forecaster
-  is live.
+  neural network trained on. The service then writes no forecast for that day, because no other
+  forecaster is live.
 - **Today's run has fewer than 51 members in a cell**: the summary is the mean and standard
   deviation over the members present. `nwp_run_is_complete` already warns about the run and names
   the absent members, so the asset adds no report of its own.
@@ -207,7 +208,7 @@ series and half-hour, with no member structure.
     - `ens_summary.py`: `summarise_runs(nwp, primaries)`.
     - `features.py`: `analysis_proxy`, `calendar_columns`, `sun_columns`, `b1_columns`,
       `lag_columns`, `knot_position`, `build_expected_rows`, and `build_input_matrix`.
-    - `network.py`: the functional `mlp` and `forward` ported from `reference_check.py`,
+    - `neural_network.py`: the functional `mlp` and `forward` ported from `reference_check.py`,
       `mixture_quantiles`, and `forecast`.
     - `README.md`: what the package does and where bundles come from.
 - **`packages/contracts/src/contracts/settings.py`**: `primary_substation_bundle_path`, defaulting
@@ -236,9 +237,8 @@ series and half-hour, with no member structure.
   the asset and the run (rule 4, and "make the telemetry name the fault"). Only our own faults
   raise: a corrupt bundle and a contract violation.
 - **The degradation is not recorded on the row.** `PowerForecast` has no degradation column, so the
-  record is the Sentry event. The in-band signal of widening bands
-  is not implemented here; the network was trained with lag masking, so its bands already widen
-  when a lag is missing.
+  record is the Sentry event. The in-band signal of widening bands is not implemented here; the
+  neural network was trained with lag masking, so its bands already widen when a lag is missing.
 - **Principle kept: "keep the serving path close to load a model, call `predict`".** The serving
   path is "load a bundle, build features, call `forecast`".
 - **Principle traded: the documented `BaseForecaster` extension point.** The plan does not subclass
