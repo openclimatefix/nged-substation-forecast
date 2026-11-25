@@ -13,9 +13,11 @@ forward pass re-implemented in numpy for each of the three seeds, and reads the 
 quantile levels out of each seed's Gaussian mixture. A new daily Dagster asset,
 `live_primary_substation_forecasts`, runs the package at the 12:00 UTC origin on the day's 00Z ECMWF
 ENS run and writes one row per Primary and half-hour to `power_forecasts`, with the 13 quantile
-columns that a separate issue adds to `PowerForecast` (see "Dependency on the contract change"). The
-bundle is copied into the image beside the existing champion model. The 6-hourly `live_forecasts`
-asset keeps running, as the fallback.
+columns that #1708 (store `PowerForecast` as 13 quantile columns, merged by PR #1709) added to
+`PowerForecast`. The bundle is copied into the image. The 6-hourly `live_forecasts` asset is gone
+before this asset lands, because #1722 (remove the XGBoost forecaster and `live_forecasts`, plan in
+PR #1723) removes it, so the service writes no forecast between the two merges and is deployed only
+after this plan's code merges.
 
 ## Verdict, size, and departures
 
@@ -38,16 +40,13 @@ the Candidate. Step 5 also needs no daily K1 run, no stored lag-free table, and 
 
 **Reviews: both plan reviews (simplicity, then correctness), and all three diff reviews.**
 
-**Dependency on the contract change.** The maintainer decided on 2026-11-18 that `PowerForecast`
-itself changes from one `power_fcst` per `ensemble_member` to 13 `Float32` quantile columns at the
-levels agreed with NGED for the delivery tables (`DELIVERY_QUANTILES`: 0.01, 0.02, 0.05, 0.10, 0.20,
-0.35, 0.50, 0.65, 0.80, 0.90, 0.95, 0.98, 0.99), keyed by
-(`time_series_id`, `power_fcst_init_time`, `valid_time`). That change touches every forecaster, the
-metrics, and the `power_forecasts` table, so it is its own issue and pull request. This plan only
-needs it before step 2 of "Implementation order" below; the package in step 1 does not depend on
-it. The design follows the research page "Delivering uncertainty to NGED's power-flow studies"
-(nged-ml-research, 2026-11-10): one quantile forecast per series and half-hour, with no member
-structure.
+**The contract change has landed.** The maintainer decided on 2026-11-18 that `PowerForecast` itself
+changes from one `power_fcst` per `ensemble_member` to 13 `Float32` quantile columns at the levels
+agreed with NGED for the delivery tables (`DELIVERY_QUANTILES`: 0.01, 0.02, 0.05, 0.10, 0.20, 0.35,
+0.50, 0.65, 0.80, 0.90, 0.95, 0.98, 0.99), keyed by (`time_series_id`, `power_fcst_init_time`,
+`valid_time`). PR #1709 merged that change. The design follows the research page "Delivering
+uncertainty to NGED's power-flow studies" (nged-ml-research, 2026-11-10): one quantile forecast per
+series and half-hour, with no member structure.
 
 ## Solution
 
@@ -71,7 +70,7 @@ structure.
    field (0 until a release is cut), and the 16 Primaries from `primaries.json` (identifier, H3
    cell, latitude, longitude, `effective_capacity_mw`, `capacity_mw`, embedding index). The
    Primaries and their capacities come from the bundle, never from today's `TimeSeriesMetadata`
-   table, for the same reason `live_forecasts` uses its frozen metadata copy.
+   table.
 3. **The asset checks that today's 00Z run is present** with the existing
    `_available_nwp_init_times`. If it is not, the asset raises `RetryRequested` every 30 minutes,
    up to 6 times, so until 15:00 UTC. That is 30 minutes after the last retry of `ecmwf_ens`
@@ -179,8 +178,8 @@ structure.
 - **Today's 00Z run is absent at 15:00 UTC**: the asset reports a degradation to Sentry tagged
   `degraded_asset=live_primary_substation_forecasts`, naming the run, and finishes without writing.
   It does not forecast from yesterday's run, because every lead would be 24 hours longer than the
-  network trained on. NGED keeps the fallback forecast from `live_forecasts`, which runs at every
-  slot.
+  network trained on. The service then writes no forecast for that day, because no other forecaster
+  is live.
 - **Today's run has fewer than 51 members in a cell**: the summary is the mean and standard
   deviation over the members present. `nwp_run_is_complete` already warns about the run and names
   the absent members, so the asset adds no report of its own.
@@ -226,10 +225,8 @@ structure.
 ### Implementation order
 
 1. **The `substation_demand_forecaster` package without the asset**, with the golden tests. This is
-   the part where train/serve skew can hide, so it gets reviewed on its own. It does not wait for
-   the contract change.
-2. **The asset, schedule, definitions, settings, and image changes**, once `PowerForecast` has its
-   quantile columns.
+   the part where train/serve skew can hide, so it gets reviewed on its own.
+2. **The asset, schedule, definitions, settings, and image changes.**
 3. **Docs**: the runbook steps and the release-log row.
 
 ## Design-philosophy check
@@ -239,7 +236,7 @@ structure.
   the asset and the run (rule 4, and "make the telemetry name the fault"). Only our own faults
   raise: a corrupt bundle and a contract violation.
 - **The degradation is not recorded on the row.** `PowerForecast` has no degradation column, so the
-  record is the Sentry event, as for `live_forecasts` today. The in-band signal of widening bands
+  record is the Sentry event. The in-band signal of widening bands
   is not implemented here; the network was trained with lag masking, so its bands already widen
   when a lag is missing.
 - **Principle kept: "keep the serving path close to load a model, call `predict`".** The serving
@@ -325,8 +322,8 @@ scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
 ## Risks and open questions
 
 - **Not subclassing `BaseForecaster`.** Recommendation: a plain function, for the reason under
-  "Design-philosophy check". The cost is that `promoted_model` and `load_forecaster_from_dir` do
-  not apply; the bundle is copied by hand from the workstation, as the runbook will say.
+  "Design-philosophy check". The cost is that the bundle is copied by hand from the workstation,
+  as the runbook will say.
 - **`pvlib` in the image, or a port of SPA.** Research's sun columns come from pvlib's SPA, and
   ml_core's NOAA geometry will not match to 1e-5. Recommendation: make `pvlib` a runtime dependency
   of `substation_demand_forecaster` and call its numpy SPA functions, so no pandas object appears in
