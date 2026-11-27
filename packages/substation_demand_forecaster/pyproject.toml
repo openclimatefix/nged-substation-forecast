@@ -1,0 +1,27 @@
+[project]
+name = "substation_demand_forecaster"
+version = "0.2.1"
+description = "Inference of research's step-5 neural-network demand forecast for the Primaries, from an exported bundle"
+readme = "README.md"
+authors = [
+    { name = "Jack Kelly", email = "jack@openclimatefix.org" }
+]
+requires-python = ">=3.14"
+# `holidays`, `pvlib` and `torch` are pinned to the versions in the bundle manifest's
+# `library_versions`, because the calendar columns, the sun columns and the forward pass must
+# reproduce the values research trained the neural network on.
+dependencies = [
+    "contracts",
+    "holidays==0.107",
+    "ml_core",
+    "numpy>=1.24",
+    "patito",
+    "polars>=1.0.0",
+    "pvlib==0.16.1",
+    "torch==2.14.1",
+    "weather_utils",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"

@@ -29,7 +29,7 @@ The single most important idea is that there are **three** roots, not one:
 |---|---|---|---|
 | Internal data tables | `DATA_PATH_INTERNAL` | **Yes** | NWP, power observations, forecast metrics — everything not on the NGED-facing delivery list |
 | Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecasts`, `effective_capacity`, …) |
-| Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | The study-submission log, plot HTML |
+| Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | The study-submission log, plot HTML, and the default location of the bundle of the step-5 neural network, the demand-forecasting neural network that research experiment 677 built up one component at a time, as it stood after step 5 (`PRIMARY_SUBSTATION_BUNDLE_PATH`, which the production image sets to `/app/primary_substation_bundle`) |
 
 > **On AWS, the two data-table roots point at two separate buckets** — `DATA_PATH_DELIVERY`
 > hard-codes the five NGED-facing delivery tables (see the "derive from root" convention just
@@ -112,10 +112,12 @@ and it confines a mis-wired secret to the one schedule that needs it — [Step 8
 runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment should *not*
 turn that into a start-up failure.
 
-The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`)
-enable error telemetry and the warnings that power data is stale; an empty `SENTRY_DSN` (the
-default) disables Sentry entirely. Their setup — laptop testing and production — has its own page:
-[Setting up Sentry telemetry](sentry.md).
+The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`,
+and `SENTRY_MONITOR_FORECASTS`) enable error telemetry, the warnings that power data is stale, and
+the daily forecast check-in. `SENTRY_DSN` is the Data Source Name (DSN) of a Sentry project, and an
+empty `SENTRY_DSN` (the default) disables Sentry entirely. `SENTRY_MONITOR_FORECASTS` is `true` only
+in production. The setup of the `SENTRY_*` settings, for laptop testing and for production, has its
+own page: [Setting up Sentry telemetry](sentry.md).
 
 ### Credentials for our own S3 data (`DATA_STORE_*`)
 

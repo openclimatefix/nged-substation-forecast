@@ -584,6 +584,7 @@ in
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
+| `substation_demand_forecaster` | Serves the demand forecast for the 16 Primaries of the step-5 neural network (the demand-forecasting neural network that research experiment 677 built up one component at a time, as it stood after step 5) from a bundle the research repository exports: bundle loading, the summary of the ECMWF ensemble (ENS), the 60 input columns, and the PyTorch forward pass. Imports nothing from the research repository |
 | `baseline_forecasters` | Naive baseline `BaseForecaster` implementations that any trained forecasting model must beat, currently `manual_heuristic` and `climatology` |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
@@ -591,7 +592,7 @@ in
 
 ### Dagster Assets (`src/nged_substation_forecast/defs/assets.py`)
 
-Four main assets:
+Five production assets:
 
 - `power_time_series_and_metadata` — pulls NGED telemetry from S3, appends to Delta Lake, upserts
   metadata parquet
@@ -603,6 +604,11 @@ Four main assets:
   aggregation
 - `ecmwf_ens` — daily-partitioned asset that downloads ECMWF ENS NWP and writes it to Delta Lake via
   `delta_store.nwp.write_nwp`, which replaces that `(nwp_model_id, init_time)` partition
+- `live_primary_substation_forecasts` (in `defs/primary_substation_forecast_assets.py`) — daily at
+  12:00 UTC, forecasts the 16 Primaries for 14 days from the day's 00Z ENS run with the step-5
+  neural network's bundle (`Settings.primary_substation_bundle_path`, carried in the image), writes
+  `fold_id="live"` rows to `power_forecasts`, and checks in to the Sentry cron monitor
+  `live-primary-substation-forecasts`
 
 ### Data Contracts (`packages/contracts/`)
 

@@ -66,8 +66,8 @@ class Settings(BaseSettings):
     """Every setting the pipeline reads from its environment.
 
     The fields cover the data paths, the object-store credentials, the MLflow tracking URI, and
-    the three Sentry settings: ``sentry_dsn``, ``sentry_environment``, and
-    ``sentry_traces_sample_rate``.
+    the four Sentry settings: ``sentry_dsn``, ``sentry_environment``,
+    ``sentry_traces_sample_rate``, and ``sentry_monitor_forecasts``.
 
     Each field takes its value from an environment variable of the same name, from the workspace
     ``.env``, or from the default declared here, in that order of precedence. The managed
@@ -206,7 +206,8 @@ class Settings(BaseSettings):
     local_artifacts_path: str = Field(
         default=str(PROJECT_ROOT / "data"),
         description=(
-            "Root of the always-local artifacts (the study submission log). Kept separate from"
+            "Root of the always-local artifacts (the study submission log and the Primary"
+            " substation forecast's bundle). Kept separate from"
             " the data-table roots because these back local-filesystem-only libraries and"
             " must stay local even when the data tables live on S3."
         ),
@@ -316,6 +317,18 @@ class Settings(BaseSettings):
     h3_grid_weights_path: str = ""
     """Parquet file of fractional H3 cell overlap with the Great Britain boundary."""
 
+    # --- Always-local artifacts (derive from local_artifacts_path unless explicitly set) --
+
+    primary_substation_bundle_path: str = Field(
+        default="",
+        description=(
+            "Directory of the exported step-5 neural-network bundle that the"
+            " live_primary_substation_forecasts asset loads with"
+            " substation_demand_forecaster.bundle.load_bundle. The production image copies the"
+            " bundle here at build time, from the primary_substation_bundle build context."
+        ),
+    )
+
     # --- Sentry observability (all optional; an empty data source name (DSN) disables Sentry) ---
 
     sentry_dsn: str = Field(
@@ -342,6 +355,15 @@ class Settings(BaseSettings):
         default=0.0,
         description=(
             "Fraction of transactions sampled for Sentry performance tracing (off by default)."
+        ),
+    )
+    sentry_monitor_forecasts: bool = Field(
+        default=False,
+        description=(
+            "Send the live_primary_substation_forecasts success check-in to Sentry's cron monitor"
+            " (the missed-check-in alarm). True only on the always-on production deployment; left"
+            " False on laptops so an intermittently-run laptop never registers a monitor"
+            " environment that Sentry would then mark as missed."
         ),
     )
 
@@ -389,6 +411,10 @@ class Settings(BaseSettings):
         self.metadata_path = self.metadata_path or uri_join(self.nged_data_path, "metadata.parquet")
         self.list_of_downloaded_files_path = self.list_of_downloaded_files_path or uri_join(
             self.nged_data_path, "list_of_downloaded_files.parquet"
+        )
+        # Always-local artifacts.
+        self.primary_substation_bundle_path = self.primary_substation_bundle_path or uri_join(
+            self.local_artifacts_path, "primary_substation_bundle"
         )
         return self
 
