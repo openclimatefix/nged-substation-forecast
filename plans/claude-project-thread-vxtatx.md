@@ -77,9 +77,9 @@ series and half-hour, with no member structure.
    up to 6 times, so until 15:00 UTC. That is 30 minutes after the last retry of `ecmwf_ens`
    (8 retries from 10:30 UTC), which can itself take about 10 minutes to finish.
 4. **The asset reads the NWP it needs in one scan** of the `nwp` Delta table, pruned to the 16 H3
-   cells and to the runs with `init_time` at or after the 00Z run of the day 13 days before the native
-   origin's date, up to today's 00Z run, so the scan includes the 00Z run 13 days back. The 13
-   days are set by the cold-snap column of the thermal-lag group. Research keeps 12 days of
+   cells and to the runs with `init_time` at or after the 00Z run of the day 13 days before the
+   native origin's date, up to today's 00Z run, so the scan includes the 00Z run 13 days back. The
+   13 days are set by the cold-snap column of the thermal-lag group. Research keeps 12 days of
    history in front of the origin (`LOOKBACK_STEPS = 12 * 48` in experiment 437's
    `e00437_features.py`, a 10-day cold-snap cap plus a 24-hour mean window). The first day of run
    D−13 is the earliest that reaches 12 days before the origin. The scan also covers the
@@ -394,27 +394,27 @@ scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
   ERA5 arrives about 5 days late (experiment 705, finding 3).
 - **Holiday calendar end.** Research's `HOLIDAY_YEARS` ends in 2028; production computes the
   calendar for the years it needs, so nothing breaks in 2029.
-- **A dead daemon has no alarm.** #1722 (remove the XGBoost forecaster and `live_forecasts`)
-  deleted `send_forecast_checkin` and the `live-forecasts` Sentry monitor, so a switched-off daemon
-  would look like a missing forecast with no alert. Recommendation: add one Sentry cron check-in to
+- **A dead daemon has no alarm.** #1722 (remove the XGBoost forecaster and `live_forecasts`) deleted
+  `send_forecast_checkin` and the `live-forecasts` Sentry monitor, so a switched-off daemon would
+  look like a missing forecast with no alert. Decided on 2026-11-27: add one Sentry cron check-in to
   the new asset, sent on success, with its own monitor slug and a daily schedule, and document the
   monitor in `docs/live_service/sentry.md`. The alternative is to accept silence until the
   maintainer notices a missing forecast.
 - **The live horizon.** Research's contract rows cover 12:00 UTC to 11:30 UTC 14 days later (672
   rows), and `PowerForecast.valid_time` must be strictly after the init time, so the 12:00 UTC row
-  is dropped. Recommendation: 671 rows, from 12:30 UTC to 11:30 UTC 14 days later, which is exactly
-  what the validated backtest rows cover. The alternative is 672 rows ending at 12:00 UTC 14 days
-  later, which adds one row that research never scored.
+  is dropped. Decided on 2026-11-27: 671 rows, from 12:30 UTC to 11:30 UTC 14 days later, which is
+  exactly what the validated backtest rows cover. The alternative is 672 rows ending at 12:00 UTC 14
+  days later, which adds one row that research never scored.
 - **The zero clamp on the eight MVA Primaries.** The step-5 fixtures are unclamped, and the golden
-  tests compare before the clamp. Recommendation: clamp, because an apparent-power series cannot be
-  negative and clamping keeps each row's quantiles non-decreasing. The cost is that the clamped
-  quantiles differ slightly from the unclamped ones that research scored.
+  tests compare before the clamp. Decided on 2026-11-27: clamp, because an apparent-power series
+  cannot be negative and clamping keeps each row's quantiles non-decreasing. The cost is that the
+  clamped quantiles differ slightly from the unclamped ones that research scored.
 - **Which bundle ships and its release number.** The production bundle is `drop/2026-10`, and the
-  bundle's `model_release` is 0, which means "not a release". Recommendation: ship it as 0 for the
-  first live runs, and cut a numbered release when the first monthly refit that production installs
-  arrives. The refit with a 2026-12-01 cut-off needs the experiment 607 ENS cache extended past
-  2026-10-31 and first runs on about 2026-12-06, so origins from 2026-12-01 to 2026-12-05 use the
-  October weights.
+  bundle's `model_release` is 0, which means "not a release". Decided on 2026-11-27: ship it as 0
+  for the first live runs, and cut a numbered release when the first monthly refit that production
+  installs arrives. The refit with a 2026-12-01 cut-off needs the experiment 607 ENS cache extended
+  past 2026-10-31 and first runs on about 2026-12-06, so origins from 2026-12-01 to 2026-12-05 use
+  the October weights.
 - **Whether research's ENS summaries equal production's.** Research calls
   `_upsample_nwp_to_half_hourly` per member on its own archive, and nobody has checked that the
   archive equals production's `nwp` table, so the 1e-5 golden test on the summary may fail for a
