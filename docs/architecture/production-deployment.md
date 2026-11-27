@@ -204,9 +204,11 @@ configured — so laptops and CI stay silent by default.
     and the three per-run checks computed inside the `ecmwf_ens` asset. `report_check_degradation`
     covers exactly that gap: each check's catch-all sends the same exception the hook would have
     sent, tagged `asset_check` with the check's name, and `report_asset_degradation` does the same
-    tagged `degraded_asset` for an *asset* that degrades rather than failing — today,
-    `power_time_series_and_metadata`'s metadata table upsert. Since log capture is off, either
-    handler's `ERROR` log alone would reach nobody. No job has a Sentry cron monitor either.
+    tagged `degraded_asset` for an *asset* that degrades rather than failing — today, when
+    `power_time_series_and_metadata` cannot upsert the metadata table or write the downloaded-files
+    list, and when `clean_nged_power_data` cannot vacuum the cleaned table. Since log capture is
+    off, either handler's `ERROR` log alone would reach nobody. No job has a Sentry cron monitor
+    either.
     Absent `report_check_degradation`, a check that cannot read its own inputs would show up only as
     a yellow tick in Dagster's Checks view, and nobody would be told.
 
@@ -522,8 +524,8 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
    touch.
 
 **What the accepted design costs.** Every ingest run currently inherits the task definition's 4 vCPU
-/ 16 GB — sized comfortably above the daily NWP ingest's peak, and oversized for an hourly telemetry
-pull. At the `eu-west-2` ARM rates in the [region price table](forecast-delivery.md#securing-it)
+/ 16 GB, which is sized for a forecast asset and oversized for an hourly telemetry pull. Nobody has
+measured the daily NWP ingest's peak memory. At the `eu-west-2` ARM rates in the [region price table](forecast-delivery.md#securing-it)
 (~\$0.21/hour for that task size), ~720 hourly runs of a few minutes each — most of them the no-ops
 described above — come to on the order of **\$5–10/month**: the same magnitude of saving the
 [EventBridge rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) dismissed as

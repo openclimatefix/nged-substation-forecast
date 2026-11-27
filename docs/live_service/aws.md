@@ -456,8 +456,8 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       but [Step 4](#step-4-build-and-verify-the-image)'s script always builds the image for ARM, and
       ARM Fargate is also ~20% cheaper than x86 for the same task size. (**Network mode** is greyed
       out at `awsvpc` — the only mode Fargate supports.)
-    - **Task size**: **4 vCPU** / **16 GB** — comfortably above the peak of the daily NWP ingest,
-      which decodes a full ensemble run.
+    - **Task size**: **4 vCPU** / **16 GB**, sized for a forecast asset. Nobody has measured the
+      peak memory of the daily NWP ingest, which decodes a full ensemble run.
     - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task), e.g.
       `nged-forecast-task-role`.
     - **Task execution role**: the execution role from [Step

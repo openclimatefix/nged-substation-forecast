@@ -251,8 +251,8 @@ class BaseForecaster(ABC):
 
         - The saved directory must contain a ``meta.json`` with a ``model_class`` field. That
           field holds the fully-qualified ``{module}.{qualname}`` of the concrete subclass, for
-          example ``"baseline_forecasters.climatology.ClimatologyForecaster"``. The baseline
-          forecasters' ``read_meta`` reads that field back when they load a saved directory.
+          example ``"baseline_forecasters.climatology.ClimatologyForecaster"``. The field records
+          which class wrote the directory; no ``load`` reads the field back.
         - ``path`` must be cleared first, so that saving over a directory holding a *larger*
           model's files leaves none of them behind. A dropped time series' weights would survive
           a re-train, if a save merged into the directory instead of replacing its contents

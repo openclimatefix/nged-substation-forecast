@@ -30,9 +30,9 @@ explicit so we don't accidentally undo them:
   image — see [Production Deployment — Design](../architecture/production-deployment.md). Under the
   handover model that design is a feature twice over: there are fewer runtime moving parts to break,
   and the model simply *freezes* between model updates.
-- **A missed ingest partition is recovered by a one-click backfill in the Dagster UI**, not by an
-  engineer reconstructing state — see [Backfilling a missed
-  partition](../live_service/operations.md#backfilling-a-missed-partition).
+- **A missed `ecmwf_ens` day is re-materialised with one click in the Dagster UI**, and a missed
+  telemetry pull is recovered by the next hourly run, so no engineer has to reconstruct state — see
+  [Backfilling a missed partition](../live_service/operations.md#backfilling-a-missed-partition).
 - **Changing the live forecaster is rebuild + redeploy**, auditable via image tags — no live mutable
   model registry for an operator to mis-drive.
 - **No static AWS keys for OCF's own resources** (IAM roles throughout) removes a whole class of
@@ -65,7 +65,7 @@ boundaries.
 expected to take.**
 
 - Acknowledge an alert.
-- Backfill a missed ingest partition from the Dagster UI.
+- Re-materialise a missed `ecmwf_ens` partition from the Dagster UI.
 - Restart the daemon.
 - Rebuild the control-plane box.
 - Escalate to OCF.
