@@ -1036,8 +1036,8 @@ wrapper's third consumer.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of
-building it. [Issue
-#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
+building it.
+[Issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
 plans EMOS and conformal variants of spread calibration, scored
 on the same rows as the quick-wins study.
 

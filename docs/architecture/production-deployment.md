@@ -330,8 +330,8 @@ artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-
 cache](ml-orchestration.md#why-there-is-no-local-cache), so it offers no way to keep serving through
 an MLflow outage. A live service that picked up each new model from MLflow without a redeploy would
 need a way to keep serving through an MLflow outage, designed against production's own availability
-needs. That design is tracked in [issue
-#472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
+needs. That design is tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Resolve repo-relative paths via a workspace marker, not directory depth
 
