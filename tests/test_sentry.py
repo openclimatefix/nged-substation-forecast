@@ -187,7 +187,7 @@ def test_init_sentry_disables_log_to_event_capture(monkeypatch: pytest.MonkeyPat
 def test_init_sentry_survives_a_malformed_dsn(caplog: pytest.LogCaptureFixture) -> None:
     """A malformed DSN must not stop the Dagster code location from loading — a typo in one
     environment variable would otherwise take down the whole service (no schedule, no forecasts),
-    with Sentry itself unreachable so the only signal is the missed-check-in alarm hours later.
+    with Sentry itself unreachable so the only signal is the log record this test asserts on.
 
     Uses a real DSN string that genuinely makes ``sentry_sdk.init`` raise ``BadDsn``, rather than
     monkeypatching ``init`` to raise, so this pins the actual failure mode instead of passing
@@ -200,58 +200,6 @@ def test_init_sentry_survives_a_malformed_dsn(caplog: pytest.LogCaptureFixture) 
     # matters here because it is the only signal a malformed DSN ever produces.
     assert any(
         "Sentry SDK" in r.message and r.levelno == logging.ERROR and r.exc_info is not None
-        for r in caplog.records
-    )
-
-
-def test_send_forecast_checkin_is_noop_when_flag_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``sentry_monitor_forecasts`` False (the default) ⇒ no check-in is sent."""
-    calls: list[dict[str, Any]] = []
-    monkeypatch.setattr(_sentry, "capture_checkin", lambda **kw: calls.append(kw))
-    _sentry.send_forecast_checkin(_settings(sentry_monitor_forecasts=False))
-    assert calls == []
-
-
-def test_send_forecast_checkin_sends_ok_when_flag_on(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Flag on ⇒ a single ``OK`` check-in to the live-forecasts monitor, carrying the config."""
-    calls: list[dict[str, Any]] = []
-    monkeypatch.setattr(_sentry, "capture_checkin", lambda **kw: calls.append(kw))
-    _sentry.send_forecast_checkin(_settings(sentry_monitor_forecasts=True))
-    assert len(calls) == 1
-    assert calls[0]["monitor_slug"] == _sentry.LIVE_FORECAST_MONITOR_SLUG
-    assert calls[0]["status"] == "ok"
-    assert calls[0]["monitor_config"] == _sentry.LIVE_FORECAST_MONITOR_CONFIG
-
-
-def test_send_forecast_checkin_uses_given_slug(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A throwaway slug (laptop testing) is honoured instead of the production monitor."""
-    calls: list[dict[str, Any]] = []
-    monkeypatch.setattr(_sentry, "capture_checkin", lambda **kw: calls.append(kw))
-    _sentry.send_forecast_checkin(
-        _settings(sentry_monitor_forecasts=True), monitor_slug="live-forecasts-test"
-    )
-    assert calls[0]["monitor_slug"] == "live-forecasts-test"
-
-
-def test_send_forecast_checkin_swallows_and_logs_on_send_error(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
-) -> None:
-    """This runs after ``live_forecasts`` has already committed its Delta write, so a raise here
-    would leave the run reported as failed on a run that in fact produced everything. There is
-    no input that reliably makes the real ``capture_checkin`` call fail offline, so the sender
-    is monkeypatched to raise instead (unlike the DSN test above, which needs a real failure
-    mode)."""
-
-    def boom(*_: Any, **__: Any) -> None:
-        raise RuntimeError("sentry down")
-
-    monkeypatch.setattr(_sentry, "capture_checkin", boom)
-    with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
-        _sentry.send_forecast_checkin(_settings(sentry_monitor_forecasts=True))
-    # One record must carry all three: a message naming what failed, ERROR level, and the
-    # traceback. Asserting them separately would pass on three different records.
-    assert any(
-        "heartbeat" in r.message and r.levelno == logging.ERROR and r.exc_info is not None
         for r in caplog.records
     )
 
@@ -405,23 +353,22 @@ def test_report_asset_retry_sends_a_warning_that_does_not_share_an_issue_with_a_
 def test_report_asset_degradation_fingerprints_a_synthesised_exception() -> None:
     """A synthesised exception reaches Sentry carrying the caller's whole fingerprint.
 
-    ``live_forecasts`` reports a missing NWP control member by building a ``ValueError`` to carry
-    the message rather than catching one, so the event has no stack trace and Sentry would group
-    it by message — and the message names the run and the slot, so every degraded slot would open
-    its own issue. The environment is the second element for the reason
+    A caller that builds an exception to carry a message, rather than catching one, sends an event
+    with no stack trace, so Sentry would group it by message. A message that names a run would
+    then open one issue per run. The environment is the second element for the reason
     ``POWER_DATA_STALE_FINGERPRINT`` gives: without it, production and a laptop share one issue.
 
     Asserted on the built event rather than on the arguments to ``capture_exception``, so a
     fingerprint set on the wrong scope is caught — see ``_build_one_event``.
     """
-    fingerprint = [_sentry.NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, "jacks-laptop"]
+    fingerprint = ["nged-synthesised-degradation", "jacks-laptop"]
     event = _build_one_event(
         lambda: _sentry.report_asset_degradation(
-            asset_name="live_forecasts", exc=ValueError("boom"), fingerprint=fingerprint
+            asset_name="ecmwf_ens", exc=ValueError("boom"), fingerprint=fingerprint
         )
     )
     assert event["fingerprint"] == fingerprint
-    assert event["tags"] == {"degraded_asset": "live_forecasts"}
+    assert event["tags"] == {"degraded_asset": "ecmwf_ens"}
     _assert_no_tags_leaked()
 
 
@@ -451,26 +398,11 @@ def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:
     scheduled_jobs = (
         schedules.power_time_series_and_metadata_job,
         schedules.ecmwf_ens_job,
-        schedules.live_forecasts_job,
     )
     for job in scheduled_jobs:
         hooks = job.hooks
         assert hooks is not None
         assert _sentry.sentry_capture_failure in hooks, job.name
-
-
-def test_monitor_config_schedule_matches_live_partitions() -> None:
-    """Drift guard: the Sentry monitor's crontab is a hand-kept copy of the live_forecasts
-    partition schedule (the two can't share an import — it would be circular; see the comment
-    on ``LIVE_FORECAST_MONITOR_CONFIG``). If someone changes one crontab and not the other,
-    the alarm would expect heartbeats on a different cadence than the asset runs; this catches
-    that."""
-    from nged_substation_forecast.defs.live_forecast_assets import live_forecast_partitions
-
-    assert (
-        _sentry.LIVE_FORECAST_MONITOR_CONFIG["schedule"]["value"]
-        == live_forecast_partitions.cron_schedule
-    )
 
 
 def test_report_power_freshness_noop_without_dsn(monkeypatch: pytest.MonkeyPatch) -> None:

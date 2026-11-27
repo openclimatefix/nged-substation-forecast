@@ -72,13 +72,9 @@ loads from there; there is no local-disk cache.
 
 ### One archive file, not a directory of files
 
-`save_to_mlflow` adds `time_series_metadata.parquet` to the model directory — the metadata table
-rows the model trained against, which production inference locates its series by — then packs the
-whole directory into a single `model.tar.gz` and logs that one file to the run's artifact root.
-`load_from_mlflow` and the production download path
-(`ml_core.production_helpers.fetch_model_artifacts`) each unpack it into a temporary directory.
-Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free, so the
-Docker bake path (`load_forecaster_from_dir`) is unaffected.
+`save_to_mlflow` packs the whole model directory into a single `model.tar.gz` and logs that one file
+to the run's artifact root. `load_from_mlflow` unpacks the archive into a temporary directory.
+Subclass `save`/`load` never see the archive: they stay directory-based and MLflow-free.
 
 The archive exists because **MLflow's directory upload merges rather than replaces**, and MLflow
 exposes no public artifact-delete API. Verified empirically against MLflow 3.15.1: re-uploading
@@ -86,8 +82,8 @@ exposes no public artifact-delete API. Verified empirically against MLflow 3.15.
 `b.ubj` in place, while re-logging a same-name single artifact overwrites it outright. A fold run is
 **reused** across re-materialisations of its partition (see "Cross-process run resolution" above),
 so with a directory upload, re-training a fold on a *smaller* population would strand the dropped
-series' model files in the run permanently — downloaded on every subsequent load and baked into the
-container image. One replaceable file makes that accumulation impossible at the source (issue #470).
+series' model files in the run permanently, to be downloaded on every subsequent load. One
+replaceable file makes that accumulation impossible at the source (issue #470).
 
 Two properties are worth keeping in mind when reading the code:
 
@@ -117,10 +113,10 @@ replaceable object, not to be small.
 `load_from_mlflow` downloads on every call. The obvious cache — keyed by the MLflow run ID, which
 looks immutable — is unsound here, because a CV fold run is **reused** across re-materialisations of
 its partition (see "Cross-process run resolution" above), so the same run ID can legitimately hold a
-different model after re-training. The key would not be unique for its contents, and keeping such a
-cache honest would need write-side invalidation in `save_to_mlflow`: machinery serving no consumer,
-because production inference makes no MLflow call on the runtime path at all — the champion model is
-baked directly into the container image at build time and loaded via the subclass's own `load`.
+different model after re-training. The key would not be unique for its contents. Keeping a cache
+keyed by run ID honest would need write-side invalidation in `save_to_mlflow`. That invalidation
+would serve no consumer, because the one caller of `load_from_mlflow` is `cv_power_forecasts`, which
+loads each fold's model once per materialisation. The live service makes no MLflow call.
 
 If a future consumer does need to keep serving through an MLflow outage, adding a cache scoped to
 that consumer's own invalidation needs is tracked in
@@ -191,7 +187,7 @@ valuable, but for **pre-training** (see [Cross-validation folds:
 Target](../cross-validation/cross-validation-folds.md#target-multiple-yearly-folds)), not for
 validation.
 
-Rejecting ERA5-backed folds excludes reanalysis only as a *promotion criterion*, not as a
+Rejecting ERA5-backed folds excludes reanalysis only as a *leaderboard criterion*, not as a
 measurement. Scoring against an estimate of past weather is legitimate as a **diagnostic** — it
 decomposes total error into the weather-to-power response and the implicit hedging against forecast
 error — and lands as its own `evaluation_scope`, leaving the leaderboard folds ENS-only. The planned
@@ -229,8 +225,8 @@ Recorded so we don't re-litigate them:
   have to commit files. MLflow is the canonical resolved-config store instead.
 - **MLflow pyfunc / model registry for persistence** — significant complexity (environment
   snapshotting, custom loaders, registry states) for no benefit over the simple `save`/`load` +
-  artifact wrapper. A registry-based champion-promotion flow remains an option later without
-  changing the artifact format.
+  artifact wrapper. A registry-based flow for choosing which trained model the live service runs
+  remains an option later without changing the artifact format.
 - **Integer MLflow experiment ID as partition-key prefix** — unreadable in the Dagster UI; every
   partition would need cross-referencing against MLflow.
 

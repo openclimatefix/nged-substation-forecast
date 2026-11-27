@@ -6,24 +6,23 @@ How to set hyperparameters and choose features for a forecasting CV run.
 
 ## Config files
 
-Each model family has a base YAML in `conf/model/`. Three exist today: `conf/model/xgboost.yaml`,
-`conf/model/manual_heuristic.yaml`, and `conf/model/climatology.yaml`. Each file has two required
-top-level keys:
+Each model family has a base YAML in `conf/model/`. Two exist today:
+`conf/model/manual_heuristic.yaml` and `conf/model/climatology.yaml`. Each file has two required
+top-level keys, shown here abridged from `conf/model/manual_heuristic.yaml`:
 
 ```yaml
 # Identifies the BaseForecaster subclass to instantiate.
-_target_: xgboost_forecaster.forecaster.XGBoostForecaster
+_target_: baseline_forecasters.manual_heuristic.ManualHeuristicForecaster
 
 model_params:
   selected_features:
-    - "power_lag_24h"
-    - "temperature_2m"
+    - "power_lag_168h" # 1 week
+    - "power_lag_336h" # 2 weeks
     - ...
 
-  # Model-specific hyperparameters:
-  n_estimators: 500
-  learning_rate: 0.05
-  ...
+  # MLflow experiment tags (used for leaderboard grouping)
+  weather_source: "none"
+  training_strategy: "none"
 ```
 
 `_target_` is a fully-qualified Python class path, resolved by
@@ -43,6 +42,13 @@ The individual strings inside the list are not parsed until training runs. The f
 pipeline (`ml_core.features._parsed_features.ParsedFeatures.from_strings`) parses each one into a
 typed descriptor and raises `ValueError` on any unrecognised or forbidden name, so a typo'd feature
 name (e.g. `tempurature_2m`) surfaces only then, not at registration.
+
+**Each forecaster reads only part of the catalogue below.** The manual heuristic reads power lags
+and nothing else, and climatology reads no feature at all, so `conf/model/climatology.yaml` sets
+`selected_features: []`. Both forecasters raise when `trained_cv_model` runs if the list holds a
+feature they do not read. The manual heuristic also raises on a list that holds no power lag. The
+weather, time, and pass-through features are what the default `TabularFeatureEngineer` can build for
+a forecaster that reads them.
 
 ### Power lags
 
@@ -98,7 +104,7 @@ DST). Electricity demand follows human behaviour, which tracks local time not UT
 | `local_time_of_year_cos` | Cosine of fraction of year (see `local_time_of_year_sin`) |
 | `local_day_of_week_sin` | Sine of day-of-week (7 day period) |
 | `local_day_of_week_cos` | Cosine of day-of-week (7 day period) |
-| `local_day_of_week` | Day-of-week name (`Monday`–`Sunday`); XGBoost receives the day's position in that list, from 0 for Monday to 6 for Sunday |
+| `local_day_of_week` | Day-of-week name (`Monday`–`Sunday`), as a Polars `Enum` in that order |
 | `local_utc_offset_minutes` | UTC offset in minutes (0 or 60 for GB; 330 for India's +5:30) |
 
 ### Static derived features
@@ -119,7 +125,7 @@ the model learn horizon-dependent biases).
 | `nwp_lead_time_hours` | Hours between `nwp_init_time` and `valid_time` |
 | `ensemble_member` | ECMWF ensemble member index (0–50) |
 | `time_series_id` | Substation identifier (integer) |
-| `time_series_type` | Asset category, e.g. `PV`, `Wind`, `Disaggregated Demand` (XGBoost receives the category's position in `LIST_OF_TIME_SERIES_TYPES`) |
+| `time_series_type` | Asset category, e.g. `PV`, `Wind`, `Disaggregated Demand` (one of `LIST_OF_TIME_SERIES_TYPES`) |
 | `power_fcst_init_time` | When the forecast was issued |
 | `nwp_init_time` | When the NWP model ran |
 
@@ -135,8 +141,9 @@ Two feature names are **forbidden** and raise `ValueError` at parse time:
 
 **Power lags** are automatically nullified by the feature engineering pipeline when the lag is
 shorter than or equal to the forecast lead time. For example, `power_lag_1h` would leak observed
-power into a 1-hour-ahead forecast, so its value is set to `null` for those rows. The model sees a
-null and treats it as a missing value (XGBoost handles nulls natively). This nullification happens
+power into a 1-hour-ahead forecast, so its value is set to `null` for those rows. The forecaster
+sees a null: the manual heuristic leaves a null lag out of that row's quantiles, and drops a row
+whose lags are all null. This nullification happens
 per-row in `_nullify_leaky_lags()`, not at config time — the feature name is still valid; the
 pipeline just makes it safe.
 
@@ -145,35 +152,21 @@ a weather feature is always available at inference time regardless of lead time.
 
 ---
 
-## XGBoost hyperparameters
+## Config fields
 
-These fields live in `XGBoostConfig` (which inherits the universal fields from
-`BaseForecasterConfig`).
-
-### Universal fields (all model families)
+These fields live in `BaseForecasterConfig`. Both baseline forecasters validate `model_params` with
+`BaseForecasterConfig` itself, so neither has a field beyond this table. A model family with
+hyperparameters of its own declares them on a subclass of `BaseForecasterConfig`.
 
 | Field | Default | Description |
 |---|---|---|
 | `selected_features` | (required) | List of feature name strings — see above. |
 | `weather_source` | `""` | Leaderboard tag, e.g. `"ecmwf_control"` or `"ecmwf_ens"`. |
 | `training_strategy` | `""` | Leaderboard tag, e.g. `"horizon_as_feature"`. |
-| `random_seed` | `0` | Passed to XGBoost's `seed` param; makes re-training a fold reproduce the same model. |
-| `model_release` | `0` | Number of the production model release, stamped on every forecast row as `power_fcst_model_version`. `0` means the run is not a release. Range 0 to 32767. |
+| `random_seed` | `0` | Seed for a forecaster's random draws, so re-training a fold reproduces the same trained forecaster. Neither baseline forecaster draws at random, so for them the field changes only the CV run's identity. |
+| `model_release` | `0` | Integer stamped on every forecast row as `power_fcst_model_version`. `0` is the default, for a run that is not a numbered release. Range 0 to 32767. |
 | `experiment_name` | `""` | Set from the job's own `experiment_name`; cannot be overridden. |
 | `ml_flow_experiment_id` | `None` | Stamped onto every `PowerForecast` row. Nothing sets it automatically. |
-
-### XGBoost-specific fields
-
-| Field | Default | Description |
-|---|---|---|
-| `n_estimators` | `1000` | Number of boosting rounds (`num_boost_round`). |
-| `learning_rate` | `0.05` | Step size shrinkage (`eta`). |
-| `max_depth` | `6` | Maximum tree depth. |
-| `min_child_weight` | `1` | Minimum sum of instance weights in a child. |
-| `subsample` | `0.8` | Fraction of rows sampled per tree. |
-| `colsample_bytree` | `0.8` | Fraction of features sampled per tree. |
-| `device` | `"cpu"` | `"cpu"` or `"cuda"`. |
-| `objective` | `"reg:squarederror"` | Loss function. |
 
 ---
 
@@ -183,8 +176,8 @@ You never edit a YAML file per CV run. Instead, pass `config_overrides` to
 `register_experiment_job`. Each override is applied to `model_params` before the config object is
 constructed.
 
-**Every key must name a field the config class declares** — the two tables above. Write
-`n_estimtors` instead of `n_estimators` and registration fails, before a single fold is scheduled,
+**Every key must name a field the config class declares** — the table above. Write
+`random_sede` instead of `random_seed` and registration fails, before a single fold is scheduled,
 with a `ValidationError` naming the key. This matters more than a typo usually would, because the
 searches planned to drive most registrations will run unattended. The
 [large language model (LLM) agent](../roadmap/auto-research.md) planned for automated
@@ -200,25 +193,26 @@ config class follows from it: to use a different one, point `base_model_config` 
 `experiment_name` comes from the job's own `experiment_name` parameter, which would overwrite an
 override of it.
 
-**Example — reduce tree depth and add a feature:**
+**Example — run the manual heuristic on the weekly analogues alone:**
 
 ```json
 {
-  "max_depth": 4,
   "selected_features": [
-    "power_lag_24h",
-    "power_lag_48h",
-    "temperature_2m",
-    "local_time_of_day_sin",
-    "local_time_of_day_cos"
+    "power_lag_168h",
+    "power_lag_336h",
+    "power_lag_504h",
+    "power_lag_672h",
+    "power_lag_840h",
+    "power_lag_1008h"
   ]
 }
 ```
 
 Every override is a **whole-value replacement**, not a merge. `selected_features` is the case you
-will meet first: to add one feature to the baseline set you must list all the features you want, not
-just the new one. The same holds when a `model_params` value is itself a mapping — an override
-replaces the whole mapping, dropping the base's other keys, so restate every key you want to keep.
+will meet first: to add a feature to the base set or drop a feature from it, you must list all the
+features you want, not just the feature that changes. The same holds when a `model_params` value is
+itself a mapping — an override replaces the whole mapping, dropping the base's other keys, so
+restate every key you want to keep.
 
 The resolved config (the YAML defaults with your overrides applied) is frozen as a JSON tag on the
 MLflow experiment at registration time. That frozen record is what `trained_cv_model` reads back at

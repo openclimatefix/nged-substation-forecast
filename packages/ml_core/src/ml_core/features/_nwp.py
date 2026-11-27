@@ -27,23 +27,16 @@ The delay stands in for when a run reaches *our* disk, not when Dynamical publis
 Dynamical publish each 00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it
 at 10:30 UTC. A 00Z run is therefore ours from roughly 10:30, which is 10.5 hours after that run's
 ``init_time``, or about 14:40 UTC at worst once the download's retries are counted. The constant is
-9 hours. In replay, ``select_nwp_init_time`` picks the same run at each of the four 6-hourly slots
-for any delay above 6 hours and up to 12 hours, so 9 hours gives each slot the run that a healthy
-ingest has landed by that slot. The same constant derives ``power_fcst_init_time`` in bulk-mode
-training, so changing it changes the training features. A run that retries past 12:00 UTC misses the
-12:00 slot in live mode, which replay does not model.
+9 hours. For any delay above 6 hours and up to 12 hours, each of the four 6-hourly slots
+(00/06/12/18 UTC) selects the same run that it selects at the 9-hour default, which is the run that
+a healthy ingest has landed by that slot. Changing the constant changes the training features.
 
 The feature pipeline uses the delay to derive ``power_fcst_init_time`` from ``nwp_init_time`` in
 bulk mode, and to derive ``nwp_init_time`` when a single-run caller omits ``nwp_init_time``.
-``select_nwp_init_time`` uses the delay to reconstruct availability for ``"replay"`` backfills.
-``select_analysis_proxy`` needs no delay: in single-run mode ``_engineer_features`` caps the
-proxy at the NWP run that call already selected.
-
-Of ``select_nwp_init_time``'s two modes, only ``"replay"`` needs the delay. A live forecast run
-joins whatever NWP runs are genuinely on disk, so reality already constrains the NWP table to the
-runs that were genuinely published. A replay of a past init time would otherwise join runs that only
-landed afterwards — lookahead bias rather than mere inaccuracy. The asymmetry in full:
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#resolve-nwp-availability-asymmetrically-live-vs-replay>
+Without the delay, a forecast reconstructed for a past init time would join NWP runs that only
+landed afterwards — lookahead bias rather than mere inaccuracy. ``select_analysis_proxy`` needs no
+delay: in single-run mode ``_engineer_features`` caps the proxy at the NWP run that call already
+selected.
 
 Two bounds constrain the value, given one 00Z run a day and forecast slots at 00/06/12/18 UTC. The
 06:00 slot must *not* see that morning's run, which has not landed yet, so the value must exceed 6

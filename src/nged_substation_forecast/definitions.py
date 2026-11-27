@@ -10,18 +10,14 @@ from nged_substation_forecast.defs import (
     cleaning_assets,
     cv_assets,
     jobs,
-    live_forecast_assets,
-    promotion_assets,
     schedules,
 )
 
-all_assets = load_assets_from_modules(
-    [assets, cleaning_assets, cv_assets, live_forecast_assets, promotion_assets]
-)
+all_assets = load_assets_from_modules([assets, cleaning_assets, cv_assets])
 
 # Initialise Sentry once per process. This module is imported by every Dagster process — the
-# daemon, the webserver, and each run worker — so error telemetry and the live_forecasts
-# heartbeat are active wherever code runs. A no-op unless a Sentry DSN is configured.
+# daemon, the webserver, and each run worker — so error telemetry is active wherever code runs.
+# A no-op unless a Sentry DSN is configured.
 init_sentry(get_settings())
 
 defs = Definitions(
@@ -29,12 +25,10 @@ defs = Definitions(
     asset_checks=[
         checks.power_data_is_fresh,
         checks.cleaned_power_keeps_up_with_raw,
-        checks.live_forecasts_are_healthy,
     ],
     jobs=[jobs.register_experiment_job],
     schedules=[
         schedules.power_time_series_and_metadata_schedule,
         schedules.ecmwf_ens_schedule,
-        schedules.live_forecasts_schedule,
     ],
 )

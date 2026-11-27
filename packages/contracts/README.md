@@ -23,7 +23,7 @@ those settings fields need, because a data-location field may be a local path or
 This package is designed to be lightweight. It defines the *shape* of the data using Patito and
 Polars, plus the settings and object-store path helpers those shapes are read and written through
 (`deltalake` and `obstore`), but it contains **no** ML-specific logic and no ML or orchestration
-dependency such as MLflow, XGBoost, or Dagster. That light dependency footprint is what lets any
+dependency such as MLflow or Dagster. That light dependency footprint is what lets any
 component in the system (e.g., a data ingestion script or a dashboard) import these schemas without
 bringing in the entire ML stack.
 
@@ -59,8 +59,11 @@ The five schemas below are the ones most callers touch. The package defines five
   hours earlier, and its rolling mean over a given number of hours), and datetime features.
   `time_series_type` is the one metadata column it can carry, and only when a feature set asks for
   it.
-- **`PowerForecast`**: ML model output schema. `power_fcst` is in MW (active power) or MVA (apparent
-  power), with the unit given per `time_series_id` in `TimeSeriesMetadata`. The forecast is of the power
+- **`PowerForecast`**: ML model output schema, one row per `(time_series_id, power_fcst_init_time,
+  valid_time)`. Each row holds a quantile forecast in 13 columns, `power_fcst_p1` …
+  `power_fcst_p99`, at the 13 `DELIVERY_QUANTILES` agreed with NGED. The quantiles are in MW
+  (active power) or MVA (apparent power), with the unit given per `time_series_id` in
+  `TimeSeriesMetadata`. The forecast is of the power
   *available*, meaning what the series would have exported or drawn had no
   active-network-management instruction been in force, so a consumer that wants the flow a capped
   generator will actually be allowed applies the cap itself. A planned change will
@@ -68,7 +71,7 @@ The five schemas below are the ones most callers touch. The package defines five
   the same MW or MVA, to recover a power — see [Forecast Building
   Blocks](https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/).
   Includes `power_fcst_model_name`, `power_fcst_model_version`, `power_fcst_init_time`,
-  `nwp_init_time`, `valid_time`, `time_series_id`, and `ensemble_member`.
+  `nwp_init_time`, `valid_time`, and `time_series_id`.
 
 ## Sign convention
 

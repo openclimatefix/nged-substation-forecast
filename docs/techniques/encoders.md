@@ -72,9 +72,8 @@ from each member. Pushing weather quantiles through the physics layer works for 
 at one generator, whose power curve is monotone below cut-out. A substation, though, sums many
 generators and a demand driven by several correlated weather variables. Each member carries that
 joint structure across variables and sites, and a summary statistic discards the joint structure.
-The gradient-boosted tree has no physics layer, which is why [ensemble statistics as
-features](../roadmap/xgboost-improvements.md#ensemble-statistics-as-features-instead-of-member-by-member-rows)
-remains a fair experiment for the tree.
+A gradient-boosted tree has no physics layer, which is why summarising the ensemble into
+statistics remains a fair input for a tree.
 
 **Feed ECMWF ENS member *n* and AIFS-ENS member *n* into the same forward pass, because the two
 members start from the same initial conditions.** ECMWF starts AIFS-ENS member *n* from the [initial
@@ -87,10 +86,11 @@ biases, but cannot learn how far to trust that source, because trust is relative
 alternatives. ICON-EU is a single deterministic run, so the same ICON-EU tokens enter all 51 forward
 passes. Where training finds ICON-EU reliable, the ICON-EU tokens pull every member towards the
 ICON-EU solution, without adding spread of their own. Pulling every member towards one run narrows
-the spread, so the per-horizon spread-skill ratio has to confirm that the pooled forecast is not
-under-dispersed. The output stays 51 equiprobable members, so the [linear
+the spread, so the per-horizon prediction interval coverage probability (PICP) has to confirm that
+the pooled forecast is not under-dispersed. The 51 forward passes still reduce to the 13 stored
+quantiles, so the [linear
 pool](probabilistic-forecasting.md#the-fix-formally-a-mixture-of-conditional-distributions) and the
-fair [continuous ranked probability score
+[continuous ranked probability score
 (CRPS)](evaluation-metrics.md#crps-continuous-ranked-probability-score) apply unchanged.
 
 **The operational alternative is to blend the sources' distributions and then rebuild members with
@@ -109,10 +109,9 @@ with lead time cannot use that signal.
 We expect ensemble spread and the disagreement between sources to be the strongest indicators of
 which source to trust, and both are already inputs. Checking what the encoder has learned needs no
 labels either: group the results by pressure gradient, ensemble spread, or disagreement between
-sources, or cluster the encoder's embeddings after training. The bar is the gradient-boosted tree
-given the same sources, and the [multi-source XGBoost
-experiment](../roadmap/xgboost-improvements.md#several-nwp-sources-as-features-v21) also tests, more
-cheaply, whether trust should depend on the weather situation at all.
+sources, or cluster the encoder's embeddings after training. The bar is a gradient-boosted tree
+given the same sources. A gradient-boosted tree given several NWP sources as features would also
+test, more cheaply, whether trust should depend on the weather situation at all.
 
 **An irradiance field recovered by inverting the metered DER fleet would be a different kind of
 input from an NWP source.** The [GB-wide

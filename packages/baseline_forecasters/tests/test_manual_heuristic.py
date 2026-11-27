@@ -10,8 +10,14 @@ from _nwp_test_data import cast_to_nwp_dtypes, nwp_records
 from _power_test_data import power_at
 from baseline_forecasters import ManualHeuristicForecaster
 from baseline_forecasters.nwp_run_rows import NwpRunRowsWithoutWeatherFeatureEngineer
+from contracts.common import DELIVERY_QUANTILES
 from contracts.ml_schemas import AllFeatures
-from contracts.power_schemas import PowerForecast, PowerTimeSeries, TimeSeriesMetadata
+from contracts.power_schemas import (
+    POWER_FCST_QUANTILE_COLUMNS,
+    PowerForecast,
+    PowerTimeSeries,
+    TimeSeriesMetadata,
+)
 from contracts.weather_schemas import ECMWF_ENS_LEAD_TIME_HOURS, Nwp
 from ml_core.base_forecaster import BaseForecasterConfig
 from ml_core.features import TabularFeatureEngineer
@@ -98,7 +104,7 @@ def test_construction_orders_the_yaml_lags_by_hours_and_rejects_no_power_lag() -
         BaseForecasterConfig(selected_features=set(raw["model_params"]["selected_features"]))
     )
 
-    assert forecaster._lag_hours == _ALL_LAG_HOURS
+    assert forecaster._lag_columns == [f"power_lag_{hours}h" for hours in _ALL_LAG_HOURS]
     with pytest.raises(ValueError, match="at least one power lag"):
         ManualHeuristicForecaster(BaseForecasterConfig(selected_features={"local_time_of_day_sin"}))
     with pytest.raises(ValueError, match="at least one power lag"):
@@ -107,7 +113,8 @@ def test_construction_orders_the_yaml_lags_by_hours_and_rejects_no_power_lag() -
         )
 
 
-def test_shedding_keeps_member_identity_through_the_real_pipeline() -> None:
+def test_quantiles_come_from_exactly_the_lags_longer_than_the_lead_time() -> None:
+    """Each row's 13 quantiles are those of the observed powers its unshed lags point back to."""
     init_time = datetime(2025, 3, 3, tzinfo=UTC)
     power_fcst_init_time = init_time + timedelta(hours=9)
     power = _power_frame([1], start=init_time - timedelta(weeks=56), end=power_fcst_init_time)
@@ -125,30 +132,29 @@ def test_shedding_keeps_member_identity_through_the_real_pipeline() -> None:
         lead_hours=(pl.col("valid_time") - pl.col("power_fcst_init_time")).dt.total_seconds() / 3600
     )
 
-    # Each value is the observed power at valid_time minus the lag whose rank is the member.
-    for row in forecast.iter_rows(named=True):
-        lag = _ALL_LAG_HOURS[row["ensemble_member"]]
-        expected = power_at(row["valid_time"] - timedelta(hours=lag), offset=7)
-        assert row["power_fcst"] == expected
-    members_by_band = {
-        "under 168 h": (forecast.filter(pl.col("lead_hours") < 168), set(range(13))),
-        "168 h to 336 h": (
-            forecast.filter(pl.col("lead_hours").is_between(168, 336, closed="left")),
-            set(range(1, 13)),
-        ),
-        "336 h to 351 h": (
-            forecast.filter(pl.col("lead_hours") >= 336),
-            set(range(2, 13)),
-        ),
+    # Every band of lead times, and so every number of unshed lags (13, 12, and 11), is covered.
+    n_rows_by_band = {
+        "under 168 h": forecast.filter(pl.col("lead_hours") < 168).height,
+        "168 h to 336 h": forecast.filter(
+            pl.col("lead_hours").is_between(168, 336, closed="left")
+        ).height,
+        "336 h to 351 h": forecast.filter(pl.col("lead_hours") >= 336).height,
     }
-    for band, (rows, expected_members) in members_by_band.items():
-        assert rows.height > 0, band
-        assert set(rows["ensemble_member"].to_list()) == expected_members, band
-    # Per row, a member is present exactly when its lag is longer than the row's lead time.
-    per_row = forecast.group_by("valid_time", "lead_hours").agg(pl.col("ensemble_member"))
-    for row in per_row.iter_rows(named=True):
-        expected = {m for m, lag in enumerate(_ALL_LAG_HOURS) if lag > row["lead_hours"]}
-        assert set(row["ensemble_member"]) == expected, row["lead_hours"]
+    assert all(n_rows > 0 for n_rows in n_rows_by_band.values()), n_rows_by_band
+    for row in forecast.iter_rows(named=True):
+        lag_values = pl.Series(
+            [
+                power_at(row["valid_time"] - timedelta(hours=lag), offset=7)
+                for lag in _ALL_LAG_HOURS
+                if lag > row["lead_hours"]
+            ],
+            dtype=pl.Float32,
+        )
+        expected = [
+            lag_values.quantile(level, interpolation="linear") for level in DELIVERY_QUANTILES
+        ]
+        actual = [row[column] for column in POWER_FCST_QUANTILE_COLUMNS]
+        assert actual == pytest.approx(expected, rel=1e-6), row["lead_hours"]
 
 
 def test_predict_drops_a_row_whose_lags_are_all_null() -> None:
@@ -179,7 +185,35 @@ def test_predict_drops_a_row_whose_lags_are_all_null() -> None:
     ).predict(data)
 
     assert forecast["valid_time"].to_list() == [init_time + timedelta(hours=2)]
-    assert forecast["ensemble_member"].to_list() == [0]
+    assert [forecast[column][0] for column in POWER_FCST_QUANTILE_COLUMNS] == [5.0] * 13
+
+
+def test_predict_reduces_three_lags_to_the_13_quantiles() -> None:
+    columns = ["power_lag_168h", "power_lag_336h", "power_lag_504h"]
+    init_time = datetime(2025, 1, 1, tzinfo=UTC)
+    data = _lag_frame(
+        [
+            {
+                "valid_time": init_time + timedelta(hours=1),
+                "time_series_id": 1,
+                "power_fcst_init_time": init_time,
+                "power_lag_168h": 3.0,
+                "power_lag_336h": 1.0,
+                "power_lag_504h": 2.0,
+            }
+        ],
+        columns,
+    )
+
+    forecast = ManualHeuristicForecaster(
+        BaseForecasterConfig(selected_features=set(columns))
+    ).predict(data)
+
+    assert forecast.height == 1
+    assert "ensemble_member" not in forecast.columns
+    # Linear interpolation over the sorted values 1, 2, and 3 gives 1 + 2 × level.
+    actual = [forecast[column][0] for column in POWER_FCST_QUANTILE_COLUMNS]
+    assert actual == pytest.approx([1.0 + 2.0 * level for level in DELIVERY_QUANTILES], rel=1e-6)
 
 
 def test_predict_stamps_the_configured_model_release() -> None:
@@ -314,7 +348,7 @@ def test_engineer_raises_in_single_run_mode() -> None:
 
 
 def test_power_fixture_gives_thirteen_distinct_lag_values() -> None:
-    """Guards the value checks above: equal lag values would hide a mislabelled member."""
+    """Guards the value checks above: equal lag values would hide a lag that was not shed."""
     target = datetime(2025, 3, 3, 12, tzinfo=UTC)
     values = {power_at(target - timedelta(hours=hours)) for hours in _ALL_LAG_HOURS}
     assert len(values) == len(_ALL_LAG_HOURS)

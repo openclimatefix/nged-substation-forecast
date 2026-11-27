@@ -5,9 +5,9 @@ nothing else: no code, no actuals, no scoring options. It runs `metrics` in lead
 file's rows, stored in `power_forecasts` under the `experiment_name` `study/<study name>`.
 
 Before anything is written, the script refuses a file whose row keys `(time_series_id,
-power_fcst_init_time, valid_time, ensemble_member)` differ from those of the cross-validation (CV)
-config's `reference_experiment_name` for the same fold. A study therefore cannot abstain
-on hard rows or choose its own ensemble members. The `metrics` asset repeats the check when it
+power_fcst_init_time, valid_time)` differ from those of the cross-validation (CV) config's
+`reference_experiment_name` for the same fold. A study therefore cannot abstain on hard rows. The
+`metrics` asset repeats the check when it
 scores a study, because the asset is the one source of a leaderboard number.
 
     uv run python scripts/forecasting/score_study.py \

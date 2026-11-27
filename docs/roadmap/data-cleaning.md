@@ -142,11 +142,12 @@ up as a step in error against a reference.
 
 **An hour in which the network operator capped a generator's export is a real measurement of a real
 export, so it is not dirty data.** It belongs out of a *training* target, because no weather feature
-can explain a network instruction — that argument, and the guardrail against feeding the cap to a
-model as a feature, are in [drop curtailed hours from the training
-target](xgboost-improvements.md#drop-curtailed-hours-from-the-training-target). A cleaning step
-that deleted capped hours from the stored telemetry would throw away what actually happened on the
-network.
+can explain a network instruction. The cap is a mask on the target and never a feature. The cap in
+force at a future valid time is not known when the forecast is made, so giving the cap to a
+forecasting model is the fault the [lookahead-bias
+guardrails](../cross-validation/model-configuration.md#lookahead-bias-guardrails) exist to prevent.
+A cleaning step that deleted capped hours from the stored telemetry would throw away what actually
+happened on the network.
 
 **One generator in the trial area is connected under active network management, and NGED has
 confirmed there are no others**, so within the trial area a missing setpoint record means a

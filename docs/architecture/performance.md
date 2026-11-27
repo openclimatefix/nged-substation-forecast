@@ -34,10 +34,10 @@ assumed:
   year is the measured average of the 899 daily runs on disk today, which is higher than the figure
   that PR extrapolated.
 
-* **`power_forecasts`** (`delta_store.power_forecasts`) sorts ensemble members of the same target
-  adjacent, uses `DELTA_BINARY_PACKED` timestamps and `BYTE_STREAM_SPLIT` for `power_fcst`
-  (near-continuous ML output has no repeats for a dictionary to exploit), shrinking the 403.6M-row
-  development table from 6.33 GB to 0.73 GB (8.7×). Details in
+* **`power_forecasts`** (`delta_store.power_forecasts`) sorts rows by
+  `(time_series_id, power_fcst_init_time, valid_time)`, uses `DELTA_BINARY_PACKED` timestamps, and
+  uses `BYTE_STREAM_SPLIT` for each of the 13 quantile columns, because near-continuous ML output
+  has no repeats for a dictionary to exploit. The levers were chosen in
   [PR #268](https://github.com/openclimatefix/nged-substation-forecast/pull/268).
 
 ## Lazy evaluation strategy
@@ -63,14 +63,14 @@ Nwp.scan_delta(path)                     # lazy scan, already Float32 physical u
 * **Query optimisation**: Polars can see the full plan end-to-end and push down filters (e.g. date
   ranges, `time_series_id` subsets) into the Delta Lake scan before any data crosses the wire.
 * **Clean boundaries**: The materialisation site is the model boundary — the one place where a
-  third-party library (XGBoost, PyTorch, …) needs a concrete in-memory array. Keeping it there makes
+  third-party library (PyTorch, scikit-learn, …) needs a concrete in-memory array. Keeping it there makes
   the boundary explicit and easy to find.
 
 **The one exception** is a `limit(1).collect()` guard in `_engineer_features` (inside `ml_core`),
 reached only when a weather lag feature is requested. It checks the raw NWP scan for the control
 member. In bulk mode (training/backtesting) a missing control member fails the pipeline loudly,
 because a silently-degraded training run would poison every comparison built on it. In single-run
-mode (production inference, replay) a missing control member is the outside world misbehaving, not a
+mode (live inference) a missing control member is the outside world misbehaving, not a
 contract violation, so the guard instead logs a warning naming the run and falls through to the
 ordinary join-miss path. The output stays full height, with every affected weather-lag column null
 rather than the row dropped. It probes the raw frame rather than the upsampled one deliberately:
@@ -126,7 +126,8 @@ the surviving row groups, so an in-memory collect would still materialise every 
 dropping 1662/1671 of the cells. The **streaming engine** (`collect(engine="streaming")`) applies
 the predicates per morsel, so peak memory is set by the morsel/row-group size, *not* the window
 length: measured pre-migration, a *full 15-month* control-member collect stayed at ~2.5 GB.
-`XGBoostForecaster.train`/`predict` therefore collect with `engine="streaming"`.
+`ClimatologyForecaster` and `ManualHeuristicForecaster` therefore collect with
+`engine="streaming"`.
 
 **Many-to-one `h3_index` ↔ `time_series_id`:** one NWP cell covers several series (the 32 V1 series
 live in just **9 cells**, one holding 12), so `h3_index` pruning is keyed on the (few) cells the
@@ -148,50 +149,56 @@ across runs, so a chunk's forecast frame stays small while each partition is rea
 all series/cells/members are processed together (a per-*cell* loop instead OOMs on the busiest cell
 — 10 series × 51 members × the 10-month window ≈ 116M rows ≈ 25 GB). Measured end-to-end on the
 `mid_2025_to_mid_2026` fold: training peaks ~5 GB and the full 51-member validation prediction
-(~321M forecast rows) peaks ~9 GB — both well under a 24 GB laptop.
+(~321M per-member predictions, reduced to ~6.3M stored rows of 13 quantiles) peaks ~9 GB — both well
+under a 24 GB laptop.
 
 ### Scoring the metrics: batch the series, and stream every scan
 
-**Scoring a whole fold at once OOM-kills a 29 GB machine, so `_score_forecast_group` scores a batch
-of time series at a time.** `compute_metrics` is independent per series, which is what makes the
-batching sound. Measured on the `mid_2025_to_mid_2026` fold when it held 28 series of about 13M
-forecast rows each, a batch of 4 series completes in roughly 50 seconds at about 18 GB peak process
-resident set size. That fold has gained series since, so the figures below understate today's fold
-and the case for batching is only stronger. That peak is dominated by the streaming Delta scan
-rather than by the data: each batch re-scans the partition, while the materialised batch frame
-itself is a few GB. A batch of 2 measured only about 2 GB lower, so a smaller batch saves little
-memory — the scan overhead is roughly constant in the *fold* size, which is what keeps the approach
-workable as folds grow to V2 scale.
+**`_score_forecast_group` scores a batch of time series at a time, so peak memory follows the batch
+rather than the fold.** `compute_metrics` is independent per series, which is what makes the
+batching sound. The batch size was measured on a 28-series frame of the `mid_2025_to_mid_2026`
+fold with about 13M rows per series, one row per ensemble member: a batch of 4 series completed in
+roughly 50 seconds at about 18 GB peak process resident set size. The fold stores one row of 13
+quantiles per half-hour, about 250,000 rows per series, a 51st as many, so these figures are an
+upper bound. That peak is dominated by the streaming Delta scan rather than by the data:
+each batch re-scans the partition, while the materialised batch frame itself is a few GB. A batch of
+2 measured only about 2 GB lower, so a smaller batch saves little memory — the scan overhead is
+roughly constant in the *fold* size, which is what keeps the approach workable as folds grow to V2
+scale.
 
 **Every scan in the scoring path streams, because the eager equivalent materialises full-length rows
 before it reduces them.** Discovering which groups a fold holds projects just the two partition
 columns, `experiment_name` and `fold_id`, and takes their distinct values. Collected eagerly, those
 two columns are still materialised at full row length before the unique, which OOM-killed that fold
-at its then-size of 364M rows; the streaming collect peaks at 0.3 GB. The same rule applies to the
-`time_series_id` and `ensemble_member` values `cv_power_forecasts` accumulates from each chunk:
-taking the unique values gives a roughly 30-element Python list per chunk instead of a roughly
-14M-element one. Measured on a 14M-row `Int32` column, the full-length list cost 2.78 seconds and
-560 MB peak against 0.05 seconds and no measurable allocation — and that 560 MB landed inside the
-loop whose whole job is holding the frame at 2 to 3 GB.
+at 364M rows; the streaming collect peaks at 0.3 GB. The same rule applies to the `time_series_id`
+values `cv_power_forecasts` accumulates from each chunk: taking the unique values gives a roughly
+30-element Python list per chunk instead of one element per forecast row. Measured on a 14M-row
+`Int32` column, the full-length list cost 2.78 seconds and 560 MB peak against 0.05 seconds and no
+measurable allocation — and that 560 MB landed inside the loop whose whole job is holding the frame
+at 2 to 3 GB.
 
 ## The other hard ceiling: Polars' 32-bit row index
 
 RAM is not the only bound a Polars query must respect. Default Polars builds use a 32-bit row index
 (`IdxSize`), so any single materialised frame, row count, or row index is capped at **2³² ≈ 4.29
-billion rows** — and crossing the cap raises **no error**. Row counts wrap modulo 2³²:
-`pl.scan_delta` over the ~5.9-billion-row NWP dev table reports 1,652,180,189 rows via
+billion rows**. Crossing the cap can go unreported: in the investigation below, row counts wrapped
+modulo 2³² without an error. On the 16.2-billion-row workstation NWP table, Polars 2.1.0 instead
+raised "Polars' maximum length reached" for `pl.len()` and `group_by(...).agg(pl.len())`, and the
+pyarrow reader returned 0. Code must rely on neither outcome. In the investigation,
+`pl.scan_delta` over the ~5.9-billion-row NWP dev table reported 1,652,180,189 rows via
 `.select(pl.len())` (= 5,947,147,485 mod 2³², exactly), and `group_by(...).agg(pl.len())` wraps
 identically for any single group past the cap, streaming engine included. This was investigated and
 empirically pinned down in
 [issue #293](https://github.com/openclimatefix/nged-substation-forecast/issues/293): the wraparound
 reproduces on plain Parquet scans (it is not a Delta Lake bug), and the `polars-u64-idx` build
-(64-bit index, lags mainline releases) returns correct counts on the same queries.
+(64-bit index, lagged mainline releases) returned correct counts on the same queries. Polars 2.1.0
+installs a 64-bit row index with the `polars[rt64]` extra.
 
 What is and isn't affected — each verified empirically on 5-billion-row scans:
 
 | Operation on a >2³²-row scan | Outcome |
 |---|---|
-| `pl.len()` / `group_by(...).agg(pl.len())` where a count exceeds 2³² | **Silently wraps mod 2³²** |
+| `pl.len()` / `group_by(...).agg(pl.len())` where a count exceeds 2³² | Wraps mod 2³² without an error (5.9-billion-row scan), or raises "maximum length reached" (Polars 2.1.0, 16.2-billion-row table) |
 | Materialising a single frame of ≥2³² rows | Unsupported (in practice RAM is exhausted first, which at least fails loudly) |
 | Filtered / partition-pruned query whose *result* is < 2³² rows | Correct |
 | Value aggregations (`sum`, `min`/`max`, quantiles) over > 2³² rows | Correct — values aren't indices |
@@ -206,10 +213,11 @@ The rules that follow:
   collect far below the cap (input pruning + `init_time` chunking), so pipeline reads are
   unaffected. The cap is a second, independent reason that rule exists: an unbounded collect of a
   V2-scale table wouldn't just OOM, its row accounting would be wrong.
-* Tables past the cap today: **NWP** (~5.9B rows). **`power_forecasts`** will pass it at V2 scale
-  (~1 trillion rows — see [forecast
-  delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data)). The `metrics`
-  asset discovers `(experiment_name, fold_id)` groups via a streaming `unique()` scan, then scores
-  each group in batches of four `time_series_id` values at a time, so peak memory is one batch,
-  never a whole fold or the whole matched population — the same chunking that keeps the row-index
-  cap out of reach.
+* Tables past the cap today: **NWP** (~16.2B rows). **`power_forecasts`** passes it within two years
+  of one live ML model at V2 scale (~2.45B rows a year against the 4.29B cap), and 4 years of 2
+  models reach ~20B rows — see [forecast
+  delivery](forecast-delivery.md#how-big-is-flexpectations-power-forecast-data). The `metrics` asset
+  discovers `(experiment_name, fold_id)` groups via a streaming `unique()` scan, then scores each
+  group in batches of four `time_series_id` values at a time, so peak memory is one batch, never a
+  whole fold or the whole matched population — the same chunking that keeps the row-index cap out of
+  reach.

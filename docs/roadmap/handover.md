@@ -25,15 +25,16 @@ scheduled cadence (e.g. quarterly maintenance windows) rather than reactively.
 Several decisions already made serve this constraint well, and this page makes that connection
 explicit so we don't accidentally undo them:
 
-- **The champion model is baked into the container image** with no MLflow (or any tracking server)
-  on the production hot path — see [Production Deployment —
-  Design](../architecture/production-deployment.md). Under the handover model this is a feature
-  twice over: there are fewer runtime moving parts to break, and the model simply *freezes* between
-  model updates.
-- **Replay mode** means a missed slot is recovered by a one-click UI backfill, not by an engineer
-  reconstructing state — see [Operating the live service](../live_service/operations.md).
-- **Promotion is rebuild + redeploy**, auditable via image tags — no live mutable model registry for
-  an operator to mis-drive.
+- **The production hot path has no MLflow (or any tracking server).** The production image carries
+  no model today. The design for a future live forecaster puts its trained model in the container
+  image — see [Production Deployment — Design](../architecture/production-deployment.md). Under the
+  handover model that design is a feature twice over: there are fewer runtime moving parts to break,
+  and the model simply *freezes* between model updates.
+- **A missed `ecmwf_ens` day is re-materialised with one click in the Dagster UI**, and a missed
+  telemetry pull is recovered by the next hourly run, so no engineer has to reconstruct state — see
+  [Backfilling a missed partition](../live_service/operations.md#backfilling-a-missed-partition).
+- **Changing the live forecaster is rebuild + redeploy**, auditable via image tags — no live mutable
+  model registry for an operator to mis-drive.
 - **No static AWS keys for OCF's own resources** (IAM roles throughout) removes a whole class of
   credential-expiry incidents. The two static credentials that remain sit at the boundary with NGED
   — the NGED read-access user and the source-bucket credentials. [Workstream
@@ -64,7 +65,7 @@ boundaries.
 expected to take.**
 
 - Acknowledge an alert.
-- Backfill a missed slot via replay mode.
+- Re-materialise a missed `ecmwf_ens` partition from the Dagster UI.
 - Restart the daemon.
 - Rebuild the control-plane box.
 - Escalate to OCF.
@@ -72,11 +73,12 @@ expected to take.**
 Keep the contract to roughly **ten items or fewer**, each one a documented button-press or a single
 command with a runbook page in [`docs/live_service/`](../live_service/index.md).
 
-Everything *not* on that list — model promotion, dependency upgrades, schema changes, infrastructure
-changes — is OCF's job during the NIA project, handled on a scheduled maintenance cadence. After the
-NIA project, the [written support agreement](#7-organisational-prerequisites) sets who does that
-work. Model re-training sits in this category too: the re-training pipeline is automated end-to-end,
-so "re-training" means triggering and reviewing an automated run on a regular cadence.
+Everything *not* on that list — trained-model updates, dependency upgrades, schema changes,
+infrastructure changes — is OCF's job during the NIA project, handled on a scheduled maintenance
+cadence. After the NIA project, the [written support agreement](#7-organisational-prerequisites)
+sets who does that work. Re-training the machine-learning model sits in this category too: the
+re-training pipeline is automated end-to-end, so "re-training" means triggering and reviewing an
+automated run on a regular cadence.
 
 One **optional tier** sits between "follow a runbook" and "escalate to OCF", for the more mysterious
 bugs that fall outside the contract but that NGED may want to try fixing themselves:
@@ -103,13 +105,14 @@ handover they need an editing pass with the NGED operator as the audience, plus 
 missed-check-in alarm.** A hung daemon, a full disk, an expired credential, or a schedule that
 simply stopped firing raises no per-task alert. A missed-check-in alarm (Sentry's cron-monitoring
 terminology) fires when *no successful forecast has landed in N hours* (e.g. 8 hours, i.e. one
-missed 6-hourly slot plus margin), regardless of why. That alarm is built and running on **Sentry
-cron monitoring**: each successful `live_forecasts` run checks in with Sentry, and Sentry alerts on
-a missed check-in — Sentry sits outside the service being watched (a dead daemon simply stops
-checking in), and check-in pings are plain portable code. The as-built mechanism is [Send telemetry
-to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
-What handover still has to settle: the Sentry account is OCF's today, so the alert routing (and
-possibly the account itself) moves to NGED.
+missed 6-hourly slot plus margin), regardless of why. The mechanism for that alarm is **Sentry
+cron monitoring**: a live forecast asset would check in with Sentry after each successful run, and
+Sentry would alert on a missed check-in. Sentry sits outside the service being watched (a dead
+daemon simply stops checking in), and check-in pings are plain portable code. The Sentry design is
+in [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry). No
+live forecast asset sends Sentry a check-in today, so the alarm has nothing to watch until a live
+forecast asset does. What handover still has to settle: the Sentry account is OCF's today, so the
+alert routing (and possibly the account itself) moves to NGED.
 
 The [production monitoring plan](live-service.md#production-monitoring) already sketches a "no fresh
 forecast" staleness alarm; this workstream promotes it from a nice-to-have to the **primary** alert,
@@ -179,8 +182,8 @@ digital best practice." Corporate cloud environments commonly impose service con
 mandatory patching, mandatory security agents, restricted egress, and bans on long-lived
 credentials. The access design is the part of the service those standards bear on most, because in
 the current design [the network layer *is* the authentication
-layer](live-service.md#access-phasing). None of the web UIs (Dagster, MLflow, and Marimo) has
-built-in authentication, and Tailscale is what restricts who can reach them. If NGED's standards
+layer](live-service.md#access-phasing). The Dagster web UI has no built-in authentication, and
+Tailscale is what restricts who can reach the Dagster web UI. If NGED's standards
 call for a different network layer, the access design needs an NGED-compatible replacement as a
 whole (e.g. NGED's virtual private network plus private subnets, or a proxy fronted by single
 sign-on).

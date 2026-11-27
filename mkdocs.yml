@@ -101,7 +101,6 @@ nav:
       - Setting up the live service on AWS: live_service/aws.md
       - Connecting to the AWS control plane: live_service/connecting.md
       - Operating the live service: live_service/operations.md
-      - Model releases: live_service/model-releases.md
       - Intervention log: live_service/intervention-log.md
       - Setting up Sentry telemetry: live_service/sentry.md
       - Backing up the workstation: live_service/backup.md
@@ -123,7 +122,6 @@ nav:
       - Staged probabilistic forecast: roadmap/staged-probabilistic-forecast.md
       - Switching events: roadmap/switching-events.md
       - Extending the training history: roadmap/training-history.md
-      - XGBoost improvements: roadmap/xgboost-improvements.md
   - API reference:
       - Overview: api/index.md
       - Contracts: api/contracts/index.md
@@ -132,4 +130,3 @@ nav:
       - Geo: api/geo/index.md
       - ML core: api/ml_core/index.md
       - NGED data: api/nged_data/index.md
-      - XGBoost forecaster: api/xgboost_forecaster/index.md

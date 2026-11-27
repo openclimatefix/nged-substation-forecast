@@ -18,12 +18,12 @@ principles in that list.
 **The model does the work, not a fallback path.** A central mechanism behind everything below is
 that the machine-learning (ML) model itself is built to keep producing a sensible forecast when some
 of its inputs are missing — rather than a chain of fallbacks wrapped around a model that assumes
-complete data. That is already partly true: the gradient-boosted trees we run today *route* missing
-features instead of requiring them to be filled in. A forecast therefore still comes out when a
-feature drops away. But the model has not yet been **trained** against realistic outages, which is
-what turns "it still produces a number" into "it still produces a number worth trusting". Much of
-what follows — the degradation ladder, the widening bands, the failure-scenario suite — exists to
-make that one design choice work; the mechanics are in [Default directions, and their
+complete data. Gradient-boosted trees, for example, *route* missing features instead of requiring
+them to be filled in, so a forecast still comes out when a feature drops away. No machine-learning
+model in this repository has yet been **trained** against realistic outages. Training against
+outages is what turns "it still produces a number" into "it still produces a number worth trusting".
+Much of what follows — the degradation ladder, the widening bands, the failure-scenario suite —
+exists to make that one design choice work; the mechanics are in [Default directions, and their
 limit](#default-directions-and-their-limit) and [Missingness in learned
 models](#missingness-in-learned-models).
 
@@ -149,36 +149,35 @@ rather than the event level, because that is what decides whether anybody is tol
 | **run failed** | A Sentry event tagged `fault_category:run_failed` — the run died, and the alert rule notifies whoever is on for the next business day |
 | **digest** | A Sentry event from a degradation sender or from `report_asset_retry` — the run carried on or has not failed yet, so it is routed to a digest rather than a notification |
 | **warning** | A Sentry `warning` event from `report_power_freshness`, which has its own alert rule |
-| **check-in** | The missed-check-in alarm, raised by Sentry from outside the deployment |
 | **operator** | No event: a human is already watching, because they started the run by hand |
+| **no forecast yet** | There is no live forecast whose degradation could be reported |
 | **nobody is told 🚧** | No Sentry event is sent. Each cell says where the fault does show up instead — usually Dagster's Checks view, which only helps somebody who already went to look — and what the silence costs |
 | **n/a** | Not a production path |
 
 **run failed** and **digest** are mostly `error`-level events (the `report_asset_retry` warning is
 the
 exception), which is exactly why the level cannot be the discriminator — see [Send telemetry to
-Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
 **No production row should read "nobody is told"** — that is [rule 4](#the-rules), and the rows that
 do are the rows still to be wired up.
 
 | Failure | Today | Intended | Human alerted? |
 |---|---|---|---|
-| One or two daily NWP runs missed | `live_forecasts` selects the freshest run present as of the forecast time, so an older run is used through the normal path; `live_forecasts_are_healthy` warns with the count of missed runs | Unchanged, plus a Sentry **warning** carrying the missed-run count 🚧 | **run failed** — from the `ecmwf_ens` run that should have landed the missing NWP, which is the usual cause. For the degraded forecast itself, **nobody is told** 🚧: `live_forecasts_are_healthy` counts the missed runs into Dagster's Checks view and, when it evaluates successfully, sends no event, so a slot built on a hole somebody else's run left behind announces itself to no one ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
-| NWP stale but still covering the horizon | Forecast produced from an increasingly ancient run; `nwp_init_time` is on every row and `live_forecasts_are_healthy` warns with the missed-run count, but the forecast itself looks as confident as a fresh one | Bands widen with the regime; `STALE NWP` warning row and a Sentry **warning** 🚧 | **run failed**, then **nobody is told** 🚧 — the same path as the row above: the missed `ecmwf_ens` run reports itself, the forecast degraded by it does not |
-| A slot produces no rows, or unusable rows, while the asset still succeeds | `live_forecasts_are_healthy` warns, naming the row count, the invalid rows, and any trained series that went missing | Unchanged, plus a Sentry **warning** 🚧 | **nobody is told** 🚧 — `live_forecasts_are_healthy` names the row count and the missing series in Dagster's Checks view and, when it evaluates successfully, sends no event, so an empty or unusable slot is silent unless somebody opens the UI ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
-| NWP absent, or too old to cover the horizon | **Hard failure** — the asset raises and NGED gets nothing (tracked to change in [#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) | Weather-blind forecast, wide bands, warning row, and the alert drops from **run failed** to a degradation event, because nothing of ours has broken 🚧 | **run failed** |
-| Telemetry stalled for one series | Forecast still produced from the model's other features; `power_data_is_fresh` warns, names the late series, and sends a Sentry warning event | Unchanged, plus regime-appropriate band widening 🚧 | **warning** |
+| One or two daily NWP runs missed | — | The forecast uses the freshest NWP run present as of the forecast time, through the normal path; bands widen slightly, and a Sentry **warning** carries the count of missed runs 🚧 | **run failed** — from the `ecmwf_ens` run that should have landed the missing NWP, which is the usual cause. For the forecast: **no forecast yet** |
+| NWP stale but still covering the horizon | — | The forecast is produced from the stale run, with `nwp_init_time` on every row; bands widen with the regime, with a `STALE NWP` warning row and a Sentry **warning** 🚧 | **run failed** — the missed `ecmwf_ens` run reports itself, as in the row above. For the forecast: **no forecast yet** |
+| NWP absent, or too old to cover the horizon | — | Weather-blind forecast, wide bands, warning row, and a degradation event rather than a failed run, because nothing of ours has broken 🚧 | **run failed** — from the `ecmwf_ens` runs that failed. For the forecast: **no forecast yet** |
+| Telemetry stalled for one series | `power_data_is_fresh` warns, names the late series, and sends a Sentry warning event. No live forecast is written | Unchanged, plus a forecast still produced from the model's other features, with regime-appropriate band widening 🚧 | **warning** |
 | The cleaning of power telemetry fails, or silently stops running | A failing cleaning rule raises, and every reader carries on with the last good cleaned table, which is stale rather than uncleaned. `cleaned_power_keeps_up_with_raw` warns when the cleaned table is built from a raw table 2 or more commits (about 6 to 12 hours of NGED deliveries) behind the current raw table | Unchanged | **run failed** for a run that raised. For a cleaning that silently stopped, **nobody is told** 🚧: the check names the lag in Dagster's Checks view and sends no event |
 | A meter reporting detectably wrong values | Malformed timestamps are dropped at ingest, but wrong *values* are not yet detected; see [Missing versus wrong](#missing-versus-wrong) | Treated as missing, which routes it into the always-output path, and warned on like any other missing input 🚧 | **nobody is told** 🚧, and nothing detects the fault either: ingest rejects a value outside `PowerTimeSeries`' range, but nothing looks for a value that is in range and still wrong, so there is not yet a warning to send |
 | A whole ECMWF slice of a de-accumulated variable corrupt | Landed; `nwp_has_no_unexpected_nulls` warns, naming the slice | Unchanged, plus a Sentry **warning** once the slice count is large 🚧 | **nobody is told** 🚧 — `nwp_has_no_unexpected_nulls` names the slice in Dagster's Checks view and, when it evaluates successfully, sends no event, so the size of the loss reaches nobody ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)) |
 | A whole ECMWF weather variable absent, or a slice of an instantaneous variable empty at every grid point | `ecmwf_ens` turns each failure into a retry for up to 4h (the empty slice is found on the raw download, the absent variable by `Nwp.validate`) and sends a Sentry warning on the first failed attempt. An ECMWF run initialised more than 36h ago fails at once instead of retrying. Once the retries are exhausted, the failure shows downstream as a missed run | Unchanged | **digest** — a `retrying_asset` warning on the first failed attempt — then **run failed** once the retries are exhausted (an old run failing at once in a backfill: **operator**) |
-| The promoted model is empty or unloadable | **Hard failure** — the asset raises | Unchanged: this is a promotion bug, not a data outage | **run failed** |
-| The `TimeSeriesMetadata` table is unreadable, or has lost rows for trained series | Live inference does not read the metadata table: each series' location comes from the promoted model's own frozen copy of the rows it trained against, so the forecast is unchanged. The hourly ingest contains the upsert failure, records `metadata_upsert_failed` and sends a Sentry error event through `report_asset_degradation` | Unchanged | **digest** — if the upsert raised, via `report_asset_degradation`. A metadata table that merely *lost rows* raises nothing at all, so **nobody is told** 🚧: the freshness check reads the metadata table only to decide what to watch, so a series that vanishes from it is quietly no longer watched, and the last stored values for it stand indefinitely |
-| A duplicated forecast row reaches the model output — a join fanning out, which takes a bug of ours rather than duplicated data at rest, since every NWP write replaces its partition | **Hard failure** — `PowerForecast.validate` raises on the duplicated primary key and NGED gets nothing for that slot | Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it | **run failed** |
-| A model is promoted whose saved config this code can no longer rebuild — a feature name it does not recognise, or a `model_params` key it no longer declares | `promoted_model` refuses it before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | **operator** — `promoted_model` is materialised by hand, outside the scheduled jobs the failure hook is attached to, so no Sentry event is sent |
-| The run named for promotion holds no model at all — usually a mistyped or stale run id | `promoted_model` fails on the download, again before replacing the model on disk, so the outgoing champion stays and keeps forecasting | Unchanged | **operator** — as above |
-| The service is not running at all | Sentry missed-check-in alarm fires from outside the deployment | Unchanged | **check-in** — next business day |
+| The `TimeSeriesMetadata` table is unreadable, or has lost rows for trained series | The hourly ingest contains the upsert failure, records `metadata_upsert_failed` and sends a Sentry error event through `report_asset_degradation` | Unchanged | **digest** — if the upsert raised, via `report_asset_degradation`. A metadata table that merely *lost rows* raises nothing at all, so **nobody is told** 🚧: the freshness check reads the metadata table only to decide what to watch, so a series that vanishes from it is quietly no longer watched, and the last stored values for it stand indefinitely |
+| A duplicated forecast row reaches the model output — a join fanning out, which takes a bug of ours rather than duplicated data at rest, since every NWP write replaces its partition | **Hard failure** — `PowerForecast.validate` raises on the duplicated primary key and the write is refused. Only cross-validation runs write forecasts today | Unchanged: writing a silently duplicated forecast would corrupt the delivered table and every metric computed from it | **operator** — a cross-validation run is started by hand |
+| The service is not running at all | No production job sends Sentry a check-in, so nothing outside the deployment notices | A Sentry missed-check-in alarm fires from outside the deployment 🚧 | **nobody is told** 🚧 — stale ingest tables are the only sign, and only for somebody who looks |
 | Any of the above during model R&D | Fails fast | Unchanged — see [R&D fails the other way](#rd-fails-the-other-way) | n/a |
+
+A dash in the Today column means that the live service writes no forecast, so no behaviour exists
+to describe.
 
 Nothing here is a 2am page. The uptime posture that makes that acceptable is argued in [Requirements
 → Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
@@ -192,9 +191,10 @@ change one, change its matching principle too. The rest are specific to degradat
 nowhere else.
 
 1. **In production, never raise because an input is absent or stale.** Degrade, widen the bands, and
-   record the degradation on the row. Reserve raising for states that are our own bug — an empty
-   promoted model, a contract violation — not for the outside world misbehaving. *(The [never-stop
-   principle](design-principles.md#1-the-power-forecast-never-stops), in imperative form.)*
+   record the degradation on the row. Reserve raising for states that are our own bug — a saved
+   model that will not load, a contract violation — not for the outside world misbehaving. *(The
+   [never-stop principle](design-principles.md#1-the-power-forecast-never-stops), in imperative
+   form.)*
 2. **Be liberal about missing inputs and strict about malformed inputs.** Absent data routes into
    the always-output path; malformed data is rejected at the contract boundary. These are opposite
    postures and both are deliberate. *(The [strict-contracts
@@ -220,15 +220,15 @@ nowhere else.
 7. **Never let the warning path be able to fail the asset it is warning about.** A bug in a warning
    function that raises would convert fail-open into fail-closed at exactly the wrong moment, which
    is why `report_power_freshness` never raises and why every asset check — the standalone
-   `power_data_is_fresh` and `live_forecasts_are_healthy`, and the three per-run checks computed
-   inside `ecmwf_ens` — runs its whole body under a catch-all. Non-blocking is not enough on its
-   own: Dagster fails a run whose check step *errors*, whatever its `blocking` setting, and the
-   scheduled jobs carry a Sentry failure hook. An unguarded warning path therefore both fails the
-   run and pages. A warning path computed *inside* an asset must also run **before** that asset's
-   write, not merely under a guard: a bug that raised after the write would leave the rows committed
-   on a run Dagster reports as failed, so the table and the run history disagree about what landed.
-   Ordering decides whether a post-write bug can land data at all; the guard only decides whether it
-   costs a run.
+   `power_data_is_fresh` and `cleaned_power_keeps_up_with_raw`, and the three per-run checks
+   computed inside `ecmwf_ens` — runs its whole body under a catch-all. Non-blocking is not enough
+   on its own: Dagster fails a run whose check step *errors*, whatever its `blocking` setting, and
+   the scheduled jobs carry a Sentry failure hook. An unguarded warning path therefore both fails
+   the run and pages. A warning path computed *inside* an asset must also run **before** that
+   asset's write, not merely under a guard: a bug that raised after the write would leave the rows
+   committed on a run Dagster reports as failed, so the table and the run history disagree about
+   what landed. Ordering decides whether a post-write bug can land data at all; the guard only
+   decides whether it costs a run.
 8. **When a capability could live in the training loop or in the production service, put it in the
    training loop.** See [Where complexity should live](#where-complexity-should-live). *(The
    [complexity-offline
@@ -264,9 +264,8 @@ very different risk, and the same reasoning that puts fail-fast in R&D and fail-
 production makes the same case about where code should sit: keep the serving path as close to "load
 a model, call `predict`" as we can.
 
-This posture is descriptive as much as aspirational. `promoted_model` already copies the champion to
-local disk so that inference makes no MLflow call. Regime-conditional interval calibration has the
-same shape: computed offline, and production does a table lookup.
+Regime-conditional interval calibration has the shape this posture asks for: computed offline,
+with production doing a table lookup.
 
 Two qualifiers keep it honest.
 
@@ -284,7 +283,8 @@ run is also a production risk, because [H2, a hundred CV runs per person in a pe
 month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month) and [H3,
 one-click promotion and one-click
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) depend on
-retraining staying cheap and promotion staying one command.
+retraining staying cheap and on promotion becoming one command. No mechanism makes promotion one
+command yet.
 
 ## Mechanisms
 
@@ -306,13 +306,14 @@ the evidence base for this distinction.
 
 ### Default directions, and their limit
 
-XGBoost uses sparsity-aware split finding. At every split it learns not just a threshold but a
-**default direction** for rows where that feature is missing: it tries sending all missing rows
-left, then right, and keeps whichever gives better gain. Missingness is routed, not imputed. This is
-why a leaky lag feature can be nulled rather than the whole row dropped.
+Gradient-boosted tree libraries such as XGBoost use sparsity-aware split finding. At every split
+the tree learns not just a threshold but a **default direction** for rows where that feature is
+missing: it tries sending all missing rows left, then right, and keeps whichever gives better gain.
+Missingness is routed, not imputed. Routing is why a feature pipeline can null a leaky lag feature
+rather than drop the whole row.
 
 The limit is that the default direction is learned **from the missingness present in the training
-data**. If a feature is never missing during training, XGBoost still picks a direction, but that
+data**. If a feature is never missing during training, the tree still picks a direction, but that
 choice was never evaluated against anything. In production, the first time that feature is missing,
 every affected row takes an untested path. So the real guarantee is narrower than "XGBoost handles
 NaN":
@@ -340,12 +341,11 @@ monitoring system working**. That is an argument for the band being first and un
 argument against the other two channels: they answer questions the band cannot, and [rule
 4](#the-rules) requires all three.
 
-Two caveats. `XGBoostConfig.objective` currently defaults to `reg:squarederror`, so today's model is
-a point forecast; quantile output
-([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) is a prerequisite.
-And bands widening *correctly* under degradation is not automatic even with quantile regression —
-the mechanism we are betting on is regime-conditional conformal calibration, discussed in
-[Missingness in learned models](#missingness-in-learned-models).
+Two caveats. No forecaster in the repository widens its bands when an input goes missing today: the
+climatology forecaster reads no live input at all, and the manual heuristic drops a row whose power
+lags are all null. And bands widening *correctly* under degradation is not automatic even with
+quantile regression — the mechanism we are betting on is regime-conditional conformal calibration,
+discussed in [Missingness in learned models](#missingness-in-learned-models).
 
 See [Probabilistic Forecasting](../techniques/probabilistic-forecasting.md) for how the intervals
 are produced and [Evaluation Metrics](../techniques/evaluation-metrics.md) for PICP and interval
@@ -358,31 +358,29 @@ relax toward a physical envelope that is always computable — wide, honest, and
 the sky can deliver. That is rung 4.
 
 Clear-sky irradiance was a named deliverable of
-[#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) (closed), designed in
-[XGBoost
-Improvements](../roadmap/xgboost-improvements.md), with further physics in [Differentiable
-Physics](../techniques/differentiable-physics.md). Only the **floor** framing is new here: nothing
-else says clear-sky is what we fall back *to*.
+[#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) (closed), with further
+physics in [Differentiable Physics](../techniques/differentiable-physics.md). Only the **floor**
+framing is new here: nothing else says clear-sky is what we fall back *to*.
 
 ### Three audiences, three channels
 
 | Audience | Question | Channel |
 |---|---|---|
 | **Forecast users** (NGED) | "How much should I trust *this row*?" | In-band: quantile spread, plus `nwp_init_time`, already on the row |
-| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the live check's missed-NWP-run count, the NWP quality check's upstream grid-point null rate |
-| **Us, the developers** | "Does anyone need to intervene, and is it us?" | Out-of-band: Sentry, plus the missed-check-in alarm. Both kinds of event arrive here — our own faults and the upstream problems only a human can chase — and the `fault_category` tag says whether anyone needs telling now (see [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)) |
+| **Data providers** | "Is *your* feed broken, and since when?" | Aggregated and **attributable**: `power_forecast_warnings`, the freshness check's late-series table, the NWP quality check's upstream grid-point null rate |
+| **Us, the developers** | "Does anyone need to intervene, and is it us?" | Out-of-band: Sentry. Both kinds of event arrive here — our own faults and the upstream problems only a human can chase — and the `fault_category` tag says whether anyone needs telling now (see [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry)) |
 
 Inherent stability creates a specific hazard for the third channel: **a system that always succeeds
 looks identical to a system that is not running at all.** Both produce zero failures. That is why
-the [Sentry missed-check-in alarm](../live_service/sentry.md), firing from outside the deployment,
-is load-bearing rather than belt-and-braces — it is the one piece of active monitoring this design
-cannot do without.
+a missed-check-in alarm, firing from outside the deployment, is load-bearing rather than
+belt-and-braces: it is the one piece of active monitoring this design cannot do without. No
+production job sends Sentry a check-in today. The [failure-modes table](#failure-modes) records that
+gap as a row where nobody is told.
 
-That alarm fires on *absence*, though, and it is not conditional on health: the check-in is sent
-from the asset body after a successful write, before any check runs, so a degraded slot still
-reports the service alive. That is deliberate — the alarm exists to catch a service that stopped —
-but it means the degraded case has to be carried by an event somebody sends, which is [rule
-6](#the-rules) and, today, the gap at
+A missed-check-in alarm fires on *absence*, and is not conditional on health: a service that is
+running but degraded still checks in. The alarm exists to catch a service that stopped, so the
+degraded case has to be carried by an event somebody sends. That requirement is [rule
+6](#the-rules), and the gap today is
 [#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
 
 For the provider channel, a warning is only actionable if it names *whose* NWP and *which* run,
@@ -390,8 +388,8 @@ which is why `power_forecast_warnings` carries a `warning_source` field ([Delive
 tables](../roadmap/delivery-tables.md#table-2-power_forecast_warnings)).
 
 The provider channel must also count the right signal. We ingest **one ECMWF run per day** — the 00Z
-run, downloaded at 10:30 UTC — and we forecast at 00:00, 06:00, 12:00, and 18:00, so healthy NWP age
-at forecast time ranges from 12 hours at the 12:00 slot to **30 hours at the 06:00 slot**, just
+run, downloaded at 10:30 UTC. For a forecast issued at 00:00, 06:00, 12:00, and 18:00, healthy NWP
+age at forecast time ranges from 12 hours at the 12:00 slot to **30 hours at the 06:00 slot**, just
 before the day's download lands. Raw age is therefore not a health signal: 18-hour-old NWP is
 exactly what the 18:00 slot is supposed to use. An absolute age threshold would have to sit in the
 narrow window between the stalest healthy state (30 hours) and the freshest outage state (36 hours —
@@ -400,10 +398,7 @@ ingest schedule or the slot times change, and that still cannot say *how many* r
 signal is **missed runs** — how many daily runs are absent between the freshest run on disk and the
 freshest that ought to exist by now. That is zero in every healthy slot, whichever slot it is.
 
-`live_forecasts_are_healthy` implements exactly that count. [Read the live forecast back off
-disk](../architecture/production-deployment.md#read-the-live-forecast-back-off-disk-with-a-second-asset-check)
-explains how the "ought to exist by now" half is derived, and why the deadline it rests on sits 14
-hours after a run's `init_time`.
+No asset check counts missed runs today.
 
 ### Missingness in learned models
 
@@ -420,21 +415,19 @@ we ingest, so it is in-distribution and needs no scenario.
 **Missing source weather reaches the electricity forecasting model through different paths for
 radiation and precipitation.** Spatial renormalisation absorbs most scattered corruption at ingest.
 **Radiation reconstruction preserves missing native windows**, so the electricity forecasting model
-sees their nulls. **Temporal point interpolation** still bridges interior precipitation nulls,
-while leaving leading/trailing nulls. **Default-direction routing** handles the nulls reaching the
-electricity forecasting model, with its guarantee limited to patterns represented in training.
-The distinction is worked through in [Known ECMWF ENS Data-Quality
+sees their nulls. **Temporal point interpolation** still bridges interior precipitation nulls, while
+leaving leading/trailing nulls. In a gradient-boosted tree model, **default-direction routing**
+handles the nulls reaching the electricity forecasting model, with its guarantee limited to patterns
+represented in training. The distinction is worked through in [Known ECMWF ENS Data-Quality
 Issues](../architecture/ecmwf-ens-known-issues.md#nulls-in-the-de-accumulated-variables-tolerated).
 
-**Temporal interpolation of precipitation is the remaining design point**, because it is
-imputation, already happening, chosen
-by nobody — which inverts the obvious worry: the risk is not that someone might later "fix" this by
-imputing, it is that the fill already exists and is unbounded, unflagged, and unmeasured. Making it
-deliberate is [a planned
-ML experiment in `nged-ml-research`](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible).
-Set it against spatial renormalisation, and the contrast is the argument for preferring one: a
-spatial mean over a cell's own grid points at the same step stays inside one member's trajectory and
-one ~250 km² hexagon, whereas a temporal bridge spans 6 to 12 hours of a *rate* variable.
+**Temporal interpolation of precipitation is the remaining design point**, because it is imputation,
+already happening, chosen by nobody — which inverts the obvious worry: the risk is not that someone
+might later "fix" this by imputing, it is that the fill already exists and is unbounded, unflagged,
+and unmeasured. Set it against spatial renormalisation, and the contrast is the argument for
+preferring one: a spatial mean over a cell's own grid points at the same step stays inside one
+member's trajectory and one ~250 km² hexagon, whereas a temporal bridge spans 6 to 12 hours of a
+*rate* variable.
 
 The whole-slice case is the awkward member of this bucket and is worth naming as such: it *is*
 blocky, and it is only chronic in the sense of recurring across runs at low volume. It sits here
@@ -464,7 +457,7 @@ setting them side by side, because the differences are less instructive than wha
 
 | Approach | How absence is represented | What it falls back to | Where the guarantee ends |
 |---|---|---|---|
-| **Gradient-boosted trees** (XGBoost, today) | Routed, not imputed: every split learns a **default direction** for rows whose feature is missing | Whichever branch scored better during training | Only the missingness patterns seen in training. A feature never missing in training still gets a direction, but one that was never evaluated against anything |
+| **Gradient-boosted trees** (for example XGBoost) | Routed, not imputed: every split learns a **default direction** for rows whose feature is missing | Whichever branch scored better during training | Only the missingness patterns seen in training. A feature never missing in training still gets a direction, but one that was never evaluated against anything |
 | **Attention encoder over a token set** (possible) | **Structurally absent**: the token is simply not in the set. Attention is permutation-invariant and variable-length, so nothing stands in for it, and masking is used for padding only | Whatever the remaining tokens support | Same training-distribution limit. Nothing about the architecture teaches it how an outage *behaves*; that has to be trained in |
 | **Dense neural network with value + mask channels** (the fixed-width fallback) | **Flagged**: an explicit mask channel beside each value, so "zero" and "unknown" stay distinguishable. GRU-D is the standard precedent, decaying the last observation toward an empirical mean | The learned decay target | Same training-distribution limit, and it spends model capacity representing absence that the token-set form gets for free |
 | **Physical forward model** | **No representation needed**: the model is defined for every input state | A physical prior — the clear-sky envelope of rung 4 | It only covers what the physics covers; it cannot supply the learned residual on top |
@@ -496,8 +489,8 @@ constraints rather than roadmap items:
   degradation](../techniques/differentiable-physics.md#graceful-degradation-when-an-input-is-missing).
 
 For honest interval widths under degradation, the mechanism is **conformal prediction applied per
-regime**: post-hoc calibration from held-out residuals, which works with XGBoost today and so can
-ship before any PyTorch work exists.
+regime**: post-hoc calibration from held-out residuals, which works with any forecaster that emits
+quantiles and so does not wait on any PyTorch work.
 
 ## What this is not
 
@@ -537,11 +530,9 @@ flag on the feature and validation layer 🚧.
 Which assets sit on which side is recorded on the assets themselves, as a `layer` tag valued
 `production` or `research` — see [Architecture
 Overview](../architecture/overview.md#core-components). The tag records which side an asset belongs
-to; it does not assert a posture, and a `production` asset can still raise: on an unloadable
-promoted model, which is our own bug, and — until
-[#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446) — on absent NWP, which
-is the row this page most wants to change. The asymmetry is also implemented at the telemetry layer:
-the Sentry failure hook is attached to the three scheduled production jobs only.
+to. The tag does not assert a posture: a `production` asset can still raise on our own bug, such as
+a failing cleaning rule in `clean_nged_power_data`. The asymmetry is also implemented at the
+telemetry layer: the Sentry failure hook is attached to the two scheduled production jobs only.
 
 ## Vocabulary
 
@@ -550,7 +541,7 @@ Borrowed terms, and how well each one fits.
 | Term | Origin | Fit |
 |---|---|---|
 | **Graceful degradation** | General | The plain-English name: lose fidelity, not availability |
-| **Static stability** | AWS Builders' Library, borrowed from vehicle dynamics | A system keeps working using state it *already has* when a dependency fails. Exactly `live_forecasts` reading NWP already on disk |
+| **Static stability** | AWS Builders' Library, borrowed from vehicle dynamics | A system keeps working using state it *already has* when a dependency fails. Exactly a forecast built from the NWP already on disk |
 | **Fail-operational vs fail-passive** | Avionics autoland; ISO 26262 | The sharpest distinction available. Fail-passive: disengage cleanly and hand back to the human. Fail-operational: keep delivering through the fault. Ours is fail-operational |
 | **Restoring force / damping** | Vehicle and aircraft dynamics | Static stability is whether a disturbed system's initial tendency is back toward correct; dynamic stability is whether that return settles rather than oscillating. Rule 10 is the damping half |
 | **Blast radius** | SRE | A different axis — see above |

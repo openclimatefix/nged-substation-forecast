@@ -15,8 +15,11 @@ import pytest
 from _cleaned_power_test_data import write_cleaned_copy, write_metadata
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
 from _power_test_data import power_at
+from contracts.common import DELIVERY_QUANTILES
 from contracts.ml_schemas import EligibleTimeSeries
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
 from dagster import DagsterInstance, materialize
+from delta_store.power_forecasts import POWER_FCST_SIGNIFICAND_BITS
 from deltalake import write_deltalake
 
 from nged_substation_forecast.defs.cv_assets import cv_power_forecasts, trained_cv_model
@@ -118,9 +121,20 @@ def test_manual_heuristic_emits_the_thirteen_lagged_powers_as_members(
     assert forecasts["fold_id"].unique().to_list() == [FOLD_ID]
     assert forecasts["experiment_name"].unique().to_list() == [EXPERIMENT_NAME]
     assert forecasts["power_fcst_model_name"].unique().to_list() == ["manual_heuristic"]
-    # One row per valid time and member: the three NWP members are not repeated.
+    # One row per valid time: the three NWP members are not repeated.
     valid_times = half_hours(_VAL_DAY).to_list()
-    assert forecasts.height == len(valid_times) * len(_WEEKLY_AND_ANNUAL_LAG_HOURS)
+    assert forecasts.height == len(valid_times)
     for row in forecasts.iter_rows(named=True):
-        lag_hours = _WEEKLY_AND_ANNUAL_LAG_HOURS[row["ensemble_member"]]
-        assert row["power_fcst"] == power_at(row["valid_time"] - timedelta(hours=lag_hours))
+        lag_values = pl.Series(
+            [
+                power_at(row["valid_time"] - timedelta(hours=lag_hours))
+                for lag_hours in _WEEKLY_AND_ANNUAL_LAG_HOURS
+            ],
+            dtype=pl.Float32,
+        )
+        expected = [
+            lag_values.quantile(level, interpolation="linear") for level in DELIVERY_QUANTILES
+        ]
+        actual = [row[column] for column in POWER_FCST_QUANTILE_COLUMNS]
+        # The stored values are rounded to POWER_FCST_SIGNIFICAND_BITS significand bits.
+        assert actual == pytest.approx(expected, rel=2.0**-POWER_FCST_SIGNIFICAND_BITS)

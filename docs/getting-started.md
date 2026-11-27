@@ -65,7 +65,8 @@ S3.
 
 Dagster works without any of this, but by default it forgets its run history and schedule state when
 you stop it. Point it at a persistent directory so that state survives a restart — this also matters
-later, because the live 6-hourly schedule only keeps time while the daemon runs continuously.
+later, because the hourly ingest schedule and the daily NWP schedule only keep time while the
+daemon runs continuously.
 
 1. Create the directory and a `dagster.yaml` inside it:
 
@@ -143,18 +144,16 @@ committing to a long `full_cv` training run.
 
 ## Running the live service on your laptop
 
-The entire live service — telemetry ingestion, NWP download, the 6-hourly forecast schedule, and the
-Dagster UI — runs on the laptop you have just set up, with no AWS involved. Running the whole stack
-locally is a deliberate portability requirement rather than a development convenience: no
-cloud-specific service may be load-bearing for scheduling or orchestration (see [the orchestration
+The entire live service runs on the laptop you have just set up, with no AWS involved: the hourly
+telemetry ingest, the daily NWP download, and the Dagster UI. Running the whole stack locally is a
+deliberate portability requirement rather than a development convenience: no cloud-specific service
+may be load-bearing for scheduling or orchestration (see [the orchestration
 decision](architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)).
 
-The 6-hourly schedule fires only while `dg dev` keeps running, so closing the laptop lid stops the
-service. That gap is exactly what the [AWS deployment](live_service/aws.md) exists to close, and why
-a missed slot is backfillable — see [Operating the live service: Backfilling a missed
-slot](live_service/operations.md#backfilling-a-missed-slot). Driving a running stack is identical in
-both environments — promotion, the schedule, inspecting a forecast, backfills — and lives in
-[Operating the live service](live_service/operations.md).
+The schedules fire only while `dg dev` keeps running, so closing the laptop lid stops the service.
+That gap is exactly what the [AWS deployment](live_service/aws.md) exists to close. Driving a
+running stack is identical in both environments — the schedules, the ingest assets, and backfills —
+and lives in [Operating the live service](live_service/operations.md).
 
 ### Optional — rehearse S3 locally with MinIO
 

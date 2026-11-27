@@ -266,12 +266,12 @@ weather input.
 
 ##### Model family choice
 
-**Building Flexpectation version 1 on a GBT such as XGBoost is defensible, but the literature paints
-GBTs as a sensible default rather than a proven winner**. [NGED's own Electricity Flexibility and
-Forecasting System (EFFS) project](https://smarter.energynetworks.org/projects/wpden03/) picked
-XGBoost, which gave the best results of the three methods the project tested and was also easy to
-automate. No study we read shows a large, dependable margin for a model family more sophisticated
-than XGBoost at substation level.
+**The literature paints GBTs such as XGBoost as a sensible default for Flexpectation version 1
+rather than a proven winner**. [NGED's own Electricity Flexibility and Forecasting System (EFFS)
+project](https://smarter.energynetworks.org/projects/wpden03/) picked XGBoost, which gave the best
+results of the three methods the project tested and was also easy to automate. No study we read
+shows a large, dependable margin for a model family more sophisticated than XGBoost at substation
+level.
 
 **Both deployments by network operators that actually tried boosted trees kept a simpler model
 instead.** [Pinheiro et al. (2023)](https://doi.org/10.1016/j.apenergy.2022.120493), running a live
@@ -1162,10 +1162,10 @@ that estimate is out of Flexpectation's scope, because the project uses no telem
 primary substation level. Flexpectation plans to produce that second opinion from the substation's
 own meter plus weather and the calendar. The first attempt is classical: a multiple seasonal-trend
 decomposition of each series into a trend and daily, weekly, and annual cycles, leaving a remainder
-in which a switch shows up as a sustained level shift. The second attempt uses the project's
-existing XGBoost training pipeline, trained with no power-lag features, so that an earlier switching
-event cannot contaminate the expected-power estimate. Neither route needs metering from below the
-substation.
+in which a switch shows up as a sustained level shift. The second attempt uses a forecaster from the
+project's cross-validation pipeline, trained with no power-lag features, so that an earlier
+switching event cannot contaminate the expected-power estimate. Neither route needs metering from
+below the substation.
 
 **Flexpectation also plans to investigate using a signal that Bouman et al.'s
 one-substation-at-a-time method cannot see: the power has to go *somewhere*.** [Bouman et al.
@@ -2185,7 +2185,7 @@ purpose-trained model that keeps the covariates.
 worth having independently.** A forecast is one component of what this project builds: the ingest,
 the contracts, the degradation ladder, the leaderboard, the delivery tables, and the live service
 all stand whichever model wins. A pre-trained model that beat a purpose-trained model would simply
-be the model the leaderboard promoted. Establishing which of the two is better on a distribution
+be the model the leaderboard ranked first. Establishing which of the two is better on a distribution
 network, measured against a common protocol on a real operator's telemetry, is a research result no
 study we read has published. A network operator deciding whether to train its own models would want
 the answer. Flexpectation is an innovation project, and a well-measured negative result is one of
@@ -2520,8 +2520,9 @@ proposed ones", alongside two related habits — picking the error measure that 
 method, and skipping comparison with naive models altogether. A team that runs every entry on its
 own leaderboard is exposed to all three by construction. That is why the
 authors'-code-and-authors'-defaults rule above matters more for Flexpectation than it does for a
-competition. That exposure is also a large part of the reason why, in Flexpectation version 1, we
-are putting effort into *optimising* our XGBoost forecasts before trying more novel approaches.
+competition. That exposure is also a large part of the reason why Flexpectation version 1 scores
+every entry against a simple reference forecaster, the manual heuristic, before trying more novel
+approaches.
 
 **The submission deadline, not a rule about which features are allowed, is what defines a fair
 information set.** [Kleinebrahm et al. (2026)](https://arxiv.org/abs/2604.24705) give a worked
@@ -3006,17 +3007,16 @@ important as historical net demand and generation measurements". That ranking is
 verdict on the connectivity-map input Flexpectation plans to use explicitly. The rest of
 TRANSITION's published design matches what Flexpectation is building.
 
-**NGED's own Electricity Flexibility and Forecasting System independently selected XGBoost, which
-the system's evaluation reported as the most accurate of the three methods tested and as easy to
-automate.** The project compared XGBoost against a long short-term memory (LSTM) neural network and
-against ARIMA. The evaluation report says XGBoost "provided the best results of the three methods
-tested, closely followed by LSTM", recommending XGBoost because XGBoost also allows simplified
-testing of features and can be easily automated. The report caveats that the LSTM could not be fully
-explored for want of graphics processing units, and expects that more testing would have brought the
-LSTM level with XGBoost rather than past XGBoost. Selecting XGBoost is the same starting point
-Flexpectation uses. [EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran from 2018 to
-2021 as a Network Innovation Competition project costing £3.3 million, and its forecasts were
-deterministic. Publishing uncertainty bands is the step Flexpectation adds.
+**NGED's own Electricity Flexibility and Forecasting System selected XGBoost, which the system's
+evaluation reported as the most accurate of the three methods tested and as easy to automate.** The
+project compared XGBoost against a long short-term memory (LSTM) neural network and against ARIMA.
+The evaluation report says XGBoost "provided the best results of the three methods tested, closely
+followed by LSTM", recommending XGBoost because XGBoost also allows simplified testing of features
+and can be easily automated. The report caveats that the LSTM could not be fully explored for want
+of graphics processing units, and expects that more testing would have brought the LSTM level with
+XGBoost rather than past XGBoost. [EFFS](https://smarter.energynetworks.org/projects/wpden03/) ran
+from 2018 to 2021 as a Network Innovation Competition project costing £3.3 million, and its
+forecasts were deterministic. Publishing uncertainty bands is the step Flexpectation adds.
 
 **[UK Power Networks' Power Flow to Solar
 Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) is the direct predecessor of

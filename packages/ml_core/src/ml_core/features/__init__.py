@@ -17,10 +17,9 @@ Public interface:
 - ``wind_feature_expressions`` — vector speed and meteorological bearing for a component pair,
   also used by study extractors at native forecast steps.
 - ``NWP_PUBLICATION_DELAY_HOURS`` — hours after an NWP run's ``init_time`` before we treat that
-  run as usable. Public because the constant is the default of three public signatures:
-  ``FeatureEngineer.engineer``, ``TabularFeatureEngineer.engineer``, and
-  ``ml_core.production_helpers.select_nwp_init_time``. A caller reasoning about any of those
-  three signatures needs a name to reach the constant by.
+  run as usable. Public because the constant is the default of two public signatures:
+  ``FeatureEngineer.engineer`` and ``TabularFeatureEngineer.engineer``. A caller reasoning about
+  either signature needs a name to reach the constant by.
 
 The package re-exports ``NWP_PUBLICATION_DELAY_HOURS`` from ``_nwp`` and
 ``wind_feature_expressions`` from ``weather_utils.wind``. The two public sub-modules are:

@@ -83,9 +83,9 @@ observed history. This is the NMAE (normalised mean absolute error) denominator 
 
 | Field | Example | Notes |
 |---|---|---|
-| `experiment_name` | `"xgboost_smoke_test"` | Unique; becomes the MLflow experiment name and partition-key prefix |
-| `base_model_config` | `"conf/model/xgboost.yaml"` | Path relative to `PROJECT_ROOT` |
-| `config_overrides` | `{"n_estimators": 100}` | Merged onto `model_params` in the YAML; every key must name a declared config field |
+| `experiment_name` | `"climatology_smoke_test"` | Unique; becomes the MLflow experiment name and partition-key prefix |
+| `base_model_config` | `"conf/model/climatology.yaml"` | Path relative to `PROJECT_ROOT` |
+| `config_overrides` | `{"random_seed": 1}` | Merged onto `model_params` in the YAML; every key must name a declared config field |
 | `run_mode` | `"smoke_test"` | `smoke_test` adds the non-leaderboard dev folds (e.g. `smoke_test`); `full_cv` or `register_only` adds the leaderboard folds |
 | `description` | `"Quick sanity check"` | Stored as an MLflow tag — optional |
 
@@ -130,7 +130,7 @@ tag does not count as a change.
 ## Step 7 — Materialise `trained_cv_model`
 
 **Trigger:** Materialise the partition `"{experiment_name}__{fold_id}"`, e.g.
-`"xgboost_smoke_test__smoke_test"`. The partition only appears after step 6 has run.
+`"climatology_smoke_test__smoke_test"`. The partition only appears after step 6 has run.
 
 **What the asset does:**
 
@@ -148,10 +148,9 @@ tag does not count as a change.
    output](../architecture/performance.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)).
 6. Engineers features via the forecaster's `feature_engineer.engineer()`.
 7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
-   then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
+   then **raises** if no series was trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
-   `forecaster.save_to_mlflow(fold_run_id, time_series_metadata=...)`, which puts the metadata table
-   rows the model trained against into the archive alongside it.
+   `forecaster.save_to_mlflow(fold_run_id)`.
 9. Records the training run on the fold run as **tags**: the training window (`train_start`,
    `train_end`) and the populations (`n_eligible_time_series`, `n_trained_time_series`).
 
@@ -169,12 +168,12 @@ which is also what resolves the run by it), so it is not logged again here.
 The MLflow run structure after training looks like this:
 
 ```text
-MLflow experiment "xgboost_smoke_test"
+MLflow experiment "climatology_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
-    │   params: n_estimators=100, learning_rate=0.05, …
+    │   params: random_seed=1, model_release=0, …
     └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end,
                            n_eligible_time_series, n_trained_time_series}
-            artifacts: model/   ← trained model binary files
+            artifacts: model.tar.gz   ← the saved model, as one archive
 ```
 
 ---
@@ -202,7 +201,7 @@ MLflow experiment "xgboost_smoke_test"
    chunk overwrites the partition (clearing any prior run), the rest **append**, so a full
    re-materialisation replaces the fold's rows without ever holding all forecasts in memory.
 5. Tags the fold run with `val_start`/`val_end` and the `n_forecast_rows`/
-   `n_forecast_time_series`/`n_ensemble_members` counters. All five are tags rather than params or
+   `n_forecast_time_series` counters. All four are tags rather than params or
    metrics because they legitimately change — and can shrink — between materialisations of the same
    fold run. Params are write-once, and MLflow reports a metric's latest value as the max over all
    its writes, so a shrunk count would read back too high.
@@ -220,33 +219,34 @@ uv run marimo edit packages/dashboard/view_forecasts.py
 ```
 
 Pick the population with the dropdowns: the **Fold** dropdown lists every `fold_id` present in the
-`power_forecasts` table (a CV fold label, a smoke-test fold, or `live` for production forecasts),
+`power_forecasts` table (a CV fold label or a smoke-test fold),
 and an **Experiment** dropdown appears (it lists the `experiment_name` of each CV run) when the
 chosen fold holds more than one `experiment_name`. Then choose a **time series** (the dropdown
 groups the 32 series by type, so all the PV sites or all the primaries sit together), a **forecast
 date**, and one of that day's **forecast runs**.
 
-**Compare with** optionally adds a second CV run's ensemble in orange for the same fold, series,
-and forecast init time. The default is **No comparison**. If the second CV run has no matching
-rows, a warning appears and the primary forecast stays visible. The NWP panel shows the primary
-CV run's weather run.
+**Compare with** optionally adds a second CV run's p5–p95 band and p50 line in orange for the same
+fold, series, and forecast init time. The default is **No comparison**. If the second CV run has no
+matching rows, a warning appears and the primary forecast stays visible. The NWP panel shows the
+primary CV run's weather run.
 
 **Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
 without restarting marimo. Its new `experiment_name` appears in the **Experiment** dropdown;
 **Fold**, **forecast date** and **forecast run** go back to their defaults, and the chosen time
 series is kept.
 
-The chart layers all 51 ensemble members as thin grey lines, observed power (wherever available,
-including past the init time) as a thick blue line, and a vertical rule at the forecast init time,
-spanning 24 hours before the init time to 14 days after it. The x-axis is labelled at midnight
-(Europe/London) with the day of week and date, with unlabelled minor ticks every 3 hours. Scroll to
-zoom, drag to pan, hover for the `ensemble_member` and value.
+The chart draws the forecast's p1–p99, p5–p95, and p20–p80 bands, each fainter than the band inside
+it, and the p50 line, with observed power (wherever available, including past the init time) as a
+thick blue line, and a vertical rule at the forecast init time, spanning 24 hours before the init
+time to 14 days after it. The x-axis is labelled at midnight (Europe/London) with the day of week
+and date, with unlabelled minor ticks every 3 hours. Scroll to zoom, drag to pan, hover for the
+values.
 
 The **Data source** radio switches the app between the local data tables (the root `.env`) and the
 production S3 buckets without restarting marimo — see the [dashboard
 README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard) for
-the `.env.s3` setup, and [Operating the live service: Inspecting a live
-forecast](../live_service/operations.md#inspecting-a-live-forecast) for the production workflow.
+the `.env.s3` setup, and [Operating the live service: Inspecting
+forecasts](../live_service/operations.md#inspecting-forecasts) for the production workflow.
 
 ---
 
@@ -257,7 +257,7 @@ run config dialog before launching.
 
 | Field | Example | Notes |
 |---|---|---|
-| `population_filter.experiment_name` | `"xgboost_smoke_test"` | Filters `power_forecasts` to one CV run; leave null to score all CV runs at once |
+| `population_filter.experiment_name` | `"climatology_smoke_test"` | Filters `power_forecasts` to one CV run; leave null to score all CV runs at once |
 | `population_filter.fold_id` | `"mid_2025_to_mid_2026"` | Filters to one fold; leave null to score all folds for the CV run |
 | `population_filter.valid_time_min/max` | `"2025-10-01T00:00:00+00:00"` | ISO-8601 UTC; trims the valid_time window. Allowed only with `evaluation_scope="ad_hoc"` |
 | `evaluation_scope` | `"leaderboard"` | `"leaderboard"` logs to MLflow; `"ad_hoc"` writes Delta only |
@@ -269,12 +269,11 @@ run config dialog before launching.
    predicates push straight into the Delta scan: naming a CV run/fold prunes to just that
    partition rather than reading the whole (unbounded) table.
 2. In `leaderboard` scope, drops any group whose `fold_id` is not a leaderboard fold in the CV
-   config, naming the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. The
-   live service writes to this same table under `fold_id="live"`, and a non-leaderboard dev fold
-   such as `smoke_test` lands there too, so an unfiltered leaderboard run finds both; leaderboard
-   scope dates its evaluation window from the CV config's leaderboard folds and has none for those
-   rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
-   takes the window from the forecast rows themselves.
+   config, naming the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. A
+   non-leaderboard dev fold such as `smoke_test` lands in the same table, so an unfiltered
+   leaderboard run finds it; leaderboard scope dates its evaluation window from the CV config's
+   leaderboard folds and has none for those rows. To score a dev fold, run the asset with
+   `evaluation_scope="ad_hoc"`, which takes the window from the forecast rows themselves.
 3. Discovers the matching `(experiment_name, fold_id)` groups, skips every `study/` forecast of an
    unfiltered run (naming them in the `skipped_study_experiments` metadata), and checks every
    remaining group before scoring any, raising on a refusal; see [What the `metrics` asset refuses
@@ -286,10 +285,10 @@ run config dialog before launching.
    batch, never a whole fold or the entire matched population. See [The other hard ceiling: Polars'
    32-bit row index](../architecture/performance.md#the-other-hard-ceiling-polars-32-bit-row-index)
    for why this chunking also keeps the row-index cap out of reach at V2 scale. For each group: a.
-   Calls `compute_metrics()` — joins observed power, collapses each forecast run's ensemble members
-   into per-timestamp quantities, and computes the deterministic metrics (MAE / NMAE / RMSE / MBE on
-   the ensemble mean) plus the probabilistic metrics (fair CRPS, spread-skill ratio, pinball loss at
-   the 13 delivery quantiles, PICP and interval width for the 6 symmetric bands) per
+   Calls `compute_metrics()` — joins observed power to each stored forecast row and computes the
+   deterministic metrics (MAE / NMAE / RMSE / MBE on the median, `power_fcst_p50`) plus the
+   probabilistic metrics (pinball loss at the 13 stored delivery quantiles, CRPS as twice their
+   mean, PICP and interval width for the 6 symmetric bands) per
    `(time_series_id, fold_id, power_fcst_model_name, horizon_slice)` — see the [evaluation-metrics
    reference](../techniques/evaluation-metrics.md) for definitions. b. Enriches rows with scope
    (`evaluation_scope`), window bounds (`window_start`, `window_end`, `window_label`),
@@ -297,7 +296,10 @@ run config dialog before launching.
    `forecast_metrics` Delta, partitioned by `(experiment_name, fold_id)` with an idempotent
    overwrite predicate — safe to re-run without duplicating rows.
 5. For `evaluation_scope="leaderboard"`: builds an aggregate metric dict and logs it to the fold's
-   MLflow child run, then averages across folds and logs the mean to the parent run. The key token
+   MLflow child run, then averages across folds and logs the mean to the parent run. Both runs are
+   tagged `metrics_version=2`, which marks scores computed from the 13 stored quantile columns;
+   a run without the tag uses other definitions under the same metric names, so compare scores only
+   between runs with the same tag value. The key token
    is `{metric_name}` for scalar metrics and `{metric_name}_{metric_param}` for parametric metrics,
    in three families: overall (`rmse__all`, `crps__all`), per type (`rmse__disaggregated_demand`),
    and per horizon slice (`nmae__all__day_ahead`). Parametric metrics are restricted to a headline
@@ -307,13 +309,13 @@ run config dialog before launching.
 After step 9, the MLflow run structure looks like this:
 
 ```text
-MLflow experiment "xgboost_smoke_test"
+MLflow experiment "climatology_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
-    │   params: n_estimators=100, learning_rate=0.05, …
+    │   params: random_seed=1, model_release=0, …
     │   metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← mean across folds
     └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end, …}
             metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← per-fold aggregate
-            artifacts: model/
+            artifacts: model.tar.gz
 ```
 
 The `forecast_metrics` Delta table stores one row per `(time_series_id, fold_id,

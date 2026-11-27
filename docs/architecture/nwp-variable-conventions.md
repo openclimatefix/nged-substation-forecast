@@ -21,9 +21,8 @@ identical in every run in the archive:
 | 3 h | 3 h → 144 h | 48 |
 | 6 h | 150 h → 360 h | 36 |
 
-The change at **144 h — 6 days** matters most, because the primary user band is 3–10 days ([XGBoost
-improvements](../roadmap/xgboost-improvements.md)), so days 6 to 10 of that band sit on the coarse
-half of the grid.
+The change at **144 h — 6 days** matters most, because the primary user band is lead times of 3–10
+days, so days 6 to 10 of that band sit on the coarse half of the grid.
 
 ## The three axes
 

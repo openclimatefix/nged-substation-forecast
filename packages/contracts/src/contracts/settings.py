@@ -66,15 +66,15 @@ class Settings(BaseSettings):
     """Every setting the pipeline reads from its environment.
 
     The fields cover the data paths, the object-store credentials, the MLflow tracking URI, and
-    the four Sentry settings: ``sentry_dsn``, ``sentry_environment``,
-    ``sentry_traces_sample_rate``, and ``sentry_monitor_forecasts``.
+    the three Sentry settings: ``sentry_dsn``, ``sentry_environment``, and
+    ``sentry_traces_sample_rate``.
 
     Each field takes its value from an environment variable of the same name, from the workspace
     ``.env``, or from the default declared here, in that order of precedence. The managed
     data-table paths default to ``""``, a sentinel meaning "derive me". Pydantic runs the
     ``after``-mode model validator ``_derive_unset_paths`` once, immediately after the
-    ``Settings`` is built. That validator fills a path left unset from ``data_path_internal``,
-    ``data_path_delivery``, or ``local_artifacts_path``. A caller therefore never observes the
+    ``Settings`` is built. That validator fills a path left unset from ``data_path_internal`` or
+    ``data_path_delivery``. A caller therefore never observes the
     sentinel and always reads a concrete path, while a path set explicitly keeps the value it was
     given. Every value is read when the ``Settings`` is built. A test that changes the
     environment afterwards therefore has to build a fresh ``Settings``. If that test reads
@@ -101,9 +101,7 @@ class Settings(BaseSettings):
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#6-the-whole-system-must-be-exercisable-on-one-laptop
     #
     # Absence is therefore caught at the point of *use*, in `get_nged_s3_store`. Catching it there
-    # confines a mis-wired secret to the one schedule that needs it. Inference — the scheduled run
-    # that produces a forecast — reads our own Delta tables and a model baked into the deployment
-    # image, so failing inference over an ingest credential would stop the forecast.
+    # confines a mis-wired secret to the one schedule that needs it.
     nged_s3_bucket_url: str = Field(
         default="",
         description=(
@@ -182,8 +180,8 @@ class Settings(BaseSettings):
     # --- Storage roots -------------------------------------------------------------------
     #
     # data_path_internal and data_path_delivery hold the (S3-capable) data tables;
-    # local_artifacts_path holds the always-local production model. Why the three roots are
-    # split, and what belongs in each:
+    # local_artifacts_path holds the always-local artifacts, such as the study submission log.
+    # Why the three roots are split, and what belongs in each:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_path_internal: str = Field(
@@ -208,7 +206,7 @@ class Settings(BaseSettings):
     local_artifacts_path: str = Field(
         default=str(PROJECT_ROOT / "data"),
         description=(
-            "Root of the always-local artifacts (the production model). Kept separate from"
+            "Root of the always-local artifacts (the study submission log). Kept separate from"
             " the data-table roots because these back local-filesystem-only libraries and"
             " must stay local even when the data tables live on S3."
         ),
@@ -318,18 +316,6 @@ class Settings(BaseSettings):
     h3_grid_weights_path: str = ""
     """Parquet file of fractional H3 cell overlap with the Great Britain boundary."""
 
-    # --- Always-local artifacts (derive from local_artifacts_path unless explicitly set) --
-
-    production_model_path: str = Field(
-        default="",
-        description=(
-            "Directory holding the current production model, written by the promoted_model"
-            " asset (ml_core.production_helpers.fetch_model_artifacts) and read by"
-            " live_forecasts via a plain BaseForecaster disk load — no MLflow at inference"
-            " time. Later COPY'd into the container image at build time (issue #222)."
-        ),
-    )
-
     # --- Sentry observability (all optional; an empty data source name (DSN) disables Sentry) ---
 
     sentry_dsn: str = Field(
@@ -348,23 +334,14 @@ class Settings(BaseSettings):
             "Sentry environment tag, the dimension that separates deployments in Sentry's UI,"
             " alerts, and cron monitors. The always-on production box sets 'production'; each"
             " developer overrides the 'local' fallback with '<name>-laptop' (e.g. 'jacks-laptop')"
-            " so laptop telemetry is cleanly filterable and the production-scoped missed-check-in"
-            " alert never fires for a laptop."
+            " so laptop telemetry is cleanly filterable and a production-scoped alert never fires"
+            " for a laptop."
         ),
     )
     sentry_traces_sample_rate: float = Field(
         default=0.0,
         description=(
             "Fraction of transactions sampled for Sentry performance tracing (off by default)."
-        ),
-    )
-    sentry_monitor_forecasts: bool = Field(
-        default=False,
-        description=(
-            "Emit the live_forecasts success heartbeat to Sentry's cron monitor (the"
-            " missed-check-in alarm). True only on the always-on production deployment; left"
-            " False on laptops so an intermittently-run laptop never registers a monitor"
-            " environment that Sentry would then mark as missed."
         ),
     )
 
@@ -412,10 +389,6 @@ class Settings(BaseSettings):
         self.metadata_path = self.metadata_path or uri_join(self.nged_data_path, "metadata.parquet")
         self.list_of_downloaded_files_path = self.list_of_downloaded_files_path or uri_join(
             self.nged_data_path, "list_of_downloaded_files.parquet"
-        )
-        # Always-local artifacts.
-        self.production_model_path = self.production_model_path or uri_join(
-            self.local_artifacts_path, "production_model"
         )
         return self
 

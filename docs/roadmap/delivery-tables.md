@@ -71,16 +71,24 @@ curtailment the operator instructed.
 The Milestone 1 report describes **three** ways of expressing uncertainty. We may deliver one or
 several of these:
 
-1. **Ensemble of deterministic forecasts** — one row per NWP ensemble member. ✅ **Implemented in
-   v0.1**.
-2. **Percentiles** — one row per `valid_time`, with a column per percentile. 🚧 Planned (v0.5).
+1. **Ensemble of deterministic forecasts** — one row per NWP ensemble member. Not stored: the
+   forecasting code reduces each run's members to Representation 2 before writing.
+2. **Percentiles** — one row per `valid_time`, with a column per percentile. ✅ **Implemented**:
+   `PowerForecast` stores the 13 columns `power_fcst_p1` … `power_fcst_p99`.
 3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🚧 Planned (v0.5).
 
-Representations 2 and 3 are two stages of one pipeline, not independent options: Representation 3
-(per-member conditional quantiles) is produced by the model, and Representation 2 is **derived from
-it** by linear-pool mixing — see [Probabilistic forecasting from NWP
-ensembles](../techniques/probabilistic-forecasting.md) for the theory and [Phase D of the
-probabilistic evaluation
+**The stored percentiles are the empirical quantiles of the values each forecaster produces.** The
+climatology baseline stores the quantiles of past power in the same calendar cell, and the manual
+heuristic stores the quantiles of its 13 historical analogues. When a forecaster predicts one power
+value per member of the ensemble forecast (ENS) of the European Centre for Medium-Range Weather
+Forecasts (ECMWF), `ml_core.quantiles` reduces those 51 values by taking the linear empirical
+quantile at each of the 13 levels.
+
+Representations 2 and 3 are planned as two stages of one pipeline, not independent options:
+Representation 3 (per-member conditional quantiles) would be produced by the model, and
+Representation 2 would then be **derived from it** by linear-pool mixing — see [Probabilistic
+forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md) for the theory and
+[Phase D of the probabilistic evaluation
 plan](metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-forecasts-representation-3-pooled-representation-2)
 for the implementation plan.
 
@@ -89,11 +97,11 @@ residuals alone would be over-confident during an NWP outage or a telemetry stal
 the consumer most needs to be told to be cautious. The interval width is the **in-band** signal that
 a forecast is degraded: it is the only number the consumer is certain to read. So it must not be
 left to the warnings table alone. The mechanism is conformal calibration **per degradation regime**,
-which works with today's XGBoost and needs no retraining
-([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle is
+which wraps an already-trained forecaster and needs no retraining
+([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)). The principle is
 [Inherent Stability → Widening
-bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal), and whether it
-worked is measured by [T1.3, faithful
+bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal). Whether the
+calibration worked is measured by [T1.3, faithful
 uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 ### Fields common to all three representations
@@ -102,10 +110,10 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 |---|---|---|
 | `time_series_id` | `int32` | The time-series ID provided by NGED. E.g. ID 1 is the raw MW flow for the "BOSTON" BSP; ID 10 is the disaggregated demand for the "SPILSBY" primary; ID 21 is the MW flow for a customer's PV site. |
 | `valid_time` | `datetime` (UTC) | The time the forecast is *about*. |
-| `nwp_init_time` | `datetime` (UTC), nullable | When the NWP model was initialised. Uniquely identifies the NWP ensemble member, and matters when NWP is delayed or when we deliberately use lagged NWP runs to grow the ensemble. Null for models that do not use NWP (e.g. persistence baselines). |
+| `nwp_init_time` | `datetime` (UTC), nullable | When the NWP model was initialised. Identifies the NWP run behind the forecast, and matters when NWP is delayed or when we deliberately use lagged NWP runs to grow the ensemble. Null for models that do not use NWP (e.g. persistence baselines). |
 | `power_fcst_init_time` | `datetime` (UTC) | When OCF's power-forecast model was initialised (the "t0"). |
-| `power_fcst_model_name` | `string` | Name of OCF's model, e.g. `"xgboost_baseline"`. Set by the `BaseForecaster` subclass. |
-| `power_fcst_model_version` | `int16` | Number of the OCF model release, from the [release log](../live_service/model-releases.md). |
+| `power_fcst_model_name` | `string` | Name of OCF's model, e.g. `"manual_heuristic"`. Set by the `BaseForecaster` subclass. |
+| `power_fcst_model_version` | `int16` | Number of the OCF model release. The value is 0 for a CV run that is not a numbered release. |
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
 `PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id` (`int32`,
@@ -115,34 +123,33 @@ and live rows share one internal table — filter on `fold_id` to select the pop
 all three are projected out of the `power_forecast` table delivered to NGED. See [metrics &
 leaderboard](metrics-and-leaderboard.md).
 
-### Representation 1 — ensemble of deterministic forecasts ✅
+### Representation 1 — ensemble of deterministic forecasts
 
-| Field | Data type | Notes |
-|---|---|---|
-| `ensemble_member` | `int8` | ID of the NWP ensemble member driving this forecast. ECMWF ENS has 51 members. |
-| `power_fcst` | `float32` | OCF's power forecast. **In this early version** the value is in physical units (MW for active power, MVA for apparent power). Sign convention depends on `substation_type` — see [Sign convention](forecast-building-blocks.md#sign-convention). |
+One row per NWP ensemble member, with columns `ensemble_member` (`int8`) and `power_fcst`
+(`float32`). The forecasting code produces this representation in memory and reduces it to
+[Representation 2](#representation-2-percentiles) before writing, so no table stores it.
 
-> **🚧 Planned change — normalise `power_fcst` to [−1, +1]
+> **🚧 Planned change — normalise the forecast to [−1, +1]
 > ([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), v0.5).** The
 > delivery contract is a normalised forecast in the range **[−1, +1]**, which NGED multiplies by a
 > capacity to obtain MW/MVA (see [forecast building blocks](forecast-building-blocks.md)). The code
 > still forecasts raw MW/MVA, but now that the static P99 `effective_capacity` estimate exists there
 > is no need to wait for dynamic capacity estimation: the switch to [−1, +1] is planned for
-> **v0.5**. This planned change is also noted in a comment on the `PowerForecast.power_fcst` field
-> in `power_schemas.py`.
+> **v0.5**. This planned change is also noted in the `PowerForecast` class docstring in
+> `power_schemas.py`.
 
-### Representation 2 — percentiles 🚧
+### Representation 2 — percentiles ✅
 
 One row per `valid_time`, with one column per percentile. Representation 2 is the primary
-NGED-facing probabilistic representation, derived from [Representation
-3](#representation-3-ensemble-of-percentile-forecasts) by pooling the per-member quantiles (the
-equal-weight mixture — *not* per-level averaging, which would discard the between-member spread; see
-[the
+NGED-facing probabilistic representation, and the one `PowerForecast` stores. Once [Representation
+3](#representation-3-ensemble-of-percentile-forecasts) exists, Representation 2 is planned to be
+derived from it by pooling the per-member quantiles (the equal-weight mixture — *not* per-level
+averaging, which would discard the between-member spread; see [the
 explainer](../techniques/probabilistic-forecasting.md#the-tempting-shortcut-that-doesnt-work-averaging-the-quantiles)):
 
 | Fields | Data type | Notes |
 |---|---|---|
-| `p1, p2, p5, p10, p20, p35, p50, p65, p80, p90, p95, p98, p99` | `float32` | The power forecast at each percentile. NGED is far more interested in the **tails** than the shoulders. Read `p50` as "50% chance the true power flow is below this value", `p99` as "99% chance below", etc. (Scaled to [−1, +1] once normalisation lands.) |
+| `power_fcst_p1`, `power_fcst_p2`, `power_fcst_p5`, `power_fcst_p10`, `power_fcst_p20`, `power_fcst_p35`, `power_fcst_p50`, `power_fcst_p65`, `power_fcst_p80`, `power_fcst_p90`, `power_fcst_p95`, `power_fcst_p98`, `power_fcst_p99` | `float32` | The power forecast at each percentile, in physical units (MW for active power, MVA for apparent power); sign convention depends on `substation_type` — see [Sign convention](forecast-building-blocks.md#sign-convention). Each column is at least the column before it. NGED is far more interested in the **tails** than the shoulders. Read `power_fcst_p50` as "50% chance the true power flow is below this value", `power_fcst_p99` as "99% chance below", etc. (Scaled to [−1, +1] once normalisation lands.) |
 
 ### Representation 3 — ensemble of percentile forecasts 🚧
 
@@ -155,7 +162,7 @@ power users who want the weather-scenario structure:
 | Fields | Data type | Notes |
 |---|---|---|
 | `ensemble_member` | `int8` | ID of the NWP ensemble member. |
-| `p1, p2, p5, p10, p20, p35, p50, p65, p80, p90, p95, p98, p99` | `float32` | The power forecast. |
+| `power_fcst_p1` … `power_fcst_p99` | `float32` | The power forecast at the 13 percentiles of Representation 2. |
 
 ---
 

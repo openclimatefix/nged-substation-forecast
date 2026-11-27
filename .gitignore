@@ -43,7 +43,7 @@ dagster_history/
 #######################
 # MLflow
 
-# This directory contains all the artifacts (e.g. the XGBoost models), parameters, and metrics for
+# This directory contains all the artifacts (e.g. the trained models), parameters, and metrics for
 # every experiment you run locally. It can grow very large and contains binary files that don't
 # belong in Git.
 mlruns/
@@ -65,8 +65,6 @@ exploration_scripts/
 
 #######################
 # Testing
-tests/xgboost_integration_plot.html
-tests/xgboost_dagster_integration_plot.html
 test.parquet
 *.zarr/
 example_data/

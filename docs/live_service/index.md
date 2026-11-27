@@ -6,15 +6,16 @@ Guide](../documentation-guide.md#how-planning-works). Design rationale (the *why
 [`docs/architecture/`](../architecture/overview.md) instead; see that folder's [Production
 Deployment — Design](../architecture/production-deployment.md) page for this area's counterpart.
 [The roadmap's Live Service page](../roadmap/live-service.md) sends readers here as its sections
-land (so far: the `live_forecasts` and `promoted_model` assets, local 6-hourly automation, the
-container build/verify runbook, the AWS bring-up runbook, and Sentry telemetry with the
-missed-check-in alarm; still to come: production monitoring, and per-task failure-email alerting).
-Once production monitoring lands and its design is promoted, the roadmap page is deleted and this
-section is the sole home for how the live service works.
+land. So far, the ingest assets and their local automation, the container build/verify runbook, the
+AWS bring-up runbook, and Sentry telemetry have landed. A live forecast asset, production
+monitoring, and per-task failure-email alerting are still to come. Once production monitoring lands
+and its design moves here, the roadmap page is deleted and this section is the sole home for how the
+live service works.
 
-The live service is distinct from [Cross-validation](../cross-validation/index.md): that area
-covers training and backtesting candidate models against historical data; this area covers picking
-one of those candidates as the running production model and keeping live forecasts flowing from it.
+The live service is distinct from [Cross-validation](../cross-validation/index.md). The
+cross-validation section covers training and backtesting candidate forecasters against historical
+data. The live-service section covers the production service that runs unattended, which ingests the
+inputs a live forecast reads and checks those inputs. The live service currently writes no forecast.
 
 **Audience note:** today these runbooks are written for OCF (Python-literate researchers). The
 working assumption is that, after the Network Innovation Allowance (NIA) project, NGED runs the
@@ -35,20 +36,20 @@ environments, so it lives on one shared page.
 
 - [Setting up the live service on AWS](aws.md) — every step to stand the service up on AWS, in
   order: S3 buckets and IAM (AWS's storage and permissions services; every AWS acronym is spelled
-  out on first use there), promote a champion and build/verify/push its image, the Fargate task, the
-  always-on control-plane box, and connecting to the Dagster UI over Tailscale.
+  out on first use there), build/verify/push the image, the Fargate task, the always-on
+  control-plane box, and connecting to the Dagster UI over Tailscale.
 - [Connecting to the AWS control plane](connecting.md) — get a laptop onto the OCF tailnet to reach
   an already-running deployment: install Tailscale, view the Dagster UI, and SSH into the always-on
   box.
-- [Operating the live service](operations.md) — driving a running stack day to day: promote a
-  champion model, let the 6-hourly `live_forecasts` schedule run (or materialise a slot by hand),
-  inspect a forecast, and backfill a missed slot in replay mode.
+- [Operating the live service](operations.md) — driving a running stack day to day: the hourly power
+  and daily numerical weather prediction (NWP) ingest schedules, reading the asset checks and Sentry
+  events when an input degrades, inspecting a forecast, and backfilling a missed partition.
 - [Intervention log](intervention-log.md) — the append-only record of every occasion a human had to
   intervene in the running service, and the artefact the [T1.1 operability
   test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) is
   scored from.
-- [Setting up Sentry telemetry](sentry.md) — point error reporting and the missed-check-in alarm at
-  a Sentry project: get a DSN, test it from your laptop, and turn it on in production.
+- [Setting up Sentry telemetry](sentry.md) — point error reporting and the freshness warnings at a
+  Sentry project: get a DSN, test it from your laptop, and turn it on in production.
 - [Backing up the workstation](backup.md) — the daily timer that snapshots the data, the MLflow
   store, the literature library, Dagster's history, and the credential files to the 18 TB disk, and
   how to restore from a snapshot.

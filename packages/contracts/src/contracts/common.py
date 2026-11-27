@@ -146,9 +146,10 @@ DELIVERY_QUANTILES: Final[tuple[float, ...]] = (
 """The 13 quantile levels agreed with NGED for the delivery tables.
 
 The levels are deliberately tail-heavy, because NGED is far more interested in the tails than the
-shoulders. This tuple is the single source of truth for every quantile-indexed artefact — the
-pinball-loss ``metric_param`` labels today, and the percentile columns of the delivery-table
-representations (Representations 2 and 3) when those representations land in v0.5.
+shoulders. This tuple is the single source of truth for every quantile-indexed artefact: the
+quantile columns of ``PowerForecast`` (``power_fcst_p1`` … ``power_fcst_p99``), the pinball-loss
+and prediction-interval ``metric_param`` labels, and the percentile columns of the delivery
+tables.
 """
 
 

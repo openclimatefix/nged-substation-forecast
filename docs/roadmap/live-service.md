@@ -1,13 +1,13 @@
 # Live service (AWS deployment)
 
 > **Status: ✅ v0.1 shipped (July 2026, `v0.1.0`)** on the accepted architecture; the same
-> architecture now runs **v0.2** (`v0.2.0`, deployed 13 August 2026) — the naive forecast is
-> deployed and running on AWS. Epic
+> architecture now runs **v0.2** (`v0.2.0`, deployed 13 August 2026). Epic
 > [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) is closed. The
-> shipped design now lives in [Production Deployment —
-> Design](../architecture/production-deployment.md) (the orchestration and champion-model
+> service runs the ingest assets on AWS. No [live forecast asset](#live-forecast-assets) exists yet,
+> so the service writes no forecast. The shipped design now lives in [Production Deployment —
+> Design](../architecture/production-deployment.md) (the orchestration and model-packaging
 > decisions), and the step-by-step operational recipes in the [live-service
-> runbooks](../live_service/index.md) (promotion, AWS bring-up, day-to-day operation).
+> runbooks](../live_service/index.md) (AWS bring-up, day-to-day operation).
 >
 > This page is **not** retired yet: it remains the home of the post-v0.1 work still tracked as open
 > issues — [production monitoring](#production-monitoring)
@@ -16,9 +16,8 @@
 > ([#328](https://github.com/openclimatefix/nged-substation-forecast/issues/328),
 > [#329](https://github.com/openclimatefix/nged-substation-forecast/issues/329)), infra-as-code
 > ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)), and the
-> MLflow-server / dev-dashboard future work
-> ([#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235),
-> [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), and the plan for
+> dev-dashboard future work
+> ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), and the plan for
 > [NWP model upgrades](#nwp-model-upgrades)
 > ([#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851), closed as not
 > planned). The
@@ -38,13 +37,11 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
 **v0.1 (get a live forecast running on AWS):**
 
 - Deploy the naive forecast so it runs live on AWS, 6-hourly, writing to `power_forecasts`
-  (`fold_id="live"`) — the [`live_forecasts` asset](#the-live_forecasts-asset).
-- Forecast *quality* does not matter yet — science improvements (baselines, XGBoost) are explicitly
-  out of scope for this milestone.
-- Production inference must have **zero dependency on MLflow at runtime** — for v0.1 the champion
-  model is baked directly into the container image at build time and loaded via a plain
-  `save`/`load`, so there is no run ID, cache lookup, or tracking-server call on the hot path at
-  all.
+  (`fold_id="live"`) — see [live forecast assets](#live-forecast-assets).
+- Forecast *quality* does not matter yet — science improvements (baselines, trained forecasters)
+  are explicitly out of scope for this milestone.
+- Production inference must have **zero dependency on MLflow at runtime**. The production image
+  carries no model today. No production asset makes a run ID, cache lookup, or tracking-server call.
 - Support both **live** (current partition) and **replay** (historical backfill) NWP availability
   modes, so missed runs can be backfilled
   ([#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)).
@@ -62,49 +59,43 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
 
 **Post-v0.1 (explicitly deferred):**
 
-- Forecast quality/science work — [baselines](metrics-and-leaderboard.md#baseline-forecasters),
-  [XGBoost improvements](xgboost-improvements.md).
+- Forecast quality/science work — [baselines](metrics-and-leaderboard.md#baseline-forecasters).
 - The NGED-delivery schema/contract
   ([#96](https://github.com/openclimatefix/nged-substation-forecast/issues/96)) — v0.1 is "forecast
   running", not "delivery contract live".
-- Basic **per-task failure email alerting** (a failed run → SNS → email). Sentry error telemetry and
-  the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) have shipped
-  ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63) — see [Send telemetry
-  to
-  Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence));
-  the remaining piece is the thin SNS→email notification edge for individual run failures.
-- An **MLflow tracking server** (issue
-  [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) and a separate
-  **development dashboard**
-  ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), both hosted on
-  the always-on control-plane box once it exists — see the [note below](#aws-architecture).
+- Basic **per-task failure email alerting** (a failed run → SNS → email). Sentry error telemetry
+  has shipped ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63) — see
+  [Send telemetry to
+  Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry)),
+  and the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) needs a live forecast
+  asset to check in. The remaining piece of per-task alerting is the thin SNS→email notification
+  edge for individual run failures.
+- A **development dashboard**
+  ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)); the always-on
+  control-plane box is one option for hosting it — see the [note below](#aws-architecture).
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
   windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire stale
   CV run partitions.
 - For more plans for post-v0.1, please see [the milestones (v0.2 onwards)](index.md#milestones).
 
-## The `live_forecasts` asset
+## Live forecast assets
 
-Issue: [#221](https://github.com/openclimatefix/nged-substation-forecast/issues/221)
-
-> **Status: ✅ Implemented**, alongside the `promoted_model` promotion asset and local 6-hourly
-> automation (`dg dev` + persistent `DAGSTER_HOME`, part of
-> [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208)). The design
-> rationale (single-run vs. bulk mode, the `live`/`replay` asymmetry, the trained-population
-> invariant) now lives at [Production Deployment — Design: Live
-> inference](../architecture/production-deployment.md#run-live-inference-in-single-run-mode-not-bulk);
-> the operational runbook — promoting a model, running the schedule, backfilling a missed slot — is
-> [Operating the live service](../live_service/operations.md), the permanent home this page's
-> shipped material moves to (and, eventually, this whole page, once every section below has landed).
+**The design gives each time-series type a live Dagster asset of its own, and no live forecast asset
+exists yet.** Each live asset owns its partitions and its schedule, and writes `fold_id="live"` rows
+to `power_forecasts`. The helpers a live asset reuses sit in neutral modules: the NWP-run lookup
+`_available_nwp_init_times` in `defs/assets.py`, beside `ecmwf_ens`, and `write_power_forecasts`
+in the `delta_store` package. [Operating the live service](../live_service/operations.md) is the
+permanent home this page's shipped material moves to (and, eventually, this whole page, once every
+section below has landed).
 
 ## Production model artifacts
 
 Issue: [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)
 
-> **Status: ✅ Done.** The design decision (bake the champion model into the image at build time; no
-> MLflow at runtime) and its rationale now live at [Production Deployment —
-> Design](../architecture/production-deployment.md); the promotion/build/verify runbook lives at
-> [Setting up the live service on AWS](../live_service/aws.md).
+> **Status: the production image carries no model.** The design for a future live forecaster (put
+> its trained model in the image at build time; no MLflow at runtime) and its rationale live at
+> [Production Deployment — Design](../architecture/production-deployment.md); the build-and-verify
+> runbook lives at [Setting up the live service on AWS](../live_service/aws.md).
 
 ## AWS architecture
 
@@ -114,7 +105,7 @@ Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > `EcsRunLauncher` — runs on AWS as v0.2 (`v0.2.0`), the same architecture v0.1 (`v0.1.0`) used,
 > unchanged; the bring-up is documented in [Setting up the live service on
 > AWS](../live_service/aws.md). The [access-phasing](#access-phasing) Stages 2–3 and the future-work
-> items (MLflow server, dev dashboard) remain post-v0.1.
+> item (dev dashboard) remain post-v0.1.
 
 The Level 1 ("nothing always-on") design proposed in issue #206 is rejected. Its cost case does not
 hold, and there are two requirements it cannot serve. The cost case rests on pricing the always-on
@@ -155,11 +146,10 @@ with RDS, and Dagster+ Solo), are recorded as a decision history in [Production 
 infrastructure tier alternatives to the EC2 control-plane
 box](../architecture/production-deployment.md#infrastructure-tier-alternatives-to-the-ec2-control-plane-box).
 
-**Future work (post-v0.1):** once an always-on control-plane box exists (the accepted option or
-later), it's also a natural home for an **MLflow tracking server** (network-reachable, persistent —
-replacing the local file-store) and a **"development dashboard"** (a Marimo app for researchers).
-Neither is needed to ship v0.1; revisit once the box exists — see [Access phasing](#access-phasing)
-below for how each one's exposure rolls out once it does.
+**Future work (post-v0.1):** the control-plane box is one option for hosting a **"development
+dashboard"** (a Marimo app for researchers). The box runs no MLflow tracking server, and none is
+planned for it. See [Access phasing](#access-phasing) below for how a dashboard's exposure would
+roll out.
 
 ### Access phasing
 
@@ -167,12 +157,12 @@ The sections above decide *where* the accepted option's pieces run; this one dec
 them, when*. Three stages, each additive on top of the last — nothing built in an earlier stage is
 reworked in a later one.
 
-The constraint driving all three stages: **none of the three web UIs has any built-in
-authentication.** Open-source `dagster-webserver` has no users, roles, or login (auth/RBAC is a
-Dagster+ feature) — anyone who can reach the port can launch and terminate runs and wipe
-materialisations. MLflow's tracking UI and the Marimo dashboard are equally open. So the network
-layer *is* the auth layer: "no public inbound ports" in Stage 1 and the read-only-second-webserver
-pattern in Stage 2 are load-bearing security decisions, not tidiness.
+The constraint driving all three stages: **neither the Dagster webserver nor a Marimo dashboard has
+any built-in authentication.** Open-source `dagster-webserver` has no users, roles, or login
+(auth/RBAC is a Dagster+ feature) — anyone who can reach the port can launch and terminate runs and
+wipe materialisations. So the network layer *is* the auth layer: "no public inbound ports" in Stage
+1 and the read-only-second-webserver pattern in Stage 2 are load-bearing security decisions, not
+tidiness.
 
 #### Stage 1 — solo, Tailscale only
 
@@ -181,13 +171,11 @@ option](../architecture/production-deployment.md#accepted-option-small-ec2-contr
 already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below have something to
 say "additive on top of."
 
-- Daemon, full-access Dagster webserver, and the Marimo dashboard all run on the `t4g.medium`
-  control-plane box, alongside MLflow once its tracking server lands (the "Future work" item just
-  above, issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) —
-  MLflow-on-the-box is not itself a new v0.1 commitment, only its access tier is decided here.
+- The daemon and the full-access Dagster webserver run on the `t4g.medium` control-plane box. The
+  box runs neither MLflow nor Marimo.
 - Security group: no public inbound ports at all. Everything is reached over Tailscale.
 
-#### Stage 2 — team gets read-only Dagster access; MLflow stays private
+#### Stage 2 — team gets read-only Dagster access
 
 Issue: [#328](https://github.com/openclimatefix/nged-substation-forecast/issues/328)
 
@@ -199,11 +187,7 @@ Issue: [#328](https://github.com/openclimatefix/nged-substation-forecast/issues/
   Workspace domain).
 - Security group opens port 443 for the first time — this is the real milestone of this stage.
 - One DNS subdomain (e.g. `dagster.<domain>`).
-- **MLflow is explicitly not exposed in this stage** — it stays Tailscale-only, unchanged from
-  Stage 1. There is no native read-only public/gated MLflow mode without either the
-  still-experimental auth plugin or allowlisting specific endpoints at the proxy — not worth it
-  unless there's a real need.
-- The full-access Dagster webserver, Marimo, and MLflow remain exactly as in Stage 1.
+- The full-access Dagster webserver remains exactly as in Stage 1.
 - **Lighter alternative if (and only if) the audience is a couple of OCF colleagues:** skip Caddy,
   oauth2-proxy, DNS, and the security-group change entirely by inviting them into the tailnet
   instead. Tailscale already authenticates members with their Google accounts, and a Tailscale ACL
@@ -240,7 +224,7 @@ Issue: [#329](https://github.com/openclimatefix/nged-substation-forecast/issues/
 - **Trade-off:** this couples the public dashboard's *availability* to the control-plane box's
   uptime. Compute isolation is preserved — a Marimo bug can't touch the Dagster daemon, since it's a
   separate task — but if the box goes down, the public dashboard becomes unreachable too, not just
-  the private Dagster/MLflow. Accepted trade-off for solo-project simplicity over running a fourth
+  the private Dagster webserver. Accepted trade-off for solo-project simplicity over running a fourth
   AWS service (an ALB) just for this.
 - Rejected alternative: Marimo's WASM/Pyodide static export (zero server, hosted on S3+CloudFront).
   Ruled out based on direct prior experience — ~30s browser-side cold start on a similar personal
@@ -271,8 +255,8 @@ reason to change Stages 1–3, which remain correct for the OCF-run phase.
 
 Issue: [#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)
 
-*Depends on the [`live_forecasts` asset](#the-live_forecasts-asset) — there is nothing to monitor
-until live forecasts exist.*
+*Depends on a [live forecast asset](#live-forecast-assets) — there is nothing to monitor until
+live forecasts exist.*
 
 The `metrics` asset implements the `leaderboard` and `ad_hoc` scopes; `production_monitoring` is
 declared in `EVALUATION_SCOPES` but unimplemented (`EvalScopeType` in `contracts/ml_schemas.py`
@@ -320,14 +304,14 @@ provides one.
 
 ### Alert on absence: the missed-check-in alarm
 
-> **Status: ✅ Shipped**
-> ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)). The heartbeat, the
-> failure hook, and the laptop/production environment split are built and documented as-built in
-> [Send telemetry to
-> Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
-> This section keeps the *why* — the design rationale for alerting on absence from outside the
-> deployment. The remaining monitoring work on this page is the separate per-task failure email edge
-> (SNS → email).
+> **Status: 🚧 Partly built**
+> ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)). The failure hook
+> and the laptop/production environment split are built and documented in [Send telemetry to
+> Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
+> No live forecast asset exists to check in with Sentry, so the missed-check-in alarm has nothing to
+> watch. This section keeps the *why* — the design rationale for alerting on absence from outside
+> the deployment. The remaining monitoring work on this page is the separate per-task failure email
+> edge (SNS → email).
 
 Per-task failure alerts ([Deployment workstream 3](#deployment-workstream-3-aws-infrastructure))
 only fire when a task runs and fails. Whole classes of failure are silent: a hung daemon, a full
@@ -378,9 +362,9 @@ ops use `OpExecutionContext` (they need `context.instance`).
 
 ### Interaction with the probabilistic metrics
 
-Any metric added to `compute_metrics` flows through this scope automatically — once the
-[probabilistic metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
-(PICP/spread-skill) land, production monitoring tracks ensemble calibration over time for free. No
+Any metric added to `compute_metrics` flows through this scope automatically, so the
+[probabilistic metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics) (PICP and
+interval width) let production monitoring track calibration over time with no extra code. No
 coupling needed; the ordering is flexible.
 
 ## NWP model upgrades
@@ -427,21 +411,21 @@ score different row sets and normalise error differently, so the figures do not 
 attribution rests on the README's reading rather than on a subtraction. Eight post-upgrade months
 cannot settle which of the two later fits is right.
 
-**The loss that remains is real for a production service, because the promoted model is always
+**The loss that remains is real for a production service, because the live forecaster is always
 trained on the old version when an upgrade lands.** Folds cut inside each era hide the loss rather
-than removing it: they show how good a model can be once it has trained on the new version, not how
-good the model already promoted is on the day the new version arrives.
+than removing it: they show how good a forecaster can be once it has trained on the new version, not
+how good the forecaster already serving is on the day the new version arrives.
 
 ### Why the model is not told the NWP version
 
-**For now, XGBoost is not given the NWP model version as a feature, for two reasons.** The
+**For now, a forecaster is not given the NWP model version as a feature, for two reasons.** The
 [study](#the-study-how-fast-a-model-recovers-after-an-upgrade) includes a post-upgrade
 flag as one of its setups, so the decision can be revisited on evidence.
 
 **On the day of an upgrade, no training row carries the new version, so a version feature cannot
-describe the new version.** An ordinal version feature sends every post-upgrade row into the leaves
-the trees fitted to the latest version they saw. Those leaves describe the old version, which is the
-mismatch the feature was meant to remove. The [era-covariate safety
+describe the new version.** In a tree model, an ordinal version feature sends every post-upgrade row
+into the leaves the trees fitted to the latest version they saw. Those leaves describe the old
+version, which is the mismatch the feature was meant to remove. The [era-covariate safety
 rule](training-history.md#scope-the-ingest-to-include-the-2024-overlap) says the same about any era
 feature: an era covariate is safe only when the value production will see is well represented in
 training, and a new version is represented by nothing. The feature starts to help only once
@@ -450,7 +434,7 @@ directly, does the same job. The weather-products study did give its models an e
 fold's training set held post-upgrade months, which is that later case.
 
 **ECMWF upgrades its forecast model roughly once a year, so the ENS version tracks the calendar
-closely.** The trees can use the version as a proxy for the date, and learn capacity changes,
+closely.** A forecaster can use the version as a proxy for the date, and learn capacity changes,
 curtailment regimes, or meter swaps where they should have learned an NWP effect. The plan to
 extend the training history with estimates of past weather is designed to avoid the same [era
 confounding](training-history.md#scope-the-ingest-to-include-the-2024-overlap).
@@ -481,7 +465,7 @@ model, the field, and the run where the shift starts, so a human can confirm the
 to the list.
 
 **Treat an upgrade as a degradation, not an error.** The forecast keeps running, the cycle column
-records that the row's NWP is post-upgrade, and the uncertainty bands widen until the promoted model
+records that the row's NWP is post-upgrade, and the uncertainty bands widen until the live model
 has trained on enough rows from the new cycle.
 
 **Two further signals are options, not yet decided.** The first is a warning row in
@@ -491,7 +475,7 @@ first run on the new cycle in the table's usual form, such as `"ecmwf_ens:2026-0
 50r1, and its `warning_description` would name the cycle. The second is a Sentry event routed to
 the digest rather than to a notification, because nothing of ours has broken.
 
-**Count the promoted model's post-upgrade training in weeks of data from the row's cycle, not in
+**Count the live model's post-upgrade training in weeks of data from the row's cycle, not in
 days since the upgrade.** A model retrained 3 weeks after an upgrade has 3 weeks of the new cycle
 behind it, while a model never retrained has none, however long ago the upgrade was. The same
 reasoning [measures NWP staleness in missed runs rather than in
@@ -573,9 +557,9 @@ product the live service reads once enough post-upgrade months have built up.
 
 Issue: [#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208) (done)
 
-> **Status: ✅ Done** (closed 2026-07-10). The native per-asset Dagster schedules that ship with [The
-> `live_forecasts` asset](#the-live_forecasts-asset) (`power_time_series_and_metadata_schedule`,
-> `ecmwf_ens_schedule`, `live_forecasts_schedule`) do the whole job. Closing #208 took a several-day
+> **Status: ✅ Done** (closed 2026-07-10). The native per-asset Dagster schedules
+> (`power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`, and one schedule per [live
+> forecast asset](#live-forecast-assets)) do the whole job. Closing #208 took a several-day
 > soak under `dg dev` with a persistent `DAGSTER_HOME`, which confirmed 6-hourly forecasts landing
 > with no duplicate rows and a missed slot backfillable in replay mode. No hand-rolled freshness op
 > is needed, and neither is the one-shot `live_pipeline_job` that [Option
@@ -599,17 +583,18 @@ Still 🚧 after v0.1:
 
 - **A bigger backtest task definition** (e.g. 8 vCPU / 32 GB) — the live 4 vCPU / 16 GB definition
   exists; right-size it after a week of CloudWatch metrics.
-- **Per-task failure email alerting** (a failed run → SNS → email) — Sentry error telemetry and the
-  missed-check-in alarm already shipped in
-  [#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63); this is the one piece
-  of alerting still open. Decided 2026-07-14: prefer **portable alerting logic over AWS-native
+- **Per-task failure email alerting** (a failed run → SNS → email) — Sentry error telemetry has
+  shipped ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)); this is the
+  one piece of alerting still open. The [missed-check-in
+  alarm](#alert-on-absence-the-missed-check-in-alarm) needs a live forecast asset to check in, so
+  the alarm does not exist yet. Decided 2026-07-14: prefer **portable alerting logic over AWS-native
   glue** (no EventBridge rules) — the checks should be plain code that runs end-to-end on a laptop
   or any cloud, with only the thin notification edge (SNS, SMTP, …) being platform-specific. Under
   the accepted option, Dagster's own run-failure sensors are the natural portable mechanism (the
-  daemon evaluates them); an EC2 instance-status-check alarm and the [missed-check-in
-  alarm](#alert-on-absence-the-missed-check-in-alarm) cover the silent-failure classes ("daemon
-  silently dead") that per-task alerts miss. The SNS-subscription-confirm step joins the
-  [runbook](../live_service/aws.md) once this lands.
+  daemon evaluates them); an EC2 instance-status-check alarm would cover the silent-failure class
+  ("daemon silently dead") that per-task alerts miss. The missed-check-in alarm would cover the
+  silent-failure class too, once a live forecast asset exists to check in. The
+  SNS-subscription-confirm step joins the [runbook](../live_service/aws.md) once this lands.
 - **Infra-as-code** ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326))
   once there's enough to justify it — per the [Access phasing sequencing note](#access-phasing),
   that point is Stage 2, not Stage 1. **Open question, not yet decided:** a small Terraform module

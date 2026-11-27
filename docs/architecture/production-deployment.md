@@ -1,20 +1,21 @@
 # Production Deployment — Design
 
-How the live service is orchestrated, and how the champion model gets from an MLflow leaderboard
-into a running production container — and why. For the step-by-step recipe — promote a model, build
-the image, verify it, push it, and stand up the AWS deployment around it — see [Setting up the live
-service on AWS](../live_service/aws.md).
+How the live service is orchestrated, and why. The live service ingests the power telemetry of
+National Grid Electricity Distribution (NGED) and the ensemble numerical weather prediction (NWP)
+from the European Centre for Medium-Range Weather Forecasts (ECMWF), and checks both. For the
+step-by-step recipe — build the image, verify it, push it, and stand up the AWS deployment around it
+— see [Setting up the live service on AWS](../live_service/aws.md).
 
 ## Run the Dagster control plane continuously on one small VM
 
 The Dagster control plane — daemon + webserver + code-location server — runs continuously on one
-small VM, alongside MLflow and Marimo, managed via Docker Compose. Its schedules are responsible for
-the entire recurring pipeline, not just the forecasts: pulling fresh telemetry from NGED's bucket
-(hourly), downloading the ECMWF ensemble NWP from Dynamical.org (daily), and issuing the forecasts
-themselves (6-hourly). The box does none of that pipeline compute of its own, though: it dispatches
-every run — those schedules and UI-launched backtests alike — to an ephemeral Fargate task via
-`EcsRunLauncher`. Even the light data-ingest runs go to Fargate; the reasoning is in [Running the
-data-ingest runs on the control-plane VM](#running-the-data-ingest-runs-on-the-control-plane-vm).
+small VM, managed via Docker Compose. The VM runs neither MLflow nor Marimo. Its schedules are
+responsible for the entire recurring pipeline: pulling fresh telemetry from NGED's bucket (hourly)
+and downloading the ECMWF ensemble NWP from Dynamical.org (daily). The box does none of that
+pipeline compute of its own, though: it dispatches every run — those schedules and UI-launched
+backtests alike — to an ephemeral Fargate task via `EcsRunLauncher`. Even the light data-ingest
+runs go to Fargate; the reasoning is in [Running the data-ingest runs on the control-plane
+VM](#running-the-data-ingest-runs-on-the-control-plane-vm).
 This VM-plus-`EcsRunLauncher` split is the [accepted infrastructure
 tier](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher); see [Live service: AWS
 architecture](../roadmap/live-service.md#aws-architecture) for the roadmap's summary, and [AWS
@@ -35,24 +36,22 @@ automation.
 The design accepts two trade-offs:
 
 - **Single point of failure.** The daemon on one VM has no managed scheduler watching it. A quiet
-  box failure could silently miss slots. The blast radius is small, because the project's [uptime
-  requirements are lenient by design](../background/requirements.md#uptime-lenient-by-design):
-  previously published forecasts stay readable from S3 and extend 14 days ahead. A missed slot
-  therefore degrades forecast freshness rather than cutting NGED off. Mitigation: the
-  [missed-check-in alarm](#send-telemetry-to-sentry-and-alarm-on-absence) — each successful 6-hourly
-  run checks in with Sentry (external to the whole deployment). An alert fires when an expected
-  check-in fails to arrive. The alarm is the only component that lives outside the box, and the
-  stack does not depend on it to function.
+  box failure could silently miss ingest runs. The blast radius is small, because the project's
+  [uptime requirements are lenient by
+  design](../background/requirements.md#uptime-lenient-by-design). Nothing outside the box
+  currently watches the daemon, so a dead daemon raises no alert: Sentry receives events only from a
+  process that is still running.
 
-- **No run-level auto-retry after a hard crash.** Accepted; covered by the existing replay/backfill
-  mode for missed slots plus the missed-check-in alarm.
+- **No run-level auto-retry after a hard crash.** We accept this trade-off. The next hourly power
+  pull back-fills the missed telemetry. A missed `ecmwf_ens` partition is re-materialised by hand
+  from the Dagster UI.
 
 "Always-on" is also less demanding than it sounds, because the box comes with **built-in maintenance
-windows**: forecasts are produced only every 6 hours, and NGED reads published forecasts directly
-from S3 (see [Forecast Delivery](forecast-delivery.md)), so the gap between one forecast run and the
-next is a regular window in which the VM can be stopped, patched, or rebuilt without NGED noticing.
-Even an overrun loses only a single slot, recoverable via replay-mode backfill. See [Requirements →
-Uptime: lenient by design](../background/requirements.md#uptime-lenient-by-design).
+windows**. The ingest runs are short and periodic, and the delivery design has NGED read published
+forecasts directly from S3 (see [Forecast Delivery](forecast-delivery.md)). The gap between one
+scheduled run and the next is therefore a regular window in which the VM can be stopped, patched, or
+rebuilt without NGED noticing. See [Requirements → Uptime: lenient by
+design](../background/requirements.md#uptime-lenient-by-design).
 
 Several other orchestration shapes were considered and rejected — see [Considered but rejected
 designs](#considered-but-rejected-designs).
@@ -110,14 +109,12 @@ compiles a `PanicException` class of its own — so listing the classes to catch
 complete, while the list of classes that must propagate can. (Dagster's own machinery — resource
 init, and serialising the returned result into an event — is still outside the guard.) The
 degradation still reaches Sentry, via
-[`report_check_degradation`](#send-telemetry-to-sentry-and-alarm-on-absence).
+[`report_check_degradation`](#send-telemetry-to-sentry).
 
-This in-Dagster check is complementary to — not a replacement for — the [missed-check-in
-alarm](#send-telemetry-to-sentry-and-alarm-on-absence). The alarm fires on total silence from
-*outside* the deployment, because a dead daemon cannot report itself; this check reports per-series
-staleness from *inside* Dagster while the daemon is alive, and forwards that same staleness to
-Sentry as a warning (see the freshness-warning bullet under [Send telemetry to
-Sentry](#send-telemetry-to-sentry-and-alarm-on-absence)). The freshness evaluation is a pure
+The check reports per-series staleness from *inside* Dagster while the daemon is alive, and
+forwards that same staleness to Sentry as a warning (see the freshness-warning bullet under [Send
+telemetry to Sentry](#send-telemetry-to-sentry)). A dead daemon cannot report itself, so the check
+says nothing when the whole deployment has stopped. The freshness evaluation is a pure
 function, so the Sentry warning reuses the same `PowerFreshnessResult` the check already computed
 rather than recomputing it; the same result will later also feed the forecast-warnings delivery
 table.
@@ -152,72 +149,7 @@ the wrong interface for a list expected to change several times a month at V2 sc
 operator-editable from the UI is designed alongside the `asset_health_history` table, so that
 operator-facing health state has one home rather than two.
 
-## Read the live forecast back off disk with a second asset check
-
-`live_forecasts` has the same shape of blind spot, and it matters more, because it is the one asset
-NGED consumes. The asset can raise nothing, report a green tick, and still have written no rows — or
-rows carrying a NaN forecast, or rows for only half the promoted model's population.
-`live_forecasts_are_healthy` closes that gap by reading the slot back out of the `power_forecasts`
-Delta table after the write and reporting what is actually there: the row count, the count of
-null/NaN/infinite `power_fcst` values, the count of rows targeting a `valid_time` at or before their
-own init time (which `PowerForecast` forbids), how far ahead the furthest row reaches, and any
-`time_series_id` the promoted model was trained on that the slot did not forecast. None of that is a
-measure of forecast *skill*, which is production monitoring's job, not a data-health check's.
-
-Two of those checks deserve a note. The **horizon** is checked because `live_forecasts` drops rows
-outside the selected NWP run's coverage, so a partly-ingested run delivers a much shorter forecast
-than NGED expect while every individual row stays perfectly well-formed — a fault nothing else would
-see. The floor is half the horizon we ask for, which is loose enough that a healthy slot (about
-13.75 of the 14 days, since the run it used is already 12–30 hours old) never trips it. A tighter
-floor would risk a false alarm, and would compete with the missed-run count for the same fault. Half
-the horizon catches only the case nothing else sees: NWP that is fresh but truncated.
-
-**The read is scoped to the promoted model's own `experiment_name`, because `write_power_forecasts`
-replaces one `(experiment_name, fold_id)` partition at a time.** Promoting a champion from a
-different CV run leaves the outgoing CV run's rows for the same slot on disk, and without
-that filter the check would report faults sourced entirely from dead rows.
-
-The same check carries the **missed daily NWP run count**, because the second way a live slot goes
-quietly wrong is to be built from an increasingly ancient weather run. It is deliberately a count of
-*runs*, never an age in hours: we ingest one ECMWF run a day and forecast four times a day, so
-healthy NWP is anywhere between 12 and 30 hours old and any absolute age threshold tight enough to
-catch an outage would fire on two slots in four every day.
-
-The count is a subtraction — how many daily runs separate the freshest run on disk from the freshest
-that ought to exist by now — and all the care goes into that second term. It is derived from a
-deadline — how long after a run's `init_time` a healthy ingest should have landed it — rather than
-from the publication time, because what matters is when the run reaches *our* disk. The deadline
-therefore has to clear `ecmwf_ens_schedule`'s 10:30 UTC start plus that asset's retry ladder — 8
-retries at 30 minutes, plus a download on each attempt, for the failure mode that is only detectable
-after downloading — so it sits at 16 hours. The retry delays alone put the last healthy landing at
-about 14:30 UTC, and paying a download and convert on every attempt moves that to about 14:40 UTC,
-which leaves 81 minutes of margin spread over 9 attempts. The deadline is therefore breached only if
-download-and-convert *averages* about 10 minutes across all 9 attempts, not if one attempt is slow:
-a single 645-second download costs only about 10 of those 81 minutes. The consequence is a one-run
-leniency at the 12:00 slot, where today's run has landed but is not yet *demanded*: a download that
-fails today is reported from the 18:00 slot onwards rather than six hours earlier. That one-run
-leniency is the right way round to be wrong. A tighter deadline would recover those six hours but
-trigger a false alarm on every morning the download merely ran slowly, which is the failure mode
-counting runs exists to avoid.
-
-Two design points follow the `power_data_is_fresh` pattern deliberately. The check is **WARN** and
-**non-blocking**, like every other check in the repo — a degraded slot is still the best forecast we
-have, and blocking would contradict the principle that a partition fails only when there is
-genuinely no useful data. And its whole body sits under the same **catch-all**, so it cannot fail
-its own step and trip `live_forecasts_job`'s failure hook.
-
-Beyond that shared pattern, this check salvages more before falling back on the shared pattern: an
-absent `power_forecasts` or NWP table reads as empty, and an absent *or unreadable* promoted-model
-`meta.json` degrades to "population unknown", so the rest of the report survives. (A read *error* on
-either table still voids the whole report.) `power_data_is_fresh` deliberately salvages nothing —
-its only per-read fallback would be "metadata table unknown", which a fresh power table would then
-render as a green tick over a corrupt metadata table.
-
-The check covers the slots where the asset *succeeded*. A slot whose asset raised never reaches it —
-Dagster does not run a check whose asset op failed — and that case is already loud, so nothing is
-lost. What the check adds is exactly the quiet half.
-
-## Send telemetry to Sentry, and alarm on absence
+## Send telemetry to Sentry
 
 Sentry carries both "we broke" and "the weather feed is late", and they need different responses, so
 the difference has to be legible in the event itself.
@@ -247,7 +179,7 @@ built: three of the five senders cover the broke side, and the degraded side has
 `report_power_freshness`, which is why most of the degradation our checks detect is invisible from
 outside Dagster ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)).
 
-Three independent Sentry mechanisms live in `nged_substation_forecast._sentry`, all active in every
+Two independent Sentry mechanisms live in `nged_substation_forecast._sentry`, both active in every
 Dagster process (daemon, webserver, and each Fargate run worker) only when a `SENTRY_DSN` is
 configured — so laptops and CI stay silent by default.
 
@@ -260,23 +192,25 @@ configured — so laptops and CI stay silent by default.
   with no stack trace, and — left at its default `event_level=ERROR` — it would turn *every* `ERROR`
   log in the process into a Sentry event, including Dagster's own startup and ad-hoc-run logs.
   Breadcrumbs — the integration's default `level=INFO` — stay on, so log context still rides along
-  with the events the senders below do send. The hook is attached to the three *scheduled* asset
-  jobs, so it covers the whole unattended production workload. Because log capture is off, the hook
-  does not report failures in a manual UI materialisation, a replay backfill, or a
-  `register_experiment_job` run, which the operator watches at the Dagster UI. The senders called
-  from inside an asset, such as `report_asset_retry`, still fire in those runs.
+  with the events the senders below do send. The hook is attached to the two *scheduled* asset
+  jobs, `power_time_series_and_metadata_job` and `ecmwf_ens_job`, so it covers the whole unattended
+  production workload. Because log capture is off, the hook does not report failures in a manual UI
+  materialisation, a backfill, or a `register_experiment_job` run, which the operator watches at
+  the Dagster UI. The senders called from inside an asset, such as `report_asset_retry`, still fire
+  in those runs.
 
     One production fault the hook cannot see is an asset check that caught its own exception instead
     of failing the run — which, by design, is every one of them: the two standalone `@asset_check`s,
     and the three per-run checks computed inside the `ecmwf_ens` asset. `report_check_degradation`
     covers exactly that gap: each check's catch-all sends the same exception the hook would have
     sent, tagged `asset_check` with the check's name, and `report_asset_degradation` does the same
-    tagged `degraded_asset` for an *asset* that degrades rather than failing — today,
-    `power_time_series_and_metadata`'s metadata table upsert. Since log capture is off, either
-    handler's `ERROR` log alone would reach nobody. `power_time_series_and_metadata_job` compounds
-    that silence: it has no cron monitor of its own. Absent `report_check_degradation`, a check that
-    cannot read its own inputs would show up only as a yellow tick in Dagster's Checks view, and
-    nobody would be told.
+    tagged `degraded_asset` for an *asset* that degrades rather than failing — today, when
+    `power_time_series_and_metadata` cannot upsert the metadata table or write the downloaded-files
+    list, and when `clean_nged_power_data` cannot vacuum the cleaned table. Since log capture is
+    off, either handler's `ERROR` log alone would reach nobody. No job has a Sentry cron monitor
+    either.
+    Absent `report_check_degradation`, a check that cannot read its own inputs would show up only as
+    a yellow tick in Dagster's Checks view, and nobody would be told.
 
     `report_asset_retry` is the early warning for an asset that is about to retry. `ecmwf_ens` sends
     the warning on the first failed attempt, tagged `retrying_asset`, so an ECMWF run that upstream
@@ -310,27 +244,10 @@ configured — so laptops and CI stay silent by default.
     Unwrapping discards nothing: the whole exception chain is serialised either way, and what the
     unwrap fixes is the event's title and how Sentry groups it.
 
-- **The missed-check-in alarm** — the *primary* production alert. After each successful *live*
-  `live_forecasts` run, the asset sends one success check-in (a heartbeat) to a Sentry cron monitor;
-  Sentry raises the alarm when no heartbeat lands within the margin (the 6-hourly schedule plus ~2 h
-  grace), regardless of cause. Because the alarm only fires once the following slot's own grace
-  period has elapsed, a missed heartbeat is flagged roughly 8 hours after the last success — one
-  6-hourly slot plus the ~2 h grace. Evaluation must live outside the deployment because a dead
-  daemon cannot report itself — the reasoning for why this, not a Dagster sensor, is the mechanism
-  is in [Alert on absence](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
-  Only *success* heartbeats are ever sent (never an `error` or `in_progress` check-in), so the alarm
-  keys purely off absence: an in-band run error is the failure hook's job, and a manual `replay`
-  backfill — which reprocesses the past rather than proving the service is live now — deliberately
-  does not check in. Sentry's `max_runtime` setting is deliberately left unset: it would time a
-  check-in against an `in_progress` counterpart, which the success-only heartbeat never sends, so
-  there is nothing for it to measure against. Sending the heartbeat never raises: `live_forecasts`
-  has already committed its Delta write by the time `send_forecast_checkin` runs, so a raise here
-  would report the run as failed while the rows it produced sit committed.
-
 - **Freshness warnings.** When the `power_data_is_fresh` asset check finds late series,
   `report_power_freshness` forwards that per-series staleness to Sentry as a `warning`-level event,
   reusing the `PowerFreshnessResult` the check already computed. It is gated on the DSN (Sentry's
-  Data Source Name, like error telemetry, not the heartbeat flag), so it fires from wherever a
+  Data Source Name), like error telemetry, so it fires from wherever a
   configured environment runs the hourly check, separated by the `environment` tag. The event is
   fingerprinted **per environment** (`["nged-power-data-stale", <environment>]`) — Sentry's
   `environment` is a filter facet, not a grouping key, so without the environment in the fingerprint
@@ -351,22 +268,17 @@ issue's "last seen" timestamp stops advancing — and the operator resolves the 
 production alert rule should fire on *regressions* (and the project's Sentry auto-resolve window
 kept short) so that a fresh stall after a recovery re-pages rather than silently appending to a
 stale-but-unresolved issue. Choosing recovery-by-silence over an explicit resolved event is a
-deliberate trade: the missed-check-in alarm above is the primary two-directional signal. This
-warning is the richer per-series breadcrumb layered on top.
+deliberate trade: the check's own green tick in Dagster's Checks view is the signal that the feed
+has recovered, and the Sentry warning is the per-series breadcrumb that reaches a human outside
+Dagster.
 
 ### Separating laptop telemetry from production
 
 Sentry's `environment` tag (from `Settings.sentry_environment`) keeps the two apart. The always-on
 box sets `environment=production`. Each developer overrides the `local` default with `<name>-laptop`
-(e.g. `jacks-laptop`, `alexs-laptop`), so error events filter cleanly by origin. The missed-check-in
-alert rule is scoped to `environment:production`, so an intermittently-run laptop never pages. A
-developer exercising the heartbeat path locally leaves `SENTRY_MONITOR_FORECASTS` off and calls
-`send_forecast_checkin` with a *throwaway* `monitor_slug` (`live-forecasts-test`), as the [Sentry
-verification script](../live_service/sentry.md#verify-it-works-from-your-laptop) does. The
-production slug is a constant in `_sentry.py`, not a setting, so a laptop that merely switched the
-flag on would check in to the shared `live-forecasts` monitor and then stop, leaving it expecting a
-6-hourly check-in the laptop won't keep sending. The [AWS runbook](../live_service/aws.md) lists the
-exact environment variables set on the box.
+(e.g. `jacks-laptop`, `alexs-laptop`), so error events filter cleanly by origin. Scope every alert
+rule that pages a human to `environment:production`, so an intermittently-run laptop never pages.
+The [AWS runbook](../live_service/aws.md) lists the exact environment variables set on the box.
 
 ## Separate "is this run usable?" from "is it perfect?"
 
@@ -391,49 +303,34 @@ issues](ecmwf-ens-known-issues.md). The `power_data_is_fresh` check above is the
 pointed at a different question — staleness rather than completeness — and is likewise a warning,
 never a failure.
 
-## Bake the model into the image at build time
+## Keep MLflow off the production runtime path
 
-Production forecasts run as ephemeral Fargate tasks, dispatched by the always-on Dagster control
+**The deployment runs no MLflow tracking server, so nothing the live service runs loads a model from
+MLflow.** Production runs are ephemeral Fargate tasks, dispatched by the always-on Dagster control
 plane described [above](#run-the-dagster-control-plane-continuously-on-one-small-vm). An ephemeral
-container has no persistent disk and no MLflow tracking server to reach — so production inference
-needs some way to get a model without depending on either.
-
-The champion model is therefore baked into the image at build time and loaded via a plain
-`save`/`load` — no MLflow, run ID, or cache involved at runtime. The model directory is produced
-once, out of band (a researcher picks the champion fold from the MLflow leaderboard and downloads
-its artifacts to local disk), then `COPY`'d into the image at build time. Promotion becomes
-rebuild + redeploy, which is auditable (image tags) and keeps MLflow completely out of the
-production runtime.
-
-That directory also holds `time_series_metadata.parquet`, the metadata table rows the model was
-trained against. Inference reads each series' H3 cell and static features from there rather than
-from the live metadata table, so the only data the container needs at runtime is the NWP and power
-Delta tables. A metadata table that is unreadable, or has lost rows, cannot fail a slot or silently
-drop a series from it. (The rejected alternative — fetching the model from MLflow at container
-startup — is covered in
-[Considered but rejected designs](#fetching-the-champion-model-from-mlflow-at-container-startup).)
+container has no persistent disk and no tracking server to reach. The production image currently
+carries no trained forecasting model. A trained forecasting model added to the live service would
+reach the container inside the image, as a plain directory that the forecaster's own `load` reads.
+The image build never contacts MLflow. (The rejected alternative — fetching the model from MLflow at
+container startup — is covered in [Considered but rejected
+designs](#fetching-a-model-from-mlflow-at-container-startup).)
 
 This design also serves the operating model for after this Network Innovation Allowance (NIA)
 project (see [Requirements → Operating model &
 handover](../background/requirements.md#operating-model-handover)). The working assumption is that
 NGED runs the service on its own AWS account, operated day to day by NGED staff who did not develop
 the code, working from the runbooks. For that operator there is no tracking server on the hot path
-to break. The model simply freezes between model updates, and a frozen model is a feature, not a
-limitation.
+to break. A trained forecasting model inside the image would change only when a new image is
+deployed, and that stability is a feature, not a limitation.
 
-Baking the model in is deliberately simpler than depending on `BaseForecaster.load_from_mlflow` at
-runtime (the mechanism the CV pipeline already uses — see [ML orchestration: model
-artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache)). The live
-deployment has no MLflow tracking server for the runtime container to reach in the first place, so
-there is nothing to cache or fail over from.
-
-**Future work:** once production wants to pick up a new champion without a rebuild + redeploy (e.g.
-after the [XGBoost quick wins](../roadmap/xgboost-improvements.md) start landing regularly), switch
-to fetching the champion model from MLflow dynamically. At that point the live service would need
-some way to keep serving through an MLflow outage. `load_from_mlflow` supplies none — it downloads
-on every call, for the reasons in [Why there is no local
-cache](ml-orchestration.md#why-there-is-no-local-cache). That mechanism therefore has to be designed
-against production's own availability needs. Tracked in
+The cross-validation pipeline does load models from MLflow, through
+`BaseForecaster.load_from_mlflow` (see [ML orchestration: model
+artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache)).
+`load_from_mlflow` downloads on every call, for the reasons in [Why there is no local
+cache](ml-orchestration.md#why-there-is-no-local-cache), so it offers no way to keep serving through
+an MLflow outage. A live service that picked up each new model from MLflow without a redeploy would
+need a way to keep serving through an MLflow outage, designed against production's own availability
+needs. That design is tracked in
 [issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Resolve repo-relative paths via a workspace marker, not directory depth
@@ -463,65 +360,6 @@ laid out like the repo root or set each path setting explicitly via its env var.
 and the other repo-relative resource files into a wheel via `importlib.resources` was considered
 for #287 and deliberately deferred until that deployment shape actually exists.)
 
-## Run live inference in single-run mode, not bulk
-
-The `live_forecasts` asset engineers features in **single-run mode** — an explicit
-`power_fcst_init_time` supplied by the partition, joined across all 51 NWP ensemble members — never
-bulk mode's one-`power_fcst_init_time`-per-NWP-run derivation (see [ML orchestration: forecast
-cadence under-sampling](ml-orchestration.md#known-limitation-forecast-cadence-under-sampling-in-cv)
-for where bulk mode's per-NWP-run derivation matters instead: CV/backtesting, not live inference). A
-production run issues one forecast for one explicit init time every 6 hours. Bulk mode's derivation
-has no meaning for a single live materialisation.
-
-## Resolve NWP availability asymmetrically: `live` vs `replay`
-
-`live_forecasts`' `availability_mode` config resolves which NWP run to join against, and the two
-modes are deliberately asymmetric:
-
-- **`"live"`** joins the freshest NWP run actually present in Delta, with **no modelled publication
-  delay** — reality already constrains the table to genuinely published runs, so a faster provider
-  is used automatically without a config change.
-- **`"replay"`** joins the freshest run at least `nwp_publication_delay_hours` old, reconstructing
-  what was genuinely available at that historical init time. Without the delay, a replay would leak
-  NWP runs that only landed after the fact — a lookahead-bias bug, not just an inaccuracy.
-
-Downstream, feature engineering caps the freshest-run join it uses for weather lags at whichever run
-was selected here, rather than re-deriving availability from the publication delay. A `"live"` slot
-therefore keeps the run it is forecasting with, however fresh that run is.
-
-The scheduled path always uses `"live"`; backfills of missed or historical partitions use
-`"replay"`. The mode is an explicit, manually-set flag rather than an automatic live-iff-recent rule
-— the ambiguity of "recent" isn't worth resolving for a backfill path that's already manually
-triggered.
-
-## Serve only the trained population
-
-`live_forecasts` forecasts exactly the production model's `trained_time_series_ids` (recorded in
-`meta.json`), never the current day's eligibility set. Forecasting exactly the trained population is
-the train==predict population invariant: a time series the model never saw during training must
-never receive a live forecast, even if it would otherwise qualify today.
-
-## Promote the champion via a Dagster asset, not a script
-
-The "researcher downloads artifacts" step above is a manually-triggered Dagster asset,
-`promoted_model` (config `mlflow_run_id`), rather than a bare script — promotion becomes a
-materialisation, giving an audit trail and lineage for free. The download logic itself
-(`ml_core.production_helpers.fetch_model_artifacts`) is a pure, asset-independent helper, so nothing
-about this decision couples it to Dagster.
-
-**The image build is hermetic and depends on the asset only through the filesystem.** A researcher
-materialises `promoted_model` on their laptop first — the candidate models live in the laptop's
-local MLflow file store — which populates `data/production_model/`. The build script hands that
-directory to `docker build` as a named build context, `production_model`, and the Dockerfile `COPY`s
-the model from that build context; the build never contacts MLflow itself. So the build needs no
-MLflow credentials and no reachable tracking server — only the base images and the package index `uv
-sync` resolves against. The model in the image is exactly the artifact set the promotion
-materialisation recorded. `docker build` stays outside Dagster too: it only ever runs on a laptop
-today. Image build/push becomes a CI-shaped concern once an MLflow tracking server and AWS infra
-exist — not a process worth orchestrating through Dagster in the meantime. The runbook steps are
-[Step 3](../live_service/aws.md#step-3-pick-and-promote-a-champion-model) and [Step
-4](../live_service/aws.md#step-4-build-and-verify-the-image).
-
 ## Considered but rejected designs
 
 Each design below was seriously considered for the live service and rejected. Every subsection
@@ -530,12 +368,12 @@ it.
 
 ### No control plane: EventBridge Scheduler launching ECS tasks
 
-**The design.** AWS EventBridge Scheduler fires on the 6-hourly cadence and launches an ECS (Elastic
-Container Service) `RunTask` that executes `dagster asset materialize` (or `dagster job execute`)
-directly in the production image. Dagster acts purely as the in-process execution framework,
-EventBridge acts as the scheduler, and compute is paid per run with nothing always-on. Run history
-could still be inspected by pointing an on-demand `dagster-webserver` at shared Postgres run
-storage.
+**The design.** AWS EventBridge Scheduler fires on each schedule's cadence and launches an ECS
+(Elastic Container Service) `RunTask` that executes `dagster asset materialize` (or `dagster job
+execute`) directly in the production image. Dagster acts purely as the in-process execution
+framework, EventBridge acts as the scheduler, and compute is paid per run with nothing always-on.
+Run history could still be inspected by pointing an on-demand `dagster-webserver` at shared Postgres
+run storage.
 
 **Why we rejected it (July 2026).** Four reasons:
 
@@ -551,9 +389,9 @@ storage.
    for the full handover plan.
 
 3. **The cost saving is not real for this workload.** EventBridge's pay-per-run economics matter
-   when the alternative is an idle fleet. Our alternative, though, is one small VM that must exist
-   anyway to host MLflow and Marimo. Splitting the scheduler out of that box would save roughly
-   \$10–15/month while adding architectural surface area.
+   when the alternative is an idle fleet. Our alternative, though, is one small VM. Moving the
+   scheduler off that VM would save roughly \$10–15/month while adding architectural surface
+   area.
 
 4. **Run-level retry is no better under EventBridge.** EventBridge Scheduler retries the
    *invocation* of a task (with backoff, a configurable max age/attempt count, and a Simple Queue
@@ -562,8 +400,8 @@ storage.
    Relaunching a whole crashed run would have required wrapping the task in a Step Functions state
    machine using the `.sync` integration, while failures *inside* a run are already handled by
    Dagster's `RetryPolicy` on individual assets/ops, which works in-process with or without a
-   daemon. So neither design gives run-level retry out of the box. At four runs per day, the
-   existing replay/backfill mode plus alerting is a sufficient answer in both worlds.
+   daemon. So neither design gives run-level retry out of the box. At one telemetry run an hour and
+   one NWP run a day, manual backfills plus alerting are a sufficient answer in both worlds.
 
 EventBridge is also graph-blind: it fires a cron and passes a payload, so asset dependency ordering
 would have been handled entirely by Dagster within a single self-contained run of the full asset
@@ -580,7 +418,7 @@ supports.
 
 **The design.** Run the Dagster daemon only periodically (say, hourly) instead of continuously, to
 save cost; on each wake-up, the daemon's schedule catch-up (`max_catchup_runs`, default 5) would
-fire any 6-hourly ticks missed while it slept.
+fire any scheduled ticks missed while it slept.
 
 **Why we rejected it.** Sensors, run monitoring, and retries all assume an always-on daemon; the web
 UI would be unavailable most of the time; and an external scheduler would still need to reliably
@@ -596,20 +434,17 @@ maintains the hosts), so the one piece of self-maintained OS in the deployment w
 **Why we rejected it.** Five reasons:
 
 1. **Fargate's premium pays off exactly where this workload can't use it.** Fargate's per-second
-   billing wins for compute that runs a few minutes per day — which is why the forecast worker runs
+   billing wins for compute that runs a few minutes per day — which is why every pipeline run goes
    there. For a box that runs 24/7, the same premium just compounds: at `eu-west-2` on-demand rates,
    an always-on 2 vCPU / 4 GB Fargate service costs roughly **2.4× the `t4g.medium` VM** it would
    replace (~\$66/month vs ~\$27/month, from the ARM Fargate and EC2 rates in the [region price
    table](forecast-delivery.md#securing-it)).
 
-2. **The box is planned to host more than the control plane.** The same VM is the intended home of
-   the MLflow tracking server and the Marimo dashboard — which is why the [EventBridge
-   rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) counts the VM as a cost
-   that exists anyway. A VM absorbs each additional long-running service as one more entry in the
-   same `docker-compose.yml`, using headroom already paid for. As Fargate services, each would be
-   its own always-on task paying the premium above over again. MLflow also brings its own
-   persistence needs (its backend store and artifact root), running into the disk problem below a
-   second time.
+2. **A VM can take on further long-running services cheaply.** The VM runs only the control plane
+   today; a Marimo dashboard is one option for a later service on the same box. A VM absorbs each
+   additional long-running service as one more entry in the same `docker-compose.yml`, using
+   headroom already paid for. As Fargate services, each would be its own always-on task paying the
+   premium above over again.
 
 3. **Postgres needs a disk that Fargate doesn't have.** A Fargate task has no persistent local
    storage, so the Postgres container (run, event, and schedule history) could not come along. It
@@ -629,7 +464,7 @@ maintains the hosts), so the one piece of self-maintained OS in the deployment w
 
 5. **The benefit is smaller than it looks.** The OS burden Fargate would remove is one Ubuntu box
    that patches itself (`unattended-upgrades`), can be stopped for maintenance in any of the
-   built-in 6-hourly maintenance windows
+   built-in maintenance windows
    ([above](#run-the-dagster-control-plane-continuously-on-one-small-vm)), and is slated for a
    tested rebuild-from-scratch script (see [Handover: make the control-plane box rebuildable from
    scratch](../roadmap/handover.md#3-make-the-control-plane-box-rebuildable-from-scratch)) so that
@@ -661,8 +496,8 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
    [handover constraint](../roadmap/handover.md) says to avoid.
 
 2. **Blast-radius isolation.** The box's only job is to always be up, and it is deliberately tiny: a
-   `t4g.medium` whose 4 GB is shared by the daemon, webserver, code-location server, and Postgres,
-   with MLflow and Marimo planned on top. The ingest jobs are lighter than inference but not
+   `t4g.medium` whose 4 GB is shared by the daemon, webserver, code-location server, and Postgres.
+   The ingest jobs are lighter than inference but not
    negligible — the NWP ingest decodes a full daily ENS run (~7 million rows) and is CPU-hungry
    enough that its download once starved *itself* through thread contention
    ([#276](https://github.com/openclimatefix/nged-substation-forecast/issues/276)). Several busy
@@ -686,12 +521,12 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
    touch.
 
 **What the accepted design costs.** Every ingest run currently inherits the task definition's 4 vCPU
-/ 16 GB — sized for inference's ~9 GB peak, and oversized for an hourly telemetry pull. At the
-`eu-west-2` ARM rates in the [region price table](forecast-delivery.md#securing-it) (~\$0.21/hour
-for that task size), ~720 hourly runs of a few minutes each — most of them the no-ops described
-above — come to on the order of **\$5–10/month**: the same magnitude of saving the [EventBridge
-rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) dismissed as "not real for
-this workload".
+/ 16 GB, which is sized for a forecast asset and oversized for an hourly telemetry pull. Nobody has
+measured the daily NWP ingest's peak memory. At the `eu-west-2` ARM rates in the [region price table](forecast-delivery.md#securing-it)
+(~\$0.21/hour for that task size), ~720 hourly runs of a few minutes each — most of them the no-ops
+described above — come to on the order of **\$5–10/month**: the same magnitude of saving the
+[EventBridge rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) dismissed as
+"not real for this workload".
 
 **A second, quieter cost is idle time billed inside a single run.** `ecmwf_ens`'s not-yet-published
 retry loop (`RetryRequested`, 30-minute waits) retries *inside the same run*, so on a
@@ -717,36 +552,31 @@ architecture, and neither moves work onto the box:
 
 Either way: shrink or skip the ingest tasks; don't move the work onto the box.
 
-### Fetching the champion model from MLflow at container startup
+### Fetching a model from MLflow at container startup
 
-**The design.** Host the MLflow artifact root on S3 and have each production container fetch the
-champion model from it at startup, instead of [baking the model into the
-image](#bake-the-model-into-the-image-at-build-time).
+**The design.** Host the MLflow artifact root on S3 and have each production container fetch its
+model from it at startup, instead of [carrying the model inside the
+image](#keep-mlflow-off-the-production-runtime-path).
 
 **Why we rejected it.** It adds runtime moving parts, needs tracking-store access from production,
-and slows cold starts. Baking the model in has none of those drawbacks. The rejection gets stronger
-under the operating model for after the NIA project (see [Requirements → Operating model &
+and slows cold starts. A model inside the image has none of those drawbacks. The rejection gets
+stronger under the operating model for after the NIA project (see [Requirements → Operating model &
 handover](../background/requirements.md#operating-model-handover)). The working assumption is that
-NGED runs the service on its own AWS account. With the model baked in, NGED never has to run — or
-depend on — an MLflow tracking server at all. The model simply freezes until a new image arrives: a
-new model reaches production only as a new container image.
+NGED runs the service on its own AWS account. With the model inside the image, NGED never has to run
+— or depend on — an MLflow tracking server at all. A new model reaches production only as a new
+container image.
 
 Rejecting this design says nothing against MLflow itself — MLflow remains the backbone of ML
-research and development: training runs log their models, configs, and metrics to it. The champion
-is *chosen* from an MLflow leaderboard (see [ML orchestration: model
-artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-cache) for the
-design, and [cross-validation](../cross-validation/index.md) for the day-to-day workflow). The
-boundary this rejection draws is between ML R&D and production: research uses MLflow constantly,
-while production's hot path never touches it. MLflow's job ends at the moment of promotion, when the
-chosen champion is copied out of the tracking store and baked into the image.
+research and development: training runs log their models, configs, and metrics to it, and the
+[cross-validation](../cross-validation/index.md) leaderboard is built from it. The boundary this
+rejection draws is between ML R&D and production: research uses MLflow constantly, while
+production's hot path never touches it.
 
-The idea may still return in a stronger form: the **future work** note at the end of [Bake the model
-into the image at build time](#bake-the-model-into-the-image-at-build-time) — the section describing
-the accepted design this rejected idea lost to — describes fetching the champion dynamically once
-redeploys become frequent. At that point a production-resilience mechanism for serving through an
-MLflow outage would need to be designed (tracked in
-[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472)).
-`load_from_mlflow` does not supply a resilience mechanism of its own.
+Fetching a model from MLflow at container startup may still return as an option if new models start
+reaching production often enough that a redeploy for each new model becomes a burden. A mechanism
+for serving through an MLflow outage would then need to be designed, because `load_from_mlflow`
+supplies none of its own. That mechanism is tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Infrastructure tier: alternatives to the EC2 control-plane box
 
@@ -759,33 +589,32 @@ plane backed by RDS, and a managed Dagster+ Solo plan.
 ### Accepted option: small EC2 control-plane box + `EcsRunLauncher`
 
 A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront reserved**)
-runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker + **the Marimo
-dashboard**, behind Tailscale (no ALB — Application Load Balancer). Every run — live schedules *and*
+runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker, behind
+Tailscale (no ALB — Application Load Balancer). Every run — live schedules *and*
 UI-launched backtests — is dispatched by `EcsRunLauncher` to an ephemeral Fargate task sized to the
 job. Add ~£1.80 EBS (Elastic Block Store, the VM's disk), £9–13/month Fargate — live inference plus
 the hourly ingest and polling runs, priced in [AWS Running Costs](aws-costs.md#v1-32-time-series) —
 and ~£0.65/backtest.
 
 **One image, four roles.** The daemon, webserver, and code-location server all run from the *same*
-[production image](#bake-the-model-into-the-image-at-build-time) the ephemeral Fargate runs use
-(harmless — the baked-in champion model is dead weight for the first three, only a run's actual
-execution touches it) — a `docker-compose.yml` on the box just launches each as a separate service
-with a different command override. The compose file, and the entrypoint gotchas it has to navigate,
-are now written up in the runbook — [Setting up the live service on AWS: Steps 9 and
+production image the ephemeral Fargate runs use. A `docker-compose.yml` on the box launches each as
+a separate service with its own command, because the image has no default command. The compose file,
+and the entrypoint gotchas it has to navigate, are now written up in the runbook — [Setting up the
+live service on AWS: Steps 9 and
 14](../live_service/aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
 
 - **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced centrally);
-  backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance roles (no static
-  keys); a standard Dagster-OSS-on-AWS deployment.
+  backtests get big ephemeral compute; a later dashboard could run on the box at no extra
+  cost; EC2 IAM instance roles (no static keys); a standard Dagster-OSS-on-AWS deployment.
 - **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
   policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher config
-  work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The risk of a long-lived,
+  work; 4 GB is comfortable but not roomy. The risk of a long-lived,
   hand-maintained server grows once the service is operated by staff who did not develop the code —
   the full mitigation list (auto-recovery alarms, disk hygiene, a tested rebuild-from-scratch
   script) is [Handover workstream
   3](../roadmap/handover.md#3-make-the-control-plane-box-rebuildable-from-scratch).
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and £10.30/£6.50
-  after, if everything squeezes into 2 GB — likely too tight with Marimo.
+  after, if everything squeezes into 2 GB.
 
 ### Infrastructure-tier options considered and rejected
 
@@ -852,7 +681,7 @@ the better design anyway).
 | £/month | 12–22 | **27–40** | 56–86 | ~41–45 (+ALB) | 37–45 |
 | Run history + UI backfills | ✗ | ✓ | ✓ | ✓ | ✓ |
 | Backtests in AWS | ✗ | ✓ big ephemeral compute | ✓ but 2–4 vCPU | ✓ | ✓ (credits) |
-| Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
+| Adding a Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
 | Servers to patch | 0 | 1 | 1 | 0 | 0 |
 | No static AWS keys | ✓ | ✓ | ✓ EC2 / ✗ Lightsail | ✓ | ✓ |
 | Multi-user UI | n/a | ✓ (Tailscale) | ✓ | ✓ | ✗ (1 user) |
@@ -875,13 +704,13 @@ RDS+ALB tax for purism; E's 1-user cap rules it out.
   box](#infrastructure-tier-alternatives-to-the-ec2-control-plane-box).
 - [AWS Running Costs](aws-costs.md) — what this architecture costs to run: the v1 estimate as
   deployed, and the projected estimate at v2 scale.
-- [Setting up the live service on AWS](../live_service/aws.md) — the step-by-step runbook:
-  promotion, image build/push, and the full AWS bring-up including the control-plane box.
+- [Setting up the live service on AWS](../live_service/aws.md) — the step-by-step runbook: image
+  build/push, and the full AWS bring-up including the control-plane box.
 - [Setting up Sentry telemetry](../live_service/sentry.md) — the how-to for the error reporting and
-  missed-check-in alarm designed above: get a DSN, test from a laptop, enable in production.
+  freshness warnings designed above: get a DSN, test from a laptop, enable in production.
 - [Configuration reference](../live_service/setup.md) — where data tables and local artifacts live,
   and how to point `Settings` at S3.
-- [ML Orchestration Design](ml-orchestration.md) — why production inference has no MLflow dependency
-  at runtime at all, unlike the CV pipeline's artifact round-trip.
+- [ML Orchestration Design](ml-orchestration.md) — how the CV pipeline round-trips trained models
+  through MLflow as one replaceable archive.
 - [Why Dagster, not Airflow?](why-dagster-not-airflow.md) — why Dagster was chosen at design time,
   whether a migration to Airflow would be possible today, and what a port would take.

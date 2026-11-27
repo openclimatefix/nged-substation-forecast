@@ -342,8 +342,7 @@ metered interval — and unit-test the timestamp convention end-to-end before tr
 azimuth. This is not a V2-only concern: the same confusion is live in today's half-hourly NWP
 resample, where treating a period-ending radiation value as instantaneous shifts the modelled solar
 peak by up to three hours beyond forecast day 6. See [NWP variable
-conventions](../architecture/nwp-variable-conventions.md), and the [fix that lands first in
-v0.5](../roadmap/xgboost-improvements.md#fix-the-nwp-resample-to-honour-the-variable-conventions).
+conventions](../architecture/nwp-variable-conventions.md).
 
 ### Panel temperature
 
@@ -393,12 +392,10 @@ right choice until that data is available.
 
 ### Soiling
 
-**Soiling belongs in the v2 forward model, not in version 1.** Version 1 reaches the same physics
-through a tabular stand-in: the [drought and sustained-heat
-accumulator](../roadmap/xgboost-improvements.md#the-long-window-variant-drought-and-sustained-heat-state)
-hands XGBoost the state variable $d_t$ below — time since precipitation last exceeded a washing
-threshold — directly as a feature. This section makes the differentiable parameterisation concrete
-for when v2 needs it.
+**Soiling belongs in the v2 forward model, not in version 1.** Version 1 can reach the same physics
+through a tabular stand-in: the state variable $d_t$ below — time since precipitation last exceeded
+a washing threshold — is supplied directly as a feature. This section makes the differentiable
+parameterisation concrete for when v2 needs it.
 
 [Capacity estimation](../roadmap/capacity-estimation.md) names soiling as one of the shared physics
 corrections a learned fleet-scale model should absorb, and notes that a capacity estimate silently
@@ -476,11 +473,11 @@ node's loss surface is better behaved. A starting point derived from a convex pr
 hand-picked vector that happens to be good, is what that section proposes.
 
 **What limits the fitted physical model is its specification, not its optimiser.** On the satellite
-irradiance source the fitted model reaches 6.28% of P99 output against XGBoost's 5.24%, so the tree
-is 1.05 percentage points better. A tree given nothing but the physical model's output lowers the
-error on neither irradiance source — the change is −0.025 percentage points [−0.061, +0.011] on the
-satellite source, an interval spanning zero. The deficit is therefore not a mis-calibration that
-rescaling the physical model's own output could repair.
+irradiance source the fitted model reaches 6.28% of P99 output against 5.24% for the study's
+XGBoost model, so the tree is 1.05 percentage points better. A tree given nothing but the physical
+model's output lowers the error on neither irradiance source — the change is −0.025 percentage
+points [−0.061, +0.011] on the satellite source, an interval spanning zero. The deficit is
+therefore not a mis-calibration that rescaling the physical model's own output could repair.
 
 **The term that hurts is the transposition, and the sketch above carries no guard on it.** The
 study compared a weather product's published direct-beam field against a beam estimated from

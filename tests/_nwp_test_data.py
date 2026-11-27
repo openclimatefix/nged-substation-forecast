@@ -1,6 +1,6 @@
 """Shared NWP test data and dtypes, for any test suite in the repo.
 
-The several ``live_forecasts`` / CV / metrics integration tests each build a synthetic ``Nwp``
+The several CV and metrics integration tests each build a synthetic ``Nwp``
 frame. ``half_hours``, ``NWP_CONTINUOUS_COL_VALUES``, ``nwp_records`` and ``write_test_nwp`` live
 here because they were byte-identical, or identical but for one parameter, across the test
 modules that used to define them locally. What genuinely differs per test file is *which* cells,

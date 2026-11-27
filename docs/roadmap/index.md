@@ -30,16 +30,13 @@ best-estimate, not a guarantee.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
   weather datasets (ECMWF ENS, CAMS, ERA5, and the CEDA UKV archive that version 1 does not
   ingest), with the dated list of upgrades to each weather model.
-- [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference asset, the
-  champion-model container, the costed AWS architecture options, production monitoring, and the
-  handling of NWP model upgrades.
+- [Live service](live-service.md) — the AWS deployment: the live forecast assets, the container
+  image that carries their trained models, the costed AWS architecture options, production
+  monitoring, and the handling of NWP model upgrades.
 - [Handover to NGED](handover.md) — the operating model after the Network Innovation Allowance (NIA)
   project ends (the working assumption is that NGED runs the service on its own AWS account): the
   operator-contract design constraint, and the handover workstreams (runbooks, alert-on-absence,
   infra-as-code, confirming NGED's cloud and security standards, and game days).
-- [XGBoost improvements](xgboost-improvements.md) — the XGBoost experiment backlog, kept as a record
-  because XGBoost is not planned for production: four effort tiers,
-  ordered best bang-for-the-buck within each tier, targeting the 3–10 day user band.
 - [Extending the training history](training-history.md) — using estimates of past weather, CAMS for
   irradiance and ERA5 for other variables, to train on the power data that predates the ECMWF
   ENS archive: the era-confounding hazard that dictates the ingest's scope, the reconciliation and
@@ -51,7 +48,7 @@ best-estimate, not a guarantee.
   weather products, and coupling that restores coherent ensemble members. The experiments that test
   it are on the [ML experiments](https://openclimatefix.github.io/nged-ml-research/ml-experiments/) pages.
 - [Experiments run by an LLM agent](auto-research.md) — a large language model (LLM) agent
-  searching for improvements to the XGBoost forecasting model in two phases: experiments run overnight
+  searching for improvements to the forecast in two phases: experiments run overnight
   from a plan agreed the day before, then a careful search in which the agent runs as a separate
   Unix user that never sees the leaderboard's validation window. The page also summarises what
   published research agents found. A person re-implements every idea that survives either phase.
@@ -84,8 +81,8 @@ naive forecast on AWS. **✅ Shipped July 2026** (`v0.1.0`), superseded on AWS b
 **Goal**: A simple XGBoost forecast that lets us test infrastructure end-to-end and establish a
 baseline. Intentionally does not detect switching events or estimate effective capacity — hence
 "naive" (assumes the grid is always in perfect health). The data pipeline, per-series XGBoost
-models, and CV leaderboard were already built; the remaining work was deployment, now running on AWS
-— see [Live service](live-service.md).
+models, and CV leaderboard were already built; the remaining work was deployment to AWS — see [Live
+service](live-service.md).
 
 ![v0.1 Naive forecast](assets/v0.1_naive_forecast_flow_diagram.png)
 
@@ -97,12 +94,12 @@ models, and CV leaderboard were already built; the remaining work was deployment
 reproducibility, and observability hardening. **✅ Shipped 13 August 2026** (`v0.2.0`) — running on
 AWS.*
 
-- More unit tests, including feature-level lag-leakage and forecaster-level determinism tests ✅
+- More unit tests, including feature-level lag-leakage tests ✅
   ([#62](https://github.com/openclimatefix/nged-substation-forecast/issues/62); exercised by
-  `test_nullify_leaky_lags`, `test_engineer_features_weather_lag_leakage_prevention` and
-  `test_random_seed_makes_training_deterministic`, alongside new package coverage for
-  `dynamical_data` ([#163](https://github.com/openclimatefix/nged-substation-forecast/issues/163))
-  and `geo` ([#164](https://github.com/openclimatefix/nged-substation-forecast/issues/164))). The
+  `test_nullify_leaky_lags` and `test_engineer_features_weather_lag_leakage_prevention`, alongside
+  new package coverage for `dynamical_data`
+  ([#163](https://github.com/openclimatefix/nged-substation-forecast/issues/163)) and `geo`
+  ([#164](https://github.com/openclimatefix/nged-substation-forecast/issues/164))). The
   CV-windowing no-lookahead, leaderboard-fairness and fold-level determinism guardrail tests remain
   unwritten — see [Engineering health](engineering-health.md#scientific-rigor-tests-and-cleanup)
 - CI on GitHub (ruff + ty + pytest on every PR) ✅ (per-PR gate + nightly network tests; see [Testing
@@ -118,10 +115,6 @@ AWS.*
 - Drop Hydra in favour of plain YAML + importlib + pydantic ✅ (`contracts.config_schemas` owns the
   `_target_` round-trip; dropping the two dependencies also unpinned `antlr4-python3-runtime`, which
   had been breaking Dagster's asset-selection strings)
-- Asset check on `live_forecasts` reporting **missed NWP runs** at forecast time
-  ([#424](https://github.com/openclimatefix/nged-substation-forecast/issues/424)) ✅
-  (`live_forecasts_are_healthy`: it also reads the slot's rows back off disk, so every production
-  asset now has a check — including the one NGED consume)
 - Start the [intervention log](../live_service/intervention-log.md) ✅ (started with the v0.1 AWS
   period; its measurement window opens at v1.0, but it cannot be reconstructed retrospectively,
   which is why it exists now)
@@ -134,7 +127,7 @@ AWS.*
 
 - Implement the ML energy forecasting "leaderboard" (cross-fold validation metrics in MLflow), ready
   for systematic cross-validation runs ✓ (CV assets added)
-- Metrics: MBE, MAE, NMAE, RMSE, Pinball loss, PICP, interval width, CRPS, Spread-Skill Ratio — all
+- Metrics: MBE, MAE, NMAE, RMSE, Pinball loss, PICP, interval width, CRPS — all
   ✅ (definitions in the [evaluation-metrics reference](../techniques/evaluation-metrics.md); plan
   and remaining 🚧 items in [Metrics & leaderboard](metrics-and-leaderboard.md))
 - Time-slice filters: nowcasting (0–6 h), day-ahead (6–36 h), medium range (Day 2–7), extended range
@@ -148,8 +141,9 @@ AWS.*
   money a better forecast saves](cost-savings-metrics.md). Expected to be the metrics NGED read
   first, so they land early in this milestone.
 - Production monitoring of the live service (`production_monitoring` metrics scope)
-- **Failure-scenario evaluation** — the evaluation machinery must precede the v0.5 experiments it is
-  meant to judge, or v0.5 picks a champion blind to how it behaves when inputs degrade:
+- **Failure-scenario evaluation** — the evaluation machinery must precede the experiments it is
+  meant to judge, or the leaderboard picks a winner blind to how the winner behaves when inputs
+  degrade:
     - Canonical failure-scenario suite: named, versioned degradation transforms
       ([#437](https://github.com/openclimatefix/nged-substation-forecast/issues/437)) — see [Scoring
       under failure scenarios](metrics-and-leaderboard.md#scoring-under-failure-scenarios)
@@ -162,9 +156,9 @@ AWS.*
   to the leaderboard as a `study/` MLflow experiment, and the scorer drops the checks that exist
   only to stop deliberate cheating
   ([#1031](https://github.com/openclimatefix/nged-substation-forecast/issues/1031), closed as not
-  planned because XGBoost experiments have stopped); see
+  planned); see
   [Experiments run by an LLM agent](auto-research.md)
-- One-command rollback for `promoted_model`
+- One-command rollback of the live model
   ([#440](https://github.com/openclimatefix/nged-substation-forecast/issues/440)), plus the runbooks
   that pin down what "one command" means
   ([#448](https://github.com/openclimatefix/nged-substation-forecast/issues/448))
@@ -189,20 +183,11 @@ AWS.*
 
 ---
 
-## v0.5 — XGBoost Upgrades ("Quick Wins")
+## v0.5 — Past Weather, Quantile Ensembles, and Degradation
 
 *Epic: [#145](https://github.com/openclimatefix/nged-substation-forecast/issues/145)*
 
-> **Status: ⏹ Not planned for production.** The production forecast will be a neural network, so
-> the XGBoost experiments of this milestone have stopped, and the text below is kept as a record.
-
-The milestone aimed to establish a strong XGBoost baseline before investing in capacity estimation
-and switching event detection.
-
-The full experiment backlog — four effort tiers, ordered best bang-for-the-buck within each tier —
-is in [XGBoost improvements](xgboost-improvements.md).
-
-This milestone also carries the **ingest of estimates of past weather** (ERA5:
+This milestone carries the **ingest of estimates of past weather** (ERA5:
 [#143](https://github.com/openclimatefix/nged-substation-forecast/issues/143), moved here from v0.7)
 and the **pre-training experiments** that ingest unlocks
 ([#167](https://github.com/openclimatefix/nged-substation-forecast/issues/167), closed; the
@@ -215,13 +200,12 @@ study](https://openclimatefix.github.io/nged-ml-research/studies/past-weather/uk
 Our power data reaches back to late 2019, Dynamical.org's ENS archive starts 2020-10-15, and our
 stored ENS table starts on 2024-04-01 and will start on 2020-10-15 once the back-fill has run, so an
 estimate of past weather is how the seasonal experiments on this page get more than one winter to
-learn from. The Tier-1 and Tier-2 config wins do not wait for it.
+learn from.
 
 This milestone also carries the **quantile-ensemble pipeline** (per-member quantile forecasts pooled
 into delivered percentiles — Phase D of [Delivering the probabilistic
 metrics](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics); theory in [Probabilistic
-forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md)), which builds directly
-on the lead-time-feature and ensemble-member-training wins in that backlog.
+forecasting from NWP ensembles](../techniques/probabilistic-forecasting.md)).
 
 It also carries the **degradation** half of the
 [inherent-stability](../design-philosophy/inherent-stability.md) work, which is gated on that same
@@ -238,20 +222,20 @@ quantile pipeline:
   ([#444](https://github.com/openclimatefix/nged-substation-forecast/issues/444), closed as not
   planned), extending
   [#168](https://github.com/openclimatefix/nged-substation-forecast/issues/168) (closed)
-- Make `live_forecasts` degrade rather than raise when NWP is absent
+- Make each live forecast asset degrade rather than raise when NWP is absent
   ([#446](https://github.com/openclimatefix/nged-substation-forecast/issues/446)) — deliberately
   gated on the two items above, since degrading earlier would emit output no scenario has tested
 
-**Phase 2 of agentic ML research** (not started, and tracked in the `nged-ml-research`
-repository): once an XGBoost model beats `manual_heuristic` on the continuous
-ranked probability score (CRPS), an LLM agent screens the XGBoost backlog, and possibly larger ideas
-from other roadmap pages, as a separate Unix user that never sees the leaderboard's validation
-window ([#193](https://github.com/openclimatefix/nged-ml-research/issues/193), in the
-`nged-ml-research` repository). The
-maintainer leans towards screening every idea. [Experiments run by an LLM agent](auto-research.md)
-gives the published evidence, and a design in which the agent screens ideas on data before the
-leaderboard's validation window, an idea is implemented again whenever the idea's score is close to
-a competitor's, and a person re-implements every idea that survives in a reviewed pull request.
+**Phase 2 of agentic ML research** (not started, and tracked in the `nged-ml-research` repository):
+once a trained forecaster beats `manual_heuristic` on the continuous ranked probability score
+(CRPS), an LLM agent screens ideas from the roadmap pages as a separate Unix user that never sees
+the leaderboard's validation window
+([#193](https://github.com/openclimatefix/nged-ml-research/issues/193), in the `nged-ml-research`
+repository). The maintainer leans towards screening every idea. [Experiments run by an LLM
+agent](auto-research.md) gives the published evidence, and a design in which the agent screens ideas
+on data before the leaderboard's validation window, an idea is implemented again whenever the idea's
+score is close to a competitor's, and a person re-implements every idea that survives in a reviewed
+pull request.
 
 ---
 
@@ -393,7 +377,7 @@ leaderboard CV run or controlled ad-hoc ablation, so we keep the result either w
   ([#363](https://github.com/openclimatefix/nged-substation-forecast/issues/363)): explore whether
   adding ICON-EU from Dynamical.org improves forecast skill over ECMWF ENS alone — the v1
   nice-to-have version of the broader [v2.1 multi-source
-  item](#v21-xgboost-improvements-at-full-scale). The v0.5 [perfect-weather
+  item](#v21-further-nwp-sources-at-full-scale). The v0.5 [perfect-weather
   ceiling](metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) sizes the
   forecast-error headroom, but that ceiling does not bound resolution, so ICON-EU's ~6.5 km grid
   could still beat a coarser estimate of past weather, such as the 31 km ERA5, on
@@ -408,7 +392,7 @@ leaderboard CV run or controlled ad-hoc ablation, so we keep the result either w
   ([#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851), closed as not
   planned): an upgraded
   weather model arrives on time and passes validation, so nothing in the live service notices it,
-  yet the promoted model was trained on the old version. The plan records the NWP model cycle on
+  yet the live model was trained on the old version. The plan records the NWP model cycle on
   every row, keeps a dated list of upgrades, treats an upgrade as a degradation that widens the
   uncertainty bands, and retrains early. It starts with a study measuring how fast a model
   recovers after the Met Office's January 2026 upgrade of UKV. See [Live service → NWP model
@@ -461,29 +445,25 @@ of the v2 live service)*
 
 ---
 
-## v2.1 — XGBoost Improvements at Full Scale
+## v2.1 — Further NWP Sources at Full Scale
 
-**v2.1 is about a month of XGBoost work, once the v2 live service runs for all 2,500 time series.**
-v2.1 would pick up the [XGBoost improvements](xgboost-improvements.md) backlog if the production
-forecast were XGBoost, and adds
-[further NWP sources as features](xgboost-improvements.md#several-nwp-sources-as-features-v21), or
-through a [product
+**v2.1 is about a month of work, once the v2 live service runs for all 2,500 time series.** v2.1
+adds further NWP sources, either as features or through a [product
 calibrator](training-history.md#a-new-weather-product-with-a-few-months-of-history) if the study of
 that design shows promise.
 
 ---
 
-## Model cards for promoted models
+## Model cards for live models
 
-**Deferred until after v2 ships.** Every model promoted to production should get a model card
+**Deferred until after v2 ships.** Every model deployed to the live service should get a model card
 recording detailed feature importance, calibration behaviour, and the population it was trained and
-validated against — the record an operator or an auditor needs to trust a specific promoted model.
+validated against — the record an operator or an auditor needs to trust a specific live model.
 The Energy Systems Catapult [DNO Forecasting
 Forum](https://es.catapult.org.uk/project/dno-forecasting-forum/) names model cards under the same
 "Explainability" characteristic as the feature attributions below, as what supports operator trust
-and incident investigation. A model card is a heavier, promotion-time record, distinct from the
-lightweight per-training-run feature attributions every model gets (see [Log feature importances for
-every trained model](xgboost-improvements.md#log-feature-importances-for-every-trained-model)).
+and incident investigation. A model card is a heavier, deployment-time record, distinct from
+lightweight feature attributions logged for each training run.
 Model cards are a stretch beyond what v2 needs in order to ship live, so this workstream starts once
 the v2 service is running.
 

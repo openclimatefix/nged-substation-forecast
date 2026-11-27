@@ -68,9 +68,10 @@ Push a deterministic model — XGBoost trained with squared error, which learns 
 mean** — through 51 members, and it captures term 1 *only*. Terms 2 and 3 are dropped entirely, at
 *every* lead time. The resulting ensemble is **under-dispersed** — systematically overconfident. The
 failure is most conspicuous at short horizons, where term 1 has barely grown, so the fan collapses
-toward the single line of the sketch above while our errors do not. The [spread-skill
-ratio](evaluation-metrics.md#spread-skill-ratio) is the metric that catches this: spread ÷ error ≪ 1
-means the fan is too thin.
+toward the single line of the sketch above while our errors do not. The [prediction interval
+coverage probability (PICP)](evaluation-metrics.md#probabilistic-metrics) is the metric that
+catches this: a p5–p95 band that covers far fewer than 90% of the actuals means the fan is too
+thin.
 
 Under-dispersion matters commercially, not just statistically: flexibility procurement keys off the
 **tails** (P90+ peaks), and it is precisely the error that makes tails look safer than they are.
@@ -90,10 +91,10 @@ mean — attenuating the fitted weather→power sensitivity. Today's model appli
 across all lead times, because it has no feature telling it how trustworthy the weather input is. So
 the day-8–14 fan can be merely *wide-looking*: large NWP spread pushed through a damped,
 horizon-blind sensitivity, with the dropped term-2 residual (largest exactly where the weather input
-is least trustworthy) never added back in. This is why the [spread-skill ratio and
-PICP](evaluation-metrics.md#probabilistic-metrics) are computed per horizon slice and not just
-overall: a visibly fanned-out `extended_range` can still be under-dispersed, and only the numbers,
-not the eye, can say so.
+is least trustworthy) never added back in. This is why
+[PICP](evaluation-metrics.md#probabilistic-metrics) and the pinball loss are computed per horizon
+slice and not just overall: a visibly fanned-out `extended_range` can still be under-dispersed, and
+only the numbers, not the eye, can say so.
 
 The mechanism also sharpens the case for giving the model `nwp_lead_time_hours` as a feature
 ([#230](https://github.com/openclimatefix/nged-substation-forecast/issues/230), closed). Beyond the
@@ -227,8 +228,8 @@ Mitigations, in order of practicality:
   closed) — the model then
   sees "one plausible scenario" as its actual input distribution, which is what a member is at
   inference time.
-- **Measure, then correct**: check the [spread-skill ratio and
-  PICP](evaluation-metrics.md#probabilistic-metrics) of the *pooled* forecast per horizon slice, and
+- **Measure, then correct**: check the [PICP and pinball
+  loss](evaluation-metrics.md#probabilistic-metrics) of the *pooled* forecast per horizon slice, and
   apply a per-horizon affine recalibration of the pooled quantiles (fit on the training window) only
   if the numbers demand it.
 
@@ -238,11 +239,11 @@ risk). Fix double-counting if measured, but don't fear it more than the disease.
 
 ## How this maps onto the project
 
-- **Diagnose first**: the spread-skill / PICP / pinball / CRPS metrics that quantify all of the
+- **Diagnose first**: the PICP, pinball, and CRPS metrics that quantify all of the
   above are implemented — see the [evaluation-metrics reference](evaluation-metrics.md) — as Phases
   A–B of the [probabilistic evaluation
   plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
-- **Cheap stopgap**: post-hoc spread inflation of the existing deterministic ensemble ([Phase C of
+- **Cheap stopgap**: post-hoc spread inflation of a deterministic ensemble ([Phase C of
   the probabilistic evaluation
   plan](../roadmap/metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-diagnosis))
   achieves calibration without any of this machinery — the full mixture pipeline must beat it to

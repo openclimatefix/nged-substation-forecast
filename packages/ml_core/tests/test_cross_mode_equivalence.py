@@ -12,8 +12,8 @@ day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mode w
 ``power_fcst_init_time = nwp_init_time + delay`` and asserts the rows match exactly on the
 primary key and on every requested feature column. The comparison is over **deliverable** rows
 (``valid_time > power_fcst_init_time``): bulk mode drops hindcast rows at source, while
-single-run mode keeps them for its caller to filter before predicting (as ``live_forecasts``
-does), so the replay side applies that same filter here. If a future change diverges the two
+single-run mode keeps them for its caller to filter before predicting, so the replay side
+applies that same filter here. If a future change diverges the two
 modes, this fails.
 
 Scope note: this test exercises the **weather, time, power-lag, weather-lag, and

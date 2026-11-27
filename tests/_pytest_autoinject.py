@@ -1,7 +1,7 @@
 """Parallelise a full-suite run with `pytest-xdist`; leave a targeted run serial.
 
 This can't be a plain `addopts = "-n auto"` because worker start-up (each worker importing the
-whole Dagster/Polars/XGBoost/MLflow stack) costs a few seconds flat, paid whether one test runs
+whole Dagster/Polars/MLflow stack) costs a few seconds flat, paid whether one test runs
 or the whole suite does. That's a good trade for the full suite, but a bad one for the "single
 test" loop CLAUDE.md documents (`uv run pytest path/to/test_foo.py::test_bar`), where it would be
 pure overhead spread across workers for one test.

@@ -1762,7 +1762,6 @@ def test_definitions_resolve(env: Path) -> None:
 
     from nged_substation_forecast.definitions import defs
     from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
-    from nged_substation_forecast.defs.live_forecast_assets import live_forecast_partitions
 
     # The strict check ``dg check defs`` runs; it also validates every partition mapping.
     Definitions.validate_loadable(defs)
@@ -1777,19 +1776,6 @@ def test_definitions_resolve(env: Path) -> None:
         "ecmwf_ens",
     } <= asset_keys
 
-    for name, layer in [
-        ("live_forecasts", "production"),
-        ("promotable_model_runs", "research"),
-        ("promoted_model", "research"),
-    ]:
-        node = asset_graph.get(AssetKey(name))
-        assert node.is_materializable
-        assert node.tags["layer"] == layer
-
-    assert {
-        key.to_user_string() for key in asset_graph.get(AssetKey("live_forecasts")).parent_keys
-    } == {"ecmwf_ens", "clean_nged_power_data"}
-
     # A broken deps=[...] string would drop this edge (the unknown key becomes an external asset).
     ecmwf_parents = {
         key.to_user_string() for key in asset_graph.get(AssetKey("ecmwf_ens")).parent_keys
@@ -1801,16 +1787,7 @@ def test_definitions_resolve(env: Path) -> None:
     assert "power_data_is_fresh" in check_keys
     assert "nwp_has_no_unexpected_nulls" in check_keys
     assert "nwp_run_is_complete" in check_keys
-    assert "live_forecasts_are_healthy" in check_keys
     assert "cleaned_power_keeps_up_with_raw" in check_keys
-
-    # ...and the 6-hourly scheduled job actually runs the live check: an AssetSelection includes
-    # its assets' checks, so this is what makes the check evaluate on every production tick.
-    live_job_checks = {
-        key.name
-        for key in repo.get_job("live_forecasts_job").asset_layer.asset_graph.asset_check_keys
-    }
-    assert live_job_checks == {"live_forecasts_are_healthy"}
 
     # A job whose AssetSelection names a missing asset resolves to an empty/wrong key set.
     for job_name, expected_assets in [
@@ -1819,27 +1796,18 @@ def test_definitions_resolve(env: Path) -> None:
             {"power_time_series_and_metadata", "clean_nged_power_data"},
         ),
         ("ecmwf_ens_job", {"ecmwf_ens"}),
-        ("live_forecasts_job", {"live_forecasts"}),
     ]:
         selected = {
             key.to_user_string() for key in repo.get_job(job_name).asset_layer.executable_asset_keys
         }
         assert selected == expected_assets
 
-    # Neither partitioned job passes `partitions_def` to `define_asset_job` — Dagster infers it from
+    # `ecmwf_ens_job` does not pass `partitions_def` to `define_asset_job` — Dagster infers it from
     # the selected asset at resolution time. Assert the inferred definition equals the one the asset
     # declares, so a job silently resolving to `None`, or to a different cadence or start, fails
     # here rather than at the next schedule tick. (Equality, not identity: what matters is that the
     # job targets the same partitions, and Dagster is free to hand back an equal copy.)
     assert repo.get_job("ecmwf_ens_job").partitions_def == ecmwf_ens_partitions
-    assert repo.get_job("live_forecasts_job").partitions_def == live_forecast_partitions
-
-    # `live_forecasts_schedule` is built by `build_schedule_from_partitioned_job`, so its cron is
-    # *derived* from that inferred partitions_def — the one thing dropping the explicit argument
-    # could plausibly have broken. Pin the resolved schedule, not just the job.
-    live_schedule = repo.get_schedule_def("live_forecasts_schedule")
-    assert live_schedule.cron_schedule == live_forecast_partitions.cron_schedule
-    assert live_schedule.execution_timezone == "UTC"
 
 
 # --- summary classes (pure, no Dagster) ----------------------------------------------------------
@@ -1990,3 +1958,52 @@ def test_ecmwf_ens_partitions_start_in_2020_and_the_schedule_takes_only_today() 
     request = ecmwf_ens_schedule(context)
     assert isinstance(request, RunRequest)
     assert request.partition_key == "2026-11-18"
+
+
+def _patch_delta_table(monkeypatch: pytest.MonkeyPatch, raw_init_times: set[str]) -> None:
+    """Monkeypatch ``assets.DeltaTable`` to return canned partition values.
+
+    Isolates ``_available_nwp_init_times``'s parsing from a real Delta table on disk — the
+    function only ever reads ``DeltaTable(...).partitions()``.
+    """
+
+    class _FakeDeltaTable:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            del args, kwargs
+
+        def partitions(self) -> list[dict[str, str]]:
+            return [
+                {"nwp_model_id": "ECMWF_ENS_0_25_degree", "init_time": value}
+                for value in raw_init_times
+            ]
+
+    monkeypatch.setattr(assets, "DeltaTable", _FakeDeltaTable)
+
+
+@pytest.mark.parametrize(
+    ("raw_value", "expected"),
+    [
+        # delta-rs' current rendering: always six fractional digits.
+        ("2026-07-04 00:00:00.000000", datetime(2026, 7, 4, 0, 0, tzinfo=UTC)),
+        # A hypothetical future delta-rs release dropping trailing zeros.
+        ("2026-07-04 00:00:00", datetime(2026, 7, 4, 0, 0, tzinfo=UTC)),
+        # An offset-carrying rendering: must be *converted* to the same instant, not relabelled.
+        # ``.replace(tzinfo=UTC)`` would wrongly yield 2026-07-04 00:00:00+00:00 here.
+        ("2026-07-04 00:00:00+02:00", datetime(2026, 7, 3, 22, 0, tzinfo=UTC)),
+    ],
+)
+def test_available_nwp_init_times_parses_each_rendering_to_utc(
+    monkeypatch: pytest.MonkeyPatch, raw_value: str, expected: datetime
+) -> None:
+    """Must survive either spelling delta-rs might emit for a whole-second ``init_time``.
+
+    ``datetime.strptime``'s ``%f`` directive requires at least one fractional digit, so it would
+    raise on the second rendering; ``datetime.fromisoformat`` (what the code uses) accepts both.
+    An offset-carrying string is not one delta-rs emits today, but the parser must convert it to
+    the correct UTC instant rather than silently relabelling its wall-clock digits as UTC.
+    """
+    _patch_delta_table(monkeypatch, {raw_value})
+
+    result = assets._available_nwp_init_times(Settings())
+
+    assert result == [expected]

@@ -46,18 +46,18 @@ block.
 ## The apps
 
 - **`view_forecasts.py`** — inspect a single forecast run: pick a time series, a fold, and a
-  forecast init time, then see every forecast ensemble member (thin grey lines) against the observed
-  power (thick blue line), from 24 hours before the init time to 14 days after it. A fold id says
-  which forecasts to look at: a cross-validation (CV) fold id names one held-out slice of history a
-  model was scored on, and `live` is the reserved id for production forecasts, which belong to no CV
-  fold. The x-axis is labelled at Europe/London midnight with the day of week and date. Optional
-  coloured lines overlay observed power shifted forward by 7 and by 14 days — the raw material of
-  the models' power-lag features. A second panel below the power chart, on the same time axis, plots
-  the numerical weather prediction (NWP) ensemble that fed the forecast at the H3 cell containing
-  the series, for whichever weather variable is picked. H3 is a grid of hexagons covering Great
-  Britain, onto which the weather is aggregated. A stitched proxy-analysis line on that second panel
-  stands in for the weather that actually happened. **Reload data** re-reads the forecast, power,
-  and NWP tables.
+  forecast init time, then see the forecast's median line inside its p20–p80, p5–p95, and p1–p99
+  bands against the observed power (thick blue line), from 24 hours before the init time to 14 days
+  after it. A fold id says which forecasts to look at: a cross-validation (CV) fold id names one
+  held-out slice of history a model was scored on, and `live` is the reserved id for production
+  forecasts, which belong to no CV fold. The x-axis is labelled at Europe/London midnight with the
+  day of week and date. Optional coloured lines overlay observed power shifted forward by 7 and by
+  14 days — the raw material of the models' power-lag features. A second panel below the power
+  chart, on the same time axis, plots the numerical weather prediction (NWP) ensemble that fed the
+  forecast at the H3 cell containing the series, for whichever weather variable is picked. H3 is a
+  grid of hexagons covering Great Britain, onto which the weather is aggregated. A stitched
+  proxy-analysis line on that second panel stands in for the weather that actually happened.
+  **Reload data** re-reads the forecast, power, and NWP tables.
 - **`map_and_timeseries.py`** — a map of every time series in the NGED trial area, the part of
   NGED's licence area this project forecasts; click a dot to see its observed power. The power query
   is capped to recent observations, because the chart inlines its rows and Altair refuses more than
@@ -88,8 +88,8 @@ To enable S3 mode, copy the committed example and fill in the real values:
 cp packages/dashboard/.env.s3.example packages/dashboard/.env.s3
 ```
 
-Only the data tables follow the toggle. The local artifact path (the production model) is never
-overridden by `.env.s3`, so the production model stays laptop-local in both modes. If `.env.s3` is
+Only the data tables follow the toggle. The local artifact path (the study submission log) is never
+overridden by `.env.s3`, so the local artifacts stay laptop-local in both modes. If `.env.s3` is
 missing, the `s3` selection falls back to local paths and the UI flags the fallback. The read-only
 AWS Identity and Access Management (IAM) user whose credentials belong in `.env.s3` is created in
 [Step 2 of the AWS
@@ -120,10 +120,11 @@ width, and both put their legend above the plot rather than beside the plot, so 
 area ends up narrower than the other's. Changing any one of those three settings on one chart alone
 visibly misaligns the pair.
 
-**A chart's data is served out of line, because the ensemble is large.** One forecast run for one
-series is 51 members × 14 days × 48 half-hours ≈ 34,000 rows, which is past both Altair's 5,000-row
-default guard and marimo's maximum output size. `build_view_forecast_chart` calls
-`alt.data_transformers.disable_max_rows()` to lift Altair's guard. `view_forecasts.py` hands the
+**A chart's data is served out of line, so a denser NWP product or a longer window does not break
+the dashboard.** One forecast run for one series is 14 days × 48 half-hours = 672 rows of 13
+quantiles, and the NWP panel holds about 51 members × 85 steps ≈ 4,300 rows, both under Altair's
+5,000-row default guard. `build_view_forecast_chart` calls `alt.data_transformers.disable_max_rows()`
+to lift Altair's guard anyway. `view_forecasts.py` hands the
 chart to `mo.ui.altair_chart`, which serves the rows as an Arrow virtual file instead of inlining
 the rows in the cell output, so the cell output marimo measures against its guard holds a URL
 rather than the rows. Values are serialised at their stored `Float32` width, because Arrow is

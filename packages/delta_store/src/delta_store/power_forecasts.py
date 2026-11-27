@@ -1,14 +1,9 @@
 """Storage policy for the internal ``power_forecasts`` Delta table.
 
 Owns everything about how ``PowerForecast`` rows are laid out on disk: the parquet writer
-properties (codec + per-column encodings), the compression-friendly row order, and the
-``power_fcst`` precision reduction. Callers write through `write_power_forecasts` so it is
-impossible to land rows in the table without this format applied.
-
-Measured impact: the full 403.6M-row development table shrank from 6.33 GB to 0.73 GB when
-rewritten into this format. The 6.33 GB figure is the delta-rs defaults: SNAPPY, dictionary
-encoding, unsorted, full precision. See the ``POWER_FORECASTS_WRITER_PROPERTIES`` docstring for
-the per-lever breakdown.
+properties (codec + per-column encodings), the compression-friendly row order, and the precision
+reduction of the 13 quantile columns ``power_fcst_p1`` … ``power_fcst_p99``. Callers write through
+`write_power_forecasts` so it is impossible to land rows in the table without this format applied.
 """
 
 from pathlib import Path
@@ -16,7 +11,7 @@ from typing import Final
 
 import patito as pt
 import polars as pl
-from contracts.power_schemas import PowerForecast
+from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast
 from contracts.typing_utils import typeddict_to_dict
 from contracts.uri import ObjectStoreOptions
 from deltalake import ColumnProperties, WriterProperties, write_deltalake
@@ -24,12 +19,12 @@ from deltalake import ColumnProperties, WriterProperties, write_deltalake
 from delta_store.precision import round_to_significand_bits
 
 POWER_FCST_SIGNIFICAND_BITS: Final[int] = 13
-"""Significand bits kept when storing ``power_fcst`` (1 implicit + 12 explicit fraction bits).
+"""Significand bits kept when storing each quantile column (1 implicit + 12 explicit fraction bits).
 
 Rounding to nearest at 13 significand bits caps the relative error at 2⁻¹³ ≈ 1.2×10⁻⁴, orders of
 magnitude below forecast error. The rounding also zeroes the 11 low fraction bits. Those 11 bits are
 otherwise pure entropy that defeats every compression codec, because nearly every full-precision
-``power_fcst`` value is distinct. Mirrors the significand-rounding scheme ``delta_store.nwp``
+forecast value is distinct. Mirrors the significand-rounding scheme ``delta_store.nwp``
 applies to NWP data, but with different writer properties. See that module's docstring for why the
 choice doesn't transfer between tables. See ``POWER_FORECASTS_WRITER_PROPERTIES`` for the measured
 size impact.
@@ -38,11 +33,12 @@ size impact.
 POWER_FORECASTS_SORT_COLS: Final[tuple[str, ...]] = PowerForecast.PRIMARY_KEY
 """Within-file row order for ``power_forecasts`` writes.
 
-``power_fcst`` becomes locally smooth, and the timestamp columns become stepped sequences, when the
-~51 ensemble members of one (series, init time, valid time) target sit on adjacent rows. Locally
-smooth values and stepped sequences are exactly what the BYTE_STREAM_SPLIT and DELTA_BINARY_PACKED
-encodings in ``POWER_FORECASTS_WRITER_PROPERTIES`` need to compress well. Leading with
-``time_series_id`` also lets parquet row-group statistics prune scans that filter on one series.
+Each quantile column becomes locally smooth, and the timestamp columns become stepped sequences,
+when the successive half-hours of one (series, init time) forecast run sit on adjacent rows.
+Locally smooth values and stepped sequences are exactly what the BYTE_STREAM_SPLIT and
+DELTA_BINARY_PACKED encodings in ``POWER_FORECASTS_WRITER_PROPERTIES`` need to compress well.
+Leading with ``time_series_id`` also lets parquet row-group statistics prune scans that filter on
+one series.
 
 Defined as ``PowerForecast.PRIMARY_KEY`` rather than repeating its columns, because the set that
 identifies a row uniquely is exactly the set whose adjacency makes a row compress. The *order* is
@@ -63,17 +59,18 @@ POWER_FORECASTS_WRITER_PROPERTIES: Final[WriterProperties] = WriterProperties(
         "valid_time": _TIMESTAMP_COLUMN_PROPERTIES,
         "power_fcst_init_time": _TIMESTAMP_COLUMN_PROPERTIES,
         "nwp_init_time": _TIMESTAMP_COLUMN_PROPERTIES,
-        "power_fcst": ColumnProperties(encoding="BYTE_STREAM_SPLIT", dictionary_enabled=False),
+        **{
+            column: ColumnProperties(encoding="BYTE_STREAM_SPLIT", dictionary_enabled=False)
+            for column in POWER_FCST_QUANTILE_COLUMNS
+        },
     },
 )
 """Parquet writer settings for the ``power_forecasts`` Delta table.
 
-``power_fcst`` is ~76% of the bytes. The delta-rs defaults (SNAPPY + dictionary encoding everywhere)
-leave that column essentially uncompressed. Measured on the table's largest single file (18.3M rows,
-105 MB): ZSTD-3 alone → 80% of the original size; adding these column encodings plus the
-``POWER_FORECASTS_SORT_COLS`` row order → 50%; adding the ``POWER_FCST_SIGNIFICAND_BITS``
-precision reduction → 29%. That file is the table's least compressible slice. Across the full table
-the format achieved 11.5%.
+The 13 quantile columns hold most of the bytes. The delta-rs defaults (SNAPPY + dictionary encoding
+everywhere) leave a column of distinct floats essentially uncompressed. ZSTD-3, the
+BYTE_STREAM_SPLIT encoding of each quantile column, the ``POWER_FORECASTS_SORT_COLS`` row order,
+and the ``POWER_FCST_SIGNIFICAND_BITS`` precision reduction each shrink the table further.
 """
 
 
@@ -87,7 +84,7 @@ def write_power_forecasts(
 ) -> None:
     """Write ``PowerForecast`` rows to the ``power_forecasts`` Delta table in its storage format.
 
-    Applies the three storage levers before writing: rounds ``power_fcst`` to
+    Applies the three storage levers before writing: rounds each of the 13 quantile columns to
     ``POWER_FCST_SIGNIFICAND_BITS`` significand bits, sorts rows by
     ``POWER_FORECASTS_SORT_COLS``, and writes with ``POWER_FORECASTS_WRITER_PROPERTIES``.
 
@@ -133,21 +130,20 @@ def write_power_forecasts(
             still clears the partition.
         replace_predicate_extra: An additional ``AND``-ed SQL predicate clause narrowing the
             overwrite below the ``(experiment_name, fold_id)`` partition. For example,
-            ``"power_fcst_init_time = '2026-07-04T06:00:00+00:00'"`` lets ``live_forecasts`` replace
-            one 6-hourly slot's rows without wiping the rest of the ``"live"`` fold's
-            partition. The production service forecasts every 6 hours, and stores every one of
-            those runs under the reserved ``fold_id`` of ``"live"`` rather than under a
-            cross-validation fold. delta-rs' ``replaceWhere`` supports predicates on non-partition
-            columns (confirmed empirically: a `datetime.isoformat()` literal round-trips correctly
-            against a ``Timestamp`` column). Only meaningful alongside ``replace_partition``.
+            ``"power_fcst_init_time = '2026-07-04T06:00:00+00:00'"`` lets a live asset replace one
+            forecast slot's rows without wiping the rest of the ``"live"`` fold's partition. A live
+            asset would store every slot under the reserved ``fold_id`` of ``"live"`` rather than
+            under a cross-validation fold. delta-rs' ``replaceWhere`` supports predicates on
+            non-partition columns (confirmed empirically: a `datetime.isoformat()` literal
+            round-trips correctly against a ``Timestamp`` column). Only meaningful alongside
+            ``replace_partition``.
         storage_options: delta-rs object-store options (credentials/endpoint) for a remote
             ``table_uri``; ``None``/empty for a local path.
     """
     prepared = (
         forecasts.with_columns(
-            power_fcst=round_to_significand_bits(
-                pl.col("power_fcst"), keep_bits=POWER_FCST_SIGNIFICAND_BITS
-            )
+            round_to_significand_bits(pl.col(column), keep_bits=POWER_FCST_SIGNIFICAND_BITS)
+            for column in POWER_FCST_QUANTILE_COLUMNS
         )
         .sort(*POWER_FORECASTS_SORT_COLS)
         .to_arrow()
