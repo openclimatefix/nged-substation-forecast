@@ -30,8 +30,9 @@ explicit so we don't accidentally undo them:
   image — see [Production Deployment — Design](../architecture/production-deployment.md). Under the
   handover model that design is a feature twice over: there are fewer runtime moving parts to break,
   and the model simply *freezes* between model updates.
-- **Replay mode** means a missed slot is recovered by a one-click UI backfill, not by an engineer
-  reconstructing state — see [Operating the live service](../live_service/operations.md).
+- **A missed ingest partition is recovered by a one-click backfill in the Dagster UI**, not by an
+  engineer reconstructing state — see [Backfilling a missed
+  partition](../live_service/operations.md#backfilling-a-missed-partition).
 - **Changing the live forecaster is rebuild + redeploy**, auditable via image tags — no live mutable
   model registry for an operator to mis-drive.
 - **No static AWS keys for OCF's own resources** (IAM roles throughout) removes a whole class of
@@ -64,7 +65,7 @@ boundaries.
 expected to take.**
 
 - Acknowledge an alert.
-- Backfill a missed slot via replay mode.
+- Backfill a missed ingest partition from the Dagster UI.
 - Restart the daemon.
 - Rebuild the control-plane box.
 - Escalate to OCF.
