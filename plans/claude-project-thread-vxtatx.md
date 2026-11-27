@@ -77,7 +77,7 @@ series and half-hour, with no member structure.
    up to 6 times, so until 15:00 UTC. That is 30 minutes after the last retry of `ecmwf_ens`
    (8 retries from 10:30 UTC), which can itself take about 10 minutes to finish.
 4. **The asset reads the NWP it needs in one scan** of the `nwp` Delta table, pruned to the 16 H3
-   cells and to the runs with `init_time >= ` the 00Z run of the day 13 days before the native
+   cells and to the runs with `init_time` at or after the 00Z run of the day 13 days before the native
    origin's date, up to today's 00Z run, so the scan includes the 00Z run 13 days back. The 13
    days are set by the cold-snap column of the thermal-lag group. Research keeps 12 days of
    history in front of the origin (`LOOKBACK_STEPS = 12 * 48` in experiment 437's
