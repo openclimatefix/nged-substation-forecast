@@ -572,10 +572,10 @@ research and development: training runs log their models, configs, and metrics t
 rejection draws is between ML R&D and production: research uses MLflow constantly, while
 production's hot path never touches it.
 
-Fetching a model from MLflow at container startup may be worth reconsidering if new models start
-reaching production often enough that a redeploy for each new model becomes a burden. A mechanism for
-serving through an MLflow outage would then need to be designed, because `load_from_mlflow` supplies
-none of its own. That mechanism is tracked in
+Fetching a model from MLflow at container startup may still return as an option if new models start
+reaching production often enough that a redeploy for each new model becomes a burden. A mechanism
+for serving through an MLflow outage would then need to be designed, because `load_from_mlflow`
+supplies none of its own. That mechanism is tracked in
 [issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Infrastructure tier: alternatives to the EC2 control-plane box

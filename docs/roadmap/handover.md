@@ -73,12 +73,12 @@ expected to take.**
 Keep the contract to roughly **ten items or fewer**, each one a documented button-press or a single
 command with a runbook page in [`docs/live_service/`](../live_service/index.md).
 
-Everything *not* on that list — forecaster updates, dependency upgrades, schema changes,
+Everything *not* on that list — trained-model updates, dependency upgrades, schema changes,
 infrastructure changes — is OCF's job during the NIA project, handled on a scheduled maintenance
 cadence. After the NIA project, the [written support agreement](#7-organisational-prerequisites)
-sets who does that work. Re-training the forecaster sits in this category too: the re-training
-pipeline is automated end-to-end, so "re-training" means triggering and reviewing an automated run
-on a regular cadence.
+sets who does that work. Re-training the machine-learning model sits in this category too: the
+re-training pipeline is automated end-to-end, so "re-training" means triggering and reviewing an
+automated run on a regular cadence.
 
 One **optional tier** sits between "follow a runbook" and "escalate to OCF", for the more mysterious
 bugs that fall outside the contract but that NGED may want to try fixing themselves:
