@@ -15,10 +15,10 @@ Every forecast in this project is a **quantile forecast**: for each substation (
 and each target half-hour (`valid_time`), one forecast *run* (`power_fcst_init_time`) stores one
 `PowerForecast` row holding the forecast at the 13 delivery quantiles, in the columns
 `power_fcst_p1` … `power_fcst_p99`. A forecaster that produces several point values per row — one
-prediction per ECMWF ENS weather member, or the manual heuristic's one observation per historical
-analogue — reduces them to the 13 linear empirical quantiles before
-storing the row. A deterministic forecast stores one value in all 13 columns. Scoring proceeds in
-two steps:
+prediction per weather member of the ensemble forecast (ENS) of the European Centre for
+Medium-Range Weather Forecasts (ECMWF), or the manual heuristic's one observation per historical
+analogue — reduces them to the 13 linear empirical quantiles before storing the row. A
+deterministic forecast stores one value in all 13 columns. Scoring proceeds in two steps:
 
 1. **Per timestamp** — each stored row is scored on its own: the median column `power_fcst_p50`
    gives the deterministic errors, and the 13 quantile columns give the pinball losses, the CRPS,
@@ -149,13 +149,11 @@ pipeline](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-for
 will be scored head-to-head at these same levels, so today's numbers are directly the baseline it
 must beat.
 
-**Finite-ensemble tail caveat:** a forecaster that takes its stored quantiles from 51 predictions,
-one per ECMWF ENS member, has a $\hat{q}(0.01)$ that interpolates between the two lowest
-predictions.
-The raw ensemble simply cannot represent its own far tails well, so its tail pinball losses are
-partly a representational limit rather than pure skill. That is not a reason to skip them (the
-product needs tails scored); it is the quantitative motivation for Phase D's per-member quantile
-models.
+**Finite-ensemble tail caveat:** when a forecaster takes its stored quantiles from 51 predictions,
+one per ECMWF ENS member, $\hat{q}(0.01)$ interpolates between the two lowest predictions. The raw
+ensemble simply cannot represent its own far tails well, so its tail pinball losses are partly a
+representational limit rather than pure skill. That is not a reason to skip them (the product needs
+tails scored); it is the quantitative motivation for Phase D's per-member quantile models.
 
 ### Mean pinball loss
 
@@ -195,11 +193,10 @@ predictions, one per ECMWF ENS member:
 | p20–p80 | 0.60 | ≈ 0.577 |
 | p35–p65 | 0.30 | ≈ 0.288 |
 
-A forecaster built on the 51 ECMWF ENS members with a p10–p90 PICP of 0.72 would therefore sit 0.05
-below what 51 calibrated values would give (0.769). The remaining 0.03 of its 8-point shortfall
-from 0.8 comes from taking quantiles of 51 values, and a calibration step has to remove both
-parts. The finite-sample shortfall grows as $m$
-shrinks.
+If a forecaster built on the 51 ECMWF ENS members has a p10–p90 PICP of 0.72, that PICP would
+therefore sit 0.05 below what 51 calibrated values would give (0.769). The remaining 0.03 of its
+8-point shortfall from 0.8 comes from taking quantiles of 51 values, and a calibration step has to
+remove both parts. The finite-sample shortfall grows as $m$ shrinks.
 
 One caveat on precision: the formula is exact only when the interpolated quantile estimator is
 evaluated on a uniform distribution; for other distribution shapes the interpolation between extreme

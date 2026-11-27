@@ -62,8 +62,8 @@ AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/
 infrastructure steps around those two scripts stay in the AWS console.
 
 - `build_and_verify_image.sh` — builds the production image, tagged with the git commit hash, then
-  smoke-tests it by running `dagster definitions validate` inside the image with no network access,
-  so an import of a missing module fails the build rather than the deployed service.
+  smoke-tests it by running `dagster definitions validate` inside the image with no network access.
+  An import of a missing module therefore fails the build rather than the deployed service.
 - `push_and_deploy_image.sh` — pushes that image to the Elastic Container Registry and registers a
   new Elastic Container Service task-definition revision pointing at the pushed image.
 

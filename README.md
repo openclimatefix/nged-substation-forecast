@@ -14,8 +14,8 @@ congestion. NGED describe the project on [their Flexpectation project
 page](https://commercial.nationalgrid.co.uk/innovation/projects/flexpectation).
 
 This repository is the research and production-harness codebase. The system is orchestrated with
-Dagster and stores all data and forecasts as Delta Lake tables on S3. Its cross-validation chain
-scores each candidate forecaster against two baseline forecasters: a climatology and a manual
+Dagster and stores all data and forecasts as Delta Lake tables on S3. The system's cross-validation
+chain scores each candidate forecaster against two baseline forecasters: a climatology and a manual
 heuristic built from past power readings.
 
 To external contributors: this repo is in early-stage development with frequent breaking changes, so

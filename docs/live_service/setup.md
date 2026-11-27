@@ -113,9 +113,9 @@ runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployme
 turn that into a start-up failure.
 
 The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`)
-enable error telemetry and the power-freshness warnings; an empty `SENTRY_DSN` (the default)
-disables Sentry entirely. Their setup — laptop testing and production — has its own page: [Setting
-up Sentry telemetry](sentry.md).
+enable error telemetry and the warnings that power data is stale; an empty `SENTRY_DSN` (the
+default) disables Sentry entirely. Their setup — laptop testing and production — has its own page:
+[Setting up Sentry telemetry](sentry.md).
 
 ### Credentials for our own S3 data (`DATA_STORE_*`)
 

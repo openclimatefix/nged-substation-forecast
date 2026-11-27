@@ -449,9 +449,9 @@ the step is safe to ship.
   ICON-EU carries wind at 10 m only, so a common set would leave a richer product's extra variables
   unused.
 - **The whole forecast, or a feature.** Is the calibrated forecast the whole forecast for wind and
-  solar, beyond day 1 for example, or an input feature to the main forecaster? A feature would
-  need the main forecaster retrained each time a product is added, which loses the "no retrain"
-  benefit.
+  solar, beyond day 1 for example, or an input feature to the main forecaster? A feature would need
+  the main forecaster retrained each time a product is added, and retraining each time loses the "no
+  retrain" benefit.
 - **The serving path.** Is a calibration and blend step in the serving path acceptable against
   principle 2, complexity offline?
 - **The failure-scenario vocabulary.** Should the [failure-scenario
@@ -473,8 +473,8 @@ The 2020–2026 span contains regime changes the weather cannot explain, in two 
 **Smooth trends** — EV and heat-pump uptake, embedded PV build-out, the 2022 price shock and the
 Demand Flexibility Service. Handle these with recency sample weights, not a date ordinal: trees
 extrapolate flat, so a date feature always sits beyond its training range at inference.
-Init-time-anchored features, which give the model the series' current level at the forecast's init
-time, absorb level drift for the same reason.
+Init-time-anchored features give the model the series' current level at the forecast's init time,
+and absorb level drift for the same reason.
 
 **COVID lockdowns** are a pulse, and the case for a dedicated feature:
 
@@ -630,8 +630,8 @@ Two details still worth tracking regardless of which route lands:
   an era boundary under the `study` skill of the `nged-ml-research` repository.
 
 **The ERA5 ingest is needed whichever ENS backfill route lands.** ERA5 is the version-1 estimate of
-past weather for every variable except irradiance, and weather-abnormality features, which score
-each weather variable as a z-score against its climatology, would take that climatology from ERA5.
+past weather for every variable except irradiance. Weather-abnormality features score each weather
+variable as a z-score against its climatology, and would take that climatology from ERA5.
 
 ## Implementation details (deleted when this ships)
 
@@ -671,7 +671,8 @@ in the `nged-ml-research` repository:
 5. Decide: promote the section to 🚧 with a milestone, or move the result to the study page and
    delete the section.
 
-**Ordering against the rest of v0.5.** A lead-time feature, which gives the model the forecast's
-lead time as an input, is a prerequisite for the lead-time-zero framing. Data-hungry structural
-changes (batched training, ensemble-member training, a global model) are worth running *after* the
-history lands, since that is where four extra years change the answer most.
+**Ordering against the rest of v0.5.** A lead-time feature gives the forecasting model the
+forecast's lead time as an input. The lead-time feature is a prerequisite for the lead-time-zero
+framing. Data-hungry structural changes (batched training, ensemble-member training, a global model)
+are worth running *after* the history lands, since that is where four extra years change the answer
+most.

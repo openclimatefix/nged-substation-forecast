@@ -25,14 +25,14 @@ scheduled cadence (e.g. quarterly maintenance windows) rather than reactively.
 Several decisions already made serve this constraint well, and this page makes that connection
 explicit so we don't accidentally undo them:
 
-- **The production hot path has no MLflow (or any tracking server)**, and the production image
-  carries no model today. The design for a future live forecaster puts its trained model in the
-  container image — see [Production Deployment — Design](../architecture/production-deployment.md).
-  Under the handover model that design is a feature twice over: there are fewer runtime moving parts
-  to break, and the model simply *freezes* between model updates.
+- **The production hot path has no MLflow (or any tracking server).** The production image carries
+  no model today. The design for a future live forecaster puts its trained model in the container
+  image — see [Production Deployment — Design](../architecture/production-deployment.md). Under the
+  handover model that design is a feature twice over: there are fewer runtime moving parts to break,
+  and the model simply *freezes* between model updates.
 - **Replay mode** means a missed slot is recovered by a one-click UI backfill, not by an engineer
   reconstructing state — see [Operating the live service](../live_service/operations.md).
-- **Changing the live model is rebuild + redeploy**, auditable via image tags — no live mutable
+- **Changing the live forecaster is rebuild + redeploy**, auditable via image tags — no live mutable
   model registry for an operator to mis-drive.
 - **No static AWS keys for OCF's own resources** (IAM roles throughout) removes a whole class of
   credential-expiry incidents. The two static credentials that remain sit at the boundary with NGED
@@ -104,14 +104,13 @@ missed-check-in alarm.** A hung daemon, a full disk, an expired credential, or a
 simply stopped firing raises no per-task alert. A missed-check-in alarm (Sentry's cron-monitoring
 terminology) fires when *no successful forecast has landed in N hours* (e.g. 8 hours, i.e. one
 missed 6-hourly slot plus margin), regardless of why. The mechanism for that alarm is **Sentry
-cron monitoring**: a live forecast asset checks in with Sentry after each successful run, and Sentry
-alerts on a missed check-in. Sentry sits outside the service being watched (a dead daemon simply
-stops checking in), and check-in pings are plain portable code. The Sentry design is in [Send
-telemetry to
-Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry). No
-live forecast asset checks in with Sentry today, so the alarm has nothing to watch until one does.
-What handover still has to settle: the Sentry account is OCF's today, so the alert routing (and
-possibly the account itself) moves to NGED.
+cron monitoring**: a live forecast asset would check in with Sentry after each successful run, and
+Sentry would alert on a missed check-in. Sentry sits outside the service being watched (a dead
+daemon simply stops checking in), and check-in pings are plain portable code. The Sentry design is
+in [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry). No
+live forecast asset sends Sentry a check-in today, so the alarm has nothing to watch until a live
+forecast asset does. What handover still has to settle: the Sentry account is OCF's today, so the
+alert routing (and possibly the account itself) moves to NGED.
 
 The [production monitoring plan](live-service.md#production-monitoring) already sketches a "no fresh
 forecast" staleness alarm; this workstream promotes it from a nice-to-have to the **primary** alert,

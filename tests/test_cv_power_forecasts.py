@@ -367,7 +367,7 @@ def test_cv_power_forecasts_fails_loudly_when_the_model_trained_no_series(
     register_experiment: RegisterExperiment,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A loaded model with an empty trained population has nothing to forecast."""
+    """A loaded forecaster with an empty trained population has nothing to forecast."""
     register_experiment(dagster_instance, EXPERIMENT_NAME)
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance

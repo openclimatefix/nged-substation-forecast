@@ -116,10 +116,10 @@ allowed, but an idea becomes a *CV run* — a candidate that can be promoted to 
 it is implemented in the pipeline's own code, behind the same data contracts and tests as everything
 else. There is then no "now rewrite the research code for production" step, because there was never
 a second, scruffier implementation to rewrite (and this should *accelerate* research, not slow it
-down). This would also make a one-command promotion *safe* rather than merely fast, once promotion
-exists: the model that won the leaderboard would be, bit for bit, the model that serves, so there
-would be no re-implementation whose divergence from the measured version can only be discovered in
-production.
+down). Running research on the production pipeline would also make a one-command promotion *safe*
+rather than merely fast, once promotion exists. The model that won the leaderboard would be, bit for
+bit, the model that serves, so there would be no re-implementation whose divergence from the
+measured version can only be discovered in production.
 
 *Without it:* research code is rewritten for production, the two implementations drift apart, and
 the deployed model no longer does what the winning CV run measured. And it takes *longer* to get
@@ -521,7 +521,8 @@ ran. `power_data_is_fresh` judges the power table by the readings on disk, not b
 pull succeeded. The rule for any asset that reads both NWP and telemetry is the same: select the
 freshest NWP run genuinely present as of the asset's own init time, read whatever telemetry is on
 disk, and stamp that run's `nwp_init_time` on every row written. A failed telemetry pull then makes
-a forecast slightly staler; it cannot make the forecast late, and it cannot make it absent.
+a forecast slightly staler; the failed pull cannot make the forecast late, and cannot make the
+forecast absent.
 
 Note the deliberate distinction between the *lineage* graph and a runtime precondition. Dagster
 still records which assets each asset depends on; that edge is what lets a developer ask Dagster to
@@ -536,8 +537,8 @@ test](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) predicts w
 
 *Decided:* the two production jobs, `power_time_series_and_metadata_job` and `ecmwf_ens_job`, run
 on independent schedules with no run-status coupling between them. The `:55` offset on the
-telemetry pull lands each hour's telemetry a few minutes before the top of the hour, which is an
-optimisation for freshness rather than a precondition for any other job.
+telemetry pull lands each hour's telemetry a few minutes before the top of the hour. The offset is
+an optimisation for freshness, not a precondition for any other job.
 
 *Serves:* [Hypothesis 1: a service that mostly runs
 itself](engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
@@ -672,9 +673,9 @@ into the in-band channel of [principle 1 ("*the power forecast never
 stops*")](#1-the-power-forecast-never-stops) rather than to a pager. There is also a model-side
 answer that is not monitoring at all: give the model features that let it *represent* the regime
 rather than merely detecting that it is unusual. Weather-abnormality features, such as each
-weather variable's z-score against its own climatology, would be that answer, and the two are
-complementary rather than alternatives. We do not yet know the right
-design; working it out is the task.
+weather variable's z-score against its own climatology, would be that model-side answer.
+Weather-abnormality features and monitoring are complementary rather than alternatives. We do not
+yet know the right design; working it out is the task.
 
 ### Shadow (champion–challenger) deployment
 

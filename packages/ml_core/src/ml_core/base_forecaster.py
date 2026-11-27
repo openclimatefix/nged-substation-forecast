@@ -326,11 +326,12 @@ class BaseForecaster(ABC):
         Args:
             data: The engineered features (lazy; the caller must not pre-collect).
             time_series_ids: The population the model must train on — the caller's eligible set.
-                The model decides how to map that population onto fitted state.
-                ``ClimatologyForecaster`` stores quantiles per calendar cell of each id. A future
-                model could instead fit one model per group of ids, for example all solar sites. The
-                population is the model's frozen record of who the model trained on (the
-                train==predict invariant), and bounds ``predict`` to that same population.
+                How a forecaster maps that population onto fitted state is left to the forecaster
+                subclass. ``ClimatologyForecaster`` stores quantiles per calendar cell of each id.
+                A future forecaster could instead fit one trained model per group of ids, for
+                example all solar sites. The population is the model's frozen record of who the
+                model trained on (the train==predict invariant), and bounds ``predict`` to that
+                same population.
         """
 
     @abstractmethod

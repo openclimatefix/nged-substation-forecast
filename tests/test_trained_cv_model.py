@@ -629,7 +629,10 @@ def test_trained_cv_model_fails_loudly_when_the_forecaster_trains_on_no_series(
     register_experiment: RegisterExperiment,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A forecaster that kept none of the eligible series must fail the asset, not save a model."""
+    """A forecaster that kept none of the eligible series must fail the asset.
+
+    The asset must not save a trained forecaster either.
+    """
     register_experiment(dagster_instance, EXPERIMENT_NAME)
     monkeypatch.setattr(
         ClimatologyForecaster, "trained_time_series_ids", property(lambda _self: [])

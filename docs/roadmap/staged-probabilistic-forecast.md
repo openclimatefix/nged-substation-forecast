@@ -47,7 +47,7 @@ cannot take a second weather model is the wrong design. The aims, in priority or
    beyond day 7, where ENS members disagree sharply about wind speed and irradiance.
 5. **Explainability.** An engineer should be able to say which stage produced an error.
 6. **Inherent stability.** Each stage always runs. No conditional skips a stage. A missing input is
-   a null that the model routes, never a raised exception.
+   a null that the forecasting model routes, never a raised exception.
 7. **Research first.** Experiments test every idea before production code changes.
 
 Aims 2 and 5 are the reason the forecast chain has more than one learned stage. Each stage has one

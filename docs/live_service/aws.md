@@ -30,7 +30,7 @@ Deployment — Design](../architecture/production-deployment.md).
 >
 > **Sentry error telemetry and the freshness warnings are wired.** Set the `SENTRY_*` vars in [Step
 > 14](#step-14-configure-dagster-on-the-box). Nothing yet alerts when the whole deployment stops,
-> and per-task failure emails (SNS) are still to come — see [the
+> and per-task failure emails (SNS, the Simple Notification Service) are still to come — see [the
 > roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 
 ## Step 1 — Create the S3 buckets
@@ -316,10 +316,10 @@ twice (its guard cannot tell an unset variable from a transient S3 error) before
 `sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
 carries on. Failing loudly per-schedule, rather than refusing the whole container, is deliberate.
 Requiring these credentials at `Settings` construction would make the container refuse to start,
-which sounds like a useful fail-fast until you notice that `ecmwf_ens` and every forecast asset read
-nothing from NGED's bucket — so stopping them because an NGED credential is missing would break
-[principle 1](../design-philosophy/design-principles.md#1-the-power-forecast-never-stops). The
-wider reasoning is under [principle
+which sounds like a useful fail-fast until you notice that `ecmwf_ens` reads nothing from NGED's
+bucket — so stopping it because an NGED credential is missing would break [principle
+1](../design-philosophy/design-principles.md#1-the-power-forecast-never-stops). The wider reasoning
+is under [principle
 6](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)
 and in the [Configuration reference](setup.md#the-env-file-and-nged-source-credentials). Catch a
 mis-wired secret in the deploy pipeline, where the blast radius is the deploy rather than the
@@ -587,8 +587,8 @@ Follow the run in **ECS** → the cluster → **Tasks**, then **CloudWatch Logs*
 `/ecs/nged-forecast`) for the container's output. The run passes when it succeeds and the
 `power_time_series` Delta table appears under
 `s3://nged-forecast-internal/data/NGED/power_time_series.delta/`. On the first pass through this
-runbook the run downloads every file in NGED's bucket, which takes a few minutes (see [Running the
-NGED
+runbook the run downloads every file in NGED's bucket, and the download takes a few minutes (see
+[Running the NGED
 ingest](operations.md#running-the-nged-ingest-first-run-rebuilds-and-the-downloaded-files-list)).
 The run exercises every AWS-side link in the chain — cluster, task definition, IAM roles, secrets,
 networking, logging — which is exactly what this step exists to verify.
@@ -860,7 +860,7 @@ scheduled runs on ephemeral Fargate — yet the repository builds a **single Doc
 no contradiction: a container image is not a program, it's a packaged **filesystem** — here, the
 Python environment (with every dependency installed), the `nged_substation_forecast` code, and the
 `conf/` directory. *Which program runs* is chosen per container, by the command each one is started
-with, and the image has no default command. The same image therefore plays four roles:
+with. The image has no default command. The same image therefore plays four roles:
 
 | Role | Runs where | Started as | What it uses from the image |
 |---|---|---|---|
@@ -1174,9 +1174,10 @@ daemons with green heartbeats.
    `ecmwf_ens_schedule`. Schedule state lives in Postgres, so this is a one-time action — it
    survives restarts and reboots.
 2. **First time only — materialise `h3_grid_weights` once, then the latest `ecmwf_ens` partition.**
-   `h3_grid_weights` is unpartitioned and has no schedule, and `ecmwf_ens` reads its output, so
-   materialise it first from the UI. A Dagster `deps=[...]` declaration records lineage; it does
-   *not* make materialising `ecmwf_ens` reach back and build its parents first. Then materialise
+   `h3_grid_weights` is unpartitioned and has no schedule. `ecmwf_ens` reads the output of
+   `h3_grid_weights`, so materialise `h3_grid_weights` first from the UI. A Dagster `deps=[...]`
+   declaration records lineage; it does *not* make materialising `ecmwf_ens` reach back and build
+   its parents first. Then materialise
    the latest `ecmwf_ens` partition rather than waiting for the 10:30 UTC tick. Watch the run get
    dispatched by the launcher: it appears in the Dagster UI, a Fargate task spins up in the ECS
    console, its logs stream to CloudWatch, and the NWP run lands under
@@ -1208,10 +1209,10 @@ service: Backfilling a missed partition](operations.md#backfilling-a-missed-part
 - **Security patches**: Ubuntu Server installs security updates automatically via
   `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
 
-Nothing yet alerts when the daemon dies silently: Sentry hears only from a process that is still
-running. Per-task failure alerts (email via SNS, the Simple Notification Service) are still to come
-too; see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) and
-[Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
+Nothing yet alerts when the daemon dies silently: Sentry receives events only from a process that is
+still running. Per-task failure alerts (email via SNS, the Simple Notification Service) are still to
+come too; see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
+and [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
 
 ## Redeploying new code
 

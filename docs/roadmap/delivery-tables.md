@@ -79,9 +79,10 @@ several of these:
 
 **The stored percentiles are the empirical quantiles of the values each forecaster produces.** The
 climatology baseline stores the quantiles of past power in the same calendar cell, and the manual
-heuristic stores the quantiles of its 13 historical analogues. A forecaster that predicts one power
-value per ECMWF ENS member reduces those 51 values with `ml_core.quantiles`, which takes the linear
-empirical quantile at each of the 13 levels.
+heuristic stores the quantiles of its 13 historical analogues. When a forecaster predicts one power
+value per member of the ensemble forecast (ENS) of the European Centre for Medium-Range Weather
+Forecasts (ECMWF), `ml_core.quantiles` reduces those 51 values by taking the linear empirical
+quantile at each of the 13 levels.
 
 Representations 2 and 3 are planned as two stages of one pipeline, not independent options:
 Representation 3 (per-member conditional quantiles) would be produced by the model, and
@@ -112,7 +113,7 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 | `nwp_init_time` | `datetime` (UTC), nullable | When the NWP model was initialised. Identifies the NWP run behind the forecast, and matters when NWP is delayed or when we deliberately use lagged NWP runs to grow the ensemble. Null for models that do not use NWP (e.g. persistence baselines). |
 | `power_fcst_init_time` | `datetime` (UTC) | When OCF's power-forecast model was initialised (the "t0"). |
 | `power_fcst_model_name` | `string` | Name of OCF's model, e.g. `"manual_heuristic"`. Set by the `BaseForecaster` subclass. |
-| `power_fcst_model_version` | `int16` | Number of the OCF model release. 0 for a CV run that is not a numbered release. |
+| `power_fcst_model_version` | `int16` | Number of the OCF model release. The value is 0 for a CV run that is not a numbered release. |
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
 `PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id` (`int32`,

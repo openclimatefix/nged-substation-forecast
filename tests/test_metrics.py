@@ -644,8 +644,8 @@ def test_metrics_no_filter_scores_every_group(
 def _append_live_fold_rows(forecasts_path: str) -> None:
     """Copy the produced forecasts into a ``fold_id="live"`` partition of the same table.
 
-    This is what a live asset writes: production output shares ``power_forecasts`` with the CV
-    folds, keyed by ``(experiment_name, fold_id="live")``.
+    The rows this helper appends have the shape a live asset would write: production output
+    shares ``power_forecasts`` with the CV folds, keyed by ``(experiment_name, fold_id="live")``.
     """
     live = pl.read_delta(forecasts_path).with_columns(fold_id=pl.lit("live"))
     write_deltalake(

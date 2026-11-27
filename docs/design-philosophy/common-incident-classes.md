@@ -21,14 +21,15 @@ minutes to days, for reasons entirely outside the consuming service's control.
 This kind of outage is the shape [Inherent Stability](inherent-stability.md) is built around: the
 [degradation ladder](inherent-stability.md#the-degradation-ladder) states what the forecast should
 still produce at each stage of loss, from one missed weather-model run through to no fresh data at
-all. The ingest already degrades this way: a stalled meter or a missed ECMWF run stops no other job.
-The forecast's own degradation is designed but not built. Weather data is the sharper case, because
-no forecaster in the repository yet falls back to a weather-blind forecast when numerical weather
-prediction (NWP) data is absent. That fallback is deliberately sequenced behind training a model
-against realistic outages, so that a degraded forecast is measured rather than merely produced. The
-[failure-modes table](inherent-stability.md#failure-modes) keeps one deliberate hard failure: a
-duplicated forecast primary key means one of our own joins has fanned out, which
-`PowerForecast.validate` rejects at the contract boundary rather than delivering.
+all. The ingest already degrades this way: a stalled meter or a missed weather run from the European
+Centre for Medium-Range Weather Forecasts (ECMWF) stops no other job. The forecast's own degradation
+is designed but not built. Weather data is the sharper case, because no forecaster in the repository
+yet falls back to a weather-blind forecast when numerical weather prediction (NWP) data is absent.
+That fallback is deliberately sequenced behind training a model against realistic outages, so that a
+degraded forecast is measured rather than merely produced. The [failure-modes
+table](inherent-stability.md#failure-modes) keeps one deliberate hard failure: a duplicated forecast
+primary key means one of our own joins has fanned out, which `PowerForecast.validate` rejects at the
+contract boundary rather than delivering.
 
 ## Upstream data malformed or silently reshaped
 
@@ -80,8 +81,8 @@ architecture](../roadmap/live-service.md#aws-architecture) extends the same inst
 every live and backtest run dispatches to its own ephemeral Fargate task, so a bad run cannot starve
 another one. The gap sits on the always-on control-plane box itself, where the Dagster daemon,
 webserver, and dashboard run as separate processes sharing one machine's memory and disk with no
-per-process limit — today's mitigation is restart-on-failure, which is reactive rather than
-preventive, and the [missed-check-in
+per-process limit. Today's mitigation is restart-on-failure, which is reactive rather than
+preventive. The [missed-check-in
 alarm](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) that would report a
 dead daemon is designed but not running
 ([#561](https://github.com/openclimatefix/nged-substation-forecast/issues/561)).

@@ -6,11 +6,11 @@ Guide](../documentation-guide.md#how-planning-works). Design rationale (the *why
 [`docs/architecture/`](../architecture/overview.md) instead; see that folder's [Production
 Deployment — Design](../architecture/production-deployment.md) page for this area's counterpart.
 [The roadmap's Live Service page](../roadmap/live-service.md) sends readers here as its sections
-land (so far: the ingest assets and their local automation, the container build/verify runbook,
-the AWS bring-up runbook, and Sentry telemetry; still to come: a live forecast asset, production
-monitoring, and per-task failure-email alerting). Once production monitoring lands and its design
-moves here, the roadmap page is deleted and this section is the sole home for how the live service
-works.
+land. So far, the ingest assets and their local automation, the container build/verify runbook, the
+AWS bring-up runbook, and Sentry telemetry have landed. A live forecast asset, production
+monitoring, and per-task failure-email alerting are still to come. Once production monitoring lands
+and its design moves here, the roadmap page is deleted and this section is the sole home for how the
+live service works.
 
 The live service is distinct from [Cross-validation](../cross-validation/index.md): that area
 covers training and backtesting candidate models against historical data; this area covers the
@@ -41,9 +41,9 @@ environments, so it lives on one shared page.
 - [Connecting to the AWS control plane](connecting.md) — get a laptop onto the OCF tailnet to reach
   an already-running deployment: install Tailscale, view the Dagster UI, and SSH into the always-on
   box.
-- [Operating the live service](operations.md) — driving a running stack day to day: the hourly
-  power and daily NWP ingest schedules, reading the asset checks and Sentry events when an input
-  degrades, inspecting a forecast, and backfilling a missed partition.
+- [Operating the live service](operations.md) — driving a running stack day to day: the hourly power
+  and daily numerical weather prediction (NWP) ingest schedules, reading the asset checks and Sentry
+  events when an input degrades, inspecting a forecast, and backfilling a missed partition.
 - [Intervention log](intervention-log.md) — the append-only record of every occasion a human had to
   intervene in the running service, and the artefact the [T1.1 operability
   test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) is

@@ -486,8 +486,8 @@ commercially sensitive.
 ### Which score steers the search
 
 **The search steers on normalised mean absolute error (NMAE) over forecast lead times of 3 to 10
-days, the headline score of the XGBoost backlog.** The scorer does not
-yet report that band. [Issue #1033 (Report NMAE over 3–10 day lead times as a leaderboard horizon
+days, which is the headline score for ideas in the XGBoost backlog.** The scorer does not yet report
+that band. [Issue #1033 (Report NMAE over 3–10 day lead times as a leaderboard horizon
 slice)](https://github.com/openclimatefix/nged-substation-forecast/issues/1033) adds the band.
 Steering on the same metric as the leaderboard keeps the screening ranking and the leaderboard
 ranking comparable. The two rankings can still disagree, because screening and the leaderboard

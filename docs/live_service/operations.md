@@ -3,10 +3,12 @@
 How to drive the running live service day to day: the ingest schedules, what the asset checks and
 Sentry events mean when an input degrades, and how to backfill a missed partition.
 
-The live service currently writes no forecast. It ingests NGED's power telemetry and the ECMWF
-ensemble NWP, cleans the telemetry, and checks both inputs. The production runtime has **no
-dependency on MLflow**: the deployment reaches no tracking server, and the [cross-validation
-assets](../cross-validation/index.md) that do need MLflow run on a researcher's laptop.
+The live service currently writes no forecast. The live service ingests the power telemetry of
+National Grid Electricity Distribution (NGED) and the ensemble numerical weather prediction (NWP)
+from the European Centre for Medium-Range Weather Forecasts (ECMWF), cleans the telemetry, and
+checks both inputs. The production runtime has **no dependency on MLflow**: the deployment reaches
+no tracking server. The [cross-validation assets](../cross-validation/index.md) that do need MLflow
+run on a researcher's laptop.
 
 ---
 
@@ -31,7 +33,7 @@ run on your laptop whichever environment runs the ingest.
 
 ## The ingest schedules
 
-Two schedules run the whole recurring pipeline, and both need the Dagster daemon running (see
+Two schedules run the whole recurring pipeline. Both need the Dagster daemon running (see
 [Prerequisites](#prerequisites-a-running-dagster-instance) above) to fire on time:
 
 - `power_time_series_and_metadata_schedule` fires at :55 past every hour. Its job runs
@@ -67,8 +69,8 @@ retries twice before reporting, and a run you cancelled yourself.
 `power_time_series_and_metadata`, is **non-blocking** and **WARN**-severity, and reports on *on-disk
 data recency* rather than on whether the asset materialised. It flags any time series whose most
 recent reading is more than 24 hours old, and its metadata carries a table of the late series with
-`last_seen` and `hours_late`. A warning therefore never stops the ingest; it tells you which feed to
-chase. A handful of persistently-late series is usually a decommissioned or renamed
+`last_seen` and `hours_late`. A warning therefore never stops the ingest. The warning tells you
+which feed to chase. A handful of persistently-late series is usually a decommissioned or renamed
 substation rather than an outage — check the metadata table before escalating.
 
 That table is capped at 50 rows
@@ -156,7 +158,8 @@ download a growing backlog. Read the traceback in the run's logs — an off-cont
 after a schema change and a bug in our own code both land here, and both want a fix rather than a
 re-run.
 
-A stalled upsert loses only the metadata change, which matters at the next training run.
+A stalled upsert loses only the change to the `TimeSeriesMetadata` table, which matters at the next
+training run.
 
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from the
 frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
@@ -256,10 +259,10 @@ Every materialisation whose completeness assessment succeeded also publishes `n_
 shows slow drift in the upstream dataset before it becomes a warning.
 
 **When a daily NWP run is missing.** We ingest one ECMWF run per day: the 00Z run, downloaded from
-10:30 UTC. `ecmwf_ens` sends a `retrying_asset` warning to Sentry on its first failed attempt, and a
-run that is still missing when the retries run out, about 4 hours later, fails `ecmwf_ens_job` and
-reaches Sentry tagged `fault_category:run_failed`. Chase Dynamical.org, then materialise the missed
-`ecmwf_ens` partition once the feed recovers (see [Backfilling a missed
+10:30 UTC. `ecmwf_ens` sends a `retrying_asset` warning to Sentry on its first failed attempt. If
+the run is still missing when the retries run out, about 4 hours later, `ecmwf_ens_job` fails and
+the failure reaches Sentry tagged `fault_category:run_failed`. Chase Dynamical.org, then materialise
+the missed `ecmwf_ens` partition once the feed recovers (see [Backfilling a missed
 partition](#backfilling-a-missed-partition)).
 
 **Log the intervention.** Every entry above that needed a human is a data point for the [T1.1

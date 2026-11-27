@@ -19,11 +19,11 @@ principles in that list.
 that the machine-learning (ML) model itself is built to keep producing a sensible forecast when some
 of its inputs are missing — rather than a chain of fallbacks wrapped around a model that assumes
 complete data. Gradient-boosted trees, for example, *route* missing features instead of requiring
-them to be filled in, so a forecast still comes out when a feature drops away. No learned model has
-yet been **trained** against realistic outages, and training against outages is what turns "it
-still produces a number" into "it still produces a number worth trusting". Much of
-what follows — the degradation ladder, the widening bands, the failure-scenario suite — exists to
-make that one design choice work; the mechanics are in [Default directions, and their
+them to be filled in, so a forecast still comes out when a feature drops away. No machine-learning
+model in this repository has yet been **trained** against realistic outages. Training against
+outages is what turns "it still produces a number" into "it still produces a number worth trusting".
+Much of what follows — the degradation ladder, the widening bands, the failure-scenario suite —
+exists to make that one design choice work; the mechanics are in [Default directions, and their
 limit](#default-directions-and-their-limit) and [Missingness in learned
 models](#missingness-in-learned-models).
 
@@ -283,7 +283,8 @@ run is also a production risk, because [H2, a hundred CV runs per person in a pe
 month](engineering-hypotheses.md#h2-a-hundred-cv-runs-per-person-in-a-peak-month) and [H3,
 one-click promotion and one-click
 rollback](engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback) depend on
-retraining staying cheap and on promotion becoming one command, which no mechanism provides yet.
+retraining staying cheap and on promotion becoming one command. No mechanism makes promotion one
+command yet.
 
 ## Mechanisms
 
@@ -373,13 +374,14 @@ Inherent stability creates a specific hazard for the third channel: **a system t
 looks identical to a system that is not running at all.** Both produce zero failures. That is why
 a missed-check-in alarm, firing from outside the deployment, is load-bearing rather than
 belt-and-braces: it is the one piece of active monitoring this design cannot do without. No
-production job sends Sentry a check-in today, which the [failure-modes table](#failure-modes)
-records as a row where nobody is told.
+production job sends Sentry a check-in today. The [failure-modes table](#failure-modes) records that
+gap as a row where nobody is told.
 
 A missed-check-in alarm fires on *absence*, and is not conditional on health: a service that is
 running but degraded still checks in. The alarm exists to catch a service that stopped, so the
-degraded case has to be carried by an event somebody sends, which is [rule 6](#the-rules) and, today,
-the gap at [#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
+degraded case has to be carried by an event somebody sends. That requirement is [rule
+6](#the-rules), and the gap today is
+[#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
 
 For the provider channel, a warning is only actionable if it names *whose* NWP and *which* run,
 which is why `power_forecast_warnings` carries a `warning_source` field ([Delivery

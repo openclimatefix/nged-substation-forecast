@@ -895,8 +895,9 @@ could add. A low ceiling need not stop anyone trying a new source, because an au
 test a new weather product quickly (see [A new weather product with a few months of
 history](training-history.md#a-new-weather-product-with-a-few-months-of-history)). That study trains
 a lag-free model on estimates of past weather, which the study calls the weather-response model. A
-lag-free variant of the ceiling's model can serve as both, so the ceiling and the study can share
-one model. The ceiling proper uses the live model's own feature set, lags included.
+lag-free variant of the ceiling's model can also serve as the weather-response model, so the ceiling
+and the study can share one model. The ceiling proper uses the live model's own feature set, lags
+included.
 
 Two rungs, in increasing order of "cheating":
 
@@ -974,9 +975,9 @@ point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-st
 
 Issue: [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225)
 
-The 51-member ensemble is very likely **underdispersed**: a model trained with squared error on the
-control member learns a conditional mean, so pushing 51 members through that model
-yields spread from *weather uncertainty only* — no model or observation uncertainty. Underdispersed
+The 51-member ensemble is very likely **underdispersed**: a forecaster trained with squared error on
+the control member learns a conditional mean, so pushing 51 members through that forecaster yields
+spread from *weather uncertainty only* — no model or observation uncertainty. Underdispersed
 ensembles are systematically overconfident, worst at short horizons where members haven't diverged.
 Flexibility procurement is a tails problem (P90+ peaks), so this overconfidence hits the use case
 directly.

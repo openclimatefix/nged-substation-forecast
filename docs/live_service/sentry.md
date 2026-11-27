@@ -134,7 +134,7 @@ Dagster on your laptop does **not** forward everything to Sentry:
   so your `<name>-laptop` staleness forms its own Sentry issue, separate from production's. Resolve
   or ignore it as you like.
 
-The failure hook's scope is the same in production; the [design
+The failure hook's scope is the same in production. The [design
 page](../architecture/production-deployment.md#send-telemetry-to-sentry) explains why the failure
 hook covers only the scheduled jobs, and how the freshness warning models recovery.
 

@@ -46,9 +46,9 @@ name (e.g. `tempurature_2m`) surfaces only then, not at registration.
 **Each forecaster reads only part of the catalogue below.** The manual heuristic reads power lags
 and nothing else, and climatology reads no feature at all, so `conf/model/climatology.yaml` sets
 `selected_features: []`. Both forecasters raise when `trained_cv_model` runs if the list holds a
-feature they do not read, and the manual heuristic also raises on a list that holds no power lag.
-The weather, time, and pass-through features are what the default
-`TabularFeatureEngineer` can build for a forecaster that reads them.
+feature they do not read. The manual heuristic also raises on a list that holds no power lag. The
+weather, time, and pass-through features are what the default `TabularFeatureEngineer` can build for
+a forecaster that reads them.
 
 ### Power lags
 
@@ -163,7 +163,7 @@ hyperparameters of its own declares them on a subclass of `BaseForecasterConfig`
 | `selected_features` | (required) | List of feature name strings — see above. |
 | `weather_source` | `""` | Leaderboard tag, e.g. `"ecmwf_control"` or `"ecmwf_ens"`. |
 | `training_strategy` | `""` | Leaderboard tag, e.g. `"horizon_as_feature"`. |
-| `random_seed` | `0` | Seed for a forecaster's random draws, so re-training a fold reproduces the same model. Neither baseline forecaster draws at random, so for them the field changes only the CV run's identity. |
+| `random_seed` | `0` | Seed for a forecaster's random draws, so re-training a fold reproduces the same trained forecaster. Neither baseline forecaster draws at random, so for them the field changes only the CV run's identity. |
 | `model_release` | `0` | Integer stamped on every forecast row as `power_fcst_model_version`. `0` is the default, for a run that is not a numbered release. Range 0 to 32767. |
 | `experiment_name` | `""` | Set from the job's own `experiment_name`; cannot be overridden. |
 | `ml_flow_experiment_id` | `None` | Stamped onto every `PowerForecast` row. Nothing sets it automatically. |
@@ -209,8 +209,8 @@ override of it.
 ```
 
 Every override is a **whole-value replacement**, not a merge. `selected_features` is the case you
-will meet first: to add one feature to the base set or drop one from it, you must list all the
-features you want, not just the one that changes. The same holds when a `model_params` value is
+will meet first: to add a feature to the base set or drop a feature from it, you must list all the
+features you want, not just the feature that changes. The same holds when a `model_params` value is
 itself a mapping — an override replaces the whole mapping, dropping the base's other keys, so
 restate every key you want to keep.
 

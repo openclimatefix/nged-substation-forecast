@@ -190,13 +190,14 @@ the initial conftests, before `pytest_configure` runs — imports the Dagster de
 imports Polars transitively. A `pytest_configure`-time set is already too late and silently caps
 nothing in the process running the tests directly (a serial run, or the `-n auto` controller
 process; xdist workers still pick up the cap, inherited via the environment at their own start-up).
-OpenMP-backed libraries and Polars each default to a thread pool sized to the machine's core
-count, so without the cap, `-n auto`'s one-process-per-core plus each process's own full-width
-thread pool oversubscribes the machine by core-count² and every worker's threads fight the others
-for the same cores — measured on a 32-thread workstation, removing the caps made the full suite run
-in 95s with 4755 threads and a load average of 201, versus 21-24s capped. The cap is 4 rather than 1
-because it costs nothing in wall-clock on that workstation while matching production more closely,
-where a single job runs with no thread cap at all.
+Libraries backed by OpenMP (Open Multi-Processing, a shared-memory threading standard) and Polars
+each default to a thread pool sized to the machine's core count, so without the cap, `-n auto`'s
+one-process-per-core plus each process's own full-width thread pool oversubscribes the machine by
+core-count² and every worker's threads fight the others for the same cores — measured on a 32-thread
+workstation, removing the caps made the full suite run in 95s with 4755 threads and a load average
+of 201, versus 21-24s capped. The cap is 4 rather than 1 because it costs nothing in wall-clock on
+that workstation while matching production more closely, where a single job runs with no thread cap
+at all.
 
 ## Warnings are errors
 

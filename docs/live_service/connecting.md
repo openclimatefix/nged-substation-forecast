@@ -97,4 +97,4 @@ docker compose logs -f daemon
   including [Step 12](aws.md#step-12-join-the-tailnet) (joining the box to the tailnet) and [Step
   15](aws.md#step-15-start-the-stack-and-connect-over-tailscale) (starting the stack).
 - [Operating the live service](operations.md) — what to do once you are connected: the ingest
-  schedules, reading the asset checks, inspecting forecasts, backfilling missed partitions.
+  schedules, reading the asset checks, inspecting forecasts, and backfilling missed partitions.

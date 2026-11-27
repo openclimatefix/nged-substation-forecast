@@ -4,11 +4,11 @@ Marimo notebooks for exploratory data analysis and ad-hoc analysis.
 
 ## Why this package exists
 
-**A notebook here answers one question about the data, and is allowed to be rough.** What the
-numerical weather prediction (NWP) archive holds for one H3 cell — H3 being the grid of hexagons
-this project aggregates weather onto — and where a weather variable goes missing: each question is
-worth a chart, and worth no more engineering than a chart. Nothing in `src/`, and no other package
-under `packages/`, imports this package, so a notebook that stops working stops working alone.
+**A notebook here answers one question about the data, and is allowed to be rough.** Each question
+is worth a chart, and worth no more engineering than a chart: what the numerical weather prediction
+(NWP) archive holds for one H3 cell — H3 being the grid of hexagons this project aggregates weather
+onto — and where a weather variable goes missing. Nothing in `src/`, and no other package under
+`packages/`, imports this package, so a notebook that stops working stops working alone.
 
 **Roughness is acceptable here because a notebook is never the route into production.** [Design
 principle 3 — one execution path from research to

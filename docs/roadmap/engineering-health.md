@@ -28,8 +28,8 @@ plus general cleanup.
   independence of `eligible_time_series` from the CV run.
 - **Determinism**: training a fold twice with a fixed `random_seed` yields identical predictions.
   Determinism underpins idempotent retries and a stable leaderboard.
-  No test evidences this claim through `trained_cv_model` or fold-window loading, so the fold-level
-  claim above is one of the guardrail tests that are still unwritten.
+  No test evidences this claim through `trained_cv_model` or fold-window loading. A fold-level
+  determinism test is therefore one of the guardrail tests that are still unwritten.
 - **Degradation smoke-tests**: ablate whole input groups — NWP absent, telemetry absent, a single
   weather variable nulled — and assert that a forecast is still produced for every time series, that
   every value stays inside physical bounds, and that nothing explodes. These consume the scenario

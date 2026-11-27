@@ -2,7 +2,7 @@
 
 The pure ``evaluate_power_freshness`` cases need neither Dagster nor Delta. Each check also has
 end-to-end tests that drive the real ``@asset_check`` — writing temp Delta tables and a metadata
-table — so the Settings plumbing, the Delta scans and the ``AssetCheckResult`` mapping are all
+table — so the Settings plumbing, the Delta scans, and the ``AssetCheckResult`` mapping are all
 exercised together.
 
 One case goes further and drives ``power_data_is_fresh`` through Dagster's executor rather than

@@ -144,16 +144,16 @@ committing to a long `full_cv` training run.
 
 ## Running the live service on your laptop
 
-The entire live service — the hourly telemetry ingest, the daily NWP download, and the Dagster UI —
-runs on the laptop you have just set up, with no AWS involved. Running the whole stack
-locally is a deliberate portability requirement rather than a development convenience: no
-cloud-specific service may be load-bearing for scheduling or orchestration (see [the orchestration
+The entire live service runs on the laptop you have just set up, with no AWS involved: the hourly
+telemetry ingest, the daily NWP download, and the Dagster UI. Running the whole stack locally is a
+deliberate portability requirement rather than a development convenience: no cloud-specific service
+may be load-bearing for scheduling or orchestration (see [the orchestration
 decision](architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm)).
 
 The schedules fire only while `dg dev` keeps running, so closing the laptop lid stops the service.
 That gap is exactly what the [AWS deployment](live_service/aws.md) exists to close. Driving a
-running stack is identical in both environments — the schedules, the ingest, backfills — and lives
-in [Operating the live service](live_service/operations.md).
+running stack is identical in both environments — the schedules, the ingest assets, and backfills —
+and lives in [Operating the live service](live_service/operations.md).
 
 ### Optional — rehearse S3 locally with MinIO
 

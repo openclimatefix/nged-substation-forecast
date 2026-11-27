@@ -1,9 +1,10 @@
 # Production Deployment — Design
 
-How the live service is orchestrated, and why. The live service ingests NGED's power telemetry and
-the ECMWF ensemble NWP, and checks both. For the step-by-step recipe — build the image, verify it,
-push it, and stand up the AWS deployment around it — see [Setting up the live service on
-AWS](../live_service/aws.md).
+How the live service is orchestrated, and why. The live service ingests the power telemetry of
+National Grid Electricity Distribution (NGED) and the ensemble numerical weather prediction (NWP)
+from the European Centre for Medium-Range Weather Forecasts (ECMWF), and checks both. For the
+step-by-step recipe — build the image, verify it, push it, and stand up the AWS deployment around it
+— see [Setting up the live service on AWS](../live_service/aws.md).
 
 ## Run the Dagster control plane continuously on one small VM
 
@@ -38,18 +39,18 @@ The design accepts two trade-offs:
   box failure could silently miss ingest runs. The blast radius is small, because the project's
   [uptime requirements are lenient by
   design](../background/requirements.md#uptime-lenient-by-design). Nothing outside the box
-  currently watches the daemon, so a dead daemon raises no alert: Sentry hears only from a process
-  that is still running.
+  currently watches the daemon, so a dead daemon raises no alert: Sentry receives events only from a
+  process that is still running.
 
-- **No run-level auto-retry after a hard crash.** Accepted. The next hourly power pull back-fills
-  the missed telemetry, and a missed `ecmwf_ens` partition is re-materialised by hand from the
-  Dagster UI.
+- **No run-level auto-retry after a hard crash.** We accept this trade-off. The next hourly power
+  pull back-fills the missed telemetry. A missed `ecmwf_ens` partition is re-materialised by hand
+  from the Dagster UI.
 
 "Always-on" is also less demanding than it sounds, because the box comes with **built-in maintenance
-windows**: the ingest runs are short and periodic, and the delivery design has NGED read published
-forecasts directly from S3 (see [Forecast Delivery](forecast-delivery.md)), so the gap between one
-scheduled run and the next is a regular window in which the VM can be stopped, patched, or rebuilt
-without NGED noticing. See [Requirements → Uptime: lenient by
+windows**. The ingest runs are short and periodic, and the delivery design has NGED read published
+forecasts directly from S3 (see [Forecast Delivery](forecast-delivery.md)). The gap between one
+scheduled run and the next is therefore a regular window in which the VM can be stopped, patched, or
+rebuilt without NGED noticing. See [Requirements → Uptime: lenient by
 design](../background/requirements.md#uptime-lenient-by-design).
 
 Several other orchestration shapes were considered and rejected — see [Considered but rejected
@@ -306,18 +307,19 @@ never a failure.
 MLflow.** Production runs are ephemeral Fargate tasks, dispatched by the always-on Dagster control
 plane described [above](#run-the-dagster-control-plane-continuously-on-one-small-vm). An ephemeral
 container has no persistent disk and no tracking server to reach. The production image currently
-carries no model. A model the live service runs reaches the container inside the image, as a plain
-directory that the forecaster's own `load` reads, and the image build never contacts MLflow. (The
-rejected alternative — fetching the model from MLflow at container startup — is covered in
-[Considered but rejected designs](#fetching-a-model-from-mlflow-at-container-startup).)
+carries no trained forecasting model. A trained forecasting model added to the live service would
+reach the container inside the image, as a plain directory that the forecaster's own `load` reads.
+The image build never contacts MLflow. (The rejected alternative — fetching the model from MLflow at
+container startup — is covered in [Considered but rejected
+designs](#fetching-a-model-from-mlflow-at-container-startup).)
 
 This design also serves the operating model for after this Network Innovation Allowance (NIA)
 project (see [Requirements → Operating model &
 handover](../background/requirements.md#operating-model-handover)). The working assumption is that
 NGED runs the service on its own AWS account, operated day to day by NGED staff who did not develop
 the code, working from the runbooks. For that operator there is no tracking server on the hot path
-to break. A model in the image freezes between model updates, and a frozen model is a feature, not a
-limitation.
+to break. A trained forecasting model inside the image would change only when a new image is
+deployed, and that stability is a feature, not a limitation.
 
 The cross-validation pipeline does load models from MLflow, through
 `BaseForecaster.load_from_mlflow` (see [ML orchestration: model
@@ -325,8 +327,9 @@ artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-
 `load_from_mlflow` downloads on every call, for the reasons in [Why there is no local
 cache](ml-orchestration.md#why-there-is-no-local-cache), so it offers no way to keep serving through
 an MLflow outage. A live service that picked up each new model from MLflow without a redeploy would
-need that mechanism designed against production's own availability needs, which is tracked in
-[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
+need a way to keep serving through an MLflow outage, designed against production's own availability
+needs. That design is tracked in [issue
+#472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Resolve repo-relative paths via a workspace marker, not directory depth
 
@@ -363,12 +366,12 @@ it.
 
 ### No control plane: EventBridge Scheduler launching ECS tasks
 
-**The design.** AWS EventBridge Scheduler fires on the 6-hourly cadence and launches an ECS (Elastic
-Container Service) `RunTask` that executes `dagster asset materialize` (or `dagster job execute`)
-directly in the production image. Dagster acts purely as the in-process execution framework,
-EventBridge acts as the scheduler, and compute is paid per run with nothing always-on. Run history
-could still be inspected by pointing an on-demand `dagster-webserver` at shared Postgres run
-storage.
+**The design.** AWS EventBridge Scheduler fires on each schedule's cadence and launches an ECS
+(Elastic Container Service) `RunTask` that executes `dagster asset materialize` (or `dagster job
+execute`) directly in the production image. Dagster acts purely as the in-process execution
+framework, EventBridge acts as the scheduler, and compute is paid per run with nothing always-on.
+Run history could still be inspected by pointing an on-demand `dagster-webserver` at shared Postgres
+run storage.
 
 **Why we rejected it (July 2026).** Four reasons:
 
@@ -395,8 +398,8 @@ storage.
    Relaunching a whole crashed run would have required wrapping the task in a Step Functions state
    machine using the `.sync` integration, while failures *inside* a run are already handled by
    Dagster's `RetryPolicy` on individual assets/ops, which works in-process with or without a
-   daemon. So neither design gives run-level retry out of the box. At four runs per day, manual
-   backfills plus alerting are a sufficient answer in both worlds.
+   daemon. So neither design gives run-level retry out of the box. At one telemetry run an hour and
+   one NWP run a day, manual backfills plus alerting are a sufficient answer in both worlds.
 
 EventBridge is also graph-blind: it fires a cron and passes a payload, so asset dependency ordering
 would have been handled entirely by Dagster within a single self-contained run of the full asset
@@ -413,7 +416,7 @@ supports.
 
 **The design.** Run the Dagster daemon only periodically (say, hourly) instead of continuously, to
 save cost; on each wake-up, the daemon's schedule catch-up (`max_catchup_runs`, default 5) would
-fire any 6-hourly ticks missed while it slept.
+fire any scheduled ticks missed while it slept.
 
 **Why we rejected it.** Sensors, run monitoring, and retries all assume an always-on daemon; the web
 UI would be unavailable most of the time; and an external scheduler would still need to reliably
@@ -519,12 +522,12 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
    touch.
 
 **What the accepted design costs.** Every ingest run currently inherits the task definition's 4 vCPU
-/ 16 GB — sized for inference's ~9 GB peak, and oversized for an hourly telemetry pull. At the
-`eu-west-2` ARM rates in the [region price table](forecast-delivery.md#securing-it) (~\$0.21/hour
-for that task size), ~720 hourly runs of a few minutes each — most of them the no-ops described
-above — come to on the order of **\$5–10/month**: the same magnitude of saving the [EventBridge
-rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) dismissed as "not real for
-this workload".
+/ 16 GB — sized comfortably above the daily NWP ingest's peak, and oversized for an hourly telemetry
+pull. At the `eu-west-2` ARM rates in the [region price table](forecast-delivery.md#securing-it)
+(~\$0.21/hour for that task size), ~720 hourly runs of a few minutes each — most of them the no-ops
+described above — come to on the order of **\$5–10/month**: the same magnitude of saving the
+[EventBridge rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) dismissed as
+"not real for this workload".
 
 **A second, quieter cost is idle time billed inside a single run.** `ecmwf_ens`'s not-yet-published
 retry loop (`RetryRequested`, 30-minute waits) retries *inside the same run*, so on a

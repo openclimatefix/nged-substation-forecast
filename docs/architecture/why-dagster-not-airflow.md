@@ -93,8 +93,8 @@ When the system was designed in August 2025, the latest Airflow release was 3.0.
   earlier, in 3.0.4 itself — and a second variant of that bug (conf not applied to runs whose
   logical dates already existed, [#59043](https://github.com/apache/airflow/issues/59043)) survived
   until Airflow 3.2.2 in May 2026. Run-config correctness matters unusually much to us because a
-  backfill's config can decide which NWP run a forecast is allowed to see, so a silently dropped
-  config produces lookahead bias rather than an error.
+  backfill's config sets which numerical weather prediction (NWP) run a forecast is allowed to see.
+  A silently dropped config therefore produces lookahead bias rather than an error.
 - **Airflow could not run our Python.** Python 3.14 support arrived in Airflow 3.2.0 (April 2026);
   Flexpectation is 3.14-only.
 
