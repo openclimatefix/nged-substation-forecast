@@ -11,7 +11,7 @@ import numpy as np
 import polars as pl
 import pytest
 import torch
-from substation_demand_forecaster.bundle import Bundle, load_bundle
+from substation_demand_forecaster.bundle import Bundle, load_bundle, require_servable_bundle
 from substation_demand_forecaster.ens_summary import SOURCE_COLUMNS, summarise_runs
 from substation_demand_forecaster.features import STEP5_COLUMNS, ExpectedRows
 from substation_demand_forecaster.neural_network import forecast, mixture_quantiles
@@ -101,6 +101,21 @@ def test_load_bundle_rejects_a_bundle_it_cannot_serve(
 ) -> None:
     with pytest.raises(ValueError, match=match):
         load_bundle(write_bundle_at(tmp_path / "bundle", manifest_overrides=overrides))
+
+
+def test_require_servable_bundle_accepts_the_cams_free_arm(bundle: Bundle) -> None:
+    require_servable_bundle(bundle)
+
+
+def test_require_servable_bundle_rejects_a_bundle_trained_on_cams(
+    tmp_path: Path, write_bundle_at: Callable[..., Path]
+) -> None:
+    root = write_bundle_at(tmp_path / "bundle")
+    config = json.loads((root / "config.json").read_text())
+    config["components"]["step5"]["b1_constants"]["cams_columns_source"] = "arm replay"
+    (root / "config.json").write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="cams_columns_source"):
+        require_servable_bundle(load_bundle(root))
 
 
 def test_load_bundle_rejects_a_changed_shared_constant(

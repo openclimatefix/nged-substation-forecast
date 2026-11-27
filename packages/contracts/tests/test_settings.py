@@ -87,6 +87,12 @@ def test_delivery_fields_are_exactly_the_known_delivery_tables():
             assert value.startswith("/internal"), f"{field_name} should derive from /internal"
 
 
+def test_primary_substation_bundle_path_derives_from_local_artifacts():
+    """The bundle is an always-local artifact, so it stays local when the data tables are on S3."""
+    settings = Settings(data_path_internal="s3://bucket/data", local_artifacts_path="/app/data")
+    assert settings.primary_substation_bundle_path == "/app/data/primary_substation_bundle"
+
+
 def test_explicit_path_overrides_derivation():
     """An explicitly set path wins over derivation from its root."""
     settings = Settings(

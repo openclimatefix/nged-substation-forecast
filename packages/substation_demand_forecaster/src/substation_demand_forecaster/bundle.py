@@ -55,6 +55,14 @@ CALENDAR_TIMEZONE: Final[str] = "Europe/London"
 B1_TRAILING_WINDOW_STEPS: Final[tuple[int, int, int]] = (6, 12, 48)
 """The 3-hour, 6-hour, and 24-hour windows of the B1 trailing means, in half-hours."""
 
+SERVABLE_CAMS_COLUMNS_SOURCE: Final[str] = "arm drop"
+"""The `cams_columns_source` of a bundle the live service can serve.
+
+Production fills the two previous-day CAMS columns with zeros, which is how the CAMS-free arm
+(`drop`) was trained. A bundle trained on real CAMS values (`arm replay`) would read zeros it never
+saw in training.
+"""
+
 _HOLIDAY_CALENDAR: Final[str] = "holidays.country_holidays('GB', subdiv='ENG')"
 """The calendar the bundle must name: the code implements this one and no other."""
 
@@ -384,4 +392,26 @@ def load_bundle(path: Path) -> Bundle:
         quantile_levels=tuple(float(level) for level in step5["quantile_levels"]),
         seeds=tuple(int(seed) for seed in component["seeds"]),
         weights=_load_weights(root=path, files=files["weights"]),
+    )
+
+
+def require_servable_bundle(bundle: Bundle) -> None:
+    """Raise unless the live service computes every input column the way `bundle` was trained.
+
+    `load_bundle` accepts a bundle trained on real CAMS values, because the golden tests replay its
+    fixtures with those values fed in. The live service has no CAMS feed and fills both CAMS
+    columns with zeros, so it serves only a bundle whose `cams_columns_source` is
+    `SERVABLE_CAMS_COLUMNS_SOURCE`.
+
+    Args:
+        bundle: A bundle `load_bundle` returned.
+
+    Raises:
+        ValueError: If the bundle's CAMS columns came from a source the live service cannot
+            reproduce.
+    """
+    _check(
+        name="b1_constants.cams_columns_source",
+        found=bundle.b1.cams_columns_source,
+        expected=SERVABLE_CAMS_COLUMNS_SOURCE,
     )

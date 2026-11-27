@@ -1,6 +1,6 @@
-"""Sentry.io telemetry: error reporting and freshness warnings.
+"""Sentry.io telemetry: error reporting, the missed-check-in alarm, and freshness warnings.
 
-The two mechanisms below are independent, and both are no-ops when Sentry is unconfigured, so
+The three mechanisms below are independent, and all are no-ops when Sentry is unconfigured, so
 laptops and CI need no Sentry configuration:
 
 - **Error telemetry** — `init_sentry` initialises the SDK once per process (a no-op unless
@@ -23,6 +23,13 @@ laptops and CI need no Sentry configuration:
   exception at *warning* level on the first failed attempt, so the operator learns of the fault
   hours before the last retry fails. It is called from inside the asset, so it also fires in a
   manual or backfill run.
+- **The missed-check-in alarm** — `send_primary_substation_forecast_checkin` sends a
+  *success-only* check-in to a Sentry cron monitor after each daily
+  ``live_primary_substation_forecasts`` run that writes today's forecast. It is gated on
+  ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing
+  never checks in to the production monitor. Sentry fires the alarm on the *absence* of a check-in
+  past the margin, because a dead daemon cannot report itself; in-band run errors are handled by
+  the failure hook above, never by this check-in.
 - **Freshness warnings** — `report_power_freshness` forwards the ``power_data_is_fresh`` asset
   check's per-series staleness to Sentry as a *warning*-level event when any series is late.
   Gated on the DSN like error telemetry, and fingerprinted per
@@ -55,9 +62,13 @@ from dagster import (
     RetryRequested,
     failure_hook,
 )
+from sentry_sdk.crons import capture_checkin
+from sentry_sdk.crons.consts import MonitorStatus
 from sentry_sdk.integrations.logging import LoggingIntegration
 
 if TYPE_CHECKING:
+    from sentry_sdk._types import MonitorConfig
+
     # Type-only import: importing this at runtime would be circular (defs/checks.py imports
     # report_power_freshness from this module). Annotate as a string below. Deferring the pure
     # freshness core into its own module — so this could be a real import — is left until a second
@@ -65,6 +76,45 @@ if TYPE_CHECKING:
     from nged_substation_forecast.defs.checks import PowerFreshnessResult
 
 logger = logging.getLogger(__name__)
+
+PRIMARY_SUBSTATION_FORECAST_MONITOR_SLUG: Final[str] = "live-primary-substation-forecasts"
+"""Slug of the Sentry cron monitor fed by ``live_primary_substation_forecasts``' success check-in.
+
+Laptop testing must use a *different*, throwaway slug (for example
+``"live-primary-substation-forecasts-test"``), so an intermittently-run laptop never registers a
+stale environment on the production monitor. The ``environment`` tag alone is not enough: the slug
+is a constant here in the source, not a setting, so a laptop that merely switched
+``Settings.sentry_monitor_forecasts`` on would check in to the production monitor and then stop,
+leaving it expecting a daily check-in the laptop will never send. Fuller reasoning:
+<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production>"""
+
+PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037
+    # DUPLICATED SCHEDULE: this crontab must match `live_primary_substation_forecasts_schedule` in
+    # defs/schedules.py, because it is the cadence on which Sentry expects a check-in. It is copied
+    # rather than imported because defs/schedules.py imports this module for the failure hook, so
+    # importing back would be circular. `test_monitor_config_schedule_matches_the_schedule` in
+    # tests/test_sentry.py fails if the two drift apart.
+    "schedule": {"type": "crontab", "value": "0 12 * * *"},
+    "timezone": "UTC",
+    "checkin_margin": 240,
+}
+"""The daily 12:00 UTC schedule, plus 240 minutes of grace before a day counts as missed.
+
+The asset retries a missing ECMWF ENS run every 30 minutes until 15:00 UTC, and a run then takes a
+few minutes, so a healthy day can check in as late as about 15:10 UTC. The 4-hour margin moves the
+alarm to 16:00 UTC, past that last retry. Only *success* check-ins are sent, so the alarm keys off
+missed check-ins alone; ``max_runtime`` is omitted because it needs an ``in_progress`` check-in to
+time against."""
+
+PRIMARY_SUBSTATION_FORECAST_DEGRADED_FINGERPRINT: Final[str] = (
+    "nged-primary-substation-forecast-degraded"
+)
+"""Stable fingerprint root for the ``live_primary_substation_forecasts`` degradations.
+
+The caller adds the kind of degradation and ``Settings.sentry_environment``, for the reason
+`POWER_DATA_STALE_FINGERPRINT` gives. Each event carries a synthesised exception, which has no
+stack trace, so Sentry would otherwise group on the message. The message names the ENS run, so
+each day's event would open a new issue rather than add to one ongoing issue per kind."""
 
 
 def init_sentry(settings: Settings) -> None:
@@ -289,6 +339,37 @@ def report_check_degradation(check_name: str, exc: BaseException) -> None:
         exc=exc,
         failure_note=f"Failed to report the degraded {check_name} check to Sentry",
     )
+
+
+def send_primary_substation_forecast_checkin(
+    settings: Settings, monitor_slug: str = PRIMARY_SUBSTATION_FORECAST_MONITOR_SLUG
+) -> None:
+    """Send a success check-in to the Sentry cron monitor, or do nothing if disabled.
+
+    A no-op unless ``settings.sentry_monitor_forecasts`` is set (True only on the always-on
+    production box), so a laptop never registers a monitor environment that Sentry would then mark
+    as missed. Sends a single ``OK`` check-in, never ``in_progress`` or ``error``, so the alarm
+    fires only on the *absence* of a check-in. Never raises: it runs after the asset has committed
+    its Delta write, so a raise would report the run as failed while the rows it produced sit
+    committed.
+
+    Args:
+        settings: The project settings carrying ``sentry_monitor_forecasts``.
+        monitor_slug: The Sentry monitor to check in to. Defaults to the production monitor;
+            laptop tests pass a throwaway slug.
+    """
+    if not settings.sentry_monitor_forecasts:
+        return
+    try:
+        capture_checkin(
+            monitor_slug=monitor_slug,
+            status=MonitorStatus.OK,
+            monitor_config=PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG,
+        )
+    except Exception:
+        # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
+        # with the traceback rather than swallowing.
+        logger.exception("Failed to send the Primary substation forecast check-in to Sentry")
 
 
 POWER_DATA_STALE_FINGERPRINT: Final[str] = "nged-power-data-stale"
