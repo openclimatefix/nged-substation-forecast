@@ -295,6 +295,9 @@ series and half-hour, with no member structure.
       a 9-day history).
     - `b1_columns`: with one day of history missing, every B1 value is finite and the standardised
       value of an all-NaN aggregate is 0.
+    - `b1_columns`: in a synthetic cold spell with one history day deleted, the cold-snap count
+      differs from the count with complete history by at most 1 day, for the missing day placed at
+      each position of the 13-day history.
     - `lag_columns`: for targets 20 and 30 hours after the native origin, the day-lag offsets are 96
       and 144 half-hours back from the target, as the formula gives; a missing reading gives value
       0, flag 1, and the largest age code.
@@ -319,6 +322,17 @@ series and half-hour, with no member structure.
 - `docs/live_service/model-releases.md`: the release row when the first bundle ships, naming
   experiments 677, 704, and 705.
 - `CLAUDE.md`: the package table and the asset list.
+
+## Measurement before the asset merges
+
+**One run-removal measurement on the workstation, reported in the implementation PR.** For a sample
+of research backtest origins, drop one history run at a time from the 13-day window (each of the
+13 positions in turn), rebuild the 60 input columns, and run the forecast. Report the largest change
+in each of the 14 thermal-lag columns, the largest change in the p50 quantile as a fraction of
+capacity, and the largest change in the p5 to p95 interval width. The number says how much a single
+missing run costs, and so whether the degradation report is enough or the asset should also widen
+the bands. It is a measurement, not a gate: the plan changes only if the change is larger than the
+bundle's own seed-to-seed spread.
 
 ## Verification commands
 
