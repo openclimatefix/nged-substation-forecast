@@ -28,9 +28,13 @@ Deployment — Design](../architecture/production-deployment.md).
 > ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is scheduled to
 > start at Stage 2, when team access adds enough moving parts to justify it.
 >
-> **Sentry error telemetry and the freshness warnings are wired.** Set the `SENTRY_*` vars in [Step
-> 14](#step-14-configure-dagster-on-the-box). Nothing yet alerts when the whole deployment stops,
-> and per-task failure emails (SNS, the Simple Notification Service) are still to come — see [the
+> **Sentry error telemetry, the freshness warnings, and the daily forecast check-in are wired.** Set
+> the `SENTRY_*` vars in the task definition in [Step
+> 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition) and on the box in [Step
+> 14](#step-14-configure-dagster-on-the-box). The [forecast
+> check-in](sentry.md#the-daily-forecast-check-in) raises a Sentry issue when no forecast has landed
+> by 16:00 UTC, whatever stopped it. Per-task failure emails (SNS, the Simple Notification Service)
+> are not built — see [the
 > roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 
 ## Step 1 — Create the S3 buckets
@@ -164,8 +168,8 @@ Then attach it to **whichever identity runs the code**:
 
 ## Step 3 — Check out the commit to deploy
 
-The image is built from your working tree and tagged with the short git commit hash of `HEAD`, so
-build from a clean checkout of the commit you mean to deploy:
+The image is built from your working tree, and its tag starts with the short git commit hash of
+`HEAD`, so build from a clean checkout of the commit you mean to deploy:
 
 ```bash
 git status --short    # prints nothing on a clean tree
@@ -173,15 +177,21 @@ git rev-parse --short=8 HEAD
 ```
 
 An uncommitted change would be built into the image under the tag of a commit that does not contain
-the change. The image carries no trained model, and the build never contacts MLflow.
+the change. The build never contacts MLflow. The one trained model the image carries is the step-5
+neural network's bundle, which the build copies from a directory you name in [Step
+4](#step-4-build-and-verify-the-image). Have that directory ready: it is the bundle the research
+repository exported for the month, the directory holding the bundle's `manifest.json`.
 
 ## Step 4 — Build and verify the image
 
 One script builds the image and smoke-tests it with **zero network access**:
 
 ```bash
-scripts/deploy/build_and_verify_image.sh    # no arguments — everything is derived
+scripts/deploy/build_and_verify_image.sh <bundle-dir>    # everything else is derived
 ```
+
+`<bundle-dir>` is the step-5 bundle directory from [Step 3](#step-3-check-out-the-commit-to-deploy).
+The script needs `jq`, which reads the bundle's `manifest.json` to derive the image tag.
 
 The script always builds for **linux/arm64**, whatever the host is, because the deployment is ARM
 end-to-end: the Fargate task definition declares ARM64 ([Step
@@ -192,12 +202,25 @@ platform 'linux/arm64 v8'`. On an x86 laptop the build and smoke test run under 
 noticeably slower than native, but correct. The script checks the emulator is registered and prints
 the one-time fix (`docker run --privileged --rm tonistiigi/binfmt --install arm64`) if it isn't.
 
-The script builds the image tagged `nged-forecast:<commit>`, where `<commit>` is the short git
-commit hash, then runs `dagster definitions validate -m nged_substation_forecast.definitions` inside
-the image with `--network=none`, and prints the result. Validation imports every module the
-Dagster definitions load, so it catches a missing package or a broken import before the image is
-pushed. The script header documents every choice it makes and is the source of truth for the
-mechanics.
+The script builds the image tagged `nged-forecast:<tag>`, where `<tag>` is
+`<commit>-r<model_release>-<research commit>`: the short git commit hash, the bundle's
+`model_release` from its manifest, and the first 8 characters of the research commit that trained
+the bundle, as in `13932888-r0-246984d2`. A monthly refit with no code change therefore gets a new
+tag. The bundle reaches the build as a second named build context, `primary_substation_bundle`, so
+the bundle never has to sit inside the checkout. The image holds the bundle at
+`/app/primary_substation_bundle`, without the bundle's fixtures and PyTorch checkpoints.
+
+The script then runs two checks inside the image, both with `--network=none`:
+
+- `dagster definitions validate -m nged_substation_forecast.definitions` imports every module the
+  Dagster definitions load, so it catches a missing package or a broken import before the image is
+  pushed.
+- `scripts/deploy/verify_bundle.py` compares the SHA-256 hash of every bundle file in the image
+  with the bundle's manifest, reports a missing or unlisted file, and loads the bundle the way
+  `live_primary_substation_forecasts` does. A bundle the service cannot serve fails here.
+
+The script finally prints the bundle's research commit and the image size. The script header
+documents every choice it makes and is the source of truth for the mechanics.
 
 ## Step 5 — Create the ECR repository
 
@@ -215,7 +238,7 @@ console](https://eu-west-2.console.aws.amazon.com) →
   derived URI.
 - **Every other setting on the create-repository form can stay at its console default:**
     - **Image tag mutability** (Mutable) and **Mutable tag exclusions** (empty) — image tags here
-      are already unique per commit (the short git commit hash, from [Step
+      are already unique per commit and bundle (from [Step
       4](#step-4-build-and-verify-the-image)), so nothing relies on retagging — but nothing needs
       immutability enforced, either.
     - **Encryption settings** (AES-256) — the console warns this can't be changed after creation,
@@ -238,12 +261,12 @@ One script pushes the image built in [Step 4](#step-4-build-and-verify-the-image
 redeploys — points the ECS (Elastic Container Service) task definition at it:
 
 ```bash
-scripts/deploy/push_and_deploy_image.sh    # no arguments — everything is derived
+scripts/deploy/push_and_deploy_image.sh <bundle-dir>    # the same bundle directory as Step 4
 ```
 
-The script takes no arguments by design, so mistyping is not possible: the tag is derived from the
-current git commit exactly as Step 4's build script derives it (so only an image that was built and
-verified, from this commit, can be pushed), and the
+The script takes only the bundle directory, so there is little to mistype: the tag is derived from
+the current git commit and the bundle's manifest exactly as Step 4's build script derives it (so
+only an image that was built and verified, from this commit and this bundle, can be pushed), and the
 AWS account id comes from `aws sts get-caller-identity`. The script logs Docker into ECR, tags, and
 pushes; then, if the `nged-forecast` task-definition family already exists ([Step
 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), it registers a new revision
@@ -403,7 +426,8 @@ server, and Postgres — is a plain EC2 virtual machine (EC2 is Elastic Compute 
 hand in [Step 11](#step-11-launch-the-control-plane-box), and the only compute in this deployment
 whose operating system we install and patch ourselves. **Every recurring job** the control plane's
 schedules dispatch executes as an ephemeral ECS task on Fargate instead — the hourly NGED telemetry
-ingest and the daily Dynamical.org NWP download. Every scheduled run
+ingest, the daily Dynamical.org NWP download, and the daily Primary substation forecast. Every
+scheduled run
 therefore gets a fresh machine that AWS owns and patches, and nothing sits idle between runs. Why
 the compute is split this way, and why the control plane is not on Fargate too, is the
 [orchestration
@@ -469,8 +493,9 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       run-launcher config names this container, so keep it predictable. Leave **Essential
       container** at **Yes**.
     - **Image URI**: `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>` from [Step
-      6](#step-6-push-the-image-to-ecr) — `<tag>` is the short git commit hash the image was built
-      from. Step 6's script prints the full URI as it pushes; to recover it later, copy it from the
+      6](#step-6-push-the-image-to-ecr) — `<tag>` is the tag from [Step
+      4](#step-4-build-and-verify-the-image).
+      Step 6's script prints the full URI as it pushes; to recover it later, copy it from the
       pushed image in the ECR console.
     - **Port mappings**: **Remove** the pre-filled port-80/HTTP row — every task here is a batch run
       that listens on nothing; port mappings are for services that accept traffic.
@@ -480,6 +505,13 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       reference](setup.md#the-configuration-model)). Leave `DATA_STORE_*` unset, since the task role
       supplies credentials. `DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` are plain environment
       values (**Value type** = **Value**), not secrets — bucket URIs are safe in clear text.
+    - **Sentry environment variables**, also plain values: `SENTRY_DSN=<OCF Sentry project DSN>`,
+      `SENTRY_ENVIRONMENT=production`, and `SENTRY_MONITOR_FORECASTS=true`. Every scheduled run
+      executes in this container, so the failure hook, the freshness warning, and the daily
+      forecast check-in all send from here ([Setting up Sentry
+      telemetry](sentry.md#turn-it-on-in-production)). A DSN is a write-only ingest key, so it is
+      safe in clear text. Leave the three out while bringing the deployment up, and add them in a
+      new revision once Sentry is ready.
     - **Secrets — the four Parameter Store entries.** In the same **Environment variables** section,
       add each parameter from [Step 8](#step-8-store-secrets-in-parameter-store) as a variable whose
       **Value type** is **ValueFrom** (the console's secrets mechanism). The **Key** is the env-var
@@ -832,8 +864,9 @@ docker pull "$REGISTRY/nged-forecast:<tag>"
 
 `REGISTRY` builds itself from the box's own 12-digit account id, which `aws sts get-caller-identity`
 reads from the instance role ([Step 11](#step-11-launch-the-control-plane-box)) — so there is
-nothing to paste for the account id. **You do still have to fill in `<tag>`**: it is the short git
-commit hash the image was built from, naming exactly which image to deploy. Step 6's script prints
+nothing to paste for the account id. **You do still have to fill in `<tag>`**: it is the tag from
+[Step 4](#step-4-build-and-verify-the-image), naming exactly which commit and which bundle to
+deploy. Step 6's script prints
 the full URI as it pushes; to recover it later, copy it from the pushed image in the ECR console.
 
 No `aws configure` is needed — the instance role from [Step
@@ -904,14 +937,18 @@ SENTRY_DSN=<OCF Sentry project DSN>
 SENTRY_ENVIRONMENT=production
 ```
 
-The two `SENTRY_*` lines turn on error telemetry and the freshness warnings (see [Send telemetry to
+The two `SENTRY_*` lines turn on error telemetry and the freshness warnings in the processes on the
+box (see [Send telemetry to
 Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry)).
 `SENTRY_ENVIRONMENT=production` is what the alert rules are scoped to; a developer testing from a
 laptop instead sets `SENTRY_ENVIRONMENT=<name>-laptop`. An empty/absent `SENTRY_DSN` disables Sentry
 entirely, so this is safe to omit while bringing the box up.
 
-(The Fargate containers get these injected from Parameter Store; the box's containers read this file
-instead — Stage-1 simplicity, one hand-managed box.)
+(The Fargate containers get the NGED secrets and the Postgres password from Parameter Store, and the
+`SENTRY_*` values from the task definition's plain environment variables in [Step
+9](#step-9-create-the-ecs-cluster-and-fargate-task-definition); the box's containers read this file
+instead — Stage-1 simplicity, one hand-managed box. `SENTRY_MONITOR_FORECASTS` stays out of this
+file, because the forecast check-in is sent from the Fargate run, never from the box.)
 
 `~/nged-forecast/docker-compose.yml`:
 
@@ -1171,9 +1208,9 @@ daemons with green heartbeats.
 
 ## Step 16 — Turn on the schedules and verify end-to-end
 
-1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule` and
-   `ecmwf_ens_schedule`. Schedule state lives in Postgres, so this is a one-time action — it
-   survives restarts and reboots.
+1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
+   and `live_primary_substation_forecasts_schedule`. Schedule state lives in Postgres, so this is a
+   one-time action — it survives restarts and reboots.
 2. **First time only — materialise `h3_grid_weights` once, then the latest `ecmwf_ens` partition.**
    `h3_grid_weights` is unpartitioned and has no schedule. `ecmwf_ens` reads the output of
    `h3_grid_weights`, so materialise `h3_grid_weights` first from the UI. A Dagster `deps=[...]`
@@ -1184,6 +1221,14 @@ daemons with green heartbeats.
    console, its logs stream to CloudWatch, and the NWP run lands under
    `s3://nged-forecast-internal/data/NWP/…`. From then on each ingest asset is kept fresh by its own
    schedule.
+
+    The first forecast needs more than that one run: `live_primary_substation_forecasts` reads the
+    day's ENS run and the 13 daily runs before it, and reports any missing history run as a
+    degradation. Backfill the 13 `ecmwf_ens` partitions before the latest partition, then
+    materialise the latest `live_primary_substation_forecasts` partition. Its run metadata should
+    show `n_rows` 10736 and an empty `missing_history_runs`, and the rows land in
+    `s3://nged-forecast-delivery/data/power_forecasts`.
+
 3. **Check the asset checks**: in the UI's Checks view, `power_data_is_fresh`,
    `cleaned_power_keeps_up_with_raw`, and the three `ecmwf_ens` checks should be green or carry a
    warning that [Operating the live
@@ -1191,9 +1236,9 @@ daemons with green heartbeats.
 4. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always` must
    bring all four services back unattended. The UI comes back over Tailscale with run history
    intact.
-5. **Leave it running for several days**: a power ingest lands every hour and a fresh NWP ingest
-   after each daily 00Z publication; check Cost Explorer against the [cost
-   model](../architecture/aws-costs.md#v1-32-time-series).
+5. **Leave it running for several days**: a power ingest lands every hour, a fresh NWP ingest
+   after each daily 00Z publication, and a Primary substation forecast soon after 12:00 UTC each
+   day; check Cost Explorer against the [cost model](../architecture/aws-costs.md#v1-32-time-series).
 
 If a run gets missed (box down, failed run), backfill it from the same UI — [Operating the live
 service: Backfilling a missed partition](operations.md#backfilling-a-missed-partition).
@@ -1210,20 +1255,25 @@ service: Backfilling a missed partition](operations.md#backfilling-a-missed-part
 - **Security patches**: Ubuntu Server installs security updates automatically via
   `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
 
-Nothing yet alerts when the daemon dies silently: Sentry receives events only from a process that is
-still running. Per-task failure alerts (email via SNS, the Simple Notification Service) are still to
-come too; see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
-and [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
+A daemon that dies silently shows up once a day, as a missed [forecast
+check-in](sentry.md#the-daily-forecast-check-in) at 16:00 UTC. Per-task failure alerts (email via
+SNS, the Simple Notification Service) are not built; see [the
+roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) and [Send telemetry
+to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
 
 ## Redeploying new code
 
-Once the service is live, shipping a code change is a repeat of a slice of this page:
+Once the service is live, shipping a code change or a new monthly bundle is a repeat of a slice of
+this page. [Operating the live service](operations.md#installing-a-new-monthly-bundle) lists the
+checks to run on a new bundle first.
 
 1. Check out the commit to deploy ([Step 3](#step-3-check-out-the-commit-to-deploy)), then build and
-   verify the new image ([Step 4](#step-4-build-and-verify-the-image)) — it gets a new tag (the new
-   commit hash).
-2. `scripts/deploy/push_and_deploy_image.sh` ([Step 6](#step-6-push-the-image-to-ecr)) — one command
-   that pushes the new tag and registers a new task-definition revision pointing at it. The run
+   verify the new image with `scripts/deploy/build_and_verify_image.sh <bundle-dir>` ([Step
+   4](#step-4-build-and-verify-the-image)). A new commit or a new bundle gives a new tag. For a code
+   change alone, pass the bundle directory the deployed image was built from.
+2. `scripts/deploy/push_and_deploy_image.sh <bundle-dir>` ([Step
+   6](#step-6-push-the-image-to-ecr)), with the same bundle directory — one command that pushes the
+   new tag and registers a new task-definition revision pointing at it. The run
    launcher resolves the family's latest revision at launch time, so the next scheduled run picks it
    up with no restart on the box.
 3. Update the box too, because the code-location server on the box evaluates the schedules:

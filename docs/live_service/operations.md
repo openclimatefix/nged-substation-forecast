@@ -1,12 +1,14 @@
 # Operating the live service
 
-How to drive the running live service day to day: the ingest schedules, what the asset checks and
-Sentry events mean when an input degrades, and how to backfill a missed partition.
+How to drive the running live service day to day: the schedules, what the asset checks and Sentry
+events mean when an input degrades, how to read and update the daily Primary substation forecast,
+and how to backfill a missed partition.
 
-The live service currently writes no forecast. The live service ingests the power telemetry of
-National Grid Electricity Distribution (NGED) and the ensemble numerical weather prediction (NWP)
-from the European Centre for Medium-Range Weather Forecasts (ECMWF), cleans the telemetry, and
-checks both inputs. The production runtime has **no dependency on MLflow**: the deployment reaches
+The live service ingests the power telemetry of National Grid Electricity Distribution (NGED) and
+the ensemble numerical weather prediction (NWP) from the European Centre for Medium-Range Weather
+Forecasts (ECMWF), cleans the telemetry, and checks both inputs. Once a day, a neural network then
+forecasts the demand of 16 Primary substations for the next 14 days. The production runtime has
+**no dependency on MLflow**: the deployment reaches
 no tracking server. The [cross-validation assets](../cross-validation/index.md) that do need MLflow
 run on a researcher's laptop.
 
@@ -26,14 +28,15 @@ stack runs in — bring one up first:
   plane](connecting.md).
 
 Either UI shows every asset, most of which are nothing to do with running the service. Paste
-`tag:layer=production` into the asset-selection box to cut the view down to the four assets the
-deployment runs: `power_time_series_and_metadata`, `clean_nged_power_data`, `h3_grid_weights`, and
-`ecmwf_ens`. `tag:layer=research` is the rest: the cross-validation assets, which need MLflow and so
-run on your laptop whichever environment runs the ingest.
+`tag:layer=production` into the asset-selection box to cut the view down to the five assets the
+deployment runs: `power_time_series_and_metadata`, `clean_nged_power_data`, `h3_grid_weights`,
+`ecmwf_ens`, and `live_primary_substation_forecasts`. `tag:layer=research` is the rest: the
+cross-validation assets, which need MLflow and so run on your laptop whichever environment runs the
+ingest.
 
-## The ingest schedules
+## The schedules
 
-Two schedules run the whole recurring pipeline. Both need the Dagster daemon running (see
+Three schedules run the whole recurring pipeline. All three need the Dagster daemon running (see
 [Prerequisites](#prerequisites-a-running-dagster-instance) above) to fire on time:
 
 - `power_time_series_and_metadata_schedule` fires at :55 past every hour. Its job runs
@@ -41,8 +44,12 @@ Two schedules run the whole recurring pipeline. Both need the Dagster daemon run
   `clean_nged_power_data`, which rebuilds the cleaned power table when its inputs have changed.
 - `ecmwf_ens_schedule` fires daily at 10:30 UTC and materialises today's `ecmwf_ens` partition, the
   00Z ECMWF ensemble run from Dynamical.org. The asset retries while the run is not yet published.
+- `live_primary_substation_forecasts_schedule` fires daily at 12:00 UTC and materialises today's
+  `live_primary_substation_forecasts` partition, which forecasts from the 00Z run that `ecmwf_ens`
+  has normally written by then. [The daily Primary substation
+  forecast](#the-daily-primary-substation-forecast) below covers that asset.
 
-Nothing downstream waits on either job's run status: an asset that reads the ingested tables runs
+Nothing downstream waits on another job's run status: an asset that reads the ingested tables runs
 against whatever is already on disk — see [Inherent Stability → The
 rules](../design-philosophy/inherent-stability.md#the-rules).
 
@@ -261,8 +268,11 @@ shows slow drift in the upstream dataset before it becomes a warning.
 **When a daily NWP run is missing.** We ingest one ECMWF run per day: the 00Z run, downloaded from
 10:30 UTC. `ecmwf_ens` sends a `retrying_asset` warning to Sentry on its first failed attempt. If
 the run is still missing when the retries run out, about 4 hours later, `ecmwf_ens_job` fails and
-the failure reaches Sentry tagged `fault_category:run_failed`. Chase Dynamical.org, then materialise
-the missed `ecmwf_ens` partition once the feed recovers (see [Backfilling a missed
+the failure reaches Sentry tagged `fault_category:run_failed`. The day's Primary substation forecast
+then writes nothing (see [The daily Primary substation
+forecast](#the-daily-primary-substation-forecast)). Chase Dynamical.org, then materialise the missed
+`ecmwf_ens` partition once the feed recovers, followed by the same day's
+`live_primary_substation_forecasts` partition (see [Backfilling a missed
 partition](#backfilling-a-missed-partition)).
 
 **Log the intervention.** Every entry above that needed a human is a data point for the [T1.1
@@ -328,6 +338,105 @@ records nothing.** The run fails with a `NgedFileParseError` naming the file's p
 retried. The same file is selected every hour, so the ingest stalls until someone fixes the cause. No
 readings are lost: after the fix, the next run ingests the whole backlog.
 
+## The daily Primary substation forecast
+
+**Trigger:** a Sentry event tagged `degraded_asset:live_primary_substation_forecasts`, a missed
+check-in on the `live-primary-substation-forecasts` cron monitor, or a new monthly bundle to deploy.
+
+**`live_primary_substation_forecasts` writes one 14-day forecast per day for the 16 Primary
+substations.** Each run writes 671 half-hourly rows per Primary to the `power_forecasts` table, with
+`power_fcst_init_time` at 12:00 UTC on the partition's day and valid times from 12:30 UTC that day
+to 11:30 UTC 14 days later. The rows carry `experiment_name="primary_substation_demand_forecaster"`,
+`power_fcst_model_name="substation_demand_forecaster"`, and `fold_id="live"`, and
+`power_fcst_model_version` holds the deployed bundle's `model_release`. The 13 quantile columns are
+in megawatts, or in megavolt-amperes for the eight Primaries metered in MVA, whose quantiles are
+clamped at zero. Re-materialising a partition replaces that `power_fcst_init_time`'s rows, so a
+re-run never duplicates a forecast.
+
+**The asset reads three inputs, and none of them comes from MLflow:**
+
+- the day's 00Z ECMWF ensemble run and the 13 daily runs before it, from the `nwp` table that
+  `ecmwf_ens` writes;
+- the Primaries' cleaned readings from the past 9 days, from the `cleaned_power_time_series` table,
+  for the lags of one day and one week;
+- the step-5 neural network's bundle, a directory that the production image carries at
+  `/app/primary_substation_bundle`. The bundle holds each seed's weights, the standardisers,
+  the 16 Primaries with their capacities, and the recipe's constants. The Primaries and their
+  capacities come from the bundle, not from the `TimeSeriesMetadata` table.
+
+**Read `n_rows` in the run's metadata first.** A run that wrote a forecast shows `n_rows` 10736 (671
+rows for each of the 16 Primaries) and `n_time_series` 16. `n_rows` 0 means the day's ENS run never
+arrived and the day has no forecast. The metadata also names the bundle that made the forecast, in
+`model_release`, `research_commit`, and `refit_month`, and lists any history run that was missing in
+`missing_history_runs`.
+
+**A missed check-in means no forecast landed today.** On a successful run for today's partition, the
+asset sends a check-in to the Sentry cron monitor `live-primary-substation-forecasts`. Sentry raises
+the missed check-in at 16:00 UTC if none has arrived. The causes include a dead daemon or box, a
+failed run, and a day whose ENS run never arrived. Look in the Dagster UI for the day's run: no run
+at all points at the daemon or the box, and a run with `n_rows` 0 points at the NWP feed. Setting up
+the monitor is in [Setting up Sentry telemetry](sentry.md#the-daily-forecast-check-in).
+
+**Each degradation reaches Sentry tagged `degraded_asset:live_primary_substation_forecasts`, and its
+message names the ENS runs involved.** Sentry groups the events by kind, so a fault that repeats
+every day stays one Sentry issue. None of the three kinds stops a forecast that could still be made:
+
+| Kind | What happened | What the asset did | What to do |
+|---|---|---|---|
+| `day_run_missing` | The day's 00Z run was not in the `nwp` table by the last retry, at about 15:00 UTC | Wrote nothing, so the day has no forecast | Recover the `ecmwf_ens` partition, then materialise the same day's `live_primary_substation_forecasts` partition |
+| `history_runs_missing` | One or more of the 13 history runs is absent | Computed the thermal-lag and solar-gain columns from the history that remains | Materialise the missing `ecmwf_ens` partitions if Dynamical.org still serves them |
+| `day_run_incomplete` | The day's run has a cell with no rows, fewer than 51 members, a missing lead, a last lead short of 360 hours, or null radiation after lead 0 | Forecast from the values present, filling a missing input with its training mean | Chase Dynamical.org, then re-materialise both partitions once the complete run is republished |
+
+While the day's run is absent, the asset retries every 30 minutes, 6 times, and sends one
+`retrying_asset` warning on the first retry. A `degraded_asset` event that carries a real stack
+trace, rather than one of the three messages above, means that the code checking the ENS runs
+raised. The forecast still ran, and the stack trace shows the bug.
+
+**A missing lag is not reported.** When a Primary has no cleaned reading at its day or week lag, the
+neural network reads the missing-lag encoding it was trained with, and the forecast moves towards
+the forecast it makes without lags. Stale telemetry already has its own check, `power_data_is_fresh`
+(see [Degraded input data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)).
+
+**A failed run is our own fault, so it fails and reaches Sentry tagged `fault_category:run_failed`.**
+The asset raises on a bundle that is missing, has an unknown format version, or was trained on
+Copernicus Atmosphere Monitoring Service (CAMS) values that the service cannot compute, and on
+output that fails the `PowerForecast` contract. Read the traceback, fix the image, and redeploy.
+
+### Installing a new monthly bundle
+
+**The research repository exports one bundle per monthly refit, and a new bundle reaches the service
+only through a new image.** The image tag names both the code and the bundle, as
+`<git commit>-r<model_release>-<research commit>`, so a refit with no code change still gets a new
+tag and the previous image stays in the Elastic Container Registry (ECR) for a rollback.
+
+1. **Run the golden tests against the new bundle.** The tests compare every stage of the forecast
+   with the fixtures the bundle ships, and read the `nwp` and `cleaned_power_time_series` tables
+   under `DATA_PATH_INTERNAL`, so point `DATA_PATH_INTERNAL` at a data folder that holds the
+   fixtures' dates:
+
+    ```bash
+    PRIMARY_SUBSTATION_BUNDLE_PATH=<bundle-dir> \
+        uv run pytest tests/test_substation_demand_forecaster_golden.py
+    ```
+
+    `<bundle-dir>` is the directory that holds the bundle's `manifest.json`. Without
+    `PRIMARY_SUBSTATION_BUNDLE_PATH`, the golden tests skip, so a run that reports only skips has
+    tested nothing.
+
+2. **Build, verify, push, and deploy the image** with the bundle directory as the scripts' one
+   argument, following [Redeploying new code](aws.md#redeploying-new-code). The build copies the
+   bundle into the image, leaving out the fixtures and the PyTorch checkpoints. The build then
+   checks every file's SHA-256 hash against the manifest and loads the bundle the way the asset
+   does. A bundle with an unknown format version, a recipe the code does not implement, or CAMS
+   columns the service cannot compute fails this check, before the image is pushed.
+
+3. **Check the next day's run metadata.** `model_release`, `research_commit`, and `refit_month`
+   should name the new bundle.
+
+**A re-run of a past partition uses the bundle in the image deployed at the time of the re-run.**
+The re-run therefore replaces the rows of the bundle that made the original forecast with rows from
+the new bundle, under the new `power_fcst_model_version`.
+
 ## Inspecting forecasts
 
 Use the `view_forecasts` dashboard app — the same app that [Running the cross-validation pipeline
@@ -342,8 +451,8 @@ Switch the **Data source** radio to `s3` (needs the git-ignored `packages/dashbo
 the read-only laptop credentials — see the [Configuration
 reference](setup.md#at-a-glance-which-settings-for-which-environment)), pick a fold in the **Fold**
 dropdown, then pick a time series and a forecast date/run. The **Fold** dropdown selects `live` when
-the `power_forecasts` table holds live rows and the first fold otherwise. The live service currently
-writes no new forecast, but any `fold_id="live"` rows written earlier remain in the table. The plot
+the `power_forecasts` table holds live rows and the first fold otherwise. The `live` fold holds the
+daily Primary substation forecasts, one run per day at 12:00 UTC. The plot
 shows the forecast median inside three grey quantile bands (p1 to p99, p5 to p95, and p20 to p80)
 against the observed power, from 24 hours before the forecast init time to 14 days after it.
 
@@ -356,8 +465,8 @@ nothing is written anywhere.
 
 ## Backfilling a missed partition
 
-If a scheduled tick was missed — the daemon was down, or a run failed — the two ingest assets
-recover differently:
+If a scheduled tick was missed — the daemon was down, or a run failed — the two ingest assets and
+the forecast recover differently:
 
 - **`power_time_series_and_metadata`** needs nothing. The next hourly run downloads every file the
   downloaded-files list lacks, so it picks up whatever the missed run would have.
@@ -365,3 +474,17 @@ recover differently:
   Dagster UI (Assets → `ecmwf_ens` → select the partition → "Materialize"), or launch a backfill
   over a range of partitions. Re-materialising a partition that has already landed replaces it (see
   [Degraded input data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)).
+- **`live_primary_substation_forecasts`** has the same daily partitions as `ecmwf_ens`.
+  Materialise a missed day's partition once that day's `ecmwf_ens` partition has landed, in the
+  same way. A backfill sends no Sentry check-in, because only today's partition sends one. A
+  backfill whose 00Z run is more than 36 hours old and absent from the `nwp` table does not retry:
+  the backfill reports `day_run_missing` at once and writes nothing.
+
+**A backfilled forecast sees the same weather as the live run, and its lags can differ.** A
+backfill reads only the ENS runs initialised up to its own day's 00Z run, so its weather inputs are
+the inputs the live run had. Its day and week lags read the cleaned power table as it is at the
+time of the backfill, which holds readings that NGED delivered late. A Primary whose lag was
+missing at 12:00 UTC on the day can therefore have a lag in the backfill, and the backfilled
+forecast can differ from the forecast the live run would have made. The backfill also uses the
+bundle in the image deployed now (see [Installing a new monthly
+bundle](#installing-a-new-monthly-bundle)).

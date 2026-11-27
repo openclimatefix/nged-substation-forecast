@@ -1,7 +1,8 @@
 # Setting up Sentry telemetry
 
-How to point this project's error telemetry and power-freshness warnings at a Sentry.io project —
-first testing it from your laptop, then turning it on in production. This is the operational recipe;
+How to point this project's error telemetry, power-freshness warnings, and daily forecast check-in
+at a Sentry.io project — first testing it from your laptop, then turning it on in production.
+This is the operational recipe;
 the design rationale (why an explicit failure hook rather than log capture, how the freshness
 warning models recovery) is on the [Send telemetry to
 Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry) design page.
@@ -118,10 +119,11 @@ every local Dagster process (the webserver and each run worker) has Sentry activ
 everything with your `SENTRY_ENVIRONMENT`. But the telemetry is deliberately narrow — running
 Dagster on your laptop does **not** forward everything to Sentry:
 
-- **Failures of the two scheduled jobs are sent.** `power_time_series_and_metadata_job` and
-  `ecmwf_ens_job` each attach the `sentry_capture_failure` hook, so a failed step in either forwards
-  the live exception — traceback intact — to Sentry Issues, tagged with your environment. This fires
-  whether the run was launched by its schedule or started by hand as that named job.
+- **Failures of the three scheduled jobs are sent.** `power_time_series_and_metadata_job`,
+  `ecmwf_ens_job`, and `live_primary_substation_forecasts_job` each attach the
+  `sentry_capture_failure` hook, so a failed step in any of them forwards the live exception —
+  traceback intact — to Sentry Issues, tagged with your environment. This fires whether the run was
+  launched by its schedule or started by hand as that named job.
 - **Ad-hoc asset materialisations are *not* sent.** Clicking "Materialize" on an asset in the
   Dagster UI runs it outside those jobs, so no failure hook is attached and a failure there never
   reaches Sentry — it is yours to watch at the UI. To exercise the real hook end to end, launch
@@ -133,6 +135,9 @@ Dagster on your laptop does **not** forward everything to Sentry:
   Delta table *will* emit one. The warning can't pollute production's issue, though: the event is
   fingerprinted per environment, so your `<name>-laptop` staleness forms its own Sentry issue,
   separate from production's. Resolve or ignore that Sentry issue as you like.
+- **No forecast check-in is sent.** `SENTRY_MONITOR_FORECASTS` defaults to `false`, so a laptop
+  never checks in to the `live-primary-substation-forecasts` cron monitor (see [The daily forecast
+  check-in](#the-daily-forecast-check-in)).
 
 The failure hook's scope is the same in production. The [design
 page](../architecture/production-deployment.md#send-telemetry-to-sentry) explains why the failure
@@ -140,16 +145,23 @@ hook covers only the scheduled jobs, and how the freshness warning models recove
 
 ## Turn it on in production
 
-On the always-on control-plane box, the two `SENTRY_*` variables go in the box's `.env` — see
-[Setting up the live service on AWS, Step 14](aws.md#step-14-configure-dagster-on-the-box):
+**The Sentry variables go in two places, because production runs Dagster in two places.** The
+always-on control-plane box runs the daemon, the webserver, and the code-location server, and reads
+its variables from the box's `.env` — see [Setting up the live service on AWS, Step
+14](aws.md#step-14-configure-dagster-on-the-box):
 
 ```dotenv
 SENTRY_DSN=<the OCF Sentry project DSN>
 SENTRY_ENVIRONMENT=production
 ```
 
-The code defines no Sentry cron monitor, so no event reaches Sentry when the whole deployment stops.
-Two one-time console steps complete the setup:
+Every scheduled run executes on a Fargate task, which reads its variables from the task
+definition instead — see [Step 9](aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
+The failure hook, the freshness warning, and the forecast check-in all fire inside those runs, so
+the task definition carries `SENTRY_DSN` and `SENTRY_ENVIRONMENT=production` too, plus
+`SENTRY_MONITOR_FORECASTS=true`, which only production sets.
+
+Three one-time console steps complete the setup:
 
 1. **Add an alert rule for the freshness warning, scoped to `environment:production`, and set
    it to fire on *regressions*.** The freshness warning is a one-way event: when NGED's feed
@@ -162,15 +174,70 @@ Two one-time console steps complete the setup:
 2. **Route events by their tags.** `fault_category:run_failed` means a scheduled job failed, so that
    cycle did not run — notify whoever is on for the next business day. Everything else belongs in a
    digest rather than a notification: `degraded_asset:*` (an asset carried on with reduced
-   function), `asset_check:*` (a check could not evaluate its own inputs, so one signal is unknown
-   rather than bad), and `retrying_asset:*` (a warning that an asset failed and will retry, sent on
-   the first failed attempt and followed by a `run_failed` event if every retry fails). Nothing here
-   warrants waking anyone — see [Inherent stability](../design-philosophy/inherent-stability.md) for
-   the uptime posture that makes that the right call.
+   function, including the [forecast's three degradation
+   kinds](operations.md#the-daily-primary-substation-forecast)), `asset_check:*` (a check could not
+   evaluate its own inputs, so one signal is unknown rather than bad), and `retrying_asset:*` (a
+   warning that an asset failed and will retry, sent on the first failed attempt and followed by a
+   `run_failed` event if every retry fails). Nothing here warrants waking anyone — see [Inherent
+   stability](../design-philosophy/inherent-stability.md) for the uptime posture that makes that the
+   right call.
+3. **Set who is told about a missed forecast check-in**, once the monitor exists (see [The daily
+   forecast check-in](#the-daily-forecast-check-in) below). A missed check-in means the service
+   wrote no forecast today, so notify whoever is on for the next business day, as for
+   `fault_category:run_failed`.
 
 One handover note: the Sentry account is OCF's today, so at handover the alert routing (and possibly
 the account itself) moves to NGED — see [Handover to
 NGED](../roadmap/handover.md#2-alert-on-absence-not-just-failure).
+
+## The daily forecast check-in
+
+**A Sentry cron monitor raises an issue when no Primary substation forecast has landed by 16:00
+UTC.** Each successful run of today's `live_primary_substation_forecasts` partition sends one `OK`
+check-in to the monitor with the slug `live-primary-substation-forecasts`. Sentry evaluates the
+monitor itself, so a dead daemon, a stopped box, and a failed run all show up as the same missed
+check-in, which no process inside the deployment could report.
+
+**The monitor's settings come from the code, and the first check-in creates the monitor.** Each
+check-in carries `PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG` from
+`nged_substation_forecast._sentry`, and Sentry creates the monitor from that configuration, or
+updates it to match:
+
+- **Schedule**: crontab `0 12 * * *`, timezone UTC, the cadence of
+  `live_primary_substation_forecasts_schedule`. A test fails if the two drift apart.
+- **Check-in margin**: 240 minutes. The asset retries a missing ENS run until about 15:00 UTC, and a
+  run then takes a few minutes, so a healthy day can check in as late as about 15:10 UTC. The margin
+  puts the alarm at 16:00 UTC, after the last retry.
+- **Maximum runtime**: not set. Only success check-ins are sent, never `in_progress`, so Sentry has
+  no start time to time a run against.
+
+A schedule or margin edited in the Sentry console is overwritten by the next check-in, so change
+the configuration in the code. The monitor appears under **Crons** in Sentry after the first
+production run that succeeds with `SENTRY_MONITOR_FORECASTS=true` in the task definition. Set who is
+told about a missed check-in on that monitor's page, as step 3 above describes.
+
+**Only production sends check-ins.** A backfill of a past day sends none, because the check-in says
+that the service is alive today. `SENTRY_MONITOR_FORECASTS` defaults to `false`, so a laptop sends
+none either. A laptop that set the variable would register the production slug under its own
+environment and then stop checking in, so Sentry would report missed check-ins for that laptop.
+To test a check-in from a laptop, pass a throwaway slug instead:
+
+```python
+import sentry_sdk
+from contracts.settings import Settings
+
+from nged_substation_forecast._sentry import init_sentry, send_primary_substation_forecast_checkin
+
+settings = Settings(sentry_monitor_forecasts=True)
+init_sentry(settings)
+send_primary_substation_forecast_checkin(
+    settings, monitor_slug="live-primary-substation-forecasts-test"
+)
+sentry_sdk.flush(timeout=10)
+```
+
+The test monitor then appears under **Crons**. Delete it once you have seen it, or Sentry reports
+its missed check-ins every day after.
 
 ## See also
 

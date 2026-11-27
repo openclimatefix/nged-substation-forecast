@@ -15,7 +15,8 @@ live service works.
 The live service is distinct from [Cross-validation](../cross-validation/index.md). The
 cross-validation section covers training and backtesting candidate forecasters against historical
 data. The live-service section covers the production service that runs unattended, which ingests the
-inputs a live forecast reads and checks those inputs. The live service currently writes no forecast.
+inputs a live forecast reads, checks those inputs, and forecasts the demand of 16 Primary
+substations once a day.
 
 **Audience note:** today these runbooks are written for OCF (Python-literate researchers). The
 working assumption is that, after the Network Innovation Allowance (NIA) project, NGED runs the
