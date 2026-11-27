@@ -36,7 +36,6 @@ from substation_demand_forecaster.bundle import (
     GRID_STEP,
     INPUT_HORIZON,
     PUBLICATION_DELAY,
-    STEP5_RECIPE,
     SUMMARY_HORIZON,
     Bundle,
     CalendarConfig,
@@ -491,9 +490,8 @@ def b1_columns(
 def analysis_proxy(summary: pl.LazyFrame) -> pl.LazyFrame:
     """Return the analysis proxy of the ENS mean temperature and shortwave.
 
-    Each run contributes its first day after its own native origin (leads strictly between 9 and
-    33.5 hours after initialisation), and `select_analysis_proxy` keeps the freshest run with a
-    value at each valid time.
+    Each run contributes its leads inside `ANALYSIS_PROXY_LEADS`, and `select_analysis_proxy` keeps
+    the freshest run with a value at each valid time.
 
     Args:
         summary: `summarise_runs`' output.
@@ -575,8 +573,6 @@ def _run_b1(
     series = _values_on_grid(
         frame=history, columns=weather, bundle=bundle, first=first, length=length
     )
-    # Nothing after the origin may come from the history; the day's run fills those steps.
-    series[:, :, lookback + 1 :] = np.nan
     run = summary.filter(pl.col("nwp_init_time") == nwp_init_time)
     today = _values_on_grid(frame=run, columns=weather, bundle=bundle, first=first, length=length)
     series[:, :, lookback + 1 :] = today[:, :, lookback + 1 :]
@@ -659,7 +655,6 @@ def build_expected_rows(
     freshest = (
         summary.lazy()
         .filter(
-            pl.col("nwp_init_time") <= nwp_init_time,
             pl.col("nwp_init_time") + PUBLICATION_DELAY < pl.col("valid_time"),
             pl.col("valid_time").dt.epoch("us").is_between(_stamp_us(first), _stamp_us(last)),
         )
@@ -711,10 +706,7 @@ def build_expected_rows(
 # --- the input matrix -----------------------------------------------------------------------
 
 
-def _check_recipe(bundle: Bundle) -> None:
-    if bundle.recipe != STEP5_RECIPE:
-        msg = f"no input-matrix recipe for {bundle.recipe!r}"
-        raise ValueError(msg)
+def _check_columns(bundle: Bundle) -> None:
     if bundle.column_names != STEP5_COLUMNS:
         msg = "the bundle's column order differs from the step-5 recipe's"
         raise ValueError(msg)
@@ -728,7 +720,7 @@ def raw_input_matrix(
     Args:
         bundle: The bundle.
         summary: `summarise_runs`' output for the day's run and the runs of the 13 days before it.
-            Runs initialised after `nwp_init_time` are ignored.
+            It must hold no run initialised after `nwp_init_time`.
         cleaned_power: `time_series_id`, `time`, and `power` of the Primaries' cleaned readings
             over the lag window, the 7 days ending 1 day before the native origin.
         nwp_init_time: The day's 00Z run.
@@ -736,8 +728,7 @@ def raw_input_matrix(
     Returns:
         The keys and the raw columns, as `InputMatrix.keys` and `InputMatrix.raw` describe them.
     """
-    _check_recipe(bundle)
-    summary = summary.filter(pl.col("nwp_init_time") <= nwp_init_time)
+    _check_columns(bundle)
     origin_index = _origin_index(nwp_init_time)
     origin_us = _stamp_us(origin_index)
     n_primaries = bundle.primaries.height
@@ -848,7 +839,7 @@ def build_input_matrix(
     """Return the 60 input columns of one forecast, raw and standardised.
 
     Args:
-        bundle: The bundle; its recipe picks the columns, and only the step-5 recipe exists.
+        bundle: The bundle.
         summary: `summarise_runs`' output for the day's run and the runs of the 13 days before it.
         cleaned_power: `time_series_id`, `time`, and `power` of the Primaries' cleaned readings
             over the lag window.
@@ -858,7 +849,7 @@ def build_input_matrix(
         The keys, the raw columns, and the standardised columns.
 
     Raises:
-        ValueError: If the bundle names a recipe this package does not implement.
+        ValueError: If the bundle's column order differs from the step-5 recipe's.
     """
     keys, raw = raw_input_matrix(
         bundle=bundle, summary=summary, cleaned_power=cleaned_power, nwp_init_time=nwp_init_time

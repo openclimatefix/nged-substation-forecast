@@ -78,15 +78,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 PRIMARY_SUBSTATION_FORECAST_MONITOR_SLUG: Final[str] = "live-primary-substation-forecasts"
-"""Slug of the Sentry cron monitor fed by ``live_primary_substation_forecasts``' success check-in.
-
-Laptop testing must use a *different*, throwaway slug (for example
-``"live-primary-substation-forecasts-test"``), so an intermittently-run laptop never registers a
-stale environment on the production monitor. The ``environment`` tag alone is not enough: the slug
-is a constant here in the source, not a setting, so a laptop that merely switched
-``Settings.sentry_monitor_forecasts`` on would check in to the production monitor and then stop,
-leaving it expecting a daily check-in the laptop will never send. Fuller reasoning:
-<https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#separating-laptop-telemetry-from-production>"""
+"""Slug of the Sentry cron monitor that ``live_primary_substation_forecasts`` checks in to."""
 
 PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: UP037
     # DUPLICATED SCHEDULE: this crontab must match `live_primary_substation_forecasts_schedule` in
@@ -346,12 +338,10 @@ def send_primary_substation_forecast_checkin(
 ) -> None:
     """Send a success check-in to the Sentry cron monitor, or do nothing if disabled.
 
-    A no-op unless ``settings.sentry_monitor_forecasts`` is set (True only in the production
-    Fargate task definition, where the asset runs), so a laptop never registers a monitor
-    environment that Sentry would then mark as missed. Sends a single ``OK`` check-in, never
-    ``in_progress`` or ``error``, so the alarm fires only on the *absence* of a check-in. Never
-    raises: it runs after the asset has committed its Delta write, so a raise would report the run
-    as failed while the rows it produced sit committed.
+    A no-op unless ``settings.sentry_monitor_forecasts`` is set. Sends a single ``OK`` check-in,
+    never ``in_progress`` or ``error``, so the alarm fires only on the *absence* of a check-in.
+    Never raises: it runs after the asset has committed its Delta write, so a raise would report
+    the run as failed while the rows it produced sit committed.
 
     Args:
         settings: The project settings carrying ``sentry_monitor_forecasts``.

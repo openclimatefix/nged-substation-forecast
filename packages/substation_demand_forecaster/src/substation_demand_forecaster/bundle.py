@@ -6,11 +6,6 @@ own `README.md`: `manifest.json` (format version, release number, seeds, file li
 component folder holding the column order, the standardisers, the offset knots, and each seed's
 weights as `seed<N>.npz`. `load_bundle` reads all of it once and returns a frozen `Bundle`, so
 nothing downstream reads a file.
-
-A bundle that this package cannot serve raises `ValueError`, because a bundle is our own
-deployment artefact: a wrong format version, a recipe this package does not implement, or a
-constant that differs from the value the code implements is a packaging bug, not a fault in the
-outside world.
 """
 
 import json
@@ -149,9 +144,6 @@ class Standardisers:
 class Bundle:
     """Everything the forecast reads from one exported bundle."""
 
-    root: Path
-    recipe: str
-    """The component's `kind`; `STEP5_RECIPE` is the only one this package implements."""
     model_release: int
     """0 for a bundle that is not a release of the forecasting model, otherwise its number."""
     research_commit: str
@@ -375,8 +367,6 @@ def load_bundle(path: Path) -> Bundle:
         entries=_read_json(path / manifest["shared_files"]["primaries"])["primaries"]
     )
     return Bundle(
-        root=path,
-        recipe=component["kind"],
         model_release=int(manifest["model_release"]),
         research_commit=str(manifest["research_git"]["commit"]),
         refit_month=str(manifest["refit_month"]),

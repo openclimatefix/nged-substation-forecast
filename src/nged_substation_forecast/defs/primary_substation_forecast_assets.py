@@ -68,13 +68,11 @@ FORECAST_INIT_HOUR_UTC: Final[int] = 12
 FORECAST_HORIZON: Final[timedelta] = timedelta(days=14)
 """The asset keeps the valid times strictly after `power_fcst_init_time` and strictly before
 `power_fcst_init_time + FORECAST_HORIZON`: 671 half-hours, from 12:30 UTC to 11:30 UTC 14 days
-later, which are exactly the rows research validated."""
+later."""
 
 HISTORY_DAYS: Final[int] = 13
-"""How many days of 00Z runs before the day's run the forecast reads.
-
-The cold-snap column of the B1 group looks 12 days back from the 09:00 UTC native origin, and the
-first day of the run 13 days back is the earliest run reaching that far."""
+"""How many daily 00Z runs before the day's run the forecast reads: enough to reach the 12 days
+before the 09:00 UTC native origin that the cold-snap column looks back over."""
 
 POWER_HISTORY: Final[timedelta] = timedelta(days=9)
 """How far before the native origin the cleaned-power read reaches; the week lag reaches 8 days
@@ -393,14 +391,11 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
     reads that day's 00Z ENS run and the 13 daily runs before it from the ``nwp`` Delta table that
     ``ecmwf_ens`` writes, and the Primaries' cleaned readings from the
     ``cleaned_power_time_series`` table that ``clean_nged_power_data`` writes. It loads the step-5
-    neural network's bundle from ``Settings.primary_substation_bundle_path``, which the production
-    image carries. The Primaries and their capacities come from the bundle, never from the
-    ``TimeSeriesMetadata`` table. It writes 671 rows per Primary to ``power_forecasts``, under
-    ``experiment_name`` ``primary_substation_demand_forecaster`` and ``fold_id`` ``"live"``, with
-    ``power_fcst_init_time`` at 12:00 UTC on the partition's day and valid times from 12:30 UTC to
-    11:30 UTC 14 days later. A re-run replaces that ``power_fcst_init_time``'s rows. The 13
-    quantile columns are in megawatts, or megavolt-amperes for the eight MVA Primaries, whose
-    quantiles are clamped at zero.
+    neural network's bundle. The Primaries and their capacities come from the bundle, never from
+    the ``TimeSeriesMetadata`` table. It writes to ``power_forecasts``, under ``experiment_name``
+    ``primary_substation_demand_forecaster`` and ``fold_id`` ``"live"``, with
+    ``power_fcst_init_time`` at 12:00 UTC on the partition's day. A re-run replaces that
+    ``power_fcst_init_time``'s rows.
 
     **When it runs.** ``live_primary_substation_forecasts_schedule`` fires it at 12:00 UTC, after
     ``ecmwf_ens_schedule`` (10:30 UTC) has normally written the day's run. The two schedules are
@@ -411,10 +406,10 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
     **What a degraded run looks like.** Each of these reaches Sentry tagged
     ``degraded_asset=live_primary_substation_forecasts``:
 
-    - The day's run is absent: the asset retries every 30 minutes up to 6 times, until 15:00 UTC,
-      with a Sentry warning on the first retry. If the run is still absent, the asset reports the
-      degradation and finishes without writing, so that day has no forecast. A backfill of a run
-      more than 36 hours old does not retry.
+    - The day's run is absent: the asset retries every 30 minutes up to 6 times, with a Sentry
+      warning on the first retry. If the run is still absent, the asset reports the degradation
+      and finishes without writing, so that day has no forecast. A backfill of a run more than 36
+      hours old does not retry.
     - A history run is missing: the thermal-lag and solar-gain columns are computed from the
       history that remains, as research computes them, and the asset names the missing runs.
     - The day's run is incomplete (fewer members, a missing lead, a short run, a missing cell, or

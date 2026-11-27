@@ -28,6 +28,3 @@ Delta tables, so they need `DATA_PATH_INTERNAL` set as well:
 PRIMARY_SUBSTATION_BUNDLE_PATH=/path/to/bundle \
     uv run pytest tests/test_substation_demand_forecaster_golden.py
 ```
-
-The unit tests under `packages/substation_demand_forecaster/tests/` build a synthetic two-Primary
-bundle with random weights, and run in CI.

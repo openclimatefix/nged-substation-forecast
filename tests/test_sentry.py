@@ -260,12 +260,7 @@ def test_send_checkin_logs_and_swallows_a_send_error(
 
 
 def test_monitor_config_schedule_matches_the_schedule() -> None:
-    """Drift guard: the monitor's crontab is a hand-kept copy of the asset's schedule.
-
-    The two cannot share an import without a circular import (see the comment on
-    ``PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG``). If one crontab changes and not the other, the
-    alarm expects check-ins on a different cadence from the one the asset runs on.
-    """
+    """Drift guard: the monitor's crontab is a hand-kept copy of the asset's schedule."""
     from nged_substation_forecast.defs.schedules import live_primary_substation_forecasts_schedule
 
     assert (

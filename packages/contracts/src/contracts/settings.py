@@ -180,8 +180,7 @@ class Settings(BaseSettings):
     # --- Storage roots -------------------------------------------------------------------
     #
     # data_path_internal and data_path_delivery hold the (S3-capable) data tables;
-    # local_artifacts_path holds the always-local artifacts, such as the study submission log and
-    # the bundle of the Primary substation forecast.
+    # local_artifacts_path holds the always-local artifacts, such as the study submission log.
     # Why the three roots are split, and what belongs in each:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 

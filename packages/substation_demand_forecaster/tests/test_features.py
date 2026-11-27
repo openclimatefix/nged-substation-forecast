@@ -132,7 +132,8 @@ def test_a_missing_lag_reads_value_zero_flag_one_and_the_largest_age(bundle: Bun
 
 
 def _local_hour(columns: np.ndarray) -> np.ndarray:
-    sin, cos = columns[:, CALENDAR_COLUMNS.index("sin_hour")], columns[:, 1]
+    sin = columns[:, CALENDAR_COLUMNS.index("sin_hour")]
+    cos = columns[:, CALENDAR_COLUMNS.index("cos_hour")]
     return np.round(np.mod(np.arctan2(sin, cos) * 24.0 / (2 * np.pi), 24.0), 6)
 
 

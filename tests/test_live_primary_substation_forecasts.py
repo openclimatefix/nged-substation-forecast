@@ -103,6 +103,12 @@ def degradations(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     return calls
 
 
+@pytest.fixture
+def today() -> datetime:
+    """Today's 00Z run, recent enough for the asset to retry."""
+    return datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 def _materialize(instance: DagsterInstance, partition_key: str = _PARTITION) -> None:
     result = materialize(
         [live_primary_substation_forecasts], partition_key=partition_key, instance=instance
@@ -116,7 +122,7 @@ def test_writes_671_rows_per_primary_from_12_30_to_11_30_14_days_later(
     degradations: list[dict[str, Any]],
 ) -> None:
     # The run one day after the partition's is there too, as a backfill would see it.
-    _write_nwp(env["nwp"], days_back=list(range(-1, 14)))
+    _write_nwp(env["nwp"], days_back=list(range(14)))
     _materialize(dagster_instance)
 
     rows = pl.read_delta(str(env["forecasts"]))
@@ -175,14 +181,13 @@ def _fake_context(retry_number: int) -> AssetExecutionContext:
 
 
 def test_an_absent_recent_run_requests_a_retry_and_warns_once(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, today: datetime
 ) -> None:
     warnings: list[str] = []
     monkeypatch.setattr(module, "_available_nwp_init_times", lambda settings: [])
     monkeypatch.setattr(
         module, "report_asset_retry", lambda **kw: warnings.append(kw["asset_name"])
     )
-    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     for retry_number in (0, 1):
         with pytest.raises(RetryRequested):
             module._wait_for_day_run(
@@ -192,10 +197,9 @@ def test_an_absent_recent_run_requests_a_retry_and_warns_once(
 
 
 def test_the_last_retry_reports_the_degradation_and_returns(
-    monkeypatch: pytest.MonkeyPatch, degradations: list[dict[str, Any]]
+    monkeypatch: pytest.MonkeyPatch, degradations: list[dict[str, Any]], today: datetime
 ) -> None:
     monkeypatch.setattr(module, "_available_nwp_init_times", lambda settings: [])
-    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     present = module._wait_for_day_run(
         context=_fake_context(MAX_RETRIES), settings=Settings(), nwp_init_time=today
     )
