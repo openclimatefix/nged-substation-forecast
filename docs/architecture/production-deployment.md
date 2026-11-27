@@ -9,13 +9,13 @@ step-by-step recipe — build the image, verify it, push it, and stand up the AW
 ## Run the Dagster control plane continuously on one small VM
 
 The Dagster control plane — daemon + webserver + code-location server — runs continuously on one
-small VM, alongside MLflow and Marimo, managed via Docker Compose. Its schedules are responsible for
-the entire recurring pipeline: pulling fresh telemetry from NGED's bucket (hourly) and downloading
-the ECMWF ensemble NWP from Dynamical.org (daily). The box does none of that pipeline compute of its
-own, though: it dispatches
-every run — those schedules and UI-launched backtests alike — to an ephemeral Fargate task via
-`EcsRunLauncher`. Even the light data-ingest runs go to Fargate; the reasoning is in [Running the
-data-ingest runs on the control-plane VM](#running-the-data-ingest-runs-on-the-control-plane-vm).
+small VM, managed via Docker Compose. The VM runs neither MLflow nor Marimo. Its schedules are
+responsible for the entire recurring pipeline: pulling fresh telemetry from NGED's bucket (hourly)
+and downloading the ECMWF ensemble NWP from Dynamical.org (daily). The box does none of that
+pipeline compute of its own, though: it dispatches every run — those schedules and UI-launched
+backtests alike — to an ephemeral Fargate task via `EcsRunLauncher`. Even the light data-ingest
+runs go to Fargate; the reasoning is in [Running the data-ingest runs on the control-plane
+VM](#running-the-data-ingest-runs-on-the-control-plane-vm).
 This VM-plus-`EcsRunLauncher` split is the [accepted infrastructure
 tier](#accepted-option-small-ec2-control-plane-box-ecsrunlauncher); see [Live service: AWS
 architecture](../roadmap/live-service.md#aws-architecture) for the roadmap's summary, and [AWS
@@ -389,9 +389,9 @@ run storage.
    for the full handover plan.
 
 3. **The cost saving is not real for this workload.** EventBridge's pay-per-run economics matter
-   when the alternative is an idle fleet. Our alternative, though, is one small VM that must exist
-   anyway to host MLflow and Marimo. Splitting the scheduler out of that box would save roughly
-   \$10–15/month while adding architectural surface area.
+   when the alternative is an idle fleet. Our alternative, though, is one small VM. Moving the
+   scheduler off that VM would save roughly \$10–15/month while adding architectural surface
+   area.
 
 4. **Run-level retry is no better under EventBridge.** EventBridge Scheduler retries the
    *invocation* of a task (with backoff, a configurable max age/attempt count, and a Simple Queue
@@ -440,14 +440,11 @@ maintains the hosts), so the one piece of self-maintained OS in the deployment w
    replace (~\$66/month vs ~\$27/month, from the ARM Fargate and EC2 rates in the [region price
    table](forecast-delivery.md#securing-it)).
 
-2. **The box is planned to host more than the control plane.** The same VM is the intended home of
-   the MLflow tracking server and the Marimo dashboard — which is why the [EventBridge
-   rejection](#no-control-plane-eventbridge-scheduler-launching-ecs-tasks) counts the VM as a cost
-   that exists anyway. A VM absorbs each additional long-running service as one more entry in the
-   same `docker-compose.yml`, using headroom already paid for. As Fargate services, each would be
-   its own always-on task paying the premium above over again. MLflow also brings its own
-   persistence needs (its backend store and artifact root), running into the disk problem below a
-   second time.
+2. **A VM can take on further long-running services cheaply.** The VM runs only the control plane
+   today; a Marimo dashboard is one option for a later service on the same box. A VM absorbs each
+   additional long-running service as one more entry in the same `docker-compose.yml`, using
+   headroom already paid for. As Fargate services, each would be its own always-on task paying the
+   premium above over again.
 
 3. **Postgres needs a disk that Fargate doesn't have.** A Fargate task has no persistent local
    storage, so the Postgres container (run, event, and schedule history) could not come along. It
@@ -499,8 +496,8 @@ several-hours-apart intervals, spends most of its ticks discovering there is not
    [handover constraint](../roadmap/handover.md) says to avoid.
 
 2. **Blast-radius isolation.** The box's only job is to always be up, and it is deliberately tiny: a
-   `t4g.medium` whose 4 GB is shared by the daemon, webserver, code-location server, and Postgres,
-   with MLflow and Marimo planned on top. The ingest jobs are lighter than inference but not
+   `t4g.medium` whose 4 GB is shared by the daemon, webserver, code-location server, and Postgres.
+   The ingest jobs are lighter than inference but not
    negligible — the NWP ingest decodes a full daily ENS run (~7 million rows) and is CPU-hungry
    enough that its download once starved *itself* through thread contention
    ([#276](https://github.com/openclimatefix/nged-substation-forecast/issues/276)). Several busy
@@ -591,8 +588,8 @@ plane backed by RDS, and a managed Dagster+ Solo plan.
 ### Accepted option: small EC2 control-plane box + `EcsRunLauncher`
 
 A `t4g.medium` (2 vCPU / 4 GB; **£20.55/month on-demand, £12.95/month 1-yr no-upfront reserved**)
-runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker + **the Marimo
-dashboard**, behind Tailscale (no ALB — Application Load Balancer). Every run — live schedules *and*
+runs the Dagster daemon + webserver + code-location server + Postgres-in-Docker, behind
+Tailscale (no ALB — Application Load Balancer). Every run — live schedules *and*
 UI-launched backtests — is dispatched by `EcsRunLauncher` to an ephemeral Fargate task sized to the
 job. Add ~£1.80 EBS (Elastic Block Store, the VM's disk), £9–13/month Fargate — live inference plus
 the hourly ingest and polling runs, priced in [AWS Running Costs](aws-costs.md#v1-32-time-series) —
@@ -606,17 +603,17 @@ live service on AWS: Steps 9 and
 14](../live_service/aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
 
 - **Pros:** Dagster properly (history, UI backfills, sensors, concurrency pools enforced centrally);
-  backtests get big ephemeral compute; dashboard rides free; EC2 IAM instance roles (no static
-  keys); a standard Dagster-OSS-on-AWS deployment.
+  backtests get big ephemeral compute; a later dashboard could run on the box at no extra
+  cost; EC2 IAM instance roles (no static keys); a standard Dagster-OSS-on-AWS deployment.
 - **Cons:** one pet server (patching, disk, daemon liveness — mitigate with systemd restart
   policies + the monitoring plan's "no fresh forecast" alarm); dagster.yaml/run-launcher config
-  work; 4 GB is comfortable but not roomy (watch Marimo's Delta scans). The risk of a long-lived,
+  work; 4 GB is comfortable but not roomy. The risk of a long-lived,
   hand-maintained server grows once the service is operated by staff who did not develop the code —
   the full mitigation list (auto-recovery alarms, disk hygiene, a tested rebuild-from-scratch
   script) is [Handover workstream
   3](../roadmap/handover.md#3-make-the-control-plane-box-rebuildable-from-scratch).
 - Cost trims: t4g.small (2 GB) is **free-trial (750 hrs/month) until 31 Dec 2026** and £10.30/£6.50
-  after, if everything squeezes into 2 GB — likely too tight with Marimo.
+  after, if everything squeezes into 2 GB.
 
 ### Infrastructure-tier options considered and rejected
 
@@ -683,7 +680,7 @@ the better design anyway).
 | £/month | 12–22 | **27–40** | 56–86 | ~41–45 (+ALB) | 37–45 |
 | Run history + UI backfills | ✗ | ✓ | ✓ | ✓ | ✓ |
 | Backtests in AWS | ✗ | ✓ big ephemeral compute | ✓ but 2–4 vCPU | ✓ | ✓ (credits) |
-| Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
+| Adding a Marimo dashboard | +£6 add-on | ✓ free on box | ✓ free on box | +£6 service | +£3.75–6 |
 | Servers to patch | 0 | 1 | 1 | 0 | 0 |
 | No static AWS keys | ✓ | ✓ | ✓ EC2 / ✗ Lightsail | ✓ | ✓ |
 | Multi-user UI | n/a | ✓ (Tailscale) | ✓ | ✓ | ✗ (1 user) |

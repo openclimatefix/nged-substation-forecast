@@ -181,8 +181,8 @@ digital best practice." Corporate cloud environments commonly impose service con
 mandatory patching, mandatory security agents, restricted egress, and bans on long-lived
 credentials. The access design is the part of the service those standards bear on most, because in
 the current design [the network layer *is* the authentication
-layer](live-service.md#access-phasing). None of the web UIs (Dagster, MLflow, and Marimo) has
-built-in authentication, and Tailscale is what restricts who can reach them. If NGED's standards
+layer](live-service.md#access-phasing). The Dagster web UI has no built-in authentication, and
+Tailscale is what restricts who can reach the Dagster web UI. If NGED's standards
 call for a different network layer, the access design needs an NGED-compatible replacement as a
 whole (e.g. NGED's virtual private network plus private subnets, or a proxy fronted by single
 sign-on).

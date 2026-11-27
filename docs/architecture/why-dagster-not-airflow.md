@@ -328,7 +328,7 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
   and dispatches both scheduled runs and UI-launched backtests to Fargate. After a split, the box
   runs Airflow's control plane (scheduler, DAG processor, triggerer, webserver, metadata DB —
   comparable weight to Dagster's). Either the box also keeps Dagster's control plane (it will not
-  fit in 4 GB alongside MLflow and Marimo — a resize), or R&D Dagster retreats to laptops and loses
+  fit in 4 GB — a resize), or R&D Dagster retreats to laptops and loses
   Fargate-dispatched CV (cross validation) runs, which matters at V2 scale.
 - **The shared ingest assets are the awkward joint.** `ecmwf_ens` and
   `power_time_series_and_metadata` are production assets, and the CV (cross validation) assets read

@@ -175,10 +175,8 @@ option](../architecture/production-deployment.md#accepted-option-small-ec2-contr
 already describes; it's named explicitly as Stage 1 here only so Stage 2/3 below have something to
 say "additive on top of."
 
-- Daemon, full-access Dagster webserver, and the Marimo dashboard all run on the `t4g.medium`
-  control-plane box, alongside MLflow once its tracking server lands (the "Future work" item just
-  above, issue [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) —
-  MLflow-on-the-box is not itself a new v0.1 commitment, only its access tier is decided here.
+- The daemon and the full-access Dagster webserver run on the `t4g.medium` control-plane box. The
+  box runs neither MLflow nor Marimo.
 - Security group: no public inbound ports at all. Everything is reached over Tailscale.
 
 #### Stage 2 — team gets read-only Dagster access; MLflow stays private

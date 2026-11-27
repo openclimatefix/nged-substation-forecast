@@ -104,7 +104,7 @@ scale come to **~£2–4/month in total**:
   (£0.0040/1k) per month lands at roughly £1.20–1.90, a small line item.
 - **Data transfer — ≈£0/month.** Ingress is free (the daily NWP download from Dynamical costs
   nothing on the AWS side); S3 ↔ Fargate/EC2 traffic within eu-west-2 is free; internet egress (the
-  Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few GB/month, inside AWS's account-wide
+  Tailscale-tunnelled Dagster UI) is a few GB/month, inside AWS's account-wide
   100 GB/month free egress allowance (£0.067/GB beyond).
 - **Everything else — pennies.** Elastic Container Registry image storage and CloudWatch Logs
   ingestion for ~1,000 task runs/month — one Fargate task per schedule tick, matching the ~1,000
