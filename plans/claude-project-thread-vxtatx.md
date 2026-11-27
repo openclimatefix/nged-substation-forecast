@@ -9,7 +9,7 @@ the live service before the Christmas 2026 break.
 
 **The planned solution.** A new workspace package, `substation_demand_forecaster`, rebuilds the
 neural network's 60 input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs
-a forward pass re-implemented in numpy for each of the three seeds, and reads the 13 NGED delivery
+a forward pass re-implemented in `torch` for each of the three seeds, and reads the 13 NGED delivery
 quantile levels out of each seed's Gaussian mixture. A new daily Dagster asset,
 `live_primary_substation_forecasts`, runs the package at the 12:00 UTC origin on the day's 00Z ECMWF
 ENS run and writes one row per Primary and half-hour to `power_forecasts`, with the 13 quantile
@@ -65,13 +65,13 @@ series and half-hour, with no member structure.
 2. **The asset loads the bundle** with `substation_demand_forecaster.bundle.load_bundle(path)` from
    the new `Settings.primary_substation_bundle_path`. `load_bundle` checks that the manifest's
    `bundle_format_version` equals `BUNDLE_FORMAT_VERSION: Final = "2"` (the manifest stores it as a
-   string), reads each seed's weights from `components/step5/weights/seed<N>.npz` with `numpy.load`,
-   and returns a frozen `Bundle` dataclass. The dataclass holds the config, the standardisers, the
-   column order, the offset knots, the model release number from the manifest's new `model_release`
-   field (0 until a release is cut), and the 16 Primaries from `primaries.json` (identifier, H3
-   cell, latitude, longitude, `effective_capacity_mw`, `capacity_mw`, embedding index). The
-   Primaries and their capacities come from the bundle, never from today's `TimeSeriesMetadata`
-   table.
+   string), reads each seed's weights from `components/step5/weights/seed<N>.npz` with `numpy.load`
+   and converts them to `torch` tensors, and returns a frozen `Bundle` dataclass. The dataclass
+   holds the config, the standardisers, the column order, the offset knots, the model release number
+   from the manifest's new `model_release` field (0 until a release is cut), and the 16 Primaries
+   from `primaries.json` (identifier, H3 cell, latitude, longitude, `effective_capacity_mw`,
+   `capacity_mw`, embedding index). The Primaries and their capacities come from the bundle, never
+   from today's `TimeSeriesMetadata` table.
 3. **The asset checks that today's 00Z run is present** with the existing
    `_available_nwp_init_times`. If it is not, the asset raises `RetryRequested` every 30 minutes,
    up to 6 times, so until 15:00 UTC. That is 30 minutes after the last retry of `ecmwf_ens`
@@ -132,15 +132,15 @@ series and half-hour, with no member structure.
    columns; float64 and a clip for the lag values; non-finite to 0 and no clip for the B1 columns;
    float16 rounding of the expected-weather rows.
 7. **`substation_demand_forecaster.neural_network.forecast(bundle, matrix, expected_rows, levels)`**
-   runs each seed's forward pass in numpy, with `scipy.special.erf` for the exact GELU and the
-   mixture's cumulative distribution. The forward pass is the functional `forward` and `mlp` of
-   `reference_check.py`, ported line by line and applying the stored weights by their `state_dict`
-   names, so the port diffs against the reference and imports nothing from research. `forecast`
-   reads the quantiles at `levels` (the 13 delivery levels in production, and the 11 research levels
-   in the golden tests) from each seed's mixture by 40 bisection steps over ±40 standard deviations,
-   sorts each seed's quantiles, converts them to a fraction of capacity with the per-Primary target
-   mean and standard deviation, averages the three seeds level by level, and sorts within each row
-   again, as research does.
+   runs each seed's forward pass in `torch` under `torch.inference_mode()` on the CPU, with
+   `torch.erf` for the exact GELU and the mixture's cumulative distribution. The forward pass is the
+   functional `forward` and `mlp` of `reference_check.py`, ported line by line and applying the
+   stored weights by their `state_dict` names, so the port diffs against the reference and imports
+   nothing from research. `forecast` reads the quantiles at `levels` (the 13 delivery levels in
+   production, and the 11 research levels in the golden tests) from each seed's mixture by 40
+   bisection steps over ±40 standard deviations, sorts each seed's quantiles, converts them to a
+   fraction of capacity with the per-Primary target mean and standard deviation, averages the three
+   seeds level by level, and sorts within each row again, as research does.
 8. **The asset relabels the origin to 12:00 UTC, multiplies by `capacity_mw`, and keeps the 671
    valid times strictly after 12:00 UTC, the last being 12:00 UTC 14 days later.** Research's own
    contract rows start at 12:00 UTC itself; `PowerForecast.valid_time` must be strictly after
@@ -202,8 +202,13 @@ series and half-hour, with no member structure.
 - **Research prerequisite (in `nged-ml-research`):** experiment 705's exporter also writes each
   seed's weights as `seed<N>.npz` and a `model_release` field in `manifest.json`, and the bundle
   format becomes version `"2"`. The `.pt` files can stay for research's own `reference_check.py`.
-- **No `torch` dependency.** The forward pass is a few linear layers, GELU, embedding lookups,
-  `log_softmax`, `erf`, and bisection, all of which numpy and scipy do.
+- **`torch` as a runtime dependency of `substation_demand_forecaster`,** in the CPU-only build. The
+  maintainer chose `torch` on 2026-11-27, so that training and serving use one tensor library when
+  production training arrives. The root `pyproject.toml` pins the PyTorch CPU wheel index for
+  `torch` through `[tool.uv.sources]`, because the default Linux wheel pulls in the CUDA libraries
+  and makes the image several gigabytes larger. The forward pass is still ported from the
+  functional `mlp` and `forward` of `reference_check.py`, with no import from research, and the
+  golden tests compare it against research's output.
 - **Root `pyproject.toml` and `uv.lock`**: `substation_demand_forecaster` as a dependency of the
   root project with a `[tool.uv.sources]` workspace entry, because the Dockerfile's `uv sync
   --no-dev --no-editable` installs only the root project's dependencies. `holidays` and `pvlib`
@@ -335,6 +340,9 @@ scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
 - **Not subclassing `BaseForecaster`.** Recommendation: a plain function, for the reason under
   "Design-philosophy check". The cost is that the bundle is copied by hand from the workstation,
   as the runbook will say.
+- **Image size with `torch`.** The CPU wheel adds roughly 200 MB to the image, and the plan has
+  not measured it. `scripts/deploy/build_and_verify_image.sh` should print the image size so that
+  the number is on record. Recommendation: accept the cost.
 - **`pvlib` in the image, or a port of SPA.** Research's sun columns come from pvlib's SPA, and
   ml_core's NOAA geometry will not match to 1e-5. Recommendation: make `pvlib` a runtime dependency
   of `substation_demand_forecaster` and call its numpy SPA functions, so no pandas object appears in
@@ -350,11 +358,11 @@ scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
 
 ### Simplicity review: what changed
 
-Ten findings were applied. The forward pass moved from `torch` to numpy, ported from the functional
-reference. The asset check, the member threshold, the `availability_mode` config, and the new
-Sentry monitor were cut. `select_analysis_proxy` stays unchanged, the asset reuses
-`ecmwf_ens_partitions`, and the checksums moved to image build time. The solar-geometry finding is
-superseded by the correctness review's finding that research uses pvlib's SPA.
+Ten findings were applied. The forward pass was ported from the functional reference. The asset
+check, the member threshold, the `availability_mode` config, and the new Sentry monitor were cut.
+`select_analysis_proxy` stays unchanged, the asset reuses `ecmwf_ens_partitions`, and the checksums
+moved to image build time. The solar-geometry finding is superseded by the correctness review's
+finding that research uses pvlib's SPA.
 
 ### Correctness review: what changed
 
