@@ -3,8 +3,9 @@
 > **Status: ✅ v0.1 shipped (July 2026, `v0.1.0`)** on the accepted architecture; the same
 > architecture now runs **v0.2** (`v0.2.0`, deployed 13 August 2026). Epic
 > [#137](https://github.com/openclimatefix/nged-substation-forecast/issues/137) is closed. The
-> service runs the ingest assets on AWS. No [live forecast asset](#live-forecast-assets) exists yet,
-> so the service writes no forecast. The shipped design now lives in [Production Deployment —
+> service runs the ingest assets on AWS, and one [live forecast asset](#live-forecast-assets), which
+> forecasts the 16 Primary substations once a day.
+> The shipped design now lives in [Production Deployment —
 > Design](../architecture/production-deployment.md) (the orchestration and model-packaging
 > decisions), and the step-by-step operational recipes in the [live-service
 > runbooks](../live_service/index.md) (AWS bring-up, day-to-day operation).
@@ -67,8 +68,8 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
   has shipped ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63) — see
   [Send telemetry to
   Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry)),
-  and the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) needs a live forecast
-  asset to check in. The remaining piece of per-task alerting is the thin SNS→email notification
+  and the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) is built on the daily
+  Primary substation forecast. The remaining piece of per-task alerting is the thin SNS→email notification
   edge for individual run failures.
 - A **development dashboard**
   ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)); the always-on
@@ -80,8 +81,9 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
 
 ## Live forecast assets
 
-**The design gives each time-series type a live Dagster asset of its own, and no live forecast asset
-exists yet.** Each live asset owns its partitions and its schedule, and writes `fold_id="live"` rows
+**The design gives each time-series type a live Dagster asset of its own, and one live forecast
+asset exists: `live_primary_substation_forecasts`, for the 16 Primary substations.**
+Each live asset owns its partitions and its schedule, and writes `fold_id="live"` rows
 to `power_forecasts`. The helpers a live asset reuses sit in neutral modules: the NWP-run lookup
 `_available_nwp_init_times` in `defs/assets.py`, beside `ecmwf_ens`, and `write_power_forecasts`
 in the `delta_store` package. [Operating the live service](../live_service/operations.md) is the
@@ -304,21 +306,24 @@ provides one.
 
 ### Alert on absence: the missed-check-in alarm
 
-> **Status: 🚧 Partly built**
+> **Status: ✅ Built**
 > ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)). The failure hook
 > and the laptop/production environment split are built and documented in [Send telemetry to
 > Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
-> No live forecast asset exists to check in with Sentry, so the missed-check-in alarm has nothing to
-> watch. This section keeps the *why* — the design rationale for alerting on absence from outside
-> the deployment. The remaining monitoring work on this page is the separate per-task failure email
+> The missed-check-in alarm is built too: `live_primary_substation_forecasts` checks in to a
+> Sentry cron monitor after each day's forecast, and Sentry raises a missed check-in at 16:00 UTC
+> (see [Setting up Sentry telemetry](../live_service/sentry.md#the-daily-forecast-check-in)). This
+> section keeps the *why* — the design rationale for alerting on absence from outside the
+> deployment. The remaining monitoring work on this page is the separate per-task failure email
 > edge (SNS → email).
 
 Per-task failure alerts ([Deployment workstream 3](#deployment-workstream-3-aws-infrastructure))
 only fire when a task runs and fails. Whole classes of failure are silent: a hung daemon, a full
 disk, an expired credential, a schedule that stopped firing. The **primary** production alert is
 therefore a **missed-check-in alarm** (Sentry's cron-monitoring terminology): it fires when **no
-successful forecast has landed in N hours** (e.g. 8 hours — one missed 6-hourly slot plus margin),
-regardless of cause. An alert feeding a runbook — rather than paging or automatic failover — is a
+successful forecast has landed by a deadline, regardless of cause. For the daily Primary
+substation forecast the deadline is 16:00 UTC, four hours after the 12:00 UTC schedule.
+An alert feeding a runbook — rather than paging or automatic failover — is a
 proportionate response because the project's [uptime requirements are lenient by
 design](../background/requirements.md#uptime-lenient-by-design). The accepted option's "daemon
 silently dead" staleness alarm (described in [the architecture
@@ -586,14 +591,14 @@ Still 🚧 after v0.1:
 - **Per-task failure email alerting** (a failed run → SNS → email) — Sentry error telemetry has
   shipped ([#63](https://github.com/openclimatefix/nged-substation-forecast/issues/63)); this is the
   one piece of alerting still open. The [missed-check-in
-  alarm](#alert-on-absence-the-missed-check-in-alarm) needs a live forecast asset to check in, so
-  the alarm does not exist yet. Decided 2026-07-14: prefer **portable alerting logic over AWS-native
+  alarm](#alert-on-absence-the-missed-check-in-alarm) is built on the daily Primary substation
+  forecast. Decided 2026-07-14: prefer **portable alerting logic over AWS-native
   glue** (no EventBridge rules) — the checks should be plain code that runs end-to-end on a laptop
   or any cloud, with only the thin notification edge (SNS, SMTP, …) being platform-specific. Under
   the accepted option, Dagster's own run-failure sensors are the natural portable mechanism (the
   daemon evaluates them); an EC2 instance-status-check alarm would cover the silent-failure class
-  ("daemon silently dead") that per-task alerts miss. The missed-check-in alarm would cover the
-  silent-failure class too, once a live forecast asset exists to check in. The
+  ("daemon silently dead") that per-task alerts miss. The missed-check-in alarm covers the
+  silent-failure class too, once a day. The
   SNS-subscription-confirm step joins the [runbook](../live_service/aws.md) once this lands.
 - **Infra-as-code** ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326))
   once there's enough to justify it — per the [Access phasing sequencing note](#access-phasing),

@@ -346,12 +346,12 @@ def send_primary_substation_forecast_checkin(
 ) -> None:
     """Send a success check-in to the Sentry cron monitor, or do nothing if disabled.
 
-    A no-op unless ``settings.sentry_monitor_forecasts`` is set (True only on the always-on
-    production box), so a laptop never registers a monitor environment that Sentry would then mark
-    as missed. Sends a single ``OK`` check-in, never ``in_progress`` or ``error``, so the alarm
-    fires only on the *absence* of a check-in. Never raises: it runs after the asset has committed
-    its Delta write, so a raise would report the run as failed while the rows it produced sit
-    committed.
+    A no-op unless ``settings.sentry_monitor_forecasts`` is set (True only in the production
+    Fargate task definition, where the asset runs), so a laptop never registers a monitor
+    environment that Sentry would then mark as missed. Sends a single ``OK`` check-in, never
+    ``in_progress`` or ``error``, so the alarm fires only on the *absence* of a check-in. Never
+    raises: it runs after the asset has committed its Delta write, so a raise would report the run
+    as failed while the rows it produced sit committed.
 
     Args:
         settings: The project settings carrying ``sentry_monitor_forecasts``.

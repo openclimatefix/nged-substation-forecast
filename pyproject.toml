@@ -62,7 +62,8 @@ dev = [
     # dependency purely so `uv sync` installs it and `uv run pytest` can collect its tests.
     "dashboard",
     # pvlib is the independent solar-position reference in `packages/ml_core/tests/test_radiation.py`.
-    # It is a dev dependency so the Dockerfile's `uv sync --no-dev` keeps it out of the image.
+    # The image carries pvlib anyway, because `substation_demand_forecaster` pins it as a runtime
+    # dependency for the forecast's sun columns.
     "pvlib>=0.11.0",
     "pytest-xdist>=3.6.1",
     # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
