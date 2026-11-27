@@ -162,15 +162,14 @@ lead-zero missingness alone does not establish that every gap pattern is learned
 
 **Precipitation still takes a different path.** Its generic point interpolation bridges interior
 nulls but leaves leading/trailing nulls. A single missing native step produces a 6-hour bridge on
-the 3-hour grid or a 12-hour bridge on the 6-hour grid. The planned
-[bounded-filling experiment](../roadmap/xgboost-improvements.md#make-the-existing-nwp-null-filling-deliberate-bounded-and-visible)
-will make that choice deliberate and measurable.
+the 3-hour grid or a 12-hour bridge on the 6-hour grid. We have found no experiment that measured
+whether those bridges help or harm a power forecast.
 
 In the 2026-08-09 example, 0.05% of one already-nullable variable is not worth discarding the other
 4282 slices of that variable or the 12 other variables that arrived complete. Rejecting the run
-leaves the live forecast on weather 24 hours older. That is the trade
-[principle 7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary) warns
-against: throwing away an otherwise-good run converts a tolerable problem into an outage.
+would leave a live forecast on weather 24 hours older. That is the trade [principle
+7](../design-philosophy/design-principles.md#7-strict-contracts-at-every-boundary) warns against:
+throwing away an otherwise-good run converts a tolerable problem into an outage.
 
 `Nwp.validate` therefore permits both patterns, and the `nwp_has_no_unexpected_nulls` asset check
 reports them (WARN, non-blocking), naming the affected `(variable, ensemble_member, valid_time)`

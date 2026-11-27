@@ -3,13 +3,15 @@
 Exercises the real wiring end-to-end against a file-based MLflow + temp Delta tables: register an
 experiment, train a fold model with ``trained_cv_model``, then materialise ``cv_power_forecasts``
 and assert the forecasts land in the ``power_forecasts`` Delta table — stamped with the fold
-label (not ``"live"``), restricted to the model's trained population, covering every NWP ensemble
-member, and written idempotently so a re-materialisation does not duplicate rows.
+label (not ``"live"``), restricted to the model's trained population, and written idempotently so a
+re-materialisation does not duplicate rows.
 """
 
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
+from typing import Any
 
 import mlflow
 import numpy as np
@@ -18,14 +20,18 @@ import pyarrow.parquet as pq
 import pytest
 from _cleaned_power_test_data import write_cleaned_copy
 from _nwp_test_data import half_hours, nwp_records, write_test_nwp
+from baseline_forecasters.climatology import ClimatologyForecaster
 from contracts.ml_schemas import EligibleTimeSeries
 from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS, PowerForecast
 from dagster import DagsterInstance, materialize
 from delta_store.power_forecasts import POWER_FCST_SIGNIFICAND_BITS
 from delta_store.precision import FLOAT32_SIGNIFICAND_BITS
 from deltalake import write_deltalake
+from ml_core.cv_helpers import date_to_utc_datetime
 from mlflow.tracking import MlflowClient
 
+from nged_substation_forecast.defs import cv_assets
+from nged_substation_forecast.defs._engineering_inputs import MAX_NWP_LEAD, load_engineering_inputs
 from nged_substation_forecast.defs.cv_assets import cv_power_forecasts, trained_cv_model
 
 pytestmark = pytest.mark.integration
@@ -33,18 +39,20 @@ pytestmark = pytest.mark.integration
 RegisterExperiment = Callable[[DagsterInstance, str], None]
 """Type of the ``register_experiment`` fixture (``tests/conftest.py``)."""
 
-RegisterExperimentWithFeatures = Callable[[DagsterInstance, str, list[str]], None]
-"""Type of the ``register_experiment`` fixture when called with its optional ``selected_features``
-argument."""
+RegisterExperimentWithConfig = Callable[..., None]
+"""Type of the ``register_experiment`` fixture when called with its keyword-only
+``base_model_config`` and ``config_overrides`` arguments."""
 
 FOLD_ID = "mid_2025_to_mid_2026"
 EXPERIMENT_NAME = "exp_predict_smoke"
 PARTITION_KEY = f"{EXPERIMENT_NAME}__{FOLD_ID}"
 
-# ts1 sits in H3 cell 10. It has training-window data (so the fold model trains a Booster for it)
-# and validation-window NWP across three ensemble members (so prediction spans the ensemble).
+# ts1 sits in H3 cell 10. It has training-window data (so the fold model trains on it)
+# and validation-window NWP rows for three ensemble members, which the feature engineer drops.
 _TS1_CELL = 10
-_TRAIN_DAY = datetime(2024, 6, 1, tzinfo=UTC)  # inside train window [2024-04-01, 2025-06-30]
+# A weekday in the month before the validation day: climatology forecasts a validation row only
+# from training samples on the same day type, at most one local month and half-hour away.
+_TRAIN_DAY = datetime(2024, 7, 31, tzinfo=UTC)  # inside train window [2024-04-01, 2025-06-30]
 _VAL_DAY = datetime(2025, 8, 1, tzinfo=UTC)  # inside val window [2025-07-01, 2026-06-30]
 _VAL_MEMBERS = (0, 1, 2)  # stands in for the full 51-member ensemble in this synthetic fixture
 
@@ -141,7 +149,7 @@ def test_cv_power_forecasts_predicts_validation_fold(
     # Only the model's trained population (ts1) is scored.
     assert set(forecasts["time_series_id"].unique().to_list()) == {1}
 
-    # The ensemble members are reduced to one row per key, holding the 13 quantile columns.
+    # The output has one row per key, no ensemble_member column, and the 13 quantile columns.
     assert "ensemble_member" not in forecasts.columns
     assert not forecasts.select(PowerForecast.PRIMARY_KEY).is_duplicated().any()
     assert set(POWER_FCST_QUANTILE_COLUMNS) <= set(forecasts.columns)
@@ -162,7 +170,7 @@ def test_cv_power_forecasts_predicts_validation_fold(
 def test_cv_power_forecasts_derives_power_lookback_from_selected_features(
     env: dict[str, str],
     dagster_instance: DagsterInstance,
-    register_experiment: RegisterExperimentWithFeatures,
+    register_experiment: RegisterExperimentWithConfig,
     spy_power_lookback: Callable[[], list[timedelta]],
 ) -> None:
     """``cv_power_forecasts`` derives ``power_lookback`` from the experiment's own
@@ -171,10 +179,17 @@ def test_cv_power_forecasts_derives_power_lookback_from_selected_features(
 
     Mirrors ``test_trained_cv_model_derives_power_lookback_from_selected_features`` in
     ``tests/test_trained_cv_model.py``, for this asset's own call site. The shared
-    ``register_experiment`` fixture defaults to a ``selected_features`` set with no power lag, so
-    passing ``power_lag_24h`` explicitly here is what exercises this call site's own derivation.
+    ``register_experiment`` fixture defaults to climatology, which selects no feature, so
+    registering the manual heuristic with ``power_lag_24h`` is what exercises this call site's own
+    derivation.
     """
-    register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m", "power_lag_24h"])
+    # Climatology selects no feature, so the manual heuristic carries the power lag here.
+    register_experiment(
+        dagster_instance,
+        EXPERIMENT_NAME,
+        base_model_config="conf/model/manual_heuristic.yaml",
+        config_overrides={"selected_features": ["power_lag_24h"]},
+    )
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
     ).success
@@ -306,3 +321,69 @@ def test_cv_power_forecasts_fails_loudly_when_a_trained_series_loses_its_metadat
     assert failure is not None
     assert "no row in the metadata parquet" in str(failure.error)
     assert "[1]" in str(failure.error)
+
+
+_MAX_PLAUSIBLE_PREDICT_CHUNKS = 50
+"""A fold's validation window needs about 40 chunks of 14 days at most; more means a loop bug."""
+
+
+def test_cv_power_forecasts_walks_contiguous_init_time_chunks_from_the_nwp_look_back(
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The chunks start one maximum NWP lead before the window and follow on 1 microsecond apart."""
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    chunks: list[tuple[datetime, datetime]] = []
+
+    def _spy(*args: Any, **kwargs: Any) -> Any:
+        # Raise rather than loop for ever when the chunk step stops advancing.
+        if len(chunks) >= _MAX_PLAUSIBLE_PREDICT_CHUNKS:
+            raise AssertionError("cv_power_forecasts made an implausible number of chunks")
+        chunks.append((kwargs["init_time_start"], kwargs["init_time_end"]))
+        return load_engineering_inputs(*args, **kwargs)
+
+    monkeypatch.setattr(cv_assets, "load_engineering_inputs", _spy)
+
+    assert materialize(
+        [cv_power_forecasts], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+
+    val_start = date_to_utc_datetime(cv_assets._cv_config.get_fold(FOLD_ID).val_start)
+    assert len(chunks) > 1
+    assert chunks[0][0] == val_start - MAX_NWP_LEAD
+    for (_, previous_end), (next_start, _) in pairwise(chunks):
+        assert next_start == previous_end + timedelta(microseconds=1)
+
+
+def test_cv_power_forecasts_fails_loudly_when_the_model_trained_no_series(
+    env: dict[str, str],
+    dagster_instance: DagsterInstance,
+    register_experiment: RegisterExperiment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A loaded forecaster with an empty trained population has nothing to forecast."""
+    register_experiment(dagster_instance, EXPERIMENT_NAME)
+    assert materialize(
+        [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance
+    ).success
+    monkeypatch.setattr(
+        ClimatologyForecaster, "trained_time_series_ids", property(lambda _self: [])
+    )
+
+    result = materialize(
+        [cv_power_forecasts],
+        partition_key=PARTITION_KEY,
+        instance=dagster_instance,
+        raise_on_error=False,
+    )
+
+    assert not result.success
+    failure = result.failure_data_for_node("cv_power_forecasts")
+    assert failure is not None
+    assert "has no trained time series" in str(failure.error)

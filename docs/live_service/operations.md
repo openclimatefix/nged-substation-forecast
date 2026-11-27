@@ -1,19 +1,14 @@
 # Operating the live service
 
-How to get a champion model producing live, 6-hourly forecasts, and how to backfill a slot that was
-missed.
+How to drive the running live service day to day: the ingest schedules, what the asset checks and
+Sentry events mean when an input degrades, and how to backfill a missed partition.
 
-There are two layers. **Promotion** (step 1–2) is manual and occasional — you do it once per
-champion model, whenever a better candidate clears the
-[cross-validation](../cross-validation/index.md) leaderboard. **Inference** (step 3) is automatic —
-once a model is promoted, the 6-hourly schedule keeps producing forecasts from it with no further
-action, as long as Dagster's daemon is running.
-
-Production inference has **zero dependency on MLflow at runtime**: the promoted model is a plain
-directory on disk, loaded with a plain `save`/`load` round trip — no run id or tracking-server call
-on the hot path. See [roadmap: Production model
-artifacts](../roadmap/live-service.md#production-model-artifacts) for why this was chosen over
-fetching the champion model from MLflow dynamically at runtime.
+The live service currently writes no forecast. The live service ingests the power telemetry of
+National Grid Electricity Distribution (NGED) and the ensemble numerical weather prediction (NWP)
+from the European Centre for Medium-Range Weather Forecasts (ECMWF), cleans the telemetry, and
+checks both inputs. The production runtime has **no dependency on MLflow**: the deployment reaches
+no tracking server. The [cross-validation assets](../cross-validation/index.md) that do need MLflow
+run on a researcher's laptop.
 
 ---
 
@@ -31,153 +26,32 @@ stack runs in — bring one up first:
   plane](connecting.md).
 
 Either UI shows every asset, most of which are nothing to do with running the service. Paste
-`tag:layer=production` into the asset-selection box to cut the view down to the five assets that
-produce the forecasts: `power_time_series_and_metadata`, `clean_nged_power_data`, `h3_grid_weights`,
-`ecmwf_ens`, and `live_forecasts`. The promotion assets used in steps 1–2 below are deliberately
-*not* in that selection: they need MLflow, which the deployment does not reach, so you run them
-yourself — today from your laptop, as step 2 says — whichever environment serves the forecasts.
-`tag:layer=research` is the rest.
+`tag:layer=production` into the asset-selection box to cut the view down to the four assets the
+deployment runs: `power_time_series_and_metadata`, `clean_nged_power_data`, `h3_grid_weights`, and
+`ecmwf_ens`. `tag:layer=research` is the rest: the cross-validation assets, which need MLflow and so
+run on your laptop whichever environment runs the ingest.
 
-## Step 1 — Pick a champion model
+## The ingest schedules
 
-**Trigger:** Materialise `promotable_model_runs` (unpartitioned — no config needed) from the Dagster
-UI, then open its output metadata.
+Two schedules run the whole recurring pipeline. Both need the Dagster daemon running (see
+[Prerequisites](#prerequisites-a-running-dagster-instance) above) to fire on time:
 
-This asset lists every MLflow fold run tagged `cv_role=fold` — i.e. every model any CV run has
-trained — as a metadata table: `run_id`, `experiment_name`, `fold_id`, `last_finished_at`. It writes
-nothing to disk and has no dependents; materialise it any time you want to refresh the list before
-picking a champion. Runs sort by their most recent MLflow finish time, including later metrics
-writes; missing end times appear as `Not recorded` and sort last. The pick itself is still by eye:
-metrics vary per CV run, so there is no single sort key that could automate "which run is best"
-— cross-check candidates against the
-leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` →
-`http://localhost:5000`; see [Cross-validation: Viewing results in the MLflow
-UI](../cross-validation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
+- `power_time_series_and_metadata_schedule` fires at :55 past every hour. Its job runs
+  `power_time_series_and_metadata`, which pulls NGED's new telemetry files, and then
+  `clean_nged_power_data`, which rebuilds the cleaned power table when its inputs have changed.
+- `ecmwf_ens_schedule` fires daily at 10:30 UTC and materialises today's `ecmwf_ens` partition, the
+  00Z ECMWF ensemble run from Dynamical.org. The asset retries while the run is not yet published.
 
-A run trained before a feature was renamed in the code cannot be served, and nothing in the table
-marks it. Step 2 refuses it rather than letting you discover that at the next 6-hourly tick.
+Nothing downstream waits on either job's run status: an asset that reads the ingested tables runs
+against whatever is already on disk — see [Inherent Stability → The
+rules](../design-philosophy/inherent-stability.md#the-rules).
 
-Copy the `run_id` of the fold you want to promote.
-
-Promotion (this step and the next) always happens **on your laptop**, whichever environment serves
-the forecasts: the candidate models live in the laptop's local MLflow file store, and the promoted
-artifacts land in a local directory (`data/production_model/`) that the AWS deployment bakes into
-its container image at build time.
-
-## Step 2 — Materialise `promoted_model`
-
-**Trigger:** Dagster UI → Assets → `promoted_model` → "Materialize". Fill in
-`PromotedModelConfig.mlflow_run_id` with the run id from step 1.
-
-**What the asset does:**
-
-1. Downloads that run's saved model artifacts from MLflow
-   (`ml_core.production_helpers.fetch_model_artifacts`) into a temporary directory.
-2. Checks the downloaded model's saved config against the running code, and **fails the
-   materialisation if this code could not load that model** — because a feature name no longer
-   parses (the offending feature is named), or because `model_params` carry a hyper-parameter this
-   code no longer declares. The check runs before anything is written, so a refused promotion leaves
-   the previous champion in place and still serving. Re-train the model against the current code and
-   promote that run; never hand-edit `meta.json`, because the boosters on disk were trained under
-   the config it records.
-3. Stamps a `promotion.json` (`mlflow_run_id`, `promoted_at`) and atomically replaces the directory
-   at `Settings.production_model_path` (`data/production_model/` by default) with the new artifacts.
-4. Reads back the new `meta.json` and reports `model_class`, `experiment_name`, `model_release`, and
-   `n_trained_time_series` as output metadata, so you can confirm the right model landed. Promote a
-   numbered release for a deployment; `model_release: 0` means the run is not a release.
-
-Promotion is a Dagster materialisation rather than a bare script, so every promotion is recorded in
-Dagster's run history — an audit trail for free. Re-promoting with a different `mlflow_run_id`
-**replaces** the directory outright; artifacts from the previous champion are not merged in.
-
-On the local stack, the next scheduled run picks the new champion up immediately (the asset loads it
-from disk). In the AWS deployment there is one more leg: rebuild and push the image, then point the
-task definition at the new tag — see [Setting up the live service on AWS: Redeploying a new champion
-model](aws.md#redeploying-a-new-champion-model).
-
-## Step 3 — Let the schedule run, or materialise `live_forecasts` by hand
-
-Once a model is promoted, `live_forecasts` produces a new forecast automatically every 6 hours — at
-00:00, 06:00, 12:00, and 18:00 UTC — via `live_forecasts_schedule`. `power_time_series_and_metadata`
-and `clean_nged_power_data` run in a separate hourly job, scheduled 5 minutes *before* each hour so
-that hour's pull has landed, and been cleaned, by the time `live_forecasts` ticks. `live_forecasts`
-depends on both assets but is deliberately not ordered against their job. That offset is an
-optimisation for freshness, not a precondition: if the pull fails or runs long, the forecast still
-goes out on time against whatever telemetry is already on disk — see [Inherent Stability → The
-rules](../design-philosophy/inherent-stability.md#the-rules). This needs the Dagster daemon running
-(see [Prerequisites](#prerequisites-a-running-dagster-instance) above) to fire on time.
-
-To materialise one 6-hourly slot yourself — e.g. right after promoting a model, so you don't have to
-wait for the next tick, or to inspect a specific partition — go to Dagster UI → Assets →
-`live_forecasts` → select the partition → fill in `LiveForecastsConfig.availability_mode` →
-"Materialize".
-
-**Partition semantics — read this before picking a partition.** A partition key names the *start* of
-its 6-hour window; the forecast's `power_fcst_init_time` (init time) is that window's *end*, six
-hours later. For example, partition key `"2026-07-04-00:00"` covers the window from 2026-07-04 00:00
-UTC (the key itself) to 2026-07-04 06:00 UTC (the next tick), so *that* partition's
-`power_fcst_init_time` is 2026-07-04 06:00 UTC — not at the midnight the key names. (The
-`live_forecasts` asset's own docstring has the full explanation.)
-
-`availability_mode` controls which NWP run is used:
-
-| `availability_mode` | When to use | Behaviour |
-|---|---|---|
-| `"live"` (default; what the schedule always uses) | Materialising the current slot, right after it ticks | Joins the **freshest NWP run actually present** with `nwp_init_time <= power_fcst_init_time` — no modelled delay, since reality already constrains the table to genuinely published runs |
-| `"replay"` | Backfilling a missed or historical slot | Joins the freshest run with `nwp_init_time <= power_fcst_init_time − nwp_publication_delay_hours`, reconstructing what was genuinely *available* at that historical `power_fcst_init_time` (without the delay, a replay would leak NWP runs that only landed afterwards) |
-
-**What the asset does:**
-
-1. Loads the production model from `Settings.production_model_path` via a plain disk `load` — the
-   concrete forecaster class is reconstructed from `meta.json`'s `model_class` field. Raises if the
-   model has no trained time series, or if the running code cannot rebuild its saved config — a
-   `selected_features` name it cannot parse, or a `model_params` key it no longer declares.
-   Promotion (step 2 above) applies that same check, so it fires here only when the code changed
-   after the champion was promoted; either way, re-promote from a run trained against the current
-   code rather than hand-editing what is on disk.
-2. Resolves which NWP `init_time` to join against via `select_nwp_init_time` and `availability_mode`
-   (table above).
-3. Builds the power spine (`build_live_power_frame`), covering 15 days of history (long enough for
-   the longest power-lag feature any production model uses) and the 14-day forecast horizon.
-4. Engineers features in **single-run mode** (an explicit `power_fcst_init_time`) across **all NWP
-   ensemble members**, then drops join artefacts: history rows (`valid_time <=
-   power_fcst_init_time`) and any row the ensemble join missed.
-5. Forecasts exactly `forecaster.trained_time_series_ids` — never today's eligibility set (the
-   train==predict population invariant) — and writes to `power_forecasts` with `fold_id="live"`.
-6. **Idempotent write:** overwrites only this partition's rows (matching `experiment_name`,
-   `fold_id="live"`, and this `power_fcst_init_time`), so re-running or replaying a slot never
-   duplicates rows or disturbs any other partition.
-7. Logs **nothing** to MLflow — a 6-hourly production run is not a CV run. Live performance
-   will be tracked by production monitoring once it exists (not yet implemented — see [roadmap:
-   Production monitoring](../roadmap/live-service.md#production-monitoring)).
-
-## Rolling back to the previous champion
-
-**Trigger:** a promoted model turns out to be worse in production than the one it replaced.
-
-Rollback is promotion run backwards: re-materialise `promoted_model` (step 2) with the *previous*
-champion's `mlflow_run_id`. Because promotion **replaces** the artifact directory outright rather
-than merging into it, there is nothing to undo — the previous model returns exactly as it was, and
-the next scheduled tick picks it up.
-
-The one thing to get right is finding the run id you are rolling back *to*. The [model release
-log](model-releases.md) records, for each release, the MLflow run id of the promoted fold run and the
-image tag, so read both off the previous row. Releases that predate the log are in **Dagster's run
-history**: open Assets → `promoted_model` → "Runs", and read `PromotedModelConfig.mlflow_run_id` off
-the previous successful materialisation.
-
-On AWS there is the same extra leg as for promotion: rebuild and push the image, then point the task
-definition at the tag — see [Redeploying a new champion
-model](aws.md#redeploying-a-new-champion-model). Rolling back to a tag that was previously deployed
-avoids the rebuild.
-
-This path works today but is not yet one command, which is what [T3.2, rollback
-effort](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback)
-measures.
+To materialise an asset yourself, go to Dagster UI → Assets → the asset → select the partition, if
+the asset has partitions → "Materialize".
 
 ## Degraded input data — NWP feed down, or telemetry stalled
 
-**Trigger:** an asset check reports a warning, or `live_forecasts` fails.
+**Trigger:** an asset check reports a warning, or an ingest job fails.
 
 The service is designed to keep answering as its inputs degrade rather than to stop — the reasoning,
 and the ladder of degradation states, are in [Inherent
@@ -185,8 +59,8 @@ Stability](../design-philosophy/inherent-stability.md). None of the situations b
 emergency; all are next-business-day fixes.
 
 **What a Sentry event's tags tell you first.** `fault_category:run_failed` means a scheduled job
-failed outright, so that cycle did not run. An event without that tag is a degradation the service kept
-forecasting through, or a `retrying_asset` warning that an asset failed and will retry. The full
+failed outright, so that cycle did not run. An event without that tag is a degradation the service
+kept running through, or a `retrying_asset` warning that an asset failed and will retry. The full
 routing is in [Setting up Sentry telemetry](sentry.md#turn-it-on-in-production). Two things send
 nothing at all: a transient failure reading NGED's bucket, which `power_time_series_and_metadata`
 retries twice before reporting, and a run you cancelled yourself.
@@ -195,7 +69,7 @@ retries twice before reporting, and a run you cancelled yourself.
 `power_time_series_and_metadata`, is **non-blocking** and **WARN**-severity, and reports on *on-disk
 data recency* rather than on whether the asset materialised. It flags any time series whose most
 recent reading is more than 24 hours old, and its metadata carries a table of the late series with
-`last_seen` and `hours_late`. A warning therefore never stops forecasts being produced; it tells you
+`last_seen` and `hours_late`. A warning therefore never stops the ingest. The warning tells you
 which feed to chase. A handful of persistently-late series is usually a decommissioned or renamed
 substation rather than an outage — check the metadata table before escalating.
 
@@ -203,8 +77,7 @@ That table is capped at 50 rows
 ([why](../architecture/production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check)).
 **Read `n_late`, not the table's length**, to see how big the stall is: `n_late` counts every late
 series, and `n_late_listed` tells you how many rows the table holds, so the two agreeing means you
-are looking at every late series and the two differing means the list is truncated. The same pair
-appears on the live-forecast check as `n_time_series_missing` and `n_time_series_missing_listed`.
+are looking at every late series and the two differing means the list is truncated.
 
 Mind the order when it *is* truncated: never-reported series come first, then the most-stale ones,
 so more than 50 never-reported series fill the table and no stale series appear in it at all.
@@ -247,18 +120,17 @@ without your watching the Checks view. The check degrades this way on purpose ra
 so the hourly ingest keeps running; nothing is known about staleness while it persists, so treat it
 as "unknown", not "healthy".
 
-**Before the first `live_forecasts` slot of a new deployment, materialise `clean_nged_power_data`
-once by hand.** `live_forecasts` reads the `cleaned_power_time_series` table that
-`clean_nged_power_data` writes. Until `clean_nged_power_data` has run, the cleaned table does not
-exist and the slot fails at the read. The hourly ingest job runs `clean_nged_power_data` straight
-after the first ingest, so the hand materialisation matters only when a slot could tick before that
-first hourly run finishes.
+**On a new deployment, the `cleaned_power_time_series` table does not exist until
+`clean_nged_power_data` has run.** Every reader of the cleaned table fails at the read until then.
+The hourly ingest job runs `clean_nged_power_data` straight after the first ingest, so materialise
+`clean_nged_power_data` by hand only when you need the cleaned table before that first hourly run
+finishes.
 
 **Reading a failed cleaning run.** `clean_nged_power_data` rebuilds `cleaned_power_time_series` from
 the raw power table when NGED has delivered new data, a cleaning rule has changed, or the
 `TimeSeriesMetadata` table has changed. Otherwise the asset returns at once with `skipped: True` in
 its run metadata. When `clean_nged_power_data` fails, the run fails and reports to Sentry. Every
-reader, `live_forecasts` included, carries on with the last good cleaned table, and the next hourly
+reader carries on with the last good cleaned table, and the next hourly
 run tries again. Read the traceback in the run's logs: a failing cleaning rule and a metadata
 parquet file that no longer matches the `TimeSeriesMetadata` contract both need a fix, not a re-run.
 
@@ -286,23 +158,8 @@ download a growing backlog. Read the traceback in the run's logs — an off-cont
 after a schema change and a bug in our own code both land here, and both want a fix rather than a
 re-run.
 
-The 6-hourly forecasts are unaffected while this persists, however long it persists:
-`live_forecasts` locates each series from the promoted model's own frozen copy of the metadata table
-rows it trained against, never from the metadata table itself. What a stalled upsert loses is the
-metadata change, which matters at the next training run.
-
-**Reading a missing NWP control member.** A Sentry event tagged `degraded_asset:live_forecasts`
-whose message names an NWP run means that run reached us with no control-member rows
-(`ensemble_member == 0`) for the cells the champion model forecasts — a partial or malformed ECMWF
-ENS download. The slot **was** written: only the weather lags degrade, and only over each lag's
-first `lag_hours` of lead time. Over those leads the lag points back before `power_fcst_init_time`,
-and the control-member analysis proxy is the only source that can answer the lag. Every later lead
-is answered by the same-run join, which reads whichever ensemble members the run does carry. Every
-non-lag feature is untouched. Re-materialise the `ecmwf_ens` partition for that `init_time` to
-repair the run, then re-materialise the `live_forecasts` partition for the slot. The write is
-idempotent, so replaying a slot replaces its rows rather than duplicating them. The event carries a
-stable fingerprint, so repeated slots keep firing one ongoing issue rather than opening a fresh
-issue each time.
+A stalled upsert loses only the change to the `TimeSeriesMetadata` table, which matters at the next
+training run.
 
 **Reading the NWP check.** `nwp_has_no_unexpected_nulls` runs inside the `ecmwf_ens` asset, from the
 frame already in memory, and is likewise non-blocking WARN. Nulls in the three de-accumulated
@@ -401,54 +258,12 @@ Every materialisation whose completeness assessment succeeded also publishes `n_
 `n_valid_times`, `n_h3_cells`, and the `valid_time` range as metadata, so the Dagster UI timeline
 shows slow drift in the upstream dataset before it becomes a warning.
 
-**Reading the live-forecast check.** `live_forecasts_are_healthy` runs against `live_forecasts`
-after each 6-hourly materialisation, is likewise non-blocking WARN, and reads the forecasts back
-*off disk* — so it answers "did this slot really land usable rows?", which the run's own green tick
-does not. It goes yellow when the slot wrote no rows at all, when any row carries a null, NaN or
-infinite forecast quantile, when a row targets a `valid_time` at or before its own init time, when the
-forecast reaches less than half the 14-day horizon we ask for, when the slot forecast fewer time
-series than the promoted model was trained on, or when the NWP feed is behind. Its metadata carries
-each of those counts plus `nwp_init_time_on_disk` and `nwp_init_time_expected`, so the description
-usually tells you which of the two halves — the write or the weather — is at fault. Note that the
-check only reports on slots where the asset *succeeded*; a slot that raised fails the run instead,
-and Sentry reports that — see *When `live_forecasts` fails outright* below.
-
-**When a daily NWP run is missing.** We ingest one ECMWF run per day (the 00Z run, downloaded at
-10:30 UTC), so healthy NWP is between 12 and 30 hours old depending on which 6-hourly slot is
-forecasting. Raw age is not a fault signal; a missed *run* is, and `live_forecasts_are_healthy`'s
-`n_missed_nwp_runs` is that count. It measures how far *behind* the feed is — how many daily runs
-separate the freshest run on disk from the freshest that ought to exist — so it is **zero in every
-healthy slot**, whichever slot it is, and it clears as soon as a fresh run lands (an older hole left
-behind in history no longer degrades anything, because the forecast uses the freshest run). Read it
-as follows.
-
-- **0** — healthy, whatever the NWP age happens to be. Do not act on the age.
-- **1** — the feed is one daily run behind. `live_forecasts` continues normally against the freshest
-  run on disk, so this needs no intervention beyond fixing the download; materialise the missed
-  `ecmwf_ens` partition once the feed recovers, and the count clears at the next slot.
-- **2 or more** — the download has been failing for more than a day. Still not an emergency, but
-  chase it the same business day: forecast quality decays as the run ages, and past roughly 15 days
-  of staleness the run stops covering the forecast horizon altogether — see *When `live_forecasts`
-  fails outright* below.
-- **absent from the metadata** — the NWP table holds no run at or before this slot, so the count has
-  no finite answer; the description says so. Expect `live_forecasts` itself to be failing too.
-
-One count deserves a caveat: the check demands the day's run by 16:00 UTC, so a download that fails
-today first shows up at the 18:00 slot rather than the 12:00 one — deliberately, for the reasoning
-in [Production Deployment — Design: the missed daily NWP run
-count](../architecture/production-deployment.md#read-the-live-forecast-back-off-disk-with-a-second-asset-check).
-
-**When `live_forecasts` fails outright.** Today, if no NWP run on disk is recent enough to cover the
-forecast horizon (roughly 15 days of staleness), the asset raises rather than producing a degraded
-forecast, and NGED receive nothing for that slot. That is a known divergence from the design
-principle, tracked for v0.5; until it is fixed, treat it as an alert to restore the NWP feed and
-then backfill the missed slots in replay mode (see [Backfilling a missed
-slot](#backfilling-a-missed-slot)).
-
-**When the model fails to load.** It is *not* a data outage when a raise complains that the
-promoted model has no trained time series: that raise is a promotion bug, and it is meant to fail
-loudly.
-Re-promote (step 2), or roll back ([above](#rolling-back-to-the-previous-champion)).
+**When a daily NWP run is missing.** We ingest one ECMWF run per day: the 00Z run, downloaded from
+10:30 UTC. `ecmwf_ens` sends a `retrying_asset` warning to Sentry on its first failed attempt. If
+the run is still missing when the retries run out, about 4 hours later, `ecmwf_ens_job` fails and
+the failure reaches Sentry tagged `fault_category:run_failed`. Chase Dynamical.org, then materialise
+the missed `ecmwf_ens` partition once the feed recovers (see [Backfilling a missed
+partition](#backfilling-a-missed-partition)).
 
 **Log the intervention.** Every entry above that needed a human is a data point for the [T1.1
 operability
@@ -513,7 +328,7 @@ records nothing.** The run fails with a `NgedFileParseError` naming the file's p
 retried. The same file is selected every hour, so the ingest stalls until someone fixes the cause. No
 readings are lost: after the fix, the next run ingests the whole backlog.
 
-## Inspecting a live forecast
+## Inspecting forecasts
 
 Use the `view_forecasts` dashboard app — the same app that [Running the cross-validation pipeline
 end-to-end](../cross-validation/dagster-workflow.md#inspecting-a-forecast-the-view_forecasts-dashboard)
@@ -525,9 +340,12 @@ uv run marimo edit packages/dashboard/view_forecasts.py
 
 Switch the **Data source** radio to `s3` (needs the git-ignored `packages/dashboard/.env.s3` holding
 the read-only laptop credentials — see the [Configuration
-reference](setup.md#at-a-glance-which-settings-for-which-environment)), keep the **Fold** dropdown
-on `live`, then pick a time series and a forecast date/run. The plot shows every forecast ensemble
-member against the observed power, from 24 hours before the forecast init time to 14 days after it.
+reference](setup.md#at-a-glance-which-settings-for-which-environment)), pick a fold in the **Fold**
+dropdown, then pick a time series and a forecast date/run. The **Fold** dropdown selects `live` when
+the `power_forecasts` table holds live rows and the first fold otherwise. The live service currently
+writes no new forecast, but any `fold_id="live"` rows written earlier remain in the table. The plot
+shows the forecast median inside three grey quantile bands (p1 to p99, p5 to p95, and p20 to p80)
+against the observed power, from 24 hours before the forecast init time to 14 days after it.
 
 Press **Reload data** to pick up runs written since you opened the app: the date and run selectors
 move to the newest run, and your chosen time series is kept.
@@ -536,16 +354,14 @@ The dashboard reads whichever tables it needs directly via their `Settings` path
 demand, so it works identically whether each path is local or `s3://` — nothing runs on AWS, and
 nothing is written anywhere.
 
-## Backfilling a missed slot
+## Backfilling a missed partition
 
-If a scheduled tick was missed — the daemon was down, or a run failed — materialise that partition
-from the Dagster UI with `LiveForecastsConfig.availability_mode="replay"` (see the table in [step
-3](#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)). This reconstructs what NWP
-data was genuinely available at that historical `power_fcst_init_time`, rather than accidentally
-using data that only arrived afterwards.
+If a scheduled tick was missed — the daemon was down, or a run failed — the two ingest assets
+recover differently:
 
-Backfilling in replay mode is also the shape of the "local dress rehearsal" for
-[#208](https://github.com/openclimatefix/nged-substation-forecast/issues/208): run `dg dev`
-continuously for several days, confirm a forecast lands every 6 hours. Then deliberately kill a run
-mid-flight and backfill the missed partition in replay mode, confirming no duplicate rows land in
-`power_forecasts` either way.
+- **`power_time_series_and_metadata`** needs nothing. The next hourly run downloads every file the
+  downloaded-files list lacks, so it picks up whatever the missed run would have.
+- **`ecmwf_ens`** has one partition per day. Materialise each missed day's partition from the
+  Dagster UI (Assets → `ecmwf_ens` → select the partition → "Materialize"), or launch a backfill
+  over a range of partitions. Re-materialising a partition that has already landed replaces it (see
+  [Degraded input data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)).

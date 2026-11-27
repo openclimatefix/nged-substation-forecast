@@ -282,12 +282,8 @@ def _time_series_ids_missing_metadata(
     output rows. Worth naming rather than inferring from an empty result, and cheap to compute —
     the metadata frame is already eager and already filtered to ``time_series_ids``.
 
-    The CV assets raise on a non-empty answer; ``live_forecasts`` does not, and reports the
-    missing series through ``live_forecasts_are_healthy`` instead. CV is R&D and fails fast, so a
-    silently-shrunk population can never poison a leaderboard comparison; ``live_forecasts`` is
-    production and must never raise on an absent input, so it degrades and reports the gap. The
-    split in full:
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
+    The CV assets raise on a non-empty answer. CV is R&D and fails fast, so a silently-shrunk
+    population can never poison a leaderboard comparison.
     """
     return sorted(set(time_series_ids) - set(metadata["time_series_id"].to_list()))
 
@@ -309,8 +305,8 @@ def _require_metadata_coverage(
     """
     missing = _time_series_ids_missing_metadata(metadata, time_series_ids)
     if missing:
-        # Capped for the same reason `checks._MAX_MISSING_SERIES_LISTED` caps its list: at V2
-        # scale an empty metadata parquet would otherwise spell out ~2,500 ids.
+        # Capped because at V2 scale an empty metadata parquet would otherwise spell out ~2,500
+        # ids.
         listed = ", ".join(str(ts_id) for ts_id in missing[:20])
         suffix = "" if len(missing) <= 20 else ", …"
         raise ValueError(
@@ -328,7 +324,7 @@ def _load_time_series_metadata(
     **Research callers only.** The metadata table is the live registry of what NGED operates, so a
     fault in it must stop a training or scoring run rather than silently shrink its population. A
     fault here means an off-contract file, or a metadata table rebuilt from a snapshot that dropped
-    rows. ``live_forecasts`` reads ``ml_core.base_forecaster.load_trained_metadata`` instead.
+    rows.
 
     Args:
         settings: Application settings (data paths, credentials).
@@ -446,7 +442,7 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     parent_run_id = get_or_create_parent_run(experiment_id)
     fold_run_id = get_or_create_fold_run(experiment_id, parent_run_id, fold_id)
 
-    forecaster.save_to_mlflow(fold_run_id, time_series_metadata=metadata_df)
+    forecaster.save_to_mlflow(fold_run_id)
     with mlflow.start_run(run_id=fold_run_id):
         # MLflow params are immutable and the fold run is reused on every re-materialisation, so
         # nothing here that can legitimately change between materialisations may be a param.
@@ -1303,12 +1299,12 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     Dagster retries and safe across processes; see "Cross-process run resolution" in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/>.
 
-    ``power_forecasts`` also holds the live service's output under ``fold_id="live"`` and any
-    non-leaderboard dev fold such as ``smoke_test``. Leaderboard scope skips any ``fold_id`` that
-    is not a leaderboard fold in the CV config, naming them in a warning and in the
-    ``skipped_fold_ids`` output metadata, because it dates its evaluation window from that config
-    and has none for them. Use ``evaluation_scope="ad_hoc"`` to score live or dev-fold rows: it
-    takes the window from the rows themselves.
+    ``power_forecasts`` can also hold rows under ``fold_id="live"`` and any non-leaderboard dev fold
+    such as ``smoke_test``. Leaderboard scope skips any ``fold_id`` that is not a leaderboard fold
+    in the CV config, naming them in a warning and in the ``skipped_fold_ids`` output metadata,
+    because it dates its evaluation window from that config and has none for them. Use
+    ``evaluation_scope="ad_hoc"`` to score live or dev-fold rows: it takes the window from the rows
+    themselves.
 
     Every group is checked before any group is scored, and each check raises. In leaderboard scope,
     every row's ``valid_time`` must lie inside the fold's window.
@@ -1364,11 +1360,11 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         .collect(engine="streaming")
         .rows()
     )
-    # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an unfiltered
-    # leaderboard run discovers a group the CV config has never heard of. The operator guide tells
-    # you to launch an unfiltered leaderboard run, leaving `fold_id` null to score every fold. The
-    # same table also holds any non-leaderboard dev fold (e.g. `smoke_test`), which the CV config
-    # does define but which is not part of the leaderboard's evaluation protocol. Either way,
+    # A live service writes its output to this same table under `fold_id="live"`, so an unfiltered
+    # leaderboard run can discover a group the CV config has never heard of. The operator guide
+    # tells you to launch an unfiltered leaderboard run, leaving `fold_id` null to score every fold.
+    # The same table also holds any non-leaderboard dev fold (e.g. `smoke_test`), which the CV
+    # config does define but which is not part of the leaderboard's evaluation protocol. Either way,
     # leaderboard scope dates its window from the config's leaderboard folds, so those rows have no
     # window to be scored against; skip them rather than fail the whole run on the first one. Ad-hoc
     # scope takes its window from the rows themselves and is the supported way to score live output
@@ -1456,7 +1452,7 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
     # Structure: {experiment_name: {mlflow_metric_key: [value_per_fold, ...]}}
-    # e.g. {"xgboost_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}}
+    # e.g. {"climatology_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}}
     # After the loop, each list is averaged and logged to the CV run's MLflow parent run.
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
     fold_metrics_by_group: dict[tuple[str, str], dict[str, float]] = {}

@@ -15,8 +15,8 @@ The Dagster asset graph (`src/nged_substation_forecast/defs/`) exists to orchest
 forecasting pipeline — scheduled, materialised, with lineage and retries — so the asset graph is the
 right home for work that repeats on a schedule and depends on other tracked outputs. The scripts in
 this directory do not fit that shape: a pre-commit hook runs once per commit and exits, a deployment
-is a person running a command by hand during a release, and a baseline forecast export or a one-off
-Delta Lake maintenance job runs whenever someone needs it, not on a schedule. Each script is run
+is a person running a command by hand, and a study submission or a one-off Delta Lake maintenance
+job runs whenever someone needs it, not on a schedule. Each script is run
 directly, not through Dagster: `uv run python <script>` for the Python scripts, or the shell script
 itself for the two under `deploy/`.
 
@@ -53,44 +53,26 @@ report as over-long. The sixth module is a library with no command line of its o
   script refuses any block a rewrap would damage — a directive, a doctest, a banner rule, hand
   alignment — rather than rewrapping the block wrongly.
 
-## `deploy/` — the two commands that ship a new champion model
+## `deploy/` — the two commands that ship a new production image
 
-The champion model is the one trained model chosen to serve production forecasts; [Operating the
-live
-service](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#step-1-pick-a-champion-model)
-covers picking a champion model. Both scripts are run by hand by a person doing a release, in
-the order given.
-Neither script takes any arguments, so that nothing can be mistyped or drift. The two scripts
-together are the recurring half of the runbook at [Setting up the live service on
+Both scripts are run by hand by a person deploying the code, in the order given. Neither script
+takes any arguments, so that nothing can be mistyped or drift. The two scripts together are the
+recurring half of the runbook at [Setting up the live service on
 AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/): the one-time
 infrastructure steps around those two scripts stay in the AWS console.
 
-- `build_and_verify_image.sh` — builds the production image with the champion model baked in, then
-  smoke-tests it with no network access and no credentials, failing hard if MLflow appears anywhere
-  in the runtime log. MLflow is the server that tracks CV runs during training. Baking the
-  champion model into the image is what frees production inference from needing MLflow at all, so a
-  mention of MLflow in the runtime log means that guarantee has gone. The runbook runs it at
-  Step 4.
+- `build_and_verify_image.sh` — builds the production image, tagged with the git commit hash, then
+  smoke-tests it by running `dagster definitions validate` inside the image with no network access.
+  An import of a missing module therefore fails the build rather than the deployed service.
 - `push_and_deploy_image.sh` — pushes that image to the Elastic Container Registry and registers a
-  new Elastic Container Service task-definition revision pointing at the pushed image. The runbook
-  runs it at Step 6.
+  new Elastic Container Service task-definition revision pointing at the pushed image.
 
-## `forecasting/` — ad-hoc CV run and maintenance scripts
+## `forecasting/` — study scoring and NWP-table maintenance scripts
 
-None of these four scripts is on a schedule. `run_baseline_experiment.py` and
-`export_baseline_forecasts.py` are run in sequence when the weather-and-calendar-only baseline is
-rebuilt. `rewrite_nwp_row_groups.py` is a migration that is run once per Delta table and then left
-alone. `score_study.py` is run whenever a study hands over a predictions file to be scored.
+None of these three scripts is on a schedule. `rewrite_nwp_row_groups.py` and
+`rename_nwp_partitions.py` are migrations that are run once per Delta table and then left alone.
+`score_study.py` is run whenever a study hands over a predictions file to be scored.
 
-- `run_baseline_experiment.py` — runs the weather-and-calendar-only baseline CV run end to end
-  in one process, in five steps: register the CV run, train the model on one cross-validation
-  fold, forecast, materialise `effective_capacity` (the denominator of the normalised mean absolute
-  error), then compute the leaderboard metrics that rank this CV run against the others. Takes
-  no arguments.
-- `export_baseline_forecasts.py` — exports one CV run's forecasts to a self-contained parquet
-  file holding the 10th, 50th, and 90th percentiles of the freshest forecast run per half-hour, for
-  offline analysis. The file carries the observed power beside the forecast so residuals can be
-  computed directly.
 - `rewrite_nwp_row_groups.py` — rewrites every partition of the `nwp` (numerical weather prediction)
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,

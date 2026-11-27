@@ -23,7 +23,7 @@ those settings fields need, because a data-location field may be a local path or
 This package is designed to be lightweight. It defines the *shape* of the data using Patito and
 Polars, plus the settings and object-store path helpers those shapes are read and written through
 (`deltalake` and `obstore`), but it contains **no** ML-specific logic and no ML or orchestration
-dependency such as MLflow, XGBoost, or Dagster. That light dependency footprint is what lets any
+dependency such as MLflow or Dagster. That light dependency footprint is what lets any
 component in the system (e.g., a data ingestion script or a dashboard) import these schemas without
 bringing in the entire ML stack.
 

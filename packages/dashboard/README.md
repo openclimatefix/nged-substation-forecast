@@ -88,8 +88,8 @@ To enable S3 mode, copy the committed example and fill in the real values:
 cp packages/dashboard/.env.s3.example packages/dashboard/.env.s3
 ```
 
-Only the data tables follow the toggle. The local artifact path (the production model) is never
-overridden by `.env.s3`, so the production model stays laptop-local in both modes. If `.env.s3` is
+Only the data tables follow the toggle. The local artifact path (the study submission log) is never
+overridden by `.env.s3`, so the local artifacts stay laptop-local in both modes. If `.env.s3` is
 missing, the `s3` selection falls back to local paths and the UI flags the fallback. The read-only
 AWS Identity and Access Management (IAM) user whose credentials belong in `.env.s3` is created in
 [Step 2 of the AWS

@@ -12,7 +12,7 @@ deliberately aren't repeated here:
 - [Setting up the live service on AWS](aws.md) owns every AWS console step — buckets, IAM (Identity
   and Access Management — AWS's permissions system), the container image, and the control-plane box.
 - [Operating the live service](operations.md) owns how to *drive* the assets once an environment is
-  up (picking a champion, the 6-hourly schedule, backfilling).
+  up (the ingest schedules, the asset checks, backfilling).
 
 ## The configuration model
 
@@ -29,7 +29,7 @@ The single most important idea is that there are **three** roots, not one:
 |---|---|---|---|
 | Internal data tables | `DATA_PATH_INTERNAL` | **Yes** | NWP, power observations, forecast metrics — everything not on the NGED-facing delivery list |
 | Delivery data tables | `DATA_PATH_DELIVERY` | **Yes** | The NGED-facing delivery tables (`power_forecasts`, `effective_capacity`, …) |
-| Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | The promoted production model, plot HTML |
+| Local artifacts | `LOCAL_ARTIFACTS_PATH` | No — always local | The study-submission log, plot HTML |
 
 > **On AWS, the two data-table roots point at two separate buckets** — `DATA_PATH_DELIVERY`
 > hard-codes the five NGED-facing delivery tables (see the "derive from root" convention just
@@ -38,26 +38,22 @@ The single most important idea is that there are **three** roots, not one:
 > setup, and [Forecast Delivery: Securing it](../architecture/forecast-delivery.md#securing-it) for
 > why.
 
-They are split for an **architectural** reason, not merely because XGBoost and Altair happen to
-write to local files (a library that can't write to S3 can always be bridged — write to a tempdir,
-upload — as MLflow does internally). The real reason is that **nothing under `LOCAL_ARTIFACTS_PATH`
-is part of the S3-backed data plane**. Each item belongs to the laptop/CV workflow or to the
-container image, not to shared storage:
+They are split for an **architectural** reason, not merely because some libraries, Altair among
+them, write to local files (a library that can't write to S3 can always be bridged — write to a
+tempdir, upload — as MLflow does internally). The real reason is that **nothing under
+`LOCAL_ARTIFACTS_PATH` is part of the S3-backed data plane**. Each item belongs to the laptop/CV
+workflow, not to shared storage:
 
-- **Promoted production model** — distributed via the **container image**, not shared storage: the
-  live deployment bakes the champion into the image at build time and loads it with a plain disk
-  `load()` (see [Production Deployment — Design](../architecture/production-deployment.md),
-  [#222](https://github.com/openclimatefix/nged-substation-forecast/issues/222)). This local
-  directory is the build-time staging area that gets copied into the image. On the deployed task,
-  the model is read from the image's own filesystem.
+- **Study-submission log** — `scripts/forecasting/score_study.py` appends every submission attempt
+  to `study_submissions.jsonl` here, on the laptop that scored the study.
 - **Plot HTML** — a **local-dev convenience** only (materialise, open in a browser); see [Operating
-  the live service: Inspecting a live forecast](operations.md#inspecting-a-live-forecast) for why it
-  is not the way to view forecasts in a deployed service.
+  the live service: Inspecting forecasts](operations.md#inspecting-forecasts) for why it is not the
+  way to view forecasts in a deployed service.
 
-So the deployed AWS runtime reads its model from the image, reads data from S3, and writes forecasts
-to S3. It never uses `LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to
-`<repo>/data`, so out of the box everything lives under one local directory and the distinction is
-invisible; it only matters once `DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` become `s3://` URIs.
+So the deployed AWS runtime reads and writes its data on S3. It never uses `LOCAL_ARTIFACTS_PATH` as
+shared storage at all. All three roots default to `<repo>/data`, so out of the box everything lives
+under one local directory and the distinction is invisible; it only matters once
+`DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` become `s3://` URIs.
 
 ### The "derive from root" convention
 
@@ -87,11 +83,10 @@ overrides).
 
 > **Design choice: NGED sees every CV/backtest fold, not just live production forecasts.** The
 > `power_forecasts` table holds every CV/backtest run alongside live production forecasts,
-> distinguished by `fold_id` (`"live"` for production — see [Operating the live
-> service](operations.md)). It is deliberate to point the whole table at the delivery bucket, not an
-> accidental side effect of the bucket split: doing so lets NGED see how each of OCF's model
-> versions actually behaves, not just whichever one is currently promoted. NGED filters on
-> `fold_id="live"` when it only wants the current production forecast.
+> distinguished by `fold_id` (`"live"` for production). It is deliberate to point the whole table at
+> the delivery bucket, not an accidental side effect of the bucket split: doing so lets NGED see how
+> each of OCF's model versions actually behaves, not just whichever one the live service runs. NGED
+> filters on `fold_id="live"` when it only wants the current production forecast.
 
 ### The `.env` file and NGED source credentials
 
@@ -115,12 +110,12 @@ use
 ([why](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)),
 and it confines a mis-wired secret to the one schedule that needs it — [Step 8 of the AWS
 runbook](aws.md#step-8-store-secrets-in-parameter-store) explains why a deployment should *not*
-promote that into a start-up failure.
+turn that into a start-up failure.
 
-The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_MONITOR_FORECASTS`,
-`SENTRY_TRACES_SAMPLE_RATE`) enable error telemetry and the missed-check-in alarm; an empty
-`SENTRY_DSN` (the default) disables Sentry entirely. Their setup — laptop testing and production —
-has its own page: [Setting up Sentry telemetry](sentry.md).
+The optional `SENTRY_*` settings (`SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`)
+enable error telemetry and the warnings that power data is stale; an empty `SENTRY_DSN` (the
+default) disables Sentry entirely. Their setup — laptop testing and production — has its own page:
+[Setting up Sentry telemetry](sentry.md).
 
 ### Credentials for our own S3 data (`DATA_STORE_*`)
 

@@ -55,7 +55,7 @@ _LOOKUP_SCHEMA: Final[dict[str, pl.DataType | type[pl.DataType]]] = {
 }
 
 _LOOKUP_FILENAME: Final[str] = "climatology_quantiles.parquet"
-"""Differs from ``time_series_metadata.parquet``, which ``save_to_mlflow`` adds to the directory."""
+"""Name of the file, inside the model directory, that holds the climatology lookup table."""
 
 
 def _local_calendar_cell_keys(valid_time: pl.Expr, *, time_zone: str) -> dict[str, pl.Expr]:

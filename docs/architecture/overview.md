@@ -51,16 +51,14 @@ Scale](performance.md).
       primary structural axis — spending it here would foreclose grouping the same assets by
       pipeline stage later, whereas a tag composes with any grouping chosen instead — and not a
       `kind` either, which Dagster reserves (`dagster/kind/*`) for naming the technology an asset
-      uses. The five `production` assets — `power_time_series_and_metadata`, `clean_nged_power_data`,
-      `h3_grid_weights`, `ecmwf_ens`, and `live_forecasts` — are everything the deployment runs to
-      produce forecasts.
-      The `research` assets are everything else: the cross-validation assets, plus
-      `promotable_model_runs` and `promoted_model`, which need an MLflow tracking server the
-      deployment does not reach. The tag says whether the service needs an asset, not where the
-      asset runs: the `research` assets all run on a researcher's laptop today, and some may move to
-      the cloud later, but never onto the VM that serves the forecasts. Filter either side in the
-      Dagster UI's selection box, or on the command line, with `tag:layer=production` /
-      `tag:layer=research`.
+      uses. The four `production` assets — `power_time_series_and_metadata`,
+      `clean_nged_power_data`, `h3_grid_weights`, and `ecmwf_ens` — are everything the deployment
+      runs. The deployment currently writes no forecast. The `research` assets are everything else:
+      the cross-validation assets, which need an MLflow tracking server the deployment does not
+      reach. The tag says whether the service needs an asset, not where the asset runs: the
+      `research` assets all run on a researcher's laptop today, and some may move to the cloud
+      later, but never onto the VM that runs the live service. Filter either side in the Dagster UI's
+      selection box, or on the command line, with `tag:layer=production` / `tag:layer=research`.
 * **Configuration Management**: plain YAML for model configs, `pydantic` for validating them, and
   `pydantic-settings` for environment-derived settings. A model YAML in `conf/model/` names its
   `BaseForecaster` subclass as a `_target_` import path, which
@@ -89,12 +87,12 @@ implementation. Each subclass of `BaseForecaster` is responsible for defining:
 * _Input translation_: Transforms the canonical `AllFeatures` Polars LazyFrame into the required
   model shape.
 * _Output translation_: Converts native model outputs into the strict `PowerForecast` schema.
-* _Persistence_: Each subclass owns its own save/load format. `XGBoostForecaster` writes one `.ubj`
-  file per `time_series_id` plus a `meta.json` containing the full serialised `XGBoostConfig`. (This
-  may change later. We may switch to saving models using native MLflow flavors (e.g.,
-  `mlflow.xgboost.log_model`), which serialize the raw model object directly.)
+* _Persistence_: Each subclass owns its own save/load format. `ClimatologyForecaster` writes its
+  quantile lookup to `climatology_quantiles.parquet` plus a `meta.json` containing the full
+  serialised config. (This may change later. We may switch to saving models using native MLflow
+  flavors, which serialize the raw model object directly.)
 * _Identity_: `MODEL_NAME` is a class-level constant on each `BaseForecaster` subclass, separate
-  from `BaseForecasterConfig`. `experiment_name`, `ml_flow_experiment_id`, and `model_release` (the
-  number of the production model release, `0` when the run is not a release) travel in the config
+  from `BaseForecasterConfig`. `experiment_name`, `ml_flow_experiment_id`, and `model_release` (an
+  integer, `0` by default, stamped as `power_fcst_model_version`) travel in the config
   instead. All of them are stamped onto every `PowerForecast` row at predict time, so each row is
-  self-describing. The [model release log](../live_service/model-releases.md) records each release.
+  self-describing.

@@ -162,7 +162,7 @@ power_forecasts/
 │   ├── 00000000000000000000.json
 │   ├── 00000000000000000001.json
 │   └── …
-├── experiment_name=xgboost_cv_0001/
+├── experiment_name=climatology_cv_0001/
 │   └── fold_id=mid_2025_to_mid_2026/
 │       ├── part-00000-cbb0236f-….zstd.parquet
 │       ├── part-00000-ef8aad4e-….zstd.parquet

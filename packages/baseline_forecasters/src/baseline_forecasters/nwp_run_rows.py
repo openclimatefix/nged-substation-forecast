@@ -56,12 +56,12 @@ class NwpRunRowsWithoutWeatherFeatureEngineer(FeatureEngineer):
         Raises:
             NotImplementedError: ``power_fcst_init_time`` is given. Delegating would not raise in
                 this engineer, but ``predict`` would then fail on the ``PowerForecast``
-                ``valid_time`` constraint, and ``live_forecasts`` would fail on ``ensemble_member``.
+                ``valid_time`` constraint.
         """
         if power_fcst_init_time is not None:
             raise NotImplementedError(
                 "NwpRunRowsWithoutWeatherFeatureEngineer supports bulk mode only. Baselines are "
-                "research baselines and are not served live, so a baseline must not be promoted."
+                "research baselines and are not served live."
             )
         nwp_keys = pt.LazyFrame.from_existing(
             nwp.select("nwp_model_id", "init_time", "h3_index", "valid_time").unique()

@@ -1,10 +1,10 @@
 # Setting up the live service on AWS
 
 Every step to stand up the live service on AWS, in order, ending with the full stack running
-unattended: data tables on S3 (Simple Storage Service, AWS's object store), the champion model baked
-into a container image, an always-on control-plane box running Dagster behind Tailscale, and
-6-hourly forecasts executing on ephemeral Fargate (AWS's serverless container compute) tasks. When
-you finish this page, you open the Dagster UI from your laptop over Tailscale and watch forecasts
+unattended: data tables on S3 (Simple Storage Service, AWS's object store), one container image for
+every role, an always-on control-plane box running Dagster behind Tailscale, and the scheduled
+ingest runs executing on ephemeral Fargate (AWS's serverless container compute) tasks. When you
+finish this page, you open the Dagster UI from your laptop over Tailscale and watch the ingest runs
 land.
 
 You can point a coding agent (e.g. Claude Code) at this page and have it drive the console steps
@@ -14,12 +14,12 @@ I've completed all steps up to and including step 7" — rather than trusting a 
 memory of which button you clicked.
 
 Standing this deployment up is one-time work, done once per AWS environment. Day-to-day driving of
-the running service — promoting a champion, backfilling a missed slot, inspecting a forecast — lives
-in [Operating the live service](operations.md). What each `Settings` field means (the three storage
-roots, the derive-from-root convention) lives in the [Configuration reference](setup.md). Design
-rationale for *why* the deployment looks like this — bake the model in at build time, an always-on
-control plane rather than EventBridge — lives in [Production Deployment —
-Design](../architecture/production-deployment.md).
+the running service — reading the asset checks, backfilling a missed partition, inspecting a
+forecast — lives in [Operating the live service](operations.md). What each `Settings` field means
+(the three storage roots, the derive-from-root convention) lives in the [Configuration
+reference](setup.md). Design rationale for *why* the deployment looks like this — no MLflow on the
+production runtime path, an always-on control plane rather than EventBridge — lives in [Production
+Deployment — Design](../architecture/production-deployment.md).
 
 > **Scope: everything here is done by hand** — AWS console plus SSH; no infrastructure-as-code
 > (Terraform, or CDK — AWS's Cloud Development Kit) yet. The manual approach is deliberate: it is
@@ -28,10 +28,9 @@ Design](../architecture/production-deployment.md).
 > ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)) is scheduled to
 > start at Stage 2, when team access adds enough moving parts to justify it.
 >
-> **Sentry telemetry is already wired; only per-task failure emails are still to come.** Sentry
-> error telemetry, the missed-check-in alarm, and the freshness warnings are wired (set the
-> `SENTRY_*` vars in [Step 14](#step-14-configure-dagster-on-the-box)); only per-task failure emails
-> (SNS) are still to come — see [the
+> **Sentry error telemetry and the freshness warnings are wired.** Set the `SENTRY_*` vars in [Step
+> 14](#step-14-configure-dagster-on-the-box). Nothing yet alerts when the whole deployment stops,
+> and per-task failure emails (SNS, the Simple Notification Service) are still to come — see [the
 > roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 
 ## Step 1 — Create the S3 buckets
@@ -163,19 +162,22 @@ Then attach it to **whichever identity runs the code**:
     table](setup.md#at-a-glance-which-settings-for-which-environment) for the exact shape). Losing
     this key can't corrupt any table, only leak read access to it.
 
-## Step 3 — Pick and promote a champion model
+## Step 3 — Check out the commit to deploy
 
-Follow [Operating the live service: Step 1](operations.md#step-1-pick-a-champion-model) and [Step
-2](operations.md#step-2-materialise-promoted_model) to materialise `promoted_model`. Promotion
-always happens **on your laptop** — the candidate models live in the laptop's local MLflow file
-store — and populates `data/production_model/` on disk, the same directory the image build below
-`COPY`s from.
+The image is built from your working tree and tagged with the short git commit hash of `HEAD`, so
+build from a clean checkout of the commit you mean to deploy:
+
+```bash
+git status --short    # prints nothing on a clean tree
+git rev-parse --short=8 HEAD
+```
+
+An uncommitted change would be built into the image under the tag of a commit that does not contain
+the change. The image carries no trained model, and the build never contacts MLflow.
 
 ## Step 4 — Build and verify the image
 
-With a champion model on disk (Step 3), one script builds the image and smoke-tests it with **zero
-network access** — the test that matters, since the entire point of baking the model in is that
-production inference has no MLflow dependency at runtime:
+One script builds the image and smoke-tests it with **zero network access**:
 
 ```bash
 scripts/deploy/build_and_verify_image.sh    # no arguments — everything is derived
@@ -190,18 +192,12 @@ platform 'linux/arm64 v8'`. On an x86 laptop the build and smoke test run under 
 noticeably slower than native, but correct. The script checks the emulator is registered and prints
 the one-time fix (`docker run --privileged --rm tonistiigi/binfmt --install arm64`) if it isn't.
 
-> Note that, during the smoke test, **Dagster is EXPECTED halt with the exception**
-> `_internal.TableNotFoundError: Local path
-"/app/data/NWP" does not exist or you don't have access!`. That halt is correct behaviour.
-
-The script builds the image tagged with the promoted model's run id and the git commit, runs it
-offline, and prints the container log with a pass/fail summary. (The smoke test's one-shot run uses
-a hard-coded, arbitrary partition key — the offline run fails at the NWP lookup long before the
-slot's validity could matter, so there is no key worth choosing.) It hard-fails only if the runtime
-touches MLflow — the hermeticity guarantee worth automating — and otherwise asks you to confirm by
-eye that the run loaded the model and failed *only* on missing NWP data (expected: no data tables
-are mounted for this isolated test). The script header documents every choice it makes and is the
-source of truth for the mechanics.
+The script builds the image tagged `nged-forecast:<commit>`, where `<commit>` is the short git
+commit hash, then runs `dagster definitions validate -m nged_substation_forecast.definitions` inside
+the image with `--network=none`, and prints the result. Validation imports every module the
+Dagster definitions load, so it catches a missing package or a broken import before the image is
+pushed. The script header documents every choice it makes and is the source of truth for the
+mechanics.
 
 ## Step 5 — Create the ECR repository
 
@@ -219,7 +215,7 @@ console](https://eu-west-2.console.aws.amazon.com) →
   derived URI.
 - **Every other setting on the create-repository form can stay at its console default:**
     - **Image tag mutability** (Mutable) and **Mutable tag exclusions** (empty) — image tags here
-      are already unique per build (the run id's short prefix plus the git commit, from [Step
+      are already unique per commit (the short git commit hash, from [Step
       4](#step-4-build-and-verify-the-image)), so nothing relies on retagging — but nothing needs
       immutability enforced, either.
     - **Encryption settings** (AES-256) — the console warns this can't be changed after creation,
@@ -245,9 +241,9 @@ redeploys — points the ECS (Elastic Container Service) task definition at it:
 scripts/deploy/push_and_deploy_image.sh    # no arguments — everything is derived
 ```
 
-The script takes no arguments by design, so mistyping is not possible: the tag is derived from
-`data/production_model/promotion.json` and the current git commit exactly as Step 4's build script
-derives it (so only an image that was built and verified, from this commit, can be pushed), and the
+The script takes no arguments by design, so mistyping is not possible: the tag is derived from the
+current git commit exactly as Step 4's build script derives it (so only an image that was built and
+verified, from this commit, can be pushed), and the
 AWS account id comes from `aws sts get-caller-identity`. The script logs Docker into ECR, tags, and
 pushes; then, if the `nged-forecast` task-definition family already exists ([Step
 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)), it registers a new revision
@@ -320,10 +316,10 @@ twice (its guard cannot tell an unset variable from a transient S3 error) before
 `sentry_capture_failure` hook reports it — while everything that does not read NGED's own bucket
 carries on. Failing loudly per-schedule, rather than refusing the whole container, is deliberate.
 Requiring these credentials at `Settings` construction would make the container refuse to start,
-which sounds like a useful fail-fast until you notice that `live_forecasts` reads our own Delta
-tables and a model baked into the image — so stopping it because an NGED credential is missing would
-break [principle 1](../design-philosophy/design-principles.md#1-the-power-forecast-never-stops). The
-wider reasoning is under [principle
+which sounds like a useful fail-fast until you notice that `ecmwf_ens` reads nothing from NGED's
+bucket — so stopping it because an NGED credential is missing would break [principle
+1](../design-philosophy/design-principles.md#1-the-power-forecast-never-stops). The wider reasoning
+is under [principle
 6](../design-philosophy/design-principles.md#6-the-whole-system-must-be-exercisable-on-one-laptop)
 and in the [Configuration reference](setup.md#the-env-file-and-nged-source-credentials). Catch a
 mis-wired secret in the deploy pipeline, where the blast radius is the deploy rather than the
@@ -407,7 +403,7 @@ server, and Postgres — is a plain EC2 virtual machine (EC2 is Elastic Compute 
 hand in [Step 11](#step-11-launch-the-control-plane-box), and the only compute in this deployment
 whose operating system we install and patch ourselves. **Every recurring job** the control plane's
 schedules dispatch executes as an ephemeral ECS task on Fargate instead — the hourly NGED telemetry
-ingest, the daily Dynamical.org NWP download, and the 6-hourly forecast. Every scheduled run
+ingest and the daily Dynamical.org NWP download. Every scheduled run
 therefore gets a fresh machine that AWS owns and patches, and nothing sits idle between runs. Why
 the compute is split this way, and why the control plane is not on Fargate too, is the
 [orchestration
@@ -425,7 +421,7 @@ yourself.
 is a fleet — the pool of instances that tasks get placed onto. On Fargate there are no instances, so
 the cluster is purely a **logical namespace for running tasks**, and we need a cluster only because
 every task has to launch *into* a cluster: it's the `--cluster` that [Step
-10](#step-10-verify-run-a-forecast-task-manually)'s manual `run-task` call targets and the
+10](#step-10-verify-run-an-ingest-task-manually)'s manual `run-task` call targets and the
 `cluster:` the `EcsRunLauncher` config in [Step 14](#step-14-configure-dagster-on-the-box) names,
 and it's where the console groups the running tasks you'll watch. An empty cluster manages no
 capacity and costs nothing, so a single `nged-forecast` cluster is all this deployment ever needs.
@@ -452,7 +448,7 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
    → **Create new task definition**. Work down the form; anything not named below stays at its
    console default:
     - **Task definition family**: `nged-forecast` — not a free choice: it's the `--task-definition`
-      in [Step 10](#step-10-verify-run-a-forecast-task-manually)'s manual run, the
+      in [Step 10](#step-10-verify-run-an-ingest-task-manually)'s manual run, the
       `task_definition:` in [Step 14](#step-14-configure-dagster-on-the-box)'s launcher config, and
       the family `scripts/deploy/push_and_deploy_image.sh` registers new revisions into.
     - **Launch type**: keep **AWS Fargate**, the pre-ticked default.
@@ -460,7 +456,8 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       but [Step 4](#step-4-build-and-verify-the-image)'s script always builds the image for ARM, and
       ARM Fargate is also ~20% cheaper than x86 for the same task size. (**Network mode** is greyed
       out at `awsvpc` — the only mode Fargate supports.)
-    - **Task size**: **4 vCPU** / **16 GB** — comfortably above the measured inference peak (~9 GB).
+    - **Task size**: **4 vCPU** / **16 GB**, sized for a forecast asset. Nobody has measured the
+      peak memory of the daily NWP ingest, which decodes a full ensemble run.
     - **Task role**: the task role from [Step 7](#step-7-iam-roles-for-the-fargate-task), e.g.
       `nged-forecast-task-role`.
     - **Task execution role**: the execution role from [Step
@@ -472,10 +469,9 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       run-launcher config names this container, so keep it predictable. Leave **Essential
       container** at **Yes**.
     - **Image URI**: `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>` from [Step
-      6](#step-6-push-the-image-to-ecr) — `<tag>` is the first 12 characters of the promoted model's
-      MLflow run id, a hyphen, and the short git commit hash the image was built
+      6](#step-6-push-the-image-to-ecr) — `<tag>` is the short git commit hash the image was built
       from. Step 6's script prints the full URI as it pushes; to recover it later, copy it from the
-      pushed image in the ECR console, or read it from the [model release log](model-releases.md).
+      pushed image in the ECR console.
     - **Port mappings**: **Remove** the pre-filled port-80/HTTP row — every task here is a batch run
       that listens on nothing; port mappings are for services that accept traffic.
     - **Environment variables**: `DATA_PATH_INTERNAL=s3://nged-forecast-internal/data` and
@@ -510,7 +506,7 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       **Entry point**: `/usr/bin/env`; leave **Command** and **Working directory** empty. Setting
       the entry point this way **overrides the image's own `ENTRYPOINT ["dagster"]`**, and matters
       more than it looks. ECS concatenates entry point + command into one argv, and both the manual
-      verification in [Step 10](#step-10-verify-run-a-forecast-task-manually) and the
+      verification in [Step 10](#step-10-verify-run-an-ingest-task-manually) and the
       `EcsRunLauncher` in [Step 14](#step-14-configure-dagster-on-the-box) supply a *full* command
       that already starts with `dagster` (the launcher generates `dagster api execute_run …` and
       can't be told otherwise). With the image's default entry point, the argv would come out as
@@ -524,16 +520,18 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
 
 Creating the task definition in the console is one-time. Later image changes never repeat it —
 `scripts/deploy/push_and_deploy_image.sh` registers new revisions of this family automatically (see
-[Redeploying a new champion model](#redeploying-a-new-champion-model)).
+[Redeploying new code](#redeploying-new-code)).
 
-## Step 10 — Verify: run a forecast task manually
+## Step 10 — Verify: run an ingest task manually
 
 Before building the control plane, trigger one task directly and confirm the compute path end-to-end
-— this manual `RunTask` also remains the fallback verification path once the schedules exist.
+— this manual `RunTask` also remains the fallback verification path once the schedules exist. The
+task runs `power_time_series_and_metadata_job`, the hourly NGED telemetry ingest, which reads the
+NGED source bucket with the Parameter Store secrets and writes to the internal bucket with the task
+role.
 
-**This command is a template — it will not run as pasted.** It contains three placeholders you must
-replace first: `<subnet-id>`, `<sg-id>`, and the partition key `<key>`. How to fill in each one is
-explained below the command.
+**This command is a template — it will not run as pasted.** It contains two placeholders you must
+replace first: `<subnet-id>` and `<sg-id>`. How to fill in each one is explained below the command.
 
 ```bash
 aws ecs run-task \
@@ -543,15 +541,15 @@ aws ecs run-task \
   --launch-type FARGATE \
   --network-configuration "awsvpcConfiguration={subnets=[<subnet-id>],securityGroups=[<sg-id>],assignPublicIp=ENABLED}" \
   --overrides '{"containerOverrides": [{"name": "nged-forecast", "command": [
-    "dagster", "job", "execute", "-m", "nged_substation_forecast.definitions", "-j", "live_forecasts_job",
-    "--tags", "{\"dagster/partition\": \"<key>\"}"
+    "dagster", "job", "execute", "-m", "nged_substation_forecast.definitions",
+    "-j", "power_time_series_and_metadata_job"
   ]}]}'
 ```
 
 Note the command starts with `dagster` — Step 9's `/usr/bin/env` entry point means every command
 spells out the full argv.
 
-Fill in the three placeholders:
+Fill in the two placeholders:
 
 - **`<subnet-id>`** — a **public** subnet in the VPC (Virtual Private Cloud — AWS's isolated
   network) the task will run in. Unless you have built custom networking in this account, that VPC
@@ -575,12 +573,6 @@ Fill in the three placeholders:
   control-plane box's Postgres port to exactly this group, so a dedicated group keeps that inbound
   rule tightly scoped.
 
-- **`<key>`** — the `live_forecasts` partition to run, formatted `YYYY-MM-DD-HH:MM` with the time at
-  a 6-hourly boundary (e.g. `2026-07-04-00:00`). A key names the *start* of its 6-hour window, and
-  the forecast init time is that window's *end* — read the [partition-semantics
-  note](operations.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand) before
-  picking a key; the most recent *completed* window is the natural choice for this verification run.
-
 > **Region matters here.** Unlike [Step 6](#step-6-push-the-image-to-ecr)'s script (which passes
 > `--region` explicitly on every call), a hand-typed AWS CLI command falls back to your configured
 > default region if `--region` is omitted — check your default region with `aws configure get
@@ -592,33 +584,22 @@ hand — the run launcher in [Step 14](#step-14-configure-dagster-on-the-box) la
 exactly the same network configuration.
 
 Follow the run in **ECS** → the cluster → **Tasks**, then **CloudWatch Logs** (log group
-`/ecs/nged-forecast`) for the container's output. What counts as a pass depends on whether any data
-has been ingested yet:
-
-- **On the first pass through this runbook, the buckets are still empty** — nothing ingests data
-  until [Step 16](#step-16-turn-on-the-schedules-and-verify-end-to-end)'s schedules turn on — so the
-  run *cannot* produce a forecast. The pass here is the cloud twin of [Step
-  4](#step-4-build-and-verify-the-image)'s offline smoke test: the task starts (proving the image
-  pulled and all four secrets resolved), its logs stream to CloudWatch, and the run fails *only* at
-  the NWP-availability lookup — a traceback ending in `TableNotFoundError`, raised from
-  `_available_nwp_init_times`. Loading the model writes no log line, so that specific failure *is*
-  the proof the model loaded: the `live_forecasts` asset loads the model first and checks NWP
-  availability second, so dying at the lookup means `load_forecaster_from_dir` already succeeded.
-  Running this task exercises every AWS-side link in the chain — cluster, task definition, IAM
-  roles, secrets, networking, logging — which is exactly what this step exists to verify.
-
-- **Once data exists** (after [Step 16](#step-16-turn-on-the-schedules-and-verify-end-to-end), when
-  this command is the fallback verification path), additionally confirm the run succeeds and a new
-  forecast lands under `s3://nged-forecast-delivery/data/power_forecasts/…` — the delivery bucket,
-  not the internal bucket, since `power_forecasts` is one of the five NGED-facing tables.
+`/ecs/nged-forecast`) for the container's output. The run passes when it succeeds and the
+`power_time_series` Delta table appears under
+`s3://nged-forecast-internal/data/NGED/power_time_series.delta/`. On the first pass through this
+runbook the run downloads every file in NGED's bucket, and the download takes a few minutes (see
+[Running the NGED
+ingest](operations.md#running-the-nged-ingest-first-run-rebuilds-and-the-downloaded-files-list)).
+The run exercises every AWS-side link in the chain — cluster, task definition, IAM roles, secrets,
+networking, logging — which is exactly what this step exists to verify.
 
 ## Step 11 — Launch the control-plane box
 
 We will now set up one small always-on EC2 instance to run the Dagster daemon (schedules, sensors,
 run dispatch), the Dagster webserver (the UI), the code-location server, and Postgres
-(run/event/schedule history) — everything except the actual forecast compute and data fetching jobs,
-which stay on ephemeral Fargate. (To read about why we're using an always-on box, and why this
-shape, see the [orchestration
+(run/event/schedule history) — everything except the pipeline runs themselves, which stay on
+ephemeral Fargate. (To read about why we're using an always-on box, and why this shape, see the
+[orchestration
 decision](../architecture/production-deployment.md#run-the-dagster-control-plane-continuously-on-one-small-vm);
 the sizing and cost are the [accepted
 option](../architecture/production-deployment.md#accepted-option-small-ec2-control-plane-box-ecsrunlauncher).)
@@ -633,7 +614,7 @@ policy, so the instance can assume the role) → **Next** → attach `nged-forec
 `AmazonEC2ContainerRegistryReadOnly` (pull the image) → **Next**. On the final **Name, review, and
 create** page, set **Role name** `nged-forecast-ctrl-role` and a **Description** such as
 *"Control-plane box for the NGED forecast service: runs the Dagster daemon/webserver, reads and
-writes the forecast S3 buckets, pulls the image from ECR, and dispatches forecast runs to Fargate."*
+writes the forecast S3 buckets, pulls the image from ECR, and dispatches pipeline runs to Fargate."*
 Leave the auto-generated **Trust policy** (the `ec2.amazonaws.com` principal) exactly as shown —
 it's correct and never hand-edited here. Then **Create role**.
 
@@ -712,7 +693,7 @@ anywhere — is *not* what we want, so work through each section and change it:
 - **Network settings** → **Edit** (the collapsed summary can't set the subnet or edit the
   security-group rules, so you must expand it):
     - **VPC**: the same VPC (the default `vpc-…`) as [Step
-      10](#step-10-verify-run-a-forecast-task-manually)'s task.
+      10](#step-10-verify-run-an-ingest-task-manually)'s task.
     - **Subnet**: change it from **No preference** to a specific **public subnet** in that VPC — the
       same subnet Step 10's task ran in is the natural pick (every default-VPC subnet is public, so
       any of them works).
@@ -850,11 +831,9 @@ docker pull "$REGISTRY/nged-forecast:<tag>"
 
 `REGISTRY` builds itself from the box's own 12-digit account id, which `aws sts get-caller-identity`
 reads from the instance role ([Step 11](#step-11-launch-the-control-plane-box)) — so there is
-nothing to paste for the account id. **You do still have to fill in `<tag>`**: it is the first 12
-characters of the promoted model's MLflow run id, a hyphen, and the short git
-commit hash the image was built from, naming exactly which image to deploy. Step 6's script prints the
-full URI as it pushes; to recover it later, copy it from the pushed image in the ECR console, or
-read it from the [model release log](model-releases.md).
+nothing to paste for the account id. **You do still have to fill in `<tag>`**: it is the short git
+commit hash the image was built from, naming exactly which image to deploy. Step 6's script prints
+the full URI as it pushes; to recover it later, copy it from the pushed image in the ECR console.
 
 No `aws configure` is needed — the instance role from [Step
 11](#step-11-launch-the-control-plane-box) supplies credentials. The ECR login token expires after
@@ -877,31 +856,29 @@ Everything lives in one directory:
 ### One image, four roles
 
 The deployment runs two kinds of job — the always-on Dagster control plane on this box, and the
-6-hourly forecast run on ephemeral Fargate — yet the repository builds a **single Dockerfile**.
-There is no contradiction: a container image is not a program, it's a packaged **filesystem** —
-here, the Python environment (with every dependency installed), the `nged_substation_forecast` code,
-and the baked-in champion model. *Which program runs* is chosen per container, by the command each
-one is started with. The same image therefore plays four roles:
+scheduled runs on ephemeral Fargate — yet the repository builds a **single Dockerfile**. There is
+no contradiction: a container image is not a program, it's a packaged **filesystem** — here, the
+Python environment (with every dependency installed), the `nged_substation_forecast` code, and the
+`conf/` directory. *Which program runs* is chosen per container, by the command each one is started
+with. The image has no default command. The same image therefore plays four roles:
 
 | Role | Runs where | Started as | What it uses from the image |
 |---|---|---|---|
 | Code-location server | this box (compose) | `dagster code-server start …` | the Python env + project code, served to the other services over gRPC |
 | Webserver (the UI) | this box (compose) | `dagster-webserver …` | just the installed `dagster-webserver` binary — it asks the code server for definitions |
 | Daemon | this box (compose) | `dagster-daemon run …` | the `dagster-daemon` binary, plus `dagster-aws` for the run launcher |
-| Forecast run | ephemeral Fargate task | `dagster api execute_run …` (generated by the launcher) | everything: env, code, **and the champion model** — the only role that loads it |
+| Scheduled run | ephemeral Fargate task | `dagster api execute_run …` (generated by the launcher) | the Python env + project code, executing the run's assets |
 
 It is deliberate to build one image, rather than a slim control-plane image plus a fat run image:
 
 - **No version skew.** The code location and the Fargate worker run from literally the same image
   tag, so they see byte-identical code and dependencies: the code location evaluates schedules, and
   the Fargate worker executes the run. With two images, a partial deploy could leave the control
-  plane and the run worker disagreeing about what `live_forecasts` *is* — a failure mode this design
+  plane and the run worker disagreeing about what `ecmwf_ens` *is* — a failure mode this design
   cannot have.
 - **One pipeline.** A single build/verify/push ([Steps 4](#step-4-build-and-verify-the-image)
   [–6](#step-6-push-the-image-to-ecr)) and a single tag to reason about, instead of two builds to
   keep in lockstep.
-- The only cost is that the three control-plane containers carry the champion model as dead weight —
-  a few megabytes of XGBoost files they never load. Cheap, and harmless.
 
 The one place the single-image design needs care is **entrypoints**, because the image can only
 declare one default (`ENTRYPOINT ["dagster"]`) while the four roles start three different
@@ -924,16 +901,13 @@ NGED_S3_BUCKET_SECRET=<same value as the Parameter Store entry>
 DAGSTER_PG_PASSWORD=<same value as /nged-forecast/dagster-pg-password from Step 8>
 SENTRY_DSN=<OCF Sentry project DSN>
 SENTRY_ENVIRONMENT=production
-SENTRY_MONITOR_FORECASTS=true
 ```
 
-The three `SENTRY_*` lines turn on error telemetry and the missed-check-in alarm (see [Send
-telemetry to
-Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence)).
-`SENTRY_ENVIRONMENT=production` is what the alarm's alert rule is scoped to; a developer testing
-from a laptop instead sets `SENTRY_ENVIRONMENT=<name>-laptop` and leaves `SENTRY_MONITOR_FORECASTS`
-unset (so a laptop never registers a stale check-in on the production monitor). An empty/absent
-`SENTRY_DSN` disables Sentry entirely, so this is safe to omit while bringing the box up.
+The two `SENTRY_*` lines turn on error telemetry and the freshness warnings (see [Send telemetry to
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry)).
+`SENTRY_ENVIRONMENT=production` is what the alert rules are scoped to; a developer testing from a
+laptop instead sets `SENTRY_ENVIRONMENT=<name>-laptop`. An empty/absent `SENTRY_DSN` disables Sentry
+entirely, so this is safe to omit while bringing the box up.
 
 (The Fargate containers get these injected from Parameter Store; the box's containers read this file
 instead — Stage-1 simplicity, one hand-managed box.)
@@ -1125,7 +1099,7 @@ Four config choices in `dagster.yaml` deserve explanation:
 
 - **`<subnet-id>` and `<sg-id>` in the run launcher** are the public subnet and security group the
   Fargate run workers launch into — the same pair [Step
-  10](#step-10-verify-run-a-forecast-task-manually)'s manual `run-task` used: the
+  10](#step-10-verify-run-an-ingest-task-manually)'s manual `run-task` used: the
   `nged-forecast-task-sg` group, and any public subnet in the default VPC. Read them off the console
   (**EC2 → Security Groups →** `nged-forecast-task-sg` for the group id; **VPC → Subnets** for a
   subnet id), or from the CLI:
@@ -1149,7 +1123,7 @@ Four config choices in `dagster.yaml` deserve explanation:
   (left sidebar, under *Network & Security*) → open `nged-forecast-ctrl-sg` → the **Inbound rules**
   tab → **Edit inbound rules** → **Add rule**: **Type** `PostgreSQL` (fills in TCP 5432), **Source**
   `Custom` → the Fargate task security group `nged-forecast-task-sg` (`<sg-id>` from [Step
-  10](#step-10-verify-run-a-forecast-task-manually)) → **Save rules**. (From the instance's
+  10](#step-10-verify-run-an-ingest-task-manually)) → **Save rules**. (From the instance's
   **Security** tab you can click the `nged-forecast-ctrl-sg` link to jump straight to that page.)
   Scoped to that security group — the box still has no publicly-reachable ports. That inbound rule
   is also why `DAGSTER_PG_PASSWORD` was added to the task definition's secrets in [Step
@@ -1175,7 +1149,7 @@ docker compose logs -f daemon    # watch it start its schedule/sensor loops
 > port 4266. That warning is a harmless startup race, not a failure. The daemon and webserver
 > `depends_on` the code-server, but plain Compose `depends_on` waits only for the code-server
 > *container to start*, not for its gRPC server to be *ready* — and the code-server has to import
-> the whole project (all code plus the baked-in champion model) before it binds 4266, which takes
+> the whole project before it binds 4266, which takes
 > several seconds. The daemon starts sooner, polls once too early, logs the warning, and retries.
 > You can confirm the code location self-healed a few seconds later: a `Received
 > LocationStateChangeEventType.LOCATION_UPDATED event for location nged_substation_forecast,
@@ -1196,43 +1170,32 @@ daemons with green heartbeats.
 
 ## Step 16 — Turn on the schedules and verify end-to-end
 
-1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
-   and `live_forecasts_schedule`. Schedule state lives in Postgres, so this is a one-time action —
-   it survives restarts and reboots.
-2. **First time only — materialise the upstream assets once so `live_forecasts` has NWP, telemetry,
-   and grid weights to read.** A Dagster `deps=[...]` declaration records lineage; it does *not*
-   make materialising `live_forecasts` reach back and build its parents first. On a brand-new box
-   the Delta tables are empty, so the very first `live_forecasts` run has no NWP, no telemetry, and
-   no grid weights to consume. Materialise these once, from the UI, in order (each is its own asset
-   because they run on different cadences and, for `ecmwf_ens` vs `live_forecasts`, different
-   partition definitions — so there is no single run that can build the whole chain):
-
-    1. `h3_grid_weights` (unpartitioned) — `ecmwf_ens` depends on it, so do this first.
-    2. the latest `ecmwf_ens` partition — gives `live_forecasts` an NWP run to forecast from.
-    3. `power_time_series_and_metadata` (unpartitioned) — the power spine and substation metadata.
-
-    (The production model is not in this list. It is deliberately *not* a Dagster dependency of
-    `live_forecasts`: its artifacts were promoted back in [Step
-    3](#step-3-pick-and-promote-a-champion-model) and baked into the image, so there is nothing to
-    materialise for it here — do not materialise `promoted_model` on the box, which has no MLflow.)
-    Once the schedules from step 1 are on, each of these upstream assets is kept fresh by its own
-    schedule. This manual pass is only to seed the empty tables for the first tick.
-
-3. **Kick a run now rather than waiting for a tick**: materialise the latest `live_forecasts`
-   partition from the UI (see [Operating the live service: Step
-   3](operations.md#step-3-let-the-schedule-run-or-materialise-live_forecasts-by-hand)). Watch the
-   run get dispatched by the launcher: it appears in the Dagster UI, a Fargate task spins up in the
-   ECS console, its logs stream to CloudWatch, and forecast rows land under
-   `s3://nged-forecast-delivery/data/power_forecasts/…`.
+1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule` and
+   `ecmwf_ens_schedule`. Schedule state lives in Postgres, so this is a one-time action — it
+   survives restarts and reboots.
+2. **First time only — materialise `h3_grid_weights` once, then the latest `ecmwf_ens` partition.**
+   `h3_grid_weights` is unpartitioned and has no schedule. `ecmwf_ens` reads the output of
+   `h3_grid_weights`, so materialise `h3_grid_weights` first from the UI. A Dagster `deps=[...]`
+   declaration records lineage; it does *not* make materialising `ecmwf_ens` reach back and build
+   its parents first. Then materialise
+   the latest `ecmwf_ens` partition rather than waiting for the 10:30 UTC tick. Watch the run get
+   dispatched by the launcher: it appears in the Dagster UI, a Fargate task spins up in the ECS
+   console, its logs stream to CloudWatch, and the NWP run lands under
+   `s3://nged-forecast-internal/data/NWP/…`. From then on each ingest asset is kept fresh by its own
+   schedule.
+3. **Check the asset checks**: in the UI's Checks view, `power_data_is_fresh`,
+   `cleaned_power_keeps_up_with_raw`, and the three `ecmwf_ens` checks should be green or carry a
+   warning that [Operating the live
+   service](operations.md#degraded-input-data-nwp-feed-down-or-telemetry-stalled) explains.
 4. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always` must
    bring all four services back unattended. The UI comes back over Tailscale with run history
    intact.
-5. **Leave it running for several days**: a forecast appears after every 6-hourly slot and a fresh
-   NWP ingest after each daily 00Z publication; check Cost Explorer against the [cost
+5. **Leave it running for several days**: a power ingest lands every hour and a fresh NWP ingest
+   after each daily 00Z publication; check Cost Explorer against the [cost
    model](../architecture/aws-costs.md#v1-32-time-series).
 
-If a slot gets missed (box down, failed run), backfill it from the same UI — [Operating the live
-service: Backfilling a missed slot](operations.md#backfilling-a-missed-slot).
+If a run gets missed (box down, failed run), backfill it from the same UI — [Operating the live
+service: Backfilling a missed partition](operations.md#backfilling-a-missed-partition).
 
 ### Optional hardening
 
@@ -1246,29 +1209,24 @@ service: Backfilling a missed slot](operations.md#backfilling-a-missed-slot).
 - **Security patches**: Ubuntu Server installs security updates automatically via
   `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
 
-The missed-check-in alarm that catches a silently-dead daemon is wired via Sentry cron monitoring
-(the `SENTRY_*` vars in [Step 14](#step-14-configure-dagster-on-the-box)). The one console step it
-needs is to **scope its alert rule to `environment:production`** in Sentry, so a developer testing
-from a laptop never trips it. The one remaining operational safety net is per-task failure alerts
-(email via SNS, the Simple Notification Service) — still to come; see [the
-roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) and [Send telemetry
-to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry-and-alarm-on-absence).
+Nothing yet alerts when the daemon dies silently: Sentry receives events only from a process that is
+still running. Per-task failure alerts (email via SNS, the Simple Notification Service) are still to
+come too; see [the roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm)
+and [Send telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
 
-## Redeploying a new champion model
+## Redeploying new code
 
-Once the service is live, shipping a better model is a repeat of a slice of this page:
+Once the service is live, shipping a code change is a repeat of a slice of this page:
 
-1. Promote the new champion locally — [Operating the live service: Steps
-   1–2](operations.md#step-1-pick-a-champion-model).
-2. Build and verify the new image ([Step 4](#step-4-build-and-verify-the-image)) — it gets a new tag
-   (the new model's run id).
-3. `scripts/deploy/push_and_deploy_image.sh` ([Step 6](#step-6-push-the-image-to-ecr)) — one command
+1. Check out the commit to deploy ([Step 3](#step-3-check-out-the-commit-to-deploy)), then build and
+   verify the new image ([Step 4](#step-4-build-and-verify-the-image)) — it gets a new tag (the new
+   commit hash).
+2. `scripts/deploy/push_and_deploy_image.sh` ([Step 6](#step-6-push-the-image-to-ecr)) — one command
    that pushes the new tag and registers a new task-definition revision pointing at it. The run
    launcher resolves the family's latest revision at launch time, so the next scheduled run picks it
    up with no restart on the box.
-4. The control-plane containers can keep running the old image — the baked-in model is dead weight
-   to them, so a *model* change doesn't affect them. When the *code* changes (assets, schedules, a
-   Dagster upgrade), also update the box: `docker login` + `docker pull` the new tag ([Step
+3. Update the box too, because the code-location server on the box evaluates the schedules:
+   `docker login` + `docker pull` the new tag ([Step
    13](#step-13-install-docker-and-pull-the-image)), update `IMAGE` in `~/nged-forecast/.env`, and
    `docker compose up -d`.
 
@@ -1291,8 +1249,8 @@ periodically once the access is live.
 
 ## See also
 
-- [Operating the live service](operations.md) — driving the deployed service day to day: promotion,
-  the 6-hourly schedule, inspecting forecasts, backfilling missed slots.
+- [Operating the live service](operations.md) — driving the deployed service day to day: the ingest
+  schedules, reading the asset checks, inspecting forecasts, backfilling missed partitions.
 - [Getting started on your laptop](../getting-started.md) — the same service end-to-end on a laptop,
   no AWS involved.
 - [Configuration reference](setup.md) — what the storage roots and `DATA_STORE_*`/credential

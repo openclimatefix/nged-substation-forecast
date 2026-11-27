@@ -63,14 +63,14 @@ Nwp.scan_delta(path)                     # lazy scan, already Float32 physical u
 * **Query optimisation**: Polars can see the full plan end-to-end and push down filters (e.g. date
   ranges, `time_series_id` subsets) into the Delta Lake scan before any data crosses the wire.
 * **Clean boundaries**: The materialisation site is the model boundary — the one place where a
-  third-party library (XGBoost, PyTorch, …) needs a concrete in-memory array. Keeping it there makes
+  third-party library (PyTorch, scikit-learn, …) needs a concrete in-memory array. Keeping it there makes
   the boundary explicit and easy to find.
 
 **The one exception** is a `limit(1).collect()` guard in `_engineer_features` (inside `ml_core`),
 reached only when a weather lag feature is requested. It checks the raw NWP scan for the control
 member. In bulk mode (training/backtesting) a missing control member fails the pipeline loudly,
 because a silently-degraded training run would poison every comparison built on it. In single-run
-mode (production inference, replay) a missing control member is the outside world misbehaving, not a
+mode (live inference) a missing control member is the outside world misbehaving, not a
 contract violation, so the guard instead logs a warning naming the run and falls through to the
 ordinary join-miss path. The output stays full height, with every affected weather-lag column null
 rather than the row dropped. It probes the raw frame rather than the upsampled one deliberately:
@@ -126,7 +126,8 @@ the surviving row groups, so an in-memory collect would still materialise every 
 dropping 1662/1671 of the cells. The **streaming engine** (`collect(engine="streaming")`) applies
 the predicates per morsel, so peak memory is set by the morsel/row-group size, *not* the window
 length: measured pre-migration, a *full 15-month* control-member collect stayed at ~2.5 GB.
-`XGBoostForecaster.train`/`predict` therefore collect with `engine="streaming"`.
+`ClimatologyForecaster` and `ManualHeuristicForecaster` therefore collect with
+`engine="streaming"`.
 
 **Many-to-one `h3_index` ↔ `time_series_id`:** one NWP cell covers several series (the 32 V1 series
 live in just **9 cells**, one holding 12), so `h3_index` pruning is keyed on the (few) cells the

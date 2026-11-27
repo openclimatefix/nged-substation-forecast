@@ -66,9 +66,9 @@ Issue: [#147](https://github.com/openclimatefix/nged-substation-forecast/issues/
 
 `ManualHeuristicForecaster` is the first baseline in the codebase. Its leaderboard rows answer the
 question this project exists to answer: **do we beat the manual heuristic?** The climatology
-baseline gives XGBoost's numbers a further point of reference. The persistence baseline
-is not planned, and [#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087)
-is closed.
+baseline gives every trained forecaster's numbers a further point of reference. The persistence
+baseline is not planned, and
+[#1087](https://github.com/openclimatefix/nged-substation-forecast/issues/1087) is closed.
 
 **Every comparison against a baseline publishes the fraction of series that beat it alongside the
 average error, never the average alone** — see [Publishing results that others can compare
@@ -91,9 +91,9 @@ conservative 95th percentile, once the [metrics
 collapse](https://github.com/openclimatefix/nged-substation-forecast/issues/1077) lands.
 
 **Reproducing the manual heuristic matters because the manual heuristic is *the bar we have to clear
-to justify the project*.** "XGBoost beats persistence" is the least we must do; "XGBoost beats the
-manual heuristic" is the deliverable. `manual_heuristic` is the first baseline we implement, and the
-one we would keep if we could implement only one.
+to justify the project*.** "A trained forecaster beats persistence" is the least we must do; "a
+trained forecaster beats the manual heuristic" is the deliverable. `manual_heuristic` is the first
+baseline we implement, and the one we would keep if we could implement only one.
 
 `manual_heuristic` fits our existing machinery, because every one of its 13 members is just a
 **power lag**:
@@ -274,7 +274,7 @@ is therefore how we measure the cross-over, not a number we can already assert. 
 the leaderboard while adding no skill over either bookend, and without these rows nobody would know.
 
 Side benefit: several more `BaseForecaster` implementations pressure-test the abstraction (the docs
-promise the interface is model-agnostic; today `XGBoostForecaster`, `ManualHeuristicForecaster`, and
+promise the interface is model-agnostic; today `ManualHeuristicForecaster` and
 `ClimatologyForecaster` exercise it).
 
 **How much the choice of reference moves the answer has been measured, and it argues for reading a
@@ -321,11 +321,11 @@ heuristic](#calibrating-the-manual-heuristic-aims-at-the-95th-percentile)) was a
 scope here. Its issue,
 [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715), is closed.
 
-**Guiding principle — no special path.** New workspace package `packages/baseline_forecasters/`
-mirroring the `xgboost_forecaster` layout (`pyproject.toml`, `src/baseline_forecasters/`, `tests/`),
-added to the root `pyproject.toml` `[tool.uv.sources]` and dependencies. Every baseline subclasses
-`BaseForecaster` and rides the **identical** asset chain (`register_experiment_job` →
-`trained_cv_model` → `cv_power_forecasts` → `metrics`) that `XGBoostForecaster` uses — a `train()`
+**Guiding principle — no special path.** The workspace package `packages/baseline_forecasters/`
+(`pyproject.toml`, `src/baseline_forecasters/`, `tests/`) sits in the root `pyproject.toml`
+`[tool.uv.sources]` and dependencies. Every baseline subclasses `BaseForecaster` and rides the
+**identical** asset chain (`register_experiment_job` → `trained_cv_model` → `cv_power_forecasts` →
+`metrics`) that every trained forecaster uses — a `train()`
 that only records `trained_time_series_ids` and a `meta.json`-only `save()` need no extra
 engineering effort, and the uniform provenance is exactly what makes re-running routine. Re-running
 cross-validation (CV) for any algo is then a native Dagster operation: select
@@ -350,21 +350,21 @@ base class until a third stateless model exists.
 
 - `MODEL_NAME = "persistence"`. Config default
   `selected_features = {"power_lag_24h", "power_lag_48h", "power_lag_168h", "power_lag_336h"}`.
-- `train()` records the sorted `trained_time_series_ids` (the requested ids present in the data,
-  mirroring XGBoost's "no usable rows → not trained" semantics). `predict()` = `pl.coalesce` of the
+- `train()` records the sorted `trained_time_series_ids` (the requested ids present in the
+  data). `predict()` = `pl.coalesce` of the
   lag columns in ascending-lag order — `_nullify_leaky_lags` nulls any lag with `lead ≥ lag_hours`
   (so the 24 h lag survives all intraday leads), and coalesce then selects the shortest *non-leaky*
   lag per row: same-time-yesterday for day-1, last-week for day 2–7, two-weeks-ago beyond. Zero
   lookahead risk because it rides the audited pipeline. Output is one value per row, written to all
   13 quantile columns by `ml_core.quantiles.to_stored_quantiles`, with `nwp_init_time` null. The
-  identity columns follow `XGBoostForecaster._build_part`. Rows where all lags are null are dropped,
+  identity columns follow `ManualHeuristicForecaster`'s. Rows where all lags are null are dropped,
   the count logged, and the per-series dropped/coverage counts recorded in asset metadata.
 - `conf/model/persistence.yaml`: `weather_source: "none"`, `training_strategy: "none"`.
 - Tests: unit (shortest-non-leaky selection on a hand-built `AllFeatures` fixture; all-null-row
   dropping; `save`/`load` round-trip freezing ids) plus an integration smoke fold via the
   `tests/test_trained_cv_model.py` fixture pattern.
-- Register (`smoke_test` → `full_cv`), materialise the chain, sanity-check: NMAE worse than XGBoost
-  overall but plausibly competitive intraday; deterministic CRPS = MAE; PICP /
+- Register (`smoke_test` → `full_cv`), materialise the chain, sanity-check: NMAE worse than the
+  manual heuristic overall but plausibly competitive intraday; deterministic CRPS = MAE; PICP /
   interval width degenerate (expected and ignorable for a deterministic baseline).
 - **Coverage caveat:** persistence's longest lag is 336 h, so leads in `[336 h, ~360 h]` drop out
   and its `all` / `extended_range` aggregates cover a shorter lead population than other models'.
@@ -465,10 +465,10 @@ protocol](../cross-validation/cross-validation-folds.md#why-expanding-window-cro
 already builds the single fold around. The caveats above apply today; the planned Ladder guard
 will constrain publication once implemented.
 
-**Measuring a promoted model's performance on live data is a separate question from deciding which
+**Measuring a live model's performance on live data is a separate question from deciding which
 model to promote.** Every model running in production is also scored against live data as it runs
-([production monitoring](live-service.md#production-monitoring)), which answers "is the promoted
-model still performing", continuously and after the fact. The fold above answers "which candidate
+([production monitoring](live-service.md#production-monitoring)), which answers "is the live model
+still performing", continuously and after the fact. The fold above answers "which candidate
 should we promote", once and ahead of the fact, and the two answers must not be blurred into a
 single answer. TS-Arena avoids reusing any fixed evaluation window at all ([Meyer et al.
 (2026)](https://arxiv.org/abs/2512.20761)); Flexpectation's promotion decision cannot work that way,
@@ -493,13 +493,13 @@ over two. The `final_test` fold needs a per-fold flag that keeps it out of every
 CV run trains or scores on it in the normal flow: extend `CvConfig` / the fold schema in
 `packages/contracts/src/contracts/config_schemas.py`, and make sure `_fold_ids_for_run_mode` in
 `defs/jobs.py` includes the fold in no run mode at all. Scoring against it is then a deliberate,
-rare act — champion candidates immediately before promotion only — through the `metrics` asset's
+rare act — candidates immediately before promotion only — through the `metrics` asset's
 existing `ad_hoc` evaluation scope, so no new asset is needed and the discipline is procedural.
 Whether the leaderboard-fold model can be reused as-is, or needs its own training run, depends on
 where the disjoint year sits relative to `mid_2025_to_mid_2026` — decide that once the backfill
 lands. **Two rules go in alongside it**: final-test results are never used to *choose between*
 candidates, because that re-creates the problem the window exists to solve; they exist to report
-honest skill for the chosen champion and to detect gross overfitting (final-test NMAE ≫ validation
+honest skill for the chosen model and to detect gross overfitting (final-test NMAE ≫ validation
 NMAE).
 
 **A multi-fold gotcha to handle when folds proliferate.** The parent-MLflow-run aggregation in the
@@ -561,9 +561,10 @@ metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
 
 **A prediction clamped to a generator's export cap is diagnostic only too, and for the same reason
 about what was known when.** The clamp uses the setpoint the network operator issued for the hour
-being scored, which a forecast issued hours earlier could not have held. When the clamp is fair and
-when the clamp is lookahead bias are set out under [drop curtailed hours from the training
-target](xgboost-improvements.md#drop-curtailed-hours-from-the-training-target).
+being scored, which a forecast issued hours earlier could not have held. The clamp is fair in an
+offline study of past hours, where the cap the operator set is as much a historical record as the
+weather is. The clamp is lookahead bias for a live forecast, because the operator sets the cap for a
+half-hour during the day, after the forecast for that half-hour was issued.
 
 **Every ratio between a model and a reference carries its reference forecast and population** — see
 [Publishing results that others can compare
@@ -601,8 +602,8 @@ interchangeable, and the difference between them decides which one to use where.
 
 The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is a
 mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading) is
-*consistent* with the mean. Our squared-error XGBoost models literally learn a conditional mean, and
-the ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the mean on RMSE
+*consistent* with the mean. A model trained with squared error learns a conditional mean, and the
+ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the mean on RMSE
 rewards a model for reporting its honest conditional mean. The mean also averages out member noise,
 so it is the more stable statistic on a small ensemble, and it matches standard NWP verification
 practice.
@@ -830,7 +831,7 @@ leaderboard.
 ## Scoring under failure scenarios 🚧
 
 > **Status: 🚧 Planned (v0.3).** Nothing scores a model under degraded inputs today, which means a
-> v0.5 champion would be picked on clean-data skill alone.
+> model would be chosen for the live service on clean-data skill alone.
 
 The [inherent-stability principle](../design-philosophy/inherent-stability.md) claims that the
 service keeps beating the manual heuristic as its inputs degrade. That claim is only worth anything
@@ -893,9 +894,9 @@ belongs in the modelling instead. The ceiling bounds the skill that ingesting an
 could add. A low ceiling need not stop anyone trying a new source, because an autonomous study can
 test a new weather product quickly (see [A new weather product with a few months of
 history](training-history.md#a-new-weather-product-with-a-few-months-of-history)). That study trains
-a lag-free XGBoost model on estimates of past weather, which the study calls the weather-response
-model. A lag-free variant of the ceiling's XGBoost model can serve as both, so the ceiling and the
-study can share one XGBoost model. The ceiling proper uses the champion's own feature set, lags
+a lag-free model on estimates of past weather, which the study calls the weather-response model. A
+lag-free variant of the ceiling's model can also serve as the weather-response model, so the ceiling
+and the study can share one model. The ceiling proper uses the live model's own feature set, lags
 included.
 
 Two rungs, in increasing order of "cheating":
@@ -974,9 +975,9 @@ point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-st
 
 Issue: [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225)
 
-The 51-member ensemble is very likely **underdispersed**: XGBoost trained with squared error on the
-control member (`cv_assets.py:373`) learns a conditional mean, so pushing 51 members through it
-yields spread from *weather uncertainty only* — no model or observation uncertainty. Underdispersed
+The 51-member ensemble is very likely **underdispersed**: a forecaster trained with squared error on
+the control member learns a conditional mean, so pushing 51 members through that forecaster yields
+spread from *weather uncertainty only* — no model or observation uncertainty. Underdispersed
 ensembles are systematically overconfident, worst at short horizons where members haven't diverged.
 Flexibility procurement is a tails problem (P90+ peaks), so this overconfidence hits the use case
 directly.
@@ -1053,24 +1054,21 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
    ([#262](https://github.com/openclimatefix/nged-substation-forecast/issues/262)) — extend the
    contract (and the Delta write/read paths) with the Rep 2 and Rep 3 percentile columns, alongside
    the existing deterministic-ensemble representation.
-2. **Quantile XGBoost model family**
-   ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) — `objective:
-   reg:quantileerror` with several `quantile_alpha`s, as a separate model family emitting
-   Rep 3. Sort each member's quantiles at predict time (monotonic rearrangement fixes quantile
-   crossing). The lead-time feature and training on multiple members
-   ([xgboost-improvements](xgboost-improvements.md) — the lead-time feature and ensemble-member
-   training) are the double-counting mitigations discussed in the explainer — land them first or
-   measure without them consciously.
+2. **Quantile model family**
+   ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) — a model family
+   trained on a quantile loss at several levels, emitting Rep 3. Sort each member's quantiles at
+   predict time (monotonic rearrangement fixes quantile crossing). A lead-time feature and training
+   on multiple members are the double-counting mitigations discussed in the explainer — land them
+   first or measure without them consciously.
 3. **Linear-pool combining step**
    ([#264](https://github.com/openclimatefix/nged-substation-forecast/issues/264)) — pool the
    per-member quantiles into delivered Rep 2 percentiles (the pseudo-sample recipe in the
    explainer), with a per-horizon affine recalibration hook (fit on train) applied only if the
-   pooled PICP numbers demand it. Scored with pinball/PICP/CRPS head-to-head against
-   the Phase-C inflated deterministic champion. The quick-wins study found that crossing the quantile
-   model's output with the 51 members left the 10% to 90% band covering 57% of outcomes,
-   against a nominal 80%, and [issue
-   #1156]({U})
-   plans the
+   pooled PICP numbers demand it. Scored with pinball/PICP/CRPS head-to-head against the Phase-C
+   inflated deterministic forecast. The XGBoost quick-wins study found that crossing the quantile
+   model's output with the 51 members left the 10% to 90% band covering 57% of outcomes, against a
+   nominal 80%, and
+   [issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) plans the
    follow-up checks on how to score and recombine the quantiles.
 
 ---
@@ -1085,7 +1083,7 @@ operational NWP?"). Example tags:
 | Tag | Example values |
 |---|---|
 | `time_series_type` | PV, Wind, disaggregated demand (primaries) |
-| `model_family` | manual_heuristic, baseline_persistence, xgboost, pytorch_mlp, pytorch_graph_dp |
+| `model_family` | manual_heuristic, climatology, baseline_persistence, pytorch_mlp, pytorch_graph_dp |
 | `weather_source` | none, ecmwf_control, full_ecmwf_ensemble, cams_ceda_ukv, era5 |
 | `input_features` | datetime, power_lag_24h, power_lag_7d, temperature |
 | `training_strategy` | direct_multistep, horizon_as_feature, end_to_end |

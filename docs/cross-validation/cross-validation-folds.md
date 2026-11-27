@@ -101,10 +101,10 @@ archive starts later than the leaderboard folds, leaving no overlapping history 
 **For a new *weather* source, the ceiling bounds the skill the source could add.** [The
 perfect-weather
 ceiling](../roadmap/metrics-and-leaderboard.md#the-perfect-weather-ceiling-what-it-gates) measures
-how much forecast skill near-perfect weather would add. If an XGBoost model trained and scored on an
-estimate of past weather barely beats the ENS-scored champion, there is little forecast-error
-headroom for a further source to recover — unless the candidate's case rests on *resolution*, which
-that ceiling does not bound.
+how much forecast skill near-perfect weather would add. If a forecaster trained and scored on an
+estimate of past weather barely beats the same forecaster scored on ENS, there is little
+forecast-error headroom for a further source to recover — unless the candidate's case rests on
+*resolution*, which that ceiling does not bound.
 
 Three patterns answer three different questions. A fourth question is under research in [A new
 weather product with a few months of

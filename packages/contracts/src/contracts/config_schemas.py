@@ -17,9 +17,9 @@ STUDY_EXPERIMENT_PREFIX: Final[str] = "study/"
 """The prefix on the ``experiment_name`` of every forecast that
 ``scripts/forecasting/score_study.py`` scores.
 
-The prefix keeps a study's rows out of the promotion path, lets a reader filter a study's rows from
-the leaderboard, and marks the forecasts on which the ``metrics`` asset runs the study checks and
-which an unfiltered ``metrics`` run skips. No reviewed CV run may use the prefix.
+The prefix lets a reader filter a study's rows from the leaderboard, and marks the forecasts on
+which the ``metrics`` asset runs the study checks and which an unfiltered ``metrics`` run skips. No
+reviewed CV run may use the prefix.
 """
 
 
@@ -35,7 +35,8 @@ def class_target(obj: type | object) -> str:
         obj: The class to name, or an instance whose class should be named.
 
     Returns:
-        The ``module.ClassName`` path, e.g. ``"xgboost_forecaster.forecaster.XGBoostForecaster"``.
+        The ``module.ClassName`` path, e.g.
+        ``"baseline_forecasters.climatology.ClimatologyForecaster"``.
 
     Raises:
         ValueError: ``obj``'s class is not defined at module level — it is nested inside another

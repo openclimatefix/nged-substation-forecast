@@ -60,11 +60,10 @@ iteration](../background/energy-forecasting-review.md#fast-comparable-iteration-
 rests on a structural argument and on practitioner testimony instead. Naming the bet matters here,
 because the orchestrator choice is staked on that bet.
 
-**Conducting CV runs is only half the loop.** A winning CV run must then move into
-production as easily and as safely as possible, which is why R&D and production share a single
-unified codebase — promotion is an [audited
-materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script),
-not a rewrite. Anything that splits the R&D and production worlds apart carries an ongoing burden (a
+**Conducting CV runs is only half the loop.** A winning CV run must then move into production as
+easily and as safely as possible, which is why R&D and production share a single unified codebase: a
+model reaches production through the same `BaseForecaster` code that trained it, not through a
+rewrite. Anything that splits the R&D and production worlds apart carries an ongoing burden (a
 tension discussed in [Option B (port only the live
 service)](#option-b-port-only-the-live-service-promising-with-a-real-two-orchestrator-cost), below).
 
@@ -93,9 +92,9 @@ When the system was designed in August 2025, the latest Airflow release was 3.0.
   to runs ([#51439](https://github.com/apache/airflow/issues/51439)) had been fixed only days
   earlier, in 3.0.4 itself — and a second variant of that bug (conf not applied to runs whose
   logical dates already existed, [#59043](https://github.com/apache/airflow/issues/59043)) survived
-  until Airflow 3.2.2 in May 2026. Run-config correctness matters unusually much to us because
-  replay-mode backfills guard against [lookahead
-  bias](production-deployment.md#resolve-nwp-availability-asymmetrically-live-vs-replay).
+  until Airflow 3.2.2 in May 2026. Run-config correctness matters unusually much to us because a
+  backfill's config sets which numerical weather prediction (NWP) run a forecast is allowed to see.
+  A silently dropped config therefore produces lookahead bias rather than an error.
 - **Airflow could not run our Python.** Python 3.14 support arrived in Airflow 3.2.0 (April 2026);
   Flexpectation is 3.14-only.
 
@@ -199,15 +198,13 @@ The orchestration layer was built thin on purpose, and three properties make it 
   policy — has no Dagster imports and would not change at all.
 - **No state crosses processes through the orchestrator.** Data crosses run boundaries via Delta
   tables; CV run state crosses via MLflow, resolved [by tag, never by
-  handle](ml-orchestration.md#cross-process-run-resolution-discover-by-tag-never-pass-handles); the
-  production model crosses as a directory baked into the image. Any orchestrator that can run a
-  Python function on a schedule can drive this system.
+  handle](ml-orchestration.md#cross-process-run-resolution-discover-by-tag-never-pass-handles). Any
+  orchestrator that can run a Python function on a schedule can drive this system.
 - **Every write is an idempotent partition overwrite**, so retry semantics do not depend on
   orchestrator guarantees.
 
-The Dagster-specific surface is roughly 2,700 lines across 6 files (`defs/assets.py`,
-`defs/cv_assets.py`, `defs/live_forecast_assets.py`, `defs/promotion_assets.py`, `defs/jobs.py`,
-`defs/schedules.py`) plus
+The Dagster-specific surface is roughly 3,100 lines across 4 files (`defs/assets.py`,
+`defs/cv_assets.py`, `defs/jobs.py`, `defs/schedules.py`) plus
 `definitions.py`, `dagster.yaml`, and the Docker Compose control plane. Beyond code, a dozen docs
 pages — most of `docs/live_service/` and [Running the cross-validation pipeline
 end-to-end](../cross-validation/dagster-workflow.md) — are written around the Dagster UI and would
@@ -217,16 +214,14 @@ need rewriting.
 
 | Dagster feature in use | Where | Airflow 3 equivalent | Fit |
 |---|---|---|---|
-| 6-hourly `TimeWindowPartitionsDefinition` | `live_forecasts` | Cron schedule + `data_interval_end` | Good — Airflow's home turf |
 | Daily partitions with `end_offset` | `ecmwf_ens` | Daily schedule + data interval | Good |
 | Concurrency pool (`pool="ECMWF"`) | `ecmwf_ens` | Airflow pools | Direct equivalent |
 | In-run retry-with-wait (`RetryRequested`) | `ecmwf_ens` NWP wait | Deferrable sensor | Airflow is **better** (see below) |
-| Typed run config + Launchpad | `availability_mode`, `MetricsConfig`, `PromotedModelConfig` | DAG `params` with schema-validated trigger forms | Workable; less strongly typed |
+| Typed run config + Launchpad | `RegisterExperimentConfig`, `MetricsConfig`, `CleanNgedPowerDataConfig` | DAG `params` with schema-validated trigger forms | Workable; less strongly typed |
 | `DynamicPartitionsDefinition` (`{experiment_name}__{fold_id}`) | CV (cross validation) layer | `PartitionedAtRuntime` + `add_partitions` (3.3.0), or one Airflow run per CV run + mapped folds | Data model now matches; the status-grid UI does not (see above) |
 | Per-fold retry and observability | CV (cross validation) layer | Dynamic task mapping (per-instance state, logs, clear; `map_index_template`) | Good on ≥3.1.4 |
-| Per-partition backfills with run config | `live_forecasts` replay | Backfills take `--dag-run-conf`; conf-dropped bug fixed in 3.2.2 | Good on ≥3.2.2; MWAA (3.2.1) still affected |
 | `add_output_metadata` tables, asset catalog, lineage | every asset | Asset-event `extra` JSON (2.10+) in the events list | Partial — raw JSON, no rendered tables or history plots |
-| Asset checks — non-blocking WARN, attached to an asset, dedicated Checks view (`power_data_is_fresh`, `nwp_has_no_unexpected_nulls`, `live_forecasts_are_healthy`) | power ingest, `ecmwf_ens`, `live_forecasts` | Data-quality as ordinary tasks (`common.sql` check operators; Great Expectations / Soda / dbt-test); no first-class check primitive or Checks UI, blocking by default (as of 3.3.0) | Partial — the capability exists as tasks; the non-blocking severity and check-status surface do not |
+| Asset checks — non-blocking WARN, attached to an asset, dedicated Checks view (`power_data_is_fresh`, `nwp_has_no_unexpected_nulls`) | power ingest, `ecmwf_ens` | Data-quality as ordinary tasks (`common.sql` check operators; Great Expectations / Soda / dbt-test); no first-class check primitive or Checks UI, blocking by default (as of 3.3.0) | Partial — the capability exists as tasks; the non-blocking severity and check-status surface do not |
 | `EcsRunLauncher` (laptop = subprocess, cloud = Fargate, switched by `dagster.yaml`) | control plane | Elastic Container Service executor (Amazon provider, Fargate launch type) | Exists; per-*task* rather than per-run granularity |
 | Data-arrival sensors (planned, [#324](https://github.com/openclimatefix/nged-substation-forecast/issues/324)) | ingest jobs | Asset-triggered DAGs, event-driven scheduling | Parity |
 
@@ -237,7 +232,7 @@ Stability](../design-philosophy/inherent-stability.md)), so an orchestrator whos
 checks are ordinary, blocking-by-default tasks makes the house pattern one we would have to rebuild
 by hand rather than inherit.
 
-### The three trickiest parts of a full port
+### The two trickiest parts of a full port
 
 #### The CV (cross validation) layer: right data model, missing status surface
 
@@ -250,28 +245,15 @@ record for CV run progress) or a hand-rolled query over Airflow's task-instance 
 a past CV run becomes a second, disconnected run. Either way, the at-a-glance grid we use daily is
 gone until Airflow ships partition observability.
 
-#### Replay backfills: fixed upstream, still deserving of explicit verification
-
-Recovering missed `live_forecasts` slots means backfilling selected 6-hourly partitions with
-`availability_mode="replay"`, which guards against [lookahead
-bias](production-deployment.md#resolve-nwp-availability-asymmetrically-live-vs-replay). The bug
-class where backfill conf was silently dropped is fixed as of Airflow 3.2.2 (see above), but its
-history is instructive: a silently dropped `availability_mode="replay"` does not fail — it produces
-subtly lookahead-contaminated forecasts. A port should still verify this path end-to-end on the
-deployed version (MWAA's 3.2.1 predates the fix), or redesign it (e.g. a dedicated replay DAG) so
-the mode cannot be dropped at all.
-
 #### Materialisation metadata and lineage
 
 Every asset attaches summary tables and row counts to its materialisation
-(`context.add_output_metadata`), which the Dagster UI renders per run and plots over time; the asset
-catalog gives lineage from ingest through forecasts, and `promoted_model` exists specifically so
-that [promotion is an audited
-materialisation](production-deployment.md#promote-the-champion-via-a-dagster-asset-not-a-script).
-Airflow's asset-event extras cover the storage half of this (the metadata travels and is queryable)
-but not the presentation half: no rendered tables, no per-asset metadata history. The equivalents
-are structured logs, MLflow, or a hand-rolled reporting table. This loss is diffuse rather than
-blocking, but it would be felt on every run.
+(`context.add_output_metadata`), which the Dagster UI renders per run and plots over time, and the
+asset catalog gives lineage from ingest through forecasts. Airflow's asset-event extras cover the
+storage half of this (the metadata travels and is queryable) but not the presentation half: no
+rendered tables, no per-asset metadata history. The equivalents are structured logs, MLflow, or a
+hand-rolled reporting table. This loss is diffuse rather than blocking, but it would be felt on
+every run.
 
 ### Where Airflow would be genuinely better
 
@@ -309,25 +291,25 @@ The assessment cuts both ways — Airflow would bring some genuine improvements:
 Everything above applies. The translation itself is not the hard part — assets are thin shells with
 their intended behaviour documented, so rewriting them as DAGs is days of work. The hard part is the
 redesign of the CV (cross validation) layer around the missing partition-status surface, the
-verification of orchestration behaviour (schedules ticking, backfills replaying without lookahead
-leakage, ECS dispatch — inherently wall-clock-bound), the docs rewrite, and the deployment cutover.
-Realistically several weeks end-to-end, landing on a cross-validation workflow with fewer of the
-affordances we rely on today.
+verification of orchestration behaviour (schedules ticking, backfills running with the config they
+were given, ECS dispatch — inherently wall-clock-bound), the docs rewrite, and the deployment
+cutover. Realistically several weeks end-to-end, landing on a cross-validation workflow with fewer
+of the affordances we rely on today.
 
 #### Option B: port only the live service — promising, with a real two-orchestrator cost
 
-Move the production side to Airflow — `power_time_series_and_metadata`, `ecmwf_ens`,
-`live_forecasts`, `h3_grid_weights`, and their schedules — and keep everything CV-run-shaped
-(registration, training, CV (cross validation) forecasts, metrics, promotion) on Dagster.
+Move the production side to Airflow — `power_time_series_and_metadata`, `clean_nged_power_data`,
+`ecmwf_ens`, `h3_grid_weights`, and their schedules — and keep everything CV-run-shaped
+(registration, training, CV (cross validation) forecasts, metrics) on Dagster.
 
 Porting only the live service works because **the seam already exists**: the [R&D/production
-boundary](production-deployment.md#bake-the-model-into-the-image-at-build-time) means the production
-hot path never touches MLflow, the model crosses as a baked image, and all data crosses via Delta
-tables rather than orchestrator state. The two halves are coupled only through storage — precisely
-the precondition for splitting orchestrators. The ported half is also the half Airflow is genuinely
-good at (cron-driven, time-partitioned, no dynamic partitions), and the result matches OCF's
-standard shape: the live service becomes one more OCF-style Airflow-orchestrated micro-service,
-while Flexpectation R&D stays a Dagster concern.
+boundary](production-deployment.md#keep-mlflow-off-the-production-runtime-path) means the production
+hot path never touches MLflow, and all data crosses via Delta tables rather than orchestrator state.
+The two halves are coupled only through storage — precisely the precondition for splitting
+orchestrators. The ported half is also the half Airflow is genuinely good at (cron-driven,
+time-partitioned, no dynamic partitions), and the result matches OCF's standard shape: the live
+service becomes one more OCF-style Airflow-orchestrated micro-service, while Flexpectation R&D stays
+a Dagster concern.
 
 In favour:
 
@@ -346,27 +328,24 @@ Against (the cost of a second orchestrator, which is ongoing rather than one-off
   and dispatches both scheduled runs and UI-launched backtests to Fargate. After a split, the box
   runs Airflow's control plane (scheduler, DAG processor, triggerer, webserver, metadata DB —
   comparable weight to Dagster's). Either the box also keeps Dagster's control plane (it will not
-  fit in 4 GB alongside MLflow and Marimo — a resize), or R&D Dagster retreats to laptops and loses
+  fit in 4 GB — a resize), or R&D Dagster retreats to laptops and loses
   Fargate-dispatched CV (cross validation) runs, which matters at V2 scale.
 - **The shared ingest assets are the awkward joint.** `ecmwf_ens` and
-  `power_time_series_and_metadata` feed both `live_forecasts` *and* the CV (cross validation)
-  assets. With ingest in Airflow, the Dagster CV (cross validation) assets' `deps` on them dangle:
-  they would be remodelled as external/observed assets, enforced lineage is lost, and "is the NWP
-  archive fresh through my backtest window?" becomes a cross-tool manual check. Extending the NWP
-  archive for a new CV (cross validation) fold becomes an *Airflow* backfill run by a researcher.
+  `power_time_series_and_metadata` are production assets, and the CV (cross validation) assets read
+  their output. With ingest in Airflow, the Dagster CV (cross validation) assets' `deps` on them
+  dangle: they would be remodelled as external/observed assets, enforced lineage is lost, and "is
+  the NWP archive fresh through my backtest window?" becomes a cross-tool manual check. Extending
+  the NWP archive for a new CV (cross validation) fold becomes an *Airflow* backfill run by a
+  researcher.
 - There is an asymmetry worth noting: NGED would get a Dagster-free world, but OCF researchers would
   still live in both tools. The boundary is clean for the operator and leakier for the developer.
 - **Option B moves the fail-open half onto the orchestrator that lacks a fail-open primitive.**
-  Option B ports precisely the half where the non-blocking check matters most:
-  `power_data_is_fresh`, `nwp_has_no_unexpected_nulls`, and `live_forecasts_are_healthy` are all
-  production-side, and the warning channel to NGED originates there. Meanwhile the R&D half — which
-  wants fail-fast and would be perfectly content with blocking data-quality tasks — is the half that
-  stays on Dagster. That is backwards with respect to the
-  [inherent-stability](../design-philosophy/inherent-stability.md) design.
-- The audit trail fragments: production run history in Airflow, promotion and CV run history in
-  Dagster/MLflow.
-- If the deployment target were MWAA at its current version (3.2.1), the backfill-conf bug would sit
-  exactly on the ported surface (replay mode), the most correctness-critical operation being moved.
+  Option B ports precisely the half where the non-blocking check matters most: `power_data_is_fresh`
+  and `nwp_has_no_unexpected_nulls` are both production-side, and the warning channel to NGED
+  originates there. Meanwhile the R&D half — which wants fail-fast and would be perfectly content
+  with blocking data-quality tasks — is the half that stays on Dagster. That is backwards with
+  respect to the [inherent-stability](../design-philosophy/inherent-stability.md) design.
+- The audit trail fragments: production run history in Airflow, CV run history in Dagster/MLflow.
 
 #### Option C: stay on Dagster, keep the seam documented — our recommendation for now
 

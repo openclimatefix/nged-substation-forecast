@@ -16,7 +16,7 @@ data-transfer question, not a compute-price question — the reasoning and the r
 are in [Forecast Delivery: Securing it](forecast-delivery.md#securing-it).
 
 The Fargate rates used throughout: x86 £0.0349/vCPU-hr + £0.0038/GB-hr; **ARM 20% cheaper**
-(£0.0279 + £0.0031), and polars/XGBoost run fine on arm64, so every task below is ARM.
+(£0.0279 + £0.0031), and Polars runs fine on arm64, so every task below is ARM.
 
 **These estimates exclude cross-validation runs (CV runs) but include routine re-training.** For v1
 we expect most — maybe all — CV-run training to run on our own laptops; the only CV run AWS sees is
@@ -24,7 +24,7 @@ an optional UI-launched backtest, priced per run below. (At v2 scale that assump
 — see [Backtests and training at v2](#backtests-and-training-scale-with-forecast-rows-too).)
 Re-training the *deployed* model is different: we plan to re-train it roughly **once a week**,
 probably on a GPU, and both estimates below carry a line for it. Fargate offers no GPUs, so the
-weekly re-train is priced as an ephemeral EC2 GPU instance (start, train, promote the new model,
+weekly re-train is priced as an ephemeral EC2 GPU instance (start, train, save the new model,
 terminate); the GPU rates are from the price-list API on 2026-07-23, converted at the same \$1 =
 £0.75.
 
@@ -47,7 +47,7 @@ up of:
 | Backtests | ~£0.65 per run, as needed |
 
 The weekly re-train row is a *planned* addition rather than an as-built cost: the live deployment
-bakes a frozen champion model into the image, and any re-training still happens on a laptop. Once
+trains no model, and any re-training still happens on a laptop. Once
 the weekly re-train moves to AWS, the arithmetic stays small: the v1 model trains in ~10 minutes on
 a laptop, so budgeting ~30 minutes of `g4dn.xlarge` (1× T4 GPU, 4 vCPU / 16 GB; \$0.615/hr →
 £0.46/hr on-demand) per weekly run — instance provisioning and data reads included — is ~£0.25/run,
@@ -65,7 +65,7 @@ Marimo as its own tiny Fargate service).
 ### Workload model
 
 Live cadence: `ecmwf_ens` 1/day (daily 00Z partition), `power_time_series_and_metadata` 24/day
-(hourly, at :55 past the hour), `live_forecasts` 4/day (6-hourly partitions), the monitoring
+(hourly, at :55 past the hour), the live forecast assets ~4/day (estimated), the monitoring
 `metrics(production_monitoring)` step ~4/day (planned —
 [#224](https://github.com/openclimatefix/nged-substation-forecast/issues/224)) → **~33
 materialisations/day ≈ 1,000/month**. This cadence ingests only ECMWF ENS and the NGED power feed
@@ -104,7 +104,7 @@ scale come to **~£2–4/month in total**:
   (£0.0040/1k) per month lands at roughly £1.20–1.90, a small line item.
 - **Data transfer — ≈£0/month.** Ingress is free (the daily NWP download from Dynamical costs
   nothing on the AWS side); S3 ↔ Fargate/EC2 traffic within eu-west-2 is free; internet egress (the
-  Tailscale-tunnelled Dagster UI and Marimo dashboard) is a few GB/month, inside AWS's account-wide
+  Tailscale-tunnelled Dagster UI) is a few GB/month, inside AWS's account-wide
   100 GB/month free egress allowance (£0.067/GB beyond).
 - **Everything else — pennies.** Elastic Container Registry image storage and CloudWatch Logs
   ingestion for ~1,000 task runs/month — one Fargate task per schedule tick, matching the ~1,000

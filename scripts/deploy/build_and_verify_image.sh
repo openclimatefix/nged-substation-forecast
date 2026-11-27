@@ -2,11 +2,10 @@
 #
 # Build the production image and smoke-test it with zero network access.
 #
-# The script is Step 4 of the AWS setup runbook as one command: build the image with the champion
-# model baked in, then prove the image runs hermetically. This header is the source of truth for
-# *why* each choice below is made. The runbook is the file `docs/live_service/aws.md`, cited below
-# as aws.md and published at
-# <https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/>.
+# The script is Step 4 of the AWS setup runbook as one command: build the image, then prove that
+# the Dagster definitions load inside it. This header is the source of truth for *why* each choice
+# below is made. The runbook is the file `docs/live_service/aws.md`, cited below as aws.md and
+# published at <https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/>.
 #
 # Usage:
 #   scripts/deploy/build_and_verify_image.sh          # no arguments — everything is derived
@@ -21,79 +20,20 @@
 # slower than native but correct. The script checks the emulator is registered and prints the fix if
 # it is not.
 #
-# The smoke test's partition key is HARD-CODED and arbitrary. In production the service forecasts
-# once per 6-hourly slot, and the partition key names the slot. The key only has to parse as
-# YYYY-MM-DD-HH:MM. The offline run dies at the numerical-weather-prediction (NWP) lookup, long
-# before the slot's validity could matter. So no real partition is needed, and no decision is worth
-# pushing onto the user. Real slots matter only for genuine runs against real data tables — see the
-# partition-semantics note at
-# <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/>.
+# The image tag is the short git commit hash of the checked-out commit, so every software release
+# gets a new tag and the previous image stays available for rollback. The GIT_SHA build arg becomes
+# an Open Container Initiative (OCI) label purely for traceability (inspect with `docker inspect`).
 #
-# The build never contacts MLflow. The build only COPYs data/production_model/ into the image, so
-# the build stays hermetic. Step 3's `promoted_model` asset populates that directory. The directory
-# is passed as the named build context `production_model`, resolved with `realpath`, so the build
-# still finds the model when data/ is a symlink to another disk. The main build context would send
-# the symlink itself, and the COPY would fail with "/data/production_model: not found". The
-# MODEL_RUN_ID and GIT_SHA build args become Open Container Initiative (OCI) labels purely for
-# traceability (inspect with `docker inspect`).
-#
-# The smoke test choices:
-#   - No credentials at all: inference reads the model baked into the image, so the smoke test
-#     passes with an empty environment. The deployed task still gets the NGED source-bucket values
-#     as secrets (runbook Step 8), because the hourly ingest schedule needs them. NGED is National
-#     Grid Electricity Distribution, the electricity network operator whose telemetry this project
-#     forecasts.
-#   - --network=none: proves runtime inference needs no network at all — the whole point of baking
-#     the model in.
-#   - Job selected with `-j live_forecasts_job`, not `--partition`: `dagster job execute` has no
-#     --partition flag. Selecting by job name and passing the partition via --tags exercises exactly
-#     the entry point Dagster's EcsRunLauncher invokes in production.
-#
-# What the script gates on, and what it does not:
-#   - HARD FAIL (exit 1) if the runtime touches MLflow. Baking the model in exists precisely so
-#     production inference has no MLflow dependency at runtime. A single "mlflow" mention in the log
-#     means that guarantee has regressed. The MLflow grep is the one check worth automating, because
-#     a reintroduced runtime MLflow call is easy to miss by eye.
-#   - NOT gated: "the model loaded" and "the only failure was missing NWP data". The container is
-#     EXPECTED to exit non-zero here. No NWP table is mounted for this isolated test, so the
-#     container fails at the NWP-availability lookup. That lookup runs *after* the model has already
-#     loaded. That ordering is the proof the model loaded; there is no reliable log string to grep
-#     for the load itself. Read the printed log and confirm by eye.
-#
-# Read for one failure by name: a traceback that names a feature the code cannot parse. A feature
-# here is one named input to the model, not a piece of functionality. That traceback means the model
-# baked into this image predates a rename of that feature. Re-promote a newer model —
-# <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#step-2-materialise-promoted_model>.
+# The smoke test runs `dagster definitions validate` in the image with --network=none and no
+# credentials. Validation imports every asset, check, job, and schedule module and resolves the
+# whole asset graph, so a dangling import, a missing package in the image, or a broken asset
+# dependency fails the build here rather than on the deployed control-plane box. It needs no
+# network and no credentials, because loading the definitions reads no data. The script gates on
+# the command's exit code: 0 means every code location loaded.
 
 set -euo pipefail
 
-# Arbitrary but well-formed (YYYY-MM-DD-HH:MM). See the header: the offline smoke test never reaches
-# the point where the slot's validity could matter.
-PARTITION_KEY="2026-01-01-00:00"
-
-PROMOTION_JSON="data/production_model/promotion.json"
-if [[ ! -f "$PROMOTION_JSON" ]]; then
-  echo "error: $PROMOTION_JSON not found — materialise the promoted_model asset first" >&2
-  echo "       (aws.md Step 3), so the model this build bakes in exists on disk." >&2
-  exit 2
-fi
-
-# The bake COPYs the promoted directory wholesale and never re-runs promotion. So a directory
-# promoted by code that does not write time_series_metadata.parquet would build and pass the smoke
-# test. The same directory would then fail every 6-hourly slot in production.
-TRAINED_METADATA="data/production_model/time_series_metadata.parquet"
-if [[ ! -f "$TRAINED_METADATA" ]]; then
-  echo "error: $TRAINED_METADATA not found — live inference locates its time series from" >&2
-  echo "       this file. Re-train, then re-materialise promoted_model." >&2
-  exit 2
-fi
-
-# The MLflow run id is read from the directory the build COPYs from, so the OCI label can never
-# drift from the model actually baked in. The image tag is that run id's first 12 hex chars plus
-# the short git commit hash, so a software release that ships the same model gets a new tag and
-# the previous image stays available for rollback.
-RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
-IMAGE="nged-forecast:${RUN_ID:0:12}-$(git rev-parse --short=8 HEAD)"
+IMAGE="nged-forecast:$(git rev-parse --short=8 HEAD)"
 
 # See the header: the deployment is ARM end-to-end, so the build always targets linux/arm64. On a
 # non-ARM host the build needs a QEMU binfmt handler registered with the kernel. So fail fast with
@@ -105,48 +45,20 @@ if [[ "$(uname -m)" != "aarch64" && ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]
   exit 2
 fi
 
-echo "==> Building ${IMAGE} for linux/arm64  (MODEL_RUN_ID=${RUN_ID})"
+echo "==> Building ${IMAGE} for linux/arm64"
 docker build \
   --platform linux/arm64 \
-  --build-context production_model="$(realpath data/production_model)" \
-  --build-arg MODEL_RUN_ID="$RUN_ID" \
   --build-arg GIT_SHA="$(git rev-parse HEAD)" \
   -t "$IMAGE" .
 
 echo
-echo "==> Smoke-testing ${IMAGE} with zero network access (partition ${PARTITION_KEY})"
-# No credentials of any kind, and --network=none: together they prove runtime inference needs
-# neither.
-LOG_FILE="$(mktemp)"
-trap 'rm -f "$LOG_FILE"' EXIT
-set +e
-docker run --network=none --platform linux/arm64 \
+echo "==> Smoke-testing ${IMAGE} with zero network access: dagster definitions validate"
+if ! docker run --rm --network=none --platform linux/arm64 \
   "$IMAGE" \
-  job execute -m nged_substation_forecast.definitions -j live_forecasts_job \
-  --tags "{\"dagster/partition\": \"${PARTITION_KEY}\"}" \
-  >"$LOG_FILE" 2>&1
-RUN_EXIT=$?
-set -e
-
-echo "----- container log (exit ${RUN_EXIT}) ----------------------------------------------"
-cat "$LOG_FILE"
-echo "-------------------------------------------------------------------------------------"
-echo
-
-# The one automated gate: hermeticity. Any real runtime MLflow use imports the `mlflow` package,
-# so a broken build surfaces the literal string somewhere in the log (import error, log line, or
-# traceback). A case-insensitive match is therefore a sound, low-rot signal.
-if grep -qi "mlflow" "$LOG_FILE"; then
-  echo "  [FAIL] MLflow appears in the runtime log — the image is NOT hermetic." >&2
-  echo "         Runtime inference must not depend on MLflow. Grep the log above for 'mlflow'." >&2
+  definitions validate -m nged_substation_forecast.definitions; then
+  echo "  [FAIL] The Dagster definitions do not load in ${IMAGE}. Read the log above." >&2
   exit 1
 fi
-echo "  [PASS] zero MLflow mentions — runtime is hermetic."
 echo
-echo "  Confirm by eye that the log above shows:"
-echo "    - the model loading, then failing ONLY at the NWP-availability lookup, and"
-echo "    - missing NWP data (no DATA_PATH_INTERNAL mounted) as the sole cause — nothing else."
-echo "  A non-zero container exit (${RUN_EXIT}) is EXPECTED here; a zero exit would be suspicious."
-echo
-echo "==> ${IMAGE} passed the automated hermeticity check."
+echo "==> ${IMAGE} passed the smoke test."
 echo "    Push + deploy it with scripts/deploy/push_and_deploy_image.sh (aws.md Step 6)."

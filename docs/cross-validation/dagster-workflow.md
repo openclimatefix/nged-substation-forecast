@@ -83,9 +83,9 @@ observed history. This is the NMAE (normalised mean absolute error) denominator 
 
 | Field | Example | Notes |
 |---|---|---|
-| `experiment_name` | `"xgboost_smoke_test"` | Unique; becomes the MLflow experiment name and partition-key prefix |
-| `base_model_config` | `"conf/model/xgboost.yaml"` | Path relative to `PROJECT_ROOT` |
-| `config_overrides` | `{"n_estimators": 100}` | Merged onto `model_params` in the YAML; every key must name a declared config field |
+| `experiment_name` | `"climatology_smoke_test"` | Unique; becomes the MLflow experiment name and partition-key prefix |
+| `base_model_config` | `"conf/model/climatology.yaml"` | Path relative to `PROJECT_ROOT` |
+| `config_overrides` | `{"random_seed": 1}` | Merged onto `model_params` in the YAML; every key must name a declared config field |
 | `run_mode` | `"smoke_test"` | `smoke_test` adds the non-leaderboard dev folds (e.g. `smoke_test`); `full_cv` or `register_only` adds the leaderboard folds |
 | `description` | `"Quick sanity check"` | Stored as an MLflow tag — optional |
 
@@ -130,7 +130,7 @@ tag does not count as a change.
 ## Step 7 — Materialise `trained_cv_model`
 
 **Trigger:** Materialise the partition `"{experiment_name}__{fold_id}"`, e.g.
-`"xgboost_smoke_test__smoke_test"`. The partition only appears after step 6 has run.
+`"climatology_smoke_test__smoke_test"`. The partition only appears after step 6 has run.
 
 **What the asset does:**
 
@@ -148,10 +148,9 @@ tag does not count as a change.
    output](../architecture/performance.md#bounding-feature-engineering-memory-prune-the-inputs-not-the-output)).
 6. Engineers features via the forecaster's `feature_engineer.engineer()`.
 7. Calls `forecaster.train(features, eligible_ids)` (the population is passed explicitly). The asset
-   then **raises** if zero boosters were trained (e.g. no series had usable power in the window).
+   then **raises** if no series was trained (e.g. no series had usable power in the window).
 8. Resolves the MLflow fold run by tag and uploads the trained model artifacts via
-   `forecaster.save_to_mlflow(fold_run_id, time_series_metadata=...)`, which puts the metadata table
-   rows the model trained against into the archive alongside it.
+   `forecaster.save_to_mlflow(fold_run_id)`.
 9. Records the training run on the fold run as **tags**: the training window (`train_start`,
    `train_end`) and the populations (`n_eligible_time_series`, `n_trained_time_series`).
 
@@ -169,12 +168,12 @@ which is also what resolves the run by it), so it is not logged again here.
 The MLflow run structure after training looks like this:
 
 ```text
-MLflow experiment "xgboost_smoke_test"
+MLflow experiment "climatology_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
-    │   params: n_estimators=100, learning_rate=0.05, …
+    │   params: random_seed=1, model_release=0, …
     └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end,
                            n_eligible_time_series, n_trained_time_series}
-            artifacts: model/   ← trained model binary files
+            artifacts: model.tar.gz   ← the saved model, as one archive
 ```
 
 ---
@@ -220,7 +219,7 @@ uv run marimo edit packages/dashboard/view_forecasts.py
 ```
 
 Pick the population with the dropdowns: the **Fold** dropdown lists every `fold_id` present in the
-`power_forecasts` table (a CV fold label, a smoke-test fold, or `live` for production forecasts),
+`power_forecasts` table (a CV fold label or a smoke-test fold),
 and an **Experiment** dropdown appears (it lists the `experiment_name` of each CV run) when the
 chosen fold holds more than one `experiment_name`. Then choose a **time series** (the dropdown
 groups the 32 series by type, so all the PV sites or all the primaries sit together), a **forecast
@@ -246,8 +245,8 @@ values.
 The **Data source** radio switches the app between the local data tables (the root `.env`) and the
 production S3 buckets without restarting marimo — see the [dashboard
 README](https://github.com/openclimatefix/nged-substation-forecast/tree/main/packages/dashboard) for
-the `.env.s3` setup, and [Operating the live service: Inspecting a live
-forecast](../live_service/operations.md#inspecting-a-live-forecast) for the production workflow.
+the `.env.s3` setup, and [Operating the live service: Inspecting
+forecasts](../live_service/operations.md#inspecting-forecasts) for the production workflow.
 
 ---
 
@@ -258,7 +257,7 @@ run config dialog before launching.
 
 | Field | Example | Notes |
 |---|---|---|
-| `population_filter.experiment_name` | `"xgboost_smoke_test"` | Filters `power_forecasts` to one CV run; leave null to score all CV runs at once |
+| `population_filter.experiment_name` | `"climatology_smoke_test"` | Filters `power_forecasts` to one CV run; leave null to score all CV runs at once |
 | `population_filter.fold_id` | `"mid_2025_to_mid_2026"` | Filters to one fold; leave null to score all folds for the CV run |
 | `population_filter.valid_time_min/max` | `"2025-10-01T00:00:00+00:00"` | ISO-8601 UTC; trims the valid_time window. Allowed only with `evaluation_scope="ad_hoc"` |
 | `evaluation_scope` | `"leaderboard"` | `"leaderboard"` logs to MLflow; `"ad_hoc"` writes Delta only |
@@ -270,12 +269,11 @@ run config dialog before launching.
    predicates push straight into the Delta scan: naming a CV run/fold prunes to just that
    partition rather than reading the whole (unbounded) table.
 2. In `leaderboard` scope, drops any group whose `fold_id` is not a leaderboard fold in the CV
-   config, naming the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. The
-   live service writes to this same table under `fold_id="live"`, and a non-leaderboard dev fold
-   such as `smoke_test` lands there too, so an unfiltered leaderboard run finds both; leaderboard
-   scope dates its evaluation window from the CV config's leaderboard folds and has none for those
-   rows. To score live output or a dev fold, run the asset with `evaluation_scope="ad_hoc"`, which
-   takes the window from the forecast rows themselves.
+   config, naming the dropped ids in a warning and in the asset's `skipped_fold_ids` metadata. A
+   non-leaderboard dev fold such as `smoke_test` lands in the same table, so an unfiltered
+   leaderboard run finds it; leaderboard scope dates its evaluation window from the CV config's
+   leaderboard folds and has none for those rows. To score a dev fold, run the asset with
+   `evaluation_scope="ad_hoc"`, which takes the window from the forecast rows themselves.
 3. Discovers the matching `(experiment_name, fold_id)` groups, skips every `study/` forecast of an
    unfiltered run (naming them in the `skipped_study_experiments` metadata), and checks every
    remaining group before scoring any, raising on a refusal; see [What the `metrics` asset refuses
@@ -311,13 +309,13 @@ run config dialog before launching.
 After step 9, the MLflow run structure looks like this:
 
 ```text
-MLflow experiment "xgboost_smoke_test"
+MLflow experiment "climatology_smoke_test"
 └── cv_summary (parent run)   tags={cv_role: parent}
-    │   params: n_estimators=100, learning_rate=0.05, …
+    │   params: random_seed=1, model_release=0, …
     │   metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← mean across folds
     └── smoke_test  tags={cv_role: fold, fold_id: smoke_test, train_start, train_end, …}
             metrics: rmse__all=4.3, rmse__disaggregated_demand=4.1, …   ← per-fold aggregate
-            artifacts: model/
+            artifacts: model.tar.gz
 ```
 
 The `forecast_metrics` Delta table stores one row per `(time_series_id, fold_id,

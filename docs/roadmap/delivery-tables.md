@@ -77,11 +77,12 @@ several of these:
    `PowerForecast` stores the 13 columns `power_fcst_p1` … `power_fcst_p99`.
 3. **Ensemble of percentile forecasts** — per-member *and* per-percentile. 🚧 Planned (v0.5).
 
-**The stored percentiles are the empirical quantiles of the ensemble members' point forecasts.** The
-XGBoost model predicts one power value per ECMWF ENS member, and `ml_core.quantiles` takes the
-linear empirical quantile of those 51 values at each of the 13 levels. The climatology baseline
-stores the quantiles of past power in the same calendar cell, and the manual heuristic stores the
-quantiles of its 13 historical analogues.
+**The stored percentiles are the empirical quantiles of the values each forecaster produces.** The
+climatology baseline stores the quantiles of past power in the same calendar cell, and the manual
+heuristic stores the quantiles of its 13 historical analogues. When a forecaster predicts one power
+value per member of the ensemble forecast (ENS) of the European Centre for Medium-Range Weather
+Forecasts (ECMWF), `ml_core.quantiles` reduces those 51 values by taking the linear empirical
+quantile at each of the 13 levels.
 
 Representations 2 and 3 are planned as two stages of one pipeline, not independent options:
 Representation 3 (per-member conditional quantiles) would be produced by the model, and
@@ -96,7 +97,7 @@ residuals alone would be over-confident during an NWP outage or a telemetry stal
 the consumer most needs to be told to be cautious. The interval width is the **in-band** signal that
 a forecast is degraded: it is the only number the consumer is certain to read. So it must not be
 left to the warnings table alone. The mechanism is conformal calibration **per degradation regime**,
-which works with today's XGBoost and needs no retraining
+which wraps an already-trained forecaster and needs no retraining
 ([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle is
 [Inherent Stability → Widening
 bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal), and whether it
@@ -111,8 +112,8 @@ uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mo
 | `valid_time` | `datetime` (UTC) | The time the forecast is *about*. |
 | `nwp_init_time` | `datetime` (UTC), nullable | When the NWP model was initialised. Identifies the NWP run behind the forecast, and matters when NWP is delayed or when we deliberately use lagged NWP runs to grow the ensemble. Null for models that do not use NWP (e.g. persistence baselines). |
 | `power_fcst_init_time` | `datetime` (UTC) | When OCF's power-forecast model was initialised (the "t0"). |
-| `power_fcst_model_name` | `string` | Name of OCF's model, e.g. `"xgboost_baseline"`. Set by the `BaseForecaster` subclass. |
-| `power_fcst_model_version` | `int16` | Number of the OCF model release, from the [release log](../live_service/model-releases.md). |
+| `power_fcst_model_name` | `string` | Name of OCF's model, e.g. `"manual_heuristic"`. Set by the `BaseForecaster` subclass. |
+| `power_fcst_model_version` | `int16` | Number of the OCF model release. The value is 0 for a CV run that is not a numbered release. |
 
 **Internal-only extensions (beyond the report draft), which NGED does not receive:** the live
 `PowerForecast` schema also carries `experiment_name` (`string`), `ml_flow_experiment_id` (`int32`,

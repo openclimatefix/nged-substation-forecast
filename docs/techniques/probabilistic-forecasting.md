@@ -243,7 +243,7 @@ risk). Fix double-counting if measured, but don't fear it more than the disease.
   above are implemented — see the [evaluation-metrics reference](evaluation-metrics.md) — as Phases
   A–B of the [probabilistic evaluation
   plan](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics).
-- **Cheap stopgap**: post-hoc spread inflation of the existing deterministic ensemble ([Phase C of
+- **Cheap stopgap**: post-hoc spread inflation of a deterministic ensemble ([Phase C of
   the probabilistic evaluation
   plan](../roadmap/metrics-and-leaderboard.md#phase-c-low-effort-calibration-after-b-proves-the-diagnosis))
   achieves calibration without any of this machinery — the full mixture pipeline must beat it to

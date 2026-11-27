@@ -23,7 +23,7 @@ Applied as ``@asset(tags=PRODUCTION_LAYER_TAGS)``.
 """
 
 RESEARCH_LAYER_TAGS: Final[dict[str, str]] = {LAYER_TAG_KEY: "research"}
-"""Tags for an asset the deployed service never needs: cross-validation, and model promotion.
+"""Tags for an asset the deployed service never needs, such as a cross-validation asset.
 
 The tag says the live service does not need the asset, not where the asset runs. Today these all
 run on a researcher's laptop; some may well move to the cloud later, though not onto the VM that

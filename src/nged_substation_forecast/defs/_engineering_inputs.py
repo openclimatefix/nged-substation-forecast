@@ -1,8 +1,6 @@
 """Loading the observed power and gridded NWP that feature engineering runs on.
 
-Shared by the research assets in ``cv_assets`` and the production asset in ``live_forecast_assets``,
-so it belongs to neither. The caller supplies the ``TimeSeriesMetadata`` that goes alongside,
-because the two layers get it from different places.
+Called by the research assets in ``cv_assets``.
 """
 
 from datetime import datetime, timedelta
@@ -38,17 +36,16 @@ def load_engineering_inputs(
 ) -> tuple[pt.LazyFrame[PowerTimeSeries], pt.LazyFrame[Nwp]]:
     """Load observed power and NWP for a window and time-series population.
 
-    Called by ``trained_cv_model`` (training window + eligible population), ``cv_power_forecasts``
-    (validation window + trained population) and ``live_forecasts`` (the live window + the promoted
-    model's population). Power is filtered to the inclusive ``[window_start - power_lookback,
-    window_end]`` window; NWP stays bounded to ``[window_start, window_end]``. Both are filtered to
-    ``time_series_ids``.
+    Called by ``trained_cv_model`` (training window + eligible population) and
+    ``cv_power_forecasts`` (validation window + trained population). Power is filtered to the
+    inclusive ``[window_start - power_lookback, window_end]`` window; NWP stays bounded to
+    ``[window_start, window_end]``. Both are filtered to ``time_series_ids``.
 
     A caller has two options when it needs power history from before ``window_start`` — for example,
     to compute a power lag feature whose target time falls earlier than the window. The caller can
-    widen ``window_start`` itself, as ``live_forecasts`` does; widening ``window_start`` also widens
-    the NWP bound, so ``live_forecasts`` passes an explicit ``init_time_start``/``init_time_end``
-    and filters the result afterwards to stay correct. Or the caller can pass ``power_lookback``,
+    widen ``window_start`` itself; widening ``window_start`` also widens the NWP bound, so such a
+    caller passes an explicit ``init_time_start``/``init_time_end`` and filters the result
+    afterwards to stay correct. Or the caller can pass ``power_lookback``,
     which widens only the power scan. The default widens neither. A ``power_lookback`` equal to the
     longest power lag a caller's features need is exactly sufficient: the scan predicate below is
     inclusive, and the earliest target time any lag can read is exactly ``window_start -
@@ -90,8 +87,7 @@ def load_engineering_inputs(
         settings: Application settings (data paths, credentials).
         time_series_ids: IDs to include; power is filtered to this population.
         metadata: The metadata for those series, whose ``h3_res_5`` decides which NWP cells are
-            scanned. R&D passes the metadata table; production passes the promoted model's frozen
-            copy.
+            scanned. The CV assets pass the metadata table.
         window_start: Inclusive start of the time window for power observations and NWP
             ``valid_time``.
         window_end: Inclusive end of the time window for power observations and NWP

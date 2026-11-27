@@ -69,7 +69,6 @@ one, the mistake is already written.
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
 | `prose-review` | reviewing, reordering or simplifying prose that already exists — structure first, then one pass per rule |
 | `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
-| `release-model` | choosing what goes into the next numbered model release from the research-default log, planning the port, or running the `model-release-N` cross-validation gate |
 
 ## Docs
 
@@ -96,8 +95,8 @@ file is far larger than it needs to be. Run the export through
 npx svgo@4 --multipass --precision=1 --final-newline chart.svg
 ```
 
-which took `docs/example_power_forecast.svg` from 571 KB to 296 KB with no visible change (verified
-by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised exports tend to trip
+which took one chart export from 571 KB to 296 KB with no visible change (verified by rendering both
+to PNG at 2× and comparing pixel by pixel). Unoptimised exports tend to trip
 `check-added-large-files`' 500 KB limit, which is the signal that this step was skipped. `svgo`
 ends its output on the closing `>`, so `--final-newline` is what stops `end-of-file-fixer`
 rewriting the chart at the next commit.
@@ -549,7 +548,7 @@ which principle is being traded away and what is bought in return.
 
 **In production, never raise because an input is absent or stale — degrade, widen the uncertainty
 bands, and record the degradation on the row.** Raising is reserved for states that are our own bug
-(an empty promoted model, a contract violation), not for the outside world misbehaving. Corollaries
+(an empty trained model, a contract violation), not for the outside world misbehaving. Corollaries
 that come up constantly when editing `defs/`:
 
 - **Liberal about missing inputs, strict about malformed ones.** Absent data routes into the
@@ -585,8 +584,7 @@ in
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
-| `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
-| `baseline_forecasters` | Naive baseline `BaseForecaster` implementations the trained forecasting models must beat, currently `manual_heuristic` and `climatology` |
+| `baseline_forecasters` | Naive baseline `BaseForecaster` implementations that any trained forecasting model must beat, currently `manual_heuristic` and `climatology` |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
 | `notebooks` | Marimo exploration notebooks |
@@ -646,15 +644,14 @@ Two operating modes:
 
 All forecasting models subclass `BaseForecaster`, which defines `train(AllFeatures)`,
 `predict(AllFeatures) -> PowerForecast`, `save(Path)`, and `load(Path) -> Self`. Each subclass owns
-its own persistence format; `XGBoostForecaster` writes one `.ubj` file per `time_series_id` plus a
-`meta.json` with the full `XGBoostConfig`.
+its own persistence format; `ClimatologyForecaster` writes a `meta.json` holding its config and
+trained population, plus a parquet file of its quantile lookup.
 
 Identity is split across three levels. **Model-family identity** — `MODEL_NAME` — is a class-level
 constant on each `BaseForecaster` subclass (a property of the implementation). **CV run identity** —
 `experiment_name` and `ml_flow_experiment_id` — lives in `BaseForecasterConfig` so it travels with
-the saved model. The **model release** — `model_release`, an integer where `0` means "not a release"
-— lives in `BaseForecasterConfig` too, and the release log
-(`docs/live_service/model-releases.md`) records each numbered release. All three are stamped onto
+the saved model. `model_release` — an integer that defaults to `0` — lives in
+`BaseForecasterConfig` too. All three are stamped onto
 every `PowerForecast` row at predict time: `power_fcst_model_name` from the class,
 `power_fcst_model_version` from `model_release`, and the dedicated
 `experiment_name`/`ml_flow_experiment_id` columns from the config. Do not collapse CV run identity

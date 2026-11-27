@@ -7,8 +7,8 @@ backup. A systemd timer runs the backup once a day.
 ## The daily backup
 
 **A systemd user timer runs the backup script every day at 03:20 UTC, and skips the day's run while
-the USB disk is unplugged.** 03:20 falls between the Dagster schedules: the live forecasts at 00:00
-and 06:00, the power ingest at 55 minutes past each hour, and the ECMWF download at 10:30. The unit
+the USB disk is unplugged.** 03:20 falls between the Dagster schedules: the power ingest at 55
+minutes past each hour, and the ECMWF download at 10:30. The unit
 files are `scripts/maintenance/systemd/nged-backup.service` and `nged-backup.timer`. Install them
 once:
 
@@ -47,7 +47,7 @@ The script writes one snapshot directory per run, named after the time in UTC, s
 `/mnt/wd_18tb/nged-substation-forecast-backups/2026-10-05T183000Z/`. Each snapshot holds:
 
 - `data_internal/` — the whole of `data/`: the NWP and NGED power tables, `power_forecasts`,
-  `forecast_metrics`, the production model, and the research outputs under `data/studies/`
+  `forecast_metrics`, and the research outputs under `data/studies/`
 - `mlruns/` — the MLflow artifacts, which hold the trained models
 - `literature/` — the git-ignored library of papers and reference documents
 - `dagster_history/` and `dagster_home/` — Dagster's run history and its `$DAGSTER_HOME` directory

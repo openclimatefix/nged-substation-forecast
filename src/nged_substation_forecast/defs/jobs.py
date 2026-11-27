@@ -31,17 +31,17 @@ class RegisterExperimentConfig(Config):
     experiment_name: str = Field(
         description=(
             "Human-readable, unique name; becomes the MLflow experiment name and the partition"
-            " key prefix. For sweeps, generate programmatically, e.g. 'xgboost_lr0p01_depth3'."
+            " key prefix. For sweeps, generate programmatically, e.g. 'heuristic_seed1'."
         ),
     )
     base_model_config: str = Field(
-        description="Path relative to PROJECT_ROOT, e.g. 'conf/model/xgboost.yaml'.",
+        description="Path relative to PROJECT_ROOT, e.g. 'conf/model/manual_heuristic.yaml'.",
     )
     config_overrides: dict[str, Any] = Field(
         default_factory=dict,
         description=(
             "Key-value overrides applied to the base YAML's model_params, replacing whole values,"
-            " e.g. {'selected_features': ['lag_1h'], 'n_estimators': 300}. Every key must name a"
+            " e.g. {'selected_features': ['power_lag_168h']}. Every key must name a"
             " field the config class declares; an unknown one is rejected, so a misspelling fails"
             " here rather than training on the YAML's value."
         ),

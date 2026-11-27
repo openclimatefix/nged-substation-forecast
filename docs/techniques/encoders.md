@@ -72,9 +72,8 @@ from each member. Pushing weather quantiles through the physics layer works for 
 at one generator, whose power curve is monotone below cut-out. A substation, though, sums many
 generators and a demand driven by several correlated weather variables. Each member carries that
 joint structure across variables and sites, and a summary statistic discards the joint structure.
-The gradient-boosted tree has no physics layer, which is why [ensemble statistics as
-features](../roadmap/xgboost-improvements.md#ensemble-statistics-as-features-instead-of-member-by-member-rows)
-remains a fair experiment for the tree.
+A gradient-boosted tree has no physics layer, which is why summarising the ensemble into
+statistics remains a fair input for a tree.
 
 **Feed ECMWF ENS member *n* and AIFS-ENS member *n* into the same forward pass, because the two
 members start from the same initial conditions.** ECMWF starts AIFS-ENS member *n* from the [initial
@@ -110,10 +109,9 @@ with lead time cannot use that signal.
 We expect ensemble spread and the disagreement between sources to be the strongest indicators of
 which source to trust, and both are already inputs. Checking what the encoder has learned needs no
 labels either: group the results by pressure gradient, ensemble spread, or disagreement between
-sources, or cluster the encoder's embeddings after training. The bar is the gradient-boosted tree
-given the same sources, and the [multi-source XGBoost
-experiment](../roadmap/xgboost-improvements.md#several-nwp-sources-as-features-v21) also tests, more
-cheaply, whether trust should depend on the weather situation at all.
+sources, or cluster the encoder's embeddings after training. The bar is a gradient-boosted tree
+given the same sources. A gradient-boosted tree given several NWP sources as features would also
+test, more cheaply, whether trust should depend on the weather situation at all.
 
 **An irradiance field recovered by inverting the metered DER fleet would be a different kind of
 input from an NWP source.** The [GB-wide

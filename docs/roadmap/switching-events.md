@@ -61,10 +61,10 @@ order:
        power) and normalise it by that series' own spread. That procedure is the same shared
        baseline named above, and the two-stage forecaster's first stage *is* that baseline — nothing
        extra.
-    2. **The same XGBoost forecaster used elsewhere in v1, but with more features that help explain
-       switching events:.** Plain lagged power features don't carry any information about whether
-       that lagged power features was in a switching event or not. The idea here is simple: Give
-       XGBoost enough information to allow it to infer which lagged features are in a switching
+    2. **A gradient-boosted forecaster with more features that help explain switching events.**
+       Plain lagged power features don't carry any information about whether that lagged power
+       features was in a switching event or not. The idea here is simple: Give the gradient-boosted
+       model enough information to allow it to infer which lagged features are in a switching
        event. Feed the lagged normalised residual, together with event-age and neighbour features,
        into a gradient-boosted model that forecasts metered power *robustly to switching*. Switching
        is handled implicitly: the model is never told an event happened, and instead learns from
@@ -171,15 +171,12 @@ the trend is a milder form of the lagged-power contamination described above. A 
 below](#stage-1-changepoint-detection-on-the-baseline-residual), is built on a robust seasonal-trend
 decomposition used in exactly this role.
 
-**Baseline implementation: reuse the existing XGBoost forecaster with no lag features.** The
-production forecaster already consumes most of the covariates the baseline needs — weather from
-numerical weather prediction (NWP), time-of-day, day-of-week (holiday flags are a [planned quick
-win](xgboost-improvements.md#uk-holiday-and-calendar-features)) — through the existing feature
-pipeline. Configuring the production forecaster with **no power-lag features** yields the
-switching-independent baseline (a lag feature would smuggle the lagged-power contamination above
-back in through the side door). Fit with a **robust (median) objective**, which doubles as the
-robust loss required below. A median (absolute-error) fit is a config-only change to the existing
-forecaster today. The per-series, per-time spread estimate used by the normalisation step below can
+**Baseline implementation: a gradient-boosted forecaster with no lag features.** The baseline needs
+weather from numerical weather prediction (NWP), time-of-day, day-of-week, and holiday flags. A
+forecaster given those covariates and **no power-lag features** yields the switching-independent
+baseline (a lag feature would smuggle the lagged-power contamination above back in through the side
+door). Fit with a **robust (median) objective**, which doubles as the robust loss required below.
+The per-series, per-time spread estimate used by the normalisation step below can
 come from either of two sources: additional quantile heads (e.g. 10%/90%) once the
 [quantile-objective model family](metrics-and-leaderboard.md#delivering-the-probabilistic-metrics)
 lands — the tidiest option — or an interim rolling median absolute deviation (MAD) of the residuals.
@@ -204,10 +201,9 @@ distinctive shape: a holiday miss hits many demand-driven series *simultaneously
 sign*, whereas a real switching event is localised and balance-conserving. [Approach 2's
 balance-attribution stage](#stage-2-balance-attribution-across-neighbours) therefore discriminates a
 holiday miss from a switching event, because its neighbourhood sum does not balance for a holiday
-miss. Second, the fix must come from the feature side — richer holiday encodings (the [planned quick
-win](xgboost-improvements.md#uk-holiday-and-calendar-features)) and, at V2 scale, cross-series
-pooling (a [global model](xgboost-improvements.md#global-model-per-time_series_type) sees dozens of
-Easters where a per-series model sees about three) — and **never** from trailing same-weekday power
+miss. Second, the fix must come from the feature side — richer holiday encodings and, at V2 scale,
+cross-series pooling (a global model per `time_series_type` sees dozens of Easters where a
+per-series model sees about three) — and **never** from trailing same-weekday power
 averages. Trailing averages would smuggle the lagged-power contamination above back in through the
 side door, absorbing a persistent switching event into "expected" within a few weeks and blinding
 the detector to exactly the events it exists to find.
@@ -333,7 +329,7 @@ flag, event age, attributed magnitude) are themselves natural features for this 
 ##### Feature-design notes
 
 - **Event age, without a normality threshold.** "How long has this series been abnormal?" is a
-  natural feature, and it needs no hand-coded normality threshold. An XGBoost split *is* a learned
+  natural feature, and it needs no hand-coded normality threshold. A tree split *is* a learned
   threshold, so the model only needs continuous accumulator statistics of the normalised residual
   and it will pick its own cutpoints. The simplest basis: signed **EWMAs (exponentially weighted
   moving averages) of the normalised residual at two or three half-lives** (say 12 hours, 3 days, 2
@@ -399,16 +395,11 @@ flag, event age, attributed magnitude) are themselves natural features for this 
 
 The two-stage forecaster can begin as soon as the baseline exists (implementation step 2 below) and
 is itself implementation step 5, evaluated by cross-validation; its result also doubles as evidence
-of the baseline's quality. So that the work gets scheduled alongside the other forecaster
-experiments, the two-stage forecaster is also tracked on the XGBoost quick-wins backlog as [the
-residual-lag
-features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline), where
-the horizon-band and init-time-anchoring interactions specific to that page are noted. Before any of
-that machinery is built, its config-only *single-stage* cousin should run first as the ablation
-control: [aligned lagged-weather
-features](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control) (a quick
-win), which lets the booster judge each lag's normality without an explicit baseline and bounds how
-much of the anomaly signal a tabular learner extracts unaided.
+of the baseline's quality. Before any of that machinery is built, its *single-stage* cousin should
+run first as the ablation control: aligned lagged-weather features, which give the model the weather
+at each lag time alongside the lagged power. The aligned lagged weather lets the booster judge each
+lag's normality without an explicit baseline and bounds how much of the anomaly signal a tabular
+learner extracts unaided.
 
 ##### A second way to use the stage-1 baseline: correct a draft
 
@@ -484,10 +475,8 @@ the draft's own attenuation with horizon is honest.
 has far smaller variance than raw power and is far more stationary across series: recent-anomaly
 persistence looks similar at a 200 MW grid supply point (GSP) and a 5 MW feeder once residuals are
 on a comparable scale. So a *global* corrector becomes plausible long before a global raw-power
-model does, sidestepping the per-series-level problem that is the [global
-model](xgboost-improvements.md#global-model-per-time_series_type)'s hard prerequisite. The
-global-model item notes the same `base_margin` move for its capacity-factor-normalised physics
-proxy.
+model does, sidestepping the per-series-level problem that is the hard prerequisite of a global
+model per `time_series_type`.
 
 ##### Attributing the uplift: calibration versus switching
 
@@ -935,17 +924,14 @@ turns out poor, the label-free fallbacks are the robust median fit (whose adequa
 experiments measure directly) and soft down-weighting of training rows by the event-age accumulator
 itself — an implicit detector, but threshold-free and tunable on the injection harness.
 
-**The decision.** After implementation step 2 (the baseline), the [aligned lagged
-weather](xgboost-improvements.md#aligned-lagged-weather-the-single-stage-ablation-control) and [the
-residual-lag
-features](xgboost-improvements.md#residual-lag-features-from-the-switching-detector-baseline)
-experiments, and the v1 label-exclusion experiments, evaluate. The v1 priority is **maximising
-NRA-forecast skill**, even where that means the model handles switching implicitly. So if the
-feature path delivers that skill (measured on out-of-event periods plus the training-side injection
-stress above) and NGED confirm the continuous signals meet their needs (an [open question for
-NGED](#open-items-dependencies)), approaches 2 and 3 demote from mainline to **contingency — kept
-designed, built if time allows once forecast skill is secured**. An explicit inferred event log is
-then a valued nice-to-have rather than a requirement.
+**The decision.** After implementation step 2 (the baseline), the aligned-lagged-weather and
+residual-lag-feature experiments, and the v1 label-exclusion experiments, evaluate. The v1 priority
+is **maximising NRA-forecast skill**, even where that means the model handles switching implicitly.
+So if the feature path delivers that skill (measured on out-of-event periods plus the training-side
+injection stress above) and NGED confirm the continuous signals meet their needs (an [open question
+for NGED](#open-items-dependencies)), approaches 2 and 3 demote from mainline to **contingency —
+kept designed, built if time allows once forecast skill is secured**. An explicit inferred event log
+is then a valued nice-to-have rather than a requirement.
 
 **The downstream artefacts that assume the discrete detector are marked conditional on this decision
 where they are defined:** [Table 5](delivery-tables.md#table-5-substation_switching), [Table 4's
@@ -1260,8 +1246,8 @@ also to test out convex optimisation as a warm-up for v2).
    from NGED (see [Open items / dependencies](#open-items-dependencies)). Nothing downstream is
    testable without these.
 2. **Baseline.** Start with the classical route: a multiple seasonal-trend decomposition per series,
-   whose remainder is the first residual to hunt for level shifts in. Then configure the existing
-   XGBoost forecaster with weather/calendar features only (**no power-lag features**) and a robust
+   whose remainder is the first residual to hunt for level shifts in. Then fit a gradient-boosted
+   forecaster with weather/calendar features only (**no power-lag features**) and a robust
    median objective, per series, with a per-series spread estimate (quantile heads once available,
    or a rolling-MAD interim). Output: normalised residual series. Sanity-check residual
    autocorrelation and per-series spread before proceeding.

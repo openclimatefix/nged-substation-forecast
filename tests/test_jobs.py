@@ -1,6 +1,6 @@
 """Unit tests for the pure helpers in ``defs/jobs.py``.
 
-These call ``_resolve_forecaster_config`` (against the real ``conf/model/xgboost.yaml``),
+These call ``_resolve_forecaster_config`` (against the real ``conf/model/manual_heuristic.yaml``),
 ``_fold_ids_for_run_mode`` (against a synthetic CV config) and the identity helpers directly — no
 MLflow, Dagster, or Settings — so they stay in the fast, unmarked unit tier. The job wiring
 itself is covered by the integration test in ``test_register_experiment_job.py``.
@@ -12,10 +12,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from contracts.config_schemas import CvConfig, CvFoldConfig
+from _dummy_forecaster import DummyForecaster, DummyForecasterConfig
+from baseline_forecasters.manual_heuristic import ManualHeuristicForecaster
+from contracts.config_schemas import CvConfig, CvFoldConfig, class_target
+from ml_core.base_forecaster import BaseForecasterConfig
 from ml_core.cv_helpers import flatten_config
 from pydantic import ValidationError
-from xgboost_forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast.defs.jobs import (
     ExperimentIdentityChangedError,
@@ -26,19 +28,36 @@ from nged_substation_forecast.defs.jobs import (
     _resolve_forecaster_config,
 )
 
-_BASE_CONFIG = "conf/model/xgboost.yaml"
+_BASE_CONFIG = "conf/model/manual_heuristic.yaml"
 
 
 def test_resolve_applies_scalar_override() -> None:
     forecaster_cls, config = _resolve_forecaster_config(
-        base_model_config=_BASE_CONFIG, config_overrides={"n_estimators": 7}, experiment_name="exp"
+        base_model_config=_BASE_CONFIG, config_overrides={"random_seed": 7}, experiment_name="exp"
     )
 
-    assert forecaster_cls is XGBoostForecaster
-    assert forecaster_cls.MODEL_NAME == "xgboost"
-    assert isinstance(config, XGBoostConfig)
-    assert config.n_estimators == 7
+    assert forecaster_cls is ManualHeuristicForecaster
+    assert forecaster_cls.MODEL_NAME == "manual_heuristic"
+    assert isinstance(config, BaseForecasterConfig)
+    assert config.random_seed == 7
     assert config.experiment_name == "exp"
+
+
+def test_resolve_builds_the_config_through_the_forecasters_config_class(tmp_path: Path) -> None:
+    """A forecaster with a config subclass as its ``CONFIG_CLASS`` gets that subclass."""
+    config_path = tmp_path / "dummy.yaml"
+    config_path.write_text(
+        f"_target_: {class_target(DummyForecaster)}\nmodel_params:\n"
+        "  selected_features: []\n  dummy_extra: 5\n"
+    )
+
+    forecaster_cls, config = _resolve_forecaster_config(
+        base_model_config=str(config_path), config_overrides={}, experiment_name="exp"
+    )
+
+    assert forecaster_cls is DummyForecaster
+    assert type(config) is DummyForecasterConfig
+    assert config.dummy_extra == 5
 
 
 def test_resolve_replaces_list_override() -> None:
@@ -57,27 +76,28 @@ def test_resolve_no_overrides_uses_yaml_defaults() -> None:
         base_model_config=_BASE_CONFIG, config_overrides={}, experiment_name="exp"
     )
 
-    assert isinstance(config, XGBoostConfig)
-    assert config.n_estimators == 500
+    assert isinstance(config, BaseForecasterConfig)
+    assert config.random_seed == 0
+    assert config.weather_source == "none"
     assert config.experiment_name == "exp"
 
 
 def test_resolve_rejects_an_ill_typed_override() -> None:
-    """Pydantic validates every hyperparameter at registration, before any fold is trained."""
-    with pytest.raises(ValidationError, match="max_depth"):
+    """Pydantic validates every config field at registration, before any fold is trained."""
+    with pytest.raises(ValidationError, match="random_seed"):
         _resolve_forecaster_config(
             base_model_config=_BASE_CONFIG,
-            config_overrides={"max_depth": "high"},
+            config_overrides={"random_seed": "high"},
             experiment_name="exp",
         )
 
 
 def test_resolve_rejects_an_unknown_override_key() -> None:
-    """A misspelled hyperparameter must fail registration, not train on the YAML's value."""
-    with pytest.raises(ValidationError, match="n_estimtors"):
+    """A misspelled config field must fail registration, not train on the YAML's value."""
+    with pytest.raises(ValidationError, match="random_sead"):
         _resolve_forecaster_config(
             base_model_config=_BASE_CONFIG,
-            config_overrides={"n_estimtors": 5000},
+            config_overrides={"random_sead": 5000},
             experiment_name="exp",
         )
 
@@ -131,15 +151,14 @@ def test_resolve_rejects_an_override_of_a_key_it_would_discard(key: str) -> None
 def test_overrides_do_not_leak_between_calls() -> None:
     """Overrides are applied to a freshly-parsed copy, so one call cannot leak into the next."""
     _resolve_forecaster_config(
-        base_model_config=_BASE_CONFIG, config_overrides={"n_estimators": 7}, experiment_name="exp"
+        base_model_config=_BASE_CONFIG, config_overrides={"random_seed": 7}, experiment_name="exp"
     )
 
     _, config = _resolve_forecaster_config(
         base_model_config=_BASE_CONFIG, config_overrides={}, experiment_name="exp"
     )
 
-    assert isinstance(config, XGBoostConfig)
-    assert config.n_estimators == 500
+    assert config.random_seed == 0
 
 
 def _mixed_fold_config() -> CvConfig:
@@ -192,7 +211,7 @@ def test_register_only_uses_the_leaderboard_folds() -> None:
 
 
 def _identity_of(**overrides: Any) -> IdentityTagsType:
-    """The identity tags a registration of ``conf/model/xgboost.yaml`` would ask for."""
+    """The identity tags a registration of ``conf/model/manual_heuristic.yaml`` would ask for."""
     forecaster_cls, config = _resolve_forecaster_config(
         base_model_config=_BASE_CONFIG, config_overrides=overrides, experiment_name="exp"
     )
@@ -212,15 +231,15 @@ def test_identity_tags_serialise_the_feature_set_sorted() -> None:
     an order-sensitive dump would make a re-registration of an *unchanged* config look changed —
     rejected by the identity check, and by MLflow's write-once params before that. Sorted output
     is the canonical form that makes the comparison mean what it says. Asserted against the base
-    YAML's whole feature set (two dozen features), so the assertion cannot pass by an accident of
-    hash ordering.
+    YAML's whole feature set (13 power lags), so the assertion cannot pass by an accident of hash
+    ordering.
     """
     _, config = _resolve_forecaster_config(
         base_model_config=_BASE_CONFIG, config_overrides={}, experiment_name="exp"
     )
 
     dumped = json.loads(
-        _identity_tags(forecaster_cls=XGBoostForecaster, forecaster_config=config)["config"]
+        _identity_tags(forecaster_cls=ManualHeuristicForecaster, forecaster_config=config)["config"]
     )
 
     assert dumped["selected_features"] == sorted(config.selected_features)
@@ -240,7 +259,7 @@ def test_unchanged_identity_is_accepted() -> None:
     ``config_target`` is one of those: experiments already in MLflow carry it, it is not part of
     an experiment's identity, and its value must not decide a re-registration either way.
     """
-    tags = _identity_of(n_estimators=7)
+    tags = _identity_of(random_seed=7)
 
     _reject_changed_identity(
         experiment_name="exp",
@@ -258,15 +277,15 @@ def test_changed_config_is_rejected_and_names_the_changed_field() -> None:
     with pytest.raises(ExperimentIdentityChangedError) as excinfo:
         _reject_changed_identity(
             experiment_name="exp",
-            stored_tags=_as_stored(_identity_of(n_estimators=7)),
-            requested_tags=_identity_of(n_estimators=300),
+            stored_tags=_as_stored(_identity_of(random_seed=7)),
+            requested_tags=_identity_of(random_seed=300),
         )
 
     message = str(excinfo.value)
     assert "'exp'" in message
-    assert "config.n_estimators: 7 -> 300" in message
+    assert "config.random_seed: 7 -> 300" in message
     # Only the field that actually changed is reported.
-    assert "max_depth" not in message
+    assert "model_release" not in message
 
 
 def test_changed_forecaster_class_is_rejected() -> None:
@@ -285,7 +304,7 @@ def test_a_reserialised_config_is_not_a_change() -> None:
     with a default, or reordered in the model class — would falsely make the experiment
     un-re-registerable, and would do it while naming no differing field at all.
     """
-    requested = _identity_of(n_estimators=7)
+    requested = _identity_of(random_seed=7)
     reserialised = json.dumps(dict(reversed(list(json.loads(requested["config"]).items()))))
 
     _reject_changed_identity(

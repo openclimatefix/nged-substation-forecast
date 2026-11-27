@@ -14,11 +14,11 @@
 Every forecast in this project is a **quantile forecast**: for each substation (`time_series_id`)
 and each target half-hour (`valid_time`), one forecast *run* (`power_fcst_init_time`) stores one
 `PowerForecast` row holding the forecast at the 13 delivery quantiles, in the columns
-`power_fcst_p1` … `power_fcst_p99`. A forecaster that produces several point values per row — the
-XGBoost model's one prediction per ECMWF ENS weather member, or the manual heuristic's one
-observation per historical analogue — reduces them to the 13 linear empirical quantiles before
-storing the row. A deterministic forecast stores one value in all 13 columns. Scoring proceeds in
-two steps:
+`power_fcst_p1` … `power_fcst_p99`. A forecaster that produces several point values per row — one
+prediction per weather member of the ensemble forecast (ENS) of the European Centre for
+Medium-Range Weather Forecasts (ECMWF), or the manual heuristic's one observation per historical
+analogue — reduces them to the 13 linear empirical quantiles before storing the row. A
+deterministic forecast stores one value in all 13 columns. Scoring proceeds in two steps:
 
 1. **Per timestamp** — each stored row is scored on its own: the median column `power_fcst_p50`
    gives the deterministic errors, and the 13 quantile columns give the pinball losses, the CRPS,
@@ -149,13 +149,11 @@ pipeline](../roadmap/metrics-and-leaderboard.md#phase-d-ensemble-of-quantile-for
 will be scored head-to-head at these same levels, so today's numbers are directly the baseline it
 must beat.
 
-**Finite-ensemble tail caveat:** the XGBoost model takes its stored quantiles from its 51
-predictions, one per ECMWF ENS member, so its $\hat{q}(0.01)$ interpolates between the two lowest
-predictions.
-The raw ensemble simply cannot represent its own far tails well, so its tail pinball losses are
-partly a representational limit rather than pure skill. That is not a reason to skip them (the
-product needs tails scored); it is the quantitative motivation for Phase D's per-member quantile
-models.
+**Finite-ensemble tail caveat:** when a forecaster takes its stored quantiles from 51 predictions,
+one per ECMWF ENS member, $\hat{q}(0.01)$ interpolates between the two lowest predictions. The raw
+ensemble simply cannot represent its own far tails well, so its tail pinball losses are partly a
+representational limit rather than pure skill. That is not a reason to skip them (the product needs
+tails scored); it is the quantitative motivation for Phase D's per-member quantile models.
 
 ### Mean pinball loss
 
@@ -183,8 +181,8 @@ receive, so a band that covers less than its nominal rate is too narrow for NGED
 whatever the reason. Part of a shortfall can come from how the quantiles were made. Quantiles taken
 from $m$ point values sit inside the true quantiles, so even $m$ values drawn from a perfectly
 calibrated distribution cover less than the nominal rate — approximately
-$\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})$. The table gives that coverage for the
-XGBoost model's 51 predictions, one per ECMWF ENS member:
+$\frac{m-1}{m+1}(\tau_{\mathrm{hi}} - \tau_{\mathrm{lo}})$. The table gives that coverage for 51
+predictions, one per ECMWF ENS member:
 
 | Band | Nominal coverage | Coverage of 51 calibrated values |
 |---|---|---|
@@ -195,10 +193,10 @@ XGBoost model's 51 predictions, one per ECMWF ENS member:
 | p20–p80 | 0.60 | ≈ 0.577 |
 | p35–p65 | 0.30 | ≈ 0.288 |
 
-A p10–p90 PICP of 0.72 for the XGBoost model is therefore 0.05 below what 51 calibrated values would
-give (0.769). The remaining 0.03 of the 8-point shortfall from 0.8 comes from taking quantiles of 51
-values, and a calibration step has to remove both parts. The finite-sample shortfall grows as $m$
-shrinks.
+If a forecaster built on the 51 ECMWF ENS members has a p10–p90 PICP of 0.72, that PICP would
+therefore sit 0.05 below what 51 calibrated values would give (0.769). The remaining 0.03 of its
+8-point shortfall from 0.8 comes from taking quantiles of 51 values, and a calibration step has to
+remove both parts. The finite-sample shortfall grows as $m$ shrinks.
 
 One caveat on precision: the formula is exact only when the interpolated quantile estimator is
 evaluated on a uniform distribution; for other distribution shapes the interpolation between extreme
@@ -360,9 +358,9 @@ check for the delivered tail quantiles.
 
 As with PICP, quantiles taken from a finite set of point values sit slightly inside the true
 quantiles, so even values drawn from a perfectly calibrated distribution exceed their p95 *more*
-than 5% of the time — slightly for the XGBoost model's 51 predictions, and by a wide margin for the
-13 historical analogues `manual_heuristic` reads. The exact shortfall per quantile and value count
-will be derived and verified by Monte Carlo at implementation time, mirroring [PICP's
+than 5% of the time — slightly for 51 predictions, one per ECMWF ENS member, and by a wide margin
+for the 13 historical analogues `manual_heuristic` reads. The exact shortfall per quantile and value
+count will be derived and verified by Monte Carlo at implementation time, mirroring [PICP's
 table](#picp-prediction-interval-coverage-probability).
 
 ### Brier score for threshold exceedance

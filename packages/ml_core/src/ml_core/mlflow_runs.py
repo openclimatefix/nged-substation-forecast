@@ -22,12 +22,10 @@ use ``mlflow`` / ``MlflowClient``, which honour whatever URI is in effect. Honou
 URI is what lets the helpers run against a file-based MLflow in tests with no server.
 """
 
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Final, cast
 
 import mlflow
-from contracts.config_schemas import STUDY_EXPERIMENT_PREFIX, import_class
+from contracts.config_schemas import import_class
 from mlflow.tracking import MlflowClient
 
 from ml_core.base_forecaster import BaseForecaster, BaseForecasterConfig
@@ -157,61 +155,3 @@ def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str)
         ) as fold_run,
     ):
         return fold_run.info.run_id
-
-
-@dataclass(frozen=True)
-class PromotableRun:
-    """One MLflow fold run (``cv_role=fold``) — a valid ``promoted_model`` promotion candidate."""
-
-    run_id: str
-    experiment_name: str
-    fold_id: str
-    last_finished_at: datetime | None
-
-
-def list_promotable_runs() -> list[PromotableRun]:
-    """List up to 1000 fold runs (``cv_role=fold``) per MLflow experiment, latest finish first.
-
-    ``last_finished_at`` is MLflow's ``end_time``: any resumed stage, including metrics,
-    updates it when the run closes. Runs without an end time sort last.
-
-    A read-only convenience for the ``promotable_model_runs`` asset
-    (``defs/promotion_assets.py``), which logs the returned list as a metadata table in the
-    Dagster UI. The MLflow experiment listing takes MLflow's default page size of 1000. The
-    per-MLflow-experiment fold-run search passes the same 1000 explicitly. The listing therefore
-    covers the first 1000 active MLflow experiments, and returns at most 1000 fold runs from each
-    MLflow experiment. A ``promoted_model`` promotion candidate's run id can then be copy-pasted
-    into that asset's launchpad rather than retyped from memory. The launchpad is the form in
-    Dagster's user interface where an asset's run-time configuration is entered before that asset is
-    materialised. The champion is still picked by eye off the MLflow leaderboard;
-    ``list_promotable_runs`` only lists the candidates. MLflow experiments whose name starts with
-    ``STUDY_EXPERIMENT_PREFIX`` are left out: a study's scored forecasts are never a candidate.
-    The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
-    beforehand.
-    """
-    client = MlflowClient()
-    runs = [
-        PromotableRun(
-            run_id=run.info.run_id,
-            experiment_name=experiment.name,
-            fold_id=run.data.tags.get("fold_id", "unknown"),
-            last_finished_at=(
-                datetime.fromtimestamp(run.info.end_time / 1000, tz=UTC)
-                if run.info.end_time is not None
-                else None
-            ),
-        )
-        for experiment in client.search_experiments()
-        if not experiment.name.startswith(STUDY_EXPERIMENT_PREFIX)
-        for run in client.search_runs(
-            experiment_ids=[experiment.experiment_id],
-            filter_string="tags.cv_role = 'fold'",
-            max_results=1000,
-            order_by=["attributes.end_time DESC"],
-        )
-    ]
-    return sorted(
-        runs,
-        key=lambda run: run.last_finished_at or datetime.min.replace(tzinfo=UTC),
-        reverse=True,
-    )
