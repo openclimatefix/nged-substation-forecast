@@ -421,7 +421,7 @@ def test_describe_day_run_faults_names_each_shortfall(tmp_path: Path) -> None:
     faults = describe_day_run_faults(native=faulty, nwp_init_time=_DAY, bundle=bundle)
     assert len(faults) == 5
     assert str(_CELLS[1]) in faults[0]
-    assert "fewer than 51 members" in faults[1]
+    assert "fewer than 51 members at some lead" in faults[1]
     assert faults[2] == f"missing lead time(s) in hours, by H3 cell: {{{_CELLS[0]}: [6]}}"
     assert faults[3] == f"the run stops short of 360 h, by H3 cell: {{{_CELLS[0]}: 300}}"
     assert "null downward_short_wave_radiation_flux_surface" in faults[4]
@@ -506,17 +506,31 @@ def test_months_past_refit_counts_calendar_months(
     assert module.months_past_refit(bundle=bundle, nwp_init_time=day) == months
 
 
-def test_a_partition_before_the_bundles_refit_month_is_refused(
+@pytest.mark.parametrize(
+    ("refit_month", "created_utc"),
+    [
+        # A bundle of the next month, so the partition is before its refit month.
+        ("2026-05", "2026-05-06T10:00:00+00:00"),
+        # The partition's own month, but the bundle was created after the 12:00 UTC origin.
+        ("2026-04", "2026-04-17T12:00:01+00:00"),
+    ],
+)
+def test_a_partition_before_the_bundle_was_created_is_refused(
     env: dict[str, Path],
     dagster_instance: DagsterInstance,
     degradations: list[dict[str, Any]],
     checkins: list[bool],
     monkeypatch: pytest.MonkeyPatch,
+    refit_month: str,
+    created_utc: str,
 ) -> None:
     monkeypatch.setattr(module, "datetime", _Noon)
-    write_bundle(env["bundle"], manifest_overrides={"refit_month": "2026-05"})
+    write_bundle(
+        env["bundle"],
+        manifest_overrides={"refit_month": refit_month, "created_utc": created_utc},
+    )
     _write_nwp(env["nwp"], days_back=list(range(14)))
-    with pytest.raises(Failure, match=r"partition 2026-04-17.*refit month 2026-05"):
+    with pytest.raises(Failure, match=rf"partition 2026-04-17.*refit month {refit_month}"):
         live_primary_substation_forecasts(build_asset_context(partition_key=_PARTITION))
     assert not env["forecasts"].exists()
     assert checkins == []
@@ -635,3 +649,108 @@ def test_the_forecasts_last_attempt_clears_a_slow_ecmwf_ens_by_30_minutes() -> N
         seconds=module.RETRY_DELAY_SECONDS
     )
     assert forecast_last - ens_end >= timedelta(minutes=30)
+
+
+def test_a_member_missing_from_the_later_leads_in_every_cell_is_reported(tmp_path: Path) -> None:
+    bundle = load_bundle(write_bundle(tmp_path / "bundle"))
+    whole = pl.concat(
+        [_day_run().with_columns(ensemble_member=pl.lit(member)) for member in range(51)]
+    )
+    lead_144 = _DAY + timedelta(hours=144)
+    faulty = whole.filter((pl.col("ensemble_member") != 7) | (pl.col("valid_time") < lead_144))
+    n_late_leads = whole.filter(pl.col("valid_time") >= lead_144)["valid_time"].n_unique()
+    faults = describe_day_run_faults(native=faulty, nwp_init_time=_DAY, bundle=bundle)
+    assert faults == [
+        (
+            f"fewer than 51 members at some lead in H3 cell(s) {sorted(_CELLS)} (fewest 50, at up"
+            f" to {n_late_leads} lead(s) in a cell)"
+        )
+    ]
+
+
+def test_a_bundle_created_by_the_12_00_origin_serves_the_day(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    write_bundle(env["bundle"], manifest_overrides={"created_utc": "2026-04-17T12:00:00+00:00"})
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    assert _materialize(dagster_instance)["n_rows"] == 2 * 671
+
+
+def test_primaries_whose_readings_miss_the_lag_window_are_reported(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    origin = native_origin(_DAY)
+    early, late = (primary["time_series_id"] for primary in PRIMARIES)
+    # Primary 101's telemetry stops 8.5 days before the origin, and Primary 102 has readings only
+    # in the last 23 hours. Both have readings in the 9-day read, and none in the lag window.
+    write_cleaned_copy(
+        env["nged"] / "power_time_series.delta",
+        flag_where=(
+            (pl.col("time_series_id") == early) & (pl.col("time") > origin - timedelta(days=8.5))
+        )
+        | ((pl.col("time_series_id") == late) & (pl.col("time") < origin - timedelta(hours=23))),
+    )
+    power = module._read_cleaned_power(
+        settings=Settings(), bundle=load_bundle(env["bundle"]), nwp_init_time=_DAY
+    )
+    assert set(power["time_series_id"].to_list()) == {early, late}
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    assert _materialize(dagster_instance)["n_primaries_without_readings"] == 2
+    without = [
+        call for call in degradations if call["fingerprint"][1] == "primaries_without_readings"
+    ]
+    assert len(without) == 1
+    assert f"[{early}, {late}]" in str(without[0]["exc"])
+
+
+def test_a_report_that_raises_still_lets_the_forecast_write_and_check_in(
+    env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    degradations: list[dict[str, Any]],
+    checkins: list[bool],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(module, "datetime", _Noon)
+    reported: list[str] = []
+
+    def broken_report(*, kind: str, message: str, settings: Settings) -> None:
+        reported.append(kind)
+        raise RuntimeError(kind)
+
+    monkeypatch.setattr(module, "_report_degradation", broken_report)
+    # Each of the four guarded reports has a degradation to send: a stale bundle, missing history
+    # runs, expected-weather rows no run covers, and a Primary without readings.
+    write_bundle(env["bundle"], manifest_overrides={"refit_month": "2026-02"})
+    write_cleaned_copy(
+        env["nged"] / "power_time_series.delta",
+        flag_where=pl.col("time_series_id") == PRIMARIES[1]["time_series_id"],
+    )
+    _write_nwp(env["nwp"], days_back=[0, 1])
+    assert _materialize(dagster_instance)["n_rows"] == 2 * 671
+    assert checkins == [True]
+    assert set(reported) == {
+        "bundle_stale",
+        "history_runs_missing",
+        "expected_weather_uncovered",
+        "primaries_without_readings",
+    }
+    # Each caught exception reaches Sentry with its stack trace, once per guarded report.
+    assert len(degradations) == 4
+
+
+def test_a_primary_with_readings_in_part_of_the_lag_window_is_not_reported(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    # Primary 102 has no reading in the last 3 days, so every day lag and some week lags are
+    # missing, but the older half of the lag window still has readings.
+    partial = PRIMARIES[1]["time_series_id"]
+    write_cleaned_copy(
+        env["nged"] / "power_time_series.delta",
+        flag_where=(pl.col("time_series_id") == partial)
+        & (pl.col("time") > native_origin(_DAY) - timedelta(days=3)),
+    )
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    metadata = _materialize(dagster_instance)
+    assert metadata["day_lag_missing_fraction"] == pytest.approx(0.5)
+    assert metadata["n_primaries_without_readings"] == 0
+    assert "primaries_without_readings" not in [call["fingerprint"][1] for call in degradations]

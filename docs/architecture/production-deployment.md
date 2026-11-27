@@ -180,8 +180,8 @@ was trained on.
 
 **The asset degrades rather than fails on input faults outside our control, and fails on our own
 faults.** A missing history run, an incomplete day's run, or a missing lag each still gives a
-forecast, from the values present. A missing or unservable bundle, a partition before the
-bundle's refit month, and an output that breaks the `PowerForecast` contract each raise, because
+forecast, from the values present. A missing or unservable bundle, a partition whose origin is
+before the bundle was created, and an output that breaks the `PowerForecast` contract each raise, because
 each is a deployment fault or a bug of ours. Each
 degradation reaches Sentry through `report_asset_degradation`, fingerprinted by its kind and
 environment, because its synthesised exception has no stack trace worth grouping on. [Operating the

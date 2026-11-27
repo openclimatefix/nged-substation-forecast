@@ -1,13 +1,14 @@
 """Golden tests: `substation_demand_forecaster` against a research bundle's fixtures.
 
-Skipped unless `PRIMARY_SUBSTATION_BUNDLE_PATH` names a bundle directory. The fixtures hold NGED
-telemetry, so they are not committed and the tests run on the workstation only. The tests read the
-weather and the cleaned power from production's own `nwp` and `cleaned_power_time_series` Delta
-tables (through `get_settings()`), so they test the real read path; the fixtures are the expected
-values only.
+The tests read the bundle at `Settings().primary_substation_bundle_path`, which
+`PRIMARY_SUBSTATION_BUNDLE_PATH` sets and which otherwise defaults to `primary_substation_bundle`
+under the local artifacts folder. They skip when that directory holds no fixtures. The fixtures
+hold NGED telemetry, so they are not committed and the tests run on the workstation only. The
+tests read the weather and the cleaned power from production's own `nwp` and
+`cleaned_power_time_series` Delta tables (through `get_settings()`), so they test the real read
+path; the fixtures are the expected values only.
 """
 
-import os
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -30,20 +31,19 @@ from substation_demand_forecaster.features import (
 )
 from substation_demand_forecaster.neural_network import QuantileForecast, forecast
 
-BUNDLE_ENV_VAR = "PRIMARY_SUBSTATION_BUNDLE_PATH"
-BUNDLE_PATH = os.environ.get(BUNDLE_ENV_VAR)
+BUNDLE_PATH = Path(get_settings().primary_substation_bundle_path)
 HISTORY_DAYS = 13
 CAMS_COLUMNS = ("cams_prev_day_mean", "cams_prev_day_csi")
 
-pytestmark = pytest.mark.skipif(
-    BUNDLE_PATH is None, reason=f"set {BUNDLE_ENV_VAR} to a bundle directory"
-)
-
 
 def _fixture_dirs() -> list[Path]:
-    if BUNDLE_PATH is None:
-        return []
-    return sorted((Path(BUNDLE_PATH) / "fixtures" / "step5").glob("origin=*"))
+    return sorted((BUNDLE_PATH / "fixtures" / "step5").glob("origin=*"))
+
+
+pytestmark = pytest.mark.skipif(
+    not _fixture_dirs(),
+    reason=f"{BUNDLE_PATH} holds no fixtures; set PRIMARY_SUBSTATION_BUNDLE_PATH to a bundle",
+)
 
 
 @dataclass(frozen=True)
@@ -60,8 +60,7 @@ class Run:
 
 @pytest.fixture(scope="module")
 def bundle() -> Bundle:
-    assert BUNDLE_PATH is not None
-    return load_bundle(Path(BUNDLE_PATH))
+    return load_bundle(BUNDLE_PATH)
 
 
 def _level_columns(frame: pl.DataFrame, *, suffix: str) -> list[str]:

@@ -122,6 +122,9 @@ def test_load_bundle_rejects_a_bundle_it_cannot_serve(
         (("shared", "calendar_timezone"), "UTC"),
         (("shared", "holidays", "calendar"), "holidays.country_holidays('GB', subdiv='SCT')"),
         (("components", "step5", "b1_constants", "cams_columns_source"), "arm replay"),
+        (("components", "step5", "lags", "cap_steps"), 96),
+        (("components", "step5", "lags", "week_steps"), 672),
+        (("components", "step5", "quantile_levels"), [0.1, 0.5, 0.9]),
     ],
 )
 def test_a_changed_config_constant_is_refused(
@@ -137,6 +140,15 @@ def test_a_changed_config_constant_is_refused(
     (root / "config.json").write_text(json.dumps(config))
     with pytest.raises(ValueError, match=leaf):
         require_servable_bundle(load_bundle(root))
+
+
+def test_a_seed_without_a_weights_file_is_refused(tmp_path: Path) -> None:
+    root = write_bundle(tmp_path / "bundle")
+    manifest = json.loads((root / "manifest.json").read_text())
+    manifest["components"]["step5"]["seeds"].append(2)
+    (root / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="3 seed"):
+        load_bundle(root)
 
 
 @pytest.mark.parametrize("path", ["primaries.json", "components/step5/standardisers.json"])

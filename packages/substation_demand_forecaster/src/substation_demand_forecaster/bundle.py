@@ -17,6 +17,7 @@ from typing import Any, Final
 import numpy as np
 import polars as pl
 import torch
+from contracts.common import DELIVERY_QUANTILES
 
 BUNDLE_FORMAT_VERSION: Final[str] = "2"
 """The `bundle_format_version` this package reads; the manifest stores it as a string."""
@@ -46,6 +47,12 @@ GRID_START: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
 GRID_STEP: Final[timedelta] = timedelta(minutes=30)
 
 CALENDAR_TIMEZONE: Final[str] = "Europe/London"
+
+LAG_CAP_STEPS: Final[int] = 48
+"""Half-hours between the newest lag and the native origin: the day lag is at least 24 hours old."""
+
+WEEK_STEPS: Final[int] = 336
+"""Half-hours in a week: the week lag's period, and the length of the window the lags read."""
 
 B1_TRAILING_WINDOW_STEPS: Final[tuple[int, int, int]] = (6, 12, 48)
 """The 3-hour, 6-hour, and 24-hour windows of the B1 trailing means, in half-hours."""
@@ -148,6 +155,9 @@ class Bundle:
     """0 for a bundle that is not a release of the forecasting model, otherwise its number."""
     research_commit: str
     refit_month: str
+    created_utc: datetime
+    """When research exported the bundle, from the manifest; no forecast before it is the bundle's
+    to make."""
     primaries: pl.DataFrame
     """One row per Primary in `primary_index` order: `primary_index` (Int64), `time_series_id`
     (Int32), `h3_index` (Int64), `latitude` and `longitude` (Float64), `effective_capacity_mw`
@@ -159,8 +169,6 @@ class Bundle:
     b1: B1Config
     calendar: CalendarConfig
     standardisers: Standardisers
-    quantile_levels: tuple[float, ...]
-    """The 13 quantile levels NGED's delivery tables carry."""
     seeds: tuple[int, ...]
     weights: tuple[dict[str, torch.Tensor], ...]
     """Each seed's tensors, keyed by their `state_dict` names, in `seeds` order."""
@@ -270,6 +278,8 @@ def _network_config(*, step5: dict[str, Any], n_knots: int) -> NetworkConfig:
 
 
 def _lag_config(*, lags: dict[str, Any]) -> LagConfig:
+    _check(name="lags.cap_steps", found=lags["cap_steps"], expected=LAG_CAP_STEPS)
+    _check(name="lags.week_steps", found=lags["week_steps"], expected=WEEK_STEPS)
     return LagConfig(
         cap_steps=int(lags["cap_steps"]),
         week_steps=int(lags["week_steps"]),
@@ -366,10 +376,24 @@ def load_bundle(path: Path) -> Bundle:
     primaries = _primaries(
         entries=_read_json(path / manifest["shared_files"]["primaries"])["primaries"]
     )
+    # The forecast's quantile columns are `DELIVERY_QUANTILES`, so the neural network must have
+    # been trained to read those levels out.
+    _check(
+        name="quantile_levels",
+        found=tuple(float(level) for level in step5["quantile_levels"]),
+        expected=DELIVERY_QUANTILES,
+    )
+    if len(component["seeds"]) != len(files["weights"]):
+        msg = (
+            f"bundle lists {len(component['seeds'])} seed(s) and {len(files['weights'])} weights"
+            " file(s); each seed needs one weights file"
+        )
+        raise ValueError(msg)
     return Bundle(
         model_release=int(manifest["model_release"]),
         research_commit=str(manifest["research_git"]["commit"]),
         refit_month=str(manifest["refit_month"]),
+        created_utc=datetime.fromisoformat(manifest["created_utc"]),
         primaries=primaries,
         column_names=tuple(column["name"] for column in columns),
         network=_network_config(step5=step5, n_knots=int(knots["n_knots"])),
@@ -379,7 +403,6 @@ def load_bundle(path: Path) -> Bundle:
         standardisers=_standardisers(
             stored=_read_json(path / files["standardisers"]), n_primaries=primaries.height
         ),
-        quantile_levels=tuple(float(level) for level in step5["quantile_levels"]),
         seeds=tuple(int(seed) for seed in component["seeds"]),
         weights=_load_weights(root=path, files=files["weights"]),
     )

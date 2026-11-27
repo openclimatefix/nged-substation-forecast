@@ -20,8 +20,10 @@ a line-by-line port of the functional reference that each bundle ships as `refer
 - `neural_network`: the forward pass of every seed, and the quantiles read out of each row's
   Gaussian mixture.
 
-**The golden tests compare every stage with a bundle's fixtures, and run only when
-`PRIMARY_SUBSTATION_BUNDLE_PATH` names a bundle directory.** The golden tests read production's
+**The golden tests compare every stage with a bundle's fixtures, and run only when the bundle
+directory that `Settings().primary_substation_bundle_path` names holds fixtures.**
+`PRIMARY_SUBSTATION_BUNDLE_PATH` sets that path, which otherwise defaults to
+`primary_substation_bundle` under the local artifacts folder. The golden tests read production's
 Delta tables, so they need `DATA_PATH_INTERNAL` set as well:
 
 ```bash

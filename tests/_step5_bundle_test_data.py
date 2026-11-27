@@ -160,6 +160,7 @@ def write_bundle(root: Path, *, manifest_overrides: dict | None = None) -> Path:
     manifest = {
         "bundle_format_version": "2",
         "refit_month": "2026-04",
+        "created_utc": "2026-04-06T10:00:00+00:00",
         "model_release": 0,
         "research_git": {"commit": "0" * 40},
         "components": {

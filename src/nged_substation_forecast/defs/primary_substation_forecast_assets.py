@@ -4,6 +4,7 @@
 run and writes one row per Primary and half-hour to the `power_forecasts` Delta table.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -41,6 +42,7 @@ from substation_demand_forecaster.ens_summary import (
 )
 from substation_demand_forecaster.features import (
     STEP5_COLUMNS,
+    InputMatrix,
     build_expected_rows,
     build_input_matrix,
     native_origin,
@@ -173,8 +175,8 @@ def describe_day_run_faults(
     The forecast is still made from the members and values present, and a value still missing goes
     through the standardiser as the training mean, so these faults degrade the forecast silently
     unless they are reported. The five cases, in the order they are returned, are a cell with no
-    rows, a cell with fewer than 51 members, a lead missing inside the run, a run that stops short
-    of 360 hours, and radiation that is null after lead 0.
+    rows, a cell with fewer than 51 members at some lead, a lead missing inside the run, a run that
+    stops short of 360 hours, and radiation that is null after lead 0.
 
     Args:
         native: `_read_native_nwp`'s rows; only the day's run is read.
@@ -190,12 +192,21 @@ def describe_day_run_faults(
     missing_cells = sorted(cells - set(run["h3_index"].unique().to_list()))
     if missing_cells:
         faults.append(f"no rows in H3 cell(s) {missing_cells}")
-    members = run.group_by("h3_index").agg(n=pl.col("ensemble_member").n_unique())
-    short_cells = members.filter(pl.col("n") < len(ECMWF_ENS_ENSEMBLE_MEMBERS)).sort("h3_index")
+    # Counted per lead, because a member that stops part-way through the run is still present in
+    # the cell as a whole.
+    short_cells = (
+        run.group_by("h3_index", "valid_time")
+        .agg(n=pl.col("ensemble_member").n_unique())
+        .filter(pl.col("n") < len(ECMWF_ENS_ENSEMBLE_MEMBERS))
+        .group_by("h3_index")
+        .agg(pl.col("n").min(), n_leads=pl.len())
+        .sort("h3_index")
+    )
     if short_cells.height:
         faults.append(
-            f"fewer than {len(ECMWF_ENS_ENSEMBLE_MEMBERS)} members in H3 cell(s) "
-            f"{short_cells['h3_index'].to_list()} (fewest {short_cells['n'].min()})"
+            f"fewer than {len(ECMWF_ENS_ENSEMBLE_MEMBERS)} members at some lead in H3 cell(s) "
+            f"{short_cells['h3_index'].to_list()} (fewest {short_cells['n'].min()}, at up to"
+            f" {short_cells['n_leads'].max()} lead(s) in a cell)"
         )
     missing_leads: dict[int, list[int]] = {}
     short: dict[int, int] = {}
@@ -324,6 +335,28 @@ def _report_degradation(*, kind: str, message: str, settings: Settings) -> None:
     )
 
 
+def _guarded(*, context: AssetExecutionContext, what: str, report: Callable[[], None]) -> None:
+    """Run one warning report under a catch-all, so a bug in it cannot fail the forecast.
+
+    Rule 7 of the inherent-stability rules puts every warning path under a catch-all, so a bug in
+    a probe degrades the report rather than failing the forecast:
+    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
+
+    Args:
+        context: The asset's context, for its log.
+        what: What the report does, completing "Could not ...".
+        report: The report.
+    """
+    try:
+        report()
+    except BaseException as exc:
+        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
+            raise  # A cancelled run must cancel.
+        # No fingerprint: this exception was caught, so it carries the stack trace Sentry groups on.
+        context.log.exception(f"Could not {what}")
+        report_asset_degradation(asset_name=ASSET_NAME, exc=exc)
+
+
 def _report_input_faults(
     *,
     context: AssetExecutionContext,
@@ -332,43 +365,30 @@ def _report_input_faults(
     nwp_init_time: datetime,
     bundle: Bundle,
 ) -> list[datetime]:
-    """Report the missing history runs and the day's run faults; return the missing runs.
-
-    Rule 7 of the inherent-stability rules puts this warning path under a catch-all, so a bug in
-    the probe degrades the report rather than failing the forecast:
-    <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
-    """
+    """Report the missing history runs and the day's run faults; return the missing runs."""
     run = nwp_init_time.date().isoformat()
-    try:
-        present = set(native["init_time"].unique().to_list())
-        missing = [init for init in history_init_times(nwp_init_time) if init not in present]
-        if missing:
-            names = ", ".join(init.date().isoformat() for init in missing)
-            message = (
-                f"{ASSET_NAME} for the {run} 00Z ENS run is missing {len(missing)} of the"
-                f" {HISTORY_DAYS} history run(s) ({names}). The thermal-lag and solar-gain columns"
-                " were computed from the history that remains, and the lags' expected-weather rows"
-                " fell back to the next-freshest run."
-            )
-            context.log.warning(message)
-            _report_degradation(kind="history_runs_missing", message=message, settings=settings)
-        faults = describe_day_run_faults(native=native, nwp_init_time=nwp_init_time, bundle=bundle)
-        if faults:
-            message = (
-                f"{ASSET_NAME} forecast from an incomplete {run} 00Z ENS run: {'; '.join(faults)}."
-                " The forecast used what is present: a missing lead is interpolated from its"
-                " neighbours, fewer members give the ensemble mean and spread of the members"
-                " present, and an input still missing takes its training mean."
-            )
-            context.log.warning(message)
-            _report_degradation(kind="day_run_incomplete", message=message, settings=settings)
-    except BaseException as exc:
-        if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
-            raise  # A cancelled run must cancel.
-        # No fingerprint: this exception was caught, so it carries the stack trace Sentry groups on.
-        context.log.exception("Could not check the ENS runs the forecast reads")
-        report_asset_degradation(asset_name=ASSET_NAME, exc=exc)
-        return []
+    present = set(native["init_time"].unique().to_list())
+    missing = [init for init in history_init_times(nwp_init_time) if init not in present]
+    if missing:
+        names = ", ".join(init.date().isoformat() for init in missing)
+        message = (
+            f"{ASSET_NAME} for the {run} 00Z ENS run is missing {len(missing)} of the"
+            f" {HISTORY_DAYS} history run(s) ({names}). The thermal-lag and solar-gain columns"
+            " were computed from the history that remains, and the lags' expected-weather rows"
+            " fell back to the next-freshest run."
+        )
+        context.log.warning(message)
+        _report_degradation(kind="history_runs_missing", message=message, settings=settings)
+    faults = describe_day_run_faults(native=native, nwp_init_time=nwp_init_time, bundle=bundle)
+    if faults:
+        message = (
+            f"{ASSET_NAME} forecast from an incomplete {run} 00Z ENS run: {'; '.join(faults)}."
+            " The forecast used what is present: a missing lead is interpolated from its"
+            " neighbours, fewer members give the ensemble mean and spread of the members"
+            " present, and an input still missing takes its training mean."
+        )
+        context.log.warning(message)
+        _report_degradation(kind="day_run_incomplete", message=message, settings=settings)
     return missing
 
 
@@ -377,8 +397,7 @@ def months_past_refit(*, bundle: Bundle, nwp_init_time: datetime) -> int:
 
     A real bundle's last offset knot is its refit month, so a positive value means the forecast's
     valid times sit past the last knot, where the offset is held flat. A monthly refit keeps the
-    value at 0. A negative value means the run falls before the bundle's refit month, which only a
-    backfill with a newer bundle can produce.
+    value at 0.
     """
     refit = datetime.strptime(bundle.refit_month, "%Y-%m").replace(tzinfo=UTC)
     return (nwp_init_time.year - refit.year) * 12 + nwp_init_time.month - refit.month
@@ -409,19 +428,22 @@ def _report_stale_bundle(*, settings: Settings, bundle: Bundle, nwp_init_time: d
         )
 
 
-def _refuse_a_run_before_the_refit_month(*, bundle: Bundle, partition_key: str) -> None:
-    """Raise `Failure` when the partition's run falls before the bundle's refit month.
+def _refuse_a_forecast_before_the_bundle_existed(*, bundle: Bundle, partition_key: str) -> None:
+    """Raise `Failure` when the partition's 12:00 UTC origin is before the bundle's `created_utc`.
 
-    A newer bundle has seen readings from after the partition's day, so its forecast of that day is
-    not the forecast the service could have made, and writing it would replace the honest one.
+    The bundle did not exist on that day, so the forecast it would write is not the forecast the
+    service served then, and a backfill would replace the served forecast. The check covers every
+    day before the refit month too, because research exports a bundle only after its refit month
+    has begun.
     """
-    nwp_init_time = partition_nwp_init_time(partition_key)
-    if months_past_refit(bundle=bundle, nwp_init_time=nwp_init_time) < 0:
+    origin = partition_nwp_init_time(partition_key) + timedelta(hours=FORECAST_INIT_HOUR_UTC)
+    if origin < bundle.created_utc:
         raise Failure(
             description=(
-                f"{ASSET_NAME} refuses partition {partition_key}, because it falls before the"
-                f" deployed bundle's refit month {bundle.refit_month}. Backfill that day with the"
-                " bundle that was live then."
+                f"{ASSET_NAME} refuses partition {partition_key}, because its 12:00 UTC origin is"
+                f" before the deployed bundle was created ({bundle.created_utc.isoformat()}, refit"
+                f" month {bundle.refit_month}). Backfill that day with the bundle that was live"
+                " then."
             )
         )
 
@@ -459,40 +481,60 @@ def _wait_for_day_run(
     raise RetryRequested(max_retries=MAX_RETRIES, seconds_to_wait=RETRY_DELAY_SECONDS) from missing
 
 
+def primaries_without_readings(*, bundle: Bundle, matrix: InputMatrix) -> list[int]:
+    """Return the `time_series_id` of each Primary whose every day and week lag is missing.
+
+    The targets' week lags cover every half-hour of the 7 days the lags read, which end 1 day
+    before the native origin, so a Primary has every lag missing exactly when it has no cleaned
+    reading in those 7 days.
+    """
+    missing = matrix.raw[:, [_DAY_LAG_MISSING, _WEEK_LAG_MISSING]].astype(bool).all(axis=1)
+    silent = (
+        pl.DataFrame({"primary_index": matrix.keys["primary_index"], "missing": missing})
+        .group_by("primary_index")
+        .agg(pl.col("missing").all())
+        .filter(pl.col("missing"))
+    )
+    return sorted(
+        bundle.primaries.filter(pl.col("primary_index").is_in(silent["primary_index"].implode()))[
+            "time_series_id"
+        ].to_list()
+    )
+
+
 def _report_primaries_without_readings(
     *,
     context: AssetExecutionContext,
     settings: Settings,
-    bundle: Bundle,
-    power: pl.DataFrame,
+    silent: list[int],
     nwp_init_time: datetime,
-) -> int:
-    """Report the bundle's Primaries with no cleaned reading in the `POWER_HISTORY` window.
-
-    Args:
-        context: The asset's context, for its log.
-        settings: The settings naming the Sentry environment.
-        bundle: The bundle's Primaries.
-        power: `_read_cleaned_power`'s rows.
-        nwp_init_time: The day's 00Z run.
-
-    Returns:
-        How many of the bundle's Primaries have no reading.
-    """
-    silent = sorted(
-        set(bundle.primaries["time_series_id"].to_list())
-        - set(power["time_series_id"].unique().to_list())
-    )
+) -> None:
     if silent:
         message = (
             f"{ASSET_NAME} for the {nwp_init_time.date().isoformat()} 00Z ENS run found no cleaned"
-            f" reading for {len(silent)} Primary time series {silent} in the"
-            f" {POWER_HISTORY.days} days before the native origin. Their day and week lags read"
-            " the missing-lag encoding, so their forecasts carry no recent level."
+            f" reading for {len(silent)} Primary time series {silent} in the 7 days the lags read,"
+            " which end 1 day before the native origin. Their day and week lags read the"
+            " missing-lag encoding, so their forecasts carry no recent level."
         )
         context.log.warning(message)
         _report_degradation(kind="primaries_without_readings", message=message, settings=settings)
-    return len(silent)
+
+
+def _report_uncovered_expected_weather(
+    *,
+    context: AssetExecutionContext,
+    settings: Settings,
+    n_uncovered: int,
+    nwp_init_time: datetime,
+) -> None:
+    if n_uncovered:
+        message = (
+            f"{ASSET_NAME} for the {nwp_init_time.date().isoformat()} 00Z ENS run has"
+            f" {n_uncovered} expected-weather row(s) that no ENS run covers. A lag that reads one"
+            " of those rows reads zeros."
+        )
+        context.log.warning(message)
+        _report_degradation(kind="expected_weather_uncovered", message=message, settings=settings)
 
 
 @asset(
@@ -537,8 +579,9 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
     - The day's run falls two or more months after the bundle's refit month, or one month after it
       and past the 7th of the month: the offset is held at the last knot's value, and the asset
       names the bundle.
-    - A Primary has no cleaned reading in the 9 days before the native origin: its day and week
-      lags read the missing encoding, and the asset names the Primary.
+    - A Primary has no cleaned reading in the 7 days the lags read, which end 1 day before the
+      native origin: its day and week lags read the missing encoding, and the asset names the
+      Primary.
 
     A day or week lag with no cleaned reading makes the neural network read the missing encoding,
     which it was trained with, and the forecast degrades towards the lag-free forecast. A single
@@ -548,16 +591,16 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
 
     A bundle that is missing, has an unknown format version, or was trained on CAMS values the
     service cannot reproduce raises, because that is a deployment fault of ours. So does a
-    partition before the bundle's refit month, which a backfill with a newer bundle would otherwise
-    overwrite with a forecast that has seen later readings. A backfill reads the runs initialised
-    up to its own day, so it sees the weather the live run saw; its lags can differ from the live
-    run's, because late telemetry is now on disk.
+    partition whose 12:00 UTC origin is before the bundle's ``created_utc``, which a backfill with
+    a newer bundle would otherwise overwrite with a forecast the service never served. A backfill
+    reads the runs initialised up to its own day, so it sees the weather the live run saw; its lags
+    can differ from the live run's, because late telemetry is now on disk.
     """
     settings = Settings()
     nwp_init_time = partition_nwp_init_time(context.partition_key)
     bundle = load_bundle(Path(settings.primary_substation_bundle_path))
     require_servable_bundle(bundle)
-    _refuse_a_run_before_the_refit_month(bundle=bundle, partition_key=context.partition_key)
+    _refuse_a_forecast_before_the_bundle_existed(bundle=bundle, partition_key=context.partition_key)
     no_forecast = MaterializeResult(metadata={"nwp_init_time": str(nwp_init_time), "n_rows": 0})
     if nwp_init_time not in set(_available_nwp_init_times(settings)):
         problem = "is not in the nwp table"
@@ -574,37 +617,53 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
         )
         return no_forecast
     # After the wait, so a run that retried reports the stale bundle once, not on every attempt.
-    _report_stale_bundle(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
-
-    missing_runs = _report_input_faults(
+    _guarded(
         context=context,
-        settings=settings,
-        native=native,
-        nwp_init_time=nwp_init_time,
-        bundle=bundle,
+        what="check the bundle's age",
+        report=lambda: _report_stale_bundle(
+            settings=settings, bundle=bundle, nwp_init_time=nwp_init_time
+        ),
+    )
+    missing_runs: list[datetime] = []
+    _guarded(
+        context=context,
+        what="check the ENS runs the forecast reads",
+        report=lambda: missing_runs.extend(
+            _report_input_faults(
+                context=context,
+                settings=settings,
+                native=native,
+                nwp_init_time=nwp_init_time,
+                bundle=bundle,
+            )
+        ),
     )
     summary = summarise_runs(native.lazy(), bundle.primaries).collect()
-    power = _read_cleaned_power(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
-    n_without_readings = _report_primaries_without_readings(
-        context=context,
-        settings=settings,
+    matrix = build_input_matrix(
         bundle=bundle,
-        power=power,
+        summary=summary,
+        cleaned_power=_read_cleaned_power(
+            settings=settings, bundle=bundle, nwp_init_time=nwp_init_time
+        ),
         nwp_init_time=nwp_init_time,
     )
-    matrix = build_input_matrix(
-        bundle=bundle, summary=summary, cleaned_power=power, nwp_init_time=nwp_init_time
+    silent = primaries_without_readings(bundle=bundle, matrix=matrix)
+    _guarded(
+        context=context,
+        what="report the Primaries without readings",
+        report=lambda: _report_primaries_without_readings(
+            context=context, settings=settings, silent=silent, nwp_init_time=nwp_init_time
+        ),
     )
     expected_rows = build_expected_rows(bundle=bundle, summary=summary, nwp_init_time=nwp_init_time)
     n_uncovered = int(np.isnat(expected_rows.run_init_time).sum())
-    if n_uncovered:
-        message = (
-            f"{ASSET_NAME} for the {nwp_init_time.date().isoformat()} 00Z ENS run has"
-            f" {n_uncovered} expected-weather row(s) that no ENS run covers. A lag that reads one"
-            " of those rows reads zeros."
-        )
-        context.log.warning(message)
-        _report_degradation(kind="expected_weather_uncovered", message=message, settings=settings)
+    _guarded(
+        context=context,
+        what="report the uncovered expected-weather rows",
+        report=lambda: _report_uncovered_expected_weather(
+            context=context, settings=settings, n_uncovered=n_uncovered, nwp_init_time=nwp_init_time
+        ),
+    )
     quantiles = forecast(
         bundle=bundle,
         matrix=matrix.standardised,
@@ -647,6 +706,6 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
             "n_uncovered_expected_weather_rows": n_uncovered,
             "day_lag_missing_fraction": float(matrix.raw[:, _DAY_LAG_MISSING].mean()),
             "week_lag_missing_fraction": float(matrix.raw[:, _WEEK_LAG_MISSING].mean()),
-            "n_primaries_without_readings": n_without_readings,
+            "n_primaries_without_readings": len(silent),
         }
     )
