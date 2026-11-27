@@ -174,7 +174,7 @@ Three one-time console steps complete the setup:
 2. **Route events by their tags.** `fault_category:run_failed` means a scheduled job failed, so that
    cycle did not run — notify whoever is on for the next business day. Everything else belongs in a
    digest rather than a notification: `degraded_asset:*` (an asset carried on with reduced
-   function, including the [forecast's three degradation
+   function, including the [forecast's five degradation
    kinds](operations.md#the-daily-primary-substation-forecast)), `asset_check:*` (a check could not
    evaluate its own inputs, so one signal is unknown rather than bad), and `retrying_asset:*` (a
    warning that an asset failed and will retry, sent on the first failed attempt and followed by a

@@ -246,6 +246,19 @@ def test_expected_rows_fall_back_to_an_older_run_then_to_zero(bundle: Bundle) ->
     )
 
 
+def test_a_null_weather_value_leaves_the_rest_of_a_covered_row(bundle: Bundle) -> None:
+    summary = _summary(bundle, run_days_back=list(range(14))).with_columns(
+        mean_shortwave=pl.lit(None, dtype=pl.Float32)
+    )
+    rows = build_expected_rows(bundle=bundle, summary=summary, nwp_init_time=_DAY)
+    row = _row_at(rows, primary=0, stamp=_DAY + PUBLICATION_DELAY - timedelta(days=1))
+    shortwave, temperature = 0, 2  # positions in the expected-weather row
+    assert np.isnan(rows.raw[row, shortwave])
+    assert rows.raw[row, temperature] == 2.0
+    assert np.isfinite(rows.raw[row, 7:]).all()  # the date-time columns
+    assert not np.isnat(rows.run_init_time[row])
+
+
 def test_a_primary_with_no_readings_keeps_its_lag_grid_indices(bundle: Bundle) -> None:
     empty_power = pl.DataFrame(
         schema={"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}

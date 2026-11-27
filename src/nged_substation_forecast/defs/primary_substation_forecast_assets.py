@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
+import numpy as np
 import patito as pt
 import polars as pl
 from contracts.common import DELIVERY_QUANTILES
@@ -179,18 +180,26 @@ def describe_day_run_faults(
             f"fewer than {len(ECMWF_ENS_ENSEMBLE_MEMBERS)} members in H3 cell(s) "
             f"{short_cells['h3_index'].to_list()} (fewest {short_cells['n'].min()})"
         )
-    leads = {
-        int((valid_time - nwp_init_time) / timedelta(hours=1))
-        for valid_time in run["valid_time"].unique().to_list()
-    }
-    last = max(leads, default=-1)
-    missing_leads = [
-        lead for lead in ECMWF_ENS_LEAD_TIME_HOURS if lead < last and lead not in leads
-    ]
+    missing_leads: dict[int, list[int]] = {}
+    short: dict[int, int] = {}
+    for cell, valid_times in (
+        run.group_by("h3_index").agg(pl.col("valid_time").unique()).sort("h3_index").iter_rows()
+    ):
+        leads = {
+            int((valid_time - nwp_init_time) / timedelta(hours=1)) for valid_time in valid_times
+        }
+        last = max(leads)
+        gaps = [lead for lead in ECMWF_ENS_LEAD_TIME_HOURS if lead < last and lead not in leads]
+        if gaps:
+            missing_leads[cell] = gaps
+        if last < ECMWF_ENS_LEAD_TIME_HOURS[-1]:
+            short[cell] = last
     if missing_leads:
-        faults.append(f"missing lead time(s) in hours {missing_leads}")
-    if last < ECMWF_ENS_LEAD_TIME_HOURS[-1]:
-        faults.append(f"the run stops at lead {last} h, short of {ECMWF_ENS_LEAD_TIME_HOURS[-1]} h")
+        faults.append(f"missing lead time(s) in hours, by H3 cell: {missing_leads}")
+    if short:
+        faults.append(
+            f"the run stops short of {ECMWF_ENS_LEAD_TIME_HOURS[-1]} h, by H3 cell: {short}"
+        )
     after_lead_0 = run.filter(pl.col("valid_time") > nwp_init_time)
     for column in _RADIATION_COLUMNS:
         n_null = after_lead_0[column].null_count()
@@ -321,7 +330,8 @@ def _report_input_faults(
             message = (
                 f"{ASSET_NAME} for the {run} 00Z ENS run is missing {len(missing)} of the"
                 f" {HISTORY_DAYS} history run(s) ({names}). The thermal-lag and solar-gain columns"
-                " were computed from the history that remains."
+                " were computed from the history that remains, and the lags' expected-weather rows"
+                " fell back to the next-freshest run."
             )
             context.log.warning(message)
             _report_degradation(kind="history_runs_missing", message=message, settings=settings)
@@ -329,7 +339,9 @@ def _report_input_faults(
         if faults:
             message = (
                 f"{ASSET_NAME} forecast from an incomplete {run} 00Z ENS run: {'; '.join(faults)}."
-                " Missing values were filled with the training mean."
+                " The forecast used what is present: a missing lead is interpolated from its"
+                " neighbours, fewer members give the ensemble mean and spread of the members"
+                " present, and an input still missing takes its training mean."
             )
             context.log.warning(message)
             _report_degradation(kind="day_run_incomplete", message=message, settings=settings)
@@ -341,6 +353,31 @@ def _report_input_faults(
         report_asset_degradation(asset_name=ASSET_NAME, exc=exc)
         return []
     return missing
+
+
+def months_past_refit(*, bundle: Bundle, nwp_init_time: datetime) -> int:
+    """Return how many calendar months the day's run falls after the bundle's refit month.
+
+    A real bundle's last offset knot is its refit month, so a positive value means the forecast's
+    valid times sit past the last knot, where the offset is held flat. A monthly refit keeps the
+    value at 0.
+    """
+    refit = datetime.strptime(bundle.refit_month, "%Y-%m").replace(tzinfo=UTC)
+    return (nwp_init_time.year - refit.year) * 12 + nwp_init_time.month - refit.month
+
+
+def _report_stale_bundle(*, settings: Settings, bundle: Bundle, nwp_init_time: datetime) -> None:
+    months = months_past_refit(bundle=bundle, nwp_init_time=nwp_init_time)
+    if months > 0:
+        _report_degradation(
+            kind="bundle_stale",
+            message=(
+                f"{ASSET_NAME} forecast the {nwp_init_time.date().isoformat()} 00Z ENS run with the"
+                f" {bundle.refit_month} bundle, {months} month(s) after its refit month. The"
+                " offset is held at the last knot's value; deploy the current month's bundle."
+            ),
+            settings=settings,
+        )
 
 
 def _wait_for_day_run(
@@ -411,9 +448,15 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
       and finishes without writing, so that day has no forecast. A backfill of a run more than 36
       hours old does not retry.
     - A history run is missing: the thermal-lag and solar-gain columns are computed from the
-      history that remains, as research computes them, and the asset names the missing runs.
+      history that remains, as research computes them, the lags' expected-weather rows fall back
+      to the next-freshest run, and the asset names the missing runs.
     - The day's run is incomplete (fewer members, a missing lead, a short run, a missing cell, or
-      null radiation): the forecast uses the values present and the asset names the faults.
+      null radiation), judged cell by cell: the forecast uses the values present and the asset
+      names the faults.
+    - No ENS run covers some of the lags' expected-weather rows: those rows read zeros, and the
+      asset counts them.
+    - The day's run falls in a month after the bundle's refit month: the offset is held at the last
+      knot's value, and the asset names the bundle.
     - A day or week lag has no cleaned reading: the neural network reads its missing encoding,
       which it was trained with, and the forecast degrades towards the lag-free forecast. This is
       not reported, because stale telemetry has its own check, ``power_data_is_fresh``.
@@ -429,6 +472,8 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
     require_servable_bundle(bundle)
     if not _wait_for_day_run(context=context, settings=settings, nwp_init_time=nwp_init_time):
         return MaterializeResult(metadata={"nwp_init_time": str(nwp_init_time), "n_rows": 0})
+    # After the wait, so a run that retried reports the stale bundle once, not on every attempt.
+    _report_stale_bundle(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
 
     native = _read_native_nwp(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
     missing_runs = _report_input_faults(
@@ -448,6 +493,15 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
         nwp_init_time=nwp_init_time,
     )
     expected_rows = build_expected_rows(bundle=bundle, summary=summary, nwp_init_time=nwp_init_time)
+    n_uncovered = int(np.isnat(expected_rows.run_init_time).sum())
+    if n_uncovered:
+        message = (
+            f"{ASSET_NAME} for the {nwp_init_time.date().isoformat()} 00Z ENS run has"
+            f" {n_uncovered} expected-weather row(s) that no ENS run covers. A lag that reads one"
+            " of those rows reads zeros."
+        )
+        context.log.warning(message)
+        _report_degradation(kind="expected_weather_uncovered", message=message, settings=settings)
     quantiles = forecast(
         bundle=bundle,
         matrix=matrix.standardised,
@@ -487,5 +541,6 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
             "research_commit": bundle.research_commit,
             "refit_month": bundle.refit_month,
             "missing_history_runs": ", ".join(init.date().isoformat() for init in missing_runs),
+            "n_uncovered_expected_weather_rows": n_uncovered,
         }
     )

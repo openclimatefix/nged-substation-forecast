@@ -14,7 +14,7 @@ from _step5_bundle_test_data import write_bundle
 from substation_demand_forecaster.bundle import Bundle, load_bundle, require_servable_bundle
 from substation_demand_forecaster.ens_summary import SOURCE_COLUMNS, summarise_runs
 from substation_demand_forecaster.features import STEP5_COLUMNS, ExpectedRows
-from substation_demand_forecaster.neural_network import forecast, mixture_quantiles
+from substation_demand_forecaster.neural_network import forecast, forward, mixture_quantiles
 
 _LEVELS = (0.01, 0.1, 0.5, 0.9, 0.99)
 
@@ -43,29 +43,36 @@ def test_three_component_mixture_clamps_log_std_and_inverts_the_cdf(bundle: Bund
         assert math.isclose(cdf, level, abs_tol=1e-6)
 
 
-def test_forecast_returns_sorted_quantiles_for_every_seed(bundle: Bundle) -> None:
+def test_forecast_scales_each_seed_by_its_primary_and_averages_the_seeds(bundle: Bundle) -> None:
     rows = 50
     rng = np.random.default_rng(2)
     matrix = rng.standard_normal((rows, len(STEP5_COLUMNS))).astype(np.float32)
     primary = np.arange(rows, dtype=np.int64) % 2
-    grid = np.arange(rows, dtype=np.int64)
-    matrix[:, 43] = grid  # day lag grid index
-    matrix[:, 44] = -1  # week lag missing
+    matrix[:, 43:45] = -1  # both lags missing, so both read the zero expected-weather row
     matrix[:, 45] = rng.uniform(-1.0, 5.0, rows)  # knot position, beyond both ends of the knots
-    expected = ExpectedRows(
-        primary_index=np.repeat([0, 1], rows),
-        grid_index=np.tile(grid, 2),
-        run_init_time=np.full(2 * rows, np.datetime64("NaT", "us")),
-        raw=np.zeros((2 * rows, 28), dtype=np.float32),
-        standardised=rng.standard_normal((2 * rows, 28)).astype(np.float16),
+    no_rows = ExpectedRows(
+        primary_index=np.zeros(0, dtype=np.int64),
+        grid_index=np.zeros(0, dtype=np.int64),
+        run_init_time=np.zeros(0, dtype="datetime64[us]"),
+        raw=np.zeros((0, 28), dtype=np.float32),
+        standardised=np.zeros((0, 28), dtype=np.float16),
     )
     out = forecast(
-        bundle=bundle, matrix=matrix, primary_index=primary, expected_rows=expected, levels=_LEVELS
+        bundle=bundle, matrix=matrix, primary_index=primary, expected_rows=no_rows, levels=_LEVELS
     )
-    assert out.per_seed.shape == (2, rows, len(_LEVELS))
-    assert out.mean.shape == (rows, len(_LEVELS))
-    assert np.isfinite(out.mean).all()
-    assert (np.diff(out.per_seed, axis=-1) >= 0).all()
+    zeros = torch.zeros((rows, 28), dtype=torch.float16)
+    mean = bundle.standardisers.target_mean[primary][:, None]
+    std = bundle.standardisers.target_std[primary][:, None]
+    for seed, weights in enumerate(bundle.weights):
+        raw = forward(
+            w=weights, x=torch.from_numpy(matrix), primary=torch.from_numpy(primary),
+            expected=(zeros, zeros), config=bundle.network,
+        )  # fmt: skip
+        standardised = mixture_quantiles(raw=raw, levels=_LEVELS, config=bundle.network).numpy()
+        expected = np.sort(standardised * std + mean, axis=1)
+        np.testing.assert_allclose(out.per_seed[seed], expected, rtol=0, atol=1e-6)
+    assert not np.allclose(out.per_seed[0], out.per_seed[1])
+    np.testing.assert_allclose(out.mean, np.sort(out.per_seed.mean(axis=0), axis=1), atol=1e-7)
     assert (np.diff(out.mean, axis=-1) >= 0).all()
 
 

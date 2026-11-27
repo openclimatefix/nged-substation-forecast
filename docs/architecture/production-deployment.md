@@ -187,6 +187,15 @@ environment, because its synthesised exception has no stack trace worth grouping
 live service](../live_service/operations.md#the-daily-primary-substation-forecast) lists the kinds
 and the operator's action for each.
 
+**The code-location server loads PyTorch, which takes about 225 MB of the box's 4 GiB.** Importing
+the Dagster definitions imports the forecaster, and the forecaster imports `torch` at module level.
+On a laptop, importing `torch` alone raises a process's peak resident memory to 225 MB, and
+importing the whole definitions module raises it to 520 MB. Only the code-location server
+imports the definitions on the box: the daemon and the webserver reach the code location over
+gRPC. The import stays at module level, so the image's `dagster definitions validate` smoke test
+at build time also proves that the image's `torch` loads. The forecast itself runs on Fargate:
+the forecast of 2026-11-20 took 6.3 s and peaked at 3.5 GB, well within the task's 16 GB.
+
 ## Send telemetry to Sentry
 
 Sentry carries both "we broke" and "the weather feed is late", and they need different responses, so

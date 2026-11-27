@@ -356,6 +356,8 @@ def send_primary_substation_forecast_checkin(
             status=MonitorStatus.OK,
             monitor_config=PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG,
         )
+        # Send now: a check-in left in the queue depends on the run worker's exit-time flush.
+        sentry_sdk.flush(timeout=5)
     except Exception:
         # Telemetry is best-effort, but a genuine bug in here must still be visible, so log at ERROR
         # with the traceback rather than swallowing.

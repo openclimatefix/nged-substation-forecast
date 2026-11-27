@@ -216,7 +216,10 @@ def test_send_checkin_sends_ok_when_the_flag_is_on(monkeypatch: pytest.MonkeyPat
     """Flag on ⇒ a single ``OK`` check-in to the production monitor, carrying the config."""
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(_sentry, "capture_checkin", lambda **kw: calls.append(kw))
+    flushes: list[float] = []
+    monkeypatch.setattr(_sentry.sentry_sdk, "flush", lambda **kw: flushes.append(kw["timeout"]))
     _sentry.send_primary_substation_forecast_checkin(_settings(sentry_monitor_forecasts=True))
+    assert flushes == [5]
     assert calls == [
         {
             "monitor_slug": _sentry.PRIMARY_SUBSTATION_FORECAST_MONITOR_SLUG,

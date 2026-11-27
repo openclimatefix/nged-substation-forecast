@@ -16,8 +16,11 @@ image_tag() {
     echo "error: ${manifest} not found; pass the bundle directory that holds manifest.json" >&2
     exit 2
   fi
-  local release research
-  release="$(jq -er '.model_release' "$manifest")"
-  research="$(jq -er '.research_git.commit[0:8]' "$manifest")"
-  echo "$(git rev-parse --short=8 HEAD)-r${release}-${research}"
+  # The callers run this function inside a command substitution, which does not inherit set -e,
+  # so each command that can fail exits explicitly rather than printing a malformed tag.
+  local release research commit
+  release="$(jq -er '.model_release' "$manifest")" || exit 2
+  research="$(jq -er '.research_git.commit[0:8]' "$manifest")" || exit 2
+  commit="$(git rev-parse --short=8 HEAD)" || exit 2
+  echo "${commit}-r${release}-${research}"
 }

@@ -378,18 +378,21 @@ at all points at the daemon or the box, and a run with `n_rows` 0 points at the 
 the monitor is in [Setting up Sentry telemetry](sentry.md#the-daily-forecast-check-in).
 
 **Each degradation reaches Sentry tagged `degraded_asset:live_primary_substation_forecasts`, and its
-message names the ENS runs involved.** Sentry groups the events by kind, so a fault that repeats
-every day stays one Sentry issue. None of the three kinds stops a forecast that could still be made:
+message names the ENS runs or the bundle involved.** Sentry groups the events by kind, so a fault
+that repeats every day stays one Sentry issue. None of the five kinds stops a forecast that could
+still be made:
 
 | Kind | What happened | What the asset did | What to do |
 |---|---|---|---|
 | `day_run_missing` | The day's 00Z run was not in the `nwp` table by the last retry, at about 15:00 UTC | Wrote nothing, so the day has no forecast | Recover the `ecmwf_ens` partition, then materialise the same day's `live_primary_substation_forecasts` partition |
-| `history_runs_missing` | One or more of the 13 history runs is absent | Computed the thermal-lag and solar-gain columns from the history that remains | Materialise the missing `ecmwf_ens` partitions if Dynamical.org still serves them |
-| `day_run_incomplete` | The day's run has a cell with no rows, fewer than 51 members, a missing lead, a last lead short of 360 hours, or null radiation after lead 0 | Forecast from the values present, filling a missing input with its training mean | Chase Dynamical.org, then re-materialise both partitions once the complete run is republished |
+| `history_runs_missing` | One or more of the 13 history runs is absent | Computed the thermal-lag and solar-gain columns from the history that remains, and took the lags' expected-weather rows from the next-freshest run | Materialise the missing `ecmwf_ens` partitions if Dynamical.org still serves them |
+| `day_run_incomplete` | The day's run has, in some H3 cell, no rows, fewer than 51 members, a missing lead, a last lead short of 360 hours, or null radiation after lead 0 | Forecast from the values present: a missing lead is interpolated from its neighbours, fewer members give the mean and spread of the members present, and an input still missing takes its training mean | Chase Dynamical.org, then re-materialise both partitions once the complete run is republished |
+| `expected_weather_uncovered` | No ENS run covers some of the half-hours the day and week lags read their expected weather from, which happens when several history runs are missing | Read zeros for those expected-weather rows; `n_uncovered_expected_weather_rows` in the run metadata counts them | As for `history_runs_missing` |
+| `bundle_stale` | The day's run falls in a month after the deployed bundle's refit month, so the forecast's valid times sit past the bundle's last offset knot, where the offset is held flat | Forecast with the old bundle | [Install the current month's bundle](#installing-a-new-monthly-bundle) |
 
 While the day's run is absent, the asset retries every 30 minutes, 6 times, and sends one
 `retrying_asset` warning on the first retry. A `degraded_asset` event that carries a real stack
-trace, rather than one of the three messages above, means that the code checking the ENS runs
+trace, rather than one of the five messages above, means that the code checking the ENS runs
 raised. The forecast still ran, and the stack trace shows the bug.
 
 **A missing lag is not reported.** When a Primary has no cleaned reading at its day or week lag, the

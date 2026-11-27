@@ -684,8 +684,9 @@ def build_expected_rows(
         values = np.concatenate(
             [_weather_columns(weather[:, primary["primary_index"]].T), date_time], axis=1
         )
-        # A half-hour no run covers holds no weather, and research's table held no row there.
-        values[~np.isfinite(weather[0, primary["primary_index"]])] = np.nan
+        # A half-hour no run covers holds no weather, and research's table held no row there. A
+        # covered half-hour keeps its row, with NaN only in a null weather column, as in research.
+        values[~np.isfinite(init[primary["primary_index"]])] = np.nan
         rows.append(values)
     raw = np.concatenate(rows).astype(np.float32)
     positions = list(bundle.network.expected_weather_positions)

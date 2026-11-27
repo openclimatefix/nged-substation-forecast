@@ -159,7 +159,7 @@ def write_bundle(root: Path, *, manifest_overrides: dict | None = None) -> Path:
         weights.append(str(path.relative_to(root)))
     manifest = {
         "bundle_format_version": "2",
-        "refit_month": "2019-12",
+        "refit_month": "2026-04",
         "model_release": 0,
         "research_git": {"commit": "0" * 40},
         "components": {

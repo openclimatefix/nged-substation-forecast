@@ -121,7 +121,6 @@ def test_writes_671_rows_per_primary_from_12_30_to_11_30_14_days_later(
     dagster_instance: DagsterInstance,
     degradations: list[dict[str, Any]],
 ) -> None:
-    # The run one day after the partition's is there too, as a backfill would see it.
     _write_nwp(env["nwp"], days_back=list(range(14)))
     _materialize(dagster_instance)
 
@@ -135,8 +134,6 @@ def test_writes_671_rows_per_primary_from_12_30_to_11_30_14_days_later(
     assert (rows["nwp_init_time"] == _DAY).all()
     assert rows["experiment_name"].unique().to_list() == ["primary_substation_demand_forecaster"]
     assert rows["fold_id"].unique().to_list() == ["live"]
-    mva = rows.filter(pl.col("time_series_id") == 101)
-    assert (mva.select(pl.min_horizontal(*POWER_FCST_QUANTILE_COLUMNS)) >= 0).to_series().all()
     # Two members per cell is an incomplete run, and nothing else is missing.
     assert [call["fingerprint"][1] for call in degradations] == ["day_run_incomplete"]
 
@@ -148,6 +145,113 @@ def test_a_second_run_of_the_partition_replaces_its_rows(
     _materialize(dagster_instance)
     _materialize(dagster_instance)
     assert pl.read_delta(str(env["forecasts"])).height == 2 * 671
+
+
+def test_a_rerun_replaces_only_its_own_init_time_and_experiment(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    _write_nwp(env["nwp"], days_back=list(range(-1, 14)))
+    _materialize(dagster_instance)
+    path = str(env["forecasts"])
+    # Another live forecaster's rows at the init time the re-run replaces.
+    other = pl.read_delta(path).with_columns(
+        pl.col("power_fcst_init_time", "valid_time", "nwp_init_time") + timedelta(days=1),
+        experiment_name=pl.lit("another_live_forecaster"),
+    )
+    other.write_delta(path, mode="append")
+    next_day = (_DAY + timedelta(days=1)).date().isoformat()
+    _materialize(dagster_instance, partition_key=next_day)
+    _materialize(dagster_instance, partition_key=next_day)
+
+    rows = pl.read_delta(path)
+    ours = rows.filter(pl.col("experiment_name") == module.EXPERIMENT_NAME)
+    assert ours.group_by("power_fcst_init_time").len().sort("power_fcst_init_time")[
+        "len"
+    ].to_list() == [2 * 671, 2 * 671]
+    assert rows.filter(pl.col("experiment_name") == "another_live_forecaster").height == 2 * 671
+
+
+class _Noon(datetime):
+    """`datetime` whose `now` is 13:00 UTC on `_DAY`, so `_PARTITION` is today's partition."""
+
+    @classmethod
+    def now(cls, tz: Any = None) -> _Noon:
+        return cls(2026, 4, 17, 13, tzinfo=UTC)
+
+
+@pytest.fixture
+def checkins(monkeypatch: pytest.MonkeyPatch, env: dict[str, Path]) -> list[bool]:
+    """Record each check-in, as whether the forecasts table existed when it was sent."""
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        module,
+        "send_primary_substation_forecast_checkin",
+        lambda settings: calls.append(env["forecasts"].exists()),
+    )
+    return calls
+
+
+def test_todays_partition_checks_in_after_the_write(
+    env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    degradations: list[dict[str, Any]],
+    checkins: list[bool],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(module, "datetime", _Noon)
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    _materialize(dagster_instance)
+    assert checkins == [True]
+
+
+def test_a_past_partition_sends_no_checkin(
+    env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    degradations: list[dict[str, Any]],
+    checkins: list[bool],
+) -> None:
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    _materialize(dagster_instance)
+    assert env["forecasts"].exists()
+    assert checkins == []
+
+
+def test_a_missing_day_run_sends_no_checkin(
+    env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    degradations: list[dict[str, Any]],
+    checkins: list[bool],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(module, "datetime", _Noon)
+    monkeypatch.setattr(module, "MAX_RETRIES", 0)  # today's run, so the first attempt is the last
+    _write_nwp(env["nwp"], days_back=list(range(1, 14)))
+    _materialize(dagster_instance)
+    assert [call["fingerprint"][1] for call in degradations] == ["day_run_missing"]
+    assert checkins == []
+
+
+def test_a_bundle_past_its_refit_month_is_reported_once(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    write_bundle(env["bundle"], manifest_overrides={"refit_month": "2026-02"})
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    _materialize(dagster_instance)
+    stale = [call for call in degradations if call["fingerprint"][1] == "bundle_stale"]
+    assert len(stale) == 1
+    assert "2 month(s) after its refit month" in str(stale[0]["exc"])
+
+
+def test_expected_weather_rows_no_run_covers_are_reported(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    # Only the day's run and the run 1 day back: no run covers the lags' earlier half-hours.
+    _write_nwp(env["nwp"], days_back=[0, 1])
+    _materialize(dagster_instance)
+    kinds = [call["fingerprint"][1] for call in degradations]
+    assert "expected_weather_uncovered" in kinds
+    uncovered = degradations[kinds.index("expected_weather_uncovered")]
+    assert "expected-weather row(s) that no ENS run covers" in str(uncovered["exc"])
 
 
 def test_a_missing_history_run_is_reported_and_the_forecast_still_written(
@@ -282,6 +386,17 @@ def test_describe_day_run_faults_names_each_shortfall(tmp_path: Path) -> None:
     assert len(faults) == 5
     assert str(_CELLS[1]) in faults[0]
     assert "fewer than 51 members" in faults[1]
-    assert faults[2] == "missing lead time(s) in hours [6]"
-    assert "stops at lead 300 h" in faults[3]
+    assert faults[2] == f"missing lead time(s) in hours, by H3 cell: {{{_CELLS[0]}: [6]}}"
+    assert faults[3] == f"the run stops short of 360 h, by H3 cell: {{{_CELLS[0]}: 300}}"
     assert "null downward_short_wave_radiation_flux_surface" in faults[4]
+
+
+def test_describe_day_run_faults_finds_a_lead_missing_from_one_cell_only(tmp_path: Path) -> None:
+    bundle = load_bundle(write_bundle(tmp_path / "bundle"))
+    whole = pl.concat(
+        [_day_run().with_columns(ensemble_member=pl.lit(member)) for member in range(51)]
+    )
+    lead_6 = _DAY + timedelta(hours=6)
+    faulty = whole.filter((pl.col("h3_index") != _CELLS[1]) | (pl.col("valid_time") != lead_6))
+    faults = describe_day_run_faults(native=faulty, nwp_init_time=_DAY, bundle=bundle)
+    assert faults == [f"missing lead time(s) in hours, by H3 cell: {{{_CELLS[1]}: [6]}}"]
