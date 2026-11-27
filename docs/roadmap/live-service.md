@@ -311,7 +311,7 @@ provides one.
 > and the laptop/production environment split are built and documented in [Send telemetry to
 > Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
 > The missed-check-in alarm is built too: `live_primary_substation_forecasts` checks in to a
-> Sentry cron monitor after each day's forecast, and Sentry raises a missed check-in at 16:00 UTC
+> Sentry cron monitor after each day's forecast, and Sentry raises a missed check-in at 17:00 UTC
 > (see [Setting up Sentry telemetry](../live_service/sentry.md#the-daily-forecast-check-in)). This
 > section keeps the *why* — the design rationale for alerting on absence from outside the
 > deployment. The remaining monitoring work on this page is the separate per-task failure email
@@ -322,7 +322,7 @@ only fire when a task runs and fails. Whole classes of failure are silent: a hun
 disk, an expired credential, a schedule that stopped firing. The **primary** production alert is
 therefore a **missed-check-in alarm** (Sentry's cron-monitoring terminology): it fires when **no
 successful forecast has landed by a deadline, regardless of cause. For the daily Primary
-substation forecast the deadline is 16:00 UTC, four hours after the 12:00 UTC schedule.
+substation forecast the deadline is 17:00 UTC, five hours after the 12:00 UTC schedule.
 An alert feeding a runbook — rather than paging or automatic failover — is a
 proportionate response because the project's [uptime requirements are lenient by
 design](../background/requirements.md#uptime-lenient-by-design). The accepted option's "daemon

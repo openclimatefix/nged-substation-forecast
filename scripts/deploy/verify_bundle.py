@@ -6,13 +6,15 @@ image leaves out the bundle's `fixtures/` folder and its `.pt` weights, which on
 `reference_check.py` reads, so those entries of the manifest are expected to be absent.
 
 Exits 1 with one line per fault if a file's SHA-256 differs from `manifest.json`, a file the
-image needs is missing, the image holds a file the manifest does not list, or `load_bundle` or
-`require_servable_bundle` rejects the bundle.
+image needs is missing, the image holds a file the manifest does not list, or an installed
+library's version differs from the version research exported the bundle with. Exits non-zero, with
+a traceback, if `load_bundle` or `require_servable_bundle` rejects the bundle.
 """
 
 import hashlib
 import json
 import sys
+from importlib import metadata
 from pathlib import Path
 from typing import Final
 
@@ -20,6 +22,11 @@ from substation_demand_forecaster.bundle import load_bundle, require_servable_bu
 
 NOT_SHIPPED_PREFIX: Final[str] = "fixtures/"
 NOT_SHIPPED_SUFFIX: Final[str] = ".pt"
+
+PINNED_LIBRARIES: Final[tuple[str, ...]] = ("holidays", "pvlib")
+"""Libraries whose version changes the input columns, so the image must hold research's version.
+
+`holidays` decides the bank-holiday columns, and `pvlib` the sun columns."""
 
 
 def _sha256(path: Path) -> str:
@@ -49,9 +56,37 @@ def bundle_faults(bundle_dir: Path) -> list[str]:
     return faults
 
 
+def _base_version(version: str) -> str:
+    """Return a version without its local label: `2.14.1+cpu` gives `2.14.1`."""
+    return version.split("+", maxsplit=1)[0]
+
+
+def library_faults(bundle_dir: Path) -> list[str]:
+    """Return one line per installed library whose version differs from the bundle's manifest.
+
+    `holidays` and `pvlib` must match exactly, and the manifest must record both. `torch` is
+    compared without its local label, because research's CUDA wheel and the image's CPU wheel of
+    one release differ only in that label, and only when the manifest records a `torch` version.
+    """
+    manifest = json.loads((bundle_dir / "manifest.json").read_text())
+    recorded: dict[str, str] = manifest.get("library_versions", {})
+    faults = []
+    for name in PINNED_LIBRARIES:
+        installed = metadata.version(name)
+        if name not in recorded:
+            faults.append(f"the manifest records no {name} version")
+        elif installed != recorded[name]:
+            faults.append(f"{name} {installed} is installed, the bundle needs {recorded[name]}")
+    if "torch" in recorded:
+        installed = _base_version(metadata.version("torch"))
+        if installed != _base_version(recorded["torch"]):
+            faults.append(f"torch {installed} is installed, the bundle needs {recorded['torch']}")
+    return faults
+
+
 def main(bundle_dir: Path) -> int:
     """Print the bundle's faults and return 1 if it has any, otherwise load it and return 0."""
-    faults = bundle_faults(bundle_dir)
+    faults = bundle_faults(bundle_dir) + library_faults(bundle_dir)
     for fault in faults:
         print(f"  [FAIL] {fault}", file=sys.stderr)
     if faults:

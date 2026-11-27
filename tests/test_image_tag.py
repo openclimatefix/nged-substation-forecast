@@ -22,20 +22,45 @@ def _tag(bundle_dir: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def test_the_tag_names_the_commit_the_release_and_the_research_commit(tmp_path: Path) -> None:
-    manifest = {"model_release": 3, "research_git": {"commit": "246984d2e8da19999f38fded"}}
-    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
-    result = _tag(tmp_path)
-    assert result.returncode == 0, result.stderr
-    commit, release, research = result.stdout.strip().split("-")
-    assert len(commit) == 8
-    assert (release, research) == ("r3", "246984d2")
+_MANIFEST = {
+    "model_release": 3,
+    "research_git": {"commit": "246984d2e8da19999f38fded"},
+    "refit_month": "2026-10",
+}
 
 
-def test_a_manifest_without_a_model_release_fails_rather_than_printing_a_tag(
+def test_the_tag_names_the_commit_the_release_the_research_commit_and_the_refit_month(
     tmp_path: Path,
 ) -> None:
-    (tmp_path / "manifest.json").write_text(json.dumps({"research_git": {"commit": "a" * 40}}))
+    (tmp_path / "manifest.json").write_text(json.dumps(_MANIFEST))
     result = _tag(tmp_path)
-    assert result.returncode != 0
+    assert result.returncode == 0, result.stderr
+    commit, release, research, refit = result.stdout.strip().split("-")
+    assert len(commit) == 8
+    assert (release, research, refit) == ("r3", "246984d2", "202610")
+
+
+def test_two_refits_from_one_research_commit_get_different_tags(tmp_path: Path) -> None:
+    tags = []
+    for month in ("2026-10", "2026-11"):
+        (tmp_path / "manifest.json").write_text(json.dumps(_MANIFEST | {"refit_month": month}))
+        tags.append(_tag(tmp_path).stdout)
+    assert tags[0] != tags[1]
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        {key: value for key, value in _MANIFEST.items() if key != "model_release"},
+        {key: value for key, value in _MANIFEST.items() if key != "refit_month"},
+        _MANIFEST | {"refit_month": "October 2026"},
+    ],
+    ids=["no model_release", "no refit_month", "malformed refit_month"],
+)
+def test_a_manifest_without_a_field_of_the_tag_exits_2_rather_than_printing_a_tag(
+    tmp_path: Path, manifest: dict
+) -> None:
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    result = _tag(tmp_path)
+    assert result.returncode == 2
     assert result.stdout == ""

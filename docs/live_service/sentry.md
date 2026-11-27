@@ -174,7 +174,7 @@ Three one-time console steps complete the setup:
 2. **Route events by their tags.** `fault_category:run_failed` means a scheduled job failed, so that
    cycle did not run — notify whoever is on for the next business day. Everything else belongs in a
    digest rather than a notification: `degraded_asset:*` (an asset carried on with reduced
-   function, including the [forecast's five degradation
+   function, including the [forecast's six degradation
    kinds](operations.md#the-daily-primary-substation-forecast)), `asset_check:*` (a check could not
    evaluate its own inputs, so one signal is unknown rather than bad), and `retrying_asset:*` (a
    warning that an asset failed and will retry, sent on the first failed attempt and followed by a
@@ -192,7 +192,7 @@ NGED](../roadmap/handover.md#2-alert-on-absence-not-just-failure).
 
 ## The daily forecast check-in
 
-**A Sentry cron monitor raises an issue when no Primary substation forecast has landed by 16:00
+**A Sentry cron monitor raises an issue when no Primary substation forecast has landed by 17:00
 UTC.** Each successful run of today's `live_primary_substation_forecasts` partition sends one `OK`
 check-in to the monitor with the slug `live-primary-substation-forecasts`. Sentry evaluates the
 monitor itself, so a dead daemon, a stopped box, and a failed run all show up as the same missed
@@ -205,9 +205,9 @@ updates it to match:
 
 - **Schedule**: crontab `0 12 * * *`, timezone UTC, the cadence of
   `live_primary_substation_forecasts_schedule`. A test fails if the two drift apart.
-- **Check-in margin**: 240 minutes. The asset retries a missing ENS run until about 15:00 UTC, and a
-  run then takes a few minutes, so a healthy day can check in as late as about 15:10 UTC. The margin
-  puts the alarm at 16:00 UTC, after the last retry.
+- **Check-in margin**: 300 minutes. The asset retries a missing ENS run until about 16:00 UTC, and a
+  run then takes a few minutes, so a healthy day can check in as late as about 16:10 UTC. The margin
+  puts the alarm at 17:00 UTC, after the last retry.
 - **Maximum runtime**: not set. Only success check-ins are sent, never `in_progress`, so Sentry has
   no start time to time a run against.
 

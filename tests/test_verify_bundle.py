@@ -5,6 +5,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+from importlib import metadata
 from pathlib import Path
 from types import ModuleType
 
@@ -29,9 +30,18 @@ verify_bundle = _load_script()
 _NOT_SHIPPED = ("fixtures/origin_2026-04-17/outputs_native.parquet", "components/step5/seed0.pt")
 
 
-def _seal(root: Path) -> None:
+def _installed_versions() -> dict[str, str]:
+    """The library versions installed now, with torch's research-side CUDA label."""
+    versions = {name: metadata.version(name) for name in ("holidays", "pvlib")}
+    return versions | {"torch": metadata.version("torch").split("+")[0] + "+cu130"}
+
+
+def _seal(root: Path, *, library_versions: dict[str, str] | None = None) -> None:
     """Record every file's SHA-256 in the manifest, plus two entries the image does not ship."""
     manifest = json.loads((root / "manifest.json").read_text())
+    manifest["library_versions"] = (
+        _installed_versions() if library_versions is None else library_versions
+    )
     manifest["sha256"] = {
         str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in sorted(root.rglob("*"))
@@ -79,3 +89,31 @@ def test_a_bundle_the_service_cannot_serve_fails_the_check(bundle_dir: Path) -> 
     )
     assert result.returncode != 0
     assert "cams_columns_source" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("library_versions", "fault"),
+    [
+        (_installed_versions() | {"holidays": "0.1"}, "holidays"),
+        (_installed_versions() | {"pvlib": "0.1"}, "pvlib"),
+        (_installed_versions() | {"torch": "1.0.0+cu130"}, "torch"),
+        ({"pvlib": metadata.version("pvlib")}, "the manifest records no holidays version"),
+    ],
+    ids=["holidays", "pvlib", "torch", "holidays unrecorded"],
+)
+def test_a_library_version_the_bundle_was_not_exported_with_fails_the_check(
+    bundle_dir: Path, library_versions: dict[str, str], fault: str
+) -> None:
+    _seal(bundle_dir, library_versions=library_versions)
+    (line,) = verify_bundle.library_faults(bundle_dir)
+    assert fault in line
+    assert verify_bundle.main(bundle_dir) == 1
+
+
+def test_torch_is_compared_without_its_local_label_and_only_when_recorded(
+    bundle_dir: Path,
+) -> None:
+    versions = _installed_versions()
+    for recorded in (versions, {name: versions[name] for name in ("holidays", "pvlib")}):
+        _seal(bundle_dir, library_versions=recorded)
+        assert verify_bundle.library_faults(bundle_dir) == []

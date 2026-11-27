@@ -88,15 +88,15 @@ PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG: "Final[MonitorConfig]" = {  # noqa: 
     # tests/test_sentry.py fails if the two drift apart.
     "schedule": {"type": "crontab", "value": "0 12 * * *"},
     "timezone": "UTC",
-    "checkin_margin": 240,
+    "checkin_margin": 300,
 }
-"""The daily 12:00 UTC schedule, plus 240 minutes of grace before a day counts as missed.
+"""The daily 12:00 UTC schedule, plus 300 minutes of grace before a day counts as missed.
 
-The asset retries a missing ECMWF ENS run every 30 minutes until 15:00 UTC, and a run then takes a
-few minutes, so a healthy day can check in as late as about 15:10 UTC. The 4-hour margin moves the
-alarm to 16:00 UTC, past that last retry. Only *success* check-ins are sent, so the alarm keys off
-missed check-ins alone; ``max_runtime`` is omitted because it needs an ``in_progress`` check-in to
-time against."""
+The asset retries a missing ECMWF ENS run every 30 minutes until about 16:00 UTC, and a run then
+takes a few minutes, so a healthy day can check in as late as about 16:10 UTC. The 5-hour margin
+moves the alarm to 17:00 UTC, past that last retry. Only *success* check-ins are sent, so the alarm
+keys off missed check-ins alone; ``max_runtime`` is omitted because it needs an ``in_progress``
+check-in to time against."""
 
 PRIMARY_SUBSTATION_FORECAST_DEGRADED_FINGERPRINT: Final[str] = (
     "nged-primary-substation-forecast-degraded"

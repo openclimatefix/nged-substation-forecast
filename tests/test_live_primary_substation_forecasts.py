@@ -20,7 +20,14 @@ from _nwp_test_data import nwp_records, write_test_nwp
 from _step5_bundle_test_data import PRIMARIES, write_bundle
 from contracts.power_schemas import POWER_FCST_QUANTILE_COLUMNS
 from contracts.settings import Settings
-from dagster import AssetExecutionContext, DagsterInstance, RetryRequested, materialize
+from dagster import (
+    AssetExecutionContext,
+    DagsterInstance,
+    Failure,
+    RetryRequested,
+    build_asset_context,
+    materialize,
+)
 from substation_demand_forecaster.bundle import load_bundle
 from substation_demand_forecaster.features import (
     INPUT_STEPS,
@@ -30,6 +37,7 @@ from substation_demand_forecaster.features import (
     native_origin,
 )
 
+from nged_substation_forecast.defs import assets as ingest_assets
 from nged_substation_forecast.defs import primary_substation_forecast_assets as module
 from nged_substation_forecast.defs.primary_substation_forecast_assets import (
     MAX_RETRIES,
@@ -61,8 +69,17 @@ def _run_records(init_time: datetime, cells: tuple[int, ...] = _CELLS) -> list[d
     ]
 
 
-def _write_nwp(path: Path, *, days_back: list[int]) -> None:
-    records = [record for back in days_back for record in _run_records(_DAY - timedelta(days=back))]
+def _write_nwp(
+    path: Path, *, days_back: list[int], day_run_cells: tuple[int, ...] = _CELLS
+) -> None:
+    """Write the runs `days_back` days before `_DAY`; the day's own run covers `day_run_cells`."""
+    records = [
+        record
+        for back in days_back
+        for record in _run_records(
+            _DAY - timedelta(days=back), cells=day_run_cells if back == 0 else _CELLS
+        )
+    ]
     write_test_nwp(str(path), records)
 
 
@@ -90,6 +107,7 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
     nged_path = tmp_path / "NGED"
     nged_path.mkdir()
     paths = {
+        "nged": nged_path,
         "nwp": tmp_path / "NWP",
         "forecasts": tmp_path / "power_forecasts",
         "bundle": write_bundle(tmp_path / "bundle"),
@@ -120,11 +138,14 @@ def _us(stamp: datetime) -> np.ndarray:
     return np.array([int(stamp.timestamp() * 1_000_000)], dtype=np.int64)
 
 
-def _materialize(instance: DagsterInstance, partition_key: str = _PARTITION) -> None:
+def _materialize(instance: DagsterInstance, partition_key: str = _PARTITION) -> dict[str, Any]:
+    """Materialise the partition and return its output metadata, as plain values."""
     result = materialize(
         [live_primary_substation_forecasts], partition_key=partition_key, instance=instance
     )
     assert result.success
+    (materialization,) = result.asset_materializations_for_node("live_primary_substation_forecasts")
+    return {key: value.value for key, value in materialization.metadata.items()}
 
 
 def test_writes_671_rows_per_primary_from_12_30_to_11_30_14_days_later(
@@ -299,14 +320,16 @@ def test_an_absent_recent_run_requests_a_retry_and_warns_once(
     monkeypatch: pytest.MonkeyPatch, today: datetime
 ) -> None:
     warnings: list[str] = []
-    monkeypatch.setattr(module, "_available_nwp_init_times", lambda settings: [])
     monkeypatch.setattr(
         module, "report_asset_retry", lambda **kw: warnings.append(kw["asset_name"])
     )
     for retry_number in (0, 1):
         with pytest.raises(RetryRequested):
             module._wait_for_day_run(
-                context=_fake_context(retry_number), settings=Settings(), nwp_init_time=today
+                context=_fake_context(retry_number),
+                settings=Settings(),
+                nwp_init_time=today,
+                problem="is not in the nwp table",
             )
         # The first attempt warns, and the second attempt adds nothing.
         assert warnings == ["live_primary_substation_forecasts"]
@@ -315,11 +338,12 @@ def test_an_absent_recent_run_requests_a_retry_and_warns_once(
 def test_the_last_retry_reports_the_degradation_and_returns(
     monkeypatch: pytest.MonkeyPatch, degradations: list[dict[str, Any]], today: datetime
 ) -> None:
-    monkeypatch.setattr(module, "_available_nwp_init_times", lambda settings: [])
-    present = module._wait_for_day_run(
-        context=_fake_context(MAX_RETRIES), settings=Settings(), nwp_init_time=today
+    module._wait_for_day_run(
+        context=_fake_context(MAX_RETRIES),
+        settings=Settings(),
+        nwp_init_time=today,
+        problem="is not in the nwp table",
     )
-    assert present is False
     assert [call["fingerprint"][1] for call in degradations] == ["day_run_missing"]
 
 
@@ -480,3 +504,134 @@ def test_months_past_refit_counts_calendar_months(
 ) -> None:
     bundle = cast("Any", SimpleNamespace(refit_month=refit_month))
     assert module.months_past_refit(bundle=bundle, nwp_init_time=day) == months
+
+
+def test_a_partition_before_the_bundles_refit_month_is_refused(
+    env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    degradations: list[dict[str, Any]],
+    checkins: list[bool],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(module, "datetime", _Noon)
+    write_bundle(env["bundle"], manifest_overrides={"refit_month": "2026-05"})
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    with pytest.raises(Failure, match=r"partition 2026-04-17.*refit month 2026-05"):
+        live_primary_substation_forecasts(build_asset_context(partition_key=_PARTITION))
+    assert not env["forecasts"].exists()
+    assert checkins == []
+    assert degradations == []
+
+
+@pytest.mark.parametrize(
+    ("refit_month", "day", "stale"),
+    [
+        ("2026-03", datetime(2026, 4, 7, tzinfo=UTC), False),
+        ("2026-03", datetime(2026, 4, 8, tzinfo=UTC), True),
+        ("2026-02", datetime(2026, 4, 1, tzinfo=UTC), True),
+        ("2026-04", datetime(2026, 4, 30, tzinfo=UTC), False),
+    ],
+)
+def test_the_bundle_is_stale_a_week_into_the_month_after_its_refit_month(
+    refit_month: str, day: datetime, stale: bool, degradations: list[dict[str, Any]]
+) -> None:
+    bundle = cast("Any", SimpleNamespace(refit_month=refit_month))
+    module._report_stale_bundle(settings=Settings(), bundle=bundle, nwp_init_time=day)
+    assert [call["fingerprint"][1] for call in degradations] == (["bundle_stale"] if stale else [])
+
+
+def test_a_day_run_without_any_primarys_cell_goes_to_the_retry(
+    env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    degradations: list[dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    problems: list[str] = []
+    monkeypatch.setattr(module, "_wait_for_day_run", lambda **kw: problems.append(kw["problem"]))
+    _write_nwp(env["nwp"], days_back=list(range(14)), day_run_cells=(_CELLS[0] + 1,))
+    assert _materialize(dagster_instance)["n_rows"] == 0
+    assert problems == ["has no rows in any of the Primaries' H3 cells"]
+    assert not env["forecasts"].exists()
+
+
+def test_a_day_run_without_any_primarys_cell_writes_nothing_on_the_last_attempt(
+    env: dict[str, Path],
+    dagster_instance: DagsterInstance,
+    degradations: list[dict[str, Any]],
+    checkins: list[bool],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(module, "datetime", _Noon)
+    monkeypatch.setattr(module, "MAX_RETRIES", 0)  # today's run, so the first attempt is the last
+    _write_nwp(env["nwp"], days_back=list(range(14)), day_run_cells=(_CELLS[0] + 1,))
+    metadata = _materialize(dagster_instance)
+    assert metadata["n_rows"] == 0
+    assert not env["forecasts"].exists()
+    assert checkins == []
+    assert [call["fingerprint"][1] for call in degradations] == ["day_run_missing"]
+    assert "has no rows in any of the Primaries' H3 cells" in str(degradations[0]["exc"])
+
+
+def test_a_day_run_missing_one_primarys_cell_is_forecast_and_reported(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    _write_nwp(env["nwp"], days_back=list(range(14)), day_run_cells=_CELLS[:1])
+    assert _materialize(dagster_instance)["n_rows"] == 2 * 671
+    incomplete = [call for call in degradations if call["fingerprint"][1] == "day_run_incomplete"]
+    assert len(incomplete) == 1
+    assert f"no rows in H3 cell(s) [{_CELLS[1]}]" in str(incomplete[0]["exc"])
+
+
+def test_the_metadata_counts_missing_lags_and_primaries_without_readings(
+    env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
+) -> None:
+    _write_nwp(env["nwp"], days_back=list(range(14)))
+    metadata = _materialize(dagster_instance)
+    assert metadata["n_primaries_without_readings"] == 0
+    assert metadata["day_lag_missing_fraction"] == 0.0
+    assert metadata["week_lag_missing_fraction"] == 0.0
+    assert "primaries_without_readings" not in [call["fingerprint"][1] for call in degradations]
+
+    # Flag every reading of Primary 102, so the cleaned read holds none of its readings.
+    silent = PRIMARIES[1]["time_series_id"]
+    write_cleaned_copy(
+        env["nged"] / "power_time_series.delta", flag_where=pl.col("time_series_id") == silent
+    )
+    degradations.clear()
+    metadata = _materialize(dagster_instance)
+    assert metadata["n_primaries_without_readings"] == 1
+    # Each Primary has the same number of input rows, so one silent Primary is half of them.
+    assert metadata["day_lag_missing_fraction"] == pytest.approx(0.5)
+    assert metadata["week_lag_missing_fraction"] == pytest.approx(0.5)
+    without = [
+        call for call in degradations if call["fingerprint"][1] == "primaries_without_readings"
+    ]
+    assert len(without) == 1
+    assert f"[{silent}]" in str(without[0]["exc"])
+
+    # Flag Primary 102's readings from more than 3 days before the origin: its day lag, at most 2
+    # days back, is present, and its week lag is missing wherever the week lag reaches further.
+    write_cleaned_copy(
+        env["nged"] / "power_time_series.delta",
+        flag_where=(pl.col("time_series_id") == silent)
+        & (pl.col("time") < native_origin(_DAY) - timedelta(days=3)),
+    )
+    degradations.clear()
+    metadata = _materialize(dagster_instance)
+    assert metadata["n_primaries_without_readings"] == 0
+    assert metadata["day_lag_missing_fraction"] == 0.0
+    assert 0.0 < metadata["week_lag_missing_fraction"] < 0.5
+
+
+def test_the_forecasts_last_attempt_clears_a_slow_ecmwf_ens_by_30_minutes() -> None:
+    """`ecmwf_ens`'s last attempt ends after its retries, 8 failed 6-minute attempts, and 10 min."""
+    ens_end = (
+        timedelta(hours=10, minutes=30)
+        + ingest_assets._ECMWF_ENS_MAX_RETRIES
+        * (timedelta(seconds=ingest_assets._ECMWF_ENS_RETRY_DELAY_SECONDS) + timedelta(minutes=6))
+        + timedelta(minutes=10)
+    )
+    forecast_last = timedelta(hours=12) + MAX_RETRIES * timedelta(
+        seconds=module.RETRY_DELAY_SECONDS
+    )
+    assert forecast_last - ens_end >= timedelta(minutes=30)

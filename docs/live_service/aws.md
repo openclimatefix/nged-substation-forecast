@@ -33,7 +33,7 @@ Deployment — Design](../architecture/production-deployment.md).
 > 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition) and on the box in [Step
 > 14](#step-14-configure-dagster-on-the-box). The [forecast
 > check-in](sentry.md#the-daily-forecast-check-in) raises a Sentry issue when no forecast has landed
-> by 16:00 UTC, whatever stopped it. Per-task failure emails (SNS, the Simple Notification Service)
+> by 17:00 UTC, whatever stopped it. Per-task failure emails (SNS, the Simple Notification Service)
 > are not built — see [the
 > roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm).
 
@@ -203,11 +203,13 @@ noticeably slower than native, but correct. The script checks the emulator is re
 the one-time fix (`docker run --privileged --rm tonistiigi/binfmt --install arm64`) if it isn't.
 
 The script builds the image tagged `nged-forecast:<tag>`, where `<tag>` is
-`<commit>-r<model_release>-<research commit>`: the short git commit hash, the bundle's
-`model_release` from its manifest, and the first 8 characters of the research commit that trained
-the bundle, as in `13932888-r0-246984d2`. A monthly refit with no code change therefore gets a new
-tag. The bundle reaches the build as a second named build context, `primary_substation_bundle`, so
-the bundle never has to sit inside the checkout. The image holds the bundle at
+`<commit>-r<model_release>-<research commit>-<refit month>`: the short git commit hash, the bundle's
+`model_release` from its manifest, the first 8 characters of the research commit that trained the
+bundle, and the bundle's `refit_month` as `YYYYMM`, as in `13932888-r0-246984d2-202610`. A monthly
+refit with no code change therefore gets a new tag, even when two refits come from one research
+commit. The script exits with status 2 if the manifest lacks any of the three fields. The bundle
+reaches the build as a second named build context, `primary_substation_bundle`, so the bundle never
+has to sit inside the checkout. The image holds the bundle at
 `/app/primary_substation_bundle`, without the bundle's fixtures and PyTorch checkpoints.
 
 The script then runs two checks inside the image, both with `--network=none`:
@@ -1208,10 +1210,33 @@ daemons with green heartbeats.
 
 ## Step 16 — Turn on the schedules and verify end-to-end
 
-1. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
+1. **First time only — delete a `power_forecasts` table that has the old schema.** An earlier
+   release stored one row per ensemble member, with the columns `ensemble_member` and `power_fcst`,
+   where the current schema has the 13 quantile columns `power_fcst_p1` to `power_fcst_p99`.
+   `live_primary_substation_forecasts` cannot write to the old table: every run fails with
+   `deltalake` `SchemaMismatchError: Cannot cast schema, number of fields does not match`. Check the
+   table's first commit for the old column:
+
+    ```bash
+    aws s3 cp \
+        s3://nged-forecast-delivery/data/power_forecasts/_delta_log/00000000000000000000.json - \
+        | grep -c ensemble_member
+    ```
+
+    A count of 1 or more means the table has the old schema. Delete the table, which holds only
+    the earlier release's rows, so the first forecast creates it afresh:
+
+    ```bash
+    aws s3 rm --recursive s3://nged-forecast-delivery/data/power_forecasts/
+    ```
+
+    `aws s3 cp` failing with "does not exist" means there is no table yet, and the first forecast
+    creates one.
+
+2. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
    and `live_primary_substation_forecasts_schedule`. Schedule state lives in Postgres, so this is a
    one-time action — it survives restarts and reboots.
-2. **First time only — materialise `h3_grid_weights` once, then the latest `ecmwf_ens` partition.**
+3. **First time only — materialise `h3_grid_weights` once, then the latest `ecmwf_ens` partition.**
    `h3_grid_weights` is unpartitioned and has no schedule. `ecmwf_ens` reads the output of
    `h3_grid_weights`, so materialise `h3_grid_weights` first from the UI. A Dagster `deps=[...]`
    declaration records lineage; it does *not* make materialising `ecmwf_ens` reach back and build
@@ -1229,14 +1254,14 @@ daemons with green heartbeats.
     show `n_rows` 10736 and an empty `missing_history_runs`, and the rows land in
     `s3://nged-forecast-delivery/data/power_forecasts`.
 
-3. **Check the asset checks**: in the UI's Checks view, `power_data_is_fresh`,
+4. **Check the asset checks**: in the UI's Checks view, `power_data_is_fresh`,
    `cleaned_power_keeps_up_with_raw`, and the three `ecmwf_ens` checks should be green or carry a
    warning that [Operating the live
    service](operations.md#degraded-input-data-nwp-feed-down-or-telemetry-stalled) explains.
-4. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always` must
+5. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always` must
    bring all four services back unattended. The UI comes back over Tailscale with run history
    intact.
-5. **Leave it running for several days**: a power ingest lands every hour, a fresh NWP ingest
+6. **Leave it running for several days**: a power ingest lands every hour, a fresh NWP ingest
    after each daily 00Z publication, and a Primary substation forecast soon after 12:00 UTC each
    day; check Cost Explorer against the [cost model](../architecture/aws-costs.md#v1-32-time-series).
 
@@ -1256,7 +1281,7 @@ service: Backfilling a missed partition](operations.md#backfilling-a-missed-part
   `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
 
 A daemon that dies silently shows up once a day, as a missed [forecast
-check-in](sentry.md#the-daily-forecast-check-in) at 16:00 UTC. Per-task failure alerts (email via
+check-in](sentry.md#the-daily-forecast-check-in) at 17:00 UTC. Per-task failure alerts (email via
 SNS, the Simple Notification Service) are not built; see [the
 roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) and [Send telemetry
 to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).

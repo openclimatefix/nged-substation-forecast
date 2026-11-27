@@ -42,7 +42,7 @@ The design accepts two trade-offs:
   [uptime requirements are lenient by
   design](../background/requirements.md#uptime-lenient-by-design). The one watch from outside the
   box is the Sentry cron monitor on the daily forecast (see [Send telemetry to
-  Sentry](#send-telemetry-to-sentry)), so a dead daemon raises an alert at 16:00 UTC on the day it
+  Sentry](#send-telemetry-to-sentry)), so a dead daemon raises an alert at 17:00 UTC on the day it
   misses the forecast, and not before.
 
 - **No run-level auto-retry after a hard crash.** We accept this trade-off. The next hourly power
@@ -172,16 +172,17 @@ forecast.
 `ecmwf_ens_schedule` fires at 10:30 UTC and has normally written the 00Z run by 12:00 UTC. The two
 schedules are coupled only through the `nwp` table on disk, as [design principle
 14](../design-philosophy/design-principles.md#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status)
-requires. When the run is not yet on disk, the asset
-retries every 30 minutes, 6 times, until 15:00 UTC, which is 30 minutes after the last retry of
-`ecmwf_ens`. The asset then reports the missing run and writes nothing, rather than forecasting
-from the previous day's run: every lead would be 24 hours longer than the leads the neural network
+requires. When the run is not yet on disk, the asset retries every 30 minutes, 8 times, until about
+16:00 UTC, which is more than an hour after `ecmwf_ens` normally finishes its last retry. The asset
+then reports the missing run and writes nothing, rather than forecasting from the previous day's
+run: every lead would be 24 hours longer than the leads the neural network
 was trained on.
 
 **The asset degrades rather than fails on input faults outside our control, and fails on our own
 faults.** A missing history run, an incomplete day's run, or a missing lag each still gives a
-forecast, from the values present. A missing or unservable bundle and an output that breaks the
-`PowerForecast` contract each raise, because each is a deployment fault or a bug of ours. Each
+forecast, from the values present. A missing or unservable bundle, a partition before the
+bundle's refit month, and an output that breaks the `PowerForecast` contract each raise, because
+each is a deployment fault or a bug of ours. Each
 degradation reaches Sentry through `report_asset_degradation`, fingerprinted by its kind and
 environment, because its synthesised exception has no stack trace worth grouping on. [Operating the
 live service](../live_service/operations.md#the-daily-primary-substation-forecast) lists the kinds
@@ -312,8 +313,8 @@ configured — so laptops and CI stay silent by default.
 - **The forecast check-in.** `send_primary_substation_forecast_checkin` sends one `OK` check-in to
   the Sentry cron monitor `live-primary-substation-forecasts` after
   `live_primary_substation_forecasts` has written today's forecast. Sentry raises a missed check-in
-  when none arrives by 16:00 UTC: the schedule's 12:00 UTC plus a 240-minute margin, which clears
-  the asset's last retry at about 15:00 UTC. The evaluation sits in Sentry, outside the deployment,
+  when none arrives by 17:00 UTC: the schedule's 12:00 UTC plus a 300-minute margin, which clears
+  the asset's last retry at about 16:00 UTC. The evaluation sits in Sentry, outside the deployment,
   so the check-in catches what no sender inside the deployment can report: a dead daemon, a stopped
   box, or a schedule that stopped firing. The check-in is a success-only signal, so a failed run
   shows up twice, as a `run_failed` event and then as the missed check-in. The check-in is gated on

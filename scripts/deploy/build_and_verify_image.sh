@@ -25,8 +25,8 @@
 # slower than native but correct. The script checks the emulator is registered and prints the fix if
 # it is not.
 #
-# The image tag is "<git commit>-r<model_release>-<research commit>", derived by _image_tag.sh,
-# which push_and_deploy_image.sh sources too. Every software release and every bundle refit
+# The image tag is "<git commit>-r<model_release>-<research commit>-<refit month>", derived by
+# _image_tag.sh, which push_and_deploy_image.sh sources too. Every software release and every bundle refit
 # therefore gets a new tag, and the previous image stays available for rollback. The GIT_SHA build
 # arg becomes an Open Container Initiative (OCI) label purely for traceability (inspect with
 # `docker inspect`).

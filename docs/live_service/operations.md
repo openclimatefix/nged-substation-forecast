@@ -366,51 +366,68 @@ re-run never duplicates a forecast.
 
 **Read `n_rows` in the run's metadata first.** A run that wrote a forecast shows `n_rows` 10736 (671
 rows for each of the 16 Primaries) and `n_time_series` 16. `n_rows` 0 means the day's ENS run never
-arrived and the day has no forecast. The metadata also names the bundle that made the forecast, in
-`model_release`, `research_commit`, and `refit_month`, and lists any history run that was missing in
-`missing_history_runs`.
+arrived, or arrived with no rows in any of the Primaries' H3 cells, and the day has no forecast. The
+metadata also names the bundle that made the forecast, in `model_release`, `research_commit`, and
+`refit_month`, and lists any history run that was missing in `missing_history_runs`.
+
+**Three metadata fields show how much telemetry the lags had.** `day_lag_missing_fraction` and
+`week_lag_missing_fraction` are the shares of the forecast's input rows, across all the Primaries,
+whose day lag or week lag has no cleaned reading. `n_primaries_without_readings` counts the
+Primaries with no cleaned reading at all in the 9 days before the 09:00 UTC native origin.
+
+**A run with `n_rows` 0 still shows as a green, materialised partition in the Dagster UI.** A
+backfill launched over the "missing" partitions therefore skips that day. To find such days, open
+the asset's partitions in the UI and read the `n_rows` of each materialisation, or filter the
+asset's materialisation events on `n_rows` 0, then materialise those partitions by name.
 
 **A missed check-in means no forecast landed today.** On a successful run for today's partition, the
 asset sends a check-in to the Sentry cron monitor `live-primary-substation-forecasts`. Sentry raises
-the missed check-in at 16:00 UTC if none has arrived. The causes include a dead daemon or box, a
+the missed check-in at 17:00 UTC if none has arrived. The causes include a dead daemon or box, a
 failed run, and a day whose ENS run never arrived. Look in the Dagster UI for the day's run: no run
 at all points at the daemon or the box, and a run with `n_rows` 0 points at the NWP feed. Setting up
 the monitor is in [Setting up Sentry telemetry](sentry.md#the-daily-forecast-check-in).
 
 **Each degradation reaches Sentry tagged `degraded_asset:live_primary_substation_forecasts`, and its
 message names the ENS runs or the bundle involved.** Sentry groups the events by kind, so a fault
-that repeats every day stays one Sentry issue. None of the five kinds stops a forecast that could
+that repeats every day stays one Sentry issue. None of the six kinds stops a forecast that could
 still be made:
 
 | Kind | What happened | What the asset did | What to do |
 |---|---|---|---|
-| `day_run_missing` | The day's 00Z run was not in the `nwp` table by the last retry, at about 15:00 UTC | Wrote nothing, so the day has no forecast | Recover the `ecmwf_ens` partition, then materialise the same day's `live_primary_substation_forecasts` partition |
+| `day_run_missing` | By the last retry, at about 16:00 UTC, the day's 00Z run was not in the `nwp` table, or had no rows in any of the Primaries' H3 cells | Wrote nothing and sent no check-in, so the day has no forecast | Recover the `ecmwf_ens` partition, then materialise the same day's `live_primary_substation_forecasts` partition |
 | `history_runs_missing` | One or more of the 13 history runs is absent | Computed the thermal-lag and solar-gain columns from the history that remains, and took the lags' expected-weather rows from the next-freshest run | Materialise the missing `ecmwf_ens` partitions if Dynamical.org still serves them |
-| `day_run_incomplete` | The day's run has, in some H3 cell, no rows, fewer than 51 members, a missing lead, a last lead short of 360 hours, or null radiation after lead 0 | Forecast from the values present: a missing lead is interpolated from its neighbours, fewer members give the mean and spread of the members present, and an input still missing takes its training mean | Chase Dynamical.org, then re-materialise both partitions once the complete run is republished |
+| `day_run_incomplete` | The day's run has, in some but not all of the Primaries' H3 cells, no rows; or, in some H3 cell, fewer than 51 members, a missing lead, a last lead short of 360 hours, or null radiation after lead 0 | Forecast from the values present: a missing lead is interpolated from its neighbours, fewer members give the mean and spread of the members present, and an input still missing takes its training mean | Chase Dynamical.org, then re-materialise both partitions once the complete run is republished |
 | `expected_weather_uncovered` | No ENS run covers some of the half-hours the day and week lags read their expected weather from, which happens when several history runs are missing | Read zeros for those expected-weather rows; `n_uncovered_expected_weather_rows` in the run metadata counts them | As for `history_runs_missing` |
-| `bundle_stale` | The day's run falls in a month after the deployed bundle's refit month, so the forecast's valid times sit past the bundle's last offset knot, where the offset is held flat | Forecast with the old bundle | [Install the current month's bundle](#installing-a-new-monthly-bundle) |
+| `bundle_stale` | The day's run falls two or more months after the deployed bundle's refit month, or one month after it and after the 7th of the month, so the forecast's valid times sit past the bundle's last offset knot, where the offset is held flat. The first 7 days of a month are exempt, because the month's refit trains on ERA5, which publishes about 5 days late | Forecast with the old bundle | [Install the current month's bundle](#installing-a-new-monthly-bundle) |
+| `primaries_without_readings` | One or more of the bundle's Primaries has no cleaned reading in the 9 days before the native origin; the message names their time series | Forecast those Primaries with the day and week lags read as missing, so their forecasts carry no recent level | Check `power_data_is_fresh` and the NGED feed for those time series (see [Degraded input data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)) |
 
-While the day's run is absent, the asset retries every 30 minutes, 6 times, and sends one
+While the day's run is absent or has none of the Primaries' cells, the asset retries every 30
+minutes, 8 times, and sends one
 `retrying_asset` warning on the first retry. A `degraded_asset` event that carries a real stack
-trace, rather than one of the five messages above, means that the code checking the ENS runs
+trace, rather than one of the six messages above, means that the code checking the ENS runs
 raised. The forecast still ran, and the stack trace shows the bug.
 
-**A missing lag is not reported.** When a Primary has no cleaned reading at its day or week lag, the
-neural network reads the missing-lag encoding it was trained with, and the forecast moves towards
-the forecast it makes without lags. Stale telemetry already has its own check, `power_data_is_fresh`
-(see [Degraded input data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)).
+**A single missing lag is not reported, but a Primary with no readings at all is.** When a Primary
+has no cleaned reading at its day or week lag, the neural network reads the missing-lag encoding it
+was trained with, and the forecast moves towards the forecast it makes without lags. Stale
+telemetry already has its own check, `power_data_is_fresh` (see [Degraded input
+data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)), and the two missing-lag fractions
+in the run metadata show how far the lags were affected. A Primary with no reading in the whole
+9-day window is reported as `primaries_without_readings`.
 
 **A failed run is our own fault, so it fails and reaches Sentry tagged `fault_category:run_failed`.**
 The asset raises on a bundle that is missing, has an unknown format version, or was trained on
-Copernicus Atmosphere Monitoring Service (CAMS) values that the service cannot compute, and on
-output that fails the `PowerForecast` contract. Read the traceback, fix the image, and redeploy.
+Copernicus Atmosphere Monitoring Service (CAMS) values that the service cannot compute, on a
+partition before the bundle's refit month (see [Backfilling a missed
+partition](#backfilling-a-missed-partition)), and on output that fails the `PowerForecast`
+contract. Read the traceback, fix the image, and redeploy.
 
 ### Installing a new monthly bundle
 
 **The research repository exports one bundle per monthly refit, and a new bundle reaches the service
 only through a new image.** The image tag names both the code and the bundle, as
-`<git commit>-r<model_release>-<research commit>`, so a refit with no code change still gets a new
-tag and the previous image stays in the Elastic Container Registry (ECR) for a rollback.
+`<git commit>-r<model_release>-<research commit>-<refit month>`, so a refit with no code change
+still gets a new tag and the previous image stays in the Elastic Container Registry (ECR) for a rollback.
 
 1. **Run the golden tests against the new bundle.** The tests compare every stage of the forecast
    with the fixtures the bundle ships, and read the `nwp` and `cleaned_power_time_series` tables
@@ -438,7 +455,9 @@ tag and the previous image stays in the Elastic Container Registry (ECR) for a r
 
 **A re-run of a past partition uses the bundle in the image deployed at the time of the re-run.**
 The re-run therefore replaces the rows of the bundle that made the original forecast with rows from
-the new bundle, under the new `power_fcst_model_version`.
+the new bundle, under the new `power_fcst_model_version`. A re-run of a partition before the
+deployed bundle's refit month fails instead and writes nothing, because the newer bundle was trained
+on readings from after that day.
 
 ## Inspecting forecasts
 
@@ -481,7 +500,16 @@ the forecast recover differently:
   Materialise a missed day's partition once that day's `ecmwf_ens` partition has landed, in the
   same way. A backfill sends no Sentry check-in, because only today's partition sends one. A
   backfill whose 00Z run is more than 36 hours old and absent from the `nwp` table does not retry:
-  the backfill reports `day_run_missing` at once and writes nothing.
+  the backfill reports `day_run_missing` at once and writes nothing. A partition whose earlier run
+  wrote `n_rows` 0 counts as materialised, so select it by name rather than through a backfill of
+  missing partitions.
+
+**A backfill of a day before the deployed bundle's refit month needs the bundle that was live on
+that day.** The asset fails such a partition with a Dagster `Failure` that names the partition and
+the bundle's refit month, before it writes any rows or sends a check-in. A newer bundle was trained
+on readings from after the partition's day, so its forecast of that day is not a forecast the
+service could have made then. To backfill the day, deploy the image built with the bundle that was
+live then, which ECR still holds, materialise the partition, and redeploy the current image.
 
 **A backfilled forecast sees the same weather as the live run, and its lags can differ.** A
 backfill reads only the ENS runs initialised up to its own day's 00Z run, so its weather inputs are

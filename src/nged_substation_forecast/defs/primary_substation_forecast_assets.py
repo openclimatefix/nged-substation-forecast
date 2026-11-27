@@ -25,6 +25,7 @@ from contracts.weather_schemas import (
 from dagster import (
     AssetExecutionContext,
     DagsterExecutionInterruptedError,
+    Failure,
     MaterializeResult,
     RetryRequested,
     asset,
@@ -39,6 +40,7 @@ from substation_demand_forecaster.ens_summary import (
     summarise_runs,
 )
 from substation_demand_forecaster.features import (
+    STEP5_COLUMNS,
     build_expected_rows,
     build_input_matrix,
     native_origin,
@@ -79,13 +81,28 @@ POWER_HISTORY: Final[timedelta] = timedelta(days=9)
 """How far before the native origin the cleaned-power read reaches; the week lag reaches 8 days
 back at most."""
 
-MAX_RETRIES: Final[int] = 6
-"""Retries of a missing day's run, `RETRY_DELAY_SECONDS` apart, so until 15:00 UTC.
+MAX_RETRIES: Final[int] = 8
+"""Retries of a missing day's run, `RETRY_DELAY_SECONDS` apart, so the last attempt starts at about
+16:00 UTC.
 
-That is 30 minutes after the last retry of `ecmwf_ens` (8 retries from 10:30 UTC), which can itself
-take about 10 minutes to finish."""
+`ecmwf_ens` starts at 10:30 UTC and retries 8 times, 30 minutes apart, each wait counted from the
+end of the failed attempt. A failed attempt measured 81 s, so the last attempt starts at about
+14:41 UTC, and a successful attempt with its checks and its write takes up to about 10 minutes, so
+`ecmwf_ens` normally finishes by about 14:51 UTC. The forecast's last attempt clears that by more
+than an hour. It still clears the end of `ecmwf_ens` by 30 minutes when every failed `ecmwf_ens`
+attempt takes 6 minutes, about 4 times the measured time, because 14:30 + 8 × 6 min + 10 min is
+15:28 UTC."""
 
 RETRY_DELAY_SECONDS: Final[int] = 1800
+
+STALE_GRACE_DAYS: Final[int] = 7
+"""Days into the month after the refit month during which the previous bundle is not yet stale.
+
+The month's refit trains on ERA5, which publishes about 5 days late, so the new bundle cannot exist
+before about the 6th of the month."""
+
+_DAY_LAG_MISSING: Final[int] = STEP5_COLUMNS.index("day_lag_missing")
+_WEEK_LAG_MISSING: Final[int] = STEP5_COLUMNS.index("week_lag_missing")
 
 _ENS_MODEL_ID: Final[str] = NwpModelId.ECMWF_ENS_0_25_degree.name
 
@@ -95,7 +112,7 @@ _RADIATION_COLUMNS: Final[tuple[str, ...]] = tuple(
 
 
 class _DayRunMissing(Exception):
-    """The day's 00Z ENS run is not in the `nwp` table yet."""
+    """The day's 00Z ENS run is not in the `nwp` table, or has none of the Primaries' cells."""
 
 
 def partition_nwp_init_time(partition_key: str) -> datetime:
@@ -360,60 +377,122 @@ def months_past_refit(*, bundle: Bundle, nwp_init_time: datetime) -> int:
 
     A real bundle's last offset knot is its refit month, so a positive value means the forecast's
     valid times sit past the last knot, where the offset is held flat. A monthly refit keeps the
-    value at 0.
+    value at 0. A negative value means the run falls before the bundle's refit month, which only a
+    backfill with a newer bundle can produce.
     """
     refit = datetime.strptime(bundle.refit_month, "%Y-%m").replace(tzinfo=UTC)
     return (nwp_init_time.year - refit.year) * 12 + nwp_init_time.month - refit.month
 
 
-def _report_stale_bundle(*, settings: Settings, bundle: Bundle, nwp_init_time: datetime) -> None:
+def bundle_is_stale(*, bundle: Bundle, nwp_init_time: datetime) -> bool:
+    """Return whether a newer bundle than `bundle` should exist by the day's run.
+
+    The bundle is stale two or more months after its refit month, and one month after it once the
+    run's day of the month passes `STALE_GRACE_DAYS`.
+    """
     months = months_past_refit(bundle=bundle, nwp_init_time=nwp_init_time)
-    if months > 0:
+    return months > 1 or (months == 1 and nwp_init_time.day > STALE_GRACE_DAYS)
+
+
+def _report_stale_bundle(*, settings: Settings, bundle: Bundle, nwp_init_time: datetime) -> None:
+    if bundle_is_stale(bundle=bundle, nwp_init_time=nwp_init_time):
+        months = months_past_refit(bundle=bundle, nwp_init_time=nwp_init_time)
         _report_degradation(
             kind="bundle_stale",
             message=(
                 f"{ASSET_NAME} forecast the {nwp_init_time.date().isoformat()} 00Z ENS run with the"
-                f" {bundle.refit_month} bundle, {months} month(s) after its refit month. The"
-                " offset is held at the last knot's value; deploy the current month's bundle."
+                f" {bundle.refit_month} bundle, {months} month(s) after its refit month, by when"
+                " the next monthly bundle should exist. The offset is held at the last knot's"
+                " value; deploy the current month's bundle."
             ),
             settings=settings,
         )
 
 
+def _refuse_a_run_before_the_refit_month(*, bundle: Bundle, partition_key: str) -> None:
+    """Raise `Failure` when the partition's run falls before the bundle's refit month.
+
+    A newer bundle has seen readings from after the partition's day, so its forecast of that day is
+    not the forecast the service could have made, and writing it would replace the honest one.
+    """
+    nwp_init_time = partition_nwp_init_time(partition_key)
+    if months_past_refit(bundle=bundle, nwp_init_time=nwp_init_time) < 0:
+        raise Failure(
+            description=(
+                f"{ASSET_NAME} refuses partition {partition_key}, because it falls before the"
+                f" deployed bundle's refit month {bundle.refit_month}. Backfill that day with the"
+                " bundle that was live then."
+            )
+        )
+
+
 def _wait_for_day_run(
-    *, context: AssetExecutionContext, settings: Settings, nwp_init_time: datetime
-) -> bool:
-    """Return whether the day's run is in the `nwp` table; request a retry while one is left.
+    *, context: AssetExecutionContext, settings: Settings, nwp_init_time: datetime, problem: str
+) -> None:
+    """Request a retry of an unusable day's run, or report it on the last attempt.
 
     Args:
         context: The asset's context, for its retry number and its log.
-        settings: The settings naming the `nwp` table and the Sentry environment.
+        settings: The settings naming the Sentry environment.
         nwp_init_time: The day's 00Z run.
-
-    Returns:
-        True when the run is present. False when it is absent and no retry is left, or the run is
-        too old to retry; the degradation has then been reported.
+        problem: Why the run cannot be forecast from, completing "the run ...": "is not in the nwp
+            table", or "has no rows in any of the Primaries' H3 cells".
 
     Raises:
-        RetryRequested: When the run is absent and a retry is left.
+        RetryRequested: When a retry is left and the run is recent enough to retry. Otherwise the
+            function reports `day_run_missing` and returns.
     """
-    if nwp_init_time in set(_available_nwp_init_times(settings)):
-        return True
     run = nwp_init_time.date().isoformat()
-    missing = _DayRunMissing(f"The {run} 00Z ECMWF ENS run is not in the nwp table.")
+    missing = _DayRunMissing(f"The {run} 00Z ECMWF ENS run {problem}.")
     too_old = _is_too_old_to_retry(nwp_init_time=nwp_init_time, now=datetime.now(UTC))
     if too_old or context.retry_number >= MAX_RETRIES:
         message = (
-            f"{ASSET_NAME} wrote no forecast for the {run} 00Z ENS run, because the run is not in"
-            " the nwp table. The service has no forecast for that day."
+            f"{ASSET_NAME} wrote no forecast for the {run} 00Z ENS run, because the run {problem}."
+            " The service has no forecast for that day."
         )
         context.log.warning(message)
         _report_degradation(kind="day_run_missing", message=message, settings=settings)
-        return False
+        return
     if context.retry_number == 0:
         report_asset_retry(asset_name=ASSET_NAME, exc=missing)
     context.log.warning(f"{missing} Requesting a retry in {RETRY_DELAY_SECONDS} s.")
     raise RetryRequested(max_retries=MAX_RETRIES, seconds_to_wait=RETRY_DELAY_SECONDS) from missing
+
+
+def _report_primaries_without_readings(
+    *,
+    context: AssetExecutionContext,
+    settings: Settings,
+    bundle: Bundle,
+    power: pl.DataFrame,
+    nwp_init_time: datetime,
+) -> int:
+    """Report the bundle's Primaries with no cleaned reading in the `POWER_HISTORY` window.
+
+    Args:
+        context: The asset's context, for its log.
+        settings: The settings naming the Sentry environment.
+        bundle: The bundle's Primaries.
+        power: `_read_cleaned_power`'s rows.
+        nwp_init_time: The day's 00Z run.
+
+    Returns:
+        How many of the bundle's Primaries have no reading.
+    """
+    silent = sorted(
+        set(bundle.primaries["time_series_id"].to_list())
+        - set(power["time_series_id"].unique().to_list())
+    )
+    if silent:
+        message = (
+            f"{ASSET_NAME} for the {nwp_init_time.date().isoformat()} 00Z ENS run found no cleaned"
+            f" reading for {len(silent)} Primary time series {silent} in the"
+            f" {POWER_HISTORY.days} days before the native origin. Their day and week lags read"
+            " the missing-lag encoding, so their forecasts carry no recent level."
+        )
+        context.log.warning(message)
+        _report_degradation(kind="primaries_without_readings", message=message, settings=settings)
+    return len(silent)
 
 
 @asset(
@@ -438,15 +517,15 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
     ``ecmwf_ens_schedule`` (10:30 UTC) has normally written the day's run. The two schedules are
     coupled only through the ``nwp`` table on disk, never through run status. On success for
     today's partition, the asset sends a check-in to the Sentry cron monitor
-    ``live-primary-substation-forecasts``, which alarms if no check-in arrives by 16:00 UTC.
+    ``live-primary-substation-forecasts``, which alarms if no check-in arrives by 17:00 UTC.
 
     **What a degraded run looks like.** Each of these reaches Sentry tagged
     ``degraded_asset=live_primary_substation_forecasts``:
 
-    - The day's run is absent: the asset retries every 30 minutes up to 6 times, with a Sentry
-      warning on the first retry. If the run is still absent, the asset reports the degradation
-      and finishes without writing, so that day has no forecast. A backfill of a run more than 36
-      hours old does not retry.
+    - The day's run is absent, or has no rows in any of the Primaries' H3 cells: the asset retries
+      every 30 minutes up to 8 times, with a Sentry warning on the first retry. If the run is
+      still unusable, the asset reports the degradation and finishes without writing or checking
+      in, so that day has no forecast. A backfill of a run more than 36 hours old does not retry.
     - A history run is missing: the thermal-lag and solar-gain columns are computed from the
       history that remains, as research computes them, the lags' expected-weather rows fall back
       to the next-freshest run, and the asset names the missing runs.
@@ -455,27 +534,48 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
       names the faults.
     - No ENS run covers some of the lags' expected-weather rows: those rows read zeros, and the
       asset counts them.
-    - The day's run falls in a month after the bundle's refit month: the offset is held at the last
-      knot's value, and the asset names the bundle.
-    - A day or week lag has no cleaned reading: the neural network reads its missing encoding,
-      which it was trained with, and the forecast degrades towards the lag-free forecast. This is
-      not reported, because stale telemetry has its own check, ``power_data_is_fresh``.
+    - The day's run falls two or more months after the bundle's refit month, or one month after it
+      and past the 7th of the month: the offset is held at the last knot's value, and the asset
+      names the bundle.
+    - A Primary has no cleaned reading in the 9 days before the native origin: its day and week
+      lags read the missing encoding, and the asset names the Primary.
+
+    A day or week lag with no cleaned reading makes the neural network read the missing encoding,
+    which it was trained with, and the forecast degrades towards the lag-free forecast. A single
+    missing lag is not reported, because stale telemetry has its own check,
+    ``power_data_is_fresh``; ``day_lag_missing_fraction`` and ``week_lag_missing_fraction`` in the
+    output metadata give the share of input rows whose lag is missing.
 
     A bundle that is missing, has an unknown format version, or was trained on CAMS values the
-    service cannot reproduce raises, because that is a deployment fault of ours. A backfill reads
-    the runs initialised up to its own day, so it sees the weather the live run saw; its lags can
-    differ from the live run's, because late telemetry is now on disk.
+    service cannot reproduce raises, because that is a deployment fault of ours. So does a
+    partition before the bundle's refit month, which a backfill with a newer bundle would otherwise
+    overwrite with a forecast that has seen later readings. A backfill reads the runs initialised
+    up to its own day, so it sees the weather the live run saw; its lags can differ from the live
+    run's, because late telemetry is now on disk.
     """
     settings = Settings()
     nwp_init_time = partition_nwp_init_time(context.partition_key)
     bundle = load_bundle(Path(settings.primary_substation_bundle_path))
     require_servable_bundle(bundle)
-    if not _wait_for_day_run(context=context, settings=settings, nwp_init_time=nwp_init_time):
-        return MaterializeResult(metadata={"nwp_init_time": str(nwp_init_time), "n_rows": 0})
+    _refuse_a_run_before_the_refit_month(bundle=bundle, partition_key=context.partition_key)
+    no_forecast = MaterializeResult(metadata={"nwp_init_time": str(nwp_init_time), "n_rows": 0})
+    if nwp_init_time not in set(_available_nwp_init_times(settings)):
+        problem = "is not in the nwp table"
+        _wait_for_day_run(
+            context=context, settings=settings, nwp_init_time=nwp_init_time, problem=problem
+        )
+        return no_forecast
+    native = _read_native_nwp(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
+    # A run with none of the Primaries' cells would be forecast from training means alone.
+    if native.filter(pl.col("init_time") == nwp_init_time).is_empty():
+        problem = "has no rows in any of the Primaries' H3 cells"
+        _wait_for_day_run(
+            context=context, settings=settings, nwp_init_time=nwp_init_time, problem=problem
+        )
+        return no_forecast
     # After the wait, so a run that retried reports the stale bundle once, not on every attempt.
     _report_stale_bundle(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
 
-    native = _read_native_nwp(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
     missing_runs = _report_input_faults(
         context=context,
         settings=settings,
@@ -484,13 +584,16 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
         bundle=bundle,
     )
     summary = summarise_runs(native.lazy(), bundle.primaries).collect()
-    matrix = build_input_matrix(
+    power = _read_cleaned_power(settings=settings, bundle=bundle, nwp_init_time=nwp_init_time)
+    n_without_readings = _report_primaries_without_readings(
+        context=context,
+        settings=settings,
         bundle=bundle,
-        summary=summary,
-        cleaned_power=_read_cleaned_power(
-            settings=settings, bundle=bundle, nwp_init_time=nwp_init_time
-        ),
+        power=power,
         nwp_init_time=nwp_init_time,
+    )
+    matrix = build_input_matrix(
+        bundle=bundle, summary=summary, cleaned_power=power, nwp_init_time=nwp_init_time
     )
     expected_rows = build_expected_rows(bundle=bundle, summary=summary, nwp_init_time=nwp_init_time)
     n_uncovered = int(np.isnat(expected_rows.run_init_time).sum())
@@ -542,5 +645,8 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
             "refit_month": bundle.refit_month,
             "missing_history_runs": ", ".join(init.date().isoformat() for init in missing_runs),
             "n_uncovered_expected_weather_rows": n_uncovered,
+            "day_lag_missing_fraction": float(matrix.raw[:, _DAY_LAG_MISSING].mean()),
+            "week_lag_missing_fraction": float(matrix.raw[:, _WEEK_LAG_MISSING].mean()),
+            "n_primaries_without_readings": n_without_readings,
         }
     )

@@ -15,8 +15,8 @@
 #
 # One argument, the same step-5 bundle directory given to build_and_verify_image.sh, and
 # everything else derived, so nothing can be mistyped or drift:
-#   - The image tag is "<git commit>-r<model_release>-<research commit>", from _image_tag.sh,
-#     which build_and_verify_image.sh sources too. So this script can only ever push the image that
+#   - The image tag is "<git commit>-r<model_release>-<research commit>-<refit month>", from
+#     _image_tag.sh, which build_and_verify_image.sh sources too. So this script can only ever push the image that
 #     script built and verified, from the commit that is checked out now and the bundle given.
 #   - The AWS account id comes from `aws sts get-caller-identity` — never typed by hand.
 #   - Region, repository, task-definition family, and container name are the fixed names the

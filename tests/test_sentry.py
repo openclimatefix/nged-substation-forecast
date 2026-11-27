@@ -262,11 +262,21 @@ def test_send_checkin_logs_and_swallows_a_send_error(
     )
 
 
-def test_monitor_config_is_utc_with_a_four_hour_margin() -> None:
-    """The alarm fires at 16:00 UTC: the 12:00 UTC schedule plus a 240-minute margin."""
+def test_monitor_config_is_utc_with_a_five_hour_margin() -> None:
+    """The alarm fires at 17:00 UTC: the 12:00 UTC schedule plus a 300-minute margin."""
     config = _sentry.PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG
     assert config["timezone"] == "UTC"
-    assert config["checkin_margin"] == 240
+    assert config["checkin_margin"] == 300
+
+
+def test_the_alarm_clears_the_forecasts_last_retry_by_an_hour() -> None:
+    from nged_substation_forecast.defs.primary_substation_forecast_assets import (
+        MAX_RETRIES,
+        RETRY_DELAY_SECONDS,
+    )
+
+    margin_seconds = _sentry.PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG["checkin_margin"] * 60
+    assert margin_seconds >= MAX_RETRIES * RETRY_DELAY_SECONDS + 3600
 
 
 def test_monitor_config_schedule_matches_the_schedule() -> None:
