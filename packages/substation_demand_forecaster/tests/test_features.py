@@ -8,7 +8,7 @@ import polars as pl
 import pytest
 from pvlib import spa
 from substation_demand_forecaster.bundle import PUBLICATION_DELAY, Bundle
-from substation_demand_forecaster.ens_summary import SUMMARY_COLUMNS
+from substation_demand_forecaster.ens_summary import SUMMARY_COLUMNS, WEATHER_VARIABLES
 from substation_demand_forecaster.features import (
     B1_COLUMNS,
     CALENDAR_COLUMNS,
@@ -150,6 +150,25 @@ def test_calendar_local_hour_follows_the_clock_changes(bundle: Bundle) -> None:
     assert hour.tolist() == [0.5, 2.0, 1.5, 1.0]
 
 
+@pytest.mark.parametrize(
+    ("local_day", "inside", "days"),
+    [
+        (datetime(2026, 12, 11), 1.0, 1.0),  # 14 days before 25 December
+        (datetime(2026, 12, 10), 0.0, 0.0),  # 15 days before
+        (datetime(2027, 1, 8), 1.0, -1.0),  # 14 days after
+        (datetime(2027, 1, 9), 0.0, 0.0),  # 15 days after
+    ],
+)
+def test_christmas_window_includes_the_days_exactly_14_days_away(
+    bundle: Bundle, local_day: datetime, inside: float, days: float
+) -> None:
+    # Midday UTC is midday in Europe/London in December and January.
+    stamps = _us((local_day + timedelta(hours=12)).replace(tzinfo=UTC))
+    columns = calendar_columns(valid_us=stamps, calendar=bundle.calendar)
+    assert columns[0, CALENDAR_COLUMNS.index("christmas_inside")] == inside
+    assert columns[0, CALENDAR_COLUMNS.index("christmas_days")] == days
+
+
 def test_calendar_marks_good_friday_by_the_local_date_of_the_stamp(bundle: Bundle) -> None:
     # 23:00 UTC on 2 April is midnight BST on Good Friday, 3 April 2026.
     stamps = _us(
@@ -257,6 +276,15 @@ def test_a_null_weather_value_leaves_the_rest_of_a_covered_row(bundle: Bundle) -
     assert rows.raw[row, temperature] == 2.0
     assert np.isfinite(rows.raw[row, 7:]).all()  # the date-time columns
     assert not np.isnat(rows.run_init_time[row])
+
+
+def test_a_negative_mean_precipitation_is_clipped_to_zero(bundle: Bundle) -> None:
+    summary = _summary(bundle, run_days_back=list(range(14))).with_columns(
+        mean_precipitation=pl.lit(-0.3, dtype=pl.Float32)
+    )
+    rows = build_expected_rows(bundle=bundle, summary=summary, nwp_init_time=_DAY)
+    row = _row_at(rows, primary=0, stamp=_DAY + PUBLICATION_DELAY - timedelta(days=1))
+    assert rows.raw[row, WEATHER_VARIABLES.index("precipitation")] == 0.0
 
 
 def test_a_primary_with_no_readings_keeps_its_lag_grid_indices(bundle: Bundle) -> None:

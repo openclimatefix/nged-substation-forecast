@@ -28,3 +28,7 @@ Delta tables, so they need `DATA_PATH_INTERNAL` set as well:
 PRIMARY_SUBSTATION_BUNDLE_PATH=/path/to/bundle \
     uv run pytest tests/test_substation_demand_forecaster_golden.py
 ```
+
+**Run the golden tests locally before merging any change to `features` or `neural_network`.**
+Several faults in the feature code are caught only by the golden tests, which skip in CI because CI
+has no bundle. Point `PRIMARY_SUBSTATION_BUNDLE_PATH` at the bundle the service serves.

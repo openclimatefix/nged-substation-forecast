@@ -114,6 +114,13 @@ def test_load_bundle_rejects_a_bundle_it_cannot_serve(
     ("keys", "value"),
     [
         (("shared", "native_origin_hour_utc"), 6),
+        (("shared", "publication_delay_hours"), 6.0),
+        (("shared", "max_lead_hours_ens_summaries"), 360.0),
+        (("shared", "max_lead_hours_trained_and_stored"), 336.0),
+        (("shared", "grid_start_utc"), "2019-09-01T00:30:00+00:00"),
+        (("shared", "grid_step_minutes"), 60),
+        (("shared", "calendar_timezone"), "UTC"),
+        (("shared", "holidays", "calendar"), "holidays.country_holidays('GB', subdiv='SCT')"),
         (("components", "step5", "b1_constants", "cams_columns_source"), "arm replay"),
     ],
 )
@@ -130,6 +137,19 @@ def test_a_changed_config_constant_is_refused(
     (root / "config.json").write_text(json.dumps(config))
     with pytest.raises(ValueError, match=leaf):
         require_servable_bundle(load_bundle(root))
+
+
+@pytest.mark.parametrize("path", ["primaries.json", "components/step5/standardisers.json"])
+def test_primaries_out_of_primary_index_order_are_refused(tmp_path: Path, path: str) -> None:
+    root = write_bundle(tmp_path / "bundle")
+    stored = json.loads((root / path).read_text())
+    if path == "primaries.json":
+        stored["primaries"] = stored["primaries"][::-1]
+    else:
+        stored["target"]["primary_index"] = stored["target"]["primary_index"][::-1]
+    (root / path).write_text(json.dumps(stored))
+    with pytest.raises(ValueError, match="primary_index order"):
+        load_bundle(root)
 
 
 def test_ens_summary_takes_wind_speed_per_member_before_averaging(bundle: Bundle) -> None:

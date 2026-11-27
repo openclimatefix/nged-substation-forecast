@@ -262,6 +262,13 @@ def test_send_checkin_logs_and_swallows_a_send_error(
     )
 
 
+def test_monitor_config_is_utc_with_a_four_hour_margin() -> None:
+    """The alarm fires at 16:00 UTC: the 12:00 UTC schedule plus a 240-minute margin."""
+    config = _sentry.PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG
+    assert config["timezone"] == "UTC"
+    assert config["checkin_margin"] == 240
+
+
 def test_monitor_config_schedule_matches_the_schedule() -> None:
     """Drift guard: the monitor's crontab is a hand-kept copy of the asset's schedule."""
     from nged_substation_forecast.defs.schedules import live_primary_substation_forecasts_schedule
