@@ -573,7 +573,7 @@ rejection draws is between ML R&D and production: research uses MLflow constantl
 production's hot path never touches it.
 
 Fetching a model from MLflow at container startup may be worth reconsidering if new models start
-reaching production often enough that a redeploy for each one becomes a burden. A mechanism for
+reaching production often enough that a redeploy for each new model becomes a burden. A mechanism for
 serving through an MLflow outage would then need to be designed, because `load_from_mlflow` supplies
 none of its own. That mechanism is tracked in
 [issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).

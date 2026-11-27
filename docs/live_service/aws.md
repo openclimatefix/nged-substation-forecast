@@ -531,8 +531,8 @@ NGED source bucket with the Parameter Store secrets and writes to the internal b
 role.
 
 **This command is a template — it will not run as pasted.** The command contains two placeholders
-you must replace first: `<subnet-id>` and `<sg-id>`. How to fill in each one is explained below the
-command.
+you must replace first: `<subnet-id>` and `<sg-id>`. The text below the command
+explains how to fill in each placeholder.
 
 ```bash
 aws ecs run-task \
