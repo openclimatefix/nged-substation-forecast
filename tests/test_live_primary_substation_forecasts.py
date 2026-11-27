@@ -507,27 +507,27 @@ def test_months_past_refit_counts_calendar_months(
 
 
 @pytest.mark.parametrize(
-    ("refit_month", "created_utc"),
+    ("refit_month", "refit_time_utc"),
     [
         # A bundle of the next month, so the partition is before its refit month.
-        ("2026-05", "2026-05-06T10:00:00+00:00"),
-        # The partition's own month, but the bundle was created after the 12:00 UTC origin.
+        ("2026-05", "2026-05-01T00:00:00+00:00"),
+        # A refit time one second after the partition's 12:00 UTC origin.
         ("2026-04", "2026-04-17T12:00:01+00:00"),
     ],
 )
-def test_a_partition_before_the_bundle_was_created_is_refused(
+def test_a_partition_before_the_bundles_refit_time_is_refused(
     env: dict[str, Path],
     dagster_instance: DagsterInstance,
     degradations: list[dict[str, Any]],
     checkins: list[bool],
     monkeypatch: pytest.MonkeyPatch,
     refit_month: str,
-    created_utc: str,
+    refit_time_utc: str,
 ) -> None:
     monkeypatch.setattr(module, "datetime", _Noon)
     write_bundle(
         env["bundle"],
-        manifest_overrides={"refit_month": refit_month, "created_utc": created_utc},
+        manifest_overrides={"refit_month": refit_month, "refit_time_utc": refit_time_utc},
     )
     _write_nwp(env["nwp"], days_back=list(range(14)))
     with pytest.raises(Failure, match=rf"partition 2026-04-17.*refit month {refit_month}"):
@@ -668,10 +668,10 @@ def test_a_member_missing_from_the_later_leads_in_every_cell_is_reported(tmp_pat
     ]
 
 
-def test_a_bundle_created_by_the_12_00_origin_serves_the_day(
+def test_an_origin_exactly_at_the_refit_time_is_served(
     env: dict[str, Path], dagster_instance: DagsterInstance, degradations: list[dict[str, Any]]
 ) -> None:
-    write_bundle(env["bundle"], manifest_overrides={"created_utc": "2026-04-17T12:00:00+00:00"})
+    write_bundle(env["bundle"], manifest_overrides={"refit_time_utc": "2026-04-17T12:00:00+00:00"})
     _write_nwp(env["nwp"], days_back=list(range(14)))
     assert _materialize(dagster_instance)["n_rows"] == 2 * 671
 

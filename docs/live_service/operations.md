@@ -419,7 +419,7 @@ in the run metadata show how far the lags were affected. A Primary with no readi
 **A failed run is our own fault, so it fails and reaches Sentry tagged `fault_category:run_failed`.**
 The asset raises on a bundle that is missing, has an unknown format version, or was trained on
 Copernicus Atmosphere Monitoring Service (CAMS) values that the service cannot compute, on a
-partition whose 12:00 UTC origin is before the bundle was created (see [Backfilling a missed
+partition whose 12:00 UTC origin is before the bundle's refit time (see [Backfilling a missed
 partition](#backfilling-a-missed-partition)), and on output that fails the `PowerForecast`
 contract. Read the traceback, fix the image, and redeploy.
 
@@ -458,8 +458,7 @@ still gets a new tag and the previous image stays in the Elastic Container Regis
 **A re-run of a past partition uses the bundle in the image deployed at the time of the re-run.**
 The re-run therefore replaces the rows of the bundle that made the original forecast with rows from
 the new bundle, under the new `power_fcst_model_version`. A re-run of a partition whose 12:00 UTC
-origin is before the deployed bundle was created fails instead and writes nothing, because that
-bundle did not serve the day.
+origin is before the deployed bundle's refit time fails instead and writes nothing.
 
 ## Inspecting forecasts
 
@@ -506,16 +505,19 @@ the forecast recover differently:
   wrote `n_rows` 0 counts as materialised, so select it by name rather than through a backfill of
   missing partitions.
 
-**A backfill of a day before the deployed bundle was created needs the bundle that was live on
-that day.** The asset compares the partition's 12:00 UTC origin with the `created_utc` timestamp in
-the bundle's `manifest.json`. It fails an earlier partition with a Dagster `Failure` that names the
-partition, the creation time, and the refit month, before it writes any rows or sends a check-in.
-The rule covers every day before the refit month, because research exports a bundle only after the
-refit month has begun. The rule also covers the first days of the refit month, before the new
-bundle was exported, when the previous month's bundle served the live forecast. A forecast from the
-newer bundle is not the forecast the service served on that day. To backfill the day, deploy the
-image built with the bundle that was live then, which ECR still holds, materialise the partition,
-and redeploy the current image.
+**A backfill of a day before the deployed bundle's refit time needs an earlier bundle.** The asset
+compares the partition's 12:00 UTC origin with `refit_time_utc` in the bundle's `manifest.json`,
+which is 00:00 UTC on the first day of the refit month. The refit trained on rows whose origin is at
+or before that time, so a forecast from an earlier origin would have seen the readings it forecasts.
+The asset fails such a partition with a Dagster `Failure` that names the partition, the refit time,
+and the refit month, before it writes any rows or sends a check-in. To backfill the day, deploy the
+image built with a bundle refitted before it, which ECR still holds, materialise the partition, and
+redeploy the current image.
+
+**A backfill on or after the refit time replaces whatever rows an earlier bundle wrote for that
+day.** The asset does not check which bundle wrote a day's rows. A backfill of the first days of the
+refit month, for example, replaces the forecast that the previous month's bundle served live on
+those days. Re-materialise a day only when you mean to replace its forecast.
 
 **A backfilled forecast sees the same weather as the live run, and its lags can differ.** A
 backfill reads only the ENS runs initialised up to its own day's 00Z run, so its weather inputs are

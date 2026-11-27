@@ -155,9 +155,9 @@ class Bundle:
     """0 for a bundle that is not a release of the forecasting model, otherwise its number."""
     research_commit: str
     refit_month: str
-    created_utc: datetime
-    """When research exported the bundle, from the manifest; no forecast before it is the bundle's
-    to make."""
+    refit_time_utc: datetime
+    """The refit's look-ahead boundary, from the manifest: the training rows' origins are at or
+    before it, so the bundle's forecasts are honest only for origins at or after it."""
     primaries: pl.DataFrame
     """One row per Primary in `primary_index` order: `primary_index` (Int64), `time_series_id`
     (Int32), `h3_index` (Int64), `latitude` and `longitude` (Float64), `effective_capacity_mw`
@@ -393,7 +393,7 @@ def load_bundle(path: Path) -> Bundle:
         model_release=int(manifest["model_release"]),
         research_commit=str(manifest["research_git"]["commit"]),
         refit_month=str(manifest["refit_month"]),
-        created_utc=datetime.fromisoformat(manifest["created_utc"]),
+        refit_time_utc=datetime.fromisoformat(manifest["refit_time_utc"]),
         primaries=primaries,
         column_names=tuple(column["name"] for column in columns),
         network=_network_config(step5=step5, n_knots=int(knots["n_knots"])),

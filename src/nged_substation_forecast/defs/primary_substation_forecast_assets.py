@@ -428,22 +428,20 @@ def _report_stale_bundle(*, settings: Settings, bundle: Bundle, nwp_init_time: d
         )
 
 
-def _refuse_a_forecast_before_the_bundle_existed(*, bundle: Bundle, partition_key: str) -> None:
-    """Raise `Failure` when the partition's 12:00 UTC origin is before the bundle's `created_utc`.
+def _refuse_a_forecast_before_the_refit_time(*, bundle: Bundle, partition_key: str) -> None:
+    """Raise `Failure` when the partition's 12:00 UTC origin is before the bundle's refit time.
 
-    The bundle did not exist on that day, so the forecast it would write is not the forecast the
-    service served then, and a backfill would replace the served forecast. The check covers every
-    day before the refit month too, because research exports a bundle only after its refit month
-    has begun.
+    The refit trained on rows whose origin is at or before `refit_time_utc`, so a forecast from an
+    earlier origin would have seen the readings it forecasts.
     """
     origin = partition_nwp_init_time(partition_key) + timedelta(hours=FORECAST_INIT_HOUR_UTC)
-    if origin < bundle.created_utc:
+    if origin < bundle.refit_time_utc:
         raise Failure(
             description=(
                 f"{ASSET_NAME} refuses partition {partition_key}, because its 12:00 UTC origin is"
-                f" before the deployed bundle was created ({bundle.created_utc.isoformat()}, refit"
-                f" month {bundle.refit_month}). Backfill that day with the bundle that was live"
-                " then."
+                f" before the deployed bundle's refit time {bundle.refit_time_utc.isoformat()}"
+                f" (refit month {bundle.refit_month}), so the bundle was trained on the readings"
+                " it would forecast. Backfill that day with a bundle refitted before it."
             )
         )
 
@@ -591,8 +589,8 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
 
     A bundle that is missing, has an unknown format version, or was trained on CAMS values the
     service cannot reproduce raises, because that is a deployment fault of ours. So does a
-    partition whose 12:00 UTC origin is before the bundle's ``created_utc``, which a backfill with
-    a newer bundle would otherwise overwrite with a forecast the service never served. A backfill
+    partition whose 12:00 UTC origin is before the bundle's ``refit_time_utc``, because the bundle
+    was trained on the readings that forecast would cover. A backfill
     reads the runs initialised up to its own day, so it sees the weather the live run saw; its lags
     can differ from the live run's, because late telemetry is now on disk.
     """
@@ -600,7 +598,7 @@ def live_primary_substation_forecasts(context: AssetExecutionContext) -> Materia
     nwp_init_time = partition_nwp_init_time(context.partition_key)
     bundle = load_bundle(Path(settings.primary_substation_bundle_path))
     require_servable_bundle(bundle)
-    _refuse_a_forecast_before_the_bundle_existed(bundle=bundle, partition_key=context.partition_key)
+    _refuse_a_forecast_before_the_refit_time(bundle=bundle, partition_key=context.partition_key)
     no_forecast = MaterializeResult(metadata={"nwp_init_time": str(nwp_init_time), "n_rows": 0})
     if nwp_init_time not in set(_available_nwp_init_times(settings)):
         problem = "is not in the nwp table"
