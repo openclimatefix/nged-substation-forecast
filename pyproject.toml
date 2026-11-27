@@ -36,6 +36,7 @@ dependencies = [
     "python-dotenv",
     "pyyaml",
     "sentry-sdk>=2.66,<3",
+    "substation_demand_forecaster",
 ]
 
 [build-system]
@@ -101,6 +102,15 @@ dynamical_data = { workspace = true }
 geo = { workspace = true }
 weather_utils = { workspace = true }
 dashboard = { workspace = true }
+substation_demand_forecaster = { workspace = true }
+# The default Linux `torch` wheel pulls in the CUDA libraries, which would make the image several
+# gigabytes larger; the forecaster runs on the CPU, so `torch` comes from PyTorch's CPU-only index.
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 # --- DAGSTER ---
 
