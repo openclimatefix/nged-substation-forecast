@@ -32,11 +32,11 @@ engineering trends is the admission test described below.
 
 If data inputs are disrupted, the forecast gets less certain instead of stopping — the full
 argument, the degradation ladder and the failure-modes table are in [Inherent
-Stability](inherent-stability.md). An error in **our own code** — a saved model that will not
-load, a contract violation, a join that has fanned out — gets the opposite posture: fail as early as
-possible, because degrading around our own bug would deliver a wrong forecast and bury its cause.
-How far such a failure then spreads is a different axis, and the business of [principle 10 ("*every
-write is atomic and idempotent, and every failure is confined to one
+Stability](inherent-stability.md). An error in **our own code** gets the opposite posture: fail as
+early as possible, because degrading around our own bug would deliver a wrong forecast and bury its
+cause. Examples are a saved model that will not load, a contract violation, and a join that has
+fanned out. How far a failure in our own code then spreads is a different axis, and the business of
+[principle 10 ("*every write is atomic and idempotent, and every failure is confined to one
 partition*")](#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition)
 rather than of this one. The plan is to deliver graceful degradation through the **model itself** —
 a machine-learning (ML) model that can, at least partially, handle missing inputs — rather than

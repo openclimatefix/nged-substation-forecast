@@ -98,10 +98,10 @@ the consumer most needs to be told to be cautious. The interval width is the **i
 a forecast is degraded: it is the only number the consumer is certain to read. So it must not be
 left to the warnings table alone. The mechanism is conformal calibration **per degradation regime**,
 which wraps an already-trained forecaster and needs no retraining
-([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)); the principle is
+([#443](https://github.com/openclimatefix/nged-substation-forecast/issues/443)). The principle is
 [Inherent Stability → Widening
-bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal), and whether it
-worked is measured by [T1.3, faithful
+bands](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal). Whether the
+calibration worked is measured by [T1.3, faithful
 uncertainty](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself).
 
 ### Fields common to all three representations

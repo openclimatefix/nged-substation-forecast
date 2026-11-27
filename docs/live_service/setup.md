@@ -50,10 +50,10 @@ workflow, not to shared storage:
   the live service: Inspecting forecasts](operations.md#inspecting-forecasts) for why it is not the
   way to view forecasts in a deployed service.
 
-So the deployed AWS runtime reads and writes its data on S3. It never uses `LOCAL_ARTIFACTS_PATH` as
-shared storage at all. All three roots default to `<repo>/data`, so out of the box everything lives
-under one local directory and the distinction is invisible; it only matters once
-`DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` become `s3://` URIs.
+So the deployed AWS runtime reads and writes its data on S3. The deployed AWS runtime never uses
+`LOCAL_ARTIFACTS_PATH` as shared storage at all. All three roots default to `<repo>/data`, so out of
+the box everything lives under one local directory and the distinction is invisible; it only matters
+once `DATA_PATH_INTERNAL` and `DATA_PATH_DELIVERY` become `s3://` URIs.
 
 ### The "derive from root" convention
 
@@ -85,8 +85,8 @@ overrides).
 > `power_forecasts` table holds every CV/backtest run alongside live production forecasts,
 > distinguished by `fold_id` (`"live"` for production). It is deliberate to point the whole table at
 > the delivery bucket, not an accidental side effect of the bucket split: doing so lets NGED see how
-> each of OCF's model versions actually behaves, not just whichever one the live service runs. NGED
-> filters on `fold_id="live"` when it only wants the current production forecast.
+> each of OCF's model versions actually behaves, not just whichever model version the live service
+> runs. NGED filters on `fold_id="live"` when it only wants the current production forecast.
 
 ### The `.env` file and NGED source credentials
 

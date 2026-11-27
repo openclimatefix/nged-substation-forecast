@@ -411,10 +411,10 @@ score different row sets and normalise error differently, so the figures do not 
 attribution rests on the README's reading rather than on a subtraction. Eight post-upgrade months
 cannot settle which of the two later fits is right.
 
-**The loss that remains is real for a production service, because the live model is always
+**The loss that remains is real for a production service, because the live forecaster is always
 trained on the old version when an upgrade lands.** Folds cut inside each era hide the loss rather
-than removing it: they show how good a model can be once it has trained on the new version, not how
-good the model already serving is on the day the new version arrives.
+than removing it: they show how good a forecaster can be once it has trained on the new version, not
+how good the forecaster already serving is on the day the new version arrives.
 
 ### Why the model is not told the NWP version
 

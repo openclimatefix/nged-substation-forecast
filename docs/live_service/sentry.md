@@ -129,10 +129,10 @@ Dagster on your laptop does **not** forward everything to Sentry:
 - **Freshness warnings *are* sent — if your local power data is stale.** Whenever the
   `power_data_is_fresh` asset check runs (alongside every `power_time_series_and_metadata`
   materialisation) and finds any series past the staleness threshold, it forwards a `warning`-level
-  event to Sentry. This is gated on the DSN alone, so a laptop with a stale local Delta table *will*
-  emit one. It can't pollute production's issue, though: the event is fingerprinted per environment,
-  so your `<name>-laptop` staleness forms its own Sentry issue, separate from production's. Resolve
-  or ignore it as you like.
+  event to Sentry. The freshness warning is gated on the DSN alone, so a laptop with a stale local
+  Delta table *will* emit one. It can't pollute production's issue, though: the event is
+  fingerprinted per environment, so your `<name>-laptop` staleness forms its own Sentry issue,
+  separate from production's. Resolve or ignore it as you like.
 
 The failure hook's scope is the same in production. The [design
 page](../architecture/production-deployment.md#send-telemetry-to-sentry) explains why the failure

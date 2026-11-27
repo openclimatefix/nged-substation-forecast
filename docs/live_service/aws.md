@@ -530,8 +530,9 @@ task runs `power_time_series_and_metadata_job`, the hourly NGED telemetry ingest
 NGED source bucket with the Parameter Store secrets and writes to the internal bucket with the task
 role.
 
-**This command is a template — it will not run as pasted.** It contains two placeholders you must
-replace first: `<subnet-id>` and `<sg-id>`. How to fill in each one is explained below the command.
+**This command is a template — it will not run as pasted.** The command contains two placeholders
+you must replace first: `<subnet-id>` and `<sg-id>`. How to fill in each one is explained below the
+command.
 
 ```bash
 aws ecs run-task \

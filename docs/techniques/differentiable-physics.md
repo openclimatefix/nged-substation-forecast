@@ -394,7 +394,7 @@ right choice until that data is available.
 
 **Soiling belongs in the v2 forward model, not in version 1.** Version 1 can reach the same physics
 through a tabular stand-in: the state variable $d_t$ below — time since precipitation last exceeded
-a washing threshold — supplied directly as a feature. This section makes the differentiable
+a washing threshold — is supplied directly as a feature. This section makes the differentiable
 parameterisation concrete for when v2 needs it.
 
 [Capacity estimation](../roadmap/capacity-estimation.md) names soiling as one of the shared physics
