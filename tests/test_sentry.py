@@ -204,6 +204,76 @@ def test_init_sentry_survives_a_malformed_dsn(caplog: pytest.LogCaptureFixture) 
     )
 
 
+def test_send_checkin_is_a_noop_when_the_flag_is_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``sentry_monitor_forecasts`` False (the default) ⇒ no check-in is sent."""
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(_sentry, "capture_checkin", lambda **kw: calls.append(kw))
+    _sentry.send_primary_substation_forecast_checkin(_settings(sentry_monitor_forecasts=False))
+    assert calls == []
+
+
+def test_send_checkin_sends_ok_when_the_flag_is_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Flag on ⇒ a single ``OK`` check-in to the production monitor, carrying the config."""
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(_sentry, "capture_checkin", lambda **kw: calls.append(kw))
+    _sentry.send_primary_substation_forecast_checkin(_settings(sentry_monitor_forecasts=True))
+    assert calls == [
+        {
+            "monitor_slug": _sentry.PRIMARY_SUBSTATION_FORECAST_MONITOR_SLUG,
+            "status": "ok",
+            "monitor_config": _sentry.PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG,
+        }
+    ]
+
+
+def test_send_checkin_uses_the_given_slug(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A throwaway slug (laptop testing) is honoured instead of the production monitor."""
+    calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(_sentry, "capture_checkin", lambda **kw: calls.append(kw))
+    _sentry.send_primary_substation_forecast_checkin(
+        _settings(sentry_monitor_forecasts=True), monitor_slug="test-slug"
+    )
+    assert calls[0]["monitor_slug"] == "test-slug"
+
+
+def test_send_checkin_logs_and_swallows_a_send_error(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The check-in runs after the Delta write has committed, so it must never fail the run.
+
+    No input reliably makes the real ``capture_checkin`` fail offline, so the sender is
+    monkeypatched to raise.
+    """
+
+    def boom(*_: Any, **__: Any) -> None:
+        raise RuntimeError("sentry down")
+
+    monkeypatch.setattr(_sentry, "capture_checkin", boom)
+    with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
+        _sentry.send_primary_substation_forecast_checkin(_settings(sentry_monitor_forecasts=True))
+    # One record must carry all three: a message naming what failed, ERROR level, and the
+    # traceback. Asserting them separately would pass on three different records.
+    assert any(
+        "check-in" in r.message and r.levelno == logging.ERROR and r.exc_info is not None
+        for r in caplog.records
+    )
+
+
+def test_monitor_config_schedule_matches_the_schedule() -> None:
+    """Drift guard: the monitor's crontab is a hand-kept copy of the asset's schedule.
+
+    The two cannot share an import without a circular import (see the comment on
+    ``PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG``). If one crontab changes and not the other, the
+    alarm expects check-ins on a different cadence from the one the asset runs on.
+    """
+    from nged_substation_forecast.defs.schedules import live_primary_substation_forecasts_schedule
+
+    assert (
+        _sentry.PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG["schedule"]["value"]
+        == live_primary_substation_forecasts_schedule.cron_schedule
+    )
+
+
 def test_failure_hook_captures_the_real_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     """The failure hook forwards ``context.op_exception`` to ``capture_exception``."""
     captured: list[BaseException] = []
@@ -398,6 +468,7 @@ def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:
     scheduled_jobs = (
         schedules.power_time_series_and_metadata_job,
         schedules.ecmwf_ens_job,
+        schedules.live_primary_substation_forecasts_job,
     )
     for job in scheduled_jobs:
         hooks = job.hooks

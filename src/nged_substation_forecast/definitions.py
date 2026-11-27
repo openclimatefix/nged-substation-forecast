@@ -10,10 +10,13 @@ from nged_substation_forecast.defs import (
     cleaning_assets,
     cv_assets,
     jobs,
+    primary_substation_forecast_assets,
     schedules,
 )
 
-all_assets = load_assets_from_modules([assets, cleaning_assets, cv_assets])
+all_assets = load_assets_from_modules(
+    [assets, cleaning_assets, cv_assets, primary_substation_forecast_assets]
+)
 
 # Initialise Sentry once per process. This module is imported by every Dagster process — the
 # daemon, the webserver, and each run worker — so error telemetry is active wherever code runs.
@@ -30,5 +33,6 @@ defs = Definitions(
     schedules=[
         schedules.power_time_series_and_metadata_schedule,
         schedules.ecmwf_ens_schedule,
+        schedules.live_primary_substation_forecasts_schedule,
     ],
 )

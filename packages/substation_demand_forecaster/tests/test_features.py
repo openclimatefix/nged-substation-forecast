@@ -12,11 +12,13 @@ from substation_demand_forecaster.ens_summary import SUMMARY_COLUMNS
 from substation_demand_forecaster.features import (
     B1_COLUMNS,
     CALENDAR_COLUMNS,
+    STEP5_COLUMNS,
     STEPS_PER_DAY,
     SUMMARY_STEPS,
     ExpectedRows,
     b1_columns,
     build_expected_rows,
+    build_input_matrix,
     calendar_columns,
     grid_index,
     lag_columns,
@@ -241,3 +243,26 @@ def test_expected_rows_fall_back_to_an_older_run_then_to_zero(bundle: Bundle) ->
     assert math.isclose(
         float(rows.raw[_row_at(rows, primary=1, stamp=origin - timedelta(days=1)), 2]), 3.0
     )
+
+
+def test_a_primary_with_no_readings_keeps_its_lag_grid_indices(bundle: Bundle) -> None:
+    empty_power = pl.DataFrame(
+        schema={"time_series_id": pl.Int32, "time": pl.Datetime("us", "UTC"), "power": pl.Float32}
+    )
+    matrix = build_input_matrix(
+        bundle=bundle,
+        summary=_summary(bundle, run_days_back=list(range(14))),
+        cleaned_power=empty_power,
+        nwp_init_time=_DAY,
+    )
+    target = matrix.keys["target_grid_index"].to_numpy()
+    origin = grid_index(_us(_DAY + PUBLICATION_DELAY))[0]
+    day, week = lag_indices(
+        target_index=target, origin_index=np.full(len(target), origin), lags=bundle.lags
+    )
+    columns = list(STEP5_COLUMNS)
+    x = matrix.standardised
+    assert (x[:, columns.index("day_lag_missing")] == 1).all()
+    assert (x[:, columns.index("week_lag_missing")] == 1).all()
+    assert (x[:, columns.index("day_lag_grid_index")] == day).all()
+    assert (x[:, columns.index("week_lag_grid_index")] == week).all()

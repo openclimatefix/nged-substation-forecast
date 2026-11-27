@@ -80,3 +80,31 @@ def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     — why an unfinished run is retried rather than failed.
     """
     return RunRequest(partition_key=context.scheduled_execution_time.strftime("%Y-%m-%d"))
+
+
+live_primary_substation_forecasts_job = define_asset_job(
+    "live_primary_substation_forecasts_job",
+    selection=AssetSelection.assets("live_primary_substation_forecasts"),
+    hooks={sentry_capture_failure},
+    description=(
+        "Forecast the 16 Primaries for 14 days from the day's 00Z ECMWF ENS run with the step-5"
+        " neural network, and write the 13 quantiles to power_forecasts at the 12:00 UTC origin."
+        " Runs daily at 12:00 UTC; retries a missing ENS run every 30 minutes until 15:00 UTC."
+    ),
+)
+
+
+@schedule(
+    job=live_primary_substation_forecasts_job, cron_schedule="0 12 * * *", execution_timezone="UTC"
+)
+def live_primary_substation_forecasts_schedule(context: ScheduleEvaluationContext) -> RunRequest:
+    """Materialise today's ``live_primary_substation_forecasts`` partition daily at 12:00 UTC.
+
+    The forecast's origin is 12:00 UTC, and by then ``ecmwf_ens_schedule`` (10:30 UTC) has normally
+    written the day's 00Z run. Nothing waits on that job's run status: the asset looks for the run
+    in the ``nwp`` table and retries every 30 minutes, up to 6 times, while the run is absent. The
+    crontab is copied into ``PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG`` in ``_sentry.py``, the
+    schedule on which the Sentry cron monitor expects a check-in, and a test fails if the two
+    drift apart.
+    """
+    return RunRequest(partition_key=context.scheduled_execution_time.strftime("%Y-%m-%d"))
