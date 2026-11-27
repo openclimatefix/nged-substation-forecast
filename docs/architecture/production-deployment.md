@@ -330,8 +330,8 @@ artifacts](ml-orchestration.md#model-artifacts-one-replaceable-archive-no-local-
 cache](ml-orchestration.md#why-there-is-no-local-cache), so it offers no way to keep serving through
 an MLflow outage. A live service that picked up each new model from MLflow without a redeploy would
 need a way to keep serving through an MLflow outage, designed against production's own availability
-needs. That design is tracked in [issue
-#472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
+needs. That design is tracked in
+[issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Resolve repo-relative paths via a workspace marker, not directory depth
 
@@ -572,9 +572,10 @@ research and development: training runs log their models, configs, and metrics t
 rejection draws is between ML R&D and production: research uses MLflow constantly, while
 production's hot path never touches it.
 
-The idea may still return if new models start reaching production often enough that a redeploy for
-each one becomes a burden. A mechanism for serving through an MLflow outage would then need to be
-designed, because `load_from_mlflow` supplies none of its own. That mechanism is tracked in
+Fetching a model from MLflow at container startup may still return as an option if new models start
+reaching production often enough that a redeploy for each new model becomes a burden. A mechanism
+for serving through an MLflow outage would then need to be designed, because `load_from_mlflow`
+supplies none of its own. That mechanism is tracked in
 [issue #472](https://github.com/openclimatefix/nged-substation-forecast/issues/472).
 
 ## Infrastructure tier: alternatives to the EC2 control-plane box

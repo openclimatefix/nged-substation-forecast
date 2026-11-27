@@ -602,11 +602,11 @@ interchangeable, and the difference between them decides which one to use where.
 
 The **mean** is the point forecast that minimises **squared error** — so RMSE (and MBE, which is a
 mean-of-errors and inherits the mean's clean energy-balance / expectations-aggregate reading) is
-*consistent* with the mean. A model trained with squared error learns a conditional mean, and the
-ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the mean on RMSE
-rewards a model for reporting its honest conditional mean. The mean also averages out member noise,
-so it is the more stable statistic on a small ensemble, and it matches standard NWP verification
-practice.
+*consistent* with the mean. A forecaster trained with squared error learns a conditional mean, and
+the ensemble mean of 51 such members is a coherent estimate of `E[power]`. Scoring the mean on RMSE
+rewards a forecaster for reporting its honest conditional mean. The mean also averages out member
+noise, so it is the more stable statistic on a small ensemble, and it matches standard NWP
+verification practice.
 
 The **median** is the point forecast that minimises **absolute error** — so MAE and NMAE are
 *consistent* with the median. It is robust to the skew that is real in this problem (holiday weeks,
@@ -1036,8 +1036,8 @@ wrapper's third consumer.
 
 Spread inflation widens the fan but cannot reshape it (the inflated ensemble is still 51 point
 forecasts, just pushed apart). It is the stopgap the full fix below must beat to earn the effort of
-building it. [Issue
-#1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
+building it.
+[Issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156)
 plans EMOS and conformal variants of spread calibration, scored
 on the same rows as the quick-wins study.
 
@@ -1067,8 +1067,8 @@ then recombine the 51 members with the **linear-pool mixture** into one set of d
    pooled PICP numbers demand it. Scored with pinball/PICP/CRPS head-to-head against the Phase-C
    inflated deterministic forecast. The XGBoost quick-wins study found that crossing the quantile
    model's output with the 51 members left the 10% to 90% band covering 57% of outcomes, against a
-   nominal 80%, and
-   [issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) plans the
+   nominal 80%.
+   [Issue #1156](https://github.com/openclimatefix/nged-substation-forecast/issues/1156) plans the
    follow-up checks on how to score and recombine the quantiles.
 
 ---

@@ -505,9 +505,9 @@ and input/output still probably dominate wall-clock time and need chunking by se
 
 **The training-history roadmap page already designs much of what this page describes.** Its section
 [A new weather product with a few months of
-history](training-history.md#a-new-weather-product-with-a-few-months-of-history) (study [issue
-#999](https://github.com/openclimatefix/nged-substation-forecast/issues/999)) proposes [training one
-weather-response model on the long power history, then calibrating per weather
+history](training-history.md#a-new-weather-product-with-a-few-months-of-history) (study
+[issue #999](https://github.com/openclimatefix/nged-substation-forecast/issues/999)) proposes
+[training one weather-response model on the long power history, then calibrating per weather
 product](training-history.md#train-on-the-long-power-history-then-calibrate-per-weather-product).
 That is stage 1 plus a per-product calibrator. This page differs in four ways:
 

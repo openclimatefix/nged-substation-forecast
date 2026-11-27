@@ -113,10 +113,10 @@ replaceable object, not to be small.
 `load_from_mlflow` downloads on every call. The obvious cache — keyed by the MLflow run ID, which
 looks immutable — is unsound here, because a CV fold run is **reused** across re-materialisations of
 its partition (see "Cross-process run resolution" above), so the same run ID can legitimately hold a
-different model after re-training. The key would not be unique for its contents, and keeping such a
-cache honest would need write-side invalidation in `save_to_mlflow`: machinery serving no consumer,
-because the one caller of `load_from_mlflow` is `cv_power_forecasts`, which loads each fold's model
-once per materialisation, and the live service makes no MLflow call.
+different model after re-training. The key would not be unique for its contents. Keeping a cache
+keyed by run ID honest would need write-side invalidation in `save_to_mlflow`. That invalidation
+would serve no consumer, because the one caller of `load_from_mlflow` is `cv_power_forecasts`, which
+loads each fold's model once per materialisation. The live service makes no MLflow call.
 
 If a future consumer does need to keep serving through an MLflow outage, adding a cache scoped to
 that consumer's own invalidation needs is tracked in

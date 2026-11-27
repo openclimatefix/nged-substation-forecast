@@ -530,7 +530,7 @@ flag on the feature and validation layer 🚧.
 Which assets sit on which side is recorded on the assets themselves, as a `layer` tag valued
 `production` or `research` — see [Architecture
 Overview](../architecture/overview.md#core-components). The tag records which side an asset belongs
-to; it does not assert a posture, and a `production` asset can still raise on our own bug, such as
+to. The tag does not assert a posture: a `production` asset can still raise on our own bug, such as
 a failing cleaning rule in `clean_nged_power_data`. The asymmetry is also implemented at the
 telemetry layer: the Sentry failure hook is attached to the two scheduled production jobs only.
 

@@ -12,10 +12,10 @@ monitoring, and per-task failure-email alerting are still to come. Once producti
 and its design moves here, the roadmap page is deleted and this section is the sole home for how the
 live service works.
 
-The live service is distinct from [Cross-validation](../cross-validation/index.md): that area
-covers training and backtesting candidate models against historical data; this area covers the
-production service that runs unattended: ingesting the inputs a live forecast reads, and checking
-them. The live service currently writes no forecast.
+The live service is distinct from [Cross-validation](../cross-validation/index.md). The
+cross-validation section covers training and backtesting candidate forecasters against historical
+data. The live-service section covers the production service that runs unattended, which ingests the
+inputs a live forecast reads and checks those inputs. The live service currently writes no forecast.
 
 **Audience note:** today these runbooks are written for OCF (Python-literate researchers). The
 working assumption is that, after the Network Innovation Allowance (NIA) project, NGED runs the
