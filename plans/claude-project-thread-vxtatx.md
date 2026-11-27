@@ -1,11 +1,11 @@
 # Plan: serve the step-5 neural-network demand forecast for the 16 Primaries (#1706)
 
-**The problem.** The live service forecasts every series with the naive forecaster, while research
-has a neural network for the 16 Primaries that beats the manual heuristic and climatology at every
-lead band. The neural network is step 5 of research experiment 677 at monthly refits. Training stays
-in `nged-ml-research`, so production needs inference only, from a plain directory of weights and
-constants that research experiment 705 exports. The goal is a daily forecast for the Primaries in
-the live service before the Christmas 2026 break.
+**The problem.** After #1722 (remove the XGBoost forecaster and `live_forecasts`), the live service
+forecasts no series, while research has a neural network for the 16 Primaries that beats the manual
+heuristic and climatology at every lead band. The neural network is step 5 of research experiment
+677 at monthly refits. Training stays in `nged-ml-research`, so production needs inference only,
+from a plain directory of weights and constants that research experiment 705 exports. The goal is a
+daily forecast for the Primaries in the live service before the Christmas 2026 break.
 
 **The planned solution.** A new workspace package, `substation_demand_forecaster`, rebuilds the
 neural network's 60 input columns from the `nwp` and `cleaned_power_time_series` Delta tables, runs
@@ -77,8 +77,9 @@ series and half-hour, with no member structure.
    up to 6 times, so until 15:00 UTC. That is 30 minutes after the last retry of `ecmwf_ens`
    (8 retries from 10:30 UTC), which can itself take about 10 minutes to finish.
 4. **The asset reads the NWP it needs in one scan** of the `nwp` Delta table, pruned to the 16 H3
-   cells and to the runs initialised from 13 days before the native origin to today's 00Z run. The
-   13 days are set by the cold-snap column of the thermal-lag group. Research keeps 12 days of
+   cells and to the runs with `init_time >= ` the 00Z run of the day 13 days before the native
+   origin's date, up to today's 00Z run, so the scan includes the 00Z run 13 days back. The 13
+   days are set by the cold-snap column of the thermal-lag group. Research keeps 12 days of
    history in front of the origin (`LOOKBACK_STEPS = 12 * 48` in experiment 437's
    `e00437_features.py`, a 10-day cold-snap cap plus a 24-hour mean window). The first day of run
    D−13 is the earliest that reaches 12 days before the origin. The scan also covers the
@@ -93,7 +94,10 @@ series and half-hour, with no member structure.
    then takes the member mean and the population standard deviation (`ddof=0`). Experiment 705 found
    that averaging first is wrong by up to 4.24 m/s in wind speed. Precipitation gets `log1p` of the
    value clipped at zero, applied to both the mean and the standard deviation, as the bundle's
-   `ens_summary_recipe` states.
+   `ens_summary_recipe` states. The summary is built out to 351 hours after the 00Z run, because
+   research's daily minimum and maximum temperature columns cover the whole local day of the last
+   valid time. Step 6 then crops the input rows to the 339-hour horizon. The upsample is called once
+   on all members together with a member key, not once per member.
 6. **`substation_demand_forecaster.features.build_input_matrix(...)` builds the 60 columns** for
    each (Primary, valid half-hour) from the native origin plus 0.5 hours to plus 339 hours, in the
    order of `components/step5/columns.json`. The function takes the recipe from the component
@@ -126,36 +130,39 @@ series and half-hour, with no member structure.
    experiment 705 showed that this window reproduces the research history exactly. The
    expected-weather rows come from `build_expected_rows(...)`. For each half-hour g in (native
    origin − 192 h, native origin − 24 h], the row is the ENS summary row of the freshest run whose
-   native 09:00 origin is at or before g: its 7 weather means (precipitation `log1p`) and 21
-   date-time columns recomputed from g, with the 14 B1 slots set to 0. Standardisation follows the
-   rules in `standardisers.json`: float32 arithmetic, clip at ±5, and NaN to 0 for the 37 lag-free
-   columns; float64 and a clip for the lag values; non-finite to 0 and no clip for the B1 columns;
-   float16 rounding of the expected-weather rows.
+   native 09:00 origin is strictly before g, because the summary holds a lead-0 row at the native
+   origin itself that research's table does not use: its 7 weather means (precipitation `log1p`) and
+   21 date-time columns recomputed from g, with the 14 B1 slots set to 0. Standardisation follows
+   the rules in `standardisers.json`: float32 arithmetic, clip at ±5, and NaN to 0 for the 37
+   lag-free columns; float64 and a clip for the lag values; non-finite to 0 and no clip for the B1
+   columns; float16 rounding of the expected-weather rows.
 7. **`substation_demand_forecaster.neural_network.forecast(bundle, matrix, expected_rows, levels)`**
    runs each seed's forward pass in `torch` under `torch.inference_mode()` on the CPU, with
    `torch.erf` for the exact GELU and the mixture's cumulative distribution. The forward pass is the
    functional `forward` and `mlp` of `reference_check.py`, ported line by line and applying the
    stored weights by their `state_dict` names, so the port diffs against the reference and imports
    nothing from research. `forecast` reads the quantiles at `levels` (the 13 delivery levels in
-   production, and the 11 research levels in the golden tests) from each seed's mixture by 40
-   bisection steps over ±40 standard deviations, sorts each seed's quantiles, converts them to a
-   fraction of capacity with the per-Primary target mean and standard deviation, averages the three
-   seeds level by level, and sorts within each row again, as research does.
+   production, and whatever levels a fixture's `outputs_native.parquet` uses in the golden tests)
+   from each seed's mixture by 40 bisection steps over ±40 standard deviations, sorts each seed's
+   quantiles, converts them to a fraction of capacity with the per-Primary target mean and standard
+   deviation, averages the three seeds level by level, and sorts within each row again, as research
+   does.
 8. **The asset relabels the origin to 12:00 UTC, multiplies by `capacity_mw`, and keeps the 671
-   valid times strictly after 12:00 UTC, the last being 12:00 UTC 14 days later.** Research's own
-   contract rows start at 12:00 UTC itself; `PowerForecast.valid_time` must be strictly after
-   `power_fcst_init_time`, so that row is dropped. The asset then clamps every quantile of the eight
-   MVA Primaries at zero, as the backtest files do. It builds a `PowerForecast` frame with the 13
-   quantile columns, `power_fcst_model_name = MODEL_NAME`, which is the constant
-   `"substation_demand_forecaster"` in the package, as for every `BaseForecaster` subclass,
-   `experiment_name = "primary_substation_demand_forecaster"`, which names the family,
+   valid times strictly after 12:00 UTC, the last being 11:30 UTC 14 days later.** Research's own
+   contract rows cover the half-open interval from 12:00 UTC to 12:00 UTC 14 days later, which is
+   672 rows ending at 11:30 UTC, so the 12:00 UTC row is the one dropped. `PowerForecast.valid_time`
+   must be strictly after `power_fcst_init_time`, so that row is dropped. The asset then clamps
+   every quantile of the eight MVA Primaries at zero, as the backtest files do. It builds a
+   `PowerForecast` frame with the 13 quantile columns, `power_fcst_model_name = MODEL_NAME`, which
+   is the constant `"substation_demand_forecaster"` in the package, as for every `BaseForecaster`
+   subclass, `experiment_name = "primary_substation_demand_forecaster"`, which names the family,
    `power_fcst_model_version` from the bundle's `model_release`, `nwp_init_time` = today's 00Z run,
    and `fold_id = "live"`.
 9. **The asset writes with `write_power_forecasts`**, replacing exactly the partition
    (`experiment_name`, `"live"`) and this `power_fcst_init_time`, so a rerun never duplicates rows.
-   No Sentry check-in monitor is added: a failed run reaches Sentry through
-   `sentry_capture_failure`, a missing run through the degradation report, and a dead daemon through
-   the existing `live-forecasts` monitor.
+   A failed run reaches Sentry through `sentry_capture_failure`, a missing run through the
+   degradation report, and the asset registers `report_asset_retry` for its retries. A dead daemon
+   needs a check-in alarm, which "Risks and open questions" asks about.
 
 #### The main branches off the happy path
 
@@ -176,7 +183,7 @@ series and half-hour, with no member structure.
   non-finite aggregate to 0. The gap is not filled from another run, so production matches research
   in this case too. The asset reports the missing history run as a degradation, naming the run.
 - **A lag time whose expected-weather row has no covering run** (every run whose native origin
-  is at or before g is missing): the row falls back to the next-freshest run that covers g, by
+  is strictly before g is missing): the row falls back to the next-freshest run that covers g, by
   smallest lead. If no run covers g, every column of the row is 0, which is the value research's
   float16 rounding of NaN gives. The asset reports the degradation.
 
@@ -187,9 +194,12 @@ series and half-hour, with no member structure.
   It does not forecast from yesterday's run, because every lead would be 24 hours longer than the
   neural network trained on. The service then writes no forecast for that day, because no other
   forecaster is live.
-- **Today's run has fewer than 51 members in a cell**: the summary is the mean and standard
-  deviation over the members present. `nwp_run_is_complete` already warns about the run and names
-  the absent members, so the asset adds no report of its own.
+- **Today's run has fewer than 51 members in a cell, misses a lead, is short, lacks an H3 cell, or
+  has null radiation cells**: the Primary is still forecast, from the members and values present,
+  and a NaN that remains goes through the standardiser as the training mean (NaN to 0). Because
+  `nwp_run_is_complete` raises only a Dagster warning, the asset also calls
+  `report_asset_degradation` once per run, naming the run and which of the five cases occurred, so
+  that the silent standardiser fill reaches Sentry.
 - **The bundle is missing or has an unknown format version**: `load_bundle` raises. That is our own
   deployment fault, not the outside world, so raising is right under the inherent-stability page,
   and the Sentry failure hook reports it. The SHA-256 of every file is checked once, at image build
@@ -199,9 +209,12 @@ series and half-hour, with no member structure.
 
 ### What changes, file by file
 
-- **Research prerequisite (in `nged-ml-research`):** experiment 705's exporter also writes each
-  seed's weights as `seed<N>.npz` and a `model_release` field in `manifest.json`, and the bundle
-  format becomes version `"2"`. The `.pt` files can stay for research's own `reference_check.py`.
+- **No research prerequisite.** Research experiment 727 already exports bundle format `"2"`, with
+  each seed's weights as `seed<N>.npz`, a `model_release` field in `manifest.json`, and the 13
+  delivery quantile levels in `config.json`. The production bundle is
+  `drop/2026-10` and the test bundle is `replay/2026-04`, under the experiment 727 folder of
+  `$DATA_PATH_INTERNAL/ml-experiments/`. The `.pt` files stay for research's own
+  `reference_check.py`.
 - **`torch` as a runtime dependency of `substation_demand_forecaster`,** in the CPU-only build. The
   maintainer chose `torch` on 2026-11-27, so that training and serving use one tensor library when
   production training arrives. The root `pyproject.toml` pins the PyTorch CPU wheel index for
@@ -232,8 +245,15 @@ series and half-hour, with no member structure.
 - **`src/nged_substation_forecast/definitions.py`**: the new module in `load_assets_from_modules`,
   and the schedule in `schedules=[...]`.
 - **`Dockerfile` and `scripts/deploy/build_and_verify_image.sh`**: a second named build context,
-  `primary_substation_bundle`, copied to the bundle path. The verify step runs the SHA-256 check of
-  every file against `manifest.json` and prints the bundle's research commit.
+  `primary_substation_bundle`, copied to the bundle path. The script takes the bundle directory as
+  its first argument, because it takes none today. The verify step runs the SHA-256 check of every
+  file against `manifest.json`, prints the bundle's research commit, and prints the image size. The
+  image tag carries the bundle's `model_release` and research commit beside the git SHA, so that a
+  refit with no code change gets a new tag and rollback still works. The image is built for
+  linux/arm64, so the step before the first build checks that a cp314 aarch64 `torch` CPU wheel
+  exists on the pinned index and that `uv.lock` resolves on both architectures.
+- **`packages/contracts/src/contracts/settings.py`**, `_derive_unset_paths`: the new bundle-path
+  setting is registered there.
 
 ### Implementation order
 
@@ -268,15 +288,16 @@ series and half-hour, with no member structure.
   bundles (the production `drop/2026-10` and the test `replay/2026-04`), because the fixtures hold
   NGED telemetry that is not committed. For each fixture origin they compare, column by column:
     - production's ENS summary against `ens_summary.parquet`;
-    - every `raw__` column of `build_input_matrix` against `input_matrix.parquet`, to 1e-5. The
+    - every `std__` column of `build_input_matrix` against `input_matrix.parquet`, to 1e-5, and
+      every `raw__` column to a relative tolerance of 1e-6, because Float32 surface pressure near
+      100,514 Pa has a rounding step of about 0.008 that an absolute 1e-5 cannot meet. The
       bundle's `cams_columns_source` says how the two CAMS columns were filled. For the `drop`
       bundle production's zeros are compared; for the `replay` bundle, which carries real CAMS
       values, the test feeds the fixture's own CAMS columns into the matrix, so the rest of the
       matrix and the outputs are still compared;
     - the expected-weather rows against `lag_and_expected_rows.parquet`;
-    - the seed-mean quantiles at the 11 research levels (the fixtures' levels, passed as the
-      `levels` argument) against `outputs_native.parquet`, to 2e-5
-      of capacity;
+    - the seed-mean quantiles at the levels of the fixtures (passed as the `levels` argument)
+      against `outputs_native.parquet`, to 2e-5 of capacity;
     - the contract-origin megawatts, before the MVA clamp, against `outputs_contract.parquet` on
       its 671 rows after 12:00 UTC. The fixtures are unclamped, so the comparison comes before the
       clamp.
@@ -293,11 +314,12 @@ series and half-hour, with no member structure.
     - `b1_columns`: a synthetic cold spell whose last warm day is 11 days before the origin gives a
       cold-snap count of 10 (the cap), and 9.5 when the last warm day is 9.5 days back (fails with
       a 9-day history).
-    - `b1_columns`: with one day of history missing, every B1 value is finite and the standardised
-      value of an all-NaN aggregate is 0.
-    - `b1_columns`: in a synthetic cold spell with one history day deleted, the cold-snap count
-      differs from the count with complete history by at most 1 day, for the missing day placed at
-      each position of the 13-day history.
+    - `b1_columns`: with one day of history missing, every B1 value is finite. An all-NaN min or
+      max aggregate standardises to 0, and an all-NaN trailing mean gives a raw 0, as research's
+      `nan_to_num` does.
+    - `b1_columns`: in a synthetic cold spell with one history day deleted at each position of
+      the 13-day history, the cold-snap count equals the count that research's function gives on the
+      same frame. Nothing asserts a bound on the shift, which the measurement below reports.
     - `lag_columns`: for targets 20 and 30 hours after the native origin, the day-lag offsets are 96
       and 144 half-hours back from the target, as the formula gives; a missing reading gives value
       0, flag 1, and the largest age code.
@@ -305,13 +327,19 @@ series and half-hour, with no member structure.
       on Good Friday 2026.
     - `sun_columns`: against a published SPA value at one timestamp and site.
     - `mixture_quantiles`: for a one-component mixture, the quantiles equal the normal quantiles to
-      1e-5.
+      1e-5. A second test uses a three-component mixture, a hand-checked softmax of the mixture
+      logits, and a `log_std` outside [−3, 3], so that a wrong softmax or a missing `log_std_clamp`
+      fails.
     - `build_expected_rows`: with the run that should cover g missing, the row comes from the
       next-freshest covering run; with none, the row is all zeros.
     - The asset, with a stub bundle of random weights and a tiny NWP and power table: writes 16 ×
-      671 rows, every row strictly after the init time; a second run of the same partition leaves
-      the row count unchanged; with today's run absent, it writes nothing and calls
-      `report_asset_degradation`; MVA rows have no negative quantile.
+      671 rows, the first at 12:30 UTC and the last at 11:30 UTC 14 days later, every row strictly
+      after the init time; a second run of the same partition leaves the row count unchanged; with
+      today's run absent, it writes nothing and calls `report_asset_degradation`; MVA rows have no
+      negative quantile; a backfill of a past partition whose `nwp` table holds newer runs ignores
+      them; the first valid time is 12:30 UTC and the last is 11:30 UTC 14 days later; each megawatt
+      value equals the fraction times `capacity_mw`; and a Primary with a missing lag keeps its grid
+      index.
 
 ## Docs to update
 
@@ -319,8 +347,8 @@ series and half-hour, with no member structure.
   can differ from the live run's.
 - `docs/live_service/aws.md`: the second build context.
 - `docs/architecture/production-deployment.md`: the second live asset and why it runs once a day.
-- `docs/live_service/model-releases.md`: the release row when the first bundle ships, naming
-  experiments 677, 704, and 705.
+- `docs/live_service/sentry.md`: the new asset's degradation tags, and the check-in monitor if the
+  maintainer wants one.
 - `CLAUDE.md`: the package table and the asset list.
 
 ## Measurement before the asset merges
@@ -366,9 +394,36 @@ scripts/deploy/build_and_verify_image.sh   # bundle checksums and copy
   ERA5 arrives about 5 days late (experiment 705, finding 3).
 - **Holiday calendar end.** Research's `HOLIDAY_YEARS` ends in 2028; production computes the
   calendar for the years it needs, so nothing breaks in 2029.
-- **No Sentry check-in monitor for the daily schedule.** What is lost is an alarm for the one
-  schedule being switched off while the daemon runs. `send_forecast_checkin` takes a
-  `monitor_slug` argument, so a second monitor is cheap to add later if wanted.
+- **A dead daemon has no alarm.** #1722 (remove the XGBoost forecaster and `live_forecasts`)
+  deleted `send_forecast_checkin` and the `live-forecasts` Sentry monitor, so a switched-off daemon
+  would look like a missing forecast with no alert. Recommendation: add one Sentry cron check-in to
+  the new asset, sent on success, with its own monitor slug and a daily schedule, and document the
+  monitor in `docs/live_service/sentry.md`. The alternative is to accept silence until the
+  maintainer notices a missing forecast.
+- **The live horizon.** Research's contract rows cover 12:00 UTC to 11:30 UTC 14 days later (672
+  rows), and `PowerForecast.valid_time` must be strictly after the init time, so the 12:00 UTC row
+  is dropped. Recommendation: 671 rows, from 12:30 UTC to 11:30 UTC 14 days later, which is exactly
+  what the validated backtest rows cover. The alternative is 672 rows ending at 12:00 UTC 14 days
+  later, which adds one row that research never scored.
+- **The zero clamp on the eight MVA Primaries.** The step-5 fixtures are unclamped, and the golden
+  tests compare before the clamp. Recommendation: clamp, because an apparent-power series cannot be
+  negative and clamping keeps each row's quantiles non-decreasing. The cost is that the clamped
+  quantiles differ slightly from the unclamped ones that research scored.
+- **Which bundle ships and its release number.** The production bundle is `drop/2026-10`, and the
+  bundle's `model_release` is 0, which means "not a release". Recommendation: ship it as 0 for the
+  first live runs, and cut a numbered release when the first monthly refit that production installs
+  arrives. The refit with a 2026-12-01 cut-off needs the experiment 607 ENS cache extended past
+  2026-10-31 and first runs on about 2026-12-06, so origins from 2026-12-01 to 2026-12-05 use the
+  October weights.
+- **Whether research's ENS summaries equal production's.** Research calls
+  `_upsample_nwp_to_half_hourly` per member on its own archive, and nobody has checked that the
+  archive equals production's `nwp` table, so the 1e-5 golden test on the summary may fail for a
+  reason that is not a bug. The first implementation step runs that comparison before anything else
+  depends on it. The analysis-proxy window was verified on one Primary, one origin, and two
+  variables only, so the golden tests widen that check to all 16 Primaries.
+- **`knot_position` clamping.** The plan clamps the knot position to the knot range, and the review
+  asked for it to stay unclamped. Research's code decides which is right, and the golden tests
+  catch a wrong choice.
 
 ### Simplicity review: what changed
 
@@ -377,6 +432,15 @@ check, the member threshold, the `availability_mode` config, and the new Sentry 
 `select_analysis_proxy` stays unchanged, the asset reuses `ecmwf_ens_partitions`, and the checksums
 moved to image build time. The solar-geometry finding is superseded by the correctness review's
 finding that research uses pvlib's SPA.
+
+### Opus review of the approved plan: what changed
+
+One blocker and nine important findings were applied, and the first implementation step checks the
+rest. The dead-daemon alarm, the 671-row horizon, the research facts now in experiment 727, the
+strict-before rule for the expected-weather run, the 351-hour summary, the silent-degradation
+cases, the image-build checks, the golden tolerances, the tests, and the 13-day scan bound are in
+the sections above. The three decisions that the review left to the maintainer are under "Risks and
+open questions".
 
 ### Correctness review: what changed
 
