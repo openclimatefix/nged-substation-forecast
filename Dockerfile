@@ -9,7 +9,9 @@
 # needs QEMU registered, which scripts/deploy/build_and_verify_image.sh checks for):
 #   docker build --platform linux/arm64 \
 #     --build-arg GIT_SHA=$(git rev-parse HEAD) \
-#     -t nged-forecast:<commit-short> .
+#     --build-context primary_substation_bundle=<bundle-dir> \
+#     -t nged-forecast:<tag> .
+# scripts/deploy/build_and_verify_image.sh <bundle-dir> runs this and derives the tag.
 
 FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS builder
 
@@ -51,6 +53,14 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY uv.lock ./
 COPY conf/ conf/
+
+# The step-5 neural-network bundle that live_primary_substation_forecasts serves, from the second
+# named build context. Its fixtures (golden test data) and .pt weights (read only by research's
+# reference_check.py) are left out. The path is set explicitly, so an override of
+# LOCAL_ARTIFACTS_PATH on the deployment cannot move the setting away from the copy.
+COPY --from=primary_substation_bundle --exclude=fixtures --exclude=**/*.pt . \
+    /app/primary_substation_bundle/
+ENV PRIMARY_SUBSTATION_BUNDLE_PATH=/app/primary_substation_bundle
 
 ENTRYPOINT ["dagster"]
 # This ENTRYPOINT exists for `docker run` smoke-test ergonomics. In the deployed service every
