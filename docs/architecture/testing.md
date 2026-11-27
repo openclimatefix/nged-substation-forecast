@@ -27,12 +27,11 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
 - **The `dev` group is also what keeps a test-only dependency out of the production image.** The
   `Dockerfile` runs `uv sync --frozen --no-dev`, so a package listed there is resolved for
   developers and for CI and absent from the image. `moto`, the mock S3 server the storage tests
-  run against, is an example. A package that the dev group lists and a production package also
-  depends on does reach the image: `pvlib` is in the dev group for the radiation test's independent
-  solar-position reference, and is also a pinned runtime dependency of
-  `substation_demand_forecaster`, which computes the forecast's sun columns with it. The check that
-  a test-only package stays out of the image is one command, and it belongs in the pull request that
-  adds such a dependency:
+  run against, is an example. The image does carry a dev-group package that a production package
+  also depends on. `pvlib` is the example: the dev group lists pvlib as the radiation test's
+  independent solar-position reference, and `substation_demand_forecaster` pins pvlib as a runtime
+  dependency to compute the forecast's sun columns. The check that a test-only package stays out of
+  the image is one command, and it belongs in the pull request that adds such a dependency:
 
     ```bash
     test "$(uv export --no-dev --format requirements-txt | grep -ciE '^(moto|pytest)==')" -eq 0

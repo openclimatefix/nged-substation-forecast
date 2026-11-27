@@ -177,10 +177,12 @@ git rev-parse --short=8 HEAD
 ```
 
 An uncommitted change would be built into the image under the tag of a commit that does not contain
-the change. The build never contacts MLflow. The one trained model the image carries is the step-5
-neural network's bundle, which the build copies from a directory you name in [Step
-4](#step-4-build-and-verify-the-image). Have that directory ready: it is the bundle the research
-repository exported for the month, the directory holding the bundle's `manifest.json`.
+the change. The build never contacts MLflow. The one trained model the image carries is the bundle
+of the step-5 neural network: the demand-forecasting neural network that research experiment 677
+built up one component at a time, as it stood after step 5. The build copies the bundle from a
+directory you name in [Step 4](#step-4-build-and-verify-the-image). Have that directory ready: it is
+the bundle the research repository exported for the month, the directory holding the bundle's
+`manifest.json`.
 
 ## Step 4 — Build and verify the image
 
@@ -198,8 +200,10 @@ end-to-end: the Fargate task definition declares ARM64 ([Step
 9](#step-9-create-the-ecs-cluster-and-fargate-task-definition)) and the control-plane box is a
 Graviton instance ([Step 11](#step-11-launch-the-control-plane-box)), so an amd64 image would push
 fine but then fail every task launch with `image Manifest does not contain descriptor matching
-platform 'linux/arm64 v8'`. On an x86 laptop the build and smoke test run under QEMU emulation —
-noticeably slower than native, but correct. The script checks the emulator is registered and prints
+platform 'linux/arm64 v8'`.
+
+**On an x86 laptop the build and smoke test run under QEMU emulation, which is noticeably slower
+than native but correct.** The script checks the emulator is registered and prints
 the one-time fix (`docker run --privileged --rm tonistiigi/binfmt --install arm64`) if it isn't.
 
 The script builds the image tagged `nged-forecast:<tag>`, where `<tag>` is
@@ -219,9 +223,13 @@ The script then runs two checks inside the image, both with `--network=none`:
   pushed.
 - `scripts/deploy/verify_bundle.py` compares the SHA-256 hash of every bundle file in the image
   with the bundle's manifest, reports a missing or unlisted file, and loads the bundle the way
-  `live_primary_substation_forecasts` does. A bundle the service cannot serve fails here.
+  `live_primary_substation_forecasts` does. The script also checks that the image's `holidays` and
+  `pvlib` versions match the versions the manifest records. When the manifest records a `torch`
+  version, the script compares `torch` too, without the local label such as `+cpu`. A bundle the
+  service cannot serve fails here.
 
-The script finally prints the bundle's research commit and the image size. The script header
+The bundle check prints the bundle's Primaries, seeds, `model_release`, refit month, and research
+commit, and the script ends by printing the image size. The script header
 documents every choice it makes and is the source of truth for the mechanics.
 
 ## Step 5 — Create the ECR repository
@@ -511,9 +519,10 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
       `SENTRY_ENVIRONMENT=production`, and `SENTRY_MONITOR_FORECASTS=true`. Every scheduled run
       executes in this container, so the failure hook, the freshness warning, and the daily
       forecast check-in all send from here ([Setting up Sentry
-      telemetry](sentry.md#turn-it-on-in-production)). A DSN is a write-only ingest key, so it is
-      safe in clear text. Leave the three out while bringing the deployment up, and add them in a
-      new revision once Sentry is ready.
+      telemetry](sentry.md#turn-it-on-in-production)). A DSN (Data Source Name) is a write-only
+      ingest key, so the DSN is safe in clear text. Leave the three Sentry variables out while
+      bringing the deployment up, and add the three variables in a new task-definition revision
+      once Sentry is ready.
     - **Secrets — the four Parameter Store entries.** In the same **Environment variables** section,
       add each parameter from [Step 8](#step-8-store-secrets-in-parameter-store) as a variable whose
       **Value type** is **ValueFrom** (the console's secrets mechanism). The **Key** is the env-var
@@ -939,16 +948,17 @@ SENTRY_DSN=<OCF Sentry project DSN>
 SENTRY_ENVIRONMENT=production
 ```
 
-The two `SENTRY_*` lines turn on error telemetry and the freshness warnings in the processes on the
-box (see [Send telemetry to
-Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry)).
+The two `SENTRY_*` lines turn on error telemetry in the daemon, the webserver, and the code-location
+server on the box (see [Send telemetry to
+Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry)). The freshness warnings
+and the forecast check-in are sent from the Fargate runs, which read the task definition instead.
 `SENTRY_ENVIRONMENT=production` is what the alert rules are scoped to; a developer testing from a
 laptop instead sets `SENTRY_ENVIRONMENT=<name>-laptop`. An empty/absent `SENTRY_DSN` disables Sentry
 entirely, so this is safe to omit while bringing the box up.
 
 (The Fargate containers get the NGED secrets and the Postgres password from Parameter Store, and the
 `SENTRY_*` values from the task definition's plain environment variables in [Step
-9](#step-9-create-the-ecs-cluster-and-fargate-task-definition); the box's containers read this file
+9](#step-9-create-the-ecs-cluster-and-fargate-task-definition). The box's containers read this file
 instead — Stage-1 simplicity, one hand-managed box. `SENTRY_MONITOR_FORECASTS` stays out of this
 file, because the forecast check-in is sent from the Fargate run, never from the box.)
 
@@ -1211,8 +1221,8 @@ daemons with green heartbeats.
 ## Step 16 — Turn on the schedules and verify end-to-end
 
 1. **First time only — delete a `power_forecasts` table that has the old schema.** An earlier
-   release stored one row per ensemble member, with the columns `ensemble_member` and `power_fcst`,
-   where the current schema has the 13 quantile columns `power_fcst_p1` to `power_fcst_p99`.
+   release stored one row per ensemble member, with the columns `ensemble_member` and `power_fcst`.
+   The current schema has the 13 quantile columns `power_fcst_p1` to `power_fcst_p99` instead.
    `live_primary_substation_forecasts` cannot write to the old table: every run fails with
    `deltalake` `SchemaMismatchError: Cannot cast schema, number of fields does not match`. Check the
    table's first commit for the old column:
@@ -1224,44 +1234,45 @@ daemons with green heartbeats.
     ```
 
     A count of 1 or more means the table has the old schema. Delete the table, which holds only
-    the earlier release's rows, so the first forecast creates it afresh:
+    the earlier release's rows, so the first forecast creates the table afresh:
 
     ```bash
     aws s3 rm --recursive s3://nged-forecast-delivery/data/power_forecasts/
     ```
 
     `aws s3 cp` failing with "does not exist" means there is no table yet, and the first forecast
-    creates one.
+    creates the table.
 
-2. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
-   and `live_primary_substation_forecasts_schedule`. Schedule state lives in Postgres, so this is a
-   one-time action — it survives restarts and reboots.
-3. **First time only — materialise `h3_grid_weights` once, then the latest `ecmwf_ens` partition.**
+2. **First time only — materialise `h3_grid_weights` once, then the latest `ecmwf_ens` partition.**
    `h3_grid_weights` is unpartitioned and has no schedule. `ecmwf_ens` reads the output of
    `h3_grid_weights`, so materialise `h3_grid_weights` first from the UI. A Dagster `deps=[...]`
    declaration records lineage; it does *not* make materialising `ecmwf_ens` reach back and build
-   its parents first. Then materialise
-   the latest `ecmwf_ens` partition rather than waiting for the 10:30 UTC tick. Watch the run get
+   its parents first. Then materialise the latest `ecmwf_ens` partition. Watch the run get
    dispatched by the launcher: it appears in the Dagster UI, a Fargate task spins up in the ECS
    console, its logs stream to CloudWatch, and the NWP run lands under
-   `s3://nged-forecast-internal/data/NWP/…`. From then on each ingest asset is kept fresh by its own
-   schedule.
-
-    The first forecast needs more than that one run: `live_primary_substation_forecasts` reads the
-    day's ENS run and the 13 daily runs before it, and reports any missing history run as a
-    degradation. Backfill the 13 `ecmwf_ens` partitions before the latest partition, then
-    materialise the latest `live_primary_substation_forecasts` partition. Its run metadata should
-    show `n_rows` 10736 and an empty `missing_history_runs`, and the rows land in
-    `s3://nged-forecast-delivery/data/power_forecasts`.
-
-4. **Check the asset checks**: in the UI's Checks view, `power_data_is_fresh`,
+   `s3://nged-forecast-internal/data/NWP/…`.
+3. **First time only — backfill the 13 `ecmwf_ens` partitions before the latest partition.**
+   `live_primary_substation_forecasts` reads the day's run of the ECMWF ensemble (ENS) and the 13
+   daily runs before it, and reports any missing history run as a degradation. Backfill those 13
+   partitions from the UI before turning the forecast schedule on, so the first scheduled forecast
+   does not run on a partial history.
+4. **UI → Automation**: switch on `power_time_series_and_metadata_schedule`, `ecmwf_ens_schedule`,
+   and `live_primary_substation_forecasts_schedule`. Schedule state lives in Postgres, so this is a
+   one-time action — it survives restarts and reboots. From then on each asset is kept fresh by its
+   own schedule.
+5. **Run the first forecast by hand.** Once the first hourly power ingest, which runs at 55 minutes
+   past each hour, has landed, materialise the latest `live_primary_substation_forecasts`
+   partition. The run's metadata should show `n_rows` 10736, which is 16 Primaries times 671
+   half-hours, and an empty `missing_history_runs`. The rows land in
+   `s3://nged-forecast-delivery/data/power_forecasts`.
+6. **Check the asset checks**: in the UI's Checks view, `power_data_is_fresh`,
    `cleaned_power_keeps_up_with_raw`, and the three `ecmwf_ens` checks should be green or carry a
    warning that [Operating the live
    service](operations.md#degraded-input-data-nwp-feed-down-or-telemetry-stalled) explains.
-5. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always` must
+7. **Reboot test**: `sudo reboot` on the box. Docker's systemd unit plus `restart: always` must
    bring all four services back unattended. The UI comes back over Tailscale with run history
    intact.
-6. **Leave it running for several days**: a power ingest lands every hour, a fresh NWP ingest
+8. **Leave it running for several days**: a power ingest lands every hour, a fresh NWP ingest
    after each daily 00Z publication, and a Primary substation forecast soon after 12:00 UTC each
    day; check Cost Explorer against the [cost model](../architecture/aws-costs.md#v1-32-time-series).
 
@@ -1280,9 +1291,10 @@ service: Backfilling a missed partition](operations.md#backfilling-a-missed-part
 - **Security patches**: Ubuntu Server installs security updates automatically via
   `unattended-upgrades`; confirm it's active with `systemctl status unattended-upgrades`.
 
-A daemon that dies silently shows up once a day, as a missed [forecast
-check-in](sentry.md#the-daily-forecast-check-in) at 17:00 UTC. Per-task failure alerts (email via
-SNS, the Simple Notification Service) are not built; see [the
+A daemon that dies silently raises a missed [forecast
+check-in](sentry.md#the-daily-forecast-check-in) at the next 17:00 UTC deadline, up to about 29
+hours after the daemon died. Per-task failure alerts (email via SNS, the Simple Notification
+Service) are not built; see [the
 roadmap](../roadmap/live-service.md#alert-on-absence-the-missed-check-in-alarm) and [Send telemetry
 to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry).
 

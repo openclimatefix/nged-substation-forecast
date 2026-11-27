@@ -5,11 +5,11 @@ events mean when an input degrades, how to read and update the daily Primary sub
 and how to backfill a missed partition.
 
 The live service ingests the power telemetry of National Grid Electricity Distribution (NGED) and
-the ensemble numerical weather prediction (NWP) from the European Centre for Medium-Range Weather
-Forecasts (ECMWF), cleans the telemetry, and checks both inputs. Once a day, a neural network then
-forecasts the demand of 16 Primary substations for the next 14 days. The production runtime has
-**no dependency on MLflow**: the deployment reaches
-no tracking server. The [cross-validation assets](../cross-validation/index.md) that do need MLflow
+the ensemble numerical weather prediction (NWP) of the European Centre for Medium-Range Weather
+Forecasts (ECMWF), which ECMWF calls ENS. The service cleans the telemetry and checks both inputs.
+Once a day, a neural network then forecasts the demand of 16 Primary substations for the next 14
+days. The production runtime has **no dependency on MLflow**: the deployment reaches no tracking
+server. The [cross-validation assets](../cross-validation/index.md) that do need MLflow
 run on a researcher's laptop.
 
 ---
@@ -347,46 +347,53 @@ check-in on the `live-primary-substation-forecasts` cron monitor, or a new month
 substations.** Each run writes 671 half-hourly rows per Primary to the `power_forecasts` table, with
 `power_fcst_init_time` at 12:00 UTC on the partition's day and valid times from 12:30 UTC that day
 to 11:30 UTC 14 days later. The rows carry `experiment_name="primary_substation_demand_forecaster"`,
-`power_fcst_model_name="substation_demand_forecaster"`, and `fold_id="live"`, and
-`power_fcst_model_version` holds the deployed bundle's `model_release`. The 13 quantile columns are
-in megawatts, or in megavolt-amperes for the eight Primaries metered in MVA, whose quantiles are
-clamped at zero. Re-materialising a partition replaces that `power_fcst_init_time`'s rows, so a
-re-run never duplicates a forecast.
+`power_fcst_model_name="substation_demand_forecaster"`, and `fold_id="live"`. The
+`power_fcst_model_version` column holds the deployed bundle's `model_release`. The 13 quantile
+columns are in megawatts, or in megavolt-amperes for the eight Primaries metered in MVA. The
+quantiles of those eight Primaries are clamped at zero, because apparent power cannot be negative.
+Re-materialising a partition replaces that `power_fcst_init_time`'s rows, so a re-run never
+duplicates a forecast.
 
 **The asset reads three inputs, and none of them comes from MLflow:**
 
-- the day's 00Z ECMWF ensemble run and the 13 daily runs before it, from the `nwp` table that
+- the day's 00Z ENS run and the 13 daily runs before the day's run, from the `nwp` table that
   `ecmwf_ens` writes;
 - the Primaries' cleaned readings from the past 9 days, from the `cleaned_power_time_series` table,
   for the lags of one day and one week;
-- the step-5 neural network's bundle, a directory that the production image carries at
-  `/app/primary_substation_bundle`. The bundle holds each seed's weights, the standardisers,
-  the 16 Primaries with their capacities, and the recipe's constants. The Primaries and their
-  capacities come from the bundle, not from the `TimeSeriesMetadata` table.
+- the bundle of the step-5 neural network, a directory that the production image carries at
+  `/app/primary_substation_bundle`. The step-5 neural network is the demand-forecasting neural
+  network that research experiment 677 built up one component at a time, as it stood after step
+  5. The bundle holds each seed's weights, the standardisers, the 16 Primaries with their
+  capacities, and the recipe's constants. The Primaries and their capacities come from the bundle,
+  not from the `TimeSeriesMetadata` table.
 
 **Read `n_rows` in the run's metadata first.** A run that wrote a forecast shows `n_rows` 10736 (671
 rows for each of the 16 Primaries) and `n_time_series` 16. `n_rows` 0 means the day's ENS run never
 arrived, or arrived with no rows in any of the Primaries' H3 cells, and the day has no forecast. The
-metadata also names the bundle that made the forecast, in `model_release`, `research_commit`, and
-`refit_month`, and lists any history run that was missing in `missing_history_runs`.
+metadata of a run that wrote a forecast also names the bundle that made the forecast, in
+`model_release`, `research_commit`, and `refit_month`, and lists any missing history run in
+`missing_history_runs`. A run with `n_rows` 0 carries only `nwp_init_time` and `n_rows`.
 
 **Three metadata fields show how much telemetry the lags had.** `day_lag_missing_fraction` and
 `week_lag_missing_fraction` are the shares of the forecast's input rows, across all the Primaries,
 whose day lag or week lag has no cleaned reading. `n_primaries_without_readings` counts the
-Primaries with no cleaned reading at all in the 7 days the lags read, which end 1 day before the
-09:00 UTC native origin.
+Primaries with no cleaned reading at all in the 7 days the lags read. Those 7 days end 1 day before
+the native origin, which is 09:00 UTC on the partition's day: the 00Z ENS run's initialisation time
+plus 9 hours, when the neural network was trained to treat the run as available.
 
 **A run with `n_rows` 0 still shows as a green, materialised partition in the Dagster UI.** A
-backfill launched over the "missing" partitions therefore skips that day. To find such days, open
-the asset's partitions in the UI and read the `n_rows` of each materialisation, or filter the
-asset's materialisation events on `n_rows` 0, then materialise those partitions by name.
+backfill launched over the "missing" partitions therefore skips that day. To find the days whose run
+wrote `n_rows` 0, open the asset's partitions in the UI and read the `n_rows` of each
+materialisation, or filter the asset's materialisation events on `n_rows` 0. Then materialise those
+partitions by name.
 
 **A missed check-in means no forecast landed today.** On a successful run for today's partition, the
 asset sends a check-in to the Sentry cron monitor `live-primary-substation-forecasts`. Sentry raises
-the missed check-in at 17:00 UTC if none has arrived. The causes include a dead daemon or box, a
-failed run, and a day whose ENS run never arrived. Look in the Dagster UI for the day's run: no run
-at all points at the daemon or the box, and a run with `n_rows` 0 points at the NWP feed. Setting up
-the monitor is in [Setting up Sentry telemetry](sentry.md#the-daily-forecast-check-in).
+the missed check-in at 17:00 UTC if no check-in has arrived. The causes include a dead daemon or
+box, a failed run, and a day whose ENS run never arrived. Look in the Dagster UI for the day's
+Dagster run of `live_primary_substation_forecasts`: no Dagster run at all points at the daemon or
+the box, and a Dagster run with `n_rows` 0 points at the NWP feed. Setting up the monitor is in
+[Setting up Sentry telemetry](sentry.md#the-daily-forecast-check-in).
 
 **Each degradation reaches Sentry tagged `degraded_asset:live_primary_substation_forecasts`, and its
 message names the ENS runs or the bundle involved.** Sentry groups the events by kind, so a fault
@@ -397,42 +404,46 @@ still be made:
 |---|---|---|---|
 | `day_run_missing` | By the last retry, at about 16:00 UTC, the day's 00Z run was not in the `nwp` table, or had no rows in any of the Primaries' H3 cells | Wrote nothing and sent no check-in, so the day has no forecast | Recover the `ecmwf_ens` partition, then materialise the same day's `live_primary_substation_forecasts` partition |
 | `history_runs_missing` | One or more of the 13 history runs is absent | Computed the thermal-lag and solar-gain columns from the history that remains, and took the lags' expected-weather rows from the next-freshest run | Materialise the missing `ecmwf_ens` partitions if Dynamical.org still serves them |
-| `day_run_incomplete` | The day's run has, in some but not all of the Primaries' H3 cells, no rows; or, in some H3 cell, fewer than 51 members at any lead, a missing lead, a last lead short of 360 hours, or null radiation after lead 0 | Forecast from the values present: a missing lead is interpolated from its neighbours, fewer members give the mean and spread of the members present, and an input still missing takes its training mean | Chase Dynamical.org, then re-materialise both partitions once the complete run is republished |
+| `day_run_incomplete` | The day's run has, in some but not all of the Primaries' H3 cells, no rows; or, in some H3 cell, fewer than 51 members at some lead, a missing lead, a last lead short of 360 hours, or null radiation after lead 0 | Forecast from the values present: a missing lead is interpolated from its neighbours, fewer members give the mean and spread of the members present, and an input still missing takes its training mean | Chase Dynamical.org, then re-materialise both partitions once the complete run is republished |
 | `expected_weather_uncovered` | No ENS run covers some of the half-hours the day and week lags read their expected weather from, which happens when several history runs are missing | Read zeros for those expected-weather rows; `n_uncovered_expected_weather_rows` in the run metadata counts them | As for `history_runs_missing` |
-| `bundle_stale` | The day's run falls two or more months after the deployed bundle's refit month, or one month after it and after the 7th of the month, so the forecast's valid times sit past the bundle's last offset knot, where the offset is held flat. The first 7 days of a month are exempt, because the month's refit trains on ERA5, which publishes about 5 days late | Forecast with the old bundle | [Install the current month's bundle](#installing-a-new-monthly-bundle) |
+| `bundle_stale` | The day's run falls 2 or more months after the deployed bundle's refit month, or 1 month after the refit month and after the 7th of the month. The neural network's level offset is fitted at one point per month, called a knot, up to the refit month, so the forecast's valid times then sit past the last knot, where the offset is held at the last knot's value. The first 7 days of a month are exempt, because the month's refit trains on ECMWF's ERA5 reanalysis, which publishes about 5 days late | Forecast with the old bundle | [Install the current month's bundle](#installing-a-new-monthly-bundle) |
 | `primaries_without_readings` | One or more of the bundle's Primaries has no cleaned reading in the 7 days the lags read, which end 1 day before the native origin; the message names their time series | Forecast those Primaries with the day and week lags read as missing, so their forecasts carry no recent level | Check `power_data_is_fresh` and the NGED feed for those time series (see [Degraded input data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)) |
 
-While the day's run is absent or has none of the Primaries' cells, the asset retries every 30
-minutes, 8 times, and sends one
-`retrying_asset` warning on the first retry. A `degraded_asset` event that carries a real stack
-trace, rather than one of the six messages above, means that the code checking the ENS runs
-raised. The forecast still ran, and the stack trace shows the bug.
+**While the day's run is absent or has none of the Primaries' cells, the asset retries every 30
+minutes, 8 times.** The asset sends one `retrying_asset` warning, on the first failed attempt.
+
+**A `degraded_asset` event that carries a real stack trace means that one of the asset's four
+warning reports raised.** The four reports check the bundle's age, the history runs and the day's
+run, the Primaries without readings, and the expected-weather rows no run covers. Each report runs
+under a catch-all, so the forecast still ran, and the stack trace shows the bug.
 
 **A single missing lag is not reported, but a Primary with no readings at all is.** When a Primary
 has no cleaned reading at its day or week lag, the neural network reads the missing-lag encoding it
-was trained with, and the forecast moves towards the forecast it makes without lags. Stale
-telemetry already has its own check, `power_data_is_fresh` (see [Degraded input
-data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)), and the two missing-lag fractions
-in the run metadata show how far the lags were affected. A Primary with no reading in the whole
-7-day lag window is reported as `primaries_without_readings`.
+was trained with. The Primary's forecast then moves towards the forecast the neural network makes
+without lags. Stale telemetry already has its own check, `power_data_is_fresh` (see [Degraded input
+data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)). The two missing-lag fractions in
+the run metadata show how far the lags were affected. A Primary with no reading in the whole 7-day
+lag window is reported as `primaries_without_readings`.
 
 **A failed run is our own fault, so it fails and reaches Sentry tagged `fault_category:run_failed`.**
-The asset raises on a bundle that is missing, has an unknown format version, or was trained on
-Copernicus Atmosphere Monitoring Service (CAMS) values that the service cannot compute, on a
-partition whose 12:00 UTC origin is before the bundle's refit time (see [Backfilling a missed
-partition](#backfilling-a-missed-partition)), and on output that fails the `PowerForecast`
-contract. Read the traceback, fix the image, and redeploy.
+The asset raises on a bundle that is missing, has an unknown format version, names a recipe or a
+constant that the code does not implement, or was trained on Copernicus Atmosphere Monitoring
+Service (CAMS) values that the service cannot compute. The asset also raises on output that fails
+the `PowerForecast` contract; for these faults, read the traceback, fix the image, and redeploy. The
+asset raises too on a partition whose 12:00 UTC origin is before the bundle's refit time, which
+[Backfilling a missed partition](#backfilling-a-missed-partition) covers.
 
 ### Installing a new monthly bundle
 
-**The research repository exports one bundle per monthly refit, and a new bundle reaches the service
-only through a new image.** The image tag names both the code and the bundle, as
+**A new monthly bundle reaches the service only through a new image.** The research repository
+exports one bundle per monthly refit. The image tag names both the code and the bundle, as
 `<git commit>-r<model_release>-<research commit>-<refit month>`, so a refit with no code change
-still gets a new tag and the previous image stays in the Elastic Container Registry (ECR) for a rollback.
+still gets a new tag. The previous image therefore stays in the Elastic Container Registry (ECR)
+under its own tag, ready for a rollback.
 
 1. **Run the golden tests against the new bundle.** The tests compare every stage of the forecast
-   with the fixtures the bundle ships, and read the `nwp` and `cleaned_power_time_series` tables
-   under `DATA_PATH_INTERNAL`, so point `DATA_PATH_INTERNAL` at a data folder that holds the
+   with the fixtures the bundle ships. The tests read the `nwp` and `cleaned_power_time_series`
+   tables under `DATA_PATH_INTERNAL`, so point `DATA_PATH_INTERNAL` at a data folder that holds the
    fixtures' dates:
 
     ```bash
@@ -443,22 +454,21 @@ still gets a new tag and the previous image stays in the Elastic Container Regis
     `<bundle-dir>` is the directory that holds the bundle's `manifest.json`. Without
     `PRIMARY_SUBSTATION_BUNDLE_PATH`, the golden tests read the bundle at the default path,
     `primary_substation_bundle` under the local artifacts folder, and skip when that directory
-    holds no fixtures, so a run that reports only skips has tested nothing.
+    holds no fixtures. A test run that reports only skips has therefore tested nothing.
 
 2. **Build, verify, push, and deploy the image** with the bundle directory as the scripts' one
    argument, following [Redeploying new code](aws.md#redeploying-new-code). The build copies the
    bundle into the image, leaving out the fixtures and the PyTorch checkpoints. The build then
-   checks every file's SHA-256 hash against the manifest and loads the bundle the way the asset
-   does. A bundle with an unknown format version, a recipe the code does not implement, or CAMS
-   columns the service cannot compute fails this check, before the image is pushed.
+   checks every file's SHA-256 hash against the manifest, checks the image's `holidays`, `pvlib`,
+   and `torch` versions against the versions the manifest records, and loads the bundle the way the
+   asset does. A bundle with an unknown format version, a recipe the code does not implement, or
+   CAMS columns the service cannot compute fails this check, before the image is pushed.
 
 3. **Check the next day's run metadata.** `model_release`, `research_commit`, and `refit_month`
    should name the new bundle.
 
-**A re-run of a past partition uses the bundle in the image deployed at the time of the re-run.**
-The re-run therefore replaces the rows of the bundle that made the original forecast with rows from
-the new bundle, under the new `power_fcst_model_version`. A re-run of a partition whose 12:00 UTC
-origin is before the deployed bundle's refit time fails instead and writes nothing.
+Read [Backfilling a missed partition](#backfilling-a-missed-partition) before re-running any past
+partition with the new image.
 
 ## Inspecting forecasts
 
@@ -499,31 +509,37 @@ the forecast recover differently:
   [Degraded input data](#degraded-input-data-nwp-feed-down-or-telemetry-stalled)).
 - **`live_primary_substation_forecasts`** has the same daily partitions as `ecmwf_ens`.
   Materialise a missed day's partition once that day's `ecmwf_ens` partition has landed, in the
-  same way. A backfill sends no Sentry check-in, because only today's partition sends one. A
-  backfill whose 00Z run is more than 36 hours old and absent from the `nwp` table does not retry:
-  the backfill reports `day_run_missing` at once and writes nothing. A partition whose earlier run
-  wrote `n_rows` 0 counts as materialised, so select it by name rather than through a backfill of
-  missing partitions.
+  same way. Select a partition whose earlier run wrote `n_rows` 0 by name, because the partition
+  counts as materialised (see [The daily Primary substation
+  forecast](#the-daily-primary-substation-forecast)).
+
+**A backfill of the forecast sends no Sentry check-in, and does not retry a run more than 36 hours
+old.** Only today's partition sends a check-in. A backfill whose 00Z run is more than 36 hours old,
+and is absent from the `nwp` table or has no rows in any of the Primaries' H3 cells, reports
+`day_run_missing` at once and writes nothing.
 
 **A backfill of a day before the deployed bundle's refit time needs an earlier bundle.** The asset
-compares the partition's 12:00 UTC origin with `refit_time_utc` in the bundle's `manifest.json`,
-which is 00:00 UTC on the first day of the refit month. The refit trained on rows whose origin is at
-or before that time, so a forecast from an earlier origin would have seen the readings it forecasts.
-The asset fails such a partition with a Dagster `Failure` that names the partition, the refit time,
-and the refit month, before it writes any rows or sends a check-in. To backfill the day, deploy the
-image built with a bundle refitted before it, which ECR still holds, materialise the partition, and
-redeploy the current image.
+compares the partition's 12:00 UTC origin with the `refit_time_utc` field of the bundle's
+`manifest.json`, which holds 00:00 UTC on the first day of the refit month. The refit trained on
+rows whose origin is at or before that time, so a forecast from an earlier origin would have seen
+the readings the forecast covers. The asset fails a partition whose origin is before the refit time
+with a Dagster `Failure` that names the partition, the refit time, and the refit month, before the
+asset writes any rows or sends a check-in. ECR keeps the earlier images. To backfill the day, deploy
+an earlier image whose bundle's refit time is at or before the day's 12:00 UTC origin, materialise
+the partition, and redeploy the current image.
 
 **A backfill on or after the refit time replaces whatever rows an earlier bundle wrote for that
-day.** The asset does not check which bundle wrote a day's rows. A backfill of the first days of the
-refit month, for example, replaces the forecast that the previous month's bundle served live on
-those days. Re-materialise a day only when you mean to replace its forecast.
+day.** A backfill, like any re-run, uses the bundle in the image deployed at the time of the
+backfill, and the asset does not check which bundle wrote a day's rows. A backfill of the first days
+of the refit month, for example, replaces the forecast that the previous month's bundle served live
+on those days. The new rows carry the deployed bundle's `model_release` as
+`power_fcst_model_version`. A monthly refit need not change `model_release`, so read `refit_month`
+in the run's metadata to see which bundle wrote a day's rows. Re-materialise a day only when you
+mean to replace its forecast.
 
 **A backfilled forecast sees the same weather as the live run, and its lags can differ.** A
 backfill reads only the ENS runs initialised up to its own day's 00Z run, so its weather inputs are
-the inputs the live run had. Its day and week lags read the cleaned power table as it is at the
-time of the backfill, which holds readings that NGED delivered late. A Primary whose lag was
-missing at 12:00 UTC on the day can therefore have a lag in the backfill, and the backfilled
-forecast can differ from the forecast the live run would have made. The backfill also uses the
-bundle in the image deployed now (see [Installing a new monthly
-bundle](#installing-a-new-monthly-bundle)).
+the inputs the live run had. The backfill's day and week lags read the cleaned power table as the
+table stands at the time of the backfill. By then the table holds readings that NGED delivered late.
+A Primary whose lag was missing at 12:00 UTC on the day can therefore have a lag in the backfill.
+The backfilled forecast can then differ from the forecast the live run made.

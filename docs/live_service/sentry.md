@@ -1,11 +1,10 @@
 # Setting up Sentry telemetry
 
 How to point this project's error telemetry, power-freshness warnings, and daily forecast check-in
-at a Sentry.io project — first testing it from your laptop, then turning it on in production.
-This is the operational recipe;
-the design rationale (why an explicit failure hook rather than log capture, how the freshness
-warning models recovery) is on the [Send telemetry to
-Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry) design page.
+at a Sentry.io project — first testing it from your laptop, then turning it on in production. This
+page is the operational recipe. The design rationale, such as why the service uses an explicit
+failure hook rather than log capture and how the freshness warning models recovery, is on the [Send
+telemetry to Sentry](../architecture/production-deployment.md#send-telemetry-to-sentry) design page.
 
 Everything here is **opt-in**: with no `SENTRY_DSN` configured, every Sentry code path is a no-op,
 so a laptop or CI run sends nothing until you deliberately set it up.
@@ -158,8 +157,8 @@ SENTRY_ENVIRONMENT=production
 Every scheduled run executes on a Fargate task, which reads its variables from the task
 definition instead — see [Step 9](aws.md#step-9-create-the-ecs-cluster-and-fargate-task-definition).
 The failure hook, the freshness warning, and the forecast check-in all fire inside those runs, so
-the task definition carries `SENTRY_DSN` and `SENTRY_ENVIRONMENT=production` too, plus
-`SENTRY_MONITOR_FORECASTS=true`, which only production sets.
+the task definition carries `SENTRY_DSN` and `SENTRY_ENVIRONMENT=production` too. The task
+definition also sets `SENTRY_MONITOR_FORECASTS=true`, which no other environment sets.
 
 Three one-time console steps complete the setup:
 
@@ -196,31 +195,34 @@ NGED](../roadmap/handover.md#2-alert-on-absence-not-just-failure).
 UTC.** Each successful run of today's `live_primary_substation_forecasts` partition sends one `OK`
 check-in to the monitor with the slug `live-primary-substation-forecasts`. Sentry evaluates the
 monitor itself, so a dead daemon, a stopped box, and a failed run all show up as the same missed
-check-in, which no process inside the deployment could report.
+check-in. No process inside the deployment could report a dead daemon or a stopped box.
 
 **The monitor's settings come from the code, and the first check-in creates the monitor.** Each
 check-in carries `PRIMARY_SUBSTATION_FORECAST_MONITOR_CONFIG` from
-`nged_substation_forecast._sentry`, and Sentry creates the monitor from that configuration, or
-updates it to match:
+`nged_substation_forecast._sentry`. Sentry creates the monitor from that configuration, or updates
+the existing monitor to match:
 
 - **Schedule**: crontab `0 12 * * *`, timezone UTC, the cadence of
-  `live_primary_substation_forecasts_schedule`. A test fails if the two drift apart.
-- **Check-in margin**: 300 minutes. The asset retries a missing ENS run until about 16:00 UTC, and a
-  run then takes a few minutes, so a healthy day can check in as late as about 16:10 UTC. The margin
-  puts the alarm at 17:00 UTC, after the last retry.
+  `live_primary_substation_forecasts_schedule`. The test
+  `test_monitor_config_schedule_matches_the_schedule` fails if the two drift apart.
+- **Check-in margin**: 300 minutes. The asset retries a missing ECMWF ensemble (ENS) run until about
+  16:00 UTC. A forecast run that then finds the ENS run takes a few minutes, so a healthy day can
+  check in as late as about 16:10 UTC. The margin puts the alarm at 17:00 UTC, after the last retry.
 - **Maximum runtime**: not set. Only success check-ins are sent, never `in_progress`, so Sentry has
   no start time to time a run against.
 
-A schedule or margin edited in the Sentry console is overwritten by the next check-in, so change
-the configuration in the code. The monitor appears under **Crons** in Sentry after the first
+**Change the monitor's configuration in the code, because the next check-in overwrites a schedule
+or margin edited in the Sentry console.** The monitor appears under **Crons** in Sentry after the first
 production run that succeeds with `SENTRY_MONITOR_FORECASTS=true` in the task definition. Set who is
 told about a missed check-in on that monitor's page, as step 3 above describes.
 
 **Only production sends check-ins.** A backfill of a past day sends none, because the check-in says
 that the service is alive today. `SENTRY_MONITOR_FORECASTS` defaults to `false`, so a laptop sends
-none either. A laptop that set the variable would register the production slug under its own
-environment and then stop checking in, so Sentry would report missed check-ins for that laptop.
-To test a check-in from a laptop, pass a throwaway slug instead:
+none either. A laptop that set the variable would register the production slug under the laptop's
+environment and then stop checking in. Sentry would then report missed check-ins for that laptop's
+environment every day.
+
+**To test a check-in from a laptop, pass a throwaway slug:**
 
 ```python
 import sentry_sdk
@@ -236,8 +238,8 @@ send_primary_substation_forecast_checkin(
 sentry_sdk.flush(timeout=10)
 ```
 
-The test monitor then appears under **Crons**. Delete it once you have seen it, or Sentry reports
-its missed check-ins every day after.
+The test monitor then appears under **Crons**. Delete the test monitor once you have seen it under
+**Crons**, or Sentry reports its missed check-ins every day after.
 
 ## See also
 

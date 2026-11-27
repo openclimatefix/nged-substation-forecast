@@ -584,7 +584,7 @@ in
 | `dynamical_data` | Downloading ECMWF ensemble NWP from Dynamical.org |
 | `geo` | H3 spatial indexing utilities |
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
-| `substation_demand_forecaster` | Serves the step-5 neural network's demand forecast for the 16 Primaries from a bundle the research repository exports: bundle loading, the ENS summary, the 60 input columns, and the PyTorch forward pass. Imports nothing from research |
+| `substation_demand_forecaster` | Serves the demand forecast for the 16 Primaries of the step-5 neural network (the demand-forecasting neural network that research experiment 677 built up one component at a time, as it stood after step 5) from a bundle the research repository exports: bundle loading, the summary of the ECMWF ensemble (ENS), the 60 input columns, and the PyTorch forward pass. Imports nothing from the research repository |
 | `baseline_forecasters` | Naive baseline `BaseForecaster` implementations that any trained forecasting model must beat, currently `manual_heuristic` and `climatology` |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |

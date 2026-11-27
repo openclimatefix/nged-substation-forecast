@@ -154,15 +154,18 @@ operator-facing health state has one home rather than two.
 
 ## Forecast the Primary substations once a day, after the NWP download
 
-**`live_primary_substation_forecasts` is the one production asset that writes a forecast; the
-other four ingest or prepare its inputs.** Once a day it forecasts the demand of 16 Primary substations
-for 14 days with the step-5 neural network, and writes 13 quantiles per half-hour to the
-`power_forecasts` delivery table under `fold_id="live"`. Its schedule,
+**`live_primary_substation_forecasts` is the one production asset that writes a forecast.** The
+other four production assets, `power_time_series_and_metadata`, `clean_nged_power_data`,
+`h3_grid_weights`, and `ecmwf_ens`, ingest or prepare the forecast's inputs. Once a day
+`live_primary_substation_forecasts` forecasts the demand of 16 Primary substations for 14 days
+with the step-5 neural network (the demand-forecasting neural network that research experiment 677
+built up one component at a time, as it stood after step 5), and writes 13 quantiles per half-hour
+to the `power_forecasts` delivery table under `fold_id="live"`. The asset's schedule,
 `live_primary_substation_forecasts_schedule`, fires at 12:00 UTC.
 
 **The asset runs once a day because its weather input changes once a day.** The service ingests one
-ECMWF ensemble run per day, the 00Z run, and the neural network was trained to forecast from that
-run as if the run became available at 09:00 UTC. The asset always forecasts from that same 09:00
+ECMWF ensemble (ENS) run per day, the 00Z run. The neural network was trained to forecast from the
+00Z run as if the run became available at 09:00 UTC. The asset always forecasts from that same 09:00
 UTC origin and relabels the rows to the 12:00 UTC origin of the delivery contract. The lags the
 neural network reads are a day and a week old, so a second run later the same day would read the
 same ENS run, the same origin, and nearly the same telemetry, and would write nearly the same
@@ -173,29 +176,34 @@ forecast.
 schedules are coupled only through the `nwp` table on disk, as [design principle
 14](../design-philosophy/design-principles.md#14-production-jobs-are-coupled-through-data-at-rest-never-through-run-status)
 requires. When the run is not yet on disk, the asset retries every 30 minutes, 8 times, until about
-16:00 UTC, which is more than an hour after `ecmwf_ens` normally finishes its last retry. The asset
-then reports the missing run and writes nothing, rather than forecasting from the previous day's
-run: every lead would be 24 hours longer than the leads the neural network
-was trained on.
+16:00 UTC. The asset's last attempt starts more than an hour after `ecmwf_ens` normally finishes its
+own last retry. The asset then reports the missing run and writes nothing, rather than forecasting
+from the previous day's run. A forecast from the previous day's run would have every lead 24 hours
+longer than the leads the neural network was trained on.
 
 **The asset degrades rather than fails on input faults outside our control, and fails on our own
 faults.** A missing history run, an incomplete day's run, or a missing lag each still gives a
-forecast, from the values present. A missing or unservable bundle, a partition whose origin is
-before the bundle's refit time, and an output that breaks the `PowerForecast` contract each raise,
-because each is a deployment fault or a bug of ours. Each
-degradation reaches Sentry through `report_asset_degradation`, fingerprinted by its kind and
-environment, because its synthesised exception has no stack trace worth grouping on. [Operating the
-live service](../live_service/operations.md#the-daily-primary-substation-forecast) lists the kinds
-and the operator's action for each.
+forecast, from the values present. The asset raises on three faults, each a deployment fault or a
+bug of ours: a missing or unservable bundle, a partition whose origin is before the bundle's refit
+time, and an output that breaks the `PowerForecast` contract.
+
+**Each degradation reaches Sentry through `report_asset_degradation`, fingerprinted by the
+degradation's kind and the environment.** The event carries an exception the asset synthesises,
+which has no stack trace worth grouping on, so the fingerprint is what groups a fault that repeats
+every day into one Sentry issue. [Operating the live
+service](../live_service/operations.md#the-daily-primary-substation-forecast) lists the kinds and
+the operator's action for each.
 
 **The code-location server loads PyTorch, which takes about 225 MB of the box's 4 GiB.** Importing
 the Dagster definitions imports the forecaster, and the forecaster imports `torch` at module level.
 On a laptop, importing `torch` alone raises a process's peak resident memory to 225 MB, and
-importing the whole definitions module raises it to 520 MB. Only the code-location server
-imports the definitions on the box: the daemon and the webserver reach the code location over
-gRPC. The import stays at module level, so the image's `dagster definitions validate` smoke test
-at build time also proves that the image's `torch` loads. The forecast itself runs on Fargate:
-the forecast of 2026-11-20 took 6.3 s and peaked at 3.5 GB, well within the task's 16 GB.
+importing the whole definitions module raises the peak to 520 MB. Only the code-location server
+imports the definitions on the box: the daemon and the webserver reach the code location over gRPC.
+The import stays at module level, so the image's `dagster definitions validate` smoke test at build
+time also proves that the image's `torch` loads.
+
+**The forecast itself runs on Fargate, well within the task's 16 GB.** The forecast of 2026-11-20
+took 6.3 s and peaked at 3.5 GB.
 
 ## Send telemetry to Sentry
 
@@ -207,6 +215,7 @@ the difference has to be legible in the event itself.
 | **Something broke** | `error` | an exception | our code, or something it depends on, could not do its job | `sentry_capture_failure`, `report_asset_degradation`, `report_check_degradation` |
 | **Something degraded** | `warning` | a message and its context | nothing threw; an input is late, stale or thin, and the forecast carried on | `report_power_freshness` |
 | **Something will be retried** | `warning` | an exception | an asset failed in a way the asset retries, so the run has not failed yet | `report_asset_retry` |
+| **Today's forecast landed** | a cron check-in, not an event | the monitor's configuration | the day's forecast was written; Sentry raises a missed check-in when none arrives by 17:00 UTC | `send_primary_substation_forecast_checkin` |
 
 An error event always carries an exception. A warning event carries an exception only when the
 warning comes from `report_asset_retry`, and every such warning carries the `retrying_asset` tag.
@@ -223,7 +232,7 @@ level. **Read the tag, never the level**, whenever the question is whether to te
 and we still have to hear about it, because only a human can ask Dynamical.org what happened;
 silence is reserved for a healthy service, not for a degraded service. That even-handedness is [rule
 4](../design-philosophy/inherent-stability.md#the-rules), and the two sides of the rule are unevenly
-built: three of the five senders cover the broke side, and the degraded side has only
+built: three of the five event senders cover the broke side, and the degraded side has only
 `report_power_freshness`, which is why most of the degradation our checks detect is invisible from
 outside Dagster ([#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501)).
 
@@ -256,8 +265,10 @@ configured — so laptops and CI stay silent by default.
     tagged `degraded_asset` for an *asset* that degrades rather than failing — today, when
     `power_time_series_and_metadata` cannot upsert the metadata table or write the downloaded-files
     list, when `clean_nged_power_data` cannot vacuum the cleaned table, and when
-    `live_primary_substation_forecasts` forecasts from incomplete ENS runs or has no ENS run to
-    forecast from. Since log capture is off, either handler's `ERROR` log alone would reach nobody.
+    `live_primary_substation_forecasts` meets any of the six degradation kinds that [Operating the
+    live service](../live_service/operations.md#the-daily-primary-substation-forecast) lists, from a
+    missing or incomplete ENS run to a stale bundle or a Primary with no recent readings. Since
+    log capture is off, either handler's `ERROR` log alone would reach nobody.
     Absent `report_check_degradation`, a check that cannot read its own inputs would show up only as
     a yellow tick in Dagster's Checks view, and nobody would be told.
 
@@ -269,7 +280,8 @@ configured — so laptops and CI stay silent by default.
     otherwise arrive with nothing to route on — so it tags `fault_category:run_failed`. That tag is
     a *positive* marker on the one class worth telling a human about, rather than a rule phrased as
     "error level, and neither degradation tag is set", which is correct today and misclassifies
-    silently the day a sixth sender is added.
+    silently the day a sixth event sender is added. The forecast check-in carries no tag and needs
+none, because a check-in is not an event and no alert rule routes on it.
 
     **What deliberately never becomes an event.** A transient failure reading NGED's bucket is
     retried in-band by `power_time_series_and_metadata` — twice, seconds apart — because nothing is
@@ -313,15 +325,17 @@ configured — so laptops and CI stay silent by default.
 - **The forecast check-in.** `send_primary_substation_forecast_checkin` sends one `OK` check-in to
   the Sentry cron monitor `live-primary-substation-forecasts` after
   `live_primary_substation_forecasts` has written today's forecast. Sentry raises a missed check-in
-  when none arrives by 17:00 UTC: the schedule's 12:00 UTC plus a 300-minute margin, which clears
-  the asset's last retry at about 16:00 UTC. The evaluation sits in Sentry, outside the deployment,
-  so the check-in catches what no sender inside the deployment can report: a dead daemon, a stopped
-  box, or a schedule that stopped firing. The check-in is a success-only signal, so a failed run
-  shows up twice, as a `run_failed` event and then as the missed check-in. The check-in is gated on
-  `Settings.sentry_monitor_forecasts` as well as on the DSN, and the setting is true only in
-  production, for the reason [below](#separating-laptop-telemetry-from-production). A backfill of
-  a past day sends no check-in, because the check-in says that the service is alive today. The
-  check-in never raises, because it runs after the forecast's Delta write has committed.
+  when no check-in arrives by 17:00 UTC: the schedule's 12:00 UTC plus a 300-minute margin, which
+  clears the asset's last retry at about 16:00 UTC. The evaluation sits in Sentry, outside the
+  deployment, so the check-in catches what no sender inside the deployment can report: a dead
+  daemon, a stopped box, or a schedule that stopped firing. The check-in is a success-only signal,
+  so a failed run shows up twice, as a `run_failed` event and then as the missed check-in.
+  `send_primary_substation_forecast_checkin` returns at once unless
+  `Settings.sentry_monitor_forecasts` is true, and without a DSN the Sentry SDK is inactive, so the
+  check-in also sends nothing. `Settings.sentry_monitor_forecasts` is true only in production, for
+  the reason [below](#separating-laptop-telemetry-from-production). A backfill of a past day sends
+  no check-in, because the check-in says that the service is alive today. The check-in never
+  raises, because it runs after the forecast's Delta write has committed.
 
 Freshness is a *two-way* state (stale ↔ recovered) modelled with a *one-way* primitive: a warning
 event has no "resolved" counterpart. So **recovery is signalled by the events stopping** — the
@@ -339,11 +353,13 @@ Sentry's `environment` tag (from `Settings.sentry_environment`) keeps the two ap
 box sets `environment=production`. Each developer overrides the `local` default with `<name>-laptop`
 (e.g. `jacks-laptop`, `alexs-laptop`), so error events filter cleanly by origin. Scope every alert
 rule that pages a human to `environment:production`, so an intermittently-run laptop never pages.
-The cron monitor needs a second guard, because a monitor is identified by its slug, which is a
-constant in the code. A laptop that sent check-ins would register its environment on the production
-monitor and then stop, and Sentry would report that environment's check-ins as missed. So only
-production sets `SENTRY_MONITOR_FORECASTS=true`, and a laptop test passes a throwaway slug.
-The [AWS runbook](../live_service/aws.md) lists the exact environment variables set on the box.
+
+**The cron monitor needs a second guard, because a monitor is identified by its slug, which is a
+constant in the code.** A laptop that sent check-ins would register the laptop's environment on the
+production monitor and then stop sending. Sentry would then report that environment's check-ins as
+missed. So only production sets `SENTRY_MONITOR_FORECASTS=true`, and a laptop test passes a
+throwaway slug. The [AWS runbook](../live_service/aws.md) lists the exact environment variables set
+on the box.
 
 ## Separate "is this run usable?" from "is it perfect?"
 
@@ -373,14 +389,13 @@ never a failure.
 **The deployment runs no MLflow tracking server, so nothing the live service runs loads a model from
 MLflow.** Production runs are ephemeral Fargate tasks, dispatched by the always-on Dagster control
 plane described [above](#run-the-dagster-control-plane-continuously-on-one-small-vm). An ephemeral
-container has no persistent disk and no tracking server to reach. The one trained model the live
-service runs, the step-5 neural network behind `live_primary_substation_forecasts`, therefore
-reaches the container inside the image, as a plain bundle directory that
-`substation_demand_forecaster.bundle.load_bundle` reads. The research repository exports the
-bundle, and the image build copies the bundle from a directory on disk and never contacts MLflow.
-(The rejected alternative — fetching the model from MLflow at
-container startup — is covered in [Considered but rejected
-designs](#fetching-a-model-from-mlflow-at-container-startup).)
+container has no persistent disk and no tracking server to reach. The live service runs one trained
+model, the step-5 neural network behind `live_primary_substation_forecasts`. The neural network
+therefore reaches the container inside the image, as a plain bundle directory that
+`substation_demand_forecaster.bundle.load_bundle` reads. The research repository exports the bundle,
+and the image build copies the bundle from a directory on disk and never contacts MLflow. (The
+rejected alternative — fetching the model from MLflow at container startup — is covered in
+[Considered but rejected designs](#fetching-a-model-from-mlflow-at-container-startup).)
 
 This design also serves the operating model for after this Network Innovation Allowance (NIA)
 project (see [Requirements → Operating model &
