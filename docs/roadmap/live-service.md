@@ -16,9 +16,8 @@
 > ([#328](https://github.com/openclimatefix/nged-substation-forecast/issues/328),
 > [#329](https://github.com/openclimatefix/nged-substation-forecast/issues/329)), infra-as-code
 > ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)), and the
-> MLflow-server / dev-dashboard future work
-> ([#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235),
-> [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), and the plan for
+> dev-dashboard future work
+> ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), and the plan for
 > [NWP model upgrades](#nwp-model-upgrades)
 > ([#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851), closed as not
 > planned). The
@@ -71,11 +70,9 @@ health](engineering-health.md#scientific-rigor-tests-and-cleanup).*
   and the [missed-check-in alarm](#alert-on-absence-the-missed-check-in-alarm) needs a live forecast
   asset to check in. The remaining piece of per-task alerting is the thin SNS→email notification
   edge for individual run failures.
-- An **MLflow tracking server** (issue
-  [#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235)) and a separate
-  **development dashboard**
-  ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), both hosted on
-  the always-on control-plane box once it exists — see the [note below](#aws-architecture).
+- A **development dashboard**
+  ([#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)); the always-on
+  control-plane box is one option for hosting it — see the [note below](#aws-architecture).
 - [Production monitoring](#production-monitoring): score live forecasts over trailing 24h/7d
   windows, logged to a dedicated MLflow experiment, with a manual, auditable way to retire stale
   CV run partitions.
@@ -108,7 +105,7 @@ Issue: [#206](https://github.com/openclimatefix/nged-substation-forecast/issues/
 > `EcsRunLauncher` — runs on AWS as v0.2 (`v0.2.0`), the same architecture v0.1 (`v0.1.0`) used,
 > unchanged; the bring-up is documented in [Setting up the live service on
 > AWS](../live_service/aws.md). The [access-phasing](#access-phasing) Stages 2–3 and the future-work
-> items (MLflow server, dev dashboard) remain post-v0.1.
+> item (dev dashboard) remain post-v0.1.
 
 The Level 1 ("nothing always-on") design proposed in issue #206 is rejected. Its cost case does not
 hold, and there are two requirements it cannot serve. The cost case rests on pricing the always-on
@@ -149,11 +146,10 @@ with RDS, and Dagster+ Solo), are recorded as a decision history in [Production 
 infrastructure tier alternatives to the EC2 control-plane
 box](../architecture/production-deployment.md#infrastructure-tier-alternatives-to-the-ec2-control-plane-box).
 
-**Future work (post-v0.1):** once an always-on control-plane box exists (the accepted option or
-later), it's also a natural home for an **MLflow tracking server** (network-reachable, persistent —
-replacing the local file-store) and a **"development dashboard"** (a Marimo app for researchers).
-Neither is needed to ship v0.1; revisit once the box exists — see [Access phasing](#access-phasing)
-below for how each one's exposure rolls out once it does.
+**Future work (post-v0.1):** the control-plane box is one option for hosting a **"development
+dashboard"** (a Marimo app for researchers). The box runs no MLflow tracking server, and none is
+planned for it. See [Access phasing](#access-phasing) below for how a dashboard's exposure would
+roll out.
 
 ### Access phasing
 
@@ -161,12 +157,12 @@ The sections above decide *where* the accepted option's pieces run; this one dec
 them, when*. Three stages, each additive on top of the last — nothing built in an earlier stage is
 reworked in a later one.
 
-The constraint driving all three stages: **none of the three web UIs has any built-in
-authentication.** Open-source `dagster-webserver` has no users, roles, or login (auth/RBAC is a
-Dagster+ feature) — anyone who can reach the port can launch and terminate runs and wipe
-materialisations. MLflow's tracking UI and the Marimo dashboard are equally open. So the network
-layer *is* the auth layer: "no public inbound ports" in Stage 1 and the read-only-second-webserver
-pattern in Stage 2 are load-bearing security decisions, not tidiness.
+The constraint driving all three stages: **neither the Dagster webserver nor a Marimo dashboard has
+any built-in authentication.** Open-source `dagster-webserver` has no users, roles, or login
+(auth/RBAC is a Dagster+ feature) — anyone who can reach the port can launch and terminate runs and
+wipe materialisations. So the network layer *is* the auth layer: "no public inbound ports" in Stage
+1 and the read-only-second-webserver pattern in Stage 2 are load-bearing security decisions, not
+tidiness.
 
 #### Stage 1 — solo, Tailscale only
 
@@ -179,7 +175,7 @@ say "additive on top of."
   box runs neither MLflow nor Marimo.
 - Security group: no public inbound ports at all. Everything is reached over Tailscale.
 
-#### Stage 2 — team gets read-only Dagster access; MLflow stays private
+#### Stage 2 — team gets read-only Dagster access
 
 Issue: [#328](https://github.com/openclimatefix/nged-substation-forecast/issues/328)
 
@@ -191,11 +187,7 @@ Issue: [#328](https://github.com/openclimatefix/nged-substation-forecast/issues/
   Workspace domain).
 - Security group opens port 443 for the first time — this is the real milestone of this stage.
 - One DNS subdomain (e.g. `dagster.<domain>`).
-- **MLflow is explicitly not exposed in this stage** — it stays Tailscale-only, unchanged from
-  Stage 1. There is no native read-only public/gated MLflow mode without either the
-  still-experimental auth plugin or allowlisting specific endpoints at the proxy — not worth it
-  unless there's a real need.
-- The full-access Dagster webserver, Marimo, and MLflow remain exactly as in Stage 1.
+- The full-access Dagster webserver remains exactly as in Stage 1.
 - **Lighter alternative if (and only if) the audience is a couple of OCF colleagues:** skip Caddy,
   oauth2-proxy, DNS, and the security-group change entirely by inviting them into the tailnet
   instead. Tailscale already authenticates members with their Google accounts, and a Tailscale ACL
@@ -232,7 +224,7 @@ Issue: [#329](https://github.com/openclimatefix/nged-substation-forecast/issues/
 - **Trade-off:** this couples the public dashboard's *availability* to the control-plane box's
   uptime. Compute isolation is preserved — a Marimo bug can't touch the Dagster daemon, since it's a
   separate task — but if the box goes down, the public dashboard becomes unreachable too, not just
-  the private Dagster/MLflow. Accepted trade-off for solo-project simplicity over running a fourth
+  the private Dagster webserver. Accepted trade-off for solo-project simplicity over running a fourth
   AWS service (an ALB) just for this.
 - Rejected alternative: Marimo's WASM/Pyodide static export (zero server, hosted on S3+CloudFront).
   Ruled out based on direct prior experience — ~30s browser-side cold start on a similar personal
